@@ -21,6 +21,8 @@ export type DrawerProps = {
   footer?: ReactNode
   /** falseは参照画像と同じ面だけをページ内に描画する。 */
   modal?: boolean
+  /** 幅。省くと既定（660）。'narrow' は 480（E-2 電話予約 svUTk）。v8 だけで効く。 */
+  width?: 'narrow'
 }
 
 /** Pencil V5 `VJKAT` を正本にした右詳細パネル。 */
@@ -36,6 +38,7 @@ export default function Drawer({
   details,
   footer,
   modal = true,
+  width,
 }: DrawerProps) {
   const titleId = useId()
   const descriptionId = useId()
@@ -57,6 +60,7 @@ export default function Drawer({
       aria-describedby={description ? descriptionId : undefined}
       aria-busy={busy || undefined}
       data-dirty={dirty || undefined}
+      data-width={width}
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-design-part="drawer"

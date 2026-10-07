@@ -310,17 +310,17 @@ export default function RankSettingsV8({
               return (
                 <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={row.tagName ? `友だち属性タグ：${row.tagName}・会員 ${formatNumber(row.memberCount)} 人` : undefined}>
                   <div className={styles.rankColName}>
-                    <TextField aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} disabled={readonly} onChange={(event) => update(index, { name: event.target.value })} />
+                    <TextField aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} />
                   </div>
                   <div className={styles.rankColThreshold}>
                     {isBase ? (
                       <span className={styles.fixedBox} title="いちばん下のランクは ¥0 から（変えられません）">¥0〜（固定）</span>
                     ) : (
-                      <TextField aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} disabled={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
+                      <TextField aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
                     )}
                   </div>
                   <div className={styles.rankColRate}>
-                    <TextField aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} disabled={readonly} onChange={(event) => update(index, { rate: event.target.value })} />
+                    <TextField aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} readOnly={readonly} onChange={(event) => update(index, { rate: event.target.value })} />
                   </div>
                   <div className={styles.rankColAction}>
                     {/* 行の右端は「…」（タグを開く・ランクを削除する）。1つの機能の印にしない。 */}
@@ -391,6 +391,7 @@ export default function RankSettingsV8({
         designNode="dEv6G"
         designWidth={520}
         designTop={300}
+        designHeaderPadding="var(--tpl-fm2-rank-dialog-head-pad)"
         confirmation
         tone="destructive"
         title={`ランク「${removeName}」を消しますか？`}

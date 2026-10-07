@@ -3,6 +3,7 @@
 
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { useLiveReorder } from '@/lib/use-live-reorder'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { ListPageBody } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -41,7 +42,6 @@ import {
   Pencil,
   Play,
   Plus,
-  Search as SearchIcon,
   Send,
   Square,
   Trash2,
@@ -58,6 +58,7 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import Checkbox from '@/components/shared/checkbox'
@@ -74,6 +75,7 @@ import Pagination from '@/components/shared/pagination'
 import SheetDialog from '@/v8/reminders/sheet-dialog'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { runUndoable } from '@/lib/undoable'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
@@ -589,6 +591,9 @@ export default function RemindersListV8() {
     })
   }
 
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
+  const liveOrder = useLiveReorder(reminders, (row) => row.id, dragId)
+
   const dropOn = (targetId: string) => {
     const from = dragId
     setDragId(null)
@@ -618,6 +623,12 @@ export default function RemindersListV8() {
 
   /* ===== フォルダの列 ===== */
 
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。未分類は色の無い輪。 */
+  const folderDotOf = (row: { folderId?: string | null }): FolderDotFolder | null => {
+    if (!row.folderId) return null
+    const folder = folders.find((f) => f.id === row.folderId)
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' },
     ...folders.map((folder) => ({
@@ -822,43 +833,22 @@ export default function RemindersListV8() {
         <Button type="button" onClick={reminderList.retry}>もう一度試す</Button>
       </div>
     ) : reminders.length === 0 ? (
-      filterActive ? (
-        <div className={styles.stateCard} data-design-node="RrYYJ">
-          <span className={styles.stateIcon}>
-            <SearchIcon size={16} aria-hidden="true" />
-          </span>
-          <p className={styles.stateTitle}>条件に合うリマインダはありません</p>
-          <p className={styles.stateDesc}>
-            「有効」「下書き」「停止中」「失敗あり」や検索を外すと、すべて出ます。
-          </p>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => {
-              setNameQuery('')
-              setFolderFilter('')
-              setStatusFilter('')
-            }}
-          >
-            条件を外す
-          </Button>
-        </div>
-      ) : (
-        <div className={styles.stateCard} data-design-node="RrYYJ">
-          <span className={styles.stateIcon}>
-            <Bell size={16} aria-hidden="true" />
-          </span>
-          <p className={styles.stateTitle}>まだリマインダはありません</p>
-          <p className={styles.stateDesc}>
-            日付を決めておくと、その前と後に自動で送れます。ひな形からも作れます。
-          </p>
-          {canEdit ? (
-            <Button type="button" variant="primary" href="/reminders/new">
-              ＋ リマインダを作る
-            </Button>
-          ) : null}
-        </div>
-      )
+      /* 修正案 D-2：空の一覧。 */
+      <EmptyList
+        data-design-node="RrYYJ"
+        icon={<Bell aria-hidden="true" />}
+        title="まだリマインダがありません"
+        description="予約日や誕生日などの日付を基準に、その前後で自動で知らせます。"
+        create={{ label: '最初のリマインダを作る', href: '/reminders/new' }}
+        canCreate={canEdit}
+        filtered={filterActive}
+        onClearFilters={() => {
+          setNameQuery('')
+          setFolderFilter('')
+          setStatusFilter('')
+        }}
+        filteredDescription="「有効」「下書き」「停止中」「失敗あり」や検索を外すと、すべて出ます"
+      />
     ) : (
       <>
         {/* キーボードで動かした結果を読み上げる。画面には出さない。 */}
@@ -893,8 +883,8 @@ export default function RemindersListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <RovingTbody>
-              {reminders.map((row) => {
+            <RovingTbody reorderKey={liveOrder.shown.map((row) => row.id).join(',')}>
+              {liveOrder.shown.map((row) => {
                 const view = rowView(row)
                 const planned =
                   view.status === 'draft' || view.status === 'stopped'
@@ -907,6 +897,10 @@ export default function RemindersListV8() {
                 return (
                   <Tr interactive
                     key={row.id}
+                    data-reorder-id={row.id}
+                    onDragEnter={() => liveOrder.enter(row.id)}
+                    onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                    onDrop={dragId ? () => dropOn(liveOrder.dropTarget(row.id)) : undefined}
                     className={styles.rowClick}
                     tabIndex={0}
                     onClick={() => setPanelId(row.id)}
@@ -932,8 +926,7 @@ export default function RemindersListV8() {
                       onClick={(event) => event.stopPropagation()}
                       draggable={canEdit}
                       onDragStart={() => setDragId(row.id)}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => dropOn(row.id)}
+                      onDragEnd={() => setDragId(null)}
                       title="上下に動かして並び替え"
                     >
                       {/* 閲覧のみ：つまみは隠し、同じ大きさの見えない印で位置を保つ。 */}
@@ -948,19 +941,21 @@ export default function RemindersListV8() {
                     </Td>
                     <NameCell
                       name={<div className={styles.nameRow}>
-                        <Link
-                          href={detailHref(row.id)}
-                          title={row.name}
-                          className={styles.cellTitle}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                            event.preventDefault()
-                            goDetail(detailHref(row.id))
-                          }}
-                        >
-                          {row.name}
-                        </Link>
+                        <FolderDotName folder={folderDotOf(row)} dot={!narrow}>
+                          <Link
+                            href={detailHref(row.id)}
+                            title={row.name}
+                            className={styles.cellTitle}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                              event.preventDefault()
+                              goDetail(detailHref(row.id))
+                            }}
+                          >
+                            {row.name}
+                          </Link>
+                        </FolderDotName>
                         {row.hasFailure || (row.failedCount ?? 0) > 0 ? (
                           <button
                             type="button"
@@ -976,7 +971,7 @@ export default function RemindersListV8() {
                           </button>
                         ) : null}
                       </div>}
-                      sub={<span title={view.subtitle}>
+                      sub={<span className={narrow ? undefined : styles.dotIndent} title={view.subtitle}>
                         <CalendarClock size={11} aria-hidden="true" className={styles.cellSubIcon} />
                         {view.subtitle}
                       </span>}

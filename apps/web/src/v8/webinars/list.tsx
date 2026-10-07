@@ -13,6 +13,7 @@
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -34,6 +35,7 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -179,10 +181,8 @@ function rowMenuItems(
       id: 'archive',
       label: w.status === 'archived' ? '下書きに戻す' : 'アーカイブする',
       onSelect: () => onArchive(w),
-      disabled: !canEdit,
-      disabledReason: canEdit ? undefined : READONLY_REASON,
     },
-  ]
+  ].filter((item) => canEdit || item.id !== 'archive')
 }
 
 function toContextItems(items: ActionMenuItem[]): ContextMenuItem[] {
@@ -230,7 +230,9 @@ function ArchiveConfirm({
       designWidth={500}
       designTop={380}
       title={restoring ? 'ウェビナーを下書きに戻しますか？' : 'ウェビナーをアーカイブしますか？'}
-      description={restoring ? '通常の一覧に戻します。公開するまでは、新しい申込は受け付けません。' : 'アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。'}
+      /* 説明は本文の頭に置く（絵は 12px・題の下 4・×の左の幅で2行）。共通の説明の段は使わない。 */
+      description=""
+      designHeaderPadding="var(--tpl-fm2-wb-head-pad)"
       confirmLabel={restoring ? '下書きに戻す' : 'アーカイブする'}
       titleIcon={false}
       confirmIcon={<Archive size={16} aria-hidden="true" />}
@@ -239,7 +241,11 @@ function ArchiveConfirm({
       onCancel={onCancel}
       onConfirm={blocked ? undefined : onConfirm}
     >
-      {/* 絵 VXZ6T：対象は薄い灰の箱（小さい題＋太い名前）、そのあとに「アーカイブしたあと」の3点。消さずに残す操作なので主ボタンは緑。 */}
+      {/* 絵 VXZ6T：説明・対象（薄い灰の箱）・「アーカイブしたあと」の3点を 14 ずつ。消さずに残す操作なので主ボタンは緑。 */}
+      <div className={styles.archiveBody}>
+      <p className={styles.archiveLead}>
+        {restoring ? '通常の一覧に戻します。公開するまでは、新しい申込は受け付けません。' : 'アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。'}
+      </p>
       <div className={styles.targetBox}>
         <p className={styles.targetLabel}>{restoring ? '下書きに戻す対象' : 'アーカイブする対象'}</p>
         <p className={styles.targetName}>{target.title}（{periodSummary(target)}）</p>
@@ -247,14 +253,14 @@ function ArchiveConfirm({
       {restoring ? (
         <p className={styles.afterList}>参加者・視聴の記録・分析はそのまま残ります。</p>
       ) : (
-        <>
+        <div className={styles.afterGroup}>
           <p className={styles.afterTitle}>アーカイブしたあと</p>
           <ul className={styles.afterList}>
             <li>・参加者・視聴の記録・分析はそのまま見られます</li>
             <li>・公開ページは閉じ、新しい申し込みは受け付けません</li>
             <li>・絞り込みの「アーカイブ済み」から確認し、下書きに戻せます</li>
           </ul>
-        </>
+        </div>
       )}
       {blocked ? (
         <Notice tone="warn">
@@ -262,6 +268,7 @@ function ArchiveConfirm({
           <span className={styles.dialogAction}><Button href={`/webinars/edit?id=${target.id}`}>編集画面で公開を停止する</Button></span>
         </Notice>
       ) : null}
+      </div>
     </ConfirmDialog>
   )
 }
@@ -388,12 +395,26 @@ function WebinarList() {
   const [overview, setOverview] = useState<WebinarOverview | null>(null)
   const [overviewAccountId, setOverviewAccountId] = useState<string | null>(null)
   const [overviewFailure, setOverviewFailure] = useState<WebinarLoadFailure | null>(null)
-  const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('updated')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
-  const [savedFilter, setSavedFilter] = useState<SavedFilter>('')
+  /*
+   * 検索語・フォルダ・状態・並び順・件数・ページは URL に置く（動きの点検 5 番）。
+   * 詳細へ行って「戻る」と、同じ絞り込み・同じページの一覧に戻る。
+   * 絞り込みを変えたらページは 1 へ（同じ書き込みの中で戻す。効果で戻すと、来た瞬間に
+   * URL から戻したページまで消える）。
+   */
+  const [view, setView] = useListUrlState({ q: '', folder: '', status: '', sort: 'updated', size: '20', page: '1' })
+  const debouncedQuery = view.q
+  const selectedFolder = view.folder
+  const savedFilter: SavedFilter = (['', 'active', 'draft', 'archived'] as const).includes(view.status as SavedFilter) ? view.status as SavedFilter : ''
+  const sortKey: SortKey = (['updated', 'created', 'name'] as const).includes(view.sort as SortKey) ? view.sort as SortKey : 'updated'
+  const pageSize = [10, 20, 50].includes(Number(view.size)) ? Number(view.size) : 20
+  const page = Math.max(1, Number.parseInt(view.page, 10) || 1)
+  const setPage = useCallback((next: number) => setView({ page: String(next) }), [setView])
+  const setSelectedFolder = useCallback((next: string) => setView({ folder: next, page: '1' }), [setView])
+  const setSavedFilter = useCallback((next: SavedFilter) => setView({ status: next, page: '1' }), [setView])
+  const setSortKey = useCallback((next: SortKey) => setView({ sort: next, page: '1' }), [setView])
+  const setPageSize = useCallback((next: number) => setView({ size: String(next), page: '1' }), [setView])
+  /* 打っている間の語は手元に持ち、止まってから URL へ（打つたびに URL を書かない）。 */
+  const [query, setQuery] = useState(view.q)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
@@ -405,7 +426,6 @@ function WebinarList() {
   const [archiveError, setArchiveError] = useState('')
   const [foldersReady, setFoldersReady] = useState(false)
   const [folders, setFolders] = useState<WebinarFolder[]>([])
-  const [selectedFolder, setSelectedFolder] = useState('')
   const [folderFormOpen, setFolderFormOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<WebinarFolder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<WebinarFolder | null>(null)
@@ -531,17 +551,20 @@ function WebinarList() {
 
   useEffect(() => { void refresh() }, [refresh])
   useEffect(() => { snapshotRef.current = { items, total, loadedAccountId } }, [items, total, loadedAccountId])
+  // URL 側の語が替わった（戻る・読み込み直後）ときは入力欄も合わせる。
+  useEffect(() => { setQuery((current) => (current.trim() === view.q ? current : view.q)) }, [view.q])
   useEffect(() => {
-    const timer = setTimeout(() => { setPage(1); setDebouncedQuery(query) }, SEARCH_DEBOUNCE_MS)
+    if (query.trim() === view.q) return
+    const timer = setTimeout(() => setView({ q: query.trim(), page: '1' }), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
   useEffect(() => { void refreshOverview() }, [refreshOverview])
   useEffect(() => { void refreshGrandTotal() }, [refreshGrandTotal])
-  useEffect(() => {
-    setSelectedFolder('')
-    void refreshFolders()
-  }, [refreshFolders])
-  useEffect(() => { setPage(1) }, [selectedFolder, savedFilter, sortKey, pageSize, selectedAccountId])
+  useEffect(() => { void refreshFolders() }, [refreshFolders])
+  // アカウントを替えたらフォルダは外してページは 1 へ（来た瞬間は URL のまま）。
+  useOnAccountSwitch(selectedAccountId, () => setView({ folder: '', page: '1' }))
+  useListScrollMemory(!loading && !accountLoading)
 
   const saveFolder = async (name: string) => {
     if (!selectedAccountId || !canEdit || folderBusy) return
@@ -611,7 +634,8 @@ function WebinarList() {
   const visibleTotal = loadedAccountId === selectedAccountId ? total : 0
   const pageCount = Math.max(1, Math.ceil(visibleTotal / pageSize))
   const currentPage = Math.min(page, pageCount)
-  useEffect(() => { if (page > pageCount) setPage(pageCount) }, [page, pageCount])
+  // 読み終わってから。読み込み中（件数 0）に詰めると、URL から戻したページが 1 になる。
+  useEffect(() => { if (hasListData && page > pageCount) setPage(pageCount) }, [hasListData, page, pageCount, setPage])
 
   /* 行 → 右の詳細パネル。開閉と↑↓の移動はつながる移り変わりで。 */
   const activeIndex = visibleItems.findIndex((w) => w.id === activeId)
@@ -664,10 +688,7 @@ function WebinarList() {
 
   const clearFilters = () => {
     setQuery('')
-    setDebouncedQuery('')
-    setSelectedFolder('')
-    setSavedFilter('')
-    setPage(1)
+    setView({ q: '', folder: '', status: '', page: '1' })
   }
 
   /* CSV は表示中の条件に合う全頁。条件が変わったら古い結果は捨てる。 */
@@ -750,9 +771,10 @@ function WebinarList() {
       ]}
     />
   )
+  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
   const createButton = canEdit
     ? <Button variant="primary" href="/webinars/new"><Plus size={15} aria-hidden="true" />ウェビナーを作る</Button>
-    : <Button variant="primary" disabled title={READONLY_REASON}><Plus size={15} aria-hidden="true" />ウェビナーを作る</Button>
+    : null
 
   /* ===== 道具の段 ===== */
   const shownChipCounts = chipCounts && chipCounts.accountId === selectedAccountId ? chipCounts : null
@@ -841,9 +863,18 @@ function WebinarList() {
   } else if (loadFailure && visibleItems.length === 0) {
     listBody = <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined} />
   } else if (visibleItems.length === 0) {
-    listBody = panelGrand === 0
-      ? <ListState kind="empty" title="まだ、ウェビナーはありません" description="録画やライブのセミナーを作ると、LINEで案内して申込を受けられます。" action={createButton} />
-      : <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索や絞り込みを外すと、すべて出ます。" action={<Button onClick={clearFilters}>条件を外す</Button>} />
+    /* 修正案 D-2：空の一覧。 */
+    listBody = (
+      <EmptyList
+        icon={<Video aria-hidden="true" />}
+        title="まだウェビナーがありません"
+        description="録画やライブのセミナーを、LINE で案内して申込を受け付けます。"
+        create={{ label: '最初のウェビナーを作る', href: '/webinars/new' }}
+        canCreate={canEdit}
+        filtered={panelGrand !== 0}
+        onClearFilters={clearFilters}
+      />
+    )
   } else {
     listBody = (
       <>
@@ -907,9 +938,7 @@ function WebinarList() {
                     <Td className={styles.colPeriod}><span className={styles.period} title={period}>{period}</span></Td>
                     <Td className={styles.colOps} onClick={(event) => event.stopPropagation()}>
                       <div className={styles.opsBox}>
-                        {canEdit
-                          ? <Button href={`/webinars/edit?id=${w.id}`}>編集</Button>
-                          : <Button disabled title={READONLY_REASON}>編集</Button>}
+                        {canEdit ? <Button href={`/webinars/edit?id=${w.id}`}>編集</Button> : null}
                         <IconButton
                           title={menuLabel}
                           aria-label={menuLabel}
@@ -996,14 +1025,14 @@ function WebinarList() {
         </KpiBand>
       </>}
       folders={<>
-        {createButton}
+        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
+        {createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         <FolderPanel
           activeId={selectedFolder}
           onSelect={(id) => { setSelectedFolder(id); setPage(1) }}
           onAddFolder={canEdit ? () => { setFolderError(''); closeDetail(); setFolderFormOpen(true) } : undefined}
           addFolderLabel="フォルダを追加"
-          addFolderDisabled={!selectedAccountId || !canEdit}
-          addFolderTitle={canEdit ? undefined : READONLY_REASON}
+          addFolderDisabled={!selectedAccountId}
           rows={folderRows}
         >
           <p className={styles.folderNote}>フォルダを消しても、中のウェビナーは未分類に残ります</p>
@@ -1062,24 +1091,22 @@ function WebinarList() {
           onNext={activeIndex >= 0 && activeIndex < visibleItems.length - 1 ? () => goDetail(1) : undefined}
           footer={active ? (
             <div className={styles.formActions}>
-              {canEdit
-                ? <Button href={`/webinars/edit?id=${active.id}`}>編集する</Button>
-                : <Button disabled title={READONLY_REASON}>編集する</Button>}
-              <Button
+              {canEdit ? <Button href={`/webinars/edit?id=${active.id}`}>編集する</Button> : null}
+              {canEdit ? <Button
                 variant="secondary"
-                disabled={!canEdit}
-                title={canEdit ? undefined : READONLY_REASON}
                 onClick={() => { closeDetail(); openArchive(active) }}
               >
                 {active.status === 'archived' ? '下書きに戻す' : 'アーカイブする'}
-              </Button>
+              </Button> : null}
             </div>
           ) : undefined}
         >
           {active ? (
             <div className={styles.detail}>
               <p className={styles.dialogLabel}>ウェビナー名</p>
-              <InlineEdit value={active.title} label="ウェビナー名" disabled={!canEdit} onSave={(next) => renameWebinar(active, next)} />
+              {canEdit
+                ? <InlineEdit value={active.title} label="ウェビナー名" onSave={(next) => renameWebinar(active, next)} />
+                : <p className={styles.dialogValue}>{active.title}</p>}
               <p className={styles.dialogLabel}>状態</p>
               <p className={styles.dialogValue}><StatusPill webinar={active} /></p>
               <p className={styles.dialogLabel}>申込・視聴</p>

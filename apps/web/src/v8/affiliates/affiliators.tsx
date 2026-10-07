@@ -17,11 +17,14 @@ import { Banknote, CircleDot, CircleHelp, Download, Plus, Trophy, Users } from '
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel from '@/components/shared/folder-panel'
+import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -78,13 +81,20 @@ const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; s
 ]
 
 /** フォルダの列（見え方の切り替え。保存しない）。 */
-const GROUPS: Array<{ key: GroupKey; label: string; match: (row: AffiliateListRow) => boolean }> = [
+/* 色は行の名前の前の丸と左のフォルダの列で同じものを使う（絵 v9JWQ）。止めているは色の無い輪。 */
+const GROUPS: Array<{ key: GroupKey; label: string; color?: string; match: (row: AffiliateListRow) => boolean }> = [
   { key: 'all', label: 'すべて', match: () => true },
-  { key: 'rate', label: '売上の割合で払う', match: (row) => row.isActive && row.commissionRate > 0 },
-  { key: 'fixed', label: '1件ごとに払う', match: (row) => row.isActive && row.commissionRate <= 0 && row.rewardAmount > 0 },
-  { key: 'none', label: '報酬なし（計測のみ）', match: (row) => row.isActive && row.commissionRate <= 0 && row.rewardAmount <= 0 },
+  { key: 'rate', label: '売上の割合で払う', color: FOLDER_COLORS[0], match: (row) => row.isActive && row.commissionRate > 0 },
+  { key: 'fixed', label: '1件ごとに払う', color: FOLDER_COLORS[1], match: (row) => row.isActive && row.commissionRate <= 0 && row.rewardAmount > 0 },
+  { key: 'none', label: '報酬なし（計測のみ）', color: FOLDER_COLORS[2], match: (row) => row.isActive && row.commissionRate <= 0 && row.rewardAmount <= 0 },
   { key: 'stopped', label: '止めている', match: (row) => !row.isActive },
 ]
+
+/** 行の名前の前の丸に渡すフォルダ。止めているは null（色の無い輪）。 */
+function folderDotOf(row: AffiliateListRow): { name: string; color?: string } | null {
+  const item = GROUPS.find((g) => g.key !== 'all' && g.match(row))
+  return item && item.color ? { name: item.label, color: item.color } : null
+}
 
 export default function AffiliatorsTab() {
   const router = useRouter()
@@ -405,7 +415,7 @@ export default function AffiliatorsTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={GROUPS.map((item) => ({ id: item.key, label: item.label, count: ready ? groupCount(item.key) : null }))}
+      rows={GROUPS.map((item) => ({ id: item.key, label: item.label, count: ready ? groupCount(item.key) : null, color: item.color }))}
       activeId={group}
       onSelect={(id) => resetPage(() => { setSaved(''); setGroup(id as GroupKey) })}
       addFolderNote={<p className={styles.stateDesc}>報酬の決め方で分けた見え方です</p>}
@@ -526,10 +536,10 @@ export default function AffiliatorsTab() {
                 )}
               </Td>
               <Td className={styles.colName}>
-                <span className={styles.stack}>
-                  <button type="button" className={styles.rowName} title={row.name} onClick={() => openDrawer(row.id, false)}>
-                    {row.name}
-                  </button>
+                <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
+                  <FolderDotName folder={folderDotOf(row)} dot={!narrow}>
+                    {nameButton(row)}
+                  </FolderDotName>
                   <span className={styles.rowCode} title={row.code}>{row.code}</span>
                   <span className={styles.rowPlan}>{planText(row)}</span>
                   <StatusPill tone={row.isActive ? 'active' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</StatusPill>
@@ -570,20 +580,16 @@ export default function AffiliatorsTab() {
       description="数の帯は「—」にしています。道具はそのまま使えます。"
       action={<RetryButton onRetry={() => { void loadList() }} />}
     />
-  ) : rows.length === 0 ? (
-    <StateCard
-      icon={<Users size={16} aria-hidden="true" />}
-      title="まだアフィリエイターはいません"
-      description="紹介してくれる人を登録すると、紹介リンクができます。先にコンバージョンで「何を成果にするか」を決めておきます"
-      action={readonly ? undefined : (
-        <Button variant="primary" href="/affiliates/new"><Plus size={14} aria-hidden="true" /> アフィリエイターを作る</Button>
-      )}
-    />
   ) : shownRows.length === 0 ? (
-    <StateCard
-      title="条件に合うものはありません"
-      description="検索や絞り込みを外すと、すべて出ます"
-      action={<Button type="button" onClick={resetConditions}>条件を外す</Button>}
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<Users aria-hidden="true" />}
+      title="まだアフィリエイターがいません"
+      description="紹介してくれる人を登録して、その人だけの紹介リンクを作ります。"
+      create={{ label: '最初のアフィリエイターを登録する', href: '/affiliates/new' }}
+      canCreate={!readonly}
+      filtered={rows.length > 0}
+      onClearFilters={resetConditions}
     />
   ) : (
     <>
@@ -604,6 +610,13 @@ export default function AffiliatorsTab() {
     </ListPagePagination>
   ) : undefined
 
+  function nameButton(row: { id: string; name: string }) {
+    return (
+      <button type="button" className={styles.rowName} title={row.name} onClick={() => openDrawer(row.id, false)}>
+        {row.name}
+      </button>
+    )
+  }
   const drawerRow = drawerId ? rows.find((row) => row.id === drawerId) ?? null : null
 
   return (

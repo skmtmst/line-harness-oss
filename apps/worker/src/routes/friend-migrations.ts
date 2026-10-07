@@ -1,6 +1,9 @@
 import { Hono, type Context } from 'hono';
 import {
   UID_EVIDENCE_TYPES,
+  getFriendFieldsForScope,
+  validateFriendFieldValue,
+  type ScopedFriendField,
   countUidMigrationItemDecisions,
   countUidMigrationItems,
   createUidMigrationRun,
@@ -13,18 +16,35 @@ import {
   type UidMigrationItemRow,
   type UidMigrationRunRow,
 } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 export const friendMigrations = new Hono<Env>();
 const MAX_MAPPING_ROWS = 5_000;
-const EXPORT_COLUMNS = ['basic', 'tags_fields', 'support'] as const;
+const EXPORT_COLUMNS = ['basic', 'friend_fields', 'tags_fields', 'support'] as const;
 type ExportColumn = (typeof EXPORT_COLUMNS)[number];
 type ImportCandidate = {
   id: string; display_name: string | null;
   real_name: string | null; system_display_name: string | null;
 };
+
+// CSV の見出し・入力キーには項目コードを使う。時刻も中央の検証を通す。
+function importFields(raw: unknown, fields: ScopedFriendField[]):
+  { values: Record<string, string | null>; error: string | null } {
+  if (raw === undefined) return { values: {}, error: null };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { values: {}, error: '友だち情報は項目コードと値で指定してください' };
+  const values: Record<string, string | null> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    const field = fields.find((item) => item.field_key === key);
+    if (!field || field.status !== 'active' || field.ec_is_master) return { values: {}, error: `${key}: 書き込める項目がありません` };
+    const checked = validateFriendFieldValue(field, value);
+    if (!checked.ok) return { values: {}, error: `${key}: ${checked.error}` };
+    values[key] = checked.value;
+  }
+  return { values, error: null };
+}
 
 function runJson(row: UidMigrationRunRow) {
   return {
@@ -796,9 +816,9 @@ friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), asy
     if (!accountId || columns.some((column) => !EXPORT_COLUMNS.includes(column))) {
       return c.json({ success: false, error: '対象アカウントと書き出す項目を選んでください' }, 400);
     }
-    // R114: タグ・友だち情報と対応情報の書き出しは未接続。選べたのに出ない
+    // R114: タグと対応情報の書き出しは未接続。友だち情報は friend_fields で指定。
     // 5列だけのCSVを渡すより、作る前に理由を返して止める（Shift_JISと同じ扱い）。
-    if (columns.some((column) => column !== 'basic')) {
+    if (columns.some((column) => column !== 'basic' && column !== 'friend_fields')) {
       return c.json({ success: false, error: 'タグ・友だち情報、対応情報の書き出しはまだ使えません。基本だけ選んでください' }, 422);
     }
     if (body.encoding === 'shift_jis') {
@@ -828,29 +848,42 @@ friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), asy
 
 friendMigrations.get('/api/friends/exports/:id/download', requireRole('owner', 'admin'), async (c) => {
   const job = await c.env.DB.prepare('SELECT * FROM friend_export_jobs WHERE id = ?').bind(c.req.param('id'))
-    .first<{ line_account_id: string; expires_at: string }>();
+    .first<{ line_account_id: string; expires_at: string; columns_json: string }>();
   if (!job || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [job.line_account_id])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   if (job.expires_at <= new Date().toISOString()) return c.json({ success: false, error: 'ダウンロード期限が切れています' }, 410);
-  type ExportRow = { line_user_id: string; display_name: string | null; real_name: string | null; system_display_name: string | null; created_at: string };
+  type ExportRow = { id: string; line_user_id: string; display_name: string | null; real_name: string | null; system_display_name: string | null; created_at: string };
+  const fields = (JSON.parse(job.columns_json) as ExportColumn[]).includes('friend_fields')
+    ? await getFriendFieldsForScope(c.env.DB, { tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID, lineAccountId: job.line_account_id }, { status: 'active' })
+    : [];
   const encoder = new TextEncoder();
   let offset = 0;
   let started = false;
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {
       if (!started) {
-        controller.enqueue(encoder.encode('\uFEFFLINEユーザーID,LINE表示名,本名,システム表示名,登録日\r\n'));
+        controller.enqueue(encoder.encode('\uFEFF' + ['LINEユーザーID', 'LINE表示名', '本名', 'システム表示名', '登録日', ...fields.map((field) => field.field_key)].map(protectCsvCell).join(',') + '\r\n'));
         started = true;
       }
-      const page = await c.env.DB.prepare(`SELECT line_user_id, display_name, real_name, system_display_name, created_at
+      const page = await c.env.DB.prepare(`SELECT id, line_user_id, display_name, real_name, system_display_name, created_at
         FROM friends WHERE line_account_id = ? ORDER BY created_at DESC, id ASC LIMIT 500 OFFSET ?`)
         .bind(job.line_account_id, offset).all<ExportRow>();
       if (page.results.length === 0) {
         controller.close();
         return;
       }
-      const csv = page.results.map((row) => [row.line_user_id, row.display_name, row.real_name, row.system_display_name, row.created_at]
+      const valueMap = new Map<string, string | null>();
+      // D1 の1文あたりのbind上限を守って、500件のページを分けて読む。
+      if (fields.length) for (let index = 0; index < page.results.length; index += 90) {
+        const ids = page.results.slice(index, index + 90).map((row) => row.id);
+        const values = await c.env.DB.prepare(
+          `SELECT friend_id, field_id, value FROM friend_field_values WHERE friend_id IN (${ids.map(() => '?').join(',')})`,
+        ).bind(...ids).all<{ friend_id: string; field_id: string; value: string | null }>();
+        for (const value of values.results) valueMap.set(`${value.friend_id}:${value.field_id}`, value.value);
+      }
+      const csv = page.results.map((row) => [row.line_user_id, row.display_name, row.real_name, row.system_display_name, row.created_at,
+        ...fields.map((field) => valueMap.get(`${row.id}:${field.id}`) ?? field.default_value)]
         .map((cell) => protectCsvCell(cell)).join(',')).join('\r\n') + '\r\n';
       controller.enqueue(encoder.encode(csv));
       offset += page.results.length;
@@ -870,6 +903,7 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
       sourceChecksum?: string;
       rows?: Array<{
         lineUid?: string;
+        friendFields?: Record<string, unknown>;
         displayName?: string | null;
         realName?: string | null;
         systemDisplayName?: string | null;
@@ -891,16 +925,20 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
     if (previous) {
       return c.json({ success: true, data: { id: previous.id, status: previous.status, result: JSON.parse(previous.result_json), duplicate: true } });
     }
+    const fields = rows.some((row) => row.friendFields !== undefined)
+      ? await getFriendFieldsForScope(c.env.DB, { tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID, lineAccountId: accountId }) : [];
     const seen = new Set<string>();
     const results: Array<{
       lineUid: string;
       kind: 'add' | 'update' | 'unchanged' | 'conflict' | 'error';
       reason: string | null;
-      values: { displayName: string | null; realName: string | null; systemDisplayName: string | null };
+      values: { displayName: string | null; realName: string | null; systemDisplayName: string | null; friendFields?: Record<string, string | null> };
     }> = [];
     for (const raw of rows) {
       const lineUid = raw.lineUid?.trim() ?? '';
+      const checkedFields = importFields(raw.friendFields, fields);
       const values = {
+        ...(raw.friendFields === undefined ? {} : { friendFields: checkedFields.values }),
         displayName: raw.displayName?.trim() || null,
         realName: raw.realName?.trim() || null,
         systemDisplayName: raw.systemDisplayName?.trim() || null,
@@ -910,6 +948,10 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
         continue;
       }
       seen.add(lineUid);
+      if (checkedFields.error) {
+        results.push({ lineUid, kind: 'error', reason: checkedFields.error, values });
+        continue;
+      }
       /*
         **同じUIDの有無は2本で見る。** 1本(`LIMIT 1`)だと拾った行が
         たまたま同アカウントの場合に他アカウントの重複を見逃す。
@@ -931,6 +973,7 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
         sameAccount.display_name === values.displayName
         && sameAccount.real_name === values.realName
         && sameAccount.system_display_name === values.systemDisplayName
+        && Object.keys(checkedFields.values).length === 0
       ) {
         results.push({ lineUid, kind: 'unchanged', reason: null, values });
       } else {
@@ -970,7 +1013,7 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
     if (job.status !== 'previewed') return c.json({ success: false, error: '確認が終わったファイルだけ反映できます' }, 409);
     const result = JSON.parse(job.result_json) as { rows: Array<{
       lineUid: string; kind: 'add' | 'update' | 'unchanged' | 'conflict' | 'error';
-      values: { displayName: string | null; realName: string | null; systemDisplayName: string | null };
+      values: { displayName: string | null; realName: string | null; systemDisplayName: string | null; friendFields?: Record<string, string | null> };
     }> };
     /*
       **競合・エラーが残るまま反映しない。** 画面は無効化しているが、
@@ -985,9 +1028,15 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
       return c.json({ success: false, error: `入力不備が${remainingError}件のこっています。ファイルを確認画面で直してから反映してください` }, 422);
     }
     const now = new Date().toISOString();
+    const fields = result.rows.some((row) => row.values.friendFields !== undefined)
+      ? await getFriendFieldsForScope(c.env.DB, { tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID, lineAccountId: job.line_account_id }) : [];
     const statements: D1PreparedStatement[] = [];
+    let applied = 0;
     for (const row of result.rows) {
+      const checked = importFields(row.values.friendFields, fields);
+      if (checked.error) return c.json({ success: false, error: `${row.lineUid}: ${checked.error}` }, 422);
       if (row.kind === 'add') {
+        applied += 1;
         statements.push(c.env.DB.prepare(`INSERT INTO friends (
           id, line_user_id, line_account_id, display_name, real_name, system_display_name,
           is_following, metadata, created_at, updated_at
@@ -996,6 +1045,7 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
           row.values.realName, row.values.systemDisplayName, now, now,
         ));
       } else if (row.kind === 'update') {
+        applied += 1;
         statements.push(c.env.DB.prepare(`UPDATE friends
           SET display_name = ?, real_name = ?, system_display_name = ?, updated_at = ?
           WHERE line_account_id = ? AND line_user_id = ?`).bind(
@@ -1003,11 +1053,23 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
           now, job.line_account_id, row.lineUid,
         ));
       }
+      if (row.kind === 'add' || row.kind === 'update') {
+        for (const [key, value] of Object.entries(checked.values)) {
+          const field = fields.find((item) => item.field_key === key)!;
+          const friendSelect = 'SELECT id FROM friends WHERE line_account_id = ? AND line_user_id = ?';
+          statements.push(value === null
+            ? c.env.DB.prepare(`DELETE FROM friend_field_values WHERE field_id = ? AND friend_id IN (${friendSelect})`).bind(field.id, job.line_account_id, row.lineUid)
+            : c.env.DB.prepare(`INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
+                SELECT id, ?, ?, ?, ? FROM friends WHERE line_account_id = ? AND line_user_id = ?
+                ON CONFLICT(friend_id, field_id) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at`)
+              .bind(field.id, value, c.get('staff').id, now, job.line_account_id, row.lineUid));
+        }
+      }
     }
     if (statements.length > 0) await c.env.DB.batch(statements);
     await c.env.DB.prepare(`UPDATE friend_import_jobs SET status = 'completed', executed_at = ? WHERE id = ? AND status = 'previewed'`)
       .bind(now, job.id).run();
-    return c.json({ success: true, data: { id: job.id, status: 'completed', applied: statements.length, duplicate: false } });
+    return c.json({ success: true, data: { id: job.id, status: 'completed', applied, duplicate: false } });
   } catch (error) {
     console.error(JSON.stringify({ event: 'friend_import_execute_failed', error: String(error) }));
     return c.json({ success: false, error: '取り込みを反映できませんでした' }, 500);

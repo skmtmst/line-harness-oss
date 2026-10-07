@@ -13,6 +13,8 @@
 // See: docs/superpowers/specs/2026-07-29-auto-webinar-design.md
 
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
+import type { WebinarAudience } from '@line-crm/shared';
+import { countRecentWebinarViewers, WEBINAR_AUDIENCE_WINDOW_SECONDS } from '../services/webinar-audience.js';
 import {
   getWebinarById,
   getWebinarBySlug,
@@ -466,6 +468,35 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
     console.error('GET /api/liff/webinars/:slug error:', err);
     return c.json({ error: 'internal_error' }, 500);
   }
+});
+
+// 既存の視聴状態の返しは保ち、人数を更新したい時だけこの口を読む。
+webinarRoutes.get('/api/liff/webinars/:slug/audience', async (c) => {
+  const auth = await resolveWebinarCaller(c, c.req.param('slug'));
+  if (auth instanceof Response) return auth;
+  const { webinar } = auth;
+  if (publicationWindowBlockReason(webinar)) return c.json({ error: 'not_found' }, 404);
+  const kind = await resolveWebinarDeliveryKind(c.env.DB, webinar);
+  const now = nowEpoch();
+  let sessionStartAt: number | null = null;
+  if (kind === 'on_demand') {
+    sessionStartAt = onDemandSessionStartAt(webinar, now);
+  } else if (kind === 'scheduled') {
+    const session = resolveSession(parseScheduleRules(webinar.schedule_json), webinar.duration_seconds, now);
+    if (session.live && session.sessionStartAt !== null) {
+      const registration = await getWebinarRegistration(c.env.DB, webinar.id, auth.friendId, session.sessionStartAt);
+      if (registration) sessionStartAt = session.sessionStartAt;
+    }
+  }
+  const data: WebinarAudience = {
+    live: sessionStartAt !== null,
+    sessionStartAt,
+    viewerCount: sessionStartAt === null ? null
+      : await countRecentWebinarViewers(c.env.DB, webinar.id, sessionStartAt, now),
+    activeWindowSeconds: WEBINAR_AUDIENCE_WINDOW_SECONDS,
+    lecturerName: null,
+  };
+  return c.json(data);
 });
 
 webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
@@ -2124,6 +2155,9 @@ webinarRoutes.get('/api/webinars/:id/ctas', async (c) => {
     const ctas = await getWebinarCtas(c.env.DB, id);
     return c.json({
       success: true,
+      version: row.cta_version ?? 0,
+      updatedBy: row.cta_updated_by ?? null,
+      updatedAt: row.cta_updated_at ?? null,
       data: ctas.map((ct) => ({
         id: ct.id,
         atSeconds: ct.at_seconds,
@@ -2149,7 +2183,12 @@ webinarRoutes.put('/api/webinars/:id/ctas', requireRole('owner', 'admin'), async
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
-    const body = await c.req.json<{ ctas?: unknown }>();
+    const body = await c.req.json<{ ctas?: unknown; expectedVersion?: unknown }>();
+    if (body.expectedVersion !== undefined && (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0)) {
+      return c.json({ success: false, error: 'invalid_expected_version' }, 400);
+    }
+    const expectedVersion = body.expectedVersion === undefined ? row.cta_version ?? 0 : Number(body.expectedVersion);
+    if (expectedVersion !== (row.cta_version ?? 0)) return c.json({ success: false, error: 'version_conflict', currentVersion: row.cta_version ?? 0, updatedBy: row.cta_updated_by ?? null, updatedAt: row.cta_updated_at ?? null }, 409);
     if (!Array.isArray(body.ctas)) {
       return c.json({ success: false, error: 'ctas_required' }, 400);
     }
@@ -2210,8 +2249,9 @@ webinarRoutes.put('/api/webinars/:id/ctas', requireRole('owner', 'admin'), async
     ) {
       return c.json({ success: false, error: 'form_account_mismatch' }, 400);
     }
-    const count = await replaceWebinarCtas(c.env.DB, id, cleaned);
-    return c.json({ success: true, data: { count } });
+    const count = await replaceWebinarCtas(c.env.DB, id, cleaned, { expectedVersion, updatedBy: c.get('staff').id });
+    if (count === null) return c.json({ success: false, error: 'version_conflict' }, 409);
+    return c.json({ success: true, data: { count, version: expectedVersion + 1 } });
   } catch (err) {
     console.error('PUT /api/webinars/:id/ctas error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

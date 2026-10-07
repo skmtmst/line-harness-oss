@@ -160,6 +160,27 @@ describe('V6 friend-add rule data contracts', () => {
 
   afterEach(() => testDb.raw.close());
 
+  it('期間の絞り込みはJST境界・集計・ページ送りにも効く', async () => {
+    seedRuleAndRun(testDb);
+    testDb.raw.exec(`UPDATE friend_add_events SET occurred_at = '2026-09-07T00:00:00.000';
+      INSERT INTO friend_add_events (id, line_account_id, friend_id, webhook_event_id, friend_kind, attribution_status, routing_status, error_code, occurred_at)
+      VALUES ('run-2', 'account-1', 'friend-1', 'webhook-2', 'returning', 'captured', 'partial_failed', 'send_failed', '2026-09-07T23:59:59.000'),
+             ('run-3', 'account-1', 'friend-1', 'webhook-3', 'returning', 'unavailable', 'failed', 'action_failed', '2026-09-08T00:00:00.000');`);
+    const path = '/api/friend-add-runs?account_id=account-1&from=2026-09-07&to=2026-09-07&limit=1';
+    const response = await app(testDb.db).request(path);
+    expect(response.status).toBe(200);
+    const { data } = await response.json() as { data: { total: number; items: unknown[]; nextCursor: string; summary: unknown } };
+    expect(data.total).toBe(2);
+    expect(data.items).toEqual([expect.objectContaining({ id: 'run-2', failureKind: 'delivery_failed' })]);
+    expect(data.summary).toMatchObject({ recentFriends: 1, recentEvents: 2, capturedFriends: 1, returning: 1, testPending: null,
+      failureKinds: [{ kind: 'delivery_failed', count: 1 }], cumulativeDeliveries: 1 });
+    const page = await app(testDb.db).request(`${path}&cursor=${encodeURIComponent(data.nextCursor)}`);
+    expect((await page.json() as { data: { items: unknown[]; summary: unknown } }).data).toMatchObject({ items: [{ id: 'run-1' }], summary: data.summary });
+    for (const suffix of ['from=2026-02-30', 'period=invalid', 'from=2026-09-08&to=2026-09-07', 'period=this_month&from=2026-09-07']) {
+      expect((await app(testDb.db).request(`/api/friend-add-runs?account_id=account-1&${suffix}`)).status).toBe(400);
+    }
+  });
+
   it('通常: ルールの総件数・競合根拠・実行集計・版とアクション詳細を返す', async () => {
     seedRuleAndRun(testDb);
     const list = await app(testDb.db).request('/api/friend-add-rules?account_id=account-1&kind=first_time&limit=1');

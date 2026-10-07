@@ -1449,6 +1449,8 @@ export interface FormSubmitClaim {
   status: FormSubmitClaimStatus;
   /** 終わった工程の名前の JSON 配列 */
   steps: string;
+  /** 工程名→完了日時。旧記録の日時は不明。 */
+  step_completed_at_json?: string;
   /** Webhook の結果の JSON。未実行は NULL */
   webhook: string | null;
   /** 確保済みの回答行の id。回答の保存前は NULL */
@@ -1647,14 +1649,25 @@ export async function appendFormSubmitClaimStep(
   const claim = await getFormSubmitClaim(db, scope);
   if (!claim || claim.owner !== owner || claim.version !== version) return false;
   const steps = readFormSubmitClaimSteps(claim);
-  if (!steps.includes(step)) steps.push(step);
+  const now = jstNow();
+  let completedAt: Record<string, string> = {};
+  try {
+    const parsed = JSON.parse(claim.step_completed_at_json ?? '{}') as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      completedAt = parsed as Record<string, string>;
+    }
+  } catch { /* 旧記録の不明な日時は埋めない。 */ }
+  if (!steps.includes(step)) {
+    steps.push(step);
+    completedAt = { ...completedAt, [step]: now };
+  }
   const result = await db
     .prepare(
       `UPDATE form_submit_claims
-          SET steps = ?, updated_at = ?
+          SET steps = ?, step_completed_at_json = ?, updated_at = ?
         WHERE ${CLAIM_SCOPE_WHERE} AND owner = ? AND version = ?`,
     )
-    .bind(JSON.stringify(steps), jstNow(), ...claimBindings(scope), owner, version)
+    .bind(JSON.stringify(steps), JSON.stringify(completedAt), now, ...claimBindings(scope), owner, version)
     .run();
   return (result.meta.changes ?? 0) > 0;
 }

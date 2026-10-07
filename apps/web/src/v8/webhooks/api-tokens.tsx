@@ -20,6 +20,7 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -496,10 +497,13 @@ export default function WebhooksApiTokensV8() {
           />
         ) : null}
         {status === 'ready' && tokens.length === 0 ? (
-          <ListState
-            kind="empty"
-            title="まだ接続がありません"
-            description={canManage ? '「API 接続の鍵を発行する」から最初の鍵を発行してください。' : '鍵の発行は統括だけができます。'}
+          /* 修正案 D-2：空の一覧。 */
+          <EmptyList
+            icon={<KeyRound aria-hidden="true" />}
+            title="まだ API 接続の鍵がありません"
+            description={canManage ? 'ほかのシステムからこのアカウントを操作するための鍵を発行します。' : '鍵の発行は統括だけができます。'}
+            create={{ label: '最初の鍵を発行する', onClick: openCreate }}
+            canCreate={canManage}
           />
         ) : null}
         {status === 'ready' && tokens.length > 0 ? (

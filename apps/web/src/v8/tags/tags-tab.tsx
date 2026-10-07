@@ -10,6 +10,7 @@
  * （components/friend-fields/tags-page-v4）を使う。見た目だけを型と絵に合わせた。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -43,12 +44,14 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import { withViewTransition } from '@/components/shared/view-transition'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
@@ -228,14 +231,30 @@ export default function TagsTab({
   const [actionError, setActionError] = useState('')
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsFailed, setStatsFailed] = useState(false)
-  const [query, setQuery] = useState('')
-  const [folder, setFolder] = useState('')
-  const [usageFilter, setUsageFilter] = useState('all')
-  const [sourceFilter, setSourceFilter] = useState('all')
-  const [quick, setQuick] = useState<string[]>([])
+  /*
+   * 検索語・フォルダ・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
+   * タグを開いて「戻る」と同じ一覧に戻る。絞り込みを変えたらページは 1 へ
+   * （同じ書き込みの中で戻す。効果で戻すと、来た瞬間に URL から戻したページまで消える）。
+   */
+  const [view, setView] = useListUrlState({ q: '', folder: '', usage: 'all', source: 'all', quick: '', size: '20', page: '1' })
+  const query = view.q
+  const folder = view.folder
+  const usageFilter = view.usage
+  const sourceFilter = view.source
+  const quick = useMemo(() => (view.quick ? view.quick.split(',') : []), [view.quick])
+  const pageSize = PAGE_SIZES.includes(Number(view.size)) ? Number(view.size) : 20
+  const page = Math.max(1, Number.parseInt(view.page, 10) || 1)
+  const setQuery = useCallback((next: string) => setView({ q: next, page: '1' }), [setView])
+  const setFolder = useCallback((next: string) => setView({ folder: next, page: '1' }), [setView])
+  const setUsageFilter = useCallback((next: string) => setView({ usage: next, page: '1' }), [setView])
+  const setSourceFilter = useCallback((next: string) => setView({ source: next, page: '1' }), [setView])
+  const setQuick = useCallback((update: string[] | ((current: string[]) => string[])) => {
+    const next = typeof update === 'function' ? update(quick) : update
+    setView({ quick: next.join(','), page: '1' })
+  }, [quick, setView])
+  const setPageSize = useCallback((next: number) => setView({ size: String(next), page: '1' }), [setView])
+  const setPage = useCallback((next: number) => setView({ page: String(next) }), [setView])
   const [quickOpen, setQuickOpen] = useState(false)
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
   const { leavingId, leave } = useRowLeaving()
@@ -297,11 +316,13 @@ export default function TagsTab({
     if (fixture) return
     setItems([])
     setGroups([])
-    setFolder('')
-    setPage(1)
     setOpenMenuId(null)
     setMenuMoveFor(null)
   }, [fixture, accountId])
+
+  // アカウントを替えたら、前のアカウントのフォルダとページを残さない（来た瞬間は URL のまま）。
+  useOnAccountSwitch(accountId, () => setView({ folder: '', page: '1' }))
+  useListScrollMemory(status === 'ready')
 
   const filtered = useMemo(() => items.filter((tag) => {
     // 保管して「元に戻す」を待っている行は出さない。
@@ -329,7 +350,6 @@ export default function TagsTab({
   const activeTag = items.find((tag) => tag.id === activeTagId) ?? null
   const activeTagIndex = visible.findIndex((tag) => tag.id === activeTagId)
   const activeGroup = activeTag ? groups.find((item) => item.id === activeTag.groupId) : undefined
-  useEffect(() => setPage(1), [query, folder, usageFilter, sourceFilter, quick, pageSize])
 
   /** アカウント切替直後の1フレームは「未取得」として扱う（v7 と同じ）。 */
   const staleAccount = !fixture && loadRequestRef.current.accountId !== accountId
@@ -499,6 +519,8 @@ export default function TagsTab({
 
   /** 行の「…」。編集・複製・フォルダへ移す・保管する。 */
   const rowMenuItems = (tag: Tag): ActionMenuItem[] => {
+    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
+    if (!canEdit) return []
     if (menuMoveFor === tag.id) {
       return [
         { id: 'move-back', label: '← 操作にもどる', onSelect: () => setMenuMoveFor(null) },
@@ -510,12 +532,10 @@ export default function TagsTab({
         })),
       ]
     }
-    const readonly = !canEdit
-    const readonlyReason = '閲覧のみのため変更できません'
     const list: ActionMenuItem[] = [
-      { id: 'edit', label: '編集', external: true, disabled: readonly, disabledReason: readonly ? readonlyReason : undefined, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
-      { id: 'copy', label: '複製して作る', external: true, disabled: readonly, disabledReason: readonly ? readonlyReason : undefined, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
-      { id: 'move', label: 'フォルダへ移す', disabled: readonly, disabledReason: readonly ? readonlyReason : undefined, onSelect: () => setMenuMoveFor(tag.id) },
+      { id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
+      { id: 'copy', label: '複製して作る', external: true, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
+      { id: 'move', label: 'フォルダへ移す', onSelect: () => setMenuMoveFor(tag.id) },
     ]
     /* 保管済みに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
     if (tag.status !== 'archived') {
@@ -524,8 +544,6 @@ export default function TagsTab({
         label: '保管する',
         tone: 'danger',
         dividerBefore: true,
-        disabled: readonly,
-        disabledReason: readonly ? readonlyReason : undefined,
         onSelect: () => requestArchive(tag),
       })
     }
@@ -558,9 +576,9 @@ export default function TagsTab({
     for (const item of rowMenuItems(tag)) {
       if (item.id === 'move-back') continue
       if (item.id === 'move') {
-        list.push({ id: 'move-ungrouped', label: '未分類へ移す', disabled: !canEdit, onSelect: () => void moveTagToGroup(tag, null) })
+        list.push({ id: 'move-ungrouped', label: '未分類へ移す', onSelect: () => void moveTagToGroup(tag, null) })
         for (const group of groups) {
-          list.push({ id: `move-${group.id}`, label: `「${group.name}」へ移す`, disabled: !canEdit, onSelect: () => void moveTagToGroup(tag, group.id) })
+          list.push({ id: `move-${group.id}`, label: `「${group.name}」へ移す`, onSelect: () => void moveTagToGroup(tag, group.id) })
         }
         continue
       }
@@ -600,12 +618,11 @@ export default function TagsTab({
   ]
 
   const filterActive = Boolean(query || folder || usageFilter !== 'all' || sourceFilter !== 'all' || quick.length)
-  const clearFilters = () => { setQuery(''); setFolder(''); setUsageFilter('all'); setSourceFilter('all'); setQuick([]) }
+  const clearFilters = () => { setView({ q: '', folder: '', usage: 'all', source: 'all', quick: '', page: '1' }) }
 
-  const createButton = (wide: boolean) => status === 'forbidden' ? null : canEdit ? (
+  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
+  const createButton = (wide: boolean) => status === 'forbidden' || !canEdit ? null : (
     <Button href="/tags/new" variant="primary" className={wide ? styles.createWide : undefined}><Plus size={15} aria-hidden="true" />タグを作る</Button>
-  ) : (
-    <Button type="button" variant="primary" className={wide ? styles.createWide : undefined} disabled><Plus size={15} aria-hidden="true" />タグを作る</Button>
   )
 
   const search = (
@@ -702,18 +719,19 @@ export default function TagsTab({
       <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
       <Button type="button" onClick={() => void load()}>もう一度試す</Button>
     </div>
-  ) : ready && items.length === 0 ? (
-    <div className={styles.stateCard} data-design-node="U0aKD">
-      <TagIcon className={styles.stateIcon} aria-hidden="true" />
-      <p className={styles.stateTitle}>まだタグがありません</p>
-      <p className={styles.stateDesc}>「＋ タグを作る」から最初の1つを作ると、ここに並びます。</p>
-    </div>
   ) : ready && visible.length === 0 ? (
-    <div className={styles.stateCard} data-design-node="U0aKD">
-      <p className={styles.stateTitle}>条件に合うタグはありません</p>
-      <p className={styles.stateDesc}>検索語・フォルダ・絞り込みを変えてください。</p>
-      {filterActive ? <Button type="button" onClick={clearFilters}>条件を外す</Button> : null}
-    </div>
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      data-design-node="U0aKD"
+      icon={<TagIcon aria-hidden="true" />}
+      title="まだタグがありません"
+      description="友だちに目印を付けて、配信の絞り込みや対応の振り分けに使います。"
+      create={{ label: '最初のタグを作る', href: '/tags/new' }}
+      canCreate={canEdit}
+      filtered={items.length > 0}
+      onClearFilters={filterActive ? clearFilters : undefined}
+      filteredDescription="検索語・フォルダ・絞り込みを外すと、すべて出ます"
+    />
   ) : (
     <DelayedSkeleton loading={!ready} skeleton={<div className={styles.skeleton} data-design-node="U0aKD" aria-busy="true" />}>
       <DataTable className={styles.table} data-design="TagTable">
@@ -724,7 +742,8 @@ export default function TagsTab({
               <span className="sr-only">一覧に出す</span>
             </Th>
             <Th className={styles.colName}>タグ</Th>
-            <Th className={styles.colFolder}>フォルダ</Th>
+            {/* 左にフォルダの列があるときは表にフォルダ列を置かず、名前の前に色の丸（2026-10-07 オーナー）。1152 は列を畳むので表に出す（絵 aPeD8）。 */}
+            {narrow ? <Th className={styles.colFolder}>フォルダ</Th> : null}
             <Th className={styles.colCount}>人数</Th>
             <Th className={styles.colSource}>付け方</Th>
             <Th className={styles.colLink}>連動</Th>
@@ -753,18 +772,30 @@ export default function TagsTab({
                 }}
               >
                 <Td className={styles.colStar} onClick={(event) => event.stopPropagation()}>
-                  <button
-                    type="button"
-                    className={styles.starButton}
-                    data-on={Boolean(tag.isStarred)}
-                    disabled={!canEdit}
-                    aria-pressed={Boolean(tag.isStarred)}
-                    aria-label={tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する'}
-                    title={canEdit ? (tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する') : '閲覧のみのため変更できません'}
-                    onClick={() => void toggleStar(tag)}
-                  >
-                    <Star className={styles.starIcon} aria-hidden="true" />
-                  </button>
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      className={styles.starButton}
+                      data-on={Boolean(tag.isStarred)}
+                      aria-pressed={Boolean(tag.isStarred)}
+                      aria-label={tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する'}
+                      title={tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する'}
+                      onClick={() => void toggleStar(tag)}
+                    >
+                      <Star className={styles.starIcon} aria-hidden="true" />
+                    </button>
+                  ) : (
+                    // 閲覧のみ：押せる星は置かず、友だち一覧に出しているかの印だけを見せる。
+                    <span
+                      className={styles.starButton}
+                      data-on={Boolean(tag.isStarred)}
+                      role="img"
+                      aria-label={tag.isStarred ? '友だち一覧に表示している' : '友だち一覧に表示していない'}
+                      title={tag.isStarred ? '友だち一覧に表示している' : '友だち一覧に表示していない'}
+                    >
+                      <Star className={styles.starIcon} aria-hidden="true" />
+                    </span>
+                  )}
                 </Td>
                 <Td className={styles.colName}>
                   <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
@@ -777,11 +808,22 @@ export default function TagsTab({
                         onDragOver={(event) => event.preventDefault()}
                         onDrop={() => void move(tag.id)}
                       >
-                        <ReorderGrip label={tag.name} disabled={!canEdit} disabledReason="閲覧のみのため並び替えできません" onMove={(direction) => void keyboardMove(tag.id, direction)}>
-                          <GripVertical className={styles.gripIcon} aria-hidden="true" />
-                        </ReorderGrip>
+                        {/* 閲覧のみ：つまみは隠し、幅だけ空けて名前の位置を保つ */}
+                        {canEdit ? (
+                          <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}>
+                            <GripVertical className={styles.gripIcon} aria-hidden="true" />
+                          </ReorderGrip>
+                        ) : (
+                          <span className={styles.gripSpace} aria-hidden="true"><GripVertical className={styles.gripIcon} /></span>
+                        )}
                       </span>
-                      <Link href={editHref} className={styles.name} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
+                      {narrow ? (
+                        <Link href={editHref} className={styles.name} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
+                      ) : (
+                        <FolderDotName folder={group ? { name: group.name, color: group.color ?? FOLDER_FALLBACK_COLOR } : null}>
+                          <Link href={editHref} className={styles.name} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
+                        </FolderDotName>
+                      )}
                       {tag.status === 'archived' ? <span className={styles.miniBadge}>保管済み</span> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
                         <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</span>
@@ -790,16 +832,18 @@ export default function TagsTab({
                     <p className={styles.sub}>{`${formatDate(tag.createdAt)}登録`}</p>
                   </ContextMenu>
                 </Td>
-                <Td className={styles.colFolder}>
-                  <span className={styles.folderCell} title={group?.name ?? '未分類'}>
-                    {group ? (
-                      <Folder className={styles.folderIcon} aria-hidden="true" color={group.color ?? FOLDER_FALLBACK_COLOR} fill={group.color ?? FOLDER_FALLBACK_COLOR} />
-                    ) : (
-                      <FolderOpen className={styles.folderIcon} aria-hidden="true" />
-                    )}
-                    <span className={styles.truncate}>{group?.name ?? '未分類'}</span>
-                  </span>
-                </Td>
+                {narrow ? (
+                  <Td className={styles.colFolder}>
+                    <span className={styles.folderCell} title={group?.name ?? '未分類'}>
+                      {group ? (
+                        <Folder className={styles.folderIcon} aria-hidden="true" color={group.color ?? FOLDER_FALLBACK_COLOR} fill={group.color ?? FOLDER_FALLBACK_COLOR} />
+                      ) : (
+                        <FolderOpen className={styles.folderIcon} aria-hidden="true" />
+                      )}
+                      <span className={styles.truncate}>{group?.name ?? '未分類'}</span>
+                    </span>
+                  </Td>
+                ) : null}
                 {/* 人数は、そのタグで絞った友だち一覧へのリンク。 */}
                 <Td className={styles.colCount} onClick={(event) => event.stopPropagation()}>
                   <Link href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
@@ -810,7 +854,8 @@ export default function TagsTab({
                 <Td className={styles.colLink}><span className={styles.cellText} title={tagLinkText(tag)}>{tagLinkText(tag)}</span></Td>
                 <Td className={styles.colUsage}><span className={styles.cellText} title={usageLabel(tag)}>{usageLabel(tag)}</span></Td>
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
-                  <span className={styles.menuAnchor}>
+                  {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
+                  {canEdit ? <span className={styles.menuAnchor}>
                     <button
                       type="button"
                       className={styles.menuButton}
@@ -831,7 +876,7 @@ export default function TagsTab({
                       ariaLabel={`タグ「${tag.name}」の操作`}
                       items={rowMenuItems(tag)}
                     />
-                  </span>
+                  </span> : null}
                 </Td>
               </Tr>
             )
@@ -870,12 +915,11 @@ export default function TagsTab({
 
       <ListPageBody
         folders={<>
-          {createButton(true)}
+          {createButton(true) ?? (status === 'forbidden' ? null : <span className={styles.viewerCreateSpace} aria-hidden="true" />)}
           <FolderPanel
             activeId={folder}
             onSelect={setFolder}
             onAddFolder={canEdit ? () => setFolderDialog('new') : undefined}
-            addFolderDisabled={!canEdit}
             addFolderLabel="フォルダを追加"
             rows={folderRows}
           >

@@ -157,19 +157,19 @@ test('v8 で何も無いときは eAQ3t の「まだ無い」が出る', async (
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="UyUMw"]')
-  expect(board?.textContent).toContain('まだ、ウェビナーはありません')
+  expect(board?.textContent).toContain('まだウェビナーがありません')
 })
 
-test('v8 の閲覧のみ（jiNg0）は作る・編集が押せない形になる', async () => {
+// 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
+test('v8 の閲覧のみ（jiNg0）は作る・編集を出さず、閲覧のみの帯を出す', async () => {
   staffRole = 'staff'
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="UyUMw"]')
   expect(board).not.toBeNull()
-  const createButton = [...board!.querySelectorAll('button')].find((button) => button.textContent?.includes('ウェビナーを作る'))
-  expect(createButton?.disabled).toBe(true)
-  const editButton = [...board!.querySelectorAll('button')].find((button) => button.textContent === '編集')
-  expect(editButton?.disabled).toBe(true)
+  const texts = [...board!.querySelectorAll('button, a')].map((el) => el.textContent ?? '')
+  expect(texts.some((t) => t.includes('ウェビナーを作る'))).toBe(false)
+  expect(texts.some((t) => t === '編集')).toBe(false)
   expect(board?.textContent).toContain('閲覧のみで見ています')
 })
 

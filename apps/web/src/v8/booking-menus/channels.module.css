@@ -1,0 +1,168 @@
+/*
+ * 予約設定 予約経路の連携（★V8-B ZyDd6）。
+ * 緑の帯 → カード（題・説明・表）×2 → 外から予約が入ったとき。
+ * 表は角丸の枠の中に、頭の行（40）と本文の行（54）。列の間は16、左右は20。
+ */
+
+.band {
+  margin: 0;
+  padding: var(--tpl-bm-10) var(--tpl-bm-12);
+  border-radius: var(--tpl-bm-8);
+  background: var(--tpl-r2-ch-band-bg);
+  color: var(--tpl-r2-ch-band-ink);
+  font-size: var(--tpl-bm-11);
+  line-height: var(--tpl-bm-17);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-12);
+  padding: var(--tpl-bm-16);
+  border-radius: var(--tpl-bm-12);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -0.5);
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-14);
+  font-weight: 700;
+  line-height: var(--tpl-bm-20);
+}
+
+.cardDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-11);
+  line-height: var(--tpl-bm-17);
+}
+
+.note {
+  margin: 0;
+  padding: var(--tpl-bm-10) var(--tpl-bm-12);
+  border-radius: var(--tpl-bm-8);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-11);
+  line-height: var(--tpl-bm-17);
+}
+
+.table {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--tpl-bm-12);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -0.5);
+}
+
+.row {
+  display: grid;
+  align-items: center;
+  column-gap: var(--tpl-bm-16);
+  height: var(--tpl-r2-ch-row-h);
+  padding: 0 var(--tpl-bm-20);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-17);
+}
+
+.row:last-child {
+  box-shadow: none;
+}
+
+.headRow {
+  height: var(--tpl-bm-40);
+  background: var(--color-table-head);
+}
+
+/* 列の幅は絵のとおり（名前の列だけ伸びる）。 */
+.staffCols {
+  grid-template-columns: minmax(0, 1fr) var(--tpl-r2-ch-col-200) var(--tpl-r2-ch-col-120) var(--tpl-r2-ch-col-110) var(--tpl-r2-ch-col-100) var(--tpl-r2-ch-col-120);
+}
+
+.routeCols {
+  grid-template-columns: minmax(0, 1fr) var(--tpl-r2-ch-col-200) var(--tpl-r2-ch-col-120) var(--tpl-r2-ch-col-60) var(--tpl-r2-ch-col-100) var(--tpl-r2-ch-col-100);
+}
+
+.head {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.right {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+/* 受け取り方は2行まで折り返してよい（絵の Hot Pepper Beauty の行）。 */
+.wrap {
+  display: block;
+}
+
+.nameCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-3);
+  min-width: 0;
+}
+
+.oneLine {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  font-weight: 700;
+}
+
+.sub {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-11);
+  line-height: var(--tpl-bm-16);
+}
+
+/* 「予定を見る」の窓の中身。 */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-8);
+  width: 100%;
+  margin: 0;
+  font-size: var(--tpl-bm-13);
+}
+
+.detailRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+}
+
+.detailKey {
+  flex-shrink: 0;
+  width: var(--tpl-r2-ch-col-120);
+  color: var(--color-ink-secondary);
+}
+
+.detailValue {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}

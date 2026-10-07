@@ -11,7 +11,7 @@ import type {
 import { useAccount } from '@/contexts/account-context'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, type FriendAddRunList } from '@/lib/api'
-import FriendAddRunsV8 from './runs-v8'
+import FriendAddRunsV8 from '@/v8/friend-add-runs/runs'
 import { describeFriendAddFailure } from '../friend-add-failure'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { csvCell } from './csv'

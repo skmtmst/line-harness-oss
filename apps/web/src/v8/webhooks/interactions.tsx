@@ -9,7 +9,7 @@
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（CSV の書き出し口が無い など）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDownLeft, ArrowUpRight, CircleAlert, History, Inbox, LayoutList, RefreshCw, Send, TriangleAlert } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, CircleAlert, FileCode, History, Inbox, LayoutList, RefreshCw, RotateCw, TriangleAlert } from 'lucide-react'
 import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -20,7 +20,7 @@ import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import DetailPanel from '@/components/shared/detail-panel'
+import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -229,11 +229,6 @@ export default function WebhooksInteractionsV8() {
   }
 
   const openDetail = (item: WebhookInteraction) => withViewTransition(() => { setSelected(item); setTechOpen(false) })
-  const selectedIndex = selected ? data.items.findIndex((item) => item.id === selected.id) : -1
-  const stepDetail = (delta: -1 | 1) => {
-    const target = selectedIndex === -1 ? undefined : data.items[selectedIndex + delta]
-    if (target) openDetail(target)
-  }
 
   const summary = data.summary
   const loaded = loadedAccountId === selectedAccountId && !error && Boolean(selectedAccountId)
@@ -374,7 +369,7 @@ export default function WebhooksInteractionsV8() {
                   </Td>
                   <Td className={styles.colTime}><span className={styles.main}>{seconds(item.durationMs)}</span></Td>
                   <Td className={styles.colOps}>
-                    <Button onClick={() => openDetail(item)}>中身を見る</Button>
+                    <Button onClick={() => openDetail(item)} aria-label={`「${item.webhookName}」の中身を見る`}>中身を見る</Button>
                   </Td>
                 </Tr>
               )
@@ -427,29 +422,20 @@ export default function WebhooksInteractionsV8() {
       </>}
       overlays={<>
         {selected ? (
-          <DetailPanel
-            open
-            title="やり取りの中身"
-            description="接続先URL、シークレット、本文は安全のため表示しません。"
-            onClose={() => setSelected(null)}
-            onPrev={() => stepDetail(-1)}
-            onNext={() => stepDetail(1)}
-            hasPrev={selectedIndex > 0}
-            hasNext={selectedIndex >= 0 && selectedIndex < data.items.length - 1}
+          <InteractionDialog
+            item={selected}
+            accountId={selectedAccountId}
+            techOpen={techOpen}
+            setTechOpen={setTechOpen}
+            canRetry={canRetry}
+            retrying={retrying === selected.id}
             busy={retrying !== null}
-          >
-            <InteractionDetail
-              item={selected}
-              techOpen={techOpen}
-              setTechOpen={setTechOpen}
-              canRetry={canRetry}
-              retrying={retrying === selected.id}
-              onRetry={() => {
-                if (selected.failureReasonCode === 'unknown') setConfirmingRetry(selected)
-                else void retry(selected)
-              }}
-            />
-          </DetailPanel>
+            onClose={() => setSelected(null)}
+            onRetry={() => {
+              if (selected.failureReasonCode === 'unknown') setConfirmingRetry(selected)
+              else void retry(selected)
+            }}
+          />
         ) : null}
         <ConfirmDialog
           open={confirmingRetry !== null}
@@ -470,48 +456,135 @@ export default function WebhooksInteractionsV8() {
   )
 }
 
-function InteractionDetail({ item, techOpen, setTechOpen, canRetry, retrying, onRetry }: {
+/** 窓のきっかけ：「予約が入った・Masato S.」→「予約が入った（Masato S.）」。文が無ければ種類の言葉。 */
+function dialogTrigger(item: WebhookInteraction): string {
+  const [head, ...rest] = item.triggerSummary.split('・')
+  if (!head) return triggerWord(item)
+  return rest.length > 0 ? `${head}（${rest.join('・')}）` : head
+}
+
+/** 送った・届いた中身（伏せ字の本文）。口が「残っていない」と返すときは null。 */
+type PayloadState = { kind: 'loading' } | { kind: 'ready'; text: string } | { kind: 'missing' } | { kind: 'error' }
+
+function payloadText(body: unknown): string {
+  if (typeof body === 'string') return body
+  try {
+    return JSON.stringify(body, null, 2) ?? ''
+  } catch {
+    return String(body)
+  }
+}
+
+/*
+ * やり取りの中身の窓（絵 `DA0Ag`：幅680・上から110・題 18/700 と状態の札・1行の説明・
+ * 8行の項目・送った・届いた中身・伏せている旨・下の段 技術的な記録／閉じる／送り直す）。
+ * 本文は F-18 の口（伏せ字にした本文）から読む。URL・鍵は出さない。
+ */
+function InteractionDialog({ item, accountId, techOpen, setTechOpen, canRetry, retrying, busy, onClose, onRetry }: {
   item: WebhookInteraction
+  accountId: string | null
   techOpen: boolean
   setTechOpen: (open: boolean) => void
   canRetry: boolean
   retrying: boolean
+  busy: boolean
+  onClose: () => void
   onRetry: () => void
 }) {
+  const [payload, setPayload] = useState<PayloadState>({ kind: 'loading' })
+  useEffect(() => {
+    if (!accountId) {
+      setPayload({ kind: 'missing' })
+      return
+    }
+    let active = true
+    setPayload({ kind: 'loading' })
+    api.webhooks.interactions.payload(item.id, accountId)
+      .then((response) => {
+        if (!active) return
+        if (!response.success) setPayload({ kind: 'error' })
+        else if (!response.data.available || response.data.body == null) setPayload({ kind: 'missing' })
+        else setPayload({ kind: 'ready', text: payloadText(response.data.body) })
+      })
+      .catch(() => { if (active) setPayload({ kind: 'error' }) })
+    return () => { active = false }
+  }, [item.id, accountId])
+
   const retryable = canRetryNow(item, canRetry)
   const failed = item.status === 'failed'
+  const why = retryabilityText(item, canRetry)
+  /* 送り直せるふつうの失敗は札だけ（説明は札の title）。それ以外は理由を札の横に出す。 */
+  const showWhy = !(retryable && !item.failureReasonCode?.match(/^(unknown|secret_unavailable)$/))
   return (
-    <div data-design-node="DA0Ag" className={styles.detail}>
-      <span className={styles.pill} data-tone={failed ? 'danger' : item.status === 'succeeded' ? 'active' : 'neutral'}>
-        <span className={styles.pillDot} aria-hidden="true" />
-        {failed ? '失敗' : item.status === 'succeeded' ? '成功' : '処理中'}
-      </span>
-      <p className={styles.sub}>{`${shortDateTime(item.startedAt)}・${item.direction === 'outgoing' ? '送った' : '受け取った'}・${item.webhookName}`}</p>
-      <dl className={styles.detailList}>
-        <div className={styles.detailRow}><dt>きっかけ</dt><dd>{triggerWord(item)}</dd></div>
-        <div className={styles.detailRow}><dt>返事</dt><dd>{item.responseLabel}{item.responseStatus !== null ? `（相手の応答番号 ${item.responseStatus}）` : ''}</dd></div>
-        {item.failureReason ? <div className={styles.detailRow}><dt>失敗した理由</dt><dd className={styles.danger}>{item.failureReason}</dd></div> : null}
-        <div className={styles.detailRow}><dt>試した回数</dt><dd>{item.attemptCount}回（1分・5分・30分あけて）</dd></div>
-        <div className={styles.detailRow}><dt>かかった時間</dt><dd>{item.durationMs == null ? '—' : `返事まで ${seconds(item.durationMs)}`}</dd></div>
-        <div className={styles.detailRow}><dt>やり直せるか</dt><dd>{retryable ? 'やり直せる' : 'やり直せない'}</dd></div>
-      </dl>
-      <div className={styles.payloadBox}>{`${item.triggerSummary}\n${item.responseLabel}`}</div>
-      <p className={styles.sub}>接続先URL、シークレット、本文のうち個人が分かる部分は、安全のため伏せています。</p>
-      {techOpen ? (
-        <dl className={styles.detailList}>
-          <div className={styles.detailRow}><dt>出来事の種類</dt><dd>{item.eventType}</dd></div>
-          <div className={styles.detailRow}><dt>状態の記号</dt><dd>{item.status}</dd></div>
-          <div className={styles.detailRow}><dt>記録の番号</dt><dd>{item.id}</dd></div>
-          <div className={styles.detailRow}><dt>やり直し元の記録</dt><dd>{item.retryOfId ?? '—'}</dd></div>
+    <Dialog
+      open
+      title="やり取りの中身"
+      description={`${shortDateTime(item.startedAt)}・${item.direction === 'outgoing' ? '送った' : '受け取った'}・${item.webhookName}`}
+      designNode="DA0Ag"
+      designWidth={680}
+      designTop={110}
+      designHeaderPadding="24px 24px 0"
+      busy={busy}
+      onCancel={onClose}
+      footer={
+        <div className={styles.dialogFoot}>
+          <Button onClick={() => setTechOpen(!techOpen)}>
+            <FileCode size={15} aria-hidden="true" />{techOpen ? '技術的な記録を閉じる' : '技術的な記録を開く'}
+          </Button>
+          <span className={styles.dialogFootSpacer} aria-hidden="true" />
+          <Button onClick={onClose} disabled={busy}>閉じる</Button>
+          {retryable ? (
+            <Button variant="primary" onClick={onRetry} busy={retrying} busyLabel="やり直し中">
+              <RotateCw size={15} aria-hidden="true" />届いたか確かめてから送り直す
+            </Button>
+          ) : null}
+        </div>
+      }
+    >
+      <div className={styles.dialogBody}>
+        <span className={styles.dialogState} data-tone={failed ? 'danger' : item.status === 'succeeded' ? 'active' : 'neutral'}>
+          <span className={styles.pillDot} aria-hidden="true" />
+          {failed ? '失敗' : item.status === 'succeeded' ? '成功' : '処理中'}
+        </span>
+        <dl className={styles.dialogList}>
+          <div className={styles.dialogRow}><dt>きっかけ</dt><dd>{dialogTrigger(item)}</dd></div>
+          <div className={styles.dialogRow}><dt>出来事の種類</dt><dd>{item.eventType}</dd></div>
+          <div className={styles.dialogRow}><dt>返事</dt><dd>{item.responseLabel}{item.responseStatus !== null ? `（相手の応答番号 ${item.responseStatus}）` : ''}</dd></div>
+          {item.failureReason ? <div className={styles.dialogRow}><dt>失敗した理由</dt><dd className={styles.danger}>{item.failureReason}</dd></div> : null}
+          <div className={styles.dialogRow}><dt>試した回数</dt><dd>{`${item.attemptCount} 回（1分・5分・30分あけて）`}</dd></div>
+          <div className={styles.dialogRow}><dt>かかった時間</dt><dd>{item.durationMs == null ? '—' : `返事まで ${seconds(item.durationMs)}`}</dd></div>
+          <div className={styles.dialogRow}><dt>記録の番号</dt><dd>{item.id}</dd></div>
+          {techOpen ? (
+            <>
+              <div className={styles.dialogRow}><dt>状態の記号</dt><dd>{item.status}</dd></div>
+              <div className={styles.dialogRow}><dt>やり直し元の記録</dt><dd>{item.retryOfId ?? '—'}</dd></div>
+            </>
+          ) : null}
+          <div className={`${styles.dialogRow} ${styles.dialogRowPill}`}>
+            <dt>やり直せるか</dt>
+            <dd>
+              <span className={styles.pill} data-tone={retryable ? 'active' : 'neutral'} title={why}>
+                <span className={styles.pillDot} aria-hidden="true" />
+                {retryable ? 'やり直せる' : 'やり直せない'}
+              </span>
+              {showWhy ? <span className={styles.dialogWhy}>{why}</span> : null}
+            </dd>
+          </div>
         </dl>
-      ) : null}
-      <p className={styles.sub}>{retryabilityText(item, canRetry)}</p>
-      <div className={styles.detailActions}>
-        <Button onClick={() => setTechOpen(!techOpen)}>{techOpen ? '技術的な記録を閉じる' : '技術的な記録を開く'}</Button>
-        {retryable ? (
-          <Button variant="primary" onClick={onRetry} busy={retrying} busyLabel="やり直し中"><Send size={15} aria-hidden="true" />やり直す</Button>
-        ) : null}
+        <h3 className={styles.dialogHeading}>送った・届いた中身</h3>
+        {payload.kind === 'ready' ? (
+          <pre className={styles.payloadBox}>{payload.text}</pre>
+        ) : (
+          <p className={styles.payloadBox}>
+            {payload.kind === 'loading'
+              ? '読み込んでいます…'
+              : payload.kind === 'missing'
+                ? '送った中身は残っていません（古い記録・受け取りの試しなど）。'
+                : '中身を読み込めませんでした。閉じて開き直してください。'}
+          </p>
+        )}
+        <p className={styles.dialogNote}>接続先 URL、シークレット、本文のうち個人が分かる部分は、安全のため伏せています。</p>
       </div>
-    </div>
+    </Dialog>
   )
 }

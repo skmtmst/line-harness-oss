@@ -291,66 +291,49 @@
  * 閉じるときは逆（150ms）。閉じの印 `data-closing` は dialog.tsx が
  * V8 のときだけ付ける（v7・試験は今までどおり即時に消える）。
  */
-[data-theme='v8'] .overlay {
-  animation: dialog-v8-overlay-enter var(--motion-base) var(--motion-ease-out);
-}
+/*
+ * 開く・閉じるは「移り変わり（transition）」で動かす（フルード・インタラクション ①）。
+ * 決まった動き（keyframes）だと、閉じかけでもう一度開くと最初から出直して飛ぶ。
+ * 移り変わりなら、途中で逆の操作をしてもその位置から滑らかに戻る。
+ * 出始めの形は @starting-style が持つ。動きを減らす設定では動かさない。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme='v8'] .overlay {
+    transition: opacity var(--motion-base) var(--motion-ease-out);
+  }
 
-[data-theme='v8'] .panel {
-  animation: dialog-v8-enter var(--motion-base) var(--motion-ease-out);
+  [data-theme='v8'] .panel {
+    transition:
+      opacity var(--motion-base) var(--motion-ease-out),
+      transform var(--motion-base) var(--motion-ease-out);
+  }
+
+  @starting-style {
+    [data-theme='v8'] .overlay {
+      opacity: 0;
+    }
+
+    [data-theme='v8'] .panel {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+    }
+  }
+
+  [data-theme='v8'] .overlay[data-closing],
+  [data-theme='v8'] .panel[data-closing] {
+    transition-duration: var(--motion-exit);
+  }
 }
 
 [data-theme='v8'] .overlay[data-closing] {
-  animation: dialog-v8-overlay-leave var(--motion-exit) var(--motion-ease-out) forwards;
+  opacity: 0;
   /* 消えていく間は下の画面を押せるようにする（薄い膜が押下を食べない）。 */
   pointer-events: none;
 }
 
 [data-theme='v8'] .panel[data-closing] {
-  animation: dialog-v8-leave var(--motion-exit) var(--motion-ease-out) forwards;
-}
-
-@keyframes dialog-v8-overlay-enter {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes dialog-v8-enter {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes dialog-v8-overlay-leave {
-  from {
-    opacity: 1;
-  }
-
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes dialog-v8-leave {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateY(4px) scale(0.98);
-  }
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
 }
 
 /* ★V8（夕13）：重なる物の外縁は border-soft（TOKENS-20261001）。 */
@@ -385,6 +368,8 @@
 [data-theme='v8'] .footer { display: block; width: 100%; flex-shrink: 0; }
 [data-theme='v8'] .footer:empty { display: none; }
 [data-theme='v8'] .actions { width: 100%; padding: 14px 24px; gap: 8px; align-items: center; border-top: 1px solid var(--color-hairline); }
+/* 下のボタンを中央に置く口（footerAlign="center"）。既定の右寄せは変えない。 */
+[data-theme='v8'] .panel[data-footer-align='center'] .actions { justify-content: center; }
 [data-theme='v8'] .footerLead { flex: 1; font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 13px; line-height: 20px; color: var(--color-ink-faint); }
 [data-theme='v8'] .designButton { min-width: 0; font-family: inherit; line-height: 20px; }
 [data-theme='v8'] .designButton[data-dialog-action='secondary'] { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }

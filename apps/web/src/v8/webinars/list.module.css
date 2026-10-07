@@ -255,6 +255,34 @@
 }
 
 /* アーカイブの確かめ（VXZ6T）：対象の箱と、アーカイブしたあとの3点。 */
+/* アーカイブの確かめ（VXZ6T）の本文。説明は題の下 4、×の左の幅まで。段の間は 14。共通の中身の余白（上下24）を詰める。 */
+.archiveBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-fm2-dialog-gap);
+  width: 100%;
+  margin-block: var(--tpl-fm2-wb-pull);
+}
+
+.archiveLead {
+  max-width: var(--tpl-fm2-wb-lead-w);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-fm2-wb-lead-lh);
+}
+
+.afterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-fm2-notes-gap);
+}
+
+.archiveBody .afterTitle,
+.archiveBody .afterList {
+  margin: 0;
+}
+
 .targetBox {
   padding: var(--tpl-wb-target-pad);
   border-radius: var(--radius-control);
@@ -348,3 +376,6 @@
 .skeletonName { display: block; width: 75%; height: var(--tpl-rule-row-gap); }
 .skeletonPill { display: block; width: 60%; height: var(--tpl-wb-pill-lh); }
 .skeletonNum { display: block; width: 60%; height: var(--tpl-rule-row-gap); margin-left: auto; }
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }

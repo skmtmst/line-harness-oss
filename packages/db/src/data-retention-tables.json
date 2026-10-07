@@ -721,6 +721,36 @@
       "column": "line_account_id"
     }
   },
+  "booking_sync_notice_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "notice_id",
+      "parent": "booking_sync_notices",
+      "parentColumn": "id"
+    }
+  },
+  "booking_sync_notice_queue": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_sync_notices": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_sync_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "booking_visit_marks": {
     "category": "purge",
     "scope": {
@@ -2112,6 +2142,13 @@
       "column": "redemption_id",
       "parent": "mileage_redemptions",
       "parentColumn": "id"
+    }
+  },
+  "mileage_reward_folders": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
     }
   },
   "mileage_reward_versions": {
@@ -3786,6 +3823,153 @@
     "scope": {
       "by": "tenant",
       "column": "tenant_id"
+    }
+  },
+  "auto_reply_deliveries": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "broadcast_media_upload_sessions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "coupon_redemptions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "imagemap_images": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "hq_broadcast_audit": {
+    "category": "retain"
+  },
+  "hq_broadcast_runs": {
+    "category": "retain"
+  },
+  "hq_broadcast_targets": {
+    "category": "retain"
+  },
+  "rt_reservation_close_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "task_id",
+      "parent": "rt_reservation_close_tasks",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_close_tasks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_store_media_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "visit_stamp_card_accounts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "visit_stamp_cards": {
+    "category": "retain"
+  },
+  "visit_stamp_checkouts": {
+    "category": "retain"
+  },
+  "visit_stamp_entries": {
+    "category": "retain"
+  },
+  "visit_stamp_paper_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "visit_stamp_redemptions": {
+    "category": "retain"
+  },
+  "visit_stamp_staff_pins": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "visit_stamp_visit_queue": {
+    "category": "global"
+  },
+  "visit_stamp_wallets": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "rt_closures": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_closure_close_tasks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "closure_id",
+      "parent": "rt_closures",
+      "parentColumn": "id"
+    }
+  },
+  "rt_closure_close_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "task_id",
+      "parent": "rt_closure_close_tasks",
+      "parentColumn": "id"
     }
   }
 }

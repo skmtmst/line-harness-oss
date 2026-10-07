@@ -32,6 +32,7 @@ import {
   loadFailureNotice,
 } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { ROLE_LABELS } from '@/lib/hq-members'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import type { OperatorNotificationTeam } from '@line-crm/shared'
@@ -83,20 +84,40 @@ function OperatorEditInner() {
   /* 絵に無い「チームを作る」は、受け取るスタッフの箱の右上から開く（足りないときだけ出す）。 */
   const [teamFormOpen, setTeamFormOpen] = useState(false)
   const teamGeneration = useRef(0)
+  /*
+   * 作るときはチームがあれば最初のチームを選んでおく（絵 gjUz3：送り先「チーム」・チーム「〇〇（3人）」）。
+   * 人が宛先・チームを触ったあとや、なおすとき（保存ずみの宛先がある）は選び直さない。
+   */
+  const teamTouchedRef = useRef(false)
+  const teamIdRef = useRef('')
+  const autoTeamRef = useRef<OperatorNotificationTeam | null>(null)
+  const [teamsSettled, setTeamsSettled] = useState(false)
   const loadTeams = () => {
     const accountId = selectedAccountId
     const generation = ++teamGeneration.current
     setTeams([])
-    if (!accountId) return
+    setTeamsSettled(false)
+    if (!accountId) { setTeamsSettled(true); return }
     setTeamError('')
     void api.notifications.teams.list(accountId).then(result => {
       if (generation !== teamGeneration.current) return
       if (!result.success) throw new Error(result.error)
       setTeams(result.data)
-    }).catch(() => { if (generation === teamGeneration.current) setTeamError('チームを読み込めませんでした。もう一度読み込んでください。') })
+      const first = result.data[0]
+      if (!editId && first && !teamTouchedRef.current && !teamIdRef.current) {
+        autoTeamRef.current = first
+        teamIdRef.current = first.id
+        setTeamId(first.id)
+      }
+      setTeamsSettled(true)
+    }).catch(() => {
+      if (generation !== teamGeneration.current) return
+      setTeamError('チームを読み込めませんでした。もう一度読み込んでください。')
+      setTeamsSettled(true)
+    })
   }
   useEffect(() => {
-    setTeamId(''); setTeamName(''); loadTeams()
+    setTeamId(''); teamIdRef.current = ''; autoTeamRef.current = null; setTeamName(''); loadTeams()
     return () => { teamGeneration.current++ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
@@ -114,6 +135,7 @@ function OperatorEditInner() {
       if (generation !== teamGeneration.current) return
       if (!result.success) throw new Error(result.error)
       setTeams(current => [...current.filter(team => team.id !== result.data.id), result.data])
+      teamIdRef.current = result.data.id
       setTeamId(result.data.id); setRecipientIds(result.data.staffIds)
     } catch (caught) { if (generation === teamGeneration.current) setTeamError(caught instanceof Error ? caught.message : '保存できませんでした。') }
     finally { setTeamBusy(false) }
@@ -139,6 +161,18 @@ function OperatorEditInner() {
   /* 公開前の確認の窓（板 `sDXNy`）。 */
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  /* 確認の窓の「役割」の列。宛先の口は役割を返さないので、ログインユーザーの一覧から引く。読めなければ空のまま。 */
+  const [staffRoles, setStaffRoles] = useState<Record<string, string>>({})
+  useEffect(() => {
+    if (!confirmOpen) return
+    let active = true
+    void Promise.resolve().then(() => api.staff.list()).then((result) => {
+      if (!active || !result.success) return
+      setStaffRoles(Object.fromEntries(result.data.map((member) => [member.id, ROLE_LABELS[member.role] ?? ''])))
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [confirmOpen])
+  const [preparingPublish, setPreparingPublish] = useState(false)
 
   // 保存ずみのお知らせを全項目そのまま復元する。一部だけ戻すと、保存した時点で初期値へ上書きされる。
   useEffect(() => {
@@ -158,6 +192,7 @@ function OperatorEditInner() {
         setThreshold(saved.threshold)
         setImportance(saved.importance)
         setRecipientIds(saved.recipientIds)
+        teamIdRef.current = saved.teamId
         setTeamId(saved.teamId)
         setSchedule(saved.schedule)
         setDedupeMinutes(saved.dedupeMinutes)
@@ -196,9 +231,10 @@ function OperatorEditInner() {
       setRecipientsError(null)
       setError((current) => (current === RECIPIENTS_SAVE_GUARD_MESSAGE ? '' : current))
       // 再開したお知らせの宛先は保存ずみのもの。全選択で上書きすると、本人だけにしていた設定が全員へ広がる。
-      if (!editId && !teamId) {
+      if (!editId) {
         const autoIds = result.data.items.map((item) => item.id)
-        setRecipientIds(autoIds)
+        // チームを選んでいるときは、チームの顔ぶれを全員選びで上書きしない。
+        if (!teamIdRef.current) setRecipientIds(autoIds)
         autoIdsRef.current = autoIds
       }
     }).catch((caught) => {
@@ -228,12 +264,15 @@ function OperatorEditInner() {
     }
     if (editId && !sawLoadingRef.current) return
     if (!editId && recipients === null && !error && recipientsError === null) return
+    // 作るときは最初のチームを選ぶかどうかが決まってから基準を掴む。
+    if (!editId && !teamsSettled) return
     if (!editId && autoIdsRef.current !== null) {
-      setBaseline(JSON.stringify(['新しい予約が入りました', DEFAULT_EVENT_TYPE, 'one', 'normal', autoIdsRef.current, '', 'anytime', '10', false, true]))
+      const autoTeam = autoTeamRef.current
+      setBaseline(JSON.stringify(['新しい予約が入りました', DEFAULT_EVENT_TYPE, 'one', 'normal', autoTeam ? autoTeam.staffIds : autoIdsRef.current, autoTeam ? autoTeam.id : '', 'anytime', '10', false, true]))
       return
     }
     setBaseline(signature)
-  }, [baseline, ruleLoading, editId, recipients, error, recipientsError, signature])
+  }, [baseline, ruleLoading, editId, recipients, error, recipientsError, signature, teamsSettled])
 
   /* 作成・なおし途中の離脱確認。公開・保存が終わると一覧へ移るので、成功後に警告は出ない。 */
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
@@ -319,9 +358,15 @@ function OperatorEditInner() {
   /* 公開の前に `sDXNy` の確認の窓を出す。保存後に直した分も出すので、古い内容のまま出さない。 */
   const openPublishConfirm = async () => {
     if (!selectedAccountId || saving || ruleLoading || publishing) return
-    const ruleId = await saveDraft()
-    if (!ruleId) return
-    setConfirmOpen(true)
+    /* 押した「公開」のボタンに手応え（押せない形＋輪）を出す。先に下書きを保存している間も。 */
+    setPreparingPublish(true)
+    try {
+      const ruleId = await saveDraft()
+      if (!ruleId) return
+      setConfirmOpen(true)
+    } finally {
+      setPreparingPublish(false)
+    }
   }
 
   const publish = async () => {
@@ -362,6 +407,7 @@ function OperatorEditInner() {
   const selectedRecipients = items.filter((item) => recipientIds.includes(item.id))
   const lineReachable = selectedRecipients.filter((item) => item.channels.line)
   const lineUnregistered = selectedRecipients.length - lineReachable.length
+  const selectedTeam = teamId ? teams.find((team) => team.id === teamId) ?? null : null
   const saveDisabled = saving || ruleLoading || publishing
   const title = editId
     ? `「${loadedName ?? (ruleLoading ? '…' : name.trim() || 'お知らせ')}」を編集する`
@@ -406,12 +452,12 @@ function OperatorEditInner() {
                   />
                 </div>
                 <div className={styles.pair}>
-                  <Field id="operator-event" label="きっかけ" value={eventType} onChange={setEventType} options={[...EVENT_OPTIONS]} disabled={!canWrite} />
-                  <Field id="operator-importance" label="重要度" value={importance} onChange={setImportance} options={IMPORTANCE_OPTIONS} disabled={!canWrite} />
+                  <Field id="operator-event" label="きっかけ" value={eventType} onChange={setEventType} options={[...EVENT_OPTIONS]} readOnly={!canWrite} />
+                  <Field id="operator-importance" label="重要度" value={importance} onChange={setImportance} options={IMPORTANCE_OPTIONS} readOnly={!canWrite} />
                 </div>
                 <div className={styles.pair}>
-                  <Field id="operator-threshold" label="どれくらいたまったら" value={threshold} onChange={setThreshold} options={THRESHOLD_OPTIONS} disabled={!canWrite} />
-                  <Field id="operator-dedupe" label="同じ知らせを重ねない" value={dedupeMinutes} onChange={setDedupeMinutes} options={DEDUPE_OPTIONS} disabled={!canWrite} />
+                  <Field id="operator-threshold" label="どれくらいたまったら" value={threshold} onChange={setThreshold} options={THRESHOLD_OPTIONS} readOnly={!canWrite} />
+                  <Field id="operator-dedupe" label="同じ知らせを重ねない" value={dedupeMinutes} onChange={setDedupeMinutes} options={DEDUPE_OPTIONS} readOnly={!canWrite} />
                 </div>
               </section>
 
@@ -421,13 +467,15 @@ function OperatorEditInner() {
                   <p className={styles.cardNote}>LINEログイン済みの人にだけ届きます。お客様の連絡先は宛先に入りません。</p>
                 </div>
                 <div className={styles.pair}>
-                  <Field id="operator-recipient-kind" label="送り先" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'チーム' }]} disabled={!canWrite} />
+                  <Field id="operator-recipient-kind" label="送り先" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'チーム' }]} readOnly={!canWrite} />
                   <Field
                     id="operator-recipient-team"
                     label="チーム"
                     value={teamId}
-                    disabled={!canWrite}
+                    readOnly={!canWrite}
                     onChange={(value) => {
+                      teamTouchedRef.current = true
+                      teamIdRef.current = value
                       setTeamId(value)
                       const team = teams.find(item => item.id === value)
                       if (team) { setRecipientIds(team.staffIds); setTeamName(team.name) }
@@ -436,6 +484,13 @@ function OperatorEditInner() {
                     options={teamOptions}
                   />
                 </div>
+                {/* 絵 gjUz3：チームを選んでいるときはスタッフの箱を出さない（顔ぶれはチームのとおり）。 */}
+                {teamId ? (teamError ? (
+                  <div className={styles.teamError}>
+                    <p role="alert">{teamError}</p>
+                    <Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button>
+                  </div>
+                ) : null) : (
                 <div className={styles.staffBox}>
                   <div className={styles.staffHead}>
                     <h3 className={styles.staffTitle}>受け取るスタッフ</h3>
@@ -454,20 +509,24 @@ function OperatorEditInner() {
                       </div>
                     ) : (
                       <ul className={styles.staffList}>
-                        {items.map((recipient) => (
+                        {/* 閲覧のみ：選ぶチェックは置かず、受け取る人の名前だけを並べる（2026-10-06 オーナー決定）。 */}
+                        {(canWrite ? items : items.filter((recipient) => recipientIds.includes(recipient.id))).map((recipient) => (
                           <li key={recipient.id} className={styles.staffRow}>
-                            <Checkbox
-                              checked={recipientIds.includes(recipient.id)}
-                              disabled={!canWrite}
-                              onCheckedChange={(checked) => {
-                                setTeamId('')
-                                setRecipientIds((current) => checked
-                                  ? [...current, recipient.id]
-                                  : current.filter((id) => id !== recipient.id))
-                              }}
-                            >
-                              {recipient.name}
-                            </Checkbox>
+                            {canWrite ? (
+                              <Checkbox
+                                checked={recipientIds.includes(recipient.id)}
+                                onCheckedChange={(checked) => {
+                                  teamTouchedRef.current = true
+                                  teamIdRef.current = ''
+                                  setTeamId('')
+                                  setRecipientIds((current) => checked
+                                    ? [...current, recipient.id]
+                                    : current.filter((id) => id !== recipient.id))
+                                }}
+                              >
+                                {recipient.name}
+                              </Checkbox>
+                            ) : <span>{recipient.name}</span>}
                             <span className={styles.staffSpacer} />
                             <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
                               {recipient.channels.line ? 'LINE' : 'LINE 未ログイン'}
@@ -512,19 +571,26 @@ function OperatorEditInner() {
                     </div>
                   ) : null}
                 </div>
-                <Checkbox checked={onlyAvailable} onCheckedChange={setOnlyAvailable} disabled={!canWrite}>
-                  手が空いている人だけに送る（対応中の人には送りません）
-                </Checkbox>
-                <Checkbox checked={emailFallback} onCheckedChange={setEmailFallback} disabled={!canWrite}>
-                  だれも受け取れないときはメールでも送る（LINE未ログインの人がいるとき）
-                </Checkbox>
+                )}
+                {canWrite ? <>
+                  <Checkbox checked={onlyAvailable} onCheckedChange={setOnlyAvailable}>
+                    手が空いている人だけに送る（対応中の人には送りません）
+                  </Checkbox>
+                  <Checkbox checked={emailFallback} onCheckedChange={setEmailFallback}>
+                    だれも受け取れないときはメールでも送る（LINE未ログインの人がいるとき）
+                  </Checkbox>
+                </> : <>
+                  {/* 閲覧のみ：チェックは置かず、いまの設定を文字で見せる。 */}
+                  <p className={styles.cardNote}>{`手が空いている人だけに送る：${onlyAvailable ? 'する' : 'しない'}`}</p>
+                  <p className={styles.cardNote}>{`だれも受け取れないときはメールでも送る：${emailFallback ? 'する' : 'しない'}`}</p>
+                </>}
               </section>
 
               <section className={styles.card} aria-labelledby="operator-when-send-heading">
                 <div className={styles.cardHead}>
                   <h2 id="operator-when-send-heading" className={styles.cardTitle}>いつ送るか・重ならないか</h2>
                 </div>
-                <Field id="operator-schedule" label="送る時間" value={schedule} onChange={setSchedule} options={SCHEDULE_OPTIONS} disabled={!canWrite} />
+                <Field id="operator-schedule" label="送る時間" value={schedule} onChange={setSchedule} options={SCHEDULE_OPTIONS} readOnly={!canWrite} />
                 <p className={styles.cardNote}>営業時間外のものは翌朝 10:00 にまとめて送ります。</p>
               </section>
 
@@ -584,8 +650,8 @@ function OperatorEditInner() {
                 <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
                 {canWrite ? (
                   <>
-                    <Button onClick={() => void saveDraft()} disabled={saveDisabled} busy={saving}>{editId ? '下書きを保存する' : '下書きを保存'}</Button>
-                    <Button onClick={() => void openPublishConfirm()} disabled={saveDisabled} variant="primary">
+                    <Button onClick={() => void saveDraft()} disabled={saveDisabled} busy={saving && !preparingPublish}>{editId ? '下書きを保存する' : '下書きを保存'}</Button>
+                    <Button onClick={() => void openPublishConfirm()} disabled={saveDisabled} busy={preparingPublish} variant="primary">
                       <Check size={15} aria-hidden="true" />運用者へのお知らせを公開
                     </Button>
                   </>
@@ -601,10 +667,46 @@ function OperatorEditInner() {
         open={confirmOpen}
         designNode="sDXNy"
         // 絵 sDXNy：窓の余白24・題の行36・本文までの間14
+        designWidth={580}
+        designTop={220}
         designHeaderPadding="24px 24px 0"
+        designHeaderHeight={50}
         title="このお知らせを公開しますか？"
         onCancel={() => { if (!publishing) setConfirmOpen(false) }}
-        footer={
+      >
+        <div className={styles.confirmBody}>
+          <div className={styles.confirmSummary}>
+            <p className={styles.confirmLine}>
+              <span className={styles.confirmLabel}>お知らせ</span>
+              <span className={styles.confirmValue}>{name.trim() || 'お知らせ名'}</span>
+            </p>
+            <p className={styles.confirmLine}>
+              <span className={styles.confirmLabel}>宛先</span>
+              <span className={styles.confirmValue}>
+                {selectedTeam
+                  ? `チーム「${selectedTeam.name}」${selectedRecipients.length} 人`
+                  : `選んだスタッフ ${selectedRecipients.length} 人`}
+              </span>
+            </p>
+            <p className={styles.confirmLine}>
+              <span className={styles.confirmLabel}>LINE が届く人</span>
+              <span className={styles.confirmValue}>
+                {`${lineReachable.length} 人${lineUnregistered > 0 ? `（${lineUnregistered} 人は LINE 未登録）` : ''}`}
+              </span>
+            </p>
+          </div>
+          <ul className={styles.confirmList} aria-label="受け取る人">
+            {selectedRecipients.map((recipient) => (
+              <li key={recipient.id} className={styles.confirmRow}>
+                <span className={styles.confirmName} title={recipient.name}>{recipient.name}</span>
+                <span className={styles.confirmRole}>{recipientRole(recipient, staffRoles)}</span>
+                <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
+                  {recipient.channels.line ? 'LINE' : '画面だけ'}
+                </StatusBadge>
+              </li>
+            ))}
+          </ul>
+          <p className={styles.confirmNote}>LINE 未登録の人には、管理画面のお知らせだけで届きます。</p>
           <div className={styles.confirmActions}>
             <Button type="button" onClick={() => setConfirmOpen(false)} disabled={publishing}>戻って直す</Button>
             <Button
@@ -615,26 +717,9 @@ function OperatorEditInner() {
               busy={publishing}
               busyLabel="公開中…"
             >
-              公開して{lineReachable.length}人にLINEで送る
+              <Send size={15} aria-hidden="true" />{`公開して ${lineReachable.length} 人に LINE で送る`}
             </Button>
           </div>
-        }
-      >
-        <div>
-          <div className={styles.confirmSummary}>
-            <div>お知らせ　{name.trim() || 'お知らせ名'}</div>
-            <div>宛先　選択中のスタッフ {selectedRecipients.length}人</div>
-            <div>LINEが届く人　{lineReachable.length}人{lineUnregistered > 0 ? `（${lineUnregistered}人は LINE 未登録）` : ''}</div>
-          </div>
-          {selectedRecipients.map((recipient) => (
-            <div key={recipient.id} className={styles.confirmRow}>
-              <span className={styles.confirmName}>{recipient.name}</span>
-              <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
-                {recipient.channels.line ? 'LINE' : '画面だけ'}
-              </StatusBadge>
-            </div>
-          ))}
-          <p className={styles.confirmNote}>LINE 未登録の人には、管理画面のお知らせだけで届きます。</p>
         </div>
       </Dialog>
 
@@ -643,19 +728,29 @@ function OperatorEditInner() {
   )
 }
 
+/** 宛先の役割。口が役割を返せばそれを、無ければログインユーザーの一覧から引いた名前を出す。 */
+function recipientRole(recipient: OperatorRecipientPreview['items'][number], staffRoles: Record<string, string>): string {
+  const own = (recipient as { roleLabel?: unknown }).roleLabel
+  return typeof own === 'string' && own ? own : staffRoles[recipient.id] ?? ''
+}
+
 /** 題（12px・太字）＋選ぶ欄。2つ並べるときは .pair に入れる。 */
-function Field({ id, label, value, onChange, options, disabled }: {
+/** 選ぶ欄。閲覧のみ（readOnly）は選ぶ部品を置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */
+function Field({ id, label, value, onChange, options, readOnly = false }: {
   id: string
   label: string
   value: string
   onChange: (value: string) => void
   options: { value: string; label: string }[]
-  disabled?: boolean
+  readOnly?: boolean
 }) {
+  const shown = options.find((option) => option.value === value)?.label ?? value
   return (
     <div className={styles.field}>
       <label htmlFor={id} className={styles.fieldLabel}>{label}</label>
-      <Select aria-label={label} id={id} size="full" value={value} onChange={onChange} options={options} disabled={disabled} />
+      {readOnly
+        ? <input id={id} aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} className={styles.input} />
+        : <Select aria-label={label} id={id} size="full" value={value} onChange={onChange} options={options} />}
     </div>
   )
 }

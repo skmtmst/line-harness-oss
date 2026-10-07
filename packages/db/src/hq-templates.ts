@@ -108,6 +108,7 @@ export interface HqTemplateDistributionResult {
   attempt_count: number;
   started_at: string;
   finished_at: string | null;
+  created_name?: string | null;
 }
 
 export type HqTemplateOwnedR2KeyState =

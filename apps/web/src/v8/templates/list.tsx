@@ -10,6 +10,8 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
+import { runOptimistic } from '@/lib/undoable'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -30,14 +32,12 @@ import {
   MessageSquare,
   MoreHorizontal,
   Plus,
-  Search as SearchIcon,
   Send,
   SquareArrowOutUpRight,
   Ticket,
   Trash2,
   TriangleAlert,
   Unlink,
-  X,
 } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
@@ -52,6 +52,7 @@ import { contentExcerpt } from '@/lib/broadcast-summary'
 import { ListPage } from '@/components/templates'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
@@ -63,6 +64,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -142,9 +144,6 @@ const PAGE_SIZE_OPTIONS = [
   { value: '20', label: '20件表示' },
   { value: '50', label: '50件表示' },
 ]
-
-const NO_MANAGE_NOTE =
-  'テンプレートの作成・変更・削除はオーナーと管理者だけができます。一覧と中身の閲覧はこのまま使えます。'
 
 /** 削除できない窓に並べる行の数（残りは「ほか N か所」）。 */
 const BLOCKED_ROWS_SHOWN = 2
@@ -226,17 +225,31 @@ export default function TemplatesListV8() {
   const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
   const [failure, setFailure] = useState<TemplatesFailure | null>(null)
-  const [templateQuery, setTemplateQuery] = useState('')
-  const [chips, setChips] = useState<Record<ChipKey, boolean>>({
-    single: false,
-    multiple: false,
-    variables: false,
-    unused: false,
-  })
-  const [savedFilter, setSavedFilter] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  /*
+   * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
+   * テンプレートを開いて「戻る」と同じ一覧に戻る。
+   */
+  const [urlView, setUrlView] = useListUrlState({ q: '', folder: 'all', chips: '', view: '', size: '20', page: '1' })
+  const templateQuery = urlView.q
+  const setTemplateQuery = useCallback((next: string) => setUrlView({ q: next, page: '1' }), [setUrlView])
+  const chips = useMemo<Record<ChipKey, boolean>>(() => {
+    const on = new Set(urlView.chips ? urlView.chips.split(',') : [])
+    return { single: on.has('single'), multiple: on.has('multiple'), variables: on.has('variables'), unused: on.has('unused') }
+  }, [urlView.chips])
+  const setChips = useCallback((update: Record<ChipKey, boolean> | ((current: Record<ChipKey, boolean>) => Record<ChipKey, boolean>)) => {
+    const next = typeof update === 'function' ? update(chips) : update
+    setUrlView({ chips: (Object.keys(next) as ChipKey[]).filter((key) => next[key]).join(','), page: '1' })
+  }, [chips, setUrlView])
+  const savedFilter = urlView.view
+  const setSavedFilter = useCallback((update: string | ((current: string) => string)) => {
+    setUrlView({ view: typeof update === 'function' ? update(savedFilter) : update, page: '1' })
+  }, [savedFilter, setUrlView])
+  const selectedCategory = urlView.folder
+  const setSelectedCategory = useCallback((next: string) => setUrlView({ folder: next, page: '1' }), [setUrlView])
+  const pageSize = [10, 20, 50].includes(Number(urlView.size)) ? Number(urlView.size) : 20
+  const setPageSize = useCallback((next: number) => setUrlView({ size: String(next), page: '1' }), [setUrlView])
+  const page = Math.max(1, Number.parseInt(urlView.page, 10) || 1)
+  const setPage = useCallback((next: number) => setUrlView({ page: String(next) }), [setUrlView])
 
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
@@ -289,7 +302,6 @@ export default function TemplatesListV8() {
     // フォルダはアカウント単位。切り替えたら前のアカウントの帯も選択も残さない。
     setFolders([])
     setUnfiledCount(null)
-    setSelectedCategory('all')
     setFolderDialogOpen(false)
     setEditingFolder(null)
     setDeletingFolder(null)
@@ -302,8 +314,9 @@ export default function TemplatesListV8() {
     setDuplicateTarget(null)
     setOpenMenuId(null)
     setSelectedIds(new Set())
-    setPage(1)
   }, [selectedAccountId])
+  // アカウントを替えたらフォルダとページを戻す（来た瞬間は URL のまま）。
+  useOnAccountSwitch(selectedAccountId, () => setUrlView({ folder: 'all', page: '1' }))
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
@@ -446,11 +459,7 @@ export default function TemplatesListV8() {
       || savedFilter,
   )
   const clearFilters = () => {
-    setTemplateQuery('')
-    setSelectedCategory('all')
-    setChips({ single: false, multiple: false, variables: false, unused: false })
-    setSavedFilter('')
-    setPage(1)
+    setUrlView({ q: '', folder: 'all', chips: '', view: '', page: '1' })
   }
 
   const toggleChip = (key: ChipKey) => {
@@ -469,9 +478,11 @@ export default function TemplatesListV8() {
   const shownItems = filteredTemplates.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   // 絞り込みや件数の変更でページが溢れたら戻す。
+  // 読み終わってから。読み込み中（0件）に詰めると、URL から戻したページが 1 になる。
   useEffect(() => {
-    if (page > pageCount) setPage(pageCount)
-  }, [page, pageCount])
+    if (!loading && page > pageCount) setPage(pageCount)
+  }, [loading, page, pageCount, setPage])
+  useListScrollMemory(!loading)
 
   const view = listView({ loading, failure, total: tabItems.length, matched: filteredTemplates.length })
   const createBlocked = createBlockedReason({ loading, failure })
@@ -651,35 +662,41 @@ export default function TemplatesListV8() {
     setMoveDraft('')
     setMoveError('')
   }
+  /*
+   * 押した瞬間に移した形を見せて窓を閉じ、裏で保存する（動きの点検・7）。
+   * 1件でも失敗したら元に戻して知らせる（「もう一度」で同じ移動をやり直せる）。
+   */
   const runMove = async () => {
     if (!moveIds) return
-    setMoving(true)
+    const ids = moveIds
+    const folderId = moveDraft === '' ? null : moveDraft
+    const previous = templates
+    const idSet = new Set(ids)
+    setTemplates((current) => current.map((t) => (idSet.has(t.id) ? { ...t, folderId } : t)))
+    setMoveIds(null)
+    setPanelMove(false)
+    setSelectedIds(new Set())
     setMoveError('')
-    try {
+    const send = async () => {
       let failed = 0
-      for (const id of moveIds) {
-        const result = await api.templates.update(id, { folderId: moveDraft === '' ? null : moveDraft })
+      for (const id of ids) {
+        const result = await api.templates.update(id, { folderId })
         if (!result.success) failed += 1
       }
-      if (failed > 0) {
-        setMoveError(`${failed}件を移動できませんでした。状態を読み直してからお試しください。`)
-        await Promise.all([load(), loadFolders()])
-        return
-      }
-      setMoveIds(null)
-      setPanelMove(false)
-      setSelectedIds(new Set())
-      notifyToast('フォルダへ移しました', { tone: 'success' })
-      await Promise.all([load(), loadFolders()])
-    } catch (reason) {
-      setMoveError(
-        reason instanceof ApiError && reason.status === 403
-          ? 'テンプレートを移すには権限が要ります。オーナーか管理者に頼んでください。'
-          : 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
-      )
-    } finally {
-      setMoving(false)
+      return failed > 0 ? { success: false as const, error: `${failed}件` } : { success: true as const }
     }
+    runOptimistic({
+      request: send,
+      revert: () => {
+        setTemplates(previous)
+        void Promise.all([load(), loadFolders()])
+      },
+      failureMessage: 'フォルダへ移せませんでした。状態を読み直したので、もう一度お試しください。',
+      onSuccess: () => {
+        notifyToast('フォルダへ移しました', { tone: 'success' })
+        void loadFolders()
+      },
+    })
   }
 
   /* 複製。複製の口は無いので、同じ内容で「下書き」として新しく作る。 */
@@ -750,15 +767,14 @@ export default function TemplatesListV8() {
 
   /* ===== 行の「…」（一斉配信で使う・複製・使っている所・削除） ===== */
   const rowMenuItems = (t: Template): ActionMenuItem[] => {
-    const readonly = !canMutateTemplates
+    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見るだけの項目（使っている所・一斉配信で使う）は残す。
+    const canMutate = canMutateTemplates
     return [
-      {
+      ...(canMutate ? [{
         id: 'edit',
         label: '編集する',
-        disabled: readonly,
-        disabledReason: readonly ? NO_MANAGE_NOTE : undefined,
         onSelect: () => withViewTransition(() => router.push(editHref(t))),
-      },
+      }] : []),
       {
         id: 'usage',
         label: '使っている所を見る',
@@ -770,34 +786,30 @@ export default function TemplatesListV8() {
         label: '一斉配信で使う',
         onSelect: () => window.location.assign(`/broadcasts/new?templateId=${encodeURIComponent(t.id)}`),
       },
-      {
-        id: 'duplicate',
-        label: '複製する',
-        icon: <Copy size={14} aria-hidden="true" />,
-        disabled: readonly,
-        disabledReason: readonly ? NO_MANAGE_NOTE : undefined,
-        onSelect: () => {
-          setDuplicateError('')
-          setDuplicateTarget(t)
+      ...(canMutate ? [
+        {
+          id: 'duplicate',
+          label: '複製する',
+          icon: <Copy size={14} aria-hidden="true" />,
+          onSelect: () => {
+            setDuplicateError('')
+            setDuplicateTarget(t)
+          },
         },
-      },
-      {
-        id: 'move',
-        label: 'フォルダへ移す',
-        icon: <FolderIcon size={14} aria-hidden="true" />,
-        disabled: readonly,
-        disabledReason: readonly ? NO_MANAGE_NOTE : undefined,
-        onSelect: () => openMove([t.id]),
-      },
-      {
-        id: 'delete',
-        label: '削除する',
-        tone: 'danger',
-        dividerBefore: true,
-        disabled: readonly,
-        disabledReason: readonly ? NO_MANAGE_NOTE : undefined,
-        onSelect: () => handleDelete(t),
-      },
+        {
+          id: 'move',
+          label: 'フォルダへ移す',
+          icon: <FolderIcon size={14} aria-hidden="true" />,
+          onSelect: () => openMove([t.id]),
+        },
+        {
+          id: 'delete',
+          label: '削除する',
+          tone: 'danger' as const,
+          dividerBefore: true,
+          onSelect: () => handleDelete(t),
+        },
+      ] : []),
     ]
   }
 
@@ -833,6 +845,12 @@ export default function TemplatesListV8() {
     : []
 
   /* ===== フォルダの列 ===== */
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。未分類は色の無い輪。 */
+  const folderDotOf = (t: { folderId: string | null }): FolderDotFolder | null => {
+    if (!t.folderId) return null
+    const folder = folders.find((f) => f.id === t.folderId)
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
   const folderRows: FolderPanelRow[] = [
     { id: 'all', label: 'すべて', count: ready ? tabItems.length : null },
     ...folders.map((folder, index) => ({
@@ -856,15 +874,14 @@ export default function TemplatesListV8() {
   ]
 
   const openPicker = () => setPickerOpen(true)
-  const createDisabled = !canMutateTemplates || createBlocked !== null
-  const createTitle = !canMutateTemplates ? NO_MANAGE_NOTE : createBlocked ?? undefined
-  const createButton = (full: boolean) => (
+  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。権限以外の理由（createBlocked）は押せない形のまま。
+  const createButton = (full: boolean) => !canMutateTemplates ? null : (
     <Button
       type="button"
       variant="primary"
       className={full ? 'v8-folder-create w-full' : undefined}
-      disabled={createDisabled}
-      title={createTitle}
+      disabled={createBlocked !== null}
+      title={createBlocked ?? undefined}
       onClick={openPicker}
     >
       <Plus size={15} aria-hidden="true" />テンプレートを作る
@@ -880,8 +897,6 @@ export default function TemplatesListV8() {
       }}
       onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
       addFolderLabel="フォルダを追加"
-      addFolderDisabled={!canMutateTemplates}
-      addFolderTitle={!canMutateTemplates ? NO_MANAGE_NOTE : undefined}
       rows={folderRows}
     >
       {/* 補助のデータ（フォルダ）だけ取れないときは、その場所に小さく1行だけ。 */}
@@ -1055,37 +1070,18 @@ export default function TemplatesListV8() {
       )}
     </div>
   ) : filteredTemplates.length === 0 ? (
-    filterActive ? (
-      <div className={styles.stateCard} data-design-node="susGP">
-        <span className={styles.stateIcon}>
-          <SearchIcon size={18} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>条件に合うテンプレートはありません</p>
-        <p className={styles.stateDesc}>
-          「1通のみ」「差し込みあり」「使っていない」や検索を外すと、すべて出ます。
-        </p>
-        <Button type="button" variant="secondary" onClick={clearFilters}>
-          <X size={13} aria-hidden="true" />
-          条件を外す
-        </Button>
-      </div>
-    ) : (
-      <div className={styles.stateCard} data-design-node="susGP">
-        <span className={styles.stateIcon}>
-          <FileText size={18} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>まだ{sectionWord}はありません</p>
-        <p className={styles.stateDesc}>
-          よく送る文を保存しておくと、一斉配信・自動応答・シナリオから選べます。
-        </p>
-        {/* 作れない人には押せないボタンを置かない（2026-10-06 オーナー決定） */}
-        {canMutateTemplates ? (
-          <Button type="button" variant="primary" onClick={openPicker}>
-            <Plus size={15} aria-hidden="true" />テンプレートを作る
-          </Button>
-        ) : null}
-      </div>
-    )
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      data-design-node="susGP"
+      icon={<FileText aria-hidden="true" />}
+      title={`まだ${sectionWord}がありません`}
+      description="よく送る文を保存しておくと、一斉配信・自動応答・シナリオから選べます。"
+      create={{ label: '最初のテンプレートを作る', onClick: openPicker }}
+      canCreate={canMutateTemplates}
+      filtered={filterActive}
+      onClearFilters={clearFilters}
+      filteredDescription="「1通のみ」「差し込みあり」「使っていない」や検索を外すと、すべて出ます"
+    />
   ) : (
     <>
       <ContextMenu
@@ -1108,12 +1104,15 @@ export default function TemplatesListV8() {
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  <Checkbox
-                    checked={allOnPageSelected}
-                    indeterminate={!allOnPageSelected && selectedCount > 0}
-                    onCheckedChange={() => toggleAllOnPage()}
-                    aria-label="このページのテンプレートをすべて選択"
-                  />
+                  {/* 閲覧のみ：まとめて変える操作が無いので、選ぶチェックを置かない（列の幅は残す） */}
+                  {canMutateTemplates ? (
+                    <Checkbox
+                      checked={allOnPageSelected}
+                      indeterminate={!allOnPageSelected && selectedCount > 0}
+                      onCheckedChange={() => toggleAllOnPage()}
+                      aria-label="このページのテンプレートをすべて選択"
+                    />
+                  ) : null}
                 </Th>
                 <Th className={styles.headCell}>テンプレート</Th>
                 <Th className={styles.headCell}>種類</Th>
@@ -1148,19 +1147,25 @@ export default function TemplatesListV8() {
                     }}
                   >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
-                      <Checkbox
-                        checked={selectedIds.has(t.id)}
-                        onCheckedChange={() => toggleOne(t.id)}
-                        aria-label={`「${t.name}」を選択`}
-                      />
+                      {canMutateTemplates ? (
+                        <Checkbox
+                          checked={selectedIds.has(t.id)}
+                          onCheckedChange={() => toggleOne(t.id)}
+                          aria-label={`「${t.name}」を選択`}
+                        />
+                      ) : null}
                     </Td>
                     <NameCell
                       name={
-                        <Link href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
-                          {t.name}
-                        </Link>
+                        <div className={styles.dotLine}>
+                          <FolderDotName folder={folderDotOf(t)} dot={!narrow}>
+                            <Link href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
+                              {t.name}
+                            </Link>
+                          </FolderDotName>
+                        </div>
                       }
-                      sub={<span className={styles.cellSub} title={excerpt}>{excerpt}</span>}
+                      sub={<span className={narrow ? styles.cellSub : `${styles.cellSub} ${styles.dotIndent}`} title={excerpt}>{excerpt}</span>}
                     />
                     <Td>
                       <span className={styles.kindBadge}>{messageTypeText(kindLabel)}</span>
@@ -1225,14 +1230,13 @@ export default function TemplatesListV8() {
       </ContextMenu>
 
       {/* まとめての帯（選ぶと表の下に出る）：フォルダへ移す・まとめて削除。 */}
-      {selectedCount > 0 ? (
+      {canMutateTemplates && selectedCount > 0 ? (
         <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
           <span className={styles.bulkCount}>{selectedCount}件を選択中</span>
           <Button
             type="button"
             variant="secondary"
-            disabled={!canMutateTemplates || moving}
-            title={!canMutateTemplates ? NO_MANAGE_NOTE : undefined}
+            disabled={moving}
             onClick={() => openMove([...selectedIds])}
           >
             <FolderIcon size={13} aria-hidden="true" />
@@ -1241,13 +1245,11 @@ export default function TemplatesListV8() {
           <Button
             type="button"
             variant="secondary"
-            disabled={!canMutateTemplates || bulkDeleting || removableSelected.length === 0}
+            disabled={bulkDeleting || removableSelected.length === 0}
             title={
-              !canMutateTemplates
-                ? NO_MANAGE_NOTE
-                : usedSelectedCount > 0
-                  ? '使っているテンプレートが選ばれています。先に使用先を差し替えてください'
-                  : undefined
+              usedSelectedCount > 0
+                ? '使っているテンプレートが選ばれています。先に使用先を差し替えてください'
+                : undefined
             }
             onClick={() => {
               setBulkDeleteError('')
@@ -1604,38 +1606,44 @@ export default function TemplatesListV8() {
               <Button type="button" variant="primary" onClick={() => withViewTransition(() => router.push(detailHref(activeTemplate)))}>
                 詳細を見る
               </Button>
-              <Button type="button" variant="secondary" disabled={!canMutateTemplates} onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))}>
-                編集する
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!canMutateTemplates}
-                onClick={() => {
-                  setDuplicateError('')
-                  setDuplicateTarget(activeTemplate)
-                }}
-              >
-                複製する
-              </Button>
-              <Button type="button" variant="secondary" disabled={!canMutateTemplates} onClick={() => openMove([activeTemplate.id])}>
-                フォルダへ移す
-              </Button>
-              <Button type="button" variant="danger" disabled={!canMutateTemplates} onClick={() => handleDelete(activeTemplate)}>
-                削除する
-              </Button>
+              {/* 閲覧のみ：変えるボタンは置かない（2026-10-06 オーナー決定） */}
+              {canMutateTemplates ? <>
+                <Button type="button" variant="secondary" onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))}>
+                  編集する
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setDuplicateError('')
+                    setDuplicateTarget(activeTemplate)
+                  }}
+                >
+                  複製する
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => openMove([activeTemplate.id])}>
+                  フォルダへ移す
+                </Button>
+                <Button type="button" variant="danger" onClick={() => handleDelete(activeTemplate)}>
+                  削除する
+                </Button>
+              </> : null}
             </div>
           }
         >
           <div className={styles.panelBody}>
             <p className={styles.panelLabel}>名前</p>
-            <InlineEdit
-              value={activeTemplate.name}
-              label="テンプレートの名前"
-              disabled={!canMutateTemplates}
-              maxLength={100}
-              onSave={(next) => renameTemplate(activeTemplate, next)}
-            />
+            {canMutateTemplates ? (
+              <InlineEdit
+                value={activeTemplate.name}
+                label="テンプレートの名前"
+                maxLength={100}
+                onSave={(next) => renameTemplate(activeTemplate, next)}
+              />
+            ) : (
+              // 閲覧のみ：鉛筆は置かず、名前だけを見せる。
+              <p className={styles.panelText}>{activeTemplate.name}</p>
+            )}
             <p className={styles.panelLabel}>中身の抜粋</p>
             <p className={styles.panelText}>
               {latestContentOf(activeTemplate).slice(0, 120)}
@@ -1731,7 +1739,7 @@ export default function TemplatesListV8() {
           ))}
         </KpiBand>
       }
-      folders={<>{createButton(true)}{folderPanel}</>}
+      folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={listPager}
       overlays={overlays}

@@ -425,7 +425,7 @@ async function prepareOperation(db: D1Database, operation: FriendBulkOperation):
     case 'set_friend_fields': {
       const ids = Object.keys(operation.values);
       const rows = await db.prepare(
-        `SELECT id, ec_is_master, type, COALESCE(type_v6, type) AS resolved_type, options_json, name
+        `SELECT id, ec_is_master, type, COALESCE(type_v8, type_v6, type) AS resolved_type, options_json, name
            FROM friend_fields WHERE id IN (${ids.map(() => '?').join(',')})`,
       ).bind(...ids).all<{ id: string; ec_is_master: number; resolved_type: string; options_json: string | null; name: string }>();
       if (rows.results.length !== ids.length) throw new FriendBulkRunError('friend_field_not_found', '友だち情報の項目が見つかりません', 404);
@@ -765,7 +765,7 @@ async function executeOperation(
       // N-042: 書き込みは中央の口へ寄せ、項目定義で検証・正規化する。
       // 作成時に検証済みのはずだが、列車合流前の古い操作が残っていても不正値を書かない。
       const defs = await db.prepare(
-        `SELECT id, COALESCE(type_v6, type) AS resolved_type, options_json
+        `SELECT id, COALESCE(type_v8, type_v6, type) AS resolved_type, options_json
            FROM friend_fields WHERE id IN (${ids.map(() => '?').join(',')})`,
       ).bind(...ids).all<{ id: string; resolved_type: string; options_json: string | null }>();
       const defById = new Map(defs.results.map((row) => [row.id, row]));

@@ -22,6 +22,7 @@ import {
   Pause,
   Play,
   Plus,
+  Zap,
 } from 'lucide-react'
 import {
   automationActionLabel,
@@ -37,6 +38,7 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
@@ -464,9 +466,19 @@ export default function AutomationListV8() {
       />
     )
   } else if (paged.length === 0) {
-    listBody = items.length === 0
-      ? <ListState kind="empty" title="まだ、ルールはありません" description="見本から作ると、よくある決めごと（友だち追加のお礼など）がすぐ始められます。" action={canEdit ? <Button variant="primary" href="/automations/new"><Plus size={15} aria-hidden="true" />ルールを作る</Button> : undefined} />
-      : <ListState kind="empty" title="条件に合うルールはありません" description="検索や絞り込みの札を外すと、すべて出ます。" action={<Button variant="secondary" onClick={() => { setSearch(''); setOnlyActive(false); setOnlyStopped(false); setSaved(''); setFolderFilter('') }}>条件を外す</Button>} />
+    /* 修正案 D-2：空の一覧。 */
+    listBody = (
+      <EmptyList
+        icon={<Zap aria-hidden="true" />}
+        title="まだオートメーションがありません"
+        description="「友だち追加でお礼を送る」など、決めた動きを自動で続けます。"
+        create={{ label: '最初のオートメーションを作る', href: '/automations/new' }}
+        canCreate={canEdit}
+        filtered={items.length > 0}
+        onClearFilters={() => { setSearch(''); setOnlyActive(false); setOnlyStopped(false); setSaved(''); setFolderFilter('') }}
+        filteredDescription="検索や絞り込みの札を外すと、すべて出ます"
+      />
+    )
   } else {
     listBody = (
       <>

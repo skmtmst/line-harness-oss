@@ -6,7 +6,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
-import OtpInput from '@/components/shared/otp-input'
+import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { api } from '@/lib/api'
@@ -30,7 +30,7 @@ export default function OpsTwoFactorV8() {
   const [uri, setUri] = useState('')
   const [manualKey, setManualKey] = useState('')
   const [qr, setQr] = useState('')
-  const [code, setCode] = useState('')
+  const [typedCode, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [qrFailed, setQrFailed] = useState(false)
@@ -90,18 +90,22 @@ export default function OpsTwoFactorV8() {
     return () => { cancelled = true }
   }, [uri, qrAttempt])
 
-  const digits = code.replace(/\D/g, '')
+  const digits = typedCode.replace(/\D/g, '')
   const codeComplete = digits.length === 6
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!session || busy) return
+  /* 6桁目が入った瞬間にも送る（entered）。送っている間は二重に送らない。 */
+  const submit = async (event?: FormEvent, entered?: string) => {
+    event?.preventDefault()
+    if (busy) return
+    const code = entered ?? typedCode
+    if (!session) return
+    const digits = code.replace(/\D/g, '')
     if (digits.length !== 6) { setError('6桁の数字を入力してください'); return }
     setBusy(true)
     setError('')
     const res = await opsCall(api.staff.confirmTwoFactorSetup(session.id, digits))
     setBusy(false)
-    if (!res.success) { setError(res.error || '認証コードが正しくありません'); return }
+    if (!res.success) { setError(otpFailureMessage(res.error || '認証コードが正しくありません')); return }
     setState('done')
   }
 
@@ -154,7 +158,7 @@ export default function OpsTwoFactorV8() {
             </div>
             <div className={styles.field}>
               <span id="ops-totp-label" className={styles.label}>認証コード（6桁）</span>
-              <OtpInput id="ops-totp-code" value={code} onChange={setCode} labelledBy="ops-totp-label" invalid={Boolean(error)} disabled={busy} />
+              <OtpInput id="ops-totp-code" value={typedCode} onChange={setCode} onComplete={(entered) => void submit(undefined, entered)} labelledBy="ops-totp-label" invalid={Boolean(error)} busy={busy} />
             </div>
             <Button type="submit" variant="primary" disabled={busy || !uri || !codeComplete} className={styles.wide} busy={busy} busyLabel="確認しています…">
               <Check aria-hidden="true" />登録する

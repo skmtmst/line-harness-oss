@@ -1603,3 +1603,58 @@ describe('枠の自動調整ルールと媒体閉鎖通知のAPI',()=>{
   expect((await requestWithMethod(done,'POST',{})).status).toBe(409);
  });
 });
+
+
+describe('提案E 来店記録', () => {
+  it('来店の印と取消が履歴に反映され、過去の案内済みも数える', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec("UPDATE rt_reservations SET customer_phone='09000000000' WHERE id='reservation-ginza'");
+    const path='/api/restaurant-test/reservations/reservation-ginza/visit?account_id=account-1';
+    expect((await request(path,{kind:'visited'})).status).toBe(200);
+    expect((await request(path,{kind:'visited'})).status).toBe(409);
+    const history=()=>request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-ginza&phone=09000000000');
+    expect((await (await history()).json() as any).data.visitCount).toBe(1);
+    expect((await requestWithMethod(path,'DELETE')).status).toBe(200);
+    expect((await (await history()).json() as any).data.visitCount).toBe(0);
+    expect(testDb.raw.prepare('SELECT undone_at FROM rt_seat_visit_marks').get()).toMatchObject({undone_at:expect.any(String)});
+    testDb.raw.exec("UPDATE rt_reservations SET status='seated' WHERE id='reservation-ginza'");
+    expect((await (await history()).json() as any).data.visitCount).toBe(1);
+  });
+  it('予約なしの来店は名前なしで記録でき、同じ卓の重なり・人数違い・他店を拒否する', async () => {
+    seedRestaurantFixture();
+    const path='/api/restaurant-test/reservations/walk-in?account_id=account-1';
+    const body={storeId:'store-ginza',tableId:'table-ginza',guestCount:2};
+    expect((await request(path,{...body,guestCount:5})).status).toBe(400);
+    expect((await request(path,{...body,storeId:'store-yokohama'})).status).toBe(400);
+    const res=await request(path,body);expect(res.status).toBe(201);
+    const data=(await res.json() as any).data;
+    expect(data).toMatchObject({status:'visited',source:'walk_in',tableId:'table-ginza'});
+    expect(Math.abs(Date.now()-Date.parse(data.startsAt))).toBeLessThan(10000);
+    expect((await request(path,body)).status).toBe(409);
+  });
+});
+
+
+describe('提案E 媒体リンク',()=>{
+  it('HTTPSだけ保存し、店舗ごとに読み直し、版の競合を拒む',async()=>{
+    seedRestaurantFixture();testDb.raw.exec("INSERT INTO rt_media(id,code,name,parser_key) VALUES('hp','hotpepper','媒体','hp')");const path='/api/restaurant-test/media-links/hotpepper?account_id=account-1';
+    const input={storeId:'store-ginza',pageUrl:'https://example.com/shop',loginUrl:'https://example.com/login',closeOnBooking:true,expectedVersion:0};
+    expect((await requestWithMethod(path,'PUT',{...input,pageUrl:'http://example.com'})).status).toBe(400);
+    expect((await requestWithMethod(path,'PUT',input)).status).toBe(200);
+    expect((await requestWithMethod(path,'PUT',input)).status).toBe(409);
+    expect((await requestWithMethod(path,'PUT',{...input,expectedVersion:1})).status).toBe(200);
+    const data=(await (await request('/api/restaurant-test/media-links?account_id=account-1&storeId=store-ginza')).json() as any).data;
+    expect(data.find((x:any)=>x.code==='hotpepper')).toMatchObject({pageUrl:input.pageUrl,version:2,closeOnBooking:1});
+  });
+  it('予約を受けないグルメ媒体を追加でき、閉じる対象にはできない',async()=>{
+    seedRestaurantFixture();
+    expect((await request('/api/restaurant-test/media?account_id=account-1',{code:'gourmet_review',name:'口コミサイト'})).status).toBe(201);
+    expect((await requestWithMethod('/api/restaurant-test/media-links/gourmet_review?account_id=account-1','PUT',{storeId:'store-ginza',pageUrl:null,loginUrl:null,closeOnBooking:true,expectedVersion:0})).status).toBe(400);
+  });
+  it('貼り付けURLは再発行でも同じで、お客さま向けページ未提供を明示する',async()=>{
+    seedRestaurantFixture();const path='/api/restaurant-test/reservation-link?account_id=account-1';
+    const a=(await (await request(path,{storeId:'store-ginza'})).json() as any).data;
+    const b=(await (await request(path,{storeId:'store-ginza'})).json() as any).data;
+    expect(a).toEqual(b);expect(a.available).toBe(false);expect(a.url).toMatch(/^https:\/\//);expect(a.html).toContain('noopener');
+  });
+});

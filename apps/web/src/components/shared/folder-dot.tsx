@@ -27,8 +27,12 @@ export function FolderDot({ folder }: { folder?: FolderDotFolder | null }) {
   )
 }
 
-/** 丸＋名前の1行。名前は1行のまま省略する（全文は呼ぶ側の title で見せる）。 */
-export function FolderDotName({ folder, children }: { folder?: FolderDotFolder | null; children: ReactNode }) {
+/**
+ * 丸＋名前の1行。名前は1行のまま省略する（全文は呼ぶ側の title で見せる）。
+ * `dot={false}` は丸を置かず名前だけを返す（丸の無い絵の板。例：1152 の板でまだ丸を描いていない一覧）。
+ */
+export function FolderDotName({ folder, dot = true, children }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode }) {
+  if (!dot) return <>{children}</>
   return (
     <span className={styles.line}>
       <FolderDot folder={folder} />

@@ -38,7 +38,7 @@ function app() {
 let store: SqliteD1;
 let bindings: Env['Bindings'];
 
-const COUPON = { title: '見本クーポン', description: '10%お得', actionUrl: 'https://example.com/' };
+const COUPON = { startsAt:'2026-01-01T00:00',endsAt:'2027-01-01T00:00', title: '見本クーポン', description: '10%お得', actionUrl: 'https://example.com/' };
 
 beforeEach(() => {
   store = createTestD1();

@@ -8,9 +8,9 @@ import {
 
 describe('キーワード1行ぶんの判定', () => {
   it('完全一致と部分一致', () => {
-    expect(keywordRuleMatches({ keyword: '予約', matchType: 'exact' }, '予約')).toBe(true);
-    expect(keywordRuleMatches({ keyword: '予約', matchType: 'exact' }, '予約したい')).toBe(false);
-    expect(keywordRuleMatches({ keyword: '予約', matchType: 'contains' }, '予約したい')).toBe(true);
+    expect(keywordRuleMatches({ keyword: '予約', matchType: 'exact',caseSensitive:false }, '予約')).toBe(true);
+    expect(keywordRuleMatches({ keyword: '予約', matchType: 'exact',caseSensitive:false }, '予約したい')).toBe(false);
+    expect(keywordRuleMatches({ keyword: '予約', matchType: 'contains',caseSensitive:false }, '予約したい')).toBe(true);
   });
 
   it('空のキーワードは当てない（全部に当たってしまう）', () => {
@@ -51,8 +51,8 @@ describe('キーワード1行ぶんの判定', () => {
       expect(keywordRuleMatches(rule, 'ＬＩＮＥ')).toBe(true);
     });
 
-    it('既定では区別する', () => {
-      expect(keywordRuleMatches({ keyword: 'LINE', matchType: 'exact' }, 'line')).toBe(false);
+    it('既定ではそろえる', () => {
+      expect(keywordRuleMatches({ keyword: 'LINE', matchType: 'exact' }, 'line')).toBe(true);
     });
   });
 });
@@ -60,7 +60,7 @@ describe('キーワード1行ぶんの判定', () => {
 describe('resolveKeywordRules', () => {
   it('設定が無ければ、これまでどおりの1行として扱う', () => {
     expect(resolveKeywordRules({ keyword: '予約', match_type: 'contains' })).toEqual([
-      { keyword: '予約', matchType: 'contains' },
+      { keyword: '予約', matchType: 'contains',caseSensitive:false },
     ]);
   });
 
@@ -83,13 +83,13 @@ describe('resolveKeywordRules', () => {
       match_type: 'exact',
       keywords_json: '{壊れた',
     });
-    expect(rules).toEqual([{ keyword: '予約', matchType: 'exact' }]);
+    expect(rules).toEqual([{ keyword: '予約', matchType: 'exact',caseSensitive:false }]);
   });
 
   it('中身が空の配列でも、元の1行に戻す', () => {
     expect(
       resolveKeywordRules({ keyword: '予約', match_type: 'exact', keywords_json: '[]' }),
-    ).toEqual([{ keyword: '予約', matchType: 'exact' }]);
+    ).toEqual([{ keyword: '予約', matchType: 'exact',caseSensitive:false }]);
   });
 });
 
@@ -193,7 +193,7 @@ describe('一律で応答（キーワードを見ない）', () => {
 
 describe('すべてにマッチ', () => {
   const twoKeywords = JSON.stringify([
-    { keyword: '予約', matchType: 'contains' },
+    { keyword: '予約', matchType: 'contains',caseSensitive:false },
     { keyword: 'キャンセル', matchType: 'contains' },
   ]);
 
@@ -237,7 +237,7 @@ describe('すべてにマッチ', () => {
       keyword: '',
       match_type: 'exact',
       keywords_json: JSON.stringify([
-        { keyword: '予約', matchType: 'exact' },
+        { keyword: '予約', matchType: 'exact',caseSensitive:false },
         { keyword: 'キャンセル', matchType: 'exact' },
       ]),
       keyword_match_mode: 'all',
@@ -253,8 +253,8 @@ describe('すべてにマッチ', () => {
       keyword: '',
       match_type: 'exact',
       keywords_json: JSON.stringify([
-        { keyword: '予約', matchType: 'exact' },
-        { keyword: '予約', matchType: 'exact' },
+        { keyword: '予約', matchType: 'exact',caseSensitive:false },
+        { keyword: '予約', matchType: 'exact',caseSensitive:false },
       ]),
       keyword_match_mode: 'all',
     };

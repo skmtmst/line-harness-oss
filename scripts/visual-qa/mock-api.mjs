@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 /** このファイル自身の指紋。動いている中身が古くないかを言うために持つ。 */
 const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
 import { readArrayGetPaths } from './api-shapes.mjs'
+import { LARGE_ENABLED, largeBody } from './large-mode.mjs'
 import { BILLING_INVOICES, BILLING_SUMMARY } from './billing-fixture.mjs'
 import {
   mileageWriteResponse,
@@ -67,7 +68,7 @@ import {
   BROADCAST_APPROVAL_CONFIG, BROADCAST_APPROVAL_CANDIDATES, BROADCAST_APPROVAL_STATE,
   BROADCAST_RECIPIENTS, BROADCAST_ACTIVITY,
   BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_FIELD_FOLDERS,
-  FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW,
+  FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW, FRIEND_FIELD_MIGRATION_PREVIEW_DOG,
   INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS, TEMPLATE_TEST_RECIPIENTS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
@@ -86,7 +87,7 @@ import {
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_ARCHIVE_IMPACT, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, OUTGOING_WEBHOOK_TEST_RESULT, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, INCOMING_WEBHOOK_UNMATCHED, ENTRY_ROUTES, INFLOW_SUMMARY,
-  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, MEASUREMENT_SITES, AD_PLATFORMS, AD_CONVERSION_LOGS, TRACKED_LINKS,
+  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, MEASUREMENT_SITES, AD_PLATFORMS, AD_CONVERSION_LOGS, AD_CONVERSION_LOG_SUMMARY, AD_EVENT_MAPPINGS, TRACKED_LINKS,
   AD_COST_ROWS, AD_COST_PLATFORMS, AD_COST_MANUAL_ENTRIES, AD_CONVERSION_COST,
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
@@ -94,17 +95,17 @@ import {
   OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, COMMON_ACTION_DETAIL_PURCHASE, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
-  BOOKING_MENUS, BOOKING_CHANNELS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_AVAILABILITY_STORE_VIEW, BOOKING_RESOURCES,
+  BOOKING_MENUS, BOOKING_CHANNELS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_AVAILABILITY_STORE_VIEW, BOOKING_AVAILABILITY_OCT, BOOKING_RESOURCES,
   BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_EXCEPTIONS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_SEND_COUNTS, LINE_NOTIFICATION_DELIVERIES,
-  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_FOLDERS, EVENT_DETAIL, EVENT_SLOTS, EVENT_OCCURRENCE_APPLICANTS, EVENT_WAITLIST, EVENT_BOOKINGS, EVENT_CHANGE_PREVIEW, EVENT_CHANGE_APPLY_RESULT, EVENT_LIFECYCLE_RESULT, EVENT_WAITLIST_REORDER_RESULT, EVENT_WAITLIST_SKIP_RESULT, EVENT_LIFF_CHANGE_RESULT, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, OPERATOR_NOTIFICATION_TEAMS, ADMIN_EVENTS, EVENT_FOLDERS, EVENT_DETAIL, EVENT_SLOTS, EVENT_OCCURRENCE_APPLICANTS, EVENT_WAITLIST, EVENT_BOOKINGS, EVENT_CHANGE_PREVIEW, EVENT_CHANGE_APPLY_RESULT, EVENT_LIFECYCLE_RESULT, EVENT_WAITLIST_REORDER_RESULT, EVENT_WAITLIST_SKIP_RESULT, EVENT_LIFF_CHANGE_RESULT, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
   NEN_PHOTO_REWARD_POLICY_VERSIONS,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
-  FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS,
+  FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_DETAIL_PUBLISHED, FORM_SUBMISSIONS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_TAGS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_DETAIL_STOPPED, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   ACCOUNT_HEALTH_LOGS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
@@ -120,8 +121,130 @@ import {
   HQ_BANNER_PRESETS, HQ_BANNER_USAGE, HQ_BANNER_STATS, HQ_BANNER_PROJECTS, HQ_BANNER_IMAGES,
   HQ_BANNER_ARCHIVED_PROJECTS, HQ_BANNER_IMAGE_COUNTS,
   NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST, NEN_FEEDING_PRODUCTS, NEN_HEALTH_SUMMARY_KOMUGI,
-  FRIEND_ADD_RUN_DETAIL, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
+  FRIEND_ADD_RUN_DETAIL, FRIEND_ADD_RUN_DETAIL_FAILED, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
 } from './fixtures.mjs'
+
+/* リッチメニューの公開の進み（K-1）。default は今までの見本（割り当てで失敗）。 */
+const RICH_MENU_PUBLISH_PROGRESS = {
+  default: {
+    run: { id: 'visual-qa-run', mode: 'publish', status: 'failed', startedAt: '2026-09-27T10:00:00+09:00', completedAt: '2026-09-27T10:01:00+09:00' },
+    steps: [
+      { key: 'image', label: '画像をLINEに上げる', status: 'done' },
+      { key: 'menu', label: 'メニューを作る', status: 'done' },
+      { key: 'assign', label: '友だちに割り当てる', status: 'failed' },
+      { key: 'cleanup', label: '前のメニューを片付ける', status: 'pending' },
+    ],
+    message: '割り当てに失敗したので、作ったメニューをLINEから消し、前のメニューのままにしました。もう一度公開できます。',
+  },
+}
+/* 公開済みの詳細（hKr8f）：4つの段がすべて済み。 */
+RICH_MENU_PUBLISH_PROGRESS['rich-menu-target'] = {
+  run: { id: 'run-target-3', mode: 'publish', status: 'succeeded', startedAt: '2026-10-01T10:44:00+09:00', completedAt: '2026-10-01T10:45:00+09:00' },
+  steps: [
+    { key: 'image', label: '画像をLINEへ登録', status: 'done' },
+    { key: 'menu', label: 'ボタンの動きをLINEへ登録', status: 'done' },
+    { key: 'assign', label: 'すべての友だちの既定に設定', status: 'done' },
+    { key: 'cleanup', label: '旧メニュー「通常メニュー（旧）」を既定から外す', status: 'done' },
+  ],
+  message: null,
+}
+const RICH_MENU_RUN = (id, status, at, lastErrorCode = null) => ({
+  id, status, lastErrorCode, idempotencyKey: `visual-${id}`, requestedByStaffId: 'visual-qa-owner', createdAt: at, updatedAt: at,
+  version: { name: '通常メニュー（会員向け）', chatBarText: 'メニューを開く', pageCount: 3, isDefaultForAll: true, targetingEnabled: false },
+  pages: [],
+})
+const RICH_MENU_PUBLISH_RUNS = {
+  'rich-menu-target': {
+    runs: [
+      RICH_MENU_RUN('run-target-3', 'succeeded', '2026-10-01T10:45:00+09:00'),
+      RICH_MENU_RUN('run-target-2b', 'succeeded', '2026-09-20T18:02:00+09:00'),
+      RICH_MENU_RUN('run-target-2a', 'failed', '2026-09-20T17:55:00+09:00', 'line_api_timeout'),
+    ],
+    published: null,
+    draftDiffersFromPublished: false,
+  },
+}
+
+
+/* タグの編集の絵（Qat9s）の「EC顧客連携済み」。一覧の行（TAGS の先頭）と同じ値に、保存済みの連動の動きを足した形。 */
+const TAG_EC_CUSTOMER_ACTIONS = [
+  { id: 'tag-ec-action-scenario', type: 'start_scenario', params: { scenarioId: 'scenario-subscription-follow' }, onFailure: 'continue' },
+  { id: 'tag-ec-action-tag', type: 'add_tag', params: { tagId: 'tag-2' }, onFailure: 'stop' },
+  { id: 'tag-ec-action-mark', type: 'set_support_mark', params: { markId: 'mark-masato' }, onFailure: 'continue' },
+]
+const TAG_EC_CUSTOMER_DEFINITION_TAG = {
+  ...TAG_DEFINITION_NEN_SUBSCRIPTION.tag,
+  id: 'tag-ec-customer',
+  name: 'EC顧客連携済み',
+  groupId: 'g-purchase',
+  friendCount: 64,
+  mileageReward: 10,
+  referralMileageReward: 0,
+  mileageMultiplierBps: 12000,
+  mileageMultiplierPriority: 3,
+  isStarred: true,
+  createdAt: '2026-01-11T00:00:00.000Z',
+  usedIn: { broadcasts: 3, forms: 1 },
+  otherActionCount: 3,
+  description: 'ECの会員と連携できた友だち',
+  linkedActions: [
+    { id: 'tag-ec-action-scenario', type: 'シナリオ開始', label: 'シナリオ「定期便フォロー」を始める', timing: 'すぐに' },
+    { id: 'tag-ec-action-tag', type: 'タグ追加', label: 'タグ「NEN会員」を付ける', timing: 'すぐに' },
+    { id: 'tag-ec-action-mark', type: '対応マーク変更', label: '担当を「Masato」にする', timing: 'すぐに' },
+  ],
+}
+const TAG_EC_CUSTOMER_AUTOMATION = {
+  ...TAG_DEFINITION_NEN_SUBSCRIPTION.automation,
+  id: 'common-action-tag-ec-customer',
+  name: 'EC顧客連携済みが付いたとき',
+  publishedVersion: { ...TAG_DEFINITION_NEN_SUBSCRIPTION.automation.publishedVersion, actions: TAG_EC_CUSTOMER_ACTIONS },
+  draftVersion: { ...TAG_DEFINITION_NEN_SUBSCRIPTION.automation.draftVersion, actions: TAG_EC_CUSTOMER_ACTIONS },
+  actions: TAG_EC_CUSTOMER_ACTIONS,
+}
+
+
+/* 詳細の絵（UTbi1）の template-1。一覧の行（TEMPLATES）は変えず、詳細と版の口だけこの形を返す。 */
+const TEMPLATE_1_CONTENT = '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking'
+const TEMPLATE_1_DETAIL = (template) => ({
+  ...template,
+  folderId: 'tf-booking',
+  category: '予約',
+  messageContent: TEMPLATE_1_CONTENT,
+  updatedAt: '2026-08-21T18:02:00+09:00',
+  accountId: 'visual-qa-account',
+  question: null,
+  questionStatus: 'draft',
+  hasDraft: true,
+  publishedVersion: 2,
+  publishedAt: '2026-08-02T10:15:00+09:00',
+  draftRevision: 1,
+  usedBy: {
+    broadcasts: [
+      { broadcastId: 'broadcast-sep-remind', title: '9月の予約リマインド（予約済み）', status: 'scheduled', scheduledAt: '2026-09-30T18:00:00+09:00', templateVersionNumber: 2, referenceMode: 'fixed' },
+    ],
+    autoReplies: [{ id: 'auto-reply-booking-change', keyword: '予約変更のお問い合わせ', matchType: 'contains', lineAccountId: 'visual-qa-account', templateVersion: null }],
+    scenarioSteps: [{ scenarioId: 'scenario-booking-follow', scenarioName: '予約フォロー', stepId: 'step-booking-follow-1', stepOrder: 1, templateVersion: null }],
+    reminderSteps: [
+      { reminderId: 'reminder-visit-aoi', reminderName: '来店前日（あおい）', stepId: 'rstep-aoi-1' },
+      { reminderId: 'reminder-visit-umeda', reminderName: '来店前日（梅田）', stepId: 'rstep-umeda-1' },
+      { reminderId: 'reminder-visit-namba', reminderName: '来店前日（なんば）', stepId: 'rstep-namba-1' },
+    ],
+    reminderEnrollments: [
+      { enrollmentId: 'enroll-aoi-0921', reminderId: 'reminder-visit-aoi', reminderName: '来店前日（あおい）9月21日分', versionNumber: 2, enrollmentStatus: 'active', targetDate: '2026-09-21' },
+    ],
+    richMenuAreas: [
+      { groupId: 'rmg-1', groupName: '会員メニュー', pageName: '1ページ目', areaId: 'area-booking', label: '予約の確認' },
+      { groupId: 'rmg-1', groupName: '会員メニュー', pageName: '2ページ目', areaId: 'area-booking-2', label: '予約の変更' },
+    ],
+    trackedLinks: [{ id: 'link-booking-lp', name: '予約ページの案内' }],
+    automations: [{ id: 'automation-booking-day-before', name: '予約前日の自動送信', eventType: 'booking_reminder' }],
+  },
+})
+const TEMPLATE_1_VERSIONS = [
+  { versionNumber: 2, status: 'in_use', messageType: 'text', messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} のご予約です。\nhttps://nen.example/booking', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-02T10:15:00+09:00' },
+  { versionNumber: 1, status: 'past', messageType: 'text', messageContent: '{名前}さん、こんにちは。\n明日のご予約をお待ちしています。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-07-14T09:40:00+09:00' },
+]
+
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -1340,6 +1463,20 @@ const RESTAURANT_OPENING_HOURS = {
     { weekday: 6, periods: [{ opensAt: '11:30', closesAt: '14:00' }, { opensAt: '17:00', closesAt: '23:00' }] },
   ],
 }
+/* 提案 E-1・E-5（枠を閉じる知らせ）：枠×媒体で1件。サーバ（/api/restaurant-test/channel-close-tasks）と同じ形。 */
+const RESTAURANT_CLOSE_TASKS = [
+  /* 絵 YMVFD の並び：19:00（2媒体・未対応）・19:30（3媒体・未対応）・翌日 18:00（1つ閉じた・残り1つ）・20:00（もう開けてよい）。閉じたタブ用に 18:00 を1件。 */
+  { id: 'cct-1', storeId: 'store-sby', slotId: 'slot-1900', startsAt: restaurantAt(19, 0), channel: 'hotpepper', status: 'close', reason: 'limited', remainingSeats: 2, recipientIds: [], createdAt: restaurantAt(17, 40), updatedAt: restaurantAt(17, 40) },
+  { id: 'cct-2', storeId: 'store-sby', slotId: 'slot-1900', startsAt: restaurantAt(19, 0), channel: 'tabelog', status: 'close', reason: 'limited', remainingSeats: 2, recipientIds: [], createdAt: restaurantAt(17, 40), updatedAt: restaurantAt(17, 40) },
+  { id: 'cct-3', storeId: 'store-sby', slotId: 'slot-1930', startsAt: restaurantAt(19, 30), channel: 'hotpepper', status: 'close', reason: 'full', remainingSeats: 0, recipientIds: [], createdAt: restaurantAt(17, 50), updatedAt: restaurantAt(17, 50) },
+  { id: 'cct-4', storeId: 'store-sby', slotId: 'slot-1930', startsAt: restaurantAt(19, 30), channel: 'tabelog', status: 'close', reason: 'full', remainingSeats: 0, recipientIds: [], createdAt: restaurantAt(17, 50), updatedAt: restaurantAt(17, 50) },
+  { id: 'cct-7', storeId: 'store-sby', slotId: 'slot-1930', startsAt: restaurantAt(19, 30), channel: 'ikyu', status: 'close', reason: 'full', remainingSeats: 0, recipientIds: [], createdAt: restaurantAt(17, 50), updatedAt: restaurantAt(17, 50) },
+  { id: 'cct-8', storeId: 'store-sby', slotId: 'slot-1800-next', startsAt: restaurantAt(18, 0, 1), channel: 'tabelog', status: 'done', reason: 'limited', remainingSeats: 1, recipientIds: [], createdAt: restaurantAt(17, 30), updatedAt: restaurantAt(17, 35) },
+  { id: 'cct-9', storeId: 'store-sby', slotId: 'slot-1800-next', startsAt: restaurantAt(18, 0, 1), channel: 'hotpepper', status: 'close', reason: 'limited', remainingSeats: 1, recipientIds: [], createdAt: restaurantAt(17, 30), updatedAt: restaurantAt(17, 30) },
+  { id: 'cct-5', storeId: 'store-sby', slotId: 'slot-2000', startsAt: restaurantAt(20, 0), channel: 'hotpepper', status: 'reopen', reason: 'limited', remainingSeats: 4, recipientIds: [], createdAt: restaurantAt(16, 10), updatedAt: restaurantAt(17, 20) },
+  { id: 'cct-10', storeId: 'store-sby', slotId: 'slot-2000', startsAt: restaurantAt(20, 0), channel: 'tabelog', status: 'reopen', reason: 'limited', remainingSeats: 4, recipientIds: [], createdAt: restaurantAt(16, 10), updatedAt: restaurantAt(17, 20) },
+  { id: 'cct-6', storeId: 'store-sby', slotId: 'slot-1800', startsAt: restaurantAt(18, 0), channel: 'hotpepper', status: 'done', reason: 'full', remainingSeats: 0, recipientIds: [], createdAt: restaurantAt(15, 0), updatedAt: restaurantAt(15, 10) },
+]
 /* 板 hQQlt（予約経路の連携）：媒体ごとの受け取り。サーバ（/api/restaurant-test/channels）と同じ形。 */
 const RESTAURANT_CHANNELS = [
   { id: 'media-hp', code: 'hotpepper', name: 'Hot Pepper グルメ', todayCount: 9, lastReceivedAt: restaurantAt(18, 42), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
@@ -1941,10 +2078,18 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
      * 運用者へのお知らせを作る（V8-B sDXNy）：公開の前に下書きを保存してから確認の窓を出す。
      * ここに無いと 405 で下書きの保存が失敗に見え、窓が撮れなかった。作った1件を返す。
      */
-    return { ...OPERATOR_NOTIFICATION_RULES[0], id: 'op-rule-new-draft', status: 'draft', version: 1 }
+    return { ...OPERATOR_NOTIFICATION_RULES[0], id: 'op-rule-new-draft', status: 'draft', isActive: false, version: 1 }
   }
-  if (method === 'POST' && /^\/api\/notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
+  if (method === 'POST' && /^\/api\/(line-)?notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
     return { accepted: 2, excluded: 0, failed: 0, duplicate: 0 }
+  }
+  /*
+   * 運用者へのお知らせを作る（板 gjUz3）→ 公開前の確認（板 sDXNy）。公開を押すと先に下書きを保存し、
+   * 保存できたときだけ確認の窓が出る。405 だと窓が出ず「下書きを保存できませんでした」で撮られていた。
+   */
+  if ((method === 'POST' && pathname === '/api/line-notifications/operator-rules')
+    || (method === 'PUT' && /^\/api\/line-notifications\/operator-rules\/[^/]+\/draft$/.test(pathname))) {
+    return { ...OPERATOR_NOTIFICATION_RULES[0], id: 'operator-rule-new', status: 'draft', isActive: false, version: 1 }
   }
   const scenarioSimulation = /^\/api\/scenarios\/([^/]+)\/simulate$/.exec(pathname)
   if (method === 'POST' && scenarioSimulation) {
@@ -2043,6 +2188,8 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
     return FRIEND_ADD_RULE_PUBLISH
   }
   if (method === 'POST' && /^\/api\/friend-fields\/[^/]+\/migration-preview$/.test(pathname)) {
+    // 板 GobMd：愛犬のお名前は種類だけの見本（移行先なし・確認番号なし）を返す。ほかは今までどおり。
+    if (pathname.includes('/field-dog-name/')) return FRIEND_FIELD_MIGRATION_PREVIEW_DOG
     return FRIEND_FIELD_MIGRATION_PREVIEW
   }
   if (method === 'POST' && pathname === '/api/inbox/saved-views') {
@@ -2369,6 +2516,32 @@ function nenMetricsBody(data, query) {
 }
 
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  /*
+    友だちのマイル詳細（V8 R6kIG・手で増やす・減らす M8zhjL）は1人に絞って読む。
+    絞ったときだけ絵の数（残高 1,240・確定待ち 120・期限が近い 200）と5行の明細を返す。
+    絞らない一覧（友だちの残高・履歴のタブ）は今までの見本のまま。
+  */
+  if (method === 'GET' && pathname === '/api/mileage/friends' && query.get('friendId') === 'friend-1') {
+    const base = MILEAGE_FRIENDS.items[0]
+    return { success: true, data: { ...MILEAGE_FRIENDS, items: [{
+      ...base, displayName: 'Kenta Kawano', available: 1240, pending: 120, monthChange: 180,
+      expiringMiles30d: 200, nextExpiringAt: '2026-10-31T00:00:00+09:00',
+    }], pagination: { total: 1, limit: 1, offset: 0 } } }
+  }
+  if (method === 'GET' && pathname === '/api/mileage/history' && query.get('friendId') === 'friend-1') {
+    const row = (id, entryType, status, amount, reason, ruleName, mode, executedByStaffName, occurredAt, balanceAfter) => ({
+      id, primaryFriendId: 'friend-1', displayName: 'Kenta Kawano', pictureUrl: null, entryType, status, amount, reason,
+      source: mode === 'manual' ? 'manual' : 'rule', hasSourceEvent: false, sourceReferenceId: null, ruleName, mode,
+      executedByStaffName, occurredAt, lineAccountName: '然 本店', balanceAfter,
+    })
+    return { success: true, data: { ...MILEAGE_HISTORY, items: [
+      row('mf-1', 'grant', 'available', 10, 'リンクをクリック', '秋の新商品のお知らせ', 'automatic', null, '2026-09-30T10:32:00+09:00', 1240),
+      row('mf-2', 'spend', 'available', -500, '送料無料クーポンと交換', '使い道：送料無料クーポン', 'automatic', null, '2026-09-29T18:05:00+09:00', 1230),
+      row('mf-3', 'grant', 'available', 48, '商品を買った', '購入 ¥4,800', 'automatic', null, '2026-09-28T21:40:00+09:00', 1730),
+      row('mf-4', 'adjustment', 'available', 100, 'おわびで付けた', '手で増やす', 'manual', '河野', '2026-09-27T12:10:00+09:00', 1682),
+      row('mf-5', 'reversal', 'available', -10, '付けすぎを取り消し', 'リンクをクリック（重複）', 'manual', '河野', '2026-09-20T09:00:00+09:00', 1582),
+    ], pagination: { total: 5, limit: 100, offset: 0 } } }
+  }
   if (method === 'GET' && pathname === '/api/hq/billing/summary') {
     return { success: true, data: BILLING_SUMMARY }
   }
@@ -2455,6 +2628,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/channels') {
     return { success: true, data: RESTAURANT_CHANNELS }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/channel-close-tasks') {
+    return { success: true, data: RESTAURANT_CLOSE_TASKS }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/inbound-emails') {
     return { success: true, data: RESTAURANT_INBOUND_EMAILS, total: RESTAURANT_INBOUND_EMAILS.length }
@@ -2645,6 +2821,38 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/affiliate-settlements/preview') {
     /* 締めの期間は頼まれた期間を返す（本物と同じ）。無いときは見本の期間。 */
     return { success: true, data: { ...AFFILIATE_SETTLEMENT_PREVIEW, periodFrom: query.get('periodFrom') ?? AFFILIATE_SETTLEMENT_PREVIEW.periodFrom, periodTo: query.get('periodTo') ?? AFFILIATE_SETTLEMENT_PREVIEW.periodTo } }
+  }
+  /* ★V8-B nAesv：注文1件の状況（引き出し）。出来事2件・成果とマイルとスコア・発送後の案内2件。 */
+  {
+    const orderDetail = /^\/api\/ec-commerce\/orders\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && orderDetail) {
+      const id = decodeURIComponent(orderDetail[1])
+      const order = EC_ORDERS.items.find((item) => item.id === id) ?? EC_ORDERS.items[0]
+      const action = (eventId, eventType, receivedAt) => ({
+        id: `${eventId}-action`, eventId, eventType, actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded',
+        attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: receivedAt, nextRetryAt: null, version: 1,
+        receivedAt, orderNumber: order.orderNumber, customerName: order.customerName, retryAvailable: false, attempts: [],
+      })
+      return {
+        success: true,
+        data: {
+          order,
+          events: [
+            { id: 'ece-detail-1', externalEventId: 'ext-ece-1', eventType: 'ec.order.confirmed', status: 'processed', failureKind: null, receivedAt: '2026-10-01T12:02:00.000Z', processedAt: '2026-10-01T12:02:30.000Z', actions: [action('ece-detail-1', 'ec.order.confirmed', '2026-10-01T12:02:00.000Z')], dispatches: [], deliveries: [] },
+            { id: 'ece-detail-2', externalEventId: 'ext-ece-2', eventType: 'ec.order.shipped', status: 'processed', failureKind: null, receivedAt: '2026-10-02T00:40:00.000Z', processedAt: '2026-10-02T00:40:30.000Z', actions: [action('ece-detail-2', 'ec.order.shipped', '2026-10-02T00:40:00.000Z')], dispatches: [], deliveries: [] },
+          ],
+          followUps: [
+            { id: 'fu-1', campaignKey: 'delivered_check', campaignLabel: 'お荷物は届きましたか（NEN配信）', scheduledAt: '2026-10-04T01:00:00.000Z', status: 'pending', attempts: 0, sentAt: null, reason: null, failureKind: null },
+            { id: 'fu-2', campaignKey: 'review_request', campaignLabel: '口コミのお願い（NEN配信）', scheduledAt: '2026-10-12T01:00:00.000Z', status: 'pending', attempts: 0, sentAt: null, reason: null, failureKind: null },
+          ],
+          outcomes: {
+            conversions: [{ id: 'cv-detail-1', pointName: '商品を買った', approvalStatus: 'approved', value: 7540, createdAt: '2026-10-01T12:03:00.000Z', orderNumber: order.orderNumber, ecEventId: 'ece-detail-1', affiliateName: null, rewardAmount: null, rewardEntryStatus: null, reversedAmount: null, settlementState: null, payoutBatchState: null, payoutResult: null, duplicateCandidate: false }],
+            mileage: [{ id: 'ml-detail-1', entryType: 'earn', amount: 75, status: 'confirmed', reason: '商品を買った', occurredAt: '2026-10-01T12:03:00.000Z' }],
+            scores: [{ id: 'sc-detail-1', scoreChange: 30, reason: '商品を買った', occurredAt: '2026-10-01T12:03:00.000Z' }],
+          },
+        },
+      }
+    }
   }
   if (pathname === '/api/ec-commerce/orders') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
@@ -3139,8 +3347,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const identityCandidate = /^\/api\/identity-candidates\/([^/]+)$/.exec(pathname)
   if (identityCandidate) {
     if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
-    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id
-      ? IDENTITY_CANDIDATE_EC
+    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id || identityCandidate[1].startsWith('ec-identity-')
+      ? { ...IDENTITY_CANDIDATE_EC, id: identityCandidate[1] }
       : IDENTITY_CANDIDATE_FRIEND
     return { success: true, data: candidate }
   }
@@ -3209,6 +3417,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 友だち詳細（★V8 Q5F2QE・JCDRm）の履歴・次の予定・回答。friend-1 だけ。
    * 絵の「最近の履歴」3行・「進行中」1行・回答カード2枚と同じ形にする（2026-10-07）。
    */
+  /* 行動スコアの明細（V8 R8NNi「点数の変化の明細」）。新しい順に5件、合計は上から足し引きが合う。 */
+  const friendScore = pathname.match(/^\/api\/friends\/([^/]+)\/score$/)
+  if (friendScore) {
+    const row = (id, reason, scoreChange, scoreAfter, occurredAt) => ({
+      id, scoringRuleId: null, ruleKey: null, scoreChange, scoreBefore: scoreAfter - scoreChange, scoreAfter,
+      reason, eventType: null, source: null, occurredAt, createdAt: occurredAt, mode: 'automatic', executedByStaffName: null,
+    })
+    return { success: true, data: { friendId: friendScore[1], currentScore: 36, history: [
+      row('fs-1', '配信のURLを押した', 3, 36, '2026-09-30T10:32:00+09:00'),
+      row('fs-2', '購入した', 30, 33, '2026-09-28T21:40:00+09:00'),
+      row('fs-3', '配信のURLを押した', 3, 3, '2026-09-24T08:12:00+09:00'),
+      row('fs-4', '「返信した」の点が消えた（14日）', -5, 0, '2026-09-16T09:00:00+09:00'),
+      row('fs-5', 'メッセージに返信した', 5, 5, '2026-09-02T19:20:00+09:00'),
+    ] } }
+  }
   if (pathname === '/api/friends/friend-1/timeline') {
     const item = (id, type, summary, occurredAt, source, account = { id: 'visual-qa-account', name: '然-NEN-TEST' }) => ({
       id, type, summary, status: null, source, occurredAt, lineAccount: account,
@@ -3321,6 +3544,34 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: TEMPLATES }
   }
   const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
+  /* 設計 NCbYn（編集中に競合）：一覧に出ない ID。使われる場所は無く、本文に URL が1つある。 */
+  if (templateDetail && templateDetail[1] === 'template-80') {
+    return {
+      success: true,
+      data: {
+        id: 'template-80',
+        name: '店舗のご案内',
+        category: '未分類',
+        messageType: 'text',
+        messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking',
+        folderId: null,
+        question: null,
+        questionStatus: 'draft',
+        usageCount: 0,
+        tapCount: 0,
+        monthlySendCount: 0,
+        totalSendCount: 0,
+        createdAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-30T05:02:00.000Z',
+        accountId: 'visual-qa-account',
+        usedBy: { autoReplies: [], automations: [], scenarioSteps: [], reminderSteps: [], richMenuAreas: [], trackedLinks: [], broadcasts: [] },
+        hasDraft: false,
+        publishedVersion: 3,
+        publishedAt: '2026-09-10T11:02:00+09:00',
+        draftRevision: 0,
+      },
+    }
+  }
   if (templateDetail) {
     const template = TEMPLATES.find((item) => item.id === templateDetail[1])
     if (template) {
@@ -3346,6 +3597,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       } : {
         autoReplies: [], automations: [], scenarioSteps: [], reminderSteps: [], richMenuAreas: [], trackedLinks: [], broadcasts: [],
       }
+      /*
+       * template-1 は詳細の絵（UTbi1・公開の窓 cuR8I・削除できない窓 Z0g3si）の形：
+       * 未公開の下書きがあり、11 か所（版を決めた 2 か所）で使われている。
+       */
+      if (template.id === 'template-1') {
+        return { success: true, data: TEMPLATE_1_DETAIL(template) }
+      }
       return {
         success: true,
         data: {
@@ -3365,6 +3623,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   // #820: 版の履歴。新しい版から返す。status は in_use / reserved / past。
   const templateVersions = /^\/api\/templates\/(template-\d+)\/versions$/.exec(pathname)
   if (templateVersions) {
+    if (templateVersions[1] === 'template-1') return { success: true, data: TEMPLATE_1_VERSIONS }
     return {
       success: true,
       data: [
@@ -3449,6 +3708,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* V8「集まった回答」の絵のフォーム（v0SbYR・MKQyJ）。form-1 とは別の ID。 */
   if (pathname === `/api/forms/${FORM_VISIT_DETAIL.id}`) return { success: true, data: FORM_VISIT_DETAIL }
   if (pathname === `/api/forms/${FORM_VISIT_DETAIL.id}/submissions`) return { success: true, data: FORM_VISIT_SUBMISSIONS }
+  /* 公開中の版（実口は account_id が無いと公開中の版を返す。編集画面は `?view=published` を付けて読む）。 */
+  if (pathname === `/api/forms/${FORM_DETAIL.id}` && query.get('view') === 'published') return { success: true, data: FORM_DETAIL_PUBLISHED }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
@@ -3654,6 +3915,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 顔ぶれを見る）を確かめられない。人数・顔ぶれ・数え直しは
    * `REMINDER_VALIDATE` / `REMINDER_AUDIENCE` が固定で返す。
    */
+  /*
+   * テスト送信先の状態。無いと既定の器が返って「未設定」の案内と
+   * 「送信先を再確認」が出て、確認の段（ltAaq）が 84px 下へずれていた。
+   * 絵は「送り先：Kenta Kawano（自分）」。
+   */
+  if (/^\/api\/reminders\/[^/]+\/test-recipient$/.test(pathname)) {
+    return {
+      success: true,
+      data: {
+        state: 'ready',
+        recipient: { id: 'visual-staff-self', displayName: 'Kenta Kawano', pictureUrl: null },
+        recipientKind: 'self',
+      },
+    }
+  }
   if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
     const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
     if (draftId === 'reminder-new') return { success: true, data: { ...REMINDER_NEW_DRAFT } }
@@ -3713,8 +3989,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
      * 本物は `actionRuns` まで含めた1件（`friend-add-rules.ts`）。
      * 未知IDは本物と同じく失敗にする。
      */
-    if (friendAddRunDetail[1] !== FRIEND_ADD_RUN_DETAIL.id) return { success: false, error: '実行結果が見つかりません' }
-    return { success: true, data: FRIEND_ADD_RUN_DETAIL }
+    const found = [FRIEND_ADD_RUN_DETAIL, FRIEND_ADD_RUN_DETAIL_FAILED].find((item) => item.id === friendAddRunDetail[1])
+    if (!found) return { success: false, error: '実行結果が見つかりません' }
+    return { success: true, data: found }
   }
   if (pathname === '/api/scenarios') {
     const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
@@ -3984,6 +4261,20 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/tags') return { success: true, data: TAGS }
   const tagDependencies = /^\/api\/tags\/([^/]+)\/dependencies$/.exec(pathname)
   if (tagDependencies) {
+    if (tagDependencies[1] === 'tag-ec-customer') {
+      const zero = Object.fromEntries(Object.keys(TAG_DEPENDENCIES_NEN_SUBSCRIPTION.referenceCounts).map((key) => [key, 0]))
+      return {
+        success: true,
+        data: {
+          ...TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
+          friendCount: 64,
+          tag: { ...TAG_DEPENDENCIES_NEN_SUBSCRIPTION.tag, id: 'tag-ec-customer', name: 'EC顧客連携済み' },
+          referenceCounts: { ...zero, broadcasts: 3, forms: 1 },
+          references: TAG_DEPENDENCIES_NEN_SUBSCRIPTION.references.filter((ref) => ref.kind === 'broadcast' || ref.kind === 'form'),
+          blockingReferenceCount: 4,
+        },
+      }
+    }
     return {
       success: true,
       data: {
@@ -3994,6 +4285,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   const tagDefinition = /^\/api\/tags\/([^/]+)$/.exec(pathname)
   if (tagDefinition) {
+    /* タグの編集の絵（Qat9s・競合 xn95q）は一覧の先頭「EC顧客連携済み」。名前・人数・連動の動きを絵に合わせる。 */
+    if (tagDefinition[1] === 'tag-ec-customer') {
+      return query.get('withActions') === '1'
+        ? { success: true, data: { ...TAG_DEFINITION_NEN_SUBSCRIPTION, ...TAG_EC_CUSTOMER_DEFINITION_TAG, tag: TAG_EC_CUSTOMER_DEFINITION_TAG, automation: TAG_EC_CUSTOMER_AUTOMATION } }
+        : { success: true, data: TAG_EC_CUSTOMER_DEFINITION_TAG }
+    }
     const tag = { ...TAG_DEFINITION_NEN_SUBSCRIPTION.tag, id: tagDefinition[1] }
     return query.get('withActions') === '1'
       ? { success: true, data: { ...TAG_DEFINITION_NEN_SUBSCRIPTION, ...tag, tag } }
@@ -4145,6 +4442,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       data: { conversionCost: AD_CONVERSION_COST, rows: AD_COST_ROWS, platforms: AD_COST_PLATFORMS, manualEntries: AD_COST_MANUAL_ENTRIES },
     }
   }
+  /* F-21 成果地点と広告に返す名前の対応（板 FDBsG）。 */
+  if (pathname === '/api/ad-platforms/mappings') return { success: true, data: AD_EVENT_MAPPINGS }
   if (pathname === '/api/ad-platforms/logs') {
     const page = Math.max(1, Number(query.get('page')) || 1)
     const limit = Math.min(200, Math.max(1, Number(query.get('limit')) || 20))
@@ -4162,6 +4461,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       data: {
         items: filtered.slice((page - 1) * limit, page * limit),
         total: filtered.length,
+        summary: AD_CONVERSION_LOG_SUMMARY,
         page,
         limit,
         sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }],
@@ -4422,6 +4722,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     ).map(toPublic)
     return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
   }
+  /* 運用者へのお知らせのチーム（板 gjUz3 の「チーム」欄・sDXNy の宛先）。高橋・佐々木・中川の3人（LINE は2人）。 */
+  if (pathname === '/api/notifications/teams') {
+    return { success: true, data: OPERATOR_NOTIFICATION_TEAMS }
+  }
   if (pathname === '/api/notifications/operator-rules' || pathname === '/api/line-notifications/operator-rules') {
     /*
      * 本物は両方の名で同じ一覧を返す（`notifications.ts`）。
@@ -4577,13 +4881,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
        * `data.items` が取れず「読み込めませんでした」になっていた。
        * 本物と同じ処理1件ずつの器で返す。
        */
-      const items = EC_ACTION_EXECUTIONS.items.map((execution) => ({
-        ...execution,
-        eventLabel: '',
-        friendId: null,
-        failureKind: null,
-        order: null,
-      }))
+      /* 本物と同じく注文番号で注文を結ぶ（★V8-B nAesv：行の「…」から注文の状況を開ける）。 */
+      const items = EC_ACTION_EXECUTIONS.items.map((execution) => {
+        const order = EC_ORDERS.items.find((item) => item.orderNumber === execution.orderNumber) ?? null
+        return {
+          ...execution,
+          eventLabel: '',
+          friendId: order?.friendId ?? null,
+          failureKind: null,
+          order,
+        }
+      })
       return {
         success: true,
         data: { items, total: items.length, summary: EC_ACTION_EXECUTIONS.summary },
@@ -4876,6 +5184,24 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/rich-menu-groups/tap-stats') {
     return { success: true, data: RICH_MENU_TAP_STATS }
   }
+  /*
+   * 公開前の確認・公開の進み・公開の履歴・予約の一覧（読むだけの口）。
+   * 下の書き込みの節（method !== 'GET' の中）にも同じ口があるが、GET はそこまで届かず
+   * 既定の器（items）が返っていた。読む口はここで返す。
+   */
+  const richMenuReadPrecheck = /^\/api\/rich-menu-groups\/([^/]+)\/prepublish-check$/.exec(pathname)
+  if (richMenuReadPrecheck) {
+    return { success: true, data: { fingerprint: 'visual-qa-fp', pageCount: 2, maxPages: 10, selfCheck: { ok: true, message: '自前の検査を通りました。' }, deviceConfirmed: false, deviceConfirmedAt: null, versionNumber: null } }
+  }
+  const richMenuReadProgress = /^\/api\/rich-menu-groups\/([^/]+)\/publish-progress$/.exec(pathname)
+  if (richMenuReadProgress) {
+    return { success: true, data: RICH_MENU_PUBLISH_PROGRESS[richMenuReadProgress[1]] ?? RICH_MENU_PUBLISH_PROGRESS.default }
+  }
+  const richMenuReadRuns = /^\/api\/rich-menu-groups\/([^/]+)\/publish-runs$/.exec(pathname)
+  if (richMenuReadRuns) {
+    return { success: true, data: RICH_MENU_PUBLISH_RUNS[richMenuReadRuns[1]] ?? { runs: [], published: null, draftDiffersFromPublished: null } }
+  }
+  if (/^\/api\/rich-menu-groups\/[^/]+\/schedules$/.test(pathname)) return { success: true, data: [] }
   const richMenuGroup = /^\/api\/rich-menu-groups\/([^/]+)$/.exec(pathname)
   if (richMenuGroup) {
     const group = RICH_MENU_GROUP_DETAILS[richMenuGroup[1]]
@@ -4883,7 +5209,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ? { success: true, data: group }
       : { success: false, error: 'リッチメニューが見つかりません' }
   }
-  if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
+  if (pathname === '/api/tag-groups') {
+    /* 本物は指定のアカウントのフォルダに accountId を付けて返す。タグの編集は accountId で絞るので、付けて返す。 */
+    const lineAccountId = query.get('lineAccountId')
+    return { success: true, data: lineAccountId ? TAG_GROUPS.map((group) => ({ ...group, accountId: lineAccountId })) : TAG_GROUPS }
+  }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
   if (/^\/api\/accounts\/[^/]+\/health$/.test(pathname)) {
     /*
@@ -5110,6 +5440,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/nen-campaigns/overview') {
     // `jobs` が入っていないと `overview.jobs.pending` で落ちる。
     return { success: true, data: { activeCampaigns: 6, jobs: { total: 2640, pending: 148, sent: 2486, failed: 6 }, columns: 24, pets: 864, coupons: 28 } }
+  }
+  /*
+   * やり取りの中身（F-18：伏せ字にした本文）。板 `DA0Ag` の中身の箱。
+   * 予約台帳（wi-2）だけ絵の本文を返し、ほかは「残っていない」。
+   */
+  const interactionPayload = /^\/api\/webhooks\/interactions\/([^/]+)\/payload$/.exec(pathname)
+  if (interactionPayload) {
+    const id = decodeURIComponent(interactionPayload[1])
+    return id === 'wi-2'
+      ? { success: true, data: { id, available: true, body: { event: 'booking_created', booking_id: 'bk_8f2…', menu: 'カウンセリング 30分', friend: 'Masato S.（伏せ字）' } } }
+      : { success: true, data: { id, available: false, body: null } }
   }
   if (pathname === '/api/webhooks/interactions') {
     /*
@@ -5463,6 +5804,15 @@ const server = createServer((req, res) => {
   if (url.pathname === '/__mock-fingerprint') {
     res.writeHead(200).end(JSON.stringify({ fingerprint: FINGERPRINT }))
     return
+  }
+
+  // 速さの測定用：VISUAL_QA_LARGE=1 のときだけ件数の多い見本を先に返す（既定の撮影は変わらない）。
+  if (LARGE_ENABLED) {
+    const large = largeBody(method, url.pathname, url.searchParams)
+    if (large !== undefined) {
+      res.writeHead(200).end(JSON.stringify(large))
+      return
+    }
   }
 
   if (method === 'GET' && url.pathname === '/api/file-scans') {
@@ -6443,7 +6793,8 @@ const server = createServer((req, res) => {
       req.on('end', () => {
         let dryRun = true
         try { dryRun = JSON.parse(raw || '{}').dryRun !== false } catch { dryRun = true }
-        const diffs = [
+        /* 公開済みの詳細の見本（hKr8f の rich-menu-target）は、ずれ無し。 */
+        const diffs = richMenuReconcile[1] === 'rich-menu-target' ? [] : [
           { kind: 'external_only', detail: 'LINEにだけあるメニュー「別で作ったメニュー」（rm-external-1）があります', richMenuId: 'rm-external-1', fix: { label: 'こちらに取り込む', action: 'import-external' } },
           { kind: 'default_mismatch', detail: 'LINEの全員既定がこのメニューを指していません（現在: rm-other-9）', richMenuId: 'rm-other-9', fix: { label: 'こちらに合わせる', action: 'relink-default' } },
         ]
@@ -6495,9 +6846,17 @@ const server = createServer((req, res) => {
     return
   }
 
-  /* 予約設定の右の写し（お客さまの予約画面）は店舗のルールを当てた空きを読む。ほかの画面は従来の空き。 */
+  /* 予約設定の右の写し（お客さまの予約画面）は店舗のルールを当てた空きを読む。ほかの画面は下の日付での分け方。 */
   if (url.pathname === '/api/booking/admin/availability' && url.searchParams.get('apply_store_rules') === '1') {
     res.writeHead(200).end(JSON.stringify(BOOKING_AVAILABILITY_STORE_VIEW))
+    return
+  }
+  /*
+    空いている時間：V8 の画面（右のスマホの見本）は今日から聞く。10/1 以降の範囲なら絵（10/2 金 始まり）の空きを返す。
+    それより前の範囲（v6 の撮影・代理予約の手順は 9/3 を選ぶ）は今までどおり。
+  */
+  if (url.pathname === '/api/booking/admin/availability' && (url.searchParams.get('from') ?? '') >= '2026-10-01') {
+    res.writeHead(200).end(JSON.stringify(BOOKING_AVAILABILITY_OCT))
     return
   }
   if (url.pathname in RAW) {

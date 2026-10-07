@@ -32,7 +32,6 @@ import {
   MoreHorizontal,
   Pause,
   Plus,
-  Search as SearchIcon,
   TriangleAlert,
   X,
 } from 'lucide-react'
@@ -53,6 +52,7 @@ import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -69,7 +69,9 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
+import HelpTip from '@/components/shared/help-tip'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars'
 import { formatDay, formatNumber } from '@/lib/format'
@@ -102,7 +104,6 @@ const MAX_BATCH_DELETE_COUNT = 20
 /** 期限が近い帯の幅。7日以内に期限切れになるものを数える。 */
 const EXPIRING_SOON_MS = 7 * 24 * 3600_000
 
-const NO_WRITE_NOTE = '閲覧のみのため、変える操作は使えません。'
 
 /*
  * 道具の段の絞り込み（板 `FM94M`：空のまま・期限つき・使われていない・
@@ -764,27 +765,22 @@ function CommonVarsListInner() {
   /* 行の「…」の中身。右クリックでも同じものを出す。 */
   const rowMenuItems = (item: CommonVar): ActionMenuItem[] => {
     const stopped = (item.status ?? 'active') === 'stopped'
-    const readonlyReason = canWrite ? undefined : NO_WRITE_NOTE
+    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
+    if (!canWrite) return []
     return [
       {
         id: 'edit',
         label: '編集',
-        disabled: !canWrite,
-        disabledReason: readonlyReason,
         onSelect: () => withViewTransition(() => router.push(`/contents/vars/edit?id=${item.id}`)),
       },
       stopped ? {
         id: 'resume',
         label: '再開する',
-        disabled: !canWrite,
-        disabledReason: readonlyReason,
         onSelect: () => openStatusDialog(item, 'resume'),
       } : {
         id: 'stop',
         label: '止める',
         icon: <Pause size={14} aria-hidden="true" />,
-        disabled: !canWrite,
-        disabledReason: readonlyReason,
         onSelect: () => openStatusDialog(item, 'stop'),
       },
       {
@@ -792,8 +788,6 @@ function CommonVarsListInner() {
         label: '削除する',
         tone: 'danger',
         dividerBefore: true,
-        disabled: !canWrite,
-        disabledReason: readonlyReason,
         onSelect: () => void openDelete(item),
       },
     ]
@@ -953,6 +947,12 @@ function CommonVarsListInner() {
     </div>
   ) : null
 
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。未分類は色の無い輪。 */
+  const folderDotOf = (row: { folderId: string | null }): FolderDotFolder | null => {
+    if (!row.folderId) return null
+    const folder = folders.find((f) => f.id === row.folderId)
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
   /* 並びは絵どおり：すべて → 作ったフォルダ → 未分類（最後）。 */
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: listFailed ? null : items.length },
@@ -974,16 +974,12 @@ function CommonVarsListInner() {
   ]
   const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
 
-  /* 閲覧のみでは押せない形にする（消さない）。行き先のある押し口に disabled は付けられないため描き分ける。 */
+  /* 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。 */
   const createButton = (full: boolean) => canWrite ? (
     <Button href="/contents/vars/new" variant="primary" className={full ? 'v8-folder-create w-full' : undefined}>
       <Plus size={15} aria-hidden="true" />共通情報を作る
     </Button>
-  ) : (
-    <Button type="button" variant="primary" disabled title={NO_WRITE_NOTE} className={full ? 'v8-folder-create w-full' : undefined}>
-      <Plus size={15} aria-hidden="true" />共通情報を作る
-    </Button>
-  )
+  ) : null
 
   const folderPanel = (
     <FolderPanel
@@ -991,8 +987,6 @@ function CommonVarsListInner() {
       onSelect={setFolderFilter}
       onAddFolder={canWrite ? () => setAddingFolder(true) : undefined}
       addFolderLabel="フォルダを追加"
-      addFolderDisabled={!canWrite}
-      addFolderTitle={canWrite ? undefined : NO_WRITE_NOTE}
       rows={folderRows}
     >
       {folderFailureNote}
@@ -1228,29 +1222,23 @@ function CommonVarsListInner() {
       </div>
     )
   ) : filtered.length === 0 ? (
-    items.length === 0 ? (
-      <div className={styles.stateCard}>
-        <span className={styles.stateIcon}><Braces size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>まだ共通情報はありません</p>
-        <p className={styles.stateDesc}>会社名や営業時間を1か所で持つと、変えるときに1回直すだけで済みます。</p>
-        {canWrite ? createButton(false) : null}
-      </div>
-    ) : (
-      <div className={styles.stateCard}>
-        <span className={styles.stateIcon}><SearchIcon size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>条件に合う共通情報はありません</p>
-        <p className={styles.stateDesc}>「空のまま」「期限つき」「使われていない」「下書き・止めた」や検索を外すと、すべて出ます</p>
-        <Button type="button" variant="secondary" onClick={clearVarFilters}>
-          <X size={13} aria-hidden="true" />条件を外す
-        </Button>
-      </div>
-    )
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<Braces aria-hidden="true" />}
+      title="まだ共通情報がありません"
+      description="会社名や営業時間を1か所で持ち、メッセージに差し込みます。"
+      create={{ label: '最初の共通情報を作る', href: '/contents/vars/new' }}
+      canCreate={canWrite}
+      filtered={items.length > 0}
+      onClearFilters={clearVarFilters}
+      filteredDescription="「空のまま」「期限つき」「使われていない」「下書き・止めた」や検索を外すと、すべて出ます"
+    />
   ) : (
     <>
       <ContextMenu
         label={contextItem ? `共通情報「${contextItem.name}」の操作` : '共通情報の操作'}
         items={contextMenuItems}
-        shouldOpen={(event) => Boolean((event.target as HTMLElement | null)?.closest?.('tr[data-row-id]'))}
+        shouldOpen={(event) => canWrite && Boolean((event.target as HTMLElement | null)?.closest?.('tr[data-row-id]'))}
       >
         <div className={styles.tableWrap}>
           <DataTable>
@@ -1325,17 +1313,21 @@ function CommonVarsListInner() {
                     </Td>
                     <NameCell
                       name={
-                        <Link
-                          href={`/contents/vars/edit?id=${item.id}`}
-                          title={item.name}
-                          className={styles.nameLink}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          {item.name}
-                        </Link>
+                        <div className={styles.dotLine}>
+                          <FolderDotName folder={folderDotOf(item)} dot={!narrow}>
+                            <Link
+                              href={`/contents/vars/edit?id=${item.id}`}
+                              title={item.name}
+                              className={styles.nameLink}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              {item.name}
+                            </Link>
+                          </FolderDotName>
+                        </div>
                       }
                       sub={
-                        <span className={styles.keyRow}>
+                        <span className={narrow ? styles.keyRow : `${styles.keyRow} ${styles.dotIndent}`}>
                           <code title={placeholderText(item.varKey)} className={styles.keyCode}>
                             {placeholderText(item.varKey)}
                           </code>
@@ -1370,8 +1362,9 @@ function CommonVarsListInner() {
                       </Td>
                     )}
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
-                      {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。 */}
-                      <div className={styles.menuBox}>
+                      {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。
+                          閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す）。 */}
+                      {canWrite ? <div className={styles.menuBox}>
                         <IconButton
                           className={styles.rowMenuButton}
                           title={`共通情報「${item.name}」の操作`}
@@ -1386,10 +1379,9 @@ function CommonVarsListInner() {
                           open={openMenuId === item.id}
                           onClose={() => setOpenMenuId(null)}
                           ariaLabel={`共通情報「${item.name}」の操作`}
-                          note={canWrite ? undefined : NO_WRITE_NOTE}
                           items={rowMenuItems(item)}
                         />
-                      </div>
+                      </div> : null}
                     </Td>
                   </Tr>
                 )
@@ -1538,6 +1530,9 @@ function CommonVarsListInner() {
       <Dialog
         open={deleteTarget !== null}
         designNode="xxKtW"
+        designWidth={600}
+        designTop={240}
+        designHeaderPadding="24px 24px 0"
         /* 絵 xxKtW：まだ消せないときは赤い題にしない（差し替え・止めるへ導く窓）。消せるときだけ赤。 */
         tone={deleteImpact && !deleteImpact.canDelete ? 'default' : 'destructive'}
         title={deleteTarget
@@ -1545,21 +1540,27 @@ function CommonVarsListInner() {
             ? `「${deleteTarget.name}」はまだ消せません`
             : `「${deleteTarget.name}」を消しますか？`
           : ''}
-        description={deleteTarget
-          ? deleteImpact && !deleteImpact.canDelete
-            ? `${formatNumber(deleteImpact.total)}か所に差し込まれています。消すと、そこが空欄のまま送られます。先に差し込みを外してください。`
-            : 'この共通情報と、登録値・次回予約を削除します。テンプレート・配信・フォルダ・友だちは削除しません。'
-          : ''}
         busy={deleteBusy}
         error={deleteError || undefined}
         onCancel={closeDelete}
         footer={deleteTarget ? (
           /* 絵 xxKtW：キャンセルは真ん中、実行は右端。 */
-          <div className={styles.splitFooter}>
-            <span aria-hidden="true" />
+          <div className={`${styles.splitFooter} ${styles.deleteFooter}`}>
+            {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
+            {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
+              <input
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="理由（必須・記録に残ります）"
+                aria-label="消した理由・止める理由（記録に残ります）"
+                title="消した理由・止める理由（記録に残ります）"
+                className={styles.footerReason}
+              />
+            ) : <span aria-hidden="true" />}
             <Button type="button" onClick={closeDelete} disabled={deleteBusy}>
               キャンセル
             </Button>
+            <span aria-hidden="true" />
             <span className={styles.footerEnd}>
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete && deleteChoice === 'replace' ? (
               <Button
@@ -1602,7 +1603,13 @@ function CommonVarsListInner() {
         ) : undefined}
       >
         {deleteTarget ? (
-          <div className={styles.dialogBody}>
+          <div className={`${styles.dialogBody} ${styles.deleteBody}`}>
+            {/* 絵 xxKtW：説明は窓の横いっぱい（×の列の下まで）。共通の窓の説明は×の左までなので本文側に置く。 */}
+            <p className={styles.deleteLead}>
+              {deleteImpact && !deleteImpact.canDelete
+                ? `${formatNumber(deleteImpact.total)}か所に差し込まれています。消すと、そこが空欄のまま送られます。先に差し込みを外してください。`
+                : 'この共通情報と、登録値・次回予約を削除します。テンプレート・配信・フォルダ・友だちは削除しません。'}
+            </p>
             {deletePhase === 'loading' ? (
               <p className={styles.dialogLead}>使われている場所を確認しています…</p>
             ) : deletePhase === 'error' ? (
@@ -1630,7 +1637,7 @@ function CommonVarsListInner() {
                         {visible.map((usageItem) => (
                           <li key={`${usageItem.kind}-${usageItem.href}`} className={styles.usageItem}>
                             <span className={styles.usageItemName}>
-                              {usageItem.kindLabel}「{usageItem.name}」
+                              {`${usageItem.kindLabel}「${usageItem.name}」`}
                             </span>
                             <a href={usageItem.href} className={styles.usageItemLink}>開いて外す</a>
                           </li>
@@ -1656,7 +1663,12 @@ function CommonVarsListInner() {
 
                 {!deleteImpact.canDelete ? (
                   <div className={styles.choiceGroup} role="radiogroup" aria-label="どうしますか">
-                    <p className={styles.dialogQuestion}>どうしますか</p>
+                    <p className={styles.dialogQuestion}>
+                      どうしますか
+                      <HelpTip label="確認した範囲">
+                        {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
+                      </HelpTip>
+                    </p>
                     <div
                       className={styles.choiceBox}
                       data-active={deleteChoice === 'replace' || undefined}
@@ -1729,10 +1741,9 @@ function CommonVarsListInner() {
                   <p className={styles.dialogHint}>{unavailableText(deleteImpact)}</p>
                 ) : null}
 
+                {deleteImpact.canDelete ? (
                 <label className={styles.dialogField}>
-                  <span className={styles.dialogLabel}>
-                    {deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'}
-                  </span>
+                  <span className={styles.dialogLabel}>消した理由（記録に残ります）</span>
                   <input
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
@@ -1740,6 +1751,7 @@ function CommonVarsListInner() {
                     className={styles.dialogInput}
                   />
                 </label>
+                ) : null}
 
                 {deleteImpact.canDelete ? (
                   <label className={styles.dialogField}>
@@ -1759,9 +1771,9 @@ function CommonVarsListInner() {
                   <p className={styles.dialogHint}>{blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason })}</p>
                 ) : null}
 
-                <p className={styles.dialogHint}>
+                {deleteImpact.canDelete ? <p className={styles.dialogHint}>
                   {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
-                </p>
+                </p> : null}
               </>
             ) : null}
           </div>
@@ -1871,26 +1883,31 @@ function CommonVarsListInner() {
                   {activeStopped ? '再開する' : '止める'}
                 </Button>
               ) : null}
-              <Button
-                type="button"
-                variant="danger"
-                disabled={!canWrite}
-                onClick={() => void openDelete(activeItem)}
-              >
-                削除する
-              </Button>
+              {canWrite ? (
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => void openDelete(activeItem)}
+                >
+                  削除する
+                </Button>
+              ) : null}
             </div>
           }
         >
           <div className={styles.panelBody}>
             <p className={styles.panelLabel}>名前</p>
-            <InlineEdit
-              value={activeItem.name}
-              label="共通情報の名前"
-              disabled={!canWrite}
-              maxLength={100}
-              onSave={(next) => renameVar(activeItem, next)}
-            />
+            {canWrite ? (
+              <InlineEdit
+                value={activeItem.name}
+                label="共通情報の名前"
+                maxLength={100}
+                onSave={(next) => renameVar(activeItem, next)}
+              />
+            ) : (
+              // 閲覧のみ：鉛筆は置かず、名前だけを見せる。
+              <p className={styles.panelText}>{activeItem.name}</p>
+            )}
             <p className={styles.panelLabel}>中身</p>
             <p className={styles.panelText}>
               {formatVarValue(activeItem.type, activeItem.value) || '（空）'}
@@ -1991,7 +2008,7 @@ function CommonVarsListInner() {
           ))}
         </KpiBand>
       }
-      folders={<>{createButton(true)}{folderPanel}</>}
+      folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
       toolbar={<>
         {hasAlerts ? <div className={styles.alertSlot}>{alerts}</div> : null}
         {narrow ? narrowToolbar : wideToolbar}

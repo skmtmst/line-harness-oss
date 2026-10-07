@@ -18,6 +18,7 @@ import type {
 import { Archive, Eye, EyeOff, HardDrive, Images, LayoutGrid, List as ListIcon, Plus } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import Checkbox from '@/components/shared/checkbox'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ActionMenu from '@/components/shared/action-menu'
@@ -1118,12 +1119,8 @@ export default function MediaLibraryListV8() {
               setFolderFilter(id)
               setPage(1)
             }}
-            onAddFolder={() => setAddingFolder(true)}
-            addFolderDisabled={!canManageMedia}
-            addFolderTitle={canManageMedia ? undefined : managementPermissionReason}
-            addFolderNote={canManageMedia ? undefined : (
-              <p>{managementPermissionReason}。</p>
-            )}
+            /* 閲覧のみ：フォルダを追加は置かない（理由は上の閲覧のみの帯で伝える。2026-10-06 オーナー決定）。 */
+            onAddFolder={canManageMedia ? () => setAddingFolder(true) : undefined}
             rows={[
               // R38: 「すべて」は絞り込み前の総数。絞り込み後の件数を
               // 入れると「すべて0・未分類2」のように母集団が混ざる。
@@ -1658,26 +1655,15 @@ export default function MediaLibraryListV8() {
                 絞り込みの0件に作る口を出すと、保存済みが消えたと誤読される。
                 代わりに「条件を外す」を置く。
               */}
-              {total === 0 && !hasFilter ? (
-                <ListState
-                  kind="empty"
-                  title="まだメディアがありません"
-                  description="配信で使う画像・動画・音声・ファイルの置き場です。"
-                  action={<Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録する</Button>}
-                />
-              ) : (
-                <ListState
-                  kind="empty"
-                  emptyPreset="filtered"
-                  title="条件に合うメディアはありません"
-                  description="種類、フォルダ、または検索条件を変えてください。"
-                  action={(
-                    <Button type="button" onClick={clearFilters}>
-                      条件を外す
-                    </Button>
-                  )}
-                />
-              )}
+              <EmptyList
+                icon={<Images aria-hidden="true" />}
+                title="まだメディアがありません"
+                description="配信で使う画像・動画・音声・ファイルを置いておきます。"
+                create={{ label: '最初のメディアを登録する', onClick: () => setUploadOpen(true) }}
+                filtered={hasFilter}
+                onClearFilters={clearFilters}
+                filteredDescription="種類、フォルダ、検索を外すと、すべて出ます"
+              />
             </div>
           ) : (
             <div className={view === 'grid' ? styles.cards : styles.rows}>

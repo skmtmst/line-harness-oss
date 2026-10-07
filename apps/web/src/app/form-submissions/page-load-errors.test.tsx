@@ -240,7 +240,7 @@ describe('正常・空は従来どおり', () => {
       throw new Error(`unexpected fetch: ${url}`)
     })
     await mount()
-    expect(host.textContent).toContain('まだ回答フォームはありません')
+    expect(host.textContent).toContain('まだ回答フォームがありません')
   })
 })
 

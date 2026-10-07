@@ -151,4 +151,13 @@
 [data-theme='v8'] .labelRow { margin-bottom: 0; gap: 6px; }
 [data-theme='v8'] .label { line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 [data-theme='v8'] .input { gap: 0; }
+
+/* 打ち直している間（Field の data-field-quiet）は、誤りの赤を引っ込めて普段の枠に戻す。 */
+.field[data-field-quiet] [aria-invalid='true'] {
+  border-color: var(--color-hairline);
+}
+
+[data-theme='v8'] .field[data-field-quiet] [aria-invalid='true'] {
+  outline-color: var(--color-toggle-off);
+}
 }

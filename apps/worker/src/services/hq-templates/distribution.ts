@@ -1,4 +1,5 @@
 import { parseTextOverrides } from './text-overrides.js';
+import { captureDistributionName, targetDistributionVersion } from './distribution-display.js';
 import { parseScenarioDefinition, scenarioSnapshot, inspectScenario, planScenario } from './scenario.js';
 import {
   beginHqTemplateDistributionRun, getHqTemplate, listHqTemplates, HQ_TEMPLATE_TYPES,
@@ -135,6 +136,9 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
 export async function preflightDistribution(db: D1Database, authority: HqTemplateAuthority, id: string, accountIds: string[], bucket?: R2Bucket, textOverrides?: unknown) {
   const accounts = await requireTargetAccounts(db, authority, accountIds);
   const { template, definition } = await templateDetail(db, authority, id);
+  const latest = await db.prepare('SELECT version FROM hq_template_versions WHERE id=? AND tenant_id=? AND template_id=?')
+    .bind(template.current_version_id!, authority.tenantId, id).first<{ version: number }>();
+  if (!latest) throw new HqTemplateError('NOT_FOUND', 404);
   const overrides = parseTextOverrides(textOverrides,accountIds,template.template_type);
   const input = { templateVersionId: template.current_version_id!, definitionJson: JSON.stringify(definition) };
   const tagDefinition = template.template_type === 'tag' ? parseTagDefinition(definition) : null;
@@ -172,7 +176,8 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
       const fixedRichReferenceMode = template.template_type === 'rich_menu' && item.itemKind !== 'rich_menu' ? item.allowedModes[0] : 'create';
       statements.push({ sql: `INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, item.sourceId, item.itemKind, fixedRichReferenceMode, item.targetId, item.expectedRevision] });
     }
-    stores.push({ accountId: account.id, accountName: account.name, items, ...(overrides.has(account.id) ? {textOverride:overrides.get(account.id)} : {}) });
+    const targetVersion = await targetDistributionVersion(db, authority.tenantId, id, account.id, latest.version);
+    stores.push({ accountId: account.id, accountName: account.name, items, targetVersion, ...(overrides.has(account.id) ? {textOverride:overrides.get(account.id)} : {}) });
   }
   for (const account of accounts) statements.unshift(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [account.id, authority.tenantId]));
   await batch(db, statements);
@@ -212,10 +217,11 @@ export async function distributionResult(db: D1Database, authority: HqTemplateAu
       }
       if (r.resolution_mode === 'create') counts.created++; else if (r.resolution_mode === 'overwrite') counts.overwritten++; else counts.aliased++;
     }
-    stores.push({ accountId: row.target_account_id, status: row.status, reason: resultReason(row.status), cleanupPending: Number(cleanup?.count ?? 0) > 0, counts });
+    stores.push({ accountId: row.target_account_id, status: row.status, reason: resultReason(row.status), cleanupPending: Number(cleanup?.count ?? 0) > 0, counts,
+      createdName: row.status === 'succeeded' ? row.created_name ?? null : null });
   }
   const targets = (await db.prepare(`SELECT target_account_id FROM hq_template_preflights WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id`).bind(authority.tenantId, templateId, runId).all<{ target_account_id: string }>()).results;
-  for (const p of targets) if (!stores.some(s => s.accountId === p.target_account_id)) stores.push({ accountId: p.target_account_id, status: 'pending', reason: null, counts: { created: 0, overwritten: 0, aliased: 0 } });
+  for (const p of targets) if (!stores.some(s => s.accountId === p.target_account_id)) stores.push({ accountId: p.target_account_id, status: 'pending', reason: null, counts: { created: 0, overwritten: 0, aliased: 0 }, createdName: null });
   stores.sort((a,b) => a.accountId.localeCompare(b.accountId));
   return { runId, status: run.status, stores };
 }
@@ -319,6 +325,7 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
       statements.push(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [p.target_account_id, authority.tenantId]));
       for (const r of resolutions) statements.push({ sql: `UPDATE hq_template_preflight_resolutions SET resolution_mode=?,target_id=COALESCE(?,target_id),alias_name=?,expected_revision=COALESCE(?,expected_revision) WHERE preflight_id=? AND tenant_id=? AND source_id=?`, bindings: [r.mode, r.targetId ?? null, r.mode === 'alias' ? r.aliasName ?? 'pending' : null, r.expectedRevision ?? null, p.id, authority.tenantId, r.sourceId] });
       statements.push({ sql: `INSERT INTO hq_template_distribution_results(run_id,tenant_id,template_id,template_version_id,target_account_id,preflight_id,idempotency_fingerprint,snapshot_token,status,finished_at) VALUES (?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, bindings: [runId, authority.tenantId, templateId, p.template_version_id, p.target_account_id, p.id, runId, p.snapshot_token, finalStatus] }, ...commit, audit(authority, 'distributed', templateId, p.target_account_id, finalStatus === 'succeeded' ? 'success' : 'failed', runId));
+      if (finalStatus === 'succeeded') statements.push(captureDistributionName(runId, authority.tenantId, p.target_account_id));
       return batch(db, statements);
     };
     try { await persist(status, plan?.statements ?? [], plan?.resolutions ?? selected); }

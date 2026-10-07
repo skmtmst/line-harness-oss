@@ -129,6 +129,7 @@ describe('R507残部 戻りリンクの経路合わせ', () => {
     expect(host.textContent).toContain('LINEログイン')
     expect(host.textContent).toContain('別のLINEアカウントでログイン')
     expect(host.textContent).not.toContain('ログインからやり直してください')
-    expect(submitButton().disabled).toBe(false)
+    // 合言葉があるので、6桁目が入った瞬間に確かめを送る（押さなくてよい）。
+    expect(fetchMock).toHaveBeenCalled()
   })
 })

@@ -16,8 +16,11 @@ import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -57,13 +60,20 @@ type FilterKey = 'open' | 'draft'
 type FolderKey = 'all' | 'tag' | 'scenario' | 'miles' | 'none'
 type LoadState = 'loading' | 'ready' | 'error'
 
-const FOLDERS: Array<{ key: FolderKey; label: string; match: (o: AffiliateOffer) => boolean }> = [
+/* 色は行の名前の前の丸と左のフォルダの列で同じものを使う（絵 h7dmB）。動きが未設定は色の無い輪。 */
+const FOLDERS: Array<{ key: FolderKey; label: string; color?: string; match: (o: AffiliateOffer) => boolean }> = [
   { key: 'all', label: 'すべて', match: () => true },
-  { key: 'tag', label: 'タグを付ける', match: (o) => Boolean(o.tagId) },
-  { key: 'scenario', label: 'シナリオを始める', match: (o) => !o.tagId && Boolean(o.scenarioId) },
-  { key: 'miles', label: 'マイルを渡す', match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles > 0 },
+  { key: 'tag', label: 'タグを付ける', color: FOLDER_COLORS[0], match: (o) => Boolean(o.tagId) },
+  { key: 'scenario', label: 'シナリオを始める', color: FOLDER_COLORS[1], match: (o) => !o.tagId && Boolean(o.scenarioId) },
+  { key: 'miles', label: 'マイルを渡す', color: FOLDER_COLORS[2], match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles > 0 },
   { key: 'none', label: '動きが未設定', match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles === 0 },
 ]
+
+/** 行の名前の前の丸に渡すフォルダ。動きが未設定は null（色の無い輪）。 */
+function folderDotOf(offer: AffiliateOffer): { name: string; color?: string } | null {
+  const item = FOLDERS.find((f) => f.key !== 'all' && f.match(offer))
+  return item && item.color ? { name: item.label, color: item.color } : null
+}
 
 const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; sort: 'newest' | 'name' | 'reward'; folder?: FolderKey }> = [
   { value: '', label: 'よく使う絞り込み', filters: [], sort: 'newest' },
@@ -355,7 +365,7 @@ export default function OffersTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={FOLDERS.map((item) => ({ id: item.key, label: item.label, count: ready ? offers.filter(item.match).length : null }))}
+      rows={FOLDERS.map((item) => ({ id: item.key, label: item.label, count: ready ? offers.filter(item.match).length : null, color: item.color }))}
       activeId={folder}
       onSelect={(id) => resetPage(() => { setSaved(''); setFolder(id as FolderKey) })}
       addFolderNote={<p className={styles.stateDesc}>成果が出たときの動きで分けた見え方です</p>}
@@ -434,12 +444,14 @@ export default function OffersTab() {
             return (
               <Tr key={offer.id} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
-                  <span className={styles.stack}>
-                    {readonly ? (
-                      <span className={styles.rowNameText} title={offer.name}>{offer.name}</span>
-                    ) : (
-                      <button type="button" className={styles.rowName} title={offer.name} onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
-                    )}
+                  <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
+                    <FolderDotName folder={folderDotOf(offer)} dot={!narrow}>
+                      {readonly ? (
+                        <span className={styles.rowNameText} title={offer.name}>{offer.name}</span>
+                      ) : (
+                        <button type="button" className={styles.rowName} title={offer.name} onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
+                      )}
+                    </FolderDotName>
                     <span className={styles.rowPlan} title={offer.description ?? undefined}>{offer.description ?? '説明はありません'}</span>
                   </span>
                 </Td>
@@ -492,15 +504,17 @@ export default function OffersTab() {
     <ListState kind="loading" title="案件を読み込んでいます" />
   ) : loadState === 'error' ? (
     <StateCard tone="error" title="案件を読み込めませんでした" description="数の帯は「—」にしています。道具はそのまま使えます。" action={<RetryButton onRetry={() => { void loadOffers() }} />} />
-  ) : offers.length === 0 ? (
-    <StateCard
-      icon={<Briefcase size={16} aria-hidden="true" />}
-      title="まだ案件はありません"
-      description="何をしたら成果になり、いくら払うかを決めると、アフィリエイターが紹介できるようになります"
-      action={readonly ? undefined : <Button variant="primary" onClick={openCreate}><Plus size={14} aria-hidden="true" /> 案件を作る</Button>}
-    />
   ) : shown.length === 0 ? (
-    <StateCard title="条件に合うものはありません" description="検索や絞り込みを外すと、すべて出ます" action={<Button type="button" onClick={resetConditions}>条件を外す</Button>} />
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<Briefcase aria-hidden="true" />}
+      title="まだ案件がありません"
+      description="何をしたら成果になり、いくら払うかを決めて、紹介してもらいます。"
+      create={{ label: '最初の案件を作る', onClick: openCreate }}
+      canCreate={!readonly}
+      filtered={offers.length > 0}
+      onClearFilters={resetConditions}
+    />
   ) : (
     <>
       {table}

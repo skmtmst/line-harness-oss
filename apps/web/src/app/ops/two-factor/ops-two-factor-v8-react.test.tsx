@@ -88,8 +88,12 @@ describe('2要素認証の設定V8（qod6X）', () => {
     expect(registerButton()?.disabled).toBe(true)
     await typeCode('12345')
     expect(registerButton()?.disabled).toBe(true)
+    // 6桁目が入った瞬間に、押さなくても確かめを送る（動きの点検・6）。
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
+    const before = fetchMock.mock.calls.length
     await typeCode('123456')
-    expect(registerButton()?.disabled).toBe(false)
+    await flush()
+    expect(fetchMock.mock.calls.slice(before).some(([url]) => String(url).includes('confirm'))).toBe(true)
   })
 
   it('QRの再表示と手入力キー・登録後の案内を出す', async () => {

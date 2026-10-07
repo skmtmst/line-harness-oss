@@ -246,6 +246,24 @@ function emptyBubble(type: BroadcastBubbleType = 'text'): BroadcastBubble {
   return { id: crypto.randomUUID(), type, content }
 }
 
+/** 選んだ時点で止める文。上限と今の大きさを両方言う（例「動画は200MBまでです。今のファイルは350MBです」）。 */
+export function mediaTooLargeMessage(isVideo: boolean, bytes: number): string {
+  const mb = bytes / (1024 * 1024)
+  const size = mb >= 10 ? `${Math.round(mb)}MB` : `${Math.round(mb * 10) / 10}MB`
+  return isVideo ? `動画は200MBまでです。今のファイルは${size}です` : `画像は10MBまでです。今のファイルは${size}です`
+}
+
+/**
+ * 動画のプレビュー画像。LINE は動画と一緒に必ず受け取り（https・JPEG/PNG・1MBまで）、
+ * 無いと保存の時点でサーバーが断る。以前は「任意」と書いていて、保存で英語の文が出ていた。
+ */
+export function videoPreviewProblem(value: unknown): string | null {
+  const url = typeof value === 'string' ? value.trim() : ''
+  if (!url) return '動画のプレビュー画像のURLを入れてください（JPEG・PNG、1MBまで）'
+  if (!url.toLowerCase().startsWith('https://')) return '動画のプレビュー画像のURLは https:// から始めてください'
+  return null
+}
+
 function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: (content: Record<string, unknown>) => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -254,7 +272,7 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
     const allowed = isVideo ? ['video/mp4'] : ['image/jpeg', 'image/png']
     const max = isVideo ? 200 * 1024 * 1024 : 10 * 1024 * 1024
     if (!allowed.includes(file.type)) { setError(isVideo ? 'MP4のみ対応しています' : 'JPEG・PNGのみ対応しています'); return }
-    if (file.size > max) { setError(isVideo ? '200MB以下にしてください' : '10MB以下にしてください'); return }
+    if (file.size > max) { setError(mediaTooLargeMessage(isVideo, file.size)); return }
     setBusy(true); setError('')
     try {
       const res = await api.broadcastMessageAssets.upload(file)
@@ -269,7 +287,7 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
       <input type="file" className="hidden" disabled={busy} accept={isVideo ? 'video/mp4' : 'image/jpeg,image/png'} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f) }} />
     </label>
     {typeof bubble.content.originalContentUrl === 'string' && bubble.content.originalContentUrl && <p className="truncate text-xs text-accent-deep">アップロード済み：{bubble.content.originalContentUrl}</p>}
-    {isVideo && <input value={String(bubble.content.previewImageUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, previewImageUrl: e.target.value })} placeholder="プレビュー画像URL（任意）" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
+    {isVideo && <input value={String(bubble.content.previewImageUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, previewImageUrl: e.target.value })} placeholder="プレビュー画像のURL（必須・https・JPEG/PNG・1MBまで）" aria-label="動画のプレビュー画像のURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
     {bubble.type === 'rich_video' && <input value={String(bubble.content.actionUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
     {error && <p className="text-xs text-danger">{error}</p>}
   </div>
@@ -545,6 +563,10 @@ function bubblesError(bubbles: BroadcastBubble[]): string {
   for (const [index, bubble] of bubbles.entries()) {
     if (bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) return `吹き出し${index + 1}のテキストを入力してください`
     if (['image','video','rich_video'].includes(bubble.type) && !bubble.content.originalContentUrl) return `吹き出し${index + 1}のファイルをアップロードしてください`
+    if (bubble.type === 'video' || bubble.type === 'rich_video') {
+      const problem = videoPreviewProblem(bubble.content.previewImageUrl)
+      if (problem) return `吹き出し${index + 1}：${problem}`
+    }
     /*
       位置情報・音声・スタンプは、足りない項目があると送る形にできない。
       空のまま保存すると、本文が空文字の配信になって、相手には**何も

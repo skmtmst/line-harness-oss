@@ -218,26 +218,33 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
           const mark = exception ? '臨時休業' : isRegularOff ? '定休' : null
           // 前後の月の日は空けておく（絵 KRgTQ）。
           if (!inMonth) return <span key={date} className={`${styles.calDay} ${styles.calDayOutside}`} aria-hidden="true" />
-          return (
-            <button
-              key={date}
-              type="button"
-              role="gridcell"
-              disabled={!canEdit}
-              aria-label={`${jpDate(date)}${mark ? `（${mark}）` : ''}`}
-              className={[
-                styles.calDay,
-                !inMonth && styles.calDayOutside,
-                mark && styles.calDayClosed,
-                isToday && styles.calDayToday,
-              ].filter(Boolean).join(' ')}
-              onClick={() => { if (exception) openEdit(exception); else openNew(date) }}
-            >
+          const dayLabel = `${jpDate(date)}${mark ? `（${mark}）` : ''}`
+          const dayClass = [
+            styles.calDay,
+            !inMonth && styles.calDayOutside,
+            mark && styles.calDayClosed,
+            isToday && styles.calDayToday,
+          ].filter(Boolean).join(' ')
+          const dayBody = (
+            <>
               <span>{d.getUTCDate()}</span>
               {mark ? (
                 <span className={`${styles.calMark} ${exception ? styles.calMarkExtra : styles.calMarkRegular}`}>{mark}</span>
               ) : null}
-            </button>
+            </>
+          )
+          // 閲覧のみ：日を押して休業を足す・直す口は置かず、日と印だけを見せる（2026-10-06 オーナー決定）。
+          const DayCell = canEdit ? 'button' : 'span'
+          return (
+            <DayCell
+              key={date}
+              {...(canEdit ? { type: 'button' as const, onClick: () => { if (exception) openEdit(exception); else openNew(date) } } : {})}
+              role="gridcell"
+              aria-label={dayLabel}
+              className={dayClass}
+            >
+              {dayBody}
+            </DayCell>
           )
         })}
       </div>
@@ -254,14 +261,18 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
             const to = item.dateTo || item.date || ''
             return (
               <div key={item.id} className={styles.exceptionRow}>
-                <button
-                  type="button"
-                  className={styles.exceptionDates}
-                  onClick={() => openEdit(item)}
-                  disabled={!canEdit}
-                >
-                  {from !== to ? `${jpDate(from)}・${jpDate(to)}` : jpDate(from)}
-                </button>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    className={styles.exceptionDates}
+                    onClick={() => openEdit(item)}
+                  >
+                    {from !== to ? `${jpDate(from)}・${jpDate(to)}` : jpDate(from)}
+                  </button>
+                ) : (
+                  // 閲覧のみ：直す口は置かず、日付だけを見せる。
+                  <span className={styles.exceptionDates}>{from !== to ? `${jpDate(from)}・${jpDate(to)}` : jpDate(from)}</span>
+                )}
                 <span className={styles.exceptionReason} title={item.reason || item.note || '臨時休業'}>{item.reason || item.note || '臨時休業'}</span>
                 {canEdit ? (
                   <button

@@ -278,6 +278,9 @@
   border-top: 1px solid var(--color-hairline);
 }
 .stop {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-wh-ops-gap);
   padding: 0;
   border: 0;
   background: none;

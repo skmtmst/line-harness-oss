@@ -3,7 +3,7 @@ import {
   renderBroadcastMessageContent,
   type BroadcastRenderContext,
 } from './render-message.js';
-import { getFriendFieldMap } from '@line-crm/db';
+import { getFriendFieldMap, getLineAccountById } from '@line-crm/db';
 import {
   resolveInterpolationExtra,
   resolveSendCommonVars,
@@ -59,6 +59,9 @@ export async function renderChatMessageContent(
     displayName: friend.display_name,
     deliveredAt: new Date(),
   };
+  if (/\{\{\s*account\.name\s*\}\}/.test(content) && friend.line_account_id) {
+    context.accountName = (await getLineAccountById(db, friend.line_account_id))?.name;
+  }
   // liff_id は account 参照が必要なので、本文で使うときだけ呼び出し側から受け取る。
   if (liffId !== undefined) context.liffId = liffId;
   if (source) {

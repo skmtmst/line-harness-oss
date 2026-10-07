@@ -245,7 +245,6 @@ shared-button-importer app/ops/two-factor/page.tsx
 shared-button-importer app/page.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
-shared-button-importer app/pools/new/pool-new-v8.tsx
 shared-button-importer app/pools/page.tsx
 shared-button-importer app/recipes/page.tsx
 shared-button-importer app/register/complete/page.tsx
@@ -423,7 +422,6 @@ shared-button-importer components/merged-person/merged-person-detail-v8.tsx
 shared-button-importer components/merged-person/merged-person-detail.tsx
 shared-button-importer components/merged-person/merged-person-sections.tsx
 shared-button-importer components/merged-person/merged-profile-dialog.tsx
-shared-button-importer components/ops/impersonation-bar.tsx
 shared-button-importer components/ops/knowledge-editor.tsx
 shared-button-importer components/ops/knowledge-list.tsx
 shared-button-importer components/ops/knowledge-ticket.tsx
@@ -446,6 +444,7 @@ shared-button-importer components/session-lost-notice.tsx
 shared-button-importer components/shared/condition-builder.tsx
 shared-button-importer components/shared/create-page.tsx
 shared-button-importer components/shared/dialog.tsx
+shared-button-importer components/shared/empty-list.tsx
 shared-button-importer components/shared/file-drop.tsx
 shared-button-importer components/shared/folder-add-dialog.tsx
 shared-button-importer components/shared/folder-panel.tsx
@@ -469,9 +468,20 @@ shared-button-importer lib/unsaved-leave-dialog.tsx
 shared-button-importer app/inflow-links/ad-connection-dialog.tsx
 shared-button-importer app/inflow-links/ad-event-mappings.tsx
 shared-button-importer components/events/event-application-preview.tsx
+shared-button-importer v8/tags/create.tsx
+shared-button-importer v8/tags/field-edit.tsx
+shared-button-importer v8/tags/field-editor.tsx
+shared-button-importer v8/tags/field-migrate.tsx
+shared-button-importer v8/tags/fields-tab.tsx
+shared-button-importer v8/tags/folder-page.tsx
 shared-button-importer v8/tags/list.tsx
+shared-button-importer v8/tags/mark-editor.tsx
+shared-button-importer v8/tags/marks-tab.tsx
+shared-button-importer v8/tags/searches-tab.tsx
 shared-button-importer v8/tags/tags-tab.tsx
 shared-button-importer v8/templates/list.tsx
+shared-button-importer v8/templates/question-new.tsx
+shared-button-importer v8/templates/carousel.tsx
 shared-button-importer v8/broadcasts/list.tsx
 shared-button-importer v8/broadcasts/quick-send.tsx
 shared-button-importer v8/forms/list.tsx
@@ -482,6 +492,7 @@ shared-button-importer v8/form-edit/edit.tsx
 shared-button-importer v8/form-edit/media-picker.tsx
 shared-button-importer v8/rich-menus/list.tsx
 shared-button-importer v8/rich-menus/external-import.tsx
+shared-button-importer v8/rich-menus/connections.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
 shared-button-importer v8/common-vars/export-panel.tsx
@@ -494,6 +505,8 @@ shared-button-importer v8/inflow-links/ad-connection-dialog.tsx
 shared-button-importer v8/inflow-links/ads.tsx
 shared-button-importer v8/inflow-links/detail.tsx
 shared-button-importer v8/inflow-links/site-script.tsx
+shared-button-importer v8/inflow-links/ad-connections.tsx
+shared-button-importer v8/inflow-links/ad-history.tsx
 shared-button-importer v8/mileage/earning-rule-new/create.tsx
 shared-button-importer v8/auto-replies/runs.tsx
 shared-button-importer v8/common-vars-edit/edit.tsx
@@ -505,6 +518,7 @@ shared-button-importer v8/webhooks/outgoing.tsx
 shared-button-importer v8/template-edit/asset.tsx
 shared-button-importer v8/template-edit/media-picker.tsx
 shared-button-importer v8/template-edit/message.tsx
+shared-button-importer v8/template-edit/rich.tsx
 shared-button-importer v8/webhooks/samples.tsx
 shared-button-importer v8/webhooks/api-tokens.tsx
 shared-button-importer v8/webhooks/sheets.tsx
@@ -538,6 +552,7 @@ shared-button-importer v8/booking-menus/tabs/staff-tab.tsx
 shared-button-importer v8/hq/account-dialogs.tsx
 shared-button-importer v8/hq/billing.tsx
 shared-button-importer v8/hq/home.tsx
+shared-button-importer v8/hq/member-dialog.tsx
 shared-button-importer v8/hq/members.tsx
 shared-button-importer v8/hq/notice-line-dialog.tsx
 shared-button-importer v8/hq/support-detail.tsx
@@ -555,8 +570,12 @@ shared-button-importer v8/affiliates/report.tsx
 shared-button-importer v8/affiliates/create.tsx
 shared-button-importer v8/automations/list.tsx
 shared-button-importer v8/automations/runs.tsx
+shared-button-importer v8/automations/templates.tsx
 shared-button-importer v8/automations/common-actions.tsx
 shared-button-importer v8/automations/versions.tsx
+shared-button-importer v8/autosave/browser-draft-notice.tsx
+shared-button-importer v8/automations/branch-editor.tsx
+shared-button-importer v8/automations/common-action-new.tsx
 shared-button-importer v8/nen-campaigns/list.tsx
 shared-button-importer v8/nen-campaigns/edit.tsx
 shared-button-importer v8/nen-campaigns/column-new.tsx
@@ -655,9 +674,20 @@ shared-button-importer v8/settings/features/screen.tsx
 shared-button-importer v8/settings/manual-links/screen.tsx
 shared-button-importer v8/settings/file-scan/screen.tsx
 shared-button-importer v8/settings/ec-commerce/screen.tsx
+shared-button-importer v8/settings/ec-commerce/order-drawer.tsx
+shared-button-importer v8/settings/ec-commerce/identity.tsx
+shared-button-importer v8/settings/pools/create.tsx
 shared-button-importer v8/settings/line-notifications/screen.tsx
 shared-button-importer v8/settings/emergency/screen.tsx
 shared-button-importer v8/settings/emergency/health.tsx
+shared-button-importer v8/restaurant-reservations/detail-dialog.tsx
+# ★V8 飲食店 提案 E（今日のお店 hKRRF・電話予約 wEzuG・枠を閉じる知らせ YMVFD・SNS 連携 y3GGTs）。全店の一覧 CHz31 は stores.tsx へ移した。
+shared-button-importer v8/restaurant/dashboard/stores.tsx
+shared-button-importer v8/restaurant/dashboard/side.tsx
+shared-button-importer v8/restaurant/dashboard/today-table.tsx
+shared-button-importer v8/restaurant/front-desk/phone-drawer.tsx
+shared-button-importer v8/restaurant/close-tasks/close-tasks.tsx
+shared-button-importer v8/settings/sns/sns.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx
@@ -691,6 +721,9 @@ shared-button-importer v8/booking-staff/staff-new.tsx
 shared-button-importer v8/scenario-first-step/first-step.tsx
 shared-button-importer v8/friend-add-publish/publish.tsx
 shared-button-importer v8/friend-add-publish/done.tsx
+# ★V8 友だち追加時の配信の実行結果（REIxB）・実行の詳細（N43uVX）を src/v8/friend-add-runs に一から書いた。
+shared-button-importer v8/friend-add-runs/runs.tsx
+shared-button-importer v8/friend-add-runs/detail.tsx
 shared-button-importer v8/automations/create/create.tsx
 shared-button-importer v8/automations/create/friend-multi-select.tsx
 # ★V8 LINEアカウントの詳細（ihjfd）・窓（CFAyf・Msb1j・WOfBN・n9Z2P）・乗り換え（x2dSNv）。src/v8 に一から書いた。
@@ -700,3 +733,8 @@ shared-button-importer v8/accounts-detail/handover.tsx
 shared-button-importer v8/account-new/register.tsx
 shared-button-importer v8/hq-templates/console.tsx
 shared-button-importer v8/hq-templates/message-form.tsx
+shared-button-importer v8/template-detail/detail.tsx
+shared-button-importer v8/tag-edit/edit.tsx
+shared-button-importer v8/tag-edit/search-edit.tsx
+shared-button-importer v8/rich-menu-edit/detail.tsx
+shared-button-importer v8/affiliate-offer-new/create.tsx

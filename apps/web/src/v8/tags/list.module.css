@@ -194,6 +194,7 @@
 
 .nameRow {
   display: flex;
+  height: var(--tpl-row-name-lh);
   align-items: center;
   gap: var(--tpl-tag-name-gap);
   min-width: 0;
@@ -516,4 +517,126 @@
   .colUsage {
     display: none;
   }
+}
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
+
+/* ★V8 対応マークのタブ（vKDj5）：案内の帯の段（上14・左右24）。帯そのものは閲覧のみの帯と同じ形。 */
+.infoRow {
+  padding: var(--tpl-tg2-info-pad);
+  flex-shrink: 0;
+}
+
+/* 行は高さ52（中の「…」28＋上下12）。字の行の高さで行が伸びないように高さで決める。 */
+.markRow > td {
+  height: var(--tpl-tg2-mark-row-h);
+  padding-block: 0;
+  line-height: var(--tpl-tag-cell-lh);
+  vertical-align: middle;
+}
+
+.markColGrip { width: var(--tpl-tg2-mark-col-grip); }
+.markColName { width: var(--tpl-tg2-mark-col-name); }
+.markColCount { width: var(--tpl-tg2-mark-col-count); }
+.markColDefault { width: var(--tpl-tg2-mark-col-default); }
+.markColAuto { width: auto; }
+.markColPlace { width: var(--tpl-tg2-mark-col-place); }
+
+/* つまみと同じ大きさの見えない印で、名前の位置を保つ（閲覧のみ・並べ替えできない行）。 */
+.gripSpace {
+  display: inline-flex;
+  width: var(--tpl-tag-grip);
+  visibility: hidden;
+}
+
+/* マークの札（地は印の色を薄く、点と字は印の色）。 */
+.markPill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-tg2-pill-gap);
+  max-width: 100%;
+  padding: var(--tpl-tg2-pill-pad);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--mark-color, var(--color-ink-secondary)) 10%, var(--color-canvas));
+  color: var(--mark-color, var(--color-ink-secondary));
+  font-size: var(--tpl-tag-cell-size);
+  font-weight: 600;
+  line-height: var(--tpl-tg2-pill-lh);
+  white-space: nowrap;
+}
+
+.markPillDot {
+  width: var(--tpl-tg2-pill-dot);
+  height: var(--tpl-tg2-pill-dot);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+/* 表の下の安全確認の段（左右24・上下16・間6）。 */
+.safetyNote {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-safety-gap);
+  padding: var(--tpl-tg2-safety-pad);
+}
+
+.safetyNoteTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.safetyNoteBody {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tg2-safety-body-size);
+}
+
+/* ★V8 保存した検索のタブ（IWnYX）：行61（名前19＋間2＋要約16、上下12）。つまみの列は無い。 */
+.searchRow > td {
+  height: var(--tpl-tg2-search-row-h);
+  padding-block: 0;
+  vertical-align: middle;
+}
+
+.searchColName { width: auto; }
+.searchColCount { width: var(--tpl-tg2-search-col-count); }
+.searchColShare { width: var(--tpl-tg2-search-col-share); }
+.searchColUsage { width: var(--tpl-tg2-search-col-usage); }
+.searchColUpdated { width: var(--tpl-tg2-search-col-updated); }
+.searchColOpen { width: var(--tpl-tg2-search-col-open); }
+
+/* 表の下の段（左右24・上下12、字11）。 */
+.footNote {
+  margin: 0;
+  padding: var(--tpl-tg2-foot-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tg2-safety-body-size);
+}
+
+/* ★V8 友だち情報欄のタブ（q5gbcM）：行58（名前19＋間2＋差し込み名13、上下12）。 */
+.fieldRow > td {
+  height: var(--tpl-tg2-field-row-h);
+  padding-block: 0;
+  vertical-align: middle;
+}
+
+.fieldColType { width: var(--tpl-tg2-field-col-type); }
+.fieldColPlace { width: var(--tpl-tg2-field-col-place); }
+
+/* 差し込み名は丸の分（16）下げて名前にそろえる。 */
+.fieldKey {
+  padding-inline-start: var(--tpl-folder-dot-indent);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--tpl-tg2-key-size);
+  line-height: var(--tpl-tg2-key-lh);
+}
+
+/* 道具の段の上の案内の帯（段の幅いっぱい、下の部品との間は絵の 14）。 */
+.toolbarBand {
+  flex-basis: 100%;
+  margin-bottom: var(--tpl-tg2-band-after);
 }

@@ -118,7 +118,7 @@ test('2000文字の検索語は上限へ切り詰めてサーバーへ届き、0
   // R173: 検索語が効いている0件は「まだありません」と言わず、
   // 条件に合うものが無い旨と条件クリアを出す。
   await eventually(() => {
-    expect(host.textContent).toContain('条件に合うシナリオはありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
   })
   expect(host.textContent).not.toContain('まだシナリオはありません')
 })
@@ -162,7 +162,7 @@ test('一覧口が落ちても失敗表示＋再読み込みが出て、無限�
   expect(retry).toBeTruthy()
   await act(async () => { retry!.click() })
   await eventually(() => {
-    expect(host.textContent).toContain('条件に合うシナリオはありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
     expect(calls.filter((url) => url.pathname === '/api/scenarios'
       && url.searchParams.get('query') === CLAMPED_QUERY).length).toBeGreaterThanOrEqual(2)
   })

@@ -378,10 +378,6 @@
   font-size: var(--text-caption);
 }
 
-/* 先に保存されたとき（h5rm8t）：本文の上の帯の置き場。帯の見た目は共通部品（save-conflict）。 */
-.conflictSlot {
-  margin-top: var(--tpl-rule-row-gap);
-}
 .compareRows {
   display: flex;
   flex-direction: column;
@@ -439,3 +435,7 @@
   color: var(--v8-bphone-chip-ink);
   font-size: var(--text-micro);
 }
+
+/* 閲覧のみ：選んでいる流入リンクを、チェックの札ではなく名前の行で見せる。 */
+.readOnlyRoute { display: flex; align-items: baseline; gap: var(--tpl-rule-row-gap); margin: 0; min-width: 0; }
+.readOnlyRouteName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--color-ink); }

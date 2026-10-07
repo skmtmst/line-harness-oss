@@ -17,6 +17,7 @@ import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { analyzeConnections, type ConnectionPage } from './connection-analysis'
 import ConnectionHeading from './connection-heading'
+import RichMenuConnectionsV8 from '@/v8/rich-menus/connections'
 
 type RichMenuGroup = {
   id: string
@@ -250,7 +251,10 @@ function ConnectionFooter({ status, groupId }: { status: string; groupId: string
   return <div className="border-hairline bg-canvas fixed right-0 bottom-0 left-0 z-20 flex items-center justify-between border-t px-6 py-3 shadow-float"><span className="text-ink-secondary text-sm">{status}</span><div className="flex gap-2"><Button href="/rich-menus">メニュー一覧へ</Button><Button variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(groupId)}`}>リッチメニューを保存する</Button></div></div>
 }
 
+/** v8 テーマのときだけ新しい画面（src/v8/rich-menus/connections）。v7 は無変更。 */
 export default function RichMenuConnectionsPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <RichMenuConnectionsV8 />
   return (
     <Suspense fallback={<ListState kind="loading" title="切替のつながりを読み込んでいます" />}>
       <ConnectionsContent />

@@ -172,65 +172,53 @@
  * 閉じるときは逆（150ms）。閉じの印 `data-closing` は drawer.tsx が
  * V8 のときだけ付ける（v7・試験は今までどおり即時に消える）。
  */
-[data-theme='v8'] .overlay {
-  animation: drawer-v8-overlay-enter var(--motion-base) var(--motion-ease-out);
+/*
+ * 開く・閉じるは「移り変わり（transition）」で動かす（フルード・インタラクション ①）。
+ * 決まった動き（keyframes）だと、閉じかけでもう一度開くと最初から出直して飛ぶ。
+ * 移り変わりなら、途中で逆の操作をしてもその位置から滑らかに戻る。
+ * 出始めの形は @starting-style が持つ。動きを減らす設定では動かさない。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme='v8'] .overlay {
+    transition: opacity var(--motion-base) var(--motion-ease-out);
+  }
+
+  [data-theme='v8'] .panel {
+    transition:
+      opacity var(--motion-panel) var(--motion-ease-out),
+      transform var(--motion-panel) var(--motion-ease-out);
+  }
+
+  @starting-style {
+    [data-theme='v8'] .overlay {
+      opacity: 0;
+    }
+
+    [data-theme='v8'] .panel {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+  }
+
+  [data-theme='v8'] .overlay[data-closing],
+  [data-theme='v8'] .panel[data-closing] {
+    transition-duration: var(--motion-exit);
+  }
 }
 
-[data-theme='v8'] .panel {
-  animation: drawer-v8-enter var(--motion-panel) var(--motion-ease-out);
+/* 幅の口（width="narrow"）。既定の 660 は変えない。 */
+[data-theme='v8'] .panel[data-width='narrow'] {
+  width: min(var(--tpl-drawer-narrow-w), 100%);
 }
 
 [data-theme='v8'] .overlay[data-closing] {
-  animation: drawer-v8-overlay-leave var(--motion-exit) var(--motion-ease-out) forwards;
+  opacity: 0;
   /* 消えていく間は下の画面を押せるようにする（薄い膜が押下を食べない）。 */
   pointer-events: none;
 }
 
 [data-theme='v8'] .panel[data-closing] {
-  animation: drawer-v8-leave var(--motion-exit) var(--motion-ease-out) forwards;
-}
-
-@keyframes drawer-v8-overlay-enter {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes drawer-v8-enter {
-  from {
-    opacity: 0;
-    transform: translateX(24px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes drawer-v8-overlay-leave {
-  from {
-    opacity: 1;
-  }
-
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes drawer-v8-leave {
-  from {
-    opacity: 1;
-    transform: translateX(0);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateX(24px);
-  }
+  opacity: 0;
+  transform: translateX(24px);
 }
 }

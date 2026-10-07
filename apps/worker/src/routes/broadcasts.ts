@@ -77,7 +77,6 @@ import { fetchQuota, releaseQuotaSlot } from '../services/broadcast-quota-guard.
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 
 const broadcasts = new Hono<Env>();
-
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
 const BROADCAST_NOTIFICATION_KEY = 'broadcast_slack_notifications';
@@ -257,8 +256,10 @@ function validateMessageOptions(value: unknown): string | null {
       if (!button || typeof button !== 'object' || Array.isArray(button)) return `ボタン${number}を読み込めませんでした`;
       const item = button as Record<string, unknown>;
       if (typeof item.label !== 'string' || !item.label.trim()) return `ボタン${number}の名前を入力してください`;
+      if (Array.from(item.label.trim()).length > 20) return `ボタン${number}の名前は20文字までです`;
       if (!['url', 'pdf', 'postback'].includes(String(item.type))) return `ボタン${number}の種類を確認してください`;
       if (typeof item.value !== 'string' || !item.value.trim()) return `ボタン${number}のURLを入力してください`;
+      if (item.type === 'postback' && item.value.length > 300) return `ボタン${number}の送る値は300文字までです`;
       if ((item.type === 'url' || item.type === 'pdf') && !/^https:\/\//i.test(item.value.trim())) {
         return `ボタン${number}のURLは https:// から始めてください`;
       }
@@ -398,6 +399,9 @@ function serializeBroadcast(row: DbBroadcast) {
     lineRequestId: r.line_request_id || null,
     aggregationUnit: r.aggregation_unit || null,
     lineAccountId: r.line_account_id || null,
+    hqRunId: r.hq_run_id ?? null,
+    fromHeadquarters: !!r.hq_run_id,
+    editable: !r.hq_run_id,
     accountIds: parseJsonArray(r.account_ids),
     dedupPriority: parseJsonArray(r.dedup_priority),
     failedAccountIds: parseJsonArray(r.failed_account_ids),
@@ -1389,6 +1393,7 @@ broadcasts.post('/api/broadcasts', async (c) => {
           messageType,
           messageContent,
           messageBubbles: body.messageBubbles,
+          messageOptions: body.messageOptions,
           altText: body.altText,
         });
       } catch (messageError) {
@@ -1526,7 +1531,7 @@ broadcasts.post('/api/broadcasts', async (c) => {
         internalMemo: body.internalMemo ?? null,
         draftStep: body.draftStep ?? null,
         draftPayloadJson: saveAsDraft ? JSON.stringify(body) : null,
-        messageOptionsJson: body.messageOptions == null ? null : JSON.stringify(body.messageOptions),
+            messageOptionsJson: body.messageOptions == null ? null : JSON.stringify(body.messageOptions),
         afterActionVersionId: body.afterActionVersionId ?? null,
         saveAsDraft,
       });
@@ -1564,6 +1569,7 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
     if (!await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
+    if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
     if (existing.status !== 'draft' && existing.status !== 'scheduled') {
       return c.json({ success: false, error: 'Only draft or scheduled broadcasts can be updated' }, 400);
@@ -1639,6 +1645,17 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
     )) {
       return c.json({ success: false, error: '配信後アクションの公開版が見つかりません' }, 400);
     }
+
+    try {
+      parseBroadcastMessageParts({
+        messageType: body.messageType ?? existing.message_type,
+        messageContent: body.messageContent ?? existing.message_content,
+        messageBubbles: body.messageBubbles,
+        messageBubblesJson: existing.message_bubbles_json,
+        messageOptions: body.messageOptions,
+            messageOptionsJson: existing.message_options_json,
+      });
+    } catch (error) { return c.json({ success: false, error: error instanceof Error ? error.message : '本文を確認してください' }, 400); }
 
     if (body.messageContent !== undefined) {
       const variableError = unsupportedVariablesError(body.messageContent);
@@ -1895,6 +1912,7 @@ broadcasts.post('/api/broadcasts/:id/cancel', requirePermission(BROADCAST_DEFINI
     if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
+    if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
     if (existing.status !== 'scheduled' || !existing.scheduled_at) {
       return c.json({ success: false, error: 'Only scheduled broadcasts can be cancelled' }, 409);
     }
@@ -2038,6 +2056,7 @@ broadcasts.post('/api/broadcasts/:id/stop', requirePermission(BROADCAST_JOB_STOP
     if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
+    if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
     /*
      * 全員配信（target_type='all'）は止められない。
@@ -2152,6 +2171,7 @@ broadcasts.post('/api/broadcasts/:id/resume', requirePermission(BROADCAST_JOB_ST
     if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
+    if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
     const rawExisting = existing as unknown as Record<string, unknown>;
     if (existing.status !== 'sending' || !rawExisting.stopped_at) {
       return c.json({
@@ -2211,6 +2231,7 @@ broadcasts.post(
       if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
         return c.json({ success: false, error: 'Broadcast not found' }, 404);
       }
+      if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
       if (existing.target_type === 'all') {
         return c.json({
           success: false,
@@ -2310,6 +2331,7 @@ broadcasts.delete('/api/broadcasts/:id', requirePermission(BROADCAST_DEFINITION_
     if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
+    if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
     if (existing.status !== 'draft' && existing.status !== 'scheduled') {
       return c.json({ success: false, error: broadcastDeleteConflictMessage(existing.status) }, 409);
     }
@@ -2347,6 +2369,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
     if (!await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
+    if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
     // N-061: 行のaccountを共通境界へ渡す。/broadcasts持ちstaffだけが送れる。
     const sendBoundary = await broadcastWriteBoundary(c, broadcastAccountIds(existing), { operationKey: BROADCAST_DEFINITION_PUBLISH_KEY });
     if (!sendBoundary.allowed) {
@@ -2390,6 +2413,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         messageType: existing.message_type,
         messageContent: existing.message_content,
         messageBubblesJson: existing.message_bubbles_json,
+        messageOptionsJson: existing.message_options_json,
         altText: existing.alt_text,
       });
     } catch (messageError) {
@@ -2790,6 +2814,7 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_
     if (!await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
+    if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
     const body = await c.req.json<{ conditions: SegmentCondition }>();
 
@@ -2844,6 +2869,7 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_
         messageType: existing.message_type,
         messageContent: existing.message_content,
         messageBubblesJson: existing.message_bubbles_json,
+        messageOptionsJson: existing.message_options_json,
         altText: existing.alt_text,
       });
     } catch (messageError) {
@@ -2981,6 +3007,7 @@ broadcasts.post('/api/broadcasts/:id/fetch-insight', requirePermission('/broadca
   try {
     const id = c.req.param('id');
     const broadcast = await getBroadcastById(c.env.DB, id);
+    if (broadcast?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
     if (!broadcast) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
@@ -3161,6 +3188,7 @@ broadcasts.post('/api/broadcasts/:id/test-send', requirePermission(BROADCAST_TES
   const id = c.req.param('id');
   try {
     const broadcast = await getBroadcastById(c.env.DB, id);
+    if (broadcast?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
     if (!broadcast) return c.json({ success: false, error: 'Broadcast not found' }, 404);
     if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
@@ -3230,6 +3258,7 @@ broadcasts.post('/api/broadcasts/:id/test-send', requirePermission(BROADCAST_TES
         messageType: broadcast.message_type,
         messageContent: broadcast.message_content,
         messageBubblesJson: broadcast.message_bubbles_json,
+        messageOptionsJson: broadcast.message_options_json,
         altText: raw.alt_text as string | null,
       }));
     } catch (messageError) {

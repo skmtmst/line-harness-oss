@@ -110,10 +110,10 @@ describe('M032 公開・テスト送信の失敗は生文を出さない', () =>
     expect(confirm).toBeTruthy()
     const dialog = document.body.querySelector('[data-design-node="sDXNy"]')
     expect(dialog, '公開前の確認の窓が出ない').not.toBeNull()
-    for (const row of ['お知らせ', '宛先', 'LINEが届く人', '戻って直す', '管理画面のお知らせだけで届きます']) {
+    for (const row of ['お知らせ', '宛先', 'LINE が届く人', '戻って直す', '管理画面のお知らせだけで届きます']) {
       expect(dialog?.textContent ?? '', `「${row}」がない`).toContain(row)
     }
-    const send = screen.getByRole('button', { name: /公開して.*にLINEで送る/ })
+    const send = screen.getByRole('button', { name: /公開して.*に LINE で送る/ })
     fireEvent.click(send)
     await waitFor(() => expect(screen.getByText(/権限がありません/)).toBeTruthy())
     expect(screen.queryByText(/API error/)).toBeNull()
