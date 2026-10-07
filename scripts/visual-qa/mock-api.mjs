@@ -2058,9 +2058,12 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
      */
     return OPERATOR_NOTIFICATION_RECIPIENTS
   }
-  /* 設計 sDXNy：作る画面の「公開」は下書きを保存してから確認の窓を開く。保存は新しい下書きを返す。 */
   if (method === 'POST' && pathname === '/api/line-notifications/operator-rules') {
-    return { ...OPERATOR_NOTIFICATION_RULES[0], id: 'operator-rule-new', status: 'draft', isActive: false, version: 1 }
+    /*
+     * 運用者へのお知らせを作る（V8-B sDXNy）：公開の前に下書きを保存してから確認の窓を出す。
+     * ここに無いと 405 で下書きの保存が失敗に見え、窓が撮れなかった。作った1件を返す。
+     */
+    return { ...OPERATOR_NOTIFICATION_RULES[0], id: 'op-rule-new-draft', status: 'draft', isActive: false, version: 1 }
   }
   if (method === 'POST' && /^\/api\/(line-)?notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
     return { accepted: 2, excluded: 0, failed: 0, duplicate: 0 }

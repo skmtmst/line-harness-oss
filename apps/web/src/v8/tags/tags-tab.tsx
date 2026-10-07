@@ -31,6 +31,8 @@ import {
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type ListStats } from '@/lib/api'
 import { useRowLeaving } from '@/lib/use-row-leaving'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPageBody } from '@/components/templates'
 import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
@@ -75,6 +77,27 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 const PAGE_SIZES = [10, 20, 50]
 
 /** 連動の文（絵の「本人+10・1.2倍 他1」）。マイル以外の連動は「他N」。0件は「—」。 */
+/**
+ * 窓なしの保管で、5秒たって送る直前に呼ぶ。影響を読み直し、その間に友だちに付いた・
+ * どこかで使われ始めたなら保管せずに失敗を返す（呼び出し側が行を戻して知らせる）。
+ * 保管そのものが断られたときも失敗を返す。
+ */
+export async function archiveIfStillUnused(
+  tagId: string,
+  accountId: string,
+  tagsApi: Pick<typeof api.tags, 'dependencies' | 'archive'> = api.tags,
+): Promise<{ success: boolean; error?: string }> {
+  const res = await tagsApi.dependencies(tagId, accountId)
+  if (!res.success) return { success: false, error: res.error }
+  const impact = res.data
+  const inUse = impact.friendCount > 0 || impact.references.length > 0 || impact.linkedActions.length > 0
+    || impact.pendingRunCount > 0 || impact.blockingReferenceCount > 0 || !impact.canArchive
+  if (inUse) return { success: false, error: 'in_use' }
+  const archived = await tagsApi.archive(tagId, accountId, { expectedVersion: impact.tag.version, impactRevision: impact.revision }, crypto.randomUUID())
+  if (!archived.success) return { success: false, error: archived.error }
+  return { success: true }
+}
+
 export function tagLinkText(tag: Tag): string {
   const main: string[] = []
   if (tag.mileageReward) main.push(`本人+${tag.mileageReward}`)
@@ -217,6 +240,8 @@ export default function TagsTab({
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
   const { leavingId, leave } = useRowLeaving()
+  // 使っている所が0のタグは窓なしで保管し、5秒は「元に戻す」で取り消せる（動きの点検 17 番・旧い一覧と同じ）。
+  const deferredDelete = useDeferredDelete()
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
@@ -280,6 +305,8 @@ export default function TagsTab({
   }, [fixture, accountId])
 
   const filtered = useMemo(() => items.filter((tag) => {
+    // 保管して「元に戻す」を待っている行は出さない。
+    if (deferredDelete.isHidden(tag.id)) return false
     if (query && !tag.name.toLowerCase().includes(query.toLowerCase())) return false
     if (folder === UNGROUPED && tag.groupId) return false
     if (folder && folder !== UNGROUPED && tag.groupId !== folder) return false
@@ -296,7 +323,7 @@ export default function TagsTab({
       if (key === 'starred' && !tag.isStarred) return false
     }
     return true
-  }), [items, query, folder, usageFilter, sourceFilter, quick])
+  }), [items, query, folder, usageFilter, sourceFilter, quick, deferredDelete])
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pages)
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -498,10 +525,30 @@ export default function TagsTab({
         label: '保管する',
         tone: 'danger',
         dividerBefore: true,
-        onSelect: () => setDeleteTarget(tag),
+        onSelect: () => requestArchive(tag),
       })
     }
     return list
+  }
+
+  /*
+   * 保管の入口。使っている所が0（友だち0人・どこからも使われていない）と分かっているタグは、
+   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる。送る直前に影響を読み直し、
+   * その間に使われ始めていたら保管せずに行を戻す。それ以外は今までどおり確かめの窓。
+   */
+  const requestArchive = (tag: Tag) => {
+    if (!isUnused(tag) || !accountId) {
+      setDeleteTarget(tag)
+      return
+    }
+    if (activeTagId === tag.id) setActiveTagId(null)
+    deferredDelete.schedule({
+      ids: [tag.id],
+      message: `タグ「${tag.name}」を保管しました`,
+      commit: () => archiveIfStillUnused(tag.id, accountId),
+      onCommitted: () => load(),
+      failureMessage: 'タグを保管できませんでした。使われ始めていないか確かめて、もう一度お試しください。',
+    })
   }
 
   /* 右クリックのメニュー。行の「…」と同じ操作。移し先はそのまま並べる。 */
@@ -685,7 +732,7 @@ export default function TagsTab({
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
-        <tbody>
+        <RovingTbody>
           {visible.map((tag) => {
             const group = groups.find((item) => item.id === tag.groupId)
             const editHref = `/tags/edit?id=${tag.id}`
@@ -815,7 +862,7 @@ export default function TagsTab({
               </Tr>
             )
           })}
-        </tbody>
+        </RovingTbody>
       </DataTable>
 
       {/* 件数とページ送り（絵：左に件数・右にページ送り）。表示件数は道具の段の右端。 */}

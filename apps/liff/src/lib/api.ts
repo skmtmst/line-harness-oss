@@ -1,3 +1,4 @@
+import type { CustomerBookingWaitlist,CustomerSeatWaitlist,RegisterSeatWaitlistInput,AcceptBookingWaitlistInput } from '@line-crm/shared';
 import type { FormLayout } from '@line-crm/shared';
 import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
 import type { WebinarAudience } from '@line-crm/shared';
@@ -73,6 +74,42 @@ export interface BookingHistoryItem {
   profile_image_url: string | null;
 }
 
+/** 予約作成の応答。お支払いありの店・メニューだけ payment が付く。 */
+export interface CreateBookingResponse {
+  booking_id: string;
+  status: string;
+  payment?: { id: string; status: string; holdUntil: string | null } | null;
+  /** 無断キャンセルが続いている人への前払いのみの案内。対象のときだけ付く。 */
+  prepayNotice?: string;
+}
+
+/** 前回と同じで予約：本人の前回の予約。無い・使えないときは available=false。 */
+export interface LastBookingResponse {
+  available: boolean;
+  reason?: string;
+  booking?: {
+    id: string;
+    starts_at: string;
+    status: string;
+    menu: { id: string; name: string };
+    staff: { id: string; display_name: string; profile_image_url: string | null };
+  };
+}
+
+/** 自分のキャンセル待ち登録。無いときは entry: null。 */
+export interface WaitlistMineResponse {
+  entry: { id: string; status: string; created_at: string } | null;
+}
+
+/** お客さまが見る支払いの状態。 */
+export interface BookingPayment {
+  id: string;
+  status: 'unpaid' | 'pending' | 'paid' | 'failed' | 'refunded' | 'expired';
+  amount?: number | null;
+  currency?: string | null;
+  hold_until?: string | null;
+}
+
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
   return { Authorization: `Bearer ${getIdToken()}`, ...extra };
 }
@@ -93,6 +130,10 @@ async function get<T>(path: string): Promise<T> {
   return res.json();
 }
 
+async function remove<T>(path:string):Promise<T>{
+ const url=new URL(`${BASE}${path}`,window.location.origin);url.searchParams.set('liffId',getLiffId());
+ const res=await fetch(url,{method:'DELETE',headers:authHeaders()});if(!res.ok)throw new Error(`API ${res.status}`);return res.json();
+}
 async function post<T>(path: string, body: unknown, headers: Record<string, string> = {}): Promise<T> {
   const url = new URL(`${BASE}${path}`, window.location.origin);
   url.searchParams.set('liffId', getLiffId());
@@ -296,15 +337,54 @@ export const api = {
   bookingSettings: () => get<LiffBookingSettings>('/api/liff/booking/settings'),
   // Worker 側で id_token を verify するので lineUserId は body に入れない。
   createRequest: (
-    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string },
+    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string;waitlist_id?:string },
     idempotencyKey: string,
   ) =>
-    post<{ booking_id: string; status: string }>(
+    post<CreateBookingResponse>(
       '/api/liff/booking/requests',
       body,
       { 'Idempotency-Key': idempotencyKey },
     ),
+  /** お支払いありの予約だけ payment が付く。なしの店では今までどおり付かない。 */
+  startBookingPayment: (bookingId: string) =>
+    post<{ payment: BookingPayment | null; checkoutUrl: string | null }>(
+      '/api/liff/booking/payments/start',
+      { bookingId },
+    ),
+  bookingPaymentStatus: (bookingId: string) =>
+    get<{ payment: BookingPayment | null }>(
+      `/api/liff/booking/payments/by-booking?bookingId=${encodeURIComponent(bookingId)}`,
+    ),
   me: () => get<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] }>('/api/liff/booking/me'),
+  /** 前回と同じで予約：本人の前回の予約を返す。失敗・対象外は呼び側が黙って隠す。 */
+  lastBooking: () => get<LastBookingResponse>('/api/liff/booking/last-booking'),
+  /** 満席の枠に「空いたら知らせる」を登録する。 */
+  registerWaitlist: (body: { staff_id: string; menu_id: string; starts_at: string }) =>
+    post<{ id: string }>('/api/liff/booking/waitlist', body),
+  bookingWaitlists:(id?:string)=>get<{waitlist:CustomerBookingWaitlist[]}>(`/api/liff/booking/waitlist${id?'?id='+encodeURIComponent(id):''}`),
+  seatWaitlists:(id?:string)=>get<{waitlist:CustomerSeatWaitlist[]}>(`/api/liff/booking/seat-waitlist${id?'?id='+encodeURIComponent(id):''}`),
+  registerSeatWaitlist:(body:RegisterSeatWaitlistInput)=>post<{id:string}>('/api/liff/booking/seat-waitlist',body),
+  acceptWaitlist:(body:AcceptBookingWaitlistInput,key:string)=>post<CreateBookingResponse>('/api/liff/booking/requests',body,{'Idempotency-Key':key}),
+  acceptSeatWaitlist:(id:string,key:string)=>post<{reservation_id:string;status:string}>(`/api/liff/booking/seat-waitlist/${encodeURIComponent(id)}/accept`,{}, {'Idempotency-Key':key}),
+  cancelSeatWaitlist:(id:string)=>remove<{status:string}>(`/api/liff/booking/seat-waitlist/${encodeURIComponent(id)}`),
+  /** 枠を指定して自分の待ち登録を返す。 */
+  waitlistMine: (staffId: string, menuId: string, startsAt: string) => {
+    const qs = new URLSearchParams({ staff_id: staffId, menu_id: menuId, starts_at: startsAt });
+    return get<WaitlistMineResponse>(`/api/liff/booking/waitlist/mine?${qs}`);
+  },
+  /** 自分のキャンセル待ちを取り消す。 */
+  cancelWaitlist: (id: string) =>
+    fetch(`${BASE}/api/liff/booking/waitlist/${encodeURIComponent(id)}?liffId=${encodeURIComponent(getLiffId())}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const err = new Error(`API ${res.status}`) as Error & { status: number };
+        err.status = res.status;
+        throw err;
+      }
+      return res.json() as Promise<{ status: string }>;
+    }),
 
   // ===== Event booking =====
   getEvent: (id: string) => get<EventDetail>(`/api/liff/events/${id}`),

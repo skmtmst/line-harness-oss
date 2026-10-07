@@ -30,6 +30,8 @@ export * from './affiliates';
 export * from './webhooks';
 export * from './booking-audit';
 export * from './booking-settings';
+export * from './booking-payments';
+export * from './booking-sales';
 export * from './booking-resources';
 export * from './booking-menu-resources';
 export * from './menu-versions';
@@ -97,6 +99,7 @@ export function createDb(d1: D1Database): D1Database {
   return d1;
 }
 export * from './folders';
+export * from './folder-assignment';
 export * from './getting-started';
 export * from './manual-links';
 export * from './error-messages';

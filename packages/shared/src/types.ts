@@ -1427,6 +1427,7 @@ export interface AffiliateClick {
 // -----------------------------------------------------------------------------
 
 export interface IncomingWebhook {
+  folderId?: string | null;
   id: string;
   name: string;
   sourceType: string;
@@ -1456,6 +1457,7 @@ export interface OutgoingWebhook {
   version?: number;
   /** 最後に設定を更新した担当のID。記録のない旧行・自動停止はnull。 */
   updatedBy?: string | null;
+  folderId?: string | null;
   id: string;
   name: string;
   url: string;

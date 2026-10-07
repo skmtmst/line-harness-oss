@@ -6986,17 +6986,16 @@ const spec = {
       post: {
         tags: ['Booking'],
         summary: '本人の予約日時を変更',
-        description: 'idToken→account→friend所有だけに許可。管理者キーは要求しない。期限・締切・空き・CASを検査し、Google同期とMeet連携の結果を返す。待ち列は含まない。',
+        description: '本人確認→店→友だちの所有だけに許可。管理者キーは要求しない。期限・締切・空き・CASを検査し、Google同期とMeet連携の結果を返す。待ち列は含まない。',
         security: [],
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
-          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
         ],
         responses: {
           '200': { description: '変更成立（meet_sync 付き）・同日時再送は changed:false' },
-          '401': { description: 'idToken 検証失敗' },
+          '401': { description: '本人確認ができない' },
           '403': { description: '期限切れ' },
-          '404': { description: 'Unknown LIFF ID・友だち・予約なし' },
+          '404': { description: '予約なし' },
           '409': { description: '版競合・枠なし' },
           '422': { description: '不正な日時・締切切れ' },
         },
@@ -7006,18 +7005,48 @@ const spec = {
       post: {
         tags: ['Booking'],
         summary: '本人の予約を取消',
-        description: 'idToken→account→friend所有だけに許可。期限・CASを検査し、リマインダ停止・カレンダー削除・Meet取消の結果を返す。取消ずみ再送は副作用をそろえて 200。待ち列は含まない。',
+        description: '本人確認→店→友だちの所有だけに許可。期限・CASを検査し、リマインダ停止・カレンダー削除・Meet取消の結果を返す。取消ずみ再送は副作用をそろえて 200。待ち列は含まない。',
         security: [],
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
-          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
         ],
         responses: {
           '200': { description: '取消成立（calendar_sync・meet_sync 付き）' },
-          '401': { description: 'idToken 検証失敗' },
+          '401': { description: '本人確認ができない' },
           '403': { description: '期限切れ' },
-          '404': { description: 'Unknown LIFF ID・友だち・予約なし' },
+          '404': { description: '予約なし' },
           '409': { description: '版競合・送信中の再試行' },
+        },
+      },
+    },
+    // ── Booking plus (前回・キャンセル待ち・今日・来店の印) ──────────────────
+    '/api/liff/booking/last-booking': {
+      get: {
+        tags: ['Booking'],
+        summary: '本人の前回の予約（メニュー・担当）を取得',
+        description: '本人確認→店→友だちだけに許可。取り消し・却下・期限切れを除く最新1件。担当が辞めた・メニューが止まっているときは available=false。写真は担当の顔写真。',
+        security: [],
+        responses: {
+          '200': { description: 'available と前回の予約（menu・staff）または available=false と理由' },
+          '401': { description: '本人確認ができない' },
+        },
+      },
+    },
+    '/api/liff/booking/waitlist/mine': {
+      get: {
+        tags: ['Booking'],
+        summary: '枠を指定して自分の待ち登録を取得',
+        description: '本人確認→店→友だちだけに許可。待っている・仮押さえ中の登録があれば返す。シートの登録・取り消しの切り替え用。',
+        security: [],
+        parameters: [
+          { name: 'staff_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'menu_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'starts_at', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'entry（登録）または entry: null' },
+          '400': { description: '枠の指定が不正' },
+          '401': { description: '本人確認ができない' },
         },
       },
     },
@@ -7192,6 +7221,568 @@ const spec = {
           '403': { description: '操作できる役割がない、または担当外のLINEアカウント' },
           '404': { description: 'このLINEアカウントの知らせが存在しない' },
           '409': { description: '知らせの条件がすでに解消している' },
+        },
+      },
+    },
+    // ── Booking payments（決済の差し替え制 #1318） ──────────────────────────
+    '/api/booking/admin/payment-config': {
+      get: {
+        tags: ['Booking'],
+        summary: '店のお支払い既定と鍵の有無を取得',
+        description: '鍵の値は返さず、有無だけ返す。テストモードの印を含む。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '店のお支払い既定' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '店のお支払い既定を保存',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['mode', 'provider', 'holdMinutes'],
+                properties: {
+                  mode: { type: 'string', enum: ['none', 'onsite', 'online'] },
+                  provider: { type: 'string', enum: ['none', 'onsite', 'stripe'] },
+                  holdMinutes: { type: 'integer', minimum: 5, maximum: 1440 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '保存した店のお支払い既定' },
+          '400': { description: '入力が正しくない' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    '/api/booking/admin/menus/{id}/payment': {
+      put: {
+        tags: ['Booking'],
+        summary: 'メニューのお支払いを上書き保存',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['mode', 'provider'],
+                properties: {
+                  mode: { type: 'string', enum: ['none', 'onsite', 'online'] },
+                  provider: { type: 'string', enum: ['none', 'onsite', 'stripe'] },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'メニューに効くお支払い設定' },
+          '400': { description: '入力が正しくない' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+      delete: {
+        tags: ['Booking'],
+        summary: 'メニューのお支払い上書きを消して店の既定に戻す',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '店の既定に戻した' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    '/api/booking/payments/start': {
+      post: {
+        tags: ['Booking'],
+        summary: '支払いを始める（担当者用）',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['bookingId'],
+                properties: {
+                  bookingId: { type: 'string' },
+                  idempotencyKey: { type: 'string', maxLength: 200 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: '支払いを始めた（決済画面のURL付き）' },
+          '200': { description: '既にある支払いを返した' },
+          '404': { description: '対象が見つからない' },
+          '409': { description: '支払いの対象でない・準備ができていない' },
+        },
+      },
+    },
+    '/api/booking/payments/by-booking': {
+      get: {
+        tags: ['Booking'],
+        summary: '支払いの状態を見る（担当者用、仮押さえ期限切れも落とす）',
+        parameters: [
+          { name: 'bookingId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '支払いの記録（無いときは null）' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    '/api/booking/payments/{id}/refund': {
+      post: {
+        tags: ['Booking'],
+        summary: '支払い済みを返金する',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '返金済みにした' },
+          '404': { description: '対象が見つからない' },
+          '409': { description: '支払い済みでない' },
+        },
+      },
+    },
+    '/api/booking/payments/webhook/{provider}': {
+      post: {
+        tags: ['Booking'],
+        summary: '支払い済みの知らせを受ける',
+        description: '署名を確かめ、二重の知らせは受け付け済みで返す。manual の店は承認待ちのまま、automatic の店は確定する。',
+        parameters: [
+          { name: 'provider', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '反映した（二重含む）' },
+          '401': { description: '署名が正しくない' },
+          '404': { description: '知らない決済サービス' },
+        },
+      },
+    },
+    '/api/liff/booking/payments/start': {
+      post: {
+        tags: ['Booking'],
+        summary: '支払いを始める（お客さま用）',
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['bookingId'],
+                properties: { bookingId: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: '支払いを始めた（決済画面のURL付き）' },
+          '200': { description: '既にある支払いを返した' },
+          '404': { description: '対象が見つからない' },
+          '409': { description: '支払いの対象でない' },
+        },
+      },
+    },
+    '/api/liff/booking/payments/by-booking': {
+      get: {
+        tags: ['Booking'],
+        summary: '支払いの状態を見る（お客さま用）',
+        security: [],
+        parameters: [
+          { name: 'bookingId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '自分の予約の支払いの記録' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    // ── Booking plus B: sales + noshow/prepay ───────────────────────────────
+    '/api/booking/admin/sales-summary': {
+      get: {
+        tags: ['Booking'],
+        summary: '予約からの売上集計を見る',
+        description: '確定のみ集計。無断キャンセルは売上に入れない。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'from', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'to', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '売上合計と件数' },
+          '400': { description: 'account_id 未指定' },
+        },
+      },
+    },
+    '/api/booking/admin/noshow-settings': {
+      get: {
+        tags: ['Booking'],
+        summary: '無断キャンセルの数え方を見る',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'オン／オフ・何回目から・数える期間・決済が無い店の扱い' },
+          '400': { description: 'account_id 未指定' },
+        },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '無断キャンセルの数え方を保存',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  enabled: { type: 'boolean' },
+                  threshold: { type: 'integer', minimum: 1, maximum: 100 },
+                  windowMonths: { type: 'integer', minimum: 1, maximum: 120 },
+                  noPaymentMode: { type: 'string', enum: ['notice', 'notice_call'] },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '保存した数え方' },
+          '400': { description: '入力が正しくない' },
+        },
+      },
+    },
+    '/api/booking/admin/friends/{friendId}/noshow': {
+      get: {
+        tags: ['Booking'],
+        summary: 'お客さまの無断キャンセル回数を見る',
+        parameters: [
+          { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '無断キャンセル回数と前払いのみの有無' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    '/api/booking/admin/friends/{friendId}/prepay': {
+      post: {
+        tags: ['Booking'],
+        summary: 'お客さまを手で前払いのみにする・外す',
+        parameters: [
+          { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  mode: { type: 'string', enum: ['manual_on', 'manual_off'] },
+                  reason: { type: 'string', description: '印を外すときは必須の1行' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '前払いのみにした・外した結果' },
+          '400': { description: 'account_id 未指定・印を外すとき理由が無い' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+      delete: {
+        tags: ['Booking'],
+        summary: 'お客さまの前払いのみを手で外して自動に戻す',
+        parameters: [
+          { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '自動に戻した結果' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象が見つからない' },
+        },
+      },
+    },
+    // ── Booking plus (booking-plus 1・2・6：繰り返し予約・待ち・今日の一覧) ──
+    '/api/booking/admin/last-booking': {
+      get: {
+        tags: ['Booking'],
+        summary: '前回と同じ内容で予約するための直近の予約を取得',
+        description: 'friend_id か booking_customer_id のどちらか一方を指定する。取り消し済みを除いた最新の予約のメニュー・担当を返す。無いときは available=false。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'friend_id', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'booking_customer_id', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '直近の予約、または available=false' },
+          '400': { description: 'account_id 未指定、または客の指定が無い・両方ある' },
+        },
+      },
+    },
+    '/api/booking/admin/today': {
+      get: {
+        tags: ['Booking'],
+        summary: '今日の予約を時刻順に取得（人・席・両方）',
+        description: 'date は店の暦日（省いたら今日）。mode=staff|seat|both。from/to で期間も取れる（35日まで）。席の予約は飲食店向けの卓の予約で、つなげる卓は両方の卓名を返す。席の結び付きがあるかは has_seat_stores で返す。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'date', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'mode', in: 'query', required: false, schema: { type: 'string', enum: ['staff', 'seat', 'both'] } },
+          { name: 'from', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'to', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'status', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'staff_id', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'bookings（人）・seats（席）・timeline（混ぜた時刻順）' },
+          '400': { description: 'account_id 未指定、または日付の形が正しくない' },
+        },
+      },
+    },
+    '/api/booking/admin/waitlist': {
+      get: {
+        tags: ['Booking'],
+        summary: 'キャンセル待ちの一覧を取得',
+        description: 'staff_id・starts_at・status で絞れる。開始時刻順・登録順で最大100件。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'staff_id', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'starts_at', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'status', in: 'query', required: false, schema: { type: 'string', enum: ['waiting', 'invited', 'converted', 'cancelled'] } },
+        ],
+        responses: {
+          '200': { description: 'waitlist の配列' },
+          '400': { description: 'account_id 未指定、または開始日時の形が正しくない' },
+        },
+      },
+      post: {
+        tags: ['Booking'],
+        summary: 'キャンセル待ちを登録',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['staff_id', 'menu_id', 'starts_at'], properties: {
+          staff_id: { type: 'string' },
+          menu_id: { type: 'string' },
+          starts_at: { type: 'string' },
+          friend_id: { type: ['string', 'null'] },
+          booking_customer_id: { type: ['string', 'null'] },
+        } } } } },
+        responses: {
+          '201': { description: '登録した待ち' },
+          '400': { description: 'account_id 未指定、または JSON・値が正しくない' },
+          '404': { description: '担当・メニューが無い' },
+          '409': { description: '同じ枠に既に待ちがある・枠が空いている・開始1時間前を過ぎた' },
+        },
+      },
+    },
+    '/api/booking/admin/waitlist/{id}': {
+      delete: {
+        tags: ['Booking'],
+        summary: 'キャンセル待ちを取り消す',
+        description: '招待ずみ（仮押さえ中）の取り消しでは、次の人へすぐ繰り上げる。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'status=cancelled' },
+          '404': { description: '待ちが無い' },
+          '409': { description: '既に締め切っている' },
+        },
+      },
+    },
+    '/api/booking/admin/waitlist/{id}/convert': {
+      post: {
+        tags: ['Booking'],
+        summary: 'キャンセル待ちを予約になったへ進める',
+        description: '同じ枠・同じ人の予約だけ受け付ける。違う予約では booking_mismatch で止まる。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['booking_id'], properties: { booking_id: { type: 'string' } } } } } },
+        responses: {
+          '200': { description: 'status=converted' },
+          '400': { description: 'account_id 未指定、または予約の指定が無い' },
+          '404': { description: '待ちが無い' },
+          '409': { description: '既に締め切っている、または予約が枠・人と合わない' },
+        },
+      },
+    },
+    '/api/booking/admin/bookings/{id}/visit': {
+      post: {
+        tags: ['Booking'],
+        summary: '来店の印を付ける（来店した・遅れる・来なかった）',
+        description: '来店したは完了へ、来なかったは無断へ進める。遅れるは印だけ。kind は visited|late|no_show。late_minutes は遅れると1〜1440分だけ要る。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['kind'], properties: {
+          kind: { type: 'string', enum: ['visited', 'late', 'no_show'] },
+          late_minutes: { type: ['integer', 'null'] },
+        } } } } },
+        responses: {
+          '200': { description: '進んだ状態と付けた印' },
+          '400': { description: 'account_id 未指定、または印の種類・分数が正しくない' },
+          '404': { description: '予約が無い' },
+          '409': { description: '状態が進められない、または締め切っている' },
+        },
+      },
+      delete: {
+        tags: ['Booking'],
+        summary: '来店の印を取り消す（元に戻す）',
+        description: '最新の印を1件消す。印で進んでいた状態（完了・無断）は確定へ戻す。遅れるは印を消すだけ。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '戻した状態' },
+          '404': { description: '印または予約が無い' },
+          '409': { description: '印のあとに状態が変わっていて戻せない' },
+        },
+      },
+    },
+    '/api/liff/booking/waitlist': {
+      get: {
+        tags: ['Booking'],
+        summary: '自分のキャンセル待ち一覧（お客さま用）',
+        security: [],
+        description: 'waiting・invited だけを開始時刻順で最大50件。本人の分だけ返す。',
+        responses: {
+          '200': { description: 'waitlist の配列' },
+          '401': { description: '本人確認ができない' },
+        },
+      },
+      post: {
+        tags: ['Booking'],
+        summary: 'キャンセル待ちを自分で登録（お客さま用）',
+        security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['staff_id', 'menu_id', 'starts_at'], properties: {
+          staff_id: { type: 'string' },
+          menu_id: { type: 'string' },
+          starts_at: { type: 'string' },
+        } } } } },
+        responses: {
+          '201': { description: '登録した待ちの id' },
+          '400': { description: 'JSON・値が正しくない' },
+          '401': { description: '本人確認ができない' },
+          '404': { description: '担当・メニューが無い' },
+          '409': { description: '同じ枠に既に待ちがある' },
+        },
+      },
+    },
+    '/api/liff/booking/waitlist/{id}': {
+      delete: {
+        tags: ['Booking'],
+        summary: 'キャンセル待ちを自分で取り消す（今回は見送る）',
+        security: [],
+        description: '招待ずみ（仮押さえ中）の取り消しでは、次の人へすぐ繰り上げる。本人の分だけ消せる。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'status=cancelled' },
+          '401': { description: '本人確認ができない' },
+          '404': { description: '待ちが無い、または締め切っている' },
+        },
+      },
+    },
+    '/api/liff/booking/seat-waitlist': {
+      get: {
+        tags: ['Booking'],
+        summary: '自分の席のキャンセル待ち一覧（お客さま用・飲食店）',
+        security: [],
+        description: '本人の分だけ、開始時刻の新しい順で最大100件。?id= で1件に絞れる。仮押さえの期限切れは先に片付ける。飲食店向け機能が無い環境では 404。',
+        parameters: [
+          { name: 'id', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'waitlist の配列' },
+          '401': { description: '本人確認ができない' },
+          '404': { description: '飲食店向け機能が無い' },
+        },
+      },
+      post: {
+        tags: ['Booking'],
+        summary: '席のキャンセル待ちを自分で登録（お客さま用・飲食店）',
+        security: [],
+        description: '人数に合う卓がすべて予約か仮押さえで埋まっている枠だけ受け付ける。開始1時間前で締め切る。',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['store_id', 'starts_at', 'guest_count'], properties: {
+          store_id: { type: 'string' },
+          starts_at: { type: 'string' },
+          guest_count: { type: 'integer', minimum: 1, maximum: 100 },
+        } } } } },
+        responses: {
+          '201': { description: '登録した待ちの id' },
+          '400': { description: 'JSON・日時・人数が正しくない、または人数に合う卓が無い' },
+          '401': { description: '本人確認ができない' },
+          '404': { description: '店舗が無い、または飲食店向け機能が無い' },
+          '409': { description: '空いている卓がある・締め切り後・同じ枠に待ちがある・登録数の上限' },
+        },
+      },
+    },
+    '/api/liff/booking/seat-waitlist/{id}': {
+      delete: {
+        tags: ['Booking'],
+        summary: '席のキャンセル待ちを自分で取り消す（お客さま用・飲食店）',
+        security: [],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'status=cancelled' },
+          '401': { description: '本人確認ができない' },
+          '404': { description: '待ちが無い、または取り消せない状態' },
+        },
+      },
+    },
+    '/api/liff/booking/seat-waitlist/{id}/accept': {
+      post: {
+        tags: ['Booking'],
+        summary: '席のキャンセル待ちの案内を受けて予約にする（お客さま用・飲食店）',
+        security: [],
+        description: 'Idempotency-Key が必須。同じ待ちから作った予約があればそれを返す。仮押さえの期限が過ぎていたら 409。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '同じ待ちから作った予約が既にある（reservation_id と status）' },
+          '201': { description: '予約を作った（reservation_id と status=confirmed）' },
+          '400': { description: 'Idempotency-Key が無い、または予約の値が正しくない' },
+          '401': { description: '本人確認ができない' },
+          '404': { description: '待ちが無い、または飲食店向け機能が無い' },
+          '409': { description: '案内の期限が切れている、または卓がふさがった' },
         },
       },
     },

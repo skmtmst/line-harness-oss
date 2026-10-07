@@ -3,13 +3,14 @@
 /* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import DateField from '@/components/shared/date-field'
+import HelpTip from '@/components/shared/help-tip'
 import { TimeField } from '@/components/shared/date-time-field'
 import Toggle from '@/components/shared/toggle'
 import { MoreAction } from '@/components/shared/row-actions'
@@ -228,14 +229,13 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
           })}
         </div>
         {saveError ? <p className="text-danger mt-3 text-sm" role="alert">{saveError}</p> : null}
-      </section>
 
-      <section className={styles.section}>
-        <div className={styles.sectionHeadRow}>
-          <div className={styles.sectionHead}>
-            <h2 className={styles.sectionTitle}>設備</h2>
-            <p className={styles.sectionDesc}>設備ごとに、同じ時間に使える数を決めます。</p>
-          </div>
+        {/* 絵 yRPxl：設備と空きの確かめは、開ける時間の白い板の中の入れ子の箱（枠・角12・内側16）。 */}
+        <div className={styles.innerStack}>
+      <section className={styles.innerSection} aria-labelledby="hours-equip-title">
+        <h3 id="hours-equip-title" className={styles.sectionTitle}>設備</h3>
+        <div className={styles.innerHeadRow}>
+          <p className={styles.sectionDesc}>設備ごとに、同じ時間に使える数を決めます。</p>
           {canEdit ? (
             <Button onClick={() => setAddingResource(true)}>設備を追加する</Button>
           ) : null}
@@ -250,7 +250,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
           />
         ) : null}
         {resourcesStatus === 'ready' && resources ? (
-          <>
+          <div className={styles.equipTable}>
             <div className={styles.equipHead} aria-hidden="true">
               <span className={styles.equipName}>設備名</span>
               <span className={styles.equipType}>種類</span>
@@ -269,7 +269,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                 onDeleted={onResourceDeleted}
               />
             ))}
-          </>
+          </div>
         ) : null}
         <ResourceDialog
           open={addingResource}
@@ -280,6 +280,8 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
       </section>
 
       <SlotCheckV8 accountId={accountId} menus={menus} />
+        </div>
+      </section>
     </div>
   )
 }
@@ -540,10 +542,11 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
   const canRun = Boolean(menuId && date && time) && !checking
 
   return (
-    <section className={styles.section}>
-      <div className={styles.sectionHead}>
-        <h2 className={styles.sectionTitle}>空きを確かめる</h2>
-        <p className={styles.sectionDesc}>お客さまの画面と同じ条件で、その日時に受けられるか確かめます。確かめても予約は作られません。</p>
+    <section className={styles.innerSection} aria-labelledby="hours-check-title">
+      {/* 絵 yRPxl は題だけ。説明の1行は行を高くするので「？」の中へ。 */}
+      <div className={styles.innerTitleRow}>
+        <h3 id="hours-check-title" className={styles.sectionTitle}>空きを確かめる</h3>
+        <HelpTip label="空きを確かめるの説明">お客さまの画面と同じ条件で、その日時に受けられるか確かめます。確かめても予約は作られません。</HelpTip>
       </div>
       <div className={styles.checkGrid}>
         <Select size="full"
@@ -573,8 +576,9 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
           ]}
         />
       </div>
-      <div className={`${styles.checkAction} mt-3`}>
-        <Button variant="primary" onClick={() => void run()} disabled={!canRun} busy={checking}>確かめる</Button>
+      <div className={styles.checkAction}>
+        {/* 絵 yRPxl：虫めがね付きの白いボタン */}
+        <Button variant="secondary" onClick={() => void run()} disabled={!canRun} busy={checking}><Search size={15} aria-hidden="true" />確かめる</Button>
         {result ? (
           <div className={`${styles.checkResult} ${result.bookable ? styles.checkOk : styles.checkNg}`} role="status">
             {result.bookable ? (

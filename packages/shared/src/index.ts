@@ -36,6 +36,7 @@ export * from "./hq-message-card";
 export * from './date-range.js';
 
 export * from './booking-sync-rules.js';
+export * from './booking-waitlist.js';
 export * from './restaurant-inventory-rules.js';
 export * from './event-liff.js';
 export * from './webinar-liff.js';

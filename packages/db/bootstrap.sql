@@ -1139,7 +1139,7 @@ CREATE TABLE automation_definitions (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE automation_logs (
   id             TEXT PRIMARY KEY,
@@ -1428,6 +1428,33 @@ CREATE TABLE "booking_menu_resources" (
   PRIMARY KEY (menu_id, resource_id)
 );
 
+CREATE TABLE booking_noshow_flag_events (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  action TEXT NOT NULL CHECK (action IN ('manual_on', 'manual_off')),
+  reason TEXT,
+  staff_id TEXT,
+  staff_name TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_noshow_flags (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL DEFAULT 'auto' CHECK (mode IN ('auto', 'manual_on', 'manual_off')),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (line_account_id, friend_id)
+);
+
+CREATE TABLE booking_noshow_thresholds (
+  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  threshold INTEGER NOT NULL DEFAULT 3 CHECK (threshold BETWEEN 1 AND 100),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+, enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)), window_months INTEGER NOT NULL DEFAULT 6 CHECK (window_months BETWEEN 1 AND 120), no_payment_mode TEXT NOT NULL DEFAULT 'notice_call'
+    CHECK (no_payment_mode IN ('notice', 'notice_call')));
+
 CREATE TABLE booking_operation_runs (
   id              TEXT PRIMARY KEY,
   booking_id      TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -1448,6 +1475,44 @@ CREATE TABLE booking_operation_runs (
   idempotency_key TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now')),
+  UNIQUE (line_account_id, idempotency_key)
+);
+
+CREATE TABLE booking_payment_configs (
+  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL DEFAULT 'none'
+    CHECK (mode IN ('none', 'onsite', 'online')),
+  -- プロバイダ名は差し替えのために絞らない。新しいサービスは登録表へ足すだけ。
+  provider TEXT NOT NULL DEFAULT 'none',
+  hold_minutes INTEGER NOT NULL DEFAULT 30 CHECK (hold_minutes BETWEEN 5 AND 1440),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_payment_menu_settings (
+  menu_id TEXT PRIMARY KEY REFERENCES menus(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL CHECK (mode IN ('none', 'onsite', 'online')),
+  provider TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_payments (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL CHECK (amount >= 0),
+  currency TEXT NOT NULL DEFAULT 'JPY',
+  status TEXT NOT NULL DEFAULT 'unpaid'
+    CHECK (status IN ('unpaid', 'pending', 'paid', 'failed', 'refunded', 'expired')),
+  provider TEXT NOT NULL,
+  provider_payment_id TEXT,
+  idempotency_key TEXT NOT NULL,
+  hold_until TEXT,
+  paid_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
   UNIQUE (line_account_id, idempotency_key)
 );
 
@@ -1506,7 +1571,8 @@ CREATE TABLE booking_settings (
              AND substr(reminder_day_before_time, 1, 2) <= '23')), reminder_hours_before INTEGER
   CHECK (reminder_hours_before IS NULL
          OR reminder_hours_before BETWEEN 1 AND 72), liff_date_view TEXT NOT NULL DEFAULT 'list'
-  CHECK (liff_date_view IN ('list', 'calendar')));
+  CHECK (liff_date_view IN ('list', 'calendar')), waitlist_hold_minutes INTEGER NOT NULL DEFAULT 30
+  CHECK (waitlist_hold_minutes BETWEEN 1 AND 1440));
 
 CREATE TABLE booking_sync_notice_outbox (
  id TEXT PRIMARY KEY, notice_id TEXT NOT NULL REFERENCES booking_sync_notices(id), generation INTEGER NOT NULL,
@@ -1541,6 +1607,53 @@ CREATE TABLE booking_sync_rules (
  version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT(datetime('now'))
 );
 
+CREATE TABLE booking_visit_marks (
+  id                    TEXT PRIMARY KEY,
+  booking_id            TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  -- visited: 来店した / late: 遅れる / no_show: 来なかった
+  kind                  TEXT NOT NULL CHECK (kind IN ('visited', 'late', 'no_show')),
+  -- late のときだけ必須の遅れ分数。
+  late_minutes          INTEGER CHECK (late_minutes IS NULL OR (late_minutes BETWEEN 1 AND 1440)),
+  -- 付けた人（ログイン利用者）。予約の担当表とは別物なので外部キーは付けない
+  -- （監査の actor と同じ考え方）。表示名も一緒に残す。
+  marked_by_staff_id    TEXT,
+  marked_by_name        TEXT,
+  -- UTC ISO8601。付けた時刻。
+  marked_at             TEXT NOT NULL,
+  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  CHECK ((kind = 'late' AND late_minutes IS NOT NULL)
+      OR (kind != 'late' AND late_minutes IS NULL))
+);
+
+CREATE TABLE "booking_waitlist" (
+  id                    TEXT PRIMARY KEY,
+  line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  staff_id              TEXT NOT NULL REFERENCES staff(id),
+  menu_id               TEXT NOT NULL REFERENCES menus(id),
+  starts_at             TEXT NOT NULL,
+  friend_id             TEXT REFERENCES friends(id) ON DELETE SET NULL,
+  booking_customer_id   TEXT REFERENCES booking_customers(id) ON DELETE SET NULL,
+  -- 枠の中の本人確認。friend_id / booking_customer_id のどちらか。
+  -- 同じ枠に同じ人が二度並べないための鍵。
+  identity_key          TEXT NOT NULL,
+  -- waiting: 待っている / invited: 空きを知らせた（仮押さえ中）
+  -- / converted: 予約になった / cancelled: 本人が取り消した
+  status                TEXT NOT NULL DEFAULT 'waiting'
+                          CHECK (status IN ('waiting', 'invited', 'converted', 'cancelled', 'finished')),
+  hold_minutes          INTEGER NOT NULL DEFAULT 30 CHECK (hold_minutes BETWEEN 1 AND 1440),
+  invited_at            TEXT,
+  hold_expires_at       TEXT,
+  -- LINE を送った時刻。LINE 未連携の電話客は店が電話するため NULL のまま。
+  notified_at           TEXT,
+  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  ends_at TEXT, block_ends_at TEXT, capacity_windows_json TEXT NOT NULL DEFAULT '[]', finish_reason TEXT, notification_retry_key TEXT, notification_claim_until TEXT, last_processed_at TEXT,
+  updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  CHECK (friend_id IS NOT NULL OR booking_customer_id IS NOT NULL)
+);
+
+CREATE TABLE booking_waitlist_resources(waitlist_id TEXT NOT NULL REFERENCES booking_waitlist(id) ON DELETE CASCADE,resource_id TEXT NOT NULL REFERENCES booking_resources(id),quantity INTEGER NOT NULL,PRIMARY KEY(waitlist_id,resource_id));
+
 CREATE TABLE "bookings" (
   id                           TEXT PRIMARY KEY,
   line_account_id              TEXT NOT NULL,
@@ -1570,7 +1683,7 @@ CREATE TABLE "bookings" (
   cancelled_at                 TEXT,
   completed_at                 TEXT,
   created_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)), cancel_claim_id TEXT,
+  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)), cancel_claim_id TEXT, waitlist_entry_id TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
@@ -1872,7 +1985,7 @@ CREATE TABLE common_actions (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-, client_request_key TEXT);
+, client_request_key TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE common_var_export_jobs (
   id TEXT PRIMARY KEY,
@@ -2068,7 +2181,7 @@ CREATE TABLE "conversion_points" (
   tenant_id  TEXT REFERENCES tenants(id),
   ingest_secret_encrypted TEXT,
   ingest_disabled_at TEXT
-, count_anonymous INTEGER NOT NULL DEFAULT 0);
+, count_anonymous INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -3675,7 +3788,7 @@ CREATE TABLE incoming_webhooks (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , version INTEGER NOT NULL DEFAULT 1
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
-  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT);
+  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE integration_api_tokens (
   id              TEXT PRIMARY KEY,
@@ -5324,7 +5437,7 @@ CREATE TABLE outgoing_webhooks (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), updated_by_staff_id TEXT);
+, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), updated_by_staff_id TEXT);
 
 CREATE TABLE photo_reward_policies (
   id TEXT PRIMARY KEY,
@@ -6413,13 +6526,57 @@ CREATE TABLE rt_reservations (
   source_updated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT);
+, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT);
 
 CREATE TABLE rt_resource_locks (
   resource_key TEXT PRIMARY KEY,
   owner_token TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE rt_seat_visit_marks (
+  id                    TEXT PRIMARY KEY,
+  reservation_id        TEXT NOT NULL REFERENCES rt_reservations(id) ON DELETE CASCADE,
+  store_id              TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  -- visited: 来店した / late: 遅れる / no_show: 来なかった
+  kind                  TEXT NOT NULL CHECK (kind IN ('visited', 'late', 'no_show')),
+  -- late のときだけ必須の遅れ分数。
+  late_minutes          INTEGER CHECK (late_minutes IS NULL OR (late_minutes BETWEEN 1 AND 1440)),
+  -- 付けた人（ログイン利用者）。監査の actor と同じ考え方で外部キーは付けない。
+  marked_by_staff_id    TEXT,
+  marked_by_name        TEXT,
+  -- UTC ISO8601。付けた時刻。
+  marked_at             TEXT NOT NULL,
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  CHECK ((kind = 'late' AND late_minutes IS NOT NULL)
+      OR (kind != 'late' AND late_minutes IS NULL))
+);
+
+CREATE TABLE "rt_seat_waitlist" (
+  id                    TEXT PRIMARY KEY,
+  store_id              TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  starts_at             TEXT NOT NULL,
+  guest_count           INTEGER NOT NULL CHECK (guest_count BETWEEN 1 AND 100),
+  customer_name         TEXT NOT NULL,
+  customer_phone        TEXT,
+  line_uid              TEXT,
+  -- 同じ開始時刻に同じ組が二度並べないための鍵（電話番号かLINE IDか名前）。
+  identity_key          TEXT NOT NULL,
+  -- waiting: 待っている / invited: 空きを知らせた（仮押さえ中）
+  -- / converted: 予約になった / cancelled: 本人が取り消した
+  status                TEXT NOT NULL DEFAULT 'waiting'
+                          CHECK (status IN ('waiting', 'invited', 'converted', 'cancelled', 'finished')),
+  hold_minutes          INTEGER NOT NULL DEFAULT 30 CHECK (hold_minutes BETWEEN 1 AND 1440),
+  -- 招待したときに空いた席。組の人数が入る席だけを候補にする。
+  table_id              TEXT REFERENCES rt_tables(id) ON DELETE SET NULL,
+  invited_at            TEXT,
+  hold_expires_at       TEXT,
+  -- LINE を送った時刻。LINE 未連携の組は店が電話するため NULL のまま。
+  notified_at           TEXT,
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  ends_at TEXT, finish_reason TEXT, notification_retry_key TEXT, notification_claim_until TEXT, last_processed_at TEXT,
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE rt_stores (
@@ -7902,6 +8059,8 @@ CREATE INDEX idx_auto_reply_versions_status
 CREATE INDEX idx_automation_definitions_account_status
   ON automation_definitions(line_account_id, status, priority DESC);
 
+CREATE INDEX idx_automation_definitions_folder ON automation_definitions(line_account_id, folder_id);
+
 CREATE INDEX idx_automation_logs_automation ON automation_logs (automation_id);
 
 CREATE INDEX idx_automation_run_daily_counts_day
@@ -7996,11 +8155,23 @@ CREATE INDEX idx_booking_exceptions_account_dates
 CREATE INDEX idx_booking_menu_resources_resource
   ON booking_menu_resources(resource_id, menu_id);
 
+CREATE INDEX idx_booking_noshow_flag_events_friend
+  ON booking_noshow_flag_events(line_account_id, friend_id, created_at DESC);
+
+CREATE INDEX idx_booking_noshow_flags_friend
+  ON booking_noshow_flags(friend_id, line_account_id);
+
 CREATE INDEX idx_booking_operation_runs_booking
   ON booking_operation_runs(line_account_id, booking_id, created_at DESC);
 
 CREATE INDEX idx_booking_operation_runs_status
   ON booking_operation_runs(status, scheduled_at);
+
+CREATE INDEX idx_booking_payments_booking
+  ON booking_payments(booking_id, created_at DESC);
+
+CREATE INDEX idx_booking_payments_status_hold
+  ON booking_payments(line_account_id, status, hold_until);
 
 CREATE INDEX idx_booking_reminders_v298_status_scheduled
   ON booking_reminders(status, scheduled_at);
@@ -8010,6 +8181,21 @@ CREATE INDEX idx_booking_resource_consumptions_resource
 
 CREATE INDEX idx_booking_resources_account_active
   ON booking_resources(line_account_id, is_active, id);
+
+CREATE INDEX idx_booking_visit_marks_account
+  ON booking_visit_marks(line_account_id, marked_at DESC);
+
+CREATE INDEX idx_booking_visit_marks_booking
+  ON booking_visit_marks(booking_id, marked_at DESC);
+
+CREATE UNIQUE INDEX idx_booking_waitlist_conversion ON bookings(waitlist_entry_id) WHERE waitlist_entry_id IS NOT NULL;
+
+CREATE INDEX idx_booking_waitlist_slot_created
+  ON booking_waitlist(line_account_id, staff_id, starts_at, status, created_at);
+
+CREATE UNIQUE INDEX idx_booking_waitlist_slot_identity
+  ON booking_waitlist(line_account_id, staff_id, starts_at, identity_key)
+  WHERE status IN ('waiting', 'invited');
 
 CREATE INDEX idx_bookings_menu_version
   ON bookings (menu_id, menu_version_number);
@@ -8107,6 +8293,8 @@ CREATE INDEX idx_common_action_versions_action_status
 CREATE INDEX idx_common_actions_account_status
   ON common_actions(line_account_id, status, updated_at DESC);
 
+CREATE INDEX idx_common_actions_folder ON common_actions(line_account_id, folder_id);
+
 CREATE UNIQUE INDEX idx_common_actions_request_key
   ON common_actions(line_account_id, client_request_key);
 
@@ -8170,6 +8358,8 @@ CREATE INDEX idx_conversion_events_tenant
 
 CREATE INDEX idx_conversion_ingestion_events_point
   ON conversion_ingestion_events(conversion_point_id, created_at DESC);
+
+CREATE INDEX idx_conversion_points_folder ON conversion_points(line_account_id, folder_id);
 
 CREATE INDEX idx_conversion_points_ingest ON conversion_points(id)
   WHERE ingest_secret_encrypted IS NOT NULL;
@@ -8637,6 +8827,8 @@ CREATE INDEX idx_incoming_webhook_receipts_received
 CREATE INDEX idx_incoming_webhook_unmatched_account_status
   ON incoming_webhook_unmatched_events (line_account_id, status, received_at);
 
+CREATE INDEX idx_incoming_webhooks_folder ON incoming_webhooks(line_account_id, folder_id);
+
 CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
 
 CREATE INDEX idx_integration_api_tokens_account
@@ -9051,6 +9243,8 @@ CREATE INDEX idx_outgoing_webhook_deliveries_due
 CREATE INDEX idx_outgoing_webhook_deliveries_webhook
   ON outgoing_webhook_deliveries(webhook_id, queued_at DESC);
 
+CREATE INDEX idx_outgoing_webhooks_folder ON outgoing_webhooks(line_account_id, folder_id);
+
 CREATE INDEX idx_outgoing_webhooks_line_account
   ON outgoing_webhooks(line_account_id, is_active, updated_at DESC);
 
@@ -9287,6 +9481,19 @@ CREATE UNIQUE INDEX idx_rt_reservations_external
 
 CREATE INDEX idx_rt_reservations_timeline ON rt_reservations(store_id, starts_at, status);
 
+CREATE INDEX idx_rt_seat_visit_marks_reservation
+  ON rt_seat_visit_marks(reservation_id, marked_at DESC);
+
+CREATE INDEX idx_rt_seat_visit_marks_store
+  ON rt_seat_visit_marks(store_id, marked_at DESC);
+
+CREATE INDEX idx_rt_seat_waitlist_slot_created
+  ON rt_seat_waitlist(store_id, starts_at, status, created_at);
+
+CREATE UNIQUE INDEX idx_rt_seat_waitlist_slot_identity
+  ON rt_seat_waitlist(store_id, starts_at, identity_key)
+  WHERE status IN ('waiting', 'invited');
+
 CREATE UNIQUE INDEX idx_rt_stores_line_account
   ON rt_stores (line_account_id) WHERE line_account_id IS NOT NULL;
 
@@ -9295,6 +9502,8 @@ CREATE INDEX idx_rt_stores_org ON rt_stores(organization_id, status);
 CREATE INDEX idx_rt_sync_events_recent ON rt_sync_events(store_id, received_at DESC);
 
 CREATE INDEX idx_rt_tables_store ON rt_tables(store_id, is_active);
+
+CREATE UNIQUE INDEX idx_rt_waitlist_conversion ON rt_reservations(waitlist_entry_id) WHERE waitlist_entry_id IS NOT NULL;
 
 CREATE INDEX idx_saved_search_references_account
   ON saved_search_references(line_account_id, saved_search_id, reference_kind);
@@ -9664,6 +9873,19 @@ CREATE TRIGGER analytics_projection_friend_stage_count
 AFTER INSERT ON analytics_projection_friend_stage
 BEGIN UPDATE analytics_projection_metric_stage SET unique_friend_count = unique_friend_count + 1 WHERE line_account_id = NEW.line_account_id AND cycle_id = NEW.cycle_id AND metric_date = NEW.metric_date AND event_type = NEW.event_type; END;
 
+CREATE TRIGGER automation_definitions_folder_delete AFTER DELETE ON folders
+BEGIN UPDATE automation_definitions SET folder_id = NULL WHERE folder_id = OLD.id; END;
+
+CREATE TRIGGER automation_definitions_folder_insert BEFORE INSERT ON automation_definitions
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'automation' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER automation_definitions_folder_update BEFORE UPDATE OF folder_id, line_account_id ON automation_definitions
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'automation' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
 CREATE TRIGGER booking_auto_assign_sync_rules_insert AFTER INSERT ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
 
 CREATE TRIGGER booking_auto_assign_sync_rules_update AFTER UPDATE ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
@@ -9698,7 +9920,45 @@ CREATE TRIGGER booking_sync_rules_insert AFTER INSERT ON booking_sync_rules BEGI
 
 CREATE TRIGGER booking_sync_rules_update AFTER UPDATE ON booking_sync_rules BEGIN INSERT INTO account_settings(id,line_account_id,key,value) VALUES(lower(hex(randomblob(16))),NEW.line_account_id,'booking_auto_assign',CASE WHEN NEW.auto_assign=1 THEN 'true' ELSE 'false' END) ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value; INSERT INTO booking_sync_notice_queue(line_account_id) VALUES(NEW.line_account_id) ON CONFLICT(line_account_id) DO UPDATE SET generation=generation+1,updated_at=datetime('now'); END;
 
+CREATE TRIGGER booking_waitlist_booking_insert BEFORE INSERT ON bookings WHEN NEW.status IN ('requested','confirmed') AND ((NEW.waitlist_entry_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM booking_waitlist w JOIN bookings b ON b.waitlist_entry_id=w.id WHERE b.id=NEW.id AND w.id=NEW.waitlist_entry_id AND w.status='converted') AND NOT EXISTS(SELECT 1 FROM booking_waitlist w WHERE w.id=NEW.waitlist_entry_id AND w.line_account_id=NEW.line_account_id AND w.friend_id=NEW.friend_id AND w.staff_id=NEW.staff_id AND w.menu_id=NEW.menu_id AND julianday(w.starts_at)=julianday(NEW.starts_at) AND ((w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')) OR (w.status='converted' AND EXISTS(SELECT 1 FROM bookings b WHERE b.id=NEW.id AND b.waitlist_entry_id=w.id))))) OR (EXISTS(SELECT 1 FROM booking_waitlist w WHERE w.line_account_id=NEW.line_account_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')) AND (EXISTS(SELECT 1 FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.staff_id=NEW.staff_id AND a.menu_id<>NEW.menu_id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at)) OR (SELECT COUNT(*) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.staff_id=NEW.staff_id AND a.menu_id=NEW.menu_id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at))>=COALESCE((SELECT concurrent_capacity FROM menus WHERE id=NEW.menu_id),1) OR EXISTS(SELECT 1 FROM booking_menu_resources mr JOIN booking_resources r ON r.id=mr.resource_id WHERE mr.menu_id=NEW.menu_id AND (r.is_active<>1 OR r.line_account_id<>NEW.line_account_id OR mr.quantity+(SELECT COALESCE(SUM(a.quantity),0) FROM booking_slot_resources a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.resource_id=r.id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at))>r.capacity)) OR EXISTS(SELECT 1 FROM json_each(COALESCE((SELECT json_group_array(json(value)) FROM booking_waitlist w,json_each(w.capacity_windows_json) WHERE w.line_account_id=NEW.line_account_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND julianday(w.starts_at)<julianday(NEW.block_ends_at) AND julianday(w.block_ends_at)>julianday(NEW.starts_at)),'[]')) win WHERE EXISTS(SELECT 1 FROM (SELECT julianday(json_extract(win.value,'$.start')) point UNION ALL SELECT julianday(a.starts_at) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND julianday(a.starts_at)>julianday(json_extract(win.value,'$.start')) AND julianday(a.starts_at)<julianday(json_extract(win.value,'$.end'))) p WHERE (SELECT COUNT(*) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND julianday(a.starts_at)<=p.point AND julianday(a.block_ends_at)>p.point)>=json_extract(win.value,'$.capacity')))))) BEGIN SELECT RAISE(ABORT,'waitlist_hold_conflict'); END;
+
+CREATE TRIGGER booking_waitlist_booking_update BEFORE UPDATE OF staff_id,menu_id,starts_at,block_ends_at,status ON bookings WHEN NEW.status IN ('requested','confirmed') AND ((NEW.waitlist_entry_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM booking_waitlist w JOIN bookings b ON b.waitlist_entry_id=w.id WHERE b.id=NEW.id AND w.id=NEW.waitlist_entry_id AND w.status='converted') AND NOT EXISTS(SELECT 1 FROM booking_waitlist w WHERE w.id=NEW.waitlist_entry_id AND w.line_account_id=NEW.line_account_id AND w.friend_id=NEW.friend_id AND w.staff_id=NEW.staff_id AND w.menu_id=NEW.menu_id AND julianday(w.starts_at)=julianday(NEW.starts_at) AND ((w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')) OR (w.status='converted' AND EXISTS(SELECT 1 FROM bookings b WHERE b.id=NEW.id AND b.waitlist_entry_id=w.id))))) OR (EXISTS(SELECT 1 FROM booking_waitlist w WHERE w.line_account_id=NEW.line_account_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')) AND (EXISTS(SELECT 1 FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.staff_id=NEW.staff_id AND a.menu_id<>NEW.menu_id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at)) OR (SELECT COUNT(*) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.staff_id=NEW.staff_id AND a.menu_id=NEW.menu_id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at))>=COALESCE((SELECT concurrent_capacity FROM menus WHERE id=NEW.menu_id),1) OR EXISTS(SELECT 1 FROM booking_menu_resources mr JOIN booking_resources r ON r.id=mr.resource_id WHERE mr.menu_id=NEW.menu_id AND (r.is_active<>1 OR r.line_account_id<>NEW.line_account_id OR mr.quantity+(SELECT COALESCE(SUM(a.quantity),0) FROM booking_slot_resources a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.resource_id=r.id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at))>r.capacity)) OR EXISTS(SELECT 1 FROM json_each(COALESCE((SELECT json_group_array(json(value)) FROM booking_waitlist w,json_each(w.capacity_windows_json) WHERE w.line_account_id=NEW.line_account_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND julianday(w.starts_at)<julianday(NEW.block_ends_at) AND julianday(w.block_ends_at)>julianday(NEW.starts_at)),'[]')) win WHERE EXISTS(SELECT 1 FROM (SELECT julianday(json_extract(win.value,'$.start')) point UNION ALL SELECT julianday(a.starts_at) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND julianday(a.starts_at)>julianday(json_extract(win.value,'$.start')) AND julianday(a.starts_at)<julianday(json_extract(win.value,'$.end'))) p WHERE (SELECT COUNT(*) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND julianday(a.starts_at)<=p.point AND julianday(a.block_ends_at)>p.point)>=json_extract(win.value,'$.capacity')))))) BEGIN SELECT RAISE(ABORT,'waitlist_hold_conflict'); END;
+
+CREATE TRIGGER booking_waitlist_claim BEFORE UPDATE OF status ON booking_waitlist WHEN NEW.status='invited' AND OLD.status='waiting' AND (EXISTS(SELECT 1 FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NULL IS NULL OR COALESCE(a.waitlist_id,'')<>NULL) AND a.staff_id=NEW.staff_id AND a.menu_id<>NEW.menu_id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at)) OR (SELECT COUNT(*) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NULL IS NULL OR COALESCE(a.waitlist_id,'')<>NULL) AND a.staff_id=NEW.staff_id AND a.menu_id=NEW.menu_id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at))>=COALESCE((SELECT concurrent_capacity FROM menus WHERE id=NEW.menu_id),1) OR EXISTS(SELECT 1 FROM booking_menu_resources mr JOIN booking_resources r ON r.id=mr.resource_id WHERE mr.menu_id=NEW.menu_id AND (r.is_active<>1 OR r.line_account_id<>NEW.line_account_id OR mr.quantity+(SELECT COALESCE(SUM(a.quantity),0) FROM booking_slot_resources a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NULL IS NULL OR COALESCE(a.waitlist_id,'')<>NULL) AND a.resource_id=r.id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at))>r.capacity)) OR EXISTS(SELECT 1 FROM json_each(NEW.capacity_windows_json) win WHERE EXISTS(SELECT 1 FROM (SELECT julianday(json_extract(win.value,'$.start')) point UNION ALL SELECT julianday(a.starts_at) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NULL IS NULL OR COALESCE(a.waitlist_id,'')<>NULL) AND julianday(a.starts_at)>julianday(json_extract(win.value,'$.start')) AND julianday(a.starts_at)<julianday(json_extract(win.value,'$.end'))) p WHERE (SELECT COUNT(*) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NULL IS NULL OR COALESCE(a.waitlist_id,'')<>NULL) AND julianday(a.starts_at)<=p.point AND julianday(a.block_ends_at)>p.point)>=json_extract(win.value,'$.capacity')))) BEGIN SELECT RAISE(IGNORE); END;
+
+CREATE TRIGGER booking_waitlist_conversion AFTER INSERT ON bookings WHEN NEW.waitlist_entry_id IS NOT NULL BEGIN UPDATE booking_waitlist SET status='converted',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=NEW.waitlist_entry_id; END;
+
+CREATE TRIGGER booking_waitlist_registration BEFORE INSERT ON booking_waitlist BEGIN SELECT CASE WHEN julianday(NEW.starts_at)<=julianday('now','+1 hour') THEN RAISE(ABORT,'waitlist_registration_closed') WHEN ((SELECT COUNT(*) FROM booking_waitlist w WHERE w.line_account_id=NEW.line_account_id AND w.status IN ('waiting','invited') AND (w.friend_id=NEW.friend_id OR (w.booking_customer_id IS NOT NULL AND w.booking_customer_id=NEW.booking_customer_id))) + (SELECT COUNT(*) FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=NEW.line_account_id AND w.status IN ('waiting','invited') AND w.line_uid=(SELECT line_user_id FROM friends WHERE id=NEW.friend_id AND line_account_id=NEW.line_account_id)))>=3 THEN RAISE(ABORT,'waitlist_limit') END; END;
+
+CREATE TRIGGER booking_waitlist_resource_snapshot AFTER UPDATE OF status ON booking_waitlist WHEN NEW.status='invited' AND OLD.status='waiting' BEGIN INSERT OR REPLACE INTO booking_waitlist_resources SELECT NEW.id,resource_id,quantity FROM booking_menu_resources WHERE menu_id=NEW.menu_id; END;
+
 CREATE TRIGGER capture_ad_conversion_account AFTER INSERT ON conversion_events BEGIN INSERT INTO ad_conversion_event_accounts(conversion_event_id,line_account_id,platform_ids_json) SELECT NEW.id,f.line_account_id,(SELECT json_group_array(p.id) FROM ad_platforms p WHERE p.line_account_id = f.line_account_id AND p.is_active = 1 AND p.verified_at IS NOT NULL AND p.name IN ('meta','google')) FROM friends f WHERE f.id = NEW.friend_id AND f.line_account_id IS NOT NULL; END;
+
+CREATE TRIGGER common_actions_folder_delete AFTER DELETE ON folders
+BEGIN UPDATE common_actions SET folder_id = NULL WHERE folder_id = OLD.id; END;
+
+CREATE TRIGGER common_actions_folder_insert BEFORE INSERT ON common_actions
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'common_action' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER common_actions_folder_update BEFORE UPDATE OF folder_id, line_account_id ON common_actions
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'common_action' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER conversion_points_folder_delete AFTER DELETE ON folders
+BEGIN UPDATE conversion_points SET folder_id = NULL WHERE folder_id = OLD.id; END;
+
+CREATE TRIGGER conversion_points_folder_insert BEFORE INSERT ON conversion_points
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'conversion' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER conversion_points_folder_update BEFORE UPDATE OF folder_id, line_account_id ON conversion_points
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'conversion' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
 
 CREATE TRIGGER conversion_points_prevent_delete
 BEFORE DELETE ON conversion_points
@@ -9830,6 +10090,19 @@ WHEN NEW.id != OLD.id
   OR NEW.version != OLD.version
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_VERSION_BINDING_IMMUTABLE'); END;
 
+CREATE TRIGGER incoming_webhooks_folder_delete AFTER DELETE ON folders
+BEGIN UPDATE incoming_webhooks SET folder_id = NULL WHERE folder_id = OLD.id; END;
+
+CREATE TRIGGER incoming_webhooks_folder_insert BEFORE INSERT ON incoming_webhooks
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER incoming_webhooks_folder_update BEFORE UPDATE OF folder_id, line_account_id ON incoming_webhooks
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
 CREATE TRIGGER line_account_tag_links_scope
 BEFORE INSERT ON line_account_tag_links
 WHEN NOT EXISTS (
@@ -9847,6 +10120,19 @@ BEGIN
   UPDATE outgoing_webhooks SET version = OLD.version + 1, updated_by_staff_id = NULL,
     updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') || '+09:00'
   WHERE id = NEW.id; END;
+
+CREATE TRIGGER outgoing_webhooks_folder_delete AFTER DELETE ON folders
+BEGIN UPDATE outgoing_webhooks SET folder_id = NULL WHERE folder_id = OLD.id; END;
+
+CREATE TRIGGER outgoing_webhooks_folder_insert BEFORE INSERT ON outgoing_webhooks
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER outgoing_webhooks_folder_update BEFORE UPDATE OF folder_id, line_account_id ON outgoing_webhooks
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
 
 CREATE TRIGGER rt_inventory_reservation_delete AFTER DELETE ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE store_id IN (OLD.store_id); END;
 
@@ -9910,11 +10196,21 @@ CREATE TRIGGER rt_reservations_rule_queue_insert AFTER INSERT ON rt_reservations
 
 CREATE TRIGGER rt_reservations_rule_queue_update AFTER UPDATE ON rt_reservations BEGIN INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(NEW.store_id,'rt_reservations:update:'||NEW.id) ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
 
+CREATE TRIGGER rt_seat_waitlist_claim BEFORE UPDATE OF status ON rt_seat_waitlist WHEN NEW.status='invited' AND OLD.status='waiting' AND (EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=NEW.store_id AND r.table_id=NEW.table_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) OR EXISTS(SELECT 1 FROM rt_seat_waitlist w WHERE w.id<>NEW.id AND w.store_id=NEW.store_id AND w.table_id=NEW.table_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND julianday(w.starts_at)<julianday(NEW.ends_at) AND julianday(w.ends_at)>julianday(NEW.starts_at))) BEGIN SELECT RAISE(IGNORE); END;
+
+CREATE TRIGGER rt_seat_waitlist_conversion AFTER INSERT ON rt_reservations WHEN NEW.waitlist_entry_id IS NOT NULL BEGIN UPDATE rt_seat_waitlist SET status='converted',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=NEW.waitlist_entry_id; END;
+
+CREATE TRIGGER rt_seat_waitlist_registration BEFORE INSERT ON rt_seat_waitlist BEGIN SELECT CASE WHEN julianday(NEW.starts_at)<=julianday('now','+1 hour') THEN RAISE(ABORT,'waitlist_registration_closed') WHEN ((SELECT COUNT(*) FROM booking_waitlist w WHERE w.line_account_id=(SELECT line_account_id FROM rt_stores WHERE id=NEW.store_id) AND w.status IN ('waiting','invited') AND (w.friend_id=(SELECT id FROM friends WHERE line_user_id=NEW.line_uid AND line_account_id=(SELECT line_account_id FROM rt_stores WHERE id=NEW.store_id)) OR (w.booking_customer_id IS NOT NULL AND w.booking_customer_id=NULL))) + (SELECT COUNT(*) FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=(SELECT line_account_id FROM rt_stores WHERE id=NEW.store_id) AND w.status IN ('waiting','invited') AND (w.line_uid=NEW.line_uid OR (NEW.line_uid IS NULL AND w.identity_key=NEW.identity_key))))>=3 THEN RAISE(ABORT,'waitlist_limit') END; END;
+
 CREATE TRIGGER rt_tables_rule_queue_delete AFTER DELETE ON rt_tables BEGIN INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(OLD.store_id,'rt_tables:delete:'||OLD.id) ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
 
 CREATE TRIGGER rt_tables_rule_queue_insert AFTER INSERT ON rt_tables BEGIN INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(NEW.store_id,'rt_tables:insert:'||NEW.id) ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
 
 CREATE TRIGGER rt_tables_rule_queue_update AFTER UPDATE ON rt_tables BEGIN INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(NEW.store_id,'rt_tables:update:'||NEW.id) ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
+
+CREATE TRIGGER rt_waitlist_reservation_insert BEFORE INSERT ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND ((NEW.waitlist_entry_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_seat_waitlist w JOIN rt_reservations r ON r.waitlist_entry_id=w.id WHERE r.id=NEW.id AND w.id=NEW.waitlist_entry_id AND w.status='converted') AND NOT EXISTS(SELECT 1 FROM rt_seat_waitlist w WHERE w.id=NEW.waitlist_entry_id AND w.store_id=NEW.store_id AND w.line_uid=NEW.line_uid AND w.table_id=NEW.table_id AND w.guest_count=NEW.guest_count AND julianday(w.starts_at)=julianday(NEW.starts_at) AND julianday(w.ends_at)=julianday(NEW.ends_at) AND ((w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')) OR (w.status='converted' AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.id=NEW.id AND r.waitlist_entry_id=w.id))))) OR (EXISTS(SELECT 1 FROM rt_seat_waitlist w WHERE w.store_id=NEW.store_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND COALESCE(NEW.waitlist_entry_id,'')<>w.id AND (NEW.table_id IS NULL OR w.table_id=NEW.table_id) AND julianday(w.starts_at)<julianday(NEW.ends_at) AND julianday(w.ends_at)>julianday(NEW.starts_at))) OR (NEW.waitlist_entry_id IS NOT NULL AND (EXISTS(SELECT 1 FROM rt_reservations r WHERE r.id<>NEW.id AND r.store_id=NEW.store_id AND r.table_id=NEW.table_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at))))) BEGIN SELECT RAISE(ABORT,'restaurant_table_conflict'); END;
+
+CREATE TRIGGER rt_waitlist_reservation_update BEFORE UPDATE OF table_id,starts_at,ends_at,status ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND ((NEW.waitlist_entry_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_seat_waitlist w JOIN rt_reservations r ON r.waitlist_entry_id=w.id WHERE r.id=NEW.id AND w.id=NEW.waitlist_entry_id AND w.status='converted') AND NOT EXISTS(SELECT 1 FROM rt_seat_waitlist w WHERE w.id=NEW.waitlist_entry_id AND w.store_id=NEW.store_id AND w.line_uid=NEW.line_uid AND w.table_id=NEW.table_id AND w.guest_count=NEW.guest_count AND julianday(w.starts_at)=julianday(NEW.starts_at) AND julianday(w.ends_at)=julianday(NEW.ends_at) AND ((w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')) OR (w.status='converted' AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.id=NEW.id AND r.waitlist_entry_id=w.id))))) OR (EXISTS(SELECT 1 FROM rt_seat_waitlist w WHERE w.store_id=NEW.store_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND COALESCE(NEW.waitlist_entry_id,'')<>w.id AND (NEW.table_id IS NULL OR w.table_id=NEW.table_id) AND julianday(w.starts_at)<julianday(NEW.ends_at) AND julianday(w.ends_at)>julianday(NEW.starts_at))) OR (NEW.waitlist_entry_id IS NOT NULL AND (EXISTS(SELECT 1 FROM rt_reservations r WHERE r.id<>NEW.id AND r.store_id=NEW.store_id AND r.table_id=NEW.table_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at))))) BEGIN SELECT RAISE(ABORT,'restaurant_table_conflict'); END;
 
 CREATE TRIGGER trg_action_score_published_version_immutable
 BEFORE UPDATE ON action_score_rule_versions
@@ -10380,6 +10676,10 @@ BEGIN INSERT INTO nen_photo_publication_reward_outbox (id,photo_id,line_account_
 
 CREATE TRIGGER v8_photo_publication_reward_snapshot AFTER UPDATE OF reward_points ON nen_photo_publications
 BEGIN INSERT INTO nen_photo_publication_reward_outbox (id,photo_id,line_account_id,friend_id,customer_id,provider_award_key,policy_version,points,status,last_error,created_at,updated_at) SELECT 'photo-publication-reward:' || ps.id,ps.id,ps.line_account_id,ps.friend_id,COALESCE(member.customer_id,''), 'photo-publication-reward:' || ps.id,pub.reward_policy_key,pub.reward_points, CASE WHEN member.customer_id IS NOT NULL AND member.customer_id != '' THEN 'pending' ELSE 'failed' END, CASE WHEN member.customer_id IS NOT NULL AND member.customer_id != '' THEN NULL ELSE 'customer_unlinked' END, (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours') || '+09:00'),(strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours') || '+09:00') FROM nen_photo_submissions ps JOIN nen_photo_publications pub ON pub.photo_id=ps.id AND pub.line_account_id=ps.line_account_id AND pub.status='published' JOIN friends f ON f.id=ps.friend_id AND f.line_account_id=ps.line_account_id LEFT JOIN nen_ec_member_snapshots member ON member.friend_id=ps.friend_id WHERE pub.id=NEW.id AND ps.status='adopted' AND ps.publication_consent_at IS NOT NULL AND ps.publication_withdrawn_at IS NULL AND pub.reward_policy_key IS NOT NULL AND pub.reward_points>0 ON CONFLICT DO NOTHING; END;
+
+CREATE VIEW booking_slot_allocations AS SELECT id,line_account_id,staff_id,menu_id,starts_at,block_ends_at,NULL AS waitlist_id FROM bookings WHERE status IN ('requested','confirmed') UNION ALL SELECT 'waitlist:'||id,line_account_id,staff_id,menu_id,starts_at,block_ends_at,id FROM booking_waitlist WHERE status='invited' AND julianday(hold_expires_at)>julianday('now');
+
+CREATE VIEW booking_slot_resources AS SELECT a.*,c.resource_id,c.quantity FROM booking_slot_allocations a JOIN booking_resource_consumptions c ON c.booking_id=a.id UNION ALL SELECT a.*,c.resource_id,c.quantity FROM booking_slot_allocations a JOIN booking_waitlist_resources c ON c.waitlist_id=a.waitlist_id;
 
 CREATE VIEW rt_inventory_occupancy AS SELECT i.*,
  COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=i.store_id

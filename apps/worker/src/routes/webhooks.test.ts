@@ -7,6 +7,8 @@ vi.mock('@line-crm/db', async (importOriginal) => {
   return {
   KNOWN_OUTGOING_EVENT_TYPES: actual.KNOWN_OUTGOING_EVENT_TYPES,
   isKnownOutgoingEventType: actual.isKnownOutgoingEventType,
+  // F-13：フォルダの所属が正しくないときの誤り（instanceof で見分けるので実物を通す）。
+  FolderAssignmentError: actual.FolderAssignmentError,
   // #1050: 緊急停止の判定。個別の試験で立てる場合は mockResolvedValue で差し替える。
   isOperationCapabilityStopped: vi.fn(async () => false),
   getIncomingWebhooks: vi.fn(),

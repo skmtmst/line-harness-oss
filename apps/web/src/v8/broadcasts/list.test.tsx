@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 一斉配信一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
- * 行が出る・言葉で絞れる・札と並びが口へ渡る・閲覧のみは帯が出て作るボタンを出さない。
+ * 行が出る・言葉で絞れる・札と並びが口へ渡る・閲覧のみは帯が出て作れない。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -173,14 +173,16 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     expect(buttonByText('古い順'), '並びの字が入れ替わっていません').toBeTruthy()
   })
 
-  // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
-  it('編集キーの無い運用担当は閲覧のみの帯が出て、作るは出さない', async () => {
+  it('編集キーの無い運用担当は閲覧のみの帯が出て、作る・保存・フォルダ追加のボタンを置かない', async () => {
     role.current = 'staff'
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています')
-    const create = [...host.querySelectorAll('button')].filter((b) => b.textContent?.includes('配信を作る'))
-    expect(create).toHaveLength(0)
+    const buttons = [...host.querySelectorAll('button')]
+    // 押せない形で出すのではなく、置かない（2026-10-06 オーナー決定）
+    expect(buttons.find((b) => b.textContent?.includes('配信を作る')), '閲覧のみに「配信を作る」が出ています').toBeUndefined()
+    expect(buttons.find((b) => b.textContent?.includes('この条件を保存する')), '閲覧のみに「この条件を保存する」が出ています').toBeUndefined()
+    expect(buttons.find((b) => b.textContent?.includes('フォルダを追加')), '閲覧のみに「フォルダを追加」が出ています').toBeUndefined()
   })
 
   it('編集キーを持つ運用担当は作れる', async () => {

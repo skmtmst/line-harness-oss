@@ -1,3 +1,4 @@
+import { readFolderAssignment, FolderAssignmentError } from './folder-assignment.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 import { resolveConversionPointTenantId } from './conversions.js';
@@ -84,6 +85,7 @@ export type ConversionDefinitionUsage = {
 };
 
 export type ConversionDefinitionListItem = {
+  folderId: string | null;
   id: string;
   name: string;
   sourceType: string;
@@ -126,6 +128,7 @@ export type ConversionDefinitionListItem = {
 };
 
 type DefinitionRow = {
+  folder_id: string | null;
   id: string;
   name: string;
   event_type: string;
@@ -325,7 +328,7 @@ function metricsCte(range: ConversionDefinitionRange): { sql: string; values: un
 }
 
 function selectDefinitionsSql(): string {
-  return `SELECT cp.id, cp.name, cp.event_type, cp.value, cp.measure_method, cp.target_url,
+  return `SELECT cp.id, cp.folder_id, cp.name, cp.event_type, cp.value, cp.measure_method, cp.target_url,
                  cp.count_repeat, cp.attribution_days, cp.source_config_json,
                  cp.deduplication_mode, cp.deduplication_window_days, cp.value_mode,
                  cp.reversal_policy, cp.line_account_id, cp.status,
@@ -432,6 +435,7 @@ function serializeDefinition(row: DefinitionRow, cancellation?: CancellationMetr
   return {
     id: row.id,
     name: row.name,
+    folderId: row.folder_id ?? null,
     sourceType: row.event_type,
     value: row.value,
     measureMethod: row.measure_method,
@@ -731,6 +735,7 @@ export async function addConversionDefinitionUsage(
 }
 
 export type CreateConversionDefinitionInput = {
+  folderId?: unknown;
   name: string;
   sourceType: string;
   sourceConfig: Record<string, unknown>;
@@ -753,6 +758,7 @@ export async function createConversionDefinition(
   db: D1Database,
   input: CreateConversionDefinitionInput,
 ) {
+  const folderId = await conversionFolder(db, input.lineAccountId, input.folderId);
   const duplicate = await db.prepare(`SELECT id FROM conversion_points
     WHERE line_account_id = ? AND lower(trim(name)) = lower(trim(?)) LIMIT 1`)
     .bind(input.lineAccountId, input.name)
@@ -772,8 +778,8 @@ export async function createConversionDefinition(
     db.prepare(`INSERT INTO conversion_points
       (id, name, event_type, value, measure_method, target_url, count_repeat,
        attribution_days, line_account_id, tenant_id, source_config_json, deduplication_mode,
-       deduplication_window_days, value_mode, reversal_policy, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+       deduplication_window_days, value_mode, reversal_policy, status, created_at, updated_at, folder_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(
         id, input.name, input.sourceType, value, input.measureMethod,
         input.measureMethod === 'url_reach' ? input.targetUrl ?? null : null,
@@ -781,7 +787,7 @@ export async function createConversionDefinition(
         input.attributionDays ?? null, input.lineAccountId, tenantId, JSON.stringify(input.sourceConfig),
         input.deduplicationMode, input.deduplicationMode === 'window'
           ? input.deduplicationWindowDays ?? null : null,
-        input.valueMode, input.reversalPolicy, input.draft ? 'draft' : 'active', now, now,
+        input.valueMode, input.reversalPolicy, input.draft ? 'draft' : 'active', now, now, folderId ?? null,
       ),
     ...input.usages.map((usage) => db.prepare(`INSERT INTO conversion_definition_usages
       (id, conversion_point_id, definition_version, line_account_id, ref_kind, ref_id,
@@ -1177,6 +1183,7 @@ function configOf(row: RevisionRow): DefinitionConfig {
 }
 
 export type ReviseConversionDefinitionInput = {
+  folderId?: unknown;
   id: string;
   scope: ConversionDefinitionScope;
   expectedVersion: number;
@@ -1216,6 +1223,7 @@ export async function reviseConversionDefinition(
   // N-268: 下書きも編集できる。版を進めても status は draft のまま。
   requireExpectedDefinition(current, input.expectedVersion, { allowDraft: true });
   const row = current!;
+  const folderId = await conversionFolder(db, row.line_account_id, input.folderId);
 
   const name = input.name.trim();
   if (!name) throw new ConversionDefinitionError('required', '成果地点の名前を入れてください', 400);
@@ -1256,7 +1264,8 @@ export async function reviseConversionDefinition(
         SET name = ?, event_type = ?, value = ?, measure_method = ?, target_url = ?,
             count_repeat = ?, attribution_days = ?, source_config_json = ?,
             deduplication_mode = ?, deduplication_window_days = ?, value_mode = ?,
-            reversal_policy = ?, updated_at = ?, version = version + 1
+            reversal_policy = ?, updated_at = ?, version = version + 1,
+            folder_id = CASE WHEN ? THEN ? ELSE folder_id END
       /*
        * 事前検査(requireExpectedDefinition)が下書きも編集可と判定するのに、
        * CAS が active だけを通すと、下書きの正常編集が必ず0件更新→409に
@@ -1268,7 +1277,7 @@ export async function reviseConversionDefinition(
         after.deduplicationMode === 'every' ? 1 : 0, after.attributionDays,
         JSON.stringify(after.sourceConfig), after.deduplicationMode,
         after.deduplicationWindowDays, after.valueMode, after.reversalPolicy,
-        now, input.id, input.expectedVersion,
+        now, folderId !== undefined ? 1 : 0, folderId ?? null, input.id, input.expectedVersion,
       ),
     // CASに勝ったときだけ監査を残す。負けた batch は行を1つも作らない。
     db.prepare(`INSERT INTO conversion_definition_revisions
@@ -2122,4 +2131,12 @@ export async function getConfirmedConversionCount(db: D1Database, input: {lineAc
       AND NOT ${cancelled}`)
     .bind(input.lineAccountId, input.lineAccountId, `${input.from}T00:00:00+09:00`, `${input.to}T00:00:00+09:00`).first<{count: number}>();
   return Number(row?.count ?? 0);
+}
+
+async function conversionFolder(db: D1Database, accountId: string | null, value: unknown) {
+  try { return await readFolderAssignment(db, 'conversion', accountId, value); }
+  catch (error) {
+    if (error instanceof FolderAssignmentError) throw new ConversionDefinitionError(error.code, error.message, 400);
+    throw error;
+  }
 }
