@@ -1876,31 +1876,7 @@ export type BroadcastApprovalCandidate = {
 };
 
 /** 二者承認の今の状態と判定（GET /:id/approval の応答）。 */
-export type BroadcastApprovalState = {
-  approval: {
-    status: NonNullable<ApiBroadcast['approvalStatus']>;
-    requestedByStaffId: string | null;
-    requestedAt: string | null;
-    approverStaffId: string | null;
-    note: string | null;
-    decidedByStaffId: string | null;
-    decidedAt: string | null;
-    rejectReason: string | null;
-    confirmedCount: number | null;
-  };
-  gate: {
-    required: boolean;
-    recipientCount: number;
-    threshold: number;
-    singleOperator: boolean;
-    operatorCount: number;
-  };
-  viewer: {
-    isApprover: boolean;
-    canApprove: boolean;
-    isRequester: boolean;
-  };
-};
+export type BroadcastApprovalState = import('@line-crm/shared').BroadcastApprovalState;
 
 /**
  * 送達台帳の内訳（#662 / N-059）。
@@ -1925,15 +1901,8 @@ export type BroadcastLedger = {
   retryableCount: number
 };
 
-export type BroadcastMessageButton = {
-  label: string
-  type: 'url' | 'pdf'
-  value: string
-}
-
-export type BroadcastMessageOptions = {
-  buttons?: BroadcastMessageButton[]
-}
+export type { BroadcastMessageButton, BroadcastMessageOptions } from '@line-crm/shared';
+import type { BroadcastMessageOptions } from '@line-crm/shared';
 
 export type BroadcastPreflight = {
   audienceCount: number
@@ -1985,8 +1954,8 @@ export type BroadcastSavedView = {
   version: number
 }
 
-export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'flex' | 'location' | 'audio' | 'carousel' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
-export type BroadcastBubble = { id: string; type: BroadcastBubbleType; content: Record<string, unknown> };
+export type { BroadcastBubbleType, BroadcastBubble } from '@line-crm/shared';
+import type { BroadcastBubble } from '@line-crm/shared';
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
   id: string;
@@ -8485,42 +8454,7 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`),
-    create: (data: {
-      title: string
-      messageType: LineMessageType
-      messageContent: string
-      messageBubbles?: BroadcastBubble[]
-      targetType: ApiBroadcast['targetType']
-      targetTagId?: string | null
-      scheduledAt?: string | null
-      status?: ApiBroadcast['status']
-      lineAccountId?: string | null
-      accountIds?: string[]
-      dedupPriority?: string[]
-      trackLinks?: boolean
-      /** 何分かけて配るか。0（既定）は一気に送る */
-      stealthSpreadMinutes?: number
-      /**
-       * 絞り込み条件。targetType が 'segment' のときに必須。
-       * 下書きに保存され、送信のときにこの条件で宛先を出す。
-       */
-      /*
-       * 宛先の条件。形は worker の `SegmentCondition` と同じ。
-       * 値の型はルールごとに違う（真偽・文字列・日付の範囲・ID の配列）ので
-       * ここでは絞らない。絞ると、条件を1つ増やすたびにここも直すことになり、
-       * 直し忘れたぶんが**画面では作れるのに保存できない条件**になる。
-       */
-      segmentConditions?: SegmentCondition
-      folderId?: string | null
-      measureOpens?: boolean
-      saveAsDraft?: boolean
-      draftStep?: ApiBroadcast['draftStep']
-      internalMemo?: string | null
-      messageOptions?: BroadcastMessageOptions | null
-      afterActionVersionId?: string | null
-      /** 1人運用のとき、送る人が確認で入れた人数 */
-      confirmedRecipientCount?: number
-    }, options?: { idempotencyKey?: string }) =>
+    create: (data: import('@line-crm/shared').BroadcastDefinitionInput, options?: { idempotencyKey?: string }) =>
       fetchApi<ApiResponse<ApiBroadcast>>('/api/broadcasts', {
         method: 'POST',
         headers: options?.idempotencyKey

@@ -550,7 +550,8 @@
     "605_restaurant_screen_api_additions.sql",
     "606_restaurant_liff_details.sql",
     "607_conversation_search_content.sql",
-    "608_line_account_folders.sql"
+    "608_line_account_folders.sql",
+    "609_hq_broadcast_authoring.sql"
   ],
-  "migrationCount": 551
+  "migrationCount": 552
 }

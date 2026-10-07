@@ -8,4 +8,13 @@ export interface HqTemplateListDisplay {
   distributed_account_count: number;
   /** 種類と件数の短い要約。最新の内容を確認できない場合はnull。 */
   content_summary: string | null;
+  this_month_sent_count?: number | null;
+  outdated_account_count?: number;
+  current_version?: number | null;
+  friend_count?: number | null;
+  manual_assignment_allowed?: boolean | null;
+  assignment_method?: string | null;
+  display_order?: number | null;
+  display_audience?: string | null;
+  tap_count?: number | null;
 }

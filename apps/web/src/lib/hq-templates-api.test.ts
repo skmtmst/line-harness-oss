@@ -121,3 +121,12 @@ describe('HQ template API transport', () => {
     expect(error.message).not.toContain('D1_ERROR')
   })
 })
+
+it('統括の版履歴・比較・復元・受取版と件数を認証済みtransportで呼ぶ',async()=>{
+ await hqTemplatesApi.versions('t/1');expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t%2F1/versions',{method:'GET'});
+ await hqTemplatesApi.compareVersions('t1',1,3);expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t1/versions/compare?from=1&to=3',{method:'GET'});
+ await hqTemplatesApi.restoreVersion('t1',2,4);expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t1/versions/2/restore',{method:'POST',body:JSON.stringify({expectedRevision:4})});
+ await hqTemplatesApi.receivedVersions('t1');expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t1/received-versions',{method:'GET'});
+ request.mockResolvedValue({success:true,stats:{thisMonthSentCount:12,outdatedTemplateCount:2}});
+ expect(await hqTemplatesApi.listStats()).toEqual({thisMonthSentCount:12,outdatedTemplateCount:2});
+});
