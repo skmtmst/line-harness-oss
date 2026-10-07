@@ -5,28 +5,28 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: var(--tpl-bks-head-mb);
 }
 
 .title {
-  font-size: 20px;
+  font-size: var(--tpl-bks-title-size);
   font-weight: 600;
-  margin: 0;
+  margin: var(--tpl-bks-none);
 }
 
 .tiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: var(--tpl-bks-tiles-mb);
 }
 
 .tile {
   background: var(--color-canvas);
-  border: 1px solid rgb(29 29 31 / 0.08);
-  border-radius: 16px;
-  box-shadow: 0 1px 2px rgb(29 29 31 / 0.04);
-  padding: 10px 16px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--tpl-bks-tile-radius);
+  box-shadow: var(--shadow-board);
+  padding: var(--tpl-bks-tile-pad);
   text-align: left;
   cursor: pointer;
   font: inherit;
@@ -38,40 +38,40 @@
 }
 
 .tileLabel {
-  font-size: 13px;
+  font-size: var(--tpl-bks-tile-label-size);
   font-weight: 500;
   color: var(--color-ink-secondary);
 }
 
 .tileValue {
-  font-size: 22px;
+  font-size: var(--tpl-bks-tile-value-size);
   font-weight: 600;
   letter-spacing: -0.4px;
   font-variant-numeric: tabular-nums;
-  margin-top: 2px;
+  margin-top: var(--tpl-bks-tile-value-mt);
 }
 
 .tileSub {
-  font-size: 12px;
+  font-size: var(--tpl-bks-tile-sub-size);
   color: var(--color-ink-faint);
-  margin-top: 2px;
+  margin-top: var(--tpl-bks-tile-sub-mt);
 }
 
 .detail {
   overflow: hidden;
-  max-height: 0;
+  max-height: var(--tpl-bks-none);
   opacity: 0;
   transition:
     max-height var(--motion-base) var(--motion-ease-out),
     opacity var(--motion-base) var(--motion-ease-out),
     margin var(--motion-base) var(--motion-ease-out);
-  margin-bottom: 0;
+  margin-bottom: var(--tpl-bks-none);
 }
 
 .detailOpen {
-  max-height: 320px;
+  max-height: var(--tpl-bks-detail-open-max-h);
   opacity: 1;
-  margin-bottom: 12px;
+  margin-bottom: var(--tpl-bks-detail-open-mb);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -82,24 +82,24 @@
 
 .detailCard {
   background: var(--color-canvas);
-  border: 1px solid rgb(29 29 31 / 0.08);
-  border-radius: 16px;
-  padding: 12px 16px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--tpl-bks-detail-card-radius);
+  padding: var(--tpl-bks-detail-card-pad);
 }
 
 .detailTitle {
-  font-size: 13px;
+  font-size: var(--tpl-bks-detail-title-size);
   font-weight: 600;
-  margin: 0 0 8px;
+  margin: var(--tpl-bks-detail-title-m);
 }
 
 .detailRow {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 0;
+  padding: var(--tpl-bks-detail-row-pad);
   border-top: 1px solid var(--color-hairline);
-  font-size: 13px;
+  font-size: var(--tpl-bks-detail-row-size);
 }
 
 .detailRow:first-of-type {
@@ -125,35 +125,35 @@
 
 .panel {
   background: var(--color-canvas);
-  border: 1px solid rgb(29 29 31 / 0.08);
-  border-radius: 16px;
-  padding: 16px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--tpl-bks-panel-radius);
+  padding: var(--tpl-bks-panel-pad);
   min-width: 0;
 }
 
 .panelTitle {
-  font-size: 15px;
+  font-size: var(--tpl-bks-panel-title-size);
   font-weight: 600;
-  margin: 0 0 12px;
+  margin: var(--tpl-bks-panel-title-m);
 }
 
 .menuRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 4px 12px;
-  padding: 8px 0;
+  padding: var(--tpl-bks-menu-row-pad);
   align-items: center;
 }
 
 .menuName {
-  font-size: 13px;
+  font-size: var(--tpl-bks-menu-name-size);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .menuMeta {
-  font-size: 12px;
+  font-size: var(--tpl-bks-menu-meta-size);
   color: var(--color-ink-secondary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -161,14 +161,14 @@
 
 .menuTrack {
   grid-column: 1 / -1;
-  height: 8px;
-  border-radius: 4px;
-  background: rgb(29 29 31 / 0.03);
+  height: var(--tpl-bks-menu-track-h);
+  border-radius: var(--tpl-bks-menu-track-radius);
+  background: var(--tpl-bks-menu-track-bg);
 }
 
 .menuFill {
-  height: 100%;
-  border-radius: 4px;
+  height: var(--tpl-bks-menu-fill-h);
+  border-radius: var(--tpl-bks-menu-fill-radius);
   background: var(--color-accent-deep);
 }
 
@@ -177,7 +177,7 @@
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 8px;
   align-items: end;
-  min-height: 220px;
+  min-height: var(--tpl-bks-week-row-min-h);
 }
 
 .weekCol {
@@ -189,7 +189,7 @@
 }
 
 .weekCount {
-  font-size: 12px;
+  font-size: var(--tpl-bks-week-count-size);
   color: var(--color-ink-secondary);
   font-variant-numeric: tabular-nums;
 }
@@ -197,18 +197,18 @@
 .weekTrack {
   width: 100%;
   max-width: 56px;
-  height: 160px;
+  height: var(--tpl-bks-week-track-h);
   display: flex;
   align-items: flex-end;
-  border-radius: 4px;
-  background: rgb(29 29 31 / 0.03);
+  border-radius: var(--tpl-bks-week-track-radius);
+  background: var(--tpl-bks-week-track-bg);
 }
 
 .weekFill {
   width: 100%;
-  border-radius: 4px;
+  border-radius: var(--tpl-bks-week-fill-radius);
   background: var(--color-accent-soft);
-  min-height: 4px;
+  min-height: var(--tpl-bks-week-fill-min-h);
 }
 
 .weekFillPeak {
@@ -216,18 +216,18 @@
 }
 
 .weekLabel {
-  font-size: 12px;
+  font-size: var(--tpl-bks-week-label-size);
   color: var(--color-ink-secondary);
 }
 
 .note {
-  font-size: 12px;
+  font-size: var(--tpl-bks-note-size);
   color: var(--color-ink-faint);
-  margin-top: 12px;
+  margin-top: var(--tpl-bks-note-mt);
 }
 
 .center {
-  padding: 32px 0;
+  padding: var(--tpl-bks-center-pad);
   text-align: center;
   color: var(--color-ink-secondary);
 }
