@@ -2058,7 +2058,11 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
      */
     return OPERATOR_NOTIFICATION_RECIPIENTS
   }
-  if (method === 'POST' && /^\/api\/notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
+  /* 設計 sDXNy：作る画面の「公開」は下書きを保存してから確認の窓を開く。保存は新しい下書きを返す。 */
+  if (method === 'POST' && pathname === '/api/line-notifications/operator-rules') {
+    return { ...OPERATOR_NOTIFICATION_RULES[0], id: 'operator-rule-new', status: 'draft', isActive: false, version: 1 }
+  }
+  if (method === 'POST' && /^\/api\/(line-)?notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
     return { accepted: 2, excluded: 0, failed: 0, duplicate: 0 }
   }
   const scenarioSimulation = /^\/api\/scenarios\/([^/]+)\/simulate$/.exec(pathname)
@@ -3438,6 +3442,34 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: TEMPLATES }
   }
   const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
+  /* 設計 NCbYn（編集中に競合）：一覧に出ない ID。使われる場所は無く、本文に URL が1つある。 */
+  if (templateDetail && templateDetail[1] === 'template-80') {
+    return {
+      success: true,
+      data: {
+        id: 'template-80',
+        name: '店舗のご案内',
+        category: '未分類',
+        messageType: 'text',
+        messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking',
+        folderId: null,
+        question: null,
+        questionStatus: 'draft',
+        usageCount: 0,
+        tapCount: 0,
+        monthlySendCount: 0,
+        totalSendCount: 0,
+        createdAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-30T05:02:00.000Z',
+        accountId: 'visual-qa-account',
+        usedBy: { autoReplies: [], automations: [], scenarioSteps: [], reminderSteps: [], richMenuAreas: [], trackedLinks: [], broadcasts: [] },
+        hasDraft: false,
+        publishedVersion: 3,
+        publishedAt: '2026-09-10T11:02:00+09:00',
+        draftRevision: 0,
+      },
+    }
+  }
   if (templateDetail) {
     const template = TEMPLATES.find((item) => item.id === templateDetail[1])
     if (template) {

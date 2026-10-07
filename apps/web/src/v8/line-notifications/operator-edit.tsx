@@ -32,6 +32,7 @@ import {
   loadFailureNotice,
 } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { ROLE_LABELS } from '@/lib/hq-members'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import type { OperatorNotificationTeam } from '@line-crm/shared'
@@ -139,6 +140,17 @@ function OperatorEditInner() {
   /* 公開前の確認の窓（板 `sDXNy`）。 */
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  /* 確認の窓の「役割」の列。宛先の口は役割を返さないので、ログインユーザーの一覧から引く。読めなければ空のまま。 */
+  const [staffRoles, setStaffRoles] = useState<Record<string, string>>({})
+  useEffect(() => {
+    if (!confirmOpen) return
+    let active = true
+    void Promise.resolve().then(() => api.staff.list()).then((result) => {
+      if (!active || !result.success) return
+      setStaffRoles(Object.fromEntries(result.data.map((member) => [member.id, ROLE_LABELS[member.role] ?? ''])))
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [confirmOpen])
 
   // 保存ずみのお知らせを全項目そのまま復元する。一部だけ戻すと、保存した時点で初期値へ上書きされる。
   useEffect(() => {
@@ -608,9 +620,46 @@ function OperatorEditInner() {
       <Dialog
         open={confirmOpen}
         designNode="sDXNy"
+        designWidth={580}
+        designTop={220}
+        designHeaderPadding="24px 24px 0"
+        designHeaderHeight={50}
         title="このお知らせを公開しますか？"
         onCancel={() => { if (!publishing) setConfirmOpen(false) }}
-        footer={
+      >
+        <div className={styles.confirmBody}>
+          <div className={styles.confirmSummary}>
+            <p className={styles.confirmLine}>
+              <span className={styles.confirmLabel}>お知らせ</span>
+              <span className={styles.confirmValue}>{name.trim() || 'お知らせ名'}</span>
+            </p>
+            <p className={styles.confirmLine}>
+              <span className={styles.confirmLabel}>宛先</span>
+              <span className={styles.confirmValue}>
+                {teamId && teamName.trim()
+                  ? `チーム「${teamName.trim()}」${selectedRecipients.length} 人`
+                  : `選んだスタッフ ${selectedRecipients.length} 人`}
+              </span>
+            </p>
+            <p className={styles.confirmLine}>
+              <span className={styles.confirmLabel}>LINE が届く人</span>
+              <span className={styles.confirmValue}>
+                {`${lineReachable.length} 人${lineUnregistered > 0 ? `（${lineUnregistered} 人は LINE 未登録）` : ''}`}
+              </span>
+            </p>
+          </div>
+          <ul className={styles.confirmList} aria-label="受け取る人">
+            {selectedRecipients.map((recipient) => (
+              <li key={recipient.id} className={styles.confirmRow}>
+                <span className={styles.confirmName} title={recipient.name}>{recipient.name}</span>
+                <span className={styles.confirmRole}>{recipientRole(recipient, staffRoles)}</span>
+                <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
+                  {recipient.channels.line ? 'LINE' : '画面だけ'}
+                </StatusBadge>
+              </li>
+            ))}
+          </ul>
+          <p className={styles.confirmNote}>LINE 未登録の人には、管理画面のお知らせだけで届きます。</p>
           <div className={styles.confirmActions}>
             <Button type="button" onClick={() => setConfirmOpen(false)} disabled={publishing}>戻って直す</Button>
             <Button
@@ -621,32 +670,21 @@ function OperatorEditInner() {
               busy={publishing}
               busyLabel="公開中…"
             >
-              公開して{lineReachable.length}人にLINEで送る
+              <Send size={15} aria-hidden="true" />{`公開して ${lineReachable.length} 人に LINE で送る`}
             </Button>
           </div>
-        }
-      >
-        <div>
-          <div className={styles.confirmSummary}>
-            <div>お知らせ　{name.trim() || 'お知らせ名'}</div>
-            <div>宛先　選択中のスタッフ {selectedRecipients.length}人</div>
-            <div>LINEが届く人　{lineReachable.length}人{lineUnregistered > 0 ? `（${lineUnregistered}人は LINE 未登録）` : ''}</div>
-          </div>
-          {selectedRecipients.map((recipient) => (
-            <div key={recipient.id} className={styles.confirmRow}>
-              <span className={styles.confirmName}>{recipient.name}</span>
-              <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
-                {recipient.channels.line ? 'LINE' : '画面だけ'}
-              </StatusBadge>
-            </div>
-          ))}
-          <p className={styles.confirmNote}>LINE 未登録の人には、管理画面のお知らせだけで届きます。</p>
         </div>
       </Dialog>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したお知らせ" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
+}
+
+/** 宛先の役割。口が役割を返せばそれを、無ければログインユーザーの一覧から引いた名前を出す。 */
+function recipientRole(recipient: OperatorRecipientPreview['items'][number], staffRoles: Record<string, string>): string {
+  const own = (recipient as { roleLabel?: unknown }).roleLabel
+  return typeof own === 'string' && own ? own : staffRoles[recipient.id] ?? ''
 }
 
 /** 題（12px・太字）＋選ぶ欄。2つ並べるときは .pair に入れる。 */
