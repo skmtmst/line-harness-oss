@@ -7872,6 +7872,79 @@ const spec = {
       },
     },
     // ── Event waitlist ────────────────────────────────────────────────────
+    '/api/liff/events/waitlist/{token}': {
+      get: {
+        tags: ['Events'],
+        summary: 'キャンセル待ちの繰上げ案内を本人が確認',
+        description: '案内対象の本人だけに、イベント名・日時・会場・人数・回答期限と残り秒数・承諾できるかを返す。',
+        security: [],
+        parameters: [
+          { name: 'token', in: 'path', required: true, schema: { type: 'string', minLength: 32, maxLength: 256 }, description: 'LINEで本人へ送った期限付き案内token' },
+        ],
+        responses: {
+          '200': { description: '{ success・data: 案内の詳細 }' },
+          '401': { description: 'LINE本人確認に失敗' },
+          '404': { description: '案内なし、または案内対象と異なるLINEユーザー' },
+        },
+      },
+    },
+    '/api/liff/events/me/waitlist': {
+      get: {
+        tags: ['Events'],
+        summary: '本人のイベントのキャンセル待ちを一覧',
+        description: '本人の待ちを、自分のイベントの行と同じ項目に source=waitlist と待機中の順番（queue_position）を足して返す。',
+        security: [],
+        parameters: [{ name: 'liffId', in: 'query', required: true, schema: { type: 'string' }, description: 'LIFF ID。LINEアカウントの解決に使う' }],
+        responses: {
+          '200': { description: '{ items: 待ちの行 }' },
+          '400': { description: 'LIFF IDからLINEアカウントを解決できない' },
+          '401': { description: 'LINE本人確認に失敗' },
+        },
+      },
+    },
+    '/api/liff/events/me/waitlist/{waitlistId}': {
+      get: {
+        tags: ['Events'],
+        summary: '本人のイベントのキャンセル待ちを1件取得',
+        security: [],
+        parameters: [{ name: 'waitlistId', in: 'path', required: true, schema: { type: 'string' } }, { name: 'liffId', in: 'query', required: true, schema: { type: 'string' }, description: 'LIFF ID。LINEアカウントの解決に使う' }],
+        responses: {
+          '200': { description: '待ちの行（順番付き）' },
+          '400': { description: 'LIFF IDからLINEアカウントを解決できない' },
+          '401': { description: 'LINE本人確認に失敗' },
+          '404': { description: '待ちが無い、または本人・アカウント範囲外' },
+        },
+      },
+    },
+    '/api/liff/events/me/waitlist/{waitlistId}/cancel': {
+      post: {
+        tags: ['Events'],
+        summary: '本人がイベントのキャンセル待ちを取り下げる',
+        security: [],
+        parameters: [{ name: 'waitlistId', in: 'path', required: true, schema: { type: 'string' } }, { name: 'liffId', in: 'query', required: true, schema: { type: 'string' }, description: 'LIFF ID。LINEアカウントの解決に使う' }],
+        responses: {
+          '200': { description: '{ ok: true }' },
+          '400': { description: 'LIFF IDからLINEアカウントを解決できない' },
+          '401': { description: 'LINE本人確認に失敗' },
+          '404': { description: '待ちが無い、または本人・アカウント範囲外' },
+          '409': { description: '予約化済みなど取り下げできない状態' },
+        },
+      },
+    },
+    '/api/liff/webinars/{slug}/audience': {
+      get: {
+        tags: ['Webinars'],
+        summary: 'ウェビナーの配信中の視聴人数を本人が取得',
+        description: '既存の視聴状態の返しとは別に、人数の更新だけに使う。LINE本人確認とウェビナー機能の有効判定を通す。配信中でない・登録の無い回は live=false・viewerCount=null。',
+        parameters: [{ name: 'slug', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '{ live・sessionStartAt・viewerCount・activeWindowSeconds・lecturerName }' },
+          '401': { description: 'LINE本人確認に失敗' },
+          '403': { description: 'このアカウントの友だちではない' },
+          '404': { description: 'ウェビナーが無い、または公開期間外' },
+        },
+      },
+    },
     '/api/liff/events/waitlist/{token}/accept': {
       post: {
         tags: ['Events'],
