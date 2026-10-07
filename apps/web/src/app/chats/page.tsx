@@ -41,6 +41,9 @@ import searchStyles from '@/v8/inbox-search/chat-search-bar.module.css'
 import { useChatSearch } from '@/v8/inbox-search/use-chat-search'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover'
+import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog'
+import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css'
+import SegmentedControl from '@/components/shared/segmented'
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
@@ -54,7 +57,7 @@ import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
-import { Bookmark, CheckCircle2, Clock3, Filter, ListFilter, Reply, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Search, SlidersHorizontal, Star, X } from 'lucide-react'
+import { Bookmark, CheckCircle2, Clock3, Filter, ListFilter, Reply, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Paperclip, Search, Send, Settings2, SlidersHorizontal, Star, X } from 'lucide-react'
 
 type Chat = ChatListItem
 
@@ -246,6 +249,14 @@ function formatInboxDatetime(iso: string | null): string {
  * オフセットは常に +09:00。
  */
 const INBOX_TIME_ZONE = 'Asia/Tokyo'
+
+/*
+ * ★V8 書く欄の「添付」（オーナー指摘：画像だけでなくファイル・動画も送る）。
+ * 選ぶ窓では画像・動画・ファイルを選べるようにする。ただし受信箱の送信口（POST /api/chats/:id/send）は
+ * いま 文字・Flex・画像 だけを受ける。動画・ファイルは選んだときに理由を出して止める（送ったつもりにさせない）。
+ */
+const ATTACH_ACCEPT_V8 = 'image/jpeg,image/png,video/mp4,application/pdf,.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv'
+const ATTACH_NOTE_V8 = '画像は JPEG / PNG・1枚 1MB まで（動画・ファイルは準備中）'
 
 function formatJstScheduledAt(iso: string): string {
   const d = new Date(iso)
@@ -617,6 +628,20 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         return next
       })
     }
+  }
+
+  /**
+   * ★V8「添付」で選んだもの。画像は今までの画像の準備へ渡す。動画・ファイルは
+   * 受信箱の送信口がまだ受けないので、理由を出して止める（画像の扱いは変えない）。
+   */
+  const handlePickAttachment = async (file: File) => {
+    if (file.type.startsWith('image/')) return handlePickImage(file)
+    const ownerKey = draftKeyOf(selectedAccountId, selectedChatId)
+    const message = file.type.startsWith('video/')
+      ? '動画はまだ受信箱から送れません。画像（JPEG / PNG・1MB まで）を選んでください'
+      : 'ファイルはまだ受信箱から送れません。画像（JPEG / PNG・1MB まで）を選んでください'
+    imageErrorDraftsRef.current.set(ownerKey, message)
+    if (draftOwnerKeyRef.current === ownerKey) setImageError(message)
   }
 
   /** 添付を外す。読み込み中の結果が遅れて届いても復活しないよう世代を進める。 */
@@ -1252,6 +1277,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    * 間が空いた並びになるので使わない（BEHAVIOR.md）。
    */
   const adminTheme = useAdminTheme()
+  const isV8 = adminTheme === 'v8'
   const chatSearch = useChatSearch(adminTheme === 'v8' ? chatDetail?.friendId ?? null : null)
   const [chatSearchFocusSeq, setChatSearchFocusSeq] = useState(0)
   const [chatSearchFilling, setChatSearchFilling] = useState(false)
@@ -3563,15 +3589,20 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   次の行へ折り返す。1行に固定したままだと 390px では右の
                   「内部メモ」が画面外へ切れて、存在自体に気づけない。
                 */}
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                {/*
+                  ★V8（M0393 XqSvX「書く前の道具」）：4つとも白地・薄い枠・高さ32・墨の字13/600・印15。
+                  「送信の設定」は settings-2、開いている間は緑の地と枠（段2「2.」）。
+                  画像だけでなくファイル・動画も選ぶので「画像」は「添付」（paperclip）にする（オーナー指摘）。
+                */}
+                <div className={`mb-2 flex items-center gap-2 ${isV8 ? chatStyles.composerToolsRow : ''}`}>
+                  <div className={`flex min-w-0 flex-wrap items-center gap-2 ${isV8 ? chatStyles.composerTools : ''}`}>
                     {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
-                    <Button variant="secondary" className="h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowTemplatePicker(true)}>
+                    <Button variant="secondary" className={isV8 ? chatStyles.tool : 'h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action'} type="button" onClick={() => setShowTemplatePicker(true)}>
                       <FileText aria-hidden="true" size={14} />
                       テンプレートを選択
                     </Button>
-                    <Button variant="secondary" className="h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowComposerOptions((v) => !v)}>
-                      <SlidersHorizontal aria-hidden="true" size={14} />
+                    <Button variant="secondary" className={isV8 ? chatStyles.tool : 'h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action'} data-active={isV8 && showComposerOptions ? '' : undefined} aria-expanded={isV8 ? showComposerOptions : undefined} type="button" onClick={() => setShowComposerOptions((v) => !v)}>
+                      {isV8 ? <Settings2 aria-hidden="true" size={14} /> : <SlidersHorizontal aria-hidden="true" size={14} />}
                       {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
                     </Button>
 
@@ -3580,24 +3611,51 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       琥珀色に変わる。窓が上に出るので、どのボタンから出た窓
                       なのかが分かる印が要る。
                     */}
-                    <Button variant="secondary" className={`h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-xs font-semibold ${
+                    <Button variant="secondary" className={isV8 ? chatStyles.tool : `h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-xs font-semibold ${
                         showMemoEditor
                           ? 'border-status-warn bg-status-warn-soft text-status-warn-deep'
                           : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
-                      }`} type="button" data-inbox-v6="internal-memo-toggle" onClick={() => setShowMemoEditor((current) => !current)} aria-expanded={showMemoEditor}>
+                      }`} data-active={isV8 && showMemoEditor ? '' : undefined} type="button" data-inbox-v6="internal-memo-toggle" onClick={() => setShowMemoEditor((current) => !current)} aria-expanded={showMemoEditor}>
                       <NotebookPen aria-hidden="true" size={14} />
                       内部メモ
                     </Button>
+                    {isV8 ? (
+                      <Button variant="secondary" className={chatStyles.tool} type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading} title="画像・動画・ファイルを添付" aria-label="添付するものを選ぶ">
+                        <Paperclip aria-hidden="true" size={14} />
+                        添付
+                      </Button>
+                    ) : (
                     <Button variant="secondary" className="h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading} title="画像を選ぶ" aria-label="画像を選ぶ">
                       <ImageIcon aria-hidden="true" size={14} />
                       画像
                     </Button>
+                    )}
                   </div>
                 </div>
 
                 {/* 送信の設定は送信キーだけ。入力中ローディングと画像の投入枠は
                     ここから外した。画像は下の枠のアイコンから選ぶ。 */}
-                {showComposerOptions && (
+                {showComposerOptions && isV8 && (
+                  /*
+                   * ★V8（段2「2. 送信の設定（開いた）」）：見出し「送るキー」・切り替え（Enter／Shift+Enter）・
+                   * 説明1行の3段。前は選ぶカードの中で文字が切れ、丸が文字に重なっていた（オーナー指摘）。
+                   * 保存先（この端末の chat.sendMode）と動きは v7 と同じ。
+                   */
+                  <div className={chatStyles.sendKey} data-inbox-v8="send-key">
+                    <p className={chatStyles.sendKeyTitle}>送るキー</p>
+                    <SegmentedControl
+                      size="small"
+                      aria-label="送るキー"
+                      options={[{ value: 'enter', label: 'Enter' }, { value: 'shift-enter', label: 'Shift+Enter' }]}
+                      value={sendMode}
+                      onChange={setSendMode}
+                    />
+                    <p className={chatStyles.sendKeyNote}>
+                      {sendMode === 'enter' ? 'Enter で送る／Shift+Enter で改行' : 'Shift+Enter で送る／Enter で改行'}（この端末に覚える）
+                    </p>
+                  </div>
+                )}
+                {showComposerOptions && !isV8 && (
                   <div className="bg-canvas-sunken rounded-card mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 p-3 text-xs">
                     <span className="text-ink-faint">送信キー:</span>
                     <RadioCardGroup legend="送信キー" className="flex flex-wrap gap-2">
@@ -3708,7 +3766,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 )}
 
                 {/* N-025: 送信予約パネル。日時はJSTのdatetime-localで入力する。 */}
-                {showSchedulePanel && (
+                {showSchedulePanel && !isV8 && (
                   <div
                     data-inbox-v6="schedule-panel"
                     className="mb-2 rounded-control border border-hairline bg-canvas-sunken p-3"
@@ -3882,13 +3940,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <input
                       ref={imageInputRef}
                       type="file"
-                      accept="image/jpeg,image/png"
+                      accept={isV8 ? ATTACH_ACCEPT_V8 : 'image/jpeg,image/png'}
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0]
                         // 同じ画像をもう一度選べるように値を戻す。
                         e.target.value = ''
-                        if (file) void handlePickImage(file)
+                        if (file) void (isV8 ? handlePickAttachment(file) : handlePickImage(file))
                       }}
                     />
                     {/*
@@ -3899,29 +3957,57 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     */}
                     <span
                       className={`min-w-0 truncate text-xs ${imageError ? 'text-danger' : 'text-ink-faint'}`}
-                      title={imageError || 'JPEG / PNG・1枚 1MB まで'}
+                      title={imageError || (isV8 ? ATTACH_NOTE_V8 : 'JPEG / PNG・1枚 1MB まで')}
                     >
                       {imageError
                         ? imageError
                         : imageUploading
                           ? '画像を読み込み中…'
-                          : 'JPEG / PNG・1枚 1MB まで'}
+                          : isV8 ? ATTACH_NOTE_V8 : 'JPEG / PNG・1枚 1MB まで'}
                     </span>
                   </span>
                   <span className="ml-auto flex shrink-0 items-center gap-2">
                     <Button
-                      size="field"
+                      size={isV8 ? 'compact' : 'field'}
+                      className={isV8 ? chatStyles.tool : undefined}
                       data-inbox-v6="schedule-toggle"
                       onClick={() => setShowSchedulePanel((v) => !v)}
                       aria-expanded={showSchedulePanel}
+                      aria-haspopup={isV8 ? 'dialog' : undefined}
                     >
+                      {isV8 ? <Clock3 aria-hidden="true" size={15} /> : null}
                       予約{scheduledSends.length > 0 ? `(${scheduledSends.length})` : ''}
                     </Button>
-                    <Button variant="primary" className="shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto" onClick={handleSendMessage} disabled={sending || messageOverLimit || (!messageContent.trim() && !pendingImage)}>
+                    <Button variant="primary" className={isV8 ? chatStyles.send : 'shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto'} onClick={handleSendMessage} disabled={sending || messageOverLimit || (!messageContent.trim() && !pendingImage)}>
+                      {isV8 && !sending ? <Send aria-hidden="true" size={15} /> : null}
                       {sending ? '送っています…' : '送信'}
                     </Button>
                   </span>
 
+                  {isV8 ? (
+                    <ScheduleSendDialog
+                      open={showSchedulePanel}
+                      onClose={() => setShowSchedulePanel(false)}
+                      content={messageContent}
+                      hasImage={Boolean(pendingImage)}
+                      value={scheduleInput}
+                      onChange={setScheduleInput}
+                      onConfirm={() => void handleScheduleSend()}
+                      busy={scheduling}
+                      error={showSchedulePanel && error ? error : undefined}
+                      rows={scheduledSends.map((row) => ({
+                        id: row.id,
+                        label: `${formatJstScheduledAt(row.scheduledAt)}${row.status === 'sending' ? '（送信中）' : ''}`,
+                        content: row.content,
+                        editable: row.status === 'scheduled',
+                        defaultValue: isoToJstDatetimeLocal(row.scheduledAt),
+                      }))}
+                      rowsFailed={scheduledSendsFailed}
+                      onRetryRows={() => { if (selectedChatId) void loadScheduledSends(selectedChatId) }}
+                      onReschedule={(id, next) => void handleReschedule(id, next)}
+                      onCancelRow={(id) => void handleCancelScheduled(id)}
+                    />
+                  ) : null}
                   <TemplatePicker
                     open={showTemplatePicker}
                     onClose={() => setShowTemplatePicker(false)}

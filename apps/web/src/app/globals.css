@@ -1422,6 +1422,7 @@
  */
 [data-theme="v8"] {
   --tpl-inbox-tool-icon: 14px;            /* 一覧の頭の印のボタンの中の印 */
+  --tpl-inbox-tool-shadow: 0 1px 2px #1d1d1f0a; /* 書く欄の道具の薄い影 */
   --tpl-inbox-pop-w: 320px;               /* 対応ルールの小窓の幅 */
   --tpl-inbox-pop-pad: 14px 16px;         /* 小窓の中の余白 */
   --tpl-inbox-pop-gap: 10px;              /* 小窓の段の間 */
