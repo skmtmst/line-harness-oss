@@ -2,6 +2,9 @@ import { jstNow } from './utils.js';
 
 export interface Webinar {
   id: string;
+  cta_version?: number;
+  cta_updated_by?: string | null;
+  cta_updated_at?: string | null;
   account_id: string | null;
   title: string;
   slug: string;
@@ -1874,26 +1877,31 @@ export async function replaceWebinarCtas(
     formId: string | null;
     url: string | null;
   }>,
-): Promise<number> {
+  lock?: { expectedVersion: number; updatedBy: string },
+): Promise<number | null> {
   const now = jstNow();
+  const expectedVersion = lock?.expectedVersion ?? (await getWebinarById(db, webinarId))?.cta_version ?? 0;
+  const token = crypto.randomUUID();
   const stmts = [
-    db.prepare('DELETE FROM webinar_ctas WHERE webinar_id = ?').bind(webinarId),
+    db.prepare(`UPDATE webinars SET cta_version = cta_version + 1, cta_updated_by = ?, cta_updated_at = ?, cta_write_token = ?, updated_at = ?
+      WHERE id = ? AND cta_version = ?`).bind(lock?.updatedBy ?? null, now, token, now, webinarId, expectedVersion),
+    db.prepare('DELETE FROM webinar_ctas WHERE webinar_id = ? AND EXISTS (SELECT 1 FROM webinars WHERE id = ? AND cta_write_token = ?)').bind(webinarId, webinarId, token),
     ...ctas.map((cta) =>
       db
         .prepare(
           `INSERT INTO webinar_ctas
              (id, webinar_id, at_seconds, kind, title, body, button_label, auto_open,
               form_id, url, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM webinars WHERE id = ? AND cta_write_token = ?)`,
         )
         .bind(
           crypto.randomUUID(), webinarId, cta.atSeconds, cta.kind, cta.title, cta.body,
-          cta.buttonLabel, cta.autoOpen ? 1 : 0, cta.formId, cta.url, now, now,
+          cta.buttonLabel, cta.autoOpen ? 1 : 0, cta.formId, cta.url, now, now, webinarId, token,
         ),
     ),
   ];
-  await db.batch(stmts);
-  return ctas.length;
+  const result = await db.batch(stmts);
+  return result[0].meta?.changes ? ctas.length : null;
 }
 
 // ---- セッション予約 (webinar_registrations) ----

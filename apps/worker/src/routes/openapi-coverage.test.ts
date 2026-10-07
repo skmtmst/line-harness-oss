@@ -132,6 +132,10 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/booking/admin/sync-rules',
   'GET /api/booking/admin/sync-notices',
   'POST /api/booking/admin/sync-notices/{id}/done',
+  'GET /api/mileage/reward-folders',
+  'POST /api/mileage/reward-folders',
+  'PUT /api/mileage/reward-folders/order',
+  'PUT /api/mileage/rewards/{id}/folder',
   // V8 integration endpoints.
   'GET /api/dashboard/activity',
   'GET /api/forms/{id}/submissions/{submissionId}',

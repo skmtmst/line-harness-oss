@@ -3327,6 +3327,7 @@ export type MileageRewardVersion = {
 }
 
 export type MileageRewardSummary = {
+  folderId?: string | null
   id: string
   lineAccountId: string
   programId: string
@@ -4159,6 +4160,12 @@ export type RichMenuAreaResponse = {
   formId: string | null
   trackedLinkId: string | null
 }
+
+/** シナリオ停止時の入力。理由は任意・200字まで。 */
+export type ScenarioStopInput = { reason?: string }
+export type ScenarioUpdateInput = Partial<Omit<Scenario,
+  'id' | 'createdAt' | 'updatedAt' | 'stoppedReason' | 'stoppedBy' | 'stoppedAt'
+>> & ScenarioStopInput
 
 /** シナリオの開始のきっかけ（128）。1本に複数持てる。 */
 export type ScenarioTriggerItem = {
@@ -5775,6 +5782,7 @@ export type FriendAddRuleConflictData = {
 }
 
 export type FriendAddRunList = {
+  period?: { key: string; from: string | null; to: string | null }
   items: Array<{
     id: string
     receivedAt: string
@@ -5798,6 +5806,11 @@ export type FriendAddRunList = {
   total: number
   nextCursor: string | null
   summary: {
+    capturedFriends?: number
+    returning?: number
+    testPending?: number | null
+    testPendingState?: { state: 'unavailable'; reason: string }
+    failureKinds?: Array<{ kind: 'delivery_unknown' | 'delivery_failed' | 'action_failed' | 'invalid_reference' | 'other'; count: number }>
     /** 直近28日に追加された人数（同じ人の再追加は1人）。 */
     recentFriends: number
     /** 直近28日の追加記録の件数（同じ人の再追加も数える）。 */
@@ -8136,15 +8149,21 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ ids }),
       }),
-    create: (data: Omit<Scenario, 'id' | 'createdAt' | 'updatedAt'>) =>
+    create: (data: Omit<Scenario, 'id' | 'createdAt' | 'updatedAt' | 'stoppedReason' | 'stoppedBy' | 'stoppedAt'>) =>
       fetchApi<ApiResponse<Scenario>>('/api/scenarios', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<Omit<Scenario, 'id' | 'createdAt' | 'updatedAt'>>) =>
+    update: (id: string, data: ScenarioUpdateInput) =>
       fetchApi<ApiResponse<Scenario>>(`/api/scenarios/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
+      }),
+    /** 配信を一時停止する。理由を省略しても止められる。 */
+    stop: (id: string, data: ScenarioStopInput = {}) =>
+      fetchApi<ApiResponse<Scenario>>(`/api/scenarios/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...data, isActive: false }),
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE' }),
@@ -9372,7 +9391,7 @@ export const api = {
       ),
     execute: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}/execute`, { method: 'POST' }),
     rollback: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}/rollback`, { method: 'POST' }),
-    createExport: (input: { accountId: string; columns: Array<'basic' | 'tags_fields' | 'support'>; encoding: 'utf-8' | 'shift_jis' }) =>
+    createExport: (input: { accountId: string; columns: Array<'basic' | 'friend_fields' | 'tags_fields' | 'support'>; encoding: 'utf-8' | 'shift_jis' }) =>
       fetchApi<ApiResponse<{ id: string; rowCount: number | null; status: string; downloadUrl: string }>>('/api/friends/exports', {
         method: 'POST', body: JSON.stringify(input),
       }),
@@ -9380,7 +9399,7 @@ export const api = {
       accountId: string
       sourceFilename: string
       sourceChecksum: string
-      rows: Array<{ lineUid: string; displayName: string | null; realName: string | null; systemDisplayName: string | null }>
+      rows: Array<{ lineUid: string; friendFields?: Record<string, string | null>; displayName: string | null; realName: string | null; systemDisplayName: string | null }>
     }) => fetchApi<ApiResponse<{
       id: string
       status: string
@@ -11176,6 +11195,9 @@ export const api = {
         },
       ),
     runs: (accountId: string, params?: {
+      period?: 'all' | 'last28days' | 'today' | 'this_month' | 'last_month'
+      from?: string
+      to?: string
       status?: FriendAddEventRoutingStatus
       ruleId?: string
       /** 追加の種類での絞り込み。サーバ側で全ページに効かせる。 */
@@ -11186,6 +11208,9 @@ export const api = {
       limit?: number
     }) => {
       const query = new URLSearchParams({ account_id: accountId })
+      if (params?.period) query.set('period', params.period)
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       if (params?.status) query.set('status', params.status)
       if (params?.ruleId) query.set('rule_id', params.ruleId)
       if (params?.kind) query.set('kind', params.kind)
@@ -12002,6 +12027,10 @@ export const api = {
       fetchApi<ApiResponse<FriendScoreDetail>>(`/api/friends/${friendId}/score`),
   },
   mileage: {
+    rewardFolders: (accountId: string) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>(`/api/mileage/reward-folders?accountId=${encodeURIComponent(accountId)}`),
+    createRewardFolder: (accountId: string, name: string) => fetchApi<ApiResponse<{ id: string; name: string; displayOrder: number; count: number }>>('/api/mileage/reward-folders', { method: 'POST', body: JSON.stringify({ accountId, name }) }),
+    reorderRewardFolders: (accountId: string, ids: string[]) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>('/api/mileage/reward-folders/order', { method: 'PUT', body: JSON.stringify({ accountId, ids }) }),
+    moveRewardToFolder: (id: string, accountId: string, folderId: string | null) => fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${encodeURIComponent(id)}/folder`, { method: 'PUT', body: JSON.stringify({ accountId, folderId }) }),
     /*
       使い道の一覧（#772 の口）。**アカウント単位で返る。**
       渡さないと、ほかの店の使い道まで混ざる。
@@ -16260,11 +16289,12 @@ export const webinarApi = {
       method: 'PUT',
       body: JSON.stringify({ comments: comments.map(({ atSeconds, authorName, body }) => ({ atSeconds, authorName, body })) }),
     }),
-  ctas: (id: string) => fetchApi<{ data: WebinarCtaCard[] }>(`/api/webinars/${id}/ctas`),
-  saveCtas: (id: string, ctas: WebinarCtaCard[]) =>
-    fetchApi<{ data: { count: number } }>(`/api/webinars/${id}/ctas`, {
+  ctas: (id: string) => fetchApi<{ data: WebinarCtaCard[]; version: number; updatedBy: string | null; updatedAt: string | null }>(`/api/webinars/${id}/ctas`),
+  saveCtas: (id: string, ctas: WebinarCtaCard[], expectedVersion?: number) =>
+    fetchApi<{ data: { count: number; version: number } }>(`/api/webinars/${id}/ctas`, {
       method: 'PUT',
       body: JSON.stringify({
+        ...(expectedVersion === undefined ? {} : { expectedVersion }),
         ctas: ctas.map(({ atSeconds, kind, title, body, buttonLabel, autoOpen, formId, url }) => ({
           atSeconds, kind, title, body, buttonLabel, autoOpen, formId, url,
         })),

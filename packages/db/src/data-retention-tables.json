@@ -2144,6 +2144,13 @@
       "parentColumn": "id"
     }
   },
+  "mileage_reward_folders": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "mileage_reward_versions": {
     "category": "purge",
     "scope": {

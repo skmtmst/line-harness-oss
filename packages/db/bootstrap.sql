@@ -3175,7 +3175,8 @@ CREATE TABLE friend_fields (
   CHECK (type_v6 IS NULL OR type_v6 IN (
     'text','textarea','number','date','datetime','tel','email','url',
     'select','multi_select','checkbox','image','pdf'
-  )));
+  )), type_v8 TEXT
+  CHECK (type_v8 IS NULL OR type_v8 = 'time'));
 
 CREATE TABLE friend_identity_links (
   id TEXT PRIMARY KEY,
@@ -4414,6 +4415,15 @@ CREATE TABLE mileage_reward_codes (
   UNIQUE (reward_version_id, code_fingerprint)
 );
 
+CREATE TABLE mileage_reward_folders (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 100),
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE mileage_reward_versions (
   id                       TEXT PRIMARY KEY,
   reward_id                TEXT NOT NULL REFERENCES mileage_rewards(id),
@@ -4459,7 +4469,7 @@ CREATE TABLE mileage_rewards (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-);
+, folder_id TEXT REFERENCES mileage_reward_folders(id));
 
 CREATE TABLE mileage_rules (
   id             TEXT PRIMARY KEY,
@@ -6798,7 +6808,8 @@ CREATE TABLE scenarios (
   delivery_mode   TEXT NOT NULL DEFAULT 'relative' CHECK (delivery_mode IN ('relative', 'elapsed', 'absolute_time')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), current_published_version_id TEXT);
+, line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), current_published_version_id TEXT, stopped_reason TEXT
+  CHECK (stopped_reason IS NULL OR length(stopped_reason) <= 200), stopped_by TEXT, stopped_at TEXT);
 
 CREATE TABLE scheduled_chat_sends (
   id TEXT PRIMARY KEY,
@@ -7794,7 +7805,7 @@ CREATE TABLE webinars (
   tag_on_cta_click TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL, cta_version INTEGER NOT NULL DEFAULT 0, cta_updated_by TEXT, cta_updated_at TEXT, cta_write_token TEXT);
 
 CREATE INDEX booking_sync_notices_account ON booking_sync_notices(line_account_id,status,target_date);
 
@@ -9020,11 +9031,15 @@ CREATE INDEX idx_mileage_redemptions_reward_created
 CREATE INDEX idx_mileage_reward_codes_available
   ON mileage_reward_codes(reward_version_id, status, created_at);
 
+CREATE INDEX idx_mileage_reward_folders_account ON mileage_reward_folders(line_account_id, display_order);
+
 CREATE INDEX idx_mileage_reward_versions_reward_status
   ON mileage_reward_versions(reward_id, status, version_number DESC);
 
 CREATE INDEX idx_mileage_rewards_account_status
   ON mileage_rewards(line_account_id, status, sort_order, updated_at DESC);
+
+CREATE INDEX idx_mileage_rewards_folder ON mileage_rewards(line_account_id, folder_id);
 
 CREATE INDEX idx_mileage_rules_account ON mileage_rules(line_account_id);
 

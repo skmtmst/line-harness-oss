@@ -2055,7 +2055,7 @@ describe('webinar CTA cards', () => {
     expect(dbMocks.replaceWebinarCtas).toHaveBeenCalledWith(expect.anything(), 'w1', [{
       atSeconds: 300, kind: 'form', title: '個別導入診断', body: '限定枠です',
       buttonLabel: '診断を受ける', autoOpen: true, formId: 'form-1', url: null,
-    }]);
+    }], { expectedVersion: 0, updatedBy: 'owner-1' });
   });
 
   test('PUT ctas — 存在しない form は 400 で何も書かない', async () => {

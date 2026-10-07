@@ -34,6 +34,10 @@ export interface Scenario {
   on_complete_mode: string;
   /** on_complete_mode が 'move' のときの移動先（122）。 */
   on_complete_scenario_id: string | null;
+  /** 最後の停止記録（590）。再開しても保持する。旧行は null。 */
+  stopped_reason?: string | null;
+  stopped_by?: string | null;
+  stopped_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -270,6 +274,7 @@ export async function updateScenario(
   db: D1Database,
   id: string,
   updates: UpdateScenarioInput,
+  options?: { stop: { reason: string | null; staffId: string } },
 ): Promise<Scenario | null> {
   const now = jstNow();
   const fields: string[] = [];
@@ -298,6 +303,18 @@ export async function updateScenario(
   if (updates.is_active !== undefined) {
     fields.push('is_active = ?');
     values.push(updates.is_active);
+  }
+  if (updates.is_active === 0 && options?.stop) {
+    // 同じ UPDATE 内の変更前の状態で判定する。二重クリックや同時停止で
+    // 最初の停止記録を上書きせず、次に再開して止めたときだけ更新する。
+    for (const [column, value] of [
+      ['stopped_reason', options.stop.reason],
+      ['stopped_by', options.stop.staffId],
+      ['stopped_at', now],
+    ] as const) {
+      fields.push(`${column} = CASE WHEN is_active = 1 THEN ? ELSE ${column} END`);
+      values.push(value);
+    }
   }
   if (updates.folder_id !== undefined) {
     fields.push('folder_id = ?');

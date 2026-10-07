@@ -43,6 +43,7 @@ export interface MileageRewardVersion {
 
 export interface MileageRewardSummary {
   id: string;
+  folderId?: string | null;
   lineAccountId: string;
   programId: string;
   name: string;
@@ -129,6 +130,7 @@ export class MileageRewardError extends Error {
 
 type RewardRow = {
   id: string;
+  folder_id: string | null;
   line_account_id: string;
   program_id: string;
   name: string;
@@ -374,6 +376,7 @@ function mapVersion(row: RewardRow): MileageRewardVersion | null {
 function mapReward(row: RewardRow): MileageRewardSummary {
   return {
     id: row.id,
+    folderId: row.folder_id ?? null,
     lineAccountId: row.line_account_id,
     programId: row.program_id,
     name: row.name,
@@ -395,7 +398,7 @@ function mapReward(row: RewardRow): MileageRewardSummary {
 
 function rewardSelect(versionExpression: string): string {
   return `
-  SELECT r.id, r.line_account_id, r.program_id, r.name, r.description, r.image_url,
+  SELECT r.id, r.folder_id, r.line_account_id, r.program_id, r.name, r.description, r.image_url,
          r.reward_kind, r.status, r.sort_order, r.current_draft_version_id,
          r.current_published_version_id, r.created_at, r.updated_at,
          v.id AS version_id, v.version_number, v.status AS version_status,

@@ -529,7 +529,11 @@
     "584_booking_sync_rules.sql",
     "585_booking_seat_waitlist_fifo.sql",
     "586_outgoing_webhook_version.sql",
-    "587_form_step_completion_times.sql"
+    "587_form_step_completion_times.sql",
+    "590_scenario_stop_reason.sql",
+    "591_friend_field_time.sql",
+    "592_mileage_reward_folders.sql",
+    "593_webinar_cta_version.sql"
   ],
-  "migrationCount": 530
+  "migrationCount": 534
 }
