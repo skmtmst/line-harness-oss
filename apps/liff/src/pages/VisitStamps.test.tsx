@@ -1,0 +1,84 @@
+// @vitest-environment happy-dom
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+const fx = vi.hoisted(() => ({ cards: vi.fn(), card: vi.fn(), showReward: vi.fn(), useReward: vi.fn(), requestPaper: vi.fn() }));
+vi.mock('../lib/api.js', () => ({
+  api: {
+    liffConfig: vi.fn().mockResolvedValue({ success: true, data: { accountId: 'acc-1', accountName: '然 - NEN - 銀座店', botBasicId: '@x' } }),
+    bookingSettings: vi.fn().mockResolvedValue({ liff_date_view: 'list', booking_window_days: 60 }),
+  },
+  visitStampsApi: fx,
+}));
+vi.mock('@line/liff', () => ({ default: { closeWindow: vi.fn() } }));
+import VisitStamps, { cardState } from './VisitStamps.js';
+
+const card = {
+  id: 'c1', name: '然 来店スタンプカード', accountIds: ['acc-1'], active: true, version: 1, expectedVersion: 1,
+  settings: {
+    mode: 'visit' as const, amountUnit: 1000, maxPerVisit: 3, firstVisitBonus: 0, expiryMonths: 6, timezone: 'Asia/Tokyo',
+    multipliers: [], rankMultipliers: [], rewards: [{ id: 'r10', name: 'デザート 1品', stamps: 10 }, { id: 'r5', name: 'ドリンク 1杯', stamps: 5 }],
+  },
+};
+const wallet = (balance: number) => ({ cardId: 'c1', friendId: 'f1', balance, earnedTotal: balance, expiresAt: '2026-07-13T03:00:00.000Z' });
+
+beforeEach(() => {
+  fx.cards.mockResolvedValue({ success: true, data: [{ card, wallet: wallet(6) }] });
+  fx.card.mockResolvedValue({ success: true, data: { card, wallet: wallet(1), entries: [] } });
+  fx.showReward.mockResolvedValue({ success: true, data: { id: 'red-1', cardId: 'c1', rewardId: 'r5', rewardName: 'ドリンク 1杯', stamps: 5, status: 'offered' } });
+  fx.useReward.mockResolvedValue({ success: true, data: { id: 'red-1', status: 'used' } });
+});
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+
+describe('来店スタンプ（お客さまの LIFF）', () => {
+  it('いま使える特典と次の目標（特典は個数の順）', () => {
+    const s = cardState(card, 6);
+    expect(s.best?.name).toBe('ドリンク 1杯');
+    expect(s.next?.name).toBe('デザート 1品');
+    expect(cardState(card, 3).best).toBeNull();
+  });
+
+  it('店員に見せる → 店員が4桁を打つと使用済みになり、残りを読み直して出す', async () => {
+    render(<VisitStamps />);
+    expect(await screen.findByText('6 / 10')).toBeTruthy();
+    expect(screen.getByText('あと 4個でデザート 1品')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '店員に見せる' }));
+    await waitFor(() => expect(fx.showReward).toHaveBeenCalledWith('acc-1', 'c1', 'r5', expect.any(String)));
+    expect(await screen.findByText('お客さまご自身では使用済みにできません')).toBeTruthy();
+    // 4桁がそろうまでは送らない（お客さまだけでは使用済みにできない）
+    fireEvent.change(screen.getByLabelText('店員の暗証番号（4桁）'), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: '使用済みにする' }));
+    expect(fx.useReward).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('店員の暗証番号（4桁）'), { target: { value: '1234' } });
+    fireEvent.click(screen.getByRole('button', { name: '使用済みにする' }));
+    await waitFor(() => expect(fx.useReward).toHaveBeenCalledWith('acc-1', 'red-1', '', '1234'));
+    expect(await screen.findByText('使用済み')).toBeTruthy();
+    expect(screen.getByText('残り 1個（次はドリンク 1杯）')).toBeTruthy();
+  });
+
+  it('暗証番号が違うと、店の理由を出して番号を消す（使用済みにしない）', async () => {
+    fx.useReward.mockRejectedValue(Object.assign(new Error('API 403'), { status: 403, body: { success: false, error: '暗証番号が違います' } }));
+    render(<VisitStamps />);
+    fireEvent.click(await screen.findByRole('button', { name: '店員に見せる' }));
+    await screen.findByText('お客さまご自身では使用済みにできません');
+    fireEvent.change(screen.getByLabelText('店員の暗証番号（4桁）'), { target: { value: '9999' } });
+    fireEvent.click(screen.getByRole('button', { name: '使用済みにする' }));
+    expect(await screen.findByText('暗証番号が違います')).toBeTruthy();
+    expect(screen.queryByText('使用済み')).toBeNull();
+  });
+
+  it('特典がまだ無いときは「店員に見せる」を出さない', async () => {
+    fx.cards.mockResolvedValue({ success: true, data: [{ card, wallet: wallet(2) }] });
+    render(<VisitStamps />);
+    expect(await screen.findByText('あと 3個でドリンク 1杯')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '店員に見せる' })).toBeNull();
+  });
+
+  it('紙のカード：写真が無いと申請しない', async () => {
+    render(<VisitStamps />);
+    fireEvent.click(await screen.findByRole('button', { name: '紙のカードを移す' }));
+    fireEvent.click(await screen.findByRole('button', { name: '申請する' }));
+    expect(await screen.findByText('紙のカードの写真を撮ってください。')).toBeTruthy();
+    expect(fx.requestPaper).not.toHaveBeenCalled();
+  });
+});

@@ -1,0 +1,443 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { VisitStampCard, VisitStampRedemption, VisitStampReward, VisitStampWallet } from '@line-crm/shared';
+import { api, visitStampsApi } from '../lib/api.js';
+import { SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
+import LoadingView from '../components/LoadingView.js';
+import LoadErrorView from '../components/LoadErrorView.js';
+import StatusView from '../components/ui/StatusView.js';
+import BottomBar from '../components/ui/BottomBar.js';
+import Button from '../components/ui/Button.js';
+import Badge from '../components/ui/Badge.js';
+import Icon from '../components/ui/Icon.js';
+
+/**
+ * ★V8 来店スタンプ（お客さまの LIFF・提案 E-8）。マイルとは別のスタンプカード。
+ *  ① スタンプカード（jQRsr）→［店員に見せる］② 特典を店員に見せる（V2HU7）→ 店員が暗証番号を打つ → 使用済み（xe8ga）
+ *  ①［紙のカードを移す］→ ③ 紙のカードを移す（h2HKh）→［申請する］→ お店の確認待ち（etLd8）
+ * お客さま本人だけでは使用済みにできない（店員の4桁の暗証番号が要る）。使用済み・取消済みの特典はサーバが二度と使わせない。
+ * 店舗は /api/liff/config の accountId、本人は LINE の ID トークン（サーバが確かめる）。
+ */
+
+type View = 'card' | 'show' | 'used' | 'paper' | 'pending';
+type Entry = { card: VisitStampCard; wallet: VisitStampWallet };
+
+const sorted = (rewards: VisitStampReward[]) => [...rewards].sort((a, b) => a.stamps - b.stamps);
+const total = (card: VisitStampCard) => Math.max(0, ...card.settings.rewards.map((r) => r.stamps));
+const requestId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `r-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
+/** 「2026年7月13日」（日本時間）。 */
+export function jpDate(iso: string): string {
+  const f = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric' });
+  return f.format(new Date(iso));
+}
+/** 「2026年1月13日 18:53」・「1月13日 18:52」（日本時間）。 */
+export function jpDateTime(date: Date, withYear = true): string {
+  const f = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', ...(withYear ? { year: 'numeric' } : {}), month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  return f.format(date).replace(/\s+/, ' ');
+}
+
+/** カードの状態の見せ方（いま使える特典・次の目標）。試験は VisitStamps.test.tsx。 */
+export function cardState(card: VisitStampCard, balance: number) {
+  const rewards = sorted(card.settings.rewards);
+  const usable = rewards.filter((r) => r.stamps <= balance);
+  const next = rewards.find((r) => r.stamps > balance) ?? null;
+  return { rewards, usable, best: usable[usable.length - 1] ?? null, next };
+}
+
+/** 店のエラー文（サーバの日本語の理由）があればそれ、無ければ汎用の文。英語・コードは出さない。 */
+function reasonOf(err: unknown): string {
+  const body = (err as { body?: { error?: unknown } })?.body;
+  const text = typeof body?.error === 'string' ? body.error : '';
+  return /[ぁ-んァ-ン一-龥]/.test(text) ? text : SUBMIT_FAILED_MESSAGE;
+}
+
+function Slots({ card, balance }: { card: VisitStampCard; balance: number }) {
+  const count = total(card);
+  const rewardAt = new Map(card.settings.rewards.map((r) => [r.stamps, r]));
+  return (
+    <div className="grid grid-cols-5 justify-between gap-y-3" role="list" aria-label={`${count}個中 ${Math.min(balance, count)}個 たまっています`}>
+      {Array.from({ length: count }, (_, i) => {
+        const n = i + 1;
+        const done = n <= balance;
+        const reward = rewardAt.get(n);
+        return (
+          <span
+            key={n}
+            role="listitem"
+            aria-label={done ? `${n}個目 済み` : reward ? `${n}個目 ${reward.name}` : `${n}個目`}
+            className={`mx-auto flex h-13 w-13 flex-col items-center justify-center rounded-full ${done ? 'bg-liff-primary text-(--liff-on-primary)' : 'bg-canvas text-liff-sub'} ${reward ? 'outline-[1.5px] outline-liff-primary' : 'outline outline-liff-line'}`}
+          >
+            {done ? <Icon name="check" className="h-6 w-6" /> : reward ? (
+              <>
+                <Icon name="gift" className="h-4 w-4 text-liff-primary" />
+                <span className="text-[9px] leading-[14px] font-semibold text-liff-primary">{`${n}個`}</span>
+              </>
+            ) : <span className="liff-num text-[13px] leading-5">{n}</span>}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function InfoRows({ rows }: { rows: Array<[string, string]> }) {
+  return (
+    <dl className="flex w-full flex-col gap-2 rounded-xl bg-liff-off-bg p-4">
+      {rows.map(([k, v]) => (
+        <div key={k} className="flex gap-3">
+          <dt className="w-14 shrink-0 text-[13px] leading-5 text-liff-sub">{k}</dt>
+          <dd className="min-w-0 flex-1 text-[13px] leading-5 font-medium text-ink">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function TextButton({ icon, children, onClick }: { icon?: 'camera'; children: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="liff-press mx-auto flex h-9 items-center justify-center gap-1.5 px-3.5 text-[13px] font-semibold text-liff-sub focus-visible:outline-2 focus-visible:outline-ink">
+      {icon ? <Icon name={icon} className="h-4 w-4" /> : null}
+      {children}
+    </button>
+  );
+}
+
+export default function VisitStamps() {
+  const [accountId, setAccountId] = useState('');
+  const [shopName, setShopName] = useState('');
+  const [entry, setEntry] = useState<Entry | null>(null);
+  const [state, setState] = useState<'loading' | 'error' | 'empty' | 'ready'>('loading');
+  const [view, setView] = useState<View>('card');
+  const [picked, setPicked] = useState<string>('');
+  const [redemption, setRedemption] = useState<(VisitStampRedemption & { shownAt: Date }) | null>(null);
+  const [used, setUsed] = useState<{ at: Date; balance: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setState('loading');
+    try {
+      const config = await api.liffConfig();
+      const account = config.data.accountId;
+      setAccountId(account); setShopName(config.data.accountName ?? '');
+      const list = await visitStampsApi.cards(account);
+      const wanted = new URLSearchParams(window.location.search).get('card');
+      const found = list.data.find((x) => x.card.id === wanted) ?? list.data[0] ?? null;
+      setEntry(found);
+      setState(found ? 'ready' : 'empty');
+    } catch (e) {
+      logFailure('visit-stamps', e);
+      setState('error');
+    }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  const info = useMemo(() => (entry ? cardState(entry.card, entry.wallet.balance) : null), [entry]);
+  const chosen = info?.usable.find((r) => r.id === picked) ?? info?.best ?? null;
+  const offerRequest = useRef(requestId());
+
+  async function show() {
+    if (!entry || !chosen) return;
+    setBusy(true); setError('');
+    try {
+      const res = await visitStampsApi.showReward(accountId, entry.card.id, chosen.id, offerRequest.current);
+      setRedemption({ ...res.data, shownAt: new Date() });
+      setView('show');
+    } catch (e) {
+      logFailure('visit-stamps-show', e);
+      setError(reasonOf(e));
+    } finally { setBusy(false); }
+  }
+
+  if (state === 'loading') return <LiffLookScope className="min-h-screen bg-canvas"><LiffHeader title="来店スタンプ" /><LoadingView /></LiffLookScope>;
+  if (state === 'error') return <LiffLookScope className="min-h-screen bg-canvas"><LiffHeader title="来店スタンプ" /><LoadErrorView note="スタンプはなくなっていません。" onRetry={() => void load()} /></LiffLookScope>;
+  if (state === 'empty' || !entry || !info) {
+    return (
+      <LiffLookScope className="min-h-screen bg-canvas">
+        <LiffHeader title="来店スタンプ" />
+        <StatusView icon="gift" title="スタンプカードはまだありません" body="お店がカードを始めると、ここにたまったスタンプが出ます。" />
+      </LiffLookScope>
+    );
+  }
+
+  const { card, wallet } = entry;
+  const count = total(card);
+
+  if (view === 'show' && redemption) {
+    return (
+      <ShowReward
+        redemption={redemption}
+        shopName={shopName}
+        onBack={() => { setView('card'); offerRequest.current = requestId(); }}
+        onUse={async (staffId, pin) => {
+          await visitStampsApi.useReward(accountId, redemption.id, staffId, pin);
+          offerRequest.current = requestId();
+          const fresh = await visitStampsApi.card(accountId, card.id).catch(() => null);
+          const balance = fresh?.data.wallet.balance ?? Math.max(0, wallet.balance - redemption.stamps);
+          if (fresh) setEntry({ card: fresh.data.card, wallet: fresh.data.wallet });
+          setUsed({ at: new Date(), balance });
+          setView('used');
+        }}
+      />
+    );
+  }
+
+  if (view === 'used' && redemption && used) {
+    const next = cardState(card, used.balance).next;
+    return (
+      <LiffLookScope className="min-h-screen bg-canvas" designNode="xe8ga">
+        <LiffHeader title="特典を使う" />
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-40">
+          <div className="flex flex-col items-center gap-2.5 px-4 pt-12 pb-6 text-center">
+            <span className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-ok-bg text-liff-primary" aria-hidden="true"><Icon name="check" className="h-9 w-9" /></span>
+            <h1 className="text-2xl leading-9 font-bold text-ink">使用済み</h1>
+            <p className="text-base leading-6 font-semibold text-ink">{redemption.rewardName}</p>
+          </div>
+          <InfoRows rows={[
+            ['日時', jpDateTime(used.at)],
+            ['店舗', shopName || '—'],
+            ['カード', `残り ${used.balance}個${next ? `（次は${next.name}）` : ''}`],
+          ]} />
+        </div>
+        <BottomBar>
+          <Button variant="secondary" className="min-h-12" onClick={() => { setView('card'); setRedemption(null); setUsed(null); setPicked(''); }}>カードに戻る</Button>
+        </BottomBar>
+      </LiffLookScope>
+    );
+  }
+
+  if (view === 'paper' || view === 'pending') {
+    return <PaperCard accountId={accountId} cardId={card.id} sent={view === 'pending'} onSent={() => setView('pending')} onBack={() => setView('card')} />;
+  }
+
+  return (
+    <LiffLookScope className="min-h-screen bg-canvas" designNode="jQRsr">
+      <LiffHeader title="来店スタンプ" />
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-44">
+        <section className="flex flex-col gap-3 rounded-2xl bg-liff-off-bg p-4 outline outline-liff-line" aria-label={card.name}>
+          <div className="flex items-center">
+            <h1 className="min-w-0 flex-1 truncate text-sm leading-[21px] font-semibold text-ink">{card.name}</h1>
+            <span className="liff-num text-sm leading-[21px] font-bold text-liff-primary">{`${Math.min(wallet.balance, count)} / ${count}`}</span>
+          </div>
+          <Slots card={card} balance={wallet.balance} />
+          <p className="text-xs leading-[18px] text-liff-sub">
+            {wallet.expiresAt
+              ? `期限：${jpDate(wallet.expiresAt)}${card.settings.expiryMonths ? `（最後の来店から ${card.settings.expiryMonths}か月）` : ''}`
+              : card.settings.expiryMonths ? `期限：最後の来店から ${card.settings.expiryMonths}か月` : '期限はありません'}
+          </p>
+        </section>
+
+        {info.best ? (
+          <section className="flex flex-col gap-2.5 rounded-2xl bg-liff-ok-bg p-4 outline-[1.5px] outline-liff-primary" aria-label="使える特典">
+            <p className="flex items-center gap-2 text-sm leading-[21px] font-semibold text-liff-primary"><Icon name="gift" className="h-4 w-4" />使える特典があります</p>
+            <p className="text-base leading-6 font-semibold text-ink">{chosen ? `${chosen.name}（${chosen.stamps}個の特典）` : ''}</p>
+          </section>
+        ) : null}
+
+        <h2 className="text-[15px] leading-[23px] font-semibold text-ink">
+          {info.next ? `あと ${info.next.stamps - wallet.balance}個で${info.next.name}` : 'すべての特典が使えます'}
+        </h2>
+        <ul className="flex flex-col gap-1.5" aria-label="特典の一覧">
+          {info.rewards.map((r) => {
+            const ok = r.stamps <= wallet.balance;
+            const selected = chosen?.id === r.id;
+            return (
+              <li key={r.id}>
+                <button
+                  type="button"
+                  disabled={!ok}
+                  onClick={() => setPicked(r.id)}
+                  aria-pressed={ok ? selected : undefined}
+                  className={`flex w-full items-center gap-2.5 text-left disabled:cursor-default ${selected && info.usable.length > 1 ? 'font-semibold' : ''}`}
+                >
+                  <span className="liff-num w-10 shrink-0 text-[13px] leading-5 font-semibold text-ink">{`${r.stamps}個`}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm leading-[21px] text-ink">{r.name}</span>
+                  <span className="text-[13px] leading-5 text-liff-sub">{ok ? '使えます' : `あと ${r.stamps - wallet.balance}個`}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
+      </div>
+      <BottomBar>
+        {info.best ? (
+          <Button variant="primary" disabled={busy} onClick={() => void show()}><Icon name="gift" className="h-4 w-4" />店員に見せる</Button>
+        ) : null}
+        <TextButton icon="camera" onClick={() => setView('paper')}>紙のカードを移す</TextButton>
+      </BottomBar>
+    </LiffLookScope>
+  );
+}
+
+/** ② 特典を店員に見せる。暗証番号は店員が打つ。お客さま本人では使用済みにできない。 */
+function ShowReward({ redemption, shopName, onBack, onUse }: {
+  redemption: VisitStampRedemption & { shownAt: Date };
+  shopName: string;
+  onBack: () => void;
+  onUse: (staffId: string, pin: string) => Promise<void>;
+}) {
+  const [pin, setPin] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const input = useRef<HTMLInputElement>(null);
+  const shortShop = shopName.split(/\s*-\s*/).pop() || shopName;
+
+  async function submit() {
+    if (pin.length !== 4) { setError('店員の暗証番号を4桁で入れてください。'); input.current?.focus(); return; }
+    setBusy(true); setError('');
+    try {
+      // 店員を選ぶ口が LIFF に無い（API は店員の ID を要る）。暗証番号だけで店員を確かめる口が入ったら staffId は不要になる。
+      await onUse('', pin);
+    } catch (e) {
+      logFailure('visit-stamps-use', e);
+      setError(reasonOf(e));
+      setPin('');
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <LiffLookScope className="min-h-screen bg-canvas" designNode="V2HU7">
+      <LiffHeader title="特典を使う" />
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-44">
+        <section className="flex flex-col items-center gap-2 rounded-2xl bg-liff-ok-bg px-4 py-7 text-center outline-[1.5px] outline-liff-primary" aria-label="見せる特典">
+          <Icon name="gift" className="h-8 w-8 text-liff-primary" />
+          <p className="text-[30px] leading-[45px] font-bold text-ink">{redemption.rewardName}</p>
+          <p className="text-[13px] leading-5 text-liff-sub">{`来店スタンプ ${redemption.stamps}個の特典`}</p>
+          <p className="text-[13px] leading-5 text-liff-sub">{`${jpDateTime(redemption.shownAt, false)}${shortShop ? ` ・ ${shortShop}` : ''}`}</p>
+        </section>
+        <p className="flex items-center gap-2 rounded-(--liff-radius) bg-liff-note px-3 py-2.5 text-[13px] leading-5 text-ink">
+          <Icon name="info" className="h-4 w-4 shrink-0 text-liff-sat" />
+          この画面を店員に見せてください。店員が押すと使用済みになります。
+        </p>
+        <div className="flex flex-col gap-2.5 border-t border-liff-line pt-4">
+          <p className="flex items-center gap-1.5 text-[13px] leading-5 font-semibold text-liff-sub"><Icon name="lock" className="h-4 w-4" />店員の操作</p>
+          <label className="relative flex w-fit flex-col gap-1.5">
+            <span className="text-[13px] leading-5 font-medium text-ink">店員の暗証番号（4桁）</span>
+            <span className="flex gap-2" aria-hidden="true">
+              {[0, 1, 2, 3].map((i) => (
+                <span key={i} className={`flex h-12 w-12 items-center justify-center rounded-xl bg-liff-chip text-xl font-medium text-ink ${i === pin.length ? 'outline-[1.5px] outline-liff-primary' : 'outline outline-liff-line-strong'}`}>
+                  {i < pin.length ? '●' : ''}
+                </span>
+              ))}
+            </span>
+            <input
+              ref={input}
+              aria-label="店員の暗証番号（4桁）"
+              inputMode="numeric"
+              autoComplete="off"
+              type="password"
+              maxLength={4}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              className="absolute inset-x-0 bottom-0 h-12 w-full cursor-text opacity-0"
+            />
+          </label>
+          <p className="text-xs leading-[18px] text-liff-sub">お客さまご自身では使用済みにできません</p>
+          {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
+        </div>
+      </div>
+      <BottomBar>
+        <Button variant="primary" disabled={busy} onClick={() => void submit()}><Icon name="check" className="h-4 w-4" />使用済みにする</Button>
+        <TextButton onClick={onBack}>戻る</TextButton>
+      </BottomBar>
+    </LiffLookScope>
+  );
+}
+
+/**
+ * ③ 紙のカードを移す。写真と押してある数を送り、お店が確かめてから足す。
+ * 写真を預ける口が LIFF にまだ無い（API は HTTPS の写真の URL を要る）。口が入るまでは送れないことをその場で伝える。
+ */
+function PaperCard({ accountId, cardId, sent, onSent, onBack }: { accountId: string; cardId: string; sent: boolean; onSent: () => void; onBack: () => void }) {
+  const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);
+  const [stamps, setStamps] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [sentAt, setSentAt] = useState<Date | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => () => { if (photo) URL.revokeObjectURL(photo.url); }, [photo]);
+
+  if (sent) {
+    return (
+      <LiffLookScope className="min-h-screen bg-canvas" designNode="etLd8">
+        <LiffHeader title="紙のカードを移す" />
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-40">
+          <div className="flex flex-col items-center gap-2.5 px-4 pt-12 pb-6 text-center">
+            <span className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-wait-bg text-liff-wait-ink" aria-hidden="true"><Icon name="hourglass" className="h-9 w-9" /></span>
+            <h1 className="text-2xl leading-9 font-bold text-ink">お店の確認待ち</h1>
+            <Badge tone="pending">確認待ち</Badge>
+            <p className="w-full text-sm leading-[21px] text-liff-sub">確認できたらカードに足して、LINE でお知らせします。</p>
+          </div>
+          <InfoRows rows={[['押印数', `${stamps} 個`], ['申請日', sentAt ? jpDateTime(sentAt) : '—'], ['写真', '1枚']]} />
+        </div>
+        <BottomBar>
+          <Button variant="secondary" className="min-h-12" onClick={onBack}>カードに戻る</Button>
+        </BottomBar>
+      </LiffLookScope>
+    );
+  }
+
+  async function submit() {
+    if (!photo) { setError('紙のカードの写真を撮ってください。'); return; }
+    setBusy(true); setError('');
+    try {
+      const photoUrl = await uploadPaperPhoto(photo.file);
+      if (!photoUrl) { setError('いまは写真を送れません。お店でスタンプを足してもらってください。'); return; }
+      await visitStampsApi.requestPaper(accountId, cardId, { photoUrl, stamps });
+      setSentAt(new Date());
+      onSent();
+    } catch (e) {
+      logFailure('visit-stamps-paper', e);
+      setError(reasonOf(e));
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <LiffLookScope className="min-h-screen bg-canvas" designNode="h2HKh">
+      <LiffHeader title="紙のカードを移す" />
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-36">
+        <p className="text-sm leading-[21px] text-liff-sub">お手持ちの紙のスタンプカードを、LINE のカードに移せます。お店が確認してから足します。</p>
+        <div className="flex flex-col gap-2">
+          <h2 className="text-sm leading-[21px] font-semibold text-ink">① 紙のカードの写真</h2>
+          <div className="flex h-[190px] w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl bg-liff-off-bg outline outline-liff-line">
+            {photo ? <img src={photo.url} alt="撮った紙のカード" className="h-full w-full object-contain" /> : (
+              <>
+                <Icon name="image" className="h-6 w-6 text-liff-sub" />
+                <span className="text-xs leading-[18px] text-liff-sub">紙のカード（表）</span>
+              </>
+            )}
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" aria-label="紙のカードの写真"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (photo) URL.revokeObjectURL(photo.url); setPhoto({ file: f, url: URL.createObjectURL(f) }); setError(''); } e.target.value = ''; }} />
+          {/* 絵の「撮り直す」は高さ36の枠のボタン（副ボタン 44 より低い）。 */}
+          <button type="button" onClick={() => fileRef.current?.click()} className="liff-press flex h-9 w-full items-center justify-center gap-1.5 rounded-(--liff-radius) border border-liff-line-strong bg-canvas px-3.5 text-[13px] font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink active:bg-liff-off-bg">
+            <Icon name="camera" className="h-4 w-4" />{photo ? '撮り直す' : '写真を撮る'}
+          </button>
+        </div>
+        <div className="flex flex-col gap-2">
+          <h2 className="text-sm leading-[21px] font-semibold text-ink">② 押してある数</h2>
+          <div className="flex items-center gap-3">
+            <button type="button" aria-label="1個へらす" disabled={stamps <= 1} onClick={() => setStamps((n) => Math.max(1, n - 1))} className="liff-press flex h-9 w-9 items-center justify-center rounded-(--liff-radius) bg-canvas outline outline-liff-line disabled:opacity-40"><Icon name="minus" className="h-4 w-4" /></button>
+            <span className="liff-num text-xl leading-[30px] font-bold text-ink" aria-live="polite">{`${stamps} 個`}</span>
+            <button type="button" aria-label="1個ふやす" disabled={stamps >= 100} onClick={() => setStamps((n) => Math.min(100, n + 1))} className="liff-press flex h-9 w-9 items-center justify-center rounded-(--liff-radius) bg-canvas outline outline-liff-line disabled:opacity-40"><Icon name="plus" className="h-4 w-4" /></button>
+          </div>
+        </div>
+        {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
+      </div>
+      <BottomBar>
+        <Button variant="primary" disabled={busy} onClick={() => void submit()}><Icon name="send" className="h-4 w-4" />申請する</Button>
+      </BottomBar>
+    </LiffLookScope>
+  );
+}
+
+/**
+ * 紙のカードの写真を預けて HTTPS の URL を受け取る。LIFF から写真を預ける口が API にまだ無い（Codex へ依頼済みの穴）。
+ * 口が入ったらここだけ差し替える。いまは null（＝送れない）を返す。
+ */
+async function uploadPaperPhoto(_file: File): Promise<string | null> {
+  return null;
+}
