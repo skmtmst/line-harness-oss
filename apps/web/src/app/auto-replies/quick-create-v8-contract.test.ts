@@ -12,7 +12,8 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
  * 重なりは作った下書きで確かめて帯に出し、確かめた分だけ承認する。
  */
 describe('かんたんに作るの配線（G4GejG）', () => {
-  const file = 'auto-replies/quick-create-v8.tsx'
+  // 入口は src/v8/auto-replies/quick-create.tsx（古い quick-create-v8.tsx はもう描かれない）。
+  const file = '../v8/auto-replies/quick-create.tsx'
   const source = readFileSync(join(SRC, file), 'utf8')
 
   it('板の印を持ち、共通の窓を使う', () => {

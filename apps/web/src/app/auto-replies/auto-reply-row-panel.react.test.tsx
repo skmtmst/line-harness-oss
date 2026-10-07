@@ -7,7 +7,11 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import AutoRepliesPage from './list-v8'
+/*
+ * 新しい一覧（src/v8/auto-replies/list.tsx）を描く。入口 page.tsx は V8 のときこの画面を出す。
+ * 2026-10-06 に、もう描かれない `./list-v8` から向け直した。
+ */
+import AutoRepliesPage from '@/v8/auto-replies/list'
 
 /*
  * V8「サクサク感」C①・D・E：自動応答一覧の行パネル。

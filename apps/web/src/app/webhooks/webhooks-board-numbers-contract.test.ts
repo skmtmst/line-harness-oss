@@ -1,34 +1,36 @@
 /**
- * 外部連携 (板 l5SRfT 一覧・NGh7b 送り先を作る) と実装の数字突き合わせ契約。
- * l5SRfT: 表の見出し 地table-head・13/20・12px/500、行 9/20。
- * NGh7b: 段の余白 20（四方）、入力の枠 h36・丸み10、選ぶ欄 h36。
+ * 外部連携 (板 NGh7b 送り先を作る) と実装の数字突き合わせ契約。
+ * NGh7b: 段の余白 20（四方）、入力の枠 h36。
+ *
+ * 2026-10-06：作るの入口は V8 のとき src/v8/webhooks/create.tsx になり、
+ * 古い new/new-v8.module.css はもう描かれない。新しい画面は数字を直書きせず
+ * 変数（var(--tpl-*)）で書く決まりなので、変数の名前と、その値（globals.css）の両方を見る。
+ * 受け取る（l5SRfT）の未対応表の数字（見出し 13/20・行 9/20）は、古い incoming-v8 だけが
+ * 持っていた表の形で、新しい画面（src/v8/webhooks/incoming.tsx）は別の小さな表（miniHead・miniRow）に
+ * なったので外した。古い試験は外付けSSDの Archive/line-harness-tests-20261006 にある。
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const DIR = resolve(__dirname);
+const SRC = resolve(__dirname, "..", "..");
+const CREATE_CSS = readFileSync(resolve(SRC, "v8/webhooks/create.module.css"), "utf-8");
+const GLOBALS = readFileSync(resolve(SRC, "app/globals.css"), "utf-8");
+
+/** globals.css の変数の値。見つからなければ空。 */
+function token(name: string): string {
+  const match = GLOBALS.match(new RegExp(`${name.replace(/[-]/g, "\\-")}:\\s*([^;]+);`));
+  return match?.[1]?.trim() ?? "";
+}
 
 describe("外部連携の板の数字", () => {
-  it("incoming 未対応表の見出しは地table-head・13/20・500", () => {
-    const css = readFileSync(resolve(DIR, "incoming-v8.module.css"), "utf-8");
-    expect(css).toMatch(/\.unmatchedTable thead th \{[^}]*background: var\(--color-table-head\)/s);
-    expect(css).toMatch(/\.unmatchedTable thead th \{[^}]*padding: 13px 20px/s);
-    expect(css).toMatch(/\.unmatchedTable thead th \{[^}]*font-weight: 500/s);
+  it("作るの段カードは余白20（四方）", () => {
+    expect(CREATE_CSS).toMatch(/\.card \{[^}]*padding: var\(--tpl-wh-card-pad\);/s);
+    expect(token("--tpl-wh-card-pad")).toBe("20px");
   });
 
-  it("incoming 未対応表の行は 9/20", () => {
-    const css = readFileSync(resolve(DIR, "incoming-v8.module.css"), "utf-8");
-    expect(css).toMatch(/\.unmatchedTable tbody td \{[^}]*padding: 9px 20px/s);
-  });
-
-  it("new の段カードは余白20（四方）", () => {
-    const css = readFileSync(resolve(DIR, "new/new-v8.module.css"), "utf-8");
-    expect(css).toMatch(/\.card \{[^}]*padding: 20px;/s);
-  });
-
-  it("new の入力の枠は h36・丸み10 (NGh7b 枠)", () => {
-    const css = readFileSync(resolve(DIR, "new/new-v8.module.css"), "utf-8");
-    expect(css).toMatch(/\.input \{[^}]*height: 36px/s);
+  it("作るの入力の枠は h36 (NGh7b 枠)", () => {
+    expect(CREATE_CSS).toMatch(/\.input \{[^}]*height: var\(--tpl-chip-h\)/s);
+    expect(token("--tpl-chip-h")).toBe("36px");
   });
 });

@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-/* 完全切り替え：v7 の scenario-list.tsx は捨て、V8 の list-v8.tsx を見る。 */
-const SCENARIO_LIST = read('../app/scenarios/list-v8.tsx')
+/* 完全切り替え：v7 の scenario-list.tsx は捨て、V8 を見る。入口は src/v8/scenarios/list.tsx（古い list-v8.tsx はもう描かれない）。 */
+const SCENARIO_LIST = read('../v8/scenarios/list.tsx')
 const AUTO_REPLIES = read('../app/auto-replies/page.tsx')
 const FRIEND_ADD = read('../app/friend-add-settings/page.tsx')
 const VARS = read('../app/contents/vars/page.tsx')

@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 // 「まとめて操作」の窓は v7・V8 の両方で使う共用部品へ移した（中身は同じ）。
-const BULK = readFileSync(new URL('./_components/bulk-routes-dialog.tsx', import.meta.url), 'utf8')
+// まとめて操作の窓は一覧の画面（page.tsx）の中にある。古い _components/bulk-routes-dialog.tsx はどこからも描かれないので 2026-10-07 に消した。
+const BULK = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
 /**
  * 流入と計測の一覧（板 xbHxg）の契約。

@@ -89,6 +89,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   await act(async () => { root.unmount() })
   host.remove()
   vi.unstubAllGlobals()
@@ -96,8 +97,11 @@ afterEach(async () => {
 
 describe('Issue #637 /friends 全ボタンにアクセシブルな名前', () => {
   it('一覧の操作・ページングを含め無名ボタンがない', async () => {
+    // 待ちは偽の時計で進める（本物の時間を待たない）。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await act(async () => { root.render(<FriendsPage />) })
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 100)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(100) })
+    vi.useRealTimers()
 
     const unnamed = buttonsWithoutAccessibleName(host)
     expect(
