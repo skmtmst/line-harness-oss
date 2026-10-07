@@ -904,13 +904,14 @@ export default function TemplatesListV8() {
     </Button>
   )
 
+  const selectCategory = (id: string) => {
+    setSelectedCategory(id)
+    setPage(1)
+  }
   const folderPanel = (
     <FolderPanel
       activeId={selectedCategory}
-      onSelect={(id) => {
-        setSelectedCategory(id)
-        setPage(1)
-      }}
+      onSelect={selectCategory}
       onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
       addFolderLabel="フォルダを追加"
       rows={folderRows}
@@ -1787,6 +1788,7 @@ export default function TemplatesListV8() {
           ))}
         </KpiBand>
       }
+      folderNav={narrow ? undefined : { rows: folderRows, activeId: selectedCategory, onSelect: selectCategory, createAction: createButton(false) }}
       folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={listPager}

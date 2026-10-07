@@ -666,6 +666,7 @@ export default function EventsListV8() {
         </KpiBand>
       )}
       folders={<>{createButton}{folderPanel}</>}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
       toolbar={toolbar}
       pagination={pager}
       overlays={overlays}

@@ -315,6 +315,31 @@
   gap: var(--tpl-e49-gap-l);
 }
 
+/* 狭い板（白い板 1100 未満）だけ出すボタン。広い板ではスマホの見本をそのまま出す。 */
+.previewToggle {
+  display: none;
+  align-self: stretch;
+}
+
+.previewToggle > * {
+  width: 100%;
+}
+
+.previewDialog {
+  display: flex;
+  justify-content: center;
+}
+
+@container v8-page (max-width: 1099px) {
+  .previewToggle {
+    display: block;
+  }
+
+  .previewPhone {
+    display: none;
+  }
+}
+
 
 .storeList {
   display: flex;

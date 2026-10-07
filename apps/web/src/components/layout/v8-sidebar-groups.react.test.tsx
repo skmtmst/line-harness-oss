@@ -201,6 +201,63 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
   })
 })
 
+describe('★V8 統括の左メニュー（絵 V8-B/JKjsE・オーナー 2026-10-07）', () => {
+  beforeEach(() => {
+    clearFeatureVisibilityCache()
+    fixture.visibility.mockReset()
+    fixture.get.mockReset()
+    fixture.visibility.mockResolvedValue({ success: true, data: { features: ALL_FEATURES_ON } })
+    fixture.get.mockResolvedValue({ success: true, data: { features: ALL_FEATURES_ON, sidebarOrder: null, sidebarItemOrder: null, specializedFeatureKeys: [] } })
+    fixture.pathname = '/hq'
+    window.localStorage.clear()
+    window.localStorage.setItem('lh_staff_role', 'owner')
+    window.localStorage.setItem('lh-sidebar-collapsed', '0')
+  })
+
+  afterEach(() => {
+    cleanup()
+    delete document.documentElement.dataset.theme
+  })
+
+  async function renderHq() {
+    const view = render(<Sidebar />)
+    await act(async () => { await Promise.resolve() })
+    return view
+  }
+
+  it('V8 は「統括」の組の見出し・左下の「統括の設定」と版。左下のアカウントの行は出さない', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    const view = await renderHq()
+    expect(view.getAllByRole('button', { name: '統括' }).length).toBeGreaterThan(0)
+    const settings = view.getAllByRole('link', { name: '統括の設定' })
+    expect(settings.length).toBeGreaterThan(0)
+    expect(settings[0].getAttribute('href')).toBe('/hq/settings')
+    expect(view.getAllByText('version').length).toBeGreaterThan(0)
+    expect(view.getAllByText('identity').length).toBeGreaterThan(0)
+    expect(view.queryAllByText('hq')).toHaveLength(0)
+  })
+
+  it('V8 の統括の設定の中（メンバーなど）では「統括の設定」が選ばれた形、アカウントの画面では選ばれない', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    fixture.pathname = '/hq/members'
+    const members = await renderHq()
+    expect(members.getAllByRole('link', { name: '統括の設定' })[0].className).toMatch(/active/)
+    cleanup()
+    fixture.pathname = '/hq'
+    const home = await renderHq()
+    expect(home.getAllByRole('link', { name: '統括の設定' })[0].className).not.toMatch(/active/)
+  })
+
+  it('v7 の統括は今までどおり（見出し無し・左下はアカウントの行・統括の設定と版は無し）', async () => {
+    document.documentElement.dataset.theme = 'v7'
+    const view = await renderHq()
+    expect(view.queryAllByRole('button', { name: '統括' })).toHaveLength(0)
+    expect(view.queryAllByRole('link', { name: '統括の設定' })).toHaveLength(0)
+    expect(view.queryAllByText('version')).toHaveLength(0)
+    expect(view.getAllByText('hq').length).toBeGreaterThan(0)
+  })
+})
+
 describe('統括の左メニューを出す住所', () => {
   it('/hq の下と LINEアカウントの登録は統括、ほかの /accounts は店舗', () => {
     expect(isHqShellPath('/hq')).toBe(true)

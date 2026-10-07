@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, type EventDetail, type EventSlot } from '../lib/api.js';
-import { formatJstEventAt } from '../lib/datetime.js';
+import { formatJstDeadline, formatJstEventSpan } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
@@ -114,7 +114,8 @@ export default function EventConfirm() {
       );
       const startsAt = `startsAt=${encodeURIComponent(slot?.starts_at ?? '')}`;
       if ('waitlisted' in res) {
-        goDone(`status=waitlisted&${startsAt}`);
+        // 完了画面で自分の待ち (順番・やめる) を探すため、待ちに入った枠を渡す。
+        goDone(`status=waitlisted&waitSlot=${encodeURIComponent(res.slot_id)}&${startsAt}`);
         return;
       }
       goDone(`bookingId=${res.id}&status=${res.status}&${startsAt}`);
@@ -173,26 +174,27 @@ export default function EventConfirm() {
     );
   }
 
-  const infoText = event.requires_approval === 1
-    ? 'このイベントは承認制です。受付後、運営が承認するまでお待ちください。キャンセルは期限まで「自分のイベント」からできます（期限はイベントごとに違います）。'
+  // 期限があれば日時で出す（板 EscPA「キャンセルは 10月10日 18:00 まで。」）。無ければ「自分のイベント」へ案内する。
+  const cancelText = event.cancel_deadline_hours_before != null
+    ? `キャンセルは ${formatJstDeadline(slot.starts_at, event.cancel_deadline_hours_before)} まで。`
     : 'キャンセルは期限まで「自分のイベント」からできます（期限はイベントごとに違います）。';
+  const infoText = event.requires_approval === 1
+    ? `このイベントは承認制です。受付後、運営が承認するまでお待ちください。${cancelText}`
+    : cancelText;
 
   return (
-    <LiffLookScope className="min-h-screen bg-ground" designNode="EscPA">
+    <LiffLookScope className="min-h-screen bg-canvas" designNode="EscPA">
       <LiffHeader title="申し込みの確認" />
-      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-28">
+      {/* 板 EscPA：中身は上下左右 16・間 14。並びは 内容の箱 → 質問 → 備考 → 注意 → プライバシーの一行。 */}
+      <div className="mx-auto w-full max-w-md space-y-3.5 px-4 pt-4 pb-28">
         <h1 className="text-xl font-bold text-ink">内容を確かめてください</h1>
         <dl className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
           <Row label="イベント" value={event.name} />
-          <Row label="日時" value={formatJstEventAt(slot.starts_at)} />
+          <Row label="日時" value={formatJstEventSpan(slot.starts_at, slot.ends_at)} />
           {event.venue_name && <Row label="場所" value={event.venue_name} />}
           {event.venue_address && <Row label="住所" value={event.venue_address} />}
         </dl>
 
-        <div className="flex gap-2 rounded-lg bg-info-bg p-3 text-xs leading-5 text-ink">
-          <Icon name="info" className="h-4 w-4 shrink-0" />
-          <p>{infoText}</p>
-        </div>
 
         {(event.questions ?? []).length > 0 && (
           <div className="space-y-4">
@@ -273,25 +275,26 @@ export default function EventConfirm() {
         )}
 
         <label className="block">
-          <span className="text-sm font-bold text-ink">
-            備考 <span className="text-[11px] font-normal text-liff-sub">任意</span>
-          </span>
+          <span className="block text-sm font-bold text-ink">備考</span>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            rows={4}
+            rows={3}
             maxLength={5000}
-            placeholder="質問や伝えたいことがあれば..."
-            className="mt-1 min-h-24 w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3.5 py-3 text-sm text-ink placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
+            placeholder="質問や伝えたいことがあれば"
+            className="mt-2 block h-20 w-full resize-none rounded-(--liff-radius) bg-canvas px-3.5 py-3 text-sm text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
           />
         </label>
-        <p className="text-right text-xs text-ink-faint">{note.length} / 5000</p>
 
         {submitError && (
           <p role="alert" className="text-sm leading-6 text-danger">
             {submitError}
           </p>
         )}
+        <div className="flex gap-2 rounded-(--liff-radius) bg-liff-note p-3 text-xs leading-[18px] text-ink">
+          <Icon name="info" className="h-4 w-4 shrink-0 text-liff-sub" />
+          <p>{infoText}</p>
+        </div>
         <PrivacyNote />
       </div>
       <BottomBar>
@@ -303,16 +306,17 @@ export default function EventConfirm() {
           onClick={back}
           className="liff-hit self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
         >
-          ←戻る
+          ← 戻る
         </button>
       </BottomBar>
     </LiffLookScope>
   );
 }
 
+/** 確認の1行。板 EscPA は 1行 40 (線を含む)・鍵と値は上ぞろえ (予約の確認と同じ)。 */
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline gap-2 py-2.5">
+    <div className="flex h-10 items-start gap-2 py-2.5">
       <dt className="w-18 shrink-0 text-xs text-liff-sub">{label}</dt>
       <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-ink" title={value}>
         {value}

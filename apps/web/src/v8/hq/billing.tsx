@@ -16,7 +16,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import {
@@ -31,7 +31,7 @@ import {
   type BillingSummary,
 } from '@/lib/hq-billing'
 import { billingFailureMessage } from './billing-failure'
-import HqSettingsNavV8 from './settings-nav'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -60,7 +60,10 @@ function invoiceDate(iso: string): string {
 }
 
 function BillingInner() {
-  usePageTitle('課金プラン')
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/JB8V1`）。
+  usePageTitle('請求')
+  usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
+  const settingsNav = useHqSettingsFolderNav('billing')
   const params = useSearchParams()
   const checkoutResult = params.get('checkout')
   /* 役割はサーバ（/api/staff/me）から読む。手元の保存値は使わない。 */
@@ -140,7 +143,7 @@ function BillingInner() {
   const invoiceUnreachable = invoiceError instanceof ApiError && invoiceError.status === 502
 
   const frame = (body: React.ReactNode) => (
-    <ListPage boardId="JB8V1" title={TITLE} description={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />}>
+    <ListPage boardId="JB8V1" title={TITLE} description={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}>
       <div className={styles.body}>{body}</div>
     </ListPage>
   )

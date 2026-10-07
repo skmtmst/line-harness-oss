@@ -12,7 +12,9 @@ describe('プライバシーポリシーの一行', () => {
     expect(privacyPolicyUrl('javascript:alert(1)')).toBe(MUSUBO_PRIVACY_URL);
     const html = renderToStaticMarkup(<PrivacyNote />);
     expect(html).toContain(`href="${MUSUBO_PRIVACY_URL}"`);
-    expect(html).toContain('min-h-11');
+    // 押せる範囲は見えない liff-hit で取り、行は 18 のまま（min-h-11 だと絵より 13px 下がる）。
+    expect(html).toContain('liff-hit');
+    expect(html).not.toContain('min-h-11');
   });
 
   it('予約・イベントの申し込み・フォーム・席の予約の送る画面に置いてある', () => {

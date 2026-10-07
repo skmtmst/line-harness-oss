@@ -627,6 +627,7 @@ export default function AffiliatorsTab() {
         </Button>
       }
       stats={stats}
+      folderNav={{ rows: GROUPS.map((item) => ({ id: item.key, label: item.label })), activeId: group, onSelect: (id) => resetPage(() => { setSaved(''); setGroup(id as GroupKey) }), createAction: readonly ? undefined : createButton(false) }}
       folders={narrow ? undefined : <>{createButton(true)}{folderPanel}</>}
       toolbar={toolbar}
       pagination={pager}

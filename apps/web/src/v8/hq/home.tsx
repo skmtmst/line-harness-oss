@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import { FolderDotName } from '@/components/shared/folder-dot'
+import { brandInitial } from '@/components/layout/brand-initial'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -301,18 +302,20 @@ export default function HqHomeV8() {
     { id: UNTAGGED, label: 'タグなし', count: untaggedCount },
   ]
 
+  const createAccount = canManage ? (
+    <Button href="/accounts/new" variant="primary" className={styles.createButton}>
+      <Plus aria-hidden="true" className={styles.buttonIcon} />アカウントを登録
+    </Button>
+  ) : null
+  const selectTag = (id: string) => { setTag(id); resetPage() }
   const folders = (
     <div className={styles.folderInset}>
       <FolderPanel
-        createAction={canManage ? (
-          <Button href="/accounts/new" variant="primary" className={styles.createButton}>
-            <Plus aria-hidden="true" className={styles.buttonIcon} />アカウントを登録
-          </Button>
-        ) : null}
+        createAction={createAccount}
         heading="タグ"
         rows={folderRows}
         activeId={tag}
-        onSelect={(id) => { setTag(id); resetPage() }}
+        onSelect={selectTag}
         onAddFolder={canManage ? () => { setTagName(''); setTagColor(''); setTagError(''); setTagDialog(true) } : undefined}
         addFolderLabel="タグを追加"
       >
@@ -440,7 +443,7 @@ export default function HqHomeV8() {
             return (
               <article key={account.id} className={warned ? `${styles.card} ${styles.cardWarn}` : styles.card} aria-label={name}>
                 <div className={styles.cardHead}>
-                  <span className={styles.logo} aria-hidden="true">{name.slice(0, 1)}</span>
+                  <span className={styles.logo} aria-hidden="true">{brandInitial(name)}</span>
                   <div className={styles.cardName}>
                     {/* 絵 `JKjsE`：名前の前に左の列（タグ）の色の丸。付けたタグが無ければ色の無い輪。 */}
                     <p className={styles.name} title={name}>
@@ -465,6 +468,8 @@ export default function HqHomeV8() {
                     <dd>{`${formatNumber(account.stats?.messagesThisMonth ?? 0)} 通`}</dd>
                   </div>
                 </dl>
+                {/* 絵 JKjsE の「すき間（ボタンを下にそろえる）」。 */}
+                <span className={styles.cardGap} aria-hidden="true" />
                 {cardActions(account)}
                 {warned ? (() => {
                   /* 要確認の理由を、引っかかった確認ごとの言葉で1行に。長ければ省略し title で全文。 */
@@ -497,7 +502,7 @@ export default function HqHomeV8() {
             return (
               <div key={account.id} className={styles.row} role="row">
                 <span role="cell" className={styles.rowName}>
-                  <span className={styles.logo} aria-hidden="true">{name.slice(0, 1)}</span>
+                  <span className={styles.logo} aria-hidden="true">{brandInitial(name)}</span>
                   <span className={styles.cardName}>
                     <span className={styles.name} title={name}>{name}</span>
                     <span className={styles.meta}>{metaOf(account)}</span>
@@ -534,6 +539,7 @@ export default function HqHomeV8() {
         </button>
       ) : undefined}
       folders={folders}
+      folderNav={{ rows: folderRows, activeId: tag, onSelect: selectTag, createAction: createAccount, label: 'タグ' }}
     >
       <div className={styles.body}>
         <PlatformNotices />

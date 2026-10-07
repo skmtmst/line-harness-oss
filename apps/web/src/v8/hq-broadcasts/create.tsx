@@ -99,6 +99,7 @@ export default function HqBroadcastCreate() {
   const canManage = role === null || canManageRole(role)
 
   const [stores, setStores] = useState<Store[] | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [tags, setTags] = useState<LineAccountTagSummary[]>([])
   const [loadError, setLoadError] = useState<unknown>(null)
   const [mode, setMode] = useState<Mode>('tag')
@@ -320,13 +321,23 @@ export default function HqBroadcastCreate() {
     )
   }
 
+  const phone = (
+    <LinePreview accountName={exampleStore} caption="今日" note={`${exampleStore}の例です。差し込みは店ごとに変わります（{予約ページ}は省いて見せています）。`}>
+      <LinePreviewMessage accountName={exampleStore} avatar={exampleStore.slice(0, 1)} time={when === 'now' ? '今' : time}>
+        {previewBody || '（本文がまだありません）'}
+      </LinePreviewMessage>
+    </LinePreview>
+  )
+  /*
+   * 白い板が 1100 未満（1280・1152 の幅）では、スマホの見本が右の列に入りきらず切れていた。
+   * 狭いときは列にボタンだけ置き、見本は窓で開く（テンプレートを作るのと同じ形）。
+   */
   const preview = (
     <div className={styles.previewCol}>
-      <LinePreview accountName={exampleStore} caption="今日" note={`${exampleStore}の例です。差し込みは店ごとに変わります（{予約ページ}は省いて見せています）。`}>
-        <LinePreviewMessage accountName={exampleStore} avatar={exampleStore.slice(0, 1)} time={when === 'now' ? '今' : time}>
-          {previewBody || '（本文がまだありません）'}
-        </LinePreviewMessage>
-      </LinePreview>
+      <div className={styles.previewToggle}>
+        <Button type="button" onClick={() => setPreviewOpen(true)}>LINEでの見え方を見る</Button>
+      </div>
+      <div className={styles.previewPhone}>{phone}</div>
     </div>
   )
 
@@ -517,6 +528,10 @@ export default function HqBroadcastCreate() {
         </div>
       </CreatePage>
       </div>
+
+      <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
+        <div className={styles.previewDialog}>{phone}</div>
+      </Dialog>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}

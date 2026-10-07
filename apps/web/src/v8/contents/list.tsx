@@ -1078,6 +1078,39 @@ export default function MediaLibraryListV8() {
     { key: 'archived', title: 'アーカイブ', icon: Archive, value: kpis.archivedTotal ?? null, unit: '件', detail: '一覧と新規選択から外したもの' },
   ]
 
+  /* 登録と取得は担当者も使える（今と同じ）。消す・移す・名前を変えるは管理者だけ。 */
+  const uploadButton = (
+    <Button type="button" variant="primary" className="v8-folder-create w-full" onClick={() => setUploadOpen(true)}>
+      <Plus size={15} aria-hidden="true" />メディアを登録する
+    </Button>
+  )
+  const selectFolder = (id: string) => {
+    setFolderFilter(id)
+    setPage(1)
+  }
+  const mediaFolderRows = [
+    // R38: 「すべて」は絞り込み前の総数。絞り込み後の件数を
+    // 入れると「すべて0・未分類2」のように母集団が混ざる。
+    // m26m: 一覧が読めていない（初回・失敗・別アカウント切替直後）の
+    // total=0 は偽ゼロなので数えない（null は数を出さない約束）。
+    { id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null },
+    ...folders.map((folder) => ({
+      id: folder.id,
+      label: folder.name,
+      // #721: フォルダ件数はAPI(itemCount)をそのまま出す。kind=media
+      // は件数未対応で来ないため「—」になる。読み込み済み範囲だけを
+      // 数える計算は、黙って別の母集団にすり替わるため廃止。
+      count: folder.itemCount ?? null,
+      color: folder.color,
+      // R37: 名前変更・削除を「…」へ接続する。権限の無い人には
+      // 押して失敗する口を見せない。
+      onEdit: canManageMedia ? () => setEditingFolder(folder) : undefined,
+      onDelete: canManageMedia ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
+      deleteNote: '削除しても、中のメディアは未分類に残ります。',
+    })),
+    { id: UNGROUPED, label: '未分類', count: unfiledCount },
+  ]
+
   return (
     <ListPage
       boardId="O7hUt7"
@@ -1108,41 +1141,14 @@ export default function MediaLibraryListV8() {
       )}
       folders={(
         <>
-          {/* 登録と取得は担当者も使える（今と同じ）。消す・移す・名前を変えるは管理者だけ。 */}
-          <Button type="button" variant="primary" className="v8-folder-create w-full" onClick={() => setUploadOpen(true)}>
-            <Plus size={15} aria-hidden="true" />メディアを登録する
-          </Button>
+          {uploadButton}
           <FolderPanel
             /* m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム #m18k と同じ形）。絞り込み後の件数は一覧側の ListRange に出す。 */
             activeId={folderFilter}
-            onSelect={(id) => {
-              setFolderFilter(id)
-              setPage(1)
-            }}
+            onSelect={selectFolder}
             /* 閲覧のみ：フォルダを追加は置かない（理由は上の閲覧のみの帯で伝える。2026-10-06 オーナー決定）。 */
             onAddFolder={canManageMedia ? () => setAddingFolder(true) : undefined}
-            rows={[
-              // R38: 「すべて」は絞り込み前の総数。絞り込み後の件数を
-              // 入れると「すべて0・未分類2」のように母集団が混ざる。
-              // m26m: 一覧が読めていない（初回・失敗・別アカウント切替直後）の
-              // total=0 は偽ゼロなので数えない（null は数を出さない約束）。
-              { id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null },
-              ...folders.map((folder) => ({
-                id: folder.id,
-                label: folder.name,
-                // #721: フォルダ件数はAPI(itemCount)をそのまま出す。kind=media
-                // は件数未対応で来ないため「—」になる。読み込み済み範囲だけを
-                // 数える計算は、黙って別の母集団にすり替わるため廃止。
-                count: folder.itemCount ?? null,
-                color: folder.color,
-                // R37: 名前変更・削除を「…」へ接続する。権限の無い人には
-                // 押して失敗する口を見せない。
-                onEdit: canManageMedia ? () => setEditingFolder(folder) : undefined,
-                onDelete: canManageMedia ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
-                deleteNote: '削除しても、中のメディアは未分類に残ります。',
-              })),
-              { id: UNGROUPED, label: '未分類', count: unfiledCount },
-            ]}
+            rows={mediaFolderRows}
           >
             {folderFailure ? (
               <div role="alert">
@@ -1184,6 +1190,7 @@ export default function MediaLibraryListV8() {
           </FolderPanel>
         </>
       )}
+      folderNav={{ rows: mediaFolderRows, activeId: folderFilter, onSelect: selectFolder, createAction: uploadButton }}
       toolbar={(
         <>
           <div className={styles.noticeRow}>
