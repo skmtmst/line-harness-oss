@@ -3817,5 +3817,124 @@
       "by": "tenant",
       "column": "tenant_id"
     }
+  },
+  "hq_broadcast_audit": {
+    "category": "retain"
+  },
+  "hq_broadcast_runs": {
+    "category": "retain"
+  },
+  "hq_broadcast_targets": {
+    "category": "retain"
+  },
+  "rt_reservation_close_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "task_id",
+      "parent": "rt_reservation_close_tasks",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_close_tasks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_store_media_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "visit_stamp_card_accounts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "visit_stamp_cards": {
+    "category": "retain"
+  },
+  "visit_stamp_checkouts": {
+    "category": "retain"
+  },
+  "visit_stamp_entries": {
+    "category": "retain"
+  },
+  "visit_stamp_paper_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "visit_stamp_redemptions": {
+    "category": "retain"
+  },
+  "visit_stamp_staff_pins": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "visit_stamp_visit_queue": {
+    "category": "global"
+  },
+  "visit_stamp_wallets": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "rt_closures": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_closure_close_tasks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "closure_id",
+      "parent": "rt_closures",
+      "parentColumn": "id"
+    }
+  },
+  "rt_closure_close_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "task_id",
+      "parent": "rt_closure_close_tasks",
+      "parentColumn": "id"
+    }
   }
 }

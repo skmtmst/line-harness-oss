@@ -531,7 +531,12 @@
     "586_outgoing_webhook_version.sql",
     "587_form_step_completion_times.sql",
     "588_company_settings.sql",
-    "589_hq_distribution_created_name.sql"
+    "589_hq_distribution_created_name.sql",
+    "594_restaurant_walk_in.sql",
+    "595_restaurant_media_links.sql",
+    "596_visit_stamps.sql",
+    "597_hq_broadcast_runs.sql",
+    "598_restaurant_closures.sql"
   ],
-  "migrationCount": 532
+  "migrationCount": 537
 }

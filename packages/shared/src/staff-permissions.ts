@@ -88,6 +88,7 @@ export interface ScopeItem {
 }
 
 export const SCOPE_ITEMS: readonly ScopeItem[] = [
+  { id: 'visit_stamps', label: '来店スタンプ', note: 'カード・押印・紙の移行', kind: 'feature', keys: ['/visit-stamps'] },
   {
     id: 'friends',
     label: '友だち',
