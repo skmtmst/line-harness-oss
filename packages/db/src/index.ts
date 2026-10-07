@@ -167,3 +167,4 @@ export * from './photo-publications';
 
 export * from './friend-summary.js';
 export * from './dashboard-activity.js';
+export * from './restaurant-inventory-rules.js';
