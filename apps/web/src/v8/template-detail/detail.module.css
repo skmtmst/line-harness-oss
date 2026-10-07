@@ -1,0 +1,109 @@
+/*
+ * ★V8 テンプレートの詳細（UTbi1・窓 Z0g3si・cuR8I）。
+ * 頭は型（PageFrame・PageHeading の「作る」）。ここは左右の列・カード・窓の中身だけ。
+ */
+.page { display: contents; }
+.backLink { display: inline-flex; align-items: center; gap: var(--tpl-eds-back-gap); color: var(--color-action); font-size: var(--text-label); font-weight: 600; text-decoration: none; }
+.backLink:hover { text-decoration: underline; }
+.loadingHead { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) 0; }
+.loading { margin: 0; padding: var(--tpl-eds-loading-pad); color: var(--color-ink-faint); font-size: var(--text-label); text-align: center; }
+
+/* 左右の列：左 余白24/28・間16、右 幅380・余白24・間14・左に線。 */
+.split { display: flex; flex: 1; min-width: 0; }
+.content { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-content-gap); min-width: 0; padding: var(--tpl-eds-content-pad); }
+.aside { display: flex; flex-direction: column; flex-shrink: 0; width: var(--tpl-eds-aside-w); padding: var(--tpl-eds-aside-pad); border-left: 1px solid var(--color-hairline); }
+.side { display: flex; flex-direction: column; gap: var(--tpl-eds-aside-gap); min-width: 0; }
+
+/* 閲覧のみの帯。 */
+.roBand { margin: 0; padding: var(--tpl-ro-band-pad); border-radius: var(--tpl-ro-band-radius); background: var(--color-info-bg); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-ro-band-lh); }
+
+/* 未公開の変更の帯（琥珀）：印18・文・比べる・公開する。 */
+.draftBand { display: flex; align-items: center; gap: var(--tpl-eds-band-gap); padding: var(--tpl-eds-band-pad); border-radius: var(--radius-card); background: var(--color-status-warn-soft); }
+.draftIcon { flex-shrink: 0; color: var(--color-warning); }
+.draftText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-title-gap); min-width: 0; }
+.draftTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-eds-band-title-lh); }
+.draftNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
+
+/* カード：枠1本・角12・余白20・間12。題 15/700・説明 12。 */
+.card { display: flex; flex-direction: column; gap: var(--tpl-eds-card-gap); padding: var(--tpl-eds-card-pad); border-radius: var(--radius-card); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); }
+.cardHead { display: flex; align-items: center; gap: var(--tpl-eds-head-gap); }
+.cardTitles { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-title-gap); min-width: 0; }
+.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-eds-card-title-lh); }
+.cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
+.bodyBox { padding: var(--tpl-eds-body-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-eds-body-lh); white-space: pre-wrap; overflow-wrap: anywhere; }
+.empty { margin: 0; color: var(--color-ink-faint); font-size: var(--text-label); text-align: center; }
+.errorText { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
+.inlineLink { color: var(--color-action); text-decoration: underline; }
+
+/* 使っている所の行：種類96・名前・版120・状態80・開く。下に線。 */
+.usageRow { display: flex; align-items: center; gap: var(--tpl-eds-row-gap); min-width: 0; padding: var(--tpl-eds-row-pad); box-shadow: var(--shadow-row-line); }
+.usageKind { flex: 0 0 var(--tpl-eds-kind-w); overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
+.usageName,
+.usageNameQuiet { flex: 1 1 0; min-width: 0; overflow: hidden; font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-eds-name-lh); text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+.usageName { color: var(--color-action); }
+.usageName:hover { text-decoration: underline; }
+.usageNameQuiet { color: var(--color-ink); }
+.usageVersion,
+.usageVersionFixed { flex: 0 0 var(--tpl-eds-ver-w); overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
+.usageState { flex: 0 0 var(--tpl-eds-state-w); overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
+.ghostButton { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: var(--tpl-eds-ghost-gap); height: var(--tpl-eds-ghost-h); padding: var(--tpl-eds-ghost-pad); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-chip-label-lh); text-decoration: none; white-space: nowrap; cursor: pointer; }
+.ghostButton:hover { background: var(--color-surface-pearl); }
+.ghostSpacer { flex: 0 0 var(--tpl-eds-ghost-h); }
+.moreRow { display: flex; justify-content: center; }
+
+/* 版の履歴：下書きは琥珀・いまの版は薄い緑・前の版は枠。角10・余白10/12・間12。 */
+.versionDraft,
+.versionInUse,
+.versionPast { display: flex; align-items: center; gap: var(--tpl-eds-row-gap); padding: var(--tpl-eds-ver-pad); border-radius: var(--radius-control); }
+.versionDraft { background: var(--color-status-warn-soft); }
+.versionInUse { background: var(--color-success-bg); }
+.versionPast { outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+.versionNum { flex-shrink: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-eds-name-lh); }
+.versionText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-title-gap); min-width: 0; }
+.versionLabel { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-eds-name-lh); }
+.versionMeta { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-eds-ver-meta-lh); }
+.versionActions { display: flex; flex-shrink: 0; gap: var(--tpl-eds-row-gap); }
+.versionError { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-eds-head-gap); }
+
+/* 右の列：操作（一斉配信で使う・複製する は同じ幅、…は36角）。 */
+.sideActions { display: flex; gap: var(--tpl-eds-side-actions-gap); }
+.sideActions > :not(.moreButton) { flex: 1 1 0; min-width: 0; }
+.moreButton { display: inline-flex; flex: 0 0 var(--tpl-eds-more); align-items: center; justify-content: center; height: var(--tpl-eds-more); padding: 0; border: 0; border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); color: var(--color-ink); cursor: pointer; }
+.moreButton:hover { background: var(--color-surface-pearl); }
+.aboutBox { display: flex; flex-direction: column; gap: var(--tpl-eds-about-gap); padding: var(--tpl-eds-about-pad); border-radius: var(--radius-card); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+.aboutTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-eds-band-title-lh); }
+.aboutList { display: flex; flex-direction: column; gap: var(--tpl-eds-about-gap); margin: 0; }
+.aboutRow { display: flex; align-items: center; gap: var(--tpl-eds-about-row-gap); padding: var(--tpl-eds-about-row-pad); box-shadow: var(--shadow-row-line); }
+.aboutRow > dt { flex: 1 1 auto; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); white-space: nowrap; }
+.aboutRow > dd { min-width: 0; margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
+.flexError { padding: var(--tpl-eds-body-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); }
+.flexErrorTitle { margin: 0; color: var(--color-danger); font-size: var(--text-caption); font-weight: 600; }
+.flexErrorNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+
+/* スマホの中の届いた吹き出し（アイコン34・名前10・吹き出し 幅200・11.5/18・時刻9）。 */
+.talkRow { display: flex; gap: var(--tpl-label-tag-gap); }
+.talkIcon { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: var(--tpl-ar-cv-talk-icon); height: var(--tpl-ar-cv-talk-icon); border-radius: var(--radius-pill); background: var(--color-success); color: var(--v8-line-chrome); font-size: var(--text-body); font-weight: 700; }
+.talkCol { display: flex; flex-direction: column; gap: var(--tpl-ar-cv-talk-gap); min-width: 0; }
+.talkName { color: var(--v8-line-sender); font-size: var(--tpl-ar-cv-talk-name-size); }
+.talkBubbleRow { display: flex; align-items: flex-end; gap: var(--tpl-sub-gap); }
+.talkBubble { width: var(--tpl-ar-cv-talk-bubble-w); margin: 0; padding: var(--tpl-ar-cv-talk-bubble-pad); border-radius: var(--v8-line-bubble-in-radius); background: var(--v8-line-chrome); color: var(--color-ink); font-size: var(--tpl-ar-cv-talk-text-size); line-height: var(--tpl-ar-cv-talk-text-lh); white-space: pre-wrap; overflow-wrap: anywhere; }
+.talkTime { color: var(--v8-line-time); font-size: var(--tpl-ar-cv-talk-time-size); white-space: nowrap; }
+
+/* 窓の中身：行は 余白8/0・間12・下に線。もっとは 12・上6。変わるところは 薄い地・余白14・間6。 */
+.dialogBody { display: flex; flex-direction: column; align-self: stretch; gap: var(--tpl-eds-dialog-gap); width: 100%; }
+.dialogList { display: flex; flex-direction: column; align-self: stretch; width: 100%; }
+.dialogRow,
+.blockedRow { display: flex; align-items: center; gap: var(--tpl-eds-row-gap); min-width: 0; padding: var(--tpl-eds-dialog-row-pad); box-shadow: var(--shadow-row-line); }
+.dialogName { flex: 1 1 0; min-width: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-eds-name-lh); text-overflow: ellipsis; white-space: nowrap; }
+.dialogState { flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); white-space: nowrap; }
+.dialogMore { margin: 0; padding: var(--tpl-eds-dialog-more-pad); color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
+/* 型の窓は中身の下に余白24。絵は中身とボタンの間が14なので、ボタンの段を上へ寄せ、下に余白24を持つ。 */
+.dialogFooter { display: flex; justify-content: center; gap: var(--tpl-eds-side-actions-gap); width: 100%; margin-top: var(--tpl-eds-dialog-footer-pull); padding: var(--tpl-eds-dialog-footer-pad); }
+.changeBox { display: flex; flex-direction: column; gap: var(--tpl-eds-change-gap); padding: var(--tpl-eds-change-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); }
+.changeTitle { margin: 0; color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-eds-note-lh); }
+.changeRemoved,
+.changeAdded,
+.changeSame { margin: 0; font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); white-space: pre-wrap; overflow-wrap: anywhere; }
+.changeRemoved { color: var(--color-status-danger); }
+.changeAdded { color: var(--color-accent-deep); }
+.changeSame { color: var(--color-ink-faint); }

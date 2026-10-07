@@ -25,7 +25,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import QuestionTemplateV8 from '../question-v8'
+import QuestionTemplateV8 from '@/v8/templates/question-new'
 
 function displayText(value: string): string {
   return value

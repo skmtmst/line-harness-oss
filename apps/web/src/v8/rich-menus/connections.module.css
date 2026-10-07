@@ -1,0 +1,251 @@
+/*
+ * ★V8 リッチメニュー 切替のつながり（wxIQ7）。枠・頭・本文の余白・右の列は型（CreatePage）が持つ。
+ * ここは段のカード（枠1・角12・余白20・間12）、メニューのカード（幅170・画像80）、行き来の札（幅96）、右の箱だけ。
+ */
+.backLink {
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-back-lh);
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-side-gap);
+  padding: var(--tpl-cn-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-card-head-gap);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-cn-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-cn-card-title-lh);
+}
+
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.map {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  row-gap: var(--tpl-tg2-side-gap);
+  padding: var(--tpl-tg2-map-pad);
+}
+
+.mapPair {
+  display: flex;
+  align-items: center;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-field-gap);
+  width: var(--tpl-tg2-menu-w);
+  padding: var(--tpl-cn-field-row-gap);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.menu[data-entry] {
+  outline: var(--tpl-tag-ring) solid var(--color-accent-deep);
+  outline-offset: calc(var(--tpl-tag-ring) * -1);
+}
+
+.menu[data-broken] {
+  outline-color: var(--color-warning);
+}
+
+.menuImage {
+  height: var(--tpl-tg2-menu-image-h);
+  border-radius: var(--radius-mini);
+  background: var(--color-table-head);
+}
+
+.menuName {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-cn-name-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menuSub {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tg2-safety-body-size);
+  line-height: var(--tpl-cn-sub-lh);
+}
+
+.link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-tg2-card-head-gap);
+  width: var(--tpl-tg2-link-w);
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-tg2-safety-body-size);
+  font-weight: 600;
+  line-height: var(--tpl-cn-sub-lh);
+  text-align: center;
+}
+
+.linkIcon {
+  width: var(--tpl-tg2-link-icon-w);
+  height: var(--tpl-tg2-link-icon-h);
+}
+
+.addRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-tg2-option-gap);
+}
+
+.count {
+  margin-left: auto;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.warn {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-tg2-swatch-gap);
+  padding: var(--tpl-tg2-warn-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+  color: var(--color-ink);
+}
+
+.warnText {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: var(--text-caption);
+}
+
+.icon {
+  width: var(--tpl-tag-ro-icon);
+  height: var(--tpl-tag-ro-icon);
+  flex-shrink: 0;
+}
+
+.check {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tpl-tg2-option-gap);
+  padding: var(--tpl-tg2-check-pad);
+  border-bottom: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.check > strong {
+  font-weight: 600;
+}
+
+.bad {
+  color: var(--color-danger);
+}
+
+/* 右の列。 */
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-card-gap);
+  width: 100%;
+}
+
+.asideActions {
+  display: flex;
+  gap: var(--tpl-tg2-option-gap);
+}
+
+.asideButton {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+.menuAnchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.moreButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-cn-control-h);
+  height: var(--tpl-cn-control-h);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-box-gap);
+  padding: var(--tpl-tg2-side-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.boxTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-cn-name-lh);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tpl-tg2-option-gap);
+  padding: var(--tpl-tg2-check-pad);
+  border-bottom: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.row > strong {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -3,9 +3,6 @@
 import { Suspense } from 'react'
 import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
 import TagsListV8 from '@/v8/tags/list'
-import FieldsTabV8 from './fields-tab-v8'
-import MarksTabV8 from './marks-v8'
-import SearchesTabV8 from './searches-v8'
 import { useAccount } from '@/contexts/account-context'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
@@ -30,15 +27,6 @@ export default function TagsPage() {
         {theme === 'v8' ? (
           <TagsListV8
             accountId={selectedAccountId}
-            renderTab={(tab, { accountId, canEdit }) =>
-              tab === 'fields' ? (
-                <FieldsTabV8 accountId={accountId} canEdit={canEdit} />
-              ) : tab === 'marks' ? (
-                <MarksTabV8 accountId={accountId} canEdit={canEdit} />
-              ) : (
-                <SearchesTabV8 accountId={accountId} canEdit={canEdit} />
-              )
-            }
           />
         ) : (
           <TagsPageV4 accountId={selectedAccountId} />

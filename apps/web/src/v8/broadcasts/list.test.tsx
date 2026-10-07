@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 一斉配信一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
- * 行が出る・言葉で絞れる・札と並びが口へ渡る・閲覧のみは帯が出て作るボタンを出さない。
+ * 行が出る・言葉で絞れる・札と並びが口へ渡る・閲覧のみは帯が出て作れない。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'

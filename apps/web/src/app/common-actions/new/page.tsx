@@ -18,7 +18,7 @@ import { TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import { CommonActionNewV8 } from '../common-action-new-v8'
+import { CommonActionNew as CommonActionNewV8 } from '@/v8/automations/common-action-new'
 import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from '../branch-editor'
 import { mergeOrderedActions, stepNumbers } from '../action-order'
 

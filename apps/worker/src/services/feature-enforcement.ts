@@ -56,6 +56,22 @@ export type FeatureJobMetadata = {
 export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   {name:'booking waitlist expiry and promotion',classification:{kind:'core',reason:'人・席の待ちの期限と先着順を保つ'},enforcement:{mode:'exempt',reason:'保存済みの待ちの後始末。LINE送信はsendAutomaticBookingLineで機能停止・外部更新停止を個別判定する'}},
   {
+    name: 'booking sync notices',
+    classification: { kind: 'feature', featureId: 'booking' },
+    enforcement: {
+      mode: 'gated',
+      sources: [
+        'apps/worker/src/services/booking-sync-rules.ts',
+        'apps/worker/src/services/booking-automatic-line.ts',
+      ],
+      markers: [
+        "featureId:'booking'",
+        'featureJobCanRun(db,',
+        "featureId:input.featureId,job:'予約の自動通知'",
+      ],
+    },
+  },
+  {
     name: 'follower import continuation',
     classification: { kind: 'core', reason: 'LINEアカウント登録後の既存友だちの取り込み継続' },
     enforcement: { mode: 'exempt', reason: '登録処理の後半で、個別機能の有効・無効には属さない' },

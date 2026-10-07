@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react'
 import EditTagPageV4 from '@/components/friend-fields/edit-tag-page-v4'
-import EditTagPageV8 from '../edit-tag-page-v8'
+import EditTagPageV8 from '@/v8/tag-edit/edit'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /** v8 テーマのときだけ新しい編集画面（edit-tag-page-v8）。v7 は無変更。 */
