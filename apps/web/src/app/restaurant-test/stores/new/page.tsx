@@ -16,6 +16,8 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import { formatDay } from '@/lib/format'
 import Button from '@/components/shared/button'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import StoreNewV8 from '@/v8/restaurant/store-new/store-new'
 
 const steps = [
   ['利用規約への同意', 'musuboの利用規約と、個人情報の取扱いをご確認ください。'],
@@ -78,7 +80,8 @@ function Field({
   </div>
 }
 
-export default function NewRestaurantStorePage() {
+/** v7 の店舗を追加（V8 は src/v8/restaurant/store-new）。 */
+function NewRestaurantStorePageV7() {
   usePageTitle('店舗を追加')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -281,4 +284,10 @@ export default function NewRestaurantStorePage() {
     {/* R161 監査：店舗名などの書きかけがある間の離脱確認。 */}
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した店舗の内容" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </div>
+}
+
+/* ★V8 切替（板 `ao15G`・`faGn4`）。v7 の見た目は data-theme="v8" が付くまで変えない。 */
+export default function NewRestaurantStorePage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <StoreNewV8 /> : <NewRestaurantStorePageV7 />
 }

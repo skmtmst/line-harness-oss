@@ -18,13 +18,8 @@ const SHARED = dirname(fileURLToPath(import.meta.url))
 const GLOBALS = readFileSync(join(SHARED, '..', '..', 'app', 'globals.css'), 'utf8')
 
 /** V7 より前から ms を直書きしている部品。トークンへ移したら消す。 */
-const BASELINE = [
-  'filter-chip.css',
-  'list-state.module.css',
-  'radio-card.module.css',
-  'search-field.module.css',
-  'kpi-card.module.css',
-]
+/* 2026-10-07 動きの点検 18 番で5本とも --motion-* へ移した。増やさない。 */
+const BASELINE: string[] = []
 
 function rawDurationDeclarations(css: string): string[] {
   return (css.replace(/\/\*[\s\S]*?\*\//g, '').match(/(?:transition|animation)[\w-]*\s*:[^;]*;/g) ?? [])

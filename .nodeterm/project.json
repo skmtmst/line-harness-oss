@@ -195,7 +195,7 @@
       "group": null,
       "collapsed": false,
       "parentId": "grp-hq",
-      "text": "あなたは司令塔(Fable 5.1)。まず docs/brain/Home.md を読み、docs/v6-orchestration-nodeterm.md §4 の流れで台帳(GitHub Issues)を回す。"
+      "text": "あなたは司令塔(Fable 5.1)。まず docs/brain/Home.md を読み、AGENTS.md の役割（司令塔）で台帳(GitHub Issues)を回す。"
     },
     {
       "id": "agent-s0",
@@ -237,7 +237,7 @@
       "group": null,
       "collapsed": false,
       "parentId": "grp-s0",
-      "text": "あなたは S0(共通部品)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S0 共通部品」の指示で動く。lane:s0 の todo を 1 件取って始める。"
+      "text": "あなたは S0(共通部品)。まず docs/brain/Home.md を読み、docs/v8-design-rules.md と apps/web/src/v8/README.md に従って動く。lane:s0 の todo を 1 件取って始める。"
     },
     {
       "id": "agent-s1",
@@ -279,7 +279,7 @@
       "group": null,
       "collapsed": false,
       "parentId": "grp-s1",
-      "text": "あなたは S1(機能 1〜5)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S1〜S3」の指示で動く。lane:s1 の todo を 1 件取って始める。"
+      "text": "あなたは S1(機能 1〜5)。まず docs/brain/Home.md を読み、docs/v8-design-rules.md と apps/web/src/v8/README.md に従って動く。lane:s1 の todo を 1 件取って始める。"
     },
     {
       "id": "agent-s2",
@@ -321,7 +321,7 @@
       "group": null,
       "collapsed": false,
       "parentId": "grp-s2",
-      "text": "あなたは S2(機能 6〜13)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S1〜S3」の指示で動く。lane:s2 の todo を 1 件取って始める。"
+      "text": "あなたは S2(機能 6〜13)。まず docs/brain/Home.md を読み、docs/v8-design-rules.md と apps/web/src/v8/README.md に従って動く。lane:s2 の todo を 1 件取って始める。"
     },
     {
       "id": "agent-s3",
@@ -363,7 +363,7 @@
       "group": null,
       "collapsed": false,
       "parentId": "grp-s3",
-      "text": "あなたは S3(機能 14〜32)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S1〜S3」の指示で動く。lane:s3 の todo を 1 件取って始める。"
+      "text": "あなたは S3(機能 14〜32)。まず docs/brain/Home.md を読み、docs/v8-design-rules.md と apps/web/src/v8/README.md に従って動く。lane:s3 の todo を 1 件取って始める。"
     },
     {
       "id": "agent-codex",
@@ -405,7 +405,7 @@
       "group": null,
       "collapsed": false,
       "parentId": "grp-codex",
-      "text": "あなたは実装(Codex)。まず docs/brain/Home.md を読み、docs/v6-directives.md §3 の指示で動く。lane:codex の todo を 1 件取って始める。"
+      "text": "あなたは実装(Codex)。まず docs/brain/Home.md を読み、AGENTS.md の Codex の持ち場（API・DB・Worker）と docs/v8-requirements/ に従って動く。lane:codex の todo を 1 件取って始める。"
     },
     {
       "id": "trigger-morning",
@@ -454,7 +454,7 @@
           "kind": "cron",
           "expr": "0 18 * * 1-5"
         },
-        "payload": "review 列の PR を順に確認する: base が最新か、必須ゲート成功か、変更パスが lane の範囲内か。満たすものをマージして Issue を閉じる。満たさないものは理由を Issue にコメントして doing に戻す。オープン PR 数、一致画面数(docs/design-qa/v6-progress-ledger.md)、blocked の件数を Slack に 1 行で書く。docs/brain/Memory.md の「進行中」を更新する。",
+        "payload": "review 列の PR を順に確認する: base が最新か、必須ゲート成功か、変更パスが lane の範囲内か。満たすものをマージして Issue を閉じる。満たさないものは理由を Issue にコメントして doing に戻す。オープン PR 数、合格した板の数(司令塔の SWITCH-READINESS.md)、blocked の件数を Slack に 1 行で書く。docs/brain/Memory.md の「進行中」を更新する。",
         "target": "agent-hq",
         "note": "平日 18:00 に司令塔へ"
       }
@@ -648,7 +648,7 @@
       "color": "#f6ecd3",
       "group": null,
       "parentId": "grp-pen",
-      "text": "あなたは Pencil デザイン修正(lane:pen)。まず docs/brain/Home.md を読む。Pencil MCP で ★V6 を直し(docs/v6-pencil-fix-prompt.md の 50 件、優先度順)、直した画面を html-css で書き出して docs/design-reference/<機能>-v6 を更新する。lane:pen の todo を 1 件取って始める。"
+      "text": "あなたは Pencil デザイン修正(lane:pen)。まず docs/brain/Home.md を読む。Pencil MCP で ★V8 を直す（docs/v8-design-rules.md）。lane:pen の todo を 1 件取って始める。"
     },
     {
       "id": "grp-fix",

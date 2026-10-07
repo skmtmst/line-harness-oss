@@ -4,6 +4,7 @@ import { createElement, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import ListState from '@/components/shared/list-state'
 import { LIST_REQUEST_TIMEOUT_MS } from '@/lib/request-timeout'
+import { readListUrlParam, writeListUrlParam } from '@/components/shared/list-url-state'
 
 export type ServerListSort = ReadonlyArray<Readonly<{
   field: string
@@ -82,11 +83,17 @@ export function useOffsetServerList<T>({
   load,
   initialLimit = DEFAULT_LIMIT,
   requestTimeoutMs = LIST_REQUEST_TIMEOUT_MS,
+  pageUrlKey,
 }: {
   /** 絞り込み・アカウント等を直列化したキー。変わると1ページ目へ戻る。 */
   requestKey: string
   load: (request: { page: number; limit: number }, signal: AbortSignal) => Promise<ServerListResponse<T>>
   initialLimit?: number
+  /**
+   * ページを URL に置く鍵（例 `'page'`。動きの点検 5 番）。渡すと、戻る・
+   * 再読み込みで同じページに戻る。渡さなければ今までどおり内側だけで持つ。
+   */
+  pageUrlKey?: string
   /*
    * #625: 応答しない要求をこの時間で打ち切り、失敗表示＋再試行へ落とす。
    * 検索語の異常な長さや経路の沈黙で「読み込んでいます」が消えない事故を防ぐ。
@@ -97,10 +104,25 @@ export function useOffsetServerList<T>({
   const [state, setState] = useState<LoadState<T>>(() => initialState(initialLimit))
   const [retryVersion, setRetryVersion] = useState(0)
   const page = navigation.requestKey === requestKey ? navigation.page : 1
+  /*
+   * URL のページは最初に描けた一覧にだけ使う。読み込んだ直後は絞り込みの値も
+   * URL から入ってきて requestKey が一度変わるので、その切り替えでは
+   * 1 ページ目へ戻さず URL のページを使う。一覧が出た後の切り替えは今までどおり 1 へ。
+   */
+  const urlPageRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!pageUrlKey) return
+    const fromUrl = Number(readListUrlParam(pageUrlKey, '1'))
+    if (!Number.isSafeInteger(fromUrl) || fromUrl <= 1) return
+    urlPageRef.current = fromUrl
+    setNavigation((current) => ({ ...current, page: fromUrl }))
+  }, [pageUrlKey])
 
   useEffect(() => {
     if (navigation.requestKey !== requestKey) {
-      setNavigation({ requestKey, page: 1 })
+      const keep = urlPageRef.current
+      setNavigation({ requestKey, page: keep ?? 1 })
+      if (pageUrlKey && keep === null) writeListUrlParam(pageUrlKey, '')
       /*
        * ★V7 sTJsh §2: 条件の切り替えでも前の一覧を消さない。
        * 新しい答えが来るまで、いま出ている行・件数・ページ番号を
@@ -134,6 +156,7 @@ export function useOffsetServerList<T>({
     void load({ page, limit: initialLimit }, controller.signal).then(
       (response) => {
         if (controller.signal.aborted) return
+        urlPageRef.current = null
         setState({
           items: response.items,
           total: response.total ?? 0,
@@ -159,8 +182,10 @@ export function useOffsetServerList<T>({
 
   const setPage = useCallback((nextPage: number) => {
     const safePage = Number.isSafeInteger(nextPage) && nextPage > 0 ? nextPage : 1
+    urlPageRef.current = null
     setNavigation((current) => ({ ...current, page: safePage }))
-  }, [])
+    if (pageUrlKey) writeListUrlParam(pageUrlKey, safePage > 1 ? String(safePage) : '')
+  }, [pageUrlKey])
   const retry = useCallback(() => setRetryVersion((version) => version + 1), [])
   const pageCount = serverListPageCount(state.total, state.limit)
 

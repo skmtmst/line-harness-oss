@@ -1,0 +1,371 @@
+/* ★V8 勤務とシフト（d5fmnM）・自分の勤務（E3YDK）・ひも付けなし（wvGke）。骨組みは layout.module.css。 */
+.fieldset {
+  display: contents;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* 担当者の切り替え：選ぶ欄（幅500）と右の一言（下にそろえる）。 */
+.switcherRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-bks-row-gap);
+}
+
+.switcherField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bks-field-gap);
+  width: var(--tpl-bks-pick-w);
+  min-width: 0;
+}
+
+.selectBox { display: block; width: 100%; }
+.selectBox :global(*) { max-width: 100%; }
+
+.switcherNote {
+  width: var(--tpl-bks-pick-note-w);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-bks-desc-lh);
+}
+
+/* 本人のひも付けの帯（灰の地）。 */
+.linkBand {
+  margin: 0;
+  padding: var(--tpl-bks-link-band-pad);
+  border-radius: var(--tpl-bks-link-band-radius);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-bks-note-lh);
+}
+
+/* いつもの勤務時間の1行：曜日28・つまみ・出る/休み44・時刻84〜時刻84（間12）。 */
+.dayRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bks-row-gap);
+  min-height: var(--tpl-bks-switch-h);
+}
+
+.dayRow[data-on] { min-height: var(--tpl-bks-input-h); }
+
+.dayName {
+  flex-shrink: 0;
+  width: var(--tpl-bks-day-w);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-bks-switch-lh);
+}
+
+.dayState {
+  flex-shrink: 0;
+  width: var(--tpl-bks-day-state-w);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-bks-switch-lh);
+}
+
+.dayState[data-off] { color: var(--color-ink-secondary); }
+
+.offNote {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-bks-desc-lh);
+}
+
+.tilde {
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-bks-switch-lh);
+}
+
+/* 時刻の欄（共通の TimeField を幅84・高さ36・時計と×なしで使う）。 */
+.time {
+  flex: 0 0 var(--tpl-bks-time-w);
+  width: var(--tpl-bks-time-w);
+}
+
+.time > button[aria-haspopup] {
+  height: var(--tpl-bks-input-h);
+  padding: var(--tpl-bks-time-pad);
+  border: 0;
+  border-radius: var(--tpl-bks-time-radius);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  font-size: var(--text-label);
+  line-height: var(--tpl-bks-switch-lh);
+}
+
+.time > button[aria-haspopup] > svg,
+.time > button[aria-label='時刻を消す'] { display: none; }
+
+/* 休憩の1行：曜日のまとまり72・時刻〜時刻・ごみ箱。 */
+.breakRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bks-row-gap);
+}
+
+.daysPick {
+  position: relative;
+  flex-shrink: 0;
+  width: var(--tpl-bks-break-label-w);
+}
+
+.daysButton {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 0;
+  height: var(--tpl-bks-input-h);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-label);
+  line-height: var(--tpl-bks-switch-lh);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.daysButton:hover { color: var(--color-action); text-decoration: underline; }
+
+.daysPanel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  display: flex;
+  gap: var(--tpl-bks-row-gap);
+  padding: var(--tpl-bks-link-band-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-controls-pop);
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tpl-bks-icon-btn);
+  height: var(--tpl-bks-icon-btn);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.iconButton:hover { background: var(--color-canvas-sunken); color: var(--color-danger); }
+.icon { width: var(--tpl-bks-icon); height: var(--tpl-bks-icon); }
+.btnIcon { width: var(--tpl-bks-btn-icon); height: var(--tpl-bks-btn-icon); flex-shrink: 0; }
+.addRow { display: flex; }
+
+/* この日だけの1行：日付100・札・メモ・ごみ箱（上下8・下に線）。 */
+.exRow { display: flex; flex-direction: column; gap: var(--tpl-bks-field-gap); border-bottom: 1px solid var(--color-divider); }
+
+.exLine {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bks-row-gap);
+  min-height: var(--tpl-bks-exc-row-h);
+  padding: var(--tpl-bks-exc-row-pad);
+}
+
+.exDate {
+  flex-shrink: 0;
+  width: var(--tpl-bks-exc-date-w);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-bks-switch-lh);
+  white-space: nowrap;
+}
+
+.exMemo {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-bks-switch-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exEdit { display: flex; align-items: center; gap: var(--tpl-bks-row-gap); padding-bottom: var(--tpl-bks-row-gap); }
+
+/* 状態の札（点つき）。休み＝灰、シフト・つながっている＝緑、休憩＝青。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--tpl-bks-pill-gap);
+  min-height: 0;
+  padding: var(--tpl-bks-pill-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-v8-pill-off);
+  color: var(--color-ink-secondary);
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-bks-pill-lh);
+  white-space: nowrap;
+}
+
+button.pill { cursor: pointer; }
+.pill[data-tone='on'] { background: var(--color-success-bg); color: var(--color-success); }
+.pill[data-tone='break'] { background: var(--color-info-bg); color: var(--color-action); }
+.pillDot { width: var(--tpl-bks-pill-dot); height: var(--tpl-bks-pill-dot); border-radius: var(--radius-pill); background: currentColor; }
+
+.dayAdd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-bks-row-gap);
+}
+
+.kindBox { display: block; width: var(--tpl-bks-pick-note-w); }
+.kindBox :global(*) { max-width: 100%; }
+.memo { flex: 1 1 0; }
+
+/* 日付の欄（共通の DateField を高さ36で使う）。 */
+.dateBox { display: block; width: 100%; }
+.dateBox button[aria-haspopup] {
+  height: var(--tpl-bks-input-h);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+}
+
+.genRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-bks-row-gap);
+}
+
+.genRow > .dateBox,
+.genRow > div { flex: 1 1 0; min-width: 0; }
+
+.calRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-bks-row-gap);
+}
+
+.calField { flex: 1 1 0; }
+
+.calMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-bks-card-gap);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-bks-desc-lh);
+}
+
+.calMetaError { color: var(--color-danger); }
+
+.calActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-bks-actions-gap);
+}
+
+.savedNote {
+  margin: 0;
+  color: var(--color-success);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-bks-note-lh);
+}
+
+.sideButton { width: 100%; }
+
+.marks {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--tpl-bks-pill-gap);
+}
+
+.mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--tpl-bks-pill-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-nano);
+  line-height: var(--tpl-bks-ph-dow-lh);
+}
+
+.mark [data-mark='○'] { color: var(--color-success); }
+.mark [data-mark='休'] { color: var(--color-ink-faint); }
+.markDay { color: var(--color-ink-faint); }
+
+/* 読み込み中・失敗・ひも付けなし（wvGke）：右の列なしで板の幅いっぱいのカード。 */
+.stateBody { padding: var(--tpl-bks-main-pad); }
+
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-bks-empty-gap);
+  padding: var(--tpl-bks-empty-pad);
+  border-radius: var(--tpl-bks-empty-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.stateIcon { width: var(--tpl-bks-empty-icon); height: var(--tpl-bks-empty-icon); color: var(--color-ink-secondary); stroke-width: 1.5; }
+
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bks-empty-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-bks-empty-title-lh);
+}
+
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-bks-empty-text-lh);
+}
+
+.stateActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-bks-actions-gap);
+}
+
+.stateLink {
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-bks-desc-lh);
+  text-decoration: none;
+}
+
+.stateLink:hover { text-decoration: underline; }

@@ -25,6 +25,8 @@ import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
+import OpsTenantsV8 from '@/v8/ops/tenants'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /** 契約先アカウント（一覧）。★V6 37-3 `X9f5jy`。 */
 
@@ -49,6 +51,11 @@ const STATUS_FILTERS: Array<{ key: string; label: string }> = [
 ]
 
 export default function OpsTenantsPage() {
+  // ★V8 は src/v8/ops/tenants.tsx。v7 は下のまま。
+  return useAdminTheme() === 'v8' ? <OpsTenantsV8 /> : <OpsTenantsV7 />
+}
+
+function OpsTenantsV7() {
   const router = useRouter()
   const [rows, setRows] = useState<OpsTenantRow[]>([])
   const [summary, setSummary] = useState<OpsTenantSummary | null>(null)

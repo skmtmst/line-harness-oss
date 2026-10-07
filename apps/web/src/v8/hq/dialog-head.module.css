@@ -1,0 +1,46 @@
+/*
+ * ★V8 統括の窓（Pencil `D6fh3`・`HMpVx`・`BHEl9`・`yLKwV`）の頭と本文の寸法。
+ * 窓の枠・×・題は共通の Dialog。統括の窓は「余白24・題17/太字・題の行は×と同じ高さ36・説明12/18・
+ * 本文との間14」で描かれているので、この印（.head）を本文の外枠に付けた窓だけを絵に合わせる。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
+ */
+:global([data-theme='v8'] [data-design-part='dialog']):has(.head) > :global(div:first-child) {
+  padding: var(--tpl-hq-dialog-head-pad);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.head) :global(h2) {
+  font-size: var(--tpl-hq-dialog-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-hq-dialog-title-lh);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.head) :global(h2 + p) {
+  margin-top: var(--tpl-hq-dialog-desc-gap);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-contract-lh);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.head) > :global(div:nth-child(2)) {
+  padding: var(--tpl-hq-dialog-content-pad);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-body-gap);
+}
+
+/* 下の帯（線の上12・窓の余白24）。真ん中寄せ・左右に分けるは画面が選ぶ。 */
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-plan-head-gap);
+  margin: var(--tpl-hq-dialog-foot-margin);
+  padding-top: var(--tpl-hq-form-gap);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.footerCenter { justify-content: center; }
+.footerSplit { justify-content: space-between; }
+.footerEnd { justify-content: flex-end; }
+.footerGroup { display: flex; align-items: center; gap: var(--tpl-hq-plan-head-gap); }

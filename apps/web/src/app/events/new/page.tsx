@@ -7,7 +7,7 @@ import { useAccount } from '@/contexts/account-context'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
-import EventsNewV8 from './events-new-v8'
+import EventsCreateV8 from '@/v8/events/create'
 
 function NewEventPageInner() {
   const { selectedAccountId } = useAccount()
@@ -36,16 +36,9 @@ function NewEventPageInner() {
   )
 }
 
+/* ★V8（板 `d4adD4`）：1枚で作り終える新しい画面（src/v8/events/create.tsx）。 */
 function NewEventPageInnerV8() {
-  const { selectedAccountId } = useAccount()
-  const sp = useSearchParams()
-
-  // ①を保存するとイベントが実在するので、以降は ?id= を連れて進む。
-  const eventId = sp.get('id')
-  const parsed = Number(sp.get('step') ?? '1')
-  const step = parsed === 2 || parsed === 3 ? (parsed as 2 | 3) : 1
-
-  return <EventsNewV8 accountId={selectedAccountId} eventId={eventId} step={step} />
+  return <EventsCreateV8 />
 }
 
 /*

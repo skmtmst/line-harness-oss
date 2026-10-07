@@ -14,7 +14,11 @@
  * 移る（v7 の引き出しは V8 の詳細画面に置き換わる）。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
+import { RovingTbody } from '@/components/shared/row-roving'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -326,17 +330,20 @@ export default function TemplatesListV8() {
   const [loading, setLoading] = useState(true)
   /** 一覧を読み込めなかった理由。取得失敗と権限不足を分ける。 */
   const [failure, setFailure] = useState<TemplatesFailure | null>(null)
-  const [templateQuery, setTemplateQuery] = useState('')
+  /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
+  const [templateQuery, setTemplateQuery] = useListUrlParam('q')
   const [chips, setChips] = useState<Record<ChipKey, boolean>>({
     single: false,
     multiple: false,
     variables: false,
     unused: false,
   })
-  const [savedFilter, setSavedFilter] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [savedFilter, setSavedFilter] = useListUrlParam('view')
+  const [selectedCategory, setSelectedCategory] = useListUrlParam('folder', 'all')
   const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageParam, setPageParam] = useListUrlParam('page', '1')
+  const page = Math.max(1, Number.parseInt(pageParam, 10) || 1)
+  const setPage = useCallback((next: number) => setPageParam(String(next)), [setPageParam])
 
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
@@ -351,6 +358,7 @@ export default function TemplatesListV8() {
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
+  const deferredDelete = useDeferredDelete()
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   /** 使っている所があるので削除できない窓（`Z0g3si`）。中身は usage 口で取る。 */
@@ -382,12 +390,16 @@ export default function TemplatesListV8() {
   const activeAccountRef = useRef<string | null>(selectedAccountId)
   const loadGenerationRef = useRef(0)
 
+  const previousAccountRef = useRef(selectedAccountId)
   useEffect(() => {
     activeAccountRef.current = selectedAccountId
     // フォルダはアカウント単位。切り替えたら前のアカウントの帯も選択も残さない（N-147）。
+    // 最初の描画では URL のフォルダ・ページを残す（戻ると同じ一覧に戻る）。
+    const switched = Boolean(previousAccountRef.current) && previousAccountRef.current !== selectedAccountId
+    previousAccountRef.current = selectedAccountId
     setFolders([])
     setUnfiledCount(null)
-    setSelectedCategory('all')
+    if (switched) setSelectedCategory('all')
     setFolderDialogOpen(false)
     setEditingFolder(null)
     setDeletingFolder(null)
@@ -400,7 +412,7 @@ export default function TemplatesListV8() {
     setDuplicateTarget(null)
     setOpenMenuId(null)
     setSelectedIds(new Set())
-    setPage(1)
+    if (switched) setPage(1)
   }, [selectedAccountId])
 
   const load = useCallback(async () => {
@@ -541,8 +553,10 @@ export default function TemplatesListV8() {
     if (savedFilter === 'used' && !(t.usageCount > 0)) return []
     if (savedFilter === 'draft-changes' && !(t.hasDraft && t.publishedAt != null)) return []
     if (savedFilter === 'draft-only' && t.publishedAt != null) return []
+    // 消して「元に戻す」を待っている行は出さない（動きの点検 17 番）。
+    if (deferredDelete.isHidden(t.id)) return []
     return [t]
-  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, chips, savedFilter])
+  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, chips, savedFilter, deferredDelete])
 
   const filterActive = Boolean(
     normalizedTemplateQuery
@@ -577,9 +591,12 @@ export default function TemplatesListV8() {
   const shownItems = filteredTemplates.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   // 絞り込みや件数の変更でページが溢れたら先頭へ戻す。
+  // 読み込みが終わる前は件数が 0 なので戻さない（URL のページを先頭へ潰さない）。
   useEffect(() => {
+    if (loading) return
     if (page > pageCount) setPage(pageCount)
-  }, [page, pageCount])
+  }, [loading, page, pageCount, setPage])
+  useListScrollMemory(!loading)
 
   // 一覧に何を出すか。**読込中・取得失敗・権限不足・空・0件を混ぜない。**
   const view = listView({
@@ -663,6 +680,9 @@ export default function TemplatesListV8() {
     })
   }
   const selectedCount = selectedIds.size
+  // 選んでいる間は Esc で選択を外す（動きの点検 12・20 番）。
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+  useEscapeToClearSelection(selectedCount > 0, clearSelection)
   const selectedTemplates = templates.filter((t) => selectedIds.has(t.id))
   /** まとめて削除は「使っていない」ものだけ。使用中が混ざると止める。 */
   const removableSelected = selectedTemplates.filter((t) => t.usageCount === 0)
@@ -714,11 +734,32 @@ export default function TemplatesListV8() {
     }
   }
 
-  // 押しただけでは消さない。窓を開くだけ。使用中なら「使っている所」の窓へ。
+  /*
+   * 使用中なら「使っている所」の窓へ。どこでも使われていない（0か所と分かっている）なら、
+   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
+   * 使っている数が分からないときは、今までどおり確かめの窓。
+   */
   const handleDelete = (t: Template) => {
     setDeleteError('')
     if (t.usageCount > 0) {
       setBlockedDelete({ item: t, accountId: selectedAccountId })
+      return
+    }
+    if (t.usageCount === 0) {
+      if (activeId === t.id) setActiveId(null)
+      setSelectedIds((current) => {
+        if (!current.has(t.id)) return current
+        const next = new Set(current)
+        next.delete(t.id)
+        return next
+      })
+      deferredDelete.schedule({
+        ids: [t.id],
+        message: `テンプレート「${t.name}」を削除しました`,
+        commit: () => api.templates.delete(t.id),
+        onCommitted: () => Promise.all([load(), loadFolders()]),
+        failureMessage: 'テンプレートを削除できませんでした。もう一度お試しください。',
+      })
       return
     }
     setPendingDelete({ item: t, accountId: selectedAccountId })
@@ -1131,7 +1172,7 @@ export default function TemplatesListV8() {
               <th aria-label="操作" />
             </tr>
           </thead>
-          <tbody>
+          <RovingTbody>
             {shownItems.map((t) => {
               const publish = publishStateOf(t)
               const kindLabel = t.question ? 'question' : t.messageType
@@ -1236,7 +1277,7 @@ export default function TemplatesListV8() {
                 </tr>
               )
             })}
-          </tbody>
+          </RovingTbody>
         </table>
       </div>
       </ContextMenu>

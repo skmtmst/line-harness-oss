@@ -201,6 +201,9 @@
   font-weight: 400;
 }
 
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 e2ekFu の説明の行）。 */
+.nameSub { padding-inline-start: var(--tpl-folder-dot-indent); }
+
 /* 板が 1100px を切ったらフォルダの列を畳む（V8 の決まり）。 */
 @container (max-width: 1099px) {
   .body {

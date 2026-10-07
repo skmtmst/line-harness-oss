@@ -17,6 +17,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
+import OpsMembersV8 from '@/v8/ops/members'
 
 /** メンバー管理。★V6 37-10 `POteo`。左下のアカウントメニューから入る。 */
 
@@ -38,6 +39,11 @@ function memberStateChip(m: OpsMember) {
 }
 
 export default function OpsMembersPage() {
+  // ★V8 は src/v8/ops/members.tsx。v7 は下のまま。
+  return useAdminTheme() === 'v8' ? <OpsMembersV8 /> : <OpsMembersV7 />
+}
+
+function OpsMembersV7() {
   const theme = useAdminTheme()
   const isV8 = theme === 'v8'
   const [members, setMembers] = useState<OpsMember[]>([])

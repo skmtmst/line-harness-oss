@@ -81,6 +81,8 @@ const V8_SECTIONS: Record<string, string[]> = {
 const V8_COPY: Record<string, Record<string, string>> = {
   '/hq/members': { '担当アカウントの割り当て': '担当範囲' },
   '/staff': { '人の名前・メールで検索': '名前・メールで探す' },
+  // ★V8 ywFJT：区分の頭のボタンは「まとめて」。
+  '/settings': { 'まとめて切替': 'まとめて' },
   '/ec-commerce': { '取り込みの記録を探す': '取り込みの記録を検索' },
   '/form-submissions': {
     '回答の保存先': '保存先',

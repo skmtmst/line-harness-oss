@@ -146,11 +146,12 @@ test('v8 の下では Pencil Q5le3 の詳細に切り替わる', async () => {
     expect(host.querySelector('[data-design-node="Q5le3"]')).toBeTruthy()
   })
   expect(host.textContent).toContain('夏のInstagram投稿')
-  expect(host.textContent).toContain('QRコードを表示')
-  expect(host.textContent).toContain('URLをコピー')
+  // ★V8 は src/v8/inflow-links/detail.tsx（絵どおり「QR コード」「URL を」の間に空白）。
+  expect(host.textContent).toContain('QR コードを表示')
+  expect(host.textContent).toContain('URL をコピー')
   expect(host.textContent).toContain('リンクを編集')
   // 数の帯
-  expect(host.textContent).toContain('今月友だちになった')
+  expect(host.textContent).toContain('今月 友だちになった')
   expect(host.textContent).toContain('成果（コンバージョン）')
   // その後と友だちの表
   expect(host.textContent).toContain('その後（この経路から来た人）')
@@ -159,7 +160,7 @@ test('v8 の下では Pencil Q5le3 の詳細に切り替わる', async () => {
   expect(host.textContent).toContain('ブロック')
   // 下の2枚
   expect(host.textContent).toContain('この経路のつながる先')
-  expect(host.textContent).toContain('QRコードを保存')
+  expect(host.textContent).toContain('QR コードを保存')
   // 青い帯の操作
   expect(host.textContent).toContain('することを変える')
 })

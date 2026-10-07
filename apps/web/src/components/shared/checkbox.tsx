@@ -7,7 +7,7 @@ import styles from './checkbox.module.css'
  * チェックボックス。Pencil ★V7 `gvjpx`「★ V7 共通 チェックボックス」。
  *
  * 一覧の選択・すぐ反映しない設定の ON/OFF に使う。すぐ反映する切替は `Toggle`。
- * 形の手本は kobra.systems の Checkbox（コードは写していない。docs/v7-reference-ui-adoption.md §5）。
+ * 形の手本は kobra.systems の Checkbox（コードは写していない）。
  *
  * - 本物の `<input type="checkbox">` を四角の上に透明に重ねる。クリック・Space・読み上げは
  *   ブラウザの標準のまま。見た目だけを ★V7 に合わせる

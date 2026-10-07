@@ -28,36 +28,9 @@
 
 /* 画面名＋手順の段は型に任せる。画面側に見出しの箱・文字の大きさを書かない。 */
 
-/* 板 `r8dGXT` の競合の帯：薄い黄色の地・濃い黄色の線・角丸 10。題は太字にしすぎない。 */
-.conflictBar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: var(--tpl-row-pad-block) var(--tpl-large-gap);
-  border: 1px solid var(--color-warning);
-  border-radius: var(--radius-control, 10px);
-  background: var(--color-status-warn-soft, #fdf3e1);
-}
-
-.conflictTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.conflictBody {
-  margin: var(--tpl-head-gap) 0 0;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-}
-
-.conflictActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+/* 板 `r8dGXT` の競合の帯の置き場。帯の見た目は共通部品（save-conflict）が持つ。 */
+.conflictSlot {
+  display: block;
 }
 
 /* 左=白カードの縦積み、右=説明カード＋スマホ。 */
@@ -708,3 +681,56 @@
 /* 段の中の間（絵どおり14・題と説明の間2）。Tailwind の半端な段の代わりに型の変数。 */
 .stackSection { gap: var(--tpl-section-gap); }
 .stackCompact { gap: var(--tpl-compact-gap); }
+
+/* 手順②（板 Z0uO6・kmTab）：外の箱に札の箱・題・画像・面の一覧を入れる。 */
+.buttonsSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-rm-section-gap);
+  min-width: 0;
+  padding: var(--tpl-hb2-rm-section-pad);
+  border-radius: var(--tpl-hb2-op-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.tabsCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-col-gap);
+  padding: var(--tpl-hb2-op-box-pad);
+  border-radius: var(--tpl-hb2-op-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.tabsTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.buttonsHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-head-gap);
+}
+
+.buttonsTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-hb2-rm-title);
+  font-weight: 700;
+  line-height: normal;
+}
+
+/* 押された回数の注意（絵：11px・行 18）。2行に収める。 */
+.tapNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hb2-op-note-lh);
+}

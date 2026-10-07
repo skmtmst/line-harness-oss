@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
+import { auditLog } from '../lib/audit-log.js';
 import {
   AD_PLATFORM_SECRET_KEYS,
+  getAdConversionRetrySource,
   getAdPlatforms,
   connectVerifiedAdPlatform,
   getAdPlatformById,
@@ -20,7 +22,7 @@ import {
 } from '@line-crm/db';
 import type { AdConversionLog } from '@line-crm/db';
 import { verifyAdPlatformReadAccess } from '../services/ad-cost-import.js';
-import { sendAdConversions } from '../services/ad-conversion.js';
+import { sendAdConversions, retryAdConversion, AdConversionRetryError } from '../services/ad-conversion.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -544,6 +546,26 @@ adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'sta
   } catch (err) {
     console.error('GET /api/ad-platforms/:id/logs error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** F-22: 再送する内容や宛先は引数で受けず、保存済みの1件を使う。 */
+adPlatforms.post('/api/ad-platforms/logs/:id/retry', requireRole('owner'), async (c) => {
+  try {
+    const row = await getAdConversionRetrySource(c.env.DB, c.req.param('id'));
+    if (!row?.line_account_id || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [row.line_account_id])) {
+      return c.json({ success: false, error: '送信記録が見つかりません' }, 404);
+    }
+    const data = await retryAdConversion(c.env.DB, {
+      logId: row.log_id, lineAccountId: row.line_account_id, credentialKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    });
+    auditLog(c, 'ad_conversion.retry', { kind: 'ad_conversion_log', id: row.log_id }, {
+      result: data.status === 'failed' ? 'failed' : 'success', lineAccountId: row.line_account_id,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof AdConversionRetryError) return c.json({ success: false, code: error.code, error: error.message }, error.status);
+    return c.json({ success: false, error: '広告への送信をやり直せませんでした' }, 500);
   }
 });
 

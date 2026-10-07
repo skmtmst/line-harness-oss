@@ -3,8 +3,7 @@
 import { Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import { V8AutoShell, type AutoV8Counts } from '@/app/automations/automations-v8'
-import { V8CommonActionsTab } from './common-actions-v8'
+import CommonActionsV8 from '@/v8/automations/common-actions'
 import { ExternalLink, MoreHorizontal, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, type CommonActionSummary } from '@/lib/api'
@@ -49,8 +48,8 @@ const STATUS_LABEL: Record<CommonActionSummary['status'], string> = {
 }
 
 /*
- * ★V8-B の切り替え。v8 の器は別ファイル（common-actions-v8.tsx）に置き、
- * v7 の器・動きはこの下の V7 のまま残す。外枠のタブは共通（automations-v8）。
+ * ★V8 の切り替え。v8 の画面は src/v8/automations/common-actions.tsx（2026-10-06 から）。
+ * v7 の器・動きはこの下の V7 のまま残す。
  */
 export default function CommonActionsPage() {
   const theme = useAdminTheme()
@@ -64,18 +63,9 @@ export default function CommonActionsPage() {
   return <CommonActionsPageV7 />
 }
 
-/* ★V8-B 共通アクションの一覧（板 `LnGNw`）。 */
+/* ★V8 共通アクションの一覧（板 `LnGNw`）。画面は src/v8/automations/common-actions.tsx。 */
 function CommonActionsPageV8() {
-  const theme = useAdminTheme()
-  const [counts, setCounts] = useState<AutoV8Counts>({})
-  if (theme !== 'v8') return null
-  return (
-    <V8AutoShell
-      tab="common-actions"
-      counts={counts}
-      render={(model) => <V8CommonActionsTab model={model} onCounts={setCounts} />}
-    />
-  )
+  return <CommonActionsV8 />
 }
 
 function CommonActionsPageV7() {

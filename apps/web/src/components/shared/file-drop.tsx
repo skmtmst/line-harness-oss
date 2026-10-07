@@ -11,7 +11,7 @@ import styles from './file-drop.module.css'
  *
  * 受信箱の返信欄・配信の画像・登録メディアの取り込みでばらばらだった見せ方をそろえる。
  * 形の手本は kobra.systems の Attachment・Magnetic Dropzone
- * （コードは写していない。docs/v7-reference-ui-adoption.md §5）。
+ * （コードは写していない）。
  * 引き寄せる動きは採らない（控えめに）。大きさは状態が変わっても変えない。
  *
  * - ボタン（「ファイルを選ぶ」）でも選べる。キーボード・スマホはここから

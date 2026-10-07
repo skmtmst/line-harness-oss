@@ -20,10 +20,8 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import './report-v8.css'
 import { TextField } from '@/components/shared/text-field'
 import HelpTip from '@/components/shared/help-tip'
-import Disclosure from '@/components/shared/disclosure'
-import Chip from '@/components/shared/chip'
-import { Check, GitCompareArrows, RefreshCw } from 'lucide-react'
-import { formatDateTime } from '@/lib/format'
+import { Check, ChevronDown, GitCompareArrows, RefreshCw, TriangleAlert } from 'lucide-react'
+import { formatDateTime, formatTime } from '@/lib/format'
 import ReportHeadV8 from './report-head-v8'
 import {
   api,
@@ -44,11 +42,11 @@ import {
 const SECTION_CHOICES: Array<{ id: AnalyticsReportSection; title: string; detail: string; unavailable?: string }> = [
   { id: 'friends', title: '友だちの増減', detail: '増えた・減った・残っている割合' },
   { id: 'reactions', title: '配信の反応', detail: '押された割合・ブロックされた割合' },
-  { id: 'routes', title: '経路と成果', detail: 'どこから来た人がいくらになったか／成果地点ごとの件数／前の期間との比べ' },
+  { id: 'routes', title: '経路と成果', detail: '流入リンクごとの友だち・成果' },
   { id: 'usage', title: '使われ方', detail: '作ったのに使っていないもの' },
   // マイルの期間別集計は未接続で、入れてもレポートは「未取得」になるだけ。
   // 新たに選ばせず、既に入っている既存レポートからは外せるようにする。
-  { id: 'mileage', title: 'マイルと紹介', detail: 'たまった・使われた・払った', unavailable: 'マイルの期間別集計はまだ接続されていません。入れても「未取得」とだけ届きます' },
+  { id: 'mileage', title: 'マイル', detail: '付けたマイル・交換', unavailable: 'まだ集計できません。入れても「未取得」とだけ届きます' },
 ]
 
 type AlertRuleDraft = { enabled: boolean; threshold: string; minimumSample: string }
@@ -106,6 +104,9 @@ const CHANNEL_LABEL: Record<string, string> = {
   email: 'メール',
   line: 'LINE',
 }
+
+/** 右の見本の行の名前（絵 H5UoIu：友だち・配信を開いた・成果）。 */
+const PREVIEW_LABEL: Partial<Record<string, string>> = { friends: '友だち', reactions: '配信を開いた', routes: '成果', mileage: 'マイル' }
 
 function sectionTitleOf(id: string): string {
   return SECTION_CHOICES.find((choice) => choice.id === id)?.title ?? id
@@ -296,6 +297,10 @@ function AnalyticsReportFormPage() {
   const [emailEnabled, setEmailEnabled] = useState(false)
   const [lineEnabled, setLineEnabled] = useState(false)
   const [alertsEnabled, setAlertsEnabled] = useState(true)
+  // 「＋ 保存した分析を選ぶ」「＋ 宛先を足す」「通知方法」で開く欄（中身は閉じていても置いておく）。
+  const [savedOpen, setSavedOpen] = useState(false)
+  const [recipientsOpen, setRecipientsOpen] = useState(false)
+  const [channelsOpen, setChannelsOpen] = useState(false)
   // 知らせの決めごとは件の条件ごとに on/off と数値を持つ。固定表示だったものを
   // 編集できるようにする(点検のN-285)。
   const [alertDrafts, setAlertDrafts] = useState<Record<string, AlertRuleDraft>>(() => defaultAlertDrafts(true))
@@ -992,14 +997,20 @@ function AnalyticsReportFormPage() {
     <div className="report-v8-page" data-design-node={updateConflict ? 'G83vi' : 'H5UoIu'}>
       <ReportHeadV8 editing={Boolean(editing)} />
       {updateConflict && (
-        <Notice tone="warn" className="report-v8-conflict" role="alert" action={<div className="report-v8-conflictActions">
-          {conflictLatest && <Button variant="secondary" disabled={saving || latestBusy || compareBusy} onClick={() => { setCompareError(''); setCompareOpen(true) }}><GitCompareArrows size={15} aria-hidden="true" />違いを比べる</Button>}
-          <Button variant="secondary" disabled={saving || latestBusy || compareBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-        </div>}>
-          <p className="report-v8-conflictTitle">ほかの人がこのレポートを先に保存しました</p>
-          <p className="report-v8-conflictSub">入力は残っています。相手の変更を確認してから保存してください。</p>
-          {conflictLatest && <p className="report-v8-conflictSub">最新の保存時刻：<time dateTime={conflictLatest.updatedAt}>{formatDateTime(conflictLatest.updatedAt)}</time></p>}
-        </Notice>
+        /* G83vi：板の頭の下に、だれがいつ保存したかと、比べる・読み込む操作の帯。 */
+        <div className="report-v8-conflictWrap">
+          <div className="report-v8-conflict" role="alert">
+            <TriangleAlert size={16} aria-hidden="true" className="report-v8-conflictIcon" />
+            <div className="report-v8-conflictText">
+              <p className="report-v8-conflictTitle">{conflictLatest ? <>ほかの人が <time dateTime={conflictLatest.updatedAt} title={formatDateTime(conflictLatest.updatedAt)}>{formatTime(conflictLatest.updatedAt)}</time> にこのレポートを保存しました</> : 'ほかの人がこのレポートを先に保存しました'}</p>
+              <p className="report-v8-conflictSub">このまま保存すると、相手の変更が消えます。入力は残っています。</p>
+            </div>
+            <div className="report-v8-conflictActions">
+              {conflictLatest && <Button variant="secondary" disabled={saving || latestBusy || compareBusy} onClick={() => { setCompareError(''); setCompareOpen(true) }}><GitCompareArrows size={15} aria-hidden="true" />違いを比べる</Button>}
+              <Button variant="secondary" disabled={saving || latestBusy || compareBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
+            </div>
+          </div>
+        </div>
       )}
       {!canManage && <Notice tone="info" message="運用担当は内容を確認できます。作成は統括または管理者が行います。" />}
       {error && <Notice tone="danger" message={error} onClose={() => setError('')} />}
@@ -1016,38 +1027,51 @@ function AnalyticsReportFormPage() {
           <legend className="sr-only">レポートの設定</legend>
           <section className="report-v8-card">
             <h2 className="report-v8-cardTitle">名前を付けます</h2>
-            <label className="report-v8-field">
-              <span className="report-v8-label">レポートの名前<span className="report-v8-required">必須</span><HelpTip label="レポートの名前">複数作るときに区別できる名前を付けてください。</HelpTip></span>
+            <label className="report-v8-field report-v8-inputField">
+              <span className="report-v8-label">名前</span>
               <TextField value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例: 週次まとめ" aria-invalid={nameError ? true : undefined} />
             </label>
             {nameError && <p className="report-v8-fieldError" role="alert">{nameError}</p>}
           </section>
           <section className="report-v8-card">
-            <h2 className="report-v8-cardTitle">何を入れますか <HelpTip label="レポートに入れるもの">チェックしたものが、この順にレポートへ並びます。</HelpTip></h2>
+            {/* 絵に無い「使われ方」は、段の頭の右に小さく置く（落とさない）。 */}
+            <div className="report-v8-cardHead">
+              <h2 className="report-v8-cardTitle">何を入れますか <HelpTip label="レポートに入れるもの">チェックしたものが、この順にレポートへ並びます。</HelpTip></h2>
+              <Checkbox className="report-v8-headCheck" checked={sections.includes('usage')} onCheckedChange={() => toggleSection('usage')}>使われ方も入れる</Checkbox>
+            </div>
             <div className="report-v8-sectionCards">
               {SECTION_CHOICES.filter((choice) => choice.id !== 'usage').map((choice) => {
                 const checked = sections.includes(choice.id)
                 const locked = Boolean(choice.unavailable) && !checked
                 return <div className="report-v8-selectionCard" key={choice.id}>
-                  <Checkbox checked={checked} disabled={locked} onCheckedChange={() => toggleSection(choice.id)} description={<>{choice.detail}{choice.unavailable && <>（{choice.unavailable}）</>}</>}><strong>{choice.title}</strong></Checkbox>
+                  <Checkbox checked={checked} disabled={locked} onCheckedChange={() => toggleSection(choice.id)}>
+                    <span className="report-v8-choice"><strong className="report-v8-choiceTitle">{choice.title}</strong><span className="report-v8-choiceDetail" title={choice.unavailable}>{choice.detail}{choice.unavailable && <>（{choice.unavailable}）</>}</span></span>
+                  </Checkbox>
                 </div>
               })}
             </div>
-            <Disclosure title="その他の集計" hint={sections.includes('usage') ? '使われ方を含めます' : '使われ方'} size="compact">
-              <Checkbox checked={sections.includes('usage')} onCheckedChange={() => toggleSection('usage')} description="作ったのに使っていないもの"><strong>使われ方</strong></Checkbox>
-            </Disclosure>
           </section>
           <section className="report-v8-card">
-            <h2 className="report-v8-cardTitle">保存した分析を添えます <HelpTip label="添える分析">選んだ分析は、送る時点の数で添えます。選ばなくても作れます。</HelpTip></h2>
+            <div className="report-v8-cardHeadStack">
+              <h2 className="report-v8-cardTitle">保存した分析を添えます</h2>
+              <p className="report-v8-cardSub">選んだ分析は、そのときの数で添えます</p>
+            </div>
             <div className="report-v8-chips">
               {savedAnalysisIds.map((id) => {
                 const item = options.savedAnalyses.find((analysis) => analysis.id === id)
-                return <Chip key={id}><span title={item?.name}>{item?.name ?? '名前を確認できません'}</span><Button size="compact" aria-label={`${item?.name ?? '分析'}を外す`} onClick={() => setSavedAnalysisIds((current) => current.filter((value) => value !== id))}>×</Button></Chip>
+                return <span className="report-v8-chip" key={id}><span className="report-v8-chipText" title={item?.name}>{item?.name ?? '名前を確認できません'}</span>{canManage && <button type="button" className="report-v8-chipRemove" aria-label={`${item?.name ?? '分析'}を外す`} onClick={() => setSavedAnalysisIds((current) => current.filter((value) => value !== id))}>×</button>}</span>
               })}
+              {savedAnalysisIds.length === 0 && <span className="report-v8-chipEmpty">{options.savedAnalyses.length > 0 ? 'まだ選んでいません。選ばなくても作れます。' : '保存した分析がありません。'}</span>}
             </div>
-            {options.savedAnalyses.length > 0 ? <Disclosure title="＋ 保存した分析を選ぶ" size="compact">
-              <div className="report-v8-sectionCards">{options.savedAnalyses.map((item) => <Checkbox key={item.id} checked={savedAnalysisIds.includes(item.id)} onCheckedChange={() => setSavedAnalysisIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])} description={item.kind === 'cross' ? 'クロス分析' : 'ファネル'}><strong>{item.name}</strong></Checkbox>)}</div>
-            </Disclosure> : <p className="report-v8-sub">保存した分析がありません。</p>}
+            {/* 閲覧のみには押せない「選ぶ」を置かない。 */}
+            {canManage && options.savedAnalyses.length > 0 && <>
+              <div className="report-v8-linkRow">
+                <button type="button" className="report-v8-addLink" aria-expanded={savedOpen} onClick={() => setSavedOpen((open) => !open)}>＋ 保存した分析を選ぶ</button>
+              </div>
+              <div className="report-v8-panel" hidden={!savedOpen}>
+                <div className="report-v8-sectionCards">{options.savedAnalyses.map((item) => <Checkbox key={item.id} checked={savedAnalysisIds.includes(item.id)} onCheckedChange={() => setSavedAnalysisIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])} description={item.kind === 'cross' ? 'クロス分析' : 'ファネル'}><strong>{item.name}</strong></Checkbox>)}</div>
+              </div>
+            </>}
           </section>
           <section className="report-v8-card">
             <h2 className="report-v8-cardTitle">だれに送りますか<span className="report-v8-required">必須</span></h2>
@@ -1055,11 +1079,17 @@ function AnalyticsReportFormPage() {
             <div className="report-v8-chips">
               {staffIds.map((id) => {
                 const person = options.recipients.find((item) => item.id === id)
-                return <Chip key={id}><span title={person?.name}>{person?.name ?? '受け取れない担当者'}</span><Button size="compact" aria-label={`${person?.name ?? '担当者'}を宛先から外す`} onClick={() => setStaffIds((current) => current.filter((value) => value !== id))}>×</Button></Chip>
+                return <span className="report-v8-chip" key={id}><span className="report-v8-chipText" title={person?.name}>{person?.name ?? '受け取れない担当者'}</span>{canManage && <button type="button" className="report-v8-chipRemove" aria-label={`${person?.name ?? '担当者'}を宛先から外す`} onClick={() => setStaffIds((current) => current.filter((value) => value !== id))}>×</button>}</span>
               })}
-              {emails.map((email, index) => email.trim() && <Chip key={index}><span title={email}>{email}</span><Button size="compact" aria-label={`${email}を宛先から外す`} onClick={() => setEmails((current) => current.filter((_, value) => value !== index))}>×</Button></Chip>)}
+              {emails.map((email, index) => email.trim() && <span className="report-v8-chip" key={index}><span className="report-v8-chipText" title={email}>{email}（メール）</span>{canManage && <button type="button" className="report-v8-chipRemove" aria-label={`${email}を宛先から外す`} onClick={() => setEmails((current) => current.filter((_, value) => value !== index))}>×</button>}</span>)}
+              {!hasRecipient && <span className="report-v8-chipEmpty">受け取る人を1人以上選んでください。選ぶまで作れません。</span>}
             </div>
-            <Disclosure title="＋ 宛先を足す" size="compact" defaultOpen={hasInvalidEmail}>
+            <div className="report-v8-linkRow">
+              {canManage && <button type="button" className="report-v8-addLink" aria-expanded={recipientsOpen} onClick={() => setRecipientsOpen((open) => !open)}>＋ 宛先を足す</button>}
+              {/* 絵に無い「通知方法」は、宛先の行の右に小さく置く（開くと下に選ぶ欄）。 */}
+              <button type="button" className="report-v8-sideLink" aria-expanded={channelsOpen} onClick={() => setChannelsOpen((open) => !open)}>通知方法：{[dashboardEnabled ? '管理画面' : '', emailEnabled ? 'メール' : '', lineEnabled ? 'LINE' : ''].filter(Boolean).join('・') || '未選択'}<ChevronDown size={14} aria-hidden="true" /></button>
+            </div>
+            <div className="report-v8-panel" hidden={!recipientsOpen && !hasInvalidEmail}>
               <ul className="report-v8-recipients divide-y" aria-label="レポートを受け取る人">
                 {options.recipients.map((person) => {
                   const checked = staffIds.includes(person.id)
@@ -1073,38 +1103,43 @@ function AnalyticsReportFormPage() {
                 </li>)}
               </ul>
               <Button variant="secondary" onClick={() => setEmails((current) => [...current, ''])}>メールだけの宛先を足す</Button>
-            </Disclosure>
-            {!hasRecipient && <p className="report-v8-sub">受け取る人を1人以上選んでください。選ぶまで作れません。</p>}
+            </div>
             {hasInvalidEmail && <p className="report-v8-fieldError">形が正しくない宛先があるため、いまのままでは作れません。</p>}
-            <Disclosure title="通知方法" hint={[dashboardEnabled ? '管理画面' : '', emailEnabled ? 'メール' : '', lineEnabled ? 'LINE' : ''].filter(Boolean).join('・') || '未選択'} size="compact">
+            <div className="report-v8-panel" hidden={!channelsOpen}>
               <div className="report-v8-sectionCards" role="group" aria-label="通知方法">
                 <Checkbox checked={dashboardEnabled} onCheckedChange={setDashboardEnabled} description="運用状態のお知らせに残します。"><strong>管理画面のお知らせにも出す</strong></Checkbox>
                 <Checkbox checked={emailEnabled} onCheckedChange={setEmailEnabled} description="宛先のメールアドレスへ送ります。担当者のメールもここで送ります。"><strong>メールでも送る</strong></Checkbox>
                 <Checkbox checked={lineEnabled} onCheckedChange={setLineEnabled} description="ログインユーザーのLINEに、要点だけを短くまとめて送ります。"><strong>LINEでも同じ内容を送る</strong></Checkbox>
               </div>
-            </Disclosure>
-          </section>
-          <section className="report-v8-card">
-            <h2 className="report-v8-cardTitle">いつ送りますか<span className="report-v8-required">必須</span><HelpTip label="送信時刻の基準">時刻は {options.timeZone} で計算します。</HelpTip></h2>
-            <div className="report-v8-scheduleGrid">
-              <label className="report-v8-field">間かく<Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="full" /></label>
-              {cadence === 'weekly' ? <label className="report-v8-field">送る曜日<Select aria-label="送る曜日" value={weekday} onChange={setWeekday} options={['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'].map((label, value) => ({ value: String(value), label }))} size="full" /></label> : <label className="report-v8-field">送る日<Select aria-label="送る日" value={monthDay} onChange={setMonthDay} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="full" /></label>}
-              <span className="report-v8-field">送る時刻<TimeField value={sendTime} onChange={setSendTime} aria-label="送る時刻" /></span>
-              <label className="report-v8-field">集計する期間<Select aria-label="集計する期間" value={periodDays} onChange={setPeriodDays} options={[{ value: '7', label: '前の7日間' }, { value: '30', label: '前の30日間' }, { value: '90', label: '前の90日間' }]} size="full" /></label>
             </div>
           </section>
           <section className="report-v8-card">
-            <h2 className="report-v8-cardTitle">知らせの決めごと <HelpTip label="変化の判定">前の期間と比べ、条件に合えばレポートに含めて知らせます。集計待ちや一部だけ取れた期間は比べません。</HelpTip></h2>
-            <Checkbox checked={alertsEnabled} onCheckedChange={setAlertsEnabled}>大きな変化を知らせる</Checkbox>
+            <h2 className="report-v8-cardTitle">いつ送りますか<HelpTip label="送信時刻の基準">時刻は {options.timeZone} で計算します。</HelpTip></h2>
+            <div className="report-v8-scheduleGrid">
+              <label className="report-v8-field">間かく<Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="full" /></label>
+              {cadence === 'weekly' ? <label className="report-v8-field">送る曜日<Select aria-label="送る曜日" value={weekday} onChange={setWeekday} options={WEEKDAY_JA.map((day, value) => ({ value: String(value), label: `${day}曜` }))} size="full" /></label> : <label className="report-v8-field">送る日<Select aria-label="送る日" value={monthDay} onChange={setMonthDay} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="full" /></label>}
+              <span className="report-v8-field">送る時刻<TimeField value={sendTime} onChange={setSendTime} aria-label="送る時刻" /></span>
+              <label className="report-v8-field">集計する期間<Select aria-label="集計する期間" value={periodDays} onChange={setPeriodDays} options={[{ value: '7', label: '前の7日' }, { value: '30', label: '前の30日' }, { value: '90', label: '前の90日' }]} size="full" /></label>
+            </div>
+          </section>
+          <section className="report-v8-card">
+            {/* 全体の入り切りは段の頭の右に小さく置く（絵は条件ごとのチェックだけ）。 */}
+            <div className="report-v8-cardHead">
+              <div className="report-v8-cardHeadStack">
+                <h2 className="report-v8-cardTitle">知らせの決めごと <HelpTip label="変化の判定">前の期間と比べ、条件に合えばレポートに含めて知らせます。集計待ちや一部だけ取れた期間は比べません。</HelpTip></h2>
+                <p className="report-v8-cardSub">数が急に動いたときだけ、すぐに知らせます。少ない数でさわがないよう、最低件数も決めます</p>
+              </div>
+              <Checkbox className="report-v8-headCheck" checked={alertsEnabled} onCheckedChange={setAlertsEnabled}>大きな変化を知らせる</Checkbox>
+            </div>
             <ul className="report-v8-alerts">
               {[...ALERT_RULE_DEFS].sort((a, b) => (a.id === 'friend_adds' ? -1 : b.id === 'friend_adds' ? 1 : 0)).map((def) => {
                 const draft = alertDrafts[def.id]
                 const fieldsDisabled = !alertsEnabled || !draft.enabled
-                return <li className="report-v8-selectionCard" key={def.id}>
-                  <Checkbox checked={draft.enabled} disabled={!alertsEnabled} aria-label={`${def.name}を使う`} onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}><strong>{def.id === 'friend_adds' ? '友だちが減った' : def.id === 'block_rate' ? 'ブロックが増えた' : '成果が0件のまま続いた'}</strong></Checkbox>
-                  <div className="report-v8-scheduleGrid">
-                    <label className="report-v8-field">{def.id === 'conversions' ? '続いた日数' : def.id === 'block_rate' ? 'ブロック率のしきい値（%）' : 'しきい値（%）'}<TextField type="number" min={0} step={def.step} inputMode="decimal" aria-label={def.thresholdLabel} value={draft.threshold} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))} /></label>
-                    <label className="report-v8-field"><span className="report-v8-label">判定に必要な最低件数<HelpTip label={`${def.name}の最低件数`}>集計できた件数が、この数以上のときだけ判定します。</HelpTip></span><TextField type="number" min={1} step={1} inputMode="numeric" aria-label={def.sampleLabel} value={draft.minimumSample} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))} /></label>
+                return <li className="report-v8-alertCard" key={def.id}>
+                  <Checkbox checked={draft.enabled} disabled={!alertsEnabled} aria-label={`${def.name}を使う`} onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}><strong className="report-v8-choiceTitle">{def.id === 'friend_adds' ? '友だちが減った' : def.id === 'block_rate' ? 'ブロックが増えた' : '成果が0件のまま続いた'}</strong></Checkbox>
+                  <div className="report-v8-alertGrid">
+                    <label className="report-v8-field report-v8-inputField"><span className="report-v8-label">{def.id === 'conversions' ? '続いた日数' : def.id === 'block_rate' ? 'ブロック率のしきい値（%）' : 'しきい値（%）'}</span><TextField type="number" min={0} step={def.step} inputMode="decimal" aria-label={def.thresholdLabel} value={draft.threshold} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))} /></label>
+                    <label className="report-v8-field report-v8-inputField"><span className="report-v8-label">判定に必要な最低件数<HelpTip label={`${def.name}の最低件数`}>集計できた件数が、この数以上のときだけ判定します。</HelpTip></span><TextField type="number" min={1} step={1} inputMode="numeric" aria-label={def.sampleLabel} value={draft.minimumSample} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))} /></label>
                   </div>
                 </li>
               })}
@@ -1113,18 +1148,19 @@ function AnalyticsReportFormPage() {
         </fieldset>
         <aside className="report-v8-rail" aria-label="届き方の見本と注意">
           <section className="report-v8-railCard">
-            <h2 className="report-v8-railTitle">{nextLabel}に、こう届きます</h2>
+            <h2 className="report-v8-railTitle">{nextLabel} に、こう届きます</h2>
             <p className="report-v8-railSub">見本</p>
-            <div className="report-v8-preview"><p className="report-v8-previewTitle">{name.trim() || '（名前なし）'}（前の{periodDays}日間）</p><div className="report-v8-previewRows">{sections.filter((id) => id !== 'usage').map((id) => <p className="report-v8-previewRow" key={id}>{sectionTitleOf(id)} <strong>送信時に集計</strong></p>)}</div><p className="report-v8-previewMore">くわしくは分析で見る</p></div>
+            <div className="report-v8-preview"><p className="report-v8-previewTitle">{name.trim() || '（名前なし）'}（前の{periodDays}日）</p>{sections.filter((id) => id !== 'usage').map((id) => <p className="report-v8-previewRow" key={id}>{PREVIEW_LABEL[id] ?? sectionTitleOf(id)} <strong>送信時に集計</strong></p>)}<p className="report-v8-previewMore">くわしくは musubo の分析で</p></div>
           </section>
-          <section className="report-v8-railCard"><h2 className="report-v8-railTitle">レポートが見ているもの</h2><ul className="report-v8-kvList"><li className="report-v8-kvRow">LINEアカウント <strong>{selectedAccount?.name ?? '選択中のアカウント'}</strong></li><li className="report-v8-kvRow">保存した分析 <strong>{savedAnalysisIds.length}件</strong></li></ul></section>
-          <section className="report-v8-railCard"><h2 className="report-v8-railTitle">気をつけること</h2><ul className="report-v8-notes"><li>数は送る時刻の時点で集めます</li><li>宛先がブロックしていると、LINEでは届きません</li></ul></section>
+          <section className="report-v8-railCard"><h2 className="report-v8-railTitle">レポートが見ているもの</h2><p className="report-v8-kvRow">LINE アカウント <strong>{selectedAccount?.name ?? '選択中のアカウント'}</strong></p><p className="report-v8-kvRow">保存した分析 <strong>{savedAnalysisIds.length} 件</strong></p></section>
+          <section className="report-v8-railCard"><h2 className="report-v8-railTitle">気をつけること</h2><ul className="report-v8-notes"><li>数は送る時刻の時点で集めます</li><li>宛先がブロックしていると、LINE では届きません</li></ul></section>
         </aside>
       </div>
       <StickyBar status={null} actions={<>
         <Button href="/analytics">キャンセル</Button>
-        {!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
-        <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>
+        {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
+        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
+        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
       </>} />
       <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy && !latestBusy) setCompareOpen(false) }} footer={<><Button variant="secondary" disabled={compareBusy || latestBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy || latestBusy || !canManage} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></>} error={compareError || undefined} busy={compareBusy || latestBusy}>
         <VersionCompare before={latestSummary} after={draftSummary} />

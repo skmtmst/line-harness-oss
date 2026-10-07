@@ -57,7 +57,10 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 
 import FileScanSettingsPage from './page'
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 const scanOf = (overrides: Partial<FileScanItem> = {}): FileScanItem => ({
   id: 'scan-1',
@@ -91,6 +94,8 @@ function ready() {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.accountId = 'acc-1'
+  // ★V8 の画面は白い板の中に「設定の中のメニュー」を置き、手元の役割（localStorage）を読む。
+  vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
 })
 
 describe('ファイルの検査の設定画面', () => {
@@ -103,7 +108,8 @@ describe('ファイルの検査の設定画面', () => {
     })
     expect(screen.getByText('川野')).toBeTruthy()
     expect(screen.getByText('危険な仕掛けが見つかりました')).toBeTruthy()
-    expect(screen.getByText('1件')).toBeTruthy()
+    // ★V8 PfA4o：件数は札「しまったファイル N」に出す。
+    expect(screen.getByRole('button', { name: /^しまったファイル \d+$/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: '使えるように戻す' })).toBeTruthy()
     // 消すは「…」の中の危ない操作として入る。
     expect(screen.getByRole('button', { name: 'invoice.pdfのその他操作' })).toBeTruthy()
@@ -116,7 +122,8 @@ describe('ファイルの検査の設定画面', () => {
     mocks.list.mockResolvedValue({ success: true, data: { items: [], total: 0, limit: 50, offset: 0 } })
     render(<FileScanSettingsPage />)
     await waitFor(() => {
-      expect(screen.getByText('当てはまるファイルがありません')).toBeTruthy()
+      // ★V8 bR6a1：しまったファイルが無いときの言い方。
+      expect(screen.getByText('しまったファイルはありません')).toBeTruthy()
     })
   })
 

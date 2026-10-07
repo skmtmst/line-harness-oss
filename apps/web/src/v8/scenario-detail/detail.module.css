@@ -1,0 +1,892 @@
+/*
+ * ★V8 シナリオ配信の編集（絵 PMLkX・nMSiE・ARuZ4・kz2B6・Al4Ek）。
+ * 寸法はすべて app/globals.css の [data-theme="v8"] の --tpl-sd-*。
+ * 外側（白い板・高さ・下の帯の居場所）は型の PageFrame が持つ。
+ */
+
+.board {
+  padding: var(--tpl-sd-loading-pad);
+}
+
+/* ── 板の頭 ─────────────────────────────── */
+.head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-sd-head-gap);
+  padding: var(--tpl-sd-head-pad);
+  /* 線は高さに数えない（絵の座標どおり）。 */
+  box-shadow: var(--tpl-sd-line-bottom);
+}
+
+.headText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-sd-head-text-gap);
+  min-width: 0;
+}
+
+.back {
+  align-self: flex-start;
+  color: var(--color-action);
+  font-size: var(--tpl-sd-back-size);
+  font-weight: 600;
+  line-height: var(--tpl-sd-back-lh);
+  text-decoration: none;
+}
+
+.back:hover {
+  text-decoration: underline;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sd-title-gap);
+  min-width: 0;
+}
+
+.title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-sd-title-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-sd-meta-size);
+  line-height: var(--tpl-sd-meta-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-sd-head-gap);
+}
+
+.iconButton {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-sd-icon-btn);
+  height: var(--tpl-sd-icon-btn);
+  padding: 0;
+  border: 0;
+  border-radius: var(--tpl-sd-icon-btn-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.iconButton:disabled {
+  color: var(--color-ink-disabled);
+  cursor: not-allowed;
+}
+
+.iconButton:focus-visible {
+  outline: 1px solid var(--color-action);
+}
+
+.iconButton > svg {
+  width: var(--tpl-sd-icon);
+  height: var(--tpl-sd-icon);
+}
+
+/* 行の「…」のメニューの目印が行の中で段を取らないよう、横並びの箱で包む。 */
+.menuBox {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+}
+
+/* ── 競合の帯（kz2B6） ─────────────────────── */
+.conflictWrap {
+  flex-shrink: 0;
+  padding: var(--tpl-sd-conflict-wrap-pad);
+}
+
+.conflictBar {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sd-conflict-gap);
+  padding: var(--tpl-sd-conflict-pad);
+  border-radius: var(--tpl-sd-oc-radius);
+  outline: 1px solid var(--color-warning);
+  outline-offset: -1px;
+  background: var(--tpl-sd-conflict-bg);
+}
+
+.conflictIcon {
+  flex-shrink: 0;
+  width: var(--tpl-sd-conflict-icon);
+  height: var(--tpl-sd-conflict-icon);
+  color: var(--color-warning);
+}
+
+.conflictText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-sd-conflict-text-gap);
+  min-width: 0;
+}
+
+.conflictTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-conflict-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-sd-conflict-title-lh);
+}
+
+.conflictBody {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sd-conflict-body-size);
+  line-height: var(--tpl-sd-conflict-body-lh);
+}
+
+/* ── 中身（左・右） ─────────────────────── */
+.body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.left {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-self: flex-start;
+  gap: var(--tpl-sd-left-gap);
+  min-width: 0;
+  padding: var(--tpl-sd-left-pad);
+}
+
+.right {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: var(--tpl-sd-right-gap);
+  box-sizing: border-box;
+  width: var(--tpl-sd-right-w);
+  padding: var(--tpl-sd-right-pad);
+  box-shadow: var(--tpl-sd-line-left);
+}
+
+.rightTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-right-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-sd-right-title-lh);
+}
+
+/* 共通のスマホが持つ題「LINEでの見え方」は、この欄では上の題が兼ねるので出さない。 */
+.phoneSlot > section > p:first-child {
+  display: none;
+}
+
+/* ── 帯（閲覧のみ・始めた直後） ───────────────── */
+.viewerBand,
+.startedBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sd-band-gap);
+  padding: var(--tpl-sd-band-pad);
+  border-radius: var(--tpl-sd-band-radius);
+  font-size: var(--tpl-sd-band-size);
+  line-height: var(--tpl-sd-band-lh);
+}
+
+.viewerBand {
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+}
+
+.startedBand {
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-sd-started-shadow);
+  color: var(--color-ink);
+}
+
+.viewerBand > svg,
+.startedBand > svg {
+  flex-shrink: 0;
+  width: var(--tpl-sd-band-icon);
+  height: var(--tpl-sd-band-icon);
+}
+
+.startedBand > svg {
+  color: var(--color-accent-deep);
+}
+
+.startedText {
+  flex: 1;
+  min-width: 0;
+}
+
+.startedLink {
+  flex-shrink: 0;
+  color: var(--color-accent-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.startedLink:hover {
+  text-decoration: underline;
+}
+
+.remainderBand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sd-remainder-gap);
+  padding: var(--tpl-sd-remainder-pad);
+  border-radius: var(--tpl-sd-card-radius);
+  outline: 1px solid var(--color-warning);
+  outline-offset: -1px;
+  background: var(--color-warning-bg);
+  font-size: var(--tpl-sd-band-size);
+}
+
+.remainderDetail {
+  color: var(--color-ink-secondary);
+}
+
+.remainderActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-sd-oc-gap);
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+.dangerLink {
+  color: var(--color-danger);
+}
+
+/* ── 3つの箱 ─────────────────────────────── */
+.stageCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-sd-cards-gap);
+}
+
+.stageCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sd-card-gap);
+  box-sizing: border-box;
+  height: var(--tpl-sd-card-h);
+  padding: var(--tpl-sd-card-pad);
+  border-radius: var(--tpl-sd-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.stageHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sd-card-head-gap);
+  margin: 0;
+}
+
+.stageNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-sd-num);
+  height: var(--tpl-sd-num);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sd-num-size);
+  font-weight: 700;
+}
+
+.stageTitle {
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-sd-card-title-lh);
+}
+
+.stageMain {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-card-main-size);
+  font-weight: 700;
+  line-height: var(--tpl-sd-card-main-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stageState {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sd-state-gap);
+}
+
+.stageStateText {
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-state-size);
+  line-height: var(--tpl-sd-state-lh);
+}
+
+.stageNote,
+.emptyNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-sd-note-size);
+  line-height: var(--tpl-sd-note-lh);
+}
+
+.stageAction {
+  display: flex;
+  margin-top: auto;
+}
+
+/* ── 数の帯 ─────────────────────────────── */
+.kpis {
+  display: flex;
+  border-radius: var(--tpl-sd-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.kpi {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-sd-kpi-gap);
+  min-width: 0;
+  padding: var(--tpl-sd-kpi-pad);
+}
+
+.kpiLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sd-kpi-label-size);
+  line-height: var(--tpl-sd-kpi-label-lh);
+}
+
+.kpiValue {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-sd-kpi-unit-gap);
+  margin: 0;
+}
+
+.kpiNum,
+.kpiNumWide {
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-kpi-num-size);
+  font-weight: 700;
+  line-height: var(--tpl-sd-kpi-num-lh);
+}
+
+.kpiNum {
+  /* 数字は絵と同じ Inter（日本語の書体だと字の箱が高くなり、下の説明がずれる）。 */
+  font-family: var(--font-inter), Inter, sans-serif;
+  /* 管理画面の等幅数字を継承しない（絵は比例幅）。 */
+  font-variant-numeric: normal;
+}
+
+.kpiNumWide {
+  line-height: var(--tpl-sd-kpi-wide-lh);
+}
+
+.kpiUnit {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sd-kpi-label-size);
+  line-height: var(--tpl-sd-kpi-label-lh);
+}
+
+.kpiDetail {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-sd-note-size);
+  line-height: var(--tpl-sd-note-lh);
+}
+
+/* ── 最後の1通の後 ─────────────────────────── */
+.onComplete {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sd-oc-gap);
+  padding: var(--tpl-sd-oc-pad);
+  border-radius: var(--tpl-sd-oc-radius);
+  background: var(--color-surface-pearl);
+}
+
+.onCompleteLabel {
+  flex-shrink: 0;
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sd-oc-label-size);
+  font-weight: 600;
+  line-height: var(--tpl-sd-oc-label-lh);
+}
+
+.onCompleteValue {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-oc-value-size);
+  line-height: var(--tpl-sd-oc-value-lh);
+}
+
+.onCompleteNote {
+  flex-shrink: 0;
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-sd-note-size);
+  line-height: var(--tpl-sd-note-lh);
+}
+
+/* 行の右の「変える」。印＋文字の副ボタン（高さは部品の36のまま）。 */
+.onComplete > button {
+  flex-shrink: 0;
+}
+
+/* ── メッセージの行 ─────────────────────────── */
+.sectionTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-section-size);
+  font-weight: 600;
+  line-height: var(--tpl-sd-section-lh);
+}
+
+.stepList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sd-steps-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepRow,
+.stepRowSelected {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sd-row-gap);
+  padding: var(--tpl-sd-row-pad);
+  border-radius: var(--tpl-sd-row-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  cursor: pointer;
+}
+
+.stepRowSelected {
+  outline: var(--tpl-sd-row-ring) solid var(--color-accent);
+  outline-offset: calc(var(--tpl-sd-row-ring) * -1);
+  background: var(--color-success-bg);
+}
+
+.stepNo {
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sd-row-no-size);
+  font-weight: 700;
+  line-height: var(--tpl-sd-row-no-lh);
+}
+
+.stepWhen {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: var(--tpl-sd-when-gap);
+  width: var(--tpl-sd-when-w);
+}
+
+.stepWhenMain {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-row-no-size);
+  font-weight: 600;
+  line-height: var(--tpl-sd-when-main-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stepWhenSub {
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: var(--tpl-sd-when-sub-size);
+  line-height: var(--tpl-sd-when-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stepTitle {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--tpl-sd-row-title-size);
+  line-height: var(--tpl-sd-row-title-lh);
+  text-align: left;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+button.stepTitle {
+  cursor: pointer;
+}
+
+button.stepTitle:hover {
+  color: var(--color-action);
+}
+
+.kindChip {
+  flex-shrink: 0;
+  padding: var(--tpl-sd-kind-pad);
+  border-radius: var(--tpl-sd-kind-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sd-kind-size);
+  line-height: var(--tpl-sd-kind-lh);
+  white-space: nowrap;
+}
+
+.stepOps {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-sd-row-gap);
+}
+
+.insertRow {
+  display: flex;
+  justify-content: center;
+  padding: var(--tpl-sd-insert-pad);
+}
+
+.insertRow > button {
+  height: var(--tpl-sd-insert-lh);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: var(--tpl-sd-insert-size);
+  font-weight: 600;
+  line-height: var(--tpl-sd-insert-lh);
+  cursor: pointer;
+}
+
+.insertRow > button:hover {
+  text-decoration: underline;
+}
+
+/* 閲覧のみ：挿入ボタンは置かず、行の間だけ同じ高さで空ける。 */
+.insertSpacer {
+  display: block;
+  height: var(--tpl-sd-insert-lh);
+}
+
+.stepEdit {
+  list-style: none;
+}
+
+/* ── 通ごとの数 ─────────────────────────── */
+.statPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sd-stat-gap);
+  padding: var(--tpl-sd-stat-pad);
+  border-radius: var(--tpl-sd-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.statPanelTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-stat-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-sd-stat-title-lh);
+}
+
+.statList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sd-stat-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.statRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sd-stat-gap);
+  padding: var(--tpl-sd-stat-row-pad);
+  box-shadow: var(--shadow-row-line);
+  font-size: var(--tpl-sd-stat-size);
+  line-height: var(--tpl-sd-stat-row-lh);
+}
+
+.statNo {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.statAudience {
+  flex-shrink: 0;
+  width: var(--tpl-sd-stat-aud-w);
+  overflow: hidden;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statBarCell {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  width: var(--tpl-sd-stat-bar-w);
+}
+
+.statBar {
+  display: block;
+  width: 100%;
+  height: var(--tpl-sd-stat-bar-h);
+  overflow: hidden;
+  border-radius: var(--tpl-sd-stat-bar-radius);
+  background: var(--color-divider);
+}
+
+.statBarFill {
+  display: block;
+  height: 100%;
+  border-radius: var(--tpl-sd-stat-bar-radius);
+  background: var(--color-accent);
+}
+
+.statReachText {
+  flex-shrink: 0;
+  width: var(--tpl-sd-stat-reach-w);
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.statAfter,
+.statAfterPause {
+  flex-shrink: 0;
+  width: var(--tpl-sd-stat-after-w);
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statAfterPause {
+  color: var(--tpl-sd-stat-after-pause);
+}
+
+/* ── 足すボタン ─────────────────────────── */
+.addRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-sd-add-gap);
+}
+
+/* ── 下の帯（追従・常に画面の下） ─────────────── */
+.footer {
+  position: sticky;
+  bottom: var(--tpl-sd-footer-margin);
+  z-index: 20;
+  flex-shrink: 0;
+  margin: var(--tpl-sd-footer-margin);
+}
+
+/* ── スマホの中身 ───────────────────────── */
+.talkBubble {
+  max-width: var(--tpl-sd-talk-max);
+  padding: var(--tpl-sd-talk-pad);
+  border-radius: var(--tpl-sd-card-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-talk-size);
+  line-height: var(--tpl-sd-talk-lh);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.talkChoice {
+  display: block;
+  margin-top: var(--tpl-sd-talk-choice-gap);
+  padding-top: var(--tpl-sd-talk-choice-gap);
+  box-shadow: var(--tpl-sd-line-top);
+  color: var(--color-action);
+  font-weight: 600;
+  text-align: center;
+}
+
+.talkImage {
+  display: block;
+  max-width: var(--tpl-sd-talk-max);
+  border-radius: var(--tpl-sd-card-radius);
+}
+
+/* ── 窓 ─────────────────────────────────── */
+.dupBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sd-dup-gap);
+  /* 共通の窓は題の段と本文の間が絵（間14）より広い。本文だけ絵の位置まで引き上げる。 */
+  margin-top: calc(var(--tpl-sd-dup-pull) * -1);
+}
+
+.dupActions {
+  display: flex;
+  justify-content: center;
+  gap: var(--tpl-sd-add-gap);
+}
+
+.dupField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sd-dup-field-gap);
+}
+
+.dupLabel {
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-dup-label-size);
+  font-weight: 500;
+  line-height: var(--tpl-sd-dup-label-lh);
+}
+
+.dupBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sd-dup-box-gap);
+  padding: var(--tpl-sd-dup-box-pad);
+  border-radius: var(--tpl-sd-dup-box-radius);
+  background: var(--color-surface-pearl);
+}
+
+.dupBoxTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-sd-dup-size);
+  font-weight: 700;
+  line-height: var(--tpl-sd-dup-lh);
+}
+
+.dupBoxBody {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sd-dup-size);
+  line-height: var(--tpl-sd-dup-lh);
+}
+
+.dupNote {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sd-band-gap);
+  margin: 0;
+  padding: var(--tpl-sd-dup-note-pad);
+  border-radius: var(--tpl-sd-dup-box-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sd-band-size);
+  line-height: var(--tpl-sd-dup-note-lh);
+}
+
+.dupNote > svg {
+  flex-shrink: 0;
+  width: var(--tpl-sd-band-icon);
+  height: var(--tpl-sd-band-icon);
+  color: var(--color-action);
+}
+
+.stopRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sd-stop-row-gap);
+  margin: 0;
+  padding: var(--tpl-sd-stop-row-pad);
+  font-size: var(--tpl-sd-stop-size);
+}
+
+.stopRow > dt {
+  flex: 1;
+  color: var(--color-ink-secondary);
+}
+
+.stopRow > dd {
+  flex: 1;
+  margin: 0;
+  color: var(--color-ink);
+}
+
+/* 開始前の確認（F1LK4e）の行。 */
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-sd-check-gap);
+  font-size: var(--tpl-sd-check-size);
+  line-height: var(--tpl-sd-check-lh);
+}
+
+.checkMark {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-sd-check-mark);
+  height: var(--tpl-sd-check-mark);
+  border-radius: var(--radius-pill);
+  font-size: var(--tpl-sd-check-mark-size);
+  font-weight: 700;
+}
+
+.checkOk {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.checkWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.checkUnknown {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}

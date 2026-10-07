@@ -7,7 +7,7 @@ import styles from './otp-input.module.css'
  * 認証コード入力（6マス）。Pencil ★V7 `xHzFK`「★ V7 共通 認証コード入力（6マス）」、1マスは `ENP7x`。
  *
  * 2段階認証・重要操作の再確認の6桁コードを、1マス1桁で入れる。
- * 動きの手本は kobra.systems の Input OTP（コードは写していない。docs/v7-reference-ui-adoption.md）。
+ * 動きの手本は kobra.systems の Input OTP（コードは写していない）。
  *
  * - 値は左から詰めた数字の列（`value`）。空いたマスを押しても、次に入れるマスへ移る
  * - 貼り付け・自動入力（iPhone・Mac のパスワード機能など）は、押した位置から振り分ける。

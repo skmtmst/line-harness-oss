@@ -205,22 +205,21 @@ async function waitForTable(): Promise<HTMLTableElement> {
 }
 
 describe('たまる決めごとの表の器収め', () => {
-  it('固定割付で先頭だけ伸び縮み・残りの幅の合計が85', async () => {
+  it('列の並び：先頭だけ伸び縮み、残り6列は絵の幅（src/v8/mileage の --tpl-ml-col-*）', async () => {
     await act(async () => {
       root.render(<AccountProvider><MileagePage /></AccountProvider>)
     })
     const table = await waitForTable()
-    /* 固定割付が無いと自動割付で器より広がる。 */
-    expect(table.className).toContain('tableFit')
-    const cols = [...table.querySelectorAll('colgroup col')]
-    expect(cols).toHaveLength(7)
-    /* 先頭は伸び縮み（幅を指定しない）。 */
-    expect((cols[0] as HTMLTableColElement).style.width).toBe('')
-    const widths = cols.slice(1).map((col) => (col as HTMLTableColElement).style.width)
-    expect(widths).toEqual(['12%', '12%', '15%', '11%', '17%', '18%'])
-    const total = widths.reduce((sum, width) => sum + Number.parseFloat(width), 0)
-    /* 100 を超えると器からはみ出す。 */
-    expect(total).toBeLessThanOrEqual(100)
+    /* ★V8（OC0gy）は共通の表の「列の並び」。表の幅は器に任せ、列の幅は CSS の変数で決める。 */
+    const head = table.querySelector('thead tr')
+    expect(head?.getAttribute('data-table-layout')).toBe('columns')
+    const cells = [...(head?.querySelectorAll('th') ?? [])]
+    expect(cells.map((cell) => cell.textContent)).toEqual([
+      '何をしてくれたら', '対象の行動', 'たまるマイル', '有効期間・失効', 'この30日', '状態', '操作',
+    ])
+    /* 先頭は伸び縮みの列（colName）、ほかは固定の列。 */
+    expect(cells[0].className).toContain('colName')
+    expect(cells.slice(1).every((cell) => !cell.className.includes('colName'))).toBe(true)
   })
 })
 
@@ -253,7 +252,7 @@ describe('行の「…」（板 `OC0gy`）', () => {
     })
     await waitForTable()
     const menuButton = [...container.querySelectorAll('button')].find(
-      (element) => element.getAttribute('aria-label') === 'あいさつでたまるのその他操作',
+      (element) => element.getAttribute('aria-label') === 'あいさつでたまるの操作',
     )
     if (!(menuButton instanceof HTMLButtonElement)) throw new Error('その他操作のボタンがありません')
     await act(async () => { menuButton.click() })

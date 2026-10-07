@@ -186,22 +186,28 @@
 }
 
 /*
- * ★A の押した感じ（M10）：押している間は 0.97 に縮め色を濃く
- * （80ms ease-out）、離すとばねで戻る（160ms spring）。
- * 動きを減らす設定では大きさを変えない（濃くするだけ残る）。
+ * 押した感じ（動きの点検 6 番・2026-10-07）：押している間は乗せたときより
+ * 暗く（塗りは --press-dim、白地は --press-dim-soft）、ごく少し縮める
+ * （--press-scale・--motion-fast）。離すとばねで戻る（160ms spring）。
+ * 以前は乗せる 0.92・押す 0.95 で、押すと明るく戻る逆の手応えだった。
+ * 動きを減らす設定では大きさを変えない（暗くするだけ残る）。
  */
 [data-theme='v8'] .button:active:not(:disabled) {
-  filter: brightness(0.95);
+  filter: var(--press-dim);
+}
+
+[data-theme='v8'] .secondary:active:not(:disabled) {
+  filter: var(--press-dim-soft);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   [data-theme='v8'] .button:active:not(:disabled) {
-    scale: 0.97;
+    scale: var(--press-scale);
     transition:
-      background-color var(--motion-instant) var(--motion-ease-out),
-      border-color var(--motion-instant) var(--motion-ease-out),
-      filter var(--motion-instant) var(--motion-ease-out),
-      scale var(--motion-instant) var(--motion-ease-out);
+      background-color var(--motion-fast) var(--motion-ease-out),
+      border-color var(--motion-fast) var(--motion-ease-out),
+      filter var(--motion-fast) var(--motion-ease-out),
+      scale var(--motion-fast) var(--motion-ease-out);
   }
 }
 

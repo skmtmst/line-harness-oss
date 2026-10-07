@@ -24,7 +24,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { bookingMenuError } from '../menu-validation'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import MenuFormV8 from './menu-form-v8'
+import MenuFormV8 from '@/v8/booking-menus/menu-form'
 
 /**
  * メニューを追加する（設計 V6 28-1-B / node GhOb3、★V8 は QqER7）。

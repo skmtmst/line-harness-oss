@@ -43,6 +43,7 @@ import Select from '@/components/shared/select'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
@@ -226,6 +227,8 @@ function ArchiveConfirm({
     <ConfirmDialog
       open
       designNode="VXZ6T"
+      designWidth={500}
+      designTop={380}
       title={restoring ? 'ウェビナーを下書きに戻しますか？' : 'ウェビナーをアーカイブしますか？'}
       description={restoring ? '通常の一覧に戻します。公開するまでは、新しい申込は受け付けません。' : 'アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。'}
       confirmLabel={restoring ? '下書きに戻す' : 'アーカイブする'}
@@ -705,6 +708,13 @@ function WebinarList() {
   const go = (href: string) => router.push(href)
 
   /* ===== フォルダ ===== */
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。 */
+  const folderDotOf = (w: WebinarListItem): FolderDotFolder | null => {
+    if (!w.folderId) return null
+    const folder = folders.find((f) => f.id === w.folderId)
+    if (folder) return { name: folder.name, color: folder.color }
+    return w.folderName ? { name: w.folderName } : null
+  }
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: panelGrand, icon: <Inbox size={15} aria-hidden="true" /> },
     /*
@@ -864,15 +874,17 @@ function WebinarList() {
                   >
                     <Td className={styles.colName}>
                       <ContextMenu label={`「${w.title}」の操作`} items={toContextItems(menuItems)}>
-                        <button
-                          type="button"
-                          className={styles.nameButton}
-                          title={w.title}
-                          aria-label={`「${w.title}」の詳細を見る`}
-                          onClick={(event) => { event.stopPropagation(); openDetail(w.id) }}
-                        >
-                          {w.title}
-                        </button>
+                        <FolderDotName folder={folderDotOf(w)}>
+                          <button
+                            type="button"
+                            className={styles.nameButton}
+                            title={w.title}
+                            aria-label={`「${w.title}」の詳細を見る`}
+                            onClick={(event) => { event.stopPropagation(); openDetail(w.id) }}
+                          >
+                            {w.title}
+                          </button>
+                        </FolderDotName>
                       </ContextMenu>
                       <span className={styles.slug} title={publicPath(w)}>{publicPath(w)}</span>
                     </Td>
@@ -955,7 +967,8 @@ function WebinarList() {
         </Button>
       }
       stats={<>
-        {!canEdit ? (
+        {/* 役割が取れるまで（null）は閲覧のみの帯を出さない。出してから消すと一覧が 64px 跳ねていた（動きの点検 8 番）。 */}
+        {role !== null && !canEdit ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
             <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>

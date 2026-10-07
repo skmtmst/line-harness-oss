@@ -208,7 +208,7 @@ export default function KpiCard({
       </div>
 
       <p className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
-        <span className={styles.detailText}>{detail}</span>
+        <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
             {retryLabel ?? 'もう一度読み込む'}

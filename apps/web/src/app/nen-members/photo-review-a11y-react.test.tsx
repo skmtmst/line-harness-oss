@@ -106,7 +106,7 @@ afterEach(async () => {
 })
 
 async function render() {
-  // 審査の結果の知らせは Toast（role=status）で出す。置き場所も一緒に描く。
+  // 審査の結果の知らせは Toast（置き場所の入れ物が role=status）で出す。置き場所も一緒に描く。
   clearToastsForTest()
   await act(async () => { root.render(<><PhotoReviewsPage /><ToastHost /></>) })
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
@@ -139,7 +139,7 @@ describe('写真審査の読み上げ（V6R-S3-e）', () => {
     await act(async () => { approve.click() })
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
 
-    const status = document.body.querySelector('[role="status"][aria-live="polite"]')
+    const status = document.body.querySelector('[role="status"][aria-live="polite"][aria-label="知らせ"]')
     expect(status?.textContent?.length ?? 0).toBeGreaterThan(0)
   })
 })

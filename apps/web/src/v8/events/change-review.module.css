@@ -1,0 +1,349 @@
+/*
+ * ★V8 変更の確認（hmr2P・窓 qUdNh）。枠・頭・右の列・下の帯は型（CreatePage）が持つ。
+ * ここはカード（枠1・角12・余白18）と表・入力・右の列の中身だけ。
+ */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-compact-gap);
+  color: var(--tpl-identity-color);
+  font-size: var(--text-label);
+  font-weight: var(--tpl-identity-weight);
+  line-height: var(--tpl-identity-lh);
+}
+.backLink:hover {
+  text-decoration: underline;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-ev-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.card:first-of-type {
+  gap: var(--tpl-toolbar-gap);
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-chip-label-lh);
+}
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+
+/* 開催回の表（見出し40・行40）。 */
+.table {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-segment);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+.headRow,
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tpl-ev-num-w) var(--tpl-ev-num-w) var(--tpl-ev-num-w) var(--tpl-ev-state-w);
+  align-items: center;
+  min-height: var(--tpl-ev-row-h);
+}
+.headRow {
+  background: var(--color-surface-pearl);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-row-sub-lh);
+}
+.row {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+  text-align: left;
+  cursor: pointer;
+}
+.row:last-child {
+  box-shadow: none;
+}
+.row:hover {
+  background: var(--color-surface-pearl);
+}
+.rowSelected,
+.rowSelected:hover {
+  background: var(--color-accent-soft);
+}
+.cellStart {
+  min-width: 0;
+  overflow: hidden;
+  padding-left: var(--tpl-rule-row-gap);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cellNum {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cellState {
+  padding-left: var(--tpl-ev-state-pad);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-ev-chip-gap);
+  padding: var(--tpl-ev-chip-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-shell);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-ev-chip-lh);
+  white-space: nowrap;
+}
+.chip::before {
+  content: '';
+  width: var(--tpl-ev-chip-dot);
+  height: var(--tpl-ev-chip-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.chipOn {
+  background: var(--color-accent-soft);
+  color: var(--color-success);
+}
+
+/* 変える内容。 */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-rule-row-gap);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wh-ops-gap);
+  min-width: 0;
+}
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-chip-label-lh);
+}
+.pickLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-wh-cell-lh);
+}
+.input {
+  width: 100%;
+  min-width: 0;
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-kw-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+.radioRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-wh-check-gap);
+}
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.linkRow {
+  display: flex;
+}
+.linkButton {
+  min-height: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-wh-cell-lh);
+  cursor: pointer;
+}
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+/* 右の列。 */
+.side {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-body-pad);
+}
+.sideCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-side-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.impactCard {
+  min-height: var(--tpl-ev-impact-h);
+}
+.sideTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-chip-label-lh);
+}
+.sideNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-care-lh);
+}
+.band,
+.bandDanger {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wh-ops-gap);
+  padding: var(--tpl-ev-band-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+.bandDanger {
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+}
+.bandTitle {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: var(--tpl-wh-cell-lh);
+}
+.bandText {
+  margin: 0;
+  word-break: normal;
+  font-size: var(--text-micro);
+  line-height: var(--tpl-ev-band-lh);
+}
+.beforeAfter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ev-ba-gap);
+}
+.beforeAfterLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.beforeAfterValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: var(--tpl-wh-cell-lh);
+}
+.lineBack {
+  padding: var(--tpl-rule-row-gap);
+  border-radius: var(--radius-segment);
+  background: var(--color-line-talk);
+}
+.lineBubble {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  padding: var(--tpl-ev-bubble-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-ev-band-lh);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.noteList {
+  margin: 0;
+  padding-left: var(--tpl-rule-row-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-ev-band-lh);
+}
+.promise {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-chip-label-lh);
+}
+
+/* 確かめる窓（qUdNh）。 */
+.confirmBody {
+  margin-top: var(--tpl-ev-confirm-pull);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rule-row-gap);
+}
+.confirmList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wh-ops-gap);
+  margin: 0;
+  padding: var(--tpl-rule-row-gap);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+}
+.confirmRow {
+  display: grid;
+  grid-template-columns: var(--tpl-ev-key-w) minmax(0, 1fr);
+  gap: var(--tpl-toolbar-gap);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.confirmRow dt {
+  color: var(--color-ink-secondary);
+}
+.confirmRow dd {
+  margin: 0;
+  color: var(--color-ink);
+}
+.confirmSample {
+  margin: 0;
+  padding: var(--tpl-rule-row-gap);
+  border-radius: var(--radius-segment);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}

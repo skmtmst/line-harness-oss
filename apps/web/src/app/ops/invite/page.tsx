@@ -13,6 +13,7 @@ import { authRequest, passwordError } from '@/lib/auth-email'
 import { ApiError } from '@/lib/api'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
+import OpsInviteV8 from '@/v8/ops/invite'
 
 /**
  * 運営メンバーの招待を受ける（★V6 37-10-A `J6KbIg`）。
@@ -24,6 +25,11 @@ import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 type Check = { email: string; name: string; needsPassword: boolean }
 
 export default function OpsInvitePage() {
+  // ★V8 は src/v8/ops/invite.tsx。v7 は下のまま。
+  return useAdminTheme() === 'v8' ? <OpsInviteV8 /> : <OpsInviteV7 />
+}
+
+function OpsInviteV7() {
   const theme = useAdminTheme()
   const v8 = theme === 'v8'
   const [token, setToken] = useState('')
