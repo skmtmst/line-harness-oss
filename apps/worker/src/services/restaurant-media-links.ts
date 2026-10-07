@@ -10,5 +10,5 @@ export function safeRestaurantHttpsUrl(value: unknown): string | null | undefine
 export function restaurantReservationEmbed(base: string, token: string) {
   const url = new URL(`/restaurant/reserve/${encodeURIComponent(token)}`, base).href;
   const escaped = url.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-  return { url, html: `<a href="${escaped}" target="_blank" rel="noopener noreferrer">LINEで予約する</a>`, available: false as const };
+  return { url, html: `<a href="${escaped}" target="_blank" rel="noopener noreferrer">LINEで予約する</a>`, available: true as const };
 }

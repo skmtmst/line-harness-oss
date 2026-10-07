@@ -537,3 +537,14 @@ export const visitStampsApi = {
   useReward: (accountId:string,id:string,staffId:string,pin:string) => post<{success:true;data:{id:string;status:'used'}}>(`/api/liff/visit-stamps/redemptions/${encodeURIComponent(id)}/use?${new URLSearchParams({accountId})}`,{staffId,pin}),
   requestPaper: (accountId:string,id:string,body:import('@line-crm/shared').VisitStampPaperInput) => post<{success:true;data:{id:string;status:'pending'}}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}/paper-requests?${new URLSearchParams({accountId})}`,body),
 };
+
+/** 飲食店の席予約。既存get/postと同じくliffIdと本人のIDトークンを送る。 */
+export const restaurantBookingApi = {
+  link: (token:string)=>get<{success:true;data:{id:string;name:string;timezone:string}}>(`/api/liff/restaurant/link/${encodeURIComponent(token)}`),
+  availability: (storeId:string,date:string,guestCount:number)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerAvailability}>(`/api/liff/restaurant/availability?${new URLSearchParams({storeId,date,guestCount:String(guestCount)})}`),
+  hold: (body:import('@line-crm/shared').RestaurantCustomerHoldInput)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>('/api/liff/restaurant/holds',body),
+  mine: (storeId:string)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking[]}>(`/api/liff/restaurant/reservations?${new URLSearchParams({storeId})}`),
+  confirm: (id:string,expectedVersion:number)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/confirm`,{expectedVersion}),
+  cancel: (id:string,expectedVersion:number)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/cancel`,{expectedVersion}),
+  reschedule: (id:string,body:{expectedVersion:number;startsAt:string;guestCount:number})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/reschedule`,body),
+};

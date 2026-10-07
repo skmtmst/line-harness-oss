@@ -54,6 +54,7 @@ export type FeatureJobMetadata = {
  * 照合するため、判定を消したり移したりすると必ずテストが落ちる。
  */
 export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
+  {name:'API draft and integration retention',classification:{kind:'core',reason:'保存期限を過ぎた下書きと連携の一時情報の消去'},enforcement:{mode:'exempt',reason:'外部送信をせず、機能の有効・無効にかかわらず保存期限を守る'}},
   {name:'visit stamps',classification:{kind:'core',reason:'来店・会計からのスタンプ台帳の整合'},enforcement:{mode:'exempt',reason:'外部送信をしない。カード停止と許可店舗は台帳の計算側で検証する'}},
   {name:'booking waitlist expiry and promotion',classification:{kind:'core',reason:'人・席の待ちの期限と先着順を保つ'},enforcement:{mode:'exempt',reason:'保存済みの待ちの後始末。LINE送信はsendAutomaticBookingLineで機能停止・外部更新停止を個別判定する'}},
   {
@@ -80,7 +81,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   {
     name: 'restaurant hold expiry',
     classification: { kind: 'core', reason: '保存済み予約の仮押さえ期限と予約済み価格変更の後始末' },
-    enforcement: { mode: 'exempt', reason: '飲食店の検証環境だけで、保存済みの期限と予約した変更を確定する' },
+    enforcement: { mode: 'exempt', reason: '飲食店の検証環境だけ。保存済みの期限と変更を確定し、自動通知はsendAutomaticBookingLineが機能・停止を個別判定する' },
   },
   {
     name: 'friend bulk runs',

@@ -219,7 +219,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
   ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/support-mark-rules', '/tags'],
   ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
-  ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/broadcast-message-assets/upload-sessions', '/broadcasts'], ['/api/reminders', '/reminders'],
+  ['/api/scenarios', '/scenarios'], ['/api/scenario-drafts', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/broadcast-message-assets/upload-sessions', '/broadcasts'], ['/api/reminders', '/reminders'],
   ['/api/friend-reminders', '/reminders'], ['/api/reminder-runs', '/reminders'],
   ['/api/auto-replies', '/auto-replies'], ['/api/auto-reply-runs', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
   ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/rich-menus', '/rich-menus'],
@@ -249,7 +249,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
   ['/api/automation-templates', '/automations'], ['/api/automation-drafts', '/automations'],
   ['/api/automation-draft-resources', '/automations'], ['/api/common-actions', '/automations'],
-  ['/api/webhooks', '/webhooks'], ['/api/line-notifications', '/line-notifications'],
+  ['/api/webhooks', '/webhooks'], ['/api/instagram', '/webhooks'], ['/api/line-notifications', '/line-notifications'],
   ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
   // 個別相談の変更・取消は予約と同じ `/booking/bookings` 権限で守る
   // (N-065 #623 司令塔裁定。`/api/meet-callback` は公開コールバックのため対象外)。
@@ -550,6 +550,7 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path.startsWith('/auth/') ||
     path === '/setup' ||
     path === '/api/integrations/stripe/webhook' ||
+    path === '/api/instagram/webhook' ||
     // 課金の Stripe Webhook は route 内で署名検証する。
     path === '/api/hq/billing/webhook' ||
     path === '/api/integrations/eccube/events' ||

@@ -1,3 +1,4 @@
+import { api9Paths, api9Schemas } from './api9-openapi.js';
 import { restaurantClosurePaths } from './restaurant-closures-openapi.js';
 import { stampPaths,hqBroadcastPaths } from './proposal-e-openapi.js';
 import { Hono } from 'hono';
@@ -25,6 +26,7 @@ const spec = {
       },
     },
     schemas: {
+      ...api9Schemas,
       BookingSyncRules: {
         type: 'object',
         required: ['lineAccountId', 'excludeCalendarBusy', 'writeLineBookingsToCalendar', 'autoAssign', 'notifyConflicts', 'notifyCalendarDisconnected', 'notifyDailyLimit', 'dailyLimit', 'nearLimitRemaining', 'version'],
@@ -410,6 +412,7 @@ const spec = {
     '/api/broadcast-message-assets/upload-sessions/{id}/complete': {
       post:{tags:['Broadcasts'],summary:'容量・形式・所属・ETagを検査して配信用URLを返す',parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}}],requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['etag'],properties:{etag:{type:'string'}}}}}},responses:{'201':{description:'安全性の検査対象として登録し、配信用URLを発行'},'200':{description:'確定済みの再要求'},'409':{description:'期限切れまたは内容不一致'},'422':{description:'ファイルの形式が不正'}}},
     },
+    ...api9Paths,
     ...restaurantClosurePaths,
     ...stampPaths,
     ...hqBroadcastPaths,

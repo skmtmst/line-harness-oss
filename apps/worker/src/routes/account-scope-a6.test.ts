@@ -53,7 +53,7 @@ function app(route: Hono<any>) {
       run: vi.fn(async () => ({})),
       all: vi.fn(async () => ({ results: [] })),
     };
-    c.env = { DB: { prepare: () => statement } as unknown as D1Database };
+    c.env = { DB: { prepare: (sql:string) => sql.includes('COUNT(*) total') ? {...statement,bind(){return this;},first:async()=>({total:0})}:statement } as unknown as D1Database };
     c.set('staff' as never, { id: 'owner', role: 'owner', tenantId: 'tenant-a' } as never);
     await next();
   });

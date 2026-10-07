@@ -30,7 +30,7 @@ async function upsertTask(db:D1Database,input:{storeId:string;slotId:string;chan
 }
 
 async function reconcileDirectBookingTasks(db:D1Database,storeId:string,timezone:string,notify:boolean) {
- const reservations=(await db.prepare(`SELECT id,starts_at,ends_at,status FROM rt_reservations WHERE store_id=? AND source IN ('line','phone')
+ const reservations=(await db.prepare(`SELECT id,starts_at,ends_at,status FROM rt_reservations WHERE store_id=? AND source IN ('line','phone') AND status<>'pending'
    AND datetime(ends_at)>datetime('now','-1 day')`).bind(storeId).all<{id:string;starts_at:string;ends_at:string;status:string}>()).results;
  const media=(await db.prepare(`SELECT m.code FROM rt_store_media_links l JOIN rt_media m ON m.id=l.media_id WHERE l.store_id=? AND l.close_on_booking=1 AND m.accepts_reservations=1`).bind(storeId).all<{code:string}>()).results;
  for(const r of reservations) {
