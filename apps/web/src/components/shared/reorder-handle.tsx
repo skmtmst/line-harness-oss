@@ -69,6 +69,7 @@ const SIX_DOTS = (
   </svg>
 )
 
+const INLINE_SLOT_CLASS = 'inline-flex items-center justify-center p-0.5'
 const INLINE_CLASS = 'inline-flex cursor-grab items-center justify-center rounded-control p-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action'
 
 export default function ReorderHandle({
@@ -101,7 +102,7 @@ export default function ReorderHandle({
     /* つまみは出さない。幅だけ同じに空け、理由は title と読み上げで言う。 */
     return (
       <span
-        className={[look === 'icon' ? styles.action : look === 'inline' ? 'inline-flex items-center justify-center p-0.5' : '', className].filter(Boolean).join(' ')}
+        className={[look === 'icon' && styles.action, look === 'inline' && INLINE_SLOT_CLASS, className].filter(Boolean).join(' ')}
         style={look === 'icon' ? { cursor: 'default', background: 'none' } : undefined}
         title={disabledReason ?? undefined}
         data-reorder-disabled=""
@@ -132,7 +133,7 @@ export default function ReorderHandle({
       data-reorder-handle=""
       aria-label={ariaLabel ?? `${label}を並び替え。上下キーで移動`}
       title={title ?? 'ドラッグまたは上下キーで並び替え'}
-      className={[look === 'icon' ? `${styles.action} ${styles.grip}` : look === 'inline' ? INLINE_CLASS : '', className].filter(Boolean).join(' ')}
+      className={[look === 'icon' && styles.action, look === 'icon' && styles.grip, look === 'inline' && INLINE_CLASS, className].filter(Boolean).join(' ')}
     >
       {glyph}
     </button>

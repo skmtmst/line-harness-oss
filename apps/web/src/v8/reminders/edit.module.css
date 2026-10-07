@@ -176,7 +176,7 @@
 .stepHead { display: flex; align-items: center; gap: var(--tpl-label-tag-gap); }
 .grip { flex: none; display: inline-flex; align-items: center; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); cursor: grab; }
 .grip:active { cursor: grabbing; }
-.grip:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; border-radius: var(--radius-icon); }
+.grip:focus-visible { outline: var(--tpl-htn-line-2) solid var(--color-action); outline-offset: var(--tpl-htn-line-2); border-radius: var(--radius-icon); }
 .stepNum {
   display: inline-flex;
   align-items: center;
