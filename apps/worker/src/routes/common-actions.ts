@@ -154,11 +154,13 @@ commonActions.post('/api/common-actions', requireRole('owner', 'admin'), async (
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
   const body = await c.req.json<{
+    folderId?: unknown;
     name?: unknown;
     description?: unknown;
     actions?: unknown;
     clientRequestKey?: unknown;
   }>().catch(() => ({} as {
+    folderId?: unknown;
     name?: unknown;
     description?: unknown;
     actions?: unknown;
@@ -166,6 +168,7 @@ commonActions.post('/api/common-actions', requireRole('owner', 'admin'), async (
   }));
   return endpoint(c, () => createCommonAction(c.env.DB, {
     lineAccountId: id,
+    folderId: body.folderId,
     name: body.name,
     description: body.description,
     actions: body.actions,
@@ -243,12 +246,14 @@ commonActions.put('/api/common-actions/:id/draft', requireRole('owner', 'admin')
   const body = await c.req.json<{
     expectedDraftVersionId?: unknown;
     expectedDraftRevision?: unknown;
+    folderId?: unknown;
     name?: unknown;
     description?: unknown;
     actions?: unknown;
   }>().catch(() => ({} as {
     expectedDraftVersionId?: unknown;
     expectedDraftRevision?: unknown;
+    folderId?: unknown;
     name?: unknown;
     description?: unknown;
     actions?: unknown;
@@ -259,7 +264,8 @@ commonActions.put('/api/common-actions/:id/draft', requireRole('owner', 'admin')
       lineAccountId: id,
       expectedDraftVersionId: body.expectedDraftVersionId,
       expectedDraftRevision: body.expectedDraftRevision,
-      name: body.name,
+      folderId: body.folderId,
+    name: body.name,
       description: body.description,
       actions: body.actions,
     });

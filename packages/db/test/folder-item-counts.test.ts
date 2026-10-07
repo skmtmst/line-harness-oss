@@ -216,20 +216,20 @@ describe('FOLDER_ITEM_COUNT_TABLES(#631)', () => {
     }
   })
 
-  it('対応表は統一パターンの9種別ちょうど。新しい種別が増減したらこの試験が気づく', () => {
+  it('対応表は統一パターンの12種別ちょうど。新しい種別が増減したらこの試験が気づく', () => {
+    // F-13（582）で自動化・共通アクション・成果に folder_id 列ができ、件数を数えるようになった。
     expect(Object.keys(FOLDER_ITEM_COUNT_TABLES).sort()).toEqual(
-      ['auto_reply', 'broadcast', 'common_var', 'media', 'reminder', 'rich_menu', 'scenario', 'tag', 'template'].sort(),
+      ['auto_reply', 'automation', 'broadcast', 'common_action', 'common_var', 'conversion', 'media', 'reminder', 'rich_menu', 'scenario', 'tag', 'template'].sort(),
     )
   })
 
-  it('対応表に無い残り9種別(webinarを除く)は、理由コメント付きで意図して外している', () => {
+  it('対応表に無い残り5種別(webinar・webhookを除く)は、理由コメント付きで意図して外している', () => {
     const covered = new Set(Object.keys(FOLDER_ITEM_COUNT_TABLES))
     covered.add('webinar') // 別実装(getWebinarFolderCounts)でカバー済み
+    covered.add('webhook') // getFolderItemCounts の中の別処理（受け取る・送るの2表を合算）でカバー済み
     const uncovered = FOLDER_KINDS.filter((kind) => !covered.has(kind))
     expect(uncovered.sort()).toEqual(
-      ['automation', 'common_action', 'conversion', 'entry_route', 'event', 'form', 'friend_field', 'mileage_rule', 'webhook'].sort(),
+      ['entry_route', 'event', 'form', 'friend_field', 'mileage_rule'].sort(),
     )
-    // F-13 の3種別（common_action・webhook・conversion）は、中身の
-    // folder_id 列が無いので件数は「数えていない」（#730）。箱の種類だけ足す。
   })
 })
