@@ -4268,6 +4268,15 @@ CREATE TABLE mileage_reward_codes (
   UNIQUE (reward_version_id, code_fingerprint)
 );
 
+CREATE TABLE mileage_reward_folders (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 100),
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE mileage_reward_versions (
   id                       TEXT PRIMARY KEY,
   reward_id                TEXT NOT NULL REFERENCES mileage_rewards(id),
@@ -4313,7 +4322,7 @@ CREATE TABLE mileage_rewards (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-);
+, folder_id TEXT REFERENCES mileage_reward_folders(id));
 
 CREATE TABLE mileage_rules (
   id             TEXT PRIMARY KEY,
@@ -8794,11 +8803,15 @@ CREATE INDEX idx_mileage_redemptions_reward_created
 CREATE INDEX idx_mileage_reward_codes_available
   ON mileage_reward_codes(reward_version_id, status, created_at);
 
+CREATE INDEX idx_mileage_reward_folders_account ON mileage_reward_folders(line_account_id, display_order);
+
 CREATE INDEX idx_mileage_reward_versions_reward_status
   ON mileage_reward_versions(reward_id, status, version_number DESC);
 
 CREATE INDEX idx_mileage_rewards_account_status
   ON mileage_rewards(line_account_id, status, sort_order, updated_at DESC);
+
+CREATE INDEX idx_mileage_rewards_folder ON mileage_rewards(line_account_id, folder_id);
 
 CREATE INDEX idx_mileage_rules_account ON mileage_rules(line_account_id);
 

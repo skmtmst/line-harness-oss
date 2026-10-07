@@ -128,6 +128,10 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/mileage/reward-folders',
+  'POST /api/mileage/reward-folders',
+  'PUT /api/mileage/reward-folders/order',
+  'PUT /api/mileage/rewards/{id}/folder',
   // V8 integration endpoints.
   'DELETE /api/hq/templates/folders/{id}',
   'DELETE /api/notifications/teams/{id}',

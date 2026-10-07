@@ -522,7 +522,8 @@
     "581_banner_emphasis_lines.sql",
     "583_restaurant_inventory_rules.sql",
     "590_scenario_stop_reason.sql",
-    "591_friend_field_time.sql"
+    "591_friend_field_time.sql",
+    "592_mileage_reward_folders.sql"
   ],
-  "migrationCount": 523
+  "migrationCount": 524
 }
