@@ -15,6 +15,7 @@ import { isDashboardNotificationData } from '@/components/dashboard/notification
 import {
   defaultDashboardPreferences,
   normalizeDashboardPreferences,
+  V8_DASHBOARD_DEFAULT_VISIBILITY,
   type DashboardPreferences,
 } from '@/components/dashboard/dashboard-preference-defaults'
 
@@ -112,7 +113,7 @@ export function useDashboard() {
   const [overview, setOverview] = useState<{ accountId: string; period: PeriodKey; value: DashboardOverview } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [preferences, setPreferences] = useState<DashboardPreferences>(defaultDashboardPreferences)
+  const [preferences, setPreferences] = useState<DashboardPreferences>(() => defaultDashboardPreferences(V8_DASHBOARD_DEFAULT_VISIBILITY))
   const [preferenceVersion, setPreferenceVersion] = useState(0)
   const [preferenceSaving, setPreferenceSaving] = useState(false)
   const preferenceSaveInFlight = useRef(false)
@@ -196,7 +197,7 @@ export function useDashboard() {
 
   useEffect(() => {
     if (!selectedAccountId) {
-      setPreferences(defaultDashboardPreferences())
+      setPreferences(defaultDashboardPreferences(V8_DASHBOARD_DEFAULT_VISIBILITY))
       setPreferenceVersion(0)
       return
     }
@@ -205,15 +206,15 @@ export function useDashboard() {
     try {
       const raw = window.localStorage.getItem(key)
       const cached = raw ? JSON.parse(raw) as { cards?: unknown; version?: unknown } : null
-      setPreferences(normalizeDashboardPreferences(cached?.cards ?? cached))
+      setPreferences(normalizeDashboardPreferences(cached?.cards ?? cached, V8_DASHBOARD_DEFAULT_VISIBILITY))
       setPreferenceVersion(Number.isInteger(cached?.version) ? Number(cached?.version) : 0)
     } catch {
-      setPreferences(defaultDashboardPreferences())
+      setPreferences(defaultDashboardPreferences(V8_DASHBOARD_DEFAULT_VISIBILITY))
     }
     void api.dashboard.preferences.get(selectedAccountId)
       .then((response) => {
         if (cancelled || !response.success) return
-        const next = normalizeDashboardPreferences(response.data.cards)
+        const next = normalizeDashboardPreferences(response.data.cards, V8_DASHBOARD_DEFAULT_VISIBILITY)
         setPreferences(next)
         setPreferenceVersion(response.data.version)
         try { window.localStorage.setItem(key, JSON.stringify({ version: response.data.version, cards: next })) } catch { /* cache unavailable */ }
@@ -242,7 +243,7 @@ export function useDashboard() {
     setPreferenceSaving(true)
     setPreferenceSaveError(null)
     try {
-      const normalized = normalizeDashboardPreferences(next)
+      const normalized = normalizeDashboardPreferences(next, V8_DASHBOARD_DEFAULT_VISIBILITY)
       const response = await api.dashboard.preferences.save(accountId, { version: preferenceVersion, cards: normalized })
       if (!response.success) throw new Error(response.error)
       try { window.localStorage.setItem(dashboardStorageKey(accountId), JSON.stringify({ version: response.data.version, cards: normalized })) } catch { /* cache unavailable */ }
@@ -273,7 +274,7 @@ export function useDashboard() {
       await api.dashboard.preferences.reset(accountId)
       const response = await api.dashboard.preferences.get(accountId)
       if (selectedAccountIdRef.current !== accountId) return
-      const next = response.success ? normalizeDashboardPreferences(response.data.cards) : defaultDashboardPreferences()
+      const next = response.success ? normalizeDashboardPreferences(response.data.cards, V8_DASHBOARD_DEFAULT_VISIBILITY) : defaultDashboardPreferences(V8_DASHBOARD_DEFAULT_VISIBILITY)
       const nextVersion = response.success ? response.data.version : 0
       setPreferences(next)
       setPreferenceVersion(nextVersion)
@@ -295,7 +296,7 @@ export function useDashboard() {
     try {
       const response = await api.dashboard.preferences.get(accountId)
       if (!response.success || selectedAccountIdRef.current !== accountId) return null
-      const next = normalizeDashboardPreferences(response.data.cards)
+      const next = normalizeDashboardPreferences(response.data.cards, V8_DASHBOARD_DEFAULT_VISIBILITY)
       setPreferences(next)
       setPreferenceVersion(response.data.version)
       try { window.localStorage.setItem(dashboardStorageKey(accountId), JSON.stringify({ version: response.data.version, cards: next })) } catch { /* cache unavailable */ }

@@ -67,17 +67,27 @@ export const DASHBOARD_CARD_DEFINITIONS: CardDefinition[] = (
   DASHBOARD_CARD_GROUPS[group].map((id) => ({ id, group, ...CARD_META[id] })),
 )
 
-export function defaultDashboardPreferences(): DashboardPreferences {
+/** 既定ON/OFFの差し替え（画面の版ごと）。保存済みの設定には効かない。 */
+export type DashboardDefaultVisibility = Partial<Record<DashboardCardId, boolean>>
+
+/**
+ * V8 の既定。絵（d8X09）は「友だち追加リンク」の右に「友だちの状態」を置く。
+ * v7 の既定（OFF）は変えない。
+ */
+export const V8_DASHBOARD_DEFAULT_VISIBILITY: DashboardDefaultVisibility = { 'friend-status': true }
+
+export function defaultDashboardPreferences(overrides?: DashboardDefaultVisibility): DashboardPreferences {
+  const visibleOf = (card: CardDefinition) => overrides?.[card.id] ?? card.defaultVisible
   return {
-    today: DASHBOARD_CARD_DEFINITIONS.filter((card) => card.group === 'today').map((card) => ({ id: card.id, visible: card.defaultVisible })),
-    main: DASHBOARD_CARD_DEFINITIONS.filter((card) => card.group === 'main').map((card) => ({ id: card.id, visible: card.defaultVisible })),
-    right: DASHBOARD_CARD_DEFINITIONS.filter((card) => card.group === 'right').map((card) => ({ id: card.id, visible: card.defaultVisible })),
+    today: DASHBOARD_CARD_DEFINITIONS.filter((card) => card.group === 'today').map((card) => ({ id: card.id, visible: visibleOf(card) })),
+    main: DASHBOARD_CARD_DEFINITIONS.filter((card) => card.group === 'main').map((card) => ({ id: card.id, visible: visibleOf(card) })),
+    right: DASHBOARD_CARD_DEFINITIONS.filter((card) => card.group === 'right').map((card) => ({ id: card.id, visible: visibleOf(card) })),
   }
 }
 
 /** 保存済み設定へ追加カードを補い、知らないIDと重複を取り除く。 */
-export function normalizeDashboardPreferences(value: unknown): DashboardPreferences {
-  const defaults = defaultDashboardPreferences()
+export function normalizeDashboardPreferences(value: unknown, overrides?: DashboardDefaultVisibility): DashboardPreferences {
+  const defaults = defaultDashboardPreferences(overrides)
   if (!value || typeof value !== 'object') return defaults
   const input = value as Partial<Record<DashboardGroup, unknown>>
 
