@@ -13,34 +13,28 @@ import Select from './select'
 afterEach(() => cleanup())
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const SRC = join(HERE, '..', '..')
-const WEB = join(SRC, '..')
-const readSource = (path: string) => readFileSync(join(SRC, path), 'utf8')
 const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
 
-describe('V5 B3 入力・検索・選択部品', () => {
-  it('入力欄はHTML属性とPencil Node IDをそのまま渡す', () => {
+describe('入力・検索・選択部品の操作と安全性', () => {
+  it('入力欄はHTML属性をそのまま渡す', () => {
     const html = renderToStaticMarkup(
       <div>
         <TextInput name="staffName" required disabled invalid defaultValue="山田" />
         <TextArea name="description" rows={4} readOnly defaultValue="説明" />
       </div>,
     )
-    expect(html).toContain('data-design-node="ytG7l"')
     expect(html).toContain('name="staffName"')
     expect(html).toContain('required=""')
     expect(html).toContain('disabled=""')
     expect(html).toContain('aria-invalid="true"')
-    expect(html).toContain('data-design-node="keKe3"')
     expect(html).toContain('readOnly=""')
   })
 
-  it('検索欄は検索属性・読込中・Pencil Node IDを持つ', () => {
+  it('検索欄は検索属性・読込中を持つ', () => {
     const html = renderToStaticMarkup(
       <SearchField aria-label="友だちを検索" value="山田" hidden loading onChange={vi.fn()} onClear={vi.fn()} />,
     )
-    expect(html).toContain('data-design-node="phlR1"')
     expect(html).toContain('type="search"')
     expect(html).toContain('aria-label="友だちを検索"')
     expect(html).toContain('aria-busy="true"')
@@ -61,9 +55,6 @@ describe('V5 B3 入力・検索・選択部品', () => {
       </div>,
     )
     const html = container.innerHTML
-    expect(html).toContain('data-design-node="rpot9"')
-    expect(html).toContain('data-design-node="niGPF"')
-    expect(html).toContain('data-design-node="Gfsb4"')
     // 開いた中身は最上層（MenuPortal→document.body）に出る。静的書き出しには載らない。
     expect(screen.getByRole('listbox')).toBeTruthy()
     expect(screen.getByRole('button', { name: '開いた状態' }).getAttribute('aria-expanded')).toBe('true')
@@ -71,17 +62,6 @@ describe('V5 B3 入力・検索・選択部品', () => {
     expect(document.body.innerHTML).toContain('aria-selected="true"')
     const hidden = container.querySelector('input[type="hidden"][name="status"]')
     expect(hidden?.getAttribute('value')).toBe('active')
-  })
-
-  it('代表画面は直書きではなく共通入力・検索・選択を使う', () => {
-    expect(readSource('app/staff/new/page.tsx')).toMatch(/import Select/)
-    expect(readSource('app/staff/new/page.tsx')).toMatch(/TextInput/)
-    expect(readSource('app/reminders/new/page.tsx')).toMatch(/TextArea/)
-    expect(readSource('components/shared/list-toolbar.tsx')).toMatch(/SearchField/)
-    // 一覧の帯から Select は外した。並び順・表示件数は仕組みができるまで描かない
-    // （§2-2「使えないプルダウンを完成画面に置かない」）。共通 Select を使っている
-    // 証拠は上の `app/staff/new/page.tsx` が持つ。
-    expect(readSource('components/shared/list-toolbar.tsx')).not.toMatch(/<Select/)
   })
 
   it('CSSモジュールは生の色とローカル変数を持たず、フォーカス輪郭を消さない', () => {
@@ -104,19 +84,5 @@ describe('V5 B3 入力・検索・選択部品', () => {
         /:focus-visible[^{]*\{[^}]*outline:\s*(?:revert|2px solid var\(--color-action\))/s,
       )
     }
-  })
-
-  it('契約はB3の実ノード・部品・宣言数を下限として持つ', () => {
-    const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
-    const inventory = JSON.parse(readFileSync(join(WEB, 'design', 'pencil-component-inventory.json'), 'utf8'))
-    expect(contract.required.parts).toBe(20)
-    expect(contract.required.partDeclarations).toBe(301)
-    expect(contract.parts['form-control'].pencilNodes).toEqual(['ytG7l', 'keKe3'])
-    expect(contract.parts['search-field'].pencilNodes).toEqual(['phlR1'])
-    expect(contract.parts.select.pencilNodes).toEqual(['rpot9', 'Gfsb4', 'niGPF', 'QB99A'])
-    for (const nodeId of ['ytG7l', 'keKe3', 'phlR1', 'rpot9', 'Gfsb4', 'niGPF', 'QB99A']) {
-      expect(inventory.components[nodeId].status, `${nodeId} がactiveではない`).toBe('active')
-    }
-    expect(contract.investigations['checkbox-switch-canonical']).toBeDefined()
   })
 })

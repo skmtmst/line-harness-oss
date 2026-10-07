@@ -7,31 +7,6 @@ const here = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(join(here, 'page.tsx'), 'utf8')
 
 describe('V6 シナリオ作成・配信方式 cCB7r', () => {
-  it('画面名を上部バーだけに置き、本文はパンくずとキャンセルから始める', () => {
-    expect(page).toContain("usePageTitle('シナリオを作成')")
-    expect(page).not.toContain("import Header from '@/components/layout/header'")
-    expect(page).not.toContain('<Header')
-    expect(page).toContain('<span>新規作成</span>')
-    expect(page).toContain('キャンセル')
-  })
-
-  it('Pencilの実Nodeと3段の進み方を表示する', () => {
-    expect(page).toContain('data-design-node="cCB7r"')
-    /*
-      段の見た目は共通部品（`components/shared/stepper`）へ移した。
-      **同じ形を2か所で別々に書かない**ため。`aria-label` と ✓ の出し方は
-      部品側の試験（`stepper.test.tsx`）が見張る。ここでは
-      **この画面が3段を、正しい名前と状態で渡しているか**を見る。
-    */
-    expect(page).toContain("import Stepper from '@/components/shared/stepper'")
-    expect(page).toContain('label="シナリオ作成の進み方"')
-    // id なし（新規）は名前と方式をこの画面でまとめて決めるので1段目は current。
-    // id あり（既存の下書きを開いた）は1段目は済んでいる（#949 N-055）。
-    expect(page).toContain("{ label: 'シナリオ情報', state: id ? 'done' : 'current' }")
-    expect(page).toContain("{ label: '配信方式', state: 'current' }")
-    expect(page).toContain("{ label: '1通目を設定', state: 'todo' }")
-  })
-
   it('既存のシナリオ用フォルダを読み、名前と分類を同じ受け口へ保存する', () => {
     /*
      * SCENARIO-20: フォルダはシナリオ所属（共通なら選択中）のアカウントで

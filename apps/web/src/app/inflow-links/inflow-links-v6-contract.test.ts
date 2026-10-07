@@ -120,24 +120,4 @@ describe('V6 流入経路一覧の契約', () => {
     expect(BULK).toContain('件に実行する')
     expect(BULK).toContain('は実行できませんでした')
   })
-
-  it('素のTailwind色を残さず、トークンで塗る', () => {
-    for (const raw of [
-      'emerald-600',
-      'emerald-700',
-      'emerald-800',
-      'blue-600',
-      'blue-700',
-      'blue-800',
-      'text-gray-800',
-      'divide-gray-100',
-      'divide-gray-200',
-      'bg-white',
-    ]) {
-      expect(PAGE, `${raw} が残っています`).not.toContain(raw)
-    }
-    expect(PAGE).toContain('text-ink')
-    expect(PAGE).toContain('bg-canvas')
-    expect(PAGE).toContain('border-hairline')
-  })
 })

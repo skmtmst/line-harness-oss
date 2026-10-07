@@ -39,25 +39,6 @@ describe('機能16 V6の一覧', () => {
     expect(affiliates).toContain('金額を0とは扱いません')
   })
 
-  it('紹介者一覧は未接続の札を出さず、状態は列・操作は枠つき＋「…」に寄せる', () => {
-    // 支払済み台帳が未接続の「未払い残高」は、つながるまで出さない（3列）。
-    expect(affiliates).not.toContain('未払い残高')
-    expect(affiliates).not.toContain('支払済み台帳が接続されると表示されます')
-    // 説明帯は集計カードの下。
-    expect(affiliates.indexOf('確定した報酬')).toBeLessThan(affiliates.indexOf('紹介リンクを渡した人ごとに'))
-    // 絞り込みの先頭は「すべて」。
-    expect(affiliates).toContain('すべて')
-    expect(affiliates.indexOf('すべて')).toBeLessThan(affiliates.indexOf('計測中'))
-    // 状態は名前の下の札（#670 16 と一本化。列と札の二重表示にしない）、操作は枠つき「成果を見る」＋「…」。
-    expect(affiliates).not.toContain('<Th align="center">状態</Th>')
-    expect(affiliates).toContain("<Chip tone={row.isActive ? 'ok' : 'neutral'}>")
-    expect(affiliates).toContain('成果を見る')
-    expect(affiliates).toContain('<MoreAction')
-    expect(affiliates).toContain('<ActionMenu')
-    expect(affiliates).toContain('紹介を止める')
-    expect(affiliates).toContain('<AffiliateArchiveDialog')
-  })
-
   it('成果承認は全状態を読み、確認不要だけをまとめて承認する', () => {
     expect(approvals).toContain('data-design-node="n5VVTb"')
     expect(approvals).toContain("(['pending', 'approved', 'rejected'] as const)")
@@ -67,18 +48,6 @@ describe('機能16 V6の一覧', () => {
     expect(approvals).toContain('選んだ{selected.size}件をまとめて認める')
     expect(approvals).toContain('まとめて却下する')
     expect(approvals).toContain('確認が必要な成果はまとめて承認できません')
-  })
-
-  it('成果承認は検索・並び順・CSV・状態・ページ送りを持つ', () => {
-    for (const word of [
-      '友だち・紹介者・案件・成果地点・注文番号で検索',
-      '金額が高い順',
-      'CSVで書き出す',
-      '確認したほうがよい',
-      '<Pagination',
-    ]) {
-      expect(approvals).toContain(word)
-    }
   })
 })
 

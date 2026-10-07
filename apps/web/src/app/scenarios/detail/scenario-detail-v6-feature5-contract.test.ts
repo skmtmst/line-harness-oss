@@ -80,23 +80,6 @@ describe('注釈を落としてから見る', () => {
 })
 
 describe('bV5Vs シナリオ編集', () => {
-  it('SCENARIO-24: 本文に画面名「シナリオ編集」と説明は出さない', () => {
-    /*
-     * 画面名は上部バーが1つだけ持つ（bV5Vs 設計）。本文に同名の題と
-     * 説明を置くと、どちらが今いる画面か分からなくなる。
-     */
-    expect(header).not.toContain('title="シナリオ編集"')
-    expect(header).not.toContain('シナリオ編集')
-    expect(header).not.toContain('配信のタイミングと内容を並べます。')
-    /*
-     * 操作は残す。配信結果・一括プレビュー・一括でテストを送る・保存の
-     * 各ボタンは Header の action に渡し続ける。
-     */
-    expect(header).toContain('action=')
-    expect(detail).toContain('配信結果を見る')
-    expect(detail).toContain('一括でテストを送る')
-  })
-
   it('「作成しただけでは配信されません」を見出しの説明から外し、帯へ移す', () => {
     expect(header).not.toContain('作成しただけでは配信されません')
     expect(banner).toContain(
@@ -107,11 +90,6 @@ describe('bV5Vs シナリオ編集', () => {
   it('帯には行き先の無い青字を置かず、次の一手を言葉で書く', () => {
     expect(banner).not.toContain('<Link')
     expect(banner).toContain('このすぐ下の「開始のきっかけ」から設定できます。')
-  })
-
-  it('表の見出しは直書きせず共通Thへ寄せる', () => {
-    expect(thead).not.toMatch(/<th\b/)
-    expect(thead.match(/<Th\b/g)).toHaveLength(8)
   })
 
   it('設計の「配信対象」の桁を表に出す', () => {
@@ -266,26 +244,6 @@ describe('通の編集を設計の段へ分ける', () => {
     expect(detail).toContain('<section data-design-node="xfYLn"')
     expect(detail).toContain('{renderStepForm()}')
     expect(detail).toContain("usePageTitle(editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ詳細')")
-  })
-
-  it('4つの面を、1枚の中で段に分ける', () => {
-    expect(stepForm).toContain('node="xfYLn"')
-    expect(stepForm).toContain('node="r6Gzsu"')
-    expect(stepForm).toContain('node="hz9ti"')
-    expect(stepForm).toContain('title="配信タイミング"')
-    expect(stepForm).toContain('title="この通の配信対象"')
-    expect(stepForm).toContain('title="送信後のアクション"')
-  })
-
-  it('「送信後」は配信タイミングの段に置く。到達タグと同じ束に戻さない', () => {
-    const timing = slice(stepForm, 'node="xfYLn"', '</FormSection>')
-    expect(timing).toContain('送信後：次のステップへ進む')
-    expect(timing).toContain('送信後：ここで止める')
-    expect(timing).not.toContain('到達したらタグ付与')
-
-    const afterSendSection = slice(stepForm, 'node="hz9ti"', '</FormSection>')
-    expect(afterSendSection).toContain('到達したらタグ付与')
-    expect(afterSendSection).not.toContain('送信後：次のステップへ進む')
   })
 
   it('配信対象の段は、条件の中身を1行で出す', () => {

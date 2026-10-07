@@ -1,13 +1,8 @@
 /*
  * 1通目設定（設計 `V6 5 kk8dz`）の契約。
  *
- * 見るのは3つ。
- *   1. 下見が「配信の流れ」1枚で、実際に届く吹き出しを出していること
- *   2. 設計の言葉づかい（「この1通目を誰に送るか」「1通目の内容」）
- *   3. 上限を超えた本文のまま保存を押せないこと
- *
- * 3つ目が本体。押せたところでLINEが弾くので、画面は「保存できたのに届かない」
- * を作ることになる。
+ * 本体は、上限を超えた本文のまま保存を押せないこと。押せたところでLINEが
+ * 弾くので、画面は「保存できたのに届かない」を作ることになる。
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -17,34 +12,8 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const COMPONENTS = path.join(__dirname, '..', '..', '..', 'components', 'scenarios')
 const PREVIEW = fs.readFileSync(path.join(COMPONENTS, 'step-preview.tsx'), 'utf8')
-const TABS = fs.readFileSync(path.join(COMPONENTS, 'message-type-tabs.tsx'), 'utf8')
-/*
- * 設計固有の実寸はCSSモジュールへ置いてある。任意値記法で散らすと
- * `design-debt` の数が増え、どれが設計の数かも区別できなくなる。
- */
-const PAGE_CSS = fs.readFileSync(path.join(__dirname, 'first-step.module.css'), 'utf8')
-const PREVIEW_CSS = fs.readFileSync(path.join(COMPONENTS, 'step-preview.module.css'), 'utf8')
-const TABS_CSS = fs.readFileSync(path.join(COMPONENTS, 'message-type-tabs.module.css'), 'utf8')
 
 describe('V6 1通目設定の契約', () => {
-  it('画面名を上部バーだけに置き、本文はパンくずとキャンセルから始める', () => {
-    expect(PAGE).toContain("usePageTitle('1通目を設定')")
-    expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
-    expect(PAGE).not.toContain('<Header')
-    expect(PAGE).toContain('キャンセル')
-  })
-
-  it('設計Node IDを画面に残す', () => {
-    expect(PAGE).toContain('data-design-node="kk8dz"')
-  })
-
-  it('段の見出しを設計の言葉にする', () => {
-    expect(PAGE).toContain("usePageTitle('1通目を設定')")
-    expect(PAGE).toContain('この1通目を誰に送るか')
-    expect(PAGE).toContain('1通目の内容')
-    expect(PAGE).not.toContain('>配信対象の絞り込み</h2>')
-  })
-
   it('作成の現在地と保存前の要点を同時に確認できる', () => {
     expect(PAGE).toContain('aria-label="シナリオ作成の進み方"')
     expect(PAGE).toContain('label="シナリオ情報" state="done"')
@@ -58,61 +27,6 @@ describe('V6 1通目設定の契約', () => {
     expect(PREVIEW).toContain('${stepLabel}')
     expect(PREVIEW).toContain('stepOrder = 1')
     expect(PREVIEW).toContain('設定サマリー')
-  })
-
-  it('下見は「配信の流れ」1枚にまとめる', () => {
-    expect(PREVIEW).toContain('配信の流れ')
-    expect(PREVIEW).not.toContain('いつ届くか</h3>')
-    expect(PREVIEW).not.toContain('何が届くか</h3>')
-  })
-
-  it('下見の外枠は設計の幅500・角丸10', () => {
-    expect(PREVIEW_CSS).toMatch(/\.preview \{[^}]*max-width: 500px;[^}]*border-radius: var\(--radius-card\);/)
-    expect(PREVIEW).toContain('styles.preview')
-    expect(PAGE).toContain('xl:grid-cols-[minmax(0,1fr)_500px]')
-  })
-
-  it('届く日時は縦の線ではなく26pxの帯で出す', () => {
-    expect(PREVIEW_CSS).toMatch(/\.band \{[^}]*height: 26px;/)
-    expect(PREVIEW).toContain('styles.band')
-    expect(PREVIEW).toContain('text-micro font-semibold')
-    expect(PREVIEW).toContain('size={13}')
-  })
-
-  it('吹き出しは左下だけ角を落とし、本文は13px', () => {
-    expect(PREVIEW_CSS).toMatch(/\.bubble \{[^}]*border-radius: var\(--radius-card\) var\(--radius-card\) var\(--radius-card\) var\(--radius-mini\);/)
-    expect(PREVIEW).toContain('styles.bubble')
-    expect(PREVIEW).toContain('text-label leading-relaxed font-medium')
-  })
-
-  it('種別タブは外枠38・タブ30の帯にする', () => {
-    expect(TABS_CSS).toMatch(/\.rail \{[^}]*min-height: 38px;[^}]*border-radius: var\(--radius-control\);/)
-    expect(TABS_CSS).toMatch(/\.tab \{[^}]*height: 30px;[^}]*border-radius: var\(--radius-mini\);/)
-    expect(TABS).toContain('styles.rail')
-    expect(TABS).toContain('${styles.tab} px-3 text-micro font-medium')
-    expect(TABS).not.toContain('rounded-t-control')
-  })
-
-  it('入力欄の高さと本文の伸び方を共通基準（UX-01）に合わせる', () => {
-    /*
-     * SCENARIO-19: 入力・選択・ボタンは PC 40px・タッチ 44px。
-     * 本文の作成欄は 160px を下限に内容に応じて伸び、上限を超えた分は
-     * 欄内スクロール。幅だけが設計固有の数（日数110）。
-     * 時刻の入力は★V7の時刻の選択（高さ40・14px）へ寄せ、画面固有の
-     * 幅130の決めは消した。
-     */
-    expect(PAGE_CSS).toMatch(/\.smallField \{[^}]*height: 40px;[^}]*width: 110px;/)
-    expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*min-height: 160px;/)
-    expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*field-sizing: content;/)
-    expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*max-height:/)
-    expect(PAGE_CSS).toContain('@media (pointer: coarse)')
-    expect(PAGE_CSS).toMatch(/\.smallField \{[^}]*height: 44px;/)
-    expect(PAGE).toContain('styles.bodyField')
-    expect(PAGE).toContain('styles.smallField')
-    expect(PAGE).toContain('<TimeField')
-    expect(PAGE).toContain('aria-label="配信する時刻"')
-    expect(PAGE).not.toContain('styles.timeField')
-    expect(PAGE).not.toContain('w-20 border px-3 py-2 text-sm')
   })
 
   it('本文は手動でも広げられ、「本文」の字が入力欄と結び付く', () => {

@@ -1,16 +1,10 @@
 {
   "$説明": [
-    "Pencil V5を共通基盤とし、対象にV6がある場合はV6を優先して写した検証用スナップショット。**正本はPencilの .pen ファイル**であって、このJSONではない。",
+    "本番の v7 の部品の値を写した検証用スナップショット（V5/V6 を優先する決まりは 2026-10-08 に外した）。見た目の正本は ★V8 の絵（docs/v8-design-rules.md）。値を写した元は Pencil の .pen ファイルであって、このJSONではない。",
     "Pencilは暗号化されていてCIから読めないため、値をここへ写して機械で照合できるようにしている。",
     "値を変えるときは必ずPencilを先に直し、そのあとここへ写す。"
   ],
   "$pencilFile": "4b332ccf-fe84-4df8-9e23-6554f2bef197/pencil-new.pen",
-  "$designPriority": {
-    "base": "V5",
-    "override": "対象画面・部品にV6が存在する場合はV6",
-    "tokenResult": "V6もV5と同じグローバル変数を参照しているため、PR #1の12トークンにV6専用上書きは不要",
-    "lastCheckedAt": "2026-08-24"
-  },
   "$componentInventory": {
     "file": "design/pencil-component-inventory.json",
     "requiredCount": 87,
@@ -19,33 +13,7 @@
       "feature",
       "screen"
     ],
-    "requiredVersionBase": "V5",
     "summary": "Pen.devの再利用部品85件を、全画面共通・機能群共通・画面専用へ分類し、状態・props・V5/V6差・影響候補ルート・移行方針を固定する。",
-    "lastCheckedAt": "2026-08-24"
-  },
-  "$v6Verification": {
-    "representativeNodes": [
-      "WQhu3",
-      "G1pfMk",
-      "kAnOQ",
-      "u5zVV0",
-      "FH74x",
-      "HNUSO",
-      "MyusN",
-      "WGM4x",
-      "FawJ8",
-      "owlEd"
-    ],
-    "summary": "受信箱・一斉配信・リマインダ・自動応答・テンプレート・リッチメニュー・回答フォーム・予約管理・運用状態・店舗ダッシュボードのV6代表10画面で全12トークンの利用を確認",
-    "partResult": "V6代表10画面で tPTMp はV5と同じ再利用部品を54回使用。Blot6は受信箱を除く9画面で同じ再利用部品を使用。V6のKPIはXywGrのrefではなく直接配置だが、色トークンは共通で高さ・余白・文字だけが異なるためSummaryCardのv6 variantへ固定した。mNUQ3はbroadcast variantへ統合した。",
-    "partReferences": {
-      "nBRKk": 0,
-      "uzNEC": 0,
-      "XywGr": 0,
-      "mNUQ3": 4,
-      "tPTMp": 54,
-      "Blot6": 9
-    },
     "lastCheckedAt": "2026-08-24"
   },
   "$status": {
@@ -68,15 +36,6 @@
     "tokens": 21,
     "parts": 20,
     "componentInventory": 87,
-    "v6RepresentativeNodes": 10,
-    "v6PartNodes": [
-      "nBRKk",
-      "uzNEC",
-      "XywGr",
-      "mNUQ3",
-      "tPTMp",
-      "Blot6"
-    ],
     "pencilNodes": [
       "XywGr",
       "nBRKk",
@@ -2105,8 +2064,7 @@
       "routes": {
         "active": [
           "/staff/new",
-          "/reminders/new",
-          "/visual-qa/friend-attributes?state=controls"
+          "/reminders/new"
         ],
         "impact": "入力欄を持つ管理画面"
       },
@@ -2226,8 +2184,7 @@
         "active": [
           "/friends",
           "/tags",
-          "/scenarios",
-          "/visual-qa/friend-attributes?state=controls"
+          "/scenarios"
         ],
         "impact": "一覧検索を持つ管理画面"
       },
@@ -2358,8 +2315,7 @@
           "/friends",
           "/staff/new",
           "/tags",
-          "/scenarios",
-          "/visual-qa/friend-attributes?state=controls"
+          "/scenarios"
         ],
         "impact": "選択欄を持つ管理画面"
       },
@@ -3550,9 +3506,7 @@
       "lastCheckedAt": "2026-08-24",
       "note": "開・読込・空・失敗・未読とフィルター操作まで実装した。既存に通知センターAPIとベル入口がないため実画面へはまだ接続しない。",
       "routes": {
-        "implemented": [
-          "/visual-qa/friend-attributes?state=overlays-notification-panel"
-        ],
+        "implemented": [],
         "impact": "通知入口を持つ管理画面"
       },
       "visualVerification": {
@@ -3761,35 +3715,6 @@
           "resolved": "#087a3e"
         }
       ]
-    },
-    "slide-panel": {
-      "name": "V8 手順・タブの中身の移り変わり",
-      "pencilNodes": [],
-      "role": "canonical",
-      "status": "active",
-      "reviewStatus": "confirmed",
-      "code": "src/components/shared/slide-panel.tsx",
-      "cssModule": "src/components/shared/slide-panel.module.css",
-      "components": [
-        "SlidePanel"
-      ],
-      "cssPrefix": "slide-panel",
-      "pencilUsage": "手順・タブの切り替えの中身",
-      "lastCheckedAt": "2026-10-04",
-      "note": "次へは右から24px＋薄く、戻るは逆（240ms glide）。V8 のときだけ。",
-      "routes": {
-        "active": [],
-        "impact": "手順・タブのある管理画面"
-      },
-      "visualVerification": {
-        "status": "unverified",
-        "requiredViewports": [
-          1440,
-          1152
-        ],
-        "reason": "司令塔が録画で確かめる。"
-      },
-      "declarations": []
     }
   },
   "investigations": {

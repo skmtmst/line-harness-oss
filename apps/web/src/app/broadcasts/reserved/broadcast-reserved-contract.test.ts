@@ -82,16 +82,6 @@ describe('V6 一斉配信の予約完了', () => {
     expect(PAGE).toContain('const scheduledLabel = formatJst(broadcast.scheduledAt)')
   })
 
-  it('設計の5段と予約要約を表示する', () => {
-    expect(PAGE).toContain('<BroadcastStepRail')
-    for (const label of ['基本設定', '対象者', 'メッセージ', '送信設定', '確認']) {
-      expect(PAGE).toContain(`label: '${label}'`)
-    }
-    for (const label of ['管理名', '配信対象', '送信予定', '状態']) {
-      expect(PAGE).toContain(`['${label}'`)
-    }
-  })
-
   it('予約後の操作は本物のAPIまたは実在する画面へつなぐ', () => {
     expect(PAGE).toContain('api.broadcasts.testSend(broadcast.id)')
     expect(PAGE).toContain('api.broadcasts.create({')
