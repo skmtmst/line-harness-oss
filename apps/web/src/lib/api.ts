@@ -5768,6 +5768,7 @@ export type FriendAddRuleConflictData = {
 }
 
 export type FriendAddRunList = {
+  period?: { key: string; from: string | null; to: string | null }
   items: Array<{
     id: string
     receivedAt: string
@@ -5791,6 +5792,11 @@ export type FriendAddRunList = {
   total: number
   nextCursor: string | null
   summary: {
+    capturedFriends?: number
+    returning?: number
+    testPending?: number | null
+    testPendingState?: { state: 'unavailable'; reason: string }
+    failureKinds?: Array<{ kind: 'delivery_unknown' | 'delivery_failed' | 'action_failed' | 'invalid_reference' | 'other'; count: number }>
     /** 直近28日に追加された人数（同じ人の再追加は1人）。 */
     recentFriends: number
     /** 直近28日の追加記録の件数（同じ人の再追加も数える）。 */
@@ -11153,6 +11159,9 @@ export const api = {
         },
       ),
     runs: (accountId: string, params?: {
+      period?: 'all' | 'last28days' | 'today' | 'this_month' | 'last_month'
+      from?: string
+      to?: string
       status?: FriendAddEventRoutingStatus
       ruleId?: string
       /** 追加の種類での絞り込み。サーバ側で全ページに効かせる。 */
@@ -11163,6 +11172,9 @@ export const api = {
       limit?: number
     }) => {
       const query = new URLSearchParams({ account_id: accountId })
+      if (params?.period) query.set('period', params.period)
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       if (params?.status) query.set('status', params.status)
       if (params?.ruleId) query.set('rule_id', params.ruleId)
       if (params?.kind) query.set('kind', params.kind)

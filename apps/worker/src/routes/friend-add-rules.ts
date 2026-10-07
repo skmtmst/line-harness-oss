@@ -719,9 +719,39 @@ function runFriendReadModel(
   return { id: row.friend_id, displayName: row.display_name, redacted: false };
 }
 
+type RunPeriod = { from: string | null; to: string | null };
+function runPeriod(period: string | undefined, from: string | undefined, to: string | undefined): RunPeriod | null {
+  const validDay = (day: string) => /^\d{4}-\d{2}-\d{2}$/.test(day) && !Number.isNaN(Date.parse(day)) && new Date(day).toISOString().slice(0, 10) === day;
+  if (from || to) {
+    if (period || (from && !validDay(from)) || (to && !validDay(to)) || (from && to && from > to)) return null;
+    return { from: from ? `${from}T00:00:00+09:00` : null, to: to ? new Date(Date.parse(`${to}T00:00:00+09:00`) + 86400000).toISOString() : null };
+  }
+  const now = new Date();
+  const jst = new Date(now.getTime() + 9 * 3600000);
+  const day = jst.toISOString().slice(0, 10);
+  const month = day.slice(0, 7);
+  if (!period || period === 'all') return { from: null, to: null };
+  if (period === 'last28days') return { from: new Date(now.getTime() - 28 * 86400000).toISOString(), to: null };
+  if (period === 'today') return { from: `${day}T00:00:00+09:00`, to: new Date(Date.parse(`${day}T00:00:00+09:00`) + 86400000).toISOString() };
+  if (period === 'this_month') return { from: `${month}-01T00:00:00+09:00`, to: new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth() + 1, 1) - 9 * 3600000).toISOString() };
+  if (period === 'last_month') return { from: new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth() - 1, 1) - 9 * 3600000).toISOString(), to: `${month}-01T00:00:00+09:00` };
+  return null;
+}
+function runFailureKind(code: string | null): 'delivery_unknown' | 'delivery_failed' | 'action_failed' | 'invalid_reference' | 'other' | null {
+  if (!code) return null;
+  if (code === 'delivery_unknown') return 'delivery_unknown';
+  if (code === 'send_failed' || code === 'send_claim_unavailable') return 'delivery_failed';
+  if (code === 'action_failed') return 'action_failed';
+  if (code === 'reference_out_of_account' || code === 'entry_route_stopped') return 'invalid_reference';
+  return 'other';
+}
+
 friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'), async (c) => {
   const isStaff = c.get('staff').role === 'staff';
   const accountId = accountIdFrom(c);
+  const range = runPeriod(c.req.query('period'), c.req.query('from'), c.req.query('to'));
+  const periodSpecified = Boolean(c.req.query('period') || c.req.query('from') || c.req.query('to'));
+  if (!range) return c.json({ success: false, error: '期間が正しくありません' }, 400);
   const status = c.req.query('status');
   const ruleId = c.req.query('rule_id');
   const kind = c.req.query('kind');
@@ -739,6 +769,8 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
     if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
     const clauses = ['e.line_account_id = ?'];
     const bindings: Array<string | number> = [accountId];
+    if (range.from) { clauses.push(`julianday(CASE WHEN substr(e.occurred_at, -1) = 'Z' OR substr(e.occurred_at, -6, 1) IN ('+', '-') THEN e.occurred_at ELSE e.occurred_at || '+09:00' END) >= julianday(?)`); bindings.push(range.from); }
+    if (range.to) { clauses.push(`julianday(CASE WHEN substr(e.occurred_at, -1) = 'Z' OR substr(e.occurred_at, -6, 1) IN ('+', '-') THEN e.occurred_at ELSE e.occurred_at || '+09:00' END) < julianday(?)`); bindings.push(range.to); }
     if (status) { clauses.push('e.routing_status = ?'); bindings.push(status); }
     if (ruleId) { clauses.push('e.routing_rule_id = ?'); bindings.push(ruleId); }
     // 種類・経路の絞り込みはサーバ側で行う。取得済み20件への表示絞りでは
@@ -756,7 +788,7 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
       listClauses.push('(e.occurred_at < ? OR (e.occurred_at = ? AND e.id < ?))');
       listBindings.push(cursor.occurredAt, cursor.occurredAt, cursor.id);
     }
-    const [result, summary] = await Promise.all([
+    const [result, summary, failures] = await Promise.all([
       c.env.DB.prepare(
         `SELECT e.id, e.friend_id, f.display_name, e.friend_kind, e.attribution_status,
                 e.entry_route_id, er.name AS entry_route_name, e.ref_code,
@@ -800,7 +832,11 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
        * 処理時刻（届いていない記録を含む）とは別物（R266）。
        */
       c.env.DB.prepare(
-        `SELECT COUNT(DISTINCT CASE WHEN REPLACE(e.occurred_at, ' ', 'T') >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-28 days') THEN e.friend_id END) AS recent_friends,
+        `SELECT COUNT(DISTINCT CASE WHEN e.attribution_status = 'captured' THEN e.friend_id END) AS captured_friends,
+                SUM(CASE WHEN e.friend_kind = 'returning' THEN 1 ELSE 0 END) AS returning_runs,
+                COUNT(DISTINCT e.friend_id) AS period_friends,
+                COUNT(*) AS period_events,
+                COUNT(DISTINCT CASE WHEN REPLACE(e.occurred_at, ' ', 'T') >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-28 days') THEN e.friend_id END) AS recent_friends,
                 SUM(CASE WHEN REPLACE(e.occurred_at, ' ', 'T') >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-28 days') THEN 1 ELSE 0 END) AS recent_events,
                 SUM(e.delivery_count) AS delivery_count,
                 SUM(CASE WHEN e.routing_status IN ('failed', 'partial_failed') THEN 1 ELSE 0 END) AS failed_runs,
@@ -811,11 +847,20 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
            FROM friend_add_events e
           WHERE ${clauses.join(' AND ')}`,
       ).bind(...bindings).first<{
+        captured_friends: number; returning_runs: number; period_friends: number; period_events: number;
         recent_friends: number; recent_events: number | null; delivery_count: number | null;
         failed_runs: number | null; average_send_ms: number | null; scenario_starts: number | null;
         last_delivery_at: string | null;
       }>(),
+      c.env.DB.prepare(`SELECT e.error_code, COUNT(*) AS count FROM friend_add_events e
+        WHERE ${clauses.join(' AND ')} AND e.routing_status IN ('failed', 'partial_failed') GROUP BY e.error_code`)
+        .bind(...bindings).all<{ error_code: string | null; count: number }>(),
     ]);
+    const failureCounts = new Map<string, number>();
+    for (const failure of failures.results ?? []) {
+      const kind = runFailureKind(failure.error_code) ?? 'other';
+      failureCounts.set(kind, (failureCounts.get(kind) ?? 0) + failure.count);
+    }
     const allRows = result.results ?? [];
     const items = allRows.slice(0, limit);
     return c.json({
@@ -849,12 +894,19 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
           deliveryCount: row.delivery_count,
           status: row.routing_status,
           errorCode: row.error_code,
+          failureKind: row.routing_status === 'failed' || row.routing_status === 'partial_failed' ? runFailureKind(row.error_code) ?? 'other' : null,
         })),
+        period: { key: c.req.query('period') ?? (periodSpecified ? 'custom' : 'all'), ...range },
         total: total?.count ?? 0,
         nextCursor: allRows.length > limit && items.length > 0 ? makeRunCursor(items[items.length - 1]) : null,
         summary: {
-          recentFriends: summary?.recent_friends ?? 0,
-          recentEvents: summary?.recent_events ?? 0,
+          recentFriends: (periodSpecified ? summary?.period_friends : summary?.recent_friends) ?? 0,
+          recentEvents: (periodSpecified ? summary?.period_events : summary?.recent_events) ?? 0,
+          capturedFriends: summary?.captured_friends ?? 0,
+          returning: summary?.returning_runs ?? 0,
+          testPending: null,
+          testPendingState: { state: 'unavailable', reason: '実行記録にテスト待ちを区別する情報がありません' },
+          failureKinds: Array.from(failureCounts, ([kind, count]) => ({ kind, count })),
           cumulativeDeliveries: summary?.delivery_count ?? 0,
           scenarioStarts: summary?.scenario_starts ?? 0,
           averageSendTimeMs: summary?.average_send_ms == null ? null : Math.max(0, Math.round(summary.average_send_ms)),
@@ -942,6 +994,7 @@ friendAddRules.get('/api/friend-add-runs/:id', requireRole('owner', 'admin', 'st
         })),
         status: row.routing_status,
         errorCode: row.error_code,
+        failureKind: row.routing_status === 'failed' || row.routing_status === 'partial_failed' ? runFailureKind(row.error_code) ?? 'other' : null,
       },
     });
   } catch (error) {
