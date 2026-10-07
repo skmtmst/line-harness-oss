@@ -37,4 +37,6 @@
 ## 見た目の決めごと
 - 窓の枠は `frame.tsx`（共通の `useOverlayFocus` でフォーカス・Esc・背景で閉じる・処理中は閉じない）。共通の窓は見出しの行の余白と説明の文字が絵と違い、説明が8上・2行に折れるため使っていない。
 - 生成パネルと参照画像を選ぶ窓は、共通の `components/hq/banners/generation-panel`・`reference-picker-dialog` をそのまま使う（2026-10-05〜06 にオーナーが ★BG-B・★BG-C で決めた形。絵 `iMnph`・`UcBQ5` は決定前の古い形）。
+- プロジェクトの中の下の帯は、承認済み ★BG-B `qIp42` の `X2oLn`「下部追従バー」どおり **左=残り枚数（`M118zK`）／中=書き出す大きさの札（`WDJak`）／右=条件をクリア（`wCvLN`）＋生成する（`abZle`）**。生成中は `An26R`「帯（生成中）」で、右が「生成をやめる」（`CzXI2`）＋押せない「生成中…」（`q9hrn`）。共通の `components/shared/sticky-bar` を使い、札は `components/hq/banners/export-size-chip`。
+  - **変えた所**：生成ボタンをパネルの中の全幅ボタン、大きさと「条件をクリア」をその下の行に置いていたが、絵と配置が違っていた（2026-10-07 の差し戻し2件）。v7（`app/hq/banners/project/page.tsx`）と同じ並びにそろえた。止める操作は帯だけに置き、作っている最中の注記（`k7sbSR`）からボタンを外した（同じ操作が2か所に出ていた）。閲覧のみの人には押せないボタンを置かないので帯ごと出さない。
 - 値は `globals.css` の `[data-theme="v8"]` の `--tpl-hb-*`。

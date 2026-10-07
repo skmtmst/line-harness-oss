@@ -67,9 +67,24 @@ describe('札の置き場所', () => {
     expect(v7).toMatch(/info=\{[\s\S]{0,200}ExportSizeChip/)
   })
 
-  it('v8 も同じ札を下の行に置く（薄い文字で出し直さない）', () => {
-    expect(v8).toContain('ExportSizeChip')
+  /*
+   * 2026-10-07 の2度目の差し戻し: 札の見た目は合っていたが、v8 だけ
+   * パネルの中（`panelFoot`）に置いていて、承認済み `qIp42` の
+   * 下部追従バー `X2oLn` と配置が違った。札も生成ボタンも帯に置く。
+   */
+  it('v8 も下部追従バーの `info`（中ほど）に札を渡す', () => {
+    expect(v8).toContain('StickyBar')
+    expect(v8).toMatch(/info=\{[\s\S]{0,200}ExportSizeChip/)
+    // パネルの中の下の行へ戻していないこと。
+    expect(v8).not.toMatch(/styles\.panelFoot/)
     expect(v8).not.toMatch(/styles\.hint\}>\{exportSizeText/)
+  })
+
+  it('v8 の生成・やめる操作も帯に置く（パネルの全幅ボタンへ戻さない）', () => {
+    expect(v8).not.toMatch(/styles\.full/)
+    // 止める操作は帯の「生成をやめる」だけ。作っている最中の注記には置かない。
+    expect(v8).not.toMatch(/>止める</)
+    expect(v8).toMatch(/>生成をやめる</)
   })
 
   it('v7・v8 とも寸法の文は `exportSizeText` から組む（決め打ちしない）', () => {
