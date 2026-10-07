@@ -6,8 +6,7 @@ import { Check, Eye, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X 
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
 import Button from '@/components/shared/button'
-import ActionMenu from '@/components/shared/action-menu'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Chip from '@/components/shared/chip'
@@ -1233,7 +1232,7 @@ function PublicationsV8({
                             busyLabel="外しています..."
                           >
                             掲載先から外す
-                          </Button><MoreAction aria-label={`${name}の掲載操作`} onClick={() => setMenuId(menuId === text(item.id) ? null : text(item.id))} /><ActionMenu open={menuId === text(item.id)} onClose={() => setMenuId(null)} items={[{ id: 'placements', label: '使う場所', onSelect: () => openPlacements(item) }]} /></div> : null}
+                          </Button><RowMenu appearance="plain" label={`${name}の掲載操作`} menuLabel="操作" triggerProps={{ title: 'そのほかの操作' }} open={menuId === text(item.id)} onOpenChange={(next) => setMenuId(next ? text(item.id) : null)} items={[{ id: 'placements', label: '使う場所', onSelect: () => openPlacements(item) }]} /></div> : null}
                         </Td>
                       </Tr>
                     )

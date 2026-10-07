@@ -7,9 +7,9 @@
  * 口・保存の決まりは app/webinars/edit/video-v8.tsx・video-stages.tsx・scheduled-session-row.tsx と同じ（BEHAVIOR.md）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CalendarPlus, Check, Monitor, MoreHorizontal, Play, Plus, Smartphone, Upload } from 'lucide-react'
+import { CalendarPlus, Check, Monitor, Play, Plus, Smartphone, Upload } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
@@ -234,13 +234,11 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
 
   const ruleMenu = (index: number, label: string, extra: Array<{ id: string; label: string; onSelect: () => void }> = []) => readOnly ? null : (
     <div className={form.menuBox}>
-      <IconButton aria-label={`${label}の操作`} title={`${label}の操作`} aria-haspopup="menu" aria-expanded={menuOpen === index} disabled={busy} onClick={() => setMenuOpen((current) => (current === index ? null : index))}>
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </IconButton>
-      <ActionMenu
+      <RowMenu
+        label={`${label}の操作`}
+        triggerProps={{ disabled: busy }}
         open={menuOpen === index}
-        onClose={() => setMenuOpen(null)}
-        ariaLabel={`${label}の操作`}
+        onOpenChange={(next) => setMenuOpen(next ? index : null)}
         items={[
           ...extra,
           { id: 'duplicate', label: '複製する', onSelect: () => duplicateRule(index) },

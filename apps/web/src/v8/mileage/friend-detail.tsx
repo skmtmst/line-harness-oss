@@ -11,16 +11,16 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ChevronLeft, CircleDot, Clock3, MessageCircle, Minus, MoreHorizontal, Plus, Undo2 } from 'lucide-react'
+import { ChevronLeft, CircleDot, Clock3, MessageCircle, Minus, Plus, Undo2 } from 'lucide-react'
 import { DetailPage } from '@/components/templates'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import { Field } from '@/components/shared/form-controls'
 import { TextArea } from '@/components/shared/text-field'
-import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -479,15 +479,12 @@ function FriendDetailInner() {
                     <Td className={styles.colMenu}>
                       {menu.length > 0 ? (
                         <div className={styles.menuBox}>
-                          <IconButton
-                            aria-label="明細の操作"
-                            title="明細の操作"
-                            aria-expanded={menuId === item.id}
-                            onClick={() => setMenuId((current) => (current === item.id ? null : item.id))}
-                          >
-                            <MoreHorizontal size={16} aria-hidden="true" />
-                          </IconButton>
-                          <ActionMenu open={menuId === item.id} ariaLabel="明細の操作" onClose={() => setMenuId(null)} items={menu} />
+                          <RowMenu
+                            label="明細の操作"
+                            items={menu}
+                            open={menuId === item.id}
+                            onOpenChange={(next) => setMenuId(next ? item.id : null)}
+                          />
                         </div>
                       ) : null}
                     </Td>

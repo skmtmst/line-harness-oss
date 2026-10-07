@@ -14,7 +14,7 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Copy, Eye, Info, MoreHorizontal, Pause, Pencil, QrCode } from 'lucide-react'
+import { ArrowLeft, Copy, Eye, Info, Pause, Pencil, QrCode } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -23,10 +23,10 @@ import { formatNumber } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { DetailPage } from '@/components/templates'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -457,15 +457,13 @@ function InflowDetailContent() {
               <h2 className={styles.afterTitle} id="inflow-after-title">その後（この経路から来た人）</h2>
               {readonly ? null : (
                 <div className={styles.menuBox}>
-                  <IconButton
-                    title="この経路の操作（受付を止める・別リンクへ送る・削除する）"
-                    aria-label="この経路の操作（受付を止める・別リンクへ送る・削除する）"
-                    aria-expanded={afterMenuOpen}
-                    onClick={() => setAfterMenuOpen((current) => !current)}
-                  >
-                    <MoreHorizontal size={16} aria-hidden="true" />
-                  </IconButton>
-                  <ActionMenu open={afterMenuOpen} onClose={() => setAfterMenuOpen(false)} ariaLabel="この経路の操作" items={afterMenuItems} />
+                  <RowMenu
+                    label="この経路の操作（受付を止める・別リンクへ送る・削除する）"
+                    menuLabel="この経路の操作"
+                    items={afterMenuItems}
+                    open={afterMenuOpen}
+                    onOpenChange={setAfterMenuOpen}
+                  />
                 </div>
               )}
             </div>
@@ -655,18 +653,10 @@ function InflowDetailContent() {
                       <Td className={styles.colResult}><span className={styles.cellFaint}>{friend.conversion ?? '—'}</span></Td>
                       <Td className={styles.colMenu}>
                         <div className={styles.menuBox}>
-                          <IconButton
-                            title={`「${friend.displayName}」の操作`}
-                            aria-label={`「${friend.displayName}」の操作`}
-                            aria-expanded={openFriendMenuId === friend.id}
-                            onClick={() => setOpenFriendMenuId((current) => (current === friend.id ? null : friend.id))}
-                          >
-                            <MoreHorizontal size={16} aria-hidden="true" />
-                          </IconButton>
-                          <ActionMenu
+                          <RowMenu
+                            label={`「${friend.displayName}」の操作`}
                             open={openFriendMenuId === friend.id}
-                            onClose={() => setOpenFriendMenuId(null)}
-                            ariaLabel={`「${friend.displayName}」の操作`}
+                            onOpenChange={(next) => setOpenFriendMenuId(next ? friend.id : null)}
                             items={[
                               { id: 'view', label: '友だちを見る', onSelect: () => { setOpenFriendMenuId(null); router.push(`/friends/detail?id=${encodeURIComponent(friend.id)}`) } },
                               { id: 'chat', label: 'チャットを開く', onSelect: () => { setOpenFriendMenuId(null); router.push(`/chats?friend=${encodeURIComponent(friend.id)}`) } },

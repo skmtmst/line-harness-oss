@@ -6,9 +6,8 @@
  * 表示数の推移（今の画面の棒グラフ）は、数のマスの「…」→「表示数の推移を見る」で下に開く。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Eye, MapPin, MousePointerClick, MoreHorizontal, Phone } from 'lucide-react'
-import ActionMenu from '@/components/shared/action-menu'
-import IconButton from '@/components/shared/icon-button'
+import { Eye, MapPin, MousePointerClick, Phone } from 'lucide-react'
+import { RowMenu } from '@/components/shared/row-actions'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -85,10 +84,7 @@ function MetricMenu({ title, onShowTrend }: { title: string; onShowTrend: () => 
   const [open, setOpen] = useState(false)
   return (
     <span className={styles.menuBox}>
-      <IconButton aria-label={`${title}の操作`} title={`${title}の操作`} aria-expanded={open} className={styles.metricMenu} onClick={() => setOpen((v) => !v)}>
-        <MoreHorizontal aria-hidden className={styles.icon16} />
-      </IconButton>
-      <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel={`${title}の操作`} items={[{ id: 'trend', label: '表示数の推移を見る', onSelect: () => { setOpen(false); onShowTrend() } }]} />
+      <RowMenu className={styles.metricMenu} label={`${title}の操作`} open={open} onOpenChange={setOpen} items={[{ id: 'trend', label: '表示数の推移を見る', onSelect: () => { setOpen(false); onShowTrend() } }]} />
     </span>
   )
 }

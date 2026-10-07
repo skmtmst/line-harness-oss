@@ -20,7 +20,6 @@ import {
   GitBranch,
   Link2,
   ListChecks,
-  MoreHorizontal,
   PhoneOff,
   Plus,
   Radio,
@@ -34,7 +33,6 @@ import { formatNumber } from '@/lib/format'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
@@ -43,7 +41,8 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import { FolderDotName } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -345,19 +344,10 @@ export default function CommonActionsV8() {
                     <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
                         <Button href={versionsHref(item.id)}>中身を見る</Button>
-                        <IconButton
-                          title={menuLabel}
-                          aria-label={menuLabel}
-                          aria-haspopup="menu"
-                          aria-expanded={openMenuId === item.id}
-                          onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
-                        <ActionMenu
+                        <RowMenu
+                          label={menuLabel}
                           open={openMenuId === item.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={menuLabel}
+                          onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                           note={canEdit ? undefined : READONLY_REASON}
                           items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect() } }))}
                         />

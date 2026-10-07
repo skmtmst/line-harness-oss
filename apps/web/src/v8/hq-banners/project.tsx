@@ -12,14 +12,13 @@
  * 色2つ・参照画像1枚」の古い形で、2026-10-06 のオーナーの決定（切り替えと切り抜きを置かない・出力サイズの小箱・
  * 色4つ・参照画像3枚・強調）と食い違うため、決定どおりの今のパネルを残した。参照画像を選ぶ窓（承認済み ★BG-C）も同じ。
  */
-import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, MoreHorizontal, Pencil, Sparkles, Star, Upload } from 'lucide-react'
+import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Sparkles, Star, Upload } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
-import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -444,13 +443,12 @@ function ProjectInner() {
   const actions = canManage ? (
     <div className={styles.headActions}>
       <span className={styles.menuBox}>
-        <IconButton aria-label={`${project.name} のほかの操作`} title="ほかの操作" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)} disabled={busy}>
-          <MoreHorizontal size={16} aria-hidden="true" />
-        </IconButton>
-        <ActionMenu
+        <RowMenu
+          label={`${project.name} のほかの操作`}
+          title="ほかの操作"
+          triggerProps={{ disabled: busy }}
           open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          ariaLabel={`${project.name} のほかの操作`}
+          onOpenChange={setMenuOpen}
           items={[
             { id: 'favorite', label: project.isFavorite ? 'お気に入りから外す' : 'お気に入りにする', icon: <Star size={14} aria-hidden="true" />, onSelect: () => { setMenuOpen(false); void patchProject('お気に入り', { isFavorite: !project.isFavorite }) } },
             { id: 'duplicate', label: '複製する', icon: <Copy size={14} aria-hidden="true" />, onSelect: () => { setMenuOpen(false); void duplicate() } },

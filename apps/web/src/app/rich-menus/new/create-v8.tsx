@@ -48,8 +48,7 @@ import {
 } from '@line-crm/shared'
 import Card from '@/components/shared/card'
 import TargetMissing from '@/components/shared/target-missing'
-import ActionMenu from '@/components/shared/action-menu'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import SectionHeader from '@/components/shared/section-header'
@@ -1934,8 +1933,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
               <Trash2 size={15} aria-hidden />このページを消す
             </Button>
             <div>
-              <MoreAction label="ページと画像の操作" aria-expanded={pageActionsOpen} aria-haspopup="menu" onClick={() => setPageActionsOpen(!pageActionsOpen)} />
-              <ActionMenu open={pageActionsOpen} onClose={() => setPageActionsOpen(false)} ariaLabel="ページと画像の操作" items={[
+              <RowMenu appearance="plain" label="ページと画像の操作" open={pageActionsOpen} onOpenChange={setPageActionsOpen} items={[
                 { id: 'media', label: '登録メディアから選ぶ', disabled: busy || activePage.id.startsWith('tmp-'), disabledReason: '先に下書きを保存してください', onSelect: () => { setImagePickTarget('active'); setMediaPickerOpen(true) } },
                 { id: 'file', label: 'ファイルを選ぶ', disabled: busy || activePage.id.startsWith('tmp-'), disabledReason: '先に下書きを保存してください', onSelect: () => pageFileInput.current?.click() },
                 { id: 'tools', label: canvasToolsOpen ? '区切りの調整を閉じる' : '区切りを調整する', onSelect: () => setCanvasToolsOpen(!canvasToolsOpen) },

@@ -24,7 +24,6 @@ import {
   Eye,
   FilePen,
   Inbox,
-  MoreHorizontal,
   MousePointerClick,
   Plus,
   Radio,
@@ -36,7 +35,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
+import { RowMenu } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
@@ -47,7 +46,7 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import DetailPanel from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -939,19 +938,10 @@ function WebinarList() {
                     <Td className={styles.colOps} onClick={(event) => event.stopPropagation()}>
                       <div className={styles.opsBox}>
                         {canEdit ? <Button href={`/webinars/edit?id=${w.id}`}>編集</Button> : null}
-                        <IconButton
-                          title={menuLabel}
-                          aria-label={menuLabel}
-                          aria-haspopup="menu"
-                          aria-expanded={openMenuId === w.id}
-                          onClick={() => setOpenMenuId((current) => (current === w.id ? null : w.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
-                        <ActionMenu
+                        <RowMenu
+                          label={menuLabel}
                           open={openMenuId === w.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={menuLabel}
+                          onOpenChange={(next) => setOpenMenuId(next ? w.id : null)}
                           note={canEdit ? undefined : READONLY_REASON}
                           items={menuItems.map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
                         />

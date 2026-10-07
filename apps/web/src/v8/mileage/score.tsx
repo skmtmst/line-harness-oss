@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Activity, Bookmark, ChevronDown, ChevronUp, CircleMinus, CirclePlus, Download, Minus, MoreHorizontal, Plus, Send, Settings2, Star, TrendingDown, Upload, UserRound } from 'lucide-react'
+import { Activity, Bookmark, ChevronDown, ChevronUp, CircleMinus, CirclePlus, Download, Minus, Plus, Send, Settings2, Star, TrendingDown, Upload, UserRound } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import {
   ApiError,
@@ -28,12 +28,11 @@ import {
   type FriendScoreDetail,
 } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -528,18 +527,10 @@ export default function ScoreTab() {
                   <span className={styles.rowActions}>
                     <Button onClick={() => setHistoryTarget(item)}>点数の変化</Button>
                     <div className={styles.menuBox}>
-                      <IconButton
-                        aria-label={`${item.displayName}の操作`}
-                        title={`${item.displayName}の操作`}
-                        aria-expanded={menuId === item.friendId}
-                        onClick={() => setMenuId((current) => (current === item.friendId ? null : item.friendId))}
-                      >
-                        <MoreHorizontal size={16} aria-hidden="true" />
-                      </IconButton>
-                      <ActionMenu
+                      <RowMenu
+                        label={`${item.displayName}の操作`}
                         open={menuId === item.friendId}
-                        ariaLabel={`${item.displayName}の操作`}
-                        onClose={() => setMenuId(null)}
+                        onOpenChange={(next) => setMenuId(next ? item.friendId : null)}
                         items={[
                           /* 閲覧のみの人には「点数を直す」を出さない。 */
                           ...(readonly ? [] : [{ id: 'adjust', label: '点数を直す', onSelect: () => setAdjustTarget(item) }]),
@@ -613,18 +604,10 @@ export default function ScoreTab() {
           <span className={styles.spacer} aria-hidden="true" />
           {!readonly && publishedVersionNo !== null ? (
             <div className={styles.menuBox}>
-              <IconButton
-                aria-label="公開中のルールの操作"
-                title="公開中のルールの操作"
-                aria-expanded={ruleMenuId === '__head'}
-                onClick={() => setRuleMenuId((current) => (current === '__head' ? null : '__head'))}
-              >
-                <MoreHorizontal size={16} aria-hidden="true" />
-              </IconButton>
-              <ActionMenu
+              <RowMenu
+                label="公開中のルールの操作"
                 open={ruleMenuId === '__head'}
-                ariaLabel="公開中のルールの操作"
-                onClose={() => setRuleMenuId(null)}
+                onOpenChange={(next) => setRuleMenuId(next ? '__head' : null)}
                 items={[
                   { id: 'edit', label: '決めごとの編集画面を開く', external: true, onSelect: () => router.push('/mileage/score-rules') },
                   {
@@ -677,18 +660,10 @@ export default function ScoreTab() {
                     <Td className={styles.colOpsMenu}>
                       {!readonly ? (
                         <div className={styles.menuBox}>
-                          <IconButton
-                            aria-label={`${rule.name}の操作`}
-                            title={`${rule.name}の操作`}
-                            aria-expanded={ruleMenuId === rule.id}
-                            onClick={() => setRuleMenuId((current) => (current === rule.id ? null : rule.id))}
-                          >
-                            <MoreHorizontal size={16} aria-hidden="true" />
-                          </IconButton>
-                          <ActionMenu
+                          <RowMenu
+                            label={`${rule.name}の操作`}
                             open={ruleMenuId === rule.id}
-                            ariaLabel={`${rule.name}の操作`}
-                            onClose={() => setRuleMenuId(null)}
+                            onOpenChange={(next) => setRuleMenuId(next ? rule.id : null)}
                             items={[
                               { id: 'edit', label: '編集', external: true, onSelect: () => router.push('/mileage/score-rules') },
                               {

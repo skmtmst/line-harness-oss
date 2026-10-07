@@ -21,8 +21,7 @@ import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Checkbox from '@/components/shared/checkbox'
 import ListToolbar from '@/components/shared/list-toolbar'
-import ActionMenu from '@/components/shared/action-menu'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
 import MediaPreviewOverlay from './media-preview-overlay'
 import Dialog from '@/components/shared/dialog'
@@ -1882,16 +1881,13 @@ function MediaCardV8({
 
         <div className={styles.cardFoot}>
           <span className={styles.menuWrap} title={canManageMedia ? undefined : managementPermissionReason}>
-            <MoreAction
+            <RowMenu
+              appearance="plain"
               label={`${item.filename}のその他操作`}
-              aria-expanded={menuOpen}
-              data-qa-open="YfTfJ"
-              onClick={onToggleMenu}
-            />
-            <ActionMenu
+              menuLabel={`${item.filename}の操作`}
               open={menuOpen}
-              ariaLabel={`${item.filename}の操作`}
-              onClose={onCloseMenu}
+              onOpenChange={(next) => (next ? onToggleMenu() : onCloseMenu())}
+              triggerProps={{ 'data-qa-open': 'YfTfJ' }}
               items={[
                 {
                   id: 'preview',

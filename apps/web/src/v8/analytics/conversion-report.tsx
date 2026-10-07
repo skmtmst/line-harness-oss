@@ -8,9 +8,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MoreHorizontal } from 'lucide-react'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { api, type ConversionDefinitionReport } from '@/lib/api'
@@ -30,11 +28,9 @@ function rangeOf(days: number) {
 }
 
 function RowMenu({ point, onShowDaily }: { point: Point; onShowDaily: () => void }) {
-  const [open, setOpen] = useState(false)
   const router = useRouter()
   return <span className={styles.rowMenu}>
-    <IconButton className={styles.rowMenuButton} aria-label={`成果地点「${point.conversionPointName}」の操作`} aria-expanded={open} onClick={() => setOpen((value) => !value)}><MoreHorizontal size={16} aria-hidden="true" /></IconButton>
-    <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel={`成果地点「${point.conversionPointName}」の操作`} items={[
+    <SharedRowMenu className={styles.rowMenuButton} label={`成果地点「${point.conversionPointName}」の操作`} items={[
       { id: 'open', label: '成果地点を開く', onSelect: () => router.push(`/conversions?pointId=${encodeURIComponent(point.conversionPointId)}`) },
       { id: 'daily', label: '日ごとの表を見る', onSelect: onShowDaily },
     ]} />

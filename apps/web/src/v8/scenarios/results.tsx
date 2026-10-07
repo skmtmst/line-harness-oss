@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Download, Eye, MoreHorizontal, PencilLine } from 'lucide-react'
+import { Download, Eye, PencilLine } from 'lucide-react'
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
 import { api, ApiError, type ScenarioRuns } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
@@ -20,8 +20,8 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { DetailPage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
@@ -639,18 +639,12 @@ export default function ScenarioResultsV8() {
                         <span className={styles.colMenu} role="cell">
                           {showMenu ? (
                             <span className={styles.menuBox}>
-                              <IconButton
-                                aria-label={`${sub.friendName}のその他の操作`}
-                                aria-expanded={openMenuId === sub.id}
-                                onClick={() => setOpenMenuId((current) => (current === sub.id ? null : sub.id))}
-                              >
-                                <MoreHorizontal aria-hidden="true" />
-                              </IconButton>
-                              <ActionMenu
-                                open={openMenuId === sub.id}
-                                ariaLabel={`${sub.friendName}の操作`}
-                                onClose={() => setOpenMenuId(null)}
+                              <RowMenu
+                                label={`${sub.friendName}のその他の操作`}
+                                menuLabel={`${sub.friendName}の操作`}
                                 items={items}
+                                open={openMenuId === sub.id}
+                                onOpenChange={(next) => setOpenMenuId(next ? sub.id : null)}
                               />
                             </span>
                           ) : null}

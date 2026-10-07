@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bookmark, Inbox, LayoutTemplate, MoreHorizontal, Pause, Play, Plus, Send } from 'lucide-react'
+import { Bookmark, Inbox, LayoutTemplate, Pause, Play, Plus, Send } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -27,7 +27,7 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
+import { RowMenu } from '@/components/shared/row-actions'
 import EmptyList from '@/components/shared/empty-list'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
@@ -609,19 +609,11 @@ export default function WebhooksOutgoingV8() {
                       <Td className={styles.colOpsNarrow}>
                         {/* 狭い幅は「…」だけ（中身を見る・やり直すも中に入れる。絵 AsfFB の下の説明のとおり）。 */}
                         <div className={styles.opsBox}>
-                          <IconButton
-                            aria-haspopup="menu"
-                            aria-expanded={menuId === item.id}
-                            aria-label={`「${item.name}」の操作`}
+                          <RowMenu
+                            label={`「${item.name}」の操作`}
                             title="操作"
-                            onClick={() => setMenuId((current) => (current === item.id ? null : item.id))}
-                          >
-                            <MoreHorizontal size={16} aria-hidden="true" />
-                          </IconButton>
-                          <ActionMenu
                             open={menuId === item.id}
-                            onClose={() => setMenuId(null)}
-                            ariaLabel={`「${item.name}」の操作`}
+                            onOpenChange={(next) => setMenuId(next ? item.id : null)}
                             items={[
                               { id: 'view', label: '中身を見る', onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } },
                               ...(item.deliverySummary.canRetry && canManage
