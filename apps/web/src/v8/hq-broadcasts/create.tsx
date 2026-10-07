@@ -37,6 +37,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { STORE_INSERTS, preflightBadge, splitPreflightRows, previewText, runTitle, scheduledIso, sendTotals, toApiContent } from './model'
 import styles from './create.module.css'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 type Store = Pick<LineAccount, 'id' | 'name' | 'tags'> & { friendCount: number }
 type Mode = 'tag' | 'store'
@@ -70,9 +71,9 @@ function errorText(caught: unknown, fallback: string): string {
   if (caught instanceof ApiError) {
     if (caught.status === 403) return '統括全体の編集権限がある人だけが一括配信を作れます。'
     if (caught.status === 409) return 'ほかの人が先に操作しました。もう一度確かめてください。'
-    if (caught.message) return caught.message
   }
-  return fallback
+  // 「API error: 500」のような内部の文は出さない。
+  return japaneseDetailOf(caught) || fallback
 }
 
 export default function HqBroadcastCreate() {

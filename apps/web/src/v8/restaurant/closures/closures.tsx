@@ -28,6 +28,7 @@ import {
   scopeText, shiftMonth, statusLine, tablesText, tasksFor, timeText, upcoming,
 } from './format'
 import styles from './closures.module.css'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 type MediaLink = { code: string; name: string; loginUrl: string | null; closeOnBooking: boolean }
 
@@ -48,7 +49,8 @@ function inGoogle(closure: RestaurantClosure, special: GoogleSpecialDay[]): bool
 function deleteMessage(error: unknown): string {
   if (error instanceof ApiError && error.code === 'version_conflict') return 'ほかの人が先に変えました。読み直したので、もう一度確かめてください。'
   if (error instanceof ApiError && error.status === 403) return 'この店舗の予約枠を変える権限がありません。'
-  return error instanceof Error && error.message ? error.message : '消せませんでした。もう一度お試しください。'
+  // 「API error: 500」のような内部の文は出さない。
+  return japaneseDetailOf(error) || '消せませんでした。もう一度お試しください。'
 }
 
 export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoogle, dialog, onDialog }: {
@@ -157,7 +159,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
       await restaurantTestApi.completeChannelCloseTask(accountId, task.id)
       notifyToast(`${nameOf(task.channel)}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' })
+      notifyToast(japaneseDetailOf(caught) || '印を付けられませんでした。', { tone: 'error' })
     } finally {
       await loadTasks()
       setBusy('')
