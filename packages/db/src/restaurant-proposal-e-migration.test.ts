@@ -33,4 +33,14 @@ describe('飲食店の提案Eマイグレーション草稿',()=>{
    db.prepare("UPDATE rt_reservations SET source='walk_in' WHERE id='reservation'").run();
   }finally{db.close();}
  });
+ it('595は媒体を参照する予約を残し、予約を受けない媒体を追加できる',()=>{
+  const db=beforeProposal();try{
+   db.transaction(()=>db.exec(readFileSync(join(root,'migrations/595_restaurant_media_links.sql'),'utf8')))();
+   expect(db.prepare('SELECT media_id FROM rt_reservations').get()).toEqual({media_id:(db.prepare("SELECT id FROM rt_media WHERE code='hotpepper'").get() as {id:string}).id});
+   expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+   expect(db.prepare("SELECT media_id FROM rt_inbound_emails WHERE id='mail'").get()).toEqual(db.prepare('SELECT media_id FROM rt_reservations').get());
+   expect(db.prepare("SELECT id,inbound_email_id FROM rt_email_digests WHERE id='digest'").get()).toEqual({id:'digest',inbound_email_id:'mail'});
+   db.exec("INSERT INTO rt_media(id,code,name,parser_key,is_active,accepts_reservations) VALUES('gourmet','gourmet_test','グルメ','gourmet_test',0,0)");
+  }finally{db.close();}
+ });
 });

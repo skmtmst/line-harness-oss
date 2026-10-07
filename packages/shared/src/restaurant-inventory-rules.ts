@@ -4,7 +4,8 @@ export interface RestaurantInventoryRules {
 }
 export type RestaurantInventoryRulesInput = Omit<RestaurantInventoryRules, 'version'> & { expectedVersion: number };
 export interface RestaurantChannelCloseTask {
-  id: string; storeId: string; slotId: string; startsAt: string; channel: string;
+ reservationId?:string;
+  id: string; storeId: string; slotId: string | null; startsAt: string; channel: string;
   status: 'close' | 'done' | 'reopen'; reason: 'full' | 'limited' | 'table_conflict';
-  remainingSeats: number; recipientIds: string[]; createdAt: string; updatedAt: string;
+  remainingSeats: number | null; recipientIds: string[]; createdAt: string; updatedAt: string;
 }

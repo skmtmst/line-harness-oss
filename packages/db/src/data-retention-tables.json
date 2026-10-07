@@ -3787,5 +3787,41 @@
       "by": "tenant",
       "column": "tenant_id"
     }
+  },
+  "rt_reservation_close_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "task_id",
+      "parent": "rt_reservation_close_tasks",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_close_tasks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_store_media_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
   }
 }

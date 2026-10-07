@@ -6394,12 +6394,12 @@ CREATE TABLE rt_line_flows (
 
 CREATE TABLE "rt_media" (
   id TEXT PRIMARY KEY,
-  code TEXT NOT NULL UNIQUE CHECK (code IN ('retty', 'gurunavi', 'tabelog', 'hotpepper', 'google_reservation', 'ikyu', 'tablecheck')),
+  code TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   sender_addresses TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(sender_addresses)),
   parser_key TEXT NOT NULL UNIQUE,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
-);
+, accepts_reservations INTEGER NOT NULL DEFAULT 1 CHECK(accepts_reservations IN (0,1)));
 
 CREATE TABLE rt_memberships (
   id TEXT PRIMARY KEY,
@@ -6471,6 +6471,24 @@ CREATE TABLE rt_organizations (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 , tenant_id TEXT REFERENCES tenants(id));
+
+CREATE TABLE rt_reservation_close_outbox (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES rt_reservation_close_tasks(id), generation INTEGER NOT NULL,
+ membership_id TEXT NOT NULL REFERENCES rt_memberships(id), retry_key TEXT NOT NULL, sent_at TEXT, lease_until TEXT, lease_token TEXT,
+ UNIQUE(task_id,generation,membership_id)
+);
+
+CREATE TABLE rt_reservation_close_tasks (
+ id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES rt_stores(id), reservation_id TEXT NOT NULL REFERENCES rt_reservations(id),
+ channel TEXT NOT NULL, starts_at TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('close','done','reopen')),
+ generation INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')),
+ UNIQUE(reservation_id,channel,starts_at)
+);
+
+CREATE TABLE rt_reservation_links (
+ store_id TEXT PRIMARY KEY REFERENCES rt_stores(id), token TEXT NOT NULL UNIQUE,
+ created_at TEXT NOT NULL DEFAULT(datetime('now'))
+);
 
 CREATE TABLE "rt_reservations" (
   id TEXT PRIMARY KEY,
@@ -6544,6 +6562,13 @@ CREATE TABLE "rt_seat_waitlist" (
   created_at            TEXT NOT NULL DEFAULT (datetime('now')),
   ends_at TEXT, finish_reason TEXT, notification_retry_key TEXT, notification_claim_until TEXT, last_processed_at TEXT,
   updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE rt_store_media_links (
+ store_id TEXT NOT NULL REFERENCES rt_stores(id), media_id TEXT NOT NULL REFERENCES rt_media(id),
+ page_url TEXT, login_url TEXT, close_on_booking INTEGER NOT NULL DEFAULT 0 CHECK(close_on_booking IN (0,1)),
+ version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT(datetime('now')),
+ PRIMARY KEY(store_id,media_id)
 );
 
 CREATE TABLE rt_stores (

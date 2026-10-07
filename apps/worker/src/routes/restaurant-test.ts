@@ -1,3 +1,4 @@
+import { safeRestaurantHttpsUrl, restaurantReservationEmbed } from '../services/restaurant-media-links.js';
 import { getRestaurantInventoryRules, saveRestaurantInventoryRules, validateRestaurantInventoryRules, listRestaurantCloseTasks } from '@line-crm/db';
 import { reconcileRestaurantInventory, recordRestaurantTableConflict } from '../services/restaurant-inventory-rules.js';
 import type { RestaurantTableLayoutInput } from '@line-crm/shared';
@@ -2487,9 +2488,60 @@ restaurantTest.get('/api/restaurant-test/channel-close-tasks',requireRole('owner
 restaurantTest.post('/api/restaurant-test/channel-close-tasks/:id/done',requireRole('owner','admin','staff'),async c=>{
  if(!hasOrganizationSelector(c))return requiredAccount(c);
  const org=await organizationFor(c);if(!org)return c.json({success:false,error:'組織がありません'},404);
- const db=dbFor(c.env);const task=await db.prepare('SELECT store_id,status FROM rt_channel_close_tasks WHERE id=?').bind(c.req.param('id')).first<{store_id:string;status:string}>();
+ const db=dbFor(c.env);const task=await db.prepare(`SELECT store_id,status,'rt_channel_close_tasks' AS task_table FROM rt_channel_close_tasks WHERE id=? UNION ALL SELECT store_id,status,'rt_reservation_close_tasks' AS task_table FROM rt_reservation_close_tasks WHERE id=?`).bind(c.req.param('id'),c.req.param('id')).first<{store_id:string;status:string;task_table:'rt_channel_close_tasks'|'rt_reservation_close_tasks'}>();
  if(!task||!await storeBelongsTo(c,org.id,task.store_id))return c.json({success:false,error:'知らせがありません'},404);
  if(task.status==='reopen')return c.json({success:false,error:'席が戻りました。もう開けてよい状態です'},409);
- await db.prepare("UPDATE rt_channel_close_tasks SET status='done',updated_at=datetime('now') WHERE id=? AND status='close'").bind(c.req.param('id')).run();
+ const changed=await db.prepare(`UPDATE ${task.task_table} SET status='done',updated_at=datetime('now') WHERE id=? AND status='close'`).bind(c.req.param('id')).run();
+ if(!changed.meta.changes&&task.status!=='done')return c.json({success:false,error:'知らせが更新されました。読み直してください'},409);
  return c.json({success:true,data:{id:c.req.param('id'),status:'done'}});
+});
+
+
+restaurantTest.get('/api/restaurant-test/media', requireRole('owner','admin','staff'), async c => {
+  return c.json({success:true,data:(await dbFor(c.env).prepare('SELECT code,name,accepts_reservations AS acceptsReservations FROM rt_media ORDER BY name').all()).results});
+});
+restaurantTest.post('/api/restaurant-test/media', requireRole('owner','admin'), async c => {
+  const body=await c.req.json<{code?:unknown;name?:unknown}>().catch(()=>null);
+  if(typeof body?.code!=='string'||!/^gourmet_[a-z0-9_]{1,50}$/.test(body.code)||typeof body.name!=='string'||!body.name.trim()||body.name.length>100)
+    return c.json({success:false,error:'グルメ媒体のコードと名前を確認してください'},400);
+  const result=await dbFor(c.env).prepare(`INSERT OR IGNORE INTO rt_media(id,code,name,parser_key,is_active,accepts_reservations) VALUES(?,?,?,?,0,0)`)
+    .bind(crypto.randomUUID(),body.code,body.name.trim(),body.code).run();
+  if(!result.meta.changes)return c.json({success:false,error:'同じコードの媒体が登録済みです'},409);
+  return c.json({success:true,data:{code:body.code,name:body.name.trim(),acceptsReservations:false}},201);
+});
+restaurantTest.get('/api/restaurant-test/media-links', requireRole('owner','admin','staff'),async c=>{
+  const org=await organizationFor(c),storeId=c.req.query('storeId')||'';
+  if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'店舗を確認してください'},400);
+  const data=await dbFor(c.env,storeId).prepare(`SELECT m.code,m.name,m.accepts_reservations AS acceptsReservations,
+    l.page_url AS pageUrl,l.login_url AS loginUrl,COALESCE(l.close_on_booking,0) AS closeOnBooking,COALESCE(l.version,0) AS version
+    FROM rt_media m LEFT JOIN rt_store_media_links l ON l.media_id=m.id AND l.store_id=? ORDER BY m.name`).bind(storeId).all();
+  return c.json({success:true,data:data.results});
+});
+restaurantTest.put('/api/restaurant-test/media-links/:code', requireRole('owner','admin'),async c=>{
+  const b=await c.req.json<{storeId:string;pageUrl:unknown;loginUrl:unknown;closeOnBooking:boolean;expectedVersion:number}>().catch(()=>null);
+  const org=await organizationFor(c);
+  if(!b||!org||typeof b.storeId!=='string'||!await storeBelongsTo(c,org.id,b.storeId))return c.json({success:false,error:'店舗を確認してください'},400);
+  const page=safeRestaurantHttpsUrl(b.pageUrl),login=safeRestaurantHttpsUrl(b.loginUrl);
+  const media=await dbFor(c.env).prepare('SELECT id,accepts_reservations FROM rt_media WHERE code=?').bind(c.req.param('code')).first<{id:string;accepts_reservations:number}>();
+  if(!media||page===undefined||login===undefined||typeof b.closeOnBooking!=='boolean'||(!media.accepts_reservations&&b.closeOnBooking)||!Number.isSafeInteger(b.expectedVersion)||b.expectedVersion<0)
+    return c.json({success:false,error:'HTTPSのURL・閉鎖対象・版を確認してください'},400);
+  const db=dbFor(c.env,b.storeId);
+  const saved=await db.prepare(`INSERT INTO rt_store_media_links(store_id,media_id,page_url,login_url,close_on_booking)
+    SELECT ?,?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM rt_store_media_links WHERE store_id=? AND media_id=?) ON CONFLICT(store_id,media_id) DO UPDATE SET page_url=excluded.page_url,login_url=excluded.login_url,
+    close_on_booking=excluded.close_on_booking,version=version+1,updated_at=datetime('now') WHERE version=?`)
+    .bind(b.storeId,media.id,page,login,b.closeOnBooking?1:0,b.expectedVersion,b.storeId,media.id,b.expectedVersion).run();
+  if(!saved.meta.changes)return c.json({success:false,error:'設定が更新されました。読み直してください'},409);
+  await db.prepare(`INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(?,'media_links_saved') ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause`).bind(b.storeId).run();
+  const row=await db.prepare('SELECT version FROM rt_store_media_links WHERE store_id=? AND media_id=?').bind(b.storeId,media.id).first<{version:number}>();
+  return c.json({success:true,data:{code:c.req.param('code'),storeId:b.storeId,pageUrl:page,loginUrl:login,closeOnBooking:b.closeOnBooking,version:row!.version}});
+});
+restaurantTest.post('/api/restaurant-test/reservation-link', requireRole('owner','admin'),async c=>{
+  const b=await c.req.json<{storeId?:string}>().catch(()=>null),org=await organizationFor(c);
+  if(!b?.storeId||!org||!await storeBelongsTo(c,org.id,b.storeId))return c.json({success:false,error:'店舗を確認してください'},400);
+  const base=safeRestaurantHttpsUrl(c.env.LIFF_URL);
+  if(!base)return c.json({success:false,error:'お客さま向けURLの設定が必要です'},503);
+  const db=dbFor(c.env,b.storeId);
+  await db.prepare('INSERT OR IGNORE INTO rt_reservation_links(store_id,token) VALUES(?,?)').bind(b.storeId,crypto.randomUUID()).run();
+  const link=await db.prepare('SELECT token FROM rt_reservation_links WHERE store_id=?').bind(b.storeId).first<{token:string}>();
+  return c.json({success:true,data:restaurantReservationEmbed(base,link!.token)});
 });
