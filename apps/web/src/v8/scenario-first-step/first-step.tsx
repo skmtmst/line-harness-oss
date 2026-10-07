@@ -60,8 +60,9 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { restoreFirstStep, scheduleToPayload } from './first-step-form'
 import styles from './first-step.module.css'
-import { browserDraftKey, useBrowserDraft } from '@/v8/autosave/use-browser-draft'
-import { BrowserDraftNotice } from '@/v8/autosave/browser-draft-notice'
+import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
+import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
 
 const modeLabel: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
@@ -231,8 +232,8 @@ export default function ScenarioFirstStepV8() {
   const mode: DeliveryMode = scenario?.deliveryMode ?? 'absolute_time'
 
   /*
-   * 1通目の保存は配信の行へ直に入る（下書きの口が無い）。書きかけはこのブラウザに
-   * だけ残し、開き直したときに「前の入力を戻す」を出す。比べる元は読み込み直後の形。
+   * 1通目の保存は配信の行へ直に入る。書きかけはシナリオの下書きの口（本物とは別の行・
+   * 配信に使わない）へ残し、開き直したときに「前の入力を戻す」を出す。比べる元は読み込み直後の形。
    */
   const formValue = {
     body, targetMode, targetTagId, targetCondition, contentMode, kind, question, kindState,
@@ -248,15 +249,30 @@ export default function ScenarioFirstStepV8() {
     // 読み込みが済んだ瞬間の形だけを採る。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadState, formBaseline])
-  const browserDraft = useBrowserDraft({
-    storageKey: formBaseline && scenario ? browserDraftKey(['scenario-first-step', scenario.lineAccountId, id]) : null,
+  const browserDraft = useScenarioDraft({
+    accountId: scenario?.lineAccountId ?? selectedAccountId,
+    draftKey: formBaseline && scenario ? scenarioDraftKey(id, 'first-step') : null,
+    // 共通（アカウントなし）のシナリオは本物に紐づけられないので、キーだけで置く。
+    scenarioId: scenario?.lineAccountId ? id : null,
+    stepId: scenario?.lineAccountId ? existingStepId : null,
+    legacyKey: scenario ? browserDraftKey(['scenario-first-step', scenario.lineAccountId, id]) : null,
     value: formValue,
     baseline: formBaseline ?? formValue,
     active: canEdit,
   })
   const restoreBrowserDraft = () => {
     const stored = browserDraft.restore()
-    if (!stored) return
+    if (stored) applyDraft(stored)
+  }
+  const loadLatestDraft = () => {
+    const latest = browserDraft.loadLatest()
+    if (latest) applyDraft(latest)
+  }
+  const cancel = () => {
+    browserDraft.clear()
+    router.push('/scenarios')
+  }
+  function applyDraft(stored: typeof formValue) {
     setBody(stored.body)
     setTargetMode(stored.targetMode)
     setTargetTagId(stored.targetTagId)
@@ -541,7 +557,7 @@ export default function ScenarioFirstStepV8() {
       status={saving ? '保存しています' : browserDraft.label ?? undefined}
       footerActions={(
         <>
-          <Button href="/scenarios">キャンセル</Button>
+          <Button type="button" onClick={cancel}>キャンセル</Button>
           <Button type="button" onClick={goDetail} disabled={saving}>1通目はあとで書く</Button>
           {canEdit ? (
             <Button
@@ -563,6 +579,7 @@ export default function ScenarioFirstStepV8() {
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       <BrowserDraftNotice ago={browserDraft.pendingAgo} onRestore={restoreBrowserDraft} onDiscard={browserDraft.clear} />
+      <ScenarioDraftConflictNotice ago={browserDraft.conflictAgo} onLoadLatest={loadLatestDraft} onOverwrite={browserDraft.overwrite} />
 
       {/*
         ここで決めるのは「この1通目を誰に送るか」。シナリオがいつ始まるか（友だち追加時など）は
