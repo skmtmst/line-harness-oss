@@ -1,4 +1,4 @@
-import { stampPaths } from './proposal-e-openapi.js';
+import { stampPaths,hqBroadcastPaths } from './proposal-e-openapi.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
@@ -355,6 +355,7 @@ const spec = {
   },
   paths: {
     ...stampPaths,
+    ...hqBroadcastPaths,
 
     // V8 API integration: authenticated endpoints, with account scope and revision checks.
   "/api/hq/templates/folders": {

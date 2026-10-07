@@ -531,7 +531,8 @@
     "587_form_step_completion_times.sql",
     "594_restaurant_walk_in.sql",
     "595_restaurant_media_links.sql",
-    "596_visit_stamps.sql"
+    "596_visit_stamps.sql",
+    "597_hq_broadcast_runs.sql"
   ],
-  "migrationCount": 532
+  "migrationCount": 533
 }

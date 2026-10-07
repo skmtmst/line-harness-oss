@@ -38,3 +38,4 @@ export * from './date-range.js';
 export * from './booking-waitlist.js';
 export * from './restaurant-inventory-rules.js';
 export * from './visit-stamps.js';
+export * from './hq-broadcasts.js';

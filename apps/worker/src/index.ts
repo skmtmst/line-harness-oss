@@ -1,3 +1,4 @@
+import { hqBroadcasts } from './routes/hq-broadcasts.js';
 import { visitStamps } from './routes/visit-stamps.js';
 import { processVisitStampQueue } from './services/visit-stamps.js';
 import { Hono, type Context } from 'hono';
@@ -479,6 +480,7 @@ app.route('/', webhook);
 app.route('/', gettingStarted);
 app.route('/', recipes);
 app.route('/', hqTemplates);
+app.route('/', hqBroadcasts);
 app.route('/', ops);
 app.route('/', manualLinks);
 app.route('/', errorMessages);

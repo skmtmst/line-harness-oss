@@ -26,3 +26,14 @@ export const stampPaths={
  '/api/liff/visit-stamps/redemptions/{id}/use':{post:op('店員のPINで一度だけ特典を使う。5回失敗で15分ロック',{staffId:string,pin:{type:'string',pattern:'^\\d{4}$',writeOnly:true}},['staffId','pin'],['id'],true)},
  '/api/liff/visit-stamps/cards/{id}/paper-requests':{post:op('紙カードの写真と押印数を申請。同じカードで承認済み・審査中の重複不可',{photoUrl:{type:'string',format:'uri',pattern:'^https://'},stamps:{type:'integer',minimum:1,maximum:10000}},['photoUrl','stamps'],['id'],true)},
 };
+const hqInput={requestId:string,title:string,messageType:string,messageContent:string,messageBubblesJson:{type:['string','null']},altText:{type:['string','null']},accountIds:{type:'array',items:string},accountTagIds:{type:'array',items:string},excludedAccountIds:{type:'array',items:string},audience:{type:'object',description:'kind=all / kind=tagとtagName。同名タグが店に複数ある場合は停止'},scheduledAt:{type:['string','null'],format:'date-time'}};
+export const hqBroadcastPaths={
+ '/api/hq/broadcasts':{get:op('統括配信の一覧（全体のowner/adminのみ）'),post:op('統括配信の対象店を固定。店舗IDまたはアカウント分類で選ぶ',hqInput,['requestId','title','messageType','messageContent','accountIds','accountTagIds','excludedAccountIds','audience','scheduledAt'])},
+ '/api/hq/broadcasts/{id}':{get:op('統括配信の店ごとの結果・一時失敗・版',{},[],['id'])},
+ '/api/hq/broadcasts/{id}/preflight':{post:op('統括配信の送る人数・今月の残枠・LINE接続・停止を店ごとに返す',{},[],['id'])},
+ '/api/hq/broadcasts/{id}/exclusions':{put:op('統括配信から問題のある店を外す。固定済み対象以外は追加不可',{accountIds:{type:'array',items:string},expectedVersion:number},['accountIds','expectedVersion'],['id'])},
+ '/api/hq/broadcasts/{id}/send':{post:{...op('統括配信を即時または同時刻で予約。店舗の編集は禁止',{expectedVersion:number},['expectedVersion'],['id']),parameters:[{name:'id',in:'path',required:true,schema:string},{name:'X-Confirm-Irreversible',in:'header',required:true,schema:{type:'string',const:'broadcast-send'}}]}},
+ '/api/hq/broadcasts/{id}/stop':{post:op('統括配信を全店まとめて停止',{expectedVersion:number},['expectedVersion'],['id'])},
+ '/api/hq/broadcasts/{id}/cancel':{post:op('統括配信を全店まとめて取り消す',{expectedVersion:number},['expectedVersion'],['id'])},
+ '/api/hq/broadcasts/{id}/targets/{accountId}/retry':{post:{...op('統括配信の店ごとの一時失敗だけ再送。成功・送達不明には再送しない',{expectedVersion:number},['expectedVersion'],['id','accountId']),parameters:[{name:'id',in:'path',required:true,schema:string},{name:'accountId',in:'path',required:true,schema:string},{name:'X-Confirm-Irreversible',in:'header',required:true,schema:{type:'string',const:'broadcast-send'}}]}},
+};
