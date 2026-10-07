@@ -4415,6 +4415,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     ).map(toPublic)
     return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
   }
+  if (method === 'POST' && pathname === '/api/line-notifications/operator-rules') {
+    /*
+     * 運用者へのお知らせを作る（sDXNy）：公開の前に下書きを保存してから確認の窓を出す。
+     * 一覧の形を返すと下書きの保存が失敗に見え、窓が撮れなかった。作った1件を返す。
+     */
+    return { success: true, data: { ...OPERATOR_NOTIFICATION_RULES[0], id: 'op-rule-new-draft', status: 'draft', version: 1 } }
+  }
   if (pathname === '/api/notifications/operator-rules' || pathname === '/api/line-notifications/operator-rules') {
     /*
      * 本物は両方の名で同じ一覧を返す（`notifications.ts`）。
