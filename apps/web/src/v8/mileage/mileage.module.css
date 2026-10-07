@@ -98,6 +98,16 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.rowNameLine {
+  /* 名前の前のフォルダの丸と名前を1行に（絵 OC0gy の「名の行」：丸 8・間 8）。 */
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+.dotIndent {
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 OC0gy の説明の行）。 */
+  padding-inline-start: var(--tpl-folder-dot-indent);
+}
 .rowSub,
 .cellSub {
   display: block;
