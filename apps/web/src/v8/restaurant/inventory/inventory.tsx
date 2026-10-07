@@ -33,6 +33,7 @@ function InventoryTabs({ ctx }: { ctx: RestaurantV8Context }) {
       <Tabs
         className={styles.tabs}
         label="予約枠・在庫の切り替え"
+        size="compact"
         items={[
           { label: '時間帯ごとの在庫', current: tab === 'stock', onClick: () => setTab('stock') },
           { label: '予約経路の連携', current: tab === 'channels', onClick: () => setTab('channels') },
@@ -51,7 +52,7 @@ function InventoryTabs({ ctx }: { ctx: RestaurantV8Context }) {
 
 export default function InventoryPage() {
   return (
-    <RestaurantShell boardId="Y8SjT2" title="予約枠・在庫" description="時間帯ごとの総枠と、媒体・LINE・当日枠の配分を確認します。">
+    <RestaurantShell storeTab="inventory" boardId="Y8SjT2" title="予約枠・在庫" description="時間帯ごとの総枠と、媒体・LINE・当日枠の配分を確認します。">
       {(ctx) => <InventoryTabs ctx={ctx} />}
     </RestaurantShell>
   )

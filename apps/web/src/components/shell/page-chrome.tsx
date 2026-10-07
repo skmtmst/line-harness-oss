@@ -157,3 +157,11 @@ export function useSettingsNavInline(enabled = true) {
     return () => setInline(false)
   }, [enabled, setInline])
 }
+
+/**
+ * ★V8：設定の住所の画面でも、絵に「設定の中のメニュー」が無い画面だけ外のメニューを出さない（SNS 連携 y3GGTs）。
+ * 枠への知らせ方は useSettingsNavInline と同じ（外に出さない印）。板の中にもメニューは置かない。
+ */
+export function useHideSettingsNav() {
+  useSettingsNavInline(true)
+}
