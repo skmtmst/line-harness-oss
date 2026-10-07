@@ -1374,6 +1374,48 @@
 }
 
 /*
+ * ★V8 受信箱の左の列の頭（M0393「1. ふだん」XqSvX の「上」）。
+ * 列の幅・頭の余白と段の間・札・選ぶ欄・状態の切り替えの実寸。
+ * 画面側（chats/inbox-v8.module.css）は var() で読む。v7 には効かない。
+ */
+[data-theme="v8"] {
+  --tpl-inbox-list-w: 372px;              /* 一覧の列の幅（絵の 1440 の幅） */
+  --tpl-inbox-list-w-min: 340px;          /* 狭い幅（左メニューを開いた 1135 など）で中央の欄を残す下限 */
+  --tpl-inbox-list-w-ratio: 32%;          /* 3つの列の幅に対する一覧の割合（1440 で 372 に届く） */
+  --tpl-inbox-panes-bleed: -20px -24px -28px; /* 板の中の余白（.content）を打ち消して板いっぱいに */
+  --tpl-inbox-panes-h: calc(100dvh - 74px); /* 板の内側の高さ（上の帯60＋板の下12＋板の縁の上下2を引く） */
+  --tpl-inbox-auto: auto;             /* v7 の決まった高さを外して中身の高さにする */
+  --tpl-inbox-none: 0;                /* v7 の外の余白（mt-3・ml-2）を外す */
+  --tpl-inbox-head-pad-top: 18px;         /* 頭の上の余白 */
+  --tpl-inbox-head-pad-x: 16px;           /* 頭の左右の余白 */
+  --tpl-inbox-head-pad-bottom: 14px;      /* 並び順の下（線まで） */
+  --tpl-inbox-head-gap: 12px;             /* 頭の段と段の間 */
+  --tpl-inbox-head-tools-gap: 6px;        /* 題の行の印のボタンの間・札の間 */
+  --tpl-inbox-tool-size: 32px;            /* 題の行の印のボタン */
+  --tpl-inbox-control-h: 36px;            /* 札・検索・選ぶ欄の高さ */
+  --tpl-inbox-control-pad: 0 10px 0 12px; /* 選ぶ欄の内側（左12・右10） */
+  --tpl-inbox-chip-pad: 0 10px;           /* 札の内側（左右10） */
+  --tpl-inbox-chip-gap: 5px;              /* 札の中の印と文字の間 */
+  --tpl-inbox-icon-sm: 13px;              /* 札の中の印 */
+  --tpl-inbox-icon-md: 14px;              /* 選ぶ欄の矢印 */
+  --tpl-inbox-filter-gap: 8px;            /* 担当者と経路の間 */
+  --tpl-inbox-seg-pad: 3px;               /* 状態の切り替えの溝の内側 */
+  --tpl-inbox-seg-gap: 2px;               /* 状態の切り替えの間 */
+  --tpl-inbox-seg-item-pad: 5px 4px;      /* 状態の切り替え1つの内側 */
+  --tpl-inbox-seg-item-radius: 8px;       /* 状態の切り替え1つの角丸 */
+  --tpl-inbox-row-pad: 12px 16px;         /* 会話の行の内側 */
+  --tpl-inbox-row-gap: 10px;              /* 顔と文の間 */
+  --tpl-inbox-row-line-gap: 2px;          /* 名前・内容・札の段の間 */
+  --tpl-inbox-row-preview-lh: 20px;       /* 内容1行の高さ */
+  --tpl-inbox-unread-dot: 10px;           /* 顔の右上の赤い点 */
+  --tpl-inbox-unread-dot-ring: 2px;       /* 赤い点の白い縁 */
+  --tpl-inbox-unread-dot-right: -1px;     /* 赤い点の右（顔34の左25から10） */
+  --tpl-inbox-badge-pad: 1px 6px;         /* 経路の札（LINE・メール）の内側 */
+  --tpl-inbox-badge-radius: 5px;          /* 経路の札の角丸 */
+  --tpl-inbox-badge-lh: 17px;             /* 経路の札・担当の文字の行の高さ */
+}
+
+/*
  * ★V8 LINEプレビューのスマホ（夕15・cfVyj）：LINE アプリの画面の写しの値。
  * 管理画面のテーマ色とは別物なので `--v8-line-*` で分ける。値は Pencil の
  * 実寸の写しで、直値はここだけに置く。部品側（line-preview.module.css）は
