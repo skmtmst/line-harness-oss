@@ -124,11 +124,11 @@ test('公開の前に確認の窓（sDXNy）で宛先と届く人数を確かめ
   })
   /* 確認の窓は body 直下に出る（ポータル）。 */
   expect(document.body.textContent).toContain('このお知らせを公開しますか？')
-  expect(document.body.textContent).toContain('LINEが届く人')
+  expect(document.body.textContent).toContain('LINE が届く人')
   const confirmButton = Array.from(document.body.querySelectorAll('button'))
-    .find((button) => button.textContent?.includes('人にLINEで送る'))
+    .find((button) => button.textContent?.includes('人に LINE で送る'))
   expect(confirmButton).toBeDefined()
-  expect(confirmButton?.textContent).toContain('2人')
+  expect(confirmButton?.textContent).toContain('2 人')
 })
 
 test('staff では閲覧のみの帯が出て、保存・公開・テスト送信のボタンは置かない（2026-10-06 オーナー決定）', async () => {
@@ -172,4 +172,27 @@ test('選んだスタッフでチームを作り、保存する通知の条件�
   expect(saved[0].body).toMatchObject({name:'対応チーム',staffIds:['sato','suzuki','tanaka']})
   await act(async () => { Array.from(host!.querySelectorAll('button')).find(button=>button.textContent?.includes('下書き'))!.click() })
   expect(saved.at(-1)?.body).toMatchObject({conditions:{teamId:'team-1',recipientType:'team'}})
+})
+
+test('作るときはチームがあれば最初のチームを選び、スタッフの箱を出さない（絵 gjUz3）。確認の窓の宛先はチーム名（sDXNy）', async () => {
+  const saved: Array<Record<string, unknown>> = []
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('recipients-preview')) return response({ success: true, data: recipientsData })
+    if (url.includes('/api/notifications/teams')) {
+      return response({ success: true, data: [{ id: 'team-n', lineAccountId: 'account-a', name: '中目黒店', staffIds: ['sato', 'tanaka'], version: 1, archivedAt: null }] })
+    }
+    if (init?.method === 'POST' && !url.includes('/publish')) saved.push(JSON.parse(String(init.body)))
+    return response({ success: true, data: { id: 'rule-1', version: 1 } })
+  }))
+  await renderPage()
+  expect(host?.textContent).toContain('中目黒店（2人）')
+  expect(host?.textContent).not.toContain('受け取るスタッフ')
+  await act(async () => {
+    Array.from(host!.querySelectorAll('button')).find((button) => button.textContent?.includes('運用者へのお知らせを公開'))!.click()
+    for (let i = 0; i < 10; i++) await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+  expect(saved.at(-1)).toMatchObject({ conditions: { recipientType: 'team', teamId: 'team-n', recipientIds: ['sato', 'tanaka'] } })
+  expect(document.body.textContent).toContain('チーム「中目黒店」2 人')
+  expect(document.body.textContent).toContain('1 人（1 人は LINE 未登録）')
 })

@@ -339,39 +339,81 @@
   font-size: var(--text-label);
 }
 
+.confirmBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-gap);
+  width: 100%;
+}
+
+.confirmList {
+  display: flex;
+  flex-direction: column;
+}
+
 .confirmActions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--tpl-footer-gap);
+  gap: var(--tpl-hb2-op-chip-gap);
+  padding-top: var(--tpl-hb2-op-gap);
+  border-top: 1px solid var(--color-hairline);
 }
 
 .confirmSummary {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-hb2-op-head-gap);
-  padding: var(--tpl-hb2-op-band-pad);
+  gap: var(--tpl-r2-op-sum-gap);
+  margin: 0;
+  padding: var(--tpl-hb2-op-preview-pad);
   border-radius: var(--radius-control);
   background: var(--color-canvas-sunken);
-  font-size: var(--text-label);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+}
+
+/* 絵 sDXNy：題（150）と値を横に並べる。値は太字・1行。 */
+.confirmPair {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hb2-op-chip-gap);
+}
+
+.confirmKey {
+  flex-shrink: 0;
+  width: var(--tpl-r2-op-key-w);
+  color: var(--color-ink-secondary);
+}
+
+.confirmValue {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .confirmRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--tpl-hb2-op-row-pad);
+  gap: var(--tpl-hb2-op-chip-gap);
+  height: var(--tpl-r2-op-confirm-row-h);
   box-shadow: var(--shadow-row-line);
 }
 
 .confirmName {
-  font-size: var(--text-label);
+  flex-shrink: 0;
+  width: var(--tpl-r2-op-name-w);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+  font-weight: 600;
 }
 
 .confirmNote {
   margin: 0;
-  padding-top: var(--tpl-hb2-op-field-gap);
   color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-an-text-lh);
 }
