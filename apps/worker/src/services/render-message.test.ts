@@ -8,6 +8,17 @@ import {
 } from './render-message.js';
 
 describe('renderMessageContent', () => {
+  test('店名と共通情報を店舗ごとに解決し、店名の文字を別の差し込みにしない', () => {
+    const text='{{account.name}} / {{var.notice}}';
+    expect(renderMessageContent(text,{accountName:'銀座店',vars:{notice:'銀座のお知らせ'}})).toBe('銀座店 / 銀座のお知らせ');
+    expect(renderMessageContent(text,{accountName:'渋谷店',vars:{notice:'渋谷のお知らせ'}})).toBe('渋谷店 / 渋谷のお知らせ');
+    expect(renderMessageContent('{{account.name}} {{var.notice}}',{accountName:'{{var.secret}}',vars:{secret:'非公開',notice:'公開'}})).toBe('{{var.secret}} 公開');
+    const json=JSON.stringify({type:'bubble',body:{type:'box',contents:[{type:'text',text:'{{account.name}}'}]}});
+    expect(JSON.parse(renderBroadcastMessageContent('flex',json,{accountName:'店"A"'})).body.contents[0].text).toBe('店"A"');
+    expect(getUnsupportedBroadcastVariables('{{account.name}}')).toEqual([]);
+    expect(hasRecipientVariables('{{account.name}}')).toBe(false);
+  });
+
   test('replaces {{liff_id}} with given liffId', () => {
     expect(renderMessageContent('hello https://liff.line.me/{{liff_id}}/x', '12345-AAA'))
       .toBe('hello https://liff.line.me/12345-AAA/x');

@@ -527,3 +527,12 @@ export const api = {
   webinarCtaClick: (slug: string, sessionStartAt: number) =>
     post<{ ok: true }>(`/api/liff/webinars/${slug}/cta-click`, { sessionStartAt }),
 };
+
+/** 来店スタンプ。PINを使う口には本人のIDトークンを常に送る。 */
+export const visitStampsApi = {
+  cards: (accountId:string) => get<{success:true;data:Array<{card:import('@line-crm/shared').VisitStampCard;wallet:import('@line-crm/shared').VisitStampWallet}>}>(`/api/liff/visit-stamps/cards?${new URLSearchParams({accountId})}`),
+  card: (accountId:string,id:string) => get<{success:true;data:{card:import('@line-crm/shared').VisitStampCard;wallet:import('@line-crm/shared').VisitStampWallet;entries:import('@line-crm/shared').VisitStampEntry[]}}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}?${new URLSearchParams({accountId})}`),
+  showReward: (accountId:string,id:string,rewardId:string,requestId:string) => post<{success:true;data:import('@line-crm/shared').VisitStampRedemption}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}/rewards?${new URLSearchParams({accountId})}`,{rewardId,requestId}),
+  useReward: (accountId:string,id:string,staffId:string,pin:string) => post<{success:true;data:{id:string;status:'used'}}>(`/api/liff/visit-stamps/redemptions/${encodeURIComponent(id)}/use?${new URLSearchParams({accountId})}`,{staffId,pin}),
+  requestPaper: (accountId:string,id:string,body:import('@line-crm/shared').VisitStampPaperInput) => post<{success:true;data:{id:string;status:'pending'}}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}/paper-requests?${new URLSearchParams({accountId})}`,body),
+};

@@ -1,0 +1,3 @@
+import {it,expect} from 'vitest';import {safeRestaurantHttpsUrl,restaurantReservationEmbed} from './restaurant-media-links.js';
+it('HTTPSだけを許可し、認証情報入り・壊れたURLを拒む',()=>{for(const url of ['http://example.com','javascript:alert(1)','https://user:pass@example.com','broken'])expect(safeRestaurantHttpsUrl(url)).toBeUndefined();expect(safeRestaurantHttpsUrl(null)).toBeNull();expect(safeRestaurantHttpsUrl('https://example.com')).toBe('https://example.com/');});
+it('発行するHTMLは安全なリンクで、ページ未提供を明示する',()=>{const r=restaurantReservationEmbed('https://liff.example.test','token');expect(r.available).toBe(false);expect(r.html).toContain('noopener noreferrer');});

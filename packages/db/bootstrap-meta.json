@@ -535,7 +535,11 @@
     "592_mileage_reward_folders.sql",
     "593_webinar_cta_version.sql",
     "594_message_type_delivery.sql",
-    "595_imagemap_message_kinds.sql"
+    "594_restaurant_walk_in.sql",
+    "595_imagemap_message_kinds.sql",
+    "595_restaurant_media_links.sql",
+    "596_visit_stamps.sql",
+    "597_hq_broadcast_runs.sql"
   ],
-  "migrationCount": 536
+  "migrationCount": 540
 }

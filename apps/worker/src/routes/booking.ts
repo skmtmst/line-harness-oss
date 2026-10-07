@@ -1,5 +1,6 @@
 import { getBookingSyncRules, saveBookingSyncRules, validateBookingSyncRules, listBookingSyncNotices } from '@line-crm/db';
 import { evaluateBookingSyncNotices } from '../services/booking-sync-rules.js';
+import { processVisitStampQueue } from '../services/visit-stamps.js';
 // Booking feature HTTP routes.
 //
 // LIFF-facing endpoints live under /api/liff/booking/* (auth-bypassed by
@@ -136,6 +137,8 @@ import {
 } from '../services/booking-channels.js';
 
 const booking = new Hono<Env>();
+booking.use('/api/booking/*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.ok)await processVisitStampQueue(c.env);});
+
 booking.onError((error,c)=>{if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
 booking.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(/\/waitlist$|\/seat-waitlist$/.test(c.req.path)&&c.req.method==='POST')){try{const accountId=c.req.path.startsWith('/api/liff/')?await resolveAccountIdFromLiff(c):await resolveAccountIdAdmin(c);if(accountId)await processBookingWaitlists(c.env,accountId);}catch{console.error(JSON.stringify({event:'waitlist_reconcile_failed'}));}}});
 
@@ -4098,7 +4101,7 @@ async function getTodaySeatReservations(
         .prepare(
           `SELECT reservation_id, kind, late_minutes, marked_by_name, marked_at
              FROM rt_seat_visit_marks
-            WHERE store_id = ? AND reservation_id IN (${list.map(() => '?').join(',')})
+            WHERE store_id = ? AND undone_at IS NULL AND reservation_id IN (${list.map(() => '?').join(',')})
             ORDER BY marked_at DESC`,
         )
         .bind(store.id, ...list.map((reservation) => reservation.id))
