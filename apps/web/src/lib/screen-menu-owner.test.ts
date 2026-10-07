@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { MENU_SECTIONS, SCREEN_MENU_OWNER, menuOwnerForScreen } from './menu'
+import { HQ_MENU_SECTIONS, MENU_SECTIONS, SCREEN_MENU_OWNER, menuOwnerForScreen } from './menu'
 
 const SIDEBAR = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '..', 'components', 'layout', 'sidebar.tsx'),
@@ -31,13 +31,18 @@ describe('画面→メニュー所属の正本（#984 LAY-15）', () => {
   })
 
   it('所属先の項目がメニューに実在する', () => {
-    const ids = new Set(MENU_SECTIONS.flatMap((section) => section.items.map((item) => item.id)))
+    // 統括の画面（/accounts/new など）は統括の左メニューの項目に属する。
+    const ids = new Set([...MENU_SECTIONS, ...HQ_MENU_SECTIONS].flatMap((section) => section.items.map((item) => item.id)))
     for (const [screen, owner] of Object.entries(SCREEN_MENU_OWNER)) {
       const candidates = typeof owner === 'string' ? [owner] : owner
       for (const id of candidates) {
         expect(ids.has(id), `${screen} の所属先 ${id} がメニューに無い`).toBe(true)
       }
     }
+  })
+
+  it('LINEアカウントの登録は統括の「アカウント」が選ばれる', () => {
+    expect(menuOwnerForScreen('/accounts/new', '')).toEqual(['hq-stores'])
   })
 
   it('サイドバーが正本を読んで選択へ反映する', () => {

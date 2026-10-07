@@ -40,6 +40,8 @@ export function applyConversionTestSchema(db: Database.Database): void {
       reversal_policy TEXT NOT NULL DEFAULT 'manual',
       -- N-270: 外部受信の鍵(暗号化)と受け口の停止時刻。
       ingest_secret_encrypted TEXT, ingest_disabled_at TEXT,
+      -- F-13(582): 成果のフォルダ。
+      folder_id TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     -- N-270: 外部受信の成否台帳。is_test は #1037(IDEA-19)の検証受信の目印。

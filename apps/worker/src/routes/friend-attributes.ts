@@ -1589,7 +1589,8 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
 
-    const accountId = body.kind === 'webinar' || body.kind === 'tag' || body.kind === 'template' || body.kind === 'form'
+    const integrationKind = ['automation', 'common_action', 'webhook', 'conversion'].includes(body.kind);
+    const accountId = integrationKind || body.kind === 'webinar' || body.kind === 'tag' || body.kind === 'template' || body.kind === 'form'
       ? (typeof body.accountId === 'string' ? body.accountId.trim() : '')
       : '';
     // テンプレートのフォルダはアカウント単位（N-147）。accountId なしで作れるのは
@@ -1599,7 +1600,7 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'account_id_required' }, 400);
     }
-    if (body.kind === 'webinar' || accountId) {
+    if (integrationKind || body.kind === 'webinar' || accountId) {
       if (!accountId) return c.json({ success: false, error: 'account_id_required' }, 400);
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.allowedAccountIds.includes(accountId)) {

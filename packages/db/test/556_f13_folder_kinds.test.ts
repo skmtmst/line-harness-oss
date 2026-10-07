@@ -59,8 +59,11 @@ function setupDbWithout556(): Database.Database {
   db.exec('PRAGMA foreign_keys = ON');
   execSafe(db, readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
 
+  // 本番と同じ順にする：556 より前の番号だけを当てる。後の番号（582 の folders を見る
+  // トリガーなど）を先に当てると、556 の作り直しの途中で folders が無い瞬間に
+  // そのトリガーが動いて落ちる。本番では 556 が先に当たるので起きない。
   const migrationFiles = readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith('.sql') && !f.startsWith('556_'))
+    .filter((f) => f.endsWith('.sql') && f < '556_')
     .sort();
 
   for (const file of migrationFiles) {

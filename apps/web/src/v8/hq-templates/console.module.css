@@ -31,11 +31,8 @@
 .folderItem span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .folderForm { display: flex; align-items: center; gap: var(--tpl-htn-chip-gap); }
 .folderTools { display: flex; flex-wrap: wrap; gap: var(--tpl-htn-chip-gap); }
-.folderDot {
-  width: var(--tpl-htn-dot); height: var(--tpl-htn-dot); flex-shrink: 0; border-radius: var(--tpl-htn-radius-pill);
-  box-shadow: var(--tpl-htn-ring-control); background: transparent;
-}
-.folderDot[data-filed] { background: var(--color-ink-faint); box-shadow: none; }
+/* フォルダの色の丸は共通部品 FolderDot。分類の列では読み上げを名前に任せる（箱を作らない包み）。 */
+.dotSlot { display: contents; }
 
 /* 道具の段 */
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s); min-width: 0; width: 100%; flex: 1 1 auto; }
