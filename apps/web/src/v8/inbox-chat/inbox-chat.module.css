@@ -1,0 +1,45 @@
+/*
+ * ★V8 受信箱の真ん中・書く欄・窓（M0393）。値は globals.css の [data-theme="v8"] の --tpl-inbox-*。
+ * このファイルは V8 の画面だけが読む（入口の page.tsx が v8 のときだけ部品を出す）。
+ */
+
+/* ── 対応ルールの小窓 ─────────────────────────── */
+.popWrap { position: relative; display: inline-flex; }
+
+.pop {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-inbox-pop-gap);
+  width: var(--tpl-inbox-pop-w);
+  max-width: calc(100vw - var(--tpl-inbox-pop-gap) * 2);
+  padding: var(--tpl-inbox-pop-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  box-shadow: var(--shadow-float);
+}
+
+.popTitle { color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--text-label--line-height); }
+.popNote { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--text-caption--line-height); }
+.popError { color: var(--color-danger); font-size: var(--text-caption); }
+.popList { display: flex; flex-direction: column; }
+.popRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-chead-gap);
+  padding: var(--tpl-inbox-pop-row-pad);
+  box-shadow: inset 0 -1px 0 var(--color-divider);
+  font-size: var(--text-caption);
+}
+.popRow:last-child { box-shadow: none; }
+.popName { flex: none; color: var(--color-ink); font-weight: 600; white-space: nowrap; }
+.popRule { min-width: 0; flex: 1; overflow: hidden; color: var(--color-ink-faint); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.popLink { align-self: flex-start; color: var(--color-action); font-size: var(--text-caption); font-weight: 600; }
+.popLink:hover { text-decoration: underline; }
+
+.dot {
+  flex: none;
+  width: var(--tpl-inbox-dot);
+  height: var(--tpl-inbox-dot);
+  border-radius: var(--radius-pill);
+}

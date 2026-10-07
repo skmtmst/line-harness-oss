@@ -40,6 +40,7 @@ import ChatSearchBar from '@/v8/inbox-search/chat-search-bar'
 import searchStyles from '@/v8/inbox-search/chat-search-bar.module.css'
 import { useChatSearch } from '@/v8/inbox-search/use-chat-search'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import InboxRulesPopover from '@/v8/inbox-chat/rules-popover'
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
@@ -53,7 +54,7 @@ import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
-import { Bookmark, CheckCircle2, Clock3, Filter, ListFilter, Reply, Settings2, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Search, SlidersHorizontal, Star, X } from 'lucide-react'
+import { Bookmark, CheckCircle2, Clock3, Filter, ListFilter, Reply, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Search, SlidersHorizontal, Star, X } from 'lucide-react'
 
 type Chat = ChatListItem
 
@@ -2616,11 +2617,17 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           )}
         </div>
         {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
+        {adminTheme === 'v8' ? (
+          /*
+           * ★V8：絵（XqSvX）の「対応ルール」は settings-2 の印。押してもページを移らず、
+           * その場で小窓を開く（オーナー指摘：別のページへ飛ぶのはおかしい）。
+           */
+          <InboxRulesPopover accountId={selectedAccountId ?? null} className={`shrink-0 h-8 w-8 p-0 ${styles.tool}`} />
+        ) : (
         <Button href="/tags?tab=marks" aria-label="対応ルール" title="対応ルール" size="compact" className={`shrink-0 h-8 w-8 p-0 ${styles.tool}`}>
-          {/* V8 の絵（XqSvX）は settings-2 の印。v7 は今までの線の印のまま。 */}
-          <Settings2 aria-hidden size={16} className="v8-only" />
-          <svg className="v7-only h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6" /></svg>
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6" /></svg>
         </Button>
+        )}
         </div>
         {[
           { key: 'all' as const, label: 'すべて', title: undefined, icon: null },
