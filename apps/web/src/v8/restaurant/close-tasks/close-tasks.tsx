@@ -166,6 +166,7 @@ export default function CloseTasksPage() {
                       </Button>
                     ) : null}
                     <RowActions
+                      className={styles.more}
                       subjectName={slotTitle(group.startsAt)}
                       menuItems={[
                         ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) })) : []),

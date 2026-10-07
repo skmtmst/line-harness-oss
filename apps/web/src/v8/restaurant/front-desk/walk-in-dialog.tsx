@@ -133,6 +133,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
                 title={table.code}
                 note={tableNote(table)}
                 icon={<Armchair size={16} aria-hidden="true" />}
+                height="short"
                 disabled={busy}
               />
             ))}

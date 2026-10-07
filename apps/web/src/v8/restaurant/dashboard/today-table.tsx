@@ -87,7 +87,7 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
                           <Check size={15} aria-hidden="true" />来店
                         </Button>
                       ) : null}
-                      <RowActions menuItems={menuItems} subjectName={r.customer_name} />
+                      <RowActions className={styles.more} menuItems={menuItems} subjectName={r.customer_name} />
                     </span>
                   </Td>
                 </Tr>

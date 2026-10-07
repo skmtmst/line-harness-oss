@@ -142,6 +142,15 @@
   flex: 1 1 0;
 }
 
+/* 行の「…」は絵では枠のある 36 角のボタン（来店と同じ高さ） */
+.more > button {
+  width: var(--tpl-e1-more);
+  height: var(--tpl-e1-more);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
 /* 右の列 */
 .side {
   display: flex;
@@ -211,7 +220,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--tpl-e1-gap-s);
+  gap: var(--tpl-e1-card-gap);
   padding: var(--tpl-e1-card-pad);
   border: 1px solid var(--color-hairline);
   border-radius: var(--tpl-e1-radius-l);
