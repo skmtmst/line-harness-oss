@@ -291,15 +291,21 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
               </div>
               {whoTab === 'line' ? (
                 <>
-                  {!person ? (
-                    <SearchField aria-label="名前・電話番号で探す" placeholder="名前・電話番号で探す" value={search} onChange={setSearch} onClear={() => setSearch('')} />
-                  ) : null}
+                  {/* 選んだあとも探す欄は残す（絵 rm92Y：欄の下に選んだ人の行）。 */}
+                  <SearchField
+                    aria-label="名前・電話番号で探す"
+                    placeholder="名前・電話番号で探す"
+                    value={search}
+                    /* 選んだあとに打ち直したら、選び直しとして扱う。 */
+                    onChange={(value) => { setSearch(value); if (person) setPerson(null) }}
+                    onClear={() => setSearch('')}
+                  />
                   {!person && search.trim().length >= 2 ? (
                     <div className={styles.foundList}>
                       {searchError ? <p role="alert" className={styles.formError}>{searchError}</p> : null}
                       {found.length === 0 && !searchError ? <p className={styles.sideText}>台帳に見つかりません。電話番号のタブから入れられます。</p> : null}
                       {found.map((c) => (
-                        <button key={`${c.lineUid || c.phone || c.name}`} type="button" className={styles.foundItem} onClick={() => setPerson(c)}>
+                        <button key={`${c.lineUid || c.phone || c.name}`} type="button" className={styles.foundItem} onClick={() => { setPerson(c); setSearch('') }}>
                           {c.name}{c.phone ? `（${c.phone}）` : ''}
                         </button>
                       ))}
