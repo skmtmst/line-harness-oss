@@ -18,6 +18,8 @@
   /* 頭の下線・右欄の区切り・下の帯を板の端まで届かせるため、
      .content の余白（20px 24px 28px）を打ち消して中で持ち直す。 */
   margin: calc(var(--tpl-bm-20) * -1) calc(var(--tpl-bm-24) * -1) calc(var(--tpl-bm-28) * -1);
+  /* 中身が短いタブでも下の帯を板の下へ（絵 x1OZS6：帯は画面の下に追従）。 */
+  min-height: var(--tpl-bk2-shell-min-h);
 }
 
 /* 板の頭：戻る・題・説明・タブ。下の線だけ。 */
@@ -129,6 +131,7 @@
 /* 中身：左＝タブの中身、右＝お客さまの画面の見本。 */
 .body {
   display: flex;
+  flex: 1 0 auto;
   align-items: stretch;
 }
 
@@ -956,6 +959,12 @@
   box-shadow: var(--shadow-row-line);
 }
 
+/* 行の中の文字ボタンは全体のボタンの最低の高さ（32）を受けない（絵 KRgTQ の行は 17 の文字1行）。 */
+.exceptionRow > button {
+  min-height: var(--tpl-bm-17);
+  line-height: var(--tpl-bm-17);
+}
+
 .exceptionDates {
   padding: 0;
   border: 0;
@@ -1076,13 +1085,40 @@
 .staffRow {
   display: flex;
   align-items: center;
-  gap: var(--tpl-bm-12);
-  padding: var(--tpl-bm-12) var(--tpl-bm-8);
-  border-bottom: 1px solid var(--color-divider);
+  gap: var(--tpl-bk2-staff-gap);
+  min-height: var(--tpl-bk2-staff-row-h);
+  padding: var(--tpl-bk2-staff-row-pad-y) var(--tpl-bk2-staff-pad-x);
+  box-shadow: var(--shadow-row-line);
 }
 
 .staffRow:last-child {
-  border-bottom: 0;
+  box-shadow: none;
+}
+
+/* 表は余白なしの枠（絵 VLEaj：角丸12・線だけ・中は端まで）。 */
+.staffTable {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+/* 頭の段：薄い灰の地・高さ40。 */
+.staffTableHead {
+  min-height: var(--tpl-bk2-staff-head-h);
+  padding-block: 0;
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 500;
+}
+
+.staffTableHead > span {
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .staffName {
@@ -1096,7 +1132,7 @@
 .staffNameLink {
   width: fit-content;
   overflow: hidden;
-  color: var(--color-action);
+  color: var(--color-accent-deep);
   font-size: var(--tpl-bm-13);
   font-weight: 600;
   text-decoration: none;
@@ -1114,34 +1150,63 @@
 }
 
 .staffColMenus {
-  width: var(--tpl-bm-70);
+  width: var(--tpl-bk2-staff-col-menus);
   flex-shrink: 0;
 }
 
 .staffColNoAssign {
-  width: var(--tpl-bm-48);
+  width: var(--tpl-bk2-staff-col-noassign);
   flex-shrink: 0;
 }
 
 .staffColWork {
-  width: var(--tpl-bm-96);
+  width: var(--tpl-bk2-staff-col-work);
   flex-shrink: 0;
 }
 
 .staffColLink {
-  width: var(--tpl-bm-150);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-bm-4);
+  width: var(--tpl-bk2-staff-col-link);
   flex-shrink: 0;
   min-width: 0;
 }
 
 .staffColStatus {
-  width: var(--tpl-bm-64);
+  width: var(--tpl-bk2-staff-col-status);
   flex-shrink: 0;
 }
 
 .staffColMenu {
-  width: var(--tpl-bm-28);
+  width: var(--tpl-bk2-staff-col-menu);
   flex-shrink: 0;
+}
+
+.staffNote {
+  margin: 0;
+  padding: var(--tpl-bm-10) var(--tpl-bm-12);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}
+
+.staffColLink .staffCellSub {
+  margin-top: 0;
+}
+
+/* 絵 VLEaj：小さい字は 16 の行、0 の行は 17（行の高さ 60・二行の警告の行 69）。 */
+.staffRow .staffCellSub {
+  line-height: var(--tpl-bm-16);
+}
+
+.staffRow .cellWarn {
+  display: flex;
+  flex-direction: column;
+  line-height: var(--tpl-bm-17);
 }
 
 .staffCellMain {
@@ -1162,8 +1227,9 @@
 .linkState {
   display: inline-flex;
   align-items: center;
-  gap: var(--tpl-bm-4);
-  padding: var(--tpl-bm-3) var(--tpl-bm-10);
+  gap: var(--tpl-bm-5);
+  padding: var(--tpl-bm-2) var(--tpl-bm-8);
+  line-height: var(--tpl-bm-18);
   border-radius: var(--radius-pill);
   background: var(--color-v8-pill-off);
   color: var(--color-ink-secondary);
