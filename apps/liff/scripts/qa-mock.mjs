@@ -126,7 +126,7 @@ function seatMock(method, pathname, url, body) {
     const date = url.searchParams.get('date') ?? '';
     const slots = seatSlots(date);
     if (!slots) return [400, { success: false, error: 'invalid_date_or_unconfigured_hours' }];
-    return [200, { success: true, data: { storeId: SEAT_STORE.id, date, guestCount: Number(url.searchParams.get('guestCount')), slots, cancelDeadlineMinutesBefore: 22 * 60, cutoffMinutesBefore: 60 } }];
+    return [200, { success: true, data: { storeId: SEAT_STORE.id, date, guestCount: Number(url.searchParams.get('guestCount')), slots, cancelDeadlineMinutesBefore: 120, cutoffMinutesBefore: 60 } }];
   }
   if (method === 'POST' && pathname === '/api/liff/restaurant/holds') {
     const b = {

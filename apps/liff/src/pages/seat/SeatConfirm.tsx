@@ -84,7 +84,7 @@ export default function SeatConfirm({
       </div>
       <ul className="flex flex-col gap-1 rounded-(--liff-radius) bg-liff-off-bg p-3 text-xs leading-[18px] text-liff-sub">
         <li>{`・${changeRule(startsAt, cancelDeadlineMinutesBefore, timeZone, now)}`}</li>
-        <li>・遅れるときは、この LINE でお店へお知らせください</li>
+        <li>・遅れるときや人数が変わるときは、この LINE でお店へお知らせください</li>
       </ul>
       {left !== null && (
         <p className="text-xs leading-[18px] text-liff-wait-ink" role="timer" aria-live="off">
