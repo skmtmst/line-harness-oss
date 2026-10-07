@@ -22,7 +22,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     api: {
       ...actual.api,
       lineAccounts: { ...actual.api.lineAccounts, list: accounts },
-      lineAccountTags: { ...actual.api.lineAccountTags, list: vi.fn(async () => ({ success: true, data: [] })) },
+      lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })) },
       tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '然 -NEN-' } })) },
     },
   }

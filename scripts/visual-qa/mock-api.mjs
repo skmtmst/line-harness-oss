@@ -3416,6 +3416,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   /* 統括ホーム（絵 `JKjsE`）の左のタグの列。 */
   if (method === 'GET' && pathname === '/api/line-account-tags') return { success: true, data: LINE_ACCOUNT_TAGS }
+  /* 統括のアカウントのフォルダ（API-17・絵 `JKjsE`：渋谷エリア・イベント・テスト・未分類）。所属はタグの先頭1件と同じ。 */
+  if (method === 'GET' && pathname === '/api/line-account-folders') {
+    const live = LINE_ACCOUNTS.filter((account) => !account.archivedAt)
+    const folders = LINE_ACCOUNT_TAGS.map((tag) => ({
+      id: tag.id, kind: 'line_account', name: tag.name, parentId: null, color: tag.color, displayOrder: tag.displayOrder,
+      createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
+      itemCount: LINE_ACCOUNTS.filter((account) => (account.tags ?? [])[0]?.id === tag.id).length,
+    }))
+    return { success: true, data: { folders, total: LINE_ACCOUNTS.length, unclassifiedCount: live.filter((account) => !(account.tags ?? []).length).length } }
+  }
   /* 統括の名前（絵 `JKjsE` の説明・`K7HYu` の欄）。 */
   if (method === 'GET' && pathname === '/api/tenants/me') return { success: true, data: { name: '然 -NEN- 本部' } }
   if (pathname === '/api/line-accounts') {
@@ -3423,7 +3433,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       `webhook` を付ける。無いと接続状態カードが「確認中」のままで、
       設計の「正常」と並べたときに実装の差に見えてしまう。
     */
-    return { success: true, data: LINE_ACCOUNTS }
+    return { success: true, data: LINE_ACCOUNTS.map((account) => {
+      const first = (account.tags ?? [])[0]
+      const tag = first ? LINE_ACCOUNT_TAGS.find((item) => item.id === first.id) : null
+      return { ...account, folderId: tag?.id ?? null, folder: tag ? { id: tag.id, kind: 'line_account', name: tag.name, parentId: null, color: tag.color, displayOrder: tag.displayOrder, createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' } : null }
+    }) }
   }
   if (pathname === '/api/friends/migrations') {
     return { success: true, data: [UID_MIGRATION_DONE, {

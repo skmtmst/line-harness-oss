@@ -7,14 +7,14 @@
  * 設定の窓だけ、見た目を絵 `HMpVx` どおりに組み直した。
  */
 import { useEffect, useState } from 'react'
-import { CircleDot, CircleHelp, RotateCcw, Star, Users } from 'lucide-react'
+import { CircleHelp, RotateCcw, Users } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import Button from '@/components/shared/button'
-import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import { api, type LineAccountTag } from '@/lib/api'
+import { api } from '@/lib/api'
+import type { Folder } from '@line-crm/shared'
 import type { AccountWithStats } from '@/contexts/account-context'
 import head from './dialog-head.module.css'
 import styles from './account-dialogs.module.css'
@@ -39,7 +39,7 @@ export function accountHandle(account: AccountWithStats): string {
   return lineHandle(account)
 }
 
-/* 板 `HMpVx`：アカウントの設定（名前・親・タグ・ほかの設定・アーカイブ）。 */
+/* 板 `HMpVx`：アカウントの設定（名前・親・フォルダ・ほかの設定・アーカイブ）。2026-10-08 タグ→フォルダ（1つだけ・API-17）。 */
 export function AccountSettingsDialogV8({ account, accounts, archived, onClose, onSaved, onArchive, onShowDetails }: {
   account: AccountWithStats
   accounts: AccountWithStats[]
@@ -51,46 +51,19 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
 }) {
   const [name, setName] = useState(account.name)
   const [parent, setParent] = useState('')
-  const [tags, setTags] = useState<LineAccountTag[]>([])
-  const [selectedTags, setSelectedTags] = useState<string[]>(() => (account.tags ?? []).map((tag) => tag.id))
-  const [addingTag, setAddingTag] = useState(false)
-  const [newTagName, setNewTagName] = useState('')
+  const initialFolder = (account as { folderId?: string | null }).folderId ?? ''
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [folderId, setFolderId] = useState<string>(initialFolder)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    void api.lineAccountTags.list().then((res) => {
-      if (!cancelled && res.success && Array.isArray(res.data)) setTags(res.data)
+    void api.lineAccountFolders.list().then((res) => {
+      if (!cancelled && res.success && Array.isArray(res.data?.folders)) setFolders([...res.data.folders].sort((a, b) => a.displayOrder - b.displayOrder))
     }).catch(() => {})
     return () => { cancelled = true }
   }, [])
-
-  const toggleTag = (id: string) => {
-    setSelectedTags((prev) => (prev.includes(id) ? prev.filter((tagId) => tagId !== id) : [...prev, id]))
-  }
-
-  const createTag = async () => {
-    const tagName = newTagName.trim()
-    if (!tagName || busy) return
-    setBusy(true)
-    setError('')
-    try {
-      const res = await api.lineAccountTags.create(tagName)
-      if (!res.success) {
-        setError(res.error)
-        return
-      }
-      setTags((prev) => [...prev, res.data])
-      setSelectedTags((prev) => (prev.includes(res.data.id) ? prev : [...prev, res.data.id]))
-      setNewTagName('')
-      setAddingTag(false)
-    } catch {
-      setError('タグを追加できませんでした。通信を確認して、もう一度お試しください。')
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const save = async () => {
     if (busy) return
@@ -117,13 +90,10 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
           return
         }
       }
-      const before = new Set((account.tags ?? []).map((tag) => tag.id))
-      const after = new Set(selectedTags)
-      const changed = before.size !== after.size || [...after].some((id) => !before.has(id))
-      if (changed) {
-        const res = await api.lineAccountTags.replace(account.id, selectedTags)
+      if (folderId !== initialFolder) {
+        const res = await api.lineAccountFolders.move(account.id, folderId || null)
         if (!res.success) {
-          setError(res.error === 'ACCOUNT_ARCHIVED' ? 'アーカイブ済みのためタグを変えられません。' : res.error)
+          setError(res.error === 'ACCOUNT_ARCHIVED' ? 'アーカイブ済みのためフォルダを変えられません。' : res.error)
           return
         }
       }
@@ -189,39 +159,18 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
             ]}
           />
         </div>
-        <div className={styles.tagField}>
-          <p className={styles.labelRow}><span className={styles.label}>タグ</span><span className={styles.note}>複数つけられます</span></p>
-          <div className={styles.tagRow}>
-            {tags.map((tag) => (
-              <FilterChip
-                key={tag.id}
-                selected={selectedTags.includes(tag.id)}
-                icon={selectedTags.includes(tag.id) ? <CircleDot size={14} aria-hidden="true" /> : <Star size={14} aria-hidden="true" />}
-                disabled={busy}
-                onChange={() => toggleTag(tag.id)}
-              >
-                {tag.name}
-              </FilterChip>
-            ))}
-            {!addingTag ? (
-              <Button type="button" disabled={busy} onClick={() => { setNewTagName(''); setAddingTag(true) }}>タグを追加</Button>
-            ) : null}
-          </div>
-          {addingTag ? (
-            <div className={styles.addRow}>
-              <TextField
-                aria-label="新しいタグの名前"
-                value={newTagName}
-                maxLength={100}
-                disabled={busy}
-                placeholder="例: 渋谷エリア"
-                onChange={(event) => setNewTagName(event.target.value)}
-                className={styles.full}
-              />
-              <Button type="button" onClick={() => void createTag()} disabled={!newTagName.trim() || busy}>追加</Button>
-            </div>
-          ) : null}
-          <p className={styles.note}>タグは アカウント一覧の左の列で絞り込みに使います</p>
+        <div className={styles.field}>
+          <label htmlFor="hq-account-folder" className={styles.label}>フォルダ</label>
+          <Select
+            id="hq-account-folder"
+            aria-label="フォルダ"
+            size="full"
+            value={folderId}
+            disabled={busy}
+            onChange={setFolderId}
+            options={[{ value: '', label: '未分類' }, ...folders.map((item) => ({ value: item.id, label: item.name }))]}
+          />
+          <p className={styles.note}>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</p>
         </div>
         {!archived && account.connection?.status === 'warn' ? (
           /* 要確認のときだけ：引っかかった確認ごとの理由（URL は折り返して全文）。 */
