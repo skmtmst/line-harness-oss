@@ -61,6 +61,15 @@
   color: var(--color-ink);
 }
 
+/* 操作を止めているとき（生成中など）。行内ラジオと同じ薄さにそろえる。 */
+.item:disabled {
+  cursor: not-allowed;
+}
+
+.root:has(.item:disabled) {
+  opacity: 0.5;
+}
+
 .item:focus-visible {
   outline: 2px solid var(--color-action);
   outline-offset: 2px;
@@ -88,4 +97,15 @@
 [data-theme='v8'] .root[data-size='small'] { border-radius: var(--radius-segment); }
 [data-theme='v8'] .root[data-size='small'] .item { padding: 3px 10px; font-size: var(--text-caption); line-height: 18px; }
 [data-theme='v8'] .root[data-size='small'] .thumb { border-radius: var(--radius-mini); }
+
+/*
+ * パネル内（★BG-B `SLgY5` つくる枚数の4択）。
+ * 器 余白3・r8・横いっぱい・項目は左から詰める／項目 5/12・文 12/17・
+ * 選択中 700 ink・未選択 500 ink-secondary／つまみ r6・上下 3。
+ * 小型（d8X09）と箱型（dtJVi）の合格は変えない。v8 だけ。
+ */
+[data-theme='v8'] .root[data-size='panel'] { display: flex; padding: 3px; border-radius: var(--radius-segment); }
+[data-theme='v8'] .root[data-size='panel'] .item { padding: 5px 12px; font-size: var(--text-caption); line-height: 17px; }
+[data-theme='v8'] .root[data-size='panel'] .selected { font-weight: 700; }
+[data-theme='v8'] .root[data-size='panel'] .thumb { top: 3px; bottom: 3px; border-radius: var(--radius-mini); }
 }

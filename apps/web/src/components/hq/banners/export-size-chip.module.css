@@ -1,0 +1,37 @@
+/*
+ * 書き出す大きさの札（★BG-B `qIp42` → `WDJak`「中 サイズ確認」）。
+ *
+ * 絵の値そのまま: 地 `$accent-soft`・角丸 `$radius-full`・内側 6/12・間 6。
+ * 中の絵 `c5NlW` は 14×14 の `$accent-deep`、文字 `GcuH5` は
+ * `$accent-deep` / `$size-micro` / 太さ 600。
+ *
+ * この見た目は**バナー生成だけのもの**。共通の下部追従バー
+ * （`components/shared/sticky-bar.module.css`）には置かない。帯は40画面以上で
+ * 共有していて、そこへ色を埋めると関係のない画面まで緑になる。
+ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-micro);
+  line-height: var(--text-micro--line-height);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* 帯が2段に折れる幅では、札の中で折り返す（横スクロールを出さない）。 */
+@media (max-width: 1100px) {
+  .chip {
+    white-space: normal;
+  }
+}
