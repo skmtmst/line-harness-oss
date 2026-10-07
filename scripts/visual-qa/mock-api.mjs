@@ -94,7 +94,7 @@ import {
   OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, COMMON_ACTION_DETAIL_PURCHASE, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
-  BOOKING_MENUS, BOOKING_CHANNELS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
+  BOOKING_MENUS, BOOKING_CHANNELS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_AVAILABILITY_STORE_VIEW, BOOKING_RESOURCES,
   BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_EXCEPTIONS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
@@ -5772,6 +5772,11 @@ const server = createServer((req, res) => {
       res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
       return
     }
+    /* 予約メニューの保存は、ほかの人が先に保存した形（409）を返す。板 v5L19Z（メニュー編集の競合）の帯を撮る。 */
+    if (method === 'PUT' && /^\/api\/booking\/admin\/menus\/[^/]+$/.test(url.pathname)) {
+      res.writeHead(409).end(JSON.stringify({ success: false, error: 'version_conflict' }))
+      return
+    }
     // 運営のお知らせ（V8 tQ2MJ・TJUUl）の宛先の見込み。数えるだけで何も変えない。
     if (method === 'POST' && url.pathname === '/api/ops/announcements/preview') {
       res.writeHead(200).end(JSON.stringify({ success: true, data: { tenants: 18, staff: 18, lineLinked: 11, withEmail: 18 } }))
@@ -6656,6 +6661,11 @@ const server = createServer((req, res) => {
     return
   }
 
+  /* 予約設定の右の写し（お客さまの予約画面）は店舗のルールを当てた空きを読む。ほかの画面は従来の空き。 */
+  if (url.pathname === '/api/booking/admin/availability' && url.searchParams.get('apply_store_rules') === '1') {
+    res.writeHead(200).end(JSON.stringify(BOOKING_AVAILABILITY_STORE_VIEW))
+    return
+  }
   if (url.pathname in RAW) {
     res.writeHead(200).end(JSON.stringify(RAW[url.pathname]))
     return
