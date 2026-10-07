@@ -1,0 +1,286 @@
+/*
+ * ★V8 シナリオ配信の配信結果（X4STXS）。
+ * 枠・頭（戻る・題・説明・右上の操作）は型（DetailPage）が持つ。ここは中身だけ。
+ */
+
+/* 右上の操作：絵は戻る・題・説明の3段の真ん中に置く（型は戻るの下の段に並べるので、その分だけ上げる）。間は12。 */
+.headActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-sc2-row-gap);
+  margin-top: calc(var(--tpl-sc2-head-pull) * -1);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-label);
+}
+
+/* 数の帯：角12の枠で囲む。マスの余白・数の行の高さは、部品の題の行（13/19.5）の分だけ詰めて絵の位置（題・数・補足）に合わせる。 */
+.kpiBox {
+  --tpl-band-cell-pad-block: var(--tpl-sc2-kpi-pad-block);
+  --tpl-band-cell-pad-side: var(--tpl-sc2-kpi-pad-side);
+  --tpl-band-cell-gap: var(--tpl-sc2-kpi-gap);
+  --tpl-band-number-lh: var(--tpl-sc2-kpi-num-lh);
+  overflow: hidden;
+  border-radius: var(--tpl-sc2-radius);
+  box-shadow: var(--tpl-sc2-ring);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sc2-section-gap);
+  min-width: 0;
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sc2-tools-gap);
+  min-width: 0;
+}
+.sectionTitle {
+  flex: 1 1 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-sc2-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-sc2-section-title-lh);
+  white-space: nowrap;
+}
+.sectionNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sc2-text-lh);
+  white-space: nowrap;
+}
+.sectionLink {
+  min-height: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-sc2-text-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sectionLink:hover {
+  text-decoration: underline;
+}
+
+/* 通ごとの反応：1通1行（番号・いつ・届いた数・率）と、その下の棒。 */
+.stepList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  border-radius: var(--tpl-sc2-radius);
+  box-shadow: var(--tpl-sc2-ring);
+}
+.stepRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sc2-step-gap);
+  padding: var(--tpl-sc2-step-pad);
+  box-shadow: var(--tpl-sc2-line-b);
+}
+.stepTop {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sc2-step-top-gap);
+  min-width: 0;
+  white-space: nowrap;
+}
+.stepNo {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: var(--tpl-sc2-text-lh);
+}
+.stepWhen {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sc2-text-lh);
+}
+.stepReach {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-sc2-reach-lh);
+}
+.stepMeta {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sc2-text-lh);
+  text-overflow: ellipsis;
+}
+.stepDrop {
+  color: var(--color-warning);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-sc2-text-lh);
+}
+.stepBar {
+  display: block;
+  width: 100%;
+  height: var(--tpl-sc2-bar-h);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--tpl-sc2-bar-track);
+  appearance: none;
+}
+.stepBar::-webkit-progress-bar {
+  border-radius: var(--radius-pill);
+  background: var(--tpl-sc2-bar-track);
+}
+.stepBar::-webkit-progress-value {
+  border-radius: var(--radius-pill);
+  background: var(--tpl-sc2-bar-fill);
+}
+.stepBar::-moz-progress-bar {
+  border-radius: var(--radius-pill);
+  background: var(--tpl-sc2-bar-fill);
+}
+
+/* 参加中の友だち：道具の段（状態で絞る・件数・配信予定を見る）と表。 */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sc2-tools-gap);
+  min-width: 0;
+}
+.statusSelect {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.count {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sc2-text-lh);
+  white-space: nowrap;
+}
+.toolsSpacer {
+  flex: 1 1 0;
+}
+.idle {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-label);
+  line-height: var(--tpl-sc2-name-lh);
+  text-align: center;
+}
+
+.table {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--tpl-sc2-radius);
+  box-shadow: var(--tpl-sc2-ring);
+}
+.headRow,
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sc2-col-gap);
+  padding: var(--tpl-sc2-row-pad);
+  min-width: 0;
+}
+.headRow {
+  background: var(--tpl-sc2-head-bg);
+  box-shadow: var(--tpl-sc2-line-b-strong);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-sc2-text-lh);
+  white-space: nowrap;
+}
+.row {
+  box-shadow: var(--tpl-sc2-line-b);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sc2-text-lh);
+}
+.row:last-child {
+  box-shadow: none;
+}
+.colName {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row .colName {
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-sc2-name-lh);
+}
+.colState {
+  display: flex;
+  flex-shrink: 0;
+  width: var(--tpl-sc2-col-state);
+}
+.colNow {
+  flex-shrink: 0;
+  width: var(--tpl-sc2-col-now);
+  white-space: nowrap;
+}
+.colNext {
+  flex-shrink: 0;
+  width: var(--tpl-sc2-col-next);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.colPlan {
+  display: flex;
+  flex-shrink: 0;
+  width: var(--tpl-sc2-col-plan);
+}
+.colMenu {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  width: var(--tpl-sc2-col-menu);
+}
+/* 「…」とメニューの位置の目印を1つの箱に包み、開いても行が伸びないようにする。 */
+.menuBox {
+  position: relative;
+  display: inline-flex;
+}
+
+.moreError {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-sc2-tools-gap);
+  margin: 0;
+  color: var(--color-status-danger);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sc2-text-lh);
+}
+.more {
+  display: flex;
+  justify-content: center;
+}
+
+.dialogButtons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-sc2-tools-gap);
+  width: 100%;
+  padding: var(--tpl-sc2-row-pad);
+  box-shadow: var(--tpl-sc2-line-t);
+}

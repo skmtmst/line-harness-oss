@@ -722,3 +722,12 @@ a.railStep:hover .railLabel {
     box-shadow: var(--tpl-bd-line-t);
   }
 }
+
+/* 予約を取り消す窓（BeNtj）：赤の取り消しと、残す側の2つの間を少し空ける。 */
+.dialogButtons.cancelButtons {
+  padding: var(--tpl-sc2-cancel-foot-pad);
+}
+
+.cancelKeep {
+  margin-left: var(--tpl-sc2-cancel-keep-gap);
+}
