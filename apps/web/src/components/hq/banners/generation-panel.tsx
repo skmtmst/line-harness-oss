@@ -309,13 +309,13 @@ export default function GenerationPanel({
 
         {/*
           * ★BG-B `ELZIS`：枚数の注記は2つとも「つくる枚数」に付く。
-          * `KCFAX`「一度に 4 枚まで」と `swcu2`「同じ条件で…」。絵では
-          * 前者がラベル行・後者が4択の下だが、Field の注記は1つなので
-          * 絵の読む順のまま1行に並べる。
+          * 置き場所も絵のまま——`KCFAX`「一度に 4 枚まで」はラベル行
+          * （4択の上）、`swcu2`「同じ条件で…」は4択の下。
           */}
         <Field
           label="つくる枚数"
-          note="一度に 4 枚まで。同じ条件で指定した枚数ぶん作ります（絵柄は毎回少しずつ変わります）"
+          note={`一度に ${maxCount} 枚まで`}
+          footNote="同じ条件で指定した枚数ぶん作ります（絵柄は毎回少しずつ変わります）"
         >
           <fieldset className="grid grid-cols-4 gap-1.5" disabled={disabled}>
             <legend className="sr-only">枚数</legend>
@@ -336,7 +336,12 @@ export default function GenerationPanel({
 
         <LimitState usage={usage ?? null} onReload={onReloadUsage} compact />
 
-        <div className="text-micro text-ink-faint">1040 × 1040 で書き出します</div>
+        {/*
+          * 「1040 × 1040 で書き出します」（★BG-B `GcuH5`）はここに出さない。
+          * 絵では下部追従バーの中ほど（左=残り枚数／中=サイズ／右=ボタン）。
+          * 画面側（`app/hq/banners/project/page.tsx`・`v8/hq-banners/project.tsx`）の
+          * 下の帯で `exportSizeText()` を出す。
+          */}
       </div>
     </aside>
   )
@@ -413,12 +418,23 @@ function EmphasisToggle({
 function Field({
   label,
   note,
+  footNote,
   htmlFor,
   help,
   children,
 }: {
   label: string
+  /**
+   * ラベルと同じ行、右端に添える一言。**入れる前に読んでおく**たぐい
+   * （上限・単位・任意かどうか）。例: ★BG-B `KCFAX`「一度に 4 枚まで」。
+   */
   note?: string
+  /**
+   * 中身の**下**に置く一言。選んだあとの結果を説明するたぐい。
+   * 例: ★BG-B `swcu2`「同じ条件で指定した枚数ぶん作ります…」。
+   * 絵では4択の下にあるので、`note` と同じ行にまとめない。
+   */
+  footNote?: string
   htmlFor?: string
   help?: ReactNode
   children: ReactNode
@@ -434,6 +450,7 @@ function Field({
         {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
       </div>
       {children}
+      {footNote ? <p className="text-nano text-ink-faint">{footNote}</p> : null}
     </div>
   )
 }

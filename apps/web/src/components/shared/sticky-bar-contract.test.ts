@@ -144,6 +144,25 @@ describe('下部追従バーの並びを部品で固定する', () => {
     expect(BAR).toMatch(/status \? </)
   })
 
+  /*
+   * ★BG-B の帯は 左=残り枚数／中=サイズ／右=ボタン（`WDJak`「中 サイズ確認」）。
+   * 読むだけの一言を操作の手前に置ける口を足した。渡さない画面は3列のまま
+   * なので、ほかの作成・編集画面の見た目は変わらない。
+   */
+  it('操作の手前の一言は、渡した画面だけ列が増える', () => {
+    expect(BAR).toMatch(/info\?:\s*ReactNode/)
+    expect(BAR).toMatch(/info \? </)
+    // 既定は3列のまま。増える列は `withInfo` を付けた画面だけ。
+    expect(CSS).toMatch(/\.withInfo\s*\{[^}]*grid-template-columns:\s*1fr auto auto 1fr/s)
+    expect(CSS).not.toMatch(/\.bar\s*\{[^}]*1fr auto auto 1fr/s)
+  })
+
+  it('一言を置いても右端は空ける', () => {
+    // 一言は `actions` の前。右端の空き箱はそのまま残す。
+    expect(BAR.indexOf('{info ?')).toBeLessThan(BAR.indexOf('styles.actions'))
+    expect(BAR).toMatch(/aria-hidden="true"/)
+  })
+
   it('1440 で横スクロールさせずに折り返す', () => {
     expect(CSS).toMatch(/@media \(max-width: 1100px\)/)
   })

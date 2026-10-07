@@ -33,6 +33,7 @@ import {
   BANNER_MAX_REFERENCE_IMAGES,
   EMPTY_GENERATION_INPUT,
   activeGeneration,
+  exportSizeText,
   inputFromGeneration,
   packedTextLines,
   readFileAsBase64,
@@ -564,6 +565,14 @@ function ProjectInner() {
                     ? `${running.requestedCount}枚中 ${running.doneCount}枚できました・今月の残り ${usage?.month.remaining ?? '—'}枚`
                     : blockedReason && input.presetKey ? blockedReason : usageStatusText(usage, input.count)}
                 </span>
+                {/*
+                  * ★BG-B の下の帯は 左=残り枚数／中=サイズ／右=ボタン。
+                  * その真ん中が `GcuH5`「1040 × 1040 で書き出します」。
+                  * 用途が未選択のうちは寸法が決まらないので出さない。
+                  */}
+                {exportSizeText(presets, input.presetKey) ? (
+                  <span className={styles.hint}>{exportSizeText(presets, input.presetKey)}</span>
+                ) : null}
                 <button type="button" className={styles.linkButton} onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy || Boolean(running)}>
                   条件をクリア
                 </button>

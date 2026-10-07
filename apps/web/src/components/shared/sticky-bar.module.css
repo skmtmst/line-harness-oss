@@ -53,6 +53,20 @@
   font-weight: 600; /* fontWeight: 600 */
 }
 
+/*
+ * 操作の手前の一言（★BG-B `WDJak`「中 サイズ確認」→ `GcuH5`）。
+ * 渡さない画面では列が増えないので、今までの3列のままで見た目は変わらない。
+ */
+.withInfo {
+  grid-template-columns: 1fr auto auto 1fr;
+}
+
+.info {
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+  white-space: nowrap;
+}
+
 .actions {
   display: flex;
   align-items: center;
@@ -66,13 +80,19 @@
  * **横スクロールさせずに2段へ折る。**
  */
 @media (max-width: 1100px) {
-  .bar {
+  .bar,
+  .withInfo {
     grid-template-columns: 1fr;
     justify-items: stretch;
   }
 
   .actions {
     justify-content: flex-end;
+  }
+
+  /* 2段に折れたら、長い一言は折り返してよい（横には出さない）。 */
+  .info {
+    white-space: normal;
   }
 }
 }

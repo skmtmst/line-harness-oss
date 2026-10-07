@@ -28,6 +28,7 @@ import {
   BANNER_MAX_REFERENCE_IMAGES,
   EMPTY_GENERATION_INPUT,
   activeGeneration,
+  exportSizeText,
   inputFromGeneration,
   packedTextLines,
   progressBadgeText,
@@ -597,6 +598,12 @@ function ProjectInner() {
               usageStatusText(usage, input.count)
             )
           }
+          /*
+           * ★BG-B の下部追従バーは 左=残り枚数／中=サイズ／右=ボタン。
+           * この真ん中が `GcuH5`「1040 × 1040 で書き出します」。
+           * 用途が未選択のうちは寸法が決まらないので出さない。
+           */
+          info={exportSizeText(presets, input.presetKey) || undefined}
           actions={
             running ? (
               <>

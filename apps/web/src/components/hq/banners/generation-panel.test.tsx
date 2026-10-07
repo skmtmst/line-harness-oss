@@ -290,13 +290,35 @@ describe('補足文はPencil BG-Bと同じ欄に付く', () => {
     expect(fieldTextOf('つくる枚数')).toContain('一度に 4 枚まで')
   })
 
+  /** a より b が後ろにあるか。DOM の並び順をそのまま見る。 */
+  function isBefore(a: Element, b: Element): boolean {
+    return Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+  }
+
+  it('「一度に 4 枚まで」は4択の上（ラベル行・`KCFAX`）', () => {
+    open()
+    const choices = screen.getByRole('group', { name: '枚数' })
+    expect(isBefore(screen.getByText('一度に 4 枚まで'), choices)).toBe(true)
+  })
+
+  it('「同じ条件で…」は4択の下（`swcu2`）', () => {
+    open()
+    const choices = screen.getByRole('group', { name: '枚数' })
+    const below = screen.getByText(/^同じ条件で指定した枚数ぶん作ります/)
+    expect(isBefore(choices, below)).toBe(true)
+  })
+
   it('画像に入れるテキストの注記（`l5Dsb1`）', () => {
     open()
     expect(fieldTextOf('画像に入れるテキスト')).toContain('1行に1つ・40文字まで／強調したい行は「強調」')
   })
 
-  it('書き出す大きさはパネルのいちばん下（`GcuH5`）', () => {
+  /*
+   * 書き出す大きさ（`GcuH5`）は絵では下部追従バーの中ほどで、パネルの中ではない。
+   * パネルだけを出したここには現れないのが正しい。帯に出す側は画面が持つ。
+   */
+  it('書き出す大きさはパネルに出さない（`GcuH5` は下部追従バー）', () => {
     open()
-    expect(screen.getByText('1040 × 1040 で書き出します')).toBeTruthy()
+    expect(screen.queryByText(/で書き出します$/)).toBeNull()
   })
 })

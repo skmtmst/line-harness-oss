@@ -23,6 +23,7 @@ import styles from './sticky-bar.module.css'
 export default function StickyBar({
   destructive,
   status,
+  info,
   actions,
   className,
 }: {
@@ -36,16 +37,29 @@ export default function StickyBar({
    * 設計の2画面には無いので、**無い画面を作ってよい。**
    */
   status?: ReactNode
+  /**
+   * 操作の手前に添える**読むだけの一言**。押したときに何が起きるかを
+   * 先に見せる用（例: ★BG-B `GcuH5`「1040 × 1040 で書き出します」）。
+   *
+   * ここにボタンや入力を置かない。置くと「操作は中央」が崩れる。
+   * 渡さない画面は今までどおり左=状態／中央=操作のままで、見た目は変わらない。
+   */
+  info?: ReactNode
   /** 中央に並べる操作。実行がいちばん右。 */
   actions: ReactNode
   className?: string
 }) {
   return (
-    <div className={[styles.bar, className].filter(Boolean).join(' ')}>
+    <div
+      className={[styles.bar, info ? styles.withInfo : null, className]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className={styles.lead}>
         {destructive}
         {status ? <p className={styles.status}>{status}</p> : null}
       </div>
+      {info ? <p className={styles.info}>{info}</p> : null}
       <div className={styles.actions}>{actions}</div>
       {/* 右端は空ける。ここに何か置くと中央が中央でなくなる。 */}
       <div aria-hidden="true" />
