@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import liff from '@line/liff';
-import { addMinutesHm, formatJpLong } from '../lib/datetime.js';
+import { formatJpLong } from '../lib/datetime.js';
 import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import Icon from './ui/Icon.js';
@@ -14,12 +14,10 @@ import type { SlotPick } from './DateTimePicker.js';
 export default function Done({
   menuName,
   slot,
-  durationMinutes,
   status,
 }: {
   menuName: string;
   slot: SlotPick;
-  durationMinutes: number;
   /** 作られた予約の状態。confirmed なら未承認の表示を出さない。 */
   status: string;
 }) {
@@ -61,7 +59,8 @@ export default function Done({
         <div className="flex h-10 items-start gap-2 py-2.5">
           <dt className="w-18 shrink-0 text-xs text-liff-sub">日時</dt>
           <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">
-            {`${formatJpLong(slot.date)}${slot.start}〜${addMinutesHm(slot.start, durationMinutes)}`}
+            {/* 板 VU6Xi は始まりの時刻だけ (「13:00〜」)。終わりは確認の段で見せている。 */}
+            {`${formatJpLong(slot.date)}${slot.start}〜`}
           </dd>
         </div>
         <div className="flex h-10 items-start gap-2 py-2.5">

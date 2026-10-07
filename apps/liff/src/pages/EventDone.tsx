@@ -48,7 +48,7 @@ export default function EventDone() {
 
   const title = isWaitlisted ? 'キャンセル待ちに入りました' : isPending ? '受付しました' : '申し込みが確定しました';
   const body = isWaitlisted
-    ? 'いまは満席です。空きが出たら、LINEでお知らせします。お知らせから24時間以内に「この席を取る」を押すと予約になります。'
+    ? 'いまは満席です。空きが出たら、LINEでお知らせします。お知らせから24時間以内に「この席を取る」を押すと予約になります'
     : isPending
       ? '運営の承認をお待ちください。承認されると LINE でお知らせします。'
       : startsAt
@@ -76,8 +76,8 @@ export default function EventDone() {
                 <div className="flex gap-2 py-2.5">
                   <dt className="w-18 shrink-0 text-xs text-liff-sub">イベント</dt>
                   <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">
-                    {eventName}
-                    {startsAt ? ` ${utcToJstHm(startsAt)}〜` : ''}
+                    {/* 1つの文にまとめる (板 qVdiX「秋のわんこ撮影会 11:00〜」)。 */}
+                    {`${eventName}${startsAt ? ` ${utcToJstHm(startsAt)}〜` : ''}`}
                   </dd>
                 </div>
               </dl>
