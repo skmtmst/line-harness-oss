@@ -262,7 +262,6 @@ shared-button-importer app/ops/two-factor/page.tsx
 shared-button-importer app/page.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
-shared-button-importer app/pools/new/pool-new-v8.tsx
 shared-button-importer app/pools/page.tsx
 shared-button-importer app/recipes/page.tsx
 shared-button-importer app/register/complete/page.tsx
@@ -683,6 +682,7 @@ shared-button-importer v8/settings/file-scan/screen.tsx
 shared-button-importer v8/settings/ec-commerce/screen.tsx
 shared-button-importer v8/settings/ec-commerce/order-drawer.tsx
 shared-button-importer v8/settings/ec-commerce/identity.tsx
+shared-button-importer v8/settings/pools/create.tsx
 shared-button-importer v8/settings/line-notifications/screen.tsx
 shared-button-importer v8/settings/emergency/screen.tsx
 shared-button-importer v8/settings/emergency/health.tsx

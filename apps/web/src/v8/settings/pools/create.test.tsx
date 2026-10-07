@@ -44,9 +44,11 @@ vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
 }))
 
-import PoolNewV8 from './pool-new-v8'
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 
-const v8tsx = readFileSync(join(process.cwd(), 'src/app/pools/new/pool-new-v8.tsx'), 'utf8')
+import PoolNewV8 from './create'
+
+const v8tsx = readFileSync(join(process.cwd(), 'src/v8/settings/pools/create.tsx'), 'utf8')
 
 const ACCOUNTS = [
   { id: 'a1', name: '然-NEN-渋谷店' },
@@ -100,7 +102,6 @@ describe('V8-B プールを作る（D0AOyx）', () => {
   it('番号つきの節とプレビューが出る', async () => {
     await renderV8()
     expect(document.querySelector('[data-design-node="D0AOyx"]'), '板IDの枠がある').toBeTruthy()
-    expect(document.querySelector('[data-create-variant="v6"]'), '作る画面の枠がある').toBeTruthy()
     expect(document.body.textContent).toContain('1. どのプールか')
     expect(document.body.textContent).toContain('2. いまの受け入れ先')
     expect(document.body.textContent).toContain('プレビュー')
@@ -157,7 +158,7 @@ describe('V8-B プールを作る（D0AOyx）', () => {
   })
 
   it('V8 の決まり（板ID・準備中なし）を守る', () => {
-    expect(v8tsx).toContain('designNode="D0AOyx"')
+    expect(v8tsx).toContain('boardId="D0AOyx"')
     expect(v8tsx).not.toContain('準備中')
   })
 })
