@@ -5,7 +5,7 @@ import {describe,it,expect} from 'vitest';
 const root=join(import.meta.dirname,'..');
 function beforeProposal(){
  const db=new Database(':memory:');db.exec(readFileSync(join(root,'schema.sql'),'utf8'));
- for(const name of readdirSync(join(root,'migrations')).filter(n=>n.endsWith('.sql')&&Number(n.split('_')[0])<594).sort()){
+ for(const name of readdirSync(join(root,'migrations')).filter(n=>n.endsWith('.sql')&&Number(n.split('_')[0])<596).sort()){
   for(const sql of readFileSync(join(root,'migrations',name),'utf8').split(/;\s*(?:\r?\n|$)/).map(s=>s.trim()).filter(Boolean)){
    try{db.exec(sql);}catch(e){if(!/already exists|duplicate column name/i.test(String(e)))throw e;}
   }
@@ -24,18 +24,18 @@ function beforeProposal(){
  return db;
 }
 describe('飲食店の提案Eマイグレーション草稿',()=>{
- it('594は外部キーが有効でも既存予約・来店印・参照先を残す',()=>{
+ it('596は外部キーが有効でも既存予約・来店印・参照先を残す',()=>{
   const db=beforeProposal();try{
-   db.transaction(()=>db.exec(readFileSync(join(root,'migrations/594_restaurant_walk_in.sql'),'utf8')))();
+   db.transaction(()=>db.exec(readFileSync(join(root,'migrations/596_restaurant_walk_in.sql'),'utf8')))();
    expect(db.prepare('SELECT id,reservation_id,undone_at FROM rt_seat_visit_marks').all()).toEqual([{id:'mark',reservation_id:'reservation',undone_at:null}]);
    expect(db.prepare('SELECT id,media_id,table_id FROM rt_reservations').get()).toEqual({id:'reservation',media_id:(db.prepare("SELECT id FROM rt_media WHERE code='hotpepper'").get() as {id:string}).id,table_id:'table'});
    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
    db.prepare("UPDATE rt_reservations SET source='walk_in' WHERE id='reservation'").run();
   }finally{db.close();}
  });
- it('595は媒体を参照する予約を残し、予約を受けない媒体を追加できる',()=>{
+ it('597は媒体を参照する予約を残し、予約を受けない媒体を追加できる',()=>{
   const db=beforeProposal();try{
-   db.transaction(()=>db.exec(readFileSync(join(root,'migrations/595_restaurant_media_links.sql'),'utf8')))();
+   db.transaction(()=>db.exec(readFileSync(join(root,'migrations/597_restaurant_media_links.sql'),'utf8')))();
    expect(db.prepare('SELECT media_id FROM rt_reservations').get()).toEqual({media_id:(db.prepare("SELECT id FROM rt_media WHERE code='hotpepper'").get() as {id:string}).id});
    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
    expect(db.prepare("SELECT media_id FROM rt_inbound_emails WHERE id='mail'").get()).toEqual(db.prepare('SELECT media_id FROM rt_reservations').get());
