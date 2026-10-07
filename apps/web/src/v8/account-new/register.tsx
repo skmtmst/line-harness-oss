@@ -660,6 +660,8 @@ export default function AccountRegisterV8() {
         designNode="qw80E"
         designWidth={640}
         designTop={180}
+        // 絵 qw80E：窓の余白24・題の行36・本文までの間14（題を4下げ、本文の位置は今のまま）
+        designHeaderPadding="24px 24px 4px"
         footer={<div className={styles.dialogFooter}>
           <Button type="button" disabled={busy} onClick={() => void runCheckThenReview()} busy={busyAction === 'check'} busyLabel="調べています…"><RotateCw size={15} aria-hidden="true" />もう一度調べる</Button>
           <Button type="button" variant="primary" disabled={!rowsPassed || !manualAck || busy} onClick={() => void save()} busy={busyAction === 'save'} busyLabel="登録しています…"><ShieldCheck size={15} aria-hidden="true" />確認コードを入れて登録する</Button>

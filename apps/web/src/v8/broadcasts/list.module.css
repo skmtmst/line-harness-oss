@@ -20,6 +20,10 @@
 .viewerBand > svg { color: var(--color-action); flex-shrink: 0; }
 
 .createFull { width: 100%; }
+/* 閲覧のみ（NtCE3）：押せない「配信を作る」「フォルダを追加」「この条件を保存する」は置かず、場所だけ空ける。 */
+.viewerCreateSpace { display: block; height: var(--tpl-fx4-viewer-create-h); }
+.viewerAddSpace { display: block; height: var(--tpl-fx4-viewer-add-h); }
+.viewerSpace { visibility: hidden; }
 
 .note {
   margin: 0;
@@ -213,6 +217,12 @@
 .colAudience { width: var(--tpl-bc-col-audience); }
 .colDate { width: var(--tpl-bc-col-date); }
 .colResult { width: var(--tpl-bc-col-result); }
+/* 広い板（l5V9a・NtCE3）は名前の前に丸が入った絵で、結果の列が 214（＋間16）。1152（jjFNi）は今までどおり。 */
+.colResultWide { width: var(--tpl-fx4-bc-col-result-wide); }
+/* 丸の下の2行目は名前の頭にそろえる（絵の「説明の行」の左 16）。 */
+/* 丸＋名前の行は箱（flex）で包む。文字の行の高さを足さない（足すと行が5〜7高くなる）。 */
+.titleLine { display: flex; min-width: 0; }
+.dotIndent { padding-inline-start: var(--tpl-folder-dot-indent); }
 .colMenu { width: var(--tpl-bc-col-menu); text-align: right; }
 
 .row { height: auto; cursor: pointer; }

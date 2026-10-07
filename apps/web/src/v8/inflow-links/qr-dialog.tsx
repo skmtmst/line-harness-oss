@@ -75,6 +75,9 @@ export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: 
       onCancel={onClose}
       designNode="GtI4Y"
       designWidth={480}
+      // 絵 GtI4Y：題の下から本文まで14。今の共通の頭（上20・下8）だと本文が7下がるので、頭を57に詰める（題の位置は今のまま）
+      designHeaderPadding="20px 24px 0"
+      designHeaderHeight={57}
       footer={stopped ? undefined : (
         <div className={styles.actions}>
           {route.id ? (

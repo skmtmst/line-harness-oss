@@ -307,3 +307,8 @@
   color: var(--color-ink);
   font-size: var(--text-label);
 }
+
+/* 名前の前のフォルダの丸（xbHxg「フォルダの丸」）。2行目・札は名前の頭にそろえる（絵の「説明の行」の左 16）。 */
+.nameLine { display: flex; min-width: 0; max-width: 100%; }
+.dotIndentPad { padding-inline-start: var(--tpl-folder-dot-indent); }
+.dotIndentMargin { margin-inline-start: var(--tpl-folder-dot-indent); }
