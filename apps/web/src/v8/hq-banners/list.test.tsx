@@ -1,0 +1,181 @@
+// @vitest-environment happy-dom
+/*
+ * V8 統括のバナー生成・一覧（src/v8/hq-banners/list.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
+ * 数のカード・プロジェクトのカード・作る窓（名前が空なら押せない）・ライブラリの次の12件・
+ * 閲覧のみには押せないボタン（作る・取り込む・星）を置かない。
+ */
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
+})
+
+const presets = vi.hoisted(() => vi.fn())
+const stats = vi.hoisted(() => vi.fn())
+const listProjects = vi.hoisted(() => vi.fn())
+const createProject = vi.hoisted(() => vi.fn())
+const updateProject = vi.hoisted(() => vi.fn())
+const listImages = vi.hoisted(() => vi.fn())
+const listAccounts = vi.hoisted(() => vi.fn())
+const push = vi.hoisted(() => vi.fn())
+const replace = vi.hoisted(() => vi.fn())
+const nav = vi.hoisted(() => ({ query: '' }))
+const roleBox = vi.hoisted(() => ({ role: 'owner' as string | null }))
+
+vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      hqBanners: {
+        ...actual.api.hqBanners,
+        presets,
+        stats,
+        projects: { ...actual.api.hqBanners.projects, list: listProjects, create: createProject, update: updateProject },
+        images: { ...actual.api.hqBanners.images, list: listImages },
+      },
+      lineAccounts: { ...actual.api.lineAccounts, list: listAccounts },
+    },
+  }
+})
+
+vi.mock('next/link', () => ({
+  default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children),
+}))
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push, replace, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  useSearchParams: () => new URLSearchParams(nav.query),
+}))
+
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+
+vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
+  const actual = await importOriginal()
+  return { ...actual, useStaffRole: () => roleBox.role }
+})
+
+import HqBannersListV8 from './list'
+
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+let host: HTMLDivElement
+let root: Root
+
+const project = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
+  id, name, description: `${name}の説明`, isFavorite: false, archivedAt: null, imageCount: 3, runningCount: 0,
+  createdBy: null, createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-30T10:00:00+09:00', ...extra,
+})
+const image = (n: number) => ({
+  id: `img-${n}`, projectId: 'p1', generationId: null, sequence: n, source: 'upload', parentImageId: null, isFavorite: n === 1,
+  createdBy: null, createdAt: `2026-09-${String(30 - n).padStart(2, '0')}T10:00:00+09:00`,
+  media: { id: `m-${n}`, filename: `${n}.png`, mimeType: 'image/png', sizeBytes: 100, width: 1040, height: 1040, url: `https://example.invalid/${n}.png` },
+  generation: null, deliveredAccountIds: n === 1 ? ['a1'] : [],
+})
+
+beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  nav.query = ''
+  roleBox.role = 'owner'
+  presets.mockResolvedValue({ success: true, data: { presets: [], maxCount: 4, engineReady: true, usage: { month: { used: 40, limit: 150, remaining: 110 }, today: { used: 6, limit: 30, remaining: 24 }, paused: false, pausedReason: null } } })
+  stats.mockResolvedValue({ success: true, data: { projects: { active: 2, archived: 1 }, deliveredImages: 9, deliveredAccounts: 3 } })
+  listProjects.mockResolvedValue({ success: true, data: [project('p1', '秋のキャンペーン', { isFavorite: true }), project('p2', '2周年 春の感謝祭', { imageCount: 0, runningCount: 1 })] })
+  createProject.mockResolvedValue({ success: true, data: project('p9', '新しい案件') })
+  updateProject.mockImplementation(async (id: string, patch: { isFavorite?: boolean }) => ({ success: true, data: project(id, '秋のキャンペーン', patch) }))
+  listImages.mockResolvedValue({ success: true, data: Array.from({ length: 12 }, (_, i) => image(i + 1)), nextBefore: '2026-09-18T10:00:00+09:00', counts: { all: 23, favorite: 3, delivered: 9, unused: 14 } })
+  listAccounts.mockResolvedValue({ success: true, data: [] })
+  push.mockReset()
+  replace.mockReset()
+  host = document.createElement('div')
+  document.body.appendChild(host)
+  root = createRoot(host)
+})
+
+afterEach(() => {
+  act(() => root.unmount())
+  host.remove()
+  document.body.innerHTML = ''
+  delete document.documentElement.dataset.theme
+})
+
+async function flush() {
+  for (let i = 0; i < 10; i++) await act(async () => { await Promise.resolve() })
+}
+
+const buttonNamed = (name: string) =>
+  Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.replace(/\s+/g, '') === name.replace(/\s+/g, ''))
+
+describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
+  it('数のカードとプロジェクトのカード（更新日・生成中の札）が出る', async () => {
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    expect(host.textContent).toContain('今月の残り')
+    expect(host.textContent).toContain('上限 150枚')
+    expect(host.textContent).toContain('秋のキャンペーン')
+    expect(host.textContent).toContain('3 枚 ・ 9/30 更新')
+    expect(host.textContent).toContain('— ・ いま作成中')
+    expect(host.querySelector('[aria-label="秋のキャンペーン を開く"]')).toBeTruthy()
+  })
+
+  it('作る窓は名前が空のあいだ押せず、作ると新しいプロジェクトを開く', async () => {
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    act(() => { buttonNamed('プロジェクトを作る')!.click() })
+    await flush()
+    const submit = buttonNamed('作って開く') as HTMLButtonElement
+    expect(submit, '作って開くがありません').toBeTruthy()
+    expect(submit.disabled).toBe(true)
+    const name = document.querySelector('input[placeholder="例: 春の感謝祭 2周年"]') as HTMLInputElement
+    fireEvent.change(name, { target: { value: '新しい案件' } })
+    await flush()
+    expect(submit.disabled).toBe(false)
+    act(() => { submit.click() })
+    await flush()
+    expect(createProject).toHaveBeenCalledWith({ name: '新しい案件', description: null })
+    expect(push).toHaveBeenCalledWith('/hq/banners/project?id=p9')
+  })
+
+  it('星を押すとお気に入りを切り替える', async () => {
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    const star = host.querySelector('[aria-label="秋のキャンペーン をお気に入りから外す"]') as HTMLButtonElement
+    expect(star).toBeTruthy()
+    act(() => { star.click() })
+    await flush()
+    expect(updateProject).toHaveBeenCalledWith('p1', { isFavorite: false })
+  })
+
+  it('ライブラリは12枚ずつ・数は「見る」に出て、次の12件で続きを読む', async () => {
+    nav.query = 'tab=library'
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    expect(host.textContent).toContain('1–12 件 / 23 件')
+    expect(listImages).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 12, withCounts: true }))
+    act(() => { buttonNamed('次の 12 件')!.click() })
+    await flush()
+    expect(listImages).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 12, before: '2026-09-18T10:00:00+09:00' }))
+    expect(buttonNamed('画像を取り込む')).toBeTruthy()
+  })
+
+  it('閲覧のみには作る・取り込む・星を置かない（押せないボタンを残さない）', async () => {
+    roleBox.role = 'viewer'
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    expect(host.textContent).toContain('秋のキャンペーン')
+    expect(buttonNamed('プロジェクトを作る')).toBeUndefined()
+    expect(host.querySelector('[aria-label="秋のキャンペーン をお気に入りから外す"]')).toBeNull()
+    expect(Array.from(host.querySelectorAll('button')).filter((b) => b.disabled)).toEqual([])
+    act(() => { root.unmount() })
+    nav.query = 'tab=library'
+    root = createRoot(host)
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    expect(host.textContent).toContain('1–12 件 / 23 件')
+    expect(buttonNamed('画像を取り込む')).toBeUndefined()
+    expect(host.querySelector('[aria-label="お気に入りにする"]')).toBeNull()
+  })
+})

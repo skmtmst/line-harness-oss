@@ -12,7 +12,7 @@ import { brandInitial } from './brand-initial'
  *
  * ここには 2026-08-26 まで「現在のLINEアカウント」の切替カードがあった。
  * 切替は共通トップバーへ移したので、ここは**いまどの会社の管理画面を
- * 見ているか**だけを示す（Pencil `J33xq/V2WbXF`、`docs/v6-common-rules.md` §1）。
+ * 見ているか**だけを示す（Pencil `J33xq/V2WbXF`、`docs/v8-design-rules.md` §5）。
  *
  * 枠も影も付けない。カードにすると、下のメニューと同じ重さに見えて、
  * 押せるものだと読み違える。ここは押せない。

@@ -31,6 +31,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { compareLabel, durationLabel, elapsedLabel } from './format'
 import ListRange from '@/components/ui/list-range'
+import OpsSupportV8 from '@/v8/ops/support'
 
 /**
  * お問い合わせ（チケット）★V6 37-6 `IjIFa`／37-6-A `b2uv3`（AIの下書き）／37-6-B `XlTAd`（作成中）。
@@ -112,6 +113,11 @@ function priorityChip(priority: OpsSupportPriority, label: string) {
 }
 
 export default function OpsSupportPage() {
+  // ★V8 は src/v8/ops/support.tsx。v7 は下のまま。
+  return useAdminTheme() === 'v8' ? <OpsSupportV8 /> : <OpsSupportV7 />
+}
+
+function OpsSupportV7() {
   const theme = useAdminTheme()
   const [summary, setSummary] = useState<OpsSupportSummary | null>(null)
   const [tickets, setTickets] = useState<OpsSupportTicket[]>([])

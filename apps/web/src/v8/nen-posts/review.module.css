@@ -1,0 +1,834 @@
+/*
+ * ★V8-B 投稿（写真の審査 TkA4D・閲覧のみ Jn95h・採用 cniyw・見送る窓 ujcar・版の履歴 N1br7）。
+ * 枠・見出し・タブの段・帯の段は型（ListPage）が持つ。ここは段の中身だけ。
+ * 寸法は app/globals.css の [data-theme="v8"] の --tpl-nm-* に置く（数字を直書きしない）。
+ */
+
+/* タブ（絵：高さ28.5・文字の下10・文字 13/18）。共通のタブの V8 の値より詰める。 */
+:global([data-theme='v8']) .tabs [role='tab'] {
+  box-sizing: border-box;
+  height: var(--tpl-nm-tab-h);
+  min-height: 0;
+  align-items: flex-start;
+  padding-bottom: 0;
+  line-height: var(--tpl-tabs-text-lh);
+}
+
+/* 閲覧のみの帯（Jn95h：タブの下に上下12・左右24の段、薄い青の帯）。 */
+.viewerRow {
+  padding: var(--tpl-nm-ro-row-pad);
+}
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* 数の帯（絵：タブの直下・高さ115）。上の線は場所を取らない内側の影で引く。 */
+:global([data-theme='v8']) .stats :global([data-kpi-strip][data-kpi-presentation='band']) {
+  border-block-width: 0;
+  box-shadow: var(--tpl-nm-band-top-line);
+}
+
+/* 数の帯の題（絵：12/500・行18）。共通の帯は 13 なので、この画面の帯だけ詰める。 */
+.stats :global([data-kpi-presentation='band'] > [data-design-version] > :first-child > p) {
+  font-size: var(--tpl-nm-row-size);
+  line-height: var(--tpl-nm-kpi-label-lh);
+}
+
+/* 数の帯の数字は絵どおりの字幅（等幅の数字にすると「1 枚」の単位が右へずれる）。 */
+.stats :global([data-kpi-number]) {
+  font-variant-numeric: normal;
+}
+
+/* 数の帯の右上の「…」：由来の説明を title で見せる印（絵の 16 角）。 */
+.kpiMore {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-nm-kpi-more);
+  height: var(--tpl-nm-kpi-more);
+  min-height: 0;
+  padding: 0;
+  line-height: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: help;
+}
+
+/* 本文の段（絵：上16・左右24・下24）。 */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-left-gap);
+  padding: var(--tpl-nm-body-pad);
+  min-width: 0;
+}
+.pubBody,
+.stateBox {
+  padding: var(--tpl-nm-body-pad);
+  min-width: 0;
+}
+
+/* 審査待ち：左の列（道具・写真・説明）＋右の棚（幅300）。 */
+.reviewGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tpl-nm-rail-w);
+  gap: var(--tpl-nm-col-gap);
+  align-items: start;
+}
+.leftColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-left-gap);
+  min-width: 0;
+}
+.adoptedColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-adopted-gap);
+  min-width: 0;
+}
+
+/* 道具の段：探す＋右に見え方の切り替え（採用は右に一言）。 */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nm-tools-gap);
+  min-width: 0;
+}
+.search {
+  width: var(--tpl-nm-search-w);
+  flex-shrink: 0;
+}
+.searchWide {
+  width: var(--tpl-nm-search-wide-w);
+  flex-shrink: 0;
+}
+.toolsSpace {
+  flex: 1 1 0;
+}
+.toolsNote {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-nm-small-size);
+  line-height: var(--tpl-nm-small-lh);
+}
+.viewSwitch {
+  flex-shrink: 0;
+}
+/* 見え方の切り替え（絵：器の余白3・項目 5/12・文字12）。小型の切り替えより左右を広げる。 */
+:global([data-theme='v8']) .viewSwitch:nth-child(n) {
+  padding: var(--tpl-nm-seg-pad);
+}
+:global([data-theme='v8']) .viewSwitch:nth-child(n) button {
+  padding: var(--tpl-nm-seg-item-pad);
+}
+
+/* 写真のカード。審査待ちは3列、採用は幅288を左から。 */
+.cards,
+.cardsWide,
+.cardsAdopted {
+  display: grid;
+  gap: var(--tpl-nm-card-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cardsWide {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.cardsAdopted {
+  grid-template-columns: repeat(auto-fill, var(--tpl-nm-card-adopted-w));
+}
+.cardItem {
+  display: flex;
+  min-width: 0;
+}
+.card,
+.cardAdopted {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-nm-card-inner-gap);
+  min-width: 0;
+  padding: var(--tpl-nm-card-pad);
+  border-radius: var(--tpl-nm-card-radius);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-nm-card-line);
+}
+.cardAdopted {
+  gap: var(--tpl-nm-card-adopted-inner-gap);
+}
+.cardSelected {
+  box-shadow: var(--tpl-nm-card-line-selected);
+}
+.cardPhoto {
+  position: relative;
+  height: var(--tpl-nm-photo-h);
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--tpl-nm-photo-radius);
+  background: var(--color-canvas-sunken);
+}
+.cardAdopted .cardPhoto {
+  height: var(--tpl-nm-photo-adopted-h);
+}
+.cardPhoto img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cardPhotoEmpty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-nm-small-size);
+}
+.cardPick {
+  position: absolute;
+  left: var(--tpl-nm-pick-offset);
+  top: var(--tpl-nm-pick-offset);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--tpl-nm-pick-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-canvas);
+  font-size: var(--tpl-nm-small-size);
+}
+.cardNameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nm-chip-gap);
+  min-width: 0;
+}
+.cardName {
+  flex: 1 1 0;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font-size: var(--tpl-nm-name-size);
+  font-weight: 700;
+  line-height: var(--tpl-nm-name-lh);
+}
+.cardAdopted .cardName {
+  font-size: var(--tpl-nm-row-size);
+  line-height: var(--tpl-nm-row-lh);
+}
+.cardDate {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-nm-small-size);
+  line-height: var(--tpl-nm-small-lh);
+  font-variant-numeric: tabular-nums;
+}
+.cardOwner {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-nm-small-size);
+  line-height: var(--tpl-nm-small-lh);
+}
+.cardCaption {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font-size: var(--tpl-nm-row-size);
+  line-height: var(--tpl-nm-row-lh);
+}
+.cardChips {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nm-chip-gap);
+  min-width: 0;
+}
+.cardActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-nm-action-gap);
+}
+.cardActions > button {
+  min-width: 0;
+  white-space: nowrap;
+}
+.cardActionSingle {
+  display: flex;
+}
+.cardActionSingle > button {
+  flex: 1;
+}
+.cardActionSpace {
+  display: block;
+  height: var(--tpl-nm-action-h);
+}
+.rejectReason {
+  margin: 0;
+  padding: var(--tpl-nm-reason-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-nm-small-size);
+  line-height: var(--tpl-nm-small-lh);
+}
+.listHint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-nm-small-size);
+  line-height: var(--tpl-nm-small-lh);
+}
+
+/* 右の決まりの棚（絵：幅300・カードの間12・中は余白16・間8）。 */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-card-gap);
+  min-width: 0;
+}
+.railCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-rail-gap);
+  padding: var(--tpl-nm-rail-pad);
+  border-radius: var(--tpl-nm-card-radius);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-nm-card-line);
+}
+.railTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-nm-rail-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-nm-rail-title-lh);
+}
+.railRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-nm-action-gap);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-nm-row-size);
+  line-height: var(--tpl-nm-row-lh);
+}
+.railRow > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.railRow strong {
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.railNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-nm-small-size);
+  line-height: var(--tpl-nm-small-lh);
+}
+
+/* まとめての帯（共通部品）。表の下に置く。 */
+.bulkRow {
+  min-width: 0;
+}
+.bulkSummary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-rail-gap);
+  margin: 0;
+}
+.bulkSummary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tpl-nm-action-gap);
+}
+.bulkSummary dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.deliveryFailures {
+  padding: var(--tpl-nm-ro-row-pad);
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: var(--text-label);
+}
+.deliveryFailures > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--tpl-nm-card-gap);
+  margin-top: var(--tpl-nm-action-gap);
+}
+
+/*
+ * 見送る窓（ujcar：幅620・上から90）と版の履歴（N1br7：幅640・上から220）。
+ * 絵の窓は四方24の1枚の箱（題 18/26・説明 12/19・中の間14・下の線の上14）。
+ * 共通の窓は題の段・中身・下の帯で余白が違うので、この2枚の窓だけ寄せる（共通部品は変えない）。
+ */
+:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child {
+  padding: var(--tpl-nm-dlg-head-pad);
+}
+:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child > :first-child {
+  gap: var(--tpl-nm-dlg-title-gap);
+}
+:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child h2 {
+  line-height: var(--tpl-nm-dlg-title-lh);
+}
+:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child h2 + * {
+  font-size: var(--tpl-nm-row-size);
+  line-height: var(--tpl-nm-textarea-lh);
+  /* 絵は言葉の途中で折る（全体の auto-phrase だと早く折れて行がずれる）。 */
+  word-break: normal;
+}
+:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :nth-child(2) {
+  padding: var(--tpl-nm-dlg-body-pad);
+}
+:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :last-child > * {
+  width: auto;
+  margin: var(--tpl-nm-dlg-foot-margin);
+  padding: var(--tpl-nm-dlg-foot-pad);
+}
+.dialogStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-dlg-gap);
+  width: 100%;
+  min-width: 0;
+}
+.dialogPhoto {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nm-card-inner-gap);
+  padding: var(--tpl-nm-dlg-photo-pad);
+  border-radius: var(--tpl-nm-photo-radius);
+  background: var(--color-surface-pearl);
+}
+.dialogPhotoThumb {
+  width: var(--tpl-nm-dlg-thumb);
+  height: var(--tpl-nm-dlg-thumb);
+  flex-shrink: 0;
+  border-radius: var(--radius-segment);
+  object-fit: cover;
+  background: var(--color-canvas-sunken);
+}
+.dialogPhotoText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-dlg-photo-gap);
+  min-width: 0;
+}
+.dialogPhotoName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-nm-row-size);
+  font-weight: 700;
+  line-height: var(--tpl-nm-row-lh);
+}
+.dialogPhotoSub {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-nm-small-size);
+  line-height: var(--tpl-nm-small-lh);
+}
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-field-gap);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-nm-row-size);
+  font-weight: 600;
+  line-height: var(--tpl-nm-row-lh);
+}
+.fieldTitle {
+  margin: 0;
+  padding: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-nm-row-size);
+  font-weight: 600;
+  line-height: var(--tpl-nm-row-lh);
+}
+
+/* 見送った理由の丸つまみ：選んだものだけ緑の太い輪。 */
+.pillGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-nm-action-gap);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-nm-action-gap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  min-height: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-nm-pill-lh);
+  cursor: pointer;
+}
+.pillDot {
+  display: inline-block;
+  width: var(--tpl-nm-radio);
+  height: var(--tpl-nm-radio);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-nm-radio-off);
+}
+.pill[aria-checked='true'] .pillDot {
+  box-shadow: var(--tpl-nm-radio-on);
+}
+.reasonTextarea {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--tpl-nm-textarea-h);
+  padding: var(--tpl-nm-textarea-pad);
+  resize: vertical;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-segment);
+  color: var(--color-ink);
+  font-size: var(--tpl-nm-row-size);
+  font-weight: 400;
+  line-height: var(--tpl-nm-textarea-lh);
+}
+.checkLine {
+  display: flex;
+  height: var(--tpl-nm-pill-lh);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-nm-card-gap);
+  min-width: 0;
+}
+.checkSub {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-nm-small-size);
+}
+.previewBox {
+  padding: var(--tpl-nm-dlg-photo-pad);
+  border-radius: var(--tpl-nm-photo-radius);
+  background: var(--color-line-talk);
+}
+.previewBox p {
+  margin: 0;
+  padding: var(--tpl-nm-bubble-pad);
+  border-radius: var(--tpl-nm-bubble-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--tpl-nm-small-size);
+  line-height: var(--tpl-nm-bubble-lh);
+}
+/* 絵どおり2行で切り、続きは「…」。全文は title で読める（余白の中に3行目を出さないよう中の span で切る）。 */
+.previewBox p > span {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* 版の履歴（N1br7：幅640・上から220・中の間14）。 */
+.historyTable {
+  overflow: hidden;
+  border-radius: var(--tpl-nm-photo-radius);
+  box-shadow: var(--tpl-nm-card-line);
+}
+.historyTable table {
+  width: 100%;
+  table-layout: fixed;
+}
+/* 絵の行：上下9・欄の間12（左右6ずつ）・端14、文字 12/17。見出しは 11 の高さ34。 */
+:global([data-theme='v8']) .historyTable :is(th, td):nth-child(n) {
+  height: auto;
+  padding: var(--tpl-nm-hist-cell-pad);
+  font-size: var(--tpl-nm-row-size);
+  line-height: var(--tpl-nm-row-lh);
+  vertical-align: middle;
+}
+:global([data-theme='v8']) .historyTable th:nth-child(n) {
+  height: var(--tpl-nm-hist-head-h);
+  padding-block: 0;
+  font-size: var(--tpl-nm-small-size);
+  line-height: var(--tpl-nm-small-lh);
+  font-weight: 400;
+}
+:global([data-theme='v8']) .historyTable :is(th, td):first-child:nth-child(n) {
+  padding-left: var(--tpl-nm-hist-edge);
+}
+:global([data-theme='v8']) .historyTable :is(th, td):last-child:nth-child(n) {
+  padding-right: var(--tpl-nm-hist-edge);
+  text-align: right;
+  white-space: nowrap;
+}
+:global([data-theme='v8']) .historyTable td:first-child:nth-child(n) {
+  font-weight: 600;
+}
+.historyTable th:nth-child(1) { width: var(--tpl-nm-hist-col-v); }
+.historyTable th:nth-child(2) { width: var(--tpl-nm-hist-col-date); }
+.historyTable th:nth-child(3) { width: var(--tpl-nm-hist-col-by); }
+.historyTable th:nth-child(5) { width: var(--tpl-nm-hist-col-ops); }
+.historyHint {
+  margin: 0;
+  word-break: normal;
+  padding: var(--tpl-nm-dlg-photo-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-nm-small-size);
+  line-height: var(--tpl-nm-bubble-lh);
+}
+.historyColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--tpl-nm-col-gap);
+  align-items: start;
+}
+.historyCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-card-gap);
+  padding: var(--tpl-nm-rail-pad);
+  border-radius: var(--tpl-nm-card-radius);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-nm-card-line);
+}
+.historyReserved {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-field-gap);
+}
+.historyReservedHead {
+  display: flex;
+  min-height: var(--tpl-nm-action-h);
+  align-items: center;
+  gap: var(--tpl-nm-action-gap);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-nm-name-lh);
+}
+.historyReservedHead > strong {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+.historyReservedWhen {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.historyReservedBody {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-nm-name-lh);
+}
+.historyLead {
+  margin: 0;
+  word-break: normal;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-nm-row-size);
+  line-height: var(--tpl-nm-bubble-lh);
+}
+.historyFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--tpl-nm-card-gap);
+}
+.inputLabel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-field-gap);
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-nm-pill-lh);
+  white-space: nowrap;
+}
+.historyActions,
+.dialogFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-nm-action-gap);
+}
+.historyCompare {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nm-action-gap);
+  font-size: var(--text-label);
+}
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--tpl-nm-row-size);
+}
+
+/* 公式サイト掲載（SyQA1）：写真の表＋右に幅190の決めごと。 */
+.publicationsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tpl-nm-pub-rail-w);
+  gap: var(--tpl-nm-card-gap);
+}
+.tableWrap {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--tpl-nm-card-radius);
+  box-shadow: var(--tpl-nm-card-line);
+}
+.publicationsTable {
+  width: 100%;
+  table-layout: fixed;
+}
+.publicationsTable th,
+.publicationsTable td {
+  padding: var(--tpl-nm-hist-pad);
+  font-size: var(--tpl-nm-row-size);
+  overflow: hidden;
+}
+.publicationsTable th:first-child { width: var(--tpl-nm-pub-col-photo); }
+.publicationsTable th:nth-child(6) { width: var(--tpl-nm-pub-col-ops); }
+.pubThumb {
+  display: block;
+  width: var(--tpl-nm-pub-thumb);
+  height: var(--tpl-nm-pub-thumb);
+  border-radius: var(--radius-segment);
+  object-fit: cover;
+  background: var(--color-canvas-sunken);
+}
+.petNameV8 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.petSubV8 {
+  display: block;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-nm-small-size);
+}
+.pubCell {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+}
+.pubNameRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-nm-action-gap);
+}
+.publicationActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--tpl-nm-dlg-photo-gap);
+}
+.publicationActions > button {
+  flex-shrink: 0;
+}
+.publicationHistory {
+  margin-top: var(--tpl-nm-card-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-nm-row-size);
+}
+.publicationHistory summary {
+  cursor: pointer;
+}
+.publicationHistory > div {
+  padding: var(--tpl-nm-card-pad);
+  border-bottom: 1px solid var(--color-hairline);
+}
+.pubRules {
+  margin: 0;
+  padding-left: var(--tpl-nm-rail-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-nm-row-size);
+  line-height: var(--tpl-nm-bubble-lh);
+}
+.orderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-nm-action-gap);
+  padding-block: var(--tpl-nm-action-gap);
+}
+.orderName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orderButtons {
+  display: flex;
+  gap: var(--tpl-nm-action-gap);
+}
+
+/* 板が狭いとき：棚は下へ、写真は2列・1列に畳む。 */
+@container v8-page (max-width: 1099px) {
+  .reviewGrid,
+  .publicationsGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@container v8-page (max-width: 900px) {
+  .cards,
+  .cardsWide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .historyColumns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@container v8-page (max-width: 560px) {
+  .cards,
+  .cardsWide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tools {
+    flex-wrap: wrap;
+  }
+}

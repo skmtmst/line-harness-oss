@@ -61,7 +61,7 @@ export function matchesQuery(account: LineAccount, query: string): boolean {
 
 /**
  * 親アカウントの名前。**IDをそのまま出さない。**
- * 親が無いものは `—`（`docs/v6-common-rules.md` の未取得表示）。
+ * 親が無いものは `—`（`docs/v8-design-rules.md` §5 の未取得表示）。
  */
 export function parentName(account: LineAccount, all: LineAccount[]): string {
   if (!account.parentLineAccountId) return '—'

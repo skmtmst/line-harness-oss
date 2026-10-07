@@ -1,0 +1,448 @@
+/*
+ * ★V8 集まった回答（v0SbYR・MKQyJ）。頭とタブは型（DetailPage）が持つ。
+ * ここは左の本文（カード：枠1・角12・余白20）と右の列（線の右・カード余白16）だけ。
+ */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-compact-gap);
+  color: var(--tpl-identity-color);
+  font-size: var(--text-label);
+  font-weight: var(--tpl-identity-weight);
+  line-height: var(--tpl-identity-lh);
+}
+.backLink:hover {
+  text-decoration: underline;
+}
+/* 型のタブの段が線を持つので、タブの部品の線は重ねない（線が2本に見えた）。 */
+.tabsPlain {
+  border-bottom: 0;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tpl-ev-fr-rail-w);
+  align-items: start;
+  gap: var(--tpl-ev-fr-col-gap);
+  margin-top: var(--tpl-ev-fr-pull-top);
+  margin-right: var(--tpl-ev-bk-pull-side);
+}
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wh-check-gap);
+  min-width: 0;
+}
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-body-pad);
+  min-width: 0;
+  min-height: 100%;
+  padding-left: var(--tpl-ev-fr-rail-pad);
+  border-left: 1px solid var(--color-hairline);
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-wh-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-wh-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-wh-card-title-lh);
+}
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+
+/* 後処理が終わっていない回答の帯。 */
+.alert {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  padding: var(--tpl-ev-fr-alert-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-status-danger-soft);
+}
+.alertIcon {
+  flex-shrink: 0;
+  color: var(--color-danger);
+}
+.alertText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+  min-width: 0;
+}
+.alertTitle {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-row-name-lh);
+}
+.alertNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+
+/* まとめ：棒の行（名前・棒・件数）。 */
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rule-row-gap);
+  margin: 0;
+}
+.barRow {
+  display: grid;
+  grid-template-columns: var(--tpl-ev-fr-bar-label-w) minmax(0, 1fr) var(--tpl-ev-fr-bar-count-w);
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.barRow dt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.barRow dd {
+  margin: 0;
+}
+.barTrack {
+  display: flex;
+}
+.meter {
+  width: 100%;
+  height: var(--tpl-ev-fr-bar-h);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+.meter::-webkit-meter-bar {
+  height: var(--tpl-ev-fr-bar-h);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+.meter::-webkit-meter-optimum-value,
+.meter::-webkit-meter-suboptimum-value,
+.meter::-webkit-meter-even-less-good-value {
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+}
+.meter::-moz-meter-bar {
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+}
+.barCount {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 自由に書く欄の新しい答え。 */
+.quoteCard {
+  gap: var(--tpl-ev-fr-quote-gap);
+}
+.quotes {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.quoteRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-rule-row-gap);
+  min-height: var(--tpl-ev-fr-quote-h);
+  box-shadow: var(--shadow-row-line);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.quoteText {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quoteWho {
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.cardFoot {
+  display: flex;
+  justify-content: flex-end;
+}
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-wh-ops-gap);
+  min-height: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-chip-label-lh);
+  cursor: pointer;
+}
+.linkButton:hover {
+  color: var(--color-action);
+}
+
+/* 1件ずつ：表。 */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.table th {
+  height: var(--tpl-ev-fr-head-h);
+  padding: 0 var(--tpl-toolbar-gap);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-wh-cell-lh);
+  text-align: left;
+}
+.colWhen {
+  width: var(--tpl-ev-fr-col-when);
+}
+.colWho {
+  width: var(--tpl-ev-fr-col-who);
+}
+.colState {
+  width: var(--tpl-ev-fr-col-state);
+}
+.table td {
+  height: var(--tpl-ev-fr-row-h);
+  padding: 0 var(--tpl-toolbar-gap);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.table tbody tr {
+  cursor: pointer;
+}
+.table tbody tr:hover {
+  background: var(--color-surface-pearl);
+}
+.table tbody .rowSelected,
+.table tbody .rowSelected:hover {
+  background: var(--color-accent-soft);
+}
+.when {
+  color: var(--color-ink-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.who {
+  max-width: 100%;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-wh-cell-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.faint {
+  color: var(--color-ink-faint);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-ev-chip-gap);
+  padding: var(--tpl-ev-chip-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-ev-chip-lh);
+  white-space: nowrap;
+}
+.chip::before {
+  content: '';
+  width: var(--tpl-ev-chip-dot);
+  height: var(--tpl-ev-chip-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.chipOk {
+  background: var(--color-accent-soft);
+  color: var(--color-success);
+}
+.chipNg {
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-ev-fr-pager-pad);
+}
+.range {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+
+/* 右の列。 */
+.railButtonsWide {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-toolbar-gap);
+}
+.railButtonsWide > * {
+  width: 100%;
+}
+.railCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-side-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.railCard[aria-label] {
+  gap: var(--tpl-compact-gap);
+}
+.railTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-row-name-lh);
+}
+.railLabel {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: var(--tpl-wh-cell-lh);
+}
+.railNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.detailList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.detailRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-rule-row-gap);
+  min-height: var(--tpl-ev-fr-detail-h);
+  box-shadow: var(--shadow-row-line);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.detailRow dt,
+.detailRow > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detailRow dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 700;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ok {
+  color: var(--color-success);
+  font-weight: 700;
+}
+.ng {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+.railButtons {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--tpl-toolbar-gap);
+  margin-top: var(--tpl-wh-ops-gap);
+}
+.railButtons > * {
+  width: 100%;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-kw-input-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  color: var(--color-ink-faint);
+}
+.search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}

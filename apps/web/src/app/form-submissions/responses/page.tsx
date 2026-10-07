@@ -17,6 +17,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import FormResponsesV8 from '@/v8/form-responses/responses'
 import { fetchApi, ApiError } from '@/lib/api'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import { csvCell } from '@/lib/presentation'
@@ -708,8 +709,14 @@ function FormResponsesInner() {
   )
 }
 
+/*
+ * ★V8（板 `v0SbYR`・`MKQyJ`）：見た目テーマが v8 のときだけ新しい画面
+ * （src/v8/form-responses/responses.tsx）に切り替える。v7 の見た目はそのまま。
+ */
 export default function FormResponsesPage() {
   usePageTitle('集まった回答')
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <FormResponsesV8 />
   return (
     <Suspense fallback={<ListState kind="loading" title="集まった回答を読み込んでいます" />}>
       <FormResponsesInner />

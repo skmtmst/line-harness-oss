@@ -1,0 +1,67 @@
+/* 運営のメンバー管理 V8（FvbHW）。値は --tpl-op-*。 */
+
+.kpis3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.invite {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+}
+
+.inviteField {
+  width: var(--tpl-op-mem-invite-w);
+  max-width: 100%;
+}
+
+.invite svg {
+  width: var(--tpl-op-auth-icon);
+  height: var(--tpl-op-auth-icon);
+}
+
+.colMail {
+  width: var(--tpl-op-mem-mail-w);
+}
+
+.colTotp {
+  width: var(--tpl-op-mem-totp-w);
+}
+
+.colState {
+  width: var(--tpl-op-mem-state-w);
+}
+
+.colLogin {
+  width: var(--tpl-op-mem-login-w);
+}
+
+.colOps {
+  width: var(--tpl-op-mem-ops-w);
+  flex-shrink: 0;
+}
+
+.ops {
+  display: flex;
+  gap: var(--tpl-op-me-gap);
+  white-space: nowrap;
+}
+
+.selfRow {
+  height: var(--tpl-op-mem-self-h);
+}
+
+.memberRow {
+  height: var(--tpl-op-dash-alert-h);
+}
+
+.faint {
+  color: var(--color-ink-faint);
+}
+
+@media (max-width: 1023.98px) {
+  .colMail,
+  .colLogin {
+    display: none;
+  }
+}

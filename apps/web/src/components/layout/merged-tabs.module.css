@@ -20,7 +20,7 @@
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
-  transition: color 150ms, border-color 150ms, background-color 150ms;
+  transition: color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .tab:hover {

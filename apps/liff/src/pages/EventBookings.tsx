@@ -14,9 +14,10 @@ import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 
-/** 札の文字は設計どおり (参加・承認待ち…)。意味は今の状態名のまま変えない。 */
+/** 札の文字は設計どおり (★V8 y1bs9A：申し込み済み・キャンセル待ち…)。意味は今の状態名のまま変えない。 */
 const statusMeta: Record<string, { text: string; tone: 'confirmed' | 'pending' | 'neutral' }> = {
-  confirmed: { text: '参加', tone: 'confirmed' },
+  confirmed: { text: '申し込み済み', tone: 'confirmed' },
+  waitlisted: { text: 'キャンセル待ち', tone: 'pending' },
   requested: { text: '承認待ち', tone: 'pending' },
   rejected: { text: '見送り', tone: 'neutral' },
   cancelled: { text: 'キャンセル', tone: 'neutral' },
@@ -190,9 +191,9 @@ export default function EventBookings() {
   }
 
   return (
-    <LiffLookScope className="min-h-screen bg-ground" designNode="y1bs9A">
+    <LiffLookScope className="min-h-screen bg-canvas" designNode="y1bs9A">
       <LiffHeader title="自分のイベント" />
-      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-10">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-3.5 p-4 pb-10">
         <h1 className="text-xl font-bold text-ink">自分のイベント</h1>
         {loading ? (
           <LoadingView />
@@ -239,7 +240,7 @@ export default function EventBookings() {
                 <StatusView icon="calendar" title="これまでのイベントはありません" />
               )
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-3.5">
                 {items.map((b) => {
                   const meta = statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
                   return (
@@ -247,18 +248,18 @@ export default function EventBookings() {
                       <Card className="p-3.5">
                         <div className="flex items-center gap-3">
                           <div
-                            className="flex w-14 shrink-0 flex-col items-center"
+                            className="flex w-14 shrink-0 flex-col items-center rounded-(--liff-radius) bg-liff-off-bg py-1.5"
                             aria-label={`${utcToJstMd(b.slot_starts_at)} ${utcToJstHm(b.slot_starts_at)}`}
                           >
-                            <span className="text-[15px] font-bold whitespace-nowrap text-ink">
+                            <span className="liff-num text-[15px] font-bold whitespace-nowrap text-ink">
                               {utcToJstMd(b.slot_starts_at)}
                             </span>
-                            <span className="text-[11px] text-liff-sub">
+                            <span className="liff-num text-[11px] text-liff-sub">
                               {utcToJstHm(b.slot_starts_at)}
                             </span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-semibold text-ink" title={b.event_name}>
+                            <div className="truncate text-sm font-bold text-ink" title={b.event_name}>
                               {b.event_name}
                             </div>
                             {b.venue_name && (
@@ -269,9 +270,35 @@ export default function EventBookings() {
                                 {b.venue_name}
                               </div>
                             )}
-                            <div className="mt-[3px]">
+                            <div className="mt-[3px] flex">
                               <Badge tone={meta.tone}>{meta.text}</Badge>
                             </div>
+                            {/* 板 y1bs9A：変える・キャンセルは文の列の下に小さく並べる。 */}
+                            {canCancel(b) && (
+                              <div className="flex items-center gap-2 pt-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void openChange(b);
+                                  }}
+                                  disabled={busy}
+                                  className="inline-flex items-center justify-center rounded-lg border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                                >
+                                  時間を変える
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionError(null);
+                                    setPendingCancel(b);
+                                  }}
+                                  disabled={busy}
+                                  className="inline-flex items-center justify-center rounded-lg border border-danger/40 bg-canvas px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                                >
+                                  キャンセルする
+                                </button>
+                              </div>
+                            )}
                           </div>
                           <button
                             type="button"
@@ -279,36 +306,11 @@ export default function EventBookings() {
                             onClick={() =>
                               navigate({ pathname: `/events/${b.event_id}`, search })
                             }
-                            className="flex h-11 w-8 shrink-0 items-center justify-center text-ink-faint focus-visible:outline-2 focus-visible:outline-ink"
+                            className="relative flex h-11 w-[18px] shrink-0 items-center justify-center text-ink-faint after:absolute after:inset-y-0 after:-right-2 after:-left-2 focus-visible:outline-2 focus-visible:outline-ink"
                           >
-                            <Icon name="chevron-right" className="h-5 w-5" />
+                            <Icon name="chevron-right" className="h-[18px] w-[18px]" />
                           </button>
                         </div>
-                        {canCancel(b) && (
-                          <div className="mt-3 flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                void openChange(b);
-                              }}
-                              disabled={busy}
-                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-hairline bg-canvas px-3 text-xs font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
-                            >
-                              時間を変える
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActionError(null);
-                                setPendingCancel(b);
-                              }}
-                              disabled={busy}
-                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-danger/30 bg-canvas px-3 text-xs font-semibold text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
-                            >
-                              キャンセルする
-                            </button>
-                          </div>
-                        )}
                       </Card>
                     </li>
                   );

@@ -1,0 +1,629 @@
+/*
+ * ★V8 成果とアフィリエイト（Pencil `nJlxX`・`KdFRI`・`v9JWQ`・`h7dmB`・`OylSV`・`aINnz`・`Eo56k`・`tnTn9`）。
+ * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
+ * 寸法は globals.css の --tpl-af-*。
+ */
+
+/* 道具の段の先頭に置く帯（案内・失敗・済んだ知らせ）。1行を取る。 */
+.fullRow {
+  flex-basis: 100%;
+  margin-bottom: var(--tpl-af-notice-after);
+}
+
+.chipGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+
+/* 表：共通の表の「列の並び」を使い、この板の寸法だけ当てる。 */
+.tableWrap {
+  min-width: 0;
+}
+.table {
+  border: 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+  gap: var(--tpl-af-col-gap);
+  height: var(--tpl-af-head-h);
+  padding: var(--tpl-af-head-pad);
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  gap: var(--tpl-af-col-gap);
+  height: var(--tpl-af-row-h);
+  padding: var(--tpl-af-row-pad);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: normal;
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > .num,
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > .num {
+  padding-right: var(--tpl-af-num-pad-end);
+  text-align: right;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.num { text-align: right; }
+.colCheck { width: var(--tpl-af-col-check); }
+/* アフィリエイター（nJlxX）：紹介リンク 76・友だち追加 84・成果 60・報酬 84・操作 140。 */
+.colLinks { width: var(--tpl-af-col-links); }
+.colFriends { width: var(--tpl-af-col-friends); }
+.colConv { width: var(--tpl-af-col-conv); }
+.colReward { width: var(--tpl-af-col-reward); }
+.colOps { width: var(--tpl-af-col-ops); }
+
+/* 名前（緑の 13/600）と下の行。 */
+.rowName {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-row-name-size);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rowName:hover { text-decoration: underline; }
+.rowPlan {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 表の数（13・行の高さは文字なり）。 */
+.cellNum {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: normal;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.rowCode {
+  display: block;
+  overflow: hidden;
+  color: var(--color-action);
+  font-family: var(--font-inter), Inter, sans-serif;
+  font-size: var(--text-micro);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rowSub,
+.cellSub {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cellMain {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-af-stack-gap);
+  min-width: 0;
+}
+.stackEnd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--tpl-af-stack-gap);
+}
+
+/* 状態の札（点つき）。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-af-pill-gap);
+  padding: var(--tpl-af-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-af-pill-lh);
+  white-space: nowrap;
+}
+.pillDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.pill[data-tone='active'] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.pill[data-tone='warn'] {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+.pill[data-tone='danger'] {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.pill[data-tone='neutral'] {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+/* 行の右端：ボタンと「…」。メニューの位置の目印が行を1段増やさないよう横に並べる。 */
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-af-ops-gap);
+}
+.menuBox {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* 表の下の案内。 */
+.footNote {
+  margin: 0;
+  padding: var(--tpl-af-foot-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 道具の段の右：よく使う絞り込み（左に印）。 */
+.savedBox { position: relative; width: var(--tpl-af-saved-w); }
+.savedBox :global(*) { max-width: 100%; }
+.savedBox :global(button) { width: 100%; padding-left: calc(var(--tpl-chip-row-gap) * 9); }
+.savedBox :global(button) > svg:last-child { display: none; }
+.savedIcon {
+  position: absolute;
+  top: 50%;
+  left: var(--tpl-rule-row-gap);
+  z-index: 1;
+  color: var(--color-ink-secondary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* 1152 の板：案内の帯 → 1段目 → 2段目。 */
+.narrowTools {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowFolder { width: var(--tpl-narrow-folder-w); }
+.narrowFolder :global(*) { max-width: 100%; }
+.narrowFolder :global(button) { width: 100%; }
+.narrowSearch { width: var(--tpl-af-search-w); }
+.spacer { flex: 1 1 0; }
+
+/* 閲覧のみの帯（数の帯の上）。薄い青の地・目の印・枠なし。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: var(--tpl-af-ro-before) var(--tpl-head-pad-side) var(--tpl-af-ro-after);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+/* 閲覧のみで隠した作るボタン（＋下の間）の場所だけ空ける。 */
+.viewerCreateSpace { display: block; height: var(--tpl-af-viewer-create-h); }
+
+/* 空・失敗の1枚。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  margin: 0 var(--tpl-toolbar-pad-side);
+  padding: var(--tpl-wb-target-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  text-align: center;
+}
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-chip-h);
+  height: var(--tpl-chip-h);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  color: var(--color-ink-secondary);
+}
+.stateIconError {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+}
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-row-name-lh);
+}
+
+/* タブの段（絵 nJlxX：タブの高さ 28）。共通のタブは変えず、この板の下の余白だけ詰める。 */
+.tabsBox :global([role='tab']) { min-height: 0; padding-bottom: var(--tpl-af-tab-pad-bottom); }
+
+/* 1行で切る（長い名前で行が伸びないように。全文は title）。 */
+.oneLine {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+
+/* 閲覧のみの名前（押せない形）。 */
+.rowNameText {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-row-name-size);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 案件（h7dmB）：報酬 110・動き 150・紹介している人 96・成果 100・操作 170。行 56。 */
+:global([data-theme='v8']) .tableOffers .row[data-table-layout='columns'] { height: var(--tpl-af-offer-row-h); }
+.colOfferReward { width: var(--tpl-af-col-offer-reward); min-width: 0; }
+.colOfferAction { width: var(--tpl-af-col-offer-action); min-width: 0; }
+.colOfferAction .cellNum { overflow: hidden; text-overflow: ellipsis; }
+.colOfferPeople { width: var(--tpl-af-col-offer-people); }
+.colOfferConv { width: var(--tpl-af-col-offer-conv); }
+.colOfferOps { width: var(--tpl-af-col-offer-ops); }
+
+/* 成果承認（OylSV）：紹介した人 96・アカウント 92・案件 150・報酬 72・確認 72・決める 124。行 56。 */
+:global([data-theme='v8']) .tableApprovals .row[data-table-layout='columns'] { height: auto; min-height: var(--tpl-af-offer-row-h); }
+.colApAffiliate { width: var(--tpl-af-col-ap-affiliate); min-width: 0; }
+.colApAccount { width: var(--tpl-af-col-ap-account); min-width: 0; }
+.colApOffer { width: var(--tpl-af-col-ap-offer); min-width: 0; }
+.colApReward { width: var(--tpl-af-col-ap-reward); }
+.colApCheck { width: var(--tpl-af-col-ap-check); }
+.colApOps { width: var(--tpl-af-col-ap-ops); }
+.colApAffiliate .cellNum,
+.colApAccount .cellNum,
+.colApOffer .cellNum { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* 2行まで折る説明（案件と成果地点の下の行）。 */
+.rowWrap {
+  display: block;
+  max-width: 100%;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+/* 表の下の別の段（続きの読み込み・まとめて処理の結果）。 */
+.subSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cell-gap-half);
+  padding: var(--tpl-af-foot-pad);
+}
+.resultList {
+  margin: 0;
+  padding-left: var(--tpl-rule-row-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-row-name-lh);
+}
+.detailList {
+  display: grid;
+  gap: var(--tpl-sub-gap);
+  margin: 0;
+  font-size: var(--text-caption);
+}
+.detailList > div { display: flex; gap: var(--tpl-toolbar-gap); }
+.detailList dt { flex-shrink: 0; width: var(--tpl-af-detail-key-w); color: var(--color-ink-faint); }
+.detailList dd { margin: 0; color: var(--color-ink-secondary); }
+
+/* まとめて操作の窓（hadfk）。 */
+.dialogStep { color: var(--color-ink-faint); font-size: var(--text-micro); }
+.bulkTargets {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  padding: var(--tpl-af-bulk-target-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+.bulkTargetsText {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+.bulkChoices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-af-ops-gap);
+  margin-top: var(--tpl-af-bulk-choices-gap);
+}
+
+/* 期間を締める（usDpO）。対象・合計の行は線で区切る。 */
+.closeBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-af-close-gap);
+}
+.closeLines { margin: 0; }
+.closeLines > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tpl-toolbar-gap);
+  padding: var(--tpl-af-close-line-pad);
+  border-bottom: 1px solid var(--color-divider-soft);
+}
+.closeLines dt {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+.closeLines dd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.closeSub {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 400;
+}
+.closeWarn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-af-dr-row-gap);
+  margin: 0;
+  padding: var(--tpl-af-bulk-target-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-af-dr-text-lh);
+}
+.closeWarn > svg { flex-shrink: 0; margin-top: var(--tpl-af-stack-gap); color: var(--color-status-warn-deep); }
+.closeExcluded {
+  padding: var(--tpl-af-bulk-target-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+.closeExcluded p { margin: 0; }
+.closeExcluded ul { margin: var(--tpl-af-stack-gap) 0 0; padding-left: var(--tpl-rule-row-gap); }
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-toolbar-gap);
+}
+.stepField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sub-gap);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.stepInput {
+  height: var(--tpl-chip-h);
+  padding: 0 var(--tpl-rule-row-gap);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 400;
+}
+
+/* 支払い（aINnz）：払う額 150・中身 70・振込先 170・状態 130・操作 170。行 59。 */
+:global([data-theme='v8']) .tablePayment .row[data-table-layout='columns'] { height: auto; min-height: var(--tpl-af-pay-row-h); }
+.colPayAmount { width: var(--tpl-af-col-pay-amount); }
+.colPayCount { width: var(--tpl-af-col-pay-count); }
+.colPayBank { width: var(--tpl-af-col-pay-bank); min-width: 0; }
+.colPayState { width: var(--tpl-af-col-pay-state); min-width: 0; }
+.colPayOps { width: var(--tpl-af-col-pay-ops); }
+
+/* 今回の締め（案内の帯のすぐ下・枠の中に 期間・対象・合計・締める）。 */
+.closeBox {
+  display: flex;
+  margin: var(--tpl-af-close-box-margin);
+  align-items: center;
+  gap: var(--tpl-af-close-box-gap);
+  padding: var(--tpl-af-close-box-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+}
+.closeCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-af-dr-kpi-gap);
+}
+.closeTitle {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: normal;
+  white-space: nowrap;
+}
+.closeYet,
+.closeDone {
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+}
+.closeYet { color: var(--color-status-warn-deep); }
+.closeDone { color: var(--color-success); }
+.closeLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+.closeValue {
+  color: var(--color-ink);
+  font-size: var(--tpl-af-close-value-size);
+  font-weight: 700;
+  line-height: normal;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.closeNote {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+.noticeStack { display: flex; flex-direction: column; }
+.rowWrapEnd {
+  display: block;
+  max-width: 100%;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+  text-align: right;
+}
+
+/* レポート（Eo56k）：見出し 12/24・行 61・成果と売上 130・報酬 160・操作 28。 */
+:global([data-theme='v8']) .tableReport .headRow[data-table-layout='columns'] { height: var(--tpl-af-rep-head-h); padding: var(--tpl-af-rep-pad); }
+:global([data-theme='v8']) .tableReport .row[data-table-layout='columns'] { height: var(--tpl-af-rep-row-h); padding: var(--tpl-af-rep-pad); }
+.colRepConv { width: var(--tpl-af-col-rep-conv); }
+.colRepReward { width: var(--tpl-af-col-rep-reward); }
+.colRepOps { width: var(--tpl-af-col-rep-ops); }
+.colRepOps :global(button) { width: var(--tpl-af-col-rep-ops); height: var(--tpl-af-col-rep-ops); min-height: 0; }
+.rowLink,
+.rowLinkText {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--tpl-row-name-size);
+  font-weight: 600;
+  line-height: normal;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rowLink { cursor: pointer; }
+.rowLink:hover { text-decoration: underline; }
+.cellStrong {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.colRepConv .cellMain { line-height: normal; }
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* 期間を選ぶ（左に暦の印）。 */
+.periodBox { position: relative; }
+.periodBox :global(button) { padding-left: calc(var(--tpl-chip-row-gap) * 9); }
+.periodIcon {
+  position: absolute;
+  top: 50%;
+  left: var(--tpl-rule-row-gap);
+  z-index: 1;
+  color: var(--color-ink-secondary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.bulkBody { display: flex; flex-direction: column; width: 100%; }

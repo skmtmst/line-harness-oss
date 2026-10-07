@@ -5,7 +5,7 @@
  */
 export default function Stepper({ steps, current }: { steps: string[]; current: number }) {
   return (
-    <ol className="flex gap-1 px-4 pt-2 pb-1" aria-label="予約の手順">
+    <ol className="flex gap-1 px-4 pt-3 pb-1" aria-label="予約の手順">
       {steps.map((label, i) => {
         const done = i < current;
         const now = i === current;

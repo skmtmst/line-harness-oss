@@ -115,8 +115,13 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
   it('リマインダの削除が共通の確認窓を使う', () => {
     /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。 */
     const src = fs.readFileSync(path.join(SRC, 'app', 'reminders', 'list-v8.tsx'), 'utf8')
-    expect(src).toContain('ConfirmDialog')
-    expect(src).toContain('confirmLabel="削除する"')
+    /*
+     * 2026-10-06：V8 の削除の窓（絵 VsSyu：幅600・危ない操作は左端・「代わりに一時停止」）は
+     * 共通の ConfirmDialog の形に無いため、src/v8/reminders/sheet-dialog（useOverlayFocus の面）で組む。
+     * どちらでも「ブラウザの confirm に戻らない・危ない操作として出す」ことを見る。
+     */
+    expect(src).toMatch(/<SheetDialog[\s\S]*designNode="VsSyu"|<ConfirmDialog[\s\S]*confirmLabel="削除する"/)
+    expect(src).toMatch(/destructive=\{\(\s*<Button variant="danger"[\s\S]*?削除する|confirmLabel="削除する"/)
     expect(src).toContain('destructive')
     expect(code(src), 'ブラウザのconfirmへ戻っている').not.toMatch(BROWSER_CONFIRM)
     // 押している間に二度押しできない

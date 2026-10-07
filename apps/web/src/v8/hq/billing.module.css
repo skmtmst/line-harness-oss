@@ -1,0 +1,276 @@
+/*
+ * ★V8 統括の請求（Pencil `JB8V1`）。頭・左の列は型（ListPage）。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-body-gap);
+  padding: var(--tpl-hq-body-pad);
+  min-width: 0;
+}
+
+.buttonIcon {
+  width: var(--tpl-hq-button-icon);
+  height: var(--tpl-hq-button-icon);
+}
+
+.error { margin: 0; color: var(--color-danger); font-size: var(--text-label); }
+.faint { color: var(--color-ink-faint); }
+
+/* 契約の帯（灰の地・角丸8・12/18） */
+.contract {
+  margin: 0;
+  padding: var(--tpl-hq-contract-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-contract-lh);
+}
+
+.intervalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-hq-col-gap);
+  min-height: var(--tpl-hq-control-h);
+}
+
+/* 周期の切り替え（器の余白3・項目 5/14・12/17） */
+.interval {
+  padding: var(--tpl-hq-seg-pad);
+}
+
+.interval > button {
+  padding: var(--tpl-hq-seg-item-pad);
+  line-height: var(--tpl-hq-seg-item-lh);
+}
+
+/* プラン3枚（間16・角丸16・余白20・高さはそろえる） */
+.plans {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-hq-plans-gap);
+}
+
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-plan-gap);
+  min-width: 0;
+  min-height: var(--tpl-hq-plan-h);
+  padding: var(--tpl-hq-plan-pad);
+  border-radius: var(--radius-panel);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.planCurrent {
+  outline-color: var(--color-accent-deep);
+  background: var(--tpl-hq-plan-current-bg);
+}
+
+.planHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--tpl-hq-plan-head-gap);
+}
+
+.planName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+  line-height: var(--tpl-hq-plan-name-lh);
+  white-space: nowrap;
+}
+
+.planDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-contract-lh);
+}
+
+.price {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--tpl-hq-card-gap);
+  margin: 0;
+}
+
+.priceValue {
+  color: var(--color-ink);
+  font-size: var(--tpl-hq-price-size);
+  font-weight: 700;
+  line-height: var(--tpl-hq-price-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+.priceUnit {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-price-unit-lh);
+  white-space: nowrap;
+}
+
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-feature-gap);
+  margin: 0;
+  padding: var(--tpl-hq-feature-pad);
+  list-style: none;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-feature-gap);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-contract-lh);
+  white-space: nowrap;
+}
+
+.check {
+  width: var(--tpl-hq-check);
+  height: var(--tpl-hq-check);
+  flex-shrink: 0;
+  color: var(--color-accent-deep);
+}
+
+.planFoot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-card-gap);
+  margin-top: auto;
+}
+
+.planButton {
+  width: 100%;
+}
+
+.planNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.badge {
+  padding: var(--tpl-hq-pill-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-hq-price-unit-lh);
+  white-space: nowrap;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+/* 支払い履歴（見出し＋表） */
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-body-gap);
+  min-width: 0;
+}
+
+.historyTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-hq-nav-item-lh);
+}
+
+.empty {
+  margin: 0;
+  padding: var(--tpl-hq-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.table {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.head,
+.row {
+  display: grid;
+  grid-template-columns: var(--tpl-hq-col-date) minmax(0, 1fr) var(--tpl-hq-col-amount) var(--tpl-hq-col-paystate) var(--tpl-hq-col-receipt);
+  align-items: center;
+  column-gap: var(--tpl-hq-col-gap);
+}
+
+.head {
+  padding: var(--tpl-hq-head-pad);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-hq-small-lh);
+  white-space: nowrap;
+}
+
+.row {
+  padding: var(--tpl-hq-pay-row-pad);
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-cell-lh);
+}
+
+.cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.amount {
+  padding-right: var(--tpl-hq-action-pad);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-hq-pill-gap);
+  padding: var(--tpl-hq-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-hq-pill-lh);
+  white-space: nowrap;
+}
+
+.dot {
+  width: var(--tpl-hq-dot);
+  height: var(--tpl-hq-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.pillInfo { background: var(--color-status-info-soft); color: var(--color-status-info); }
+.pillIdle { background: var(--color-step-idle); color: var(--color-ink-secondary); }

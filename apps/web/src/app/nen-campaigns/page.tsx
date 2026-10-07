@@ -21,7 +21,7 @@ import {
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { NenOverview, type ColumnDeliveryPlan, type FriendOption, type NenCoupon, type NenKpis, type NenTab } from './nen-overview'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import NenCampaignsV8 from './nen-campaigns-v8'
+import NenCampaignsV8 from '@/v8/nen-campaigns/list'
 import { defaultScheduleLocal, jstMonthRange } from './nen-period'
 
 type Notice = { tone: 'success' | 'error'; text: string }
@@ -106,14 +106,11 @@ export default function NenCampaignsPage() {
       loadedTabs.current.add(next)
       setLoading(false)
     }
-    try {
-      if (next === 'history') {
-        const deliveryRes = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 })
-        if (sequence !== loadSequence.current) return
-        if (!deliveryRes.success) return fail('送った履歴を読み込めませんでした。')
-        setDeliveryList(deliveryRes.data); done()
-        return
-      }
+    /*
+      数の帯とタブの件数（設定・コラム・今月の数）。どのタブでも同じものを使う。
+      読めたら true。読めないときは false（帯は「—」のまま）。
+    */
+    const loadShared = async (): Promise<boolean> => {
       const now = new Date()
       const thisMonth = jstMonthRange(now)
       const lastMonth = jstMonthRange(now, -1)
@@ -126,10 +123,8 @@ export default function NenCampaignsPage() {
         api.nenCampaigns.deliveries(selectedAccountId, { from: lastMonth.from, to: lastMonth.to, limit: 1 }),
         api.nenCampaigns.birthdayCoupon(selectedAccountId),
       ])
-      if (sequence !== loadSequence.current) return
-      if (!settingRes.success || !columnRes.success || !flowRes.success || !columnMetricRes.success || !thisMonthRes.success || !lastMonthRes.success) {
-        return fail(next === 'columns' ? 'コラムの情報を読み込めませんでした。' : '自動配信の情報を読み込めませんでした。')
-      }
+      if (sequence !== loadSequence.current) return false
+      if (!settingRes.success || !columnRes.success || !flowRes.success || !columnMetricRes.success || !thisMonthRes.success || !lastMonthRes.success) return false
       setSettings(settingRes.data); setColumns(columnRes.data)
       setColumnsTotal(columnRes.pagination?.total ?? columnRes.data.length)
       setFlowMetrics(flowRes.data); setColumnMetrics(columnMetricRes.data)
@@ -152,6 +147,27 @@ export default function NenCampaignsPage() {
       // 数値カードは全タブで共通なので、自動配信・停止中・コラムの3つをまとめて読み込み済みにする。
       for (const shared of ['auto', 'columns', 'paused'] as NenTab[]) loadedTabs.current.add(shared)
       setTabErrors((current) => ({ ...current, auto: '', columns: '', paused: '' }))
+      return true
+    }
+    try {
+      if (next === 'history') {
+        /*
+          URLで送った履歴を直接開いたときは、共通の数の帯がまだ無い。履歴と一緒に読む
+          （★V8-B Tj7n4 は履歴でも帯に数が出る）。帯が読めなくても履歴は出す。
+        */
+        const [deliveryRes] = await Promise.all([
+          api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 }),
+          loadedTabs.current.has('auto') ? Promise.resolve(true) : loadShared().catch(() => false),
+        ])
+        if (sequence !== loadSequence.current) return
+        if (!deliveryRes.success) return fail('送った履歴を読み込めませんでした。')
+        setDeliveryList(deliveryRes.data); done()
+        return
+      }
+      if (!(await loadShared())) {
+        if (sequence !== loadSequence.current) return
+        return fail(next === 'columns' ? 'コラムの情報を読み込めませんでした。' : '自動配信の情報を読み込めませんでした。')
+      }
       done()
     } catch { fail('情報を読み込めませんでした。通信を確認してください。') }
   }, [selectedAccountId])
@@ -442,7 +458,7 @@ export default function NenCampaignsPage() {
 
   /*
    * ★V8-B：data-theme="v8" のときだけ新しいNEN配信画面
-   * （MuhWR・Jxmqh・Tj7n4・oqSJP）へ切り替える。v7 の見た目はそのまま。
+   * （src/v8/nen-campaigns/list.tsx：MuhWR・Jxmqh・Tj7n4・oqSJP）へ切り替える。v7 の見た目はそのまま。
    * 取得・保存の持ち方は変えない（page.tsx が持ったまま）。
    */
   if (theme === 'v8') {

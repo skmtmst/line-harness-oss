@@ -38,7 +38,7 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
   })
 
   it('タブは ?tab= のまま。履歴を積まない', () => {
-    // 共有・再読込・戻るに強い（`v6-common-rules.md` §2-2）。
+    // 共有・再読込・戻るに強い（`docs/v8-design-rules.md` §5）。
     expect(PAGE).toContain('&tab=${t.value}')
   })
 
@@ -95,7 +95,7 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
 
   it('できないことは押し口を出さず、理由を書く', () => {
     /*
-      `v6-common-rules.md` §7-10「出す＝使える」。
+      `docs/v8-design-rules.md` §5「出す＝使える」。
       写す口だけはまだ無い（台帳 #128）。アーカイブは X-1 で繋いだ。
     */
     const actions = accountActions(account())

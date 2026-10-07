@@ -86,7 +86,7 @@ export default function MenuList({
           })}
         </div>
       )}
-      <ul className="space-y-2.5">
+      <ul className="space-y-3.5">
         {visible.map((m) => {
           const selected = m.id === selectedId;
           return (
@@ -109,11 +109,14 @@ export default function MenuList({
                   <span className="block truncate text-[15px] font-bold text-ink" title={m.name}>
                     {m.name}
                   </span>
-                  {m.description && (
-                    <span className="mt-[3px] block truncate text-[11.5px] text-liff-sub" title={m.description}>
-                      {m.description}
-                    </span>
-                  )}
+                  {/* 説明が無いメニューも行を取っておく (板 IruGD の「シャンプーのみ」。カードの高さをそろえる)。 */}
+                  <span
+                    className="mt-[3px] block truncate text-[11.5px] text-liff-sub"
+                    title={m.description ?? undefined}
+                    aria-hidden={m.description ? undefined : true}
+                  >
+                    {m.description || '\u00a0'}
+                  </span>
                   <span className="mt-[3px] block text-xs">
                     <span className="font-semibold text-ink">{m.duration_minutes}分</span>
                     <span className="ml-2 font-bold text-liff-primary">

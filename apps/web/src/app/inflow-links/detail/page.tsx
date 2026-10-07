@@ -33,6 +33,7 @@ import type {
 } from '@line-crm/shared'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatNumber } from '@/lib/format'
+import InflowDetailV8 from '@/v8/inflow-links/detail'
 
 /** 選んだ流入元の人数、成果、友だち、追加時の動きをまとめて表示する。 */
 
@@ -883,6 +884,9 @@ function InflowLinkDetailPageContent() {
 }
 
 export default function InflowLinkDetailPage() {
+  // ★V8 は src/v8 に一から書いた詳細（Q5le3）。v7 はこのファイルのまま。
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <InflowDetailV8 />
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
       <InflowLinkDetailPageContent />

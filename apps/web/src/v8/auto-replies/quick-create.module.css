@@ -1,124 +1,194 @@
-/* ★V8 自動応答 かんたんに作る（板 `G4GejG`）。色・角丸は globals.css の名前だけ。 */
-
-.field {
-  margin-bottom: 0;
+/*
+ * ★V8 自動応答 かんたんに作る（板 `G4GejG`、小窓 560）。窓の枠・題・× は共通の Dialog。
+ * この窓は「余白24・題18太字・欄の間14・題と欄の間6・下の段は上8・キャンセルと保存は真ん中」。
+ * × は絵に無いが共通の決まり（閉じ方は右上の×）なので残し、題の行の高さを変えないよう重ねる。
+ * 値は globals.css の --tpl-ms-qc-*。色・角丸は名前だけ。
+ */
+:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:first-child) {
+  position: relative;
+  padding: var(--tpl-ms-qc-head-pad);
 }
 
-.field:last-of-type {
-  margin-bottom: 0;
+:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:first-child) > :global(button) {
+  position: absolute;
+  top: var(--tpl-ms-qc-close-inset);
+  right: var(--tpl-ms-qc-close-inset);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.body) :global(h2) {
+  font-size: var(--tpl-ms-qc-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-ms-qc-title-lh);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:nth-child(2)) {
+  padding: var(--tpl-ms-key-content-pad);
+}
+
+.body {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--tpl-ms-key-gap);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  /* 絵は題と欄も窓の中の兄弟（間14）。 */
+  gap: var(--tpl-ms-key-gap);
 }
 
 .label {
-  display: block;
-  margin-bottom: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 500;
-  line-height: 1.3;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-ms-key-token-size);
+  font-weight: 600;
+  line-height: var(--tpl-ms-key-cell-lh);
 }
 
 .chipBox {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
+  gap: var(--tpl-ms-fn-field-gap);
+  padding: var(--tpl-ms-qc-chipbox-pad);
+  border-radius: var(--tpl-ms-key-box-radius);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
   background: var(--color-canvas);
 }
 
 .chipBox:focus-within {
-  outline: 1px solid var(--color-accent);
-  outline-offset: -1px;
+  outline: var(--tpl-ms-focus-w) solid var(--color-action);
+  outline-offset: var(--tpl-ms-focus-offset);
 }
 
 .chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--tpl-sub-gap);
-  border: 1px solid var(--color-hairline);
+  gap: var(--tpl-ms-qc-chip-gap);
+  padding: var(--tpl-ms-qc-chip-pad);
   border-radius: var(--radius-pill);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: 1.6;
+  outline: 1px solid var(--color-action);
+  outline-offset: -1px;
+  background: var(--color-success-bg);
+  color: var(--color-action);
+  font-size: var(--tpl-ms-key-token-size);
+  font-weight: 600;
+  line-height: var(--tpl-ms-key-cell-lh);
+  white-space: nowrap;
 }
 
+/* 札の×は札の右の余白に重ね、指を乗せたとき・キーボードで選んだときだけ見せる（札の幅を変えない）。 */
 .chipRemove {
+  position: absolute;
+  top: 50%;
+  right: var(--tpl-ms-qc-chip-x-inset);
   display: inline-flex;
+  width: var(--tpl-ms-qc-chip-x);
+  height: var(--tpl-ms-qc-chip-x);
+  min-width: 0;
+  min-height: 0;
   align-items: center;
   justify-content: center;
-  border: none;
+  padding: 0;
   border-radius: var(--radius-pill);
+  opacity: 0;
+  transform: translateY(-50%);
+  border: 0;
   background: transparent;
-  color: var(--color-ink-faint);
-  font-size: var(--text-body);
-  line-height: 1;
+  color: var(--color-action);
   cursor: pointer;
 }
 
-.chipRemove:hover {
-  color: var(--color-ink);
+.chip:hover .chipRemove,
+.chipRemove:focus-visible {
+  opacity: 1;
+  background: var(--color-canvas);
 }
 
 .chipInput {
-  flex: 1;
-  border: none;
+  min-width: var(--tpl-ms-qc-input-min);
+  flex: 1 1 0;
+  padding: 0;
+  border: 0;
   background: transparent;
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-size: var(--tpl-ms-key-token-size);
+  line-height: var(--tpl-ms-key-cell-lh);
   outline: none;
+}
+
+.chipInput::placeholder {
+  color: var(--color-ink-faint);
 }
 
 .textarea {
   width: 100%;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
+  height: var(--tpl-ms-qc-textarea-h);
+  padding: var(--tpl-ms-key-box-pad);
+  border: 0;
+  border-radius: var(--tpl-ms-key-box-radius);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: var(--text-label);
-  line-height: 1.5;
+  line-height: var(--tpl-ms-fn-input-lh);
   resize: vertical;
 }
 
-.textarea:focus {
-  outline: 1px solid var(--color-accent);
-  outline-offset: -1px;
+.textarea:focus-visible {
+  outline: var(--tpl-ms-focus-w) solid var(--color-action);
+  outline-offset: var(--tpl-ms-focus-offset);
 }
 
 .fieldError {
-  margin: var(--tpl-sub-gap) 0 0;
+  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-caption);
 }
 
 .overlapBand {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  gap: var(--tpl-ms-key-info-gap);
+  margin: 0;
+  padding: var(--tpl-ms-key-box-pad);
   border-radius: var(--radius-control);
   background: var(--color-warning-bg);
   color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: 1.3;
+  font-size: var(--tpl-ms-key-token-size);
 }
 
 .overlapIcon {
   flex: none;
-  margin-top: 1px;
-  color: var(--color-ink-secondary);
+  color: var(--color-warning);
 }
 
 .footer {
   display: flex;
   align-items: center;
-  gap: var(--tpl-cell-gap-half);
+  gap: var(--tpl-ms-key-row-gap);
+  margin: var(--tpl-ms-qc-foot-margin);
+  padding-top: var(--tpl-ms-key-row-gap);
 }
 
 .detailLink {
   display: inline-flex;
+  height: var(--tpl-ms-key-btn-h);
   align-items: center;
+  gap: var(--tpl-ms-fn-field-gap);
+  padding: var(--tpl-ms-qc-text-btn-pad);
+  border-radius: var(--radius-control);
   color: var(--color-ink-secondary);
   font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-ms-key-info-lh);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .detailLink:hover {
@@ -126,5 +196,9 @@
 }
 
 .footerSpacer {
-  flex: 1;
+  flex: 1 1 0;
+}
+
+.footerBalance {
+  flex: 0 0 var(--tpl-ms-qc-balance-w);
 }

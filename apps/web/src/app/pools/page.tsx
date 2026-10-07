@@ -21,10 +21,12 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import PoolsV8 from '@/v8/settings/pools/pools'
 
 type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
 
-export default function PoolsPage() {
+function PoolsPageV7() {
   usePageTitle('プール管理')
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
@@ -459,4 +461,10 @@ function CreatePoolModal({
       </div>
     </div>
   )
+}
+
+/** ★V8：data-theme="v8" のときだけ新しい画面（src/v8/settings/pools）を出す。 */
+export default function PoolsPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <PoolsV8 /> : <PoolsPageV7 />
 }

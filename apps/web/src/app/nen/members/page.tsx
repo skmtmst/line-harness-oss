@@ -12,7 +12,7 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import LifetimeTab from './lifetime-tab'
 import MembersTab from './members-tab'
-import MembersPageV8 from './members-v8'
+import MembersPageV8 from '@/v8/nen-members/members'
 import RankSettingsTab from './rank-settings-tab'
 
 export type MemberTab = 'members' | 'ranks' | 'lifetime'

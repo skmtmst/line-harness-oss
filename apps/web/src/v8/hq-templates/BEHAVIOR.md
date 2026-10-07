@@ -1,0 +1,29 @@
+# 統括のテンプレートの動き（BEHAVIOR.md）
+
+対象：`console.tsx`（★V8-B 一覧 `LRc93`・メッセージのひな形を作る `X4JcOf`・アカウントへ配る `meBRB`）と `message-form.tsx`（`X4JcOf` の中身）。
+今までの画面 `app/hq/templates/template-console.tsx` から動きを写し、見た目だけを絵どおりに組み直した。小さな計算は `definition.ts`。
+配る結果の板 `dEvJM` は API 待ち（Codex）。今は同じ画面の進み具合の段で結果を出す。
+
+## 入口
+- `app/hq/templates/page.tsx` が V8 のときだけこの画面を出す（v7 は今までの `HqTemplatePage`）。
+- タグ・リッチメニュー・回答フォーム・シナリオのひな形の中身は、入口が今の編集部品（`TemplateDefinitionEditor`）を `DefinitionEditor` として渡す（src/v8 は @/app を読まない）。
+
+## 受け付ける URL と指定
+- `?type=template|tag|rich_menu|form|scenario`（無い・違う値は template）。左の列「種類」で切り替える。
+- `#template=<ID>&run=<配布番号>`：配った結果をあとから GET で戻す（今までと同じ。中身・認証情報は書かない）。
+- `sessionStorage`：新規保存の依頼（`hq-template-create-attempt` の鍵。所属先・利用者・種類で分ける）。今までと同じ。
+
+## 読み書き（API：`hqTemplatesApi`）
+- 一覧 `list(type)`・目録 `list()`（参照先の候補と種類ごとの数。失敗しても一覧は出す）・配り先 `accounts()`・所属先 `context()`（`/api/staff/me` の tenantId）・分類 `folders.*`。
+- 作る・直す：`create(input, requestId)`（POST の前に依頼を残す。応答不明は同じ依頼を固定し「前回の保存を再確認」、確定した拒否だけ解く）・`update(id, {expectedRevision})`（版の衝突は「最新の内容を読み込む」）。画像 `uploadImage`、使われなかった画像は `deleteImage` で後片付け（R568）。
+- 複製 `duplicate`（同じ版への依頼IDを使い回す）・削除 `remove`（確認の窓）。
+- 配る：選んだアカウント → `preflight`（選んだ集合と一致しない確認は使わない・期限切れは再確認）→ 重複は未選択から（一括の配布方法・アカウントごと・参照先ごとに選ぶ。上書きできないものは選べない）→ `distribute`（配布番号＝preflightId。応答不達は `result` で戻し、送り直さない）→ 失敗したアカウントだけ再確認。テキストのひな形はアカウントごとの本文（textOverrides）を付けられる。
+
+## 一覧
+- 左の列：作るボタン・種類（テンプレート・リッチメニュー・回答フォーム・タグ・シナリオ、数は目録から）・分類（すべて・未分類・各分類、追加・名前を変える・外す）。
+- 行：名前の前に分類の丸（未分類は輪）、参照先・更新日時・配布先、右端に「アカウントへ配る」と「…」（編集・複製・削除する）。
+- 閲覧のみ（owner/admin 以外）：作る・配る・「…」・分類の操作を出さず、上に「閲覧のみで見ています」の帯。作るボタンの場所は空けておく。
+
+## 作る（メッセージ）
+- 名前・分類（カテゴリ）・形式（テキスト・カード型はタイトル・本文・ボタン最大3つで作る。画像・カルーセルは今までの詳細編集）・フォルダ・画像（カード型）。右に LINE での見え方。
+- 下の帯：キャンセル・ひな形を保存（中央・本文の下、長いときは画面の下に追従）。

@@ -141,7 +141,8 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
     expect(fixture.fetchApi.mock.calls[0][0]).toBe('/api/staff/invitee-1/resend-invitation')
     expect(fixture.fetchApi.mock.calls[0][1]).toMatchObject({ method: 'POST' })
 
-    const notice = await screen.findByRole('status')
+    const notice = await screen.findByRole('status', { name: '知らせ' })
+    await waitFor(() => expect(notice.textContent).toContain('送り直しました'))
     expect(notice.textContent).toContain('送り直しました')
     /* 新しい期限が JST で出る。日付が読めないと「いつまでに受けてもらうか」が伝わらない。 */
     expect(notice.textContent).toContain('3月4日')
@@ -167,7 +168,7 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
     expect(fixture.fetchApi).toHaveBeenCalledTimes(1)
 
     await act(async () => { release?.() })
-    await waitFor(() => expect(screen.getByRole('status')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('status', { name: '知らせ' }).textContent).toContain('送り直しました'))
   })
 
   it('素早い二度押しでも1回しか叩かない(同じ描画の中で2回届く場合)', async () => {
@@ -192,7 +193,8 @@ describe('招待の再送 (N-425/N-432 #668)', () => {
 
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('すでに利用を開始しています')
-    expect(screen.queryByRole('status')).toBeNull()
+    // 知らせの入れ物（role=status）は最初からあるので、どの知らせも空であることで見る
+    expect(screen.getAllByRole('status').map((el) => el.textContent).join('')).toBe('')
     /* 失敗しても押し直せる。押せないまま詰むのがこの票のもとの不具合。 */
     await openRowMenu()
     expect((resendButtons()[0] as HTMLButtonElement).disabled).toBe(false)

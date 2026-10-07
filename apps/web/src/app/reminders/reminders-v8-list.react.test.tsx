@@ -179,3 +179,58 @@ test('v8 の行の操作は見本の並びを持つ', async () => {
     expect(host.querySelector('[data-design-node="SkY9V"]')).toBeTruthy()
   })
 })
+
+// 2026-10-06 オーナー決定：閲覧のみには押せないボタン・項目を置かずに隠す（帯は出す）。板 a5C1p。
+test('v8 の閲覧のみ（a5C1p）は作る・選ぶ箱・押せない行の操作を出さず、閲覧のみの帯を出す', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  handler = (url) => {
+    if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'viewer' } })
+    return base(url)
+  }
+  await act(async () => root.render(<RemindersPage />))
+  await settle()
+  await eventually(() => {
+    expect(host.querySelector('[data-design-node="a5C1p"]')?.textContent).toContain('閲覧のみで見ています')
+    expect(host.textContent).toContain('契約終了の前に知らせる')
+  })
+  const actionTexts = [...host.querySelectorAll('button, a')].map((el) => el.textContent ?? '')
+  expect(actionTexts.some((text) => text.includes('リマインダを作る'))).toBe(false)
+  expect(actionTexts.some((text) => text.includes('フォルダを追加'))).toBe(false)
+  expect(host.querySelectorAll('input[type="checkbox"], [role="checkbox"]')).toHaveLength(0)
+  const trigger = [...host.querySelectorAll('button')]
+    .find((item) => item.getAttribute('aria-label') === 'リマインダ「契約終了の前に知らせる」の操作')
+  await act(async () => { trigger!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  await eventually(() => {
+    const labels = [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map((item) => item.textContent?.trim())
+    expect(labels).toEqual(['詳細を見る', '登録者を管理', '配信予定を見る', '実行結果を見る'])
+  })
+})
+
+test('v8 の削除の窓（VsSyu）は危ない操作を左端に離し、動いている行には「代わりに一時停止」を出す', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await act(async () => root.render(<RemindersPage />))
+  await settle()
+  await eventually(() => {
+    expect(host.textContent).toContain('契約終了の前に知らせる')
+  })
+  const trigger = [...host.querySelectorAll('button')]
+    .find((item) => item.getAttribute('aria-label') === 'リマインダ「契約終了の前に知らせる」の操作')
+  await act(async () => { trigger!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  const remove = await (async () => {
+    let found: HTMLElement | undefined
+    await eventually(() => {
+      found = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.trim() === '削除') as HTMLElement | undefined
+      expect(found).toBeTruthy()
+    })
+    return found!
+  })()
+  await act(async () => { remove.click() })
+  await eventually(() => {
+    const dialog = document.querySelector('[data-design-node="VsSyu"]')
+    expect(dialog?.textContent).toContain('「契約終了の前に知らせる」を削除する')
+    expect(dialog?.textContent).toContain('削除は元に戻せません。')
+    const buttons = [...dialog!.querySelectorAll('button')].map((button) => button.textContent?.trim())
+    // 右上の×（文字なし）のあと、左端に削除、真ん中に取消と代わりの操作。
+    expect(buttons.filter(Boolean)).toEqual(['削除する', 'キャンセル', '代わりに一時停止'])
+  })
+})

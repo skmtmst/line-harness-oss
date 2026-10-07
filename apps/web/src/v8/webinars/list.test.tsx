@@ -49,11 +49,11 @@ function webinar(overrides: Partial<WebinarListItem> = {}): WebinarListItem {
 }
 
 const items = [
-  webinar(),
+  webinar({ folderId: 'folder-seminar', folderName: 'セミナー' }),
   webinar({ id: 'webinar-5', title: '旧機能説明会', slug: 'old', status: 'draft', publicationState: 'ended' }),
 ]
 const folders = [
-  { id: 'folder-seminar', kind: 'webinar', accountId: 'account-a', name: 'セミナー', parentId: null, displayOrder: 0, count: 1, color: null, createdAt: '', updatedAt: '' },
+  { id: 'folder-seminar', kind: 'webinar', accountId: 'account-a', name: 'セミナー', parentId: null, displayOrder: 0, count: 1, color: '#2f6fde', createdAt: '', updatedAt: '' },
 ]
 
 const json = (data: unknown) => new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -108,6 +108,18 @@ describe('V8 ウェビナー一覧', () => {
     expect(dialog?.textContent).toContain('ウェビナーをアーカイブしますか？')
     expect(dialog?.textContent).toContain('アーカイブする対象')
     expect(dialog?.textContent).toContain('旧機能説明会')
+  })
+
+  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）', async () => {
+    await render()
+    const filed = host.querySelector('[data-row-id="webinar-1"]')?.querySelectorAll('[data-folder-dot]') ?? []
+    expect(filed).toHaveLength(1)
+    expect(filed[0].getAttribute('data-folder-dot')).toBe('filed')
+    expect(filed[0].getAttribute('aria-label')).toBe('フォルダ：セミナー')
+    expect((filed[0] as HTMLElement).style.backgroundColor).toBeTruthy()
+    const unfiled = host.querySelector('[data-row-id="webinar-5"]')?.querySelectorAll('[data-folder-dot]') ?? []
+    expect(unfiled).toHaveLength(1)
+    expect(unfiled[0].getAttribute('data-folder-dot')).toBe('unfiled')
   })
 
   it('終わった公開は「非公開」、公開ページの道は /webinar/〇〇', async () => {

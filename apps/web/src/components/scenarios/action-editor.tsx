@@ -22,7 +22,6 @@
  *     `scenario_actions` に名前もフォルダもセットの口も無く、読む口も
  *     書く口も無い。入口だけ置くと、書いたものが消えたように見える・
  *     保存できるように見えて設定済みだと誤認させる（R241）。
- *     引き継ぎは `docs/design-qa/v6-scenario-action-editor-handoff.md`
  *   - 8つの動作 … 現行の編集口が持つ種別は `ScenarioActionType` の5つ。
  *     変更時は、安全に変換できる設定をV6下書きAPIへ同時保存する
  *   - 「発動2回目以降も各動作を実行」をセクションに1つ … `repeatOnRefire` は

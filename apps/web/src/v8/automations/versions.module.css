@@ -1,0 +1,260 @@
+/*
+ * ★V8 共通アクションの版と使われている場所（Pencil `ziSgL`）。
+ * 枠・見出しは型（DetailPage）が持つ。ここは戻る道・数のマス・版の履歴・呼び出し元の表だけ。
+ */
+
+/* 題の上の「← 共通アクション一覧へ戻る」。 */
+.back {
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-am-ver-back-lh);
+  text-decoration: none;
+}
+.back:hover {
+  text-decoration: underline;
+}
+
+.errorBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+/* 中身の段（絵：上 16・左右 24・間 14）。型の詳細の中身（上 20・左右 28・間 20）との差だけ外へ出す。 */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-am-ver-content-gap);
+  margin: var(--tpl-am-ver-body-shift);
+}
+
+/* 4つの数のマス（枠つき・同じ幅・間 12）。 */
+.cards {
+  /* 絵のマスは下の段まで 14。型のマスの高さが 5 高いぶん詰める。 */
+  margin-bottom: calc(var(--tpl-am-ver-cards-trim) * -1);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tpl-am-ver-card-gap);
+}
+
+/* 版の履歴（白い角丸の板・中 20・間 12）。 */
+.historyCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-am-ver-history-gap);
+  padding: var(--tpl-am-ver-history-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-am-ver-title-size);
+  font-weight: 700;
+  line-height: normal;
+}
+.cardLead {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-am-ver-lead-lh);
+}
+.versionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-am-ver-history-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.versionRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--tpl-am-col-gap);
+  min-height: var(--tpl-am-ver-row-h);
+  box-shadow: var(--shadow-row-line);
+}
+.versionRow > .pill {
+  align-self: center;
+}
+.versionName {
+  width: var(--tpl-am-ver-name-w);
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: normal;
+}
+.versionChain {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 札（点つき）。 */
+.pill {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--tpl-am-pill-gap);
+  padding: var(--tpl-am-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-am-pill-lh);
+  white-space: nowrap;
+}
+.pillDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.pill[data-tone='active'] { background: var(--color-success-bg); color: var(--color-success); }
+.pill[data-tone='neutral'] { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
+.pill[data-tone='info'] { background: var(--color-status-info-soft); color: var(--color-action); }
+
+/* どこから呼ばれているか（見出し 14/700・枠つきの表）。 */
+.usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-am-ver-usage-gap);
+}
+.usageTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-am-ver-usage-title-lh);
+}
+.tableBox {
+  overflow: hidden;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-card);
+}
+.table {
+  border: 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+  gap: var(--tpl-am-col-gap);
+  height: var(--tpl-am-ver-head-h);
+  min-height: 0;
+  padding: var(--tpl-am-ver-head-pad);
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  gap: var(--tpl-am-col-gap);
+  height: var(--tpl-am-ver-use-row-h);
+  padding: var(--tpl-am-ver-use-row-pad);
+  border-bottom: 0;
+  box-shadow: var(--tpl-am-ver-use-row-line);
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--tpl-compact-gap);
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: normal;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colNum,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colNum {
+  align-items: flex-end;
+  padding-right: var(--tpl-am-ver-num-pad-end);
+  text-align: right;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colWhere,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colWhere {
+  flex: 1 1 0;
+  min-width: 0;
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colOps,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colState {
+  align-items: flex-start;
+}
+.colPinned { width: var(--tpl-am-ver-col-pinned); flex-shrink: 0; }
+.colNum { width: var(--tpl-am-ver-col-num); flex-shrink: 0; }
+.colState { width: var(--tpl-am-ver-col-state); flex-shrink: 0; }
+.colOps { width: var(--tpl-am-ver-col-ops); flex-shrink: 0; }
+.where {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.whereSub {
+  display: block;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-row-sub-size);
+}
+.cell {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+.cellMuted {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+/* 表の下の灰色の注。 */
+.footBox {
+  margin: 0;
+  padding: var(--tpl-am-ver-foot-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-am-ver-lead-lh);
+}
+
+/* 利用先を更新する窓の中身。 */
+.compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-cell-gap-half);
+}
+.compareLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.compareValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+.changeList {
+  margin: 0;
+  padding-left: var(--tpl-rule-row-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}

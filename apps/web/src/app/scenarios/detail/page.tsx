@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import TargetMissing from '@/components/shared/target-missing'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import ScenarioDetailClient from './scenario-detail-client'
-import ScenarioDetailV8 from './detail-v8'
+import ScenarioDetailV8 from '@/v8/scenario-detail/detail'
 
 function ScenarioDetailPageContent() {
   const searchParams = useSearchParams()
@@ -13,7 +13,7 @@ function ScenarioDetailPageContent() {
   const showStarted = searchParams.get('started') === '1'
   /*
    * ★V8 への切り替えはテーマで行う。data-theme="v8" のときだけ
-   * detail-v8.tsx（PMLkX / nMSiE / ARuZ4、小窓 F1LK4e・OPGU2・Al4Ek）
+   * src/v8/scenario-detail/detail.tsx（PMLkX / nMSiE / ARuZ4 / kz2B6、小窓 F1LK4e・OPGU2・Al4Ek）
    * を描き、それ以外は今までどおりの v7 を出す。
    */
   const theme = useAdminTheme()

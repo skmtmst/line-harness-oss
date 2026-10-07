@@ -35,8 +35,8 @@
 1. 親・LINE両作業ツリーの開始前確認
 2. 最新 `codex/development` から専用ブランチを作成して実装
 3. テスト、型検査、ビルド、差分検査後に内容別でコミット
-4. GitHubへpushし、`codex/development` 宛てPRを作成。競合、失敗中の必須チェック、秘密情報、意図しない設定変更がなければ統合し、ローカルも同期
-5. 必要な場合だけ、クリーン確認、バックアップ、dry-run、DB更新、コード配備、反映後確認を順番に実施
+4. **作業役（司令塔が起動した Claude のサブエージェント）と Codex は、コミットまでで止めて報告します。push・PR作成・統合は司令塔が行います**（2026-10-06〜）。利用者（オーナー・共同開発者）から直接頼まれた司令塔だけが、GitHubへpushし、`codex/development` 宛てPRを作成し、競合、失敗中の必須チェック、秘密情報、意図しない設定変更がなければ統合し、ローカルも同期します
+5. 必要な場合だけ、クリーン確認、バックアップ、dry-run、DB更新、コード配備、反映後確認を順番に実施。**検証環境への配備は手動**です（マージしただけでは検証に出ません。Deploy Cloudflare Staging の workflow_dispatch、司令塔は `tools/hq/deploy-staging.sh`）。配備の run が success かを確かめてください
 
 - 所有者不明の変更、重大な仕様選択、テスト失敗、競合、秘密情報、環境不一致がある場合は停止し、理由と必要な判断を報告してください。
 - 事前警告と明示的承認が必要なDB更新・環境変更などは、承認を得る段階だけ停止してください。それ以前の安全な工程は自動的に進めてください。
@@ -47,9 +47,10 @@
 
 | 担当 | 所有する領域 |
 | --- | --- |
-| Claude | `docs/v6-requirements/`、`scripts/visual-qa/`、`docs/design-qa/`、`docs/design-reference/`、`apps/web/src/components/shared/`、Pencil |
-| Codex | `apps/worker/src/routes/`、`apps/worker/src/services/`、`packages/db/`、`.github/`、`apps/web/src/lib/api.ts` の分割 |
+| Claude（司令塔と作業役） | 画面：`apps/web/src/v8/`、`apps/web/src/app/**/page.tsx` の入口、型 `apps/web/src/components/templates/`、共通部品 `apps/web/src/components/shared/`・`layout/`、`globals.css` の `[data-theme="v8"]`、`scripts/visual-qa/`、`docs/v8-*`・`docs/v8-requirements/`・`docs/v6-requirements/`、`docs/brain/`、Pencil |
+| Codex | API・DB・Worker：`apps/worker/`、`packages/db/`（migration は番号ごとにオーナー承認）、`packages/shared` の型、`apps/web/src/lib/api*`、`.github/` |
 
+- 画面（見た目）は Codex に作らせません。機能追加（F-1〜F-25 など）の API・DB・Worker は Codex が作ります（2026-10-06 オーナー）。
 - 相手の所有領域を変更するときは、作業前にSlackの対象スレッドで宣言してください。
 
 ## `codex/development` 同時更新防止ゲート
@@ -113,31 +114,32 @@
 
 ## 管理画面のデザイン設計ルール
 
-- 管理画面の見た目は **V8 だけ**で作ります（2026-10-05 オーナー決定。「前の見た目に戻す」は無くします）。**本番は全画面が V8 で絵と合格するまで v7 の見た目のまま**なので、画面の v7 の分岐は本番を切り替えるときに一度に消し、それまで消さないでください。決まりの正本は `docs/v8-design-rules.md` です。画面を作る・直す前に読んでください。
-- 判断基準は **「使う人にとって分かりやすく使いやすいか」** と **Pencil の ★V8**（`~/Downloads/LINE-Harness-V8.pen`：部品の正本と主な画面／`~/Downloads/LINE-Harness-V8-B.pen`：残りの画面）です。**画面ごとに、その板の絵のとおり**に作ります。1枚の絵を全部の画面の決まりにしないでください。
-- 画面は **型**（`apps/web/src/components/templates/`）に中身を入れて作り、部品は **共通部品**（`apps/web/src/components/shared/`・`layout/`）を使います。どちらも絵と照合済みです。画面の中で箱・余白・部品を手で書いたり、部品の見た目を画面側で上書きしたりしないでください。
+- 管理画面の見た目は **V8 だけ**で作ります（2026-10-05 オーナー決定。「前の見た目に戻す」は無くします）。決まりの正本は `docs/v8-design-rules.md` です。画面を作る・直す前に読んでください。
+- **本番の切り替え**は `docs/v8-requirements/v8-switch.md` が正です（2026-10-07 オーナー決定）。切り替えてよいのは、管理画面の 434 枚（測る対象）がすべて合格したとき（機能追加待ちの板は別に数える）。LIFF の 28 枚は別の関門で、LIFF も全部合格してから管理画面と同じ日に出します。切り替えの日は環境変数 `NEXT_PUBLIC_ADMIN_THEME=v8` を変えるだけで、画面の v7 の分岐・v7 の試験は**切り替えの1週間後の別の PR**で消します。それまで消さないでください。
+- 判断基準は **「使う人にとって分かりやすく使いやすいか」** と **Pencil の ★V8**（`~/Downloads/LINE-Harness-V8.pen`：部品の正本と主な画面／`~/Downloads/LINE-Harness-V8-B.pen`：残りの画面）です。**画面ごとに、その板の絵のとおり**に作ります。1枚の絵を全部の画面の決まりにしないでください。ゴールの分母は 462 枚（管理画面 434＋LIFF 28）です。
+- V8 の画面は `apps/web/src/v8/<機能>/` に書きます。今の V8 ファイル（`app/**/*-v8.tsx`）で絵と 60% 以上合うものはそのファイルを直し、60% 未満・V8 なしは `src/v8` に一から書きます（2026-10-06 オーナー）。決まりは `apps/web/src/v8/README.md`。
+- 画面は **型**（`apps/web/src/components/templates/`）に中身を入れて作り、部品は **共通部品**（`apps/web/src/components/shared/`・`layout/`）を使います。画面の中で箱・余白・部品を手で書いたり、部品の見た目を画面側で上書きしたりしないでください。
+- 閲覧のみの人には押せないボタンを置かず隠します（絵が押せない形で描いていても隠す。閲覧のみの帯は出す）。左にフォルダの列がある一覧は、表にフォルダの列を置かず名前の前にフォルダの色の丸を付けます。そのほかの作り方の決まりは `docs/v8-design-rules.md` §2。
 - 見た目を変えるときは Pencil の ★V8 を先に直してください。コードだけ直すと、次に絵を見た人が元に戻します。
-- **入れてよいのは、絵と照合して合格したものだけ**です。同じ幅で撮った絵と実装を重ね、文字の中身・行の数・データの有無・権限の違い以外が同じであること（余白・段の間は ±4px 以内、はみ出し 0）。文字列の試験・ビルド成功・`data-design-node` の印は見た目の証拠ではありません。
-- V6・V7 の文言や骨格・ノードIDを文字で固定する見た目の契約テストは、画面を V8 にするときに消すか V8 に書き換えてください（v7 の分岐と v7 の画素の見張りは、本番を V8 に切り替えるときに消します）。動き（保存・送信・権限・失敗時の扱い・読み直し）を守るテストは消さないでください。消したときは PR に「何を・なぜ」を書きます。
-- 機能ごとの動きと合格条件は `docs/v6-requirements/` の要件定義に従います（動きの正本です。見た目は V8 の絵が勝ちます）。要件と実装が食い違うときは、実装ではなく要件を先に直します。
-- 管理画面のPC表示は、横スクロールを使わず主要情報と操作を1画面内で確認できる構成にしてください。確かめる幅は 1152・1280・1366・1425・1440・1920px で、どの幅でもはみ出し・右端越えは 0 にします。右の欄（プレビュー）とフォルダの列は、白い板の幅が 1100px 未満のときに畳みます。
+- **入れてよいのは、絵と照合して合格したものだけ**です。合格＝**絵の文字の位置が ±4px で 90% 以上合う（`~/lh-work/tools/hq/measure.sh`）＋重ねた絵を目で確かめる**（切れ・重なり・折り返し・色）。司令塔が `~/lh-work/design/v8/PASSED.tsv` に記録します。幅は **1440 と 1152**。違ってよいのは文字の中身・行の数・データの有無・権限の出し入れだけです。文字列の試験・ビルド成功・`data-design-node` の印は見た目の証拠ではありません。
+- V6・V7 の文言や骨格・ノードIDを文字で固定する見た目の契約テストは、画面を V8 にするときに消すか V8 に書き換えてください（v7 の分岐と v7 の画素の見張りは、切り替えの1週間後に消します）。動き（保存・送信・権限・失敗時の扱い・読み直し）を守るテストは消さないでください。消したときは PR に「何を・なぜ」を書きます。
+- 機能ごとの動きと合格条件は `docs/v6-requirements/` の要件定義（34 本）と `docs/v8-requirements/`（V8 で足した機能・LIFF・切り替え）に従います（動きの正本です。見た目は V8 の絵が勝ちます）。要件と実装が食い違うときは、実装ではなく要件を先に直します。
+- 管理画面のPC表示は、横スクロールを使わず主要情報と操作を1画面内で確認できる構成にしてください。合格の撮影は板の幅（1440・1152）、崩れの見張り（CI）は 1152・1440・1920 で、どの幅でもはみ出し・右端越えは 0 にします。右の欄（プレビュー）とフォルダの列は、白い板の幅が 1100px 未満のときに畳みます。
 - 一覧の名前、コード、見出し、ボタンなどの短い文字列は、単語の途中で改行しないでください。狭い列では1行のまま省略表示し、`title` などで全文を確認できるようにします。
 - 列数が多い場合は、文字を無理に折り返さず、重複列の削除、短い見出し、関連情報の統合、列幅・余白・文字サイズの調整、重要度の低い情報のレスポンシブ非表示を先に検討してください。
 - スマートフォン、長いURL・秘密値の詳細表示、比較上すべての列が必須の表など、情報欠落を避ける必要がある場合だけ横スクロールまたは安全な折り返しを許可します。
-- V3/V4の積み残しに手を入れるときだけ、`docs/pendev-v4-implementation-runbook.md` の手順に従ってください。**新しい画面をV3/V4/V6/V7基準で作らないでください。**
+- **新しい画面を V3/V4/V6/V7 基準で作らないでください。**
 
 ## 古い要件定義は読まない
 
-- 要件の正本は `docs/v6-requirements/v6-requirements-master-index.md` が指す 34 本と、その §5 の横断契約だけです。それ以外を要件として読まないでください。
-- `docs/archive/` 配下は V2〜V5 世代の廃止文書です。開かない・引用しない・実装の根拠にしないでください。git 履歴の確認だけに使います。
-- `docs/lstep-feature-parity-matrix.md` と `docs/lstep-gap-analysis.md` は 2026-08-15 時点の調査で、半分が既に実装済みと判明しています。「無い機能」の一覧として使わず、比較の根拠には `docs/lstep-liny-screen-behavior-research-2026-08.md` と `docs/lstep-unverified-assumptions.md` を使ってください。
+- 要件の正本は `docs/v6-requirements/v6-requirements-master-index.md` が指す 34 本と、その §5 の横断契約、`docs/v8-requirements/` だけです。それ以外を要件として読まないでください。
+- 終わった V2〜V7 の文書（V6 の決まり・指示書・引き継ぎ、`docs/archive/`、V6 の点検・台帳など）は 2026-10-07 にリポジトリから外しました（git の履歴と外付けSSDの控えにだけ残ります）。読まず、引用せず、実装の根拠にしないでください。
 - `docs/design-reference/` と `docs/design-qa/` の `-v2`〜`-v6` が付くフォルダは旧設計の画像です。設計一致の比較には使わず、★V8 の絵と重ねて比べてください。
-- `docs/pendev-v4-implementation-runbook.md` は V3/V4 の積み残しにだけ使い、新しい画面の根拠にしないでください。
-- `docs/v6-requirements/v6-32-feature-requirements-progress.md` と `docs/design-qa/v6-progress-ledger.md` の実装・画像確認の状況は廃止済みです。見た目の進捗は ★V8 との照合の記録（司令塔の `~/lh-work/design/v8/PASSED.tsv`）を見てください。
-- `docs/v6-common-rules.md`・`docs/v6-directives.md`・`docs/v6-parallel-plan.md`・`docs/v6-pencil-fix-prompt.md`・`docs/v6-design-review-handoff.md`・`docs/v6-4-1-handoff.md`・`docs/v6-orchestration-nodeterm.md` は見た目の根拠として廃止です。読まず、`docs/v8-design-rules.md` に従ってください。
+- 見た目の進捗は ★V8 との照合の記録（司令塔の `~/lh-work/design/v8/PASSED.tsv` と `SWITCH-READINESS.md`）を見てください。
+- Lステップ・Liny との比較の根拠には `docs/lstep-liny-screen-behavior-research-2026-08.md` と `docs/lstep-unverified-assumptions.md` を使ってください。
 
 ## 起動時の必読(全エージェント共通)
 
-- 新しいセッションを始めたら、回答の前にこの順で読んでください: `AGENTS.md` → `docs/brain/Memory.md`(この仕事の事実と判断基準) → `docs/brain/rules/corrections.md`(受けた修正指示。恒久的に守る) → `docs/brain/rules/mistakes.md`(やらかしと再発防止) → 自分の担当の指示書(`docs/v6-directives.md`、`docs/v6-parallel-plan.md`)。
+- 新しいセッションを始めたら、回答の前にこの順で読んでください: `AGENTS.md` → `docs/brain/Memory.md`(この仕事の事実と判断基準) → `docs/brain/rules/corrections.md`(受けた修正指示。恒久的に守る) → `docs/brain/rules/mistakes.md`(やらかしと再発防止) → 自分の担当の決まり(画面＝`docs/v8-design-rules.md`・`apps/web/src/v8/README.md`・`~/lh-work/design/v8/HOW-TO-90.md`、API＝司令塔の依頼書と `docs/v8-requirements/`)。
 - 利用者に訂正・要望を言われたら、その場で `docs/brain/rules/corrections.md` に 3 行(日付 / 指摘 / 今後)で追記してください。同じ失敗を 2 回指摘されたら `docs/brain/rules/mistakes.md` に追記してください。
 - `docs/brain/Memory.md` の「進行中」が実態とずれていたら、気づいた人が直してください。

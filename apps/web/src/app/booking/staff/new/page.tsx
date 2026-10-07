@@ -21,7 +21,7 @@ import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { canEditFeature } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import StaffNewV8 from './staff-new-v8'
+import StaffNewV8 from '@/v8/booking-staff/staff-new'
 
 /**
  * 予約スタッフを登録する（設計 V2 8-2-2 / node bEL9g）。

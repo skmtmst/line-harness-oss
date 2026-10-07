@@ -1,0 +1,171 @@
+/*
+ * ★V8 リマインダの詳細（rbAig 概要・loVfW 登録者）。
+ * 外の枠は型（PageFrame）。頭（戻る・題・説明・タブ）と、左の本文／右の列はここで組む。
+ * 数字は globals.css の [data-theme="v8"] の段の --tpl-rm-* に置く。
+ */
+
+/* ---- 頭 ---- */
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-rm-row-gap-sm);
+  padding: var(--tpl-detail-head-pad-top) var(--tpl-detail-head-pad-side) var(--tpl-detail-tabs-pad-bottom);
+  box-shadow: var(--tpl-rm-line-bottom-strong);
+  flex-shrink: 0;
+}
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-side-card-gap);
+  color: var(--tpl-identity-color);
+  font-size: var(--tpl-rm-back-size);
+  font-weight: var(--tpl-identity-weight);
+  line-height: var(--tpl-identity-lh);
+  text-decoration: none;
+}
+.backLink:hover { text-decoration: underline; }
+.title {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.meta { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-rm-note-size); line-height: var(--tpl-rm-note-lh); }
+
+/* ---- 左の本文と右の列 ---- */
+.split { display: flex; flex: 1; min-width: 0; }
+.main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-create-content-gap);
+  min-width: 0;
+  padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side);
+}
+.side {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-section-gap);
+  width: var(--tpl-rm-side-w);
+  padding: var(--tpl-preview-pad);
+  box-shadow: var(--tpl-rm-line-left);
+}
+.side > * { align-self: stretch; }
+.phoneWrap { display: flex; justify-content: center; padding-top: var(--tpl-rm-phone-pull); }
+.sideActions { display: flex; align-items: center; gap: var(--tpl-rm-side-row-gap); }
+.sideAction { flex: 1 1 0; min-width: 0; }
+.menuAnchor { display: inline-flex; flex: none; }
+.menuButton { width: var(--tpl-rm-icon-btn); height: var(--tpl-rm-icon-btn); }
+.valueState[data-tone='ok'] { color: var(--color-accent-deep); }
+.valueDanger { color: var(--color-danger); }
+
+/* ---- 失敗の帯 ---- */
+.failBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rm-row-gap-lg);
+  padding: var(--tpl-rm-band-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-status-danger-soft);
+}
+.failIcon { flex: none; color: var(--color-danger); }
+.failText { display: flex; flex: 1; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
+.failTitle { margin: 0; color: var(--color-danger); font-size: var(--tpl-rm-label-size); font-weight: 700; line-height: var(--tpl-rm-label-lh); }
+.failNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--tpl-rm-note-size); line-height: var(--tpl-rm-note-lh); }
+
+/* ---- 案内の帯（登録者） ---- */
+.infoBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rm-row-gap);
+  margin: 0;
+  padding: var(--tpl-rm-info-pad);
+  border-radius: var(--tpl-rm-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rm-label-size);
+  line-height: var(--tpl-rm-band-lh);
+}
+.infoIcon { flex: none; color: var(--color-action); }
+
+/* ---- 段（カード） ---- */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rm-row-gap-lg);
+  padding: var(--tpl-section-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+}
+.cardHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
+.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-rm-title-lh); }
+.cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-rm-note-size); line-height: var(--tpl-rm-note-lh); }
+.spacer { flex: 1; min-width: 0; }
+
+/* ---- 表（行は線で区切る。行の高さを増やさないよう線は内側の影） ---- */
+.table { display: flex; flex-direction: column; gap: var(--tpl-rm-row-gap-lg); }
+.headRow, .row {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rm-row-gap-lg);
+  padding: var(--tpl-rm-stop-pad);
+  box-shadow: var(--tpl-rm-line-bottom);
+  font-size: var(--tpl-rm-note-size);
+  line-height: var(--tpl-rm-note-lh);
+}
+.headRow { color: var(--color-ink-secondary); font-weight: 600; }
+.row { color: var(--color-ink); }
+.row[data-warn] { background: var(--color-status-warn-soft); }
+.colFlex { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.colNum { flex: none; width: var(--tpl-rm-col-num); }
+.colSent { flex: none; width: var(--tpl-rm-col-step); }
+.colFail { flex: none; width: var(--tpl-rm-col-fail); }
+.colFail[data-danger] { color: var(--color-danger); }
+.colNext { flex: none; width: var(--tpl-rm-col-when); }
+.colWhen { flex: none; width: var(--tpl-rm-col-time); }
+.colStep { flex: none; width: var(--tpl-rm-col-fail); }
+.colWide { flex: none; width: var(--tpl-rm-col-step); }
+.colResult { display: flex; flex: none; width: var(--tpl-rm-col-result); }
+.colReason { flex: none; width: var(--tpl-rm-col-when); overflow: hidden; color: var(--color-ink-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.colDate { flex: none; width: var(--tpl-rm-col-date); }
+.colState { display: flex; flex: none; width: var(--tpl-rm-col-step); }
+.colOps { display: flex; flex: none; justify-content: flex-end; gap: var(--tpl-rm-insert-gap); width: var(--tpl-rm-col-ops); }
+.cellSub { display: block; color: var(--color-ink-faint); font-size: var(--tpl-rm-small-size); line-height: var(--tpl-rm-small-lh); }
+.friendName { color: var(--color-ink); font-weight: 600; text-decoration: none; }
+.friendName:hover, .friendLink:hover { text-decoration: underline; }
+.friendLink { color: var(--color-action); font-weight: 600; text-decoration: none; }
+.colDate > * { width: 100%; }
+/* 絵の基準日の欄は高さ32（表の行 55.5）。部品の中身は変えず、この表の中でだけ高さを合わせる。 */
+.dateField > button { min-height: 0; height: var(--tpl-rm-date-h); }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-rm-pill-gap);
+  padding: var(--tpl-rm-pill-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rm-note-size);
+  font-weight: 600;
+  line-height: var(--tpl-rm-pill-lh);
+  white-space: nowrap;
+}
+.pill[data-tone='ok'] { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.pill[data-tone='warn'] { background: var(--color-status-danger-soft); color: var(--color-danger); }
+.pillDot { width: var(--tpl-badge-dot); height: var(--tpl-badge-dot); border-radius: var(--radius-pill); background: currentColor; }
+.moreRow { display: flex; justify-content: flex-end; }
+
+/* ---- 道具の段・ページ送り ---- */
+.toolbar { display: flex; align-items: center; gap: var(--tpl-rm-side-row-gap); }
+.search { width: var(--tpl-rm-search-w); flex: none; }
+.pager { display: flex; align-items: center; gap: var(--tpl-label-tag-gap); padding: var(--tpl-rm-pager-pad); }
+.pagerCount { flex: 1; color: var(--color-ink-secondary); font-size: var(--tpl-rm-label-size); line-height: var(--tpl-rm-band-lh); }

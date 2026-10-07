@@ -1,0 +1,267 @@
+/*
+ * ★V8 オートメーションのルール一覧（Pencil `LWQXd`・1152 `En14p`・閲覧のみ `nH9L8`）。
+ * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）と shell が持つ。ここは表と道具の中身だけ。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-am-*` と共通の `--tpl-*` だけを使う。
+ */
+
+/* 閲覧のみで「ルールを作る」を置かないときの場所（作るボタンの高さ＋下の間）。 */
+.createSpace {
+  display: block;
+  flex-shrink: 0;
+  height: var(--tpl-chip-h);
+  margin-bottom: var(--tpl-am-create-after);
+}
+.createSpaceInline {
+  display: block;
+  flex-shrink: 0;
+  width: var(--tpl-am-create-w);
+  height: var(--tpl-chip-h);
+}
+/* 閲覧のみで「フォルダを追加」を置かないときの場所。 */
+.addSpace {
+  display: block;
+  height: var(--tpl-am-add-space);
+}
+.folderNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-am-note-lh);
+  /* 絵は字の途中で折る（全体の言葉のまとまりで折ると3行になる）。 */
+  word-break: normal;
+}
+
+/* 案内の帯（表の上の主列）。帯の下は道具の段の上の余白と同じだけ空ける。 */
+.noticeRow {
+  flex-basis: 100%;
+  margin-bottom: var(--tpl-am-notice-after);
+}
+.errorRow {
+  padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-pad-block);
+}
+
+/* 表：絵の列の並び（見出し 13/20・行 9/20・欄の間16・行 54）。
+ * 共通の表の「列の並び」（data-table-layout=columns）を使い、この板の寸法だけ上から当てる。 */
+.tableWrap {
+  min-width: 0;
+}
+.table {
+  border: 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+  gap: var(--tpl-am-col-gap);
+  height: var(--tpl-am-head-h);
+  padding: var(--tpl-am-head-pad);
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  gap: var(--tpl-am-col-gap);
+  height: var(--tpl-am-row-h);
+  padding: var(--tpl-am-row-pad);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--tpl-am-cell-gap);
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: normal;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colRuns,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colRuns {
+  align-items: flex-end;
+  padding-right: var(--tpl-am-num-pad-end);
+  text-align: right;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+  flex: 1 1 0;
+  min-width: 0;
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colOps {
+  overflow: visible;
+}
+/* 1152 の板（En14p）：名前が2行になるので行は 55.5。 */
+:global([data-theme='v8']) .narrowTable .table .row[data-table-layout='columns'] {
+  height: var(--tpl-am-narrow-row-h);
+}
+.colTrigger { width: var(--tpl-am-col-trigger); flex-shrink: 0; }
+.colWho { width: var(--tpl-am-col-who); flex-shrink: 0; }
+.colDo { width: var(--tpl-am-col-do); flex-shrink: 0; }
+.colRuns { width: var(--tpl-am-col-runs); flex-shrink: 0; }
+.colState { width: var(--tpl-am-col-state); flex-shrink: 0; }
+.colOps { width: var(--tpl-am-col-ops); flex-shrink: 0; }
+
+/* ルール名（緑の 13/600）。広い板は1行、狭い板は2行まで。 */
+.name {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-row-name-size);
+  font-weight: 600;
+  line-height: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* きっかけ・だれに：12 の文字で2行まで。 */
+.cell {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.cellOne {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sub {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* この30日（右寄せ）。2行目は小さく。 */
+.numMain {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.numSub {
+  display: block;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  line-height: normal;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状態の札（点つき）。 */
+.pill {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--tpl-am-pill-gap);
+  padding: var(--tpl-am-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-am-pill-lh);
+  white-space: nowrap;
+}
+.pillDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.pill[data-tone='active'] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.pill[data-tone='neutral'] {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+/* 行の右端：編集と「…」。メニューの位置の目印が行を1段増やさないよう横に並べる。 */
+.opsBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-am-ops-gap);
+}
+/* 閲覧のみで「編集する」を置かないときの場所。 */
+.editSpace {
+  display: block;
+  flex-shrink: 0;
+  width: var(--tpl-am-edit-w);
+  height: var(--tpl-chip-h);
+}
+
+/* 表の下の案内。 */
+.footNote {
+  margin: 0;
+  padding: var(--tpl-am-foot-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状態の札の並び。 */
+.chipGroup {
+  display: flex;
+  gap: var(--tpl-toolbar-gap);
+}
+
+/* 道具の段の右：よく使う絞り込み（左に印・右の矢印なし）。 */
+.savedBox { position: relative; width: var(--tpl-am-saved-w); }
+.savedBox :global(*) { max-width: 100%; }
+.savedBox :global(button) { width: 100%; padding-left: calc(var(--tpl-chip-row-gap) * 9); }
+.savedBox :global(button) > svg:last-child { display: none; }
+.savedIcon {
+  position: absolute;
+  top: 50%;
+  left: var(--tpl-rule-row-gap);
+  z-index: 1;
+  color: var(--color-ink-secondary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* 1152 の板（En14p）：案内の帯 → 1段目 → 2段目。 */
+.narrowTools {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowFolder { width: var(--tpl-am-folder-w); }
+.narrowFolder :global(*) { max-width: 100%; }
+.narrowFolder :global(button) { width: 100%; }
+.narrowSearch { width: var(--tpl-am-search-w); }
+.spacer { flex: 1 1 0; }
+
+/* 1人で試す窓の中身。 */
+.testBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cell-gap-half);
+}
+.testNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
