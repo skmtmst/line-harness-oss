@@ -850,7 +850,7 @@ function WebinarList() {
   } else if (visibleItems.length === 0) {
     listBody = panelGrand === 0
       ? <ListState kind="empty" title="まだ、ウェビナーはありません" description="録画やライブのセミナーを作ると、LINEで案内して申込を受けられます。" action={createButton} />
-      : <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索や絞り込みを外すと、すべて出ます。" action={<Button onClick={clearFilters}>条件を外す</Button>} />
+      : <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索や絞り込みの札を外すと、すべて出ます" action={<Button onClick={clearFilters}>条件を外す</Button>} />
   } else {
     listBody = (
       <>
