@@ -523,14 +523,21 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole(
     return c.json({ success: false, code: 'file_scan_blocked', error: '確認のため受け付けできません' }, 422);
   }
   const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-  const stored = await storeBroadcastMedia({
-    bucket: c.env.IMAGES,
-    body: storageBody,
-    contentLength,
-    mimeType: validation.mimeType,
-    originalFilename: validation.filename,
-    publicBaseUrl: workerUrl,
-  });
+  let stored: Awaited<ReturnType<typeof storeBroadcastMedia>>;
+  try {
+    stored = await storeBroadcastMedia({
+      bucket: c.env.IMAGES,
+      body: storageBody,
+      contentLength,
+      mimeType: validation.mimeType,
+      originalFilename: validation.filename,
+      publicBaseUrl: workerUrl,
+    });
+  } catch (err) {
+    // 途中で切れた・申告の大きさと中身が違う・保存先の失敗。どれも選び直しで直る。
+    console.error('broadcast asset store error:', err);
+    return c.json({ success: false, error: 'ファイルを保存できませんでした。通信を確かめて、もう一度選び直してください' }, 502);
+  }
   // 全体の検査は保存の直後に回す。clean になるまで配信には出さない。
   await ensureFileScanForUpload({
     db: c.env.DB,
