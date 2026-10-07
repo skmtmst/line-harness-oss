@@ -139,6 +139,7 @@ function OperatorEditInner() {
   /* 公開前の確認の窓（板 `sDXNy`）。 */
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [preparingPublish, setPreparingPublish] = useState(false)
 
   // 保存ずみのお知らせを全項目そのまま復元する。一部だけ戻すと、保存した時点で初期値へ上書きされる。
   useEffect(() => {
@@ -319,9 +320,15 @@ function OperatorEditInner() {
   /* 公開の前に `sDXNy` の確認の窓を出す。保存後に直した分も出すので、古い内容のまま出さない。 */
   const openPublishConfirm = async () => {
     if (!selectedAccountId || saving || ruleLoading || publishing) return
-    const ruleId = await saveDraft()
-    if (!ruleId) return
-    setConfirmOpen(true)
+    /* 押した「公開」のボタンに手応え（押せない形＋輪）を出す。先に下書きを保存している間も。 */
+    setPreparingPublish(true)
+    try {
+      const ruleId = await saveDraft()
+      if (!ruleId) return
+      setConfirmOpen(true)
+    } finally {
+      setPreparingPublish(false)
+    }
   }
 
   const publish = async () => {
@@ -584,8 +591,8 @@ function OperatorEditInner() {
                 <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
                 {canWrite ? (
                   <>
-                    <Button onClick={() => void saveDraft()} disabled={saveDisabled} busy={saving}>{editId ? '下書きを保存する' : '下書きを保存'}</Button>
-                    <Button onClick={() => void openPublishConfirm()} disabled={saveDisabled} variant="primary">
+                    <Button onClick={() => void saveDraft()} disabled={saveDisabled} busy={saving && !preparingPublish}>{editId ? '下書きを保存する' : '下書きを保存'}</Button>
+                    <Button onClick={() => void openPublishConfirm()} disabled={saveDisabled} busy={preparingPublish} variant="primary">
                       <Check size={15} aria-hidden="true" />運用者へのお知らせを公開
                     </Button>
                   </>
