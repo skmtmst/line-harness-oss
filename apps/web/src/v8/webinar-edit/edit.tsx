@@ -344,29 +344,31 @@ function EditInner() {
   const wizardChrome = (key: StepKey, primary?: ReactNode): WizardChrome => {
     const nextLabel = NEXT_LABEL[key]
     const label = nextLabel && unsaved.has(key) && savable.has(key) ? `保存して${nextLabel}` : nextLabel
+    const footerWithDraft = (draft: ReactNode) => <>
+      <Button href="/webinars">キャンセル</Button>
+      {readOnly ? null : draft}
+      {primary ?? (label ? (
+        <Button variant="primary" disabled={savingForNav !== false} onClick={() => void handleNext(key)} busy={savingForNav === 'next'}>
+          <ArrowRight size={15} aria-hidden="true" />{label}
+        </Button>
+      ) : null)}
+    </>
     return {
       title: STEP_TITLE[key],
       identity: <BackLink />,
       steps: <WizardSteps current={key} stateOf={stateOf} onSelect={goStep} />,
       status: unsaved.size > 0 ? '保存していない変更があります' : undefined,
-      footerActions: <>
-        <Button href="/webinars">キャンセル</Button>
-        {readOnly ? null : (
-          <Button
-            disabled={savingForNav !== false || !savable.has(key)}
-            title={savable.has(key) ? undefined : 'この段に保存する変更はありません'}
-            onClick={() => void handleDraftSave(key)}
-            busy={savingForNav === 'draft'}
-          >
-            下書きを保存
-          </Button>
-        )}
-        {primary ?? (label ? (
-          <Button variant="primary" disabled={savingForNav !== false} onClick={() => void handleNext(key)} busy={savingForNav === 'next'}>
-            <ArrowRight size={15} aria-hidden="true" />{label}
-          </Button>
-        ) : null)}
-      </>,
+      footerActions: footerWithDraft(
+        <Button
+          disabled={savingForNav !== false || !savable.has(key)}
+          title={savable.has(key) ? undefined : 'この段に保存する変更はありません'}
+          onClick={() => void handleDraftSave(key)}
+          busy={savingForNav === 'draft'}
+        >
+          下書きを保存
+        </Button>,
+      ),
+      footerWithDraft,
     }
   }
 

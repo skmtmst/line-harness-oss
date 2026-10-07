@@ -241,8 +241,23 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       identity={chrome.identity}
       steps={chrome.steps}
       description="動画の途中や終わりに出すカードと、申込に使う回答フォームを決めます。"
-      footerActions={chrome.footerActions}
+      /* 競合の間は「下書きを保存」を「比べてから保存」に替える（押すと違いを比べる窓。絵 pvimJ）。 */
+      footerActions={conflict && chrome.footerWithDraft
+        ? chrome.footerWithDraft(<Button disabled={busy} busy={reading} onClick={() => void readLatest()}>比べてから保存</Button>)
+        : chrome.footerActions}
       status={chrome.status}
+      /* 競合の帯は左右の列の上に横いっぱい（絵 pvimJ）。 */
+      notice={conflict ? (
+        <div className={styles.conflict} role="alert" data-design-node="pvimJ">
+          <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
+          <div className={styles.conflictText}>
+            <p className={styles.conflictTitle}>{latest?.editor.updatedAt ? `ほかの人が ${new Date(latest.editor.updatedAt).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })} にこのウェビナーを保存しました` : 'ほかの人がこのウェビナーを保存しました'}</p>
+            <p className={styles.conflictNote}>このまま保存すると、ほかの人の変更が消えます</p>
+          </div>
+          <Button disabled={busy} busy={reading} onClick={() => void readLatest()}><GitCompare size={15} aria-hidden="true" />違いを比べる</Button>
+          <Button disabled={busy} onClick={() => setReplaceConfirm(true)}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
+        </div>
+      ) : undefined}
       preview={<>
         <h2 className={form.previewTitle}>カードの見え方</h2>
         <div className={styles.previewCard}>
@@ -255,17 +270,6 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         </div>
       </>}
     >
-      {conflict ? (
-        <div className={styles.conflict} role="alert" data-design-node="pvimJ">
-          <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-          <div className={styles.conflictText}>
-            <p className={styles.conflictTitle}>{latest?.editor.updatedAt ? `ほかの人が ${new Date(latest.editor.updatedAt).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })} にこのウェビナーを保存しました` : 'ほかの人がこのウェビナーを保存しました'}</p>
-            <p className={styles.conflictNote}>このまま保存すると、ほかの人の変更が消えます</p>
-          </div>
-          <Button disabled={busy} busy={reading} onClick={() => void readLatest()}><GitCompare size={15} aria-hidden="true" />違いを比べる</Button>
-          <Button disabled={busy} onClick={() => setReplaceConfirm(true)}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-        </div>
-      ) : null}
 
       <section className={form.card} data-gap="tight" aria-labelledby="webinar-cta-title" data-wc-pane="cta">
         <div className={form.cardHeadRow}><h2 id="webinar-cta-title" className={form.cardTitle}>{ctas === null ? 'CTA カード' : `CTA カード ${ctas.length}枚`}</h2></div>
