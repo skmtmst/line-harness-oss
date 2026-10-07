@@ -2,7 +2,7 @@
 /*
  * ★V8 会話の頭（M0393 XqSvX・段2「5. 会話の頭のメニュー」）。
  * - 担当・対応状況は1つだけ選ぶ。四角のチェックボックスは出さない（オーナー指摘）
- * - 担当は名前で探せる。選んでいる行は aria-selected と ✓
+ * - 共通の選ぶ欄（shared/select）を使う。選んでいる行は aria-selected
  * - メールの会話でも同じ頭：☆と探すは渡したときだけ出る
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -37,18 +37,19 @@ describe('会話の頭のメニュー', () => {
     const options = screen.getAllByRole('option')
     expect(options.map((o) => o.textContent)).toEqual(['未対応', '対応中', '保留', '対応済み'])
     expect(options[0].getAttribute('aria-selected')).toBe('true')
-    fireEvent.click(options[2])
+    fireEvent.click(options[2].querySelector('button')!)
     expect(onStatus).toHaveBeenCalledWith('on_hold')
   })
 
-  test('担当は名前で探せ、選ぶと変わる。未割り当ても選べる', () => {
+  test('担当は1つだけ選ぶ一覧で、選ぶと変わる。未割り当ても選べる', () => {
     const { onOperator } = mount()
     expect(screen.getByRole('button', { name: '担当者を変える' }).textContent).toContain('担当：Kenta')
     fireEvent.click(screen.getByRole('button', { name: '担当者を変える' }))
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
-    fireEvent.change(screen.getByLabelText('担当者名を検索'), { target: { value: 'mas' } })
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['MMasato'])
-    fireEvent.click(screen.getByRole('option'))
+    const options = screen.getAllByRole('option')
+    expect(options.map((o) => o.textContent)).toEqual(['Kenta', 'Masato', '未割り当て'])
+    expect(options[0].getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(options[1].querySelector('button')!)
     expect(onOperator).toHaveBeenCalledWith('op-m')
   })
 
