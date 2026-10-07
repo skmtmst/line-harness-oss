@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
-import { Activity, BellRing, Layers, MessageCircle, Rocket, ShoppingCart, SlidersHorizontal, Users, type LucideIcon } from 'lucide-react'
+import { Activity, BellRing, Layers, MessageCircle, Rocket, Share2, ShoppingCart, SlidersHorizontal, Users, type LucideIcon } from 'lucide-react'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
 
@@ -37,6 +37,7 @@ const SETTINGS_ORDER = [
   '/emergency', // 運用状態
   '/ec-commerce', // EC連携
   '/line-notifications', // LINE通知
+  '/settings/sns', // SNS 連携（提案 E-6）。今ある絵の並びを動かさないよう末尾に足す
 ] as const
 
 /** 絵の印（lucide）。 */
@@ -49,7 +50,13 @@ const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
   '/emergency': Activity,
   '/ec-commerce': ShoppingCart,
   '/line-notifications': BellRing,
+  '/settings/sns': Share2,
 }
+
+/** 左のメニュー（lib/menu）に無く、設定の中のメニューにだけ出す項目。 */
+const SETTINGS_ONLY_ITEMS: MenuItem[] = [
+  { id: 'settings-sns', href: '/settings/sns', label: 'SNS 連携', icon: '', note: 'Google ビジネスと Instagram をつなぎます', required: true },
+]
 
 /** 機能設定の下に付く2つの画面（絵の「下にマニュアルの正本表・ファイルの検査」）。 */
 const SETTINGS_CHILDREN = [
@@ -133,7 +140,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
     return true
   }
 
-  const byHref = new Map(settingsSectionItems.map((item) => [item.href, item]))
+  const byHref = new Map([...settingsSectionItems, ...SETTINGS_ONLY_ITEMS].map((item) => [item.href, item]))
   const items = SETTINGS_ORDER
     .map((href) => byHref.get(href))
     .filter((item): item is MenuItem => Boolean(item))
@@ -147,7 +154,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
       ? pathname === '/settings'
       : itemActive(item.href)
     // 機能設定の下の2つは絵に無いが、ここからしか行けないので消さない。機能設定とその2つを開いているときだけ出す。
-    const children = item.href === '/settings' && (pathname === '/settings' || pathname.startsWith('/settings/')) ? SETTINGS_CHILDREN : []
+    const children = item.href === '/settings' && (pathname === '/settings' || SETTINGS_CHILDREN.some((child) => itemActive(child.href))) ? SETTINGS_CHILDREN : []
     const Icon = SETTINGS_ICONS[item.href as (typeof SETTINGS_ORDER)[number]]
     return (
       <li key={item.href}>

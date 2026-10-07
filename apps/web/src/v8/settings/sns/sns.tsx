@@ -19,7 +19,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import TextLink from '@/components/shared/text-link'
 import { RowActions } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useHideSettingsNav, usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -78,7 +78,7 @@ function GoogleCard({ data, error, canManage }: { data: GoogleConnectionData | n
       ) : (
         <p className={styles.text}>{connection.status === 'pending_location' ? 'Google アカウントの認可は済んでいます。つなぐ店舗を選んでください。' : 'Google ビジネスとつなぐと、口コミ・投稿・プロフィールをこの管理画面で扱えます。'}</p>
       )}
-      <div className={styles.links}>
+      <div className={`${styles.links} ${styles.linksWide}`}>
         {connected ? (
           <>
             <TextLink href="/restaurant-test/google?tab=reviews">口コミへ</TextLink>
@@ -98,7 +98,7 @@ function GoogleCard({ data, error, canManage }: { data: GoogleConnectionData | n
 function InstagramCard({ canManage }: { canManage: boolean }) {
   const [asked, setAsked] = useState(false)
   return (
-    <section className={styles.card} aria-labelledby="sns-instagram">
+    <section className={`${styles.card} ${styles.cardInstagram}`} aria-labelledby="sns-instagram">
       <div className={styles.cardHead}>
         <span className={styles.mark} aria-hidden="true">IG</span>
         <h2 id="sns-instagram" className={styles.cardTitle}>Instagram</h2>
@@ -108,7 +108,7 @@ function InstagramCard({ canManage }: { canManage: boolean }) {
       <p className={styles.subTitle}>つなぐとできること</p>
       <ul className={styles.checks}>
         {INSTAGRAM_CAN.map((item) => (
-          <li key={item} className={styles.check}><Check size={15} aria-hidden="true" className={styles.checkIcon} />{item}</li>
+          <li key={item} className={styles.check}><Check size={16} aria-hidden="true" className={styles.checkIcon} />{item}</li>
         ))}
       </ul>
       {canManage ? (
@@ -126,13 +126,15 @@ function InstagramCard({ canManage }: { canManage: boolean }) {
 
 /** 受信箱での見え方の見本（絵の「見本」の表）。実際の受信箱のデータではない。 */
 const SAMPLE_ROWS = [
-  { who: '@yuki_gourmet', sub: 'Instagram の DM', state: '未対応', tone: 'danger' as const, owner: '担当：なし', text: '金曜 20時に4名で入れますか？', at: '18:02', route: 'Instagram' },
-  { who: '鈴木 美咲', sub: 'LINE の友だち', state: '対応済み', tone: 'success' as const, owner: '担当：Kenta', text: '明日 19時、2名で予約できますか', at: '17:40', route: 'LINE' },
+  { face: 'Y', who: '@yuki_gourmet', sub: 'Instagram の DM', state: '未対応', tone: 'danger' as const, owner: '担当：なし', text: '金曜 20時に4名で入れますか？', at: '18:02', route: 'Instagram', last: '今日' },
+  { face: '鈴', who: '鈴木 美咲', sub: 'LINE の友だち', state: '対応済み', tone: 'success' as const, owner: '担当：Kenta', text: '明日 19時、2名で予約できますか', at: '17:40', route: 'LINE', last: '今日' },
 ]
 
 export default function SnsSettingsPage() {
   usePageTitle('SNS 連携')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
+  /* 絵（y3GGTs）には設定の中のメニューが無い。この画面だけ出さない。 */
+  useHideSettingsNav()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   const canManage = role === null || canManageRole(role)
@@ -151,6 +153,7 @@ export default function SnsSettingsPage() {
   return (
     <PageFrame kind="list" boardId="y3GGTs">
       <PageHeading
+        headingSize="compact"
         title="SNS 連携"
         help="Google ビジネスと Instagram をつなぎます。つないだ Instagram の DM は受信箱に「Instagram」の札付きで並び、LINE と同じ場所で返せます。"
       />
@@ -159,31 +162,40 @@ export default function SnsSettingsPage() {
           <GoogleCard data={google} error={error} canManage={canManage} />
           <InstagramCard canManage={canManage} />
         </div>
-        <SectionHeader
-          title="受信箱での見え方（見本）"
-          help="Instagram をつないだあとの受信箱の並び方の見本です。表の中身は例で、実際のメッセージではありません。"
-          helpLabel="受信箱での見え方の説明"
-        />
-        <DataTable data-design="sns-inbox-sample">
-          <thead>
-            <TableHeadRow>
-              <Th>相手</Th>
-              <Th className={styles.colState}>対応・担当</Th>
-              <Th>最新のメッセージ</Th>
-              <Th className={styles.colRoute}>経路</Th>
-            </TableHeadRow>
-          </thead>
-          <tbody>
-            {SAMPLE_ROWS.map((row) => (
-              <Tr key={row.who}>
-                <Td><span className={styles.who}>{row.who}</span><span className={styles.whoSub}>{row.sub}</span></Td>
-                <Td className={styles.colState}><StatusBadge tone={row.tone}>{row.state}</StatusBadge><span className={styles.whoSub}>{row.owner}</span></Td>
-                <Td><span className={styles.who}>{row.text}</span><span className={styles.whoSub}>{`今日 ${row.at}`}</span></Td>
-                <Td className={styles.colRoute}><span className={styles.route}>{row.route}</span></Td>
-              </Tr>
-            ))}
-          </tbody>
-        </DataTable>
+        <div className={styles.sample}>
+          <SectionHeader
+            title="受信箱での見え方（見本）"
+            help="Instagram をつないだあとの受信箱の並び方の見本です。表の中身は例で、実際のメッセージではありません。"
+            helpLabel="受信箱での見え方の説明"
+          />
+          <DataTable className={styles.table} data-design="sns-inbox-sample">
+            <thead>
+              <TableHeadRow className={styles.headRow} data-table-layout="columns">
+                <Th className={styles.colWho}>相手</Th>
+                <Th className={styles.colState}>対応・担当</Th>
+                <Th className={styles.colText}>最新のメッセージ</Th>
+                <Th className={styles.colRoute}>経路</Th>
+                <Th className={styles.colLast}>最終接触</Th>
+              </TableHeadRow>
+            </thead>
+            <tbody>
+              {SAMPLE_ROWS.map((row) => (
+                <Tr key={row.who} className={styles.row} data-table-layout="columns">
+                  <Td className={styles.colWho}>
+                    <span className={styles.whoCell}>
+                      <span className={styles.face} aria-hidden="true">{row.face}</span>
+                      <span className={styles.whoText}><span className={styles.who}>{row.who}</span><span className={styles.whoSub}>{row.sub}</span></span>
+                    </span>
+                  </Td>
+                  <Td className={styles.colState}><span className={styles.stateCell}><StatusBadge tone={row.tone}>{row.state}</StatusBadge><span className={styles.owner}>{row.owner}</span></span></Td>
+                  <Td className={styles.colText}><span className={styles.message}>{row.text}</span><span className={styles.owner}>{`今日 ${row.at}`}</span></Td>
+                  <Td className={styles.colRoute}><span className={styles.route}>{row.route}</span></Td>
+                  <Td className={styles.colLast}><span className={styles.last}>{row.last}</span></Td>
+                </Tr>
+              ))}
+            </tbody>
+          </DataTable>
+        </div>
       </div>
     </PageFrame>
   )

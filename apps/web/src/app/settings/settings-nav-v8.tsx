@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { api } from '@/lib/api'
 import { canEditTable } from './manual-links/manual-link-view'
 import styles from './settings-v8.module.css'
-import { Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Bell, type LucideIcon } from 'lucide-react'
+import { Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Share2, Bell, type LucideIcon } from 'lucide-react'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 
 /**
@@ -50,6 +50,8 @@ const TAIL_LINKS: NavLink[] = [
   { href: '/emergency', label: '運用状態', icon: Activity },
   { href: '/ec-commerce', label: 'EC連携', icon: ShoppingCart },
   { href: '/line-notifications', label: 'LINE通知', icon: Bell },
+  /* SNS 連携（提案 E-6）。今ある絵の並びを動かさないよう末尾に足す */
+  { href: '/settings/sns', label: 'SNS 連携', icon: Share2 },
 ]
 
 export function SettingsNavV8() {
