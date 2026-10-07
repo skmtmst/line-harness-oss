@@ -18,7 +18,7 @@
 .root { display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap-outer); min-width: 0; }
 .loading { color: var(--color-ink-faint); font-size: var(--tpl-fe-body-size); }
 
-.backLink { display: inline-flex; align-items: center; gap: var(--tpl-fe-icon-gap); }
+.backLink { display: inline-flex; align-items: center; gap: var(--tpl-fe-icon-gap); font-size: var(--text-label); }
 
 
 /* ---------- 段（カード） ---------- */
@@ -192,7 +192,11 @@
 .changeLine { margin: 0; font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
 .changeLine[data-kind='add'] { color: var(--color-accent-deep); }
 .changeLine[data-kind='remove'] { color: var(--color-danger); }
-.publishBody { width: 100%; display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap); }
+.publishBody { width: 100%; display: flex; flex-direction: column; gap: var(--tpl-fm2-dialog-gap); margin-block: var(--tpl-fm2-dialog-pull); }
+.publishLead { margin: 0; font-size: var(--text-label); line-height: var(--tpl-fm2-lh-label); color: var(--color-ink-secondary); }
+.publishBody .changes { padding: var(--tpl-fm2-changes-pad); }
+.publishBody .changesTitle { line-height: var(--tpl-fe-note-lh); }
+.publishBody .publishNotes { gap: var(--tpl-fm2-notes-gap); }
 .publishActions { display: flex; justify-content: center; gap: var(--tpl-fe-words-gap); }
 .publishNotes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--tpl-fe-head-gap); font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
 

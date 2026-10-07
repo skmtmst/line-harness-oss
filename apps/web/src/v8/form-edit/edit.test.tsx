@@ -168,6 +168,29 @@ describe('回答フォームの編集（V8）', () => {
     expect(formsUpdate.mock.invocationCallOrder[0]).toBeLessThan(formsPublish.mock.invocationCallOrder[0])
   })
 
+  it('確かめの窓の「変わること」は、公開中の版（account_id なしの取得）との違いと版の番号を出す', async () => {
+    const { fetchApi } = await import('@/lib/api')
+    const published = structuredClone(layout)
+    published.sections[0].blocks = [
+      published.sections[0].blocks[0],
+      { id: 'q-old', kind: 'input', type: 'radio', name: 'trigger', label: 'ご来店のきっかけ', required: false, choiceMode: 'tag', choices: [{ id: 't1', label: '紹介' }] },
+    ]
+    vi.mocked(fetchApi).mockImplementation((async (path: string) => (
+      path.startsWith('/api/forms/form-1?view=published')
+        ? { success: true, data: { id: 'form-1', name: '来店アンケート', description: '', layout: published } }
+        : { success: true, data: [] }
+    )) as typeof fetchApi)
+    await render('id=form-1')
+    await screen.findByText('ページ1 のブロック')
+    fireEvent.click(screen.getByRole('button', { name: 'この版を公開' }))
+    const dialog = await screen.findByRole('dialog', { name: 'この版を公開する' })
+    expect(within(dialog).getByText('変わること（版6 → 版7）')).toBeTruthy()
+    expect(await within(dialog).findByText(/質問「今日のご来店の目的は？」を足した/)).toBeTruthy()
+    expect(within(dialog).getByText(/質問「ご来店のきっかけ」を消した/)).toBeTruthy()
+    expect(within(dialog).getByText('・公開するまで、いまの版6がそのまま使われます。')).toBeTruthy()
+    expect(vi.mocked(fetchApi).mock.calls.some(([path]) => String(path).startsWith('/api/forms/form-1?view=published'))).toBe(true)
+  })
+
   it('ブロックを足すと、その設定が開いて並びの最後に入る', async () => {
     await render('id=form-1')
     await screen.findByText('ページ1 のブロック')

@@ -228,7 +228,9 @@ function ArchiveConfirm({
       designWidth={500}
       designTop={380}
       title={restoring ? 'ウェビナーを下書きに戻しますか？' : 'ウェビナーをアーカイブしますか？'}
-      description={restoring ? '通常の一覧に戻します。公開するまでは、新しい申込は受け付けません。' : 'アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。'}
+      /* 説明は本文の頭に置く（絵は 12px・題の下 4・×の左の幅で2行）。共通の説明の段は使わない。 */
+      description=""
+      designHeaderPadding="var(--tpl-fm2-wb-head-pad)"
       confirmLabel={restoring ? '下書きに戻す' : 'アーカイブする'}
       titleIcon={false}
       confirmIcon={<Archive size={16} aria-hidden="true" />}
@@ -237,7 +239,11 @@ function ArchiveConfirm({
       onCancel={onCancel}
       onConfirm={blocked ? undefined : onConfirm}
     >
-      {/* 絵 VXZ6T：対象は薄い灰の箱（小さい題＋太い名前）、そのあとに「アーカイブしたあと」の3点。消さずに残す操作なので主ボタンは緑。 */}
+      {/* 絵 VXZ6T：説明・対象（薄い灰の箱）・「アーカイブしたあと」の3点を 14 ずつ。消さずに残す操作なので主ボタンは緑。 */}
+      <div className={styles.archiveBody}>
+      <p className={styles.archiveLead}>
+        {restoring ? '通常の一覧に戻します。公開するまでは、新しい申込は受け付けません。' : 'アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。'}
+      </p>
       <div className={styles.targetBox}>
         <p className={styles.targetLabel}>{restoring ? '下書きに戻す対象' : 'アーカイブする対象'}</p>
         <p className={styles.targetName}>{target.title}（{periodSummary(target)}）</p>
@@ -245,14 +251,14 @@ function ArchiveConfirm({
       {restoring ? (
         <p className={styles.afterList}>参加者・視聴の記録・分析はそのまま残ります。</p>
       ) : (
-        <>
+        <div className={styles.afterGroup}>
           <p className={styles.afterTitle}>アーカイブしたあと</p>
           <ul className={styles.afterList}>
             <li>・参加者・視聴の記録・分析はそのまま見られます</li>
             <li>・公開ページは閉じ、新しい申し込みは受け付けません</li>
             <li>・絞り込みの「アーカイブ済み」から確認し、下書きに戻せます</li>
           </ul>
-        </>
+        </div>
       )}
       {blocked ? (
         <Notice tone="warn">
@@ -260,6 +266,7 @@ function ArchiveConfirm({
           <span className={styles.dialogAction}><Button href={`/webinars/edit?id=${target.id}`}>編集画面で公開を停止する</Button></span>
         </Notice>
       ) : null}
+      </div>
     </ConfirmDialog>
   )
 }
@@ -842,7 +849,7 @@ function WebinarList() {
   } else if (visibleItems.length === 0) {
     listBody = panelGrand === 0
       ? <ListState kind="empty" title="まだ、ウェビナーはありません" description="録画やライブのセミナーを作ると、LINEで案内して申込を受けられます。" action={createButton} />
-      : <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索や絞り込みを外すと、すべて出ます。" action={<Button onClick={clearFilters}>条件を外す</Button>} />
+      : <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索や絞り込みの札を外すと、すべて出ます" action={<Button onClick={clearFilters}>条件を外す</Button>} />
   } else {
     listBody = (
       <>

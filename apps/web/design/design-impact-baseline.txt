@@ -710,6 +710,9 @@ shared-button-importer v8/booking-staff/staff-new.tsx
 shared-button-importer v8/scenario-first-step/first-step.tsx
 shared-button-importer v8/friend-add-publish/publish.tsx
 shared-button-importer v8/friend-add-publish/done.tsx
+# ★V8 友だち追加時の配信の実行結果（REIxB）・実行の詳細（N43uVX）を src/v8/friend-add-runs に一から書いた。
+shared-button-importer v8/friend-add-runs/runs.tsx
+shared-button-importer v8/friend-add-runs/detail.tsx
 shared-button-importer v8/automations/create/create.tsx
 shared-button-importer v8/automations/create/friend-multi-select.tsx
 # ★V8 LINEアカウントの詳細（ihjfd）・窓（CFAyf・Msb1j・WOfBN・n9Z2P）・乗り換え（x2dSNv）。src/v8 に一から書いた。

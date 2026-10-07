@@ -13,7 +13,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import { api, type FriendAddRunDetail } from '@/lib/api'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { describeFriendAddFailure } from '../../friend-add-failure'
-import FriendAddRunDetailV8 from './detail-v8'
+import FriendAddRunDetailV8 from '@/v8/friend-add-runs/detail'
 import {
   DELIVERY_UNKNOWN_ACTION,
   DELIVERY_UNKNOWN_CODE,
