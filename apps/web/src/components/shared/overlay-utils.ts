@@ -45,7 +45,7 @@ export function useOverlayFocus(
     if (activeOverlays.size === 0) originalOverflow = document.body.style.overflow
     activeOverlays.set(key, { depth, order })
     const isTop = () => {
-      if (document.documentElement.dataset.theme !== 'v8') return true
+      if (document.documentElement?.dataset?.theme !== 'v8') return true
       const top = [...activeOverlays.entries()].sort((a, b) => b[1].depth - a[1].depth || b[1].order - a[1].order)[0]
       return top?.[0] === key
     }
@@ -97,8 +97,8 @@ export function useOverlayFocus(
       document.removeEventListener('keydown', onKeyDown)
       const restoreFocus = isTop()
       activeOverlays.delete(key)
-      if (document.documentElement.dataset.theme !== 'v8' || activeOverlays.size === 0) {
-        document.body.style.overflow = document.documentElement.dataset.theme === 'v8' ? originalOverflow : previousOverflow
+      if (document.documentElement?.dataset?.theme !== 'v8' || activeOverlays.size === 0) {
+        document.body.style.overflow = document.documentElement?.dataset?.theme === 'v8' ? originalOverflow : previousOverflow
       }
       if (restoreFocus) previous?.focus()
     }
