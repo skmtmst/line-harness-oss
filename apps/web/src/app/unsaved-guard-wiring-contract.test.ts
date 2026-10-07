@@ -134,6 +134,7 @@ const GUARDED = [
   'v8/hq-broadcasts/create.tsx',
   'v8/settings/booking-media/screen.tsx',
   'v8/template-edit/asset.tsx',
+  'v8/visit-stamps/visit-stamps.tsx',
   'v8/template-edit/message.tsx',
   'v8/webinar-edit/edit.tsx',
   'v8/webinar-edit/new.tsx',

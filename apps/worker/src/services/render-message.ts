@@ -94,9 +94,18 @@ export function renderBroadcastMessageContent(
   content: string,
   context: BroadcastRenderContext,
 ): string {
-  if (messageType !== 'flex') return renderMessageContent(content, context);
-  const parsed = JSON.parse(content) as unknown;
-  return JSON.stringify(renderJsonValue(parsed, context));
+  if (messageType === 'flex') {
+    const parsed = JSON.parse(content) as unknown;
+    return JSON.stringify(renderJsonValue(parsed, context));
+  }
+  // カルーセルも中身は JSON。名前の " で壊れて文字のまま届かないよう、同じく
+  // 値ごとに置き換える。読めない中身は今までどおり文字として置き換える。
+  if (messageType === 'carousel') {
+    let parsed: unknown;
+    try { parsed = JSON.parse(content); } catch { return renderMessageContent(content, context); }
+    return JSON.stringify(renderJsonValue(parsed, context));
+  }
+  return renderMessageContent(content, context);
 }
 
 export function assertNoUnresolvedBroadcastVariables(content: string): void {

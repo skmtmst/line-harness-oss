@@ -1501,12 +1501,6 @@ const RESTAURANT_CLOSURE_PREVIEW = {
   waitlistCount: 0,
   conflicts: [],
 }
-/* 提案 E-4・E-10：店ごとの媒体リンク（管理画面の URL と「予約が入ったら閉じる」）。サーバ（/api/restaurant-test/media-links）と同じ形。 */
-const RESTAURANT_MEDIA_LINKS = [
-  { code: 'hotpepper', name: 'ホットペッパー', acceptsReservations: 1, pageUrl: 'https://www.hotpepper.jp/strJ000000000/', loginUrl: 'https://www.cms.hotpepper.jp/', closeOnBooking: 1, version: 1 },
-  { code: 'tabelog', name: '食べログ', acceptsReservations: 1, pageUrl: 'https://tabelog.com/tokyo/A0000/A000000/00000000/', loginUrl: 'https://owner.tabelog.com/', closeOnBooking: 1, version: 1 },
-  { code: 'gurunavi', name: 'ぐるなび', acceptsReservations: 1, pageUrl: null, loginUrl: null, closeOnBooking: 0, version: 0 },
-]
 /* 板 hQQlt（予約経路の連携）：媒体ごとの受け取り。サーバ（/api/restaurant-test/channels）と同じ形。 */
 const RESTAURANT_CHANNELS = [
   { id: 'media-hp', code: 'hotpepper', name: 'Hot Pepper グルメ', todayCount: 9, lastReceivedAt: restaurantAt(18, 42), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
@@ -2092,6 +2086,15 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   if (method === 'PUT' && /^\/api\/hq\/broadcasts\/[^/]+\/exclusions$/.test(pathname)) return { ...HQ_RUN_DRAFT, id: pathname.split('/')[4], version: 3 }
   if (method === 'POST' && /^\/api\/hq\/broadcasts\/[^/]+\/(send|stop|cancel)$/.test(pathname)) return { ...HQ_RUN_SENT, id: pathname.split('/')[4] }
   if (method === 'POST' && /^\/api\/hq\/broadcasts\/[^/]+\/targets\/[^/]+\/retry$/.test(pathname)) return HQ_RUN_SENT
+  /* 来店スタンプ（w4SBbv）：保存・押印・承認・取り消し・暗証番号は、本物と同じ形の返事だけ返す（中身は変えない）。 */
+  if (pathname.startsWith('/api/visit-stamps/')) {
+    if (/^\/api\/visit-stamps\/cards(\/[^/]+)?$/.test(pathname)) return { ...VISIT_STAMP_CARD, version: VISIT_STAMP_CARD.version + 1 }
+    if (/\/grants$/.test(pathname) || /\/reverse$/.test(pathname)) return { cardId: 'vs-card-1', friendId: 'vs-f-5', balance: 1, earnedTotal: 12, expiresAt: null }
+    const review = /^\/api\/visit-stamps\/paper-requests\/([^/]+)\/review$/.exec(pathname)
+    if (review) return { id: review[1], status: 'approved' }
+    const pin = /^\/api\/visit-stamps\/pins\/([^/]+)$/.exec(pathname)
+    if (pin) return { staffId: pin[1], accountId: 'visual-qa-account', configured: true }
+  }
   /* 自動応答のかんたんに作る（板 G4GejG）：作った下書き。重なりは ar-quick の口が返す。 */
   if (method === 'POST' && pathname === '/api/auto-replies/drafts') {
     return { autoReplyId: 'ar-quick', versionId: 'arv-quick', versionNumber: 1, status: 'draft', settings: null, lastTestStatus: null, lastTestedAt: null, publishedAt: null }
@@ -2597,7 +2600,54 @@ const HQ_RUN_SENT = {
   ],
 }
 
+/* 来店スタンプ（提案 E-7 w4SBbv）。カード1枚・紙の申請4件・佐藤 健二さん（vs-f-5）の台帳。日時は UTC（画面は日本時間で出す）。 */
+const VISIT_STAMP_CARD = {
+  id: 'vs-card-1', name: '然 来店スタンプカード', accountIds: ['visual-qa-account'], active: true, version: 3, expectedVersion: 3,
+  settings: {
+    mode: 'amount', amountUnit: 1000, maxPerVisit: 3, firstVisitBonus: 1, expiryMonths: 6, timezone: 'Asia/Tokyo',
+    multipliers: [{ multiplier: 2, weekdays: [2], startMinute: 1020, endMinute: 1140, from: '2025-12-31T15:00:00.000Z', to: '2026-03-31T15:00:00.000Z' }],
+    rankMultipliers: [],
+    rewards: [{ id: 'reward-drink', name: 'ドリンク 1杯', stamps: 5 }, { id: 'reward-dessert', name: 'デザート 1品', stamps: 10 }],
+  },
+}
+const VISIT_STAMP_FRIENDS = {
+  'vs-f-1': { id: 'vs-f-1', displayName: 'みさき', metadata: { name: '鈴木 美咲' } },
+  'vs-f-2': { id: 'vs-f-2', displayName: 'けん', metadata: { name: '小林 健' } },
+  'vs-f-3': { id: 'vs-f-3', displayName: 'めぐ', metadata: { name: '加藤 恵' } },
+  'vs-f-4': { id: 'vs-f-4', displayName: 'つばさ', metadata: { name: '中村 翼' } },
+  'vs-f-5': { id: 'vs-f-5', displayName: 'けんじ', metadata: { name: '佐藤 健二' } },
+}
+const VISIT_STAMP_PAPER = [
+  { id: 'vsp-1', card_id: 'vs-card-1', friend_id: 'vs-f-1', line_account_id: 'visual-qa-account', photo_url: '', stamps: 7, status: 'pending', created_at: '2026-01-12 11:14:00' },
+  { id: 'vsp-2', card_id: 'vs-card-1', friend_id: 'vs-f-2', line_account_id: 'visual-qa-account', photo_url: '', stamps: 4, status: 'pending', created_at: '2026-01-12 04:02:00' },
+  { id: 'vsp-3', card_id: 'vs-card-1', friend_id: 'vs-f-3', line_account_id: 'visual-qa-account', photo_url: '', stamps: 9, status: 'pending', created_at: '2026-01-11 10:45:00' },
+  { id: 'vsp-4', card_id: 'vs-card-1', friend_id: 'vs-f-4', line_account_id: 'visual-qa-account', photo_url: '', stamps: 3, status: 'approved', created_at: '2026-01-10 09:20:00' },
+]
+const vsEntry = (id, kind, delta, actorId, reason, createdAt, originalId = null) => ({ id, cardId: 'vs-card-1', friendId: 'vs-f-5', accountId: 'visual-qa-account', kind, delta, actorId, reason, createdAt, originalId })
+const VISIT_STAMP_ENTRIES = [
+  vsEntry('vse-1', 'visit', 2, 'stf-3', '来店・会計 2,400円', '2026-01-13T09:40:00.000Z'),
+  vsEntry('vse-2', 'redeem', -10, 'stf-3', 'デザート 1品', '2026-01-13T09:10:00.000Z'),
+  vsEntry('vse-3', 'paper', 7, 'stf-1', '紙のカードの写真を確認しました', '2026-01-12T11:30:00.000Z'),
+  vsEntry('vse-4', 'visit', 1, null, '来店（予約の来店）', '2026-01-12T03:05:00.000Z'),
+  vsEntry('vse-5', 'manual', 1, 'stf-1', '押し忘れ', '2026-01-11T10:02:00.000Z'),
+  vsEntry('vse-6', 'reverse', -1, 'stf-1', 'まちがい', '2026-01-11T10:30:00.000Z', 'vse-5'),
+  vsEntry('vse-7', 'visit', 1, null, '来店', '2026-01-08T10:00:00.000Z'),
+]
+function visitStampRead(pathname, query) {
+  if (pathname === '/api/visit-stamps/cards') return { success: true, data: [VISIT_STAMP_CARD] }
+  if (pathname === '/api/visit-stamps/paper-requests') return { success: true, data: VISIT_STAMP_PAPER }
+  if (/^\/api\/visit-stamps\/cards\/[^/]+\/wallet$/.test(pathname)) {
+    const friendId = query.get('friendId') ?? ''
+    const entries = friendId === 'vs-f-5' ? VISIT_STAMP_ENTRIES : []
+    return { success: true, data: { wallet: { cardId: 'vs-card-1', friendId, balance: entries.reduce((n, e) => n + e.delta, 0), earnedTotal: 12, expiresAt: '2026-07-13T09:40:00.000Z' }, entries } }
+  }
+  const friend = /^\/api\/friends\/(vs-f-\d)$/.exec(pathname)
+  if (friend && VISIT_STAMP_FRIENDS[friend[1]]) return { success: true, data: VISIT_STAMP_FRIENDS[friend[1]] }
+  return null
+}
+
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  { const stamps = method === 'GET' ? visitStampRead(pathname, query) : null; if (stamps) return stamps }
   if (method === 'GET' && pathname === '/api/restaurant-test/media-links') return { success: true, data: RESTAURANT_MEDIA_LINKS }
   if (method === 'GET' && pathname === '/api/restaurant-test/media') return { success: true, data: RESTAURANT_MEDIA_LINKS.map(({ code, name, acceptsReservations }) => ({ code, name, acceptsReservations })) }
   if (method === 'GET' && pathname === '/api/hq/broadcasts') return { success: true, data: [HQ_RUN_SENT, HQ_RUN_DRAFT] }
@@ -2713,9 +2763,6 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/closures') {
     const month = query.get('month')
     return { success: true, data: RESTAURANT_CLOSURES.filter((c) => !month || (c.startDate.slice(0, 7) <= month && c.endDate.slice(0, 7) >= month)) }
-  }
-  if (method === 'GET' && pathname === '/api/restaurant-test/media-links') {
-    return { success: true, data: RESTAURANT_MEDIA_LINKS }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/opening-hours') {
     return { success: true, data: RESTAURANT_OPENING_HOURS }

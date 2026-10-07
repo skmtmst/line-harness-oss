@@ -304,6 +304,40 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // ---- 来店スタンプ (★V8 jQRsr・V2HU7・xe8ga・h2HKh・etLd8) ----
+  // カード1枚・6個たまった本人。特典を見せる→店員の暗証番号で使用済み→残り 1個（サーバは特典の個数だけ減らす）。
+  {
+    const card = {
+      id: 'vs-card-1', name: '然 来店スタンプカード', accountIds: ['qa-account'], active: true, version: 1, expectedVersion: 1,
+      settings: {
+        mode: 'visit', amountUnit: 1000, maxPerVisit: 3, firstVisitBonus: 0, expiryMonths: 6, timezone: 'Asia/Tokyo',
+        multipliers: [], rankMultipliers: [],
+        rewards: [{ id: 'reward-drink', name: 'ドリンク 1杯', stamps: 5 }, { id: 'reward-dessert', name: 'デザート 1品', stamps: 10 }],
+      },
+    };
+    const wallet = { cardId: 'vs-card-1', friendId: 'qa-friend', balance: 6, earnedTotal: 6, expiresAt: '2026-07-13T03:00:00.000Z' };
+    if (method === 'GET' && pathname === '/api/liff/visit-stamps/cards') {
+      json(res, 200, { success: true, data: [{ card, wallet }] });
+      return;
+    }
+    if (method === 'GET' && pathname === '/api/liff/visit-stamps/cards/vs-card-1') {
+      json(res, 200, { success: true, data: { card, wallet, entries: [] } });
+      return;
+    }
+    if (method === 'POST' && pathname === '/api/liff/visit-stamps/cards/vs-card-1/rewards') {
+      json(res, 201, { success: true, data: { id: 'vs-redeem-1', cardId: 'vs-card-1', rewardId: 'reward-drink', rewardName: 'ドリンク 1杯', stamps: 5, status: 'offered' } });
+      return;
+    }
+    if (method === 'POST' && pathname === '/api/liff/visit-stamps/redemptions/vs-redeem-1/use') {
+      json(res, 200, { success: true, data: { id: 'vs-redeem-1', status: 'used' } });
+      return;
+    }
+    if (method === 'POST' && pathname === '/api/liff/visit-stamps/cards/vs-card-1/paper-requests') {
+      json(res, 201, { success: true, data: { id: 'vs-paper-1', status: 'pending' } });
+      return;
+    }
+  }
+
   // ---- 予約 ----
   if (method === 'GET' && pathname === '/api/liff/booking/menus') {
     json(res, 200, {

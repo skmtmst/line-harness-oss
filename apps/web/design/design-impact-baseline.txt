@@ -481,6 +481,7 @@ shared-button-importer v8/tags/searches-tab.tsx
 shared-button-importer v8/tags/tags-tab.tsx
 shared-button-importer v8/templates/list.tsx
 shared-button-importer v8/templates/question-new.tsx
+shared-button-importer v8/visit-stamps/visit-stamps.tsx
 shared-button-importer v8/templates/carousel.tsx
 shared-button-importer v8/broadcasts/list.tsx
 shared-button-importer v8/broadcasts/quick-send.tsx
