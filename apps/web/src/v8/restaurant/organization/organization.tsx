@@ -286,7 +286,7 @@ function MemberForm({ member, stores, busy, onSubmit, onCancel, login }: {
   }
   return (
     <form key={member?.id ?? 'new'} onSubmit={submit} className={styles.form}>
-      <div className={styles.formGrid}>
+      <div className={`${styles.formGrid} ${styles.memberGrid}`}>
         <Field label="氏名" name="staffName" defaultValue={member?.staff_name} required />
         <Field label="メール" name="email" type="email" defaultValue={member?.email ?? ''} />
         <label className={styles.field}>
@@ -301,9 +301,9 @@ function MemberForm({ member, stores, busy, onSubmit, onCancel, login }: {
         <Field label="Googleメール" name="googleEmail" type="email" defaultValue={member?.google_email ?? ''} />
       </div>
       {login}
-      <div className={styles.formActions}>
+      <div className={`${styles.formActions} ${styles.memberActions}`}>
         <Button type="button" onClick={onCancel}>キャンセル</Button>
-        <Button variant="primary" type="submit" disabled={busy}>{member ? '保存する' : '追加する'}</Button>
+        <Button variant="primary" type="submit" disabled={busy}>{member ? null : <Plus aria-hidden className={styles.buttonIcon} />}{member ? '保存する' : '追加する'}</Button>
       </div>
     </form>
   )
@@ -495,6 +495,10 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           <Dialog
             open={showMemberForm || editingMember !== undefined}
             designNode="ou60i"
+            designWidth={560}
+            designTop={140}
+            designHeaderPadding="24px 24px 0"
+            designHeaderHeight={50}
             title={editingMember ? `${editingMember.staff_name}を変更` : '飲食店向けユーザーを追加'}
             onCancel={closeMemberDialog}
           >
@@ -514,16 +518,30 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
               ) : null}
             />
           </Dialog>
-          <ConfirmDialog
+          <Dialog
             open={Boolean(stopping)}
             designNode="bMpC5"
+            designWidth={480}
+            designTop={300}
             title="この所属ユーザーを停止しますか？"
-            description="名簿には残り、再開できます。ログインと連携している場合はログインも停止します。"
-            confirmLabel="停止する"
+            designHeaderPadding="24px 24px 0"
+            designHeaderHeight={50}
             busy={busy}
             onCancel={() => setStopId('')}
-            onConfirm={() => { if (stopping) void mutate(() => updateMember(stopping.id, { status: 'suspended' }), '停止しました。').then(() => setStopId('')) }}
-          />
+            footer={<></>}
+          >
+            {/* 絵（bMpC5）：だれを止めるか（役割・担当店舗）と、名簿の停止はログインを変えないこと（受け口も名簿だけを変える）。 */}
+            {stopping ? (
+              <div className={styles.stopBody}>
+                <p className={styles.stopWho}>{`${stopping.staff_name}（${roleLabel[stopping.role]}・${data.stores.find((s) => s.id === stopping.store_id)?.name || '全店舗'}）`}</p>
+                <p className={styles.stopNote}>名簿には残り、再開できます。ログインの権限は変わりません。</p>
+                <div className={styles.stopActions}>
+                  <Button onClick={() => setStopId('')} disabled={busy}>キャンセル</Button>
+                  <Button variant="danger" busy={busy} busyLabel="処理中…" disabled={busy} onClick={() => { if (stopping) void mutate(() => updateMember(stopping.id, { status: 'suspended' }), '停止しました。').then(() => setStopId('')) }}>停止する</Button>
+                </div>
+              </div>
+            ) : null}
+          </Dialog>
           <Panel title="権限マトリクス" description="想定の役割分担です。実際の操作可否は、ログイン中のスタッフの役割（オーナー・管理者・スタッフ）で決まります。" flush>
             <div role="table" aria-label="権限マトリクス" className={styles.table}>
               <div role="row" className={styles.headRow}>
