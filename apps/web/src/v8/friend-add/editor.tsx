@@ -626,20 +626,19 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         {step === 'basic'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'
           : `名前：${rule.name || '（未入力）'}・いまは${statusLabel}です`}
-        {/* 先に保存されたとき（h5rm8t）：頭の中、説明の下に横いっぱいの帯。 */}
-        {conflict ? (
-          /* 帯は共通部品（save-conflict）に寄せた。比べる窓は項目を左右に並べるこの画面のものを使う。 */
-          <div className={styles.conflictSlot}>
-            <SaveConflictBand
-              title={`ほかの人が先に初回案内「${rule.name}」を保存しました`}
-              designNode="h5rm8t"
-              compareBusy={compareBusy}
-              onCompare={() => void openCompare()}
-              onReload={() => void reloadAfterConflict()}
-            />
-          </div>
-        ) : null}
       </>}
+      /* 先に保存されたとき（h5rm8t）：板の頭の下に、入力欄と右の列にまたがる帯（型の notice の置き場）。
+         帯は共通部品（save-conflict）。比べる窓は項目を左右に並べるこの画面のものを使う。 */
+      notice={conflict ? (
+        <SaveConflictBand
+          title={`ほかの人が先に初回案内「${rule.name}」を保存しました`}
+          designNode="h5rm8t"
+          compareBusy={compareBusy}
+          onCompare={() => void openCompare()}
+          onReload={() => void reloadAfterConflict()}
+        />
+      ) : null}
+      noticeSpacing="band"
       preview={preview}
       footerActions={canEdit ? (
         <>

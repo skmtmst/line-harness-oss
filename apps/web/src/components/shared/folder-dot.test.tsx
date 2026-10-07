@@ -36,6 +36,11 @@ describe('フォルダの色の丸', () => {
     expect(html.indexOf('data-folder-dot')).toBeLessThan(html.indexOf('NEN会員'))
   })
 
+  it('dot={false} は丸を置かず名前だけを返す（丸の無い 1152 の板）', () => {
+    const html = renderToStaticMarkup(<FolderDotName folder={{ name: '会員', color: '#e07b24' }} dot={false}>NEN会員</FolderDotName>)
+    expect(html).toBe('NEN会員')
+  })
+
   it('大きさ 8・名前との間 8・説明の行の字下げ 16 は変数で持つ', () => {
     expect(globals).toMatch(/--tpl-folder-dot-size: 8px; --tpl-folder-dot-gap: 8px; --tpl-folder-dot-indent: 16px;/)
     expect(css).toContain('width: var(--tpl-folder-dot-size)')
