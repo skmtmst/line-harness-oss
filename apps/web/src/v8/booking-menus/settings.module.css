@@ -144,6 +144,11 @@
   padding: var(--tpl-bm-24) var(--tpl-bm-28);
 }
 
+/* 予約経路の連携（絵 ZyDd6）は右の列が無い全幅。帯が頭の線のすぐ下から始まり、左右は 24。 */
+.mainChannels {
+  padding: 0 var(--tpl-bm-24) var(--tpl-bm-24);
+}
+
 .side {
   display: flex;
   flex-direction: column;
