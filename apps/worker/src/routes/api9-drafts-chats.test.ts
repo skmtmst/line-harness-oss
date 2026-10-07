@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { beforeEach, afterEach, describe, it, expect } from 'vitest';
+import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -229,4 +229,37 @@ describe('会話の検索と位置', () => {
     expect(data.hits).toHaveLength(1);
     expect(data.hits[0].before?.id).toBe('0499');
   });
+});
+
+it('1万件をDBで数えて絞り、繰り返し検索では本文を全件読み直さない',async()=>{
+  const insert=db.raw.prepare("INSERT INTO messages_log(id,friend_id,direction,message_type,content,created_at) VALUES(?,'f1','incoming','text',?,'2026-10-07')");
+  db.raw.transaction(()=>{for(let i=0;i<10000;i++)insert.run(String(i).padStart(5,'0'),i%100===0?'ＬＩＮＥの予約':'ふつうの会話');})();
+  let data=(await read(await app().request('/api/chats/f1/messages/search?q=line&limit=3&offset=98'))).data;
+  expect(data.total).toBe(100);expect(data.hits).toHaveLength(2);expect(data.nextOffset).toBeNull();
+  expect(data.hits[0]).toMatchObject({id:'09800',before:{id:'09799'},after:{id:'09801'}});
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM messages_log WHERE search_content IS NOT NULL').get()).toEqual({n:10000});
+  const spy=vi.spyOn(db.db,'prepare');
+  data=(await read(await app().request('/api/chats/f1/messages/search?q=予約&limit=2'))).data;
+  expect(data.total).toBe(100);expect(data.hits).toHaveLength(2);expect(data.nextOffset).toBe(2);
+  const sqls=spy.mock.calls.map(([sql])=>sql);
+  expect(sqls.some(sql=>sql.includes('UPDATE messages_log SET search_content'))).toBe(false);
+  expect(sqls.filter(sql=>/SELECT id,content FROM messages_log/.test(sql))).toHaveLength(1);
+  expect(sqls.find(sql=>/SELECT id,content FROM messages_log/.test(sql))).toContain('search_content IS NULL');
+  expect(sqls.filter(sql=>/FROM messages_log/.test(sql)).every(sql=>/search_content IS NULL|COUNT\(\*\)|LIMIT \? OFFSET \?/.test(sql))).toBe(true);
+  spy.mockRestore();
+});
+it('検索用本文は新規・編集・取消・テスト切替に追随し、半角カナと結合文字も探せる',async()=>{
+  message('m01','ｶﾞイド cafe\u0301 %_');
+  expect((await read(await app().request('/api/chats/f1/messages/search?q='+encodeURIComponent('ガイド café')))).data.total).toBe(1);
+  expect((await read(await app().request('/api/chats/f1/messages/search?q='+encodeURIComponent('%_')))).data.total).toBe(1);
+  db.raw.exec("UPDATE messages_log SET content='新しい本文' WHERE id='m01'");
+  expect((await read(await app().request('/api/chats/f1/messages/search?q=新しい'))).data.total).toBe(1);
+  expect((await read(await app().request('/api/chats/f1/messages/search?q=ガイド'))).data.total).toBe(0);
+  message('m02','新しい追加');
+  expect((await read(await app().request('/api/chats/f1/messages/search?q=新しい'))).data.total).toBe(2);
+  db.raw.exec("UPDATE messages_log SET unsent_at='2026-10-07' WHERE id='m01'; UPDATE messages_log SET delivery_type='test' WHERE id='m02'");
+  expect((await read(await app().request('/api/chats/f1/messages/search?q=新しい'))).data.total).toBe(0);
+  expect(db.raw.prepare('SELECT search_content FROM messages_log').all()).toEqual([{search_content:null},{search_content:null}]);
+  db.raw.exec("UPDATE messages_log SET delivery_type=NULL WHERE id='m02'");
+  expect((await read(await app().request('/api/chats/f1/messages/search?q=新しい'))).data.total).toBe(1);
 });

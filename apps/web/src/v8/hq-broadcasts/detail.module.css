@@ -129,3 +129,49 @@
   line-height: var(--tpl-e49-lh-20);
   font-variant-numeric: tabular-nums;
 }
+
+/* 店ごとの失敗の理由。表の下に1行ずつ。 */
+.reasons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-gap-xs);
+}
+
+.reasonsTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-e49-lh-20);
+}
+
+.reasonList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-gap-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reason {
+  display: flex;
+  gap: var(--tpl-e49-gap-l);
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e49-lh-20);
+}
+
+.reasonStore {
+  flex: 0 0 var(--tpl-e49-col-name);
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reasonText {
+  min-width: 0;
+}

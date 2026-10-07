@@ -22,3 +22,11 @@ describe('統括からの配信API',()=>{
   expect((await call('/api/hq/broadcasts')).status).toBe(403);
  });
 });
+
+it('GETで下書き本文を読み、PATCHで同じIDのまま直し、古い版を拒む',async()=>{
+ const input={requestId:'editable',title:'下書き',messageType:'text',messageContent:'前の本文',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null};
+ const created=await call('/api/hq/broadcasts','POST',input);const id=(await created.json() as any).data.id;
+ expect((await (await call(`/api/hq/broadcasts/${id}`)).json() as any).data.input.messageContent).toBe('前の本文');
+ const changed=await call(`/api/hq/broadcasts/${id}`,'PATCH',{...input,messageContent:'新しい本文',expectedVersion:1});expect(changed.status).toBe(200);expect((await changed.json() as any).data).toMatchObject({id,version:2,input:{messageContent:'新しい本文'}});
+ expect((await call(`/api/hq/broadcasts/${id}`,'PATCH',{...input,expectedVersion:1})).status).toBe(409);
+});

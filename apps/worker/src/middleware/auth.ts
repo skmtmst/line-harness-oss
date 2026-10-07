@@ -273,6 +273,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/restaurant-test/media', '/restaurant-test/channels'],
   ['/api/restaurant-test/closures', '/restaurant-test/inventory'],
   ['/api/restaurant-test/availability', '/restaurant-test/inventory'],
+  ['/api/restaurant-test/close-notification-settings', '/restaurant-test/inventory'],
   ['/api/restaurant-test/inventory-rules', '/restaurant-test/inventory'],
   ['/api/restaurant-test/channel-close-tasks', '/restaurant-test/inventory'],
 ];

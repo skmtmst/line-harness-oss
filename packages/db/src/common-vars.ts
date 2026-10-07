@@ -221,7 +221,7 @@ export async function resolveCommonVarValuesAt(
       // 制約導入前の旧行は value が NULL で残り得る。NULL を値として返すと
       // 呼出し側の `vars[key] ?? ''` で空文字化して送られるため、
       // 文字列でない値は missing 相当の失敗に倒す。
-      if (typeof row.value !== 'string') {
+      if (typeof row.value !== 'string' || (['store_phone','reservation_url'].includes(varKey) && !row.value.trim())) {
         failures.push({ varKey, reason: 'missing' });
         continue;
       }
@@ -235,7 +235,7 @@ export async function resolveCommonVarValuesAt(
       });
       continue;
     }
-    if (row.expiry_behavior === 'fallback' && typeof row.fallback_value === 'string') {
+    if (row.expiry_behavior === 'fallback' && typeof row.fallback_value === 'string' && (!['store_phone','reservation_url'].includes(varKey) || !!row.fallback_value.trim())) {
       values[varKey] = row.fallback_value;
       entries.push({
         id: row.id,

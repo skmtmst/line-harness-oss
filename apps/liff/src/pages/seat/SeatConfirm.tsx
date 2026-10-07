@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { changeRule, longDate, remainingText, stayText, zonedParts } from '../../lib/seat-reserve.js';
 
+const FIELD = 'h-9 w-full rounded-(--liff-radius) bg-canvas px-3 text-sm text-ink placeholder:text-liff-sub outline outline-1 -outline-offset-1 outline-liff-line-strong focus-visible:outline-2 focus-visible:outline-ink';
+
 /**
  * ② 確認 (★V8 km8EG)。お店・日時・人数・お席・お名前・電話の箱、ご要望、取り消しの決まり、仮押さえの残り時間。
  * 確定のボタンは下の操作の帯 (呼ぶ側) に置く。仮押さえの時間が切れたら onExpired を呼ぶ。
  *
- * 口が無いもの (報告済み)：ご要望・電話は席予約の口に送り先が無い。ご要望は入力できない形で
- * 「LINEでお送りください」と案内し、電話は「LINEでご連絡します」と書く (受け取らない値を集めない)。
+ * ご要望（任意・200字）と電話（任意）は、確定の口へ送る（API-11）。お席は割り当てた卓・空いている卓の種類。
+ * 遅れたときの決まりは店の設定（無ければ LINE で知らせる案内）。変更（reschedule）は前の予約の値を見せるだけ。
  */
 export default function SeatConfirm({
   timeZone,
@@ -16,6 +18,12 @@ export default function SeatConfirm({
   endsAt,
   guestCount,
   cancelDeadlineMinutesBefore,
+  seat,
+  late,
+  note,
+  phone,
+  onNote,
+  onPhone,
   holdExpiresAt,
   holdMinutes,
   reschedule,
@@ -30,6 +38,14 @@ export default function SeatConfirm({
   endsAt: string;
   guestCount: number;
   cancelDeadlineMinutesBefore: number;
+  /** お席の言葉（「テーブル席（お店で決めます）」）。 */
+  seat: string;
+  /** 遅れたときの決まりの1文（句点なし）。 */
+  late: string;
+  note: string;
+  phone: string;
+  onNote: (value: string) => void;
+  onPhone: (value: string) => void;
   /** 仮押さえの期限。変更 (reschedule) のときは仮押さえが無いので null。 */
   holdExpiresAt: string | null;
   /** お取りしている長さ (分)。 */
@@ -56,9 +72,8 @@ export default function SeatConfirm({
     ['お店', storeName],
     ['日時', `${longDate(p.date)}${p.hm}〜${stayText(startsAt, endsAt)}`],
     ['人数', `${guestCount}名`],
-    ['お席', 'お店で決めます'],
+    ['お席', seat],
     ['お名前', `${customerName} さま`],
-    ['電話', 'LINEでご連絡します'],
   ];
 
   return (
@@ -73,18 +88,52 @@ export default function SeatConfirm({
             </dd>
           </div>
         ))}
+        <div className="flex items-start gap-3">
+          <dt className="shrink-0 text-[13px] leading-5 text-liff-sub">
+            <label htmlFor="seat-phone">電話</label>
+          </dt>
+          <dd className="min-w-0 flex-1">
+            {reschedule ? (
+              <span className="block truncate text-[13px] leading-5 font-semibold text-ink">{phone || '—'}</span>
+            ) : (
+              <input
+                id="seat-phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                maxLength={50}
+                value={phone}
+                onChange={(e) => onPhone(e.target.value)}
+                placeholder="任意（お店からの連絡用）"
+                className="block w-full bg-transparent text-[13px] leading-5 font-semibold text-ink placeholder:font-normal placeholder:text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+              />
+            )}
+          </dd>
+        </div>
       </dl>
       <div className="flex flex-col gap-1.5">
-        <p className="flex items-center gap-1.5 text-[13px] leading-5 font-bold text-ink">
+        <label htmlFor="seat-note" className="flex items-center gap-1.5 text-[13px] leading-5 font-bold text-ink">
           ご要望（任意）<span className="text-[11px] leading-[17px] font-normal text-liff-sub">任意</span>
-        </p>
-        <p className="flex h-9 items-center truncate rounded-(--liff-radius) bg-canvas px-3 text-sm text-liff-sub outline outline-1 -outline-offset-1 outline-liff-line-strong">
-          ご要望はこのあと LINE でお送りください
-        </p>
+        </label>
+        {reschedule ? (
+          <p className="flex h-9 items-center truncate rounded-(--liff-radius) bg-canvas px-3 text-sm text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong">
+            {note || 'なし'}
+          </p>
+        ) : (
+          <input
+            id="seat-note"
+            type="text"
+            maxLength={200}
+            value={note}
+            onChange={(e) => onNote(e.target.value)}
+            placeholder="例：記念日です・ベビーカーで行きます"
+            className={FIELD}
+          />
+        )}
       </div>
       <ul className="flex flex-col gap-1 rounded-(--liff-radius) bg-liff-off-bg p-3 text-xs leading-[18px] text-liff-sub">
         <li>{`・${changeRule(startsAt, cancelDeadlineMinutesBefore, timeZone, now)}`}</li>
-        <li>・遅れるときや人数が変わるときは、この LINE でお店へお知らせください</li>
+        <li>{`・${late}`}</li>
       </ul>
       {left !== null && (
         <p className="text-xs leading-[18px] text-liff-wait-ink" role="timer" aria-live="off">

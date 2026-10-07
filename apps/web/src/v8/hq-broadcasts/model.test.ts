@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { HqBroadcastPreflight, HqBroadcastRun } from '@line-crm/shared'
-import { canRetry, excludedReason, preflightBadge, previewText, resultBadge, runTitle, scheduledIso, sendTotals, splitPreflightRows, toApiContent } from './model'
+import { canRetry, excludedReason, failureLines, fromApiContent, preflightBadge, previewText, resultBadge, runTitle, scheduledIso, sendTotals, splitPreflightRows, toApiContent } from './model'
 
 const check = (id: string, people: number, remaining: number | null, reasons: string[] = [], excluded = false): HqBroadcastPreflight => ({
   accountId: id, accountName: id, audienceCount: people, remaining, connected: true, paused: reasons.some((r) => r.includes('停止')), blockedReasons: reasons, excluded, broadcastId: null,
@@ -34,6 +34,27 @@ describe('一括配信の計算', () => {
     expect(preflightBadge(check('b', 5880, 2100, ['今月の送信枠が足りません'])).label).toBe('3,780通 足りない')
     expect(preflightBadge(check('c', 1, 1, ['LINEに接続されていません'])).label).toBe('LINE の接続切れ')
     expect(preflightBadge(check('d', 1, 1, ['店舗または配信が停止中'])).label).toBe('配信を止めている')
+  })
+
+  it('下書きを読み直すとき、口の書き方を画面の差し込みに戻す（空白入りも）', () => {
+    expect(fromApiContent('{{ account.name }}より：{{name}}さん {{var.store_phone}} → {{var.reservation_url}}'))
+      .toBe('{店名}より：{友だちの名前}さん {店の電話番号} → {予約ページ}')
+  })
+
+  it('店の共通情報が足りない店：本文で使っている電話番号・予約ページを札に書く', () => {
+    const blocked = check('e', 1, 10, ['店舗の共通情報を確認してください'])
+    expect(preflightBadge(blocked, '{店名}：{店の電話番号} → {予約ページ}').label).toBe('店の電話番号・予約ページが未設定')
+    expect(preflightBadge(blocked, '{店名}より').label).toBe('共通情報が足りない')
+    expect(preflightBadge(check('f', 0, 10, ['友だちが0人です'])).label).toBe('友だちが0人')
+  })
+
+  it('失敗の理由は外した店を除き、人数とやり直せるかを添える', () => {
+    const lines = failureLines({ targets: [
+      target(check('銀座店', 10, 10), 'sent', 0, 0, { failureReasons: [{ code: 'no_friends', label: '友だちが0人です', count: 0, retryable: false }] }),
+      target(check('梅田店', 10, 10, [], true), 'excluded', 0, 0, { failureReasons: [{ code: 'x', label: '出さない', count: 1, retryable: false }] }),
+      target(check('名古屋店', 10, 10), 'failed', 3, 0, { failureReasons: [{ code: 'line_busy', label: 'LINEが混雑しています', count: 3, retryable: true }] }),
+    ] })
+    expect(lines.map((l) => `${l.store}:${l.text}`)).toEqual(['銀座店:友だちが0人です', '名古屋店:LINEが混雑しています（3人）・やり直せます'])
   })
 
   it('送る店と外す店の数と人数（外した店・問題のある店は外す側）', () => {

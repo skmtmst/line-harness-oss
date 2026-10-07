@@ -17,7 +17,7 @@ import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import TextLink from '@/components/shared/text-link'
 import { notifyToast } from '@/components/shared/toast'
-import { ApiError } from '@/lib/api'
+import { ApiError, describeSaveFailure } from '@/lib/api'
 import { restaurantGoogleApi, type GoogleSpecialDay } from '@/lib/restaurant-google-api'
 import { restaurantTestApi, type RestaurantReservation } from '@/lib/restaurant-test-api'
 import type { RestaurantV8Context } from '../booking-kit/shell'
@@ -48,7 +48,7 @@ function inGoogle(closure: RestaurantClosure, special: GoogleSpecialDay[]): bool
 function deleteMessage(error: unknown): string {
   if (error instanceof ApiError && error.code === 'version_conflict') return 'ほかの人が先に変えました。読み直したので、もう一度確かめてください。'
   if (error instanceof ApiError && error.status === 403) return 'この店舗の予約枠を変える権限がありません。'
-  return error instanceof Error && error.message ? error.message : '消せませんでした。もう一度お試しください。'
+  return describeSaveFailure(error)
 }
 
 export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoogle, dialog, onDialog }: {
@@ -79,6 +79,8 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   const [removing, setRemoving] = useState<RestaurantClosure | null>(null)
   const [busy, setBusy] = useState('')
   const [removeError, setRemoveError] = useState('')
+  /* 記録ごとの重なる予約の数と連絡済みの数（contact-status。閲覧のみも読める）。 */
+  const [contacts, setContacts] = useState<Record<string, { reservations: number; contacted: number }>>({})
 
   /* 予約の件数を数える範囲：見ている月と、今日から3か月先まで。 */
   const range = useMemo(() => {
@@ -133,6 +135,25 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
 
   const holidays = useMemo(() => regularHolidays(hours), [hours])
   const list = useMemo(() => upcoming(closures ?? [], today), [closures, today])
+
+  /* 右の列に出す記録だけ、連絡の状況を読む（読めない記録は予約の数だけ出す）。 */
+  const shownKey = list.slice(0, UPCOMING_LIMIT).map((c) => `${c.id}:${c.version}`).join(',')
+  useEffect(() => {
+    if (!accountId || !shownKey) return
+    let current = true
+    const ids = shownKey.split(',').map((key) => key.split(':')[0])
+    void Promise.all(ids.map((id) => restaurantTestApi.closureContactStatus(accountId, id)
+      .then((res) => [id, { reservations: res.data.reservations.length, contacted: res.data.contactedCount }] as const)
+      .catch(() => null)))
+      .then((rows) => {
+        if (!current) return
+        const next: Record<string, { reservations: number; contacted: number }> = {}
+        for (const row of rows) if (row) next[row[0]] = row[1]
+        setContacts(next)
+      })
+    return () => { current = false }
+  }, [accountId, shownKey])
+
   const countOf = useCallback((closure: RestaurantClosure): number | null => {
     if (!reservations || closure.startDate < range.from || closure.endDate >= range.to) return null
     return overlapping(closure, reservations, timezone).length
@@ -157,7 +178,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
       await restaurantTestApi.completeChannelCloseTask(accountId, task.id)
       notifyToast(`${nameOf(task.channel)}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' })
+      notifyToast(describeSaveFailure(caught), { tone: 'error' })
     } finally {
       await loadTasks()
       setBusy('')
@@ -317,8 +338,9 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
             <ul className={styles.cards}>
               {list.slice(0, UPCOMING_LIMIT).map((closure) => {
                 const t = tasksFor(closure, tasks)
-                const count = countOf(closure)
-                const line = statusLine(count, t)
+                const contact = contacts[closure.id]
+                const count = contact ? contact.reservations : countOf(closure)
+                const line = statusLine(count, t, contact ? contact.contacted : null)
                 const warn = t.open.length > 0
                 const items = [
                   ...(canWrite ? [

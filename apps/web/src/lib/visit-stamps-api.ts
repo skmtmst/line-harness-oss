@@ -1,9 +1,11 @@
-import { fetchApi } from './api';
+import { fetchApi, fetchApiBlob } from './api';
 import type { VisitStampCard,VisitStampCardInput,VisitStampWallet,VisitStampEntry } from '@line-crm/shared';
 type Response<T>={success:true;data:T};
 const path=(s:string)=>`/api/visit-stamps${s}`;
 const send=<T>(s:string,method:string,body:unknown)=>fetchApi<Response<T>>(path(s),{method,body:JSON.stringify(body)});
 export const visitStampsApi={
+ entries:(query:import('@line-crm/shared').VisitStampEntryQuery)=>fetchApi<Response<import('@line-crm/shared').VisitStampEntryPage>>(path(`/entries?${new URLSearchParams(Object.entries(query).filter(([,v])=>v!==undefined).map(([k,v])=>[k,String(v)]))}`)),
+ paperPhoto:(accountId:string,id:string)=>fetchApiBlob(path(`/paper-photos/${encodeURIComponent(id)}?${new URLSearchParams({accountId})}`)),
  cards:()=>fetchApi<Response<VisitStampCard[]>>(path('/cards')),
  create:(body:VisitStampCardInput)=>send<VisitStampCard>('/cards','POST',body),
  save:(id:string,body:VisitStampCardInput)=>send<VisitStampCard>(`/cards/${encodeURIComponent(id)}`,'PUT',body),

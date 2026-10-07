@@ -1876,3 +1876,8 @@ describe('一斉配信動画の直接アップロード',()=>{
     expect(fetchSpy).toHaveBeenCalledTimes(2)
   })
 })
+
+it('休業の409から画面が重なる記録の名前・日付をdataとして取得する',()=>{
+ const data={conflicts:[{id:'closure',name:'設備点検',startDate:'2026-11-10',endDate:'2026-11-11'}]};const raw=JSON.stringify({success:false,error:'休業・貸切が重なっています',code:'closure_overlap',data});
+ expect(extractApiErrorCode(raw)).toBe('closure_overlap');expect(extractApiErrorData(raw)).toEqual(data);expect(extractApiErrorMessage(raw,409)).toBe('休業・貸切が重なっています');
+});

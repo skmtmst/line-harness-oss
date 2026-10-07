@@ -5,7 +5,7 @@ import {
   activeTenantLineAccountSql,
   getBookingAdminSettings,
 } from '@line-crm/db';
-import type { RestaurantCustomerHoldInput } from '@line-crm/shared';
+import type { RestaurantCustomerHoldInput, RestaurantCustomerConfirmInput } from '@line-crm/shared';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { dbFor } from '../services/db-router.js';
 import { tzDateStr } from '../services/availability.js';
@@ -13,6 +13,8 @@ import { openSeatTables } from '../services/restaurant-closures.js';
 import {
   customerAvailability,
   customerBooking,
+  validCustomerDetails,
+  customerDetailValue,
   processRestaurantCustomerNotices,
   type CustomerStore,
   type CustomerReservationRow,
@@ -156,6 +158,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', async (c) => {
     .catch(() => null);
   if (
     !body ||
+    !validCustomerDetails(body) ||
     typeof body.startsAt !== 'string' ||
     !Number.isFinite(Date.parse(body.startsAt)) ||
     !Number.isInteger(body.guestCount) ||
@@ -171,12 +174,14 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', async (c) => {
     startsAt = new Date(body.startsAt).toISOString();
   const old = await db
     .prepare(
-      'SELECT * FROM rt_reservations WHERE store_id=? AND line_uid=? AND customer_request_id=?',
+      'SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type FROM rt_reservations WHERE store_id=? AND line_uid=? AND customer_request_id=?',
     )
     .bind(store.id, self.uid, body.requestId)
     .first<CustomerReservationRow>();
   if (old) {
     if (
+      old.note !== customerDetailValue(body.note) ||
+      old.customer_phone !== customerDetailValue(body.customerPhone) ||
       old.starts_at !== startsAt ||
       old.guest_count !== body.guestCount ||
       old.status === 'cancelled' ||
@@ -213,7 +218,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', async (c) => {
   // 営業時間を読んだ版と同じときだけ作る。席・本人・残枠はDBトリガーでも守る。
   await db
     .prepare(
-      `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,? WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)`,
+      `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id,note,customer_phone) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)`,
     )
     .bind(
       id,
@@ -227,12 +232,14 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', async (c) => {
       tables[0]!.id,
       expires,
       body.requestId,
+      customerDetailValue(body.note),
+      customerDetailValue(body.customerPhone),
       store.id,
       result.hoursVersion,
     )
     .run();
   const saved = await db
-    .prepare('SELECT * FROM rt_reservations WHERE id=?')
+    .prepare('SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type FROM rt_reservations WHERE id=?')
     .bind(id)
     .first<CustomerReservationRow>();
   if (!saved) return c.json({ success: false, error: 'slot_conflict' }, 409);
@@ -248,7 +255,7 @@ restaurantCustomerBooking.get(
     const rows = (
       await dbFor(c.env, store.id)
         .prepare(
-          'SELECT * FROM rt_reservations WHERE store_id=? AND line_uid=? ORDER BY starts_at DESC LIMIT 100',
+          'SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type FROM rt_reservations WHERE store_id=? AND line_uid=? ORDER BY starts_at DESC LIMIT 100',
         )
         .bind(store.id, self.uid)
         .all<CustomerReservationRow>()
@@ -263,11 +270,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       const self = await identity(c);
       if (self instanceof Response) return self;
       const b = await c.req
-        .json<{
-          expectedVersion: number;
-          startsAt?: string;
-          guestCount?: number;
-        }>()
+        .json<RestaurantCustomerConfirmInput & {startsAt?: string; guestCount?: number}>()
         .catch(() => null);
       if (
         !b ||
@@ -278,10 +281,11 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
           { success: false, error: 'expected_version_required' },
           400,
         );
+      if (action === 'confirm' && !validCustomerDetails(b)) return c.json({success:false,error:'invalid_customer_details'},400);
       const db = dbFor(c.env),
         row = await db
           .prepare(
-            `SELECT r.* FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE r.id=? AND r.line_uid=? AND s.line_account_id=? AND s.status='active' AND r.customer_request_id IS NOT NULL`,
+            `SELECT r.*, (SELECT seat_type FROM rt_tables t WHERE t.id=r.table_id AND t.store_id=r.store_id) AS seat_type FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE r.id=? AND r.line_uid=? AND s.line_account_id=? AND s.status='active' AND r.customer_request_id IS NOT NULL`,
           )
           .bind(c.req.param('id'), self.uid, self.accountId)
           .first<CustomerReservationRow>();
@@ -291,6 +295,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         (action === 'confirm' && row.status === 'confirmed') ||
         (action === 'cancel' && row.status === 'cancelled')
       ) {
+        if (action === 'confirm' && ((b.note !== undefined && customerDetailValue(b.note)!==row.note) || (b.customerPhone !== undefined && customerDetailValue(b.customerPhone)!==row.customer_phone))) return c.json({success:false,error:'request_conflict'},409);
         await finish(c, store);
         return c.json({ success: true, data: customerBooking(row) });
       }
@@ -320,6 +325,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       let starts = row.starts_at,
         ends = row.ends_at,
         table = row.table_id,
+        seatType = row.seat_type,
         count = row.guest_count,
         hoursVersion: number | null = null;
       if (action === 'reschedule') {
@@ -379,6 +385,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
               .first())
           ) {
             table = t.id;
+            seatType = t.seatType ?? null;
             break;
           }
         }
@@ -387,10 +394,13 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       }
       const next = {
         ...row,
+        note: action === 'confirm' && b.note !== undefined ? customerDetailValue(b.note) : row.note,
+        customer_phone: action === 'confirm' && b.customerPhone !== undefined ? customerDetailValue(b.customerPhone) : row.customer_phone,
         status: action === 'cancel' ? 'cancelled' : 'confirmed',
         starts_at: starts,
         ends_at: ends,
         table_id: table,
+        seat_type: seatType,
         guest_count: count,
         customer_version: row.customer_version + 1,
         hold_expires_at: null,
@@ -398,7 +408,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       const results = await db.batch([
         db
           .prepare(
-            `UPDATE rt_reservations SET status=?,starts_at=?,ends_at=?,table_id=?,guest_count=?,customer_version=customer_version+1,hold_expires_at=NULL,updated_at=datetime('now') WHERE id=? AND line_uid=? AND customer_version=? AND status=? AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)) AND (?<>'confirm' OR julianday(hold_expires_at)>julianday('now'))`,
+            `UPDATE rt_reservations SET status=?,starts_at=?,ends_at=?,table_id=?,guest_count=?,note=?,customer_phone=?,customer_version=customer_version+1,hold_expires_at=NULL,updated_at=datetime('now') WHERE id=? AND line_uid=? AND customer_version=? AND status=? AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)) AND (?<>'confirm' OR julianday(hold_expires_at)>julianday('now'))`,
           )
           .bind(
             next.status,
@@ -406,6 +416,8 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
             ends,
             table,
             count,
+            next.note,
+            next.customer_phone,
             row.id,
             self.uid,
             b.expectedVersion,

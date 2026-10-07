@@ -38,33 +38,39 @@ function mappedContent(input:HqBroadcastInput,name:string) {
 function condition(tagId:string|null):SegmentCondition {
   return {operator:'AND',rules:[{type:'is_following',value:true},...(tagId?[{type:'tag_exists' as const,value:tagId}]:[])]};
 }
-export async function prepareHqBroadcast(db:D1Database,tenantId:string,actorId:string,b:HqBroadcastInput) {
+export async function prepareHqBroadcast(db:D1Database,tenantId:string,actorId:string,b:HqBroadcastInput, update?:{run:RunRow;expectedVersion:number}) {
   if(!b||typeof b.title!=='string'||!b.title.trim()||b.title.length>200||typeof b.messageContent!=='string'||!b.messageContent.trim()||b.messageContent.length>200000)throw new StampError('配信名と本文を確認してください');
   stampId(b.requestId);
+  if(update&&(!Number.isSafeInteger(update.expectedVersion)||update.expectedVersion<1))throw new StampError('読み込んだ版を指定してください');
+  if(update&&(update.run.status!=='prepared'||b.requestId!==(JSON.parse(update.run.input_json) as HqBroadcastInput).requestId))throw new StampError('下書きだけ変更できます。同じ依頼番号を使ってください',409);
   for(const ids of [b.accountIds,b.accountTagIds,b.excludedAccountIds])if(!Array.isArray(ids)||ids.length>100||new Set(ids).size!==ids.length)throw new StampError('店舗・分類を確認してください');else ids.forEach(stampId);
   if(!b.accountIds.length&&!b.accountTagIds.length)throw new StampError('対象店か分類を選んでください');
   if(!b.audience||!['all','tag'].includes(b.audience.kind)||(b.audience.kind==='tag'&&(typeof b.audience.tagName!=='string'||!b.audience.tagName.trim()||b.audience.tagName.length>100)))throw new StampError('全員か、同じ名前のタグを選んでください');
-  if(!['text','image','video','audio','flex','sticker','location','carousel'].includes(b.messageType))throw new StampError('本文の種類を確認してください');
+  if(!['text','image','video','audio','flex','sticker','location','carousel','imagemap','rich_message','card_message','coupon','research'].includes(b.messageType))throw new StampError('本文の種類を確認してください');
   try {const content=mappedContent(b,'確認用の店名'),parts=parseBroadcastMessageParts({...b,...content});buildMessages(parts);if(unsupportedMessageVariables(parts).length)throw new Error();}
   catch {throw new StampError('本文・差し込みの形式を確認してください');}
   const canonical=JSON.stringify(Object.fromEntries(Object.entries(b).sort(([a],[z])=>a.localeCompare(z)))),existing=await db.prepare('SELECT id,input_json FROM hq_broadcast_runs WHERE tenant_id=? AND request_id=?').bind(tenantId,b.requestId).first<{id:string;input_json:string}>();
-  if(existing){if(existing.input_json!==canonical)throw new StampError('同じ実行の依頼で内容が変わっています',409);return getHqBroadcastRun(db,tenantId,existing.id);}
+  if(existing&&!update){if(existing.input_json!==canonical)throw new StampError('同じ実行の依頼で内容が変わっています',409);return getHqBroadcastRun(db,tenantId,existing.id);}
   if(b.scheduledAt!==null&&(typeof b.scheduledAt!=='string'||!Number.isFinite(Date.parse(b.scheduledAt))||Date.parse(b.scheduledAt)<=Date.now()))throw new StampError('予約日時は未来にしてください');
   for(const tag of b.accountTagIds)if(!await db.prepare('SELECT id FROM line_account_tags WHERE id=? AND tenant_id=?').bind(tag,tenantId).first())throw new StampError('分類を確認してください',403);
   const all=(await db.prepare('SELECT id,name FROM line_accounts WHERE tenant_id=? AND archived_at IS NULL').bind(tenantId).all<{id:string;name:string}>()).results;
   for(const id of [...b.accountIds,...b.excludedAccountIds])if(!all.some(a=>a.id===id))throw new StampError('店舗を確認してください',403);
   const tagged=b.accountTagIds.length?(await db.prepare(`SELECT DISTINCT line_account_id FROM line_account_tag_links WHERE tenant_id=? AND tag_id IN (${b.accountTagIds.map(()=>'?').join(',')})`).bind(tenantId,...b.accountTagIds).all<{line_account_id:string}>()).results.map(x=>x.line_account_id):[];
   const selected=all.filter(a=>[...b.accountIds,...tagged].includes(a.id));if(!selected.length)throw new StampError('対象店がありません');
-  const id=crypto.randomUUID(),statements=[db.prepare('INSERT INTO hq_broadcast_runs(id,tenant_id,request_id,actor_id,input_json,scheduled_at) VALUES(?,?,?,?,?,?)').bind(id,tenantId,b.requestId,actorId,canonical,b.scheduledAt)];
+  const id=update?.run.id??crypto.randomUUID(),token=crypto.randomUUID(),statements=[db.prepare('INSERT INTO hq_broadcast_runs(id,tenant_id,request_id,actor_id,input_json,scheduled_at) VALUES(?,?,?,?,?,?)').bind(id,tenantId,b.requestId,actorId,canonical,b.scheduledAt)];
+  if(update){
+   statements.splice(0,1,db.prepare(`UPDATE hq_broadcast_runs SET input_json=?,scheduled_at=?,version=version+1,dispatch_token=?,updated_at=datetime('now') WHERE id=? AND tenant_id=? AND status='prepared' AND version=?`).bind(canonical,b.scheduledAt,token,id,tenantId,update.expectedVersion));
+   statements.push(db.prepare('DELETE FROM hq_broadcast_targets WHERE run_id=? AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)').bind(id,id,token));
+  }
   for(const a of selected) {
     let tag:string|null=null;if(b.audience.kind==='tag'){
       const tags=(await db.prepare('SELECT id FROM tags WHERE line_account_id=? AND name=?').bind(a.id,b.audience.tagName.trim()).all<{id:string}>()).results;
       if(tags.length===1)tag=tags[0].id;
     }
-    statements.push(db.prepare('INSERT INTO hq_broadcast_targets(run_id,line_account_id,account_name,tag_id,excluded) VALUES(?,?,?,?,?)').bind(id,a.id,a.name,tag,b.excludedAccountIds.includes(a.id)?1:0));
-    statements.push(db.prepare('INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),id,a.id,actorId,'target_fixed'));
+    statements.push(db.prepare(`INSERT INTO hq_broadcast_targets(run_id,line_account_id,account_name,tag_id,excluded) SELECT ?,?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)`).bind(id,a.id,a.name,tag,b.excludedAccountIds.includes(a.id)?1:0,Number(!!update),id,token));
+    statements.push(db.prepare(`INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) SELECT ?,?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)`).bind(crypto.randomUUID(),id,a.id,actorId,update?'draft_updated':'target_fixed',Number(!!update),id,token));
   }
-  try {await db.batch(statements);}catch(e){const winner=await db.prepare('SELECT id,input_json FROM hq_broadcast_runs WHERE tenant_id=? AND request_id=?').bind(tenantId,b.requestId).first<{id:string;input_json:string}>();if(!winner)throw e;if(winner.input_json!==canonical)throw new StampError('同じ実行の依頼で内容が変わっています',409);return getHqBroadcastRun(db,tenantId,winner.id);}
+  try {const result=await db.batch(statements);if(update&&!result[0].meta.changes)throw new StampError('下書きが更新されました。読み直してください',409);}catch(e){if(update)throw e;const winner=await db.prepare('SELECT id,input_json FROM hq_broadcast_runs WHERE tenant_id=? AND request_id=?').bind(tenantId,b.requestId).first<{id:string;input_json:string}>();if(!winner)throw e;if(winner.input_json!==canonical)throw new StampError('同じ実行の依頼で内容が変わっています',409);return getHqBroadcastRun(db,tenantId,winner.id);}
   return getHqBroadcastRun(db,tenantId,id);
 }
 export async function preflightHqBroadcast(db:D1Database,run:RunRow):Promise<HqBroadcastPreflight[]> {
@@ -82,6 +88,7 @@ export async function preflightHqBroadcast(db:D1Database,run:RunRow):Promise<HqB
     const audience=await db.prepare(`SELECT COUNT(*) AS count FROM friends f WHERE f.line_account_id=? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0
       AND f.line_user_id IS NOT NULL AND f.line_user_id<>'' AND (? IS NULL OR EXISTS(SELECT 1 FROM friend_tags ft WHERE ft.friend_id=f.id AND ft.tag_id=?))`)
       .bind(t.line_account_id,t.tag_id,t.tag_id).first<{count:number}>();
+    if(audience!.count===0)reasons.push('友だちが0人です');
     const quota=connected?await fetchQuota(account!.channel_access_token):{limit:null,used:null};
     const remaining=quota.limit===null||quota.used===null?null:Math.max(0,quota.limit-quota.used);
     // APIエラーも接続不明として人に返す。別の店舗の枠では補えない。
@@ -125,7 +132,8 @@ export async function readHqBroadcastResult(db:D1Database,run:RunRow):Promise<Hq
   const input=JSON.parse(run.input_json) as HqBroadcastInput,rows=(await db.prepare(`SELECT t.*,b.status AS child_status,b.total_count,b.success_count,b.stopped_at,b.lock_version,
     (SELECT COUNT(*) FROM broadcast_send_claims s WHERE s.broadcast_id=b.id AND s.state='failed' AND s.error_code IN ('line_http_429','stopped_before_dispatch')) AS retryable_count
     FROM hq_broadcast_targets t LEFT JOIN broadcasts b ON b.id=t.broadcast_id WHERE t.run_id=? ORDER BY t.line_account_id`).bind(run.id).all<Target & {child_status:string|null;total_count:number|null;success_count:number|null;stopped_at:string|null;retryable_count:number;lock_version:number|null}>()).results;
-  return {id:run.id,title:input.title,status:run.status,version:run.version,scheduledAt:run.scheduled_at,targets:rows.map(r=>({...(r.preflight_json?JSON.parse(r.preflight_json):{accountId:r.line_account_id,accountName:r.account_name,audienceCount:null,remaining:null,connected:false,paused:false,blockedReasons:[]}),excluded:!!r.excluded,broadcastId:r.broadcast_id,status:r.excluded?'excluded':(run.status==='cancelled'?'cancelled':r.child_status==='draft'&&run.status!=='prepared'?'failed':r.child_status??'prepared'),successCount:r.success_count??0,totalCount:r.total_count??0,version:r.lock_version??1,retryableCount:r.retryable_count,stopped:!!r.stopped_at}))};
+  const failures=(await db.prepare(`SELECT t.line_account_id,s.state,s.error_code,COUNT(*) AS count FROM hq_broadcast_targets t JOIN broadcast_send_claims s ON s.broadcast_id=t.broadcast_id WHERE t.run_id=? AND s.state IN ('failed','unknown') GROUP BY t.line_account_id,s.state,s.error_code`).bind(run.id).all<{line_account_id:string;state:string;error_code:string|null;count:number}>()).results;
+  return {input,id:run.id,title:input.title,status:run.status,version:run.version,scheduledAt:run.scheduled_at,targets:rows.map(r=>({...(r.preflight_json?JSON.parse(r.preflight_json):{accountId:r.line_account_id,accountName:r.account_name,audienceCount:null,remaining:null,connected:false,paused:false,blockedReasons:[]}),failureReasons:failures.filter(f=>f.line_account_id===r.line_account_id).map(f=>classifyHqFailure(f.state,f.error_code,f.count)).concat(r.child_status==='sent'&&r.total_count===0?[{code:'no_friends',label:'友だちが0人です',count:0,retryable:false}]:r.child_status==='draft'&&run.status==='scheduled'?[{code:'before_send_failed',label:'送信前の確認で止まりました。店舗の送信前確認をやり直してください',count:0,retryable:true}]:[]),excluded:!!r.excluded,broadcastId:r.broadcast_id,status:r.excluded?'excluded':(run.status==='cancelled'?'cancelled':r.child_status==='draft'&&run.status!=='prepared'?'failed':r.child_status??'prepared'),successCount:r.success_count??0,totalCount:r.total_count??0,version:r.lock_version??1,retryableCount:r.retryable_count,stopped:!!r.stopped_at}))};
 }
 export async function stopHqBroadcast(db:D1Database,run:RunRow,actorId:string,cancel:boolean,version:number) {
   const token=crypto.randomUUID(),ops=[db.prepare(`UPDATE hq_broadcast_runs SET status=?,version=version+1,dispatch_token=? WHERE id=? AND version=? AND status NOT IN ('cancelled')`).bind(cancel?'cancelled':'stopped',token,run.id,version)];
@@ -161,4 +169,13 @@ export async function retryHqBroadcastTarget(db:D1Database,run:RunRow,accountId:
   await reopenFailedClaims(db,broadcast.id,updated!.send_attempt_no!);
   await db.prepare('INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),run.id,accountId,actorId,'retry_failed').run();
   return readHqBroadcastResult(db,run);
+}
+
+export function classifyHqFailure(state:string,errorCode:string|null,count:number) {
+ if(state==='unknown')return {code:'delivery_unknown',label:'LINEの応答なし（届いたか確認が必要）',count,retryable:false};
+ if(errorCode==='line_http_429')return {code:'line_busy',label:'LINEが混雑しています',count,retryable:true};
+ if(errorCode==='stopped_before_dispatch')return {code:'stopped',label:'送信前に停止しました',count,retryable:true};
+ if(errorCode?.startsWith('common_var'))return {code:'store_information_missing',label:'店の共通情報が不足しています',count,retryable:false};
+ if(errorCode==='line_http_401'||errorCode==='line_http_403')return {code:'line_connection',label:'LINEの接続を確認してください',count,retryable:false};
+ return {code:'send_failed',label:'LINEへ送れませんでした',count,retryable:false};
 }

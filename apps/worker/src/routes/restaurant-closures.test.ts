@@ -178,7 +178,7 @@ describe('日付で席予約を閉じる',()=>{
  test('重なる記録は409で相手を返す。時刻の境目は重ならず、別の卓だけなら同時に閉じられる',async()=>{
   const saved=await create({...closureInput,kind:'private_event',tableIds:['table-1']});expect(saved.status).toBe(201);
   const overlap=await create({...closureInput,startTime:'19:00',endTime:'21:00',tableIds:['table-1']});expect(overlap.status).toBe(409);
-  expect(overlap.body.conflicts.map((r:any)=>r.id)).toEqual([saved.body.data.closure.id]);
+  expect(overlap.body.data.conflicts.map((r:any)=>r.id)).toEqual([saved.body.data.closure.id]);
   expect((await create({...closureInput,tableIds:['table-2']})).status).toBe(201);
   expect((await create({...closureInput,startTime:'20:00',endTime:'21:00'})).status).toBe(201);
  });
@@ -228,7 +228,7 @@ describe('日付で席予約を閉じる',()=>{
  test('DBの書込ゲートも新規予約・重複休業・待機・招待を拒否し、通常の受付へ戻せる',async()=>{
   const saved=await create();expect(saved.status).toBe(201);
   expect(()=>seedReservation('blocked')).toThrow('closure_conflict');
-  expect(()=>testDb.raw.exec(`INSERT INTO rt_closures SELECT 'duplicate',store_id,start_date,end_date,all_day,start_time,end_time,kind,memo,table_ids_json,periods_json,created_by,created_by_name,version,created_at,updated_at,archived_at FROM rt_closures;`)).toThrow('closure_overlap');
+  expect(()=>testDb.raw.exec(`INSERT INTO rt_closures SELECT 'duplicate',store_id,start_date,end_date,all_day,start_time,end_time,kind,memo,table_ids_json,periods_json,created_by,created_by_name,version,created_at,updated_at,archived_at,notify_media FROM rt_closures;`)).toThrow('closure_overlap');
   expect(()=>testDb.raw.prepare(`INSERT INTO rt_seat_waitlist(id,store_id,starts_at,ends_at,guest_count,customer_name,identity_key,status) VALUES('waiting','store-s',?,?,2,'試験','name:test','waiting')`).run(SLOT,SLOT_END)).toThrow('closure_conflict');
   await request('DELETE',closurePath+'/'+saved.body.data.closure.id,{expectedVersion:1});expect(()=>seedReservation('open')).not.toThrow();
  });
@@ -286,4 +286,45 @@ test('一部貸切で残りの卓が満席ならLIFFの待機を受け、閉じ�
  seedReservation('full-other','confirmed','table-2');await create({...closureInput,kind:'private_event',tableIds:['table-1']});
  const res=await seatLiffRequest('/api/liff/booking/seat-waitlist',{store_id:'store-s',starts_at:SLOT,guest_count:2});expect(res.status).toBe(201);
  const {id}=await res.json() as {id:string};expect(testDb.raw.prepare('SELECT status FROM rt_seat_waitlist WHERE id=?').get(id)).toEqual({status:'waiting'});
+});
+
+test('変更のpreviewは自分だけを除外し、他店や存在しないIDは除外できない',async()=>{
+ const saved=await create(),id=saved.body.data.closure.id;
+ expect((await post(closurePath+'/preview',closureInput)).status).toBe(409);
+ const ok=await post(closurePath+'/preview',{...closureInput,excludeId:id});expect(ok.status).toBe(200);expect((await ok.json() as any).data.conflicts).toEqual([]);
+ expect((await post(closurePath+'/preview',{...closureInput,excludeId:'other-id'})).status).toBe(404);
+});
+test('重なり409のdataに相手の名前と日付が入り、previewに電話・LINE友だちを返す',async()=>{
+ seedReservation('with-phone');testDb.raw.exec("UPDATE rt_reservations SET customer_phone='09012345678' WHERE id='with-phone'");
+ const preview=await post(closurePath+'/preview',closureInput);expect((await preview.json() as any).data.reservations[0]).toMatchObject({customerPhone:'09012345678',friendId:null,isLineFriend:false});
+ await create({...closureInput,memo:'設備の交換'});const res=await create();expect(res.body).toMatchObject({code:'closure_overlap',data:{conflicts:[expect.objectContaining({name:'設備の交換',startDate:'2026-11-10',endDate:'2026-11-10'})]}});
+});
+test('連絡済みは作成後に担当者が手動送信した重なる予約だけを数え、同じ予約は一度',async()=>{
+ for(const id of ['r1','r2','r3'])seedReservation(id);
+ testDb.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f1','u1','account-9'),('f2','u2','account-9'),('f3','u3','account-9');UPDATE rt_reservations SET line_uid=CASE id WHEN 'r1' THEN 'u1' WHEN 'r2' THEN 'u2' ELSE 'u3' END;");
+ const saved=await create(),id=saved.body.data.closure.id;
+ testDb.raw.prepare("UPDATE rt_closures SET created_at='2026-10-07 01:00:00' WHERE id=?").run(id);
+ const insert=testDb.raw.prepare("INSERT INTO messages_log(id,friend_id,direction,message_type,content,source,sent_by_staff_id,created_at) VALUES(?,?,'outgoing','text','連絡',?,?,?)");
+ insert.run('old','f2','manual','staff','2026-10-07T09:59:59');insert.run('auto','f3','broadcast','staff','2026-10-07T10:00:01');
+ insert.run('new1','f1','manual','staff','2026-10-07T10:00:01');insert.run('new2','f1','manual','staff','2026-10-07T01:00:02Z');
+ const res=await get(closurePath+'/'+id+'/contact-status');expect(res.status).toBe(200);const result=(await res.json() as any).data;
+ expect(result.contactedCount).toBe(1);expect(result.reservations.map((r:any)=>[r.id,r.contacted])).toEqual([['r1',true],['r2',false],['r3',false]]);
+});
+test('通知なしで保存・変更した休業には新しい媒体閉鎖作業を作らない',async()=>{
+ testDb.raw.exec("INSERT INTO rt_media(id,code,name,parser_key) VALUES('m','media','媒体','p');INSERT INTO rt_store_media_links(store_id,media_id,close_on_booking) VALUES('store-s','m',1)");
+ const saved=await create({...closureInput,notifyMedia:false});expect(saved.status).toBe(201);expect(saved.body.data.closure.notifyMedia).toBe(false);
+ expect(testDb.raw.prepare('SELECT COUNT(*) n FROM rt_closure_close_tasks').get()).toEqual({n:0});
+ const id=saved.body.data.closure.id;await request('PATCH',closurePath+'/'+id,{...closureInput,notifyMedia:true,expectedVersion:1});
+ expect(testDb.raw.prepare('SELECT COUNT(*) n FROM rt_closure_close_tasks').get()).toEqual({n:1});
+ await request('PATCH',closurePath+'/'+id,{...closureInput,notifyMedia:false,expectedVersion:2});
+ expect(testDb.raw.prepare('SELECT status FROM rt_closure_close_tasks').all()).toEqual([{status:'reopen'}]);
+});
+test('店ごとの再開通知と宛先を版付きで保存し、取消後の通知を止める',async()=>{
+ testDb.raw.exec("INSERT INTO rt_media(id,code,name,parser_key) VALUES('m','media','媒体','p');INSERT INTO rt_store_media_links(store_id,media_id,close_on_booking) VALUES('store-s','m',1);INSERT INTO rt_memberships(id,organization_id,store_id,staff_name,role,line_uid,status) VALUES('manager','org-s','store-s','店長','store_manager','uid','active');");
+ const settings={storeId:'store-s',notifyReopen:false,recipientMode:'selected',membershipIds:['manager'],expectedVersion:0};
+ const path='/api/restaurant-test/close-notification-settings';expect((await request('PUT',path,settings)).status).toBe(200);expect((await request('PUT',path,settings)).status).toBe(409);
+ expect((await request('PUT',path,{...settings,membershipIds:['other-member'],expectedVersion:1})).status).toBe(403);
+ const saved=await create();expect(cardSender).toHaveBeenCalledTimes(1);
+ await request('DELETE',closurePath+'/'+saved.body.data.closure.id,{expectedVersion:1});expect(cardSender).toHaveBeenCalledTimes(1);
+ expect(testDb.raw.prepare('SELECT status FROM rt_closure_close_tasks').get()).toEqual({status:'reopen'});
 });

@@ -74,7 +74,10 @@ export default function HqBroadcastList() {
                 <Td className={styles.colStores}><span className={styles.sub}>{stores}</span></Td>
                 <Td className={styles.colAt}><span className={styles.sub}>{run.scheduledAt ? jpDateTime(run.scheduledAt) : 'すぐ送る'}</span></Td>
                 <Td className={styles.colMenu}>
-                  <RowActions subjectName={run.title} menuItems={[{ id: 'open', label: run.status === 'prepared' ? '確かめて送る' : '送った結果を見る', onSelect: () => { window.location.href = href } }]} />
+                  <RowActions subjectName={run.title} menuItems={[
+                    { id: 'open', label: run.status === 'prepared' ? '確かめて送る' : '送った結果を見る', onSelect: () => { window.location.href = href } },
+                    ...(run.status === 'prepared' && canManage ? [{ id: 'edit', label: '下書きを直す', onSelect: () => { window.location.href = `/hq/broadcasts/new?id=${encodeURIComponent(run.id)}` } }] : []),
+                  ]} />
                 </Td>
               </Tr>
             )
