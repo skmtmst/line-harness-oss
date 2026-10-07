@@ -128,6 +128,10 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/booking/admin/sync-rules',
+  'PUT /api/booking/admin/sync-rules',
+  'GET /api/booking/admin/sync-notices',
+  'POST /api/booking/admin/sync-notices/{id}/done',
   // V8 integration endpoints.
   'GET /api/dashboard/activity',
   'GET /api/forms/{id}/submissions/{submissionId}',

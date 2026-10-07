@@ -721,6 +721,36 @@
       "column": "line_account_id"
     }
   },
+  "booking_sync_notice_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "notice_id",
+      "parent": "booking_sync_notices",
+      "parentColumn": "id"
+    }
+  },
+  "booking_sync_notice_queue": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_sync_notices": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_sync_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "bookings": {
     "category": "purge",
     "scope": {

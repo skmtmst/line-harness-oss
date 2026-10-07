@@ -1508,6 +1508,39 @@ CREATE TABLE booking_settings (
          OR reminder_hours_before BETWEEN 1 AND 72), liff_date_view TEXT NOT NULL DEFAULT 'list'
   CHECK (liff_date_view IN ('list', 'calendar')));
 
+CREATE TABLE booking_sync_notice_outbox (
+ id TEXT PRIMARY KEY, notice_id TEXT NOT NULL REFERENCES booking_sync_notices(id), generation INTEGER NOT NULL,
+ retry_key TEXT NOT NULL, sent_at TEXT, lease_until TEXT, lease_token TEXT,
+ UNIQUE(notice_id,generation)
+);
+
+CREATE TABLE booking_sync_notice_queue (
+ line_account_id TEXT PRIMARY KEY, generation INTEGER NOT NULL DEFAULT 1,
+ updated_at TEXT NOT NULL DEFAULT(datetime('now'))
+);
+
+CREATE TABLE booking_sync_notices (
+ id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id), notice_key TEXT NOT NULL,
+ staff_id TEXT NOT NULL REFERENCES staff(id), target_date TEXT NOT NULL,
+ kind TEXT NOT NULL CHECK(kind IN ('calendar_disconnected','daily_limit','conflict')),
+ status TEXT NOT NULL CHECK(status IN ('open','done','resolved')), booking_id TEXT,
+ booking_count INTEGER NOT NULL DEFAULT 0, daily_limit INTEGER, message TEXT NOT NULL,
+ generation INTEGER NOT NULL DEFAULT 1,
+ created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')),
+ UNIQUE(line_account_id,notice_key)
+);
+
+CREATE TABLE booking_sync_rules (
+ line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id),
+ auto_assign INTEGER NOT NULL CHECK(auto_assign IN (0,1)),
+ notify_conflicts INTEGER NOT NULL CHECK(notify_conflicts IN (0,1)),
+ notify_calendar_disconnected INTEGER NOT NULL CHECK(notify_calendar_disconnected IN (0,1)),
+ notify_daily_limit INTEGER NOT NULL CHECK(notify_daily_limit IN (0,1)),
+ daily_limit INTEGER NOT NULL CHECK(daily_limit BETWEEN 1 AND 1000),
+ near_limit_remaining INTEGER NOT NULL CHECK(near_limit_remaining>=0 AND near_limit_remaining<daily_limit),
+ version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT(datetime('now'))
+);
+
 CREATE TABLE "bookings" (
   id                           TEXT PRIMARY KEY,
   line_account_id              TEXT NOT NULL,
@@ -7606,6 +7639,8 @@ CREATE TABLE webinars (
   updated_at TEXT NOT NULL
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL);
 
+CREATE INDEX booking_sync_notices_account ON booking_sync_notices(line_account_id,status,target_date);
+
 CREATE INDEX idx_account_handovers_from ON account_handovers (from_account_id);
 
 CREATE INDEX idx_account_handovers_status ON account_handovers (status);
@@ -9629,6 +9664,10 @@ CREATE TRIGGER analytics_projection_friend_stage_count
 AFTER INSERT ON analytics_projection_friend_stage
 BEGIN UPDATE analytics_projection_metric_stage SET unique_friend_count = unique_friend_count + 1 WHERE line_account_id = NEW.line_account_id AND cycle_id = NEW.cycle_id AND metric_date = NEW.metric_date AND event_type = NEW.event_type; END;
 
+CREATE TRIGGER booking_auto_assign_sync_rules_insert AFTER INSERT ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
+
+CREATE TRIGGER booking_auto_assign_sync_rules_update AFTER UPDATE ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
+
 CREATE TRIGGER booking_resource_consumptions_account_insert
 BEFORE INSERT ON booking_resource_consumptions
 FOR EACH ROW
@@ -9648,6 +9687,16 @@ BEFORE UPDATE ON booking_resource_consumptions
 FOR EACH ROW
 BEGIN
   SELECT RAISE(ABORT, 'booking_resource_consumption_immutable'); END;
+
+CREATE TRIGGER booking_sync_notice_booking_delete AFTER DELETE ON bookings BEGIN INSERT INTO booking_sync_notice_queue(line_account_id) VALUES(OLD.line_account_id) ON CONFLICT(line_account_id) DO UPDATE SET generation=generation+1,updated_at=datetime('now'); END;
+
+CREATE TRIGGER booking_sync_notice_booking_insert AFTER INSERT ON bookings BEGIN INSERT INTO booking_sync_notice_queue(line_account_id) VALUES(NEW.line_account_id) ON CONFLICT(line_account_id) DO UPDATE SET generation=generation+1,updated_at=datetime('now'); END;
+
+CREATE TRIGGER booking_sync_notice_booking_update AFTER UPDATE ON bookings BEGIN INSERT INTO booking_sync_notice_queue(line_account_id) VALUES(NEW.line_account_id) ON CONFLICT(line_account_id) DO UPDATE SET generation=generation+1,updated_at=datetime('now'); END;
+
+CREATE TRIGGER booking_sync_rules_insert AFTER INSERT ON booking_sync_rules BEGIN INSERT INTO account_settings(id,line_account_id,key,value) VALUES(lower(hex(randomblob(16))),NEW.line_account_id,'booking_auto_assign',CASE WHEN NEW.auto_assign=1 THEN 'true' ELSE 'false' END) ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value; INSERT INTO booking_sync_notice_queue(line_account_id) VALUES(NEW.line_account_id) ON CONFLICT(line_account_id) DO UPDATE SET generation=generation+1,updated_at=datetime('now'); END;
+
+CREATE TRIGGER booking_sync_rules_update AFTER UPDATE ON booking_sync_rules BEGIN INSERT INTO account_settings(id,line_account_id,key,value) VALUES(lower(hex(randomblob(16))),NEW.line_account_id,'booking_auto_assign',CASE WHEN NEW.auto_assign=1 THEN 'true' ELSE 'false' END) ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value; INSERT INTO booking_sync_notice_queue(line_account_id) VALUES(NEW.line_account_id) ON CONFLICT(line_account_id) DO UPDATE SET generation=generation+1,updated_at=datetime('now'); END;
 
 CREATE TRIGGER capture_ad_conversion_account AFTER INSERT ON conversion_events BEGIN INSERT INTO ad_conversion_event_accounts(conversion_event_id,line_account_id,platform_ids_json) SELECT NEW.id,f.line_account_id,(SELECT json_group_array(p.id) FROM ad_platforms p WHERE p.line_account_id = f.line_account_id AND p.is_active = 1 AND p.verified_at IS NOT NULL AND p.name IN ('meta','google')) FROM friends f WHERE f.id = NEW.friend_id AND f.line_account_id IS NOT NULL; END;
 

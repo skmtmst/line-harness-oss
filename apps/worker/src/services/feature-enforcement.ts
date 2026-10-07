@@ -55,6 +55,22 @@ export type FeatureJobMetadata = {
  */
 export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   {
+    name: 'booking sync notices',
+    classification: { kind: 'feature', featureId: 'booking' },
+    enforcement: {
+      mode: 'gated',
+      sources: [
+        'apps/worker/src/services/booking-sync-rules.ts',
+        'apps/worker/src/services/booking-automatic-line.ts',
+      ],
+      markers: [
+        "featureId:'booking'",
+        'featureJobCanRun(db,',
+        "featureId:input.featureId,job:'予約の自動通知'",
+      ],
+    },
+  },
+  {
     name: 'follower import continuation',
     classification: { kind: 'core', reason: 'LINEアカウント登録後の既存友だちの取り込み継続' },
     enforcement: { mode: 'exempt', reason: '登録処理の後半で、個別機能の有効・無効には属さない' },

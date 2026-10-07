@@ -521,8 +521,9 @@
     "580_banner_reference_images.sql",
     "581_banner_emphasis_lines.sql",
     "583_restaurant_inventory_rules.sql",
+    "584_booking_sync_rules.sql",
     "586_outgoing_webhook_version.sql",
     "587_form_step_completion_times.sql"
   ],
-  "migrationCount": 523
+  "migrationCount": 524
 }

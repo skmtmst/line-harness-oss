@@ -22,6 +22,40 @@ const spec = {
       },
     },
     schemas: {
+      BookingSyncRules: {
+        type: 'object',
+        required: ['lineAccountId', 'excludeCalendarBusy', 'writeLineBookingsToCalendar', 'autoAssign', 'notifyConflicts', 'notifyCalendarDisconnected', 'notifyDailyLimit', 'dailyLimit', 'nearLimitRemaining', 'version'],
+        properties: {
+          lineAccountId: { type: 'string' },
+          excludeCalendarBusy: { type: 'boolean', const: true },
+          writeLineBookingsToCalendar: { type: 'boolean', const: true },
+          autoAssign: { type: 'boolean' },
+          notifyConflicts: { type: 'boolean' },
+          notifyCalendarDisconnected: { type: 'boolean' },
+          notifyDailyLimit: { type: 'boolean' },
+          dailyLimit: { type: 'integer', minimum: 1, maximum: 1000 },
+          nearLimitRemaining: { type: 'integer', minimum: 0, maximum: 999, description: 'dailyLimit より小さい値' },
+          version: { type: 'integer', minimum: 0 },
+        },
+      },
+      BookingSyncNotice: {
+        type: 'object',
+        required: ['id', 'lineAccountId', 'staffId', 'date', 'kind', 'status', 'bookingId', 'bookingCount', 'dailyLimit', 'message', 'createdAt', 'updatedAt'],
+        properties: {
+          id: { type: 'string' },
+          lineAccountId: { type: 'string' },
+          staffId: { type: 'string' },
+          date: { type: 'string', format: 'date' },
+          kind: { type: 'string', enum: ['calendar_disconnected', 'daily_limit', 'conflict'] },
+          status: { type: 'string', enum: ['open', 'done', 'resolved'] },
+          bookingId: { type: ['string', 'null'] },
+          bookingCount: { type: 'integer' },
+          dailyLimit: { type: ['integer', 'null'] },
+          message: { type: 'string' },
+          createdAt: { type: 'string' },
+          updatedAt: { type: 'string' },
+        },
+      },
       ApiResponse: {
         type: 'object',
         properties: {
@@ -7065,6 +7099,99 @@ const spec = {
             } } } } } },
           },
           '400': { description: 'account_id 未指定' },
+        },
+      },
+    },
+    '/api/booking/admin/sync-rules': {
+      get: {
+        tags: ['Booking'], summary: '予約の同期・自動割り当て・通知ルールを取得',
+        description: '未保存なら既定値と version=0 を返す。カレンダーの空き時間除外とLINE予約の書き込みは常に有効。Cache-Control: no-store。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '現在の予約ルール', content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'data'], properties: {
+              success: { type: 'boolean', const: true }, data: { $ref: '#/components/schemas/BookingSyncRules' },
+            },
+          } } } },
+          '400': { description: 'account_id 未指定' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+      put: {
+        tags: ['Booking'], summary: '予約の同期・通知ルールを版付きで保存',
+        description: '予約設定の編集権限が必要。expectedVersion=0 は初回保存、既存行は版一致時だけ更新する。nearLimitRemaining は dailyLimit より小さい値。保存後に通知条件を再評価する。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['expectedVersion', 'autoAssign', 'notifyConflicts', 'notifyCalendarDisconnected', 'notifyDailyLimit', 'dailyLimit', 'nearLimitRemaining'],
+          properties: {
+            expectedVersion: { type: 'integer', minimum: 0 },
+            autoAssign: { type: 'boolean' },
+            notifyConflicts: { type: 'boolean' },
+            notifyCalendarDisconnected: { type: 'boolean' },
+            notifyDailyLimit: { type: 'boolean' },
+            dailyLimit: { type: 'integer', minimum: 1, maximum: 1000 },
+            nearLimitRemaining: { type: 'integer', minimum: 0, maximum: 999 },
+            excludeCalendarBusy: { type: 'boolean', const: true },
+            writeLineBookingsToCalendar: { type: 'boolean', const: true },
+          },
+        } } } },
+        responses: {
+          '200': { description: '保存後の予約ルール', content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'data'], properties: {
+              success: { type: 'boolean', const: true }, data: { $ref: '#/components/schemas/BookingSyncRules' },
+            },
+          } } } },
+          '400': { description: 'account_id 未指定、入力または版が不正' },
+          '403': { description: '予約設定の編集権限がない、または担当外のLINEアカウント' },
+          '409': { description: '別の担当者が先に保存した', content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'error', 'currentVersion'], properties: {
+              success: { type: 'boolean', const: false }, error: { type: 'string' },
+              currentVersion: { type: 'integer', minimum: 0 },
+            },
+          } } } },
+        },
+      },
+    },
+    '/api/booking/admin/sync-notices': {
+      get: {
+        tags: ['Booking'], summary: '予約のカレンダー未接続・上限接近・重複の知らせを取得',
+        description: '対応済み・解消済みも含め、対象日と作成日時の降順で最大500件を返す。Cache-Control: no-store。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '予約の知らせ一覧', content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'data'], properties: {
+              success: { type: 'boolean', const: true },
+              data: { type: 'array', maxItems: 500, items: { $ref: '#/components/schemas/BookingSyncNotice' } },
+            },
+          } } } },
+          '400': { description: 'account_id 未指定' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+    },
+    '/api/booking/admin/sync-notices/{id}/done': {
+      post: {
+        tags: ['Booking'], summary: '予約の知らせを対応済みにする',
+        description: 'owner・admin・staff が操作可能。対応済みの再操作も成功する。条件が解消済みなら409、担当外の知らせは404。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '対応済みの知らせ', content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'data'], properties: {
+              success: { type: 'boolean', const: true }, data: {
+                type: 'object', required: ['id', 'status'], properties: {
+                  id: { type: 'string' }, status: { type: 'string', const: 'done' },
+                },
+              },
+            },
+          } } } },
+          '400': { description: 'account_id 未指定' },
+          '403': { description: '操作できる役割がない、または担当外のLINEアカウント' },
+          '404': { description: 'このLINEアカウントの知らせが存在しない' },
+          '409': { description: '知らせの条件がすでに解消している' },
         },
       },
     },
