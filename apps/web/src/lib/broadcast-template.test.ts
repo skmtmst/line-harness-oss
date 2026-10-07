@@ -70,7 +70,7 @@ describe('保存に渡す吹き出し', () => {
   const bubble = (text: string) => ({ id: text, type: 'text' as const, content: { text } })
 
   it('1つだけなら渡さない', () => {
-    expect(bubblesForSave([bubble('a')])).toBeUndefined()
+    expect(bubblesForSave([bubble('a')])).toEqual([bubble('a')])
   })
 
   it('2つ以上なら渡す', () => {
@@ -167,23 +167,23 @@ describe('素材の引用を LINE の種別に直す', () => {
     expect(out.messageContent).not.toContain('assetId')
   })
 
-  it('リッチメッセージは Flex に直す', () => {
+  it('リッチメッセージはタップ範囲を持つイメージマップに直す', () => {
     const out = bubbleLegacyMessage({
       id: 'b', type: 'rich_message',
-      content: { assetId: 'a', assetName: '便り', imageUrl: 'https://example.com/a.png', description: '新米です', actionUrl: 'https://example.com/lp' },
+      content: { assetId: 'a', assetName: '便り',baseUrl:'https://example.com/images/map',baseSize:{width:1040,height:520},tapAreas:[{x:0,y:0,width:100,height:100,actionType:'uri',uri:'https://example.com/lp'}], imageUrl: 'https://example.com/a.png', description: '新米です', actionUrl: 'https://example.com/lp' },
     })
-    expect(out.messageType).toBe('flex')
-    expect(JSON.parse(out.messageContent)).toMatchObject({ type: 'bubble' })
+    expect(out.messageType).toBe('imagemap')
+    expect(JSON.parse(out.messageContent)).toMatchObject({baseSize:{width:1040,height:520}})
     expect(out.messageContent).not.toContain('assetId')
   })
 
-  it('クーポンは読める文に直す（JSON を本文にしない）', () => {
+  it('クーポンは使用ボタンつきカードに直す', () => {
     const out = bubbleLegacyMessage({
       id: 'b', type: 'coupon',
-      content: { assetId: 'a', assetName: '夏クーポン', description: '500円引き', actionUrl: 'https://example.com/c' },
+      content: { assetId: 'a', assetName: '夏クーポン',startsAt:'2026-01-01T00:00',endsAt:'2027-01-01T00:00',description: '500円引き', actionUrl: 'https://example.com/c' },
     })
-    expect(out.messageType).toBe('text')
-    expect(out.messageContent).toBe('500円引き\nhttps://example.com/c')
+    expect(out.messageType).toBe('flex')
+    expect(out.messageContent).toContain('coupon_use:a')
   })
 
   it('リサーチは読める文に直す', () => {
@@ -257,5 +257,17 @@ describe('ボタンの入力不備', () => {
     expect(messageButtonsError([button(), button(), button(), button(), button()])).toBe(
       'ボタンは4つまでです',
     )
+  })
+})
+
+
+describe('イメージマップのAPIと編集用データの往復',()=>{
+  it('LINEの範囲をピクセルのまま保ち、既存のリッチメッセージとして読み込む',()=>{
+    const payload={baseUrl:'https://example.com/images/map',baseSize:{width:1040,height:520},altText:'予約案内',actions:[{type:'message',text:'予約',area:{x:520,y:0,width:520,height:520}}]}
+    const loaded=messageTemplateToBubble({id:'template',name:'予約案内',messageType:'imagemap',messageContent:JSON.stringify(payload)})!
+    expect(loaded.type).toBe('rich_message')
+    expect(loaded.content.coordinateUnit).toBe('px')
+    expect(bubblesForSave([loaded])).toHaveLength(1)
+    expect(JSON.parse(bubbleLegacyMessage(loaded).messageContent)).toMatchObject(payload)
   })
 })
