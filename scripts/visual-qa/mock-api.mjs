@@ -1497,12 +1497,19 @@ const RESTAURANT_CLOSURES = [
 /* 臨時休業・貸切の窓の preview：この日の予約2件（LINE の友だち1件・ホットペッパー1件）。保存・送信はしない。 */
 const RESTAURANT_CLOSURE_PREVIEW = {
   reservations: [
-    { id: 'cl-r1', startsAt: restaurantAt(12, 0, 13), endsAt: restaurantAt(14, 0, 13), guestCount: 2, customerName: '山田 花子', source: 'line', tableId: 'tbl-1', friendId: 'friend-1', isLineFriend: true },
-    { id: 'cl-r2', startsAt: restaurantAt(19, 0, 13), endsAt: restaurantAt(21, 0, 13), guestCount: 4, customerName: '佐藤 美咲', source: 'hotpepper', tableId: 'tbl-4', friendId: null, isLineFriend: false },
+    { id: 'cl-r1', startsAt: restaurantAt(12, 0, 13), endsAt: restaurantAt(14, 0, 13), guestCount: 2, customerName: '山田 花子', customerPhone: null, contacted: false, source: 'line', tableId: 'tbl-1', friendId: 'friend-1', isLineFriend: true },
+    { id: 'cl-r2', startsAt: restaurantAt(19, 0, 13), endsAt: restaurantAt(21, 0, 13), guestCount: 4, customerName: '佐藤 美咲', customerPhone: '03-…', contacted: false, source: 'hotpepper', tableId: 'tbl-4', friendId: null, isLineFriend: false },
   ],
+  contactedCount: 0,
   waitlistCount: 0,
   conflicts: [],
 }
+/* 右の列の「連絡済み」（contact-status）：20日の臨時休業は予約2件のうち1件に LINE で連絡済み。ほかは予約なし。 */
+const restaurantClosureContact = (id) => id === 'cl-1'
+  ? { ...RESTAURANT_CLOSURE_PREVIEW, contactedCount: 1, reservations: RESTAURANT_CLOSURE_PREVIEW.reservations.map((r, i) => ({ ...r, contacted: i === 0 })) }
+  : { contactedCount: 0, reservations: [], waitlistCount: 0, conflicts: [] }
+/* E-4 の「もう開けてよい」の知らせと知らせる相手（店長・ホール担当の2人を選んだ形）。 */
+const RESTAURANT_CLOSE_NOTIFICATION = { storeId: 'store-sby', notifyReopen: true, recipientMode: 'selected', membershipIds: ['mem-2', 'mem-4'], version: 1 }
 /* 板 hQQlt（予約経路の連携）：媒体ごとの受け取り。サーバ（/api/restaurant-test/channels）と同じ形。 */
 const RESTAURANT_CHANNELS = [
   { id: 'media-hp', code: 'hotpepper', name: 'Hot Pepper グルメ', todayCount: 9, lastReceivedAt: restaurantAt(18, 42), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
@@ -2768,6 +2775,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/opening-hours') {
     return { success: true, data: RESTAURANT_OPENING_HOURS }
+  }
+  {
+    const contact = method === 'GET' ? /^\/api\/restaurant-test\/closures\/([^/]+)\/contact-status$/.exec(pathname) : null
+    if (contact) return { success: true, data: restaurantClosureContact(contact[1]) }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/close-notification-settings') {
+    return { success: true, data: { ...RESTAURANT_CLOSE_NOTIFICATION, storeId: query.get('storeId') || 'store-sby' } }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/channels') {
     return { success: true, data: RESTAURANT_CHANNELS }

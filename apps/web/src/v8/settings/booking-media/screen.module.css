@@ -358,3 +358,22 @@
   z-index: var(--tpl-e49-footer-z);
   margin: var(--tpl-e49-gap-l) var(--tpl-fx4-footer-inset);
 }
+
+/* 知らせる相手：押すと選ぶ窓が開く（見た目は値の箱のまま）。 */
+.targetButton {
+  background: var(--color-canvas);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.targetButton:focus-visible {
+  outline: var(--tpl-e49-focus-ring) solid var(--color-accent);
+}
+
+.memberPicks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-gap-xs);
+  padding-left: var(--tpl-e49-gap-l);
+}

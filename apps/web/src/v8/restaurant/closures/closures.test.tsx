@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), closures: vi.fn(), openingHours: vi.fn(), channelCloseTasks: vi.fn(), mediaLinks: vi.fn(),
   previewClosure: vi.fn(), createClosure: vi.fn(), updateClosure: vi.fn(), deleteClosure: vi.fn(), completeChannelCloseTask: vi.fn(),
-  inventoryDay: vi.fn(),
+  inventoryDay: vi.fn(), closureContactStatus: vi.fn(),
 }))
 const google = vi.hoisted(() => ({ profile: vi.fn(), proposeClosureHours: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
@@ -20,7 +20,7 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRo
 import { ApiError } from '@/lib/api'
 import InventoryPage from '../inventory/inventory'
 import { snapshotOf } from '../booking-kit/test-data'
-import { inputError, monthWeeks, overlapping, statusLine, tasksFor, todayIn } from './format'
+import { inputError, monthWeeks, overlapMessage, overlapping, statusLine, tasksFor, todayIn } from './format'
 
 const today = todayIn('Asia/Tokyo')
 const month = today.slice(0, 7)
@@ -57,6 +57,9 @@ beforeEach(() => {
   fixture.createClosure.mockImplementation(async (_a: string, body: Record<string, unknown>) => ({ data: { closure: { ...closure('cl-new', future), ...body, id: 'cl-new', version: 1 }, reservations: [{}, {}], waitlistCount: 0, conflicts: [] } }))
   fixture.deleteClosure.mockResolvedValue({ data: { id: 'cl-1', version: 4, archived: true } })
   fixture.completeChannelCloseTask.mockResolvedValue({ success: true })
+  fixture.closureContactStatus.mockImplementation(async (_a: string, id: string) => ({ data: id === 'cl-1'
+    ? { contactedCount: 1, reservations: [{ id: 'r1' }, { id: 'r2' }], waitlistCount: 0, conflicts: [] }
+    : { contactedCount: 0, reservations: [], waitlistCount: 0, conflicts: [] } }))
   google.profile.mockResolvedValue({ profile: { specialHours: [] } })
   google.proposeClosureHours.mockResolvedValue({ success: true, change: {} })
 })
@@ -76,6 +79,9 @@ describe('UVnvR 休業日・貸切', () => {
     expect(screen.getByRole('tab', { name: '休業日・貸切' }).getAttribute('aria-selected')).toBe('true')
     expect(card.textContent).toContain('終日・全卓')
     expect(card.textContent).toContain('他サイト 未対応 2')
+    /* 連絡済みは contact-status の数（休業を作った後に担当者が LINE で送った予約）。 */
+    await waitFor(() => expect(card.textContent).toContain('予約 2件 ・ 連絡済み 1件 ・ 他サイト 未対応 2'))
+    expect(fixture.closureContactStatus).toHaveBeenCalledWith('account-1', 'cl-1')
     expect(document.querySelector('[data-closure-card="cl-2"]')!.textContent).toContain('18:00〜22:00 ・ 個室A・T1')
     expect(screen.getAllByText('定休').length).toBeGreaterThan(1)
     const band = document.querySelector('[data-closure-band]') as HTMLElement
@@ -114,12 +120,36 @@ describe('UVnvR 休業日・貸切', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'この日を閉じる' }))
     await waitFor(() => expect(google.proposeClosureHours).toHaveBeenCalledWith('account-1', 'cl-new', 1, false))
 
-    fixture.createClosure.mockRejectedValueOnce(new ApiError(409, 'closure_overlap', 'closure_overlap'))
+    fixture.createClosure.mockRejectedValueOnce(new ApiError(409, '重なっています', 'closure_overlap', {
+      conflicts: [closure('cl-x', future, { name: '会社の宴会', kind: 'private_event', allDay: false, startTime: '18:00', endTime: '22:00' })],
+    }))
     fireEvent.click(await screen.findByRole('button', { name: /臨時休業・貸切を足す/ }))
     const again = await waitFor(() => document.querySelector('[data-design-node="nVvXy"]') as HTMLElement)
     await within(again).findByText(/予約が 2件あります/)
     fireEvent.click(within(again).getByRole('button', { name: 'この日を閉じる' }))
-    expect(await within(again).findByText('同じ日・同じ卓に、ほかの休業・貸切があります。日付か卓を変えてください。')).not.toBeNull()
+    /* 409 の data から相手の名前と日付を出す。 */
+    expect(await within(again).findByText(/の貸切「会社の宴会」と重なっています。日付か卓を変えてください。/)).not.toBeNull()
+  })
+
+  it('変える窓は自分を除いて preview を呼び、電話番号・連絡済みを preview から出す。閉じる知らせは外せる', async () => {
+    fixture.previewClosure.mockResolvedValue({ data: { contactedCount: 1, reservations: [
+      { id: 'r1', startsAt: `${day(future)}T03:00:00.000Z`, endsAt: `${day(future)}T05:00:00.000Z`, guestCount: 2, customerName: '山田 花子', customerPhone: null, contacted: true, source: 'line', tableId: 't1', friendId: 'friend-9', isLineFriend: true },
+      { id: 'r2', startsAt: `${day(future)}T10:00:00.000Z`, endsAt: `${day(future)}T12:00:00.000Z`, guestCount: 4, customerName: '佐藤 美咲', customerPhone: '03-1234-5678', contacted: false, source: 'hotpepper', tableId: 't4', friendId: null, isLineFriend: false },
+    ], waitlistCount: 0, conflicts: [] } })
+    fixture.updateClosure.mockImplementation(async (_a: string, id: string, body: Record<string, unknown>) => ({ data: { closure: { ...closure(id, future), ...body, version: 4 }, reservations: [], contactedCount: 0, waitlistCount: 0, conflicts: [] } }))
+    render(<InventoryPage />)
+    await waitFor(() => expect(document.querySelector('[data-closure-card="cl-1"]')).not.toBeNull())
+    const card = document.querySelector('[data-closure-card="cl-1"]') as HTMLElement
+    fireEvent.click(within(card).getByRole('button', { name: /の操作$/ }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '変える' }))
+    const dialog = await waitFor(() => document.querySelector('[data-design-node="nVvXy"]') as HTMLElement)
+    await within(dialog).findByText(/予約が 2件あります（保存しても取り消しません・連絡済み 1件）/)
+    expect(fixture.previewClosure).toHaveBeenCalledWith('account-1', expect.objectContaining({ excludeId: 'cl-1' }))
+    expect(within(dialog).getByRole('link', { name: /電話で連絡（03-1234-5678）/ })).not.toBeNull()
+    expect(within(dialog).getByRole('link', { name: '連絡済み（会話を見る）' }).getAttribute('href')).toBe('/chats?friend=friend-9')
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /「閉じる知らせ」を出す/ }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '変更を保存' }))
+    await waitFor(() => expect(fixture.updateClosure).toHaveBeenCalledWith('account-1', 'cl-1', expect.objectContaining({ notifyMedia: false, expectedVersion: 3 })))
   })
 
   it('「…」の「消して開ける」は確かめてから版つきで消す', async () => {
@@ -176,6 +206,15 @@ describe('休業日・貸切の数え方', () => {
     expect(statusLine(2, tasksFor({ id: 'x' }, [t('close'), t('done')]))).toBe('予約 2件 ・ 他サイト 未対応 1')
     expect(statusLine(0, tasksFor({ id: 'x' }, [t('done'), t('done')]))).toBe('予約 0件 ・ 他サイト 閉じた 2/2')
     expect(statusLine(null, tasksFor({ id: 'x' }, []))).toBe('')
+    expect(statusLine(2, tasksFor({ id: 'x' }, []), 1)).toBe('予約 2件 ・ 連絡済み 1件')
+    expect(statusLine(0, tasksFor({ id: 'x' }, []), 0)).toBe('予約 0件')
+  })
+
+  it('重なりの文：相手の種類・名前・日付・時刻。相手が分からなければ一般の文', () => {
+    const c = { name: '会社の宴会', kind: 'private_event' as const, startDate: '2026-10-24', endDate: '2026-10-24', allDay: false, startTime: '18:00', endTime: '22:00' }
+    expect(overlapMessage([c])).toBe('10月24日（土） 18:00〜22:00の貸切「会社の宴会」と重なっています。日付か卓を変えてください。')
+    expect(overlapMessage([{ ...c, name: '臨時休業', kind: 'temporary_closed', allDay: true }, c])).toBe('10月24日（土）の臨時休業（ほか 1件）と重なっています。日付か卓を変えてください。')
+    expect(overlapMessage([])).toBe('同じ日・同じ卓に、ほかの休業・貸切があります。日付か卓を変えてください。')
   })
 
   it('入力の誤り：過去の日・おわりが前・時間帯の逆を止める', () => {
