@@ -75,6 +75,7 @@ import Pagination from '@/components/shared/pagination'
 import SheetDialog from '@/v8/reminders/sheet-dialog'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { runUndoable } from '@/lib/undoable'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
@@ -622,6 +623,12 @@ export default function RemindersListV8() {
 
   /* ===== フォルダの列 ===== */
 
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。未分類は色の無い輪。 */
+  const folderDotOf = (row: { folderId?: string | null }): FolderDotFolder | null => {
+    if (!row.folderId) return null
+    const folder = folders.find((f) => f.id === row.folderId)
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' },
     ...folders.map((folder) => ({
@@ -955,19 +962,21 @@ export default function RemindersListV8() {
                     </Td>
                     <NameCell
                       name={<div className={styles.nameRow}>
-                        <Link
-                          href={detailHref(row.id)}
-                          title={row.name}
-                          className={styles.cellTitle}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                            event.preventDefault()
-                            goDetail(detailHref(row.id))
-                          }}
-                        >
-                          {row.name}
-                        </Link>
+                        <FolderDotName folder={folderDotOf(row)} dot={!narrow}>
+                          <Link
+                            href={detailHref(row.id)}
+                            title={row.name}
+                            className={styles.cellTitle}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                              event.preventDefault()
+                              goDetail(detailHref(row.id))
+                            }}
+                          >
+                            {row.name}
+                          </Link>
+                        </FolderDotName>
                         {row.hasFailure || (row.failedCount ?? 0) > 0 ? (
                           <button
                             type="button"
@@ -983,7 +992,7 @@ export default function RemindersListV8() {
                           </button>
                         ) : null}
                       </div>}
-                      sub={<span title={view.subtitle}>
+                      sub={<span className={narrow ? undefined : styles.dotIndent} title={view.subtitle}>
                         <CalendarClock size={11} aria-hidden="true" className={styles.cellSubIcon} />
                         {view.subtitle}
                       </span>}
