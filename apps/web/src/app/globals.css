@@ -2282,4 +2282,5 @@ select:not([multiple]):not(.appearance-none) {
 [data-theme="v8"] {
   --tpl-ux5-nav-group-gap: 1px;
   --tpl-ux5-help-mark-font: var(--font-inter), Inter, sans-serif;
+  --tpl-ux5-combobox-h: 36px;
 }
