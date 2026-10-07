@@ -25,7 +25,7 @@ import type { MessageTemplateDefinition, TemplateKind, TemplateKindCounts } from
 export interface RichMenuDefinition {
   schemaVersion: 1
   richMenu: {
-    id: string; name: string; chatBarText: string; size: 'large' | 'compact'; defaultPageId: string
+    id: string; name: string; chatBarText: string; size: 'large' | 'compact'; defaultPageId: string; displayOrder?: number; displayAudience?: 'all' | 'store'
     pages: Array<{
       id: string; name: string; imageR2Key: string
       areas: Array<{
@@ -124,6 +124,13 @@ async function request<T>(path: string, method = 'GET', body?: unknown, headers?
 }
 const idPath = (id: string) => `/${encodeURIComponent(id)}`
 export const hqTemplatesApi = {
+  versions: (id:string) => fetchHqTemplateVersions(id),
+  compareVersions: (id:string,from:number,to:number) => compareHqTemplateVersions(id,from,to),
+  restoreVersion: (id:string,version:number,expectedRevision:number) => restoreHqTemplateVersion(id,version,expectedRevision),
+  receivedVersions: (id:string) => fetchHqTemplateReceivedVersions(id),
+  listStats: (type:TemplateType='template') => fetchHqTemplateListStats(type),
+  listAttributeTags: () => request<HqTemplateListItem[]>('?kind=tag'),
+  attributeKindCounts: () => request<{tag:number;friend_field:null;support_mark:null}>('/attribute-kind-counts'),
   uploadRichMessageImage: async (file:File):Promise<import('@line-crm/shared').TemplateImagemapUpload> => {
     if(!['image/png','image/jpeg'].includes(file.type) || !file.size || file.size>8*1024*1024) throw new Error('PNG・JPEGの画像を8MB以内で選んでください。')
     const response=await fetchApi<{success:true;data:import('@line-crm/shared').TemplateImagemapUpload}>(`/api/hq/templates/media?purpose=rich_message&filename=${encodeURIComponent(file.name)}`,{method:'POST',headers:{'Content-Type':file.type},body:file})
@@ -182,4 +189,13 @@ export const hqTemplatesApi = {
   preflight: (id: string, accountIds: string[], textOverrides?: import('@line-crm/shared').HqTemplateTextOverride[]) => request<Preflight>(`${idPath(id)}/preflight`, 'POST', { accountIds, ...(textOverrides ? {textOverrides} : {}) }),
   distribute: (id: string, preflightId: string, resolutions: Resolution[]) => request<DistributionResult>(`${idPath(id)}/distribute`, 'POST', { preflightId, resolutions }),
   result: (id: string, runId: string) => request<DistributionResult>(`${idPath(id)}/distributions/${encodeURIComponent(runId)}`),
+}
+
+export const fetchHqTemplateVersions = (id: string) => request<import('@line-crm/shared').HqTemplateVersionDisplay[]>(`/${encodeURIComponent(id)}/versions`)
+export const compareHqTemplateVersions = (id: string, from: number, to: number) => request<import('@line-crm/shared').HqTemplateVersionComparison>(`/${encodeURIComponent(id)}/versions/compare?from=${from}&to=${to}`)
+export const restoreHqTemplateVersion = (id: string, version: number, expectedRevision: number) => request<TemplateDetail>(`/${encodeURIComponent(id)}/versions/${version}/restore`, 'POST', {expectedRevision})
+export const fetchHqTemplateReceivedVersions = (id: string) => request<import('@line-crm/shared').HqTemplateReceivedVersion[]>(`/${encodeURIComponent(id)}/received-versions`)
+export async function fetchHqTemplateListStats(type: TemplateType = 'template') {
+  const result = await fetchApi<{success: true; stats: import('@line-crm/shared').HqTemplateListStats}>(`/api/hq/templates?type=${type}`)
+  return result.stats
 }

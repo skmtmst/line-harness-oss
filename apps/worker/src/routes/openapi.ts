@@ -1,3 +1,4 @@
+import { api18Paths } from './api18-openapi.js';
 import { chatAttachmentPaths } from './chat-attachments-openapi.js';
 import { api17Paths, api17TemplateKind } from './api17-openapi.js';
 import { api9Paths, api9Schemas } from './api9-openapi.js';
@@ -415,6 +416,7 @@ const spec = {
     '/api/broadcast-message-assets/upload-sessions/{id}/complete': {
       post:{tags:['Broadcasts'],summary:'容量・形式・所属・ETagを検査して配信用URLを返す',parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}}],requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['etag'],properties:{etag:{type:'string'}}}}}},responses:{'201':{description:'安全性の検査対象として登録し、配信用URLを発行'},'200':{description:'確定済みの再要求'},'409':{description:'期限切れまたは内容不一致'},'422':{description:'ファイルの形式が不正'}}},
     },
+    ...api18Paths,
     ...api17Paths,
     ...api9Paths,
     ...restaurantClosurePaths,
@@ -2090,7 +2092,7 @@ const spec = {
       get: {
         tags: ['HQ Templates'],
         summary: '統括ひな形一覧を取得',
-        parameters: [{name:'kind',in:'query',schema:api17TemplateKind,description:'メッセージの6種類で絞る。type=templateと併用可能。応答のkind_countsは絞り込み前の件数。'},{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] } }],
+        parameters: [{name:'kind',in:'query',schema:{type:'string',enum:[...api17TemplateKind.enum,'tag']},description:'メッセージの6種類またはtagで絞る。type=templateと併用可能。応答のkind_countsは絞り込み前の件数。'},{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] } }],
         responses: { '200': { description: 'Tenant-scoped template list' }, '400': { description: 'Invalid template type' }, '403': { description: 'Owner or admin role required' } },
       },
       post: {

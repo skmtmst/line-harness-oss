@@ -133,6 +133,26 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/hq/templates/attribute-kind-counts',
+  'GET /api/hq/templates/{id}/versions',
+  'GET /api/hq/templates/{id}/versions/compare',
+  'POST /api/hq/templates/{id}/versions/{version}/restore',
+  'GET /api/hq/templates/{id}/received-versions',
+  'GET /api/hq/broadcasts/folders',
+  'POST /api/hq/broadcasts/folders',
+  'PATCH /api/hq/broadcasts/folders/{id}',
+  'DELETE /api/hq/broadcasts/folders/{id}',
+  'GET /api/hq/broadcasts/approvals/candidates',
+  'GET /api/hq/broadcasts/{id}/approval',
+  'POST /api/hq/broadcasts/{id}/approval-request',
+  'POST /api/hq/broadcasts/{id}/approve',
+  'POST /api/hq/broadcasts/{id}/reject',
+  'POST /api/hq/broadcasts/{id}/approval-cancel',
+  'POST /api/hq/broadcasts/{id}/test-send',
+  'GET /api/hq/broadcasts/{id}/targets/{accountId}/recipients',
+  'GET /api/hq/broadcasts/{id}/activity',
+  'GET /api/hq/broadcasts/{id}/export.csv',
+
   'POST /api/chats/{id}/send',
   'POST /api/chats/{id}/attachments/upload',
   'POST /api/chats/{id}/attachments/upload-sessions',
