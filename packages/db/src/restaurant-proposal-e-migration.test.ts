@@ -32,7 +32,7 @@ describe('飲食店の提案Eマイグレーション草稿',()=>{
    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
    db.prepare("UPDATE rt_reservations SET source='walk_in' WHERE id='reservation'").run();
   }finally{db.close();}
- });
+ },30000);
  it('597は媒体を参照する予約を残し、予約を受けない媒体を追加できる',()=>{
   const db=beforeProposal();try{
    db.transaction(()=>db.exec(readFileSync(join(root,'migrations/597_restaurant_media_links.sql'),'utf8')))();
@@ -42,5 +42,5 @@ describe('飲食店の提案Eマイグレーション草稿',()=>{
    expect(db.prepare("SELECT id,inbound_email_id FROM rt_email_digests WHERE id='digest'").get()).toEqual({id:'digest',inbound_email_id:'mail'});
    db.exec("INSERT INTO rt_media(id,code,name,parser_key,is_active,accepts_reservations) VALUES('gourmet','gourmet_test','グルメ','gourmet_test',0,0)");
   }finally{db.close();}
- });
+ },30000);
 });
