@@ -26,7 +26,7 @@ import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextArea } from '@/components/shared/text-field'
 import Checkbox from '@/components/shared/checkbox'
-import { RowActions } from '@/components/shared/row-actions'
+import RowMenu from './row-menu'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -399,12 +399,15 @@ export default function HqBroadcastCreate() {
 
           <section className={styles.section} aria-label="② 中身">
             <SectionHeader title="② 中身" help="店ごとに変わる差し込みは、送るときに店の名前や店の共通情報へ置き換わります。店の共通情報が無い店は、送る前の確かめで止まります。" helpLabel="中身の説明" />
+            {/* 絵（p17Qku）：切り替えは中身の幅（横いっぱいに伸ばさない）。 */}
+            <div className={styles.kindPick}>
             <SegmentedControl<Kind>
               aria-label="中身の種類"
               value={kind}
               onChange={(next) => { setKind(next); setAssetId('') }}
               options={[{ value: 'text', label: '文章' }, { value: 'coupon', label: 'クーポン' }, { value: 'rich', label: 'リッチメッセージ' }]}
             />
+            </div>
             {kind !== 'text' ? (
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>{kind === 'coupon' ? 'クーポン' : 'リッチメッセージ'}</span>
@@ -492,9 +495,9 @@ export default function HqBroadcastCreate() {
                           <Td className={styles.colCheck}><StatusBadge tone={badge.tone} title={p.blockedReasons.join('・') || undefined}>{badge.label}</StatusBadge></Td>
                           <Td className={styles.colSend}><StatusBadge tone={go ? 'success' : 'neutral'}>{go ? '送る' : '外す'}</StatusBadge></Td>
                           <Td className={styles.colMenu}>
-                            <RowActions
+                            <RowMenu
                               subjectName={p.accountName}
-                              menuItems={p.blockedReasons.length > 0
+                              items={p.blockedReasons.length > 0
                                 ? [{ id: 'why', label: `外す理由：${p.blockedReasons.join('・')}`, disabled: true, disabledReason: '直すと次から送れます', onSelect: () => {} }]
                                 : [{ id: 'toggle', label: p.excluded ? 'この店に送る' : 'この店を外す', onSelect: () => void toggleExclude(p) }]}
                             />
@@ -510,7 +513,7 @@ export default function HqBroadcastCreate() {
                         <Td className={styles.colCheck}><StatusBadge tone="success">すべて足りる</StatusBadge></Td>
                         <Td className={styles.colSend}><StatusBadge tone="success">送る</StatusBadge></Td>
                         <Td className={styles.colMenu}>
-                          <RowActions subjectName={`ほか ${rest.length}店`} menuItems={[{ id: 'all', label: '1店ずつ見る', onSelect: () => setShowAll(true) }]} />
+                          <RowMenu subjectName={`ほか ${rest.length}店`} items={[{ id: 'all', label: '1店ずつ見る', onSelect: () => setShowAll(true) }]} />
                         </Td>
                       </Tr>
                     ) : null}

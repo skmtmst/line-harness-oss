@@ -17,6 +17,8 @@ export interface ListFolderNav {
   createAction?: ReactNode
   /** 選ぶ欄の呼び名（「フォルダ」「タグ」など）。選択肢は「呼び名：名前」で出す。 */
   label?: string
+  /** 畳んだ選ぶ欄の幅（px）。「種類：リッチメニュー」のように選択肢が長い画面だけ渡す。省くと共通の幅（150）。 */
+  width?: number
 }
 export interface ListPageBodyProps {
   stats?: ReactNode
@@ -59,10 +61,10 @@ export function ListPageBody({ stats, folders, collapsedFolders, folderNav, fold
   </div>
 }
 /** folderNav から組む、畳んだときの「作る・フォルダを選ぶ欄」。 */
-function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = 'フォルダ' }: ListFolderNav) {
+function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = 'フォルダ', width }: ListFolderNav) {
   return <>
     {createAction ? <span className={styles.collapsedCreate}>{createAction}</span> : null}
-    <span className={styles.collapsedSelect}>
+    <span className={styles.collapsedSelect} style={width ? { width } : undefined}>
       <Select aria-label={label} value={activeId} onChange={onSelect} options={rows.map((row) => ({ value: row.id, label: `${label}：${row.label}` }))} />
     </span>
   </>

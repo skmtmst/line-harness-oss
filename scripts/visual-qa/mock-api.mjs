@@ -319,6 +319,16 @@ const HQ_TEMPLATE_PREFLIGHT_HTN = {
   ],
 }
 
+/** 統括のテンプレート（★V8-B dEvJM）：配った結果。成功2（新規・同じ名前で別名）・失敗1。 */
+const HQ_TEMPLATE_RESULT_HTN = {
+  runId: 'visual-hq-run-1', status: 'partial',
+  stores: [
+    { accountId: 'visual-qa-account-prod', accountName: '然-NEN-本店', status: 'succeeded', reason: null, counts: { created: 1, overwritten: 0, aliased: 0 }, createdName: '秋の新商品のお知らせ' },
+    { accountId: 'visual-qa-account-store', accountName: '然-NEN-渋谷店', status: 'succeeded', reason: null, counts: { created: 0, overwritten: 0, aliased: 1 }, createdName: '秋の新商品のお知らせ（2）' },
+    { accountId: 'visual-qa-account-event-2025', accountName: '2025年イベント', status: 'failed', reason: 'タグ「秋の新商品」がこのアカウントにありません', counts: { created: 0, overwritten: 0, aliased: 0 }, createdName: null },
+  ],
+}
+
 /** 統括 LINEアカウントを登録の見本（★V8-B GwKE2 のタグ・qw80E の5段）。 */
 const LINE_ACCOUNT_CONNECT_HTN = {
   steps: [
@@ -2118,6 +2128,8 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   }
   // 統括のテンプレート（★V8-B meBRB）：配る前の確認。
   if (method === 'POST' && /^\/api\/hq\/templates\/visual-hq-tpl-[^/]+\/preflight$/.test(pathname)) return HQ_TEMPLATE_PREFLIGHT_HTN
+  // 統括のテンプレート（★V8-B dEvJM）：配る。結果の窓に出す成功2・失敗1を返す。
+  if (method === 'POST' && /^\/api\/hq\/templates\/visual-hq-tpl-[^/]+\/distribute$/.test(pathname)) return HQ_TEMPLATE_RESULT_HTN
   // 統括 LINEアカウントを登録（★V8-B v2KMj・qw80E・TvXII）。接続確認は5段すべて通った返事、登録は取り込み中。
   if (method === 'POST' && pathname === '/api/line-accounts/connect/check') return LINE_ACCOUNT_CONNECT_HTN
   if (method === 'POST' && pathname === '/api/line-accounts/connect') {
@@ -3249,6 +3261,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const row = HQ_TEMPLATES_HTN.find((item) => item.id === hqTemplateDetail[1])
     return row ? { success: true, data: { template: row, definition: hqTemplateDefinitionHtn(row) } } : { success: false, error: 'Not found' }
   }
+  if (method === 'GET' && /^\/api\/hq\/templates\/visual-hq-tpl-[^/]+\/distributions\/[^/]+$/.test(pathname)) return { success: true, data: HQ_TEMPLATE_RESULT_HTN }
   if (method === 'DELETE' && pathname === '/api/hq/templates/media') {
     return { success: true, data: { deleted: true } }
   }
