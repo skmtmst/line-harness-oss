@@ -46,6 +46,9 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
+import { hqFormPortableReferenceError } from '@/components/forms/hq-form-definition-adapter'
+import type { FormEditHost } from './host'
 import {
   conflictMessage,
   conflictTitle,
@@ -86,9 +89,12 @@ type Snapshot = {
   layout: FormLayout
 }
 
-function FormEditInner() {
+function FormEditInner({ host }: { host?: FormEditHost }) {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
+  /* 統括のひな形から使うとき（host.ts）。読み込み・保存は呼ぶ側。 */
+  const hostRef = useRef(host)
+  hostRef.current = host
   const { selectedAccount, selectedAccountId } = useAccount()
   const narrow = useNarrowViewport()
 
@@ -97,25 +103,27 @@ function FormEditInner() {
   const answerUrl = liffId ? `https://liff.line.me/${liffId}/forms/${id}` : null
 
   const [editTab, setEditTab] = useState<EditTab>(() => readTab(params.get('tab')))
-  const [name, setName] = useState('')
+  /* 統括から使うときは、最初の描画から読み込んだ中身で出す（空の一瞬に保存を押させない）。 */
+  const [name, setName] = useState(() => host?.initial.name ?? '')
   const [nameError, setNameError] = useState<string | null>(null)
-  usePageTitle(name || '回答フォーム編集')
-  const [description, setDescription] = useState('')
-  const [isActive, setIsActive] = useState(true)
+  /* 統括から使うときは上の帯を「回答フォーム」だけにする（絵 u5MM7。呼ぶ側の題と同じ）。 */
+  usePageTitle(host ? '回答フォーム' : name || '回答フォーム編集')
+  const [description, setDescription] = useState(() => host?.initial.description ?? '')
+  const [isActive, setIsActive] = useState(!host)
   const [submitCount, setSubmitCount] = useState(0)
-  const [onSubmitTagId, setOnSubmitTagId] = useState('')
+  const [onSubmitTagId, setOnSubmitTagId] = useState(() => host?.initial.onSubmitTagId ?? '')
   const [ogTitle, setOgTitle] = useState('')
   const [ogDescription, setOgDescription] = useState('')
   const [ogImageUrl, setOgImageUrl] = useState('')
-  const [layout, setLayoutState] = useState<FormLayout>(emptyLayout)
+  const [layout, setLayoutState] = useState<FormLayout>(() => host?.initial.layout ?? emptyLayout())
   const [page, setPage] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!host)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [formLoaded, setFormLoaded] = useState(false)
+  const [formLoaded, setFormLoaded] = useState(Boolean(host))
   const [formLoadFailed, setFormLoadFailed] = useState<'missing' | 'forbidden' | 'error' | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const savedSnapshot = useRef<string | null>(null)
@@ -245,6 +253,29 @@ function FormEditInner() {
 
   useEffect(() => {
     setFormLoadFailed(null)
+    const hosted = hostRef.current
+    if (hosted) {
+      /* 統括のひな形：読み込んだ中身を入れるだけ（店の口は呼ばない）。 */
+      const initial = hosted.initial
+      const loaded: Snapshot = {
+        name: initial.name, description: initial.description, isActive: false, onSubmitTagId: initial.onSubmitTagId,
+        ogTitle: '', ogDescription: '', ogImageUrl: '', layout: initial.layout,
+      }
+      setName(loaded.name)
+      setDescription(loaded.description)
+      setIsActive(loaded.isActive)
+      setOnSubmitTagId(loaded.onSubmitTagId)
+      setLayoutState(loaded.layout)
+      setRefs(hosted.refs)
+      const index = readPage(params.get('page'), loaded.layout.sections.length)
+      pageFromUrl.current = true
+      setPage(index)
+      setSelectedBlockId(params.get('block') ?? firstInputBlockId(loaded.layout.sections[index]?.blocks ?? []))
+      savedSnapshot.current = JSON.stringify(loaded)
+      setFormLoaded(true)
+      setLoading(false)
+      return
+    }
     void (async () => {
       try {
         // 参照一覧は選んでいる公式アカウントに絞る（別アカウントのタグ等を混ぜない）。
@@ -297,7 +328,7 @@ function FormEditInner() {
 
   // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
   useEffect(() => {
-    if (!selectedAccountId) return
+    if (hostRef.current || !selectedAccountId) return
     const menuIds = new Set<string>()
     for (const section of layout.sections) {
       for (const b of section.blocks) {
@@ -474,7 +505,7 @@ function FormEditInner() {
 
   /** 保存を断る理由（無ければ null）。自動保存の「通せる形か」にも同じものを使う。 */
   const saveProblem = (publishAfter: boolean): { message: string; name?: boolean } | null => {
-    if (!selectedAccountId) return { message: 'LINE公式アカウントを選んでください' }
+    if (!host && !selectedAccountId) return { message: 'LINE公式アカウントを選んでください' }
     if (!name.trim()) return { message: 'フォーム名を入力してください', name: true }
     const allBlocks = layout.header.concat(layout.sections.flatMap((s) => s.blocks))
     if (allBlocks.find((b) => b.kind === 'input' && !b.label.trim())) return { message: 'タイトルが空のブロックがあります' }
@@ -499,6 +530,11 @@ function FormEditInner() {
       const publishError = validateFormForPublish(layout)
       if (publishError) return { message: publishError }
     }
+    if (host) {
+      /* 店にだけある友だち情報・テンプレート・リマインダ・画像は、ひな形に入れられない（配った先の ID に直せない）。 */
+      const portableError = hqFormPortableReferenceError({ name, description, layout, onSubmitTagId, onSubmitScenarioId: '', saveToMetadata: true })
+      return portableError ? { message: portableError } : null
+    }
     if (contentRevisionRef.current === null) return { message: '読み込みが終わっていません。少し待ってから、もう一度お試しください' }
     return null
   }
@@ -522,6 +558,12 @@ function FormEditInner() {
       return false
     }
     if (!silent) setNameError(null)
+    if (host) {
+      /* 統括：保存（と配る）は呼ぶ側。publishAfter は［保存して配る］。 */
+      setError('')
+      host.onSave({ name: name.trim(), description: description.trim(), layout, onSubmitTagId }, publishAfter)
+      return true
+    }
     if (!selectedAccountId) return false
     while (saveInFlight.current) await saveInFlight.current.catch(() => undefined)
     const expectedRevision = contentRevisionRef.current
@@ -644,7 +686,7 @@ function FormEditInner() {
   const autosave = useDraftAutosave({
     fingerprint: currentSnapshot,
     dirty,
-    active: role === null || canManageRole(role),
+    active: !host && (role === null || canManageRole(role)),
     enabled: formLoaded && !loading && !conflict && saveProblem(false) === null,
     paused: leaveTarget !== null || saving || showPublish,
     save: () => save(false, { silent: true }),
@@ -677,10 +719,10 @@ function FormEditInner() {
 
   /* ---------------- 対象が無いとき ---------------- */
 
-  if (!id) {
+  if (!host && !id) {
     return <TargetMissing kind="unspecified" title="編集する回答フォームが指定されていません" description="一覧から編集するフォームを選び直してください。" backHref="/form-submissions" backLabel="回答フォーム一覧へ戻る" />
   }
-  if (!loading && !selectedAccountId) {
+  if (!host && !loading && !selectedAccountId) {
     return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="選ぶとフォームを編集できます。" />
   }
   if (!loading && formLoadFailed === 'missing') {
@@ -705,7 +747,7 @@ function FormEditInner() {
 
   /* ---------------- 画面 ---------------- */
 
-  const statusLine = !publishedVersionId
+  const statusLine = host ? host.statusLine : !publishedVersionId
     ? '下書き・まだ公開していません'
     : dirty || (publishedContentRevision !== null && contentRevision !== null && publishedContentRevision !== contentRevision)
       ? '下書き・公開中の版と違うところがあります'
@@ -719,7 +761,7 @@ function FormEditInner() {
   const publishChanges = describePublishChanges(publishedSide ?? savedSide, { name, description, layout })
 
   const phone = (
-    <FormPhone layout={layout} pageIndex={page} accountName={selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} />
+    <FormPhone layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} />
   )
 
   const preview = (
@@ -728,6 +770,13 @@ function FormEditInner() {
         <Smartphone size={15} aria-hidden="true" />
         LINEでの見え方を見る
       </Button>
+      {host ? (
+        /* 統括（u5MM7）：回答用URLは配った先のアカウントごとに出る。ここは配った先だけ。 */
+        <section className={styles.urlBox} aria-label="配った先">
+          <h2 className={styles.urlTitle}>配った先</h2>
+          <p className={styles.urlNote}>{host.distributedLine}</p>
+        </section>
+      ) : (
       <section className={styles.urlBox} aria-label="回答用URL">
         <h2 className={styles.urlTitle}>回答用URL</h2>
         {answerUrl ? (
@@ -757,11 +806,28 @@ function FormEditInner() {
           <p className={styles.urlNote}>回答用URLを発行する設定がまだありません。LINEアカウント設定を確認してください。</p>
         )}
       </section>
+      )}
       <div className={styles.phoneArea}>{phone}</div>
     </div>
   )
 
-  const footerActions = (
+  const hostBusy = Boolean(host?.busy)
+  const footerActions = host ? (
+    <>
+      <Button onClick={() => requestUnsavedAction(host.onCancel)} disabled={hostBusy}>キャンセル</Button>
+      {host.readOnly ? null : (
+        <>
+          <Button onClick={() => void save(false)} disabled={hostBusy} busy={hostBusy} busyLabel="保存中…" title="ひな形を保存（配った先は変わりません）">
+            下書きを保存
+          </Button>
+          <Button variant="primary" onClick={() => void save(true)} disabled={hostBusy} title="保存して、アカウントへ配る画面へ進みます">
+            <Upload size={15} aria-hidden="true" />
+            保存して配る
+          </Button>
+        </>
+      )}
+    </>
+  ) : (
     <>
       <Button href="/form-submissions">キャンセル</Button>
       <Button onClick={() => void save(false).then((ok) => { if (ok) autosave.markSaved() })} disabled={saving} busy={saving} busyLabel="保存中…" title="フォームを保存（公開中の内容は変わりません）">
@@ -799,9 +865,22 @@ function FormEditInner() {
       title={name || 'フォーム名未設定'}
       identity={(
         /* 絵は矢印も文字の1つ（「← 回答フォームへ」）。 */
-        <Link href="/form-submissions" className={styles.backLink}>
-          {'← 回答フォームへ'}
-        </Link>
+        host ? (
+          <Link
+            href={host.backHref}
+            className={styles.backLink}
+            onClick={(event) => {
+              event.preventDefault()
+              requestUnsavedAction(host.onCancel)
+            }}
+          >
+            {'← 回答フォームへ'}
+          </Link>
+        ) : (
+          <Link href="/form-submissions" className={styles.backLink}>
+            {'← 回答フォームへ'}
+          </Link>
+        )
       )}
       steps={(
         <div className={styles.tabs}>
@@ -813,11 +892,12 @@ function FormEditInner() {
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}
-      status={autosave.label
+      status={host ? (dirty ? '保存していない変更があります' : undefined) : autosave.label
         ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
         : dirty ? '保存していない変更があります' : undefined}
     >
       <div className={styles.root} data-fe-root>
+        {host?.notice}
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
         {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
         {loading || !formLoaded ? (
@@ -830,7 +910,8 @@ function FormEditInner() {
             refs={refs}
             selectedBlockId={selectedBlockId}
             inputCount={inputCount}
-            accountId={selectedAccountId}
+            accountId={host ? null : selectedAccountId}
+            portable={Boolean(host)}
             onSelectPage={selectPage}
             onAddPage={addSection}
             onRenamePage={renameSection}
@@ -848,7 +929,8 @@ function FormEditInner() {
         ) : (
           <AppearanceTab
             options={layout.options}
-            accountId={selectedAccountId}
+            accountId={host ? null : selectedAccountId}
+            portable={Boolean(host)}
             name={name}
             nameError={nameError}
             description={description}
@@ -946,11 +1028,11 @@ function FormEditInner() {
   )
 }
 
-export default function FormEditV8() {
+export default function FormEditV8({ host }: { host?: FormEditHost } = {}) {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<p>読み込み中...</p>}>
-      <FormEditInner />
+      <FormEditInner host={host} />
     </Suspense>
   )
 }

@@ -632,7 +632,7 @@ function ChangeBox({ title, before, after }: { title: string; before: string; af
  * 型の「作る」の頭（戻る・名前・説明）と左右の列。詳細には保存が無いので下の帯を置かない
  * （型の CreatePage は帯が必須で、帯があると本文が画面の高さで切られるため、枠と頭だけ型から使う）。
  */
-function DetailFrame({ title, identity, description, preview, children }: {
+export function DetailFrame({ title, identity, description, preview, children }: {
   title: string; identity: ReactNode; description: string; preview: ReactNode; children: ReactNode
 }) {
   return (

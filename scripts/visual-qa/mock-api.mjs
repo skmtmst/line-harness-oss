@@ -289,7 +289,8 @@ const HQ_TEMPLATES_HTN = [
   { id: 'visual-hq-tpl-question', name: '好みのコース', description: '選択肢 4', template_type: 'template', kind: 'question', folder_id: null, revision: 1, updated_at: '2026-01-13T00:00:00.000Z', reference_summary: '', distributed_account_count: 1, distributed_account_names: ['本店'], distributed_account_more: 0, content_summary: '選択肢 4' },
   { id: 'visual-hq-tpl-holiday', name: '定休日のご案内', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-08-30T06:20:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '本文' },
   { id: 'visual-hq-tpl-menu', name: '基本のメニュー', description: null, template_type: 'rich_menu', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '6分割・画像あり' },
-  { id: 'visual-hq-tpl-form', name: '予約', description: null, template_type: 'form', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '質問 3' },
+  /* 回答フォームの編集（u5MM7・scJcP・xRPdo・N4T9mO）の中身は店の来店アンケートと同じ。配った先は絵の3アカウント。 */
+  { id: 'visual-hq-tpl-form', name: '来店アンケート', description: null, template_type: 'form', folder_id: null, revision: 3, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 3, distributed_account_names: ['本店', '渋谷店', 'イベント'], distributed_account_more: 0, content_summary: '質問 3' },
   { id: 'visual-hq-tpl-tag-vip', name: 'VIP', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: 'タグ 1' },
   { id: 'visual-hq-tpl-tag-new', name: '新規', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: 'タグ 1' },
 ]
@@ -305,6 +306,15 @@ const HQ_TEMPLATE_ACCOUNTS_HTN = [
   { id: 'visual-qa-account', name: '然 -NEN- TEST' },
 ]
 function hqTemplateDefinitionHtn(row) {
+  if (row.template_type === 'form') {
+    return {
+      schemaVersion: 1,
+      form: {
+        name: row.name, description: null, fields: FORM_DETAIL.fields, layout: FORM_DETAIL.layout,
+        on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true,
+      },
+    }
+  }
   const media = row.id === 'visual-hq-tpl-autumn' ? [{
     id: 'visual-hq-media-autumn', kind: 'image', filename: 'autumn-venison.jpg', mimeType: 'image/jpeg', sizeBytes: 182000, width: 1040, height: 1040, durationMs: null,
     r2Key: 'hq-templates/visual-tenant-1/autumn-venison.jpg', publicUrl: null, versionId: 'v1', versionNo: 1, contentHash: 'visual',

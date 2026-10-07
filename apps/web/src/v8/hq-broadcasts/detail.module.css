@@ -53,6 +53,7 @@
   table-layout: fixed;
 }
 
+
 :global([data-theme='v8']) .table .headRow.headRow > th {
   height: auto;
   padding: var(--tpl-e49-head-pad);
@@ -174,4 +175,13 @@
 
 .reasonText {
   min-width: 0;
+}
+
+/* 右の列（配信した設定）と並ぶので、狭い板（1280 など）では数・状態の列の幅を決めず、店の名前の列と分け合う。 */
+@container v8-page (max-width: 1099px) {
+  .colNum,
+  .colFail,
+  .colState {
+    width: auto;
+  }
 }
