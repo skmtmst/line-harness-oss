@@ -29,7 +29,9 @@ describe('共用の配り先（api.musubo.jp）に特定の会社・旧製品の
     expect(html).not.toContain('然-NEN-');
     expect(html).toContain('<title>musubo</title>');
     expect(html).toContain('rel="icon"');
-    expect(html).not.toContain('user-scalable=no');
+    const viewport = html.match(/name="viewport"\s+content="([^"]*)"/)?.[1] ?? '';
+    expect(viewport).toContain('width=device-width');
+    expect(viewport).not.toContain('user-scalable=no');
     const form = readFileSync(fileURLToPath(new URL('./form.ts', import.meta.url)), 'utf8');
     expect(form).not.toMatch(/X Harness を受け取る/);
   });
