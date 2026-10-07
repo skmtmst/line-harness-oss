@@ -1,0 +1,134 @@
+/*
+ * ★V8 友だち追加時の配信の実行の詳細（N43uVX）。
+ * 頭の下に線 → 左（余白24/28・間16）と右の欄（380・余白24・間14・左に線）。
+ * 値は app/globals.css の --tpl-fm2-rd-*。白い板が 1100px を切ったら右の欄を左の下へ畳む。
+ */
+.backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }
+
+.split {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-fm2-rd-main-gap);
+  min-width: 0;
+  padding: var(--tpl-fm2-rd-main-pad);
+}
+
+/* 失敗の帯：薄い赤・角12・余白12/16・間12。 */
+.failBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-ar-ed-band-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-danger-bg);
+}
+
+.failIcon { flex-shrink: 0; color: var(--color-danger); }
+.failText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
+.failTitle { margin: 0; color: var(--color-danger); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-fm2-rd-title-lh); }
+.failNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+
+/* 行ったこと：枠1本・角12・余白20・間12。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-fm2-rd-card-gap);
+  padding: var(--tpl-fm2-rd-card-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.cardHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
+.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-fm2-rd-card-title-size); font-weight: 700; line-height: var(--tpl-fm2-rd-card-title-lh); }
+.cardSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-fm2-rd-card-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 1つの処理：枠1本・角10・余白12/14・間10。失敗は薄い赤の地で枠なし。 */
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-fm2-rd-step-gap);
+  padding: var(--tpl-fm2-rd-step-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+}
+
+.step[data-state='ng'] { border-color: transparent; background: var(--color-danger-bg); }
+.stepIcon { flex-shrink: 0; width: var(--tpl-fm2-rd-step-icon); height: var(--tpl-fm2-rd-step-icon); color: var(--color-accent); }
+.step[data-state='ng'] .stepIcon { color: var(--color-danger); }
+.step[data-state='wait'] .stepIcon { color: var(--color-ink-faint); }
+.stepIndex { flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 700; }
+.stepText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
+.stepTitle { overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-fm2-rd-title-lh); text-overflow: ellipsis; white-space: nowrap; }
+.stepSub { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-fm2-rd-sub-lh); }
+.step[data-state='ng'] .stepSub { color: var(--color-danger); }
+/* 時刻だけの2行目は小さく（絵は 11/13）。 */
+.stepSub[data-kind='time'] { font-size: var(--text-micro); line-height: var(--tpl-fm2-rd-time-lh); }
+
+.notice { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; }
+
+/* 右の欄：380・余白24・間14・左に線。 */
+.side {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--tpl-fm2-rd-side-gap);
+  box-sizing: border-box;
+  width: var(--tpl-fm2-rd-side-w);
+  padding: var(--tpl-fm2-rd-side-pad);
+  border-left: 1px solid var(--color-hairline);
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-fm2-rd-box-gap);
+  padding: var(--tpl-fm2-rd-box-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+}
+
+.boxTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-fm2-rd-title-lh); }
+
+.rows { display: flex; flex-direction: column; gap: var(--tpl-fm2-rd-box-gap); margin: 0; }
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-fm2-rd-row-gap);
+  padding: var(--tpl-fm2-rd-row-pad);
+  border-bottom: 1px solid var(--tpl-fm2-rd-row-line);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-fm2-rd-sub-lh);
+}
+
+.row dt { flex-shrink: 0; color: var(--color-ink-secondary); }
+.row dd { overflow: hidden; margin: 0; min-width: 0; color: var(--color-ink); font-weight: 600; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.mono { font-variant-numeric: tabular-nums; }
+
+/* トーク・設定：同じ幅で並べる（間8）。 */
+.sideActions { display: flex; gap: var(--tpl-fm2-rd-actions-gap); }
+.sideActions > * { flex: 1 1 0; min-width: 0; }
+
+@container v8-page (max-width: 1099px) {
+  .split { flex-direction: column; }
+  .side { width: 100%; border-top: 1px solid var(--color-hairline); border-left: 0; }
+}

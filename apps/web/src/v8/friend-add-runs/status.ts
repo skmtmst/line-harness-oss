@@ -69,3 +69,42 @@ export function elapsedText(receivedAt: string, processedAt: string | null): str
   if (Number.isNaN(ms) || ms < 0) return '—'
   return `${(ms / 1000).toFixed(1)}秒`
 }
+
+const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
+
+/** 日本時間の年月日・時分秒・曜日。オフセットなしの古い行は JST として読む。読めなければ null。 */
+export function jstParts(value: string | null): { month: number; day: number; hh: string; mm: string; ss: string; weekday: string } | null {
+  if (!value) return null
+  const bare = value.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/)
+  if (bare && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)) {
+    const weekday = WEEKDAYS[new Date(Date.UTC(Number(bare[1]), Number(bare[2]) - 1, Number(bare[3]))).getUTCDay()]
+    return { month: Number(bare[2]), day: Number(bare[3]), hh: bare[4], mm: bare[5], ss: bare[6] ?? '00', weekday }
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  const jst = new Date(parsed.getTime() + 9 * 60 * 60 * 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return {
+    month: jst.getUTCMonth() + 1, day: jst.getUTCDate(),
+    hh: pad(jst.getUTCHours()), mm: pad(jst.getUTCMinutes()), ss: pad(jst.getUTCSeconds()),
+    weekday: WEEKDAYS[jst.getUTCDay()],
+  }
+}
+
+/** 詳細の題の下：`9月7日（月）10:14`。 */
+export function jstTitleDate(value: string | null): string {
+  const p = jstParts(value)
+  return p ? `${p.month}月${p.day}日（${p.weekday}）${p.hh}:${p.mm}` : '—'
+}
+
+/** 詳細の右の列：`9/7 10:14:01`。 */
+export function jstShortDateTime(value: string | null): string {
+  const p = jstParts(value)
+  return p ? `${p.month}/${p.day} ${p.hh}:${p.mm}:${p.ss}` : '—'
+}
+
+/** 行ったことの時刻：`10:14:02`。 */
+export function jstClock(value: string | null): string {
+  const p = jstParts(value)
+  return p ? `${p.hh}:${p.mm}:${p.ss}` : '—'
+}
