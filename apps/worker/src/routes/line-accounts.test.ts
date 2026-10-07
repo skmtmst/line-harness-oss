@@ -1046,6 +1046,44 @@ describe('POST /api/line-accounts/:id/connection-checks', () => {
     });
   });
 
+  test.each([
+    ['https://stg.example.test/webhook', 'matched'],
+    ['https://alias.example.test/webhook', 'matched'],
+    ['https://alias.example.test/webhook/', 'matched'],
+    ['https://prod.example.test/webhook', 'mismatched'],
+  ] as const)('この Worker の別の入口（%s）に登録された Webhook は %s と判定する', async (registered, expected) => {
+    dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/v2/bot/info')) return Response.json({ displayName: 'テスト' });
+      if (url.endsWith('/v2/bot/channel/webhook/endpoint')) return Response.json({ endpoint: registered, active: true });
+      if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
+      return new Response(null, { status: 404 });
+    }));
+    const app = new Hono<TestEnv>();
+    app.use('*', async (c, next) => {
+      c.set('staff', { id: 'test-staff', name: 'Test', role: 'owner', readOnly: false });
+      c.env = {
+        DB: makeDbStub(),
+        WORKER_PUBLIC_URL: 'https://stg.example.test',
+        WORKER_URL: 'https://stg.example.test',
+        WORKER_ALIAS_URLS: 'https://alias.example.test/, not-a-url',
+      } as unknown as TestEnv['Bindings'];
+      await next();
+    });
+    app.route('/', lineAccounts);
+
+    const res = await requestCheck(app);
+    expect(res.status).toBe(200);
+    const webhook = dbMocks.saveLineAccountConnectionChecks.mock.calls[0][1].checks
+      .find((check: { kind: string }) => check.kind === 'webhook_endpoint');
+    expect(webhook).toMatchObject({
+      result: expected,
+      expectedUrl: 'https://stg.example.test/webhook',
+      registeredUrl: registered,
+    });
+  });
+
   test('統括画面の管理者も接続情報を更新できる', async () => {
     const res = await requestCheck(setupApp('admin'));
 
