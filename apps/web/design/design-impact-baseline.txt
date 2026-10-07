@@ -245,7 +245,6 @@ shared-button-importer app/ops/two-factor/page.tsx
 shared-button-importer app/page.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
-shared-button-importer app/pools/new/pool-new-v8.tsx
 shared-button-importer app/pools/page.tsx
 shared-button-importer app/recipes/page.tsx
 shared-button-importer app/register/complete/page.tsx
@@ -423,7 +422,6 @@ shared-button-importer components/merged-person/merged-person-detail-v8.tsx
 shared-button-importer components/merged-person/merged-person-detail.tsx
 shared-button-importer components/merged-person/merged-person-sections.tsx
 shared-button-importer components/merged-person/merged-profile-dialog.tsx
-shared-button-importer components/ops/impersonation-bar.tsx
 shared-button-importer components/ops/knowledge-editor.tsx
 shared-button-importer components/ops/knowledge-list.tsx
 shared-button-importer components/ops/knowledge-ticket.tsx
@@ -446,6 +444,7 @@ shared-button-importer components/session-lost-notice.tsx
 shared-button-importer components/shared/condition-builder.tsx
 shared-button-importer components/shared/create-page.tsx
 shared-button-importer components/shared/dialog.tsx
+shared-button-importer components/shared/empty-list.tsx
 shared-button-importer components/shared/file-drop.tsx
 shared-button-importer components/shared/folder-add-dialog.tsx
 shared-button-importer components/shared/folder-panel.tsx
@@ -674,9 +673,13 @@ shared-button-importer v8/settings/features/screen.tsx
 shared-button-importer v8/settings/manual-links/screen.tsx
 shared-button-importer v8/settings/file-scan/screen.tsx
 shared-button-importer v8/settings/ec-commerce/screen.tsx
+shared-button-importer v8/settings/ec-commerce/order-drawer.tsx
+shared-button-importer v8/settings/ec-commerce/identity.tsx
+shared-button-importer v8/settings/pools/create.tsx
 shared-button-importer v8/settings/line-notifications/screen.tsx
 shared-button-importer v8/settings/emergency/screen.tsx
 shared-button-importer v8/settings/emergency/health.tsx
+shared-button-importer v8/restaurant-reservations/detail-dialog.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx
@@ -710,6 +713,9 @@ shared-button-importer v8/booking-staff/staff-new.tsx
 shared-button-importer v8/scenario-first-step/first-step.tsx
 shared-button-importer v8/friend-add-publish/publish.tsx
 shared-button-importer v8/friend-add-publish/done.tsx
+# ★V8 友だち追加時の配信の実行結果（REIxB）・実行の詳細（N43uVX）を src/v8/friend-add-runs に一から書いた。
+shared-button-importer v8/friend-add-runs/runs.tsx
+shared-button-importer v8/friend-add-runs/detail.tsx
 shared-button-importer v8/automations/create/create.tsx
 shared-button-importer v8/automations/create/friend-multi-select.tsx
 # ★V8 LINEアカウントの詳細（ihjfd）・窓（CFAyf・Msb1j・WOfBN・n9Z2P）・乗り換え（x2dSNv）。src/v8 に一から書いた。

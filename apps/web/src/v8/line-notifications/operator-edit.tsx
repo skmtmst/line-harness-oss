@@ -84,20 +84,40 @@ function OperatorEditInner() {
   /* 絵に無い「チームを作る」は、受け取るスタッフの箱の右上から開く（足りないときだけ出す）。 */
   const [teamFormOpen, setTeamFormOpen] = useState(false)
   const teamGeneration = useRef(0)
+  /*
+   * 作るときはチームがあれば最初のチームを選んでおく（絵 gjUz3：送り先「チーム」・チーム「〇〇（3人）」）。
+   * 人が宛先・チームを触ったあとや、なおすとき（保存ずみの宛先がある）は選び直さない。
+   */
+  const teamTouchedRef = useRef(false)
+  const teamIdRef = useRef('')
+  const autoTeamRef = useRef<OperatorNotificationTeam | null>(null)
+  const [teamsSettled, setTeamsSettled] = useState(false)
   const loadTeams = () => {
     const accountId = selectedAccountId
     const generation = ++teamGeneration.current
     setTeams([])
-    if (!accountId) return
+    setTeamsSettled(false)
+    if (!accountId) { setTeamsSettled(true); return }
     setTeamError('')
     void api.notifications.teams.list(accountId).then(result => {
       if (generation !== teamGeneration.current) return
       if (!result.success) throw new Error(result.error)
       setTeams(result.data)
-    }).catch(() => { if (generation === teamGeneration.current) setTeamError('チームを読み込めませんでした。もう一度読み込んでください。') })
+      const first = result.data[0]
+      if (!editId && first && !teamTouchedRef.current && !teamIdRef.current) {
+        autoTeamRef.current = first
+        teamIdRef.current = first.id
+        setTeamId(first.id)
+      }
+      setTeamsSettled(true)
+    }).catch(() => {
+      if (generation !== teamGeneration.current) return
+      setTeamError('チームを読み込めませんでした。もう一度読み込んでください。')
+      setTeamsSettled(true)
+    })
   }
   useEffect(() => {
-    setTeamId(''); setTeamName(''); loadTeams()
+    setTeamId(''); teamIdRef.current = ''; autoTeamRef.current = null; setTeamName(''); loadTeams()
     return () => { teamGeneration.current++ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
@@ -115,6 +135,7 @@ function OperatorEditInner() {
       if (generation !== teamGeneration.current) return
       if (!result.success) throw new Error(result.error)
       setTeams(current => [...current.filter(team => team.id !== result.data.id), result.data])
+      teamIdRef.current = result.data.id
       setTeamId(result.data.id); setRecipientIds(result.data.staffIds)
     } catch (caught) { if (generation === teamGeneration.current) setTeamError(caught instanceof Error ? caught.message : '保存できませんでした。') }
     finally { setTeamBusy(false) }
@@ -151,6 +172,7 @@ function OperatorEditInner() {
     }).catch(() => undefined)
     return () => { active = false }
   }, [confirmOpen])
+  const [preparingPublish, setPreparingPublish] = useState(false)
 
   // 保存ずみのお知らせを全項目そのまま復元する。一部だけ戻すと、保存した時点で初期値へ上書きされる。
   useEffect(() => {
@@ -170,6 +192,7 @@ function OperatorEditInner() {
         setThreshold(saved.threshold)
         setImportance(saved.importance)
         setRecipientIds(saved.recipientIds)
+        teamIdRef.current = saved.teamId
         setTeamId(saved.teamId)
         setSchedule(saved.schedule)
         setDedupeMinutes(saved.dedupeMinutes)
@@ -208,9 +231,10 @@ function OperatorEditInner() {
       setRecipientsError(null)
       setError((current) => (current === RECIPIENTS_SAVE_GUARD_MESSAGE ? '' : current))
       // 再開したお知らせの宛先は保存ずみのもの。全選択で上書きすると、本人だけにしていた設定が全員へ広がる。
-      if (!editId && !teamId) {
+      if (!editId) {
         const autoIds = result.data.items.map((item) => item.id)
-        setRecipientIds(autoIds)
+        // チームを選んでいるときは、チームの顔ぶれを全員選びで上書きしない。
+        if (!teamIdRef.current) setRecipientIds(autoIds)
         autoIdsRef.current = autoIds
       }
     }).catch((caught) => {
@@ -240,12 +264,15 @@ function OperatorEditInner() {
     }
     if (editId && !sawLoadingRef.current) return
     if (!editId && recipients === null && !error && recipientsError === null) return
+    // 作るときは最初のチームを選ぶかどうかが決まってから基準を掴む。
+    if (!editId && !teamsSettled) return
     if (!editId && autoIdsRef.current !== null) {
-      setBaseline(JSON.stringify(['新しい予約が入りました', DEFAULT_EVENT_TYPE, 'one', 'normal', autoIdsRef.current, '', 'anytime', '10', false, true]))
+      const autoTeam = autoTeamRef.current
+      setBaseline(JSON.stringify(['新しい予約が入りました', DEFAULT_EVENT_TYPE, 'one', 'normal', autoTeam ? autoTeam.staffIds : autoIdsRef.current, autoTeam ? autoTeam.id : '', 'anytime', '10', false, true]))
       return
     }
     setBaseline(signature)
-  }, [baseline, ruleLoading, editId, recipients, error, recipientsError, signature])
+  }, [baseline, ruleLoading, editId, recipients, error, recipientsError, signature, teamsSettled])
 
   /* 作成・なおし途中の離脱確認。公開・保存が終わると一覧へ移るので、成功後に警告は出ない。 */
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
@@ -331,9 +358,15 @@ function OperatorEditInner() {
   /* 公開の前に `sDXNy` の確認の窓を出す。保存後に直した分も出すので、古い内容のまま出さない。 */
   const openPublishConfirm = async () => {
     if (!selectedAccountId || saving || ruleLoading || publishing) return
-    const ruleId = await saveDraft()
-    if (!ruleId) return
-    setConfirmOpen(true)
+    /* 押した「公開」のボタンに手応え（押せない形＋輪）を出す。先に下書きを保存している間も。 */
+    setPreparingPublish(true)
+    try {
+      const ruleId = await saveDraft()
+      if (!ruleId) return
+      setConfirmOpen(true)
+    } finally {
+      setPreparingPublish(false)
+    }
   }
 
   const publish = async () => {
@@ -374,6 +407,7 @@ function OperatorEditInner() {
   const selectedRecipients = items.filter((item) => recipientIds.includes(item.id))
   const lineReachable = selectedRecipients.filter((item) => item.channels.line)
   const lineUnregistered = selectedRecipients.length - lineReachable.length
+  const selectedTeam = teamId ? teams.find((team) => team.id === teamId) ?? null : null
   const saveDisabled = saving || ruleLoading || publishing
   const title = editId
     ? `「${loadedName ?? (ruleLoading ? '…' : name.trim() || 'お知らせ')}」を編集する`
@@ -440,6 +474,8 @@ function OperatorEditInner() {
                     value={teamId}
                     readOnly={!canWrite}
                     onChange={(value) => {
+                      teamTouchedRef.current = true
+                      teamIdRef.current = value
                       setTeamId(value)
                       const team = teams.find(item => item.id === value)
                       if (team) { setRecipientIds(team.staffIds); setTeamName(team.name) }
@@ -448,6 +484,13 @@ function OperatorEditInner() {
                     options={teamOptions}
                   />
                 </div>
+                {/* 絵 gjUz3：チームを選んでいるときはスタッフの箱を出さない（顔ぶれはチームのとおり）。 */}
+                {teamId ? (teamError ? (
+                  <div className={styles.teamError}>
+                    <p role="alert">{teamError}</p>
+                    <Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button>
+                  </div>
+                ) : null) : (
                 <div className={styles.staffBox}>
                   <div className={styles.staffHead}>
                     <h3 className={styles.staffTitle}>受け取るスタッフ</h3>
@@ -473,6 +516,8 @@ function OperatorEditInner() {
                               <Checkbox
                                 checked={recipientIds.includes(recipient.id)}
                                 onCheckedChange={(checked) => {
+                                  teamTouchedRef.current = true
+                                  teamIdRef.current = ''
                                   setTeamId('')
                                   setRecipientIds((current) => checked
                                     ? [...current, recipient.id]
@@ -526,6 +571,7 @@ function OperatorEditInner() {
                     </div>
                   ) : null}
                 </div>
+                )}
                 {canWrite ? <>
                   <Checkbox checked={onlyAvailable} onCheckedChange={setOnlyAvailable}>
                     手が空いている人だけに送る（対応中の人には送りません）
@@ -604,8 +650,8 @@ function OperatorEditInner() {
                 <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
                 {canWrite ? (
                   <>
-                    <Button onClick={() => void saveDraft()} disabled={saveDisabled} busy={saving}>{editId ? '下書きを保存する' : '下書きを保存'}</Button>
-                    <Button onClick={() => void openPublishConfirm()} disabled={saveDisabled} variant="primary">
+                    <Button onClick={() => void saveDraft()} disabled={saveDisabled} busy={saving && !preparingPublish}>{editId ? '下書きを保存する' : '下書きを保存'}</Button>
+                    <Button onClick={() => void openPublishConfirm()} disabled={saveDisabled} busy={preparingPublish} variant="primary">
                       <Check size={15} aria-hidden="true" />運用者へのお知らせを公開
                     </Button>
                   </>
@@ -637,8 +683,8 @@ function OperatorEditInner() {
             <p className={styles.confirmLine}>
               <span className={styles.confirmLabel}>宛先</span>
               <span className={styles.confirmValue}>
-                {teamId && teamName.trim()
-                  ? `チーム「${teamName.trim()}」${selectedRecipients.length} 人`
+                {selectedTeam
+                  ? `チーム「${selectedTeam.name}」${selectedRecipients.length} 人`
                   : `選んだスタッフ ${selectedRecipients.length} 人`}
               </span>
             </p>

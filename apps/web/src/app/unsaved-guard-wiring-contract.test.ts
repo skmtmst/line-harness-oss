@@ -258,8 +258,8 @@ const EXEMPTIONS: Record<string, string> = {
     '重なりの共通部品。初回フォーカスの寄せ先を呼出側で選べるだけで、編集を持たない',
   'components/shared/button.tsx':
     'ボタンの共通部品。開いた直後の標的用の ref を受けられるだけで、編集を持たない',
-  'app/pools/new/pool-new-v8.tsx':
-    'new/page.tsx（hq 未判定）と同じ画面の★V8版。作る前の一時入力だけで下書きを持たないため、番兵の要否は元の画面と一緒に決める',
+  'v8/settings/pools/create.tsx':
+    'new/page.tsx（hq 未判定）と同じ画面の★V8版（前の app/pools/new/pool-new-v8.tsx を置き換えた）。作る前の一時入力だけで下書きを持たないため、番兵の要否は元の画面と一緒に決める',
   'app/form-submissions/page.tsx':
     '一覧と絞り込みが中心。作る操作は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/inflow-links/page.tsx':

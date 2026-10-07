@@ -69,6 +69,7 @@ let comments = [
   { atSeconds: -60, authorName: '田中', body: 'こんばんは' },
 ]
 const puts: Array<{ path: string; body: unknown }> = []
+const conflictState = vi.hoisted(() => ({ ctas: false }))
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 
@@ -79,6 +80,7 @@ beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   roleState.role = 'owner'
   puts.length = 0
+  conflictState.ctas = false
   comments = [
     { atSeconds: 45, authorName: 'まさ', body: 'わかりやすい！' },
     { atSeconds: -60, authorName: '田中', body: 'こんばんは' },
@@ -92,6 +94,7 @@ beforeEach(() => {
     const method = init?.method ?? 'GET'
     if (method === 'PUT') {
       puts.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null })
+      if (conflictState.ctas && path.endsWith('/ctas')) return json({ success: false, error: 'ほかの人が保存しました', code: 'version_conflict' }, 409)
       if (path.endsWith('/comments')) return json({ data: { count: (JSON.parse(String(init?.body)) as { comments: unknown[] }).comments.length } })
       return json({ data: { count: 0 } })
     }
@@ -200,5 +203,18 @@ describe('V8 ウェビナーの編集', () => {
       { atSeconds: 45, authorName: 'まさ', body: 'とてもわかりやすい' },
     ] })
     expect(host.textContent).toContain('2件保存しました')
+  })
+  it('CTA（pvimJ）：保存が競合したら帯を左右の列の上に出し、下書きの保存を「比べてから保存」に替える', async () => {
+    conflictState.ctas = true
+    nav.search = 'id=webinar-1&pane=cta'
+    await render(<WebinarEditV8 />)
+    expect(host.querySelector('[data-design-node="pvimJ"]')).toBeNull()
+    await act(async () => { buttonText('下書きを保存')!.click() })
+    for (let i = 0; i < 6; i += 1) await act(async () => {})
+    const band = host.querySelector('[data-design-node="pvimJ"][role="alert"]')
+    expect(band?.textContent).toContain('このまま保存すると、ほかの人の変更が消えます')
+    expect(buttonText('下書きを保存')).toBeUndefined()
+    expect(buttonText('比べてから保存')).toBeTruthy()
+    expect([...host.querySelectorAll('a')].some((link) => link.textContent?.trim() === 'キャンセル')).toBe(true)
   })
 })

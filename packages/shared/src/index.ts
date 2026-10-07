@@ -44,3 +44,5 @@ export * from './line-message-limits.js';
 export * from './visit-stamps.js';
 export * from './hq-broadcasts.js';
 export * from './restaurant-closures';
+export * from './company-settings';
+export * from './hq-template-distribution-display';

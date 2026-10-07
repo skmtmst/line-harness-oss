@@ -1,0 +1,55 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * 一覧が0件のときの1枚（★V8 修正案 D-2・絵 `gIaJZ`）。
+ * 表の場所の中央に、印（44px の薄い灰の角丸）・題 16/700・説明 13・主ボタン。
+ * 枠も地も付けない（白い板の中に置くので、入れ子のカードにしない）。
+ */
+.root {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-d23-empty-gap);
+  padding: var(--tpl-d23-empty-pad);
+  text-align: center;
+}
+
+.mark {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-d23-empty-mark);
+  height: var(--tpl-d23-empty-mark);
+  border-radius: var(--tpl-d23-empty-mark-radius);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+}
+
+.mark svg {
+  width: var(--tpl-d23-empty-icon);
+  height: var(--tpl-d23-empty-icon);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-d23-empty-title);
+  font-weight: 700;
+  line-height: var(--tpl-d23-empty-title-lh);
+}
+
+.description {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-d23-empty-desc);
+  font-weight: 400;
+  line-height: var(--tpl-d23-empty-desc-lh);
+}
+
+/* 絵では説明とボタンの間に 6px の「間」を足して 16px 空ける。 */
+.action {
+  margin-top: var(--tpl-d23-empty-action-gap);
+}
+}

@@ -121,8 +121,7 @@ describe('N-426: 初回設定画面', () => {
       setter.call(input, '123456')
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    const form = host.querySelector('form')!
-    await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+    // 6桁目が入った瞬間に送られる（動きの点検・6）。返事を待つだけ。
     await flush()
     expect(fixture.calls.at(-1)).toMatchObject({
       url: 'https://api.example.test/api/auth/two-factor/setup/confirm',
@@ -141,8 +140,7 @@ describe('N-426: 初回設定画面', () => {
       setter.call(input, '123456')
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    const form = host.querySelector('form')!
-    await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+    // 6桁目が入った瞬間に送られる（動きの点検・6）。返事を待つだけ。
     await flush()
     expect(vi.mocked(fetch)).toHaveBeenCalledWith(
       'https://api.example.test/api/auth/session',
@@ -168,10 +166,9 @@ describe('N-426: 初回設定画面', () => {
       setter.call(input, '654321')
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    const form = host.querySelector('form')!
-    await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+    // 6桁目が入った瞬間に送られる（動きの点検・6）。返事を待つだけ。
     await flush()
-    expect(host.textContent).toContain('認証コードが正しくありません')
+    expect(host.textContent).toContain('コードが違います。もう一度入れてください')
     expect(input.value).toBe('')
     expect(window.sessionStorage.getItem('lh_admin_session_fallback')).toBeNull()
   })
@@ -187,8 +184,7 @@ describe('N-426: 初回設定画面', () => {
       setter.call(input, '654321')
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    const form = host.querySelector('form')!
-    await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+    // 6桁目が入った瞬間に送られる（動きの点検・6）。返事を待つだけ。
     await flush()
     expect(host.textContent).toContain('設定の有効時間が切れました')
     // 無効なQRと入力欄は再試行可能に見せない。
@@ -209,8 +205,7 @@ describe('N-426: 初回設定画面', () => {
       setter.call(input, '654321')
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    const form = host.querySelector('form')!
-    await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+    // 6桁目が入った瞬間に送られる（動きの点検・6）。返事を待つだけ。
     await flush()
     expect(host.textContent).toContain('入力回数を超えました')
     expect(host.querySelector('form')).toBeNull()
@@ -226,8 +221,7 @@ describe('N-426: 初回設定画面', () => {
       setter.call(input, '654321')
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    const form = host.querySelector('form')!
-    await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+    // 6桁目が入った瞬間に送られる（動きの点検・6）。返事を待つだけ。
     await flush()
     expect(host.textContent).toContain('接続を確かめて')
     expect(host.textContent).not.toContain('Failed to fetch')

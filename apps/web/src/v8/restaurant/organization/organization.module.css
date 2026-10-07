@@ -328,6 +328,7 @@
 /* 窓の中のフォーム（vCEKM・ou60i）。 */
 .form {
   display: flex;
+  width: 100%;
   flex-direction: column;
   gap: var(--tpl-rt-dialog-gap);
 }
@@ -374,4 +375,47 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-rt-chip-row-gap);
+}
+
+/* 停止の確認（bMpC5）：名前の行と、薄い地の注意。 */
+.stopBody {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--tpl-st2-stop-gap);
+}
+
+.stopWho {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.stopNote {
+  margin: 0;
+  padding: var(--tpl-st2-stop-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-st2-stop-note-lh);
+}
+
+/* ユーザーの追加・変更の窓（ou60i）：段の間は絵の値、ボタンの段は上に線。 */
+.memberGrid {
+  row-gap: var(--tpl-st2-member-row-gap);
+}
+
+.memberActions {
+  padding-top: var(--tpl-rt-dialog-gap);
+  box-shadow: var(--tpl-sb-line-top);
+}
+
+.stopActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-rt-chip-row-gap);
+  padding-top: var(--tpl-rt-dialog-gap);
+  box-shadow: var(--tpl-sb-line-top);
 }

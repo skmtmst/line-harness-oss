@@ -3,6 +3,7 @@ import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes } fr
 import shell from './data-table.module.css'
 import { loadFailureCopy } from './api-error-message'
 import HelpTip from './help-tip'
+import { FailureTitle, RetryLabel } from './retry-label'
 import styles from './table.module.css'
 
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
@@ -260,7 +261,7 @@ export function TableStateRow({
   title,
   description,
   onRetry,
-  retryLabel = 'もう一度読み込む',
+  retryLabel,
   error,
 }: {
   colSpan: number
@@ -277,11 +278,11 @@ export function TableStateRow({
     <tr className={shell.row}>
       <td colSpan={colSpan} className={shell.bodyCell}>
         <div className={styles.stateCell} role={kind === 'error' ? 'alert' : 'status'}>
-          <p className={styles.stateTitle}>{title ?? failure?.title ?? text.title}</p>
+          <p className={styles.stateTitle}>{kind === 'error' ? <FailureTitle title={title ?? failure?.title ?? text.title} /> : (title ?? failure?.title ?? text.title)}</p>
           <p className={styles.stateDescription}>{description ?? failure?.description ?? text.description}</p>
           {kind === 'error' && (failure && !failure.retryable ? undefined : onRetry) ? (
             <button type="button" onClick={onRetry} className={styles.stateRetry}>
-              {retryLabel}
+              {retryLabel ?? <RetryLabel />}
             </button>
           ) : null}
         </div>

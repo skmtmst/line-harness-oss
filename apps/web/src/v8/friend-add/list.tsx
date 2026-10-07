@@ -44,6 +44,7 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
@@ -680,31 +681,24 @@ function FriendAddList() {
       </div>
     )
   } else if (items.length === 0) {
-    listBody = filterActive ? (
-      <div className={styles.stateCard}>
-        <span className={styles.stateIcon}><UserPlus size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>条件に合う設定はありません</p>
-        <p className={styles.stateDesc}>「有効」「下書き」「停止中」や検索を外すと、すべて出ます。</p>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setSearch('')
-            setAppliedSearch('')
-            setStatusFilter('')
-            setFolder(null)
-            resetCursor()
-          }}
-        >
-          条件を外す
-        </Button>
-      </div>
-    ) : (
-      <div className={styles.stateCard}>
-        <span className={styles.stateIcon}><UserPlus size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>まだ経路ごとの初回案内はありません</p>
-        <p className={styles.stateDesc}>いまは全員に「経路が分からなかった人」の案内が届きます。流入リンクごとに案内を分けられます。</p>
-        {createButton}
-      </div>
+    /* 修正案 D-2：空の一覧。 */
+    listBody = (
+      <EmptyList
+        icon={<UserPlus aria-hidden="true" />}
+        title="まだ友だち追加時の配信がありません"
+        description="友だちになった直後のあいさつを、流入経路ごとに分けて送ります。"
+        create={{ label: '最初の配信を作る', href: '/friend-add-settings?view=new' }}
+        canCreate={canEdit}
+        filtered={filterActive}
+        onClearFilters={() => {
+          setSearch('')
+          setAppliedSearch('')
+          setStatusFilter('')
+          setFolder(null)
+          resetCursor()
+        }}
+        filteredDescription="「有効」「下書き」「停止中」や検索を外すと、すべて出ます"
+      />
     )
   } else {
     listBody = (

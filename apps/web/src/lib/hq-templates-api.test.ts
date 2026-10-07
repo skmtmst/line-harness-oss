@@ -13,6 +13,17 @@ import { hqTemplatesApi, HqTemplatesApiError } from './hq-templates-api'
 const request = transport.request
 beforeEach(() => { request.mockReset(); request.mockResolvedValue({ success: true, data: { value: 'ok' } }) })
 describe('HQ template API transport', () => {
+  it('配布先の版と作った名前を、既存の項目や件数を残して返す', async () => {
+    const preflight = { preflightId: 'p1', expiresAt: '2026-10-07T00:00:00Z', stores: [{ accountId: 'a', accountName: '試験店舗',
+      items: [], targetVersion: { version: 2, latestVersion: 2, status: 'latest', label: '版2（最新）' } }] };
+    request.mockResolvedValue({ success: true, data: preflight });
+    expect(await hqTemplatesApi.preflight('t1', ['a'])).toEqual(preflight);
+    const result = { runId: 'p1', status: 'completed', stores: [{ accountId: 'a', status: 'succeeded',
+      counts: { created: 0, overwritten: 0, aliased: 1 }, createdName: '試験の名前 (2)' }] };
+    request.mockResolvedValue({ success: true, data: result });
+    expect(await hqTemplatesApi.distribute('t1', 'p1', [])).toEqual(result);
+    expect(await hqTemplatesApi.result('t1', 'p1')).toEqual(result);
+  });
   it('画像をJSON化せず認証・CSRF共通transportで送信する', async () => {
     const file = new File(['fixture'], '画像.png', { type: 'image/png' })
     await hqTemplatesApi.uploadImage(file, 'message')

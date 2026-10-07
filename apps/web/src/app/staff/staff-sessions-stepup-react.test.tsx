@@ -211,8 +211,8 @@ describe('権限変更の直前再認証 (N-427)', () => {
 
     // 6桁コードを入れると grant を取り、同じ保存へ token を付けてやり直す
     // 認証コード入力（★V7 xHzFK）の1マス目へまとめて入れると、6マスへ振り分けられる。
-    fireEvent.change(screen.getByLabelText('1桁目'), { target: { value: '123456' } })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '本人確認して実行' })) })
+    // 6桁目が入った瞬間に送られる（動きの点検・6。「本人確認して実行」を押さなくてよい）。
+    await act(async () => { fireEvent.change(screen.getByLabelText('1桁目'), { target: { value: '123456' } }) })
 
     expect(fixture.staffStepUp).toHaveBeenCalledWith({ method: 'totp', value: '123456', purpose: 'staff.permissions.change' })
     await waitFor(() => expect(fixture.staffUpdate).toHaveBeenCalledTimes(2))
