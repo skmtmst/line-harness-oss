@@ -51,6 +51,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { runUndoable } from '@/lib/undoable'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { useLiveReorder } from '@/lib/use-live-reorder'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
@@ -612,6 +613,9 @@ export default function ScenariosListV8() {
 
   /* ===== 並び替え ===== */
 
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
+  const liveOrder = useLiveReorder(scenarios, (row) => row.id, dragId)
+
   const dropOn = (targetId: string) => {
     const from = dragId
     setDragId(null)
@@ -907,8 +911,8 @@ export default function ScenariosListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <RovingTbody>
-              {scenarios.map((s) => {
+            <RovingTbody reorderKey={liveOrder.shown.map((s) => s.id).join(',')}>
+              {liveOrder.shown.map((s) => {
                 const rowFolder = s.folderId ? folders.find((f) => f.id === s.folderId) : undefined
                 const folderName = s.folderId
                   ? rowFolder?.name ?? 'フォルダ'
@@ -926,6 +930,10 @@ export default function ScenariosListV8() {
                   <Tr
                     interactive
                     key={s.id}
+                    data-reorder-id={s.id}
+                    onDragEnter={() => liveOrder.enter(s.id)}
+                    onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                    onDrop={dragId ? () => dropOn(liveOrder.dropTarget(s.id)) : undefined}
                     className={`${styles.row} ${styles.rowClick}`}
                     tabIndex={0}
                     onClick={() => setPanelId(s.id)}
@@ -949,8 +957,7 @@ export default function ScenariosListV8() {
                       onClick={(event) => event.stopPropagation()}
                       draggable={canEdit}
                       onDragStart={() => setDragId(s.id)}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => dropOn(s.id)}
+                      onDragEnd={() => setDragId(null)}
                       title="上下に動かして並び替え"
                     >
                       <ReorderGrip

@@ -59,6 +59,7 @@ import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
 import { runUndoable } from '@/lib/undoable'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { useLiveReorder } from '@/lib/use-live-reorder'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import Button from '@/components/shared/button'
@@ -807,6 +808,9 @@ export default function AutoRepliesListV8() {
     applyPriorityUpdates(updates, `${name}を${direction === -1 ? '1つ上' : '1つ下'}へ動かしました`)
   }
 
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
+  const liveOrder = useLiveReorder(shownItems, (r) => r.id, dragId)
+
   const dropOn = (targetId: string) => {
     if (!dragId || dragId === targetId || !canEdit || sortKey !== 'priority') {
       setDragId(null)
@@ -1188,8 +1192,8 @@ export default function AutoRepliesListV8() {
               {tableHeadCells}
             </TableHeadRow>
           </thead>
-          <RovingTbody>
-            {shownItems.map((r) => {
+          <RovingTbody reorderKey={liveOrder.shown.map((r) => r.id).join(',')}>
+            {liveOrder.shown.map((r) => {
               const name = displayName(r)
               const conflicts = r.conflictAttentionCount ?? 0
               const actions = actionSummary(r)
@@ -1208,6 +1212,10 @@ export default function AutoRepliesListV8() {
               return (
                 <Tr interactive
                   key={r.id}
+                  data-reorder-id={r.id}
+                  onDragEnter={() => liveOrder.enter(r.id)}
+                  onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                  onDrop={dragId ? () => dropOn(liveOrder.dropTarget(r.id)) : undefined}
                   className={styles.rowClick}
                   tabIndex={0}
                   onClick={() => setPanelId(r.id)}
@@ -1231,8 +1239,7 @@ export default function AutoRepliesListV8() {
                     onClick={(event) => event.stopPropagation()}
                     draggable={canEdit && sortKey === 'priority'}
                     onDragStart={() => setDragId(r.id)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => dropOn(r.id)}
+                    onDragEnd={() => setDragId(null)}
                   >
                     <ReorderGrip
                       label={name}

@@ -117,4 +117,27 @@
 .compact .body {
   padding: 4px 12px 12px;
 }
+
+/*
+ * ★V8（フルード・インタラクション ③）：開く・閉じるで高さを滑らかに変える。
+ * 中身（::details-content）の高さを 0 ↔ auto で移り変わらせる。途中で押し直しても、
+ * その高さから戻る。動きを減らす設定・対応していないブラウザでは今までどおり一瞬で開閉する。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme='v8'] .root {
+    interpolate-size: allow-keywords;
+  }
+
+  [data-theme='v8'] .root::details-content {
+    height: 0;
+    overflow: clip;
+    transition:
+      height var(--motion-base) var(--motion-ease-out),
+      content-visibility var(--motion-base) allow-discrete;
+  }
+
+  [data-theme='v8'] .root[open]::details-content {
+    height: auto;
+  }
+}
 }

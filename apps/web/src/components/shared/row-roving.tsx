@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, type HTMLAttributes, type ReactNode, type RefObject } from 'react'
+import { useFlipRows } from '@/lib/use-live-reorder'
 
 /*
  * 一覧の表で「1行に Tab は1回だけ止まる」口（動きの点検 20 番）。
@@ -181,10 +182,16 @@ export function useRowRoving(ref: RefObject<HTMLTableSectionElement | null>, ena
  */
 export function RovingTbody({
   children,
+  reorderKey,
   ...bodyProps
-}: Omit<HTMLAttributes<HTMLTableSectionElement>, 'children'> & { children?: ReactNode }) {
+}: Omit<HTMLAttributes<HTMLTableSectionElement>, 'children'> & {
+  children?: ReactNode
+  /** 並びの印（行の id を並べた文字）。変わると、`data-reorder-id` の行を前の位置から滑らせる。 */
+  reorderKey?: string
+}) {
   const ref = useRef<HTMLTableSectionElement>(null)
   useRowRoving(ref)
+  useFlipRows(ref, reorderKey ?? '')
   return (
     <tbody ref={ref} {...bodyProps}>
       {children}

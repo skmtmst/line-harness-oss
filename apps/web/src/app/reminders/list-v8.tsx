@@ -3,6 +3,7 @@
 
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { useLiveReorder } from '@/lib/use-live-reorder'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { ListPageBody } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -589,6 +590,9 @@ export default function RemindersListV8() {
     })
   }
 
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
+  const liveOrder = useLiveReorder(reminders, (row) => row.id, dragId)
+
   const dropOn = (targetId: string) => {
     const from = dragId
     setDragId(null)
@@ -893,8 +897,8 @@ export default function RemindersListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <RovingTbody>
-              {reminders.map((row) => {
+            <RovingTbody reorderKey={liveOrder.shown.map((row) => row.id).join(',')}>
+              {liveOrder.shown.map((row) => {
                 const view = rowView(row)
                 const planned =
                   view.status === 'draft' || view.status === 'stopped'
@@ -907,6 +911,10 @@ export default function RemindersListV8() {
                 return (
                   <Tr interactive
                     key={row.id}
+                    data-reorder-id={row.id}
+                    onDragEnter={() => liveOrder.enter(row.id)}
+                    onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                    onDrop={dragId ? () => dropOn(liveOrder.dropTarget(row.id)) : undefined}
                     className={styles.rowClick}
                     tabIndex={0}
                     onClick={() => setPanelId(row.id)}
@@ -932,8 +940,7 @@ export default function RemindersListV8() {
                       onClick={(event) => event.stopPropagation()}
                       draggable={canEdit}
                       onDragStart={() => setDragId(row.id)}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => dropOn(row.id)}
+                      onDragEnd={() => setDragId(null)}
                       title="上下に動かして並び替え"
                     >
                       {/* 閲覧のみ：つまみは隠し、同じ大きさの見えない印で位置を保つ。 */}
