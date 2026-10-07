@@ -727,3 +727,7 @@ shared-button-importer v8/accounts-detail/handover.tsx
 shared-button-importer v8/account-new/register.tsx
 shared-button-importer v8/hq-templates/console.tsx
 shared-button-importer v8/hq-templates/message-form.tsx
+shared-button-importer v8/template-detail/detail.tsx
+shared-button-importer v8/tag-edit/edit.tsx
+shared-button-importer v8/tag-edit/search-edit.tsx
+shared-button-importer v8/rich-menu-edit/detail.tsx
