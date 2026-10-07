@@ -32,7 +32,6 @@ import {
   MoreHorizontal,
   Pause,
   Plus,
-  Search as SearchIcon,
   TriangleAlert,
   X,
 } from 'lucide-react'
@@ -53,6 +52,7 @@ import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -1228,23 +1228,17 @@ function CommonVarsListInner() {
       </div>
     )
   ) : filtered.length === 0 ? (
-    items.length === 0 ? (
-      <div className={styles.stateCard}>
-        <span className={styles.stateIcon}><Braces size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>まだ共通情報はありません</p>
-        <p className={styles.stateDesc}>会社名や営業時間を1か所で持つと、変えるときに1回直すだけで済みます。</p>
-        {canWrite ? createButton(false) : null}
-      </div>
-    ) : (
-      <div className={styles.stateCard}>
-        <span className={styles.stateIcon}><SearchIcon size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>条件に合う共通情報はありません</p>
-        <p className={styles.stateDesc}>「空のまま」「期限つき」「使われていない」「下書き・止めた」や検索を外すと、すべて出ます</p>
-        <Button type="button" variant="secondary" onClick={clearVarFilters}>
-          <X size={13} aria-hidden="true" />条件を外す
-        </Button>
-      </div>
-    )
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<Braces aria-hidden="true" />}
+      title="まだ共通情報がありません"
+      description="会社名や営業時間を1か所で持ち、メッセージに差し込みます。"
+      create={{ label: '最初の共通情報を作る', href: '/contents/vars/new' }}
+      canCreate={canWrite}
+      filtered={items.length > 0}
+      onClearFilters={clearVarFilters}
+      filteredDescription="「空のまま」「期限つき」「使われていない」「下書き・止めた」や検索を外すと、すべて出ます"
+    />
   ) : (
     <>
       <ContextMenu

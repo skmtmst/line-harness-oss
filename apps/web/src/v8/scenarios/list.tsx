@@ -28,7 +28,6 @@ import {
   Pause,
   Play,
   Plus,
-  Search as SearchIcon,
   Send,
   ShieldCheck,
   Square,
@@ -55,6 +54,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
@@ -822,29 +822,18 @@ export default function ScenariosListV8() {
         <Button type="button" onClick={() => void loadScenarios()}>もう一度試す</Button>
       </div>
     ) : scenarios.length === 0 ? (
-      scenarioFilterActive ? (
-        /* 板 `BxGhV`「絞り込みで0件」。 */
-        <div className={styles.stateCard} data-design-node="BxGhV">
-          <span className={styles.stateIcon}>
-            <SearchIcon size={16} aria-hidden="true" />
-          </span>
-          <p className={styles.stateTitle}>条件に合うシナリオはありません</p>
-          <p className={styles.stateDesc}>「停止中のみ」「今月作った」や検索を外すと、すべて出ます</p>
-          <Button type="button" variant="secondary" onClick={clearScenarioFilters}>条件を外す</Button>
-        </div>
-      ) : (
-        /* 板 `BxGhV`「まだシナリオが無い」。 */
-        <div className={styles.stateCard} data-design-node="BxGhV">
-          <span className={styles.stateIcon}>
-            <ListVideo size={16} aria-hidden="true" />
-          </span>
-          <p className={styles.stateTitle}>まだシナリオはありません</p>
-          <p className={styles.stateDesc}>友だち追加のあと7日間の案内などを、自動で順に送れます</p>
-          {canEdit ? (
-            <Button type="button" variant="primary" onClick={handleCreate}>＋ シナリオを作る</Button>
-          ) : null}
-        </div>
-      )
+      /* 修正案 D-2（2026-10-07 採用）：空の一覧は次の一歩へ導く。 */
+      <EmptyList
+        data-design-node="BxGhV"
+        icon={<ListVideo aria-hidden="true" />}
+        title="まだシナリオがありません"
+        description="友だち追加や購入をきっかけに、決めた順番でメッセージを届けます。"
+        create={{ label: '最初のシナリオを作る', onClick: handleCreate }}
+        canCreate={canEdit}
+        filtered={scenarioFilterActive}
+        onClearFilters={clearScenarioFilters}
+        filteredDescription="「停止中のみ」「今月作った」や検索を外すと、すべて出ます"
+      />
     ) : (
       <>
         {/* キーボードで動かした結果を読み上げる。画面には出さない。 */}

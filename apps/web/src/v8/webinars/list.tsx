@@ -34,6 +34,7 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -841,9 +842,18 @@ function WebinarList() {
   } else if (loadFailure && visibleItems.length === 0) {
     listBody = <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined} />
   } else if (visibleItems.length === 0) {
-    listBody = panelGrand === 0
-      ? <ListState kind="empty" title="まだ、ウェビナーはありません" description="録画やライブのセミナーを作ると、LINEで案内して申込を受けられます。" action={createButton} />
-      : <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索や絞り込みを外すと、すべて出ます。" action={<Button onClick={clearFilters}>条件を外す</Button>} />
+    /* 修正案 D-2：空の一覧。 */
+    listBody = (
+      <EmptyList
+        icon={<Video aria-hidden="true" />}
+        title="まだウェビナーがありません"
+        description="録画やライブのセミナーを、LINE で案内して申込を受け付けます。"
+        create={{ label: '最初のウェビナーを作る', href: '/webinars/new' }}
+        canCreate={canEdit}
+        filtered={panelGrand !== 0}
+        onClearFilters={clearFilters}
+      />
+    )
   } else {
     listBody = (
       <>

@@ -17,6 +17,7 @@ import { Banknote, CircleDot, CircleHelp, Download, Plus, Trophy, Users } from '
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -570,20 +571,16 @@ export default function AffiliatorsTab() {
       description="数の帯は「—」にしています。道具はそのまま使えます。"
       action={<RetryButton onRetry={() => { void loadList() }} />}
     />
-  ) : rows.length === 0 ? (
-    <StateCard
-      icon={<Users size={16} aria-hidden="true" />}
-      title="まだアフィリエイターはいません"
-      description="紹介してくれる人を登録すると、紹介リンクができます。先にコンバージョンで「何を成果にするか」を決めておきます"
-      action={readonly ? undefined : (
-        <Button variant="primary" href="/affiliates/new"><Plus size={14} aria-hidden="true" /> アフィリエイターを作る</Button>
-      )}
-    />
   ) : shownRows.length === 0 ? (
-    <StateCard
-      title="条件に合うものはありません"
-      description="検索や絞り込みを外すと、すべて出ます"
-      action={<Button type="button" onClick={resetConditions}>条件を外す</Button>}
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<Users aria-hidden="true" />}
+      title="まだアフィリエイターがいません"
+      description="紹介してくれる人を登録して、その人だけの紹介リンクを作ります。"
+      create={{ label: '最初のアフィリエイターを登録する', href: '/affiliates/new' }}
+      canCreate={!readonly}
+      filtered={rows.length > 0}
+      onClearFilters={resetConditions}
     />
   ) : (
     <>

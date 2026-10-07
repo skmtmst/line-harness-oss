@@ -37,7 +37,6 @@ import {
   MoreHorizontal,
   Pause,
   Pencil,
-  Search as SearchIcon,
   Square,
   Play,
   Trash2,
@@ -61,6 +60,7 @@ import { runUndoable } from '@/lib/undoable'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
@@ -1097,42 +1097,18 @@ export default function AutoRepliesListV8() {
       )}
     </div>
   ) : sortedItems.length === 0 ? (
-    filterActive ? (
-      <div className={styles.stateCard} style={{ padding: '28px 24px' }} data-design-node="G8i4xP">
-        <span className={styles.stateIcon} style={{ width: 32, height: 32 }}>
-          <SearchIcon size={16} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>条件に合うルールはありません</p>
-        <p className={styles.stateDesc}>
-          「停止中のみ」「時間帯あり」「今月0回」や検索を外すと、すべて出ます。
-        </p>
-        <Button type="button" variant="secondary" onClick={clearFilters}>✕ 条件を外す</Button>
-      </div>
-    ) : (
-      <div className={styles.stateCard} style={{ padding: '28px 24px' }} data-design-node="G8i4xP">
-        <span className={styles.stateIcon} style={{ width: 32, height: 32 }}>
-          <MessageSquare size={16} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>まだ自動応答のルールはありません</p>
-        <p className={styles.stateDesc}>
-          よく届く質問や営業時間外の連絡に、自動で返せます。ひな形からも作れます。
-        </p>
-        {canEdit ? (
-          <>
-            <Button type="button" variant="primary" onClick={() => router.push('/auto-replies/edit')}>
-              ＋ ルールを作る
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setQuickOpen(true)}>
-              かんたんに作る
-            </Button>
-          </>
-        ) : (
-          <Button type="button" variant="primary" disabled title={NO_MANAGE_NOTE}>
-            ＋ ルールを作る
-          </Button>
-        )}
-      </div>
-    )
+    /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない。 */
+    <EmptyList
+      data-design-node="G8i4xP"
+      icon={<MessageSquare aria-hidden="true" />}
+      title="まだ自動応答がありません"
+      description="届いた言葉に合わせて、決めた返事を自動で送ります。"
+      create={{ label: '最初の自動応答を作る', onClick: () => router.push('/auto-replies/edit') }}
+      canCreate={canEdit}
+      filtered={filterActive}
+      onClearFilters={clearFilters}
+      filteredDescription="「停止中のみ」「時間帯あり」「今月0回」や検索を外すと、すべて出ます"
+    />
   ) : (
     <>
       <span className="sr-only" role="status" aria-live="polite">

@@ -40,6 +40,7 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Checkbox from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
@@ -626,24 +627,18 @@ export default function InflowListV8({
       />
     )
   } else if (sortedRows.length === 0) {
-    // 絞り込み・検索で0件のときは「まだ無い」と言わない（R173）。
-    listBody = accountRows.length > 0 && (normalizedSearch !== '' || filter !== 'all' || selectedGenre !== '')
-      ? (
-        <ListState
-          kind="empty"
-          title="条件に合うものはありません"
-          description="検索や絞り込みを外すと、すべて出ます"
-          action={<Button onClick={() => { setSearch(''); setFilter('all'); setSelectedGenre(''); setPage(1) }}>条件を外す</Button>}
-        />
-      )
-      : (
-        <ListState
-          kind="empty"
-          title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入リンクはありません'}
-          description="QR コードや URL ごとに、どこから友だちになったかを数えられます"
-          action={readonly ? undefined : createButton}
-        />
-      )
+    // 絞り込み・検索で0件のときは「まだ無い」と言わない（R173）。修正案 D-2：空の一覧。
+    listBody = (
+      <EmptyList
+        icon={<Link2 aria-hidden="true" />}
+        title={selectedGenre && accountRows.length === 0 ? `「${selectedGenreLabel}」にはまだ流入リンクがありません` : 'まだ流入リンクがありません'}
+        description="QR コードや URL ごとに、どこから友だちになったかを数えます。"
+        create={{ label: '最初の流入リンクを作る', href: '/inflow-links/new' }}
+        canCreate={!readonly}
+        filtered={accountRows.length > 0 && (normalizedSearch !== '' || filter !== 'all' || selectedGenre !== '')}
+        onClearFilters={() => { setSearch(''); setFilter('all'); setSelectedGenre(''); setPage(1) }}
+      />
+    )
   } else {
     listBody = (
       <>

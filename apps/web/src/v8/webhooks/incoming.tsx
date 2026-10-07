@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Copy, LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical } from 'lucide-react'
+import { Copy, LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
 import type { IncomingWebhook } from '@line-crm/shared'
 import {
   api,
@@ -25,6 +25,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -571,12 +572,14 @@ export default function WebhooksIncomingV8() {
   if (!selectedAccountId) {
     rightColumn = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
   } else if (incomingStatus === 'ready' && !selected) {
+    /* 修正案 D-2：空の一覧。 */
     rightColumn = (
-      <ListState
-        kind="empty"
+      <EmptyList
+        icon={<Inbox aria-hidden="true" />}
         title="まだ受け取り口がありません"
-        description="相手のサービスから知らせを受け取るURLを、「受け取り口を作る」から作れます"
-        action={canManage ? <Button variant="primary" onClick={openCreate}><Plus size={15} aria-hidden="true" />受け取り口を作る</Button> : undefined}
+        description="相手のサービスから届く知らせを受け取る URL を作ります。"
+        create={{ label: '最初の受け取り口を作る', onClick: openCreate }}
+        canCreate={canManage}
       />
     )
   } else if (!selected) {

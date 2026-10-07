@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bookmark, Inbox, LayoutTemplate, Pause, Play, Plus } from 'lucide-react'
+import { Bookmark, Inbox, LayoutTemplate, Pause, Play, Plus, Send } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -26,6 +26,7 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -492,22 +493,18 @@ export default function WebhooksOutgoingV8() {
         action={<Button onClick={() => void reload()}>もう一度読み込む</Button>}
       />
     )
-  } else if (displayed.length === 0) {
-    listBody = (
-      <ListState
-        kind="empty"
-        title="まだ、送り先はありません"
-        description="送り先を作ると、友だちの動きをほかのシステムへ知らせられます"
-        action={canManage ? <Button variant="primary" href="/webhooks/new"><Plus size={15} aria-hidden="true" />送り先を作る</Button> : undefined}
-      />
-    )
   } else if (visible.length === 0) {
+    /* 修正案 D-2：空の一覧。 */
     listBody = (
-      <ListState
-        kind="empty"
-        title="条件に合う送り先はありません"
-        description="検索や絞り込みの札を外すと、すべて出ます"
-        action={filterActive ? <Button onClick={clearFilters}>条件を外す</Button> : undefined}
+      <EmptyList
+        icon={<Send aria-hidden="true" />}
+        title="まだ送り先がありません"
+        description="友だちの動きを、ほかのシステムへ自動で知らせます。"
+        create={{ label: '最初の送り先を作る', href: '/webhooks/new' }}
+        canCreate={canManage}
+        filtered={displayed.length > 0}
+        onClearFilters={filterActive ? clearFilters : undefined}
+        filteredDescription="検索や絞り込みの札を外すと、すべて出ます"
       />
     )
   } else {

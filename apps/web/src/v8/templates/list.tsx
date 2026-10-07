@@ -30,14 +30,12 @@ import {
   MessageSquare,
   MoreHorizontal,
   Plus,
-  Search as SearchIcon,
   Send,
   SquareArrowOutUpRight,
   Ticket,
   Trash2,
   TriangleAlert,
   Unlink,
-  X,
 } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
@@ -52,6 +50,7 @@ import { contentExcerpt } from '@/lib/broadcast-summary'
 import { ListPage } from '@/components/templates'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
@@ -1024,34 +1023,18 @@ export default function TemplatesListV8() {
       )}
     </div>
   ) : filteredTemplates.length === 0 ? (
-    filterActive ? (
-      <div className={styles.stateCard} data-design-node="susGP">
-        <span className={styles.stateIcon}>
-          <SearchIcon size={18} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>条件に合うテンプレートはありません</p>
-        <p className={styles.stateDesc}>
-          「1通のみ」「差し込みあり」「使っていない」や検索を外すと、すべて出ます。
-        </p>
-        <Button type="button" variant="secondary" onClick={clearFilters}>
-          <X size={13} aria-hidden="true" />
-          条件を外す
-        </Button>
-      </div>
-    ) : (
-      <div className={styles.stateCard} data-design-node="susGP">
-        <span className={styles.stateIcon}>
-          <FileText size={18} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>まだ{sectionWord}はありません</p>
-        <p className={styles.stateDesc}>
-          よく送る文を保存しておくと、一斉配信・自動応答・シナリオから選べます。
-        </p>
-        <Button type="button" variant="primary" disabled={!canMutateTemplates} title={!canMutateTemplates ? NO_MANAGE_NOTE : undefined} onClick={openPicker}>
-          <Plus size={15} aria-hidden="true" />テンプレートを作る
-        </Button>
-      </div>
-    )
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      data-design-node="susGP"
+      icon={<FileText aria-hidden="true" />}
+      title={`まだ${sectionWord}がありません`}
+      description="よく送る文を保存しておくと、一斉配信・自動応答・シナリオから選べます。"
+      create={{ label: '最初のテンプレートを作る', onClick: openPicker }}
+      canCreate={canMutateTemplates}
+      filtered={filterActive}
+      onClearFilters={clearFilters}
+      filteredDescription="「1通のみ」「差し込みあり」「使っていない」や検索を外すと、すべて出ます"
+    />
   ) : (
     <>
       <ContextMenu

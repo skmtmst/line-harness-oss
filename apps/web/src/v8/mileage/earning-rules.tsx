@@ -27,6 +27,7 @@ import {
 } from '@/lib/api'
 import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -848,22 +849,18 @@ export default function EarningRulesTab() {
       <p className={styles.stateDesc}>数の帯は「—」にしています。道具はそのまま使えます。</p>
       <Button type="button" onClick={() => void load()}>もう一度試す</Button>
     </div>
-  ) : rules.length === 0 ? (
-    <div className={styles.stateCard}>
-      <p className={styles.stateTitle}>まだ、たまる決めごとはありません</p>
-      <p className={styles.stateDesc}>どの行動で何マイル付けるかを決めると、友だちにマイルがたまりはじめます</p>
-      {!readonly ? (
-        <Button variant="primary" href="/mileage/earning-rules/new">
-          <Plus size={14} aria-hidden="true" /> たまる決めごとを作る
-        </Button>
-      ) : null}
-    </div>
   ) : visible.length === 0 ? (
-    <div className={styles.stateCard}>
-      <p className={styles.stateTitle}>条件に合う決めごとはありません</p>
-      <p className={styles.stateDesc}>名前の検索や絞り込みを外すと、すべて出ます</p>
-      <Button type="button" onClick={resetAll}>条件を外す</Button>
-    </div>
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<Coins aria-hidden="true" />}
+      title="まだたまる決めごとがありません"
+      description="どの行動で何マイル付けるかを決めて、友だちにマイルをためます。"
+      create={{ label: '最初の決めごとを作る', href: '/mileage/earning-rules/new' }}
+      canCreate={!readonly}
+      filtered={rules.length > 0}
+      onClearFilters={resetAll}
+      filteredDescription="名前の検索や絞り込みを外すと、すべて出ます"
+    />
   ) : (
     <>
       {table}

@@ -7,11 +7,12 @@
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左のタグの列（型のフォルダの列＋共通 FolderPanel）・
  * 数のカード4枚・探す欄と状態の札・カード／表の切り替え・並び・件数・アカウントのカード・件数と注。
  */
-import { CircleDot, Info, Inbox, LogIn, Plus, RotateCcw, Settings, Star } from 'lucide-react'
+import { CircleDot, Info, Inbox, LogIn, Plus, RotateCcw, Settings, Star, MessageCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -363,11 +364,13 @@ export default function HqHomeV8() {
   ) : loading ? (
     <ListState kind="loading" title="アカウントを読み込んでいます" />
   ) : accounts.length === 0 ? (
-    <ListState
-      kind="empty"
-      title="まだアカウントがありません"
-      description="最初のLINE公式アカウントを登録すると、ここからアカウントへログインできます。"
-      action={canManage ? <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録する</Button> : undefined}
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<MessageCircle aria-hidden="true" />}
+      title="まだ LINE 公式アカウントがありません"
+      description="アカウントを登録すると、ここから各アカウントの管理画面に入れます。"
+      create={{ label: '最初のアカウントを登録する', href: '/accounts/new' }}
+      canCreate={canManage}
     />
   ) : (
     <>
@@ -418,7 +421,14 @@ export default function HqHomeV8() {
       {connectionResult ? <Notice tone="info" message={connectionResult} /> : null}
 
       {shown.length === 0 ? (
-        <ListState kind="empty" title="該当するアカウントがありません" description="検索の言葉や絞り込みを変えてください。" />
+        <EmptyList
+          icon={<MessageCircle aria-hidden="true" />}
+          title="まだ LINE 公式アカウントがありません"
+          description=""
+          filtered
+          onClearFilters={() => { setQuery(''); setStatus(STATUS_FILTERS[0].value); resetPage() }}
+          filteredDescription="検索の言葉や絞り込みを外すと、すべて出ます"
+        />
       ) : view === 'cards' ? (
         <div className={styles.grid}>
           {shown.map((account) => {

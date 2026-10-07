@@ -28,6 +28,7 @@ import { formatNumber } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
 import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel from '@/components/shared/folder-panel'
 import HelpTip from '@/components/shared/help-tip'
@@ -772,14 +773,18 @@ export default function RewardsTab() {
     <StateCard title="使い道を見る権限がありません" description="オーナーか管理者に確認してください。" />
   ) : status === 'error' ? (
     <StateCard tone="error" title="使い道を読み込めませんでした" description="数の帯は「—」にしています。道具はそのまま使えます。" action={<RetryButton onRetry={() => void load()} />} />
-  ) : rewards.length === 0 ? (
-    <StateCard
-      title="まだ使い道がありません"
-      description="交換できる特典を1つ出すと、マイルが動きにつながります"
-      action={!readonly ? <Button variant="primary" href="/mileage/rewards/edit"><Plus size={14} aria-hidden="true" /> 使い道を作る</Button> : undefined}
-    />
   ) : visible.length === 0 ? (
-    <StateCard title="条件に合う使い道はありません" description="名前の検索や絞り込みを外すと、すべて出ます" action={<Button type="button" onClick={resetAll}>条件を外す</Button>} />
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<Gift aria-hidden="true" />}
+      title="まだ使い道がありません"
+      description="たまったマイルと交換できる特典を出します。"
+      create={{ label: '最初の使い道を作る', href: '/mileage/rewards/edit' }}
+      canCreate={!readonly}
+      filtered={rewards.length > 0}
+      onClearFilters={resetAll}
+      filteredDescription="名前の検索や絞り込みを外すと、すべて出ます"
+    />
   ) : (
     <>
       {table}

@@ -41,6 +41,7 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import { withViewTransition } from '@/components/shared/view-transition'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -655,18 +656,19 @@ export default function TagsTab({
       <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
       <Button type="button" onClick={() => void load()}>もう一度試す</Button>
     </div>
-  ) : ready && items.length === 0 ? (
-    <div className={styles.stateCard} data-design-node="U0aKD">
-      <TagIcon className={styles.stateIcon} aria-hidden="true" />
-      <p className={styles.stateTitle}>まだタグがありません</p>
-      <p className={styles.stateDesc}>「＋ タグを作る」から最初の1つを作ると、ここに並びます。</p>
-    </div>
   ) : ready && visible.length === 0 ? (
-    <div className={styles.stateCard} data-design-node="U0aKD">
-      <p className={styles.stateTitle}>条件に合うタグはありません</p>
-      <p className={styles.stateDesc}>検索語・フォルダ・絞り込みを変えてください。</p>
-      {filterActive ? <Button type="button" onClick={clearFilters}>条件を外す</Button> : null}
-    </div>
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      data-design-node="U0aKD"
+      icon={<TagIcon aria-hidden="true" />}
+      title="まだタグがありません"
+      description="友だちに目印を付けて、配信の絞り込みや対応の振り分けに使います。"
+      create={{ label: '最初のタグを作る', href: '/tags/new' }}
+      canCreate={canEdit}
+      filtered={items.length > 0}
+      onClearFilters={filterActive ? clearFilters : undefined}
+      filteredDescription="検索語・フォルダ・絞り込みを外すと、すべて出ます"
+    />
   ) : (
     <DelayedSkeleton loading={!ready} skeleton={<div className={styles.skeleton} data-design-node="U0aKD" aria-busy="true" />}>
       <DataTable className={styles.table} data-design="TagTable">

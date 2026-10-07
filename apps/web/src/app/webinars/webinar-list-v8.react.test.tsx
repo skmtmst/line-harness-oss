@@ -157,7 +157,7 @@ test('v8 で何も無いときは eAQ3t の「まだ無い」が出る', async (
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="UyUMw"]')
-  expect(board?.textContent).toContain('まだ、ウェビナーはありません')
+  expect(board?.textContent).toContain('まだウェビナーがありません')
 })
 
 test('v8 の閲覧のみ（jiNg0）は作る・編集が押せない形になる', async () => {
