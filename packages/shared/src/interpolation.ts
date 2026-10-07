@@ -27,6 +27,7 @@ const PER_RECIPIENT = [
  * 誰に送っても同じ値になる。
  */
 const BROADCAST_WIDE = [
+  /^account\.name$/,
   /^liff_id$/,
   /^var\.[a-z][a-z0-9_]*$/,
   /^date([+-]\d+)?(:[a-z_]+)?$/,

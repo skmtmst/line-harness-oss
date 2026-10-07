@@ -1,3 +1,5 @@
+import { restaurantClosurePaths } from './restaurant-closures-openapi.js';
+import { stampPaths,hqBroadcastPaths } from './proposal-e-openapi.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
@@ -15,6 +17,7 @@ const spec = {
   security: [{ bearerAuth: [] }],
   components: {
     securitySchemes: {
+      liffIdToken: {type:'http',scheme:'bearer',description:'指定した店舗のLINE Login IDトークン。APIキーとは別。'},
       bearerAuth: {
         type: 'http',
         scheme: 'bearer',
@@ -386,6 +389,10 @@ const spec = {
     },
   },
   paths: {
+    ...restaurantClosurePaths,
+    ...stampPaths,
+    ...hqBroadcastPaths,
+
     // V8 API integration: authenticated endpoints, with account scope and revision checks.
   "/api/hq/templates/folders": {
     "get": {
