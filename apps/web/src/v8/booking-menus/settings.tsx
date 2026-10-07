@@ -271,7 +271,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     const range = previewRange()
     setPreview((current) => ({ ...current, status: 'loading' }))
     bookingApi
-      .getAvailability(accountId, { menuId: firstActiveMenu.id, from: range.from, to: range.to })
+      .getAvailability(accountId, { menuId: firstActiveMenu.id, from: range.from, to: range.to, applyStoreRules: true })
       .then((response) => {
         if (cancelled) return
         setPreview({
