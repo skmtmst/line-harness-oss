@@ -172,6 +172,33 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.getByText('使われていない')).toBeTruthy()
   })
 
+  it('受け口を止めると押した瞬間に「止まっています」になり、保存に失敗したら元に戻す（触り心地 5 回目）', async () => {
+    let finish: (response: Response) => void = () => {}
+    const base = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input))
+      if (url.pathname.endsWith('/ingest-disable')) {
+        calls.push(`${init?.method ?? 'GET'} ${url.pathname}`)
+        return new Promise<Response>((resolve) => { finish = resolve })
+      }
+      return base(input, init)
+    })
+    await mount()
+    fireEvent.click(screen.getByText('商品を買った'))
+    await flush()
+    const panel = screen.getByRole('region', { name: '詳細の小窓' })
+    expect(panel.textContent).toContain('（動いています）')
+    fireEvent.click(screen.getByRole('button', { name: '受け口を止める' }))
+    await flush()
+    expect(calls).toContain('POST /api/conversions/definitions/cp-1/ingest-disable')
+    // 返事を待たずに変わっている
+    expect(screen.getByRole('region', { name: '詳細の小窓' }).textContent).toContain('（止まっています）')
+    await act(async () => { finish(json({ success: false, error: 'conflict' }, 409)) })
+    await flush()
+    expect(screen.getByRole('region', { name: '詳細の小窓' }).textContent).toContain('（動いています）')
+    expect(calls.filter((call) => call === 'GET /api/conversions/definitions')).toHaveLength(1)
+  })
+
   it('札で絞ると、その状態の行だけになる', async () => {
     await mount()
     fireEvent.click(screen.getByRole('button', { name: /止めている 1/ }))

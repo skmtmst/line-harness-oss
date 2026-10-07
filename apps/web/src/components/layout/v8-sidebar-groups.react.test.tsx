@@ -9,6 +9,9 @@
  *   - 左メニューのいちばん下に「設定」（オーナー・管理者だけ）
  *   - v7 では開閉も歯車も出さず、V2 モードの組隠しも v8 では効かない
  */
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { cleanup, render, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -131,6 +134,24 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
     expect(view.getAllByRole('link', { name: 'オートメーション' }).length).toBeGreaterThan(0)
     expect(window.localStorage.getItem('lh-sidebar-groups')).toContain('"automation":true')
+  })
+
+  it('開閉は項目を包みに残して高さで動かす。畳んだ包みは押せず読み上げない（触り心地 5 回目）', async () => {
+    const view = await renderSidebar()
+    const toggle = view.getAllByRole('button', { name: '自動化' })[0]!
+    const box = toggle.parentElement!.querySelector('[data-group-open]')!
+    expect(box.getAttribute('data-group-open')).toBe('false')
+    expect(box.hasAttribute('inert')).toBe(true)
+    expect(box.getAttribute('aria-hidden')).toBe('true')
+    await act(async () => { toggle.click() })
+    expect(box.isConnected).toBe(true)
+    expect(box.getAttribute('data-group-open')).toBe('true')
+    expect(box.hasAttribute('inert')).toBe(false)
+    expect(box.hasAttribute('aria-hidden')).toBe(false)
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'sidebar.module.css'), 'utf8')
+    // 動きは「動きを減らす」設定では付けない
+    expect(css).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*\[data-theme="v8"\] \.sectionItems \{\s*transition:\s*grid-template-rows var\(--motion-base\)/)
+    expect(css).toMatch(/\.sectionItemsClosed \{\s*grid-template-rows: 0fr;/)
   })
 
   it('いまいる画面の組は、畳まれていても開いてその項目を選ばれた形にする', async () => {

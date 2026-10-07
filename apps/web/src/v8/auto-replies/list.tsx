@@ -1224,7 +1224,7 @@ export default function AutoRepliesListV8() {
                   </Td>
                   <NameCell
                     name={<div className={styles.nameRow}>
-                      <FolderDotName folder={folderDotOf(r)} dot={!narrow}>
+                      <FolderDotName folder={folderDotOf(r)}>
                         <Link
                           href={`/auto-replies/edit?id=${r.id}`}
                           title={name}

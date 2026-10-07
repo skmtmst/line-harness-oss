@@ -44,6 +44,7 @@ import { ListPagePagination } from '@/components/templates'
 import { formatMileageDate, formatMileageNumber } from './display'
 import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
+import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
@@ -281,27 +282,55 @@ export default function RewardsTab() {
   const changeState = async (reward: MileageRewardSummary) => {
     if (readonly || !accountId
       || (reward.status !== 'published' && reward.status !== 'draft' && reward.status !== 'stopped')) return
+    /*
+     * 出すのを止める・また出す：押した瞬間に状態を変え、裏で保存する（触り心地 5 回目）。
+     * 失敗したら元に戻してトーストで知らせる。下書きを公開するのは中身の確かめがあるので今までどおり。
+     */
+    if (reward.status === 'published' || reward.status === 'stopped') {
+      const before = reward.status
+      const next = before === 'published' ? 'stopped' : 'published'
+      const setStatus = (status: MileageRewardSummary['status']) => setRewards((current) => current.map((item) => (
+        item.id === reward.id ? { ...item, status } : item
+      )))
+      setBusyId(reward.id)
+      setActionError('')
+      setStatus(next)
+      try {
+        const response = before === 'published'
+          ? await api.mileage.stopReward(reward.id, accountId)
+          : await api.mileage.resumeReward(reward.id, accountId)
+        if (!response.success) throw new Error(response.error)
+        const saved = response.data
+        if (saved && typeof saved === 'object' && saved.id === reward.id) {
+          setRewards((current) => current.map((item) => (item.id === reward.id ? { ...item, ...saved } : item)))
+        }
+      } catch {
+        setStatus(before)
+        notifyToast(before === 'published'
+          ? `「${reward.name}」を止められませんでした。元に戻しました。`
+          : `「${reward.name}」をまた出せませんでした。元に戻しました。`, {
+          tone: 'error',
+          actionLabel: 'もう一度',
+          onAction: () => { void changeState({ ...reward, status: before }) },
+        })
+      } finally {
+        setBusyId(null)
+      }
+      return
+    }
     setBusyId(reward.id)
     setActionError('')
     try {
-      const response = reward.status === 'published'
-        ? await api.mileage.stopReward(reward.id, accountId)
-        : reward.status === 'stopped'
-          ? await api.mileage.resumeReward(reward.id, accountId)
-          : await api.mileage.publishReward(
-            reward.id,
-            accountId,
-            reward.currentDraftVersionId ?? reward.currentVersion?.id ?? undefined,
-            reward.currentVersion?.revision,
-          )
+      const response = await api.mileage.publishReward(
+        reward.id,
+        accountId,
+        reward.currentDraftVersionId ?? reward.currentVersion?.id ?? undefined,
+        reward.currentVersion?.revision,
+      )
       if (!response.success) throw new Error(response.error)
       await load()
     } catch {
-      setActionError(reward.status === 'published'
-        ? '使い道を止められませんでした。もう一度お試しください。'
-        : reward.status === 'stopped'
-          ? '使い道をまた出せませんでした。もう一度お試しください。'
-          : '使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+      setActionError('使い道を公開できませんでした。内容を確認してもう一度お試しください。')
     } finally {
       setBusyId(null)
     }

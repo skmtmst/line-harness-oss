@@ -55,6 +55,7 @@ import { FolderDotName } from '@/components/shared/folder-dot'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import { useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
 import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
 import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state'
@@ -347,6 +348,8 @@ export default function TagsTab({
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pages)
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（自動応答と同じ動き）。 */
+  const liveOrder = useLiveReorder(visible, (tag) => tag.id, dragId)
   const activeTag = items.find((tag) => tag.id === activeTagId) ?? null
   const activeTagIndex = visible.findIndex((tag) => tag.id === activeTagId)
   const activeGroup = activeTag ? groups.find((item) => item.id === activeTag.groupId) : undefined
@@ -751,14 +754,18 @@ export default function TagsTab({
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
-        <RovingTbody>
-          {visible.map((tag) => {
+        <RovingTbody reorderKey={liveOrder.shown.map((tag) => tag.id).join(',')}>
+          {liveOrder.shown.map((tag) => {
             const group = groups.find((item) => item.id === tag.groupId)
             const editHref = `/tags/edit?id=${tag.id}`
             return (
               <Tr
                 interactive
                 key={tag.id}
+                data-reorder-id={tag.id}
+                onDragEnter={() => liveOrder.enter(tag.id)}
+                onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                onDrop={dragId ? () => void move(liveOrder.dropTarget(tag.id)) : undefined}
                 className={styles.row}
                 leaving={leavingId === tag.id}
                 tabIndex={0}
@@ -805,8 +812,7 @@ export default function TagsTab({
                         draggable={canEdit}
                         onClick={(event) => event.stopPropagation()}
                         onDragStart={() => setDragId(tag.id)}
-                        onDragOver={(event) => event.preventDefault()}
-                        onDrop={() => void move(tag.id)}
+                        onDragEnd={() => setDragId(null)}
                       >
                         {/* 閲覧のみ：つまみは隠し、幅だけ空けて名前の位置を保つ */}
                         {canEdit ? (

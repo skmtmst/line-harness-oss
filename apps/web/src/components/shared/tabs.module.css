@@ -183,4 +183,8 @@
 [data-theme='v8'] .current { border-bottom: 2px solid var(--color-ink); }
 [data-theme='v8'] .items[data-sliding='true'] .current { border-bottom-color: transparent; }
 [data-theme='v8'] .indicator { border-radius: 0; }
+/* 詰めた段（size="compact"）：文字の行だけ詰める。下12・間24・線は同じ。 */
+[data-theme='v8'] .list[data-size='compact'] .tab { min-height: 0; line-height: var(--tpl-tabs-compact-lh); }
+/* 選んだタブの下線は段の線に重ねる（絵の下線は段の高さを足さない）。 */
+[data-theme='v8'] .list[data-size='compact'] .current { margin-bottom: var(--tpl-tabs-compact-line-overlap); }
 }

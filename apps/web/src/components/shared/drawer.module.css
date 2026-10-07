@@ -206,6 +206,11 @@
   }
 }
 
+/* 幅の口（width="narrow"）。既定の 660 は変えない。 */
+[data-theme='v8'] .panel[data-width='narrow'] {
+  width: min(var(--tpl-drawer-narrow-w), 100%);
+}
+
 [data-theme='v8'] .overlay[data-closing] {
   opacity: 0;
   /* 消えていく間は下の画面を押せるようにする（薄い膜が押下を食べない）。 */

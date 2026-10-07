@@ -1314,7 +1314,7 @@ function CommonVarsListInner() {
                     <NameCell
                       name={
                         <div className={styles.dotLine}>
-                          <FolderDotName folder={folderDotOf(item)} dot={!narrow}>
+                          <FolderDotName folder={folderDotOf(item)}>
                             <Link
                               href={`/contents/vars/edit?id=${item.id}`}
                               title={item.name}

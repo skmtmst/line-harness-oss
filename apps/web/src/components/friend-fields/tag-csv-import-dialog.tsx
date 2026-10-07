@@ -24,6 +24,8 @@ import {
 import styles from './tag-csv-import-dialog.module.css'
 import { formatYmd } from '@/lib/format'
 
+const PREVIEW_ROW_STEP = 100
+
 type Phase = 'select' | 'preview' | 'saving' | 'success' | 'partial'
 type PreviewFilter = 'all' | 'ready' | 'skipped' | 'invalid'
 
@@ -71,6 +73,11 @@ export default function TagCsvImportDialog({
   const [preview, setPreview] = useState<TagCsvImportPreview | null>(null)
   const [result, setResult] = useState<TagCsvImportResult | null>(null)
   const [filter, setFilter] = useState<PreviewFilter>('all')
+  /*
+   * 2026-10-07 速さ：確認の表は最初の 100 行だけ描き、続きは「もっと見る」で足す。
+   * 500 行を全部描くと表だけで 3,500 要素になる。エラーの行は上の「エラー」で絞れる。
+   */
+  const [shownRows, setShownRows] = useState(PREVIEW_ROW_STEP)
   const [error, setError] = useState('')
   const busy = phase === 'saving'
   const panelRef = useOverlayFocus(open, onClose, busy)
@@ -121,6 +128,7 @@ export default function TagCsvImportDialog({
       const response = await api.tags.importPreview(rows)
       if (!response.success) throw new Error(response.error)
       setPreview(response.data)
+      setShownRows(PREVIEW_ROW_STEP)
       setPhase('preview')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '取り込む内容を確認できませんでした')
@@ -267,7 +275,7 @@ export default function TagCsvImportDialog({
               ] as Array<[PreviewFilter, string, number]>).map(([key, label, total]) => <FilterChip
                 key={key}
                 selected={filter === key}
-                onChange={() => setFilter(key)}
+                onChange={() => { setFilter(key); setShownRows(PREVIEW_ROW_STEP) }}
                 count={total}
               >{label}</FilterChip>)}
             </div>
@@ -275,7 +283,7 @@ export default function TagCsvImportDialog({
               <table className={styles.table}>
                 <colgroup><col style={{ width: '7%' }} /><col style={{ width: '26%' }} /><col style={{ width: '21%' }} /><col style={{ width: '12%' }} /><col /></colgroup>
                 <thead><TableHeadRow><Th>行</Th><Th>タグ名</Th><Th>フォルダ</Th><Th>扱い</Th><Th>理由</Th></TableHeadRow></thead>
-                <tbody>{visiblePreviewRows.map((row) => <tr key={`${row.line}-${row.name}`}>
+                <tbody>{visiblePreviewRows.slice(0, shownRows).map((row) => <tr key={`${row.line}-${row.name}`}>
                   <td>{row.line}</td>
                   <td className={styles.truncate} title={row.name}>{row.name || '（空欄）'}</td>
                   <td className={styles.truncate} title={row.folderName}>{row.folderName || '未分類'}</td>
@@ -283,6 +291,13 @@ export default function TagCsvImportDialog({
                   <td>{row.message ?? '登録できます'}</td>
                 </tr>)}</tbody>
               </table>
+              {visiblePreviewRows.length > shownRows ? (
+                <div className={styles.moreRows}>
+                  <Button type="button" variant="text" onClick={() => setShownRows((n) => n + PREVIEW_ROW_STEP)}>
+                    {`もっと見る（残り${visiblePreviewRows.length - shownRows}行）`}
+                  </Button>
+                </div>
+              ) : null}
             </div>
             {/*
               設計 `sfTEW` の注意帯。**押す前に、押したらどうなるかを言う。**

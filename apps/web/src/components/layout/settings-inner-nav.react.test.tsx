@@ -59,7 +59,7 @@ describe('★V8 設定の中のメニュー', () => {
   afterEach(() => cleanup())
 
   // 2026-10-06：設定の板（ihjfd ほか 8 枚）の並びへ。見出し「設定」・印つき・プール管理あり・「専用」の小見出しなし。
-  it('絵の並びで出す：はじめの設定・LINEアカウント・プール管理・ログインユーザー・機能設定・運用状態・EC連携・LINE通知', async () => {
+  it('絵の並びで出す：はじめの設定・LINEアカウント・プール管理・ログインユーザー・機能設定・運用状態・EC連携・LINE通知（SNS 連携は末尾）', async () => {
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { ec_commerce: true, line_notifications: true, multi_store_hierarchy: true } },
@@ -79,11 +79,23 @@ describe('★V8 設定の中のメニュー', () => {
       '運用状態',
       'EC連携',
       'LINE通知',
+      // 提案 E-6：今ある絵の並びを動かさないよう末尾に足した
+      'SNS 連携',
     ])
     expect(view.getByText('設定')).toBeTruthy()
     expect(view.queryByText('専用')).toBeNull()
     // 「会社とロゴ」は API ができるまで出さない
     expect(view.queryByText('会社とロゴ')).toBeNull()
+  })
+
+  it('SNS 連携の画面では SNS 連携が今の画面になり、機能設定の下の2つは出さない', async () => {
+    fixture.pathname = '/settings/sns'
+    fixture.visibility.mockResolvedValue({ success: true, data: { features: {} } })
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(view.queryByRole('link', { name: 'SNS 連携' })).toBeTruthy())
+    expect(view.getByRole('link', { name: 'SNS 連携' }).getAttribute('aria-current')).toBe('page')
+    expect(view.getByRole('link', { name: '機能設定' }).getAttribute('aria-current')).toBeNull()
+    expect(view.queryByRole('link', { name: 'ファイルの検査' })).toBeNull()
   })
 
   it('機能設定の下の2つは、ほかの設定の画面では出さない', async () => {
