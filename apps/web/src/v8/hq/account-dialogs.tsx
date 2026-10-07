@@ -6,11 +6,10 @@
  * 読み書きの口・本人確認は v7（app/hq/account-settings-dialogs.tsx）と同じ（import できないので写した）。
  * 設定の窓だけ、見た目を絵 `HMpVx` どおりに組み直した。
  */
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { CircleDot, Star, TrendingUp, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CircleDot, CircleHelp, RotateCcw, Star, Users } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
-import { otpDigits, otpFailureMessage } from '@/components/shared/otp-input'
+import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
@@ -24,77 +23,10 @@ import { FALLBACK_REASON, connectionReasons, lineHandle } from './connection-rea
 /** 絵 `HMpVx` の窓の幅と上からの位置（px）。 */
 const SETTINGS_WIDTH = 560
 const SETTINGS_TOP = 200
-
-/* 6桁コードの升。貼り付けに対応し、動きは付けない（HANDOFF §8）。 */
-function CodeBoxes({ value, onChange, onComplete, disabled, invalid = false, label }: {
-  value: string
-  onChange: (next: string) => void
-  /** 6桁そろった瞬間に1回（送るボタンを押させない。動きの点検・6）。 */
-  onComplete?: (code: string) => void
-  disabled?: boolean
-  /** 違った。6桁を消して1枠目へ戻す。 */
-  invalid?: boolean
-  label: string
-}) {
-  const boxes = useRef<Array<HTMLInputElement | null>>([])
-  const write = (next: string) => {
-    const clean = otpDigits(next).slice(0, 6)
-    onChange(clean)
-    if (clean.length === 6 && value.length !== 6 && !disabled) onComplete?.(clean)
-  }
-  useEffect(() => {
-    if (!invalid) return
-    onChange('')
-    boxes.current[0]?.focus()
-    // 違ったと分かった瞬間だけ。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invalid])
-  const setDigit = (index: number, raw: string) => {
-    if (raw === '') {
-      onChange(value.slice(0, index) + value.slice(index + 1))
-      if (index > 0) boxes.current[index - 1]?.focus()
-      return
-    }
-    // 全角の数字は半角に。自動入力で1枠に6桁まとめて来たら、全部の枠へ振り分ける。
-    const digits = otpDigits(raw)
-    if (!digits) return
-    if (digits.length > 1) {
-      write(value.slice(0, index) + digits)
-      boxes.current[Math.min(index + digits.length, 5)]?.focus()
-      return
-    }
-    write(value.slice(0, index) + digits + value.slice(index + 1))
-    if (index < 5) boxes.current[index + 1]?.focus()
-  }
-  return (
-    <div className={styles.codeBoxes} role="group" aria-label={label}>
-      {[0, 1, 2, 3, 4, 5].map((index) => (
-        <input
-          key={index}
-          ref={(node) => { boxes.current[index] = node }}
-          className={styles.codeBox}
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          value={value[index] ?? ''}
-          disabled={disabled}
-          aria-invalid={invalid || undefined}
-          aria-label={`${label}${index + 1}文字目`}
-          onChange={(event) => setDigit(index, event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Backspace' && !value[index] && index > 0) boxes.current[index - 1]?.focus()
-          }}
-          onPaste={(event) => {
-            const pasted = otpDigits(event.clipboardData.getData('text')).slice(0, 6)
-            if (!pasted) return
-            event.preventDefault()
-            write(pasted)
-            boxes.current[Math.min(pasted.length, 5)]?.focus()
-          }}
-        />
-      ))}
-    </div>
-  )
-}
+/** 絵 `D6ljr`・`HFsO9` の窓の幅と上からの位置（px）。 */
+const ARCHIVE_WIDTH = 520
+const ARCHIVE_TOP = 240
+const RESTORE_TOP = 220
 
 async function stepUpToken(code: string): Promise<string> {
   const res = await api.auth.stepUp({ method: 'totp', value: code, purpose: 'line_account.archive' })
@@ -305,7 +237,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
           <p className={styles.label}>ほかの設定</p>
           <div className={styles.buttonRow}>
             <Button type="button" onClick={onShowDetails}>
-              <TrendingUp aria-hidden="true" className={styles.icon} />詳しい数値を見る
+              <CircleHelp aria-hidden="true" className={styles.icon} />詳しい数値を見る
             </Button>
             <Button href="/hq/members">
               <Users aria-hidden="true" className={styles.icon} />メンバー・担当範囲
@@ -355,18 +287,23 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
     <Dialog
       open
       title={`「${account.name}」をアーカイブしますか？`}
-      description="一覧から外します。送受信は止まり、友だちと履歴は残ります。あとで「戻す」で戻せます（オーナーのみ）。"
-      tone="destructive"
       designNode="D6ljr"
-      confirmLabel="本人確認してアーカイブする"
+      designWidth={ARCHIVE_WIDTH}
+      designTop={ARCHIVE_TOP}
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void archive()}
       onCancel={onClose}
+      footer={
+        <div className={`${head.footer} ${head.footerEnd}`}>
+          <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
+          <Button type="button" variant="danger" onClick={() => void archive()} disabled={busy} busy={busy} busyLabel="アーカイブ中…">本人確認してアーカイブする</Button>
+        </div>
+      }
     >
-      <div className={styles.stack}>
+      <div className={head.head}>
+        <p className={styles.lead}>一覧から外します。送受信は止まり、友だちと履歴は残ります。あとで「戻す」で戻せます（オーナーのみ）。</p>
         <div className={styles.field}>
-          <label htmlFor="hq-account-archive-reason" className={styles.label}>アーカイブの理由（任意）</label>
+          <label htmlFor="hq-account-archive-reason" className={styles.labelLarge}>アーカイブの理由（任意）</label>
           <TextField
             id="hq-account-archive-reason"
             value={reason}
@@ -378,8 +315,8 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
           />
         </div>
         <div className={styles.field}>
-          <span className={styles.label}>本人確認（認証アプリの6桁）</span>
-          <CodeBoxes value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void archive(entered)} invalid={Boolean(error)} disabled={busy} label="認証コード" />
+          <span className={styles.stepLabel}>本人確認（認証アプリの6桁）</span>
+          <OtpInput visualLabel="認証コード（6桁）" label="認証コード" value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void archive(entered)} invalid={Boolean(error)} busy={busy} />
         </div>
       </div>
     </Dialog>
@@ -423,18 +360,27 @@ export function AccountRestoreDialogV8({ account, onClose, onDone }: {
     <Dialog
       open
       title={`「${account.name}」をアーカイブから戻しますか？`}
-      description="戻した直後は「止まっている」状態です。送受信を始めるときは、アカウントの詳細で「動かす」を押します。"
       designNode="HFsO9"
-      confirmLabel="本人確認して戻す"
+      designWidth={ARCHIVE_WIDTH}
+      designTop={RESTORE_TOP}
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void restore()}
       onCancel={onClose}
+      footer={
+        <div className={`${head.footer} ${head.footerEnd}`}>
+          <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
+          <Button type="button" variant="primary" onClick={() => void restore()} disabled={busy} busy={busy} busyLabel="戻しています…">
+            <RotateCcw aria-hidden="true" className={styles.icon} />本人確認して戻す
+          </Button>
+        </div>
+      }
     >
-      <div className={styles.field}>
-        <span className={styles.label}>本人確認（認証アプリの6桁）</span>
-        <CodeBoxes value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void restore(entered)} invalid={Boolean(error)} disabled={busy} label="認証コード" />
-        <Link href="/hq/members" className={styles.link}>戻すのはオーナー・本人確認のある人だけです</Link>
+      <div className={head.head}>
+        <p className={styles.lead}>戻した直後は「止まっている」状態です。送受信を始めるときは、アカウントの詳細で「動かす」を押します。</p>
+        <div className={styles.field}>
+          <span className={styles.stepLabel}>本人確認（認証アプリの6桁）</span>
+          <OtpInput visualLabel="認証コード（6桁）" label="認証コード" value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void restore(entered)} invalid={Boolean(error)} busy={busy} />
+        </div>
       </div>
     </Dialog>
   )
