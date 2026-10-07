@@ -1242,6 +1242,8 @@ const EC_SUBSCRIPTIONS = {
     { month: '2026-06', count: 158, amount: 1248000 }, { month: '2026-07', count: 169, amount: 1324000 }, { month: '2026-08', count: 172, amount: 1482000 },
   ] },
   risk: { source: 'payment_status', ruleVersion: 'subscription-payment-status-v1', calculatedAt: '2026-09-06T09:58:00+09:00', predictiveScoreAvailable: false },
+  // 本物の口（GET /api/ec-commerce/subscriptions）は形が読めなかった件数を必ず返す。無いと定期便のタブが落ちる（wqC8x）
+  skipped: { malformedSnapshots: 0 },
 }
 
 const EC_CONNECTOR = {
@@ -3710,6 +3712,18 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /* F-5 テンプレートの見本4件（本番 `apps/worker/src/routes/templates.ts` の TEMPLATE_EXAMPLES と同じ形）。 */
+  if (pathname === '/api/templates/examples') {
+    return {
+      success: true,
+      data: [
+        { id: 'template-example-business-hours', name: '営業時間のご案内', body: 'いつもご利用ありがとうございます。営業時間のご案内です。平日 10:00〜19:00、土日祝 10:00〜18:00です。ご来店をお待ちしております。', imageSlot: '/images/template-examples/business-hours.png' },
+        { id: 'template-example-campaign', name: 'キャンペーンのお知らせ', body: '期間限定キャンペーンのお知らせです。対象商品が10%お得になります。この機会にぜひご利用ください。', imageSlot: '/images/template-examples/campaign.png' },
+        { id: 'template-example-booking', name: '予約の受付', body: 'ご予約を受け付けました。日時が近づきましたらご案内をお送りします。変更・キャンセルはお早めにご連絡ください。', imageSlot: '/images/template-examples/booking.png' },
+        { id: 'template-example-thanks-coupon', name: '来店のお礼とクーポン', body: 'ご来店ありがとうございました。次回使えるクーポンをお送りします。またのご利用をお待ちしております。', imageSlot: '/images/template-examples/thanks-coupon.png' },
+      ],
+    }
+  }
   if (pathname === '/api/templates') {
     if (query.has('page') || query.has('limit')) {
       const q = query.get('q')?.toLowerCase()
@@ -4868,6 +4882,31 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
               { id: `${id}-action-1`, type: 'add_tag', params: { tagId: 'tag-trial' }, onFailure: 'stop' },
               { id: `${id}-action-2`, type: 'send_message', params: { messageType: 'text', content: '予約の受付をはじめます。ご希望の日時を送ってください。' }, onFailure: 'stop' },
               { id: `${id}-action-3`, type: 'start_scenario', params: { scenarioId: 'scenario-trial' }, onFailure: 'stop' },
+            ],
+            commonActionRefs: [],
+            commonActionVersions: {},
+          },
+        }
+      }
+      /*
+       * ★V8 下書きを仕上げる（J1VA8）の撮影用の下書き。見本「「予約」と送られたら担当へ」から作った形
+       * （メッセージを受け取ったとき・言葉「予約」・タグを付ける→メッセージを送る→担当へ知らせる）。
+       */
+      if (id === 'automation-v8-template-draft') {
+        return {
+          success: true,
+          data: {
+            id,
+            draftVersionId: `${id}-version`,
+            name: '見本：「予約」と送られたら担当へ（下書き）',
+            description: null,
+            eventType: 'message_received',
+            triggerConfig: { keyword: '予約' },
+            conditions: {},
+            actions: [
+              { id: `${id}-action-1`, type: 'add_tag', params: { tagId: 'tag-trial' }, onFailure: 'stop' },
+              { id: `${id}-action-2`, type: 'send_message', params: { messageType: 'text', content: '予約の受付をはじめます。ご希望の日時を送ってください。' }, onFailure: 'stop' },
+              { id: `${id}-action-3`, type: 'notify_staff', params: { notificationRuleId: 'notification-rule-booking', message: '河野・坂本に LINE で' }, onFailure: 'stop' },
             ],
             commonActionRefs: [],
             commonActionVersions: {},

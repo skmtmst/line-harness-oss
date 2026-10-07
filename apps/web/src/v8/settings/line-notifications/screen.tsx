@@ -11,13 +11,14 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
-import NotificationRunList from '@/components/line-notifications/notification-run-list'
 import KpiBand from '@/components/shared/kpi-band'
 import Toggle from '@/components/shared/toggle'
-import { CircleDot, Info, Star } from 'lucide-react'
+import { CircleDot, Download, Info, Plus, Star } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
+import OperatorTab from './operator-tab'
+import RunsTab from './runs-tab'
 import styles from './screen.module.css'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -639,6 +640,8 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   /* 変える操作（出す・止める・文面を直す）はオーナー・管理者だけ。閲覧のみには押せないボタンを置かない。役割が分かるまでは今までどおり出す。 */
   const staffRole = useStaffRole()
   const canManage = staffRole ? canManageRole(staffRole) : true
+  /* 運用者へのお知らせ（u8xibp）：板の頭の「CSVで書き出す」で開く理由の窓。 */
+  const [operatorExportOpen, setOperatorExportOpen] = useState(false)
   /*
    * N-340: `loadGeneration` は load() の useEffect の中でしか進まない。
    * アカウント切替の描画コミットと、その useEffect が実際に発火する瞬間の
@@ -1121,6 +1124,10 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   return <SbSettingsScreen
     boardId={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}
     layout="narrow-nav"
+    actions={tab === 'operator' && expandedSetting === null && canManage ? <>
+      <Button onClick={() => setOperatorExportOpen(true)} disabled={!selectedAccountId}><Download aria-hidden="true" size={15} />CSVで書き出す</Button>
+      <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
+    </> : undefined}
     title="LINE通知"
     description="注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。"
   >
@@ -1141,9 +1148,11 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       </p>
     ) : null}
     {!canManage && expandedSetting === null ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</p> : null}
-    {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
-    {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
-    {tab === 'operator' ? renderOperatorRules?.(selectedAccountId) : null}
+    {tab === 'failures' ? <RunsTab lineAccountId={selectedAccountId} mode="failures" /> : null}
+    {tab === 'history' ? <RunsTab lineAccountId={selectedAccountId} mode="history" /> : null}
+    {tab === 'operator' ? (renderOperatorRules
+      ? renderOperatorRules(selectedAccountId)
+      : <OperatorTab lineAccountId={selectedAccountId} canManage={canManage} exportOpen={operatorExportOpen} onExportClose={() => setOperatorExportOpen(false)} />) : null}
     {tab === 'customer' && expandedSetting ? <>
       <CustomerNotificationEditor
         setting={expandedSetting}

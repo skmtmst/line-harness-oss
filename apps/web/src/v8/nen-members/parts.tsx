@@ -59,7 +59,7 @@ export function rankTone(rankKey: string | null, rankOrder: string[]): 'top' | '
 }
 
 export function RankChip({ rankKey, name, rankOrder }: { rankKey: string | null; name: string; rankOrder: string[] }) {
-  return <span className={styles.rankChip} data-tone={rankTone(rankKey, rankOrder)}>{name}</span>
+  return <span className={styles.rankChip} data-tone={rankTone(rankKey, rankOrder)}><span className={styles.rankDot} aria-hidden="true" />{name}</span>
 }
 
 /** ランクの決まりの4つの言葉（API の値は1種類ずつなので、言葉は画面が持つ）。 */

@@ -866,3 +866,8 @@
   background: var(--color-table-head);
 }
 .labelRow { display: flex; align-items: center; gap: var(--tpl-ml-dlg-label-gap); }
+
+/* 名前の前のフォルダの丸の分だけ、補足を名前の頭にそろえる。 */
+.dotIndent {
+  padding-left: var(--tpl-folder-dot-indent);
+}

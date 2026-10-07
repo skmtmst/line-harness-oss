@@ -72,6 +72,19 @@ export interface BookingHistoryItem {
   menu_name: string;
   staff_name: string;
   profile_image_url: string | null;
+  /**
+   * F-6 本人の日時変更・取消に要る値。履歴の口（`/api/liff/booking/me`）が返したときだけ使う。
+   * 無いときはカードに「日時を変える」「キャンセル」を出さない（押しても送れないため）。
+   */
+  lock_version?: number;
+  menu_id?: string;
+  staff_id?: string;
+}
+
+/** 本人の日時変更・取消の返事（使うのは版と状態だけ）。 */
+export interface SelfBookingChangeResponse {
+  lock_version?: number;
+  status?: string;
 }
 
 /** 予約作成の応答。お支払いありの店・メニューだけ payment が付く。 */
@@ -356,6 +369,12 @@ export const api = {
       `/api/liff/booking/payments/by-booking?bookingId=${encodeURIComponent(bookingId)}`,
     ),
   me: () => get<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] }>('/api/liff/booking/me'),
+  /** F-6 本人の取消。版（lock_version）が合わないと 409。期限を過ぎると 403 self_deadline_passed。 */
+  cancelMyBooking: (id: string, lockVersion: number) =>
+    post<SelfBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/cancel`, { lock_version: lockVersion }),
+  /** F-6 本人の日時変更。starts_at は UTC の ISO。埋まっていると 409 slot_not_available。 */
+  rescheduleMyBooking: (id: string, body: { starts_at: string; lock_version: number }) =>
+    post<SelfBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/reschedule`, body),
   /** 前回と同じで予約：本人の前回の予約を返す。失敗・対象外は呼び側が黙って隠す。 */
   lastBooking: () => get<LastBookingResponse>('/api/liff/booking/last-booking'),
   /** 満席の枠に「空いたら知らせる」を登録する。 */

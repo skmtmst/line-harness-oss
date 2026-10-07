@@ -26,7 +26,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
 import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -115,6 +115,8 @@ function ProjectInner() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   usePageTitle(project?.name ?? null)
+  // ★V8 パンくずは「ホーム › バナー生成 › プロジェクト名」（絵 `V8-B/iMnph`）。
+  usePageCrumbs([{ label: 'バナー生成', href: '/hq/banners' }])
 
   const loadUsage = useCallback(async () => {
     const res = await api.hqBanners.usage().catch(() => null)

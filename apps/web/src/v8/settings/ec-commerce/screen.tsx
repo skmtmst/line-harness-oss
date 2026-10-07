@@ -41,6 +41,7 @@ import {
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
+import EcConnector from './connector'
 import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
 
@@ -586,7 +587,7 @@ export default function EcCommerceScreen({
       <EcTabsV8 accountId={selectedAccountId} active={tab} />
       {tab === 'events' ? <EventsPanel accountId={selectedAccountId} /> : null}
       {tab === 'subscriptions' ? renderSubscriptions?.(selectedAccountId) : null}
-      {tab === 'connector' ? renderConnector?.(selectedAccountId, canEdit) : null}
+      {tab === 'connector' ? (renderConnector ? renderConnector(selectedAccountId, canEdit) : <EcConnector accountId={selectedAccountId} canEdit={canEdit} />) : null}
     </SbSettingsScreen>
   )
 }

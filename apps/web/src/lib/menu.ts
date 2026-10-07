@@ -51,6 +51,12 @@ export interface MenuSection {
 }
 
 /** 統括コンソールだけで使う、アカウント横断の管理メニュー。 */
+/** 統括の外側（左メニュー・上の帯）を出す住所（/hq の下と、統括から開く LINEアカウントの登録）。 */
+export function isHqShellPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new'
+}
+
 export const HQ_MENU_SECTIONS: MenuSection[] = [
   {
     id: 'hq',

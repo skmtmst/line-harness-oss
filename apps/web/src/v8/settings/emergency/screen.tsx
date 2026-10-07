@@ -19,6 +19,7 @@ import type { OperationSeverity } from '@/lib/operation-status'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { HealthPanelV8 } from './health'
+import UpdateHistoryV8 from './history'
 import styles from './screen.module.css'
 
 /** 板 Y4LkX1 の並び。健全性チェック・更新履歴・緊急コントロール。 */
@@ -119,7 +120,7 @@ export default function EmergencyScreen({
         />
       ) : null}
       {tab === 'control' ? renderControl?.(accounts, controlRef) : null}
-      {tab === 'history' ? renderHistory?.() : null}
+      {tab === 'history' ? (renderHistory ? renderHistory() : <UpdateHistoryV8 />) : null}
     </SbSettingsScreen>
   )
 }

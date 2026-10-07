@@ -494,19 +494,29 @@
   font-weight: 600;
 }
 
-/* 種類を選ぶ窓（R9XUMr）。 */
+/* 種類を選ぶ窓（R9XUMr）：段の間 20・カードの間 12・カードは高さ 184・余白 16・中の間 6。 */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-feat-picker-gap);
+  width: 100%;
+}
+
 .pickerGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--tpl-cell-gap-half);
+  column-gap: var(--tpl-feat-picker-col-gap);
+  row-gap: var(--tpl-feat-picker-gap);
 }
 
 .kindCard {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--tpl-tl-pill-gap);
-  padding: var(--tpl-tl-kind-card-pad);
+  gap: var(--tpl-feat-kind-gap);
+  min-width: 0;
+  min-height: var(--tpl-feat-kind-h);
+  padding: var(--tpl-feat-kind-pad);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
@@ -522,22 +532,29 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--tpl-tl-state-icon);
-  height: var(--tpl-tl-state-icon);
-  border-radius: var(--radius-tile);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
+  width: var(--tpl-feat-kind-icon);
+  height: var(--tpl-feat-kind-icon);
+  border-radius: var(--tpl-feat-kind-icon-radius);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
 }
 
 .kindTitle {
   color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
+  font-size: var(--text-body);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .kindDesc {
+  width: 100%;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
+  line-height: var(--tpl-feat-kind-desc-lh);
+}
+
+.kindSpacer {
+  flex: 1 1 0;
 }
 
 .kindMeta {
@@ -545,6 +562,66 @@
   flex-direction: column;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
+  white-space: nowrap;
+}
+
+/* 見本から作る（F-5）：見出しと行の間 8・カードは余白 10/12・角 10・薄い枠。 */
+.examples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-feat-example-gap);
+}
+
+.examplesTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+
+.exampleRow {
+  display: flex;
+  gap: var(--tpl-feat-example-gap);
+}
+
+.exampleCard {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-feat-example-inner-gap);
+  min-width: 0;
+  padding: var(--tpl-feat-example-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--tpl-feat-example-radius);
+  background: var(--color-canvas);
+  text-align: left;
+  cursor: pointer;
+}
+
+.exampleCard:hover {
+  border-color: var(--color-action);
+}
+
+.exampleName {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.exampleKind {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+}
+
+.pickerFooter {
+  display: flex;
+  justify-content: center;
 }
 
 /* 詳細パネルの中身。 */

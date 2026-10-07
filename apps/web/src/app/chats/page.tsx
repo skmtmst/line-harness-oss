@@ -53,7 +53,7 @@ import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
-import { Bookmark, CheckCircle2, Filter, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Search, SlidersHorizontal, Star, X } from 'lucide-react'
+import { Bookmark, CheckCircle2, Clock3, Filter, ListFilter, Reply, Settings2, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Search, SlidersHorizontal, Star, X } from 'lucide-react'
 
 type Chat = ChatListItem
 
@@ -116,12 +116,14 @@ type InboxSavedView = {
 
 function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
   return channel === 'line' ? (
-    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-mini px-1.5 text-micro font-medium">
+    <span className={`bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-mini px-1.5 text-micro font-medium ${styles.channelBadge}`}>
       LINE
     </span>
   ) : (
-    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-mini border px-1.5 text-micro font-medium">
-      MAIL
+    <span className={`bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-mini border px-1.5 text-micro font-medium ${styles.channelBadge}`}>
+      {/* V8 の絵（XqSvX）は「メール」。v7 は今までの MAIL のまま。 */}
+      <span className="v7-only">MAIL</span>
+      <span className="v8-only">メール</span>
     </span>
   )
 }
@@ -2484,17 +2486,17 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             メールを開いても一覧が残って中央が半分のままだった。 */}
         <div
           data-inbox-v4="conversation-list"
-          className={`bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden border-hairline w-full lg:w-[340px] ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
+          className={`bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden border-hairline w-full lg:w-[340px] ${styles.listCol} ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
         >
           {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
                 <section
         data-design="Filters"
         data-inbox-v4="quick-filters"
-        className="relative flex flex-wrap items-center gap-1.5 border-b border-hairline p-3"
+        className={`relative flex flex-wrap items-center gap-1.5 border-b border-hairline p-3 ${styles.headTop}`}
         aria-label="受信箱のクイック絞り込み"
       >
-        <div className="flex w-full items-center gap-2"><h2 className="mr-auto text-lg font-semibold">受信箱</h2>
+        <div className={`flex w-full items-center gap-2 ${styles.titleRow}`}><h2 className="mr-auto text-lg font-semibold">受信箱</h2>
         {/*
           設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
           右から420pxのパネルが出る（`bXyEA`）。
@@ -2503,8 +2505,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <Button type="button" size="compact" className="h-8 w-8 p-0" aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
-          <Filter aria-hidden size={16} />
+        <Button type="button" size="compact" className={`h-8 w-8 p-0 ${styles.tool}`} aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+          {/* V8 の絵（XqSvX）は list-filter の印。v7 は今までの漏斗のまま。 */}
+          <Filter aria-hidden size={16} className="v7-only" />
+          <ListFilter aria-hidden size={16} className="v8-only" />
         </Button>
         {/*
           INBOX-11: メニューは「保存した検索」ボタンではなく、画面幅いっぱいの
@@ -2517,7 +2521,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           <Button
             type="button"
             size="compact"
-            className="h-8 w-8 p-0" aria-label="保存した検索" title="保存した検索"
+            className={`h-8 w-8 p-0 ${styles.tool}`} aria-label="保存した検索" title="保存した検索"
             onClick={() => {
               setSavedViewsOpen((open) => !open)
               setSavedViewError('')
@@ -2612,13 +2616,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           )}
         </div>
         {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
-        <Button href="/tags?tab=marks" aria-label="対応ルール" title="対応ルール" size="compact" className="shrink-0 h-8 w-8 p-0">
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6" /></svg>
+        <Button href="/tags?tab=marks" aria-label="対応ルール" title="対応ルール" size="compact" className={`shrink-0 h-8 w-8 p-0 ${styles.tool}`}>
+          {/* V8 の絵（XqSvX）は settings-2 の印。v7 は今までの線の印のまま。 */}
+          <Settings2 aria-hidden size={16} className="v8-only" />
+          <svg className="v7-only h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6" /></svg>
         </Button>
         </div>
         {[
-          { key: 'all' as const, label: 'すべて', title: undefined },
-          { key: 'reply' as const, label: '要返信', title: '対応状況が「未対応」の会話' },
+          { key: 'all' as const, label: 'すべて', title: undefined, icon: null },
+          { key: 'reply' as const, label: '要返信', title: '対応状況が「未対応」の会話', icon: Reply },
           /*
            * INBOX-10: ここで数えるのは対応期限ではなく、未対応のまま
            * 最後のやり取りから1時間以上たった会話。「期限超過」と書くと
@@ -2628,16 +2634,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
            * 高さ32にそろえる。行の中で高さが違うと、同じ1行でも上端が
            * ずれて2行に見える（見た目の自動点検 k=5）。
            */
-          { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話' },
+          { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話', icon: Clock3 },
         ].map((filter) => (
           <Button variant="secondary" className={`h-8 shrink-0 items-center whitespace-nowrap rounded-pill border px-2 text-xs font-semibold transition-colors ${
               quickFilter === filter.key
                 ? 'border-accent-deep bg-accent-soft text-accent-deep'
                 : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
-            }`} key={filter.key} type="button" onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }} aria-pressed={quickFilter === filter.key} title={filter.title}>
+            } ${styles.chip}`} key={filter.key} type="button" onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }} aria-pressed={quickFilter === filter.key} title={filter.title}>
+            {/* V8 の絵の札は 要返信＝reply・1時間以上待ち＝clock-3 の印を文字の前に置く。v7 では出さない。 */}
+            {filter.icon ? <filter.icon aria-hidden className={styles.chipIcon} /> : null}
             {filter.label}
             {/* 件数がまだ無い時は「—」を出さない（★V7：意味の無い記号を置かない）。 */}
-            {quickCountsNow ? <span className="ml-1 tabular-nums">{quickCountsNow[filter.key]}</span> : null}
+            {quickCountsNow ? <span className={`ml-1 tabular-nums ${styles.chipCount}`}>{quickCountsNow[filter.key]}</span> : null}
           </Button>
         ))}
         <SavedViewDialog
@@ -2694,7 +2702,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         />
       </section>
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
-          <div className="border-b border-hairline p-4">
+          <div className={`border-b border-hairline p-4 ${styles.searchBlock}`}>
             <div className="relative">
               <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-faint" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
               <input
@@ -2704,14 +2712,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               maxLength={SEARCH_QUERY_MAX_LENGTH}
               placeholder="名前・メールアドレス・内容で検索"
               aria-label="名前・メールアドレス・内容で検索"
-              className="w-full rounded-control border border-hairline bg-canvas py-2 pr-3 pl-9 text-xs text-ink outline-none focus:border-accent-deep focus:ring-2 focus:ring-accent-deep/15"
+              className={`w-full rounded-control border border-hairline bg-canvas py-2 pr-3 pl-9 text-xs text-ink outline-none focus:border-accent-deep focus:ring-2 focus:ring-accent-deep/15 ${styles.searchInput}`}
               />
             </div>
             {/*
               #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
               プルダウンが自分で名乗るため、外の字は置かない。
             */}
-            <label className="mt-3 inline-flex w-[calc(50%-4px)] items-center text-micro font-semibold text-ink-secondary">
+            <div className={styles.filterRow}>
+            <label className={`mt-3 inline-flex w-[calc(50%-4px)] items-center text-micro font-semibold text-ink-secondary ${styles.filterCell}`}>
               <span className="min-w-0 flex-1">
                 {/*
                   未読数は集計の口から渡す。**画面に見えている行から数えない**
@@ -2729,8 +2738,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 />
               </span>
             </label>
-            <div className="ml-2 inline-block w-[calc(50%-4px)] min-w-0 align-bottom">
+            <div className={`ml-2 inline-block w-[calc(50%-4px)] min-w-0 align-bottom ${styles.filterCell}`}>
               <Select aria-label="受信経路で絞り込む" value={channel} onChange={(value) => router.push(buildInboxUrl(value as 'all' | 'line' | 'email', null))} options={CHANNELS.map((item) => ({value:item.key,label:`経路：${item.label}`}))} />
+            </div>
             </div>
           </div>
 
@@ -2739,12 +2749,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             必ず1行に収まるよう、折り返さない・5つで幅いっぱいにする。
             選んだ所は白地に濃い文字。読み上げはラジオの決まり。
           */}
-          <div className="border-b border-hairline px-3 py-2">
+          <div className={`border-b border-hairline px-3 py-2 ${styles.statusBlock}`}>
             <div
               role="radiogroup"
               aria-label="対応状況で絞り込む"
               onKeyDown={handleStatusFilterKeyDown}
-              className="bg-shell flex h-8 flex-nowrap items-stretch rounded-control p-0.5"
+              className={`bg-shell flex h-8 flex-nowrap items-stretch rounded-control p-0.5 ${styles.statusSeg}`}
             >
               {statusFilters.map((f, index) => {
                 const selected = statusFilter === f.key
@@ -2761,7 +2771,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     // #639 の素のボタンの最小高さ32pxをここだけ外す。
                     // 切り替え全体の高さ32pxの中に収めるため。
                     style={{ minHeight: 0 }}
-                    className={`min-w-0 flex-1 truncate rounded-mini px-1 text-center text-xs whitespace-nowrap transition-colors ${
+                    className={`min-w-0 flex-1 truncate rounded-mini px-1 text-center text-xs whitespace-nowrap transition-colors ${styles.statusItem} ${
                       selected
                         ? 'bg-canvas font-semibold text-ink shadow-card'
                         : 'text-ink-secondary hover:text-ink font-medium'
@@ -2774,7 +2784,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
           </div>
 
-          <p data-inbox-sort="fixed" className="border-b border-hairline px-3 pb-3 text-micro text-ink-secondary">並び順：未読が先・新しい順</p>
+          <p data-inbox-sort="fixed" className={`border-b border-hairline px-3 pb-3 text-micro text-ink-secondary ${styles.sortLine}`}>並び順：未読が先・新しい順</p>
           {/* Chat List（2026-10-07 速さ：行は ChatListWindow で窓分けして描く） */}
           <div ref={listScrollRef} data-inbox-list-scroller="" className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
             <>
@@ -2872,14 +2882,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       }}
                       className={`w-full px-3 py-3 text-left transition-colors ${
                         selectedThreadId === item.threadId ? 'bg-accent-soft' : 'hover:bg-shell'
-                      }`}
+                      } ${styles.row}`}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className={`flex items-start gap-3 ${styles.rowInner}`}>
                         <div className="relative shrink-0">
                           {/* メールの行も名前の頭文字（以前は全員「M」で、誰の会話か目で追えなかった）。 */}
-                          <Avatar name={item.customerName} size={40} />
+                          <Avatar name={item.customerName} size={adminTheme === 'v8' ? 34 : 40} />
                           {item.isUnread && (
-                            <span className="border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2" aria-label="未読" />
+                            <span className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -2890,15 +2900,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               {formatRelative(item.lastIncomingAt)}
                             </span>
                           </div>
-                          <div className="mt-1 flex items-start justify-between gap-2">
-                            <p className="text-ink-faint line-clamp-2 min-w-0 flex-1 text-xs leading-4">
+                          <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
+                            <p className={`text-ink-faint line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview}`}>
                               {item.subject || item.preview}
                             </p>
                           </div>
-                          <div className="mt-1 flex items-center gap-2">
+                          <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
                             <ChannelBadge channel="email" />
-                            <span className="text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs">
-                              <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold">
+                            <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
+                              <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
                                 {(item.assignedStaffName ?? '未').charAt(0)}
                               </span>
                               <span className="truncate">担当：{item.assignedStaffName ?? '未割り当て'}</span>
@@ -2966,14 +2976,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           ? 'bg-shell'
                           /* 板 `M0393`：未対応は顔の赤い点＋太字で、行の地は塗らない。 */
                           : 'hover:bg-shell'
-                      }`}
+                      } ${styles.row}`}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className={`flex items-start gap-3 ${styles.rowInner}`}>
                         <div className="relative shrink-0">
                           {/* ★V7 友だちの顔：画像が読めない時も色つきの頭文字。 */}
-                          <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={32} />
+                          <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={adminTheme === 'v8' ? 34 : 32} />
                           {chat.isUnread && (
-                            <span className="border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2" aria-label="未読" />
+                            <span className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -2989,9 +2999,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             )}
                           </div>
                           {/* 板 `M0393`：行ごとの状態の札は置かない（赤い点＋太字と上の切り替えで足りる）。 */}
-                          <div className="mt-1 flex items-start justify-between gap-2">
+                          <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
                             <p
-                              className={`line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${
+                              className={`line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview} ${
                                 needsAttention ? 'text-ink font-medium' : 'text-ink-faint'
                               }`}
                               title={preview}
@@ -3002,10 +3012,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               {preview || <span className="text-ink-faint italic">(まだメッセージなし)</span>}
                             </p>
                           </div>
-                          <div className="mt-1 flex items-center gap-2">
+                          <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
                             <ChannelBadge channel="line" />
-                            <span className="text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs">
-                              <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold">
+                            <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
+                              <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
                                 {(operatorName ?? '未').charAt(0)}
                               </span>
                               <span className="truncate">担当：{operatorName ?? '未割り当て'}</span>

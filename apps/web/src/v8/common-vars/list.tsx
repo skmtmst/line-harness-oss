@@ -2008,6 +2008,8 @@ function CommonVarsListInner() {
           ))}
         </KpiBand>
       }
+      /* 1281〜1339 の幅は板が狭いのに 1152 用の道具の段にならない。そこだけ型が作る・フォルダを出す。 */
+      folderNav={narrow ? undefined : { rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
       folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
       toolbar={<>
         {hasAlerts ? <div className={styles.alertSlot}>{alerts}</div> : null}

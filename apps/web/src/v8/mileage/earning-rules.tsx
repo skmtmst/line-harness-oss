@@ -916,7 +916,7 @@ export default function EarningRulesTab() {
       }
       stats={stats}
       folders={<>{createButton(true)}{folderPanel}</>}
-      collapsedFolders={undefined}
+      folderNav={narrow ? undefined : { rows: FOLDERS.map((item) => ({ id: item.key, label: item.label })), activeId: folder, onSelect: (id) => resetPage(() => setFolder(id as FolderKey)), createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

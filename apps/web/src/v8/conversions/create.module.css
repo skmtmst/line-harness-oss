@@ -242,7 +242,7 @@
 .previewRows {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-cn-side-card-gap);
+  gap: var(--tpl-rest3-cv-row-gap);
   margin: 0;
 }
 .previewRow {
