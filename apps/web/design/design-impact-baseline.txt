@@ -525,6 +525,7 @@ shared-button-importer v8/form-edit/edit.tsx
 shared-button-importer v8/form-edit/media-picker.tsx
 shared-button-importer v8/rich-menus/list.tsx
 shared-button-importer v8/rich-menus/external-import.tsx
+shared-button-importer v8/rich-menus/connections.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
 shared-button-importer v8/common-vars/export-panel.tsx
