@@ -26,6 +26,11 @@ export function formatJpDay(date: string): string {
   return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${WEEKDAY_JP[d.getUTCDay()]}）`
 }
 
+/** LINE の予約画面の時刻は先頭の0を落とす（09:00 → 9:00。絵 d5fmnM・E3YDK）。 */
+export function phoneTime(time: string): string {
+  return time.replace(/^0(\d:)/, '$1')
+}
+
 export function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>): string {
   if (menu.price_mode === 'inquiry') return 'お問い合わせ'
   if (menu.price_mode === 'free' || menu.base_price === 0) return '無料'
@@ -161,7 +166,7 @@ export function PhoneDatetimeStep({ menu, staffName, slots, closedDates, closedW
     <PhoneChrome
       step={3}
       foot={<>
-        {picked && selected ? <span className={styles.footPick}>{formatJpDay(selected)}{picked.start}〜{picked.end}</span> : null}
+        {picked && selected ? <span className={styles.footPick}>{formatJpDay(selected)}{phoneTime(picked.start)}〜{phoneTime(picked.end)}</span> : null}
         <span className={styles.cta} data-off={picked ? undefined : true}>内容を確かめる</span>
       </>}
     >
@@ -198,7 +203,7 @@ export function PhoneDatetimeStep({ menu, staffName, slots, closedDates, closedW
           : (
             <div className={styles.slots}>
               {selectedSlots.slice(0, 6).map((slot) => (
-                <span key={`${slot.date}-${slot.start}`} className={styles.slot} data-now={slot === picked || undefined} data-off={slot.remaining <= 0 || undefined}>{slot.start}</span>
+                <span key={`${slot.date}-${slot.start}`} className={styles.slot} data-now={slot === picked || undefined} data-off={slot.remaining <= 0 || undefined}>{phoneTime(slot.start)}</span>
               ))}
             </div>
           )}
