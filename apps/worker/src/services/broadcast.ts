@@ -139,6 +139,7 @@ export async function processBroadcastSend(
     messageType: broadcast.message_type,
     messageContent: broadcast.message_content,
     messageBubblesJson: broadcast.message_bubbles_json,
+    messageOptionsJson: broadcast.message_options_json,
     altText: broadcast.alt_text,
   });
   const commonVarSnapshot = await prepareBroadcastCommonVarSnapshot(
@@ -898,6 +899,7 @@ async function processQueuedBroadcastBatches(
     messageType: broadcast.message_type,
     messageContent: broadcast.message_content,
     messageBubblesJson: broadcast.message_bubbles_json,
+    messageOptionsJson: broadcast.message_options_json,
     altText: broadcast.alt_text,
   });
   const commonVarSnapshot = await prepareBroadcastCommonVarSnapshot(

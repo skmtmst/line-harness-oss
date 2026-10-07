@@ -847,7 +847,12 @@ export type MessageType =
   | "video"
   | "audio"
   | "sticker"
-  | "carousel";
+  | "carousel"
+  | "rich_message"
+  | "coupon";
+
+/** LINEに渡す種類。編集画面はリッチメッセージとして保持する。 */
+export type LineMessageType = MessageType | 'imagemap';
 
 export interface ScenarioStep {
   /** 主キー (UUIDv4) */
@@ -2177,6 +2182,8 @@ export interface AutoReplyDraftInput {
   respondToAll: boolean;
   name: string | null;
   keywordMatchMode: "any" | "all";
+  /** true（既定）: 全角半角・大小文字・前後空白をそろえる。false: そのまま当てる。 */
+  normalizeKeywords?: boolean;
   folderId: string | null;
   /** 管理者だけが読む補足。友だちへ送る本文には含めない。 */
   internalMemo: string | null;

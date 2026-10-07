@@ -1,3 +1,4 @@
+import { prepareImagemapImages, IMAGEMAP_WIDTHS } from '../services/imagemap-images.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   assetStatusOf,
@@ -124,7 +125,7 @@ function serialize(row: BroadcastMessageAsset) {
     name: row.name,
     // 旧caller互換：編集中の下書きがあれば下書きを返す。公開版だけが要るときは
     // publishedPayload を読む。保存直後に公開版が書き換わることはない。
-    payload: JSON.parse(draftPayloadOf(row)) as unknown,
+    payload: { ...(JSON.parse(draftPayloadOf(row)) as Record<string,unknown>), assetId: row.id },
     publishedPayload: JSON.parse(row.payload_json) as unknown,
     folderId: row.folder_id ?? null,
     status: assetStatusOf(row),
@@ -299,6 +300,10 @@ broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner'
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const folder = await readAssetFolderId(c.env.DB, body as unknown as Record<string, unknown>, body.lineAccountId ?? null, scope.canSeeUnassigned);
   if (!folder.ok) return c.json({ success: false, error: folder.error }, 422);
+  if (body.kind === 'rich_message') {
+    try { body.payload = await prepareImagemapImages(c.env, body.payload as Record<string,unknown>, body.lineAccountId ?? null, c.env.WORKER_URL || new URL(c.req.url).origin); }
+    catch (error) { return c.json({success:false,error:error instanceof Error ? error.message : '画像を準備できませんでした'},422); }
+  }
   const row = await createBroadcastMessageAsset(c.env.DB, {
     lineAccountId: body.lineAccountId,
     kind: body.kind,
@@ -336,6 +341,10 @@ broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('own
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const folder = await readAssetFolderId(c.env.DB, body as unknown as Record<string, unknown>, existing.line_account_id, scope.canSeeUnassigned);
     if (!folder.ok) return c.json({ success: false, error: folder.error }, 422);
+    if (existing.kind === 'rich_message') {
+      try { body.payload = await prepareImagemapImages(c.env, body.payload as Record<string,unknown>, existing.line_account_id, c.env.WORKER_URL || new URL(c.req.url).origin); }
+      catch (error) { return c.json({success:false,error:error instanceof Error ? error.message : '画像を準備できませんでした'},422); }
+    }
     // 名前・置き場・下書き本文を1文で書く。CAS敗北時は全面不変。
     const row = await saveBroadcastMessageAssetDraft(c.env.DB, existing.id, {
       name: body.name.trim(),
@@ -453,6 +462,16 @@ broadcastMessageAssets.delete('/api/broadcast-message-assets/:id', requireRole('
   return deleted
     ? c.json({ success: true, data: null })
     : c.json({ success: false, error: 'Not found' }, 404);
+});
+
+// LINE公式の baseUrl/{幅}。拡張子は付けない。
+broadcastMessageAssets.get('/images/imagemaps/:id/:width', async c => {
+  const id = c.req.param('id');
+  const width = Number(c.req.param('width'));
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !IMAGEMAP_WIDTHS.some(value => value === width)) return c.notFound();
+  const object = await c.env.IMAGES.get(`imagemaps/${id}/${width}`);
+  if (!object) return c.notFound();
+  return new Response(object.body,{headers:{'Content-Type':'image/png','X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=31536000, immutable'}});
 });
 
 // LINEが取得する素材は認証外の経路で返す。保存時に検証した拡張子だけを許し、

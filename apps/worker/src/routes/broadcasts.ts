@@ -257,8 +257,10 @@ function validateMessageOptions(value: unknown): string | null {
       if (!button || typeof button !== 'object' || Array.isArray(button)) return `ボタン${number}を読み込めませんでした`;
       const item = button as Record<string, unknown>;
       if (typeof item.label !== 'string' || !item.label.trim()) return `ボタン${number}の名前を入力してください`;
+      if (Array.from(item.label.trim()).length > 20) return `ボタン${number}の名前は20文字までです`;
       if (!['url', 'pdf', 'postback'].includes(String(item.type))) return `ボタン${number}の種類を確認してください`;
       if (typeof item.value !== 'string' || !item.value.trim()) return `ボタン${number}のURLを入力してください`;
+      if (item.type === 'postback' && item.value.length > 300) return `ボタン${number}の送る値は300文字までです`;
       if ((item.type === 'url' || item.type === 'pdf') && !/^https:\/\//i.test(item.value.trim())) {
         return `ボタン${number}のURLは https:// から始めてください`;
       }
@@ -1389,6 +1391,7 @@ broadcasts.post('/api/broadcasts', async (c) => {
           messageType,
           messageContent,
           messageBubbles: body.messageBubbles,
+          messageOptions: body.messageOptions,
           altText: body.altText,
         });
       } catch (messageError) {
@@ -1526,7 +1529,7 @@ broadcasts.post('/api/broadcasts', async (c) => {
         internalMemo: body.internalMemo ?? null,
         draftStep: body.draftStep ?? null,
         draftPayloadJson: saveAsDraft ? JSON.stringify(body) : null,
-        messageOptionsJson: body.messageOptions == null ? null : JSON.stringify(body.messageOptions),
+            messageOptionsJson: body.messageOptions == null ? null : JSON.stringify(body.messageOptions),
         afterActionVersionId: body.afterActionVersionId ?? null,
         saveAsDraft,
       });
@@ -1639,6 +1642,17 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
     )) {
       return c.json({ success: false, error: '配信後アクションの公開版が見つかりません' }, 400);
     }
+
+    try {
+      parseBroadcastMessageParts({
+        messageType: body.messageType ?? existing.message_type,
+        messageContent: body.messageContent ?? existing.message_content,
+        messageBubbles: body.messageBubbles,
+        messageBubblesJson: existing.message_bubbles_json,
+        messageOptions: body.messageOptions,
+            messageOptionsJson: existing.message_options_json,
+      });
+    } catch (error) { return c.json({ success: false, error: error instanceof Error ? error.message : '本文を確認してください' }, 400); }
 
     if (body.messageContent !== undefined) {
       const variableError = unsupportedVariablesError(body.messageContent);
@@ -2390,6 +2404,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         messageType: existing.message_type,
         messageContent: existing.message_content,
         messageBubblesJson: existing.message_bubbles_json,
+        messageOptionsJson: existing.message_options_json,
         altText: existing.alt_text,
       });
     } catch (messageError) {
@@ -2844,6 +2859,7 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_
         messageType: existing.message_type,
         messageContent: existing.message_content,
         messageBubblesJson: existing.message_bubbles_json,
+        messageOptionsJson: existing.message_options_json,
         altText: existing.alt_text,
       });
     } catch (messageError) {
@@ -3230,6 +3246,7 @@ broadcasts.post('/api/broadcasts/:id/test-send', requirePermission(BROADCAST_TES
         messageType: broadcast.message_type,
         messageContent: broadcast.message_content,
         messageBubblesJson: broadcast.message_bubbles_json,
+        messageOptionsJson: broadcast.message_options_json,
         altText: raw.alt_text as string | null,
       }));
     } catch (messageError) {

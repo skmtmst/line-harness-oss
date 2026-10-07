@@ -560,7 +560,7 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (isBlankText(body.name) || isBlankText(body.messageType) || isBlankText(body.messageContent)) {
       return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
     }
-    const message = validateTemplateMessage(body.messageType, body.messageContent);
+    const message = validateTemplateMessage(body.messageType, body.messageContent, false);
     if (!message.ok) {
       const { ok: _ok, ...failure } = message;
       return c.json({ success: false, ...failure }, 422);
@@ -667,7 +667,7 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
       ?? existing.draft_message_content
       ?? existing.message_content;
     const message = changesMessage
-      ? validateTemplateMessage(baseMessageType, baseMessageContent)
+      ? validateTemplateMessage(baseMessageType, baseMessageContent, false)
       : { ok: true as const };
     if (!message.ok) {
       const { ok: _ok, ...failure } = message;
@@ -808,7 +808,7 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
     const draftType = existing.draft_message_type ?? existing.message_type;
     const draftContent = existing.draft_message_content ?? existing.message_content;
     if (hasTemplateDraft(existing)) {
-      const message = validateTemplateMessage(draftType, draftContent);
+      const message = validateTemplateMessage(draftType, draftContent, false);
       if (!message.ok) {
         const { ok: _ok, ...failure } = message;
         return c.json({ success: false, ...failure }, 422);

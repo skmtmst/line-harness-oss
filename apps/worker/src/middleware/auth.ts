@@ -219,7 +219,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
   ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/support-mark-rules', '/tags'],
   ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
-  ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/reminders', '/reminders'],
+  ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/broadcast-message-assets/upload-sessions', '/broadcasts'], ['/api/reminders', '/reminders'],
   ['/api/friend-reminders', '/reminders'], ['/api/reminder-runs', '/reminders'],
   ['/api/auto-replies', '/auto-replies'], ['/api/auto-reply-runs', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
   ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/rich-menus', '/rich-menus'],

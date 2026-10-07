@@ -11,6 +11,7 @@
  * 読めない中身はテキストに落とす（例外にしない）。1通の中身が壊れている
  * だけで配信全体や、その人の以降の配信まで止まると困る。
  */
+import { convertBroadcastAsset, isBroadcastAssetKind, validateImagemapMessage } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 
@@ -48,6 +49,18 @@ function cleanEmptyNodes(obj: unknown): void {
 }
 
 export function buildMessage(messageType: string, messageContent: string, altText?: string): Message {
+  if (isBroadcastAssetKind(messageType)) {
+    const payload = JSON.parse(messageContent);
+    const converted = convertBroadcastAsset(messageType, payload.assetName ?? '', payload);
+    if (!converted.ok) throw new Error(converted.error);
+    return buildMessage(converted.message.messageType, converted.message.messageContent, converted.message.altText);
+  }
+  if (messageType === 'imagemap') {
+    const payload = JSON.parse(messageContent);
+    const error = validateImagemapMessage(payload);
+    if (error) throw new Error(error);
+    return { type: 'imagemap', baseUrl: payload.baseUrl, baseSize: payload.baseSize, actions: payload.actions, altText: altText || payload.altText || 'リッチメッセージ' };
+  }
   if (messageType === 'text') {
     return { type: 'text', text: messageContent };
   }

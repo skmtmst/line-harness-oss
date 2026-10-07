@@ -1,6 +1,10 @@
 import {
   TEMPLATE_TEXT_MAX_CHARACTERS,
   countTemplateTextCharacters,
+  validateFlexMessage,
+  validateImagemapMessage,
+  convertBroadcastAsset,
+  isBroadcastAssetKind,
 } from '@line-crm/shared';
 
 export { TEMPLATE_TEXT_MAX_CHARACTERS } from '@line-crm/shared';
@@ -9,7 +13,7 @@ export type TemplateMessageValidationResult =
   | { ok: true }
   | {
       ok: false;
-      code: 'TEMPLATE_TEXT_TOO_LONG';
+      code: 'TEMPLATE_TEXT_TOO_LONG' | 'INVALID_MESSAGE';
       error: string;
       field: 'messageContent';
       maxCharacters: number;
@@ -25,7 +29,21 @@ export type TemplateMessageValidationResult =
 export function validateTemplateMessage(
   messageType: string | undefined,
   messageContent: string | undefined,
+  checkFlex = true,
 ): TemplateMessageValidationResult {
+  if (messageContent !== undefined && ((checkFlex && messageType === 'flex') || messageType === 'imagemap' || isBroadcastAssetKind(messageType))) {
+    let error: string | null = null;
+    try {
+      const parsed = JSON.parse(messageContent);
+      if (messageType === 'flex') error = validateFlexMessage(parsed);
+      else if (messageType === 'imagemap') error = validateImagemapMessage(parsed);
+      else if (isBroadcastAssetKind(messageType)) {
+        const converted = convertBroadcastAsset(messageType, parsed.assetName ?? '', parsed);
+        if (!converted.ok) error = converted.error;
+      }
+    } catch { error = 'メッセージの中身を正しいJSON形式で入力してください'; }
+    if (error) return { ok: false, code: 'INVALID_MESSAGE', error, field: 'messageContent', maxCharacters: 0, actualCharacters: 0 };
+  }
   if (messageType !== 'text' || messageContent === undefined) return { ok: true };
 
   const actualCharacters = countTemplateTextCharacters(messageContent);
