@@ -35,6 +35,16 @@ export type RestaurantTable = {
   id: string; store_id: string; code: string; label: string; seat_type: string; min_capacity: number;
   max_capacity: number; floor_x: number; floor_y: number; join_group: string | null; is_active: number
 }
+export type SeatVisitMark = {
+  id?: string; kind: 'visited' | 'late' | 'no_show'; late_minutes: number | null;
+  marked_by_name: string | null; marked_at: string
+}
+export type SeatWaitlistEntry = {
+  id: string; store_id: string; starts_at: string; guest_count: number; customer_name: string;
+  status: 'waiting' | 'invited' | 'converted' | 'cancelled'; hold_minutes: number;
+  table_id: string | null; table_label?: string | null;
+  invited_at: string | null; hold_expires_at: string | null; notified_at: string | null; created_at: string
+}
 export type RestaurantInventory = {
   id: string; store_id: string; starts_at: string; slot_minutes: 15 | 30; total_capacity: number;
   ota_capacity: number; line_capacity: number; walk_in_capacity: number; same_day_capacity?: number; reserved_count: number; version?: number; updated_by?: string | null; updated_by_name?: string | null; updated_at?: string;
@@ -125,6 +135,33 @@ export const restaurantTestApi = {
   decideApproval: (accountId: string, id: string, action: 'approve' | 'return', comment?: string) => fetchApi<{ success: true; data: RestaurantApprovalDecision }>(withAccount(`/api/restaurant-test/approvals/${id}`, accountId), { method: 'PATCH', body: JSON.stringify({ action, comment }) }),
   createReservation: (accountId: string, body: Record<string, unknown>) => fetchApi<{ success: true; data: { id: string; tableId: string | null; lineNotice: { sent: boolean; reason: string | null } } }>(withAccount('/api/restaurant-test/reservations/manual', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateReservation: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi(withAccount(`/api/restaurant-test/reservations/${id}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
+  /** 席の来店の印（booking-plus 6 の席対応）。 */
+  postSeatVisitMark: (accountId: string, id: string, body: { kind: 'visited' | 'late' | 'no_show'; lateMinutes?: number }) =>
+    fetchApi<{ success: true; data: { status: string; visit_mark: SeatVisitMark } }>(
+      withAccount(`/api/restaurant-test/reservations/${id}/visit`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** 席の来店の印を取り消す（元に戻す）。 */
+  deleteSeatVisitMark: (accountId: string, id: string) =>
+    fetchApi<{ success: true; data: { status: string } }>(
+      withAccount(`/api/restaurant-test/reservations/${id}/visit`, accountId),
+      { method: 'DELETE' },
+    ),
+  /** 席の空き待ちの一覧。 */
+  listSeatWaitlist: (accountId: string, params: { storeId: string; startsAt?: string; status?: string }) => {
+    const query = new URLSearchParams({ storeId: params.storeId })
+    if (params.startsAt) query.set('startsAt', params.startsAt)
+    if (params.status) query.set('status', params.status)
+    return fetchApi<{ success: true; data: { waitlist: SeatWaitlistEntry[] } }>(
+      withAccount(`/api/restaurant-test/seat-waitlist?${query.toString()}`, accountId),
+    )
+  },
+  /** 席の空き待ちを取り消す。 */
+  cancelSeatWaitlist: (accountId: string, id: string) =>
+    fetchApi<{ success: true; data: { status: string } }>(
+      withAccount(`/api/restaurant-test/seat-waitlist/${id}`, accountId),
+      { method: 'DELETE' },
+    ),
   importReservation: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/inbound/reservations', accountId), { method: 'POST', body: JSON.stringify(body) }),
   saveTableLayout: (accountId: string, body: RestaurantTableLayoutInput) => fetchApi<{ success: true; data: { tables: RestaurantTablePosition[] } }>(withAccount('/api/restaurant-test/tables/layout', accountId), { method: 'PUT', body: JSON.stringify(body) }),
   createTable: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/tables', accountId), { method: 'POST', body: JSON.stringify(body) }),
