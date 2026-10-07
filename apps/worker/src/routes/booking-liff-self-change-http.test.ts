@@ -366,6 +366,33 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     return sqlite.prepare('SELECT * FROM bookings WHERE id = ?').get(id) as Record<string, unknown>;
   }
 
+  test('予約履歴の版とメニュー・担当を使って日時変更と取消ができる', async () => {
+    mockSlots([D11, D12]);
+    const id = await adminCreate('menu-ok', T1, 'history-actions');
+    sqlite.prepare('UPDATE bookings SET lock_version = 3 WHERE id = ?').run(id);
+    const readHistory = async () => {
+      const res = await selfApp.request('/api/liff/booking/me?liffId=liff-ny-1', {
+        headers: { Authorization: 'Bearer test-id-token' },
+      }, env, execCtx);
+      expect(res.status).toBe(200);
+      return res.json<{ upcoming: Array<{ id: string; menu_id: string; staff_id: string; lock_version: number }>; past: Array<{ id: string; lock_version: number }> }>();
+    };
+    const first = (await readHistory()).upcoming;
+    expect(first).toHaveLength(1);
+    expect(first[0]).toMatchObject({ id, menu_id: 'menu-ok', staff_id: 'staff-ny', lock_version: 3 });
+    const changed = await selfPost(`/api/liff/booking/${id}/reschedule`, {
+      starts_at: T2, lock_version: first[0].lock_version,
+    });
+    expect(changed.status).toBe(200);
+    const next = (await readHistory()).upcoming[0];
+    expect(next.lock_version).toBe(4);
+    const cancelled = await selfPost(`/api/liff/booking/${id}/cancel`, { lock_version: next.lock_version });
+    expect(cancelled.status).toBe(200);
+    const last = await readHistory();
+    expect(last.upcoming).toEqual([]);
+    expect(last.past[0]).toMatchObject({ id, menu_id: 'menu-ok', staff_id: 'staff-ny', lock_version: 4 });
+  });
+
   test('日時変更が成立し、版が進み、変更通知が自動で積まれる（manual印なし）', async () => {
     mockSlots([D11, D12]);
     const id = await adminCreate('menu-ok', T1, 'rs-ok');

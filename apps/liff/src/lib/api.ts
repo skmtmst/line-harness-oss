@@ -2,6 +2,8 @@ import type { CustomerBookingWaitlist,CustomerSeatWaitlist,RegisterSeatWaitlistI
 import type { FormLayout } from '@line-crm/shared';
 import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
 import type { WebinarAudience } from '@line-crm/shared';
+import type { BookingHistoryResponse, LiffBookingChangeResponse } from '@line-crm/shared';
+export type { BookingHistoryItem } from '@line-crm/shared';
 export type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
 export type { WebinarAudience } from '@line-crm/shared';
 import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
@@ -62,16 +64,6 @@ export interface LiffBookingSettings extends LiffLookApiSettings {
   booking_window_days: number;
   /** 予約のルール「お店が承認してから確定する」。無いときは承認あり扱い。 */
   approval_mode?: 'automatic' | 'manual';
-}
-
-export interface BookingHistoryItem {
-  id: string;
-  starts_at: string;
-  status: string;
-  customer_note?: string | null;
-  menu_name: string;
-  staff_name: string;
-  profile_image_url: string | null;
 }
 
 /** 予約作成の応答。お支払いありの店・メニューだけ payment が付く。 */
@@ -355,7 +347,11 @@ export const api = {
     get<{ payment: BookingPayment | null }>(
       `/api/liff/booking/payments/by-booking?bookingId=${encodeURIComponent(bookingId)}`,
     ),
-  me: () => get<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] }>('/api/liff/booking/me'),
+  me: () => get<BookingHistoryResponse>('/api/liff/booking/me'),
+  cancelBooking: (id: string, lockVersion: number) =>
+    post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/cancel`, { lock_version: lockVersion }),
+  rescheduleBooking: (id: string, body: { lock_version: number; starts_at: string; reason?: string }) =>
+    post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/reschedule`, body),
   /** 前回と同じで予約：本人の前回の予約を返す。失敗・対象外は呼び側が黙って隠す。 */
   lastBooking: () => get<LastBookingResponse>('/api/liff/booking/last-booking'),
   /** 満席の枠に「空いたら知らせる」を登録する。 */
