@@ -18,6 +18,7 @@ export default function SegmentedControl<T extends string>({
   'aria-label': ariaLabel,
   className,
   size = 'medium',
+  disabled = false,
 }: {
   options: { value: T; label: string }[]
   value: T
@@ -27,9 +28,13 @@ export default function SegmentedControl<T extends string>({
   /**
    * 大きさ。既定 'medium' は箱型（dtJVi：項目 6/12・文 13）。
    * 'small' は小型（d8X09 グラフ／表：器 r8・項目 3/10・文 12・
-   * つまみ r6・全体の高さ 28）。v8 だけで効く。
+   * つまみ r6・全体の高さ 28）。
+   * 'panel' は脇のパネル内（★BG-B `SLgY5` つくる枚数：器 余白3・r8・
+   * 横いっぱい・項目 5/12・文 12/17・選択中 700・つまみ r6）。v8 だけで効く。
    */
-  size?: 'medium' | 'small'
+  size?: 'medium' | 'small' | 'panel'
+  /** 操作を止める（生成中など）。項目すべてを押せなくする。 */
+  disabled?: boolean
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -80,6 +85,7 @@ export default function SegmentedControl<T extends string>({
             itemRefs.current[index] = el
           }}
           type="button"
+          disabled={disabled}
           className={[styles.item, option.value === value ? styles.selected : null]
             .filter(Boolean)
             .join(' ')}
