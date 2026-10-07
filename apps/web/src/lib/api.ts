@@ -1,4 +1,5 @@
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
+import type { BookingConflictsResponse, BookingReassignInput, BookingCustomerNotification } from '@line-crm/shared';
 import type { LineMessageType, BookingWaitlistSlotSummary,SeatWaitlistSlotSummary,CustomerSeatWaitlist } from '@line-crm/shared';
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
@@ -14697,6 +14698,15 @@ export const bookingApi = {
   },
   getBooking: (accountId: string, id: string) =>
     fetchApi<{ booking: BookingAdminDetail }>(withAccount(`/api/booking/admin/bookings/${id}`, accountId)),
+  /** 重なった2件の表示情報と理由、カレンダー連携の案内。 */
+  getConflicts: (accountId: string) =>
+    fetchApi<ApiResponse<BookingConflictsResponse>>(withAccount('/api/booking/admin/conflicts', accountId)),
+  /** 既存の枠照合・変更通知を使う。LINE未連携なら電話連絡の案内が返る。 */
+  reassignBooking: (accountId: string, id: string, body: BookingReassignInput) =>
+    fetchApi<UpdateBookingResult & { customerNotification: BookingCustomerNotification }>(
+      withAccount(`/api/booking/admin/bookings/${encodeURIComponent(id)}/reassign`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   getAlternatives: (
     accountId: string,
     input: { menuId: string; staffId: string; startsAt: string },
