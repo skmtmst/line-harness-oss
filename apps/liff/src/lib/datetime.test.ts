@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   formatJp,
+  formatHoldLeft,
+  formatJstDeadline,
   formatJstEventAt,
   formatJstEventSpan,
   formatMd,
@@ -57,5 +59,16 @@ describe('イベントの日時の見せ方', () => {
     expect(formatJstEventSpan('2026-10-11T14:00:00Z', '2026-10-11T16:00:00Z')).toBe(
       '10月11日（日）23:00 〜 10月12日（月）01:00',
     );
+  });
+
+  it('取り消しの締め切りは始まりの何時間前かを JST の日時で出す（日をまたいで戻る）', () => {
+    // 始まり JST 10/11 10:00、16 時間前 → JST 10/10 18:00。
+    expect(formatJstDeadline('2026-10-11T10:00:00+09:00', 16)).toBe('10月10日 18:00');
+    expect(formatJstDeadline('2026-10-11T01:00:00Z', 0)).toBe('10月11日 10:00');
+  });
+
+  it('取っておく残り時間は時間と分、1時間未満は分だけ', () => {
+    expect(formatHoldLeft(23 * 3600 + 41 * 60 + 30)).toBe('23時間 41分');
+    expect(formatHoldLeft(41 * 60 + 59)).toBe('41分');
   });
 });
