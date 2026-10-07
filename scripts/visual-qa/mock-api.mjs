@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 /** このファイル自身の指紋。動いている中身が古くないかを言うために持つ。 */
 const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
 import { readArrayGetPaths } from './api-shapes.mjs'
+import { LARGE_ENABLED, largeBody } from './large-mode.mjs'
 import { BILLING_INVOICES, BILLING_SUMMARY } from './billing-fixture.mjs'
 import {
   mileageWriteResponse,
@@ -5456,6 +5457,15 @@ const server = createServer((req, res) => {
   if (url.pathname === '/__mock-fingerprint') {
     res.writeHead(200).end(JSON.stringify({ fingerprint: FINGERPRINT }))
     return
+  }
+
+  // 速さの測定用：VISUAL_QA_LARGE=1 のときだけ件数の多い見本を先に返す（既定の撮影は変わらない）。
+  if (LARGE_ENABLED) {
+    const large = largeBody(method, url.pathname, url.searchParams)
+    if (large !== undefined) {
+      res.writeHead(200).end(JSON.stringify(large))
+      return
+    }
   }
 
   if (method === 'GET' && url.pathname === '/api/file-scans') {
