@@ -59,7 +59,7 @@ function Slots({ card, balance }: { card: VisitStampCard; balance: number }) {
   const count = total(card);
   const rewardAt = new Map(card.settings.rewards.map((r) => [r.stamps, r]));
   return (
-    <div className="grid grid-cols-5 justify-between gap-y-3" role="list" aria-label={`${count}個中 ${Math.min(balance, count)}個 たまっています`}>
+    <div className="grid grid-cols-[repeat(5,auto)] justify-between gap-y-3" role="list" aria-label={`${count}個中 ${Math.min(balance, count)}個 たまっています`}>
       {Array.from({ length: count }, (_, i) => {
         const n = i + 1;
         const done = n <= balance;
@@ -69,7 +69,7 @@ function Slots({ card, balance }: { card: VisitStampCard; balance: number }) {
             key={n}
             role="listitem"
             aria-label={done ? `${n}個目 済み` : reward ? `${n}個目 ${reward.name}` : `${n}個目`}
-            className={`mx-auto flex h-13 w-13 flex-col items-center justify-center rounded-full ${done ? 'bg-liff-primary text-(--liff-on-primary)' : 'bg-canvas text-liff-sub'} ${reward ? 'outline-[1.5px] outline-liff-primary' : 'outline outline-liff-line'}`}
+            className={`flex h-13 w-13 flex-col items-center justify-center rounded-full ${done ? 'bg-liff-primary text-(--liff-on-primary)' : 'bg-canvas text-liff-sub'} ${reward ? 'outline-[1.5px] outline-liff-primary' : 'outline outline-liff-line'}`}
           >
             {done ? <Icon name="check" className="h-6 w-6" /> : reward ? (
               <>
@@ -271,7 +271,7 @@ export default function VisitStamps() {
                   aria-pressed={ok ? selected : undefined}
                   className={`flex w-full items-center gap-2.5 text-left disabled:cursor-default ${selected && info.usable.length > 1 ? 'font-semibold' : ''}`}
                 >
-                  <span className="liff-num w-10 shrink-0 text-[13px] leading-5 font-semibold text-ink">{`${r.stamps}個`}</span>
+                  <span className="w-10 shrink-0 text-[13px] leading-5 font-semibold text-ink">{`${r.stamps}個`}</span>
                   <span className="min-w-0 flex-1 truncate text-sm leading-[21px] text-ink">{r.name}</span>
                   <span className="text-[13px] leading-5 text-liff-sub">{ok ? '使えます' : `あと ${r.stamps - wallet.balance}個`}</span>
                 </button>
@@ -337,8 +337,8 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
             <span className="text-[13px] leading-5 font-medium text-ink">店員の暗証番号（4桁）</span>
             <span className="flex gap-2" aria-hidden="true">
               {[0, 1, 2, 3].map((i) => (
-                <span key={i} className={`flex h-12 w-12 items-center justify-center rounded-xl bg-liff-chip text-xl font-medium text-ink ${i === pin.length ? 'outline-[1.5px] outline-liff-primary' : 'outline outline-liff-line-strong'}`}>
-                  {i < pin.length ? '●' : ''}
+                <span key={i} className={`flex h-12 w-12 items-center justify-center rounded-xl bg-liff-chip liff-num text-xl leading-6 font-medium text-ink ${i === pin.length ? 'outline-[1.5px] outline-liff-primary' : 'outline outline-liff-line-strong'}`}>
+                  {i < pin.length ? '●' : i === pin.length ? <span className="h-6 w-0.5 rounded-xs bg-ink" /> : ''}
                 </span>
               ))}
             </span>
