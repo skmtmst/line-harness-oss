@@ -8,8 +8,9 @@
 
 ## 点検する範囲
 
-- `docs/v6-requirements/`(要件 34 本と横断契約)
-- `docs/v6-*.md`(指示書、並列計画、NodeTerm 設計、Pencil 修正)
+- `docs/v8-design-rules.md`(見た目の決まりの正本)と `docs/v8-*.md`(画面の作り方・置き場の地図など)
+- `docs/v8-requirements/`(V8 で足した機能・LIFF・本番の切り替えの要件)
+- `docs/v6-requirements/`(機能の要件 34 本と横断契約。入口は `v6-requirements-master-index.md`。見た目は V8 が勝つ)
 - `docs/brain/`(Memory、corrections、mistakes)
 - `AGENTS.md`
 
