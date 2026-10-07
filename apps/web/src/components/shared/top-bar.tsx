@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { Building2, ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import AccountSwitchMenu, { type AccountSwitchMenuHq } from './account-switch-menu'
+import type { MenuPortalRect } from './menu-portal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
 import styles from './top-bar.module.css'
 
@@ -13,6 +14,20 @@ export interface TopBarAccount {
   /** 頭の1文字。アイコンの代わりに出す。無ければ名前の1文字目。 */
   mark?: string
 }
+
+export interface TopBarNotificationsPopover {
+  open: boolean
+  onClose: () => void
+  /** ベル。外を押したかの判定と Esc で焦点を戻す先。 */
+  getAnchor: () => HTMLElement | null
+  /** 小窓の位置の基準：上の帯の右端から 8 内側・帯の下。 */
+  getPositionRect: () => MenuPortalRect | null
+  /** 小窓の id（ベルの aria-controls）。 */
+  id: string
+}
+
+/** 小窓の右端を上の帯の右端から内側へ寄せる幅（絵 mV28V）。 */
+const BELL_POPOVER_EDGE = 8
 
 export interface TopBarProps {
   title: string
@@ -42,6 +57,12 @@ export interface TopBarProps {
    * v7 では描かない。
    */
   notificationUnreadCount?: number
+  /**
+   * ★V8：ベルを押したときの小窓（V8.pen `DIHFx/D2eAyQ`・小窓 `mV28V`）を描く。
+   * 渡すとベルはページを移らずに小窓を開くボタンになる。渡さなければ今までどおり
+   * 通知の一覧（/notifications）へのリンク。中身（取得・既読）は呼ぶ側が持つ。
+   */
+  renderNotifications?: (popover: TopBarNotificationsPopover) => ReactNode
   /**
    * ★V8 外側の左側（畳むボタンとパンくず）を出すか。
    * 左メニューの無い殻（停止中のワークスペース等）では渡さない。
@@ -92,6 +113,7 @@ export default function TopBar({
   userName,
   onLogout,
   notificationUnreadCount = 0,
+  renderNotifications,
   v8Chrome = false,
   chromeVariant = 'default',
   menuCollapsed = false,
@@ -103,6 +125,18 @@ export default function TopBar({
 }: TopBarProps) {
   const [switchOpen, setSwitchOpen] = useState(false)
   const switchRef = useRef<HTMLButtonElement>(null)
+  const rootRef = useRef<HTMLElement>(null)
+  const bellRef = useRef<HTMLButtonElement>(null)
+  const [bellOpen, setBellOpen] = useState(false)
+  const bellPopoverId = useId()
+  const closeBell = useCallback(() => setBellOpen(false), [])
+  const getBell = useCallback(() => bellRef.current, [])
+  const getBellPosition = useCallback((): MenuPortalRect | null => {
+    const bar = rootRef.current?.getBoundingClientRect()
+    if (!bar) return null
+    const right = bar.right - BELL_POPOVER_EDGE
+    return { top: bar.top, bottom: bar.bottom, left: right, right, width: 0 }
+  }, [])
   const classes = [styles.root, className].filter(Boolean).join(' ')
   const handleAccountChange = (event: ChangeEvent<HTMLSelectElement>) => {
     onAccountChange(event.target.value)
@@ -129,7 +163,7 @@ export default function TopBar({
   }, [])
 
   return (
-    <header className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined}>
+    <header ref={rootRef} className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined}>
       {/*
         ★V8 外側（Pencil `y3gx8R`）：左に畳むボタンとパンくず
         （アカウント › 画面名）。v7 では .v8-only が消す。
@@ -288,21 +322,37 @@ export default function TopBar({
             hq={hqReturn}
           />
           {/*
-            ★V8: 通知。押すと通知の一覧（/notifications）を開く。
+            ★V8: 通知。小窓を渡されたら、押すとページを移らずにベルの下へ小窓を開く
+            （絵 DIHFx/D2eAyQ）。渡されなければ通知の一覧（/notifications）へのリンク。
             未読は赤い丸で右上に出す（100以上は 99+）。
           */}
-          <Link
-            href="/notifications"
-            className={`${styles.iconButton} v8-only`}
-            aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
-          >
-            <BellIcon />
-            {notificationUnreadCount > 0 ? (
-              <span className={styles.bellBadge} aria-hidden="true">
-                {notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}
-              </span>
-            ) : null}
-          </Link>
+          {renderNotifications ? (
+            <>
+              <button
+                ref={bellRef}
+                type="button"
+                className={`${styles.iconButton} v8-only`}
+                aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
+                aria-haspopup="dialog"
+                aria-expanded={bellOpen}
+                aria-controls={bellOpen ? bellPopoverId : undefined}
+                onClick={() => setBellOpen((current) => !current)}
+              >
+                <BellIcon />
+                <BellBadge count={notificationUnreadCount} />
+              </button>
+              {renderNotifications({ open: bellOpen, onClose: closeBell, getAnchor: getBell, getPositionRect: getBellPosition, id: bellPopoverId })}
+            </>
+          ) : (
+            <Link
+              href="/notifications"
+              className={`${styles.iconButton} v8-only`}
+              aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
+            >
+              <BellIcon />
+              <BellBadge count={notificationUnreadCount} />
+            </Link>
+          )}
           <span className={styles.separator} aria-hidden="true" />
         </> : null}
 
@@ -381,6 +431,16 @@ function PanelLeftIcon() {
       <rect width="18" height="18" x="3" y="3" rx="2" />
       <path d="M9 3v18" />
     </svg>
+  )
+}
+
+/* ★V8: ベルの未読の数（赤い丸・100以上は 99+）。 */
+function BellBadge({ count }: { count: number }) {
+  if (count <= 0) return null
+  return (
+    <span className={styles.bellBadge} aria-hidden="true">
+      {count > 99 ? '99+' : count}
+    </span>
   )
 }
 
