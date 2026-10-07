@@ -15,7 +15,6 @@ const ADVANCED = readFileSync(join(HERE, 'advanced-search-dialog.tsx'), 'utf8')
 /* N-039: 保存検索・通知の窓は overlay 規約へ乗せるため部品へ切り出した。 */
 const SAVED_DIALOG = readFileSync(join(HERE, 'saved-search-dialog.tsx'), 'utf8')
 const NOTICE_DIALOG = readFileSync(join(HERE, 'notice-dialog.tsx'), 'utf8')
-const TIMELINE = readFileSync(join(HERE, 'friend-timeline.tsx'), 'utf8')
 /* #984 LAY-14: 友だち配下の主タブの正本は friends-tabs.ts。 */
 const FRIENDS_TABS = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'friends-tabs.ts'), 'utf8')
 const DETAIL = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'detail', 'page.tsx'), 'utf8')
@@ -148,7 +147,8 @@ describe('友だちV8の画面契約', () => {
   })
 
   it('友だち詳細から一括確認済み操作を除く', () => {
-    expect(TIMELINE).not.toContain('すべて確認済みにする')
+    // 履歴は詳細の画面（detail/page.tsx）が自分で描く。古い friend-timeline.tsx はどこからも描かれないので 2026-10-07 に消した。
+    expect(DETAIL).not.toContain('すべて確認済みにする')
   })
 
   it('ブラウザ標準アラートを使わず独自ダイアログを出す', () => {

@@ -1,10 +1,7 @@
-// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 /*
  * #673 視覚品質基盤の契約。
@@ -14,8 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  * B. 押した感触・行ホバー・メニューの出入り・指標カードの骨組みを、
  *    共通のベースCSSと主要な指標カードへ入れる。
  *
- * 文字列を読むだけの契約では、読み込み中に骨組みが本当に描画されるか
- * 見えないので、InboxKpis を実Reactで mount して確かめる。
+ * 2026-10-07：受信箱の指標カード（components/chats/inbox-kpis.tsx）はどの画面からも
+ * 描かれないので消した。それを実Reactで mount して骨組みを見ていた試験は、今の受信箱
+ * （app/chats/page.tsx）に同じ指標カードが無いため付け替えられず、外した。
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -23,36 +21,6 @@ const SRC = join(HERE, '..')
 const GLOBALS = readFileSync(join(HERE, 'globals.css'), 'utf8')
 /** 注釈を落としたCSS。宣言だけを見る。 */
 const GLOBALS_CODE = GLOBALS.replace(/\/\*[\s\S]*?\*\//g, '')
-
-vi.mock('@/lib/api', () => ({
-  api: {
-    chatStats: {
-      get: vi.fn(),
-    },
-  },
-}))
-
-import { api } from '@/lib/api'
-import InboxKpis from '@/components/chats/inbox-kpis'
-
-const chatStatsGet = vi.mocked(api.chatStats.get)
-
-let host: HTMLDivElement
-let root: Root
-
-beforeEach(() => {
-  ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-  host = document.createElement('div')
-  document.body.appendChild(host)
-  root = createRoot(host)
-})
-
-afterEach(async () => {
-  vi.useRealTimers()
-  await act(async () => { root.unmount() })
-  host.remove()
-  vi.clearAllMocks()
-})
 
 describe('#673 A. カード・パネルの立体感', () => {
   it('カードの影は層状影（近距離の薄い影＋下端の光＋1pxリング）', () => {
@@ -78,7 +46,6 @@ describe('#673 A. カード・パネルの立体感', () => {
 
   it('主要画面の任意値 shadow をトークンへ寄せた', () => {
     const migrated = [
-      ['components/chats/inbox-kpis.tsx', 'shadow-card'],
       ['components/chats/template-picker.tsx', 'shadow-card'],
       ['components/dashboard/qr-dialog.tsx', 'shadow-float'],
       ['components/dashboard/dashboard-editor.tsx', 'shadow-card'],
@@ -129,44 +96,6 @@ describe('#673 B. 触った感触', () => {
 })
 
 describe('#673 指標カードのスケルトン', () => {
-  it('読み込み中は数の場所に骨組みを出し、取れてから実数に替わる', async () => {
-    let resolveStats: ((value: { success: true; data: unknown }) => void) | undefined
-    chatStatsGet.mockImplementation(
-      () => new Promise((resolve) => { resolveStats = resolve }) as ReturnType<typeof api.chatStats.get>,
-    )
-    // 待ちは偽の時計で進める（本物の時間を待たない）。骨組みの 0.3 秒は描いた瞬間から数えるので、描く前に替える。
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
-    await act(async () => { root.render(<InboxKpis />) })
-
-    const section = host.querySelector('section[aria-label="受信箱の対応状況"]')
-    expect(section?.getAttribute('aria-busy')).toBe('true')
-    /*
-     * ★V7 仕上げ §3: 骨組みは 0.3 秒待ってから出す（速い応答では出さない）。
-     * 出る前は本物の場所を不可視で取るので、実数の「—」は見えない。
-     * 「要返信」＋4指標＋待ち時間の骨組み。
-     */
-    await act(async () => { await vi.advanceTimersByTimeAsync(350) })
-    expect(host.querySelectorAll('[data-skeleton]').length).toBeGreaterThanOrEqual(5)
-
-    const stats = {
-      waiting: 3,
-      oldestWaitingMinutes: 42,
-      mine: 1,
-      todayInbound: 5,
-      todayByChannel: { email: 2 },
-      waitingOverAnHour: 1,
-    }
-    await act(async () => {
-      resolveStats?.({ success: true, data: stats })
-    })
-    expect(section?.getAttribute('aria-busy')).toBeNull()
-    // ★V7 §3: 出した骨組みは最低 0.4 秒残る。待ってから実数を確かめる。
-    await act(async () => { await vi.advanceTimersByTimeAsync(450) })
-    expect(host.querySelectorAll('[data-skeleton]').length).toBe(0)
-    expect(section?.textContent).toContain('要返信 3件')
-    expect(section?.textContent).toContain('5件')
-  })
-
   it('ダッシュボードの指標カードも骨組みの口を持つ', () => {
     const page = readFileSync(join(HERE, 'page.tsx'), 'utf8')
     // LiveDataCard / TodayTaskCard / SendQuotaCard が loading を受け取り、

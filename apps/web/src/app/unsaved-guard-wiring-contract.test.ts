@@ -35,15 +35,11 @@ const GUARDED = [
   'app/booking/staff/new/page.tsx',
   'app/booking/staff/new/staff-new-v8.tsx',
   'app/booking/staff/shifts/page.tsx',
-  'app/contents/vars/edit/edit-v8.tsx',
   'app/contents/vars/edit/page.tsx',
-  'app/contents/vars/new/new-v8.tsx',
   'app/contents/vars/new/page.tsx',
-  'app/conversions/new/conversion-create-v8.tsx',
   'app/conversions/new/page.tsx',
   'app/ec-commerce/connector-panel.tsx',
   'app/form-submissions/edit/page.tsx',
-  'app/friend-add-settings/editor-v8.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',
   'app/inflow-links/new/page.tsx',
   // 2026-10-07：入口は src/v8 の画面を出すだけ。番兵は画面（operator-edit）が持つ。
@@ -268,8 +264,6 @@ const EXEMPTIONS: Record<string, string> = {
     '分類の変更は選んだ直後に即時保存し、下書きを持たない',
   'components/friend-fields/tags-page-v4.tsx':
     '一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
-  'app/broadcasts/list-v8.tsx':
-    '一覧と絞り込みが中心。フォルダ・並び替え・保存した検索など一覧上の操作は押した直後に即時保存し、配信の作成は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/tags/tags-tab-v8.tsx':
     'tags-page-v4.tsx と同じ一覧のV8版。一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
   'app/tags/searches-v8.tsx':
@@ -392,19 +386,10 @@ const EXEMPTIONS: Record<string, string> = {
  * もう描かれない古い画面ファイル（入口は src/v8 の新しい画面か、別の画面を出す）。
  * ファイルは切り替えの日まで残るので、探すと見つかる。見張っても意味が無いので探す対象から外す。
  * 切り替えの日にファイルと一緒にここから消す（2026-10-06 に GUARDED・EXEMPTIONS・UNTRIAGED から移した）。
+ * 2026-10-07：載っていた11本はどの入口からも描かれないので消した（外付けSSDの lh-archive-20261007/repo-code に写しあり）。
+ * account-ordering.tsx は V8 の LINE アカウント一覧の窓から開くようになったので、ここから EXEMPTIONS へ移した。
  */
 const NOT_RENDERED: Record<string, string> = {
-  'app/scenarios/list-v8.tsx': '入口は src/v8/scenarios/list.tsx',
-  'app/auto-replies/list-v8.tsx': '入口は V8 のとき src/v8/auto-replies/list.tsx',
-  'app/form-submissions/list-v8.tsx': '入口は src/v8/forms/list.tsx',
-  'app/rich-menus/list-v8.tsx': '入口は V8 のとき src/v8/rich-menus/list.tsx',
-  'app/webhooks/new/new-v8.tsx': '入口は V8 のとき src/v8/webhooks/create.tsx',
-  'app/webhooks/incoming-v8.tsx': '入口は V8 のとき src/v8/webhooks/incoming.tsx',
-  'app/webhooks/_components/webhooks-v8-incoming.tsx': '入口は V8 のとき src/v8/webhooks/incoming.tsx',
-  'app/inflow-links/new/inflow-create-v8.tsx': 'どの入口からも読まれていない',
-  'app/nen-campaigns/edit/campaign-editor.tsx': 'どの入口からも読まれていない（V8 は campaign-editor-v8.tsx）',
-  'app/nen-members/photo-reward-policy.tsx': 'どの入口からも読まれていない',
-  'app/broadcasts/quick-send-dialog.tsx': 'どの入口からも読まれていない',
 }
 
 /*
