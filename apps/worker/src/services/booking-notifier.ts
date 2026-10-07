@@ -8,7 +8,8 @@ export type NotificationKind =
   | 'expired'
   | 'changed'
   | 'day_before'
-  | 'hours_before';
+  | 'hours_before'
+  | 'waitlist_invite';
 
 export interface NotificationContext {
   menuName: string;
@@ -19,6 +20,8 @@ export interface NotificationContext {
   daysUntil: number;
   /** 送信時点から予約開始までの実際の残り時間（時間。1時間未満は1）。設定値ではなく実測 (R333)。 */
   hoursUntil: number;
+  /** キャンセル待ちの招待だけ使う仮押さえ分数。それ以外は入れない。 */
+  holdMinutes?: number;
 }
 
 /**
@@ -74,6 +77,10 @@ export function renderNotificationText(
       return `${relDay ? `${relDay}のご予約` : 'ご予約'}のお知らせです。${detail}`;
     case 'hours_before':
       return `${relDay ? `${relDay}のご予約` : 'ご予約'}まであと ${ctx.hoursUntil} 時間です。${detail}`;
+    case 'waitlist_invite': {
+      const hold = Number(ctx.holdMinutes ?? 30);
+      return `キャンセルが出ました。${detail}\n\n${hold}分以内にご予約ください。この枠は今だけあなたが優先です。`;
+    }
   }
 }
 

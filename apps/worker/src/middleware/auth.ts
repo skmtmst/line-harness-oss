@@ -418,6 +418,9 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/menus'],
   ['GET', '/api/restaurant-test/channels'],
   ['POST', '/api/restaurant-test/reservations/manual'],
+  // 席の空き待ち（booking-plus 席版）：担当者も日の帯から印を付ける。
+  ['GET', '/api/restaurant-test/seat-waitlist'],
+  ['POST', '/api/restaurant-test/seat-waitlist'],
   ['POST', '/api/restaurant-test/reservations/holds'],
   ['GET', '/api/restaurant-test/reservations/day'],
   ['GET', '/api/restaurant-test/customers/search'],
@@ -454,6 +457,11 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
   ['PATCH', /^\/api\/restaurant-test\/reservations\/[^/]+$/],
+  // 席の空き待ちの取り消し・繰り上げ・来店の印（booking-plus 席版）。
+  ['DELETE', /^\/api\/restaurant-test\/seat-waitlist\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/seat-waitlist\/[^/]+\/convert$/],
+  ['POST', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
+  ['DELETE', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
   ['POST', /^\/api\/restaurant-test\/channel-close-tasks\/[^/]+\/done$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
