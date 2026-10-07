@@ -19,6 +19,7 @@ import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel from '@/components/shared/folder-panel'
@@ -537,9 +538,7 @@ export default function AffiliatorsTab() {
               <Td className={styles.colName}>
                 <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
                   <FolderDotName folder={folderDotOf(row)} dot={!narrow}>
-                    <button type="button" className={styles.rowName} title={row.name} onClick={() => openDrawer(row.id, false)}>
-                      {row.name}
-                    </button>
+                    {nameButton(row)}
                   </FolderDotName>
                   <span className={styles.rowCode} title={row.code}>{row.code}</span>
                   <span className={styles.rowPlan}>{planText(row)}</span>
@@ -615,6 +614,13 @@ export default function AffiliatorsTab() {
     </ListPagePagination>
   ) : undefined
 
+  function nameButton(row: { id: string; name: string }) {
+    return (
+      <button type="button" className={styles.rowName} title={row.name} onClick={() => openDrawer(row.id, false)}>
+        {row.name}
+      </button>
+    )
+  }
   const drawerRow = drawerId ? rows.find((row) => row.id === drawerId) ?? null : null
 
   return (

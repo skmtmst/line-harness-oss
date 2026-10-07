@@ -2493,6 +2493,32 @@ function nenMetricsBody(data, query) {
 }
 
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  /*
+    友だちのマイル詳細（V8 R6kIG・手で増やす・減らす M8zhjL）は1人に絞って読む。
+    絞ったときだけ絵の数（残高 1,240・確定待ち 120・期限が近い 200）と5行の明細を返す。
+    絞らない一覧（友だちの残高・履歴のタブ）は今までの見本のまま。
+  */
+  if (method === 'GET' && pathname === '/api/mileage/friends' && query.get('friendId') === 'friend-1') {
+    const base = MILEAGE_FRIENDS.items[0]
+    return { success: true, data: { ...MILEAGE_FRIENDS, items: [{
+      ...base, displayName: 'Kenta Kawano', available: 1240, pending: 120, monthChange: 180,
+      expiringMiles30d: 200, nextExpiringAt: '2026-10-31T00:00:00+09:00',
+    }], pagination: { total: 1, limit: 1, offset: 0 } } }
+  }
+  if (method === 'GET' && pathname === '/api/mileage/history' && query.get('friendId') === 'friend-1') {
+    const row = (id, entryType, status, amount, reason, ruleName, mode, executedByStaffName, occurredAt, balanceAfter) => ({
+      id, primaryFriendId: 'friend-1', displayName: 'Kenta Kawano', pictureUrl: null, entryType, status, amount, reason,
+      source: mode === 'manual' ? 'manual' : 'rule', hasSourceEvent: false, sourceReferenceId: null, ruleName, mode,
+      executedByStaffName, occurredAt, lineAccountName: '然 本店', balanceAfter,
+    })
+    return { success: true, data: { ...MILEAGE_HISTORY, items: [
+      row('mf-1', 'grant', 'available', 10, 'リンクをクリック', '秋の新商品のお知らせ', 'automatic', null, '2026-09-30T10:32:00+09:00', 1240),
+      row('mf-2', 'spend', 'available', -500, '送料無料クーポンと交換', '使い道：送料無料クーポン', 'automatic', null, '2026-09-29T18:05:00+09:00', 1230),
+      row('mf-3', 'grant', 'available', 48, '商品を買った', '購入 ¥4,800', 'automatic', null, '2026-09-28T21:40:00+09:00', 1730),
+      row('mf-4', 'adjustment', 'available', 100, 'おわびで付けた', '手で増やす', 'manual', '河野', '2026-09-27T12:10:00+09:00', 1682),
+      row('mf-5', 'reversal', 'available', -10, '付けすぎを取り消し', 'リンクをクリック（重複）', 'manual', '河野', '2026-09-20T09:00:00+09:00', 1582),
+    ], pagination: { total: 5, limit: 100, offset: 0 } } }
+  }
   if (method === 'GET' && pathname === '/api/hq/billing/summary') {
     return { success: true, data: BILLING_SUMMARY }
   }
@@ -3365,6 +3391,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 友だち詳細（★V8 Q5F2QE・JCDRm）の履歴・次の予定・回答。friend-1 だけ。
    * 絵の「最近の履歴」3行・「進行中」1行・回答カード2枚と同じ形にする（2026-10-07）。
    */
+  /* 行動スコアの明細（V8 R8NNi「点数の変化の明細」）。新しい順に5件、合計は上から足し引きが合う。 */
+  const friendScore = pathname.match(/^\/api\/friends\/([^/]+)\/score$/)
+  if (friendScore) {
+    const row = (id, reason, scoreChange, scoreAfter, occurredAt) => ({
+      id, scoringRuleId: null, ruleKey: null, scoreChange, scoreBefore: scoreAfter - scoreChange, scoreAfter,
+      reason, eventType: null, source: null, occurredAt, createdAt: occurredAt, mode: 'automatic', executedByStaffName: null,
+    })
+    return { success: true, data: { friendId: friendScore[1], currentScore: 36, history: [
+      row('fs-1', '配信のURLを押した', 3, 36, '2026-09-30T10:32:00+09:00'),
+      row('fs-2', '購入した', 30, 33, '2026-09-28T21:40:00+09:00'),
+      row('fs-3', '配信のURLを押した', 3, 3, '2026-09-24T08:12:00+09:00'),
+      row('fs-4', '「返信した」の点が消えた（14日）', -5, 0, '2026-09-16T09:00:00+09:00'),
+      row('fs-5', 'メッセージに返信した', 5, 5, '2026-09-02T19:20:00+09:00'),
+    ] } }
+  }
   if (pathname === '/api/friends/friend-1/timeline') {
     const item = (id, type, summary, occurredAt, source, account = { id: 'visual-qa-account', name: '然-NEN-TEST' }) => ({
       id, type, summary, status: null, source, occurredAt, lineAccount: account,
