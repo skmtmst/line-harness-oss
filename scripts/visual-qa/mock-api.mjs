@@ -1242,6 +1242,8 @@ const EC_SUBSCRIPTIONS = {
     { month: '2026-06', count: 158, amount: 1248000 }, { month: '2026-07', count: 169, amount: 1324000 }, { month: '2026-08', count: 172, amount: 1482000 },
   ] },
   risk: { source: 'payment_status', ruleVersion: 'subscription-payment-status-v1', calculatedAt: '2026-09-06T09:58:00+09:00', predictiveScoreAvailable: false },
+  // 本物の口（GET /api/ec-commerce/subscriptions）は形が読めなかった件数を必ず返す。無いと定期便のタブが落ちる（wqC8x）
+  skipped: { malformedSnapshots: 0 },
 }
 
 const EC_CONNECTOR = {
