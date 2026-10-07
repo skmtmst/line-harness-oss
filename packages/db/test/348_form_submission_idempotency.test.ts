@@ -123,6 +123,7 @@ describe('予約ヘルパー(実 SQL)', () => {
   beforeEach(() => {
     sqlite = new Database(':memory:');
     sqlite.exec(MIGRATION);
+    sqlite.exec(readFileSync(join(HERE, '..', 'migrations', '587_form_step_completion_times.sql'), 'utf8'));
     db = asD1(sqlite);
   });
 

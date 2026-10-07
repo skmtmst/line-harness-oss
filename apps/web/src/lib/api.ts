@@ -31,6 +31,11 @@ import type {
   AutoReplyPublishResult,
   AutoReplyValidationResult,
   Friend,
+  FriendUpcomingItem,
+  FriendSummary,
+  DashboardActivityItem,
+  FormSubmissionDetail,
+  FormSubmissionPage,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
   FriendAddEventRoutingStatus,
@@ -3170,6 +3175,8 @@ export type FriendDetail = FriendWithTags & {
  * 確定した予定だけを返す。動的条件の将来配信は含まない。
  */
 export type FriendUpcoming = {
+  items?: FriendUpcomingItem[]
+  itemsError?: boolean
   nextBooking: {
     kind: 'booking' | 'event_booking' | 'meet_consultation'
     /** booking は予約ID、event_booking はイベントID、meet_consultation は相談ID */
@@ -6355,6 +6362,8 @@ export const api = {
      * 受信箱の顧客情報に出す「次の予定」（IDEA-02）。
      * 値が null = 予定なし、*_Error=true = 取得失敗（未取得）を区別する。
      */
+    summary: (id: string) =>
+      fetchApi<ApiResponse<FriendSummary>>(`/api/friends/${encodeURIComponent(id)}/summary`),
     upcoming: (id: string) =>
       fetchApi<ApiResponse<FriendUpcoming>>(`/api/friends/${id}/upcoming`),
     mileage: (id: string, params?: number | { limit?: number; accountId?: string }) => {
@@ -7411,6 +7420,17 @@ export const api = {
   },
   /** 回答フォーム。 */
   forms: {
+    submission: (formId: string, submissionId: string, accountId: string) =>
+      fetchApi<ApiResponse<FormSubmissionDetail>>(
+        `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string } = {}) => {
+      const query = new URLSearchParams({ account_id: accountId, page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
+      if (params.query) query.set('q', params.query)
+      return fetchApi<ApiResponse<FormSubmissionPage>>(
+        `/api/forms/${encodeURIComponent(formId)}/submissions?${query}`,
+      )
+    },
     list: (accountId: string) =>
       fetchApi<ApiResponse<Array<{ id: string; name: string; description: string | null; isActive: boolean }>>>(
         `/api/forms?account_id=${encodeURIComponent(accountId)}`,
@@ -10836,6 +10856,10 @@ export const api = {
       fetchApi<ApiResponse<Array<{ id: string; name: string }>>>('/api/operators'),
   },
   dashboard: {
+    activity: (accountId: string, limit = 10) =>
+      fetchApi<ApiResponse<{ items: DashboardActivityItem[] }>>(
+        `/api/dashboard/activity?account_id=${encodeURIComponent(accountId)}&limit=${encodeURIComponent(String(limit))}`,
+      ),
     overview: (params: { period?: 'today' | 'last7' | 'last28'; accountId: string }) => {
       const query = new URLSearchParams()
       if (params?.period) query.set('period', params.period)
@@ -12409,7 +12433,7 @@ export const api = {
       update: (
         id: string,
         lineAccountId: string,
-        data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string; folderId?: string | null },
+        data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string; expectedVersion?: number; folderId?: string | null },
         stepUpToken?: string,
       ) =>
         fetchApi<ApiResponse<OutgoingWebhook>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {

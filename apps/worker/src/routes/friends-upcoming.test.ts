@@ -50,6 +50,8 @@ function app() {
 type UpcomingBody = {
   success: boolean;
   data?: {
+    items: import('@line-crm/shared').FriendUpcomingItem[];
+    itemsError: boolean;
     nextBooking: { kind: string; id: string; title: string; startsAt: string; status: string } | null;
     nextBookingError: boolean;
     nextAutoDelivery: { kind: string; id: string; name: string; scheduledAt: string } | null;
@@ -116,6 +118,8 @@ describe('GET /api/friends/:id/upcoming (IDEA-02)', () => {
     const { status, body } = await upcoming();
     expect(status).toBe(200);
     expect(body.data).toEqual({
+      items: [],
+      itemsError: false,
       nextBooking: null,
       nextBookingError: false,
       nextAutoDelivery: null,
@@ -202,4 +206,129 @@ describe('GET /api/friends/:id/upcoming (IDEA-02)', () => {
     expect(body.data?.nextAutoDelivery).toBeNull();
     expect(body.data?.nextAutoDeliveryError).toBe(true);
   });
+});
+
+
+describe('進行中の配信一覧', () => {
+  test('複数シナリオと予約配信を日時順で返し、対象外・停止中は除く', async () => {
+    seedScenario('a', 'active', FUTURE.late);
+    seedScenario('b', 'delivering', FUTURE.soon);
+    seedScenario('paused', 'paused', FUTURE.soon);
+    db.raw.prepare(`INSERT INTO broadcasts (id, title, message_type, message_content,
+      status, scheduled_at, line_account_id, target_type, target_tag_id)
+      VALUES (?, ?, 'text', '試験', 'scheduled', ?, ?, ?, ?)`)
+      .run('broadcast-1', '予約配信', FUTURE.mid, 'account-a', 'all', null);
+    db.raw.prepare(`INSERT INTO broadcasts (id, title, message_type, message_content,
+      status, scheduled_at, line_account_id, target_type, target_tag_id)
+      VALUES ('excluded', '対象外', 'text', '試験', 'scheduled', ?, 'account-a', 'tag', 'missing-tag')`)
+      .run(FUTURE.soon);
+    const { body } = await upcoming();
+    expect(body.data?.itemsError).toBe(false);
+    expect(body.data?.items.map(i => i.kind)).toEqual(['scenario', 'broadcast', 'scenario']);
+    expect(body.data?.items[1]).toMatchObject({ sentCount: 0, totalCount: 1,
+      href: '/broadcasts/detail?id=broadcast-1' });
+    expect(body.data?.nextAutoDelivery?.id).toBe('scenario-b');
+  });
+  test('20件に制限し、日時未確定の進行中も含める', async () => {
+    for (let i = 0; i < 22; i++) seedScenario(String(i), 'active', FUTURE.mid);
+    seedScenario('unknown', 'active', null);
+    const { body } = await upcoming();
+    expect(body.data?.items).toHaveLength(20);
+    db.raw.prepare(`DELETE FROM friend_scenarios WHERE id != 'fs-unknown'`).run();
+    const next = await upcoming();
+    expect(next.body.data?.items[0].scheduledAt).toBeNull();
+  });
+  test('リマインダは登録単位でまとめ、送信済み件数を返す', async () => {
+    seedReminderRun('r', FUTURE.mid);
+    db.raw.prepare(`INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date)
+      VALUES ('fr-r', 'friend-1', 'reminder-r', '2999-01-12')`).run();
+    db.raw.prepare(`INSERT INTO friend_reminder_deliveries
+      (id, friend_reminder_id, reminder_step_id) VALUES ('done', 'fr-r', 'step-done')`).run();
+    const { body } = await upcoming();
+    expect(body.data?.items).toHaveLength(1);
+    expect(body.data?.items[0]).toMatchObject({ kind: 'reminder', sentCount: 1, scheduledAt: FUTURE.mid });
+  });
+  test('取得失敗を空の予定と区別し、従来の予定を残す', async () => {
+    seedScenario('a', 'active', FUTURE.soon);
+    db.raw.exec('DROP TABLE automation_runs');
+    const { body } = await upcoming();
+    expect(body.data?.itemsError).toBe(true);
+    expect(body.data?.nextAutoDelivery?.id).toBe('scenario-a');
+  });
+});
+
+
+test('自動化は稼働中だけを返し、試し実行・他のアカウントは除く', async () => {
+  db.raw.prepare(`INSERT INTO automation_definitions (id, line_account_id, name)
+    VALUES ('automation-1', 'account-a', '待機処理')`).run();
+  const insert = db.raw.prepare(`INSERT INTO automation_runs
+    (id, line_account_id, automation_id, automation_version_id, friend_id, source_event_id,
+     idempotency_key, status, resume_at, is_test) VALUES (?, ?, 'automation-1', 'v1',
+      'friend-1', ?, ?, ?, ?, ?)`);
+  insert.run('run-1', 'account-a', 'e1', 'i1', 'waiting', FUTURE.mid, 0);
+  insert.run('test-run', 'account-a', 'e2', 'i2', 'waiting', FUTURE.soon, 1);
+  insert.run('other-run', 'account-b', 'e3', 'i3', 'waiting', FUTURE.soon, 0);
+  insert.run('done-run', 'account-a', 'e4', 'i4', 'success', FUTURE.soon, 0);
+  const { body } = await upcoming();
+  expect(body.data?.items).toHaveLength(1);
+  expect(body.data?.items[0]).toMatchObject({ kind: 'automation', id: 'run-1', sentCount: null, totalCount: null });
+});
+
+test('一斉配信の条件判定とアカウント境界を守る', async () => {
+  const insert = db.raw.prepare(`INSERT INTO broadcasts (id, title, message_type, message_content,
+    status, scheduled_at, line_account_id, target_type, segment_conditions, stopped_at)
+    VALUES (?, '絞り込み', 'text', '試験', 'scheduled', ?, ?, 'segment', ?, ?)`);
+  const condition = (name: string) => JSON.stringify({ operator: 'AND', rules: [{ type: 'name', value: { text: name } }] });
+  insert.run('included', FUTURE.mid, 'account-a', condition('田中'), null);
+  insert.run('excluded', FUTURE.mid, 'account-a', condition('対象外'), null);
+  insert.run('other', FUTURE.mid, 'account-b', condition('田中'), null);
+  insert.run('stopped', FUTURE.mid, 'account-a', condition('田中'), PAST);
+  const { body } = await upcoming();
+  expect(body.data?.itemsError).toBe(false);
+  expect(body.data?.items.map(i => i.id)).toEqual(['included']);
+});
+
+
+test('シナリオは登録時の公開版で全体を数え、複数メッセージも1工程として数える', async () => {
+  seedScenario('published', 'active', FUTURE.mid);
+  const snapshot = JSON.stringify([{ version_step_id: 'v1:0', step_order: 0 }, { version_step_id: 'v1:1', step_order: 1 }]);
+  db.raw.prepare(`INSERT INTO scenario_versions (id, scenario_id, version_number, steps_snapshot,
+    published_at, created_at, updated_at) VALUES ('v1', 'scenario-published', 1, ?, ?, ?, ?)`)
+    .run(snapshot, PAST, PAST, PAST);
+  db.raw.prepare(`UPDATE friend_scenarios SET published_version_id = 'v1', started_at = ?`).run(PAST);
+  for (const id of ['message-1', 'message-2']) {
+    db.raw.prepare(`INSERT INTO messages_log (id, friend_id, direction, message_type, content,
+      scenario_version_step_id, created_at) VALUES (?, 'friend-1', 'outgoing', 'text', '試験', 'v1:0', ?)`)
+      .run(id, FUTURE.soon);
+  }
+  const { body } = await upcoming();
+  expect(body.data?.items[0]).toMatchObject({ sentCount: 1, totalCount: 2 });
+});
+
+test('リマインダの再試行は次の再試行日時を返す', async () => {
+  seedReminderRun('retry', FUTURE.soon, 'retry_wait');
+  db.raw.prepare(`INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date)
+    VALUES ('fr-retry', 'friend-1', 'reminder-retry', '2999-01-12')`).run();
+  db.raw.prepare(`UPDATE reminder_delivery_runs SET next_retry_at = ?`).run(FUTURE.mid);
+  const { body } = await upcoming();
+  expect(body.data?.items[0].scheduledAt).toBe(FUTURE.mid);
+});
+
+test('複数アカウントの予約配信は重複除外後の対象だけを返す', async () => {
+  db.raw.prepare(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+    VALUES ('account-b', 'channel-b', '別の試験', 'fixture-token', 'fixture-secret')`).run();
+  db.raw.prepare(`INSERT INTO friends (id, line_user_id, line_account_id)
+    VALUES ('friend-2', 'U-friend-2', 'account-b')`).run();
+  db.raw.prepare('UPDATE friends SET picture_url = ?').run('https://profile.line-scdn.net/' + 'fixture'.repeat(20));
+  db.raw.prepare(`INSERT INTO broadcasts (id, title, message_type, message_content, status,
+    scheduled_at, target_type, account_ids, dedup_priority)
+    VALUES ('dedup', '重複除外配信', 'text', '試験', 'scheduled', ?, 'multi-account-dedup',
+      '["account-a","account-b"]', '["account-b","account-a"]')`).run(FUTURE.mid);
+  expect((await upcoming()).body.data?.items).toEqual([]);
+  db.raw.prepare(`UPDATE broadcasts SET dedup_priority = '["account-a","account-b"]'`).run();
+  const { body } = await upcoming();
+  expect(body.data?.itemsError).toBe(false);
+  expect(body.data?.items.map(i => i.id)).toEqual(['dedup']);
+  db.raw.prepare(`UPDATE line_accounts SET is_active = 0 WHERE id = 'account-a'`).run();
+  expect((await upcoming()).body.data?.items).toEqual([]);
 });
