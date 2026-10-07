@@ -3647,6 +3647,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 顔ぶれを見る）を確かめられない。人数・顔ぶれ・数え直しは
    * `REMINDER_VALIDATE` / `REMINDER_AUDIENCE` が固定で返す。
    */
+  /*
+   * テスト送信先の状態。無いと既定の器が返って「未設定」の案内と
+   * 「送信先を再確認」が出て、確認の段（ltAaq）が 84px 下へずれていた。
+   * 絵は「送り先：Kenta Kawano（自分）」。
+   */
+  if (/^\/api\/reminders\/[^/]+\/test-recipient$/.test(pathname)) {
+    return {
+      success: true,
+      data: {
+        state: 'ready',
+        recipient: { id: 'visual-staff-self', displayName: 'Kenta Kawano', pictureUrl: null },
+        recipientKind: 'self',
+      },
+    }
+  }
   if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
     const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
     if (draftId === 'reminder-new') return { success: true, data: { ...REMINDER_NEW_DRAFT } }
