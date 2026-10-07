@@ -123,7 +123,7 @@
 @keyframes date-field-in {
   from {
     opacity: 0;
-    scale: 0.97;
+    scale: var(--popover-enter-scale);
   }
 }
 
