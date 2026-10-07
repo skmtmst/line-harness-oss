@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { CircleDot, Star, TrendingUp, Users } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
+import { otpDigits, otpFailureMessage } from '@/components/shared/otp-input'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
@@ -24,22 +25,44 @@ const SETTINGS_WIDTH = 560
 const SETTINGS_TOP = 200
 
 /* 6桁コードの升。貼り付けに対応し、動きは付けない（HANDOFF §8）。 */
-function CodeBoxes({ value, onChange, disabled, label }: {
+function CodeBoxes({ value, onChange, onComplete, disabled, invalid = false, label }: {
   value: string
   onChange: (next: string) => void
+  /** 6桁そろった瞬間に1回（送るボタンを押させない。動きの点検・6）。 */
+  onComplete?: (code: string) => void
   disabled?: boolean
+  /** 違った。6桁を消して1枠目へ戻す。 */
+  invalid?: boolean
   label: string
 }) {
   const boxes = useRef<Array<HTMLInputElement | null>>([])
+  const write = (next: string) => {
+    const clean = otpDigits(next).slice(0, 6)
+    onChange(clean)
+    if (clean.length === 6 && value.length !== 6 && !disabled) onComplete?.(clean)
+  }
+  useEffect(() => {
+    if (!invalid) return
+    onChange('')
+    boxes.current[0]?.focus()
+    // 違ったと分かった瞬間だけ。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invalid])
   const setDigit = (index: number, raw: string) => {
     if (raw === '') {
       onChange(value.slice(0, index) + value.slice(index + 1))
       if (index > 0) boxes.current[index - 1]?.focus()
       return
     }
-    const digit = raw.replace(/\D/g, '').slice(-1)
-    if (!digit) return
-    onChange((value.slice(0, index) + digit + value.slice(index + 1)).slice(0, 6))
+    // 全角の数字は半角に。自動入力で1枠に6桁まとめて来たら、全部の枠へ振り分ける。
+    const digits = otpDigits(raw)
+    if (!digits) return
+    if (digits.length > 1) {
+      write(value.slice(0, index) + digits)
+      boxes.current[Math.min(index + digits.length, 5)]?.focus()
+      return
+    }
+    write(value.slice(0, index) + digits + value.slice(index + 1))
     if (index < 5) boxes.current[index + 1]?.focus()
   }
   return (
@@ -51,19 +74,19 @@ function CodeBoxes({ value, onChange, disabled, label }: {
           className={styles.codeBox}
           inputMode="numeric"
           autoComplete="one-time-code"
-          maxLength={1}
           value={value[index] ?? ''}
           disabled={disabled}
+          aria-invalid={invalid || undefined}
           aria-label={`${label}${index + 1}文字目`}
           onChange={(event) => setDigit(index, event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Backspace' && !value[index] && index > 0) boxes.current[index - 1]?.focus()
           }}
           onPaste={(event) => {
-            const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+            const pasted = otpDigits(event.clipboardData.getData('text')).slice(0, 6)
             if (!pasted) return
             event.preventDefault()
-            onChange(pasted)
+            write(pasted)
             boxes.current[Math.min(pasted.length, 5)]?.focus()
           }}
         />
@@ -290,10 +313,12 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
   onDone: () => void
 }) {
   const [reason, setReason] = useState('')
-  const [code, setCode] = useState('')
+  const [typedCode, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const archive = async () => {
+  /* 6桁目が入った瞬間にも送る（entered）。送っている間は二重に送らない。 */
+  const archive = async (entered?: string) => {
+    const code = entered ?? typedCode
     if (busy) return
     if (code.replace(/\D/g, '').length !== 6) {
       setError('認証アプリの6桁コードを入力してください。')
@@ -310,7 +335,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
       }
       onDone()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'アーカイブできませんでした。')
+      setError(caught instanceof Error ? otpFailureMessage(caught.message) : 'アーカイブできませんでした。')
     } finally {
       setBusy(false)
     }
@@ -343,7 +368,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
         </div>
         <div className={styles.field}>
           <span className={styles.label}>本人確認（認証アプリの6桁）</span>
-          <CodeBoxes value={code} onChange={setCode} disabled={busy} label="認証コード" />
+          <CodeBoxes value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void archive(entered)} invalid={Boolean(error)} disabled={busy} label="認証コード" />
         </div>
       </div>
     </Dialog>
@@ -356,10 +381,12 @@ export function AccountRestoreDialogV8({ account, onClose, onDone }: {
   onClose: () => void
   onDone: () => void
 }) {
-  const [code, setCode] = useState('')
+  const [typedCode, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const restore = async () => {
+  /* 6桁目が入った瞬間にも送る（entered）。送っている間は二重に送らない。 */
+  const restore = async (entered?: string) => {
+    const code = entered ?? typedCode
     if (busy) return
     if (code.replace(/\D/g, '').length !== 6) {
       setError('認証アプリの6桁コードを入力してください。')
@@ -376,7 +403,7 @@ export function AccountRestoreDialogV8({ account, onClose, onDone }: {
       }
       onDone()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '戻せませんでした。')
+      setError(caught instanceof Error ? otpFailureMessage(caught.message) : '戻せませんでした。')
     } finally {
       setBusy(false)
     }
@@ -395,7 +422,7 @@ export function AccountRestoreDialogV8({ account, onClose, onDone }: {
     >
       <div className={styles.field}>
         <span className={styles.label}>本人確認（認証アプリの6桁）</span>
-        <CodeBoxes value={code} onChange={setCode} disabled={busy} label="認証コード" />
+        <CodeBoxes value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void restore(entered)} invalid={Boolean(error)} disabled={busy} label="認証コード" />
         <Link href="/hq/members" className={styles.link}>戻すのはオーナー・本人確認のある人だけです</Link>
       </div>
     </Dialog>

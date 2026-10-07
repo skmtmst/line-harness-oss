@@ -1,4 +1,6 @@
-import React, { forwardRef } from 'react'
+'use client'
+
+import React, { forwardRef, useEffect, useState } from 'react'
 import type {
   InputHTMLAttributes,
   ReactNode,
@@ -63,8 +65,24 @@ export function Field({
   children: ReactNode
 }) {
   const hasHelp = help !== undefined && help !== null
+  /*
+   * 誤りの見せ方を全画面でそろえる（動きの点検・8）。
+   * - 誤りが出た欄で打ち直し始めたら、その場で赤と文を引っ込める（直している最中に赤くし続けない）。
+   * - 欄を離れたとき、画面がまだ誤りを持っていれば、もう一度見せる。
+   * - 画面が新しい誤りを渡したら（文が変わったら）、すぐ見せる。
+   * 打ち始めの瞬間に赤くするかどうかは画面の確かめ方次第だが、出たあとの消え方はここで決める。
+   */
+  const [quiet, setQuiet] = useState(false)
+  const errorKey = typeof error === 'string' ? error : error ? 'node' : ''
+  useEffect(() => { setQuiet(false) }, [errorKey])
+  const shownError = quiet ? null : error
   return (
-    <div className={styles.field}>
+    <div
+      className={styles.field}
+      data-field-quiet={quiet && error ? '' : undefined}
+      onInput={error ? () => { if (!quiet) setQuiet(true) } : undefined}
+      onBlur={quiet ? () => setQuiet(false) : undefined}
+    >
       {/* 「？」は label の外に置く。中に入れるとラベルがボタンを指してしまい、
           入力欄との結びつき（htmlFor・読み上げ）が壊れる。 */}
       <div className={styles.labelRow}>
@@ -82,8 +100,8 @@ export function Field({
         ) : null}
       </div>
       {children}
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
-      {!error && note ? <p className={styles.note}>{note}</p> : null}
+      {shownError ? <p className={styles.error} role="alert">{shownError}</p> : null}
+      {!shownError && note ? <p className={styles.note}>{note}</p> : null}
     </div>
   )
 }

@@ -13,6 +13,7 @@
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -388,12 +389,26 @@ function WebinarList() {
   const [overview, setOverview] = useState<WebinarOverview | null>(null)
   const [overviewAccountId, setOverviewAccountId] = useState<string | null>(null)
   const [overviewFailure, setOverviewFailure] = useState<WebinarLoadFailure | null>(null)
-  const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('updated')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
-  const [savedFilter, setSavedFilter] = useState<SavedFilter>('')
+  /*
+   * 検索語・フォルダ・状態・並び順・件数・ページは URL に置く（動きの点検 5 番）。
+   * 詳細へ行って「戻る」と、同じ絞り込み・同じページの一覧に戻る。
+   * 絞り込みを変えたらページは 1 へ（同じ書き込みの中で戻す。効果で戻すと、来た瞬間に
+   * URL から戻したページまで消える）。
+   */
+  const [view, setView] = useListUrlState({ q: '', folder: '', status: '', sort: 'updated', size: '20', page: '1' })
+  const debouncedQuery = view.q
+  const selectedFolder = view.folder
+  const savedFilter: SavedFilter = (['', 'active', 'draft', 'archived'] as const).includes(view.status as SavedFilter) ? view.status as SavedFilter : ''
+  const sortKey: SortKey = (['updated', 'created', 'name'] as const).includes(view.sort as SortKey) ? view.sort as SortKey : 'updated'
+  const pageSize = [10, 20, 50].includes(Number(view.size)) ? Number(view.size) : 20
+  const page = Math.max(1, Number.parseInt(view.page, 10) || 1)
+  const setPage = useCallback((next: number) => setView({ page: String(next) }), [setView])
+  const setSelectedFolder = useCallback((next: string) => setView({ folder: next, page: '1' }), [setView])
+  const setSavedFilter = useCallback((next: SavedFilter) => setView({ status: next, page: '1' }), [setView])
+  const setSortKey = useCallback((next: SortKey) => setView({ sort: next, page: '1' }), [setView])
+  const setPageSize = useCallback((next: number) => setView({ size: String(next), page: '1' }), [setView])
+  /* 打っている間の語は手元に持ち、止まってから URL へ（打つたびに URL を書かない）。 */
+  const [query, setQuery] = useState(view.q)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
@@ -405,7 +420,6 @@ function WebinarList() {
   const [archiveError, setArchiveError] = useState('')
   const [foldersReady, setFoldersReady] = useState(false)
   const [folders, setFolders] = useState<WebinarFolder[]>([])
-  const [selectedFolder, setSelectedFolder] = useState('')
   const [folderFormOpen, setFolderFormOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<WebinarFolder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<WebinarFolder | null>(null)
@@ -531,17 +545,20 @@ function WebinarList() {
 
   useEffect(() => { void refresh() }, [refresh])
   useEffect(() => { snapshotRef.current = { items, total, loadedAccountId } }, [items, total, loadedAccountId])
+  // URL 側の語が替わった（戻る・読み込み直後）ときは入力欄も合わせる。
+  useEffect(() => { setQuery((current) => (current.trim() === view.q ? current : view.q)) }, [view.q])
   useEffect(() => {
-    const timer = setTimeout(() => { setPage(1); setDebouncedQuery(query) }, SEARCH_DEBOUNCE_MS)
+    if (query.trim() === view.q) return
+    const timer = setTimeout(() => setView({ q: query.trim(), page: '1' }), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
   useEffect(() => { void refreshOverview() }, [refreshOverview])
   useEffect(() => { void refreshGrandTotal() }, [refreshGrandTotal])
-  useEffect(() => {
-    setSelectedFolder('')
-    void refreshFolders()
-  }, [refreshFolders])
-  useEffect(() => { setPage(1) }, [selectedFolder, savedFilter, sortKey, pageSize, selectedAccountId])
+  useEffect(() => { void refreshFolders() }, [refreshFolders])
+  // アカウントを替えたらフォルダは外してページは 1 へ（来た瞬間は URL のまま）。
+  useOnAccountSwitch(selectedAccountId, () => setView({ folder: '', page: '1' }))
+  useListScrollMemory(!loading && !accountLoading)
 
   const saveFolder = async (name: string) => {
     if (!selectedAccountId || !canEdit || folderBusy) return
@@ -611,7 +628,8 @@ function WebinarList() {
   const visibleTotal = loadedAccountId === selectedAccountId ? total : 0
   const pageCount = Math.max(1, Math.ceil(visibleTotal / pageSize))
   const currentPage = Math.min(page, pageCount)
-  useEffect(() => { if (page > pageCount) setPage(pageCount) }, [page, pageCount])
+  // 読み終わってから。読み込み中（件数 0）に詰めると、URL から戻したページが 1 になる。
+  useEffect(() => { if (hasListData && page > pageCount) setPage(pageCount) }, [hasListData, page, pageCount, setPage])
 
   /* 行 → 右の詳細パネル。開閉と↑↓の移動はつながる移り変わりで。 */
   const activeIndex = visibleItems.findIndex((w) => w.id === activeId)
@@ -664,10 +682,7 @@ function WebinarList() {
 
   const clearFilters = () => {
     setQuery('')
-    setDebouncedQuery('')
-    setSelectedFolder('')
-    setSavedFilter('')
-    setPage(1)
+    setView({ q: '', folder: '', status: '', page: '1' })
   }
 
   /* CSV は表示中の条件に合う全頁。条件が変わったら古い結果は捨てる。 */

@@ -277,3 +277,21 @@ export function useListScrollMemory(ready: boolean, anchorRef?: RefObject<HTMLEl
     }
   }, [anchorRef])
 }
+
+/**
+ * LINE アカウントを切り替えたときだけ動かす（絞り込みを外す・ページを1へ戻すなど）。
+ *
+ * `useEffect(() => setPage(1), [accountId, …])` のように書くと、来た瞬間（読み込み中の
+ * null → いまのアカウント）にも動いて、URL から戻した絞り込み・ページを消してしまう。
+ * 前に見ていたアカウントが在って、それと違うアカウントに替わったときだけ呼ぶ。
+ */
+export function useOnAccountSwitch(accountId: string | null | undefined, onSwitch: () => void): void {
+  const previousRef = useRef<string | null | undefined>(undefined)
+  const onSwitchRef = useRef(onSwitch)
+  onSwitchRef.current = onSwitch
+  useEffect(() => {
+    const previous = previousRef.current
+    previousRef.current = accountId
+    if (previous && accountId && previous !== accountId) onSwitchRef.current()
+  }, [accountId])
+}

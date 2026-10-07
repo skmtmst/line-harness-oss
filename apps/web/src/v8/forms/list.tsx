@@ -35,6 +35,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { runUndoable } from '@/lib/undoable'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -496,13 +497,16 @@ export default function FormsListV8() {
     })
   }, [formFilter, query, formSort, forms])
 
+  /* 取り消し待ちの削除（5秒）の行は一覧から外して描く（動きの点検 17 番）。 */
+  const deferredDelete = useDeferredDelete()
   const listTotal = reviewMode ? clientFilteredForms.length : formTotal
   const pageCount = Math.max(1, Math.ceil(listTotal / pageSize))
   const visiblePage = Math.min(page, pageCount)
   const pageStart = (visiblePage - 1) * pageSize
-  const visibleForms = reviewMode
+  const pageForms = reviewMode
     ? clientFilteredForms.slice(pageStart, pageStart + pageSize)
     : forms
+  const visibleForms = deferredDelete.hiddenCount === 0 ? pageForms : pageForms.filter((form) => !deferredDelete.isHidden(form.id))
   /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。無ければ未分類の輪。 */
   const folderDotOf = (folderId: string | null | undefined) => {
     const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
@@ -575,6 +579,53 @@ export default function FormsListV8() {
     } finally {
       setDeleteImpactLoading(false)
     }
+  }
+
+  /*
+   * 「削除」：影響を先に読み、消しても何も失われないフォーム（未公開・回答 0・利用先 0 で、
+   * 完全削除ができるもの）だけ、確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で
+   * 取り消せる（動きの点検 17 番）。そうでなければ今までどおり窓（アーカイブを勧める）。
+   */
+  const requestDelete = async (form: Form) => {
+    const accountId = selectedAccountId
+    if (!accountId) {
+      void openDelete(form)
+      return
+    }
+    let impact: FormDeleteImpact | null = null
+    try {
+      const result = await api.forms.deleteImpact(form.id, accountId)
+      if (result.success) impact = result.data
+    } catch {
+      impact = null
+    }
+    const harmless = impact !== null && impact.canDelete && impact.submissionCount === 0 && impact.referenceCount === 0 && !impact.form.isActive
+    if (!impact || !harmless) {
+      void openDelete(form)
+      return
+    }
+    const revision = impact.revision
+    closeDetail()
+    deferredDelete.schedule({
+      ids: [form.id],
+      message: `回答フォーム「${displayFormName(form.name)}」を削除しました`,
+      commit: async () => {
+        try {
+          const result = await api.forms.remove(form.id, accountId, revision)
+          if (!result.success) throw new Error('delete_failed')
+        } catch (reason) {
+          // 応答が失われても、もう消えていれば成功（窓の扱いと同じ）。
+          try {
+            await api.forms.get(form.id, accountId)
+          } catch (checkError) {
+            if (checkError instanceof ApiError && checkError.status === 404) return
+          }
+          throw reason
+        }
+      },
+      onCommitted: () => Promise.all([loadForms(), loadStats()]),
+      failureMessage: 'この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。',
+    })
   }
 
   const closeDelete = () => {
@@ -944,7 +995,7 @@ export default function FormsListV8() {
       : []),
     { id: 'move', label: 'フォルダへ移す', onSelect: () => openMove(form) },
     { id: 'archive', label: 'アーカイブ', dividerBefore: true, onSelect: () => void openDelete(form) },
-    { id: 'delete', label: '削除', tone: 'danger' as const, onSelect: () => void openDelete(form) },
+    { id: 'delete', label: '削除', tone: 'danger' as const, onSelect: () => void requestDelete(form) },
   ]
 
   /* ===== フォルダの列 ===== */

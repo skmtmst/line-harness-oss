@@ -51,9 +51,8 @@ async function enterCode(digits: string) {
   })
 }
 
+/* 6桁目が入った瞬間に送られる（動きの点検・6）。ボタンを押す前に返事を待つだけ。 */
 async function submit() {
-  const button = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('確認してログイン'))!
-  await act(async () => { button.click() })
   await settle()
 }
 
@@ -99,17 +98,17 @@ describe('R506 通信断の案内', () => {
     }
   })
 
-  it('誤コード400はサーバーの理由をそのまま出す', async () => {
+  it('誤コード400は「コードが違います」と人の言葉で出す', async () => {
     fixture.verify = { status: 400, body: { success: false, error: '認証コードが正しくありません' } }
     await render()
     await enterCode('654321')
     await submit()
 
-    expect(host.textContent).toContain('認証コードが正しくありません')
+    expect(host.textContent).toContain('コードが違います。もう一度入れてください')
     expect(host.textContent).not.toContain('接続を確かめて')
   })
 
-  it('回数制限429はサーバーの理由をそのまま出す', async () => {
+  it('回数制限429はサーバーの理由（やり直し先つき）をそのまま出す', async () => {
     fixture.verify = { status: 429, body: { success: false, error: '入力回数を超えました。ログインからやり直してください' } }
     await render()
     await enterCode('654321')

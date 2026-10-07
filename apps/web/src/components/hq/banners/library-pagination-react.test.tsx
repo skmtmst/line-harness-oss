@@ -111,7 +111,7 @@ describe('画像ライブラリの取得枚数と続きの読み込み', () => {
     await chooseSize(20)
     await screen.findByText('一覧を読み込めませんでした')
     list.mockResolvedValue(page(['retried']))
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }))
     await screen.findByText('1枚を表示中')
     expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 20, withCounts: true })
   })

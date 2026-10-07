@@ -11,6 +11,7 @@ import {
   useListUrlFlag,
   useListUrlParam,
   useListUrlState,
+  useOnAccountSwitch,
 } from './list-url-state'
 
 /*
@@ -163,5 +164,22 @@ describe('URL への書き込みは描いた後', () => {
     expect(spy).toHaveBeenCalledTimes(1)
     expect(window.location.search).toContain('stopped=1')
     spy.mockRestore()
+  })
+})
+
+describe('アカウントを替えたときだけ戻す', () => {
+  function SwitchProbe({ accountId, onSwitch }: { accountId: string | null; onSwitch: () => void }) {
+    useOnAccountSwitch(accountId, onSwitch)
+    return null
+  }
+
+  it('来た瞬間（未選択→いまのアカウント）は呼ばず、別のアカウントへ替えたときだけ呼ぶ', () => {
+    const onSwitch = vi.fn()
+    const view = render(<SwitchProbe accountId={null} onSwitch={onSwitch} />)
+    view.rerender(<SwitchProbe accountId="a" onSwitch={onSwitch} />)
+    view.rerender(<SwitchProbe accountId="a" onSwitch={onSwitch} />)
+    expect(onSwitch).not.toHaveBeenCalled()
+    view.rerender(<SwitchProbe accountId="b" onSwitch={onSwitch} />)
+    expect(onSwitch).toHaveBeenCalledTimes(1)
   })
 })

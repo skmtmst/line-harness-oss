@@ -10,6 +10,8 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -223,17 +225,33 @@ export default function TemplatesListV8() {
   const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
   const [failure, setFailure] = useState<TemplatesFailure | null>(null)
-  const [templateQuery, setTemplateQuery] = useState('')
-  const [chips, setChips] = useState<Record<ChipKey, boolean>>({
-    single: false,
-    multiple: false,
-    variables: false,
-    unused: false,
-  })
-  const [savedFilter, setSavedFilter] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  /*
+   * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
+   * テンプレートを開いて「戻る」と同じ一覧に戻る。
+   */
+  const [urlView, setUrlView] = useListUrlState({ q: '', folder: 'all', chips: '', view: '', size: '20', page: '1' })
+  const templateQuery = urlView.q
+  const setTemplateQuery = useCallback((next: string) => setUrlView({ q: next, page: '1' }), [setUrlView])
+  const chips = useMemo<Record<ChipKey, boolean>>(() => {
+    const on = new Set(urlView.chips ? urlView.chips.split(',') : [])
+    return { single: on.has('single'), multiple: on.has('multiple'), variables: on.has('variables'), unused: on.has('unused') }
+  }, [urlView.chips])
+  const setChips = useCallback((update: Record<ChipKey, boolean> | ((current: Record<ChipKey, boolean>) => Record<ChipKey, boolean>)) => {
+    const next = typeof update === 'function' ? update(chips) : update
+    setUrlView({ chips: (Object.keys(next) as ChipKey[]).filter((key) => next[key]).join(','), page: '1' })
+  }, [chips, setUrlView])
+  const savedFilter = urlView.view
+  const setSavedFilter = useCallback((update: string | ((current: string) => string)) => {
+    setUrlView({ view: typeof update === 'function' ? update(savedFilter) : update, page: '1' })
+  }, [savedFilter, setUrlView])
+  const selectedCategory = urlView.folder
+  const setSelectedCategory = useCallback((next: string) => setUrlView({ folder: next, page: '1' }), [setUrlView])
+  const pageSize = [10, 20, 50].includes(Number(urlView.size)) ? Number(urlView.size) : 20
+  const setPageSize = useCallback((next: number) => setUrlView({ size: String(next), page: '1' }), [setUrlView])
+  const page = Math.max(1, Number.parseInt(urlView.page, 10) || 1)
+  const setPage = useCallback((next: number) => setUrlView({ page: String(next) }), [setUrlView])
+  /* 取り消し待ちの削除（5秒）の行は一覧から外して描く（動きの点検 17 番）。 */
+  const deferredDelete = useDeferredDelete()
 
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
@@ -286,7 +304,6 @@ export default function TemplatesListV8() {
     // フォルダはアカウント単位。切り替えたら前のアカウントの帯も選択も残さない。
     setFolders([])
     setUnfiledCount(null)
-    setSelectedCategory('all')
     setFolderDialogOpen(false)
     setEditingFolder(null)
     setDeletingFolder(null)
@@ -299,8 +316,9 @@ export default function TemplatesListV8() {
     setDuplicateTarget(null)
     setOpenMenuId(null)
     setSelectedIds(new Set())
-    setPage(1)
   }, [selectedAccountId])
+  // アカウントを替えたらフォルダとページを戻す（来た瞬間は URL のまま）。
+  useOnAccountSwitch(selectedAccountId, () => setUrlView({ folder: 'all', page: '1' }))
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
@@ -414,6 +432,7 @@ export default function TemplatesListV8() {
   const normalizedTemplateQuery = useMemo(() => normalizeTemplateSearchText(templateQuery), [templateQuery])
 
   const filteredTemplates = useMemo(() => templateSearchIndex.flatMap(({ template: t, normalizedSearchText }) => {
+    if (deferredDelete.isHidden(t.id)) return []
     if (normalizedTemplateQuery && !normalizedSearchText.includes(normalizedTemplateQuery)) return []
     /* フォルダで絞る。`category` の文字列ではなく `folderId` で見る。 */
     if (selectedCategory === 'unfiled' && t.folderId !== null) return []
@@ -427,7 +446,7 @@ export default function TemplatesListV8() {
     if (savedFilter === 'draft-changes' && !(t.hasDraft && t.publishedAt != null)) return []
     if (savedFilter === 'draft-only' && t.publishedAt != null) return []
     return [t]
-  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, chips, savedFilter])
+  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, chips, savedFilter, deferredDelete])
 
   const filterActive = Boolean(
     normalizedTemplateQuery
@@ -439,11 +458,7 @@ export default function TemplatesListV8() {
       || savedFilter,
   )
   const clearFilters = () => {
-    setTemplateQuery('')
-    setSelectedCategory('all')
-    setChips({ single: false, multiple: false, variables: false, unused: false })
-    setSavedFilter('')
-    setPage(1)
+    setUrlView({ q: '', folder: 'all', chips: '', view: '', page: '1' })
   }
 
   const toggleChip = (key: ChipKey) => {
@@ -462,9 +477,11 @@ export default function TemplatesListV8() {
   const shownItems = filteredTemplates.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   // 絞り込みや件数の変更でページが溢れたら戻す。
+  // 読み終わってから。読み込み中（0件）に詰めると、URL から戻したページが 1 になる。
   useEffect(() => {
-    if (page > pageCount) setPage(pageCount)
-  }, [page, pageCount])
+    if (!loading && page > pageCount) setPage(pageCount)
+  }, [loading, page, pageCount, setPage])
+  useListScrollMemory(!loading)
 
   const view = listView({ loading, failure, total: tabItems.length, matched: filteredTemplates.length })
   const createBlocked = createBlockedReason({ loading, failure })
@@ -580,11 +597,32 @@ export default function TemplatesListV8() {
     }
   }
 
-  // 押しただけでは消さない。窓を開くだけ。使用中なら「使っている所」の窓へ。
+  /*
+   * 使用中なら「使っている所」の窓へ。どこでも使われていない（0か所と分かっている）なら、
+   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
+   * 使っている数が分からないときは、今までどおり確かめの窓。
+   */
   const handleDelete = (t: Template) => {
     setDeleteError('')
     if (t.usageCount > 0) {
       setBlockedDelete({ item: t, accountId: selectedAccountId })
+      return
+    }
+    if (t.usageCount === 0) {
+      if (activeId === t.id) setActiveId(null)
+      setSelectedIds((current) => {
+        if (!current.has(t.id)) return current
+        const next = new Set(current)
+        next.delete(t.id)
+        return next
+      })
+      deferredDelete.schedule({
+        ids: [t.id],
+        message: `テンプレート「${t.name}」を削除しました`,
+        commit: () => api.templates.delete(t.id),
+        onCommitted: () => Promise.all([load(), loadFolders()]),
+        failureMessage: 'テンプレートを削除できませんでした。もう一度お試しください。',
+      })
       return
     }
     setPendingDelete({ item: t, accountId: selectedAccountId })
