@@ -1,0 +1,107 @@
+/*
+ * ★V8 店舗ダッシュボード（CHz31）。値は globals.css の `--tpl-rt-*`。
+ * 表：見出し 上下9・左右20・地 table-head／行 上下10・左右20・上に細い線。欄の間16。
+ */
+.table {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.headRow,
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-col-gap);
+  padding: var(--tpl-rt-thead-pad);
+  min-width: 0;
+}
+
+.headRow {
+  background: var(--color-table-head);
+}
+
+.headRow .cell {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: normal;
+}
+
+.row {
+  padding: var(--tpl-rt-row-pad);
+  box-shadow: var(--tpl-rt-line-top);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-cell-gap);
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.colStore { flex: 1 1 0; }
+.colArea { flex: 0 0 var(--tpl-rt-col-100); }
+.colCount { flex: 0 0 var(--tpl-rt-col-64); }
+.colGuests { flex: 0 0 var(--tpl-rt-col-80); }
+.colCapacity { flex: 0 0 var(--tpl-rt-col-72); }
+.colState { flex: 0 0 var(--tpl-rt-col-90); align-items: flex-start; }
+
+.num {
+  align-items: flex-end;
+  padding-right: var(--tpl-rt-num-pad-end);
+  text-align: right;
+}
+
+.storeName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+.storeCode {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.actionBody {
+  display: flex;
+  gap: var(--tpl-rt-action-gap);
+}
+
+.actionButton {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.actionIcon {
+  width: var(--tpl-rt-icon-15);
+  height: var(--tpl-rt-icon-15);
+  flex-shrink: 0;
+}
+
+.noteBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-note-gap);
+}
+
+.noteTitle {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.noteText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+}

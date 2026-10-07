@@ -35,6 +35,8 @@ import { useAccount } from '@/contexts/account-context'
 import TemplatePicker from '@/components/chats/template-picker'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
+import ChatThreadWindow from '@/components/chats/chat-thread-window'
+import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
 import EmailThread from '@/components/support/email-thread'
@@ -659,17 +661,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false)
   const isComposingRef = useRef(false)
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
+  const listScrollRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   /*
    * INBOX-27: スクロール位置の決め方を分けるための記録。
    * - stickToBottomRef: いま下端にいるか。下端にいる間だけ新着へ追従する。
    * - prevMessageWindowRef: 前回描いた会話・最後尾・件数。追加か切替かを判別する。
-   * - pendingPrependRef: 「前のメッセージ」で上へ足す直前の高さと位置。
    * - unseenIncoming: 読んでいる途中に下へ届いた相手からの新着件数。
    */
   const stickToBottomRef = useRef(true)
   const prevMessageWindowRef = useRef<{ chatId: string; lastId: string | null; count: number } | null>(null)
-  const pendingPrependRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null)
   const [unseenIncoming, setUnseenIncoming] = useState(0)
   // U008: 狭い幅で切れた宛先名を、その場で全文に広げるための状態。
   const [headerNameExpanded, setHeaderNameExpanded] = useState(false)
@@ -684,6 +685,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // 「サーバから最後に受け取った行」を ref で保持して次ページの起点にする
   // (offset 方式だと新着で行が押し下げられた分が欠落する)。
   const nextCursorRef = useRef<ListCursor | null>(null)
+  /*
+   * 「さらに読み込む」で足したページがあるか。定期の取り直しは1ページ目だけを
+   * 取るので、足したあとにカーソルを1ページ目の末尾へ戻すと、次の「さらに
+   * 読み込む」が読み済みの2ページ目を取り直して何も増えない（2026-10-07 測って
+   * 見つけた。10,000 件の見本で、5秒ごとに押しても 400 件から先へ進まなかった）。
+   */
+  const extraPagesLoadedRef = useRef(false)
   // 会話を素早く切り替えたとき、前の会話の遅い応答で現在の詳細を
   // 上書きしない。注目操作が別の友だちへ向く事故もここで防ぐ。
   const detailRequestIdRef = useRef(0)
@@ -844,6 +852,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     const requestId = ++chatListRequestRef.current
     setChats([])
     nextCursorRef.current = null
+    extraPagesLoadedRef.current = false
     setHasMoreChats(false)
     setLoadingMore(false)
     setLoading(true)
@@ -900,6 +909,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         })
         const last = rows[rows.length - 1]
         nextCursorRef.current = toListCursor(last)
+        extraPagesLoadedRef.current = true
         setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
       }
     } catch {
@@ -1203,11 +1213,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         const rows = detail.messages ?? []
         /*
          * INBOX-27: 上へ足す追加なので、いま読んでいる位置を保持する。
-         * 追加前の高さを記録し、描画後の効果で「増えた分だけscrollTopを
-         * 足す」ことで同じメッセージが同じ画面位置に残る。
+         * 2026-10-07：位置は窓分け（ChatThreadWindow）が「いちばん上に見えている
+         * 吹き出し」を目印に守る。高さの差で足す方式は、まだ測っていない
+         * 吹き出しの見込みの高さが入るので使わない。
          */
-        const el = messagesScrollRef.current
-        if (el) pendingPrependRef.current = { scrollHeight: el.scrollHeight, scrollTop: el.scrollTop }
         setChatDetail((prev) => {
           if (!prev || prev.id !== requestedChatId) return prev
           const seen = new Set((prev.messages ?? []).map((m) => m.id))
@@ -1286,9 +1295,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         for (const chat of prev) if (!freshIds.has(chat.id)) merged.push(chat)
         return merged
       })
-      const last = rows[rows.length - 1]
-      nextCursorRef.current = toListCursor(last)
-      setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
+      // 足したページがある間は、続きの起点（カーソル）と「続きがあるか」を守る。
+      if (!extraPagesLoadedRef.current) {
+        const last = rows[rows.length - 1]
+        nextCursorRef.current = toListCursor(last)
+        setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
+      }
       setChatListFailed(false)
       return true
     } catch {
@@ -1568,14 +1580,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     const prev = prevMessageWindowRef.current
     prevMessageWindowRef.current = { chatId: chatDetail.id, lastId, count: list.length }
 
-    const prepend = pendingPrependRef.current
-    pendingPrependRef.current = null
-    if (prepend) {
-      const delta = el.scrollHeight - prepend.scrollHeight
-      if (delta > 0) el.scrollTop = prepend.scrollTop + delta
-      return
-    }
-
     const sameChat = prev?.chatId === chatDetail.id
     if (!sameChat) {
       el.scrollTop = el.scrollHeight
@@ -1590,21 +1594,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       if (incomingCount > 0) setUnseenIncoming((count) => count + incomingCount)
       return
     }
-    el.scrollTop = el.scrollHeight
+    // 上へ足しただけ（前のメッセージ）・取り直しで中身が同じ … 位置は窓分けが守る。
+    if (appended) el.scrollTop = el.scrollHeight
   }, [chatDetail?.messages, chatDetail?.id])
 
   // 画像などの遅れての読み込みで高さが伸びても、読み返し中の位置を崩さない。
+  // 2026-10-07：窓分け（ChatThreadWindow）が行の高さの変化を見張って直す。
   // 下端にいる時だけ下端へ寄せ直す。失敗→代替表示で高さが縮む場合も同じ。
-  useEffect(() => {
-    const el = messagesScrollRef.current
-    if (!el || typeof MutationObserver === 'undefined') return
-    const observer = new MutationObserver(() => {
-      if (pendingPrependRef.current) return
-      if (stickToBottomRef.current) el.scrollTop = el.scrollHeight
-    })
-    observer.observe(el, { childList: true, subtree: true, attributes: true })
-    return () => observer.disconnect()
-  }, [selectedChatId])
 
   // スクロール位置を追い続ける。下端にいる間だけ新着へ追従する(INBOX-27)。
   useEffect(() => {
@@ -1618,7 +1614,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     el.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
     return () => el.removeEventListener('scroll', onScroll)
-  }, [selectedChatId])
+    /*
+     * 会話を選んだ直後は読み込み中でスクロール欄がまだ無い。選んだ時だけ
+     * 付けると見張りが付かず「いつも下にいる」扱いになり、読み返している
+     * 途中でも新着で下へ飛んでいた（2026-10-07 測って見つけた）。欄が出来た
+     * 時（会話の中身が届いた時）にも付け直す。
+     */
+  }, [selectedChatId, chatDetail?.id])
 
   // Auto-resize textarea as messageContent grows (INBOX-20: 3行〜8行で伸ばす)
   useEffect(() => {
@@ -2678,8 +2680,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           </div>
 
           <p data-inbox-sort="fixed" className="border-b border-hairline px-3 pb-3 text-micro text-ink-secondary">並び順：未読が先・新しい順</p>
-          {/* Chat List */}
-          <div className="flex-1 overflow-y-auto">
+          {/* Chat List（2026-10-07 速さ：行は ChatListWindow で窓分けして描く） */}
+          <div ref={listScrollRef} data-inbox-list-scroller="" className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
             <>
                 {/*
                   メール一覧の失敗行。LINEだけ見ているときは出さない。
@@ -2749,7 +2751,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   .map((item) => ({
                     at: item.lastMessageAt ?? item.lastIncomingAt,
                     unread: item.isUnread,
-                    node: (
+                    key: `email:${item.id}`,
+                    // 描くのは見えている行だけ（窓分け）。中身はその時に作る。
+                    render: () => (
                     // 区切り線は外の箱が持つ。押し場所に border-hairline を書くと
                     // 直書きボタンの借金に数えられる (design-debt)。
                     <div key={item.id} className="border-b border-hairline">
@@ -2819,7 +2823,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           .filter(Boolean)
                           .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
-                  .map((chat) => {
+                  .map((chat) => ({
+                  at: chat.lastMessageAt ?? '',
+                  unread: chat.isUnread,
+                  key: chat.id,
+                  // 描くのは見えている行だけ（窓分け）。中身はその時に作る。
+                  render: () => {
                   const isSelected = selectedChatId === chat.id
                   const operatorName = operators.find((operator) => operator.id === chat.operatorId)?.name ?? null
                   // 「真の自発（要対応）」= chat.status='unread'。webhook 側で auto_reply に
@@ -2912,8 +2921,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     </button>
                     </div>
                   )
-                  return { at: chat.lastMessageAt ?? '', unread: chat.isUnread, node }
-                })
+                  return node
+                  },
+                }))
                   // 両方とも口側で「未読が先・新しい順」。未読の有無が違う
                   // 行同士は時刻に関わらず未読が先、同じ中では新しい順。
                   const precedes = (
@@ -2922,7 +2932,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   ): number =>
                     Number(b.unread) - Number(a.unread)
                     || String(b.at).localeCompare(String(a.at))
-                  const rows: { node: React.ReactNode }[] = []
+                  const rows: ChatListWindowItem[] = []
                   {
                     let i = 0
                     let j = 0
@@ -2952,7 +2962,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       </div>
                     )
                   }
-                  if (rows.length > 0) return rows.map((row) => row.node)
+                  if (rows.length > 0) {
+                    return <ChatListWindow items={rows} scrollerRef={listScrollRef} hasMore={hasMoreChats || hasMoreEmails} />
+                  }
                   // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
                   if (inboxListFailed) return null
                   return (
@@ -3173,7 +3185,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               {/* Messages — LINE-style chat bubbles */}
               <div className="relative flex min-h-0 flex-1 flex-col">
               {/* 板 `M0393`：会話の地は surface-pearl（LINE青の地は使わない）。 */}
-              <div ref={messagesScrollRef} className="flex-1 space-y-2 overflow-y-auto p-4" style={{ backgroundColor: 'var(--color-surface-pearl)' }}>
+              {/*
+                2026-10-07 速さ：吹き出しは下から積む窓分け（ChatThreadWindow）。
+                見ている位置は窓分けの側で守るので、ブラウザの自動の位置合わせは切る
+                （二重に直すと飛ぶ）。行の間 8px は行の中に持つので space-y は付けない。
+              */}
+              <div ref={messagesScrollRef} data-inbox-thread-scroller="" className="flex-1 overflow-y-auto p-4" style={{ backgroundColor: 'var(--color-surface-pearl)', overflowAnchor: 'none' }}>
                 {/*
                   古い履歴の続き。直近100件だけ読んでいる会話で出す。
                   押すと今見えている最古の1件より古い分を上に足す。
@@ -3195,8 +3212,17 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <p className="text-on-accent/60 text-sm">メッセージはまだありません。</p>
                   </div>
                 ) : (
-                  (chatDetail.messages ?? []).map((msg, idx) => {
-                    const prevMsg = idx > 0 ? (chatDetail.messages ?? [])[idx - 1] : null
+                  <ChatThreadWindow
+                    key={chatDetail.id}
+                    messages={chatDetail.messages ?? []}
+                    scrollerRef={messagesScrollRef}
+                    hasMore={messagesHasMore}
+                    loadingOlder={loadingOlderMessages}
+                    onLoadOlder={() => { void loadOlderMessages() }}
+                    label={`${chatDetail.friendName}さんとのメッセージ`}
+                    renderMessage={(msg, idx, list) => {
+                    const prevMsg = idx > 0 ? list[idx - 1] : null
+                    const isLast = idx === list.length - 1
                     const showDateSep = !prevMsg || !sameYmd(prevMsg.createdAt, msg.createdAt)
                     const isOutgoing = msg.direction === 'outgoing'
 
@@ -3223,29 +3249,30 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     if (msg.source === 'scenario') {
                       const startedAt = formatDateTime(msg.createdAt)
                       return (
-                        <div key={msg.id}>
+                        <>
                           {showDateSep && (
-                            <div className="my-3 flex justify-center">
+                            <div className="mb-3 flex justify-center" style={{ marginTop: idx === 0 ? 12 : 4 }}>
                               <span className="bg-ink/20 text-on-accent/85 rounded-pill px-2.5 py-0.5 text-micro">
                                 {formatYmdSlash(msg.createdAt)}
                               </span>
                             </div>
                           )}
-                          <div className="my-2 flex items-center justify-center gap-1.5">
+                          {/* 上下の 8px は窓分けの行が持つ（外の余白は測った高さに入らない）。 */}
+                          <div className="flex items-center justify-center gap-1.5" style={{ marginTop: !showDateSep && idx === 0 ? 8 : 0, marginBottom: isLast ? 8 : 0 }}>
                             <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-micro font-semibold text-action shadow-card">
                               <Link2 aria-hidden="true" size={13} />
                               シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始
                             </span>
                             <time className="text-micro text-ink-faint">{startedAt}</time>
                           </div>
-                        </div>
+                        </>
                       )
                     }
 
                     return (
-                      <div key={msg.id}>
+                      <>
                         {showDateSep && (
-                          <div className="flex justify-center my-3">
+                          <div className="flex justify-center mb-3" style={{ marginTop: idx === 0 ? 12 : 4 }}>
                             {/* 板 `M0393`：日付の区切りは白い札＋濃い文字。 */}
                             <span className="text-micro text-ink-secondary bg-canvas border border-hairline px-2.5 py-0.5 rounded-pill">
                               {formatYmdSlash(msg.createdAt)}
@@ -3344,9 +3371,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             </div>
                           )}
                         </div>
-                      </div>
+                      </>
                     )
-                  })
+                  }}
+                  />
                 )}
               </div>
               {/*
