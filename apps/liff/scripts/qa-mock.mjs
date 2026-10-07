@@ -85,6 +85,28 @@ const QA_EVENT_WAITLIST = {
   slot_ends_at: '2026-10-11T12:00:00+09:00',
 };
 
+/** 自分のキャンセル待ちの行 (GET /api/liff/events/me/waitlist・EventWaitlistMine の形)。qa-slot-2 の 2 番目。 */
+const QA_EVENT_WAITLIST_MINE = {
+  source: 'waitlist',
+  id: 'qa-event-waitlist-1',
+  event_id: 'qa-event-1',
+  slot_id: 'qa-slot-2',
+  status: 'waiting',
+  customer_note: null,
+  event_name: '秋のわんこ撮影会',
+  event_image_url: null,
+  venue_name: '然 渋谷店 2F',
+  venue_address: null,
+  venue_url: null,
+  cancel_deadline_hours_before: null,
+  slot_starts_at: '2026-10-11T11:00:00+09:00',
+  slot_ends_at: '2026-10-11T12:00:00+09:00',
+  party_size: 1,
+  created_at: '2026-10-02T09:00:00+09:00',
+  offer_expires_at: null,
+  queue_position: 2,
+};
+
 // 紹介のリンク・案件は ★V8 S3uBl の言葉に合わせる (秋の定期便キャンペーン・鹿肉ふりかけ)。
 const QA_LINK = {
   refCode: 'QA1234',
@@ -612,6 +634,15 @@ const server = createServer(async (req, res) => {
     json(res, 200, { items: [QA_EVENT_BOOKING, QA_EVENT_WAITLIST] });
     return;
   }
+  // 自分のキャンセル待ち (qVdiX の「順番 2 番目」「キャンセル待ちをやめる」)。
+  if (method === 'GET' && pathname === '/api/liff/events/me/waitlist') {
+    json(res, 200, { items: [QA_EVENT_WAITLIST_MINE] });
+    return;
+  }
+  if (method === 'POST' && /^\/api\/liff\/events\/me\/waitlist\/[^/]+\/cancel$/.test(pathname)) {
+    json(res, 200, { ok: true });
+    return;
+  }
   if (method === 'GET' && pathname.startsWith('/api/liff/events/me/')) {
     json(res, 200, QA_EVENT_BOOKING);
     return;
@@ -620,6 +651,21 @@ const server = createServer(async (req, res) => {
     const m = pathname.match(/^\/api\/liff\/events\/me\/([^/]+)\/cancel$/);
     if (method === 'POST' && m) {
       json(res, 200, { ok: true });
+      return;
+    }
+  }
+  // 空きが出た案内の中身 (BjcuB「10月11日（日）11:00〜 に 1 席」「あと 23時間 41分」)。
+  {
+    const m = pathname.match(/^\/api\/liff\/events\/waitlist\/([^/]+)$/);
+    if (method === 'GET' && m) {
+      json(res, 200, {
+        success: true,
+        data: {
+          waitlistId: 'qa-event-waitlist-1', eventId: 'qa-event-1', slotId: 'qa-slot-2', eventName: '秋のわんこ撮影会',
+          startsAt: '2026-10-11T11:00:00+09:00', endsAt: '2026-10-11T12:00:00+09:00', venueName: '然 渋谷店 2F',
+          partySize: 1, status: 'offered', expiresAt: '2026-10-03T08:41:30+09:00', remainingSeconds: 23 * 3600 + 41 * 60 + 30, canAccept: true,
+        },
+      });
       return;
     }
   }

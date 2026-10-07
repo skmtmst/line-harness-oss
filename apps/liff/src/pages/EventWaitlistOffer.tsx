@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import liff from '@line/liff';
-import { api } from '../lib/api.js';
+import { api, type EventWaitlistOfferDetail } from '../lib/api.js';
+import { formatHoldLeft, formatJstEventAt } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import Button from '../components/ui/Button.js';
 import BottomBar from '../components/ui/BottomBar.js';
@@ -23,6 +24,21 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
   const navigate = useNavigate();
   // ?liffId=... を引き継ぐ (再読み込みで失わない)。
   const { search } = useLocation();
+
+  // 案内の中身 (枠の日時・席の数・取っておく残り時間)。読めなければ本文だけ出す。
+  const [offer, setOffer] = useState<EventWaitlistOfferDetail | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api
+      .eventWaitlistOffer(token)
+      .then((res) => {
+        if (alive) setOffer(res.data);
+      })
+      .catch((e) => logFailure('event-waitlist-offer-detail', e));
+    return () => {
+      alive = false;
+    };
+  }, [token]);
 
   const accept = async () => {
     if (state === 'submitting' || state === 'confirmed') return;
@@ -105,17 +121,20 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
           </div>
         ) : (
           <>
-            {/* ★V8 (BjcuB)：上の帯と下の帯の間の真ん中に、丸・題・本文を置く。
-                絵の「10月11日（日）11:00〜 に 1 席」「あと 23時間 41分」は、案内の中身を
-                読む口が API に無いため出さない (API が入ったら足す)。 */}
+            {/* ★V8 (BjcuB)：上の帯と下の帯の間の真ん中に、丸・題・本文・取っておく残り時間を置く。
+                案内の中身 (GET /api/liff/events/waitlist/:token) が読めないときは本文だけ。 */}
             <div className="flex min-h-[calc(100dvh-var(--liff-header-h)-1px-142px)] flex-col items-center justify-center px-6 py-4">
               <StatusView
                 large
                 icon="party-popper"
                 tone="success"
                 title="空きが出ました"
-                body="下のボタンを押すまで、予約にはなりません。"
-              />
+                body={`${offer ? `${formatJstEventAt(offer.startsAt)}〜 に ${offer.partySize} 席あります。` : ''}下のボタンを押すまで、予約にはなりません。`}
+              >
+                {offer && offer.remainingSeconds > 0 && (
+                  <p className="text-[13px] font-bold whitespace-nowrap text-liff-wait-ink">{`あと ${formatHoldLeft(offer.remainingSeconds)} 取っておきます`}</p>
+                )}
+              </StatusView>
             </div>
             <BottomBar>
               <Button variant="primary" onClick={accept} disabled={state === 'submitting'}>
