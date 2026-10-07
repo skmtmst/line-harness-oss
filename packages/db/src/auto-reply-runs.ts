@@ -58,6 +58,7 @@ export interface AutoReplyDraftSettings {
   respondToAll: boolean;
   name: string | null;
   keywordMatchMode: string;
+  normalizeKeywords?: boolean;
   folderId: string | null;
   /** 運用者だけが読むメモ。友だちへ送る本文には使わない。 */
   internalMemo?: string | null;
@@ -121,6 +122,7 @@ export function autoReplyDraftSettingsFromRow(rule: AutoReply): AutoReplyDraftSe
     respondToAll: rule.respond_to_all === 1,
     name: rule.name,
     keywordMatchMode: rule.keyword_match_mode,
+    normalizeKeywords: true,
     folderId: rule.folder_id,
     internalMemo: null,
     replyDelaySeconds: null,
@@ -139,6 +141,8 @@ export function autoReplyDefinitionSnapshot(rule: AutoReply): string {
 function autoReplyRuntimeSnapshot(settings: AutoReplyDraftSettings): string {
   return JSON.stringify({
     ...settings,
+    normalizeKeywords: true,
+    receiveSources: ['line'],
     internalMemo: null,
     replyDelaySeconds: null,
     unmatchedAction: null,
@@ -172,6 +176,7 @@ export function parseAutoReplyVersionSettings(row: AutoReplyVersionRow): AutoRep
     respondToAll: parsed.respondToAll === true,
     name: parsed.name ?? null,
     keywordMatchMode: parsed.keywordMatchMode === 'all' ? 'all' : 'any',
+    normalizeKeywords: parsed.normalizeKeywords !== false,
     folderId: parsed.folderId ?? null,
     internalMemo: parsed.internalMemo ?? null,
     replyDelaySeconds: Number.isInteger(parsed.replyDelaySeconds)
@@ -212,6 +217,10 @@ export function autoReplyRowFromDraftSettings(
     respond_to_all: settings.respondToAll ? 1 : 0,
     name: settings.name,
     keyword_match_mode: settings.keywordMatchMode,
+    normalize_keywords: settings.normalizeKeywords !== false,
+    receive_sources: settings.receiveSources,
+    reply_delay_seconds: settings.replyDelaySeconds ?? null,
+    unmatched_action: settings.unmatchedAction ?? null,
     /* 下書き設定から作った仮の行。停止・削除の記録はまだ無い。 */
     lifecycle_status: 'draft',
     stopped_at: null,
@@ -310,13 +319,15 @@ export async function getAutoReplyInternalMemos(
 export async function planAutoReplyInternalMemoStatements(
   db: D1Database,
   rule: AutoReply,
-  internalMemo: string | null,
+  internalMemo: string | null | undefined,
+  normalizeKeywords?: boolean,
 ): Promise<{ statements: D1PreparedStatement[]; draftUpdated: boolean; versionId: string | null }> {
   const now = jstNow();
   const draft = await getAutoReplyDraftVersion(db, rule.id);
   if (draft) {
     const snapshot = JSON.parse(draft.definition_snapshot) as Record<string, unknown>;
-    snapshot.internalMemo = internalMemo;
+    if (internalMemo !== undefined) snapshot.internalMemo = internalMemo;
+    if (normalizeKeywords !== undefined) snapshot.normalizeKeywords = normalizeKeywords;
     return {
       statements: [
         db.prepare(
@@ -337,7 +348,8 @@ export async function planAutoReplyInternalMemoStatements(
   const snapshot = JSON.stringify({
     ...autoReplyDraftSettingsFromRow(rule),
     receiveSources: previous?.receiveSources ?? ['line'],
-    internalMemo,
+    normalizeKeywords: normalizeKeywords ?? (previous?.normalizeKeywords !== false),
+    internalMemo: internalMemo === undefined ? previous?.internalMemo ?? null : internalMemo,
     replyDelaySeconds: previous?.replyDelaySeconds ?? null,
     unmatchedAction: previous?.unmatchedAction ?? null,
   });
@@ -494,6 +506,7 @@ export function autoReplyRuleCreateFingerprint(input: CreateAutoReplyInput): str
     friendConditions: input.friendConditions ?? null,
     respondToAll: input.respondToAll === true,
     name: input.name ?? null,
+    normalizeKeywords: input.normalizeKeywords !== false,
     keywordMatchMode: input.keywordMatchMode ?? 'any',
     folderId: input.folderId ?? null,
     internalMemo: input.internalMemo ?? null,
@@ -952,6 +965,8 @@ export async function ensureAutoReplyPublishedVersion(
       const carried = JSON.parse(previous.definition_snapshot) as Partial<AutoReplyDraftSettings>;
       snapshotToSave = JSON.stringify({
         ...(JSON.parse(snapshot) as Record<string, unknown>),
+        normalizeKeywords: carried.normalizeKeywords !== false,
+        receiveSources: carried.receiveSources ?? ['line'],
         internalMemo: carried.internalMemo ?? null,
         replyDelaySeconds: carried.replyDelaySeconds ?? null,
         unmatchedAction: carried.unmatchedAction ?? null,

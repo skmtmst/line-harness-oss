@@ -253,6 +253,7 @@ interface AutoReplyDraftInput {
   respondToAll: boolean;
   name: string | null;
   keywordMatchMode: 'any' | 'all';
+  normalizeKeywords?: boolean;
   folderId: string | null;
   internalMemo: string | null;
   replyDelaySeconds: number | null;
@@ -332,6 +333,7 @@ function readExtras(body: Record<string, unknown>):
       respondToAll?: boolean;
       name?: string | null;
       keywordMatchMode?: 'any' | 'all';
+      normalizeKeywords?: boolean;
       folderId?: string | null;
       internalMemo?: string | null;
       replyDelaySeconds?: number | null;
@@ -387,6 +389,10 @@ function readExtras(body: Record<string, unknown>):
     } else {
       value.folderId = body.folderId;
     }
+  }
+  if ('normalizeKeywords' in body) {
+    if (typeof body.normalizeKeywords !== 'boolean') return {ok:false,error:'キーワードをそろえる設定はtrueまたはfalseで指定してください'};
+    value.normalizeKeywords = body.normalizeKeywords;
   }
   if ('keywordMatchMode' in body) {
     if (body.keywordMatchMode !== 'any' && body.keywordMatchMode !== 'all') {
@@ -553,6 +559,7 @@ function draftInputFromSettings(settings: AutoReplyDraftSettings): AutoReplyDraf
     keywords: readJson<AutoReplyDraftInput['keywords']>(settings.keywords),
     respondToAll: settings.respondToAll,
     name: settings.name,
+    normalizeKeywords: settings.normalizeKeywords !== false,
     keywordMatchMode: settings.keywordMatchMode === 'all' ? 'all' : 'any',
     folderId: settings.folderId,
     internalMemo: settings.internalMemo ?? null,
@@ -701,6 +708,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
       keywords: jsonText(extras.value.keywords),
       respondToAll,
       name: extras.value.name ?? null,
+      normalizeKeywords: extras.value.normalizeKeywords !== false,
       keywordMatchMode: extras.value.keywordMatchMode ?? 'any',
       folderId: extras.value.folderId ?? null,
       internalMemo: extras.value.internalMemo ?? null,
@@ -1673,6 +1681,7 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       respondToAll?: boolean;
       name?: string | null;
       keywordMatchMode?: 'any' | 'all';
+      normalizeKeywords?: boolean;
       folderId?: string | null;
     }>();
 

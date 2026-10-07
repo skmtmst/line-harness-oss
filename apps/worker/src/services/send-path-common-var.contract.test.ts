@@ -52,6 +52,7 @@ const SEND_PATHS: Array<{ file: string; mustCall: string; label: string }> = [
  * 漏れうる）。この一覧は新規のLINE送信経路を足したとき必ず見直す。
  */
 const NON_TEMPLATE_PATHS: Array<{ file: string; label: string }> = [
+  {file:'services/auto-reply-delivery.ts',label:'遅延返信（auto-reply.tsで厳格に差し込み済みのJSONを固定して送る）'},
   { file: 'services/affiliate-notifier.ts', label: 'アフィリエイト通知（固定文）' },
   { file: 'services/analytics-reports.ts', label: '集計レポート通知（固定文）' },
   { file: 'services/booking-notifier.ts', label: '予約通知（固定文）' },

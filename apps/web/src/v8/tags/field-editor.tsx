@@ -37,6 +37,7 @@ export const FIELD_TYPE_WORDS: Record<FriendFieldType, string> = {
   date: '日付',
   number: '数',
   datetime: '日時',
+  time: '時刻',
   checkbox: 'はい／いいえ',
   url: 'リンク',
   tel: '電話番号',

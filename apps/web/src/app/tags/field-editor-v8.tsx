@@ -36,6 +36,7 @@ const V8_TYPE_LABELS: Record<FriendFieldType, string> = {
   date: '日付',
   number: '数',
   datetime: '日時',
+  time: '時刻',
   checkbox: 'はい／いいえ',
   url: 'リンク',
   tel: '電話番号',
@@ -50,6 +51,7 @@ const V8_TYPE_HINTS: Partial<Record<FriendFieldType, string>> = {
   multi_select: '興味のあることなど',
   date: '生年月日など',
   number: '回数・金額など',
+  time: '来店時刻など（HH:MM）',
 }
 const TYPE_COUNT = PRIMARY_TYPES.length + SECONDARY_TYPES.length
 const NEEDS_OPTIONS = new Set<FriendFieldType>(['select', 'multi_select'])

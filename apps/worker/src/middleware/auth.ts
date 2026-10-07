@@ -219,7 +219,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
   ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/support-mark-rules', '/tags'],
   ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
-  ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/reminders', '/reminders'],
+  ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/broadcast-message-assets/upload-sessions', '/broadcasts'], ['/api/reminders', '/reminders'],
   ['/api/friend-reminders', '/reminders'], ['/api/reminder-runs', '/reminders'],
   ['/api/auto-replies', '/auto-replies'], ['/api/auto-reply-runs', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
   ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/rich-menus', '/rich-menus'],
@@ -243,6 +243,8 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/getting-started', '/getting-started'],
   ['/api/conversions', '/conversions'], ['/api/measurement-sites', '/conversions'], ['/api/scoring', '/scoring'], ['/api/scoring-rules', '/scoring'],
   ['/api/ad-platforms/mappings', '/inflow-links'], ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
+  ['/api/hq/broadcasts', '/hq/broadcasts'],
+  ['/api/visit-stamps', '/visit-stamps'],
   ['/api/mileage', '/mileage'], ['/api/action-scores', '/mileage'],
   ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
   ['/api/automation-templates', '/automations'], ['/api/automation-drafts', '/automations'],
@@ -266,6 +268,11 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/audit', 'access.audit.view'],
   // 在庫ルールと媒体受付の操作は、予約枠・在庫画面に帰属する。
   // 設定変更は route 側でも owner/admin に絞る。
+  ['/api/restaurant-test/media-links', '/restaurant-test/channels'],
+  ['/api/restaurant-test/reservation-link', '/restaurant-test/channels'],
+  ['/api/restaurant-test/media', '/restaurant-test/channels'],
+  ['/api/restaurant-test/closures', '/restaurant-test/inventory'],
+  ['/api/restaurant-test/availability', '/restaurant-test/inventory'],
   ['/api/restaurant-test/inventory-rules', '/restaurant-test/inventory'],
   ['/api/restaurant-test/channel-close-tasks', '/restaurant-test/inventory'],
 ];
@@ -419,7 +426,10 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/opening-hours'],
   ['GET', '/api/restaurant-test/menus'],
   ['GET', '/api/restaurant-test/channels'],
+  ['GET', '/api/restaurant-test/media'],
+  ['GET', '/api/restaurant-test/media-links'],
   ['POST', '/api/restaurant-test/reservations/manual'],
+  ['POST', '/api/restaurant-test/reservations/walk-in'],
   // 席の空き待ち（booking-plus 席版）：担当者も日の帯から印を付ける。
   ['GET', '/api/restaurant-test/seat-waitlist'],
   ['POST', '/api/restaurant-test/seat-waitlist'],
@@ -429,6 +439,11 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/customers/history'],
   ['GET', '/api/restaurant-test/inventory/day'],
   // 既存の在庫閲覧と同じく担当者も確認できる。ルールの保存は管理者以上。
+  ['GET', '/api/restaurant-test/closures'],
+  ['POST', '/api/restaurant-test/closures'],
+  ['POST', '/api/restaurant-test/closures/preview'],
+  ['GET', '/api/restaurant-test/availability'],
+  ['POST', '/api/restaurant-test/google/hours/from-closure'],
   ['GET', '/api/restaurant-test/inventory-rules'],
   ['GET', '/api/restaurant-test/channel-close-tasks'],
   // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
@@ -464,6 +479,8 @@ const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = 
   ['POST', /^\/api\/restaurant-test\/seat-waitlist\/[^/]+\/convert$/],
   ['POST', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
   ['DELETE', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
+  ['PATCH', /^\/api\/restaurant-test\/closures\/[^/]+$/],
+  ['DELETE', /^\/api\/restaurant-test\/closures\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/channel-close-tasks\/[^/]+\/done$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],

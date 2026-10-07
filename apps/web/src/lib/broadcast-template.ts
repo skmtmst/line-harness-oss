@@ -42,7 +42,7 @@ export function messageTemplateToBubble(template: BroadcastTemplateOption): Broa
     }
   }
 
-  if (template.messageType === 'image') {
+  if (template.messageType === 'image' || template.messageType === 'video') {
     try {
       const image = JSON.parse(template.messageContent) as {
         originalContentUrl?: string
@@ -51,7 +51,7 @@ export function messageTemplateToBubble(template: BroadcastTemplateOption): Broa
       if (!image.originalContentUrl) return null
       return {
         id: bubbleId(),
-        type: 'image',
+        type: template.messageType,
         content: {
           originalContentUrl: image.originalContentUrl,
           previewImageUrl: image.previewImageUrl ?? image.originalContentUrl,
@@ -62,6 +62,14 @@ export function messageTemplateToBubble(template: BroadcastTemplateOption): Broa
     } catch {
       return null
     }
+  }
+
+
+  if (template.messageType === 'imagemap') {
+    try {
+      const p = JSON.parse(template.messageContent) as {baseUrl:string;baseSize:{width:number;height:number};altText?:string;actions:Array<{type:string;area:Record<string,number>;linkUri?:string;text?:string}>}
+      return {id:bubbleId(),type:'rich_message',content:{assetId:template.id,assetName:template.name,imageUrl:`${p.baseUrl}/1040`,baseUrl:p.baseUrl,baseSize:p.baseSize,description:p.altText,coordinateUnit:'px',tapAreas:p.actions.map(a=>({...a.area,actionType:a.type,uri:a.linkUri,text:a.text}))}}
+    } catch { return null }
   }
 
   if (template.messageType === 'flex') {
@@ -165,6 +173,7 @@ export type BroadcastMessageKind =
   | 'audio'
   | 'sticker'
   | 'carousel'
+  | 'imagemap'
 
 /** 位置情報・音声・スタンプ。シナリオと同じ入力欄・同じ並べ方を使う。 */
 const KIND_FIELD_TYPES = new Set<BroadcastBubbleType>(['location', 'audio', 'sticker'])
@@ -191,16 +200,7 @@ export function isContentTemplateType(type: BroadcastBubbleType): boolean {
   return ['rich_message', 'card_message', 'coupon', 'research'].includes(type)
 }
 
-/**
- * 保存に渡す吹き出し。1つだけなら渡さない。
- *
- * `message_bubbles_json` が入っている配信は、送信が「複数吹き出しの実配信は
- * 次フェーズです」で断る。画面は1つしか書いていなくても常に配列を渡して
- * いたので、**作れるのに送れない**配信ができていた。1つのときは前からある
- * messageType / messageContent だけで足りる。
- *
- * 2通目以降が本当に送れるようになったら、この関数ごと消してよい。
- */
+/** 1通でも編集用の種類・素材参照・中身を保存する。 */
 export function bubblesForSave(bubbles: BroadcastBubble[]): BroadcastBubble[] | undefined {
-  return bubbles.length > 1 ? bubbles : undefined
+  return bubbles.length ? bubbles : undefined
 }
