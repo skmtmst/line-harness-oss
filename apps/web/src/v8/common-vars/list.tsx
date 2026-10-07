@@ -32,6 +32,7 @@ import {
   MoreHorizontal,
   Pause,
   Plus,
+  Search as SearchIcon,
   TriangleAlert,
   X,
 } from 'lucide-react'
@@ -52,7 +53,6 @@ import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -70,8 +70,8 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
 import HelpTip from '@/components/shared/help-tip'
-import { FolderDotName } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars'
 import { formatDay, formatNumber } from '@/lib/format'
@@ -947,12 +947,12 @@ function CommonVarsListInner() {
     </div>
   ) : null
 
-  /* 行の名前の前の色の丸（2026-10-07 オーナー：表にフォルダ列を置かない）。 */
-  const folderDotOf = (folderId: string | null | undefined) => {
-    const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。未分類は色の無い輪。 */
+  const folderDotOf = (row: { folderId: string | null }): FolderDotFolder | null => {
+    if (!row.folderId) return null
+    const folder = folders.find((f) => f.id === row.folderId)
     return folder ? { name: folder.name, color: folder.color } : null
   }
-
   /* 並びは絵どおり：すべて → 作ったフォルダ → 未分類（最後）。 */
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: listFailed ? null : items.length },
@@ -1222,17 +1222,23 @@ function CommonVarsListInner() {
       </div>
     )
   ) : filtered.length === 0 ? (
-    /* 修正案 D-2：空の一覧。 */
-    <EmptyList
-      icon={<Braces aria-hidden="true" />}
-      title="まだ共通情報がありません"
-      description="会社名や営業時間を1か所で持ち、メッセージに差し込みます。"
-      create={{ label: '最初の共通情報を作る', href: '/contents/vars/new' }}
-      canCreate={canWrite}
-      filtered={items.length > 0}
-      onClearFilters={clearVarFilters}
-      filteredDescription="「空のまま」「期限つき」「使われていない」「下書き・止めた」や検索を外すと、すべて出ます"
-    />
+    items.length === 0 ? (
+      <div className={styles.stateCard}>
+        <span className={styles.stateIcon}><Braces size={18} aria-hidden="true" /></span>
+        <p className={styles.stateTitle}>まだ共通情報はありません</p>
+        <p className={styles.stateDesc}>会社名や営業時間を1か所で持つと、変えるときに1回直すだけで済みます。</p>
+        {canWrite ? createButton(false) : null}
+      </div>
+    ) : (
+      <div className={styles.stateCard}>
+        <span className={styles.stateIcon}><SearchIcon size={18} aria-hidden="true" /></span>
+        <p className={styles.stateTitle}>条件に合う共通情報はありません</p>
+        <p className={styles.stateDesc}>「空のまま」「期限つき」「使われていない」「下書き・止めた」や検索を外すと、すべて出ます</p>
+        <Button type="button" variant="secondary" onClick={clearVarFilters}>
+          <X size={13} aria-hidden="true" />条件を外す
+        </Button>
+      </div>
+    )
   ) : (
     <>
       <ContextMenu
@@ -1284,16 +1290,6 @@ function CommonVarsListInner() {
                 const valueText = formatVarValue(item.type, item.value)
                 const pending = item.nextSchedule ?? null
                 const updateTitle = `最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`
-                const nameLink = (
-                  <Link
-                    href={`/contents/vars/edit?id=${item.id}`}
-                    title={item.name}
-                    className={styles.nameLink}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {item.name}
-                  </Link>
-                )
                 return (
                   <Tr
                     interactive
@@ -1323,13 +1319,21 @@ function CommonVarsListInner() {
                     </Td>
                     <NameCell
                       name={
-                        <span className={styles.nameLine}>
-                          {/* 色の丸は左にフォルダの列が出ているときだけ（1152 で列を畳むと、絵 XIzkJ どおり丸なし）。 */}
-                          {narrow ? nameLink : <FolderDotName folder={folderDotOf(item.folderId)}>{nameLink}</FolderDotName>}
-                        </span>
+                        <div className={styles.dotLine}>
+                          <FolderDotName folder={folderDotOf(item)} dot={!narrow}>
+                            <Link
+                              href={`/contents/vars/edit?id=${item.id}`}
+                              title={item.name}
+                              className={styles.nameLink}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              {item.name}
+                            </Link>
+                          </FolderDotName>
+                        </div>
                       }
                       sub={
-                        <span className={styles.keyRow} data-dot-indent={narrow ? undefined : ''}>
+                        <span className={narrow ? styles.keyRow : `${styles.keyRow} ${styles.dotIndent}`}>
                           <code title={placeholderText(item.varKey)} className={styles.keyCode}>
                             {placeholderText(item.varKey)}
                           </code>

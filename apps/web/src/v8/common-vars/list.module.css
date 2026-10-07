@@ -250,14 +250,6 @@
   padding-block: var(--tpl-cv-row-pad-block);
 }
 
-/* 名前の行（色の丸＋名前）は名前の行の高さに収める（丸で行が伸びないように）。 */
-.nameLine {
-  display: flex;
-  height: var(--tpl-cv-name-lh);
-  align-items: center;
-  min-width: 0;
-}
-
 .nameLink {
   display: block;
   max-width: 100%;
@@ -292,10 +284,6 @@
   align-items: center;
   gap: var(--tpl-cv-key-gap);
   min-width: 0;
-}
-
-.keyRow[data-dot-indent] {
-  padding-inline-start: var(--tpl-folder-dot-indent);
 }
 
 .keyCode {
