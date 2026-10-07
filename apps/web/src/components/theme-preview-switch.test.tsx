@@ -29,6 +29,17 @@ beforeEach(() => {
 })
 
 describe('画面の見た目（試作）の切り替え', () => {
+  it('既定が V8 の環境（検証）は切り替えを出さない（2026-10-07 オーナー「検証環境は V8 に切り替えて」）', () => {
+    vi.stubEnv('NEXT_PUBLIC_ADMIN_THEME', 'v8')
+    try {
+      document.documentElement.dataset.theme = 'v8'
+      render(<ThemePreviewSwitch />)
+      expect(screen.queryByRole('switch', { name: '新しい見た目（V8・試作）を使う' })).toBeNull()
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('今のテーマを読んでスイッチに反映する', () => {
     document.documentElement.dataset.theme = 'v8'
     render(<ThemePreviewSwitch />)
