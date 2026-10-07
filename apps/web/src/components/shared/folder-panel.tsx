@@ -50,6 +50,8 @@ export interface FolderPanelRow {
    * 直したいときに作り直すしかなかった。
    */
   onEdit?: () => void
+  /** 色を持たないフォルダ（統括のひな形の分類など）は false。「色を変える」を出さない。 */
+  colorEditable?: boolean
   /**
    * 並び順を動かす。**端の行には渡さない**（押せない口を置かない）。
    * 設計 `CzndJ` の「並び順を上へ／下へ」。
@@ -92,8 +94,10 @@ function folderMenuItems(
   if (row.onEdit) {
     items.push(
       { id: `${row.id}-rename`, label: label.rename, icon: icon(<Pencil size={14} aria-hidden="true" />), onSelect: () => runAction(row.onEdit) },
-      { id: `${row.id}-color`, label: label.color, icon: icon(<Palette size={14} aria-hidden="true" />), onSelect: () => runAction(row.onEdit) },
     )
+    if (row.colorEditable !== false) {
+      items.push({ id: `${row.id}-color`, label: label.color, icon: icon(<Palette size={14} aria-hidden="true" />), onSelect: () => runAction(row.onEdit) })
+    }
   }
   if (row.onMoveUp) {
     items.push({ id: `${row.id}-up`, label: label.up, icon: icon(<ArrowUp size={14} aria-hidden="true" />), onSelect: () => runAction(row.onMoveUp) })

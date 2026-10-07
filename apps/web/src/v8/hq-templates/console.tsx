@@ -14,14 +14,10 @@
  * が今の編集部品を `DefinitionEditor` として渡す（src/v8 から @/app を読まないため）。
  */
 import { useEffect, useRef, useState, type ComponentType } from 'react'
-import { ArrowLeft, Check, Copy, Inbox, Pencil, Plus, RotateCw, Search, Send, Trash2 } from 'lucide-react'
-import type { HqTemplateFolder } from '@line-crm/shared'
+import { ArrowLeft, Check, Plus, RotateCw, Search, Send } from 'lucide-react'
+import type { HqTemplateFolder, TemplateKind } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage } from '@/components/templates'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import FolderPanel from '@/components/shared/folder-panel'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -33,7 +29,6 @@ import { Th } from '@/components/shared/table'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { freshDefinition } from '@/lib/hq-template-authoring'
-import { distributedAccountsLine, templateSubLine } from './list-row'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
 import {
   hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type MessageTemplateDefinition,
@@ -43,41 +38,17 @@ import {
   choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems,
   uploadedKeysIn, type TemplateMedia,
 } from './definition'
-import { FolderDot } from '@/components/shared/folder-dot'
 import MessageForm from './message-form'
+import HqStoreList from './store-list'
 import styles from './console.module.css'
 
-const LABELS: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
 const PAGE_TITLES: Record<TemplateType, string> = { tag: '友だち属性', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
-const CREATE_LABELS: Record<TemplateType, string> = { tag: 'タグを作る', template: 'テンプレートを作る', rich_menu: 'メニューを作る', form: 'フォームを作る', scenario: 'シナリオを作る' }
 const EDIT_TITLES: Record<TemplateType, string> = { tag: 'タグのひな形', template: 'メッセージのひな形', rich_menu: 'リッチメニューのひな形', form: '回答フォームのひな形', scenario: 'シナリオのひな形' }
-const LIST_DESCRIPTIONS: Record<TemplateType, string> = {
-  tag: 'タグのひな形を作り、各 LINE アカウントへ配ります。',
-  template: 'メッセージのひな形を作り、各 LINE アカウントへ配ります。友だち属性・リッチメニュー・回答フォームも同じ形です。',
-  rich_menu: 'リッチメニューのひな形を作り、各 LINE アカウントへ配ります。',
-  scenario: 'シナリオのひな形を作り、停止中の下書きとして各 LINE アカウントへ配ります。',
-  form: '回答フォームのひな形を作り、各 LINE アカウントへ配ります。',
-}
-/** 左の列の「種類」。絵の順（テンプレート・リッチメニュー・回答フォーム・タグ）＋シナリオ。 */
-const TYPE_ORDER: TemplateType[] = ['template', 'rich_menu', 'form', 'tag', 'scenario']
-const TYPE_COLORS: Record<TemplateType, string | null> = { template: null, rich_menu: 'var(--color-icon-tile-blue)', form: 'var(--color-icon-tile-green)', tag: 'var(--color-icon-tile-orange)', scenario: 'var(--color-icon-tile-purple)' }
-/** 種類ごとの正規の住所（左メニューと同じ）。シナリオは専用の住所が無いので旧URLのまま。 */
-const TYPE_ROUTES: Record<TemplateType, string> = { template: '/hq/templates', tag: '/hq/friend-attributes', rich_menu: '/hq/rich-menus', form: '/hq/form-submissions', scenario: '/hq/templates?type=scenario' }
-/** 1280 などで畳んだ「種類：リッチメニュー」が切れない幅（共通の 150 では「種類：回答フォ…」になる）。 */
-const TYPE_PICK_WIDTH = 176
 const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る' }
 
 type Stage = 'list' | 'edit' | 'accounts' | 'duplicates' | 'result'
 const errorText = (error: unknown) => error instanceof Error ? error.message : '処理できませんでした。時間をおいて再確認してください。'
 
-/** 一覧の更新日時（絵：9/30 10:12）。読めない値は「—」。 */
-function shortDate(value: string): string {
-  const time = Date.parse(value)
-  if (!Number.isFinite(time)) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(time))
-  const get = (kind: string) => parts.find((part) => part.type === kind)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
-}
 
 /** 種類ごとの中身の編集部品（タグ・リッチメニュー・回答フォーム・シナリオ）。入口が今の部品を渡す。 */
 export interface DefinitionEditorProps {
@@ -104,9 +75,6 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   const [folderLoadFailed, setFolderLoadFailed] = useState(false)
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folderFilter, setFolderFilter] = useState<string>('all')
-  const [folderName, setFolderName] = useState('')
-  const [folderFormOpen, setFolderFormOpen] = useState(false)
-  const [folderEditId, setFolderEditId] = useState<string | null>(null)
   const [textOverrides, setTextOverrides] = useState<Record<string, string>>({})
   const [overrideOpen, setOverrideOpen] = useState<string | null>(null)
   const duplicateAttempts = useRef(new Map<string, string>())
@@ -118,6 +86,10 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   const [definition, setDefinition] = useState<TemplateDefinition>(() => freshDefinition(type))
   const [selected, setSelected] = useState<string[]>([])
   const [search, setSearch] = useState('')
+  /* テンプレートの6種類（店と同じ上のタブ・API-17）。タブを替えたらその種類だけ読む。 */
+  const [kind, setKind] = useState<TemplateKind>('message')
+  const [kindRows, setKindRows] = useState<HqTemplate[] | null>(null)
+  const [kindCounts, setKindCounts] = useState<Partial<Record<TemplateKind, number>> | null>(null)
   const [preflight, setPreflight] = useState<Preflight | null>(null)
   const [choices, setChoices] = useState<Record<string, DistributionMode>>({})
   const [bulkMode, setBulkMode] = useState<'' | DistributionMode>('')
@@ -136,7 +108,6 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   const [conflict, setConflict] = useState(false)
   const [message, setMessage] = useState('')
   const [remove, setRemove] = useState<HqTemplate | null>(null)
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
   /** R561: 連続作成のたびに正規編集部品を掛け直す番号。 */
   const [formKey, setFormKey] = useState(0)
@@ -193,6 +164,13 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     )
     return () => { current = false }
   }, [type])
+  useEffect(() => {
+    if (type !== 'template' || stage !== 'list') return
+    let current = true
+    void hqTemplatesApi.listByKind(kind).then((rows) => { if (current) setKindRows(rows) }).catch(() => { if (current) setKindRows(null) })
+    void hqTemplatesApi.kindCounts().then((counts) => { if (current) setKindCounts(counts) }).catch(() => undefined)
+    return () => { current = false }
+  }, [type, kind, stage])
   useEffect(() => {
     if (stage !== 'duplicates') return
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -378,6 +356,13 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     if (result && result.status !== 'running') setResultDialogFor(`${result.runId}:${result.status}`)
   }, [result])
   const reloadFolders = async () => setFolders(await hqTemplatesApi.folders.list())
+  const reloadKind = async () => {
+    if (type !== 'template') return
+    const [rows, counts] = await Promise.all([hqTemplatesApi.listByKind(kind), hqTemplatesApi.kindCounts().catch(() => null)])
+    if (!alive.current) return
+    setKindRows(rows)
+    if (counts) setKindCounts(counts)
+  }
   const expiry = preflight ? Date.parse(preflight.expiresAt) : NaN
   const expired = !Number.isFinite(expiry) || expiry <= now
   const resolutions = preflight ? resolvedItems(preflight, choices) : null
@@ -393,8 +378,6 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     setDefinition(next); setName(nextName); setDescription(nextDescription)
     await save(false, next, nextName, nextDescription, andAnother)
   }
-  const shownRows = templates.filter((row) => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()) && (folderFilter === 'all' || (row.folder_id ?? 'none') === folderFilter))
-  const folderOf = (id: string | null | undefined) => folders.find((folder) => folder.id === id) ?? null
   const summary = contentSummary(type, definition)
 
   const notices = <>
@@ -403,166 +386,66 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     {message ? <Notice tone="success" message={message} onClose={() => setMessage('')} /> : null}
   </>
 
-  /* ───── 一覧（LRc93） ───── */
+  /* ───── 一覧（店の同じ機能の一覧と同じ形・i0Ao0R / wZPua / DzdC3 / noVq4。2026-10-08 オーナー） ───── */
   if (stage === 'list') {
-    const typeCounts = (kind: TemplateType) => catalog ? catalog.filter((row) => row.template_type === kind).length : kind === type ? templates.length : null
-    const rowMenu = (row: HqTemplate): ActionMenuItem[] => [
-      { id: 'edit', label: '編集', icon: <Pencil size={14} aria-hidden="true" />, onSelect: () => open(row.id, 'edit') },
-      { id: 'duplicate', label: '複製', icon: <Copy size={14} aria-hidden="true" />, onSelect: () => void perform(async () => {
-        const key = `${row.id}:${row.revision}`
-        const requestId = duplicateAttempts.current.get(key) ?? crypto.randomUUID()
-        duplicateAttempts.current.set(key, requestId)
-        await hqTemplatesApi.duplicate(row.id, `${row.name}のコピー`, row.revision, requestId)
-        duplicateAttempts.current.delete(key)
-        setTemplates(await hqTemplatesApi.list(type))
-        setMessage('ひな形を複製しました。')
-      }) },
-      { id: 'remove', label: '削除する', icon: <Trash2 size={14} aria-hidden="true" />, tone: 'danger', dividerBefore: true, onSelect: () => setRemove(row) },
-    ]
-    const createButton = canEdit
-      ? <Button variant="primary" disabled={!ready || busy} onClick={startCreate}><Plus size={15} aria-hidden="true" />{CREATE_LABELS[type]}</Button>
-      : null
-    /* 絵：テンプレートの行は受信箱の印（inbox）、ほかは色付きのフォルダ。 */
-    const typeRows = TYPE_ORDER.map((kind) => ({ id: kind, label: LABELS[kind], count: typeCounts(kind), color: TYPE_COLORS[kind], ...(kind === 'template' ? { icon: <Inbox size={15} /> } : {}) }))
-    const selectType = (id: string) => { if (id !== type) window.location.assign(TYPE_ROUTES[id as TemplateType] ?? `/hq/templates?type=${id}`) }
-    const folderNavRows = [{ id: 'all', label: 'すべて' }, { id: 'none', label: '未分類' }, ...folders.map((folder) => ({ id: folder.id, label: folder.name }))]
+    const listRows = type === 'template' && kindRows ? kindRows : templates
+    const duplicateRow = (row: HqTemplate) => void perform(async () => {
+      const key = `${row.id}:${row.revision}`
+      const requestId = duplicateAttempts.current.get(key) ?? crypto.randomUUID()
+      duplicateAttempts.current.set(key, requestId)
+      await hqTemplatesApi.duplicate(row.id, `${row.name}のコピー`, row.revision, requestId)
+      duplicateAttempts.current.delete(key)
+      setTemplates(await hqTemplatesApi.list(type))
+      await reloadKind()
+      setMessage('ひな形を複製しました。')
+    })
     return (
-      <ListPage
-        boardId="LRc93"
-        title={PAGE_TITLES[type]}
-        description={LIST_DESCRIPTIONS[type]}
-        folderNav={[
-          { label: '種類', rows: typeRows, activeId: type, onSelect: selectType, createAction: createButton ?? undefined, width: TYPE_PICK_WIDTH },
-          ...(folderLoadFailed ? [] : [{ label: '分類', rows: folderNavRows, activeId: folderFilter, onSelect: setFolderFilter }]),
-        ]}
-        folders={(
-          <div className={styles.rail}>
-          <FolderPanel
-            heading="種類"
-            createAction={createButton ?? <span className={styles.createSpace} aria-hidden="true" />}
-            rows={typeRows}
-            activeId={type}
-            onSelect={selectType}
-          >
-            <p className={styles.railNote}>配るときは、行の「アカウントへ配る」から。種類ごとに一覧を切り替えます。</p>
-          </FolderPanel>
-          {/* 絵（LRc93・2026-10-07 足した「分類」）：種類と同じ形の行（すべて＝受信箱・未分類＝開いたフォルダ）と「分類を追加」。 */}
-          {folderLoadFailed ? <p role="alert" className={styles.railNote}>分類を読み込めませんでした。ページを再読み込みしてください。</p> : (
-            <div className={styles.folderBlock} aria-label="分類（フォルダ）">
-              <FolderPanel
-                heading="分類"
-                rows={[
-                  { id: 'all', label: 'すべて', count: null, icon: <Inbox size={15} /> },
-                  { id: 'none', label: '未分類', count: null },
-                  ...folders.map((folder) => ({
-                    id: folder.id, label: folder.name, count: null,
-                    ...(canEdit ? {
-                      onEdit: () => { setFolderEditId(folder.id); setFolderName(folder.name); setFolderFormOpen(true) },
-                      onDelete: () => void perform(async () => {
-                        await hqTemplatesApi.folders.remove(folder.id, folder.revision)
-                        await reloadFolders(); setTemplates(await hqTemplatesApi.list(type)); setFolderFilter('all')
-                        setMessage('分類を外しました。ひな形は未分類に残ります。')
-                      }),
-                      deleteNote: '分類を外しても、中のひな形は未分類に残ります。',
-                    } : {}),
-                  })),
-                ]}
-                activeId={folderFilter}
-                onSelect={setFolderFilter}
-                onAddFolder={canEdit && !folderFormOpen ? () => { setFolderEditId(null); setFolderName(''); setFolderFormOpen(true) } : undefined}
-                addFolderLabel="分類を追加"
-              >
-                {canEdit && folderFormOpen ? (
-                  <span className={styles.folderForm}>
-                    <input aria-label="分類の名前" className={styles.input} value={folderName} maxLength={100} disabled={busy} onChange={(event) => setFolderName(event.target.value)} />
-                    <Button size="compact" disabled={busy || !folderName.trim()} onClick={() => void perform(async () => {
-                      const target = folders.find((folder) => folder.id === folderEditId)
-                      if (target) await hqTemplatesApi.folders.update(target.id, folderName.trim(), target.revision)
-                      else await hqTemplatesApi.folders.create(folderName.trim())
-                      await reloadFolders(); setFolderName(''); setFolderEditId(null); setFolderFormOpen(false)
-                    })}>{folderEditId ? '名前を変える' : '追加する'}</Button>
-                    <Button size="compact" variant="text" disabled={busy} onClick={() => { setFolderName(''); setFolderEditId(null); setFolderFormOpen(false) }}>やめる</Button>
-                  </span>
-                ) : null}
-              </FolderPanel>
-            </div>
-          )}
-          </div>
+      <HqStoreList
+        type={type}
+        rows={listRows}
+        ready={ready}
+        busy={busy}
+        canEdit={canEdit}
+        accountTotal={accounts.length}
+        kind={type === 'template' ? kind : undefined}
+        kindCounts={kindCounts}
+        onKindChange={type === 'template' ? setKind : undefined}
+        folders={folders}
+        folderLoadFailed={folderLoadFailed}
+        folderFilter={folderFilter}
+        onFolderFilter={setFolderFilter}
+        onAddFolder={async (folderName) => { await hqTemplatesApi.folders.create(folderName); await reloadFolders() }}
+        onRenameFolder={async (folder, folderName) => { await hqTemplatesApi.folders.update(folder.id, folderName, folder.revision); await reloadFolders() }}
+        onDeleteFolder={async (folder) => {
+          await hqTemplatesApi.folders.remove(folder.id, folder.revision)
+          await reloadFolders(); setTemplates(await hqTemplatesApi.list(type)); await reloadKind(); setFolderFilter('all')
+          setMessage('フォルダを消しました。ひな形は未分類に残ります。')
+        }}
+        onCreate={startCreate}
+        onEdit={(row) => open(row.id, 'edit')}
+        onDistribute={(row) => open(row.id, 'accounts')}
+        onDuplicate={duplicateRow}
+        onRemove={(row) => setRemove(row)}
+        notices={notices}
+        overlays={(
+          <ConfirmDialog
+            open={!!remove}
+            title="ひな形を削除"
+            description={`「${remove?.name ?? ''}」を削除します。配布済みのアカウントデータは残ります。`}
+            destructive
+            confirmLabel="削除する"
+            busy={busy}
+            onCancel={() => { if (!busy) setRemove(null) }}
+            onConfirm={() => void perform(async () => {
+              if (!remove) return
+              await hqTemplatesApi.remove(remove.id, remove.revision)
+              setTemplates((current) => current.filter((t) => t.id !== remove.id))
+              setKindRows((current) => current ? current.filter((t) => t.id !== remove.id) : current)
+              setRemove(null); setMessage('ひな形を削除しました。')
+            })}
+          />
         )}
-        toolbar={(
-          <div className={`${styles.toolbar} ${styles.listToolbar}`}>
-            <label className={styles.search}>
-              <Search size={14} aria-hidden="true" />
-              <input aria-label="ひな形を検索" placeholder="ひな形を探す" value={search} onChange={(event) => setSearch(event.target.value)} />
-            </label>
-            <span className={styles.count}>{`${PAGE_TITLES[type] === '友だち属性' ? 'タグ' : PAGE_TITLES[type]} ${shownRows.length} 件`}</span>
-          </div>
-        )}
-      >
-        {notices}
-        {!ready ? (
-          <p role="status" className={styles.empty}>{busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。'}</p>
-        ) : <div className={styles.listArea}>
-          <div className={styles.tableBox}>
-            <table className={styles.table}>
-              <colgroup><col /><col className={styles.colRef} /><col className={styles.colDate} /><col className={styles.colDest} /><col className={styles.colActions} /></colgroup>
-              <thead><tr><Th>名前</Th><Th>参照先</Th><Th>更新日時</Th><Th>配布先</Th><Th><span className={styles.srOnly}>操作</span></Th></tr></thead>
-              <tbody>
-                {shownRows.map((row) => {
-                  const folder = folderOf(row.folder_id)
-                  return (
-                    <tr key={row.id}>
-                      <td>
-                        <span className={styles.nameLine}>
-                          <FolderDot folder={folder ? { name: folder.name } : null} />
-                          <span className={styles.name} title={row.name}>{row.name}</span>
-                        </span>
-                        <span className={styles.sub} title={templateSubLine(row, LABELS[row.template_type])}>{templateSubLine(row, LABELS[row.template_type])}</span>
-                      </td>
-                      <td><span className={row.reference_summary ? styles.cell : `${styles.cell} ${styles.cellEmpty}`} title={row.reference_summary}>{row.reference_summary || '—'}</span></td>
-                      <td><span className={styles.cell}>{shortDate(row.updated_at)}</span></td>
-                      <td className={styles.topCell}>
-                        {row.distributed_account_count === undefined ? <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span>
-                          : row.distributed_account_count ? <>
-                            <span className={styles.strong}>{`${row.distributed_account_count} アカウント`}</span>
-                            {distributedAccountsLine(row) ? <span className={styles.sub} title={distributedAccountsLine(row) ?? undefined}>{distributedAccountsLine(row)}</span> : null}
-                          </>
-                          : <span className={styles.strong}>まだ配っていない</span>}
-                      </td>
-                      <td>
-                        <span className={styles.rowActions}>
-                          {canEdit ? <>
-                            <Button disabled={busy} onClick={() => open(row.id, 'accounts')} aria-label={`${row.name}をアカウントへ配る`}><Send size={15} aria-hidden="true" />アカウントへ配る</Button>
-                            <span className={styles.menuBox}>
-                              <RowMenu label={`${row.name}の操作`} items={rowMenu(row)} open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
-                            </span>
-                          </> : null}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            {!shownRows.length && <p className={styles.empty}>{templates.length ? '検索に一致するひな形はありません。' : 'まだひな形がありません。最初のひな形を作成してください。'}</p>}
-          </div>
-          <p className={styles.tableNote}>行の「…」から 編集・削除。配ったあとに直すと、各アカウントへは新しい版として届きます（配布先の版で確かめられます）。</p>
-        </div>}
-        <ConfirmDialog
-          open={!!remove}
-          title="ひな形を削除"
-          description={`「${remove?.name ?? ''}」を削除します。配布済みのアカウントデータは残ります。`}
-          destructive
-          confirmLabel="削除する"
-          busy={busy}
-          onCancel={() => { if (!busy) setRemove(null) }}
-          onConfirm={() => void perform(async () => {
-            if (!remove) return
-            await hqTemplatesApi.remove(remove.id, remove.revision)
-            setTemplates((current) => current.filter((t) => t.id !== remove.id)); setRemove(null); setMessage('ひな形を削除しました。')
-          })}
-        />
-      </ListPage>
+      />
     )
   }
 
