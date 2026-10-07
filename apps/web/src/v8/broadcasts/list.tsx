@@ -42,6 +42,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -887,6 +888,11 @@ export default function BroadcastListV8() {
   )
 
   /* ===== 表 ===== */
+  const folderDotOf = (folderId: string | null | undefined) => {
+    const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
+
   const tableHead = (
     <thead>
       <TableHeadRow>
@@ -894,7 +900,7 @@ export default function BroadcastListV8() {
         <Th className={styles.colStatus}>状態</Th>
         {narrow ? null : <Th className={styles.colAudience}>配信条件</Th>}
         <Th className={styles.colDate}>配信日時</Th>
-        <Th className={styles.colResult}>結果</Th>
+        <Th className={narrow ? styles.colResult : styles.colResultWide}>結果</Th>
         <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
       </TableHeadRow>
     </thead>
@@ -952,6 +958,21 @@ export default function BroadcastListV8() {
           const audience = audienceSummary(broadcast, getTagName, getScenarioName)
           const detailHref = `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`
           const menuLabel = `配信「${broadcast.title}」の操作`
+          const titleLink = (
+            <Link
+              href={detailHref}
+              className={styles.cellTitle}
+              title={broadcast.title}
+              onClick={(event) => {
+                event.stopPropagation()
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                event.preventDefault()
+                goDetail(broadcast.id)
+              }}
+            >
+              {broadcast.title}
+            </Link>
+          )
           return (
             <Tr
               key={broadcast.id}
@@ -968,20 +989,9 @@ export default function BroadcastListV8() {
               }}
             >
               <Td>
-                <Link
-                  href={detailHref}
-                  className={styles.cellTitle}
-                  title={broadcast.title}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                    event.preventDefault()
-                    goDetail(broadcast.id)
-                  }}
-                >
-                  {broadcast.title}
-                </Link>
-                <span className={styles.cellSub}>{messageTypeLabel(broadcast.messageType)}</span>
+                {/* 左にフォルダの列がある広い板は、名前の前にフォルダの色の丸（絵 l5V9a・NtCE3）。1152（jjFNi）は列が無いので出さない。 */}
+                {narrow ? titleLink : <div className={styles.titleLine}><FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName></div>}
+                <span className={narrow ? styles.cellSub : `${styles.cellSub} ${styles.dotIndent}`}>{messageTypeLabel(broadcast.messageType)}</span>
               </Td>
               <Td><StatusBadge broadcast={broadcast} /></Td>
               {narrow ? null : (
