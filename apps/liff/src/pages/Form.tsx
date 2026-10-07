@@ -235,9 +235,7 @@ export default function Form() {
         if (cancelled) return;
         setForm(data);
         setAnswers(initialAnswers(data.layout));
-        if (data.layout.options?.pageTitle) {
-          document.title = data.layout.options.pageTitle;
-        }
+        // タブの題は上の帯（LiffHeader）が pageTitle・フォーム名から付ける。
 
         // 前回の回答を出す設定のときだけ、サーバが中身を返す。
         // 試しでは前の試しを書き戻さない（本物の回答も出さない）。

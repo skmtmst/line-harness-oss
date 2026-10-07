@@ -12,8 +12,18 @@ let cachedShopName: string | null = null;
  * 店名は /api/liff/config の accountName。読めないときは空のままにする
  * (帯の形は変えず、店名のところだけ空ける)。
  */
+export function liffDocumentTitle(title: string): string {
+  const name = title.trim();
+  return name ? `${name} | musubo` : 'musubo';
+}
+
 export default function LiffHeader({ title }: { title: string }) {
   const [shopName, setShopName] = useState(cachedShopName);
+
+  // ブラウザ・LINE の上に出る題も、帯の題と同じ画面名にする（「<画面名> | musubo」）。
+  useEffect(() => {
+    document.title = liffDocumentTitle(title);
+  }, [title]);
 
   useEffect(() => {
     if (cachedShopName !== null) return;
