@@ -537,7 +537,7 @@ export default function AffiliatorsTab() {
               </Td>
               <Td className={styles.colName}>
                 <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
-                  <FolderDotName folder={folderDotOf(row)} dot={!narrow}>
+                  <FolderDotName folder={folderDotOf(row)}>
                     {nameButton(row)}
                   </FolderDotName>
                   <span className={styles.rowCode} title={row.code}>{row.code}</span>

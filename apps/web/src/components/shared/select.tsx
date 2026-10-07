@@ -1,7 +1,7 @@
 'use client'
 
 import { ArrowUpDown, Check, ChevronDown, ChevronUp } from 'lucide-react'
-import React, { useEffect, useId, useRef, useState } from 'react'
+import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './select.module.css'
@@ -42,6 +42,17 @@ export interface SelectProps {
   icon?: ReactNode
 }
 
+/*
+ * 候補が多い（タグ 2,000 個など）ときは、開いた一覧のうち見えている所の前後だけ描く
+ * （2026-10-07 速さ。全部描くと 2,000 個で 8,000 要素・開くまで 0.4 秒）。
+ * 行の高さは 38px で決まっているので、位置は計算で出す。
+ * 読み上げには「全 n 件中 m 件目」を aria-setsize / aria-posinset で渡す。
+ * キーボードで動かした先が描かれていなければ、そこまでスクロールしてから描く。
+ */
+const WINDOW_THRESHOLD = 100
+const OPTION_HEIGHT = 38
+const WINDOW_OVERSCAN = 12
+
 /** Pencil V5 `rpot9` / `Gfsb4` を正本にした単一選択。 */
 export default function Select({
   'aria-label': ariaLabel,
@@ -70,6 +81,64 @@ export default function Select({
   const selectedIndex = Math.max(0, enabledOptions.findIndex((option) => option.value === value))
   const [activeIndex, setActiveIndex] = useState(selectedIndex)
   const selected = options.find((option) => option.value === value) ?? options[0]
+  // 候補ごとに「使える候補の中で何番目か」を1回で引く（行ごとに探すと 2,000 個で 400 万回）。
+  const enabledIndexOf = useMemo(() => {
+    const map = new Map<string, number>()
+    enabledOptions.forEach((option, index) => map.set(option.value, index))
+    return map
+  }, [enabledOptions])
+  const windowed = options.length > WINDOW_THRESHOLD
+  // 一覧は器（MenuPortal）が後から描くので、ref ではなく描かれた時に受け取る。
+  const [listEl, setListEl] = useState<HTMLUListElement | null>(null)
+  const [scrollWindow, setScrollWindow] = useState({ top: 0, height: 0 })
+
+  // 開いている間、器（MenuPortal）のスクロールを追う。
+  useLayoutEffect(() => {
+    if (!open || !windowed) return
+    const list = listEl
+    const scroller = list?.closest<HTMLElement>('[data-menu-portal]')
+    if (!list || !scroller) return
+    let frame = 0
+    const read = () => {
+      frame = 0
+      const top = scroller.scrollTop - list.offsetTop
+      const height = scroller.clientHeight || 400
+      setScrollWindow((prev) => (prev.top === top && prev.height === height ? prev : { top, height }))
+    }
+    // 開いたときは選んでいる候補が見える所から。
+    const selectedAt = options.findIndex((option) => option.value === value)
+    if (selectedAt > 0) scroller.scrollTop = list.offsetTop + selectedAt * OPTION_HEIGHT
+    read()
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(read) }
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      scroller.removeEventListener('scroll', onScroll)
+      if (frame) cancelAnimationFrame(frame)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, windowed, listEl])
+
+  // キーボードで動かした候補が見える所にあるようにする（描かれていなければ描いてから）。
+  useLayoutEffect(() => {
+    if (!open || !windowed) return
+    const list = listEl
+    const scroller = list?.closest<HTMLElement>('[data-menu-portal]')
+    const option = enabledOptions[activeIndex]
+    if (!list || !scroller || !option) return
+    const at = options.findIndex((candidate) => candidate.value === option.value)
+    const top = list.offsetTop + at * OPTION_HEIGHT
+    if (top < scroller.scrollTop) scroller.scrollTop = top
+    else if (top + OPTION_HEIGHT > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = top + OPTION_HEIGHT - scroller.clientHeight
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex, open, windowed, listEl])
+
+  let windowStart = 0
+  let windowEnd = options.length
+  if (open && windowed) {
+    const height = scrollWindow.height || 400
+    windowStart = Math.max(0, Math.floor(scrollWindow.top / OPTION_HEIGHT) - WINDOW_OVERSCAN)
+    windowEnd = Math.min(options.length, Math.ceil((scrollWindow.top + height) / OPTION_HEIGHT) + WINDOW_OVERSCAN)
+  }
 
   useEffect(() => {
     if (disabled) setOpen(false)
@@ -169,6 +238,7 @@ export default function Select({
           onClose={() => setOpen(false)}
         >
           <ul
+            ref={setListEl}
             id={listboxId}
             role="listbox"
             aria-labelledby={buttonId}
@@ -178,11 +248,18 @@ export default function Select({
             style={{ position: 'static', width: '100%' }}
             onMouseDown={(event) => event.preventDefault()}
           >
-          {options.map((option) => {
-            const optionIndex = enabledOptions.findIndex((candidate) => candidate.value === option.value)
+          {windowStart > 0 ? <li role="presentation" aria-hidden="true" style={{ height: windowStart * OPTION_HEIGHT }} /> : null}
+          {options.slice(windowStart, windowEnd).map((option, offset) => {
+            const optionIndex = enabledIndexOf.get(option.value) ?? -1
             const isSelected = option.value === value
             return (
-              <li key={option.value} role="option" aria-selected={isSelected}>
+              <li
+                key={option.value}
+                role="option"
+                aria-selected={isSelected}
+                aria-setsize={windowed ? options.length : undefined}
+                aria-posinset={windowed ? windowStart + offset + 1 : undefined}
+              >
                 <button
                   type="button"
                   className={`${styles.option} ${isSelected ? `${styles.selected} ${styles.selectedBackground}` : ''}`}
@@ -201,6 +278,7 @@ export default function Select({
               </li>
             )
           })}
+          {windowEnd < options.length ? <li role="presentation" aria-hidden="true" style={{ height: (options.length - windowEnd) * OPTION_HEIGHT }} /> : null}
           </ul>
         </MenuPortal>
       ) : null}

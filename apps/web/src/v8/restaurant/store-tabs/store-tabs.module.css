@@ -1,0 +1,5 @@
+/* 店のタブの行（E-1 `店のタブ`：左右 24）。タブの形は共通の Tabs が持つ。 */
+.row {
+  flex-shrink: 0;
+  padding: 0 var(--tpl-e1-side);
+}

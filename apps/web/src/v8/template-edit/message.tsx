@@ -45,6 +45,7 @@ import {
   requestTemplateReferences,
   resolveEditorAccountId,
   saveTemplateEdit,
+  validateTemplateSave,
   templateAccountMismatch,
   templateSaveGuard,
   templateUsageEntries,
@@ -54,6 +55,7 @@ import {
   type TemplateReferences,
 } from './core'
 import { TemplateEditFrame } from './frame'
+import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import InsertRow from './insert-row'
 import styles from './edit.module.css'
 
@@ -91,6 +93,12 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
   const [publishCheck, setPublishCheck] = useState<{ id: string; entries: ReturnType<typeof templateUsageEntries> } | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  /*
+   * 新しく作る画面で自動保存が先に作ったテンプレート（一斉配信と同じく、
+   * 最初の自動保存で1件作り、あとは同じ行を上書きする）。URL は変えない
+   * （変えると読み込み直しで入力中の欄が揺れる）。
+   */
+  const [autoCreated, setAutoCreated] = useState<{ id: string; accountId: string | null } | null>(null)
 
   /* URL の id が変わった瞬間に、前の中身を描画中に捨てる（今の画面と同じ）。 */
   let editor = editorState
@@ -99,11 +107,16 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
     setEditor(editor)
     setClean(snapshot(editor.draft))
     setConflict(null)
+    setAutoCreated(null)
   }
   const { name, folderId, messageType, messageContent } = editor.draft
   const updateDraft = (patch: Partial<TemplateDraft>) => setEditor((prev) => ({ ...prev, draft: { ...prev.draft, ...patch } }))
 
   const binding = { templateId: id, templateStatus: editor.status, templateAccountId: editor.templateAccountId, selectedAccountId }
+  /* 保存の宛先。新規でも自動保存で作ったあとは、その行への上書きにする。 */
+  const saveBinding = !id && autoCreated
+    ? { templateId: autoCreated.id, templateStatus: 'ready' as const, templateAccountId: autoCreated.accountId, selectedAccountId }
+    : binding
   const editorAccountId = resolveEditorAccountId(binding)
   const accountMismatch = templateAccountMismatch(binding)
   const saveGuard = templateSaveGuard(binding)
@@ -114,6 +127,10 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
   const title = id ? 'メッセージを編集' : 'メッセージを作る'
   usePageTitle(title)
   const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
+  /* 自動保存と手の保存が同時に新規作成へ流れて2件できないよう、送っている途中の保存を待ってから送る。 */
+  const inFlightRef = useRef<Promise<unknown> | null>(null)
+  const autoCreatedRef = useRef(autoCreated)
+  autoCreatedRef.current = autoCreated
 
   useEffect(() => {
     setFolders([])
@@ -207,24 +224,54 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
     setConflict({ name: editor.draft.name, at: '', latest: null })
   }
 
-  /** 入力を保存する。できたらテンプレートの id を返す。 */
-  const saveNow = async (): Promise<string | null> => {
-    setSaving(true)
-    setError('')
+  /**
+   * 入力を保存する。できたらテンプレートの id を返す。
+   * silent は自動保存：「保存中」の印と赤い帯は出さない（失敗は保存の帯に出る）。
+   * 競合（409）は自動でも帯を出す（このまま書くと相手の変更が消えるため）。
+   */
+  const saveNow = async ({ silent = false }: { silent?: boolean } = {}): Promise<string | null> => {
+    if (!silent) {
+      setSaving(true)
+      setError('')
+    }
+    while (inFlightRef.current) await inFlightRef.current.catch(() => undefined)
+    const sent = editor.draft
+    const made = autoCreatedRef.current
+    const target = !id && made
+      ? { templateId: made.id, templateStatus: 'ready' as const, templateAccountId: made.accountId, selectedAccountId }
+      : binding
+    const request = saveTemplateEdit({ ...target, ...sent })
+    inFlightRef.current = request
     try {
-      const res = await saveTemplateEdit({ ...binding, ...editor.draft })
+      const res = await request
       if (!res.ok) {
-        if (res.conflict && id) await raiseConflict(id)
-        else setError(res.error)
+        if (res.conflict && target.templateId) await raiseConflict(target.templateId)
+        else if (!silent) setError(res.error)
         return null
       }
-      setClean(snapshot(editor.draft))
+      if (!id && !target.templateId) {
+        const created = { id: res.id, accountId: selectedAccountId }
+        autoCreatedRef.current = created
+        setAutoCreated(created)
+      }
+      setClean(snapshot(sent))
       setConflict(null)
       return res.id
     } finally {
-      setSaving(false)
+      if (inFlightRef.current === request) inFlightRef.current = null
+      if (!silent) setSaving(false)
     }
   }
+
+  /* 入力が止まって2秒で下書きへ静かに保存する（一斉配信と同じ）。閲覧のみは動かさない。 */
+  const autosave = useDraftAutosave({
+    fingerprint: snapshot(editor.draft),
+    dirty,
+    active: canMutate,
+    enabled: !loading && !conflict && validateTemplateSave({ ...saveBinding, ...editor.draft }) === null,
+    paused: leaveTarget !== null || saving || publishing,
+    save: async () => (await saveNow({ silent: true })) !== null,
+  })
 
   const leave = () => {
     disarm()
@@ -256,6 +303,7 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
 
   const onSaveDraft = async () => {
     const savedId = await saveNow()
+    if (savedId) autosave.markSaved()
     if (savedId) {
       notifyToast('下書きを保存しました')
       leave()
@@ -405,6 +453,7 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
             <div className={styles.phone}>{phone}</div>
           </>
         )}
+        status={autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined}
         footerActions={(
           <>
             <Button href="/templates">キャンセル</Button>

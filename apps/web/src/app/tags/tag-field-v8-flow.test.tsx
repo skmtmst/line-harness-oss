@@ -285,6 +285,29 @@ describe('V8 友だち情報の欄の通し：作る→値を書く', () => {
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith(expect.stringContaining('/tags?tab=fields&highlight=f-new')))
   })
 
+  it('種類の「時刻」を押して選べ、既定値は HH:MM のときだけ時刻の種類で作る', async () => {
+    renderNode(<NewFieldPage />)
+    await flush()
+    await act(async () => { setInputValue(host.querySelector('input[placeholder="例：愛犬のお名前"]') as HTMLInputElement, '来店時刻') })
+    await act(async () => { setInputValue(host.querySelector('input[placeholder="pet_name"]') as HTMLInputElement, 'visit_time') })
+    const chip = screen.getByRole('radio', { name: /時刻/ }) as HTMLButtonElement
+    expect(chip.disabled).toBe(false)
+    fireEvent.click(chip)
+    await flush()
+    expect(chip.getAttribute('aria-checked')).toBe('true')
+    const defaultInput = host.querySelector('#ff-default') as HTMLInputElement
+    expect(defaultInput, '既定値の入力が見つかりません').toBeTruthy()
+    await act(async () => { setInputValue(defaultInput, '9時半') })
+    fireEvent.click(screen.getByRole('button', { name: '項目を作る' }))
+    await flush()
+    expect(createField).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('時刻の既定値は「09:30」のように')
+    await act(async () => { setInputValue(defaultInput, '09:30') })
+    fireEvent.click(screen.getByRole('button', { name: '項目を作る' }))
+    await waitFor(() => expect(createField).toHaveBeenCalledTimes(1))
+    expect(createField.mock.calls[0]![1]).toMatchObject({ type: 'time', defaultValue: '09:30' })
+  })
+
   it('友だちの欄に値を書く→知らせ', async () => {
     const onDone = vi.fn()
     renderNode(
