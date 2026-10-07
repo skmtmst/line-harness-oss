@@ -368,5 +368,10 @@
     "color": 6,
     "radius": 0,
     "shadow": 0
+  },
+  "v8/tags/folder-page.tsx": {
+    "color": 9,
+    "radius": 0,
+    "shadow": 0
   }
 }

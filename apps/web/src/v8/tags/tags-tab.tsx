@@ -47,6 +47,7 @@ import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
@@ -677,7 +678,8 @@ export default function TagsTab({
               <span className="sr-only">一覧に出す</span>
             </Th>
             <Th className={styles.colName}>タグ</Th>
-            <Th className={styles.colFolder}>フォルダ</Th>
+            {/* 左にフォルダの列があるときは表にフォルダ列を置かず、名前の前に色の丸（2026-10-07 オーナー）。1152 は列を畳むので表に出す（絵 aPeD8）。 */}
+            {narrow ? <Th className={styles.colFolder}>フォルダ</Th> : null}
             <Th className={styles.colCount}>人数</Th>
             <Th className={styles.colSource}>付け方</Th>
             <Th className={styles.colLink}>連動</Th>
@@ -734,7 +736,13 @@ export default function TagsTab({
                           <GripVertical className={styles.gripIcon} aria-hidden="true" />
                         </ReorderGrip>
                       </span>
-                      <Link href={editHref} className={styles.name} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
+                      {narrow ? (
+                        <Link href={editHref} className={styles.name} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
+                      ) : (
+                        <FolderDotName folder={group ? { name: group.name, color: group.color ?? FOLDER_FALLBACK_COLOR } : null}>
+                          <Link href={editHref} className={styles.name} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
+                        </FolderDotName>
+                      )}
                       {tag.status === 'archived' ? <span className={styles.miniBadge}>保管済み</span> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
                         <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</span>
@@ -743,16 +751,18 @@ export default function TagsTab({
                     <p className={styles.sub}>{`${formatDate(tag.createdAt)}登録`}</p>
                   </ContextMenu>
                 </Td>
-                <Td className={styles.colFolder}>
-                  <span className={styles.folderCell} title={group?.name ?? '未分類'}>
-                    {group ? (
-                      <Folder className={styles.folderIcon} aria-hidden="true" color={group.color ?? FOLDER_FALLBACK_COLOR} fill={group.color ?? FOLDER_FALLBACK_COLOR} />
-                    ) : (
-                      <FolderOpen className={styles.folderIcon} aria-hidden="true" />
-                    )}
-                    <span className={styles.truncate}>{group?.name ?? '未分類'}</span>
-                  </span>
-                </Td>
+                {narrow ? (
+                  <Td className={styles.colFolder}>
+                    <span className={styles.folderCell} title={group?.name ?? '未分類'}>
+                      {group ? (
+                        <Folder className={styles.folderIcon} aria-hidden="true" color={group.color ?? FOLDER_FALLBACK_COLOR} fill={group.color ?? FOLDER_FALLBACK_COLOR} />
+                      ) : (
+                        <FolderOpen className={styles.folderIcon} aria-hidden="true" />
+                      )}
+                      <span className={styles.truncate}>{group?.name ?? '未分類'}</span>
+                    </span>
+                  </Td>
+                ) : null}
                 {/* 人数は、そのタグで絞った友だち一覧へのリンク。 */}
                 <Td className={styles.colCount} onClick={(event) => event.stopPropagation()}>
                   <Link href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>

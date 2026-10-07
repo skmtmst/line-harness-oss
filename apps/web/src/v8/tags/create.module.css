@@ -611,3 +611,27 @@ a.way:hover {
 .choice > input {
   accent-color: var(--color-accent-deep);
 }
+
+/* ★フォルダを追加の窓（IjVpM）：幅560・余白24・段の間16、ボタンは右寄せ。 */
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-dialog-body-gap);
+  width: 100%;
+  margin-top: var(--tpl-tg2-dialog-pull-top);
+  margin-bottom: var(--tpl-tg2-dialog-body-pull-bottom);
+}
+
+.dialogFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-tg2-option-gap);
+  width: 100%;
+  padding: var(--tpl-tg2-dialog-footer-pad);
+}
+
+.dialogFooterEnd {
+  display: flex;
+  gap: var(--tpl-tg2-option-gap);
+  margin-left: auto;
+}
