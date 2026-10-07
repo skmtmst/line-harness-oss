@@ -1,13 +1,14 @@
 import { ApiError, fetchApi } from './api'
-import type { FormLayout } from '@line-crm/shared'
+import type { FormLayout, HqTemplateListDisplay } from '@line-crm/shared'
 
 export const TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form', 'scenario'] as const
 export type TemplateType = typeof TEMPLATE_TYPES[number]
 export type DistributionMode = 'create' | 'overwrite' | 'alias'
-export interface HqTemplate {
+export interface HqTemplate extends Partial<HqTemplateListDisplay> {
   id: string; name: string; description: string | null; template_type: TemplateType
   folder_id?: string | null; revision: number; updated_at: string; reference_summary?: string; distributed_account_count?: number
 }
+export type HqTemplateListItem = HqTemplate & HqTemplateListDisplay
 export interface TagDefinition {
   schemaVersion: 1
   tag: {
@@ -165,7 +166,7 @@ export const hqTemplatesApi = {
    * リッチメニューや回答フォームの編集では、別種類のタグやテンプレートを
    * 参照先に選ぶため、一覧表示とは別に全部入りの目録が要る。
    */
-  list: (type?: TemplateType) => request<HqTemplate[]>(type ? `?type=${type}` : ''),
+  list: (type?: TemplateType) => request<HqTemplateListItem[]>(type ? `?type=${type}` : ''),
   folders: {
     list: () => request<import('@line-crm/shared').HqTemplateFolder[]>('/folders'),
     create: (name: string) => request<import('@line-crm/shared').HqTemplateFolder>('/folders', 'POST', { name }),

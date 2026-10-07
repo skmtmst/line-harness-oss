@@ -201,6 +201,51 @@ export async function listHqTemplates(
   return result.results ?? [];
 }
 
+/** 一覧の材料を一度の問い合わせで取得する。definition_jsonはHTTP応答へ出さない。 */
+export interface HqTemplateListSource extends HqTemplate {
+  display_type: HqTemplateType;
+  definition_json: string | null;
+  distributed_account_names_json: string;
+  distributed_account_count: number;
+}
+
+export async function listHqTemplateDisplaySources(
+  db: D1Database,
+  tenantId: string,
+  type?: HqTemplateType,
+): Promise<HqTemplateListSource[]> {
+  const result = await db.prepare(`
+    WITH templates AS (
+      SELECT *, COALESCE(extended_type,template_type) AS display_type
+      FROM hq_templates WHERE tenant_id=?1 AND archived_at IS NULL
+        AND (?2 IS NULL OR COALESCE(extended_type,template_type)=?2)
+    ), successful_accounts AS (
+      SELECT DISTINCT r.template_id, a.id AS account_id, a.name
+      FROM hq_template_distribution_results r
+      JOIN templates t ON t.id=r.template_id AND t.tenant_id=r.tenant_id
+      JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
+      WHERE r.tenant_id=?1 AND r.status='succeeded'
+    ), ranked_accounts AS (
+      SELECT *, ROW_NUMBER() OVER (PARTITION BY template_id ORDER BY name,account_id) AS position
+      FROM successful_accounts
+    ), distribution AS (
+      SELECT template_id, COUNT(*) AS account_count,
+        json_group_array(name) FILTER (WHERE position<=3) AS names_json
+      FROM (SELECT * FROM ranked_accounts ORDER BY template_id,position)
+      GROUP BY template_id
+    )
+    SELECT t.*, t.display_type AS template_type, v.definition_json,
+      COALESCE(d.account_count,0) AS distributed_account_count,
+      COALESCE(d.names_json,'[]') AS distributed_account_names_json
+    FROM templates t
+    LEFT JOIN hq_template_versions v ON v.id=t.current_version_id
+      AND v.tenant_id=t.tenant_id AND v.template_id=t.id
+    LEFT JOIN distribution d ON d.template_id=t.id
+    ORDER BY t.updated_at DESC,t.id
+  `).bind(tenantId, type ?? null).all<HqTemplateListSource>();
+  return result.results ?? [];
+}
+
 export async function updateHqTemplate(
   db: D1Database,
   input: {
