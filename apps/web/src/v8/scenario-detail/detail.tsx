@@ -119,6 +119,8 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StatusChip from '@/components/shared/status-chip'
 import Notice from '@/components/shared/notice'
+import { browserDraftKey, useBrowserDraft } from '@/v8/autosave/use-browser-draft'
+import { BrowserDraftNotice } from '@/v8/autosave/browser-draft-notice'
 import Select from '@/components/shared/select'
 import {
   scenarioReachBarWidth,
@@ -591,6 +593,9 @@ export default function ScenarioDetailV8({
   const [triggerCount, setTriggerCount] = useState<number | null>(null)
   /** 位置情報・動画・音声・スタンプの入力。 */
   const [kindState, setKindState] = useState<MessageKindState>(() => emptyMessageKindState())
+  /** 通の入力欄を開いた回の番号。開くたびに「開いた直後の形」を比べる元として採り直す。 */
+  const [stepFormNonce, setStepFormNonce] = useState(0)
+  const [stepFormBaseline, setStepFormBaseline] = useState<{ nonce: number; value: { stepForm: StepFormState; kindState: MessageKindState } } | null>(null)
   /** 差し込みをカーソルの位置に入れるために、本文の入力欄を持つ。 */
   const stepBodyRef = useRef<HTMLTextAreaElement>(null)
 
@@ -1230,6 +1235,7 @@ export default function ScenarioDetailV8({
     setShowStepForm(true)
     setInsertAfter(null)
     setStepError('')
+    setStepFormNonce((n) => n + 1)
   }
 
   /**
@@ -1252,6 +1258,7 @@ export default function ScenarioDetailV8({
     setShowStepForm(true)
     setInsertAfter(null)
     setStepError('')
+    setStepFormNonce((n) => n + 1)
   }
 
   const openAddTemplateStep = () => {
@@ -1261,6 +1268,7 @@ export default function ScenarioDetailV8({
     setShowStepForm(true)
     setInsertAfter(null)
     setStepError('')
+    setStepFormNonce((n) => n + 1)
   }
 
   /**
@@ -1276,6 +1284,7 @@ export default function ScenarioDetailV8({
     setShowStepForm(true)
     setInsertAfter(afterOrder)
     setStepError('')
+    setStepFormNonce((n) => n + 1)
   }
 
   const openEditStep = (step: ScenarioStep) => {
@@ -1311,6 +1320,7 @@ export default function ScenarioDetailV8({
     setShowStepForm(false)
     setInsertAfter(null)
     setStepError('')
+    setStepFormNonce((n) => n + 1)
   }
 
   const closeStepForm = () => {
@@ -1536,6 +1546,7 @@ export default function ScenarioDetailV8({
           return
         }
       }
+      stepDraft.clear()
       closeStepForm()
       loadScenario(true)
       reloadStats()
@@ -1657,6 +1668,37 @@ export default function ScenarioDetailV8({
    */
   const stepFormPreview = previewOffsets(deliveryMode, stepForm.schedule)
 
+  /*
+   * 通の保存は配信の行へ直に入る（下書きの口が無い）。書きかけの通はこのブラウザに
+   * だけ残し、同じ通を開き直したときに「前の入力を戻す」を出す。キャンセルで捨てる。
+   */
+  const stepFormOpen = showStepForm || editingStepId !== null
+  const stepFormValue = { stepForm, kindState }
+  useEffect(() => {
+    if (!stepFormOpen) {
+      if (stepFormBaseline !== null) setStepFormBaseline(null)
+      return
+    }
+    if (stepFormBaseline?.nonce !== stepFormNonce) setStepFormBaseline({ nonce: stepFormNonce, value: stepFormValue })
+    // 開いた直後の形だけを採る。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepFormOpen, stepFormNonce, stepFormBaseline])
+  const stepDraft = useBrowserDraft({
+    storageKey: stepFormOpen && scenario && stepFormBaseline?.nonce === stepFormNonce
+      ? browserDraftKey(['scenario-step', scenario.lineAccountId, id, editingStepId ?? 'new'])
+      : null,
+    value: stepFormValue,
+    baseline: stepFormBaseline?.value ?? stepFormValue,
+    active: canEdit,
+  })
+  const restoreStepDraft = () => {
+    const stored = stepDraft.restore()
+    if (!stored) return
+    // 新しく足す通の番号は今の並びで決める（残っていた番号は古いことがある）。
+    setStepForm(editingStepId ? stored.stepForm : { ...stored.stepForm, stepOrder: stepForm.stepOrder })
+    setKindState(stored.kindState)
+  }
+
   // 新規追加（上部）とステップ編集（行直下インライン）の両方で使うフォーム。
   // 同時に開くのは常に片方だけなので、state は stepForm を共有する。
   const renderStepForm = () => (
@@ -1664,6 +1706,7 @@ export default function ScenarioDetailV8({
       {!editingStepId && (
         <h4 className="text-sm font-semibold text-ink-secondary mb-3">新しいステップを追加</h4>
       )}
+      <BrowserDraftNotice ago={stepDraft.pendingAgo} onRestore={restoreStepDraft} onDiscard={stepDraft.clear} />
       {/* 左が編集、右が「いまどの通を触っているか」。任意値の桁指定ではなく
           3列の標準段で組む（2:1）。直書きの数を増やさない。 */}
       <div className="grid gap-4 lg:grid-cols-3">
@@ -1976,9 +2019,16 @@ export default function ScenarioDetailV8({
           <Button variant="primary" onClick={handleSaveStep} disabled={stepSaving} busy={stepSaving}>
             {editingStepId ? '更新' : '追加する'}
           </Button>
-          <Button variant="secondary" onClick={closeStepForm}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              stepDraft.clear()
+              closeStepForm()
+            }}
+          >
             キャンセル
           </Button>
+          {stepDraft.label ? <p className="text-ink-secondary self-center text-xs" aria-live="polite" data-autosave-status>{stepDraft.label}</p> : null}
         </div>
       </div>
 

@@ -1,114 +1,276 @@
 'use client'
 
 /*
- * ★V8 店舗ダッシュボード（Pencil `CHz31`）。
+ * ★V8 飲食店のダッシュボード「今日のお店」（提案 E-1 `hKRRF`。採用 2026-10-07）。
  *
- * 数5（予約数・ご来店予定・空席率・売上予測・未返信口コミ）→ 店舗一覧
- * → 全店アクション／同期方針。数の根拠は今の画面と同じ（見せ方だけの移し替え）。
- * 動きは BEHAVIOR.md。
+ * 板の頭（今日のお店・日付・営業時間・更新／＋ウォークイン・＋電話予約）→ 店のタブ
+ * → 他の予約サイトの枠を閉じる知らせ → 今日の数（今日の予約・来店予定・空席（いま）・未返信の口コミ）
+ * → 今日の予約の表（来店の印）｜右：予約サイト・グルメ媒体・Google の口コミ・Instagram の新着。
+ * 全店の一覧（前の店舗ダッシュボード `CHz31`）は `?view=stores` で残す。動きは BEHAVIOR.md。
  */
-import { useMemo, useState } from 'react'
-import { Send, Store } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Armchair, Bell, CalendarCheck, Check, Plus, Star, Users } from 'lucide-react'
+import { DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
 import Button from '@/components/shared/button'
-import { formatYen } from '@/lib/format'
-import type { RestaurantSnapshot } from '@/lib/restaurant-test-api'
-import RestaurantFrame from '../common-a/frame'
-import { HalfGrid, Panel, PanelAside, Stat, StatRow, Status } from '../common-a/parts'
+import Chip from '@/components/shared/chip'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import TextLink from '@/components/shared/text-link'
+import { notifyToast } from '@/components/shared/toast'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
+import { useStaffRole } from '@/lib/staff-role'
+import { restaurantTestApi } from '@/lib/restaurant-test-api'
+import PhoneReservationDrawer from '../front-desk/phone-drawer'
+import WalkInDialog from '../front-desk/walk-in-dialog'
+import { pad2 } from '../front-desk/slots'
+import StoreTabs from '../store-tabs/store-tabs'
+import StoresDashboardV8 from './stores'
+import { SidePanel } from './side'
+import { TodayTable } from './today-table'
+import { canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle, summarizeToday } from './summarize'
+import { useStoreToday } from './use-store-today'
 import styles from './dashboard.module.css'
 
+function daysAgo(iso: string, now: number): string {
+  const days = Math.max(0, Math.floor((now - Date.parse(iso)) / 86_400_000))
+  return days === 0 ? '今日' : `${days}日前`
+}
 
-export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
-  /* 集計は今日以降の有効予約だけを見る（今の画面と同じ R104）。 */
-  const nowIso = new Date().toISOString()
-  const upcoming = data.reservations.filter((r) => r.starts_at >= nowIso && !['cancelled', 'no_show'].includes(r.status))
-  const guestCount = upcoming.reduce((sum, r) => sum + r.guest_count, 0)
-  const totalCapacity = data.stores.reduce((sum, item) => sum + item.capacity, 0)
-  const unreplied = data.reviews.filter((r) => r.reply_status === 'unreplied').length
-  const priceOf = (courseId: string | null) => data.menuItems.find((m) => m.id === courseId)?.price ?? null
-  const priced = upcoming.filter((r) => priceOf(r.course_id) !== null)
-  const revenue = priced.reduce((sum, r) => sum + r.guest_count * (priceOf(r.course_id) || 0), 0)
-  const lineIssues = data.stores.filter((item) => item.line_status === 'error').length
-  const connectorIssues = data.connectors.filter((c) => ['error', 'warning'].includes(c.status)).length
-  const issues = lineIssues + connectorIssues
+function headDescription(hours: ReturnType<typeof useStoreToday>['hours'], updatedAt: Date | null): string {
+  const now = new Date()
+  const week = '日月火水木金土'[now.getDay()]
+  const periods = hours?.find((day) => day.weekday === now.getDay())?.periods ?? null
+  const open = hours === null ? null : periods && periods.length > 0 ? periods.map((p) => `${p.opensAt}〜${p.closesAt}`).join('・') : '休み'
+  return [
+    `${now.getMonth() + 1}月${now.getDate()}日（${week}）`,
+    open ? `営業 ${open}` : null,
+    updatedAt ? `更新 ${pad2(updatedAt.getHours())}:${pad2(updatedAt.getMinutes())}` : null,
+  ].filter(Boolean).join(' ・ ')
+}
+
+/** 「LINE 7・電話 4・ウォークイン 1」。0 の経路は出さない（予約サイト経由もあれば足す）。 */
+export function sourceBreakdown(summary: Pick<ReturnType<typeof summarizeToday>, 'line' | 'phone' | 'walkIn' | 'media'>): string {
+  const parts = [['LINE', summary.line], ['電話', summary.phone], ['ウォークイン', summary.walkIn], ['予約サイト', summary.media]] as const
+  const shown = parts.filter(([, n]) => n > 0).map(([label, n]) => `${label} ${n}`)
+  return shown.length ? shown.join('・') : 'まだ予約はありません'
+}
+
+function TodayStore() {
+  usePageTitle('店舗ダッシュボード')
+  usePageCrumbs([{ label: 'ホーム', href: '/' }])
+  const { selectedAccountId } = useAccount()
+  const role = useStaffRole()
+  const canWrite = canWriteRole(role)
+  const d = useStoreToday(selectedAccountId)
+  const [phoneOpen, setPhoneOpen] = useState(false)
+  const [walkInOpen, setWalkInOpen] = useState(false)
+  const [busyId, setBusyId] = useState('')
+  const now = Date.now()
+  const tables = useMemo(() => (d.snapshot?.tables ?? []).filter((t) => t.store_id === d.store?.id), [d.snapshot, d.store])
+  const summary = useMemo(() => (d.today ? summarizeToday(d.today, tables, now) : null), [d.today, tables]) // eslint-disable-line react-hooks/exhaustive-deps
+  const groups = useMemo(() => groupCloseTasks(d.closeTasks ?? [], d.media ?? []), [d.closeTasks, d.media])
+  const pending = groups.filter((g) => g.state === 'open' || g.state === 'partly')
+  const first = pending[0] ?? null
+  const firstItem = first ? openItems(first)[0] ?? null : null
+  const firstMedium = firstItem ? d.media?.find((m) => m.code === firstItem.channel) ?? null : null
+  const google = d.google
+  const googleConnected = google?.connection.status === 'connected'
+
+  const markVisited = async (id: string) => {
+    if (!d.accountId) return
+    setBusyId(id)
+    try {
+      await restaurantTestApi.postSeatVisitMark(d.accountId, id, { kind: 'visited' })
+      notifyToast('来店にしました。')
+      await d.reload()
+    } catch (caught) {
+      notifyToast(caught instanceof Error && caught.message ? caught.message : '来店にできませんでした。', { tone: 'error' })
+      await d.reload()
+    } finally {
+      setBusyId('')
+    }
+  }
+
+  const undoVisited = async (id: string) => {
+    if (!d.accountId) return
+    setBusyId(id)
+    try {
+      await restaurantTestApi.deleteSeatVisitMark(d.accountId, id)
+      notifyToast('来店の印を取り消しました。')
+    } catch (caught) {
+      notifyToast(caught instanceof Error && caught.message ? caught.message : '取り消せませんでした。', { tone: 'error' })
+    } finally {
+      await d.reload()
+      setBusyId('')
+    }
+  }
+
+  const closeOne = async (taskId: string, name: string) => {
+    if (!d.accountId) return
+    setBusyId(taskId)
+    try {
+      await restaurantTestApi.completeChannelCloseTask(d.accountId, taskId)
+      notifyToast(`${name}の枠を閉じた印を付けました。`)
+    } catch (caught) {
+      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' })
+    } finally {
+      await d.reload()
+      setBusyId('')
+    }
+  }
+
+  const actions = canWrite && d.store ? (
+    <>
+      <Button onClick={() => setWalkInOpen(true)}><Plus size={15} aria-hidden="true" />ウォークイン</Button>
+      <Button variant="primary" onClick={() => setPhoneOpen(true)}><Plus size={15} aria-hidden="true" />電話予約</Button>
+    </>
+  ) : null
+
+  let body
+  if (d.loading && !d.snapshot) {
+    body = <div className={styles.state}><ListState kind="loading" /></div>
+  } else if (d.error && !d.snapshot) {
+    body = <div className={styles.state}><ListState kind="error" error={d.error} onRetry={() => window.location.reload()} /></div>
+  } else if (!d.store) {
+    body = <div className={styles.state}><ListState kind="empty" title="店舗が登録されていません" description="統括から店舗を登録してください。" /></div>
+  } else {
+    body = (
+      <>
+        {first ? (
+          <div className={styles.closeRow}>
+            <div className={styles.closeBand} role="status" data-close-band="">
+              <Bell size={18} aria-hidden="true" className={styles.closeIcon} />
+              <div className={styles.closeText}>
+                <p className={styles.closeTitle}>{`他の予約サイトの枠を閉じてください（未対応 ${pending.length}件）`}</p>
+                <p className={styles.closeDetail}>
+                  {`${slotTitle(first.startsAt)} の枠が${reasonText(first)} → ${openItems(first).map((item) => item.name).join('・')} の枠を閉じてください`}
+                </p>
+              </div>
+              {firstMedium?.adminUrl ? (
+                <Button href={firstMedium.adminUrl} target="_blank" rel="noopener noreferrer">{`${firstMedium.name}の管理画面を開く ↗`}</Button>
+              ) : null}
+              {canWrite && firstItem ? (
+                <Button onClick={() => void closeOne(firstItem.id, firstItem.name)} disabled={busyId === firstItem.id} aria-label={`${firstItem.name}の枠を閉じた`}>
+                  <Check size={15} aria-hidden="true" />閉じた
+                </Button>
+              ) : null}
+              <TextLink href="/restaurant-test/close-tasks">すべて見る</TextLink>
+            </div>
+          </div>
+        ) : null}
+        <div className={styles.stats}>
+          <KpiBand gridClassName="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <KpiCard
+              presentation="band"
+              title="今日の予約"
+              icon={<CalendarCheck size={13} aria-hidden="true" />}
+              value={summary?.groups ?? null}
+              unit="組"
+              loading={!summary}
+              detail={summary ? sourceBreakdown(summary) : '読み込んでいます'}
+              action={{ label: '予約台帳を開く', href: '/restaurant-test/reservations' }}
+            />
+            <KpiCard
+              presentation="band"
+              title="来店予定"
+              icon={<Users size={13} aria-hidden="true" />}
+              value={summary?.guests ?? null}
+              unit="人"
+              loading={!summary}
+              detail={summary ? (summary.peak ? `いちばん多いのは ${summary.peak.label}（${summary.peak.guests}人）` : '今日の予約はまだありません') : '読み込んでいます'}
+              action={{ label: '時間ごとに見る', href: '/restaurant-test/reservations' }}
+            />
+            <KpiCard
+              presentation="band"
+              title="空席（いま）"
+              icon={<Armchair size={13} aria-hidden="true" />}
+              value={summary?.freeTables ?? null}
+              unit="卓"
+              loading={!summary}
+              detail={summary ? `全 ${summary.totalTables} 卓${summary.counterSeats ? `・カウンター ${summary.counterSeats} 席` : ''}` : '読み込んでいます'}
+              help="動いている卓のうち、いま予約が重なっていない卓の数です。"
+              action={{ label: '席を見る', href: '/restaurant-test/tables' }}
+            />
+            <KpiCard
+              presentation="band"
+              title="未返信の口コミ"
+              icon={<Star size={13} aria-hidden="true" />}
+              value={googleConnected ? google.summary.unrepliedCount : null}
+              unit="件"
+              delta={googleConnected && d.oldestReview ? <Chip tone="warn">{`最長 ${daysAgo(d.oldestReview.createTime, now)}`}</Chip> : null}
+              detail={googleConnected
+                ? `Google ★${google.connection.averageRating ?? '—'}（${google.connection.totalReviewCount ?? 0}件）`
+                : google ? 'Google ビジネスとつないでいません' : '読み込めませんでした'}
+              action={googleConnected ? { label: '返信する', href: '/restaurant-test/google' } : { label: 'つなぐ', href: '/settings/sns' }}
+            />
+          </KpiBand>
+        </div>
+        <DashboardRow
+          asideSize="wide"
+          aside={<SidePanel media={d.media} google={google} latestReview={d.latestReview} canWrite={canWrite} now={now} />}
+        >
+          <TodayTable
+            rows={d.today}
+            canWrite={canWrite}
+            busyId={busyId}
+            onVisited={(id) => void markVisited(id)}
+            onUndo={(id) => void undoVisited(id)}
+          />
+        </DashboardRow>
+      </>
+    )
+  }
 
   return (
-    <>
-      <StatRow>
-        <Stat label="予約数" value={`${upcoming.length}件`} note="今日以降の有効予約" help="今日以降に開始する、取消・無断キャンセルでない予約の件数です。" />
-        <Stat label="ご来店予定" value={`${guestCount}名`} note="今日以降の人数合計" help="今日以降の有効予約の人数の合計です。来店済みの過去分は含みません。" />
-        <Stat label="空席率" value={`${Math.max(0, Math.round((1 - guestCount / Math.max(totalCapacity, 1)) * 100))}%`} note="全店舗の概算" help="分母は全店舗の収容数の合計、分子は今日以降の有効予約の人数の合計です。時間帯ごとの空きではありません。" />
-        <Stat label="売上予測" value={priced.length ? formatYen(revenue) : '—'} note={priced.length ? `コース設定 ${priced.length}件分` : 'コース設定がありません'} help="コース単価×人数の合計です。席のみ（コース未設定）の予約は含みません。固定の客単価では計算しません。" />
-        <Stat label="未返信口コミ" value={`${unreplied}件`} note="Google口コミ" warning={unreplied > 0} />
-      </StatRow>
-      <Panel
-        title="店舗一覧"
-        description="本部から全店の予約と接続状態を確認します。"
-        aside={<PanelAside tone={issues ? 'warning' : 'success'}>{issues ? `${issues}件の要確認` : 'すべて正常'}</PanelAside>}
-        flush
-      >
-        <div role="table" aria-label="店舗一覧" className={styles.table}>
-          <div role="row" className={styles.headRow}>
-            {/* 絵の列幅：店舗は残り・エリア100・予約64・予定人数80・収容数72・状態90×3。 */}
-            <span role="columnheader" className={`${styles.cell} ${styles.colStore}`}>店舗</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colArea}`}>エリア</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colCount} ${styles.num}`}>予約</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colGuests} ${styles.num}`}>予定人数</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colCapacity} ${styles.num}`}>収容数</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colState}`}>LINE</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colState}`}>Google</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colState}`}>予約媒体</span>
-          </div>
-          {data.stores.map((item) => {
-            const reservations = upcoming.filter((r) => r.store_id === item.id)
-            const connector = data.connectors.find((c) => c.store_id === item.id && c.provider === 'restaurant_board')
-            return (
-              <div key={item.id} role="row" className={styles.row}>
-                <span role="cell" className={`${styles.cell} ${styles.colStore}`}>
-                  <span className={styles.storeName} title={item.name}>{item.name}</span>
-                  <span className={styles.storeCode}>{item.code}</span>
-                </span>
-                <span role="cell" className={`${styles.cell} ${styles.colArea}`}>{item.area || '—'}</span>
-                <span role="cell" className={`${styles.cell} ${styles.colCount} ${styles.num}`}>{`${reservations.length}件`}</span>
-                <span role="cell" className={`${styles.cell} ${styles.colGuests} ${styles.num}`}>{`${reservations.reduce((s, r) => s + r.guest_count, 0)}名`}</span>
-                <span role="cell" className={`${styles.cell} ${styles.colCapacity} ${styles.num}`}>{`${item.capacity}席`}</span>
-                <span role="cell" className={`${styles.cell} ${styles.colState}`}><Status value={item.line_status} /></span>
-                <span role="cell" className={`${styles.cell} ${styles.colState}`}><Status value={item.google_status} /></span>
-                <span role="cell" className={`${styles.cell} ${styles.colState}`}><Status value={connector?.status || 'unconfigured'} /></span>
-              </div>
-            )
-          })}
-        </div>
-      </Panel>
-      <HalfGrid>
-        <Panel title="全店アクション" description="検証中は下書き作成まで。外部配信は行いません。" >
-          <div className={styles.actionBody}>
-          <Button variant="secondary" disabled className={styles.actionButton}><Store aria-hidden className={styles.actionIcon} />Google 一斉投稿（未接続）</Button>
-          <Button variant="secondary" disabled className={styles.actionButton}><Send aria-hidden className={styles.actionIcon} />LINE 一斉配信（未接続）</Button>
-          </div>
-        </Panel>
-        <Panel title="同期方針" description="安全な検証のため固定しています。" >
-          <div className={styles.noteBody}>
-          <p className={styles.noteTitle}>レストランボード中心の一方向受信</p>
-          <p className={styles.noteText}>取得できない媒体は個別受信口を追加します。予約台帳から外部媒体への在庫・予約更新は0件です。</p>
-          </div>
-        </Panel>
-      </HalfGrid>
-    </>
+    <DashboardPage
+      boardId="hKRRF"
+      headingSize="compact"
+      title="今日のお店"
+      description={d.store ? headDescription(d.hours, d.updatedAt) : undefined}
+      actions={actions}
+      tabs={<StoreTabs current="dashboard" flush />}
+    >
+      {body}
+      {d.store ? (
+        <>
+          <PhoneReservationDrawer
+            open={phoneOpen}
+            accountId={d.accountId}
+            storeId={d.store.id}
+            tables={tables}
+            onClose={() => setPhoneOpen(false)}
+            onSaved={({ lineFailed }) => {
+              setPhoneOpen(false)
+              notifyToast(lineFailed ? '予約は入れました。LINE の確認は送れていません。' : '予約を入れました。', lineFailed ? { tone: 'error' } : undefined)
+              void d.reload()
+            }}
+          />
+          <WalkInDialog
+            open={walkInOpen}
+            accountId={d.accountId}
+            storeId={d.store.id}
+            tables={tables}
+            onClose={() => setWalkInOpen(false)}
+            onSaved={({ seated }) => {
+              setWalkInOpen(false)
+              notifyToast(seated ? '入店にしました。' : '席は取りました。来店の印は付けられませんでした。表の［来店］を押してください。', seated ? undefined : { tone: 'error' })
+              void d.reload()
+            }}
+          />
+        </>
+      ) : null}
+    </DashboardPage>
   )
 }
 
-export default function DashboardV8() {
-  /* 今の画面と同じ「今日以降の有効予約」の取り方（R103/R104）。 */
-  const [todayStartIso] = useState(() => { const day = new Date(); day.setHours(0, 0, 0, 0); return day.toISOString() })
-  const query = useMemo(() => ({ from: todayStartIso, status: 'pending,confirmed,seated,visited', limit: 500, offset: 0 }), [todayStartIso])
-  return (
-    <RestaurantFrame
-      boardId="CHz31"
-      title="店舗ダッシュボード"
-      description="全店舗の予約・空席・連携状態を、本部からまとめて確認します。"
-      query={query}
-    >
-      {({ data }) => <DashboardBoard data={data} />}
-    </RestaurantFrame>
-  )
+/** `?view=stores` のときは全店の一覧（前の店舗ダッシュボード `CHz31`）。 */
+export default function RestaurantDashboardV8() {
+  const [view, setView] = useState<'today' | 'stores' | null>(null)
+  useEffect(() => {
+    setView(new URLSearchParams(window.location.search).get('view') === 'stores' ? 'stores' : 'today')
+  }, [])
+  if (view === null) return null
+  return view === 'stores' ? <StoresDashboardV8 /> : <TodayStore />
 }

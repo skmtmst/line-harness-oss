@@ -71,6 +71,8 @@ export type DialogProps = {
    * `'cancel'` を渡す。×と背景は取消と同じ動きのまま変えない。
    */
   primaryAction?: 'confirm' | 'cancel'
+  /** ★V8：下のボタンの並び。省くと今までどおり右寄せ。'center' は中央（E-3 ウォークイン PUWyq）。v7 では効かない。 */
+  footerAlign?: 'center'
 }
 
 /** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
@@ -102,6 +104,7 @@ export default function Dialog({
   confirmation = false,
   compact = false,
   primaryAction = 'confirm',
+  footerAlign,
 }: DialogProps) {
   const titleId = useId()
   const descriptionId = useId()
@@ -163,6 +166,7 @@ export default function Dialog({
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-size={size}
+      data-footer-align={footerAlign}
       data-design-width={designWidth ? '' : undefined}
       data-design-header-padding={designHeaderPadding ? '' : undefined}
       data-design-header-height={designHeaderHeight ? '' : undefined}
