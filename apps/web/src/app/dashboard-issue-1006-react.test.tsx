@@ -215,6 +215,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   await act(async () => {
     for (const save of net.putSaves) save.resolve(jsonResponse(fail(400)))
     await Promise.resolve()
@@ -296,13 +297,15 @@ describe('DASH-03 新アカウントの読込中に前の予約・運用状態�
     expect(todayCard('今日の予約').textContent).toContain('1')
 
     net.bookings = () => new Promise<Json>(() => {})
+    // 待ちは偽の時計で進める（本物の時間を待たない）。骨組みの 0.3 秒は読み始めから数えるので、切り替える前に替える。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await switchAccount('account-b')
     const card = todayCard('今日の予約')
     /*
      * #673 で読込中の件数は「—」ではなく骨組み（スケルトン）に替わった。
      * ★V7 仕上げ §3 で骨組みは 0.3 秒待ってから出るので、待ってから確かめる。
      */
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(350) })
     expect(card.querySelector('[data-skeleton]')).not.toBeNull()
     expect(card.querySelector('[aria-busy="true"]')).not.toBeNull()
     expect(card.textContent).not.toContain('1件')

@@ -18,7 +18,7 @@ const modules = [
   'row-actions.module.css',
   'data-table.module.css',
   'page-header.module.css',
-  'note-bar.module.css',
+  // note-bar.module.css は NoteBar が読まなくなった（使う所が無い）ので 2026-10-07 に消した。
   'side-cards.module.css',
   'sticky-bar.module.css',
   'radio-card.module.css',

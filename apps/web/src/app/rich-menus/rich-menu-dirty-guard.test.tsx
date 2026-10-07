@@ -215,6 +215,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   cleanup()
 })
 
@@ -581,9 +582,13 @@ describe('公開前チェックの人数（未保存条件）', () => {
     await flush()
   }
 
-  /** 人数の再取得は250msのデバウンス。実時間で待ってから通信の引数を見る。 */
+  /**
+   * 人数の再取得は250msのデバウンス。偽の時計で進めてから通信の引数を見る（本物の時間を待たない）。
+   * デバウンスは条件を直した瞬間から数えるので、直す前に偽の時計へ替える（editConditionUnsaved の前）。
+   */
   async function waitPreviewFetch() {
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+    vi.useRealTimers()
     await flush()
   }
 
@@ -594,6 +599,7 @@ describe('公開前チェックの人数（未保存条件）', () => {
     await flush()
     await screen.findByText('このメニューを出す相手')
 
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await editConditionUnsaved()
     await waitPreviewFetch()
 
