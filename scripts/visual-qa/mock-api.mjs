@@ -1936,7 +1936,11 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
      */
     return OPERATOR_NOTIFICATION_RECIPIENTS
   }
-  if (method === 'POST' && /^\/api\/notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
+  /* 設計 sDXNy：作る画面の「公開」は下書きを保存してから確認の窓を開く。保存は新しい下書きを返す。 */
+  if (method === 'POST' && pathname === '/api/line-notifications/operator-rules') {
+    return { ...OPERATOR_NOTIFICATION_RULES[0], id: 'operator-rule-new', status: 'draft', isActive: false, version: 1 }
+  }
+  if (method === 'POST' && /^\/api\/(line-)?notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
     return { accepted: 2, excluded: 0, failed: 0, duplicate: 0 }
   }
   const scenarioSimulation = /^\/api\/scenarios\/([^/]+)\/simulate$/.exec(pathname)
