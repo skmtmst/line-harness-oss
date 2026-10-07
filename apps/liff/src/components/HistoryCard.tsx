@@ -2,29 +2,57 @@ import type { BookingHistoryItem } from '../lib/api.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import Card from './ui/Card.js';
 import Badge from './ui/Badge.js';
+import Button from './ui/Button.js';
 
 /**
  * 予約の履歴の札 (★V8・YvTJ3)。日付の四角＋メニュー名＋状態の札。
- * 「日時を変える／キャンセル」の2ボタンは機能追加 F-6・API待ちのため付けない
- * (LIFF から予約を変える・消す口はまだ無い)。
+ * 下に「日時を変える／キャンセル」の2ボタン (F-6 本人の変更・取消)。
+ * 押す口が渡されたときだけ出す (履歴の口が版などを返さないと送れないため、呼び側が決める)。
  */
-export default function HistoryCard({ booking }: { booking: BookingHistoryItem }) {
+export default function HistoryCard({
+  booking,
+  onChange,
+  onCancel,
+  disabled = false,
+}: {
+  booking: BookingHistoryItem;
+  onChange?: () => void;
+  onCancel?: () => void;
+  disabled?: boolean;
+}) {
   const meta = STATUS_META[booking.status] ?? { label: booking.status, tone: 'neutral' as const };
+  const hasActions = Boolean(onChange || onCancel);
   return (
     <li>
-      <Card className="flex items-center gap-3 p-3.5">
-        <div className="flex w-14 shrink-0 flex-col items-center rounded-(--liff-radius) bg-liff-off-bg py-1.5">
-          <span className="text-xs font-semibold whitespace-nowrap text-ink">
-            {utcToJstMd(booking.starts_at)}
-          </span>
-          <span className="text-[11px] text-liff-sub">{utcToJstHm(booking.starts_at)}</span>
-        </div>
-        <div className="min-w-0 flex-1 space-y-[3px]">
-          <div className="truncate text-sm font-bold text-ink" title={booking.menu_name}>
-            {booking.menu_name}
+      <Card className="flex flex-col gap-2.5 p-3.5">
+        <div className="flex items-center gap-3">
+          <div className="flex w-14 shrink-0 flex-col items-center rounded-(--liff-radius) bg-liff-off-bg py-1.5">
+            <span className="liff-num text-[15px] leading-[18px] font-bold whitespace-nowrap text-ink">
+              {utcToJstMd(booking.starts_at)}
+            </span>
+            <span className="liff-num text-[11px] leading-[13px] text-liff-sub">{utcToJstHm(booking.starts_at)}</span>
           </div>
-          <Badge tone={meta.tone}>{meta.label}</Badge>
+          <div className="flex min-w-0 flex-1 flex-col items-start gap-[3px]">
+            <div className="w-full truncate text-sm leading-normal font-bold text-ink" title={booking.menu_name}>
+              {booking.menu_name}
+            </div>
+            <Badge tone={meta.tone}>{meta.label}</Badge>
+          </div>
         </div>
+        {hasActions && (
+          <div className="flex gap-2">
+            {onChange && (
+              <Button variant="secondary" className="flex-1" disabled={disabled} onClick={onChange}>
+                日時を変える
+              </Button>
+            )}
+            {onCancel && (
+              <Button variant="secondary" className="flex-1" disabled={disabled} onClick={onCancel}>
+                キャンセル
+              </Button>
+            )}
+          </div>
+        )}
       </Card>
     </li>
   );
