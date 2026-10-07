@@ -195,7 +195,7 @@ describe('一括配信の詳細（xOXuY ⑤ 送った結果）', () => {
     } })
     hq.retry.mockResolvedValue({ data: {} })
     render(<HqBroadcastDetail />)
-    await screen.findByText('⑤ 送った結果')
+    await screen.findByText('アカウントごとの送った結果')
     expect(screen.getByText('送れた')).toBeTruthy()
     expect(screen.getAllByText('失敗')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: /失敗した店にやり直す/ }))

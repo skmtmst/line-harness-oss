@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Ban, CirclePause, PencilLine, RotateCcw, Send } from 'lucide-react'
 import type { HqBroadcastRun } from '@line-crm/shared'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { PageFrame } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -24,8 +24,10 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError, describeSaveFailure } from '@/lib/api'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { type ResultTarget, canRetry, failedCount, failureLines, fromApiContent, jpDateTime, preflightBadge, resultBadge, runBadge, sendTotals } from './model'
+import { type ResultTarget, canRetry, failedCount, failureLines, fromApiContent, jpDateTime, preflightBadge, previewText, resultBadge, runBadge, sendTotals } from './model'
 import styles from './detail.module.css'
+import detailStyles from '../broadcast-detail/detail.module.css'
+import BroadcastPhone from '../broadcast-detail/phone'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 const n = (value: number) => value.toLocaleString('ja-JP')
@@ -57,7 +59,7 @@ export function ResultCard({ run, canManage, onRetry, onRetryAll }: {
     <section className={styles.card} aria-labelledby="hq-bc-result">
       <div className={styles.cardHead}>
         <div className={styles.cardText}>
-          <h2 id="hq-bc-result" className={styles.cardTitle}>⑤ 送った結果</h2>
+          <h2 id="hq-bc-result" className={styles.cardTitle}>アカウントごとの送った結果</h2>
           <p className={styles.cardSub}>{`${jpDateTime(run.scheduledAt)} ・ ${n(sentTo.length)}店に送信 ・ 成功 ${n(success)}人 ・ 失敗 ${n(failed)}人`}</p>
         </div>
         {canManage && retryable.length > 0 ? (
@@ -252,36 +254,101 @@ export default function HqBroadcastDetail() {
     'retry-all': { title: '失敗した店にやり直します', description: '一時的に失敗した人と、止める前に送れなかった人にだけ送ります。届いた人には二重に送りません。', label: 'やり直す' },
   }
 
+  /* 店の配信の詳細（M2tJM）と同じ頭・数の帯・右の「配信した設定」とスマホ。統括だけの口はアカウント別の内訳（表）とやり直し。 */
+  const sentTo = run ? run.targets.filter((t) => !t.excluded) : []
+  const delivered = sentTo.reduce((sum, t) => sum + (t.successCount ?? 0), 0)
+  const failedPeople = sentTo.reduce((sum, t) => sum + failedCount(t), 0)
+  const skipped = run ? run.targets.filter((t) => t.excluded || t.status === 'excluded').length : 0
+  const audience = run?.input?.audience?.kind === 'tag' ? `タグ：${run.input.audience.tagName}` : '友だち全員'
+  const people = run ? (run.status === 'prepared' ? (totals?.sendPeople ?? 0) : sentTo.reduce((sum, t) => sum + (t.totalCount ?? 0), 0)) : 0
+  const bubbles = (() => { try { return run?.input?.messageBubblesJson ? JSON.parse(run.input.messageBubblesJson) : null } catch { return null } })()
+  const messageText = bubbles?.length ? (bubbles[0].type === 'coupon' ? 'クーポン 1通' : 'リッチメッセージ 1通') : 'テキスト 1通'
+  const exampleStore = sentTo[0]?.accountName ?? '店の名前'
+  const tone = badge?.tone === 'success' ? 'success' : badge?.tone === 'danger' ? 'danger' : badge?.tone === 'warning' ? 'warning' : 'neutral'
+  const stat = (label: string, value: number | null, unit: string, detail: string) => (
+    <div className={detailStyles.stat}>
+      <p className={detailStyles.statLabel}>{label}</p>
+      <p className={detailStyles.statValue}>
+        <span className={detailStyles.statNum}>{value == null ? '—' : n(value)}</span>
+        {unit ? <span className={detailStyles.statUnit}>{unit}</span> : null}
+      </p>
+      <p className={detailStyles.statDetail}>{detail}</p>
+    </div>
+  )
+
   return (
     <>
-      <PageFrame kind="detail" boardId="xOXuY">
-        <PageHeading
-          headingSize="compact"
-          title={run?.title ?? '一括配信'}
-          description={run ? `${run.scheduledAt ? jpDateTime(run.scheduledAt) : 'すぐ送る'} ・ ${n(run.targets.filter((t) => !t.excluded).length)}店` : undefined}
-          identity={badge ? <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge> : undefined}
-          actions={canManage && run ? (
-            <>
+      <PageFrame kind="detail" boardId="M2tJM xOXuY">
+        <header className={detailStyles.head}>
+          <div className={detailStyles.name}>
+            <div className={detailStyles.titleRow}>
+              <h2 className={detailStyles.title} title={run?.title}>{run?.title ?? '一括配信'}</h2>
+              {badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : null}
+            </div>
+            {run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : null}
+          </div>
+          {canManage && run ? (
+            <div className={detailStyles.actions}>
               {run.status === 'prepared' || (live && run.status !== 'stopped') ? (
-                <Button variant="danger" onClick={() => setAsk({ kind: 'cancel' })}><Ban size={15} aria-hidden="true" />取り消す</Button>
+                <Button size="field" variant="danger" onClick={() => setAsk({ kind: 'cancel' })}><Ban size={15} aria-hidden="true" />取り消す</Button>
               ) : null}
               {live && run.status !== 'stopped' ? (
-                <Button onClick={() => setAsk({ kind: 'stop' })}><CirclePause size={15} aria-hidden="true" />止める</Button>
+                <Button size="field" onClick={() => setAsk({ kind: 'stop' })}><CirclePause size={15} aria-hidden="true" />止める</Button>
               ) : null}
               {run.status === 'prepared' ? (
-                <Button href={`/hq/broadcasts/new?id=${encodeURIComponent(run.id)}`}><PencilLine size={15} aria-hidden="true" />下書きを直す</Button>
+                <Button size="field" href={`/hq/broadcasts/new?id=${encodeURIComponent(run.id)}`}><PencilLine size={15} aria-hidden="true" />下書きを直す</Button>
               ) : null}
               {run.status === 'prepared' ? (
-                <Button variant="primary" onClick={() => setAsk({ kind: 'send' })} disabled={(totals?.sendStores ?? 0) === 0} title={(totals?.sendStores ?? 0) === 0 ? '送れる店がありません' : undefined}>
+                <Button size="field" variant="primary" onClick={() => setAsk({ kind: 'send' })} disabled={(totals?.sendStores ?? 0) === 0} title={(totals?.sendStores ?? 0) === 0 ? '送れる店がありません' : undefined}>
                   <Send size={15} aria-hidden="true" />{`${n(totals?.sendStores ?? 0)}店に送る`}
                 </Button>
               ) : null}
-            </>
-          ) : undefined}
-        />
-        <div className={styles.body}>
-          {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
-          {body}
+            </div>
+          ) : null}
+        </header>
+        <div className={detailStyles.split}>
+          <div className={detailStyles.main}>
+            {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
+            {run && run.status !== 'prepared' ? (
+              <>
+                <h3 className={detailStyles.secTitle}>配信結果</h3>
+                <div className={detailStyles.stats}>
+                  {stat('届いた', delivered, '人', `送ったアカウント ${n(sentTo.length)}`)}
+                  {stat('失敗', failedPeople, '人', failedPeople > 0 ? '下の内訳からやり直せます' : '失敗はありません')}
+                  {stat('開いた', null, '', '統括ではまだ数えていません')}
+                  {stat('外した', skipped, 'アカウント', skipped > 0 ? '送らなかったアカウント' : 'なし')}
+                </div>
+              </>
+            ) : null}
+            <section className={detailStyles.section}>
+              <h3 className={detailStyles.secTitle}>アカウント別の内訳</h3>
+              {body}
+            </section>
+          </div>
+          <aside className={detailStyles.side} aria-label="配信した設定とメッセージ">
+            <h3 className={detailStyles.secTitle}>配信した設定</h3>
+            <dl className={detailStyles.rows}>
+              {[
+                ['送るアカウント', `${n(sentTo.length)}アカウント${skipped ? `（外した ${n(skipped)}）` : ''}`],
+                ['対象', `${audience} ${n(people)}人`],
+                [run?.status === 'prepared' ? '送る日時' : '送った日時', run?.scheduledAt ? jpDateTime(run.scheduledAt) : 'すぐ送る'],
+                ['メッセージ', messageText],
+              ].map(([label, value]) => (
+                <div key={label} className={detailStyles.row}><dt>{label}</dt><dd title={value}>{value}</dd></div>
+              ))}
+            </dl>
+            {run ? (
+              <>
+                <h3 className={detailStyles.secTitle}>メッセージ</h3>
+                <BroadcastPhone
+                  broadcast={{ messageType: run.input?.messageType ?? 'text', messageContent: previewText(fromApiContent(run.input?.messageContent ?? ''), exampleStore), messageBubbles: bubbles }}
+                  accountName={exampleStore}
+                  chip={run.scheduledAt ? jpDateTime(run.scheduledAt) : '送る前の見本'}
+                  time={run.scheduledAt ? jpDateTime(run.scheduledAt).replace(/^.*）/, '') : '—'}
+                />
+              </>
+            ) : null}
+          </aside>
         </div>
       </PageFrame>
       {ask ? (
