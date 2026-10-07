@@ -13,6 +13,7 @@ const Affiliate = lazy(() => import('./pages/Affiliate.js'));
 const Webinar = lazy(() => import('./pages/Webinar.js'));
 const Form = lazy(() => import('./pages/Form.js'));
 const EventWaitlistOffer = lazy(() => import('./pages/EventWaitlistOffer.js'));
+const VisitStamps = lazy(() => import('./pages/VisitStamps.js'));
 
 function Loading() {
   return <LoadingView />;
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/events/:id/done" element={<EventDone />} />
         <Route path="/events/:id" element={<Event />} />
         <Route path="/affiliate" element={<Affiliate />} />
+        <Route path="/visit-stamps" element={<VisitStamps />} />
         <Route path="/webinar/:slug" element={<Webinar />} />
         <Route path="/forms/:id" element={<Form />} />
         <Route path="/" element={<Navigate to="/booking" replace />} />

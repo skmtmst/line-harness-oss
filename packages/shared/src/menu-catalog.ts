@@ -95,6 +95,8 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
       { id: 'booking-bookings', featureKey: 'booking' },
       { id: 'booking-menus', featureKey: 'booking' },
       { id: 'events', featureKey: 'events' },
+      // 提案 E-7（2026-10-07）：来店スタンプ。飲食店もサロンも使う。鍵は予約と同じ（専用の鍵は無い）。
+      { id: 'visit-stamps', featureKey: 'booking' },
       { id: 'booking-own-shifts', featureKey: 'booking' },
     ],
   },

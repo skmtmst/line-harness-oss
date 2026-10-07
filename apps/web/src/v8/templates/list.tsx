@@ -1158,7 +1158,7 @@ export default function TemplatesListV8() {
                     <NameCell
                       name={
                         <div className={styles.dotLine}>
-                          <FolderDotName folder={folderDotOf(t)} dot={!narrow}>
+                          <FolderDotName folder={folderDotOf(t)}>
                             <Link href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
                               {t.name}
                             </Link>

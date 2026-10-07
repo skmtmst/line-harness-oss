@@ -61,6 +61,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { describeFriendAddFailure } from './failure'
 import { useCursorStack } from './use-cursor-stack'
 import styles from './list.module.css'
@@ -372,6 +373,11 @@ function FriendAddList() {
       void load()
     }
   }
+
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（自動応答と同じ動き）。 */
+  const liveOrder = useLiveReorder(regularItems, (rule) => rule.id, dragId)
+  const bodyRef = useRef<HTMLTableSectionElement>(null)
+  useFlipRows(bodyRef, liveOrder.shown.map((rule) => rule.id).join(','))
 
   const dropOn = (targetId: string) => {
     const from = dragId
@@ -708,15 +714,23 @@ function FriendAddList() {
         <div className={styles.tableWrap}>
           <DataTable className={styles.table}>
             <TableHead />
-            <tbody>
-              {regularItems.map((rule, index) => (
-                <Tr key={rule.id} className={styles.row} data-table-layout="columns" data-row-id={rule.id}>
+            <tbody ref={bodyRef}>
+              {liveOrder.shown.map((rule, index) => (
+                <Tr
+                  key={rule.id}
+                  className={styles.row}
+                  data-table-layout="columns"
+                  data-row-id={rule.id}
+                  data-reorder-id={rule.id}
+                  onDragEnter={() => liveOrder.enter(rule.id)}
+                  onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                  onDrop={dragId ? () => dropOn(liveOrder.dropTarget(rule.id)) : undefined}
+                >
                   <Td
                     className={styles.colOrder}
                     draggable={canReorder}
                     onDragStart={() => setDragId(rule.id)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => dropOn(rule.id)}
+                    onDragEnd={() => setDragId(null)}
                     title={canReorder ? '上下に動かして並び替え' : reorderReason}
                   >
                     <span className={styles.orderBox}>

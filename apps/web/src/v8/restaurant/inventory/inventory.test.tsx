@@ -46,7 +46,7 @@ beforeEach(() => {
     ? { success: true, data: channels }
     : { success: true, data: [{ id: 'mail-1', storeId: 'store-1', receivedAt: at(0, 18, 20), status: 'quarantined', reason: '人数の欄が読めませんでした', mediaCode: 'tabelog', mediaName: '食べログ' }], total: 1 }))
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
 
 describe('Y8SjT2 予約枠・在庫', () => {
   it('配分・在庫の表・いちばん混む時間の卓と「行を押したとき」の箱・開ける時間が出る', async () => {

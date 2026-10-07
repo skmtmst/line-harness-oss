@@ -251,4 +251,29 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
       vi.useRealTimers()
     }
   })
+  it('統括から来た配信（提案 E-9・l3RQH）は「統括から」の札と鍵を出し、「…」は見る・複製だけ（編集・削除を出さない）', async () => {
+    flushListUrlState()
+    window.history.replaceState(null, '', '/broadcasts')
+    const hqRow = { ...base, id: 'bc-hq', title: '1月の限定メニュー', fromHeadquarters: true, hqRunId: 'run-1', editable: false }
+    listBroadcasts.mockImplementation(async () => ({
+      success: true,
+      data: [hqRow, rowB],
+      kpis: { scheduled: 1, thisMonth: 2, delivered: 0, openRate: 0, drafts: 1 },
+      statusCounts: { all: 2, scheduled: 1, draft: 1, pending_approval: 0, sent: 0, failed: 0 },
+      pagination: { total: 2, limit: 20, cursor: 0, nextCursor: null },
+    }))
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    const rowOf = (title: string) => [...host.querySelectorAll('tr')].find((tr) => tr.textContent?.includes(title))
+    expect(rowOf('1月の限定メニュー')?.textContent).toContain('統括から')
+    expect(rowOf('未購入者フォロー')?.textContent).not.toContain('統括から')
+    const trigger = rowOf('1月の限定メニュー')?.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement
+    act(() => { trigger.click() })
+    const labels = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent?.trim())
+    expect(labels).toContain('見る')
+    expect(labels).toContain('複製')
+    expect(labels.some((label) => label?.includes('削除'))).toBe(false)
+    expect(labels.some((label) => label?.includes('編集'))).toBe(false)
+    expect(labels.some((label) => label?.includes('フォルダへ移す'))).toBe(false)
+  })
 })

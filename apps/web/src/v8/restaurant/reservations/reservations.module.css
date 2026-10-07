@@ -615,6 +615,25 @@
   font-size: var(--text-label);
 }
 
+/* その日の臨時休業・貸切（提案 E-10）：琥珀の帯＋右に休業日・貸切への行き先 */
+.closureBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-l);
+  padding: var(--tpl-rs-band-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+}
+
+.closureText {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+}
+
 /* 顧客カルテ（3枚） */
 .karte {
   display: flex;
