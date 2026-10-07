@@ -835,13 +835,38 @@ button.stepTitle:hover {
   color: var(--color-action);
 }
 
+/* 止める確認（OPGU2）：説明・数の行・ボタンを間 12 で縦に並べる。 */
+.stopBody {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--tpl-bc2-stop-gap);
+}
+
+.stopDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bc2-stop-desc-size);
+  line-height: var(--tpl-bc2-stop-desc-lh);
+}
+
 .stopRow {
   display: flex;
   align-items: center;
   gap: var(--tpl-sd-stop-row-gap);
   margin: 0;
   padding: var(--tpl-sd-stop-row-pad);
+  border-bottom: 1px solid var(--color-divider);
   font-size: var(--tpl-sd-stop-size);
+}
+
+/* 絵のボタンは窓の帯ではなく本文の続き：上に線・間 14・右寄せ。 */
+.stopFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-bc2-stop-footer-gap);
+  padding-top: var(--tpl-bc2-stop-footer-pad);
+  border-top: 1px solid var(--color-hairline);
 }
 
 .stopRow > dt {

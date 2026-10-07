@@ -5832,7 +5832,7 @@ const bookingMenuRules = (windowDays, cutoffHours) => ({
   },
 })
 export const BOOKING_MENUS = [
-  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 105, buffer_after_minutes: 15, base_price: 8400, price_mode: 'fixed', version: 1, sort_order: 1, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 3, effectiveBookingRules: bookingMenuRules(60, 24) },
+  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 105, buffer_after_minutes: 15, base_price: 8400, price_mode: 'fixed', version: 1, sort_order: 1, is_active: 1, auto_tag_id: null, intake_question: '気になるところ・アレルギーがあれば教えてください', concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 3, effectiveBookingRules: bookingMenuRules(60, 24) },
   { id: 'bm-2', name: 'トリミング（中型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 150, buffer_after_minutes: 15, base_price: 12600, price_mode: 'fixed', version: 1, sort_order: 2, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(60, 24) },
   { id: 'bm-3', name: 'シャンプーのみ', category_label: 'トリミング', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 4200, price_mode: 'fixed', version: 1, sort_order: 3, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 60, cutoff_hours_before: 12, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 1, effectiveBookingRules: bookingMenuRules(60, 12) },
   { id: 'bm-4', name: '爪切り', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, price_mode: 'fixed', version: 1, sort_order: 6, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 2) },
@@ -5995,6 +5995,31 @@ for (const staff of BOOKING_AVAILABILITY.by_staff) {
       state: slot.start === '14:00' ? 'full' : 'limited',
     })
   }
+}
+
+/*
+  予約設定の右の写し（お客さまの予約画面）が読む空き。店舗のルールを当てた見え方（apply_store_rules=1）。
+  板 yRPxl・KRgTQ・x1OZS6 の写し：金 10/2 から5日（空き・空き・満・休み・空き）、10/2 は 9:00〜16:00 の6枠で 10:00・16:00 が満。
+  ほかの画面（予約台帳・新しい予約・勤務）は BOOKING_AVAILABILITY のまま。
+*/
+const storeSlot = (date, start, end, remaining) => ({ date, start, end, capacity: 2, remaining, state: remaining > 0 ? 'limited' : 'full' })
+export const BOOKING_AVAILABILITY_STORE_VIEW = {
+  by_staff: [
+    {
+      staff_id: 'bs-1', display_name: '佐々木',
+      slots: [
+        storeSlot('2026-10-02', '09:00', '10:45', 1),
+        storeSlot('2026-10-02', '10:00', '11:45', 0),
+        storeSlot('2026-10-02', '13:00', '14:45', 1),
+        storeSlot('2026-10-02', '14:00', '15:45', 1),
+        storeSlot('2026-10-02', '15:00', '16:45', 1),
+        storeSlot('2026-10-02', '16:00', '17:45', 0),
+        storeSlot('2026-10-03', '10:00', '11:45', 1),
+        storeSlot('2026-10-06', '13:00', '14:45', 1),
+      ],
+    },
+  ],
+  closed_dates: ['2026-10-05'],
 }
 
 /*
@@ -8188,61 +8213,139 @@ export const NEN_MEMBER_LIST = {
   ],
 }
 
-/** 然-NEN- マイペットの一覧。本物は `GET /api/nen/pets` の形。 */
+/**
+ * 然-NEN- マイペットの一覧。本物は `GET /api/nen/pets` の形。
+ * ★V8-B 板 wTIej・t2SMXX・eLjeQ（マイペット）の絵の8匹（犬4・猫3・その他1）に合わせた。
+ */
+const nenPet = (id, name, callName, gender, animalType, breed, birthday, ageLabel, weightKg, neutered, activityLevel, activityLabel, productName, feeding, weightUpdatedAt, weightStale, owner) => ({
+  id, name, callName, gender, animalType, breed, birthday, ageLabel, weightKg, neutered, activityLevel, activityLabel, productName, feeding,
+  imageUrl: null, updatedAt: weightUpdatedAt, weightUpdatedAt, weightStale, owner,
+})
+const nenOwner = (friendId, name, customerId) => ({ friendId, name, pictureUrl: null, customerId })
 export const NEN_PET_LIST = {
   items: [
-    {
-      id: 'nen-pet-momo', name: 'もも', callName: 'ももちゃん', gender: 'female', animalType: 'dog',
-      breed: 'トイ・プードル', birthday: '2022-09-02', ageLabel: '4歳', weightKg: 3.2,
-      neutered: 'yes', activityLevel: 'normal', activityLabel: 'ふつう', productName: '鹿肉ミンチ',
-      feeding: { dailyKcal: 320, dailyGrams: 280, factorLabel: '避妊・去勢済み', stageLabel: '成犬', venisonGrams: 60, venisonKcal: 72, treatName: '鹿ジャーキー' },
-      imageUrl: null, updatedAt: '2026-09-06T10:00:00+09:00', weightUpdatedAt: '2026-09-06T10:00:00+09:00', weightStale: false,
-      owner: { friendId: 'friend-1', name: '高橋 直人', pictureUrl: null, customerId: 'customer-1' },
-    },
-    {
-      id: 'nen-pet-sora', name: 'そら', callName: 'そらくん', gender: 'male', animalType: 'cat',
-      breed: 'スコティッシュフォールド', birthday: '2024-08-28', ageLabel: '2歳', weightKg: 4.1,
-      neutered: 'unknown', activityLevel: 'low', activityLabel: 'おだやか', productName: null,
-      feeding: null,
-      imageUrl: null, updatedAt: '2026-08-20T10:00:00+09:00', weightUpdatedAt: '2026-08-20T10:00:00+09:00', weightStale: true,
-      owner: { friendId: 'friend-2', name: '前田 さくら', pictureUrl: null, customerId: 'customer-2' },
-    },
+    nenPet('nen-pet-komugi', 'こむぎ', 'こむぎちゃん', 'female', 'dog', '柴', '2022-04-03', '4歳', 9.2, 'yes', 'normal', 'ふつう', 'ドライフード（成犬）',
+      { dailyKcal: 560, dailyGrams: 128, factorLabel: '避妊・去勢済み', stageLabel: '成犬', venisonGrams: 12, venisonKcal: 56, treatName: '然 鹿肉ジャーキー' },
+      '2026-09-28T10:00:00+09:00', false, nenOwner('friend-3', '田中 明子', '10234')),
+    nenPet('nen-pet-sora', 'そら', 'そらくん', 'male', 'cat', '雑種', '2019-05-10', '7歳', 4.8, 'yes', 'low', '少なめ', 'ドライフード（成猫）',
+      { dailyKcal: 230, dailyGrams: 62, factorLabel: '避妊・去勢済み', stageLabel: '成猫', venisonGrams: 5, venisonKcal: 23, treatName: '然 鹿肉ジャーキー' },
+      '2026-09-20T10:00:00+09:00', false, nenOwner('friend-2', '佐藤 健', '10198')),
+    nenPet('nen-pet-momo', 'もも', 'ももちゃん', 'female', 'dog', 'トイプードル', '2024-09-02', '2歳', 3.1, 'no', 'high', '多め', 'ドライフード（成犬）',
+      { dailyKcal: 250, dailyGrams: 58, factorLabel: 'していない', stageLabel: '成犬', venisonGrams: null, venisonKcal: 0, treatName: null },
+      '2026-09-30T10:00:00+09:00', false, nenOwner('friend-1', '鈴木 真理', '10311')),
+    nenPet('nen-pet-lucky', 'ラッキー', 'ラッキーくん', 'male', 'dog', 'ゴールデン', '2020-06-21', '6歳', 29.8, 'yes', 'high', '多め', 'ドライフード（成犬）',
+      { dailyKcal: 1280, dailyGrams: 340, factorLabel: '避妊・去勢済み', stageLabel: '成犬', venisonGrams: 30, venisonKcal: 128, treatName: '然 鹿肉ジャーキー' },
+      '2026-09-25T10:00:00+09:00', false, nenOwner('friend-4', '高橋 優', null)),
+    nenPet('nen-pet-hana', 'ハナ', 'ハナちゃん', 'female', 'cat', '雑種', '2017-02-14', '9歳', 4.1, 'yes', 'normal', 'ふつう', 'ドライフード（成猫）',
+      { dailyKcal: 210, dailyGrams: 55, factorLabel: '避妊・去勢済み', stageLabel: 'シニア', venisonGrams: null, venisonKcal: 0, treatName: null },
+      '2026-06-12T10:00:00+09:00', true, nenOwner('friend-3', '田中 明子', '10234')),
+    nenPet('nen-pet-maru', 'まる', 'まるくん', 'male', 'dog', 'ミックス', '2015-03-01', '11歳', 12.4, 'yes', 'low', '少なめ', null,
+      { dailyKcal: 610, dailyGrams: null, factorLabel: '避妊・去勢済み', stageLabel: 'シニア', venisonGrams: null, venisonKcal: 0, treatName: null },
+      '2026-05-30T10:00:00+09:00', true, nenOwner('friend-5', '伊藤 さくら', '10455')),
+    nenPet('nen-pet-chibi', 'ちび', 'ちびくん', 'male', 'cat', 'スコティッシュ', '2025-07-07', '1歳', null, 'no', 'normal', 'ふつう', null,
+      null, '', false, nenOwner('friend-1', '鈴木 真理', '10311')),
+    nenPet('nen-pet-piyo', 'ピヨ', 'ピヨちゃん', 'unknown', 'other', 'セキセイインコ', '2023-08-01', '3歳', 0.04, 'unknown', 'normal', 'ふつう', null,
+      null, '2026-09-01T10:00:00+09:00', false, nenOwner('friend-2', '佐藤 健', '10198')),
   ],
-  total: 2,
+  total: 8,
   page: 1,
-  pageSize: 20,
-  kpis: { total: 2, dogs: 1, cats: 1, newThisMonth: 0, computable: 1, staleWeight: 1 },
-  products: [{ id: 'feeding-product-1', name: '鹿肉ミンチ' }],
+  pageSize: 10,
+  kpis: { total: 8, dogs: 4, cats: 3, newThisMonth: 2, computable: 5, staleWeight: 2 },
+  products: [
+    { id: 'feeding-staple-1', name: 'ドライフード（成犬・成猫用／総合栄養食）' },
+    { id: 'feeding-staple-2', name: 'ドライフード（シニア用）' },
+    { id: 'feeding-staple-3', name: 'ウェットフード' },
+    { id: 'feeding-staple-4', name: '手作り（目安）' },
+  ],
   treatLimitPercent: 10,
 }
 
-/** 然-NEN- 健康日記の一覧。本物は `GET /api/nen/health` の形。 */
+/** 然-NEN- ごはんの目安（主食と然の商品）。本物は `GET /api/nen/feeding-products` の形。板 h7A2F。 */
+export const NEN_FEEDING_PRODUCTS = {
+  products: [
+    { id: 'feeding-staple-1', name: 'ドライフード（成犬・成猫用／総合栄養食）', kcalPer100g: 380, isDefault: true, kind: 'staple' },
+    { id: 'feeding-staple-2', name: 'ドライフード（シニア用）', kcalPer100g: 340, isDefault: false, kind: 'staple' },
+    { id: 'feeding-staple-3', name: 'ウェットフード', kcalPer100g: 90, isDefault: false, kind: 'staple' },
+    { id: 'feeding-staple-4', name: '手作り（目安）', kcalPer100g: 150, isDefault: false, kind: 'staple' },
+    { id: 'feeding-nen-1', name: '然 鹿肉ジャーキー', kcalPer100g: 330, isDefault: true, kind: 'nen' },
+    { id: 'feeding-nen-2', name: '然 鹿肉ふりかけ', kcalPer100g: 360, isDefault: false, kind: 'nen' },
+  ],
+  treatLimitPercent: 10,
+  petCount: 8,
+}
+
+/**
+ * 然-NEN- 健康日記の一覧。本物は `GET /api/nen/health` の形。
+ * ★V8-B 板 mIwA4・BVuYh・z2tvtX（健康日記）の絵の6匹に合わせた。
+ */
+const nenHealthRow = (pet, owner, lastLoggedOn, lastLoggedLabel, daysSinceLast, count30d, weightSeries, latestStool, latestAppetite, changes) => ({
+  pet, owner, lastLoggedOn, lastLoggedLabel, daysSinceLast, count30d, totalRecords: count30d * 3,
+  weightSeries, latestWeightKg: weightSeries.filter((v) => v != null).at(-1) ?? null,
+  weightChangePercent: null, latestStool, latestAppetite, changes,
+  concerning: changes.some((change) => change.tone === 'warn'),
+})
+const nenHealthPet = (id, name, callName, animalType, breed, ageLabel) => ({ id, name, callName, animalType, breed, ageLabel, imageUrl: null })
 export const NEN_HEALTH_LIST = {
   items: [
-    {
-      pet: { id: 'nen-pet-momo', name: 'もも', callName: 'ももちゃん', animalType: 'dog', breed: 'トイ・プードル', ageLabel: '4歳', imageUrl: null },
-      owner: { friendId: 'friend-1', name: '高橋 直人', customerId: 'customer-1' },
-      lastLoggedOn: '2026-09-06', lastLoggedLabel: '昨日', daysSinceLast: 1,
-      count30d: 12, totalRecords: 48,
-      weightSeries: [3.1, 3.2, 3.2, 3.1, 3.2, 3.2, 3.3, 3.2],
-      latestWeightKg: 3.2, weightChangePercent: 3.2, latestStool: 'normal', latestAppetite: 'good',
-      changes: [], concerning: false,
-    },
-    {
-      pet: { id: 'nen-pet-sora', name: 'そら', callName: 'そらくん', animalType: 'cat', breed: 'スコティッシュフォールド', ageLabel: '2歳', imageUrl: null },
-      owner: { friendId: 'friend-2', name: '前田 さくら', customerId: 'customer-2' },
-      lastLoggedOn: null, lastLoggedLabel: '記録なし', daysSinceLast: null,
-      count30d: 0, totalRecords: 0,
-      weightSeries: [null, null, null, null, null, null, null, null],
-      latestWeightKg: null, weightChangePercent: null, latestStool: null, latestAppetite: null,
-      changes: [{ key: 'silent', label: '30日記録なし', tone: 'faint' }],
-      concerning: false,
-    },
+    nenHealthRow(nenHealthPet('nen-pet-komugi', 'こむぎ', 'こむぎちゃん', 'dog', '柴', '4歳'), { friendId: 'friend-3', name: '田中 明子', customerId: '10234' },
+      '2026-09-30', '7日前', 7, 28, [9.8, 9.7, 9.7, 9.6, 9.5, 9.4, 9.3, 9.2], '良い', 'ふつう',
+      [{ key: 'weight_drop', label: '体重 −6%（8週）', tone: 'warn' }]),
+    nenHealthRow(nenHealthPet('nen-pet-sora', 'そら', 'そらくん', 'cat', '雑種', '7歳'), { friendId: 'friend-2', name: '佐藤 健', customerId: '10198' },
+      '2026-09-29', '8日前', 8, 25, [4.8, 4.8, 4.9, 4.8, 4.8, 4.8, 4.8, 4.8], 'ふつう', '不良',
+      [{ key: 'appetite_poor', label: '食いつき不良が3回続く', tone: 'warn' }]),
+    nenHealthRow(nenHealthPet('nen-pet-momo', 'もも', 'ももちゃん', 'dog', 'トイプードル', '2歳'), { friendId: 'friend-1', name: '鈴木 真理', customerId: '10311' },
+      '2026-09-30', '7日前', 7, 30, [3.1, 3.1, 3.0, 3.1, 3.1, 3.1, 3.1, 3.1], '良い', '良い', []),
+    nenHealthRow(nenHealthPet('nen-pet-maru', 'まる', 'まるくん', 'dog', 'ミックス', '11歳'), { friendId: 'friend-5', name: '伊藤 さくら', customerId: '10455' },
+      '2026-09-28', '9日前', 9, 22, [12.4, 12.4, 12.4, 12.4, 12.4, 12.4, 12.4, 12.4], 'ふつう', 'ふつう', []),
+    nenHealthRow(nenHealthPet('nen-pet-chibi', 'ちび', 'ちびくん', 'cat', 'スコティッシュ', '1歳'), { friendId: 'friend-1', name: '鈴木 真理', customerId: '10311' },
+      '2026-08-20', '08/20', 48, 0, [null, null, null, null, null, null, null, null], null, null,
+      [{ key: 'silent', label: '30日以上 記録なし', tone: 'faint' }]),
+    nenHealthRow(nenHealthPet('nen-pet-hana', 'ハナ', 'ハナちゃん', 'cat', '雑種', '9歳'), { friendId: 'friend-3', name: '田中 明子', customerId: '10234' },
+      '2026-08-26', '08/26', 42, 0, [null, null, null, null, null, null, null, null], null, null,
+      [{ key: 'silent', label: '30日以上 記録なし', tone: 'faint' }]),
   ],
-  total: 2,
+  total: 6,
   page: 1,
-  pageSize: 20,
-  kpis: { recordsThisWeek: 5, petsWithRecords: 1, petsTotal: 2, concerning: 0, silent30: 1 },
+  pageSize: 10,
+  kpis: { recordsThisWeek: 38, petsWithRecords: 6, petsTotal: 8, concerning: 2, silent30: 2 },
+}
+
+/**
+ * 然-NEN- 健康日記 30日のまとめ。本物は `GET /api/nen/health/:petId/summary` の形。
+ * 板 BVuYh（こむぎ）の絵の記録。ほかのペットは一覧の値から組み立てる（mock-api）。
+ */
+export const NEN_HEALTH_SUMMARY_KOMUGI = {
+  pet: { id: 'nen-pet-komugi', name: 'こむぎ', callName: 'こむぎちゃん', animalType: 'dog', breed: '柴', ageLabel: '4歳', weightKg: 9.2 },
+  owner: { friendId: 'friend-3', name: '田中 明子' },
+  generatedAt: '2026-09-30T10:00:00+09:00',
+  summary: {
+    days: 30,
+    records: 28,
+    weight: { first: 9.8, last: 9.2, min: 9.2, max: 9.8 },
+    heartRateAvg: 96,
+    respiratoryRateAvg: 24,
+    stool: { normal: 24, soft: 4 },
+    appetite: { good: 10, normal: 18 },
+    skin: { normal: 27, itchy: 1 },
+    tearStain: { normal: 27, mild: 1 },
+    notes: [
+      { loggedOn: '2026-09-30', note: '散歩を短めにした' },
+      { loggedOn: '2026-09-26', note: '耳をかいていた' },
+      { loggedOn: '2026-09-18', note: 'トリミング' },
+    ],
+    logs: [
+      { loggedOn: '2026-09-30', weightKg: 9.2, heartRateBpm: 96, respiratoryRateBpm: 24, stool: 'normal', appetite: 'normal', skin: 'normal', tearStain: 'normal' },
+      { loggedOn: '2026-09-28', weightKg: 9.2, heartRateBpm: 98, respiratoryRateBpm: 24, stool: 'normal', appetite: 'normal', skin: 'normal', tearStain: 'normal' },
+      { loggedOn: '2026-09-26', weightKg: 9.3, heartRateBpm: 95, respiratoryRateBpm: 23, stool: 'soft', appetite: 'normal', skin: 'itchy', tearStain: 'normal' },
+      { loggedOn: '2026-09-24', weightKg: 9.3, heartRateBpm: 96, respiratoryRateBpm: 24, stool: 'normal', appetite: 'normal', skin: 'normal', tearStain: 'normal' },
+      { loggedOn: '2026-09-21', weightKg: 9.4, heartRateBpm: 97, respiratoryRateBpm: 25, stool: 'normal', appetite: 'good', skin: 'normal', tearStain: 'mild' },
+      { loggedOn: '2026-09-18', weightKg: 9.4, heartRateBpm: 95, respiratoryRateBpm: 24, stool: 'normal', appetite: 'good', skin: 'normal', tearStain: 'normal' },
+    ],
+  },
+  labels: {
+    stool: { normal: '問題なし', soft: '少し気になる', hard: 'かたい', diarrhea: '下痢', bloody: '血が混じる', other: 'その他' },
+    appetite: { good: '良い', normal: 'ふつう', poor: '不良' },
+  },
 }
 
 /** 友だち追加時配信の実行詳細。本物は `GET /api/friend-add-runs/:id` の形。 */
