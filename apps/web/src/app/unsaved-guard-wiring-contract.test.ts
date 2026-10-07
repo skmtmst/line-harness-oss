@@ -144,6 +144,15 @@ const GUARDED = [
   'v8/accounts-detail/handover.tsx',
   'v8/restaurant/inventory/stock.tsx',
   'v8/hq/support.tsx',
+  /* 2026-10-07：src/v8 に一から書いた画面（まとめの取り込みで見張りの対象に入った）。それぞれ自分で useUnsavedGuard と離脱確認を持つ。 */
+  'v8/affiliate-offer-new/create.tsx',
+  'v8/tag-edit/search-edit.tsx',
+  'v8/tags/create.tsx',
+  'v8/tags/field-editor.tsx',
+  'v8/tags/mark-editor.tsx',
+  'v8/template-edit/rich.tsx',
+  'v8/templates/carousel.tsx',
+  'v8/templates/question-new.tsx',
 ] as const
 
 /*
@@ -256,6 +265,12 @@ const EXEMPTIONS: Record<string, string> = {
     '一覧と絞り込みが中心。作る操作は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/inflow-links/page.tsx':
     '一覧の一括操作（移動・再開）は押した直後に即時保存し、下書きを持たない',
+  'v8/automations/common-action-new.tsx':
+    'app/common-actions/common-action-new-v8.tsx と同じ画面を src/v8 に一から書いたもの（j2hfkS）。番兵の要否は元の画面（new/page.tsx・s3 未判定）と一緒に決めるため、同じ扱いでここに置く',
+  'v8/tags/field-migrate.tsx':
+    'app/tags/field-migrate-v8.tsx と同じ項目移行画面を src/v8 に一から書いたもの（GobMd）。事前確認→明示実行の2段階で、途中離脱で失うのは確認状態だけ',
+  'v8/tag-edit/edit.tsx':
+    'タグの編集（xn95q）を src/v8 に一から書いたもの。元の画面（components/friend-fields/edit-tag-page-v4.tsx・s1 未判定）と同じ扱いで、番兵の要否は元の画面と一緒に決める',
   'app/tags/field-migrate-v8.tsx':
     '★V8 の項目移行画面（GobMd）。事前確認→明示実行の2段階で、途中離脱で失うのは確認状態だけ。離脱番兵の v7 同等画面（fields/migrate/page.tsx）と同じ扱い',
   'app/inflow-links/detail/page.tsx':

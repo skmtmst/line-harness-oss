@@ -21,7 +21,7 @@ import type { FriendFieldMigrationPreview, FriendFieldMigrationRun } from '@/lib
 import { createResponseGate } from '@/lib/latest-request'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { formatDateTime } from '@/lib/format'
-import FieldMigrateV8 from '@/app/tags/field-migrate-v8'
+import FieldMigrateV8 from '@/v8/tags/field-migrate'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]

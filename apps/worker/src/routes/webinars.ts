@@ -13,6 +13,8 @@
 // See: docs/superpowers/specs/2026-07-29-auto-webinar-design.md
 
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
+import type { WebinarAudience } from '@line-crm/shared';
+import { countRecentWebinarViewers, WEBINAR_AUDIENCE_WINDOW_SECONDS } from '../services/webinar-audience.js';
 import {
   getWebinarById,
   getWebinarBySlug,
@@ -466,6 +468,35 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
     console.error('GET /api/liff/webinars/:slug error:', err);
     return c.json({ error: 'internal_error' }, 500);
   }
+});
+
+// 既存の視聴状態の返しは保ち、人数を更新したい時だけこの口を読む。
+webinarRoutes.get('/api/liff/webinars/:slug/audience', async (c) => {
+  const auth = await resolveWebinarCaller(c, c.req.param('slug'));
+  if (auth instanceof Response) return auth;
+  const { webinar } = auth;
+  if (publicationWindowBlockReason(webinar)) return c.json({ error: 'not_found' }, 404);
+  const kind = await resolveWebinarDeliveryKind(c.env.DB, webinar);
+  const now = nowEpoch();
+  let sessionStartAt: number | null = null;
+  if (kind === 'on_demand') {
+    sessionStartAt = onDemandSessionStartAt(webinar, now);
+  } else if (kind === 'scheduled') {
+    const session = resolveSession(parseScheduleRules(webinar.schedule_json), webinar.duration_seconds, now);
+    if (session.live && session.sessionStartAt !== null) {
+      const registration = await getWebinarRegistration(c.env.DB, webinar.id, auth.friendId, session.sessionStartAt);
+      if (registration) sessionStartAt = session.sessionStartAt;
+    }
+  }
+  const data: WebinarAudience = {
+    live: sessionStartAt !== null,
+    sessionStartAt,
+    viewerCount: sessionStartAt === null ? null
+      : await countRecentWebinarViewers(c.env.DB, webinar.id, sessionStartAt, now),
+    activeWindowSeconds: WEBINAR_AUDIENCE_WINDOW_SECONDS,
+    lecturerName: null,
+  };
+  return c.json(data);
 });
 
 webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {

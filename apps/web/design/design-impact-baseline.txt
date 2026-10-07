@@ -469,9 +469,20 @@ shared-button-importer lib/unsaved-leave-dialog.tsx
 shared-button-importer app/inflow-links/ad-connection-dialog.tsx
 shared-button-importer app/inflow-links/ad-event-mappings.tsx
 shared-button-importer components/events/event-application-preview.tsx
+shared-button-importer v8/tags/create.tsx
+shared-button-importer v8/tags/field-edit.tsx
+shared-button-importer v8/tags/field-editor.tsx
+shared-button-importer v8/tags/field-migrate.tsx
+shared-button-importer v8/tags/fields-tab.tsx
+shared-button-importer v8/tags/folder-page.tsx
 shared-button-importer v8/tags/list.tsx
+shared-button-importer v8/tags/mark-editor.tsx
+shared-button-importer v8/tags/marks-tab.tsx
+shared-button-importer v8/tags/searches-tab.tsx
 shared-button-importer v8/tags/tags-tab.tsx
 shared-button-importer v8/templates/list.tsx
+shared-button-importer v8/templates/question-new.tsx
+shared-button-importer v8/templates/carousel.tsx
 shared-button-importer v8/broadcasts/list.tsx
 shared-button-importer v8/broadcasts/quick-send.tsx
 shared-button-importer v8/forms/list.tsx
@@ -482,6 +493,7 @@ shared-button-importer v8/form-edit/edit.tsx
 shared-button-importer v8/form-edit/media-picker.tsx
 shared-button-importer v8/rich-menus/list.tsx
 shared-button-importer v8/rich-menus/external-import.tsx
+shared-button-importer v8/rich-menus/connections.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
 shared-button-importer v8/common-vars/export-panel.tsx
@@ -494,6 +506,8 @@ shared-button-importer v8/inflow-links/ad-connection-dialog.tsx
 shared-button-importer v8/inflow-links/ads.tsx
 shared-button-importer v8/inflow-links/detail.tsx
 shared-button-importer v8/inflow-links/site-script.tsx
+shared-button-importer v8/inflow-links/ad-connections.tsx
+shared-button-importer v8/inflow-links/ad-history.tsx
 shared-button-importer v8/mileage/earning-rule-new/create.tsx
 shared-button-importer v8/auto-replies/runs.tsx
 shared-button-importer v8/common-vars-edit/edit.tsx
@@ -505,6 +519,7 @@ shared-button-importer v8/webhooks/outgoing.tsx
 shared-button-importer v8/template-edit/asset.tsx
 shared-button-importer v8/template-edit/media-picker.tsx
 shared-button-importer v8/template-edit/message.tsx
+shared-button-importer v8/template-edit/rich.tsx
 shared-button-importer v8/webhooks/samples.tsx
 shared-button-importer v8/webhooks/api-tokens.tsx
 shared-button-importer v8/webhooks/sheets.tsx
@@ -538,6 +553,7 @@ shared-button-importer v8/booking-menus/tabs/staff-tab.tsx
 shared-button-importer v8/hq/account-dialogs.tsx
 shared-button-importer v8/hq/billing.tsx
 shared-button-importer v8/hq/home.tsx
+shared-button-importer v8/hq/member-dialog.tsx
 shared-button-importer v8/hq/members.tsx
 shared-button-importer v8/hq/notice-line-dialog.tsx
 shared-button-importer v8/hq/support-detail.tsx
@@ -555,8 +571,11 @@ shared-button-importer v8/affiliates/report.tsx
 shared-button-importer v8/affiliates/create.tsx
 shared-button-importer v8/automations/list.tsx
 shared-button-importer v8/automations/runs.tsx
+shared-button-importer v8/automations/templates.tsx
 shared-button-importer v8/automations/common-actions.tsx
 shared-button-importer v8/automations/versions.tsx
+shared-button-importer v8/automations/branch-editor.tsx
+shared-button-importer v8/automations/common-action-new.tsx
 shared-button-importer v8/nen-campaigns/list.tsx
 shared-button-importer v8/nen-campaigns/edit.tsx
 shared-button-importer v8/nen-campaigns/column-new.tsx
@@ -707,3 +726,8 @@ shared-button-importer v8/accounts-detail/handover.tsx
 shared-button-importer v8/account-new/register.tsx
 shared-button-importer v8/hq-templates/console.tsx
 shared-button-importer v8/hq-templates/message-form.tsx
+shared-button-importer v8/template-detail/detail.tsx
+shared-button-importer v8/tag-edit/edit.tsx
+shared-button-importer v8/tag-edit/search-edit.tsx
+shared-button-importer v8/rich-menu-edit/detail.tsx
+shared-button-importer v8/affiliate-offer-new/create.tsx
