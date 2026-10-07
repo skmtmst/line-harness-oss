@@ -524,8 +524,9 @@
     "579_banner_color_roles.sql",
     "580_banner_reference_images.sql",
     "581_banner_emphasis_lines.sql",
+    "582_automation_integration_folders.sql",
     "583_restaurant_inventory_rules.sql",
     "585_booking_seat_waitlist_fifo.sql"
   ],
-  "migrationCount": 526
+  "migrationCount": 527
 }
