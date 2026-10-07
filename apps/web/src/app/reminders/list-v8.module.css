@@ -287,6 +287,11 @@
 .menuCell {
   text-align: right;
 }
+.menuBox {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
 
 .menuButton {
   display: inline-flex;
@@ -313,6 +318,10 @@
 
 /* まとめての帯の内側（選択中に表の下へ出る）。 */
 .bulkRow {
+  /* 長い一覧でも画面の下に付いてくる（動きの点検 12 番）。表が短ければ今までどおり表のすぐ下。 */
+  position: sticky;
+  bottom: var(--bulk-bar-float-gap);
+  z-index: 10;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -557,3 +566,22 @@
 .narrowFolder :global(button) { width: 100%; }
 .narrowSearch { width: var(--tpl-kw-input-w); }
 .narrowSpacer { flex: 1 1 0; }
+
+/* 閲覧のみの帯（a5C1p）：頭の下・数の帯の上。左右24・下8の中に、青い地の帯（余白10/14・間10）。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg { flex-shrink: 0; color: var(--color-action); }
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-rm-viewer-create-h); }
+/* 閲覧のみ：つまみと同じ大きさの見えない印で、名前の位置を保つ。 */
+.gripSpace { display: inline-flex; visibility: hidden; }

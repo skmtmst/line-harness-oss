@@ -1,0 +1,171 @@
+/* ★V8 ウェビナーの作る手順の段の中身（j7PP04・VWNaA・LPOe7・Q0Jrk・E7iAYs・XCUNf）で共通の箱と欄。 */
+
+/* 段のカード：線1・角12・内側20・中の間14。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wc-card-gap);
+  min-width: 0;
+  padding: var(--tpl-wc-an-card-pad);
+  border-radius: var(--tpl-wc-card-radius);
+  box-shadow: var(--tpl-an-ring);
+  background: var(--color-canvas);
+}
+.card[data-gap='tight'] { gap: var(--tpl-wc-an-gap); }
+.cardHead { display: flex; flex-direction: column; gap: var(--tpl-wc-cm-head-gap); min-width: 0; }
+.cardHeadRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); min-width: 0; }
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-an-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-an-card-title-lh);
+}
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+
+.field { display: flex; flex-direction: column; gap: var(--tpl-wc-field-gap); min-width: 0; }
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-label-tag-gap);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-wc-label-lh);
+}
+.labelSmall {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-text-sm-lh);
+}
+.optional { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; }
+.pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--tpl-wc-pair-gap);
+  align-items: start;
+}
+.help {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.fieldError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.radioPair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--tpl-wc-pair-gap);
+}
+
+/* 右の列の下のボタン（テストを送る など）。真ん中に並べる。 */
+.previewActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.previewNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+  text-align: center;
+}
+.previewTitle {
+  align-self: stretch;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-preview-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-preview-title-lh);
+}
+
+/* 行の並び（枠・カード・通知）：内側の上下・下に1pxの線。行の右端は「…」。 */
+.list { display: flex; flex-direction: column; min-width: 0; }
+.listRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wc-an-row-gap);
+  min-height: var(--tpl-wc-list-row-h);
+  padding: var(--tpl-wc-list-row-pad);
+  box-shadow: var(--shadow-row-line);
+}
+.rowMain { flex: 1; min-width: 0; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-wc-label-lh); }
+.rowStrong { flex-shrink: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-wc-label-lh); }
+.rowSide { flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menuBox { position: relative; display: flex; flex-shrink: 0; }
+
+.buttons { display: flex; flex-wrap: wrap; gap: var(--tpl-toolbar-gap); }
+
+/* 状態の札（点つき）。 */
+.pill {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-wb-pill-gap);
+  padding: var(--tpl-wb-pill-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-wb-pill-lh);
+  white-space: nowrap;
+}
+.pill[data-tone='success'] { background: var(--color-success-bg); color: var(--color-success); }
+.pill[data-tone='info'] { background: var(--color-info-bg); color: var(--color-action); }
+.pill[data-tone='warn'] { background: var(--color-warning-bg); color: var(--color-warning); }
+.pill[data-tone='danger'] { background: var(--color-danger-bg); color: var(--color-danger); }
+.pillDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+/* 文字だけのボタン（＋ 枠を足す など）。 */
+.textButton {
+  width: fit-content;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-text-sm-lh);
+  cursor: pointer;
+}
+.textButton:hover { text-decoration: underline; }
+.textButton:disabled { cursor: not-allowed; opacity: 0.5; }
+
+/* 閲覧のみの値（選ぶ欄の代わり）：高さ36・内側12・薄い地。 */
+.readValue {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  height: var(--tpl-wc-control-h);
+  padding: var(--tpl-wc-input-pad);
+  border-radius: var(--tpl-wc-input-radius);
+  background: var(--color-table-head);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-wc-label-lh);
+  white-space: nowrap;
+}
+.readValue[data-compact] { width: auto; }

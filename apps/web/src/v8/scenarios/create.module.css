@@ -1,0 +1,166 @@
+/*
+ * ★V8 シナリオを作る①（dnzqC）。
+ * 枠・頭・手順の輪・下の帯は型（CreatePage）が持つ。ここは左の段（カード）の中身だけ。
+ */
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-label);
+}
+
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sc2-notice-gap);
+}
+
+.viewerBand {
+  margin: 0;
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+
+/* 段（カード）：枠1・角12・余白20・中の間14。共通カードの枠（1）は内側に入るので、余白は 20−1。 */
+.card {
+  gap: var(--tpl-section-gap);
+  min-width: 0;
+}
+:global([data-theme='v8']) .card {
+  padding: var(--tpl-sc2-card-pad);
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sc2-head-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-sc2-title-lh);
+}
+.cardDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+
+/* シナリオ情報：名前（伸びる）とフォルダ（280）を横に並べる。 */
+.infoRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-sc2-row-gap);
+  width: 100%;
+}
+.nameField {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-sc2-field-gap);
+  min-width: 0;
+}
+.folderField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sc2-field-gap);
+  width: var(--tpl-sc2-folder-w);
+  flex-shrink: 0;
+}
+.folderSelect {
+  display: block;
+  width: 100%;
+}
+.folderSelect :global(*) {
+  max-width: 100%;
+}
+.fieldLabel,
+.fieldLabelStrong {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-sc2-field-gap);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-chip-label-lh);
+  white-space: nowrap;
+}
+.fieldLabelStrong {
+  font-weight: 600;
+}
+.fieldHint {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.fieldWarn {
+  color: var(--color-warning);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.fieldError {
+  color: var(--color-status-danger);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+
+/* 配信方式：2枚の選ぶカード（高さ98・間10）。 */
+.modeRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-sc2-mode-gap);
+}
+.modeCard {
+  min-height: var(--tpl-sc2-mode-h);
+}
+
+/* 見本：選んだ方式で2人がいつ受け取るか。 */
+.example {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sc2-ex-gap);
+  width: 100%;
+}
+.exampleTitle {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-sc2-ex-lh);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.exampleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sc2-ex-row-gap);
+  padding: var(--tpl-sc2-ex-row-pad);
+  border-radius: var(--tpl-sc2-ex-radius);
+  background: var(--color-surface-pearl);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sc2-ex-lh);
+  white-space: nowrap;
+}
+.exampleWho {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+.exampleStart {
+  color: var(--color-ink-secondary);
+}
+.exampleAt {
+  color: var(--color-ink);
+}
+.exampleNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-sc2-ex-note-lh);
+}

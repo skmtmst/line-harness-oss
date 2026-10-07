@@ -123,7 +123,7 @@ describe('スタッフ登録（V8）の読み込みと登録ボタン', () => {
     await waitFor(() => { expect(document.querySelector('[data-skeleton]')).toBeTruthy() })
 
     await act(async () => { gate.resolve({ menus: MENUS }) })
-    expect(await screen.findByRole('button', { name: /カット/ })).toBeTruthy()
+    expect(await screen.findByRole('checkbox', { name: /カット/ })).toBeTruthy()
   })
 
   test('ログインユーザー取得が遅れても文字は出さず枠の骨組みで待つ', async () => {
@@ -144,15 +144,15 @@ describe('スタッフ登録（V8）の読み込みと登録ボタン', () => {
     const gate = deferred<unknown>()
     fixture.createStaff = vi.fn(() => gate.promise)
     render(<NewBookingStaffPage />)
-    await screen.findByRole('button', { name: /カット/ })
+    await screen.findByRole('checkbox', { name: /カット/ })
 
-    fireEvent.change(screen.getByPlaceholderText('例: 田中 美咲'), { target: { value: '田中' } })
-    fireEvent.click(screen.getByRole('button', { name: /カット/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'スタッフを追加する' }))
+    fireEvent.change(screen.getByPlaceholderText('田中 美咲'), { target: { value: '田中' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: /カット/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
 
     // ボタンの内側だけ登録中に変わり、入力欄は触れるまま。
     expect(await screen.findByRole('button', { name: '登録しています…' })).toBeTruthy()
-    expect(screen.getByPlaceholderText('例: 田中 美咲')).toBeTruthy()
+    expect(screen.getByPlaceholderText('田中 美咲')).toBeTruthy()
 
     await act(async () => { gate.resolve({ id: 'staff-new-1' }) })
     await waitFor(() => { expect(fixture.createStaff).toHaveBeenCalled() })

@@ -1,0 +1,73 @@
+/* ★V8-B 運営 ログイン 2段目（板 `tOPeY`）。寸法は globals.css の --tpl-ms-otp-*。 */
+
+.page {
+  display: flex;
+  min-height: 100svh;
+  align-items: center;
+  justify-content: center;
+  padding: var(--tpl-ms-otp-page-pad);
+  background: var(--color-canvas-sunken);
+}
+
+.card {
+  display: flex;
+  width: 100%;
+  max-width: var(--tpl-ms-otp-card-w);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-ms-otp-card-gap);
+  padding: var(--tpl-ms-otp-card-pad);
+  border-radius: var(--tpl-ms-otp-card-radius);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-ms-otp-card-shadow);
+}
+
+.card > * {
+  margin: 0;
+}
+
+.title {
+  color: var(--color-ink);
+  font-size: var(--tpl-ms-otp-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-ms-otp-title-lh);
+}
+
+.desc {
+  width: 100%;
+  /* 絵は字の途中で折る（全体の言葉のまとまりで折る指定を外す）。 */
+  word-break: normal;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-ms-otp-desc-size);
+  line-height: var(--tpl-ms-otp-desc-lh);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ms-otp-field-gap);
+}
+
+.label {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-ms-otp-label-size);
+  font-weight: 500;
+  line-height: var(--tpl-ms-otp-label-lh);
+}
+
+.submit {
+  width: 100%;
+  height: var(--tpl-ms-otp-btn-h);
+}
+
+.icon {
+  width: var(--tpl-ms-otp-icon);
+  height: var(--tpl-ms-otp-icon);
+}
+
+.foot {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-ms-otp-foot-size);
+  line-height: var(--tpl-ms-otp-foot-lh);
+}

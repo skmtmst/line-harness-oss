@@ -1,0 +1,143 @@
+/*
+ * ★V8-B 分析「ファネルを作る」（VDPz5）。窓の枠・×・題は共通の Dialog。
+ * この窓は「余白24・題17・題の行は×と同じ36・欄の間14・段の間8・2列の間12・下の線は余白の内側」。
+ * 値は globals.css の --tpl-ms-fn-*（窓の頭は --tpl-ms-key-* と同じ寸法）。
+ */
+:global([data-theme='v8'] [data-design-part='dialog']):has(.form) > :global(div:first-child) {
+  padding: var(--tpl-ms-key-head-pad);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.form) :global(h2) {
+  font-size: var(--tpl-ms-key-title-size);
+  line-height: var(--tpl-ms-key-title-lh);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.form) > :global(div:nth-child(2)) {
+  padding: var(--tpl-ms-key-content-pad);
+}
+
+.form {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--tpl-ms-key-gap);
+}
+
+.field,
+.stepCol {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--tpl-ms-fn-field-gap);
+}
+
+.stepCol {
+  flex: 1 1 0;
+}
+
+.labelRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-ms-key-info-lh);
+  white-space: nowrap;
+}
+
+.subLabel {
+  color: var(--color-ink);
+  font-size: var(--tpl-ms-key-token-size);
+  font-weight: 600;
+  line-height: var(--tpl-ms-key-cell-lh);
+  white-space: nowrap;
+}
+
+.input {
+  width: 100%;
+  height: var(--tpl-ms-key-btn-h);
+  padding: var(--tpl-ms-key-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-ms-fn-input-shadow);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--tpl-ms-fn-input-lh);
+}
+
+.input:focus-visible {
+  outline: var(--tpl-ms-focus-w) solid var(--color-action);
+  outline-offset: var(--tpl-ms-focus-offset);
+}
+
+.input:disabled {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ms-key-row-gap);
+}
+
+.stepBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ms-key-row-gap);
+}
+
+.stepRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-ms-key-col-gap);
+}
+
+/* 外すは題の行の右端に重ねる（行の高さを変えない）。 */
+.removeStep {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-ms-fn-remove-gap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-ms-key-micro-lh);
+  cursor: pointer;
+}
+
+.removeStep:hover {
+  color: var(--color-danger);
+}
+
+.addRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ms-key-col-gap);
+}
+
+.addNote {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-ms-key-micro-lh);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-ms-key-row-gap);
+  margin: var(--tpl-ms-key-foot-margin);
+  padding-top: var(--tpl-ms-key-gap);
+  border-top: 1px solid var(--color-hairline);
+}

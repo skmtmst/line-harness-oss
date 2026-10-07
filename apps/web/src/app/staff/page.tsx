@@ -47,6 +47,8 @@ import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissi
 import StaffHeadV8, { STAFF_TAB_KEYS } from './staff-head-v8'
 import OtpInput from '@/components/shared/otp-input'
 import { formatDateTime } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import StaffV8 from '@/v8/settings/staff/staff'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -965,6 +967,12 @@ function StaffPageHost() {
   return <div data-design-node={administrator ? 'nku0f' : 'A35Gh'} className="staff-fid-page">{body}</div>
 }
 
-export default function StaffPage() {
+function StaffPageV7() {
   return <Suspense fallback={<div className="text-sm text-ink-faint">読み込み中…</div>}><StaffPageHost /></Suspense>
+}
+
+/** ★V8：data-theme="v8" のときだけ新しい画面（src/v8/settings/staff）を出す。 */
+export default function StaffPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <StaffV8 /> : <StaffPageV7 />
 }

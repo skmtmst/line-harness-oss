@@ -61,6 +61,30 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
   const menuRef = useRef<HTMLDivElement>(null)
   const anchorMarkRef = useRef<HTMLSpanElement>(null)
 
+  const getAnchor = () => {
+    const explicit = anchorRef?.current
+    if (explicit) return explicit
+    const mark = anchorMarkRef.current
+    if (!mark) return null
+    // `MoreAction` 等の開くボタンの直後に置く並びが前提。
+    // ボタンが無ければ目印自体を基準にする。
+    const previous = mark.previousElementSibling
+    return previous instanceof HTMLElement ? previous : mark
+  }
+  /*
+   * 戻す先は押せる要素。位置の基準が囲み（右クリックの ContextMenu など）の
+   * ときは、その中の開くボタンへ戻す。囲みへ focus() しても効かず BODY に落ちる。
+   */
+  const getFocusTarget = (): HTMLElement | null => {
+    const anchor = getAnchor()
+    if (!anchor) return null
+    if (anchor.matches('button, a[href], [tabindex]:not([tabindex="-1"])')) return anchor
+    const buttons = anchor.querySelectorAll<HTMLElement>('button, a[href], [tabindex]:not([tabindex="-1"])')
+    return buttons.length > 0 ? buttons[buttons.length - 1] : null
+  }
+  const getAnchorRef = useRef(getFocusTarget)
+  getAnchorRef.current = getFocusTarget
+
   // 最上層（portal）では外側・Esc の扱いを MenuPortal に任せる。
   // 開くボタンの押し直しはトグル（閉じる）になる。
   useEffect(() => {
@@ -79,14 +103,49 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     }
   }, [inline, onClose, open])
 
+  /*
+   * 開いたら最初の項目へフォーカスを入れる（WAI-ARIA のメニューの決まり）。
+   * 最上層の器（MenuPortal）は、器が付いて位置を測るまで中身を描かない・
+   * 隠しておくので、開いた直後の effect ではまだ項目が無い。描けて見えるまで
+   * 数コマ待ってから入れる（以前はここで空振りして、矢印キーが効かなかった）。
+   * 閉じたら、フォーカスが行き場を失っていれば開いたボタンへ戻す。
+   * 項目から窓を開くときは、選んだ時点で開いたボタンへ戻してあるので、
+   * 窓を閉じた後もそのボタンへ帰る（動きの点検 2・3 番）。
+   */
   useEffect(() => {
-    if (!open) return
-    if (!inline) menuRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus()
+    if (!open || inline) return
+    const anchor = getAnchorRef.current()
+    let frame = 0
+    let tries = 0
+    const focusFirst = () => {
+      const first = menuRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')
+      const host = menuRef.current?.closest<HTMLElement>('[data-menu-portal]')
+      const hidden = !first || (host && host.style.visibility === 'hidden')
+      if (!hidden && first) {
+        first.focus({ preventScroll: true })
+        return
+      }
+      tries += 1
+      if (tries < 10) frame = requestAnimationFrame(focusFirst)
+    }
+    frame = requestAnimationFrame(focusFirst)
+    return () => {
+      cancelAnimationFrame(frame)
+      const active = typeof document === 'undefined' ? null : document.activeElement
+      const lost = !active || active === document.body || !active.isConnected || Boolean(menuRef.current?.contains(active))
+      if (lost && anchor?.isConnected) anchor.focus({ preventScroll: true })
+    }
   }, [inline, open])
 
   if (!open) return null
 
   const moveFocus = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Tab') {
+      // Tab はメニューを閉じて、開いたボタンの次（前）へ進む。既定の動きは止めない。
+      getFocusTarget()?.focus({ preventScroll: true })
+      onClose()
+      return
+    }
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
     const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? [])
     if (buttons.length === 0) return
@@ -94,17 +153,6 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     const current = buttons.indexOf(document.activeElement as HTMLButtonElement)
     const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : event.key === 'ArrowDown' ? (current + 1) % buttons.length : (current - 1 + buttons.length) % buttons.length
     buttons[next].focus()
-  }
-
-  const getAnchor = () => {
-    const explicit = anchorRef?.current
-    if (explicit) return explicit
-    const mark = anchorMarkRef.current
-    if (!mark) return null
-    // `MoreAction` 等の開くボタンの直後に置く並びが前提。
-    // ボタンが無ければ目印自体を基準にする。
-    const previous = mark.previousElementSibling
-    return previous instanceof HTMLElement ? previous : mark
   }
 
   const menu = (
@@ -138,7 +186,14 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
             disabled={item.disabled}
             title={item.label}
             data-qa-open={item.qaOpen}
-            onClick={(event) => { event.stopPropagation(); item.onSelect(); onClose() }}
+            onClick={(event) => {
+              event.stopPropagation()
+              // 先に開いたボタンへ戻しておく。項目が窓を開くと、窓はこのボタンを
+              // 「開く前の場所」として覚え、閉じた後にここへ戻す（消えた項目へは戻れない）。
+              if (!inline) getFocusTarget()?.focus({ preventScroll: true })
+              item.onSelect()
+              onClose()
+            }}
           >
             {item.icon ? <span className={styles.icon} aria-hidden="true">{item.icon}</span> : null}
             <span className={styles.itemBody}>

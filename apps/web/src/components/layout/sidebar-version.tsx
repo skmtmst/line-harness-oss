@@ -35,7 +35,18 @@ export default function SidebarVersion() {
     return () => { cancelled = true }
   }, [])
 
-  if (!ready) return null
+  /*
+   * 読み込む間も2行ぶんの高さを取っておく（動きの点検 11 番）。null にすると、版が
+   * 届いた瞬間に上の「設定」の入口が 59px 押し上げられて、全画面で少しずれていた。
+   */
+  if (!ready) {
+    return (
+      <div className="invisible border-t border-hairline px-4 pb-3 pt-2.5" aria-hidden="true" data-version-reserve="">
+        <p className="text-caption font-medium">&nbsp;</p>
+        <p className="mt-0.5 text-micro">&nbsp;</p>
+      </div>
+    )
+  }
   if (!lines) return <p className="border-t border-hairline px-4 pb-3 pt-2.5 text-micro text-ink-faint">版の情報なし</p>
   return (
     <div className="border-t border-hairline px-4 pb-3 pt-2.5">

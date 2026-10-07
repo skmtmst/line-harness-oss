@@ -145,7 +145,6 @@ export default function ShipmentPanel({
                   // 設計は「今日 / 明日 / 今週 / 遅延」。いまの API は
                   // soon（今日・明日）と later しか返さないので、その2つに寄せる。
                   // 遅延を出すには出荷済みかどうかの判定が要る。
-                  // docs/v025-open-questions.md に残している。
                   { key: 'soon' as const, label: '今日・明日', count: data.soonCount },
                   { key: 'later' as const, label: 'あさって以降', count: data.laterCount },
                 ]
@@ -214,7 +213,7 @@ export default function ShipmentPanel({
                         {/*
                           数量は ec_events.payload に入っているが、
                           出荷予定の API が返していない。列だけ出して
-                          入ったら繋ぐ。docs/v025-open-questions.md に残す。
+                          入ったら繋ぐ。
                         */}
                         <Td align="right" className="text-ink-faint tabular-nums">
                           {row.quantity > 0 ? formatNumber(row.quantity) : '—'}

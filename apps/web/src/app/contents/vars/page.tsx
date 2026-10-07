@@ -48,7 +48,7 @@ import {
 import VarsExportPanel from './export-panel'
 import { formatDay, formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import CommonVarsListV8 from './list-v8'
+import CommonVarsListV8 from '@/v8/common-vars/list'
 
 /**
  * 共通情報の一覧。

@@ -1,0 +1,265 @@
+/*
+ * ★V8 外部連携「API 接続」（ralAc）と発行した鍵の窓（UkZLi）。枠・見出し・タブ・数の帯は型（ListPage）と shell。
+ * 本文：上16・左右24・下24、段の間12。表の見出しは灰の地・角8、行は高さ72・下に線。値は globals.css の --tpl-ms-key-*。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ms-key-body-gap);
+  padding: var(--tpl-wh-body-pad);
+}
+
+.createRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ms-key-row-gap);
+}
+
+.createSpace {
+  height: var(--tpl-ms-key-btn-h);
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.createRule,
+.footNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-ms-key-micro-lh);
+  white-space: nowrap;
+}
+
+.infoBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ms-key-info-gap);
+  padding: var(--tpl-ms-key-info-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+}
+
+.infoBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+.infoBand > p {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--tpl-ms-key-info-lh);
+}
+
+.table {
+  display: flex;
+  flex-direction: column;
+}
+
+.headRow,
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ms-key-col-gap);
+}
+
+.headRow {
+  padding: var(--tpl-ms-key-head-row-pad);
+  border-radius: var(--tpl-ms-key-box-radius);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-ms-key-micro-lh);
+}
+
+.row {
+  height: var(--tpl-ms-key-row-h);
+  padding: var(--tpl-ms-key-row-pad);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-size: var(--tpl-ms-key-token-size);
+  line-height: var(--tpl-ms-key-cell-lh);
+}
+
+.colName,
+.colScopes,
+.colCreated,
+.colUsed {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.colName,
+.colScopes { flex: 0 0 var(--tpl-ms-key-col-name); }
+.colCreated { flex: 0 0 var(--tpl-ms-key-col-created); }
+.colUsed { flex: 0 0 var(--tpl-ms-key-col-used); }
+.colState { flex: 0 0 var(--tpl-ms-key-col-state); }
+.colOps { flex: 0 0 var(--tpl-ms-key-col-ops); }
+
+.menuBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wh-ops-gap);
+}
+
+.moreButton {
+  width: var(--tpl-ms-key-btn-h);
+  padding: 0;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-ms-key-pill-gap);
+  padding: var(--tpl-ms-key-pill-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  font-size: var(--tpl-ms-key-token-size);
+  font-weight: 600;
+  line-height: var(--tpl-ms-key-pill-lh);
+  white-space: nowrap;
+}
+
+.pillDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* 発行の窓（名前・できること）。 */
+.createBody {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--tpl-ms-key-gap);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ms-key-field-gap);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.label {
+  padding: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-ms-key-info-lh);
+}
+
+.input {
+  width: 100%;
+  height: var(--tpl-ms-key-btn-h);
+  padding: var(--tpl-ms-key-input-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--tpl-ms-key-token-size);
+}
+
+.checkRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-ms-key-check-gap);
+}
+
+.createNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-ms-key-token-size);
+  line-height: var(--tpl-ms-key-cell-lh);
+}
+
+/* 窓の枠・×・題は共通の Dialog。発行した鍵の窓は「余白24・題17・題の行は×と同じ36・間14・下の線は余白の内側」で描かれている。 */
+:global([data-theme='v8'] [data-design-part='dialog']):has(.issuedBody) > :global(div:first-child) {
+  padding: var(--tpl-ms-key-head-pad);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.issuedBody) :global(h2) {
+  font-size: var(--tpl-ms-key-title-size);
+  line-height: var(--tpl-ms-key-title-lh);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.issuedBody) > :global(div:nth-child(2)) {
+  padding: var(--tpl-ms-key-content-pad);
+}
+
+.issuedBody {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--tpl-ms-key-gap);
+}
+
+.issuedNote {
+  margin: 0;
+  padding: var(--tpl-ms-key-box-pad);
+  border-radius: var(--tpl-ms-key-box-radius);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-ms-key-note-lh);
+}
+
+.issuedTokenRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ms-key-row-gap);
+  padding: var(--tpl-ms-key-box-pad);
+  border-radius: var(--tpl-ms-key-box-radius);
+  background: var(--color-canvas-sunken);
+}
+
+.issuedToken {
+  min-width: 0;
+  flex: 1 1 0;
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--tpl-ms-key-token-size);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.issuedMeta {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-ms-key-token-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issuedFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-ms-key-row-gap);
+  margin: var(--tpl-ms-key-foot-margin);
+  padding-top: var(--tpl-ms-key-gap);
+  border-top: 1px solid var(--color-hairline);
+}

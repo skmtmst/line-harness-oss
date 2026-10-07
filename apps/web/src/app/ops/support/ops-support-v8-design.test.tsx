@@ -48,6 +48,8 @@ function respond(url: string) {
       },
     })
   }
+  // 書ける運営メンバー（閲覧のみなら起票・返信の操作を出さない）。
+  if (url.endsWith('/api/ops/me')) return json({ success: true, data: { id: 'ops-1', readOnly: false } })
   return json({ success: false, error: 'unexpected' }, 404)
 }
 

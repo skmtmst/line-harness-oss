@@ -82,6 +82,8 @@
 .slug {
   display: block;
   margin-top: var(--tpl-row-sub-gap);
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 UyUMw の説明の行）。 */
+  padding-inline-start: var(--tpl-folder-dot-indent);
   overflow: hidden;
   color: var(--color-ink-secondary);
   font-size: var(--tpl-row-sub-size);

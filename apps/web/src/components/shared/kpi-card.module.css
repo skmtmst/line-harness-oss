@@ -172,7 +172,7 @@
   height: var(--text-metric);
   border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
-  animation: kpi-card-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: kpi-card-pulse var(--motion-pulse) var(--motion-ease-in-out) infinite;
 }
 
 @keyframes kpi-card-pulse {
@@ -301,3 +301,11 @@
 /* 印なしの帯の横並びは kpi-band-v8.css（層なしCSS）に置く。 */
 /* ★V8 数のマスの下の段（Pp3nS「下」：高さ18・右に行き先）。行き先のボタンが押せる高さ32で段を押し広げない（司令塔 2026-10-05） */
 [data-theme='v8'] .detail .retry { min-height: 0; height: auto; padding: 0; line-height: 18px; margin-left: auto; }
+
+/*
+ * 読み込み中の骨組みは、届いた数字と同じ行の高さを取る（動きの点検 8 番）。
+ * 以前は 22px で、数字（帯は --tpl-band-number-lh、それ以外は 32px）に替わると
+ * 数の帯が 4px 伸び、下の一覧がまとめて押し下げられていた。
+ */
+[data-theme='v8'] .skeleton { height: 32px; }
+[data-theme='v8'] .card[data-kpi-presentation='band'] .skeleton { height: var(--tpl-band-number-lh); }

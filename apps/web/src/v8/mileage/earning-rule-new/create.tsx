@@ -1,0 +1,506 @@
+'use client'
+
+/*
+ * ★V8-B マイル「たまる決めごとを作る」（Pencil：作る `ctLwT`・競合 `BnrQp`）。
+ *
+ * 型（CreatePage）に、4つの段（どのルールか・何マイル付けるか・受け取る人・使えるまで・付けすぎを防ぐ）と、
+ * 右の列（この設定だとこう貯まります・気をつけること）、下の帯（キャンセル・保存して続けて作る・保存して動かす）を渡す。
+ *
+ * 聞く項目・保存の口・送る形・失敗の扱いは今の作る画面（app/mileage/earning-rules/new/v8-earning-rule-new.tsx）と同じ
+ * （BEHAVIOR.md）。違うのは見せ方だけ。
+ */
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeftRight, Check, ChevronLeft, Hourglass, RefreshCw, Share2, TriangleAlert, User, Zap } from 'lucide-react'
+import type { Tag } from '@line-crm/shared'
+import { ApiError, api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { formatNumber } from '@/lib/format'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { CreatePage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
+import DateField from '@/components/shared/date-field'
+import Disclosure from '@/components/shared/disclosure'
+import HelpTip from '@/components/shared/help-tip'
+import Notice from '@/components/shared/notice'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Select from '@/components/shared/select'
+import {
+  EARNING_RULE_EVENT_TYPES as EVENT_TYPES,
+  EARNING_RULE_NOTIFY_TEMPLATE,
+  earningRuleCancellationEvent,
+} from './rule-fields'
+import styles from './create.module.css'
+
+const DAILY_CAPS = [
+  ['', '制限なし'],
+  ['1', '1日1回まで'],
+  ['2', '1日2回まで'],
+  ['3', '1日3回まで'],
+  ['5', '1日5回まで'],
+  ['10', '1日10回まで'],
+]
+
+const LIST_HREF = '/mileage?tab=earning-rules'
+
+/** 数を桁区切りで出す。取れていない数は「—」。 */
+const miles = (value: number | null | undefined) =>
+  typeof value === 'number' && Number.isFinite(value) ? formatNumber(value) : '—'
+
+/** 競合の帯の「だれが・いつ」。口が返したときだけ使う（無ければ言い切らない）。 */
+function conflictWho(data: unknown): { who: string | null; at: string | null } {
+  if (!data || typeof data !== 'object') return { who: null, at: null }
+  const record = data as Record<string, unknown>
+  const who = typeof record.updatedByName === 'string' ? record.updatedByName : typeof record.updatedBy === 'string' ? record.updatedBy : null
+  const raw = typeof record.updatedAt === 'string' ? record.updatedAt : null
+  const date = raw ? new Date(raw) : null
+  const at = date && !Number.isNaN(date.getTime())
+    ? new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }).format(date)
+    : null
+  return { who, at }
+}
+
+export default function EarningRuleCreateV8() {
+  usePageTitle('たまる決めごとを作る')
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'マイル', href: LIST_HREF }])
+  const router = useRouter()
+  const { selectedAccountId } = useAccount()
+  const [name, setName] = useState('')
+  const [eventType, setEventType] = useState<string>('booking_created')
+  const [source, setSource] = useState('')
+  const [amount, setAmount] = useState('')
+  const [initialStatus, setInitialStatus] = useState<'available' | 'pending'>('available')
+  const [ignoreMultiplier, setIgnoreMultiplier] = useState(false)
+  const [dailyCap, setDailyCap] = useState('')
+  const [uniqueMode, setUniqueMode] = useState<'' | 'subject' | 'subjectPerDay'>('')
+  const [beneficiary, setBeneficiary] = useState<'actor' | 'referrer'>('actor')
+  const [validFrom, setValidFrom] = useState('')
+  const [validUntil, setValidUntil] = useState('')
+  const [expiresAfterDays, setExpiresAfterDays] = useState('365')
+  const [reverseOnCancellation, setReverseOnCancellation] = useState(true)
+  const [showConditions, setShowConditions] = useState(false)
+  const [targetConditions, setTargetConditions] = useState<SegmentCondition | null>(null)
+  const [isActive, setIsActive] = useState(true)
+  const [notifyFriend, setNotifyFriend] = useState(true)
+  const [tags, setTags] = useState<Tag[]>([])
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  /** BnrQp：保存が 409 で返ったとき。口が返した「だれが・いつ」を持つ。 */
+  const [conflict, setConflict] = useState<{ who: string | null; at: string | null } | null>(null)
+  const [trialBusy, setTrialBusy] = useState(false)
+  const [trialError, setTrialError] = useState('')
+  const [trial, setTrial] = useState<{ matchedFriends: number; estimatedTotalMiles: number } | null>(null)
+  const createKeyRef = useRef<{ fingerprint: string; key: string } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined).then((res) => {
+      if (!cancelled && res.success) setTags(res.data)
+    }).catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccountId])
+
+  const selected = EVENT_TYPES.find((t) => t.value === eventType) ?? EVENT_TYPES[0]
+  const value = Number(amount)
+  const validAmount = amount.trim() !== '' && Number.isInteger(value) && value >= 1
+  const expiryDays = expiresAfterDays === '' ? null : Number(expiresAfterDays)
+  const cancellationEvent = earningRuleCancellationEvent(eventType)
+
+  const multiplierTags = useMemo(
+    () => tags.filter((t) => t.mileageMultiplierBps != null),
+    [tags],
+  )
+
+  const dirty = Boolean(
+    name || eventType !== 'booking_created' || source ||
+    amount || initialStatus !== 'available' || ignoreMultiplier || dailyCap ||
+    uniqueMode || beneficiary !== 'actor' || validFrom || validUntil ||
+    expiresAfterDays !== '365' || !reverseOnCancellation || targetConditions !== null ||
+    !isActive || !notifyFriend,
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+
+  const validate = () => {
+    if (!name.trim()) return 'ルール名を入力してください'
+    if (!validAmount) return '付与マイルは1以上の整数で入力してください'
+    if (!selectedAccountId) return 'LINEアカウントを選択してください'
+    if (expiryDays !== null && (!Number.isInteger(expiryDays) || expiryDays < 1 || expiryDays > 3650)) {
+      return '有効期限は1〜3650日で入力してください'
+    }
+    if (validFrom && validUntil && validFrom > validUntil) {
+      return '終了日は開始日より後にしてください'
+    }
+    return null
+  }
+
+  const draftBody = () => ({
+    name: name.trim(),
+    eventType,
+    source: source || null,
+    amount: value,
+    initialStatus,
+    validFrom: validFrom || null,
+    validUntil: validUntil || null,
+    expiresAfterDays: expiryDays,
+    cancellationEventTypes: reverseOnCancellation && cancellationEvent ? [cancellationEvent] : [],
+    targetConditions: pruneCondition(targetConditions),
+    sortOrder: 0,
+  })
+
+  const save = async (continueAfter: boolean) => {
+    const problem = validate()
+    if (problem) {
+      setSaveError(problem)
+      return
+    }
+    setSaving(true)
+    setSaveError('')
+    setConflict(null)
+    try {
+      const payload = {
+        name: name.trim(),
+        eventType,
+        source: source || null,
+        amount: value,
+        initialStatus,
+        lineAccountId: selectedAccountId!,
+        conditions: {
+          ...(dailyCap ? { dailyCapActions: Number(dailyCap) } : {}),
+          ...(uniqueMode === 'subject' ? { uniquePerSubject: true } : {}),
+          ...(uniqueMode === 'subjectPerDay' ? { uniquePerSubjectPerDay: true } : {}),
+          ...(ignoreMultiplier ? { ignoreMultiplier: true } : {}),
+          ...(beneficiary === 'referrer' ? { beneficiary: 'referrer' as const } : {}),
+        },
+        validFrom: validFrom || null,
+        validUntil: validUntil || null,
+        isActive,
+      }
+      const fingerprint = JSON.stringify(payload)
+      if (createKeyRef.current?.fingerprint !== fingerprint) {
+        createKeyRef.current = { fingerprint, key: crypto.randomUUID() }
+      }
+      const res = await api.mileage.createRule(payload, { idempotencyKey: createKeyRef.current.key })
+      if (!res.success) throw new Error(res.error)
+      const draftResponse = await api.mileage.saveEarningRuleDraft(res.data.id, {
+        accountId: selectedAccountId!,
+        expectedVersion: 0,
+        draft: {
+          ...draftBody(),
+          notification: { enabled: notifyFriend, messageTemplate: EARNING_RULE_NOTIFY_TEMPLATE },
+        },
+      })
+      if (!draftResponse.success) {
+        const deleted = await api.mileage.deleteRule(res.data.id).catch(() => null)
+        if (!deleted?.success) {
+          await api.mileage.updateRule(res.data.id, { isActive: false }).catch(() => undefined)
+          throw new Error(`${draftResponse.error}(作りかけの決めごとが残っているかもしれません。一覧で確認してください)`)
+        }
+        throw new Error(draftResponse.error)
+      }
+      router.push(continueAfter ? '/mileage/earning-rules/new' : LIST_HREF)
+    } catch (caught) {
+      /* BnrQp：同時に作られた・版がずれたときは競合の帯で知らせる。 */
+      if (caught instanceof ApiError && caught.status === 409) {
+        setConflict(conflictWho(caught.data))
+        setSaveError('')
+      } else {
+        setSaveError(caught instanceof Error ? caught.message : '保存できませんでした。もう一度お試しください。')
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const runTrial = async () => {
+    if (!selectedAccountId || trialBusy) return
+    const problem = validate()
+    if (problem) {
+      setTrialError(problem)
+      return
+    }
+    setTrialBusy(true)
+    setTrialError('')
+    try {
+      const response = await api.mileage.testEarningRule(selectedAccountId, draftBody())
+      if (!response.success) throw new Error(response.error)
+      setTrial({ matchedFriends: response.data.matchedFriends, estimatedTotalMiles: response.data.estimatedTotalMiles })
+    } catch (caught) {
+      setTrial(null)
+      setTrialError(caught instanceof Error ? caught.message : '試算できませんでした。もう一度お試しください。')
+    } finally {
+      setTrialBusy(false)
+    }
+  }
+
+  const back = <Link href={LIST_HREF} className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />マイルへ</Link>
+
+  const conflictTitle = conflict?.who
+    ? `${conflict.who}さんが${conflict.at ? ` ${conflict.at} に` : ''}この決めごとを保存しました`
+    : `ほかの人が${conflict?.at ? ` ${conflict.at} に` : ''}この決めごとを保存しました`
+  const conflictBand = conflict ? (
+    <div className={styles.conflictBand} role="alert" aria-label="ほかの人が先に保存しました">
+      <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
+      <div className={styles.conflictText}>
+        <p className={styles.conflictTitle}>{conflictTitle}</p>
+        <p className={styles.conflictNote}>{conflict.who ? `このまま保存すると、${conflict.who}さんの変更が消えます` : 'このまま保存すると、先に保存された変更が消えます'}</p>
+      </div>
+      <Button href={LIST_HREF}><ArrowLeftRight size={15} aria-hidden="true" />違いを比べる</Button>
+      <Button href={LIST_HREF}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
+    </div>
+  ) : null
+
+  const trialValue = (filled: string) => (trialBusy ? '数えています…' : trial ? filled : '—')
+  const preview = (
+    <div className={styles.side}>
+      <section className={styles.sideCard} aria-labelledby="er-new-trial">
+        <div className={styles.sideHead}>
+          <h2 className={styles.sideTitle} id="er-new-trial">この設定だとこう貯まります</h2>
+          <button type="button" className={styles.trialButton} onClick={() => void runTrial()} disabled={trialBusy}>
+            {trialBusy ? '数えています' : '試算する'}
+          </button>
+        </div>
+        <p className={styles.sideNote}>この30日にあてはめた見込み</p>
+        {trialError ? <Notice tone="danger" message={trialError} /> : null}
+        <dl className={styles.trialRows}>
+          <div className={styles.trialRow}>
+            <dt>当てはまる人</dt>
+            <dd>{trialValue(`${miles(trial?.matchedFriends)}人`)}</dd>
+          </div>
+          <div className={styles.trialRow}>
+            <dt>付くマイル</dt>
+            <dd>{trialValue(miles(trial?.estimatedTotalMiles))}</dd>
+          </div>
+          <div className={styles.trialRow}>
+            <dt>
+              1人あたり
+              {/* 倍率の注は絵に無い。効くタグがあるときだけ「？」の中で知らせる。 */}
+              {multiplierTags.length > 0 && !ignoreMultiplier ? (
+                <HelpTip label="倍率の説明">倍率はタグ側の設定で決まります。優先度がいちばん高いタグ1枚だけが効きます。</HelpTip>
+              ) : null}
+            </dt>
+            <dd>{`${validAmount ? miles(value) : '—'}${dailyCap ? `（1日${dailyCap}回まで）` : ''}`}</dd>
+          </div>
+        </dl>
+      </section>
+      <section className={styles.sideCard} aria-labelledby="er-new-caution">
+        <h2 className={styles.sideTitle} id="er-new-caution">気をつけること</h2>
+        <p className={styles.caution}>
+          ・付けたマイルはあとから消せません（減らすで取り消しの明細を足します）
+          <br />
+          ・確定待ちは、確定の日まで残高に入りません
+        </p>
+      </section>
+    </div>
+  )
+
+  return (
+    <CreatePage
+      boardId={conflict ? 'BnrQp' : 'ctLwT'}
+      title="たまる決めごとを作る"
+      description="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
+      identity={back}
+      previewToggle={conflictBand}
+      preview={preview}
+      footerActions={(
+        <>
+          <Button href={LIST_HREF}>キャンセル</Button>
+          <Button onClick={() => void save(true)} disabled={saving} busy={saving} busyLabel="保存しています">
+            保存して続けて作る
+          </Button>
+          <Button variant="primary" onClick={() => void save(false)} disabled={saving} busy={saving} busyLabel="保存しています">
+            <Check size={15} aria-hidden="true" />保存して動かす
+          </Button>
+        </>
+      )}
+    >
+      {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError('')} /> : null}
+
+      <section className={styles.card} aria-labelledby="er-new-rule">
+        <div className={styles.cardHead}>
+          <h2 className={styles.cardTitle} id="er-new-rule">どのルールか</h2>
+          <p className={styles.cardNote}>きっかけになる行動を選びます</p>
+        </div>
+        <label className={styles.field}>
+          <span className={styles.label}>名前</span>
+          <input
+            type="text"
+            aria-label="名前"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="例：リンクをクリック"
+            className={styles.input}
+          />
+        </label>
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <span className={styles.labelRow}>
+              <span className={styles.pickLabel}>きっかけ</span>
+              <HelpTip label="きっかけの説明">{selected.note}</HelpTip>
+            </span>
+            <Select
+              aria-label="きっかけ"
+              value={eventType}
+              onChange={(next) => {
+                setEventType(next)
+                setSource('')
+              }}
+              options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+              size="full"
+            />
+          </div>
+          <div className={styles.field}>
+            <span className={styles.pickLabel}>行動の出どころ</span>
+            <Select
+              aria-label="行動の出どころ"
+              value={source}
+              onChange={(next) => setSource(next)}
+              size="full"
+              options={selected.sources.map(([optionValue, label]) => ({ value: optionValue, label }))}
+            />
+          </div>
+        </div>
+        <button type="button" className={styles.linkButton} onClick={() => setShowConditions((v) => !v)} aria-expanded={showConditions}>
+          ＋ 条件を足す（タグ・友だち情報など）
+        </button>
+        {showConditions ? (
+          <div className={styles.conditionBox}>
+            <ConditionBuilder value={targetConditions} onChange={setTargetConditions} label="利用対象の条件" />
+            <p className={styles.cardNote}>条件を付けない場合は全員が対象です。</p>
+          </div>
+        ) : null}
+      </section>
+
+      <section className={styles.card} aria-labelledby="er-new-amount">
+        <div className={styles.cardHead}>
+          <h2 className={styles.cardTitle} id="er-new-amount">何マイル付けるか</h2>
+        </div>
+        <div className={styles.fieldRow}>
+          <label className={styles.field}>
+            <span className={styles.label}>マイル</span>
+            <input
+              type="number"
+              min={1}
+              aria-label="マイル"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className={styles.input}
+            />
+          </label>
+          <div className={styles.field}>
+            <span className={styles.pickLabel}>付け方</span>
+            <Select
+              aria-label="付け方"
+              value="決まった数"
+              onChange={() => {}}
+              size="full"
+              options={[{ value: '決まった数', label: '決まった数' }]}
+              disabled
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className={styles.card} aria-labelledby="er-new-who">
+        <div className={styles.cardHead}>
+          <h2 className={styles.cardTitle} id="er-new-who">受け取る人・使えるまで</h2>
+        </div>
+        <RadioCardGroup legend="受け取る人" className={styles.choiceRow}>
+          <RadioCard name="beneficiary" value="actor" checked={beneficiary === 'actor'} onChange={() => setBeneficiary('actor')}
+            icon={<User size={16} />} title="行動した本人" note="そのまま本人の残高に" />
+          <RadioCard name="beneficiary" value="referrer" checked={beneficiary === 'referrer'} onChange={() => setBeneficiary('referrer')}
+            icon={<Share2 size={16} />} title="紹介した人" note="この人を紹介した相手に" />
+        </RadioCardGroup>
+        <RadioCardGroup legend="使えるまで" className={styles.choiceRow}>
+          <RadioCard name="initial-status" value="available" checked={initialStatus === 'available'} onChange={() => setInitialStatus('available')}
+            icon={<Zap size={16} />} title="すぐ使える" note="その場で残高に入る" />
+          <RadioCard name="initial-status" value="pending" checked={initialStatus === 'pending'} onChange={() => setInitialStatus('pending')}
+            icon={<Hourglass size={16} />} title="確定待ち" note="確定するまで使えない" />
+        </RadioCardGroup>
+      </section>
+
+      <section className={styles.card} aria-labelledby="er-new-limit">
+        <div className={styles.cardHead}>
+          <h2 className={styles.cardTitle} id="er-new-limit">付けすぎを防ぐ</h2>
+        </div>
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <span className={styles.pickLabel}>1日に数える回数</span>
+            <Select
+              aria-label="1日に数える回数"
+              value={dailyCap}
+              onChange={(next) => setDailyCap(next)}
+              size="full"
+              options={DAILY_CAPS.map(([optionValue, label]) => ({ value: optionValue, label }))}
+            />
+          </div>
+          <div className={styles.field}>
+            <span className={styles.pickLabel}>同じ対象の数えかた</span>
+            <Select
+              aria-label="同じ対象の数えかた"
+              value={uniqueMode}
+              onChange={(next) => setUniqueMode(next as typeof uniqueMode)}
+              size="full"
+              options={[
+                { value: '', label: '何度でも数える' },
+                { value: 'subject', label: '同じ対象は1回' },
+                { value: 'subjectPerDay', label: '同じ URL は1回' },
+              ]}
+            />
+          </div>
+        </div>
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <span className={styles.label}>開始日</span>
+            <DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" />
+          </div>
+          <div className={styles.field}>
+            <span className={styles.labelRow}>
+              <span className={styles.label}>終了日</span>
+              <span className={styles.optional}>任意</span>
+            </span>
+            <DateField value={validUntil} onChange={setValidUntil} aria-label="終了日" placeholder="なし" />
+          </div>
+        </div>
+        {/* 絵には無いが、倍率・期限・取り消し・通知・すぐ動かすの欄は落とさない（段の最後に畳んで置く）。 */}
+        <Disclosure title="詳しい設定（倍率・通知・取り消し・公開）" size="compact">
+          <div className={styles.detailsBody}>
+            <label className={styles.field}>
+              <span className={styles.label}>付いたマイルの有効期限</span>
+              <span className={styles.inlineRow}>
+                <input type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" className={styles.input} />
+                <span className={styles.cardNote}>日後（空欄なら期限なし）</span>
+              </span>
+            </label>
+            <Checkbox checked={ignoreMultiplier} onCheckedChange={setIgnoreMultiplier} description="誰でも同じ額にしたいときに選びます。">
+              会員ランクの倍率をかけない
+            </Checkbox>
+            {cancellationEvent ? (
+              <Checkbox
+                checked={reverseOnCancellation}
+                onCheckedChange={setReverseOnCancellation}
+                description={`${eventType === 'booking_created' ? '予約の取り消し' : '注文の取り消し'}を同じ記録から追跡します。`}
+              >
+                取り消されたら、付けたぶんを引く
+              </Checkbox>
+            ) : null}
+            <Checkbox checked={notifyFriend} onCheckedChange={setNotifyFriend}>
+              マイルが付いたら、この内容を自動で知らせる
+            </Checkbox>
+            <Checkbox checked={isActive} onCheckedChange={setIsActive} description="オフにすると停止中で保存します。">
+              作成したらすぐ動かす
+            </Checkbox>
+          </div>
+        </Disclosure>
+      </section>
+
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した決めごと" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </CreatePage>
+  )
+}

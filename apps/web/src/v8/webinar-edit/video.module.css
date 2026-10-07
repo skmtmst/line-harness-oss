@@ -1,0 +1,158 @@
+/* ★V8 ウェビナーの ②動画（VWNaA・LPOe7）。カード・欄・行の形は form.module.css。 */
+
+.desc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wc-an-text-lh);
+}
+
+/* 動画の行：淡い地・角10・内側12・間12。黒い小窓 96×54。 */
+.videoRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wc-an-row-gap);
+  padding: var(--tpl-wc-an-row-gap);
+  border-radius: var(--tpl-wc-vd-row-radius);
+  background: var(--color-table-head);
+}
+.thumb {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-wc-vd-thumb-w);
+  height: var(--tpl-wc-vd-thumb-h);
+  border-radius: var(--tpl-wc-vd-thumb-radius);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+.videoText { display: flex; flex: 1; flex-direction: column; gap: var(--tpl-wc-cm-head-gap); min-width: 0; }
+.videoName {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-wc-tab-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.videoMeta { color: var(--color-ink-secondary); font-size: var(--text-micro); line-height: var(--tpl-row-sub-lh); }
+
+/* 準備の段：札（点なし）と ›。 */
+.stages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-wc-vd-stage-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stageItem { display: flex; align-items: center; gap: var(--tpl-wc-vd-stage-gap); }
+.stageSep { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-row-sub-lh); }
+.stage {
+  padding: var(--tpl-wc-vd-stage-pad);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-row-sub-lh);
+  white-space: nowrap;
+}
+.stage[data-state='done'] { background: var(--color-success-bg); color: var(--color-success); }
+.stage[data-state='current'] { background: var(--color-warning-bg); color: var(--color-ink); }
+.stageNote {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+
+.dateInput {
+  width: 100%;
+  height: var(--tpl-wc-control-h);
+  padding: var(--tpl-wc-input-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--tpl-wc-input-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-body);
+}
+.dateInput:disabled { opacity: 0.6; }
+
+.side { flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-wc-tab-lh); white-space: nowrap; }
+
+/* 開催回の表：見出しは淡い地・角8・内側 8/16。欄 150・100・80・100。 */
+.sessionHead {
+  display: flex;
+  gap: var(--tpl-wc-an-row-gap);
+  padding: var(--tpl-wc-vd-head-pad);
+  border-radius: var(--tpl-wc-an-chart-radius);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-row-sub-lh);
+}
+.note { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+.sessionRow { padding: var(--tpl-wc-vd-row-pad); }
+.sessionRow > span { display: flex; align-items: center; }
+.colWhen { width: var(--tpl-wc-vd-col-when); flex-shrink: 0; }
+.colCap { width: var(--tpl-wc-vd-col-cap); flex-shrink: 0; }
+.colCount { width: var(--tpl-wc-vd-col-count); flex-shrink: 0; }
+.colState { width: var(--tpl-wc-vd-col-cap); flex-shrink: 0; }
+.strong { color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-text-sm-lh); white-space: nowrap; }
+.cell { color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); white-space: nowrap; }
+.capEdit { display: flex; align-items: center; gap: var(--tpl-wc-vd-stage-gap); }
+.rowError { flex-basis: 100%; color: var(--color-danger); font-size: var(--text-caption); }
+
+/* 右の列：公開ページでの見え方のカード（線1・角12・内側16）。 */
+.pageCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wc-an-row-gap);
+  align-self: stretch;
+  padding: var(--tpl-wc-cm-side-pad);
+  border-radius: var(--tpl-wc-card-radius);
+  box-shadow: var(--tpl-an-ring);
+  background: var(--color-canvas);
+}
+.pageTitle {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-an-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-an-card-title-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--tpl-wc-vd-player-h);
+  border-radius: var(--tpl-wc-vd-thumb-radius);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+.pageNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+
+.dialogBody { display: flex; flex-direction: column; gap: var(--tpl-wc-an-gap); }
+.days { display: flex; flex-wrap: wrap; gap: var(--tpl-wc-vd-stage-gap); }
+.day {
+  width: var(--tpl-wc-control-h);
+  height: var(--tpl-wc-control-h);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--tpl-wc-input-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  cursor: pointer;
+}
+.day[aria-pressed='true'] { border-color: var(--color-accent-deep); color: var(--color-accent-deep); font-weight: 600; }

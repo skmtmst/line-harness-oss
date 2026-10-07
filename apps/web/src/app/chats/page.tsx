@@ -1,5 +1,6 @@
 'use client'
 
+import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton'
 import Avatar from '@/components/shared/avatar'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -2934,12 +2935,20 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   }
                   if (inboxListLoading) {
                     return (
-                      <div
-                        role="status"
-                        data-inbox-list-state="loading"
-                        className="text-ink-faint flex min-h-36 items-center justify-center px-4 py-8 text-center text-sm"
-                      >
-                        会話を読み込んでいます...
+                      /*
+                       * 会話の行の形の骨組み（動きの点検 15 番）。0.3 秒以内に届けば出さない。
+                       * 読み上げには「読み込んでいます」を残す。
+                       */
+                      <div role="status" aria-busy="true" data-inbox-list-state="loading">
+                        <span className="sr-only">会話を読み込んでいます...</span>
+                        <DelayedSkeleton
+                          loading
+                          skeleton={
+                            <div aria-hidden="true">
+                              {[0, 1, 2, 3, 4, 5].map((row) => <SkeletonRow key={row} />)}
+                            </div>
+                          }
+                        />
                       </div>
                     )
                   }
@@ -3837,7 +3846,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           友だち詳細。メールでも出したいが、メールのスレッドは友だちに
           紐づいていない（support_email_threads は customer_email しか
           持たない）。メールアドレスから友だちを引く口が要る。
-          docs/v025-open-questions.md に残している。
 
           いまはメールを開いているときは案内を出す。空の枠を出すより、
           なぜ出ないかが分かる方がよい。

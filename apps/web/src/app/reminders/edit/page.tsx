@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation'
 import TargetMissing from '@/components/shared/target-missing'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Issue469ReminderStepEditor, Issue469ReminderTestStage } from './issue469-reminder-screens'
-import ReminderEditV8 from './edit-v8'
+import ReminderEditV8 from '@/v8/reminders/edit'
 
 /**
  * リマインダの編集。

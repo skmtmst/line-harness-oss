@@ -154,6 +154,7 @@ export default function FriendsListV8() {
   const [refreshing, setRefreshing] = useState(false)
   const [optionsFailed, setOptionsFailed] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   const [bulkOpen, setBulkOpen] = useState(false)
   const [rowAction, setRowAction] = useState<{ friend: FriendListItem; action: FriendAction } | null>(null)
   const [notice, setNotice] = useState<Notice>(null)
@@ -872,7 +873,7 @@ export default function FriendsListV8() {
       overlays={(
         <>
           <span className={styles.bulkWrap} data-design="V8BulkBar">
-            <BulkBar count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください">
+            <BulkBar count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください" onClear={clearSelection}>
               {selectedIds.size > 1 && canRunBulk(staffRole) ? (
                 <Button variant="secondary" data-qa-open="IAf7j" onClick={() => setBulkOpen(true)}>操作を選ぶ</Button>
               ) : null}

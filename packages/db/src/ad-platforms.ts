@@ -951,3 +951,41 @@ export async function connectVerifiedAdPlatform(db: D1Database, platform: AdPlat
     .bind(at,at,platform.id,platform.line_account_id,platform.name,platform.updated_at,platform.config,platform.config_encrypted).run();
   return Number(result.meta.changes ?? 0) === 1;
 }
+
+/** F-22: 保存済みの送信と待ち行列を、同じ目印で結び付ける。 */
+export interface AdConversionRetrySource extends AdConversionOutboxRow {
+  log_id: string;
+  log_status: string;
+  log_provider_event_id: string | null;
+}
+export async function getAdConversionRetrySource(db: D1Database, logId: string): Promise<AdConversionRetrySource | null> {
+  return db.prepare(`SELECT o.*, l.id AS log_id, l.status AS log_status,
+      l.provider_event_id AS log_provider_event_id
+    FROM ad_conversion_logs l JOIN ad_conversion_outbox o
+      ON o.ad_platform_id = l.ad_platform_id AND o.friend_id = l.friend_id
+      AND o.event_name = l.event_name AND o.idempotency_key = l.idempotency_key
+      AND o.line_account_id = l.line_account_id
+    WHERE l.id = ?`).bind(logId).first<AdConversionRetrySource>();
+}
+
+/** 古い送信記録の created_at は再試行で変わるため、初回待ち行列の日時を期限の正本にする。 */
+export async function claimAdConversionRetry(
+  db: D1Database, row: AdConversionRetrySource, now: Date = new Date(),
+): Promise<string | null> {
+  const lease = crypto.randomUUID();
+  const result = await db.prepare(`UPDATE ad_conversion_outbox
+    SET status = 'sending', lease_token = ?, attempt_count = attempt_count + 1, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND created_at = ?
+      AND is_retryable = 1 AND status IN ('pending', 'failed')
+      AND julianday(created_at) > julianday(?) - 90
+      AND provider_event_id = ?
+      AND EXISTS (SELECT 1 FROM ad_conversion_logs l
+        WHERE l.id = ? AND l.status = 'failed' AND l.line_account_id = ad_conversion_outbox.line_account_id
+          AND l.ad_platform_id = ad_conversion_outbox.ad_platform_id
+          AND l.friend_id = ad_conversion_outbox.friend_id AND l.event_name = ad_conversion_outbox.event_name
+          AND l.idempotency_key = ad_conversion_outbox.idempotency_key
+          AND l.provider_event_id = ad_conversion_outbox.provider_event_id)`)
+    .bind(lease, now.toISOString(), row.id, row.line_account_id, row.created_at,
+      now.toISOString(), row.provider_event_id, row.log_id).run();
+  return (result.meta?.changes ?? 0) === 1 ? lease : null;
+}

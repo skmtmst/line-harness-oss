@@ -15,7 +15,7 @@ const nativeHeaderExceptions = new Set(baseline.nativeTableHeaderExceptions)
 const v8NativeHeaders: Record<string, number> = {
   'app/accounts/migration.tsx': 8,
   'app/duplicates/page.tsx': 12,
-  'app/templates/page.tsx': 8,
+  // 'app/templates/page.tsx' は 2026-10-06 に新しい一覧（src/v8/templates）へ移り、直書き th が 0 になったので外した。
 }
 const sources = Object.fromEntries(
   targets.map((path) => [path, readFileSync(join(SRC, path), 'utf8')]),

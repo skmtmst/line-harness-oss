@@ -36,6 +36,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict } from '@/components/shared/save-conflict'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -190,11 +191,25 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
   const [loadMissing, setLoadMissing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [conflict, setConflict] = useState(false)
-  // 編集の競合（`k32cn`）。入力は捨てず、比べる・読み込むを選んでもらう。
-  const [compareTarget, setCompareTarget] = useState<ReminderDraftSettings | null>(null)
-  const [compareBusy, setCompareBusy] = useState(false)
-  const [compareError, setCompareError] = useState('')
+  /*
+   * 編集の競合（`k32cn`）。入力は捨てず、比べる・読み込むを選んでもらう。
+   * 帯・比べる窓・読み直しは共通の save-conflict（動きの点検 16 番）。
+   */
+  const saveConflict = useSaveConflict<ReminderDraftSettings>({
+    // 「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
+    fetchLatest: async () => {
+      const response = await api.reminders.getDraft(reminderId)
+      if (!response.success || response.data.reminderId !== reminderId) return null
+      return response.data.settings
+    },
+    // 「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
+    reload: async () => {
+      setError('')
+      await loadDraft()
+    },
+  })
+  const conflict = saveConflict.conflict !== null
+  const clearConflict = saveConflict.clear
   const [testConfirm, setTestConfirm] = useState(false)
   const requestSeq = useRef(0)
 
@@ -220,7 +235,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       setDraft(response.data)
       setSettings(response.data.settings)
       setBasics(basicsFromDraft(response.data.settings))
-      setConflict(false)
+      clearConflict()
     } catch (caught) {
       if (seq !== requestSeq.current) return
       if (caught instanceof ApiError && caught.status === 404) setLoadMissing(true)
@@ -228,7 +243,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
-  }, [reminderId])
+  }, [reminderId, clearConflict])
 
   useEffect(() => {
     setDraft(null)
@@ -242,33 +257,6 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     setValidationState('idle')
     void loadDraft()
   }, [loadDraft])
-
-  // `k32cn`「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
-  const reloadAfterConflict = async () => {
-    setCompareTarget(null)
-    setCompareError('')
-    setError('')
-    await loadDraft()
-  }
-
-  // `k32cn`「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
-  const openCompare = async () => {
-    if (compareBusy) return
-    setCompareBusy(true)
-    setCompareError('')
-    try {
-      const response = await api.reminders.getDraft(reminderId)
-      if (!response.success || response.data.reminderId !== reminderId) {
-        setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
-        return
-      }
-      setCompareTarget(response.data.settings)
-    } catch {
-      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
-    } finally {
-      setCompareBusy(false)
-    }
-  }
 
   // 配信予定は「これから」の段と「完了」の段で読む。
   useEffect(() => {
@@ -336,7 +324,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
   async function saveSettings(next: ReminderDraftSettings): Promise<boolean> {
     setBusy(true)
     setError('')
-    setConflict(false)
+    clearConflict()
     try {
       const response = await api.reminders.saveDraft(
         reminderId,
@@ -351,7 +339,8 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       return true
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {
-        setConflict(true)
+        const data = caught.data as { updatedAt?: unknown } | null
+        saveConflict.mark(typeof data?.updatedAt === 'string' ? data.updatedAt : '')
         setError('この下書きは別の画面で先に更新されました。最新の内容を読み直してください。')
       } else {
         setError('保存できませんでした。')
@@ -436,22 +425,13 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         {v8stage === 'done' ? `名前：${subjectSettings.name}` : `名前：${subjectSettings.name}・いまは下書きです`}
       </p>
       {conflict ? (
-        <div className="border-accent bg-accent-soft rounded-card flex flex-wrap items-center gap-3 border p-4" data-design-node="k32cn" role="alert">
-          <p className="text-ink min-w-0 flex-1 text-sm">
-            ほかの人が先に保存しました。
-            <span className="text-ink-secondary mt-0.5 block text-xs">
-              あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。
-            </span>
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
-              {compareBusy ? '比べています...' : '違いを比べる'}
-            </Button>
-            <Button type="button" variant="primary" onClick={() => void reloadAfterConflict()}>
-              最新を読み込んで続ける
-            </Button>
-          </div>
-        </div>
+        <SaveConflictBand
+          designNode="k32cn"
+          title={saveConflictTitle(saveConflict.conflict?.updatedAt ?? '', 'リマインダ', subjectSettings.name)}
+          compareBusy={saveConflict.compareBusy}
+          onCompare={() => void saveConflict.compare()}
+          onReload={() => void saveConflict.reloadLatest()}
+        />
       ) : (error || (!testConfirm && testIssue && v8stage === 'confirm')) ? (
         <Notice tone="danger">
           {error || testIssue}
@@ -565,36 +545,16 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         onCancel={() => setTestConfirm(false)}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="この手順への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-      <ConfirmDialog
-        open={compareTarget !== null || compareError !== ''}
-        title="最新の保存と比べる"
-        description="あなたの下書きと、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
-        confirmLabel="最新を読み込んで続ける"
-        busy={compareBusy}
-        error={compareError || undefined}
-        onConfirm={() => void reloadAfterConflict()}
-        onCancel={() => {
-          setCompareTarget(null)
-          setCompareError('')
-        }}
-      >
-        {compareTarget && settings && (() => {
-          const mine = basics ? basicsToDraft(settings, basics) : settings
-          const lines = describeReminderDiff(mine, compareTarget)
-          return lines.length === 0 ? (
-            <p className="text-ink-secondary mt-3 text-sm">違いは見つかりませんでした。そのまま読み込めます。</p>
-          ) : (
-            <ul className="mt-3 space-y-1.5 text-sm">
-              {lines.map((line, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <span aria-hidden className="text-accent-deep font-bold">・</span>
-                  <span className="text-ink">{line}</span>
-                </li>
-              ))}
-            </ul>
-          )
-        })()}
-      </ConfirmDialog>
+      <SaveConflictCompareDialog
+        open={saveConflict.compareOpen}
+        busy={saveConflict.compareBusy}
+        error={saveConflict.compareError}
+        lines={saveConflict.latest && settings
+          ? describeReminderDiff(basics ? basicsToDraft(settings, basics) : settings, saveConflict.latest).map((text) => ({ text }))
+          : null}
+        onReload={() => void saveConflict.reloadLatest()}
+        onCancel={saveConflict.closeCompare}
+      />
     </div>
   )
 }

@@ -1,0 +1,221 @@
+/*
+ * ★V8 ファイルの検査（PfA4o）。外側（型・中のメニュー・戻るリンク）は sb-frame。
+ * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-sb-*）。
+ */
+
+.infoBand,
+.dangerBand,
+.doneBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-band-gap);
+  margin: 0;
+  padding: var(--tpl-sb-band-pad);
+  border-radius: var(--tpl-sb-band-radius);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sb-band-text);
+  line-height: var(--tpl-sb-band-lh);
+}
+
+.infoBand { background: var(--color-status-info-soft); }
+.infoBand .bandIcon { color: var(--color-action); }
+.dangerBand { background: var(--color-status-danger-soft); color: var(--color-danger); }
+.doneBand { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+
+.bandIcon {
+  flex-shrink: 0;
+  width: var(--tpl-sb-band-icon);
+  height: var(--tpl-sb-band-icon);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+.search {
+  width: var(--tpl-sb-search-w-wide);
+  flex-shrink: 0;
+}
+
+.chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-sb-chip-gap);
+  height: var(--tpl-sb-ctl-h);
+  padding: var(--tpl-sb-chip-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--tpl-sb-chip-text);
+  font-weight: 500;
+  line-height: var(--tpl-sb-chip-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  outline-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+
+.chip:focus-visible {
+  outline: var(--tpl-sb-focus-ring);
+}
+
+.btnIcon {
+  width: var(--tpl-sb-icon-m);
+  height: var(--tpl-sb-icon-m);
+  flex-shrink: 0;
+}
+
+/* 表：枠 1・角丸 12・余白 4/12。列はファイル・上げた人 120・見つかったもの・操作 200（間 12）。 */
+.table {
+  padding: var(--tpl-sb-tbl-pad);
+  border-radius: var(--tpl-sb-card-radius);
+  outline: 1px solid var(--color-hairline);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tpl-sb-fs-col-uploader) minmax(0, 1fr) var(--tpl-sb-fs-col-action);
+  align-items: center;
+  column-gap: var(--tpl-sb-tbl-gap);
+  padding: var(--tpl-sb-tbl-row-pad);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-size: var(--tpl-sb-tbl-head);
+}
+
+.row:last-child {
+  box-shadow: none;
+}
+
+.headRow {
+  color: var(--color-ink-secondary);
+  font-weight: 600;
+}
+
+.headRow:last-child {
+  box-shadow: var(--shadow-row-line);
+}
+
+.cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell[data-tone='danger'] { color: var(--color-status-danger); }
+.cell[data-tone='warn'] { color: var(--color-status-warn-deep); }
+
+.name {
+  font-weight: 600;
+}
+
+.released {
+  margin-left: var(--tpl-sb-row-badge-gap);
+  padding: var(--tpl-sb-pill-pad-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-shell);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sb-row-sub);
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-sb-pill-gap);
+  white-space: nowrap;
+}
+
+.menuBox {
+  display: flex;
+  align-items: center;
+}
+
+:global([data-theme='v8']) .menuBox .more {
+  width: var(--tpl-sb-more);
+  height: var(--tpl-sb-more);
+  min-width: var(--tpl-sb-more);
+  min-height: var(--tpl-sb-more);
+  flex-basis: var(--tpl-sb-more);
+}
+
+.muted {
+  color: var(--color-ink-faint);
+}
+
+/* 外の検査サービス（枠 12・余白 16・間 12）。 */
+.external {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-group-gap);
+  padding: var(--tpl-sb-ext-pad);
+  border-radius: var(--tpl-sb-card-radius);
+  outline: 1px solid var(--color-hairline);
+}
+
+.externalHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-group-gap);
+}
+
+.externalText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-sb-row-sub-gap);
+  min-width: 0;
+}
+
+.externalTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-sb-group-title);
+  font-weight: 700;
+  line-height: var(--tpl-sb-group-title-lh);
+}
+
+.externalNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-sb-note-text);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-group-gap);
+  max-width: var(--tpl-sb-form-w);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-field-gap);
+}
+
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--tpl-sb-band-text);
+  font-weight: 500;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

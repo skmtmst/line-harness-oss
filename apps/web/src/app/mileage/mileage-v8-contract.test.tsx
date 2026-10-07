@@ -30,6 +30,9 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
+/* 1152 の板（ZJIyl）に切り替えないよう、広い画面として描く。 */
+vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
+
 let staffRole = 'admin'
 vi.mock('@/lib/staff-role', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/staff-role')>()
@@ -279,10 +282,10 @@ test('v8 のたまる決めごとは板 OC0gy に切り替わる', async () => {
   await settle()
   await eventually(() => {
     expect(host.querySelector('[data-design-node="OC0gy"]')).toBeTruthy()
+    expect(host.textContent).toContain('友だち追加')
   })
   expect(host.textContent).toContain('たまる決めごと')
   expect(host.textContent).toContain('決めごとを作る')
-  expect(host.textContent).toContain('友だち追加')
   expect(host.textContent).toContain('動いています')
   // v7 の器は出ない
   expect(host.querySelector('[data-mileage-design="v6"]')).toBeNull()
@@ -303,8 +306,8 @@ test('v8 のタブごとに板 ID が替わる（S35pO・CJlf4・oRbJi・IRPw8�
     await settle()
     await eventually(() => {
       expect(host.querySelector(`[data-design-node="${node}"]`)).toBeTruthy()
+      expect(host.textContent).toContain(word)
     })
-    expect(host.textContent).toContain(word)
     act(() => root.unmount())
     host.remove()
     host = document.createElement('div')
@@ -313,18 +316,19 @@ test('v8 のタブごとに板 ID が替わる（S35pO・CJlf4・oRbJi・IRPw8�
   }
 })
 
-test('v8 の閲覧のみは帯が出て作る操作が押せない（E2Any）', async () => {
+test('v8 の閲覧のみは帯が出て、作る操作は出さない（E2Any）', async () => {
   staffRole = 'staff'
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<MileagePage />))
   await settle()
   await eventually(() => {
-    expect(host.querySelector('[data-design-node="OC0gy"]')).toBeTruthy()
+    expect(host.querySelector('[data-design-node="E2Any"]')).toBeTruthy()
+    expect(host.textContent).toContain('友だち追加')
   })
   expect(host.textContent).toContain('閲覧のみで見ています')
-  const createButton = [...host.querySelectorAll('button')].find((item) =>
-    item.textContent?.includes('決めごとを作る'))
-  expect(createButton?.disabled).toBe(true)
+  /* 2026-10-06 オーナー：閲覧のみの人には、押せない形で残さず隠す。 */
+  expect(host.textContent).not.toContain('決めごとを作る')
+  expect(host.querySelector('[aria-label="友だち追加を上へ"]')).toBeNull()
 })
 
 test('v7 の下では従来の器が出る（新しい器には切り替わらない）', async () => {

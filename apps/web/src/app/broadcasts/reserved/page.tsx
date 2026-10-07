@@ -21,7 +21,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useStaffRole } from '@/lib/staff-role'
 import { canEditFeature } from '@/lib/staff-capability'
-import ReservedV8 from '../reserved-v8'
+import ReservedV8 from '@/v8/broadcast-detail/reserved'
 
 type AudienceEstimate = {
   audienceCount: number

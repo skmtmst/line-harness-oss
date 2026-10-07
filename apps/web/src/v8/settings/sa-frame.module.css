@@ -1,0 +1,19 @@
+/*
+ * 設定 A の画面（はじめの設定・LINEアカウント・プール管理・ログインユーザー）の外側。
+ * 設定の型（SettingsPage）の中身の欄は幅 720・余白 24/28 の既定なので、
+ * 絵の幅（設定の中のメニューの右から、板の右 24 まで）に広げる。
+ * 包みは display: contents（型の枠の並びを変えない）。
+ */
+.screen {
+  display: contents;
+}
+
+.screen [data-template-region='body'] {
+  gap: 0;
+}
+
+.screen [data-template-region='body'] > [data-template-region='content'] {
+  max-width: none;
+  padding: var(--tpl-sa-content-pad);
+  gap: var(--tpl-sa-gap);
+}

@@ -23,7 +23,7 @@ import { TextInput } from '@/components/shared/form-controls'
 import { useStepUpGate } from '@/components/step-up-prompt'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import HandoverV8 from './handover-v8'
+import HandoverV8 from '@/v8/accounts-detail/handover'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import {
   DIFFERENT_PROVIDER_NOTE,

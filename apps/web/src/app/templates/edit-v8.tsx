@@ -20,7 +20,6 @@ import { api, ApiError } from '@/lib/api'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import SegmentedControl from '@/components/shared/segmented'
-import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import LinePreview from '@/components/shared/line-preview'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -40,6 +39,7 @@ import {
 } from '@/components/templates/message-template-editor'
 import EditorV8, { EditorCard } from './editor-v8'
 import { describeTemplateDiff, type TemplateDraftSide } from './edit/template-conflict-diff'
+import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle } from '@/components/shared/save-conflict'
 import styles from './editor-v8.module.css'
 import { isTemplateDetailData } from './template-detail-data'
 import {
@@ -412,22 +412,14 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
         onPublish={publishConflict ? () => void openCompare() : () => void onPublish()}
         publishLabel={publishConflict ? '比べてから保存' : undefined}
         error={publishConflict ? (
-          <div className="border-accent bg-accent-soft rounded-card flex flex-wrap items-center gap-3 border p-4" data-design-node="NCbYn" role="alert">
-            <p className="text-ink min-w-0 flex-1 text-sm">
-              ほかの人が先に更新しました。
-              <span className="text-ink-secondary mt-0.5 block text-xs">
-                あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。
-              </span>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
-                {compareBusy ? '比べています...' : '違いを比べる'}
-              </Button>
-              <Button type="button" variant="primary" onClick={() => reloadAfterConflict()}>
-                最新を読み込んで続ける
-              </Button>
-            </div>
-          </div>
+          /* 競合の帯は共通部品（save-conflict）。絵は `NCbYn`。 */
+          <SaveConflictBand
+            title={saveConflictTitle('', 'テンプレート', name)}
+            designNode="NCbYn"
+            compareBusy={compareBusy}
+            onCompare={() => void openCompare()}
+            onReload={() => reloadAfterConflict()}
+          />
         ) : (error || publishError || undefined)}
         guide={(
           <>
@@ -576,36 +568,19 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
         )}
       </EditorV8>
 
-      <ConfirmDialog
+      <SaveConflictCompareDialog
         open={compareTarget !== null || compareError !== ''}
-        title="最新の保存と比べる"
-        description="あなたの下書きと、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
-        confirmLabel="最新を読み込んで続ける"
         busy={compareBusy}
         error={compareError || undefined}
-        onConfirm={() => reloadAfterConflict()}
+        lines={compareTarget
+          ? describeTemplateDiff({ name, category, folderId, messageType, messageContent } satisfies TemplateDraftSide, compareTarget).map((text) => ({ text }))
+          : null}
+        onReload={() => reloadAfterConflict()}
         onCancel={() => {
           setCompareTarget(null)
           setCompareError('')
         }}
-      >
-        {compareTarget && (() => {
-          const mine: TemplateDraftSide = { name, category, folderId, messageType, messageContent }
-          const lines = describeTemplateDiff(mine, compareTarget)
-          return lines.length === 0 ? (
-            <p className="text-ink-secondary mt-3 text-sm">違いは見つかりませんでした。そのまま読み込めます。</p>
-          ) : (
-            <ul className="mt-3 space-y-1.5 text-sm">
-              {lines.map((line, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <span aria-hidden className="text-accent-deep font-bold">・</span>
-                  <span className="text-ink">{line}</span>
-                </li>
-              ))}
-            </ul>
-          )
-        })()}
-      </ConfirmDialog>
+      />
 
       <ConfirmDialog
         open={publishCheck !== null}

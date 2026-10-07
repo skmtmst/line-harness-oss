@@ -155,9 +155,9 @@ describe('読み込み中・失敗の間は下の帯を出さない', () => {
 });
 
 describe('受け付けましたの画面 (★V8・VU6Xi)', () => {
-  it('緑の丸の印＋履歴ボタンに calendar-days があり、帯に LINEに戻る', () => {
+  it('緑の丸の印があり、帯に LINEに戻る・予約の履歴を見る (板どおり履歴ボタンに印は付けない)', () => {
     const done = src('components', 'Done.tsx');
-    expect(done).toContain('calendar-days');
+    expect(done).not.toContain('calendar-days');
     expect(done).toContain('bg-liff-soft');
     expect(done).toContain('LINEに戻る');
     expect(done).toContain('予約の履歴を見る');

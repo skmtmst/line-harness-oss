@@ -1,0 +1,228 @@
+/*
+ * ★V8 テンプレートの作る・編集（u5YC6・a1k3d・NCbYn・S6FEuB・EsYo4）。
+ * 寸法は globals.css の --tpl-te-*（と作る型の --tpl-*）だけを読む。
+ */
+
+/* 戻るリンク（絵は「← テンプレートへ」を1つの文字で描く）。 */
+.back { text-decoration: none; }
+.back:hover { text-decoration: underline; }
+
+/* 競合の帯の段（NCbYn「帯の段 競合」）：頭のすぐ下・左右24・下8。 */
+.bandRow { padding: var(--tpl-te-band-row-pad); flex-shrink: 0; }
+.band {
+  display: flex; align-items: center; gap: var(--tpl-te-band-gap);
+  padding: var(--tpl-te-band-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-warning); outline-offset: -1px;
+  background: var(--color-status-warn-soft);
+}
+.bandIcon { flex-shrink: 0; color: var(--color-warning); }
+.bandText { display: flex; flex-direction: column; gap: var(--tpl-te-band-text-gap); flex: 1 1 0; min-width: 0; }
+.bandTitle { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; line-height: var(--tpl-te-band-title-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bandDesc { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-te-band-desc-lh); }
+.bandActions { display: flex; gap: var(--tpl-te-band-gap); flex-shrink: 0; }
+
+/* 左の段（白い箱）：余白20・中の間14。題 15/700・説明 12。 */
+/* 絵の箱は内側の線（outline）で余白20。Card の枠1px の分だけ余白を引く。 */
+.card { gap: var(--tpl-section-gap); min-width: 0; padding: calc(var(--tpl-section-pad) - 1px); }
+.cardHead { display: flex; flex-direction: column; gap: var(--tpl-te-head-gap); }
+.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-te-card-title-lh); }
+.cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+.hint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-te-hint-lh); }
+.error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+
+/* 名前とフォルダの並び：名前は伸びる・フォルダ 220・間12・下でそろえる。 */
+.pair { display: flex; align-items: flex-end; gap: var(--tpl-rule-row-gap); width: 100%; }
+.grow { flex: 1 1 0; min-width: 0; }
+.field { display: flex; flex-direction: column; gap: var(--tpl-field-gap-basic); min-width: 0; }
+.folderField { width: var(--tpl-te-folder-w); flex-shrink: 0; }
+.folderField :global(*) { max-width: 100%; }
+.label { display: flex; align-items: center; gap: var(--tpl-label-tag-gap); color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-chip-label-lh); }
+.labelSmall { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-text-sm-lh); }
+.optional { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; }
+.required { color: var(--color-danger); font-size: var(--text-micro); font-weight: 600; }
+
+/* 形：小さい題＋切り替え（間12）。 */
+.typeRow { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); }
+
+/* 本文の箱：余白14・間8。字 13/22 の4行・間の16・差し込むの並び。 */
+.bodyBox {
+  display: flex; flex-direction: column; gap: var(--tpl-body-gap);
+  padding: var(--tpl-body-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border); outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.bodyBox:focus-within { outline-color: var(--color-action); }
+.bodyText {
+  height: var(--tpl-te-body-h); min-height: var(--tpl-te-body-h);
+  padding: 0; border: 0; outline: 0; background: transparent;
+  color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-body-lh);
+  resize: vertical;
+}
+.bodyText[data-kind='flex'] { height: var(--tpl-te-flex-h); font-family: var(--font-mono, monospace); font-size: var(--text-caption); }
+.bodySpacer { height: var(--tpl-te-body-spacer); flex-shrink: 0; }
+.insertRow { display: flex; align-items: center; gap: var(--tpl-chip-row-gap); flex-wrap: wrap; }
+.insertLine { display: contents; }
+.insertLabel { color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
+.insertChip {
+  display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap);
+  height: var(--tpl-chip-h); padding: var(--tpl-insert-pad);
+  border: 0; border-radius: var(--radius-control); background: transparent;
+  color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-chip-label-lh);
+  white-space: nowrap; cursor: pointer;
+}
+.insertChip:hover:not(:disabled) { background: var(--color-canvas-sunken); }
+.insertChip:disabled { cursor: not-allowed; opacity: 0.5; }
+.insertChip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-action); outline-offset: calc(var(--tpl-te-focus) * -1); }
+.counter { margin-left: auto; color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
+.counter[data-over] { color: var(--color-danger); }
+
+/* 本文の中のURL：枠の行（余白 10/12・間10）＋リンク名。 */
+.urlRow {
+  display: flex; align-items: center; gap: var(--tpl-te-url-gap);
+  padding: var(--tpl-te-url-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+}
+.urlIcon { flex-shrink: 0; color: var(--color-ink-faint); }
+.urlText { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-caption); }
+.urlNote { flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
+
+/* 右の列（作る型の右の列と同じ寸法）：幅380・余白24・左の線。左右は別々に縦へ送る。 */
+.side {
+  display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
+  width: var(--tpl-te-side-w); min-height: 0; overflow-x: hidden; overflow-y: auto;
+  padding: var(--tpl-preview-pad);
+  border-left: 1px solid var(--color-hairline);
+  background: var(--color-table-head);
+}
+.sideContent { display: flex; flex-direction: column; align-items: center; gap: var(--tpl-section-gap); width: var(--tpl-preview-content-width); flex: 0 0 auto; }
+.sideContent > * { flex-shrink: 0; }
+
+/* 右の列：送るときの名前の箱・届き方の題。 */
+.sideCard {
+  display: flex; flex-direction: column; gap: var(--tpl-side-card-gap); align-self: stretch;
+  padding: var(--tpl-side-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.sideTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-side-title-lh); }
+.sideText { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-side-title-lh); }
+.sideList { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--tpl-side-row-gap); font-size: var(--text-caption); }
+.previewHead { align-self: stretch; margin: 0; color: var(--color-ink); font-size: var(--tpl-preview-title-size); font-weight: 600; line-height: var(--tpl-preview-title-lh); }
+/* 届き方の題はこの画面が出す。見本の部品の題（LINEでの見え方）は重ねない。 */
+.phone { align-self: stretch; margin-top: var(--tpl-te-phone-shift); }
+.phone > section > p:first-child { display: none; }
+.previewToggle { display: none; align-self: stretch; }
+.previewToggle > * { width: 100%; }
+.previewDialog { display: flex; justify-content: center; }
+.previewDialog > section > p:first-child { display: none; }
+
+
+/* 1152 の板（a1k3d）：右の列は余白16・中の幅いっぱい。スマホは窓で開く。 */
+@container v8-page (max-width: 1099px) {
+  .side { width: var(--tpl-preview-narrow-width); padding: var(--tpl-te-narrow-side-pad); }
+  .sideContent { width: 100%; }
+  .previewToggle { display: block; }
+  .phone, .previewHead { display: none; }
+  .insertLine { display: flex; align-items: center; gap: var(--tpl-chip-row-gap); width: 100%; }
+  .insertRow { flex-direction: column; align-items: stretch; gap: var(--tpl-body-gap); }
+}
+
+/* 閲覧のみの帯（決まり：押せない操作は置かず、帯で知らせる）。 */
+.readonly {
+  display: flex; align-items: center; gap: var(--tpl-ro-band-gap);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-ro-band-lh);
+}
+
+/* 比べる窓の中の差分。 */
+.diffList { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--tpl-side-row-gap); color: var(--color-ink); font-size: var(--text-label); }
+.dateRow { display: flex; align-items: flex-end; gap: var(--tpl-rule-row-gap); }
+
+/* スマホ幅：左右を縦に積む（作る型と同じ切り替え）。 */
+@media (max-width: 1023px) {
+  .side { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
+}
+
+/* ── クーポン・リサーチ（S6FEuB・EsYo4） ── */
+.spacer { flex: 1 1 0; }
+.tilde { flex-shrink: 0; align-self: flex-end; padding-bottom: var(--tpl-te-tilde-pad); color: var(--color-ink-faint); font-size: var(--text-body); line-height: var(--tpl-te-tilde-lh); }
+.toggleRow { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); width: 100%; }
+.toggleLabel { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-side-title-lh); }
+.toggleLabelSmall { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); white-space: nowrap; }
+
+/* 中身：画像の枠 160×106・右に2つの入力（間10）。 */
+.couponRow { display: flex; align-items: flex-start; gap: var(--tpl-rule-row-gap); width: 100%; }
+.couponImage {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden;
+  width: var(--tpl-te-coupon-img-w); height: var(--tpl-te-coupon-img-h);
+  padding: 0; border: 0; border-radius: var(--radius-control);
+  background: var(--tpl-te-coupon-bg); color: var(--color-ink); cursor: pointer;
+}
+.couponImage img { width: 100%; height: 100%; object-fit: cover; }
+.couponImage:focus-visible { outline: var(--tpl-te-focus) solid var(--color-action); outline-offset: var(--tpl-te-focus); }
+.couponImageEmpty { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); font-weight: 600; }
+.couponFields { display: flex; flex-direction: column; gap: var(--tpl-te-url-gap); flex: 1 1 0; min-width: 0; }
+.imageDialog { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-body-gap); }
+.imageDialog > :global(*) { max-width: 100%; }
+
+/* 右の箱の数の行（34.5・下線）。 */
+.statList { margin: 0; display: flex; flex-direction: column; gap: var(--tpl-side-card-gap); }
+.statRow { display: flex; align-items: center; gap: var(--tpl-body-gap); padding: var(--tpl-side-row-pad) 0; box-shadow: var(--shadow-row-line); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+.statRow dt { flex: 1 1 0; color: var(--color-ink-secondary); }
+.statRow dd { margin: 0; color: var(--color-ink); font-weight: 600; }
+
+/* 質問の箱：余白14・間10。問の番号の前に並びを変える印。 */
+.question {
+  display: flex; flex-direction: column; gap: var(--tpl-te-url-gap); width: 100%;
+  padding: var(--tpl-body-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+}
+.grip { display: inline-flex; align-items: center; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); cursor: pointer; }
+.grip:disabled { cursor: default; opacity: 0.5; }
+.grip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-action); outline-offset: var(--tpl-te-focus); }
+.questionNo { color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-text-sm-lh); }
+.formatField { width: var(--tpl-te-format-w); flex-shrink: 0; }
+.formatField :global(*) { max-width: 100%; }
+.choiceRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-label-tag-gap); }
+.choice {
+  display: inline-flex; align-items: center; gap: var(--tpl-chip-gap);
+  height: var(--tpl-chip-h); padding: var(--tpl-chip-pad);
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.choice:focus-within { outline-color: var(--color-action); }
+.choiceInput {
+  field-sizing: content; min-width: var(--tpl-te-choice-min-w);
+  padding: 0; border: 0; outline: 0; background: transparent;
+  color: var(--color-ink); font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-te-choice-lh);
+}
+.choiceRemove { display: none; align-items: center; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); cursor: pointer; }
+.choice:hover .choiceRemove, .choice:focus-within .choiceRemove { display: inline-flex; }
+
+/* 見本のスマホの中のカード（幅200・角丸14）。 */
+.assetRow { display: flex; align-items: flex-start; gap: var(--tpl-label-tag-gap); }
+.assetAvatar {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: var(--tpl-te-avatar); height: var(--tpl-te-avatar); border-radius: var(--radius-pill);
+  background: var(--color-accent-deep); color: var(--color-canvas); font-size: var(--text-body); font-weight: 700;
+}
+.assetCard { display: flex; flex-direction: column; overflow: hidden; width: var(--tpl-te-asset-w); border-radius: var(--tpl-te-asset-radius); background: var(--color-canvas); }
+.assetImage { display: flex; align-items: center; justify-content: center; height: var(--tpl-te-asset-img-h); background: var(--tpl-te-coupon-bg); color: var(--color-ink); font-size: var(--text-micro); }
+.assetImage img { width: 100%; height: 100%; object-fit: cover; }
+.assetBody { display: flex; flex-direction: column; gap: var(--tpl-sub-gap); padding: var(--tpl-te-asset-pad); }
+.assetTitle { margin: 0; color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-text-sm-lh); }
+.assetSub { margin: 0; color: var(--color-ink-faint); font-size: var(--text-nano); line-height: var(--tpl-te-asset-sub-lh); }
+.assetAction { margin: 0; padding: var(--tpl-te-asset-action-pad); box-shadow: var(--tpl-te-line-top); color: var(--color-action); font-size: var(--text-caption); font-weight: 600; text-align: center; }
+
+/* 日時の欄は絵の高さ（36）。部品の既定（40）は変えず、この画面の箱だけで合わせる。 */
+.dateBox > button:first-child { height: var(--tpl-chip-h); }
+/* 「消す」は切り替えから離す（絵：切り替えの右に 33）。 */
+.questionRemove { margin-left: var(--tpl-te-q-remove-shift); }

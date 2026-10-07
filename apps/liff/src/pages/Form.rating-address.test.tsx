@@ -92,7 +92,7 @@ describe('5段階評価', () => {
     fireEvent.click(screen.getByRole('radio', { name: '星4つ' }));
     submitForm.mockResolvedValue({ status: 200, body: { success: true, data: {} } });
     fireEvent.click(screen.getByRole('button', { name: '送信する' }));
-    expect(await screen.findByText('送信しました')).toBeTruthy();
+    expect(await screen.findByText('ご回答ありがとうございました')).toBeTruthy();
     expect(submitForm.mock.calls[0][1].data['対応']).toBe(4);
   });
 
@@ -133,7 +133,7 @@ describe('住所', () => {
     fireEvent.click(screen.getByRole('radio', { name: '星5つ' }));
     submitForm.mockResolvedValue({ status: 200, body: { success: true, data: {} } });
     fireEvent.click(screen.getByRole('button', { name: '送信する' }));
-    expect(await screen.findByText('送信しました')).toBeTruthy();
+    expect(await screen.findByText('ご回答ありがとうございました')).toBeTruthy();
     const sent = submitForm.mock.calls[0][1].data['住所'] as Record<string, string>;
     expect(sent.prefecture).toBe('東京都');
     expect(sent.city).toBe('千代田区');
