@@ -1671,6 +1671,8 @@ async function runFrequentHeavyJobs(
       run: async () => {
         const { expireRestaurantHolds, applyDueRestaurantMenuPrices } = await import('./services/restaurant-booking.js');
         await expireRestaurantHolds(dbFor(env), new Date(event.scheduledTime).toISOString());
+        const { processRestaurantInventoryRuleQueue } = await import('./services/restaurant-inventory-rules.js');
+        await processRestaurantInventoryRuleQueue(env);
         await applyDueRestaurantMenuPrices(dbFor(env));
       },
     });
