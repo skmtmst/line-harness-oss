@@ -51,9 +51,10 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     for (const title of ['次の予約', 'つながる先']) expect(screen.getByRole('heading', { name: title })).not.toBeNull()
   })
 
-  it('箱を押すと変更の窓が開き、保存は今の口へ届く', async () => {
+  it('箱を押すと予約の詳細（AjZhH）が開き、「変更する」から変更の窓へ。保存は今の口へ届く', async () => {
     render(<ReservationsPage />)
     fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+    fireEvent.click(await screen.findByRole('button', { name: '変更する' }))
     fireEvent.change(screen.getByLabelText('お客様名'), { target: { value: '佐藤 健太' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', expect.objectContaining({ customerName: '佐藤 健太', tableId: 't1' })))

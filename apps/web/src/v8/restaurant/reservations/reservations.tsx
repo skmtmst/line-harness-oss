@@ -18,8 +18,14 @@ import { CancelReservationDialog, EditReservationDialog, InboundTrialDialog, typ
 import ListView, { PAGE_SIZE } from './list'
 import PhoneReservation from './phone'
 import TodayView, { type PhonePreset } from './today'
+import ReservationDetailDialog from '../../restaurant-reservations/detail-dialog'
 import { type LedgerView, dayRange, monthRange, sameDay, toYmd, weekRange } from './format'
 import styles from './reservations.module.css'
+
+/** 予約を変えられる役割か（口は owner・admin・staff。閲覧のみは 403）。読めるまでは出す（最後の守りは口の 403）。 */
+function canWriteRole(role: string | null | undefined): boolean {
+  return !role || role === 'owner' || role === 'admin' || role === 'staff'
+}
 
 const VIEWS: Array<{ key: LedgerView; label: string }> = [
   { key: 'today', label: '今日' },
@@ -53,12 +59,14 @@ function ViewSwitch({ view, counts, onChange }: {
 }
 
 /* 頭の右：見方の切り替え（数はその月を取り直して今日・今週・今月で数える。遅い応答は捨てる）と主ボタン。 */
-function HeadControls({ storePicker, view, day, storeId, busy, onView, onPhone }: {
+function HeadControls({ storePicker, view, day, storeId, busy, canWrite, onView, onPhone }: {
   storePicker: ReactNode
   view: LedgerView
   day: Date
   storeId: string
   busy: boolean
+  /** 閲覧のみは false。押せないボタンは置かない。 */
+  canWrite: boolean
   onView: (view: LedgerView) => void
   onPhone: (preset: PhonePreset) => void
 }) {
@@ -87,11 +95,13 @@ function HeadControls({ storePicker, view, day, storeId, busy, onView, onPhone }
     <div className={styles.headControls}>
       {storePicker}
       <ViewSwitch view={view} counts={counts} onChange={onView} />
-      {/* 絵 l9NlC0（今日）・Z3FoM（一覧）とも頭の右に置く。 */}
-      <span className={styles.headButtons}>
-        <Button disabled={busy} onClick={() => onPhone({ date: day, hold: true })}><Lock size={15} aria-hidden="true" />枠を押さえる</Button>
-        <Button variant="primary" disabled={busy} onClick={() => onPhone({ date: day })}><Plus size={15} aria-hidden="true" />電話の予約を入れる</Button>
-      </span>
+      {/* 絵 l9NlC0（今日）・Z3FoM（一覧）とも頭の右に置く。閲覧のみは押せないボタンを置かない。 */}
+      {canWrite ? (
+        <span className={styles.headButtons}>
+          <Button disabled={busy} onClick={() => onPhone({ date: day, hold: true })}><Lock size={15} aria-hidden="true" />枠を押さえる</Button>
+          <Button variant="primary" disabled={busy} onClick={() => onPhone({ date: day })}><Plus size={15} aria-hidden="true" />電話の予約を入れる</Button>
+        </span>
+      ) : null}
     </div>
   )
 }
@@ -115,8 +125,8 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const { data, store, busy, mutate, reload } = ctx
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  /* 予約の口は owner・admin・staff に開いている。受信データの試し（媒体の受信口）は owner・admin だけ。 */
-  const canWrite = true
+  /* 予約の口は owner・admin・staff に開いている（閲覧のみは 403）。受信データの試し（媒体の受信口）は owner・admin だけ。 */
+  const canWrite = canWriteRole(role)
   const canImport = role === null || canManageRole(role)
   const accountId = selectedAccountId || ''
   const storeId = store?.id || ''
@@ -124,6 +134,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const menuItems = useMemo(() => data.menuItems.filter((m) => !store || m.store_id === store.id), [data.menuItems, store])
   const [todayRows, setTodayRows] = useState<RestaurantReservation[] | null>(null)
   const [openId, setOpenId] = useState('')
+  const [detailId, setDetailId] = useState('')
   const [cancelId, setCancelId] = useState('')
   const [showImport, setShowImport] = useState(false)
   const [lineWarning, setLineWarning] = useState('')
@@ -158,6 +169,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   }, [mutate, reload])
 
   const opened = rows.find((r) => r.id === openId) ?? data.reservations.find((r) => r.id === openId) ?? null
+  const detailed = rows.find((r) => r.id === detailId) ?? data.reservations.find((r) => r.id === detailId) ?? null
   const cancelling = rows.find((r) => r.id === cancelId) ?? data.reservations.find((r) => r.id === cancelId) ?? null
 
   if (phone) {
@@ -199,6 +211,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onDay={onDay}
           onAdd={(preset) => onPhone(preset)}
           onOpen={setOpenId}
+          onDetail={setDetailId}
         />
       ) : (
         <ListView
@@ -222,6 +235,20 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onRestore={(id) => { void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed' }), '予約を有効に戻しました。') }}
         />
       )}
+      <ReservationDetailDialog
+        reservation={detailed}
+        accountId={accountId}
+        tables={tables}
+        courses={menuItems}
+        busy={busy}
+        canWrite={canWrite}
+        onClose={() => setDetailId('')}
+        onCancel={(id) => { setDetailId(''); setCancelId(id) }}
+        onRestore={(id) => {
+          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed' }), '予約を有効に戻しました。').then((ok) => { if (ok) setDetailId('') })
+        }}
+        onEdit={(id) => { setDetailId(''); setOpenId(id) }}
+      />
       <EditReservationDialog
         reservation={opened}
         tables={tables}
@@ -313,6 +340,7 @@ export default function ReservationsPage() {
   }, [view, day, period, status, page])
 
   const changeView = (next: LedgerView) => { setView(next); setPage(1) }
+  const canWrite = canWriteRole(useStaffRole())
 
   if (phone) {
     return (
@@ -341,6 +369,7 @@ export default function ReservationsPage() {
           day={day}
           storeId={ctx?.selectedStoreId ?? ''}
           busy={!ctx || ctx.busy}
+          canWrite={canWrite}
           onView={changeView}
           onPhone={setPhone}
         />

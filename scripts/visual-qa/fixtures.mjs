@@ -6111,6 +6111,52 @@ export const BOOKING_AVAILABILITY_STORE_VIEW = {
 }
 
 /*
+  V8 の絵（板 d5fmnM・E3YDK・CcA4k・wvGke・yRPxl・KRgTQ・x1OZS6 など）の右のスマホの見本が読む空き。
+  絵は 10/2（金）始まり：最初の空きが金曜で 9:00〜16:00 の6枠（10:00 と 16:00 は満）、
+  10/3（土）空き・10/4（日）満・10/5（月）休み・10/6（火）空き。
+  「トリミング（小型犬）」の90分＋間隔15分で 105 分の枠。
+  上の BOOKING_AVAILABILITY（9/3 始まり）は v6 の撮影と代理予約の手順が日付で選ぶので残し、
+  見本の API は「10/1 以降の範囲」を聞かれたときだけこちらを返す（V8 の画面は今日から聞く）。
+*/
+const OCT_SLOT = (date, start, remaining) => {
+  const [h, m] = start.split(':').map(Number)
+  const end = h * 60 + m + 105
+  return {
+    date, start, end: `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`,
+    capacity: 2, remaining, state: remaining === 0 ? 'full' : 'limited',
+  }
+}
+export const BOOKING_AVAILABILITY_OCT = {
+  by_staff: [
+    {
+      staff_id: 'bs-1', display_name: '佐々木',
+      slots: [
+        OCT_SLOT('2026-10-02', '09:00', 1), OCT_SLOT('2026-10-02', '10:00', 0), OCT_SLOT('2026-10-02', '13:00', 1),
+        OCT_SLOT('2026-10-02', '14:00', 1), OCT_SLOT('2026-10-02', '15:00', 1), OCT_SLOT('2026-10-02', '16:00', 0),
+        OCT_SLOT('2026-10-03', '10:00', 1), OCT_SLOT('2026-10-03', '13:00', 1),
+        OCT_SLOT('2026-10-04', '10:00', 0), OCT_SLOT('2026-10-04', '13:00', 0),
+        OCT_SLOT('2026-10-06', '09:00', 1), OCT_SLOT('2026-10-06', '13:00', 1),
+        OCT_SLOT('2026-10-09', '10:00', 1), OCT_SLOT('2026-10-10', '13:00', 1),
+        OCT_SLOT('2026-10-13', '09:00', 1), OCT_SLOT('2026-10-16', '15:00', 1),
+        OCT_SLOT('2026-10-17', '15:00', 1), OCT_SLOT('2026-10-19', '10:00', 1),
+        OCT_SLOT('2026-10-20', '13:00', 1),
+      ],
+    },
+    {
+      staff_id: 'bs-3', display_name: '高田',
+      slots: [
+        OCT_SLOT('2026-10-02', '15:00', 1), OCT_SLOT('2026-10-03', '09:00', 1),
+        OCT_SLOT('2026-10-06', '15:00', 1), OCT_SLOT('2026-10-08', '13:00', 1),
+        OCT_SLOT('2026-10-14', '09:00', 1), OCT_SLOT('2026-10-16', '13:00', 1),
+      ],
+    },
+  ],
+  closed_dates: ['2026-10-05'],
+}
+
+/*
+
+/*
   受付枠画面 `tksPc` が読む、担当者ごとの通常応答。
   現行APIが持つのは1曜日1区間と特別営業で、休けい・店舗上限・
   明示休業はまだ返せない。その項目は画面側で作らず「—」にする。

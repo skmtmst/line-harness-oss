@@ -678,6 +678,7 @@ shared-button-importer v8/settings/pools/create.tsx
 shared-button-importer v8/settings/line-notifications/screen.tsx
 shared-button-importer v8/settings/emergency/screen.tsx
 shared-button-importer v8/settings/emergency/health.tsx
+shared-button-importer v8/restaurant-reservations/detail-dialog.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx
