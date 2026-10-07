@@ -266,6 +266,18 @@
   text-decoration: underline;
 }
 
+.dotLine {
+  /* 丸と名前の行。ブロックの flex にして、行の箱が字の高さより伸びないようにする（絵 FM94M の名の行）。 */
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.dotIndent {
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 FM94M の説明の行）。 */
+  padding-inline-start: var(--tpl-folder-dot-indent);
+}
+
 .keyRow {
   display: flex;
   height: var(--tpl-cv-key-lh);
