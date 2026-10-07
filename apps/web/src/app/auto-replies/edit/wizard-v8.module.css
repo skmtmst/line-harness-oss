@@ -685,8 +685,12 @@
   font-weight: 500;
   cursor: pointer;
 }
-.insertChip:hover {
+.insertChip:hover:not(:disabled) {
   background: var(--color-canvas-sunken);
+}
+.insertChip:disabled {
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
 }
 .counter {
   margin-left: auto;
