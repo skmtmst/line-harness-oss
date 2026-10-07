@@ -735,3 +735,4 @@ shared-button-importer v8/accounts-detail/handover.tsx
 shared-button-importer v8/account-new/register.tsx
 shared-button-importer v8/hq-templates/console.tsx
 shared-button-importer v8/hq-templates/message-form.tsx
+shared-button-importer v8/affiliate-offer-new/create.tsx
