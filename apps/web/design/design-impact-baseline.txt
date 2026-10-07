@@ -589,6 +589,7 @@ shared-button-importer v8/affiliates/report.tsx
 shared-button-importer v8/affiliates/create.tsx
 shared-button-importer v8/automations/list.tsx
 shared-button-importer v8/automations/runs.tsx
+shared-button-importer v8/automations/templates.tsx
 shared-button-importer v8/automations/common-actions.tsx
 shared-button-importer v8/automations/versions.tsx
 shared-button-importer v8/nen-campaigns/list.tsx
