@@ -6,20 +6,19 @@
  *
  * v7 の画面（app/hq/banners/project/page.tsx）と、読み書きの口・1枚ずつ作る繰り返し・
  * 戻ったら続きから動く・失敗時の扱い・`?id=` `?from=` は同じ。見た目だけを絵どおりに一から組んだ：
- * 頭（型 ListPage：題・説明・画像を取り込む・アーカイブする・「…」）→ 左に札と画像のます、右に生成パネル。
+ * 頭（型 ListPage：題・説明／来た道の案内・操作5つ）→ 左に札と画像のます、右に生成パネル。
  *
  * 右の生成パネルは共通の GenerationPanel をそのまま使う。絵（iMnph）は「用途の選ぶ欄・切り抜きの位置・
  * 色2つ・参照画像1枚」の古い形で、2026-10-06 のオーナーの決定（切り替えと切り抜きを置かない・出力サイズの小箱・
  * 色4つ・参照画像3枚・強調）と食い違うため、決定どおりの今のパネルを残した。参照画像を選ぶ窓（承認済み ★BG-C）も同じ。
  */
-import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, MoreHorizontal, Pencil, Sparkles, Star, Upload } from 'lucide-react'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Sparkles, Star, Upload } from 'lucide-react'
+import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
-import ActionMenu from '@/components/shared/action-menu'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
-import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -101,7 +100,8 @@ function ProjectInner() {
   const [formBusy, setFormBusy] = useState(false)
   const [formError, setFormError] = useState('')
   const [archiveConfirm, setArchiveConfirm] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
+  // 画像のますの枠（section）が指す見出し。板の `KWlQY` をそのまま見出しに使う。
+  const galleryHeadId = useId()
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   // 参照に選んだ画像の実体。他プロジェクトの画像も選べるので、この一覧に関係なく手元に置く。
@@ -439,23 +439,14 @@ function ProjectInner() {
   const deliveredCount = images.filter((i) => i.deliveredAccountIds.length > 0).length
   const doneSoFar = running ? running.doneCount + running.failedCount : 0
 
+  /*
+   * 頭の操作は承認済み ★BG-B `qIp42` の `e3LG3u`「操作ボタン群」どおり、5つを横並びで出す
+   * （画像を取り込む／お気に入り／複製／名前と説明を変える／アーカイブ）。
+   * 「…」の畳んだメニューに入れていたが、板はどのボタンも開いた姿で描いている。
+   * `docs/v8-design-rules.md` §1 は「板」＞「共通部品」なので、板に合わせる。
+   */
   const actions = canManage ? (
     <div className={styles.headActions}>
-      <span className={styles.menuBox}>
-        <IconButton aria-label={`${project.name} のほかの操作`} title="ほかの操作" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)} disabled={busy}>
-          <MoreHorizontal size={16} aria-hidden="true" />
-        </IconButton>
-        <ActionMenu
-          open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          ariaLabel={`${project.name} のほかの操作`}
-          items={[
-            { id: 'favorite', label: project.isFavorite ? 'お気に入りから外す' : 'お気に入りにする', icon: <Star size={14} aria-hidden="true" />, onSelect: () => { setMenuOpen(false); void patchProject('お気に入り', { isFavorite: !project.isFavorite }) } },
-            { id: 'duplicate', label: '複製する', icon: <Copy size={14} aria-hidden="true" />, onSelect: () => { setMenuOpen(false); void duplicate() } },
-            { id: 'rename', label: '名前と説明を変える', icon: <Pencil size={14} aria-hidden="true" />, onSelect: () => { setMenuOpen(false); setFormError(''); setFormOpen(true) } },
-          ]}
-        />
-      </span>
       <Button onClick={() => fileRef.current?.click()} disabled={busy || archived || uploading} busy={uploading} busyLabel="取り込み中…">
         <Upload aria-hidden="true" className={styles.icon} />画像を取り込む
       </Button>
@@ -468,32 +459,50 @@ function ProjectInner() {
         aria-hidden="true"
         onChange={(event) => { void takeIn(event.target.files?.[0]); event.target.value = '' }}
       />
+      <Button onClick={() => void patchProject('お気に入り', { isFavorite: !project.isFavorite })} disabled={busy}>
+        <Star aria-hidden="true" className={project.isFavorite ? styles.starOn : styles.icon} />{project.isFavorite ? 'お気に入りから外す' : 'お気に入り'}
+      </Button>
+      <Button onClick={() => void duplicate()} disabled={busy}>
+        <Copy aria-hidden="true" className={styles.icon} />複製
+      </Button>
+      <Button onClick={() => { setFormError(''); setFormOpen(true) }} disabled={busy}>
+        <Pencil aria-hidden="true" className={styles.icon} />名前と説明を変える
+      </Button>
       {archived ? (
         <Button onClick={() => void patchProject('復元', { archived: false })} disabled={busy}>
           <ArchiveRestore aria-hidden="true" className={styles.icon} />復元
         </Button>
       ) : (
         <Button onClick={() => setArchiveConfirm(true)} disabled={busy || Boolean(running)}>
-          <Archive aria-hidden="true" className={styles.icon} />アーカイブする
+          <Archive aria-hidden="true" className={styles.icon} />アーカイブ
         </Button>
       )}
     </div>
   ) : undefined
 
   return (
-    <ListPage boardId={boardId} title={project.name} description={description} actions={actions}>
+    <ListPage boardId={boardId} title={project.name} description={description} actions={actions}
+      crumbs={<Breadcrumb items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />}>
       <div className={styles.body}>
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}
         <div className={styles.split}>
-          <section className={styles.gallery} aria-label="このプロジェクトの画像">
+          <section className={styles.gallery} aria-labelledby={galleryHeadId}>
+            {/*
+              * 見出しの行（承認済み `qIp42` の `KWlQY`「このプロジェクトの画像」・`LWv01`「12枚」・
+              * `h4yzAO`「画像を押すと詳細・アカウントへ渡す」）。板では3つが左から続いて並び、
+              * 絞り込みの札はその下の行（`sc16B`・`TngIp`・`JlVG7`）。
+              */}
+            <div className={styles.galleryHead}>
+              <h3 id={galleryHeadId} className={styles.galleryTitle}>このプロジェクトの画像</h3>
+              <span className={styles.hint}>{`${images.length}枚`}</span>
+              <span className={styles.hint}>画像を押すと詳細・アカウントへ渡す</span>
+            </div>
             <div className={styles.galleryTools}>
               <div role="group" aria-label="画像の絞り込み" className={styles.chips}>
                 <FilterChip selected={filter === 'all'} icon={<Sparkles size={14} aria-hidden="true" />} onChange={() => setFilter('all')}>{`すべて ${images.length}`}</FilterChip>
                 <FilterChip selected={filter === 'favorite'} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>{`お気に入り ${favoriteCount}`}</FilterChip>
                 <FilterChip selected={filter === 'delivered'} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>{`アカウントへ渡し済み ${deliveredCount}`}</FilterChip>
               </div>
-              <span className={styles.spacer} />
-              <span className={styles.hint}>画像を押すと詳細・アカウントへ渡す</span>
             </div>
 
             {/*
@@ -514,7 +523,7 @@ function ProjectInner() {
               <ListState
                 kind="empty"
                 title="まだ画像がありません"
-                description="右の生成パネルで用途とテキストを決めて「画像を生成」を押すと、ここに並びます。手持ちの画像は「画像を取り込む」から入れられます。"
+                description="右の生成パネルで用途とテキストを決めて「生成する」を押すと、ここに並びます。手持ちの画像は「画像を取り込む」から入れられます。"
               />
             ) : visible.length === 0 && pendingCount === 0 ? (
               <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => setFilter('all')}>条件を外す</Button>} />
@@ -558,6 +567,8 @@ function ProjectInner() {
                 referenceBusy={referenceBusy}
                 usage={usage}
                 onReloadUsage={loadUsage}
+                /* 承認済み ★BG-B `qIp42` の `ta8eS`「利用量」。この板だけが見出しを持つ。 */
+                usageHeading
               />
             </div>
           ) : null}
@@ -609,7 +620,8 @@ function ProjectInner() {
                   <Button onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy}>条件をクリア</Button>
                   <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || Boolean(blockedReason)}>
                     <Sparkles aria-hidden="true" className={styles.icon} />
-                    画像を生成（{input.count}枚）
+                    {/* 板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。パネルの見出し `S0ay0i`「画像を生成」とは別。 */}
+                    生成する（{input.count}枚）
                   </Button>
                 </>
               )

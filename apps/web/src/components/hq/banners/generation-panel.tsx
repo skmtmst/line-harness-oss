@@ -68,6 +68,7 @@ export default function GenerationPanel({
   referenceBusy,
   usage,
   onReloadUsage,
+  usageHeading,
 }: {
   presets: BannerPreset[]
   maxCount: number
@@ -84,6 +85,11 @@ export default function GenerationPanel({
   /** 上限の帯（板 zOpMG）。上限のときだけ出す。 */
   usage?: BannerUsage | null
   onReloadUsage?: () => void
+  /**
+   * 利用量の棒の上に見出し「利用量」を置く（承認済み ★BG-B `qIp42` の `ta8eS` 1042,1843 37x17）。
+   * 板がそう描いている V8 のプロジェクトの中だけが渡す。v7 の既定は変えない。
+   */
+  usageHeading?: boolean
 }) {
   const uid = useId()
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -371,7 +377,7 @@ export default function GenerationPanel({
           />
         </Field>
 
-        <UsageBars usage={usage ?? null} />
+        <UsageBars usage={usage ?? null} heading={usageHeading} />
 
         <LimitState usage={usage ?? null} onReload={onReloadUsage} compact />
 
@@ -386,8 +392,12 @@ export default function GenerationPanel({
   )
 }
 
-/** パネル内の利用量の棒（板 iMnph）。空きがあるときだけ出す。上限のときは下の帯が出る。 */
-function UsageBars({ usage }: { usage: BannerUsage | null }) {
+/**
+ * パネル内の利用量の棒（板 iMnph）。空きがあるときだけ出す。上限のときは下の帯が出る。
+ * `heading` を渡すと上に「利用量」を置く（★BG-B `qIp42` の `ta8eS`。棒と同時に出る）。
+ * 文字は `ta8eS` 3文字 w=37・h=17 ＝ 12px・太さ600 で、同じパネルの「色の決め方」と同じ見た目。
+ */
+function UsageBars({ usage, heading }: { usage: BannerUsage | null; heading?: boolean }) {
   if (!usage) return null
   if (usage.blocked || usage.paused || usage.month.remaining <= 0 || usage.today.remaining <= 0) return null
   const rows = [
@@ -396,6 +406,7 @@ function UsageBars({ usage }: { usage: BannerUsage | null }) {
   ]
   return (
     <div data-design-node="iMnph-usage" className="flex flex-col gap-1.5">
+      {heading ? <p className="text-caption font-semibold text-ink">利用量</p> : null}
       {rows.map(({ label, bucket }) => {
         const pct = bucket.limit > 0 ? Math.max(0, Math.min(100, (bucket.remaining / bucket.limit) * 100)) : 0
         return (

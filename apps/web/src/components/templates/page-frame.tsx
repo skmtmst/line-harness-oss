@@ -10,14 +10,16 @@ export interface PageHeadingProps {
   help?: ReactNode
   identity?: ReactNode
   actions?: ReactNode
+  /** 題と説明の下の行に置く、来た道の案内（★BG-B `qIp42` の `HLq5w`・`Y5UR7`）。 */
+  crumbs?: ReactNode
   steps?: ReactNode
   /** 作る型の手順の置き方。既定は題と説明の下の行。FU2aU の同行版は 'inline'。 */
   stepsPlacement?: 'below' | 'inline'
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, description, help, identity, actions, steps, headingSize, stepsPlacement = 'below' }: PageHeadingProps) {
-  return <header className={styles.heading} data-template-region="heading" data-heading-size={headingSize} data-has-steps={!!steps || undefined} data-steps-placement={stepsPlacement}>
+export function PageHeading({ title, description, help, identity, actions, crumbs, steps, headingSize, stepsPlacement = 'below' }: PageHeadingProps) {
+  return <header className={styles.heading} data-template-region="heading" data-heading-size={headingSize} data-has-steps={!!steps || undefined} data-has-crumbs={!!crumbs || undefined} data-steps-placement={stepsPlacement}>
     {identity ? <div className={styles.identity}>{identity}</div> : null}
     <div className={styles.headingText}>
       <div className={styles.titleRow}><h2 className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</h2>
@@ -25,6 +27,7 @@ export function PageHeading({ title, description, help, identity, actions, steps
       </div>
       {description ? <div className={styles.description}>{description}</div> : null}
     </div>
+    {crumbs ? <div className={styles.crumbs} data-template-region="crumbs">{crumbs}</div> : null}
     {steps ? <div className={styles.steps}>{steps}</div> : null}
     {actions ? <div className={styles.actions}>{actions}</div> : null}
   </header>
