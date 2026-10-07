@@ -62,6 +62,8 @@ export const metadata: Metadata = {
   icons: {
     icon: '/icon.svg',
   },
+  // 管理画面は検索に出さない（public/robots.txt・_headers の X-Robots-Tag と同じ）。
+  robots: { index: false, follow: false },
   openGraph: {
     title: DEFAULT_TITLE,
     description: DEFAULT_TITLE,

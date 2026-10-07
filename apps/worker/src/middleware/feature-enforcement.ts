@@ -213,6 +213,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/webhook', 'public', 'LINE署名で検証する受信経路'),
   exempt('/webhooks', 'public', '外部署名で検証する受信経路'),
   exempt('/openapi.json', 'public', '公開API仕様'),
+  exempt('/robots.txt', 'public', '検索に出さない robots（全部拒否）'),
   exempt('/docs', 'public', '公開API仕様'),
   exempt('/auth', 'public', 'ログイン開始とcallback'),
   exempt('/health', 'system', '稼働確認'),
