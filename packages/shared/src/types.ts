@@ -197,6 +197,7 @@ export type FriendFieldType =
   | "number"
   | "date"
   | "datetime"
+  | "time"
   | "select"
   | "multi_select"
   | "checkbox"

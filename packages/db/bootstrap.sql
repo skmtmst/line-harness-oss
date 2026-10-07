@@ -3028,7 +3028,8 @@ CREATE TABLE friend_fields (
   CHECK (type_v6 IS NULL OR type_v6 IN (
     'text','textarea','number','date','datetime','tel','email','url',
     'select','multi_select','checkbox','image','pdf'
-  )));
+  )), type_v8 TEXT
+  CHECK (type_v8 IS NULL OR type_v8 = 'time'));
 
 CREATE TABLE friend_identity_links (
   id TEXT PRIMARY KEY,

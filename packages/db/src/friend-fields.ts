@@ -21,6 +21,7 @@ export const FRIEND_FIELD_TYPES = [
   'number',
   'date',
   'datetime',
+  'time',
   'select',
   'multi_select',
   'checkbox',
@@ -40,6 +41,8 @@ export interface FriendField {
   field_key: string;
   type: string;
   type_v6?: string | null;
+  /** V8で追加した時刻。既存の型制約と値を保ったまま保存する（591）。 */
+  type_v8?: 'time' | null;
   options_json: string | null;
   default_value: string | null;
   source: string;
@@ -99,11 +102,11 @@ export interface FriendFieldUsageTarget {
 }
 
 function normalizeFriendField<T extends FriendField>(row: T): T {
-  return { ...row, type: row.type_v6 ?? row.type };
+  return { ...row, type: row.type_v8 ?? row.type_v6 ?? row.type };
 }
 
 function legacyStoredType(type: FriendFieldType): string {
-  return type === 'datetime' || type === 'image' || type === 'pdf' ? 'text' : type;
+  return type === 'time' || type === 'datetime' || type === 'image' || type === 'pdf' ? 'text' : type;
 }
 
 /**
@@ -238,8 +241,8 @@ export async function createFriendField(
       `INSERT INTO friend_fields
          (id, folder_id, name, field_key, type, options_json, default_value,
           source, ec_field_path, ec_is_master, is_personal, is_starred,
-          display_order, type_v6, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          display_order, type_v6, type_v8, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -255,7 +258,8 @@ export async function createFriendField(
       input.isPersonal ? 1 : 0,
       input.isStarred ? 1 : 0,
       input.displayOrder ?? 0,
-      input.type,
+      input.type === 'time' ? 'text' : input.type,
+      input.type === 'time' ? 'time' : null,
       now,
       now,
     )
@@ -374,8 +378,8 @@ export async function createFriendFieldForScope(
         `INSERT INTO friend_fields
            (id, folder_id, name, field_key, type, options_json, default_value,
             source, ec_field_path, ec_is_master, is_personal, is_starred,
-            display_order, type_v6, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            display_order, type_v6, type_v8, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -391,7 +395,8 @@ export async function createFriendFieldForScope(
         input.isPersonal ? 1 : 0,
         input.isStarred ? 1 : 0,
         input.displayOrder ?? 0,
-        input.type,
+        input.type === 'time' ? 'text' : input.type,
+        input.type === 'time' ? 'time' : null,
         now,
         now,
       ),
@@ -851,6 +856,12 @@ export function validateFriendFieldValue(
     }
     return { ok: true, value: raw.trim() };
   }
+  if (type === 'time') {
+    if (typeof raw !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.trim())) {
+      return { ok: false, error: 'HH:mmの時刻（00:00〜23:59）で入力してください' };
+    }
+    return { ok: true, value: raw.trim() };
+  }
   if (type === 'datetime') {
     if (typeof raw !== 'string') return { ok: false, error: '日時形式で入力してください' };
     const text = raw.trim();
@@ -1040,7 +1051,7 @@ export async function getFriendFieldMap(
 ): Promise<Record<string, string>> {
   const result = await db
     .prepare(
-      `SELECT f.field_key, COALESCE(f.type_v6, f.type) AS field_type, f.options_json,
+      `SELECT f.field_key, COALESCE(f.type_v8, f.type_v6, f.type) AS field_type, f.options_json,
               COALESCE(v.value, f.default_value) AS value
          FROM friend_fields f
          LEFT JOIN friend_field_values v

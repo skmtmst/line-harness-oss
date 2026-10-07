@@ -521,7 +521,8 @@
     "580_banner_reference_images.sql",
     "581_banner_emphasis_lines.sql",
     "583_restaurant_inventory_rules.sql",
-    "590_scenario_stop_reason.sql"
+    "590_scenario_stop_reason.sql",
+    "591_friend_field_time.sql"
   ],
-  "migrationCount": 522
+  "migrationCount": 523
 }

@@ -9357,7 +9357,7 @@ export const api = {
       ),
     execute: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}/execute`, { method: 'POST' }),
     rollback: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}/rollback`, { method: 'POST' }),
-    createExport: (input: { accountId: string; columns: Array<'basic' | 'tags_fields' | 'support'>; encoding: 'utf-8' | 'shift_jis' }) =>
+    createExport: (input: { accountId: string; columns: Array<'basic' | 'friend_fields' | 'tags_fields' | 'support'>; encoding: 'utf-8' | 'shift_jis' }) =>
       fetchApi<ApiResponse<{ id: string; rowCount: number | null; status: string; downloadUrl: string }>>('/api/friends/exports', {
         method: 'POST', body: JSON.stringify(input),
       }),
@@ -9365,7 +9365,7 @@ export const api = {
       accountId: string
       sourceFilename: string
       sourceChecksum: string
-      rows: Array<{ lineUid: string; displayName: string | null; realName: string | null; systemDisplayName: string | null }>
+      rows: Array<{ lineUid: string; friendFields?: Record<string, string | null>; displayName: string | null; realName: string | null; systemDisplayName: string | null }>
     }) => fetchApi<ApiResponse<{
       id: string
       status: string
