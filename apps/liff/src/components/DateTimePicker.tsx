@@ -224,7 +224,7 @@ function DaySlots({
                 onClick={() => onSelect({ date: day, start: t.start })}
                 disabled={!t.open}
                 aria-pressed={active}
-                className={`liff-press liff-num h-11 rounded-(--liff-radius) px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                className={`liff-press liff-num h-11 w-full rounded-(--liff-radius) px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                   active
                     ? 'bg-liff-primary font-bold text-(--liff-on-primary)'
                     : t.open
