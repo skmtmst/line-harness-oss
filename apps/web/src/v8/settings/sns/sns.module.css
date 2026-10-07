@@ -1,4 +1,4 @@
-/* ★V8 SNS 連携（E-6 y3GGTs）。寸法は globals.css の --tpl-e1-* だけを使う。板の頭は型（PageHeading）が持つ。 */
+/* ★V8-B SNS 連携（`YINmJ`・`DFnll`／2026-10-07 承認）。寸法は globals.css の --tpl-e1-* だけを使う。板の頭は型（PageHeading）が持つ。 */
 
 .body {
   display: flex;
@@ -7,287 +7,79 @@
   padding: var(--tpl-e1-sns-body-pad);
 }
 
-.cards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--tpl-e1-side-gap);
-}
-
-/* カード（高さ320・上下左右20・行の間14。Instagram は12） */
+/* カードは1列で横幅いっぱい（上下左右20・行の間12・角丸12） */
 .card {
   display: flex;
   flex-direction: column;
   gap: var(--tpl-e1-sns-card-gap);
-  min-height: var(--tpl-e1-sns-card-h);
   padding: var(--tpl-e1-sns-card-pad);
   border: 1px solid var(--color-hairline);
   border-radius: var(--tpl-e1-radius-l);
 }
 
-.cardInstagram {
-  gap: var(--tpl-e1-gap-l);
-}
-
+/* 段の頭：題（15/700）と説明（12）の縦並び、間は2 */
 .cardHead {
   display: flex;
-  align-items: center;
-  gap: var(--tpl-e1-gap-l);
+  flex-direction: column;
+  gap: var(--tpl-e1-sns-head-gap);
   min-width: 0;
-}
-
-.mark {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-e1-sns-mark);
-  height: var(--tpl-e1-sns-mark);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--tpl-e1-sns-mark-radius);
-  background: var(--color-table-head);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 700;
-  line-height: var(--tpl-e1-lh-20);
 }
 
 .cardTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--text-lead);
-  font-weight: 600;
-  line-height: var(--tpl-e1-lh-24);
+  font-size: var(--tpl-e1-sns-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-e1-sns-title-lh);
+}
+
+.cardSub {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-sns-sub-lh);
+}
+
+/* 行：ことば＋余白＋こたえ（12/700） */
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-e1-sns-row-gap);
+  min-width: 0;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-sns-row-lh);
+}
+
+.rowLabel {
+  flex: 0 0 auto;
+  color: var(--color-ink-secondary);
+}
+
+.rowSpacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.rowValue {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 700;
+  text-align: right;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.spacer {
-  flex: 1 1 0;
-}
-
-.facts {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-e1-sns-card-gap);
-  margin: 0;
-}
-
-.fact {
-  display: flex;
-  gap: var(--tpl-e1-gap-l);
-  font-size: var(--text-label);
-  line-height: var(--tpl-e1-lh-20);
-}
-
-.fact dt {
-  width: var(--tpl-e1-sns-key-w);
-  flex: 0 0 auto;
-  color: var(--color-ink-secondary);
-}
-
-.fact dd {
-  margin: 0;
-  color: var(--color-ink);
-  font-weight: 500;
-}
-
-.text {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-e1-lh-20);
-}
-
-.subTitle {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-e1-lh-20);
-}
-
-.checks {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-e1-gap-l);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.check {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-e1-gap-s);
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  line-height: var(--tpl-e1-lh-21);
-}
-
-.checkIcon {
-  flex: 0 0 auto;
-  color: var(--color-accent-deep);
-}
-
-.links {
+/* ボタンの行：左に主な操作、右端に解除 */
+.actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--tpl-e1-gap-l);
-  margin-top: auto;
-}
-
-.linksWide {
-  gap: var(--tpl-e1-sns-links-gap);
+  gap: var(--tpl-e1-sns-row-gap);
 }
 
 .note {
+  margin: 0;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  line-height: var(--tpl-e1-lh-18);
-}
-
-/* 受信箱の見本（題と表の間10）。表は角丸12の枠、共通の表の「列の並び」 */
-.sample {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-e1-gap-m);
-}
-
-.table {
-  overflow: hidden;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--tpl-e1-radius-l);
-}
-
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
-  border-top: 0;
-}
-
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
-  height: auto;
-  padding: 0;
-  border: 0;
-  box-shadow: none;
-}
-
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
-  border-bottom: 0;
-  box-shadow: var(--shadow-row-line);
-}
-
-:global([data-theme='v8']) .table .row[data-table-layout='columns']:last-child {
-  box-shadow: none;
-}
-
-.colWho {
-  width: var(--tpl-e1-sns-col-who);
-}
-
-.colState {
-  width: var(--tpl-e1-col-state-sns);
-}
-
-.colText {
-  width: var(--tpl-e1-sns-col-text);
-}
-
-.colRoute {
-  width: var(--tpl-e1-sns-col-route);
-}
-
-.colLast {
-  width: var(--tpl-e1-sns-col-last);
-}
-
-.whoCell {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-e1-gap-m);
-  min-width: 0;
-}
-
-.face {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-e1-sns-face);
-  height: var(--tpl-e1-sns-face);
-  border-radius: var(--tpl-e1-radius-pill);
-  background: var(--color-table-head);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 600;
-}
-
-.whoText {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.who {
-  display: block;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 500;
-  line-height: var(--tpl-e1-lh-18);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.whoSub {
-  display: block;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-e1-lh-16);
-}
-
-.stateCell {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--tpl-e1-gap-xxs);
-}
-
-.owner {
-  display: block;
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-e1-lh-16);
-}
-
-.message {
-  display: block;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: var(--tpl-e1-lh-18);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.route {
-  display: inline-flex;
-  padding: var(--tpl-e1-chip-pad);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--tpl-e1-radius-chip);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-e1-lh-18);
-  white-space: nowrap;
-}
-
-.last {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-e1-lh-20);
-}
-
-@media (max-width: 1023px) {
-  .cards {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  line-height: var(--tpl-e1-sns-note-lh);
 }

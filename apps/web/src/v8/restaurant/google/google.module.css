@@ -568,6 +568,42 @@
   line-height: normal;
 }
 
+/* ★V8-B `U1X7T2`（2026-10-07 承認）Instagram 同時投稿の区画 */
+.igBand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-ig-gap);
+  padding: var(--tpl-rt-ig-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--color-surface-pearl);
+  min-width: 0;
+}
+
+.igToggleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  min-width: 0;
+}
+
+.igToggleLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+}
+
+/* 注記は白地の小さな箱（11px） */
+.igNote {
+  margin: 0;
+  padding: var(--tpl-rt-gray-note-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rt-rich-body-lh);
+}
+
 .picker {
   display: flex;
   flex-direction: column;

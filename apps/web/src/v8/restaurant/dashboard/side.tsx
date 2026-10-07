@@ -5,7 +5,7 @@
  *
  * 媒体のリンク（店舗ページ・管理画面）は「予約サイト・グルメ媒体」の設定（/settings/booking-media）で保存した URL。
  * 保存してある行だけにリンクが出る。見出しの右の「設定」から、その設定の画面へ。
- * Instagram はまだつなげないので「つなぐ」への案内だけ（SNS 連携の画面へ）。
+ * Instagram は投稿の同時公開まで対応（設定 › SNS 連携）。DM・コメントを受け取る口はまだ無いので案内だけ。
  */
 import { CornerUpLeft } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -97,11 +97,11 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
 
       <SectionHeader
         title="Instagram の新着"
-        help="Instagram をつなぐと、DM とコメントの新着がここに出て、受信箱で LINE と同じように返せます。"
+        help="いまの Instagram 連携は、Googleビジネスの投稿を Instagram にも同時に出すところまでです。DM とコメントの新着は、受け取る口ができてからここに出します。"
         helpLabel="Instagram の新着の説明"
       />
       <div className={styles.sideCard}>
-        <p className={styles.sideText}>Instagram はまだつないでいません。つなぐと DM・コメントの新着がここに出ます。</p>
+        <p className={styles.sideText}>DM・コメントの新着はまだここに出せません。Instagram のつなぎ方は SNS 連携の画面で見られます。</p>
         <TextLink href="/settings/sns">SNS 連携を見る</TextLink>
       </div>
     </div>

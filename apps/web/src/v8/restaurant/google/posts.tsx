@@ -8,7 +8,7 @@
  */
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { ImageIcon, MoreHorizontal, Plus, RefreshCw, Send } from 'lucide-react'
-import type { MediaItem } from '@line-crm/shared'
+import type { InstagramConnectionStatus, MediaItem } from '@line-crm/shared'
 import { api, ApiError, type MediaUploadSession } from '@/lib/api'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
@@ -21,6 +21,7 @@ import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
+import Toggle from '@/components/shared/toggle'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
@@ -76,6 +77,28 @@ function postWhen(post: GooglePost): string {
   if (post.status === 'published' && post.publishedAt) return `${formatShortDay(post.publishedAt)} 公開`
   if (post.status === 'draft') return '未送信'
   return formatShortStamp(post.updatedAt)
+}
+
+/*
+ * Instagram 同時投稿の札（★V8-B `HEEN9`／2026-10-07 承認）。
+ * 絵のことばは3つだけなので、送る前（出す設定だがまだ結果が無い）は札を出さない。
+ * `post.instagram` が `null` のとき＝この口が同時投稿に未対応。札も操作も出さない。
+ */
+function instagramBadge(post: GooglePost): { label: string; tone: StatusBadgeTone; title?: string } | null {
+  const ig = post.instagram
+  if (!ig) return null
+  if (!ig.enabled) return { label: 'Instagram なし', tone: 'neutral' }
+  if (ig.status === 'published') return { label: 'Instagram 済み', tone: 'success' }
+  if (ig.status === 'failed') return { label: 'Instagram 失敗・再試行', tone: 'danger', title: ig.error ?? undefined }
+  return null
+}
+
+/** 確認画面の「Instagram」の行（★V8-B `U1X7T2` の決めごとをことばにしたもの）。 */
+function instagramFact(ig: NonNullable<GooglePost['instagram']>): string {
+  if (!ig.enabled) return '出しません'
+  if (ig.status === 'published') return '出しました'
+  if (ig.status === 'failed') return '出せませんでした（再送できます）'
+  return ig.caption ? 'Google と同時に出します（Instagram 用の文章あり）' : 'Google と同時に出します（本文をそのまま使います）'
 }
 
 export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav }) {
@@ -148,6 +171,20 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
     }
   }
 
+  /** Instagram だけをもう一度送る。Google の公開はそのまま残る（★V8-B `HEEN9`）。 */
+  const retryInstagram = async (post: GooglePost) => {
+    setBusyId(post.id)
+    setActionError('')
+    try {
+      await restaurantGoogleApi.retryInstagram(accountId, post.id)
+      await load()
+    } catch (err) {
+      setActionError(errorMessage(err, 'Instagram へ送れませんでした。'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const menuItems = (post: GooglePost): ActionMenuItem[] => {
     const actionable = post.status === 'draft' || post.status === 'rejected' || post.status === 'failed'
     const items: ActionMenuItem[] = [
@@ -155,6 +192,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
     ]
     if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', external: true, onSelect: () => window.open(post.searchUrl ?? '', '_blank', 'noopener') })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
+    if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', disabled: busyId === post.id, onSelect: () => void retryInstagram(post) })
     if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, disabled: busyId === post.id, onSelect: () => setConfirmRemove(post) })
     return items
   }
@@ -183,6 +221,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
             <div className={styles.postList}>
               {data.posts.map((post) => {
                 const badge = statusBadge(post)
+                const igBadge = instagramBadge(post)
                 const name = post.title ?? post.summary
                 return (
                   <div key={post.id} className={styles.postRow}>
@@ -191,6 +230,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
                     {post.origin === 'google' ? <span className={styles.postMeta}>Googleで作成</span> : null}
                     <span className={styles.postMeta}>{postWhen(post)}</span>
                     <span className={`${styles.kindChip} ${badge.tone === 'success' ? styles.kindOffer : badge.tone === 'warning' ? styles.kindEvent : badge.tone === 'danger' ? styles.chipDanger : badge.tone === 'info' ? styles.chipInfo : styles.kindStandard}`}>{badge.label}</span>
+                    {igBadge ? <span className={`${styles.kindChip} ${igBadge.tone === 'success' ? styles.kindOffer : igBadge.tone === 'danger' ? styles.chipDanger : styles.kindStandard}`} title={igBadge.title}>{igBadge.label}</span> : null}
                     <span className={styles.menuBox}>
                       <IconButton aria-label={`投稿「${name}」の操作`} title={`投稿「${name}」の操作`} aria-expanded={menuFor === post.id} onClick={() => setMenuFor((current) => (current === post.id ? null : post.id))}>
                         <MoreHorizontal aria-hidden className={styles.icon16} />
@@ -208,7 +248,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
               <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
             </div>
           ) : null}
-          <p className={styles.grayNote}>{`行の「…」から 中身を見る・Google から削除。削除は元に戻せません（確認の小窓が出ます）。${data.writeEnabled ? '' : '検証環境では Google へは送りません。'}`}</p>
+          <p className={styles.grayNote}>{`行の「…」から 中身を見る・Google から削除・Instagram へ再送。削除は元に戻せません（確認の小窓が出ます）。Instagram が失敗した投稿は再送でき、Google への公開はそのまま残ります。${data.writeEnabled ? '' : '検証環境では Google へは送りません。'}`}</p>
         </section>
       ) : null}
       <ConfirmDialog
@@ -239,10 +279,14 @@ interface PostForm {
   mediaId: string | null
   mediaFilename: string | null
   mediaSourceUrl: string | null
+  /** Instagram にも出すか（★V8-B `U1X7T2`／2026-10-07 承認。新しい投稿は既定でオン）。 */
+  igEnabled: boolean
+  /** Instagram 用の文章。空なら本文をそのまま使う。 */
+  igCaption: string
 }
 
 function emptyForm(kind: GooglePostKind): PostForm {
-  return { kind, summary: '', title: '', start: '', end: '', ctaType: '', ctaUrl: '', couponCode: '', redeemOnlineUrl: '', termsConditions: '', mediaId: null, mediaFilename: null, mediaSourceUrl: null }
+  return { kind, summary: '', title: '', start: '', end: '', ctaType: '', ctaUrl: '', couponCode: '', redeemOnlineUrl: '', termsConditions: '', mediaId: null, mediaFilename: null, mediaSourceUrl: null, igEnabled: true, igCaption: '' }
 }
 
 function formFromPost(post: GooglePost): PostForm {
@@ -261,11 +305,16 @@ function formFromPost(post: GooglePost): PostForm {
     mediaId: post.media[0]?.mediaId ?? null,
     mediaFilename: post.media[0]?.filename ?? null,
     mediaSourceUrl: post.media[0]?.sourceUrl ?? null,
+    igEnabled: post.instagram?.enabled ?? false,
+    igCaption: post.instagram?.caption ?? '',
   }
 }
 
-/** 送る形は今の画面と同じ（日時は「日付」と「時刻」に分けて送る）。 */
-function draftInputFrom(form: PostForm): GooglePostDraftInput {
+/**
+ * 送る形は今の画面と同じ（日時は「日付」と「時刻」に分けて送る）。
+ * `igAvailable` が false（Instagram をつないでいない）ときは、画面に区画が出ないので必ず「出さない」で送る。
+ */
+function draftInputFrom(form: PostForm, igAvailable: boolean): GooglePostDraftInput {
   const [startDate = '', startTime = ''] = form.start.split('T')
   const [endDate = '', endTime = ''] = form.end.split('T')
   return {
@@ -276,6 +325,7 @@ function draftInputFrom(form: PostForm): GooglePostDraftInput {
     cta: form.kind !== 'offer' && form.ctaType ? { type: form.ctaType, url: form.ctaType === 'call' ? null : form.ctaUrl.trim() || null } : null,
     offer: form.kind === 'offer' ? { couponCode: form.couponCode.trim() || null, redeemOnlineUrl: form.redeemOnlineUrl.trim() || null, termsConditions: form.termsConditions.trim() || null } : null,
     mediaId: form.mediaId,
+    instagram: igAvailable ? { enabled: form.igEnabled, caption: form.igCaption.trim() || null } : { enabled: false, caption: null },
   }
 }
 
@@ -300,7 +350,18 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   const [busy, setBusy] = useState<'save' | 'confirm' | null>(null)
   const [actionError, setActionError] = useState('')
   const [upload, setUpload] = useState<{ busy: boolean; progress: number; error: string }>({ busy: false, progress: 0, error: '' })
+  const [igState, setIgState] = useState<InstagramConnectionStatus['state'] | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  /* Instagram をつないでいるときだけ同時投稿の区画を出す（「出す＝使える」）。 */
+  useEffect(() => {
+    let alive = true
+    api.instagram.connection(accountId)
+      .then((response) => { if (alive) setIgState(response.success ? response.data.state : 'unconfigured') })
+      .catch(() => { if (alive) setIgState('unconfigured') })
+    return () => { alive = false }
+  }, [accountId])
+  const igAvailable = igState === 'connected'
 
   useEffect(() => {
     if (!postId) { setForm(emptyForm(kindFromUrl)); setInitial(emptyForm(kindFromUrl)); setLoading(false); return }
@@ -368,6 +429,10 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
       if (!form.start || !form.end) return '期間のはじめ・おわりの日時を入力してください。'
       if (form.end < form.start) return '期間のおわりは、はじめより後にしてください。'
     }
+    if (igAvailable && form.igEnabled) {
+      if (!form.mediaId) return 'Instagram にも投稿するときは、画像を1枚選んでください。'
+      if (form.igCaption.length > 2200) return 'Instagram 用の文章は2,200文字までです。'
+    }
     return null
   }
 
@@ -377,7 +442,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
     setBusy('save')
     setActionError('')
     try {
-      const input = draftInputFrom(form)
+      const input = draftInputFrom(form, igAvailable)
       const response = postId ? await restaurantGoogleApi.savePost(accountId, postId, input) : await restaurantGoogleApi.createPost(accountId, input)
       setInitial(form)
       return response.post.id
@@ -526,6 +591,29 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             disabled={!editable}
           />
         </Field>
+        {igAvailable ? (
+          <div className={styles.igBand} data-design-node="hsiwQ">
+            <div className={styles.igToggleRow}>
+              {editable ? (
+                <>
+                  <Toggle checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} />
+                  <span className={styles.igToggleLabel}>Instagram にも投稿する</span>
+                </>
+              ) : (
+                <span className={styles.igToggleLabel}>{`Instagram にも投稿する：${form.igEnabled ? 'はい' : 'いいえ'}`}</span>
+              )}
+            </div>
+            {form.igEnabled ? (
+              <>
+                <Field label="Instagram 用の文章（書き換えたいときだけ）" htmlFor="gb-post-ig-caption">
+                  <textarea id="gb-post-ig-caption" className={styles.summaryInput} value={form.igCaption} onChange={(e) => set({ igCaption: e.target.value })} disabled={!editable} maxLength={2200} placeholder="空のままなら、上の本文をそのまま使います" aria-describedby="gb-post-ig-caption-count" />
+                  <span id="gb-post-ig-caption-count" className="sr-only">{`${form.igCaption.length} / 2,200 文字`}</span>
+                </Field>
+                <p className={styles.igNote}>Instagram には画像が 1 枚必要です。PNG の画像は自動で JPEG に変換されます。</p>
+              </>
+            ) : null}
+          </div>
+        ) : null}
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
         {editable ? (
           <>
@@ -612,6 +700,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
       {post.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。「この内容で予約する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
       {!writeEnabled ? <Notice tone="warn">この環境ではGoogleへの投稿が許可されていません。内容の確認まではできます。</Notice> : null}
       {writeEnabled && !canPublish ? <Notice tone="warn">Googleへの投稿は店舗管理者以上が行います。この下書きは保存されているので、管理者が確認して投稿できます。</Notice> : null}
+      {post.instagram?.status === 'failed' ? <Notice tone="warn">{`Instagram へは出せませんでした${post.instagram.error ? `（${post.instagram.error}）` : ''}。Google への公開はそのまま残っています。投稿一覧の「…」から「Instagram へ再送」でもう一度送れます。`}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <dl className={styles.facts}>
         <div className={styles.factRow}><dt className={styles.factKey}>投稿先</dt><dd className={styles.factValue}>{storeName}</dd></div>
@@ -619,6 +708,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
         <div className={styles.factRow}><dt className={styles.factKey}>公開予定</dt><dd className={styles.factValue}>今すぐ（日本時間）</dd></div>
         {post.cta ? <div className={styles.factRow}><dt className={styles.factKey}>ボタン</dt><dd className={styles.factValue}>{`${CTA_LABELS[post.cta.type]}${post.cta.url ? ` → ${post.cta.url}` : ''}`}</dd></div> : null}
         {post.media[0] ? <div className={styles.factRow}><dt className={styles.factKey}>画像</dt><dd className={styles.factValue}>{post.media[0].filename}</dd></div> : null}
+        {post.instagram ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram</dt><dd className={styles.factValue}>{instagramFact(post.instagram)}</dd></div> : null}
       </dl>
       {post.title ? <p className={styles.cardTitle}>{post.title}</p> : null}
       <p className={styles.preText}>{post.summary}</p>
