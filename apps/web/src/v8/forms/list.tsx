@@ -877,22 +877,25 @@ export default function FormsListV8() {
       setMoveTarget(null)
       return
     }
-    setMoveBusy(true)
+    /* 押した瞬間に移した形を見せて窓を閉じ、裏で保存する（動きの点検・7）。失敗したら戻して知らせる。 */
+    const target = moveTarget
+    const previousFolderId = target.folderId ?? null
+    const setFolderOf = (folderId: string | null) => setForms((current) => current.map((form) => (form.id === target.id ? { ...form, folderId } : form)))
+    setFolderOf(nextFolderId)
+    setMoveTarget(null)
     setMoveError('')
     try {
       const res = await fetchApi<{ success: boolean; data: Form }>(
-        `/api/forms/${moveTarget.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+        `/api/forms/${target.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
         { method: 'PUT', body: JSON.stringify({ folderId: nextFolderId }) },
       )
       if (!res.success) throw new Error('move_failed')
-      setMoveTarget(null)
-      await loadForms()
+      void loadForms()
     } catch (error) {
-      setMoveError(error instanceof ApiError && error.status === 422
+      setFolderOf(previousFolderId)
+      notifyToast(error instanceof ApiError && error.status === 422
         ? 'そのフォルダはありません。開き直して、もう一度お試しください。'
-        : 'フォルダへ移せませんでした。もう一度お試しください。')
-    } finally {
-      setMoveBusy(false)
+        : 'フォルダへ移せませんでした。', { tone: 'error' })
     }
   }
 

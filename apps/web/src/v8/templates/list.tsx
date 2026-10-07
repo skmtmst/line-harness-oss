@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { runOptimistic } from '@/lib/undoable'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -658,35 +659,41 @@ export default function TemplatesListV8() {
     setMoveDraft('')
     setMoveError('')
   }
+  /*
+   * 押した瞬間に移した形を見せて窓を閉じ、裏で保存する（動きの点検・7）。
+   * 1件でも失敗したら元に戻して知らせる（「もう一度」で同じ移動をやり直せる）。
+   */
   const runMove = async () => {
     if (!moveIds) return
-    setMoving(true)
+    const ids = moveIds
+    const folderId = moveDraft === '' ? null : moveDraft
+    const previous = templates
+    const idSet = new Set(ids)
+    setTemplates((current) => current.map((t) => (idSet.has(t.id) ? { ...t, folderId } : t)))
+    setMoveIds(null)
+    setPanelMove(false)
+    setSelectedIds(new Set())
     setMoveError('')
-    try {
+    const send = async () => {
       let failed = 0
-      for (const id of moveIds) {
-        const result = await api.templates.update(id, { folderId: moveDraft === '' ? null : moveDraft })
+      for (const id of ids) {
+        const result = await api.templates.update(id, { folderId })
         if (!result.success) failed += 1
       }
-      if (failed > 0) {
-        setMoveError(`${failed}件を移動できませんでした。状態を読み直してからお試しください。`)
-        await Promise.all([load(), loadFolders()])
-        return
-      }
-      setMoveIds(null)
-      setPanelMove(false)
-      setSelectedIds(new Set())
-      notifyToast('フォルダへ移しました', { tone: 'success' })
-      await Promise.all([load(), loadFolders()])
-    } catch (reason) {
-      setMoveError(
-        reason instanceof ApiError && reason.status === 403
-          ? 'テンプレートを移すには権限が要ります。オーナーか管理者に頼んでください。'
-          : 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
-      )
-    } finally {
-      setMoving(false)
+      return failed > 0 ? { success: false as const, error: `${failed}件` } : { success: true as const }
     }
+    runOptimistic({
+      request: send,
+      revert: () => {
+        setTemplates(previous)
+        void Promise.all([load(), loadFolders()])
+      },
+      failureMessage: 'フォルダへ移せませんでした。状態を読み直したので、もう一度お試しください。',
+      onSuccess: () => {
+        notifyToast('フォルダへ移しました', { tone: 'success' })
+        void loadFolders()
+      },
+    })
   }
 
   /* 複製。複製の口は無いので、同じ内容で「下書き」として新しく作る。 */

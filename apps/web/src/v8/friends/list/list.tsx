@@ -47,6 +47,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
+import { notifyToast } from '@/components/shared/toast'
 import { useListScrollMemory } from '@/components/shared/list-url-state'
 import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
@@ -431,23 +432,34 @@ export default function FriendsListV8() {
     URL.revokeObjectURL(url)
   }, [friends])
 
+  /*
+   * 注目の ★ は押した瞬間に変え、裏で保存する（動きの点検・7）。失敗したら元に戻して知らせる。
+   * ほかの変更と重なった（409）ときは、最新を読み直して知らせる。
+   */
   const toggleAttention = useCallback(async (friend: FriendListItem) => {
     const current = String(friend.metadata?.__attention ?? '') === '1'
+    const apply = (on: boolean) => setFriends((rows) => rows.map((row) => (
+      row.id === friend.id ? { ...row, metadata: { ...(row.metadata ?? {}), __attention: on ? '1' : null } } : row
+    )))
+    apply(!current)
     try {
       await fetchApi<{ success: boolean; data: unknown }>(
         `/api/friends/${friend.id}/metadata?expectedUpdatedAt=${encodeURIComponent(friend.updatedAt)}`,
         { method: 'PUT', body: JSON.stringify({ __attention: current ? null : '1' }) },
       )
-      await loadFriends()
+      void loadFriends()
     } catch (error) {
+      apply(current)
       if (error instanceof ApiError && error.status === 409) {
         await loadFriends()
-        setNotice({ title: '注目がほかの変更と重なりました', message: '最新の状態を読み直しました。確認してもう一度お試しください。' })
+        notifyToast('注目がほかの変更と重なりました。最新の状態を読み直したので、確かめてもう一度押してください。', { tone: 'error' })
       } else {
-        setNotice({ title: '注目の変更に失敗しました。通信を確かめて、もう一度お試しください。', message: '通信状態を確認して、もう一度お試しください。' })
+        notifyToast('注目を変えられませんでした。', { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleAttentionRef.current(friend) } })
       }
     }
   }, [loadFriends])
+  const toggleAttentionRef = useRef(toggleAttention)
+  toggleAttentionRef.current = toggleAttention
 
   const allowedActions: FriendAction[] = [
     ...(canRunBulk(staffRole) || canEditFriends ? ['tag', 'field'] as FriendAction[] : []),
