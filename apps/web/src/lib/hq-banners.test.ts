@@ -4,6 +4,7 @@ import {
   EMPTY_GENERATION_INPUT,
   activeGeneration,
   aspectBadge,
+  exportSizeText,
   generationConditionRows,
   groupPresets,
   imageMatchesQuery,
@@ -138,6 +139,19 @@ describe('用途の見出し', () => {
       { group: 'line', label: 'LINE' },
       { group: 'sns', label: 'SNS' },
     ])
+  })
+})
+
+describe('下の帯に出す書き出す大きさ（★BG-B `GcuH5`）', () => {
+  it('選んでいる用途の寸法をそのまま書く', () => {
+    expect(exportSizeText(presets, 'line_rich_message')).toBe('1040 × 1040 で書き出します')
+    // 正方形以外も決め打ちにしない。
+    expect(exportSizeText(presets, 'sns_story')).toBe('1080 × 1920 で書き出します')
+  })
+
+  it('用途が決まっていないときは何も書かない', () => {
+    expect(exportSizeText(presets, '')).toBe('')
+    expect(exportSizeText(presets, 'no_such_preset')).toBe('')
   })
 })
 

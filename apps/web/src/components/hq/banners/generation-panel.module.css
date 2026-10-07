@@ -57,4 +57,19 @@
   background: var(--color-canvas-sunken);
 }
 
+/*
+ * 使い方の説明（★BG-B `R6MBHf`）の1行ぶん。名前と説明を縦に積む。
+ * 板は名前 `UPIq5`（上 919・高さ 16）の 2px 下に説明 `Z55Iao`（上 937）を置く。
+ * 正規の余白段（4px きざみ）に寄せると、3 行ぶん積み上がって最後の説明が
+ * 6px ずれ、±4px の照合を外す。ここだけ板どおりの 2px が要るので、
+ * 画面側の CSS に理由つきで書く（#704 のラチェットは 4px きざみを守るための
+ * もので、板の寸法そのものを否定しない。docs/v8-design-rules.md §1 の2）。
+ */
+.howToText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
 }

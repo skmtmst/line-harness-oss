@@ -144,6 +144,53 @@ describe('下部追従バーの並びを部品で固定する', () => {
     expect(BAR).toMatch(/status \? </)
   })
 
+  /*
+   * ★BG-B の帯は 左=残り枚数／中=サイズ／右=ボタン（`WDJak`「中 サイズ確認」）。
+   * 読むだけの一言を操作の手前に置ける口を足した。渡さない画面は
+   * 左=状態／中央=操作／右端=空きのままなので、ほかの作成・編集画面の
+   * 見た目は変わらない。
+   *
+   * 2026-10-07 の2度目の差し戻し（この見張り自体を直した）: はじめは
+   * 4列（`1fr auto auto 1fr`）にして右端へ空き列を残していた。しかし
+   * 承認済み ★BG-B `qIp42` の帯 `X2oLn` は右の列 `J94Yj` が
+   * `fill_container` ＋ `justifyContent: end` で、**ボタンが帯の右端に付く**。
+   * 4列だと操作が中央寄りになって絵と違ったため、3列目を操作そのものにして
+   * 右そろえへ変えた。空き列へ戻すとこの試験が落ちる。
+   */
+  it('操作の手前の一言を渡した画面は、ボタンを右端に置く', () => {
+    expect(BAR).toMatch(/info\?:\s*ReactNode/)
+    expect(BAR).toMatch(/info \? </)
+    // 列は3つのまま。3列目が操作で、中身を右へ寄せる。
+    expect(CSS).toMatch(/\.withInfo\s*\{[^}]*grid-template-columns:\s*1fr auto 1fr/s)
+    expect(CSS).toMatch(/\.withInfo \.actions\s*\{[^}]*justify-content:\s*flex-end/s)
+    // 右端に空き列を作る4列へ戻していないこと。
+    expect(CSS).not.toMatch(/1fr auto auto 1fr/)
+  })
+
+  /*
+   * 2026-10-07: `GcuH5` を薄い文字で出していて絵と違った（差し戻し）。
+   * 直し方は「帯に色を足す」ではなく「札の部品を渡す」。帯は40画面以上で
+   * 共有していて、ここへ色を埋めると関係のない画面まで緑になる。
+   */
+  it('一言の置き場所だけを持ち、画面ごとの見た目は埋めない', () => {
+    const info = CSS.match(/\.info \{([^}]*)\}/s)?.[1] ?? ''
+    expect(info, '.info の規定が無い').not.toBe('')
+    expect(info).not.toMatch(/background/)
+    expect(info).not.toMatch(/border-radius/)
+    expect(info).not.toMatch(/--color-accent/)
+    expect(info).not.toMatch(/font-size/)
+    // 札は中身の部品が描く。帯がアイコンを持たない。
+    expect(BAR).not.toMatch(/lucide-react/)
+  })
+
+  it('一言を渡さない画面は、今までどおり右端を空ける', () => {
+    // 一言は `actions` の前（押す前に読ませる）。
+    expect(BAR.indexOf('{info ?')).toBeLessThan(BAR.indexOf('styles.actions'))
+    // 右端の空き箱は残す。ただし一言を渡した画面では作らない
+    // （`X2oLn` どおりボタンが右端に付くため。上の試験とひと組）。
+    expect(BAR).toMatch(/info \? null : <div aria-hidden="true"/)
+  })
+
   it('1440 で横スクロールさせずに折り返す', () => {
     expect(CSS).toMatch(/@media \(max-width: 1100px\)/)
   })
@@ -164,5 +211,48 @@ describe('下部追従バーの並びを部品で固定する', () => {
     expect(v8).not.toMatch(/border-radius/)
     // 並びは変えない（3列・中央寄せの決まりは別の試験が守る）。
     expect(v8).not.toMatch(/grid-template-columns/)
+  })
+
+  /*
+   * **承認済みの板が共通部品より上。** `docs/v8-design-rules.md` §1 の順位は
+   * 「2. Pencil の ★V8（画面ごとに、その板の絵のとおり。1枚の絵を全部の画面の
+   * 決まりにしない）」＞「4. 共通部品」。
+   *
+   * 2026-10-07 の停止の原因はここを逆にしたこと——★A/M10 の板で決めた
+   * V8 の浮かせ（高さ60・枠なし・ふんわり影）を、承認済み ★BG-B `qIp42` の
+   * 帯 `X2oLn`（**高さ72・stroke `#DADDE2` 1px・影の指定なし**）より優先し、
+   * 板どおりに直すことを利用者への選択の質問にしてしまった。
+   *
+   * 直し方は「★A の規定を弱める」ではない（40画面以上がその板のまま）。
+   * **板が違う画面だけが渡す札**を足し、より強い指定で戻す。
+   * ★A の規定を消す・弱めると上の試験が落ちる。ひと組で見張る。
+   */
+  it('板が枠線の帯を描く画面は、その板どおりに戻せる（★BG-B X2oLn）', () => {
+    const outlined = CSS.match(/\[data-theme='v8'\] \.bar\.outlined \{([^}]*)\}/s)?.[1] ?? ''
+    expect(outlined, 'V8 の .bar.outlined の規定が無い').not.toBe('')
+    expect(outlined).toMatch(/min-height:\s*72px/) // height: 72
+    expect(outlined).toMatch(/border:\s*1px solid var\(--color-hairline\)/) // stroke: #DADDE2 / 1
+    expect(outlined).toMatch(/box-shadow:\s*none/) // 影の指定なし
+    // 並びは共通のまま（板ごとに列を変えない）。
+    expect(outlined).not.toMatch(/grid-template-columns/)
+    // 画面側で部品の見た目を上書きせず、部品の口で受ける（§2）。
+    expect(BAR).toMatch(/outlined\?:\s*boolean/)
+    expect(BAR).toMatch(/outlined \? styles\.outlined : null/)
+    // 渡した画面だけに効く。渡さない画面は ★A の浮かせのまま。
+    expect(CSS).toMatch(/\[data-theme='v8'\] \.bar \{/)
+  })
+
+  it('同じ板の2画面（v7・V8 のバナーのプロジェクト）が札を渡している', () => {
+    const v8Page = fs.readFileSync(path.join(SRC, 'v8/hq-banners/project.tsx'), 'utf8')
+    const v7Page = fs.readFileSync(path.join(SRC, 'app/hq/banners/project/page.tsx'), 'utf8')
+    for (const [name, source] of [
+      ['V8', v8Page],
+      ['v7', v7Page],
+    ] as const) {
+      const call = source.slice(source.indexOf('<StickyBar'))
+      expect(call.slice(0, call.indexOf('/>')), `${name} が outlined を渡していない`).toMatch(
+        /\boutlined\b/,
+      )
+    }
   })
 })

@@ -7,6 +7,7 @@ import HqBannerProjectV8 from '@/v8/hq-banners/project'
 import { Archive, ArchiveRestore, Copy, LoaderCircle, Pencil, Sparkles, Star } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import ExportSizeChip from '@/components/hq/banners/export-size-chip'
 import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ImageDetailModal from '@/components/hq/banners/image-detail-modal'
 import ImageTile, { PendingTile } from '@/components/hq/banners/image-tile'
@@ -28,6 +29,7 @@ import {
   BANNER_MAX_REFERENCE_IMAGES,
   EMPTY_GENERATION_INPUT,
   activeGeneration,
+  exportSizeText,
   inputFromGeneration,
   packedTextLines,
   progressBadgeText,
@@ -588,6 +590,12 @@ function ProjectInner() {
 
       <div data-design-node={running ? 'Kg13T' : 'SIT0Z'} className="sticky bottom-0 z-10">
         <StickyBar
+          /*
+           * 同じ板（★BG-B `qIp42` の `X2oLn`：枠線つき・高さ72・影なし）。
+           * v7 の土台は元からこの姿なので、渡しても見た目は変わらない。
+           * V8 へ切り替えたときに板どおりのままにするための札。
+           */
+          outlined
           status={
             running ? (
               `${running.requestedCount}枚中 ${running.doneCount}枚できました・今月の残り ${usage?.month.remaining ?? '—'}枚`
@@ -596,6 +604,17 @@ function ProjectInner() {
             ) : (
               usageStatusText(usage, input.count)
             )
+          }
+          /*
+           * ★BG-B の下部追従バーは 左=残り枚数／中=サイズ／右=ボタン。
+           * この真ん中が `WDJak`「中 サイズ確認」——薄い緑の丸い札に切り抜きの絵と
+           * `GcuH5`「1040 × 1040 で書き出します」。見た目は札の部品が持つ。
+           * 用途が未選択のうちは寸法が決まらないので、列を増やさず何も出さない。
+           */
+          info={
+            exportSizeText(presets, input.presetKey) ? (
+              <ExportSizeChip text={exportSizeText(presets, input.presetKey)} />
+            ) : undefined
           }
           actions={
             running ? (
