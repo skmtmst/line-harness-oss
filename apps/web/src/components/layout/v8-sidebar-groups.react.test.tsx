@@ -52,7 +52,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-import Sidebar from './sidebar'
+import Sidebar, { isHqShellPath } from './sidebar'
 import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -177,5 +177,16 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     const view = await renderSidebar({ friendAttributesV2Mode: true })
     expect(view.queryAllByText('自動化')).toHaveLength(0)
     expect(view.queryAllByText('予約')).toHaveLength(0)
+  })
+})
+
+describe('統括の左メニューを出す住所', () => {
+  it('/hq の下と LINEアカウントの登録は統括、ほかの /accounts は店舗', () => {
+    expect(isHqShellPath('/hq')).toBe(true)
+    expect(isHqShellPath('/hq/templates')).toBe(true)
+    expect(isHqShellPath('/accounts/new')).toBe(true)
+    expect(isHqShellPath('/accounts')).toBe(false)
+    expect(isHqShellPath('/hqx')).toBe(false)
+    expect(isHqShellPath(null)).toBe(false)
   })
 })
