@@ -5795,7 +5795,7 @@ const bookingMenuRules = (windowDays, cutoffHours) => ({
   },
 })
 export const BOOKING_MENUS = [
-  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 105, buffer_after_minutes: 15, base_price: 8400, price_mode: 'fixed', version: 1, sort_order: 1, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 3, effectiveBookingRules: bookingMenuRules(60, 24) },
+  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 105, buffer_after_minutes: 15, base_price: 8400, price_mode: 'fixed', version: 1, sort_order: 1, is_active: 1, auto_tag_id: null, intake_question: '気になるところ・アレルギーがあれば教えてください', concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 3, effectiveBookingRules: bookingMenuRules(60, 24) },
   { id: 'bm-2', name: 'トリミング（中型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 150, buffer_after_minutes: 15, base_price: 12600, price_mode: 'fixed', version: 1, sort_order: 2, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(60, 24) },
   { id: 'bm-3', name: 'シャンプーのみ', category_label: 'トリミング', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 4200, price_mode: 'fixed', version: 1, sort_order: 3, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 60, cutoff_hours_before: 12, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 1, effectiveBookingRules: bookingMenuRules(60, 12) },
   { id: 'bm-4', name: '爪切り', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, price_mode: 'fixed', version: 1, sort_order: 6, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 2) },
@@ -5958,6 +5958,31 @@ for (const staff of BOOKING_AVAILABILITY.by_staff) {
       state: slot.start === '14:00' ? 'full' : 'limited',
     })
   }
+}
+
+/*
+  予約設定の右の写し（お客さまの予約画面）が読む空き。店舗のルールを当てた見え方（apply_store_rules=1）。
+  板 yRPxl・KRgTQ・x1OZS6 の写し：金 10/2 から5日（空き・空き・満・休み・空き）、10/2 は 9:00〜16:00 の6枠で 10:00・16:00 が満。
+  ほかの画面（予約台帳・新しい予約・勤務）は BOOKING_AVAILABILITY のまま。
+*/
+const storeSlot = (date, start, end, remaining) => ({ date, start, end, capacity: 2, remaining, state: remaining > 0 ? 'limited' : 'full' })
+export const BOOKING_AVAILABILITY_STORE_VIEW = {
+  by_staff: [
+    {
+      staff_id: 'bs-1', display_name: '佐々木',
+      slots: [
+        storeSlot('2026-10-02', '09:00', '10:45', 1),
+        storeSlot('2026-10-02', '10:00', '11:45', 0),
+        storeSlot('2026-10-02', '13:00', '14:45', 1),
+        storeSlot('2026-10-02', '14:00', '15:45', 1),
+        storeSlot('2026-10-02', '15:00', '16:45', 1),
+        storeSlot('2026-10-02', '16:00', '17:45', 0),
+        storeSlot('2026-10-03', '10:00', '11:45', 1),
+        storeSlot('2026-10-06', '13:00', '14:45', 1),
+      ],
+    },
+  ],
+  closed_dates: ['2026-10-05'],
 }
 
 /*
