@@ -8,7 +8,7 @@
  * - 銀行用 CSV の本人確認：PayoutStepUpDialog を写した（`CVz5d`。この担当の板ではない）。
  */
 import { useEffect, useState } from 'react'
-import { CircleHelp, Lock } from 'lucide-react'
+import { CircleHelp, Download, Lock } from 'lucide-react'
 import {
   api,
   type AffiliateAccountSettlementPreview,
@@ -19,6 +19,7 @@ import { formatNumber } from '@/lib/format'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import OtpInput from '@/components/shared/otp-input'
 import { formatDate, formatYen, periodText } from './display'
 import styles from './affiliates.module.css'
 
@@ -150,15 +151,17 @@ export function PayoutStepUpDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [exportKey, setExportKey] = useState('')
-  /* 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
+  /* 2段階認証を使っている人は6桁、無い人はパスワードで確認する。6桁の人も「パスワードで本人確認」に切り替えられる（絵 CVz5d）。 */
   const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
-  const usePassword = stepUpMethod === 'password'
+  const [preferPassword, setPreferPassword] = useState(false)
+  const usePassword = stepUpMethod === 'password' || (stepUpMethod === 'totp' && preferPassword)
   const ready = usePassword ? code.length > 0 : /^\d{6}$/.test(code)
 
   useEffect(() => {
     if (!batch) return
     setCode('')
     setError('')
+    setPreferPassword(false)
     setExportKey(crypto.randomUUID())
   }, [batch])
 
@@ -180,56 +183,71 @@ export function PayoutStepUpDialog({
     }
   }
 
+  const summary = batch ? `書き出す中身：${formatNumber(batch.lineCount)}件・${formatYen(batch.totalAmount)}` : undefined
+
   return (
     <Dialog
       open={Boolean(batch)}
       designNode="CVz5d"
-      title={usePassword ? 'パスワードで本人確認' : '認証アプリで本人確認'}
-      description={usePassword
-        ? '口座情報を含む銀行用CSVは、パスワードで再認証したときだけ書き出せます。'
-        : '口座情報を含む銀行用CSVは、6桁コードで再認証したときだけ書き出せます。'}
+      designWidth={520}
+      confirmation
+      designHeaderPadding="29px 24px 0"
+      designHeaderHeight={52}
+      title="本人確認をしてください"
       busy={busy}
       error={stepUpMethod === 'none' ? 'この操作には二段階認証またはパスワードの設定が必要です。' : error}
       onCancel={onClose}
-      footer={(
-        <div className={styles.dialogActions}>
-          <Button type="button" onClick={onClose} disabled={busy}>戻る</Button>
+    >
+      {/* 絵 CVz5d：説明・6桁の欄・切り替えのリンク・ボタン（本文の続き・真ん中）を間 12 で縦に並べる。 */}
+      <div className={styles.closeBody}>
+        <p className={styles.closeDesc} title={summary}>
+          {usePassword
+            ? '銀行用 CSV には口座情報が入ります。パスワードで本人確認したときだけ書き出せます。ファイルは 15 分で期限切れになります。'
+            : '銀行用 CSV には口座情報が入ります。認証アプリの 6 桁コードで本人確認したときだけ書き出せます。ファイルは 15 分で期限切れになります。'}
+        </p>
+        {usePassword ? (
+          <label className={styles.stepField} htmlFor="affiliate-payout-step-up">
+            パスワード
+            <input
+              id="affiliate-payout-step-up"
+              type="password"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              autoFocus
+              autoComplete="current-password"
+              className={styles.stepInput}
+            />
+          </label>
+        ) : stepUpMethod === 'totp' ? (
+          <OtpInput
+            id="affiliate-payout-step-up"
+            visualLabel="認証コード（6桁）"
+            label="認証アプリの6桁コード"
+            value={code}
+            onChange={setCode}
+            invalid={Boolean(error)}
+            disabled={busy}
+            autoFocus
+          />
+        ) : null}
+        {stepUpMethod === 'totp' ? (
+          <p className={styles.stepSwitch}>
+            {usePassword ? '認証アプリが使えるときは ' : '認証アプリが使えないときは '}
+            <button type="button" className={styles.linkButton} onClick={() => { setPreferPassword((current) => !current); setCode(''); setError('') }}>
+              {usePassword ? '6 桁コードで本人確認' : 'パスワードで本人確認'}
+            </button>
+          </p>
+        ) : null}
+        <div className={styles.closeFooter}>
+          <Button type="button" onClick={onClose} disabled={busy}>やめる</Button>
           {stepUpMethod !== 'none' ? (
-            <Button type="button" variant="primary" onClick={() => { void exportCsv() }} disabled={busy || !ready} busy={busy} busyLabel="確認しています">
-              本人確認してCSVを書き出す
+            <Button type="button" variant="primary" title={summary} onClick={() => { void exportCsv() }} disabled={busy || !ready} busy={busy} busyLabel="確認しています">
+              <Download size={15} aria-hidden="true" />
+              確認して書き出す
             </Button>
           ) : null}
         </div>
-      )}
-    >
-      {batch ? <p className={styles.closeSub}>{`書き出す中身：${formatNumber(batch.lineCount)}件・${formatYen(batch.totalAmount)}`}</p> : null}
-      {usePassword ? (
-        <label className={styles.stepField} htmlFor="affiliate-payout-step-up">
-          パスワード
-          <input
-            id="affiliate-payout-step-up"
-            type="password"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            autoFocus
-            autoComplete="current-password"
-            className={styles.stepInput}
-          />
-        </label>
-      ) : stepUpMethod === 'totp' ? (
-        <label className={styles.stepField} htmlFor="affiliate-payout-step-up">
-          認証アプリの6桁コード
-          <input
-            id="affiliate-payout-step-up"
-            value={code}
-            onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-            inputMode="numeric"
-            autoFocus
-            className={styles.stepInput}
-            placeholder="000000"
-          />
-        </label>
-      ) : null}
+      </div>
     </Dialog>
   )
 }
