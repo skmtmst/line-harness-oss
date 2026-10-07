@@ -66,6 +66,15 @@
 /* 作る型の手順は題と説明の下の行。FU2aU の同行版は stepsPlacement="inline" で残す。 */
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { flex-basis: 100%; order: 3; margin-inline: 0; }
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 2; margin-left: auto; }
+/*
+ * 来た道の案内（crumbs）は題と説明の下の行で、操作のボタンと同じ行の左。
+ * 承認済み ★BG-B `qIp42`：`HLq5w`「プロジェクト一覧」`Y5UR7`（プロジェクト名）が y=100、
+ * 右の5ボタン（`e3LG3u`）が y=99 で**同じ行**。題 y=24・説明 y=57 はその上の行。
+ * 既定の頭は1行（題＋説明 ／ 操作）なので、crumbs を渡した画面だけ題を全幅にして折り返す。
+ */
+:global([data-theme='v8']) [data-page-template='list'] .heading[data-has-crumbs] > .headingText { flex-basis: 100%; }
+:global([data-theme='v8']) [data-page-template='list'] .heading > .crumbs { flex: 1; min-width: 0; order: 2; }
+:global([data-theme='v8']) [data-page-template='list'] .heading[data-has-crumbs] > .actions { order: 3; margin-left: auto; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] { flex-wrap: nowrap; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .steps { flex-basis: auto; order: 0; margin-inline: auto; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .actions { order: 0; margin-left: 0; }

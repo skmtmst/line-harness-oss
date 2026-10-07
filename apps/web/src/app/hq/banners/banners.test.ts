@@ -10,6 +10,8 @@ const modal = read('../../../components/hq/banners/image-detail-modal.tsx')
 const projects = read('../../../components/hq/banners/projects-section.tsx')
 const library = read('../../../components/hq/banners/library-section.tsx')
 const shell = read('../../../components/hq/banners/banner-shell.tsx')
+/* ★V8 のプロジェクトの中。承認済み ★BG-B `qIp42` に合わせた言葉と見出しの見張りに使う。 */
+const v8Project = read('../../../v8/hq-banners/project.tsx')
 const banners = [listPage, projectPage, panel, modal, projects, library, shell, read('../../../components/hq/banners/image-tile.tsx'), read('../../../components/hq/banners/project-card.tsx')]
 
 /**
@@ -83,6 +85,20 @@ describe('統括 バナー生成', () => {
     for (const label of ['すべて', 'お気に入り', 'アカウントへ渡し済み']) {
       expect(projectPage).toContain(label)
     }
+  })
+
+  /*
+   * 承認済み ★BG-B `qIp42` にあって実装に無かった2つ（2026-10-08 に足した）。
+   * `ta8eS`「利用量」＝パネルの棒の上の見出し。共通部品の既定は変えず、名前（`usageHeading`）を1つ足して
+   * 板がそう描いている V8 だけが渡す。`b1So7a`「生成する（2枚）」＝下の帯のボタンで、v7 と同じ言葉。
+   * パネルの見出し `S0ay0i`「画像を生成」とは別なので、パネル側に「生成する」は入れない（上の it が見張る）。
+   */
+  it('V8 は板 qIp42 の「利用量」と「生成する（N枚）」を持ち、v7 の既定は変えない', () => {
+    expect(panel).toContain('usageHeading')
+    expect(panel).toContain('利用量')
+    expect(v8Project).toContain('usageHeading')
+    expect(v8Project).toContain('生成する（{input.count}枚）')
+    expect(projectPage).not.toContain('usageHeading')
   })
 
   it('モーダルは全面1枚のオーバーレイで、幅は max-width（1920/1160 の固定幅を書かない）', () => {
