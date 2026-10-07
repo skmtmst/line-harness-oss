@@ -38,13 +38,6 @@
   line-height: var(--tpl-hq-cell-lh);
 }
 
-.inputLabel {
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 500;
-  line-height: var(--tpl-hq-nav-item-lh-20);
-}
-
 .note {
   margin: 0;
   color: var(--color-ink-faint);

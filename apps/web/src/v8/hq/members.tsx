@@ -18,7 +18,8 @@ import ListState from '@/components/shared/list-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api, ApiError } from '@/lib/api'
-import { canResendInvite, lastLoginLabel, memberKpis, memberStatus, sortMembers, type MemberStatus } from '@/lib/hq-members'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersByRole, type MemberStatus } from '@/lib/hq-members'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
@@ -39,6 +40,14 @@ const STATUS_WORDS: Record<MemberStatus, string> = {
   invited: '招待中',
   expired: '期限切れ',
   inactive: '停止中',
+}
+
+/** 状態の札の色（絵 `r4ARpV` の「状態の札」：有効＝緑・招待中＝青・停止中＝灰）。 */
+const STATUS_TONES: Record<MemberStatus, StatusBadgeTone> = {
+  active: 'success',
+  invited: 'info',
+  expired: 'danger',
+  inactive: 'neutral',
 }
 
 const VIEWER_NOTE = '閲覧のみで見ています。権限者の招待・変更はオーナーか管理者に頼んでください。'
@@ -107,7 +116,8 @@ function MembersInner() {
   }, [load])
 
   const accountNames = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts])
-  const rows = sortMembers(members, me?.id ?? null)
+  /* 絵 `r4ARpV` の並び：状態→役割（オーナー→管理者→担当者→閲覧のみ）→名前。 */
+  const rows = sortMembersByRole(members)
   const kpis = useMemo(() => memberKpis(members), [members])
   const canManage = me?.role === 'owner' || me?.role === 'admin'
   const restricted = me?.accountScope === 'accounts'
@@ -236,8 +246,8 @@ function MembersInner() {
                     <span role="cell" className={styles.cell} title={member.email ?? ''}>{member.email ?? '—'}</span>
                     <span role="cell" className={styles.cell}>{ROLE_WORDS[member.role] ?? member.role}</span>
                     <span role="cell" className={styles.cell} title={scope}>{scope}</span>
-                    <span role="cell"><span className={state === 'active' ? `${styles.pill} ${styles.pillOk}` : state === 'invited' ? `${styles.pill} ${styles.pillInfo}` : state === 'expired' ? `${styles.pill} ${styles.pillDanger}` : `${styles.pill} ${styles.pillIdle}`}><span className={styles.dot} aria-hidden="true" />{STATUS_WORDS[state]}</span></span>
-                    <span role="cell" className={styles.cell}>{lastLoginLabel(lastLogins[member.id])}</span>
+                    <span role="cell"><StatusBadge tone={STATUS_TONES[state]}>{STATUS_WORDS[state]}</StatusBadge></span>
+                    <span role="cell" className={styles.cell}>{lastLoginShort(lastLogins[member.id])}</span>
                     <span role="cell" className={styles.actions}>
                       {canManage && canResendInvite(member) ? (
                         <button
