@@ -1304,6 +1304,16 @@ function CommonVarsListInner() {
                 const valueText = formatVarValue(item.type, item.value)
                 const pending = item.nextSchedule ?? null
                 const updateTitle = `最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`
+                const nameLink = (
+                  <Link
+                    href={`/contents/vars/edit?id=${item.id}`}
+                    title={item.name}
+                    className={styles.nameLink}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {item.name}
+                  </Link>
+                )
                 return (
                   <Tr
                     interactive
@@ -1334,20 +1344,12 @@ function CommonVarsListInner() {
                     <NameCell
                       name={
                         <span className={styles.nameLine}>
-                        <FolderDotName folder={folderDotOf(item.folderId)}>
-                          <Link
-                            href={`/contents/vars/edit?id=${item.id}`}
-                            title={item.name}
-                            className={styles.nameLink}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            {item.name}
-                          </Link>
-                        </FolderDotName>
+                          {/* 色の丸は左にフォルダの列が出ているときだけ（1152 で列を畳むと、絵 XIzkJ どおり丸なし）。 */}
+                          {narrow ? nameLink : <FolderDotName folder={folderDotOf(item.folderId)}>{nameLink}</FolderDotName>}
                         </span>
                       }
                       sub={
-                        <span className={styles.keyRow}>
+                        <span className={styles.keyRow} data-dot-indent={narrow ? undefined : ''}>
                           <code title={placeholderText(item.varKey)} className={styles.keyCode}>
                             {placeholderText(item.varKey)}
                           </code>

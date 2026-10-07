@@ -276,11 +276,14 @@
 
 .keyRow {
   display: flex;
-  padding-inline-start: var(--tpl-folder-dot-indent);
   height: var(--tpl-cv-key-lh);
   align-items: center;
   gap: var(--tpl-cv-key-gap);
   min-width: 0;
+}
+
+.keyRow[data-dot-indent] {
+  padding-inline-start: var(--tpl-folder-dot-indent);
 }
 
 .keyCode {
