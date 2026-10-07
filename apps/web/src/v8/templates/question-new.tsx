@@ -81,16 +81,21 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   /* 統括の入口（host）では店のテンプレートを読まない（新しく作るだけ）。 */
   const id = host ? null : params.get('id')
   const { selectedAccountId, loading: accountLoading } = useAccount()
-  usePageTitle(id ? '質問を編集' : '質問を作る')
+  usePageTitle(host ? 'テンプレート' : id ? '質問を編集' : '質問を作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'テンプレート', href: '/templates' }])
-  const [name, setName] = useState('')
+  /* 統括の編集（host.initialContent）：保存してある質問から始める。形が合わなければ空から。 */
+  const [hostInitial] = useState(() => {
+    const content = host?.initialContent
+    return content?.kind === 'question' && isEditableQuestion(content.question as unknown as ScenarioQuestion) ? { name: content.name, question: content.question as unknown as ScenarioQuestion } : null
+  })
+  const [name, setName] = useState(hostInitial?.name ?? '')
   const [category, setCategory] = useState('未分類')
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
-  const [initialQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
+  const [initialQuestion] = useState<ScenarioQuestion>(() => hostInitial?.question ?? emptyQuestion())
   const [question, setQuestion] = useState<ScenarioQuestion>(initialQuestion)
   const [usageCount, setUsageCount] = useState(0)
   const [loading, setLoading] = useState(Boolean(id))
@@ -100,7 +105,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [publishConfirm, setPublishConfirm] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
-  const [savedSnapshot, setSavedSnapshot] = useState(() => snapshotOf({ name: '', category: '未分類', folderId: null, question: initialQuestion }))
+  const [savedSnapshot, setSavedSnapshot] = useState(() => snapshotOf({ name: hostInitial?.name ?? '', category: '未分類', folderId: null, question: initialQuestion }))
 
   const folderAccountId = id ? templateAccountId : selectedAccountId
   useEffect(() => {

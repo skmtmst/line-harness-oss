@@ -34,7 +34,7 @@ import { freshDefinition } from '@/lib/hq-template-authoring'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
 import {
   hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition,
-  type Preflight, type TemplateDefinition, type TemplateDetail, type TemplateInput, type TemplateType,
+  type Preflight, type TemplateDefinition, type FormDefinition, type TemplateDetail, type TemplateInput, type TemplateType,
 } from '@/lib/hq-templates-api'
 import {
   choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems,
@@ -43,9 +43,13 @@ import {
 import MessageForm from './message-form'
 import TemplateMessageEditor from '@/v8/template-edit/message'
 import TemplateAssetEditor from '@/v8/template-edit/asset'
+import TemplateRichEditor from '@/v8/template-edit/rich'
 import CarouselV8 from '@/v8/templates/carousel'
 import QuestionNewV8 from '@/v8/templates/question-new'
 import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/host'
+import FormEditV8 from '@/v8/form-edit/edit'
+import type { FormEditHost } from '@/v8/form-edit/host'
+import { hqFormDefinitionToEditor, hqFormEditorToDefinition } from '@/components/forms/hq-form-definition-adapter'
 import HqStoreList from './store-list'
 import HqTemplateDetail from './detail'
 import styles from './console.module.css'
@@ -142,7 +146,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   const editTitle = `${EDIT_TITLES[type]}を${detail ? '編集' : '作る'}`
   /* 絵（meBRB の進み具合・dEvJM の窓の後ろ）：配っている間も結果のあとも題は「アカウントへ配る：名前」のまま。 */
   const pageTitle = stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : `アカウントへ配る：${detail?.template.name ?? ''}`
-  usePageTitle(stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? `${PAGE_TITLES[type]} › ${type === 'template' ? (detail ? 'ひな形を編集' : 'ひな形を作る') : editTitle}` : PAGE_TITLES[type])
+  /* 絵（HfK0O・u5MM7）：店の作る・編集の画面を使うときは、上の帯は「ホーム › テンプレート／回答フォーム」だけ。 */
+  usePageTitle(stage === 'list' || (stage === 'edit' && !createUncertain && (type === 'form' || type === 'template')) ? PAGE_TITLES[type] : stage === 'edit' ? `${PAGE_TITLES[type]} › ${editTitle}` : PAGE_TITLES[type])
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   useEffect(() => {
@@ -493,9 +498,12 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
    * 前回の保存が結果不明のときは、入力を固定した今の画面（下）で再確認する。
    */
   const editKind: TemplateKind = detail && 'template' in detail.definition ? templateKind(detail.definition) : kind
-  const sharedEditor = type === 'template' && !createUncertain && (editKind === 'message' || (['coupon', 'research', 'carousel', 'question'].includes(editKind) && !detail))
+  const current = ('template' in definition ? definition : freshDefinition('template')) as MessageTemplateDefinition
+  /* 編集で中身を店の画面の形に戻せないもの（古い形のカード等）は、空で開いて上書きしないよう今の画面（X4JcOf）で直す。 */
+  const editContent = detail && type === 'template' && editKind !== 'message' ? hostContentOf(editKind, name, current) : undefined
+  const sharedEditor = type === 'template' && !createUncertain && ['message', 'coupon', 'research', 'carousel', 'question', 'rich_message'].includes(editKind)
+    && (!detail || editKind === 'message' || Boolean(editContent))
   if (stage === 'edit' && sharedEditor) {
-    const current = ('template' in definition ? definition : freshDefinition('template')) as MessageTemplateDefinition
     const host: TemplateEditHost = {
       backHref: '/hq/templates',
       description: '保存して配ると、選んだアカウントのテンプレートに新しい版として届きます',
@@ -511,12 +519,61 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
       },
       onCancel: toList,
       initialMessage: detail && editKind === 'message' ? { name, messageType: current.template.messageType, messageContent: current.template.messageContent } : undefined,
+      /* 編集（B-29）：カルーセル・質問・クーポン・リサーチ・リッチメッセージも店の作る画面で直す。 */
+      initialContent: editContent,
+      readOnly: !canEdit,
+      /* g8d6ai：画像は統括の置き場へ送り5サイズを作る（API-17）。保存されなかった画像は一覧へ戻るときに片付ける（R568）。 */
+      uploadRichImage: async (file) => {
+        setUploadBusy(true)
+        try {
+          const uploadedImage = await hqTemplatesApi.uploadRichMessageImage(file)
+          for (const media of uploadedImage.media) noteSessionUpload(media)
+          return uploadedImage
+        } finally {
+          if (alive.current) setUploadBusy(false)
+        }
+      },
+    }
+    const editorKey = `${editKind}-${detail?.template.id ?? 'new'}-${formKey}`
+    if (editKind === 'rich_message') return <TemplateRichEditor key={editorKey} host={host} />
+    if (editKind === 'message') return <TemplateMessageEditor key={editorKey} id={null} visual={false} host={host} />
+    if (editKind === 'carousel') return <CarouselV8 key={editorKey} host={host} />
+    if (editKind === 'question') return <QuestionNewV8 key={editorKey} host={host} />
+    return <TemplateAssetEditor key={editorKey} kind={editKind as 'coupon' | 'research'} host={host} />
+  }
+
+  /*
+   * ───── 回答フォーム：店の回答フォームの編集画面を使い、右の列に「配った先」、主ボタンを［保存して配る］にする（B-36）─────
+   * 絵：中身 u5MM7・答え終わったあと scJcP・受付と見た目 xRPdo・予約ブロック N4T9mO。前回の保存が結果不明のときは下の今の画面で再確認する。
+   */
+  if (stage === 'edit' && type === 'form' && !createUncertain && 'form' in definition) {
+    const value = hqFormDefinitionToEditor(definition)
+    const listRow = detail ? templates.find((item) => item.id === detail.template.id) as HqTemplateListItem | undefined : undefined
+    const host: FormEditHost = {
+      backHref: '/hq/form-submissions',
+      initial: { name: value.name, description: value.description, layout: value.layout, onSubmitTagId: value.onSubmitTagId },
+      // 配った先で直せる参照先だけ（統括のタグのひな形）。友だち情報・テンプレート・リマインダは店ごとの ID なので選ばせない。
+      refs: { tags: referenceOptions('tag'), friendFields: [], scenarios: [], reminders: [], templates: [] },
+      accountName: '公式アカウント',
+      statusLine: formStatusLine(listRow),
+      distributedLine: formDistributedLine(listRow),
+      busy,
+      notice: notices,
+      onSave: (content, distribute) => {
+        let next: FormDefinition
+        try {
+          next = hqFormEditorToDefinition({ ...value, ...content })
+        } catch (cause) {
+          setError(errorText(cause))
+          return
+        }
+        setDefinition(next); setName(next.form.name); setDescription(next.form.description ?? '')
+        void save(distribute, next, next.form.name, next.form.description ?? '')
+      },
+      onCancel: toList,
       readOnly: !canEdit,
     }
-    if (editKind === 'message') return <TemplateMessageEditor key={`${detail?.template.id ?? 'new'}-${formKey}`} id={null} visual={false} host={host} />
-    if (editKind === 'carousel') return <CarouselV8 key={`carousel-${formKey}`} host={host} />
-    if (editKind === 'question') return <QuestionNewV8 key={`question-${formKey}`} host={host} />
-    return <TemplateAssetEditor key={`${editKind}-${formKey}`} kind={editKind as 'coupon' | 'research'} host={host} />
+    return <FormEditV8 key={`form-${detail?.template.id ?? 'new'}-${formKey}`} host={host} />
   }
 
   /* ───── 作る・編集（X4JcOf：前回の保存の再確認・カード型・カルーセル・質問・リッチメッセージ） ───── */
@@ -790,8 +847,44 @@ function resultSentence(store: DistributionResult['stores'][number]): string {
   return '配りました'
 }
 
+/** 回答フォームの題の下の1行（u5MM7）。配った版との違いは版の口ができてから（API 待ち）。 */
+export function formStatusLine(row: HqTemplateListItem | undefined): string {
+  if (!row) return '下書き・まだ配っていません（保存して配ると、選んだアカウントへ届きます）'
+  return (row.distributed_account_count ?? 0) > 0
+    ? '下書き（保存して配ると、配った先へ新しい版として届きます）'
+    : '下書き・まだ配っていません（保存して配ると、選んだアカウントへ届きます）'
+}
+
+/** 右の列「配った先」の文（u5MM7）。名前は API-14 の最大3件と、ほかの数。 */
+export function formDistributedLine(row: HqTemplateListItem | undefined): string {
+  const count = row?.distributed_account_count ?? 0
+  if (!row || count === 0) return 'まだどのアカウントにも配っていません。保存して配ると、各アカウントでは回答フォームとして使えます。'
+  const names = (row.distributed_account_names ?? []).map((name) => name.replace(/^然\s*-NEN-\s*/, ''))
+  const more = row.distributed_account_more ?? 0
+  const list = names.length ? `（${names.join('・')}${more > 0 ? `・ほか${more}` : ''}）` : ''
+  return `配った先：${count} アカウント${list}。各アカウントでは回答フォームとして使えます。`
+}
+
 function accountName(accounts: HqAccount[], id: string): string {
   return accounts.find((account) => account.id === id)?.name ?? id
+}
+
+/** 保存してある統括のひな形を、店の作る画面へ渡す中身（保存と同じ形）に戻す。読めなければ undefined（空から）。 */
+export function hostContentOf(kind: TemplateKind, name: string, definition: MessageTemplateDefinition): TemplateHostContent | undefined {
+  const asset = definition.asset
+  if ((kind === 'coupon' || kind === 'research' || kind === 'rich_message') && asset?.kind === kind) {
+    const payload = asset.payload as Record<string, unknown>
+    return kind === 'rich_message' ? { kind, name, payload, media: [...definition.media] } : { kind, name, payload }
+  }
+  if (kind === 'question' && definition.template.questionJson) {
+    try {
+      return { kind, name, question: JSON.parse(definition.template.questionJson) as Record<string, unknown>, messageContent: definition.template.messageContent }
+    } catch { return undefined }
+  }
+  if (kind === 'carousel' && definition.template.messageType === 'carousel') {
+    return { kind, name, messageContent: definition.template.messageContent, tapLimitMode: definition.template.carouselTapLimitMode, tapLimitText: definition.template.carouselTapLimitText }
+  }
+  return undefined
 }
 
 /** 店の作る画面が組み立てた中身を、統括のひな形（メッセージ）の形にする。カード型の部品（card）は本文で書き直したので外す。 */
@@ -804,6 +897,9 @@ export function hostDefinition(current: MessageTemplateDefinition, content: Temp
   }
   if (content.kind === 'question') {
     return { ...rest, template: { ...rest.template, messageType: 'text', messageContent: content.messageContent, questionJson: JSON.stringify(content.question), questionStatus: 'published' } }
+  }
+  if (content.kind === 'rich_message') {
+    return { ...rest, media: content.media, asset: { kind: 'rich_message', payload: content.payload as never }, template: { ...rest.template, messageType: 'text', messageContent: '', questionJson: null } }
   }
   if (content.kind === 'carousel') {
     return { ...rest, template: { ...rest.template, messageType: 'carousel', messageContent: content.messageContent, carouselActionsJson: null, carouselTapLimitMode: content.tapLimitMode, carouselTapLimitText: content.tapLimitText, questionJson: null } }

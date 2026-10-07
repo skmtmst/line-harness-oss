@@ -62,6 +62,33 @@ const visualQuestions = (): ResearchQuestion[] => [
   { key: 'vq-3', text: '改善してほしいところがあれば教えてください', format: 'free', required: false, choices: [] },
 ]
 
+/** 保存してある payload（クーポン・リサーチ）を欄の値に戻す。統括の編集で使う（host.initialContent）。 */
+export function assetInitial(payload: Record<string, unknown>) {
+  const str = (value: unknown) => (typeof value === 'string' ? value : '')
+  const num = (value: unknown, fallback: string) => (typeof value === 'number' && Number.isFinite(value) ? String(value) : fallback)
+  const questions = Array.isArray(payload.questions)
+    ? payload.questions.flatMap((item): ResearchQuestion[] => {
+      if (!item || typeof item !== 'object') return []
+      const q = item as Record<string, unknown>
+      const format: ResearchFormat = q.format === 'multiple' || q.format === 'free' ? q.format : 'single'
+      return [{ key: crypto.randomUUID(), text: str(q.text), format, required: q.required !== false, choices: Array.isArray(q.choices) ? q.choices.map(str) : [] }]
+    })
+    : []
+  return {
+    description: str(payload.description),
+    couponTitle: str(payload.title),
+    imageUrl: str(payload.imageUrl),
+    couponOnce: payload.oncePerFriend === false ? 'unlimited' as const : 'once' as const,
+    couponVisibility: payload.visibility === 'link' ? 'link' as const : 'friends' as const,
+    lottery: payload.lottery === true,
+    lotteryRate: num(payload.lotteryRate, '20'),
+    winnerLimit: num(payload.winnerLimit, '500'),
+    startsAt: str(payload.startsAt),
+    endsAt: str(payload.endsAt),
+    questions,
+  }
+}
+
 /** `2026-08-01T00:00` → `8/1`（見本の札に出す短い日付）。 */
 function shortDate(value: string): string {
   const m = /^\d{4}-(\d{2})-(\d{2})/.exec(value)
@@ -83,33 +110,35 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const role = useStaffRole()
   const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
   const { selectedAccountId, accounts } = useAccount()
-  usePageTitle(meta.heading)
+  usePageTitle(host ? 'テンプレート' : meta.heading)
   const actionOptions = useActionOptions()
 
-  const [name, setName] = useState(visual ? (kind === 'coupon' ? '夏の20%オフ' : '定期便のご満足度') : '')
+  /* 統括の編集：保存してある payload から欄を埋める（同じ形で保存し直す）。 */
+  const init = host?.initialContent && host.initialContent.kind === kind && 'payload' in host.initialContent ? { name: host.initialContent.name, ...assetInitial(host.initialContent.payload) } : null
+  const [name, setName] = useState(init ? init.name : visual ? (kind === 'coupon' ? '夏の20%オフ' : '定期便のご満足度') : '')
   const [folder, setFolder] = useState(visual ? meta.folder : '')
   const [folders, setFolders] = useState<Folder[]>([])
-  const [description, setDescription] = useState(visual ? (kind === 'coupon' ? '会計時にこの画面をご提示ください。他の割引との併用はできません。' : 'いつもありがとうございます。3問だけ聞かせてください。') : '')
+  const [description, setDescription] = useState(init ? init.description : visual ? (kind === 'coupon' ? '会計時にこの画面をご提示ください。他の割引との併用はできません。' : 'いつもありがとうございます。3問だけ聞かせてください。') : '')
   // クーポン
-  const [couponTitle, setCouponTitle] = useState(visual && kind === 'coupon' ? '夏の20%オフ' : '')
-  const [imageUrl, setImageUrl] = useState('')
+  const [couponTitle, setCouponTitle] = useState(init ? init.couponTitle : visual && kind === 'coupon' ? '夏の20%オフ' : '')
+  const [imageUrl, setImageUrl] = useState(init ? init.imageUrl : '')
   const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(null)
   const [imageOpen, setImageOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [couponOnce, setCouponOnce] = useState<'once' | 'unlimited'>('once')
-  const [couponVisibility, setCouponVisibility] = useState<'friends' | 'link'>('friends')
-  const [lottery, setLottery] = useState(false)
-  const [lotteryRate, setLotteryRate] = useState('20')
-  const [winnerLimit, setWinnerLimit] = useState('500')
-  const [couponStartsAt, setCouponStartsAt] = useState(visual ? '2026-08-01T00:00' : '')
-  const [couponEndsAt, setCouponEndsAt] = useState(visual ? '2026-08-31T23:59' : '')
+  const [couponOnce, setCouponOnce] = useState<'once' | 'unlimited'>(init ? init.couponOnce : 'once')
+  const [couponVisibility, setCouponVisibility] = useState<'friends' | 'link'>(init ? init.couponVisibility : 'friends')
+  const [lottery, setLottery] = useState(init ? init.lottery : false)
+  const [lotteryRate, setLotteryRate] = useState(init ? init.lotteryRate : '20')
+  const [winnerLimit, setWinnerLimit] = useState(init ? init.winnerLimit : '500')
+  const [couponStartsAt, setCouponStartsAt] = useState(init ? init.startsAt : visual ? '2026-08-01T00:00' : '')
+  const [couponEndsAt, setCouponEndsAt] = useState(init ? init.endsAt : visual ? '2026-08-31T23:59' : '')
   const [couponUseActions, setCouponUseActions] = useState<InlineAction[]>([])
   // リサーチ
-  const [researchStartsAt, setResearchStartsAt] = useState(visual ? '2026-10-01T10:00' : '')
-  const [researchEndsAt, setResearchEndsAt] = useState(visual ? '2026-10-15T23:59' : '')
+  const [researchStartsAt, setResearchStartsAt] = useState(init ? init.startsAt : visual ? '2026-10-01T10:00' : '')
+  const [researchEndsAt, setResearchEndsAt] = useState(init ? init.endsAt : visual ? '2026-10-15T23:59' : '')
   const [targetTagId, setTargetTagId] = useState('')
-  const [questions, setQuestions] = useState<ResearchQuestion[]>(() => (visual ? visualQuestions() : [newQuestion()]))
+  const [questions, setQuestions] = useState<ResearchQuestion[]>(() => (init?.questions.length ? init.questions : visual ? visualQuestions() : [newQuestion()]))
   const [answerActions, setAnswerActions] = useState<InlineAction[]>([])
   const [orderMenu, setOrderMenu] = useState<string | null>(null)
   const orderAnchor = useRef<HTMLButtonElement | null>(null)
@@ -120,8 +149,11 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
+    if (host) return
     setPickedMedia(null)
     setImageUrl('')
+    // 統括では上のバーのアカウントに結びつかない（編集で読み込んだ画像を消さない）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
 
   /* フォルダはアカウントの置き場一覧から選ぶ（保存値はフォルダ名のまま。今と同じ）。 */

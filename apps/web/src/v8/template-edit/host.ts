@@ -8,6 +8,7 @@
  *   - 店のアカウントに結びつく欄（登録メディア・タグ・シナリオ・行うこと）は出さない（配った先の ID に直せないため）
  */
 import type { ReactNode } from 'react'
+import type { TemplateImagemapUpload } from '@line-crm/shared'
 
 /** 画面が組み立てて渡す中身。メッセージは形と本文、クーポン・リサーチは店と同じ形の payload。 */
 export type TemplateHostContent =
@@ -17,6 +18,8 @@ export type TemplateHostContent =
   | { kind: 'question'; name: string; question: Record<string, unknown>; messageContent: string }
   /** カルーセル：店のカルーセルと同じ形の本文（LINE のカルーセルの列）。押したら動く選択肢は使わない。 */
   | { kind: 'carousel'; name: string; messageContent: string; tapLimitMode: 'none' | 'once'; tapLimitText: string | null }
+  /** リッチメッセージ（g8d6ai）：統括の口で作った5サイズの画像（media）と、店と同じ形の payload（面と URL）。 */
+  | { kind: 'rich_message'; name: string; payload: Record<string, unknown>; media: TemplateImagemapUpload['media'] }
 
 export interface TemplateEditHost {
   /** 板の頭の「← テンプレートへ」の行き先。 */
@@ -38,6 +41,10 @@ export interface TemplateEditHost {
   primaryLabel?: string
   /** 編集のとき、読み込んだ中身（メッセージ）。 */
   initialMessage?: { name: string; messageType: string; messageContent: string }
+  /** 編集のとき、読み込んだ中身（カルーセル・質問・クーポン・リサーチ・リッチメッセージ）。保存と同じ形。 */
+  initialContent?: TemplateHostContent
   /** 閲覧のみ（押せる操作を出さない）。 */
   readOnly?: boolean
+  /** リッチメッセージの画像を統括の置き場へ送り、LINE の5サイズを作る（API-17 の口）。 */
+  uploadRichImage?: (file: File) => Promise<TemplateImagemapUpload>
 }

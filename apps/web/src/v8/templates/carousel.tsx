@@ -64,6 +64,44 @@ export function inlineActionsText(actions: InlineAction[], tags: Array<{ id: str
   return actions.length > 1 ? `${text} ほか${actions.length - 1}` : text
 }
 
+/** 保存してある本文（LINE のカルーセルの列）をカードの形に戻す。壊れていれば投げる。 */
+export function panelsFromContent(messageContent: string, storedActions: Record<string, Record<string, unknown[]>> | null = null): Panel[] {
+  const parsed = JSON.parse(messageContent) as unknown
+  const columns = Array.isArray(parsed) ? parsed : ((parsed as { columns?: unknown })?.columns ?? [])
+  if (!Array.isArray(columns)) return []
+  return columns.map((c, i) => {
+    const col = c as Partial<Panel>
+    return {
+      thumbnailImageUrl: col.thumbnailImageUrl ?? '',
+      title: col.title ?? '',
+      text: col.text ?? '',
+      actions: Array.isArray(col.actions) && col.actions.length > 0
+        ? (col.actions as unknown as Array<Record<string, unknown>>).map((a, ai) => {
+          const isUri = a.type === 'uri' || typeof a.uri === 'string'
+          return {
+            label: (a.label as string) ?? '',
+            kind: isUri ? ('uri' as const) : ('action' as const),
+            uri: (a.uri as string) ?? '',
+            actions: readInlineActions((storedActions?.[String(i)]?.[String(ai)] as unknown[]) ?? null),
+          }
+        })
+        : [emptyChoice()],
+    }
+  })
+}
+
+/** 統括の編集（host.initialContent）：保存してあるカルーセルをカードに戻す。読めなければ null。 */
+function hostCarouselInitial(host: TemplateEditHost | undefined) {
+  const content = host?.initialContent
+  if (!content || content.kind !== 'carousel') return null
+  try {
+    const panels = panelsFromContent(content.messageContent)
+    return panels.length ? { name: content.name, panels, tapLimitMode: content.tapLimitMode, tapLimitText: content.tapLimitText ?? '' } : null
+  } catch {
+    return null
+  }
+}
+
 function Carousel({ host }: { host?: TemplateEditHost }) {
   const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -71,11 +109,12 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   /* 統括の入口（host）では店のテンプレートを読まない（新しく作るだけ）。 */
   const id = host ? null : params.get('id')
   const visual = params.get('visual') === '1'
-  usePageTitle(id ? 'カルーセルを編集' : 'カルーセルを作る')
+  usePageTitle(host ? 'テンプレート' : id ? 'カルーセルを編集' : 'カルーセルを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'テンプレート', href: '/templates' }])
 
-  const [name, setName] = useState(visual ? '夏の定番5点' : '')
-  const [panels, setPanels] = useState<Panel[]>(visual ? visualPanels() : [emptyPanel()])
+  const [hostInitial] = useState(() => hostCarouselInitial(host))
+  const [name, setName] = useState(hostInitial ? hostInitial.name : visual ? '夏の定番5点' : '')
+  const [panels, setPanels] = useState<Panel[]>(() => hostInitial ? hostInitial.panels : visual ? visualPanels() : [emptyPanel()])
   const [selected, setSelected] = useState(0)
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
@@ -88,8 +127,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
-  const [tapLimitMode, setTapLimitMode] = useState<'none' | 'once'>('none')
-  const [tapLimitText, setTapLimitText] = useState('')
+  const [tapLimitMode, setTapLimitMode] = useState<'none' | 'once'>(hostInitial ? hostInitial.tapLimitMode : 'none')
+  const [tapLimitText, setTapLimitText] = useState(hostInitial ? hostInitial.tapLimitText : '')
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
   const [snapshotTaken, setSnapshotTaken] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -128,29 +167,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         setTapLimitText(res.data.carouselTapLimitText ?? '')
         const storedActions = (res.data.carouselActions ?? null) as Record<string, Record<string, unknown[]>> | null
         try {
-          const parsed = JSON.parse(res.data.messageContent) as unknown
-          const columns = Array.isArray(parsed) ? parsed : ((parsed as { columns?: unknown })?.columns ?? [])
-          if (Array.isArray(columns) && columns.length > 0) {
-            setPanels(columns.map((c, i) => {
-              const col = c as Partial<Panel>
-              return {
-                thumbnailImageUrl: col.thumbnailImageUrl ?? '',
-                title: col.title ?? '',
-                text: col.text ?? '',
-                actions: Array.isArray(col.actions) && col.actions.length > 0
-                  ? (col.actions as unknown as Array<Record<string, unknown>>).map((a, ai) => {
-                    const isUri = a.type === 'uri' || typeof a.uri === 'string'
-                    return {
-                      label: (a.label as string) ?? '',
-                      kind: isUri ? ('uri' as const) : ('action' as const),
-                      uri: (a.uri as string) ?? '',
-                      actions: readInlineActions((storedActions?.[String(i)]?.[String(ai)] as unknown[]) ?? null),
-                    }
-                  })
-                  : [emptyChoice()],
-              }
-            }))
-          }
+          const loaded = panelsFromContent(res.data.messageContent, storedActions)
+          if (loaded.length > 0) setPanels(loaded)
         } catch {
           setError('いまの中身を読み取れませんでした。保存すると上書きされます。')
         }

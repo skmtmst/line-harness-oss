@@ -136,7 +136,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const accountName = (accountId: string | null) => accounts.find((account) => account.id === accountId)?.name ?? null
   const dirty = !loading && snapshot(editor.draft) !== clean
   const title = id || host?.initialMessage ? 'メッセージを編集' : 'メッセージを作る'
-  usePageTitle(title)
+  usePageTitle(host ? 'テンプレート' : title)
   const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
   /* 自動保存と手の保存が同時に新規作成へ流れて2件できないよう、送っている途中の保存を待ってから送る。 */
   const inFlightRef = useRef<Promise<unknown> | null>(null)
