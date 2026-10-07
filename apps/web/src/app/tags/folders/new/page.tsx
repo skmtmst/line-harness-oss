@@ -11,6 +11,8 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import StickyBar from '@/components/shared/sticky-bar'
 import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import TagFolderPageV8 from '@/v8/tags/folder-page'
 import {
   folderDeleteErrorMessage,
   folderSaveErrorMessage,
@@ -325,6 +327,9 @@ function FolderEditor() {
   )
 }
 
+/** v8 テーマのときだけ新しい画面（src/v8/tags/folder-page：V8 の一覧の上に窓）。v7 は無変更。 */
 export default function NewTagFolderPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <TagFolderPageV8 />
   return <Suspense fallback={<p className="text-ink-faint p-6 text-sm">読み込んでいます</p>}><FolderEditor /></Suspense>
 }

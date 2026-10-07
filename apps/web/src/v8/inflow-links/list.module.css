@@ -308,6 +308,8 @@
   font-size: var(--text-label);
 }
 
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
 /* 名前の前のフォルダの丸（xbHxg「フォルダの丸」）。2行目・札は名前の頭にそろえる（絵の「説明の行」の左 16）。 */
 .nameLine { display: flex; min-width: 0; max-width: 100%; }
 .dotIndentPad { padding-inline-start: var(--tpl-folder-dot-indent); }

@@ -604,7 +604,10 @@ export default function EventsListV8() {
         {active ? (
           <div className={styles.panelBody}>
             <p className={styles.panelLabel}>イベント名</p>
-            <InlineEdit value={active.name} label="イベント名" disabled={!canEdit} onSave={(next) => renameEvent(active, next)} />
+            {/* 閲覧のみ：鉛筆は置かず、名前だけを見せる（2026-10-06 オーナー決定）。 */}
+            {canEdit
+              ? <InlineEdit value={active.name} label="イベント名" onSave={(next) => renameEvent(active, next)} />
+              : <p className={styles.panelText}>{active.name}</p>}
             <p className={styles.panelLabel}>状態</p>
             <p className={styles.panelText}>{STATE_LABEL[eventRowState(active)]}</p>
             <p className={styles.panelLabel}>予約・承認待ち</p>

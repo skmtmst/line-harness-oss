@@ -348,14 +348,22 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>外から予約が入ったとき</h2>
         </div>
-        <fieldset disabled={!canEdit || savingAssign} className={styles.ruleLine}>
-          <span className={styles.ruleLineLabel}>指名なしの予約は、その時間に空いているスタッフへ自動で割り当て</span>
-          <Toggle
-            label="指名なしの予約は、その時間に空いているスタッフへ自動で割り当て"
-            checked={data.autoAssign}
-            onChange={(next) => void saveAutoAssign(next)}
-          />
-        </fieldset>
+        {canEdit ? (
+          <fieldset disabled={savingAssign} className={styles.ruleLine}>
+            <span className={styles.ruleLineLabel}>指名なしの予約は、その時間に空いているスタッフへ自動で割り当て</span>
+            <Toggle
+              label="指名なしの予約は、その時間に空いているスタッフへ自動で割り当て"
+              checked={data.autoAssign}
+              onChange={(next) => void saveAutoAssign(next)}
+            />
+          </fieldset>
+        ) : (
+          // 閲覧のみ：つまみは置かず、いまの設定を文字で見せる（2026-10-06 オーナー決定）。
+          <p className={styles.ruleLine}>
+            <span className={styles.ruleLineLabel}>指名なしの予約は、その時間に空いているスタッフへ自動で割り当て</span>
+            <span className="text-sm text-ink-secondary">{data.autoAssign ? 'オン' : 'オフ'}</span>
+          </p>
+        )}
         {assignError ? <p role="alert" className="text-sm text-ink-secondary">{assignError}</p> : null}
       </section>
 

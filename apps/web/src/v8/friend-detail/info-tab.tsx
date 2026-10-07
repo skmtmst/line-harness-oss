@@ -3,7 +3,7 @@
 /*
  * 情報欄タブ（Q5F2QE の 4.）。その人について決めた項目を2列に並べ、最後に1回保存する。
  * 分類（すべて・基本・フォルダ）は URL の group で選ぶ（FRIEND-21・今と同じ指定）。
- * 権限が無い人は欄が押せず、保存ボタンを置かずに理由だけ出す（N-045）。
+ * 権限が無い人は欄を読み取りだけにし、保存ボタンを置かずに理由だけ出す（N-045）。
  */
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
@@ -29,9 +29,10 @@ function FieldInput({ field, value, onChange, disabled, id }: {
   disabled: boolean
   id: string
 }) {
+  // 変えられないとき（権限が無い・ECが正本の項目）は、押せない部品を置かずに読み取りだけの欄で見せる（2026-10-06 オーナー決定）。
   const readOnly = disabled || !!field.ecIsMaster
   if (field.type === 'textarea') {
-    return <TextArea id={id} rows={3} value={value} disabled={readOnly} onChange={(e) => onChange(e.target.value)} />
+    return <TextArea id={id} rows={3} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} onChange={(e) => onChange(e.target.value)} />
   }
   if (field.type === 'multi_select') {
     // 複数選択を単一選択で保存すると既存の複数値が黙って上書きされる（#496-16）。読むだけ。
@@ -42,13 +43,17 @@ function FieldInput({ field, value, onChange, disabled, id }: {
       </div>
     )
   }
+  if (readOnly && (field.type === 'select' || field.type === 'checkbox' || field.type === 'date')) {
+    // 選ぶ部品は置かず、選んでいる値を文字で見せる。
+    const shown = field.type === 'checkbox' ? (value === '1' ? 'はい' : 'いいえ') : (value || '未入力')
+    return <TextField id={id} value={shown} readOnly aria-readonly="true" aria-label={`${field.name}の値`} title={shown} />
+  }
   if (field.type === 'select') {
     return (
       <Select
         id={id}
         size="full"
         value={value}
-        disabled={readOnly}
         onChange={(v) => onChange(v)}
         aria-label={`${field.name}の値`}
         options={[{ value: '', label: '— 未設定 —' }, ...(field.options ?? []).map((o) => ({ value: o, label: o }))]}
@@ -57,14 +62,14 @@ function FieldInput({ field, value, onChange, disabled, id }: {
   }
   if (field.type === 'checkbox') {
     return (
-      <Checkbox id={id} checked={value === '1'} disabled={readOnly} onCheckedChange={(c) => onChange(c ? '1' : '')} aria-label={`${field.name}：はい`}>はい</Checkbox>
+      <Checkbox id={id} checked={value === '1'} onCheckedChange={(c) => onChange(c ? '1' : '')} aria-label={`${field.name}：はい`}>はい</Checkbox>
     )
   }
   if (field.type === 'date') {
-    return <DateField id={id} value={value} onChange={onChange} disabled={readOnly} aria-labelledby={`${id}-label`} placeholder="未入力" />
+    return <DateField id={id} value={value} onChange={onChange} aria-labelledby={`${id}-label`} placeholder="未入力" />
   }
   const inputType = field.type === 'number' ? 'number' : field.type === 'url' ? 'url' : field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'
-  return <TextField id={id} type={inputType} value={value} disabled={readOnly} placeholder="未入力" onChange={(e) => onChange(e.target.value)} />
+  return <TextField id={id} type={inputType} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} placeholder="未入力" onChange={(e) => onChange(e.target.value)} />
 }
 
 export default function InfoTab({ friendId, group, data, perms }: {

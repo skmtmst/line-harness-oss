@@ -221,7 +221,7 @@ describe('V8 タグの通し：作る→付ける→外す', () => {
     renderNode(<NewTagPage />)
     await flush()
 
-    const nameInput = host.querySelector('input[placeholder="例: 定期購入者"]') as HTMLInputElement
+    const nameInput = host.querySelector('input[placeholder="例：定期購入者"]') as HTMLInputElement
     expect(nameInput, 'タグ名の入力が見つかりません').toBeTruthy()
     await act(async () => { setInputValue(nameInput, '流れの型2') })
     fireEvent.click(screen.getByRole('button', { name: 'タグを作る' }))

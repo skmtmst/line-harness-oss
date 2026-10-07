@@ -1,0 +1,69 @@
+/*
+ * ★V8-B 案件を作る（Td4TN）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
+ * ここは段のカード（枠1・角12・余白20・間14）と右の列の箱（余白16・間6）の中身だけ。寸法は --tpl-wa-af-*。
+ */
+.back { color: var(--color-action); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-wa-af-back-lh); text-decoration: none; }
+.back:hover { text-decoration: underline; }
+
+.viewerBand {
+  margin: 0; padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-ro-band-lh);
+}
+.error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); line-height: var(--tpl-wa-af-note-lh); }
+.note { margin: 0; color: var(--color-success); font-size: var(--text-caption); line-height: var(--tpl-wa-af-note-lh); }
+
+/* 段のカード。 */
+.card {
+  display: flex; flex-direction: column; gap: var(--tpl-wa-af-card-gap);
+  padding: var(--tpl-wa-af-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.cardHead { display: flex; flex-direction: column; gap: var(--tpl-wa-af-head-gap); }
+.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-wa-af-title-lh); }
+.cardNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-wa-af-note-lh); }
+
+/* 入力：題（13/20）＋欄（間6）。 */
+.field { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-wa-af-field-gap); min-width: 0; }
+.label { display: flex; align-items: center; gap: var(--tpl-wa-af-field-gap); color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-wa-af-label-lh); }
+.optional { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; }
+.pickLabel { display: flex; align-items: center; gap: var(--tpl-wa-af-field-gap); color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-wa-af-note-lh); }
+.selectBox { width: 100%; min-width: 0; }
+.selectBox :global(*) { max-width: 100%; }
+.pair { display: flex; gap: var(--tpl-wa-af-pair-gap); width: 100%; }
+
+/* 成果を認めたときにすること：枠の行（余白 10/12・間12）。つまみ＋名前と中身。 */
+.switchRow {
+  display: flex; align-items: flex-start; gap: var(--tpl-wa-af-switch-gap);
+  padding: var(--tpl-wa-af-switch-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+}
+.switchBody { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-wa-af-head-gap); min-width: 0; }
+.switchName { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-wa-af-preview-lh); }
+.switchNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-wa-af-note-lh); }
+.retry { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-wa-af-field-gap); }
+
+/* 右の列の箱。 */
+.sideCard {
+  display: flex; flex-direction: column; gap: var(--tpl-wa-af-side-gap); align-self: stretch;
+  padding: var(--tpl-wa-af-side-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.sideTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-wa-af-side-title-size); font-weight: 700; line-height: var(--tpl-wa-af-side-title-lh); }
+.sideNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-wa-af-side-note-lh); }
+.previewBox {
+  display: flex; flex-direction: column; gap: var(--tpl-wa-af-preview-gap);
+  padding: var(--tpl-wa-af-preview-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+}
+.previewName { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-wa-af-preview-lh); }
+.previewDesc { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-wa-af-note-lh); }
+.previewReward { margin: 0; color: var(--color-accent-deep); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-wa-af-preview-lh); }
+.careList { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-wa-af-care-lh); }

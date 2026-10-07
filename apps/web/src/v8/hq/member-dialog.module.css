@@ -1,0 +1,126 @@
+/*
+ * ★V8 統括のメンバーの窓（招待 `yLKwV`・変更 `BHEl9`・確認 `M4jS9`）の中身。
+ * 頭・下の帯は dialog-head.module.css。値は globals.css の `--tpl-hq-*`。
+ * 段の間 14・ラベルと欄の間 6・ラジオの行の間 8・ラジオどうし 20。
+ */
+.form { width: 100%; }
+.full { width: 100%; }
+.icon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-hq-form-gap);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-field-gap);
+  min-width: 0;
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-hq-field-gap);
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-hq-field-gap);
+  margin: 0;
+  padding: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-hq-cell-lh);
+}
+
+.inputLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-hq-nav-item-lh-20);
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 400;
+  line-height: var(--tpl-hq-small-lh);
+}
+
+/* 担当範囲・状態（題 → ラジオの行 → チェックの枠。間 8） */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-plan-head-gap);
+  min-width: 0;
+}
+
+.radios {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-hq-mem-radio-gap);
+}
+
+.checks {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-hq-mem-check-gap);
+  padding: var(--tpl-hq-mem-check-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.callout {
+  margin: 0;
+  padding: var(--tpl-hq-note-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+}
+
+/* 確認（行 35.5・題の列 200・行の下に線） */
+.confirmList { display: flex; flex-direction: column; margin: 0; }
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-plan-head-gap);
+  min-height: var(--tpl-hq-mem-confirm-row-h);
+  box-shadow: var(--shadow-row-line);
+}
+
+.confirmLabel {
+  flex-shrink: 0;
+  width: var(--tpl-hq-mem-confirm-label-w);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-hq-cell-lh);
+}
+
+.confirmValue {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-cell-lh);
+}
+
+.confirmNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-cell-lh);
+}
