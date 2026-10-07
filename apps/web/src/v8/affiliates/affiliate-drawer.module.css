@@ -1,0 +1,291 @@
+/*
+ * ★V8 アフィリエイターの詳細の引き出し（Pencil `tnTn9`）。右から 620・余白 24・段の間 16。
+ * 寸法は globals.css の --tpl-af-dr-*。
+ * ファイル名を drawer.module.css にしない。ビルド後の組の名前が共通の右面（drawer_*）と同じになり、
+ * 設計値の照合（verify-design-values）がこちらの値を共通部品の値として読んでしまう。
+ */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--color-scrim);
+}
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 81;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-af-dr-gap);
+  width: min(var(--tpl-af-dr-w), 100%);
+  padding: var(--tpl-af-dr-pad);
+  overflow: hidden;
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-af-dr-shadow);
+}
+.drawer:focus { outline: none; }
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-toolbar-gap);
+}
+.headText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-af-dr-head-gap);
+  min-width: 0;
+}
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-heading);
+  font-weight: 700;
+  line-height: normal;
+  white-space: nowrap;
+}
+.sub {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.close {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-af-dr-close);
+  height: var(--tpl-af-dr-close);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--tpl-af-dr-tab-gap);
+  border-bottom: 1px solid var(--color-divider-soft, var(--color-hairline));
+}
+.tab {
+  margin-bottom: -1px;
+  padding: 0 0 var(--tpl-af-dr-tab-pad-bottom);
+  border: 0;
+  border-bottom: var(--tpl-af-dr-tab-line) solid transparent;
+  background: none;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-body);
+  font-weight: 400;
+  line-height: normal;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab[data-current] {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-af-dr-gap);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.kpis {
+  display: flex;
+  gap: var(--tpl-toolbar-gap);
+}
+.kpi {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-af-dr-kpi-gap);
+  min-width: 0;
+  padding: var(--tpl-af-dr-kpi-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+}
+.kpiLabel {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kpiValue {
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+  line-height: var(--tpl-af-dr-kpi-value-lh);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.kpiSub {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  line-height: var(--tpl-af-dr-kpi-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.sectionTitle {
+  margin: 0;
+  padding-bottom: var(--tpl-toolbar-gap);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: normal;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+}
+.listRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-af-dr-row-gap);
+  min-height: var(--tpl-af-dr-row-h);
+  padding: var(--tpl-af-dr-row-pad);
+}
+.listRow + .listRow { border-top: 1px solid var(--color-hairline); }
+.listText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.listName {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.listSub {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.listValue {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.listActions {
+  display: flex;
+  gap: var(--tpl-af-ops-gap);
+}
+.empty {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-af-ops-gap);
+  padding: var(--tpl-af-dr-card-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: normal;
+}
+.cardText,
+.note {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-af-dr-text-lh);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-toolbar-gap);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-af-stack-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+.input {
+  height: var(--tpl-chip-h);
+  padding: 0 var(--tpl-rule-row-gap);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 400;
+}
+
+.foot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  padding-top: var(--tpl-af-dr-foot-pad);
+  border-top: 1px solid var(--color-hairline);
+}
+.stop {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+  cursor: pointer;
+}
+.stop:disabled { color: var(--color-ink-faint); cursor: default; }
+.spacer { flex: 1 1 0; }

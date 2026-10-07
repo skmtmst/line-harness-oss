@@ -115,6 +115,6 @@ describe('CyW0E ダッシュボードの絵合わせ', () => {
     expect(body).not.toContain('クローズ')
     // 下の札
     expect(body).toContain('スタンダード 1・プロ 1・ライト 2・トライアル 1')
-    expect(body).toContain('メール未登録1人・LINE未登録2人（渋谷ドッグカフェ 1・北の牧場 1）')
+    expect(body).toContain('メール未登録 1 人・LINE 未登録 2 人（渋谷ドッグカフェ 1・北の牧場 1）')
   })
 })

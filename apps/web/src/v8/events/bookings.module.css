@@ -1,0 +1,309 @@
+/*
+ * ★V8 申込者（Mu8qW）。頭・数の帯・本文の余白は型（DetailPage）が持つ。
+ * ここはカード（枠1・角12・上14・横20）と、行で並べる3つの表・お知らせの欄だけ。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rule-row-gap);
+  margin: var(--tpl-ev-bk-pull-top) var(--tpl-ev-bk-pull-side) 0;
+}
+.subLine {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+.backLink {
+  color: var(--color-ink-secondary);
+}
+.backLink:hover {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+}
+.occurrencePick {
+  width: var(--tpl-ev-bk-pick-w);
+}
+.occurrencePick :global(*) {
+  max-width: 100%;
+}
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-label);
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ev-bk-head-gap);
+  padding-top: var(--tpl-ev-bk-card-top);
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.card > .cardTitle,
+.card > .cardHead {
+  padding: 0 var(--tpl-wh-card-pad);
+}
+.cardPadded {
+  padding: var(--tpl-ev-bk-broadcast-top) var(--tpl-wh-card-pad) var(--tpl-ev-bk-card-top);
+  gap: var(--tpl-ev-bk-broadcast-gap);
+}
+.cardPadded > .cardTitle,
+.cardPadded > .cardHead {
+  padding: 0;
+}
+.cardHeadSplit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--tpl-rule-row-gap);
+  padding: 0 var(--tpl-wh-card-pad);
+}
+.cardHeadSplit > :last-child:not(.attendance) {
+  justify-self: end;
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+  min-width: 0;
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-chip-label-lh);
+}
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.attendance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: var(--tpl-wh-check-gap);
+  padding: var(--tpl-ev-bk-att-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-row-name-lh);
+}
+.attendanceStrong {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+.attendanceDanger {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+.attendanceNote {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+
+/* 表（見出し40・申込者の行56・ほかの行42）。 */
+.table {
+  display: flex;
+  flex-direction: column;
+}
+.headRow,
+.row {
+  display: grid;
+  align-items: center;
+  padding: 0 var(--tpl-wh-card-pad);
+}
+.headRow {
+  min-height: var(--tpl-ev-row-h);
+  background: var(--color-surface-pearl);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-row-sub-lh);
+}
+.row {
+  min-height: var(--tpl-ev-bk-row-h);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.row:last-child {
+  box-shadow: none;
+}
+.mainRow {
+  min-height: var(--tpl-ev-bk-main-row-h);
+}
+.mainGrid {
+  grid-template-columns: var(--tpl-ev-bk-main-cols);
+}
+.waitGrid {
+  grid-template-columns: var(--tpl-ev-bk-wait-cols);
+}
+.cancelGrid {
+  grid-template-columns: var(--tpl-ev-bk-cancel-cols);
+}
+.person {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+  min-width: 0;
+}
+.personName,
+.cellName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-wh-cell-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cellName {
+  font-weight: 500;
+}
+.personSub {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.cellText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-wh-ops-gap);
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.empty {
+  margin: 0;
+  padding: var(--tpl-rule-row-gap) var(--tpl-wh-card-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-label);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-ev-chip-gap);
+  padding: var(--tpl-ev-chip-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-ev-chip-lh);
+  white-space: nowrap;
+}
+.chip::before {
+  content: '';
+  width: var(--tpl-ev-chip-dot);
+  height: var(--tpl-ev-chip-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.chip_neutral {
+  background: var(--color-shell);
+  color: var(--color-ink-secondary);
+}
+.chip_success {
+  background: var(--color-accent-soft);
+  color: var(--color-success);
+}
+.chip_warning {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+.chip_info {
+  background: var(--color-status-info-soft);
+  color: var(--color-status-info);
+}
+.chip_danger {
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+}
+
+/* お知らせを送る。 */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wh-ops-gap);
+}
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-chip-label-lh);
+}
+.broadcastRow {
+  display: flex;
+  gap: var(--tpl-rule-row-gap);
+}
+.input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-kw-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+
+/* 確かめの窓の中。 */
+.dialogLabel {
+  display: grid;
+  gap: var(--tpl-compact-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.textarea {
+  padding: var(--tpl-wh-textarea-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 400;
+}
+.dialogButtons {
+  display: flex;
+  gap: var(--tpl-toolbar-gap);
+  margin-bottom: var(--tpl-toolbar-gap);
+}
+.kpis {
+  --tpl-band-number-size: var(--tpl-ev-bk-kpi-num);
+  --tpl-band-number-lh: var(--tpl-ev-bk-kpi-num-lh);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tpl-rule-row-gap);
+}

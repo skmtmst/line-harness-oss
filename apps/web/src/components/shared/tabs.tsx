@@ -31,7 +31,7 @@ export function Tabs({
   items: TabItem[]
   /**
    * タブ行の右端に置くもの。ヘッダー操作を独立した行にしないため
-   * （`docs/v6-common-rules.md` §1-4、Pencil `aToSv` は space_between）。
+   * （`docs/v8-design-rules.md` §5、Pencil `aToSv` は space_between）。
    */
   actions?: ReactNode
   className?: string

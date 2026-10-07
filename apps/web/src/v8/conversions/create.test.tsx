@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -130,13 +130,14 @@ describe('V8 成果地点を作る', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: '自動化（オートメーション）' }))
     await flush()
     fireEvent.click(screen.getByRole('button', { name: /保存して数えはじめる/ }))
-    await flush()
+    // 送るまでの待ちの回数は混み具合で変わる。決まった回数ではなく、送られるまで待つ（CI で混むと落ちていた）。
+    await waitFor(() => expect(posted.length).toBe(1))
     expect(posted[0].name).toBe('定期便を始めた')
     expect(posted[0].usages).toEqual([
       { refKind: 'automation', refId: 'auto-1', refVersionId: 'v1' },
       { refKind: 'automation', refId: 'auto-2', refVersionId: 'v2' },
     ])
-    expect(push).toHaveBeenCalledWith('/conversions?tab=points&highlight=cp-new')
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/conversions?tab=points&highlight=cp-new'))
   })
 
   it('閲覧のみ：帯を出し、保存のボタン・使う場所を足すは置かない', async () => {

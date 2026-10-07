@@ -54,7 +54,7 @@ export type LiffPreviewView = 'list' | 'calendar'
  * 読み込み中・失敗の見せ方も実LIFFの共通部品（`LoadingView`・
  * `LoadErrorView`・`apps/liff/src/lib/user-message.ts` の文言）と同じにする。
  * 失敗は題「読み込めませんでした」＋本文 LOAD_FAILED_MESSAGE
- * （「電波の良いところで、もう一度お試しください。」）＋「もう一度読み込む」。
+ * （「電波のよいところで、もう一度お試しください。」）＋「もう一度読み込む」。
  *
  * お客様はメニュー→担当→日時の順に進むため、ここでは先頭の有効メニューの
  * `by_staff[0]`（担当一覧の先頭と同じ並び）の空き枠をそのまま表示し、
@@ -118,9 +118,9 @@ export default function LiffDateTimePreview({
             <div className="mx-auto max-w-md p-8 text-center">
               {/* 実LIFFの LoadErrorView と同じ題＋本文。題と重ねないため
                   本文は LOAD_FAILED_MESSAGE（`apps/liff/src/lib/user-message.ts`）
-                  の「電波の良いところで、もう一度お試しください。」だけにする。 */}
+                  の「電波のよいところで、もう一度お試しください。」だけにする。 */}
               <p className="text-ink text-base font-bold">読み込めませんでした</p>
-              <p className="text-ink-secondary mt-2 text-sm leading-6">電波の良いところで、もう一度お試しください。</p>
+              <p className="text-ink-secondary mt-2 text-sm leading-6">電波のよいところで、もう一度お試しください。</p>
               {/* 実LIFFの LoadErrorView と同じ「もう一度読み込む」ボタンの見え方。
                   「← 戻る」と同じく、押せない見本なのでボタン要素ではなく
                   見た目だけ再現する（直書きボタンの負債も増やさない）。 */}

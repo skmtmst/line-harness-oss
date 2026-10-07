@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import { motionMs } from './overlay-utils'
 import styles from './bulk-bar.module.css'
 
 export type BulkBarProps = {
@@ -24,6 +25,11 @@ export type BulkBarProps = {
    */
   below?: ReactNode
   className?: string
+  /**
+   * 選択を外す。渡すと Esc で選択を外せる（窓・メニューが開いている間は窓側の Esc が先）。
+   * 動きの点検 12 番。
+   */
+  onClear?: () => void
 }
 
 /*
@@ -37,9 +43,30 @@ export type BulkBarProps = {
  *   入る: 下8pxから浮き上がる（motion-base・ease-out）
  *   出る: 下がって消える（motion-fast）
  */
-export default function BulkBar({ count, unit = '件', hint, children, overflow, below, className }: BulkBarProps) {
+/**
+ * 選んでいる間は Esc で選択を外す（動きの点検 12 番）。一括バーを自前で持つ一覧も使う。
+ * 窓・メニュー・⌘K が開いている間と、入力欄の中の Esc は奪わない。
+ */
+export function useEscapeToClearSelection(active: boolean, onClear: (() => void) | undefined): void {
+  useEffect(() => {
+    if (!active || !onClear) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [data-menu-portal]')) return
+      const target = event.target as HTMLElement | null
+      if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return
+      onClear()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [active, onClear])
+}
+
+export default function BulkBar({ count, unit = '件', hint, children, overflow, below, className, onClear }: BulkBarProps) {
   const visible = count > 0
   const [rendered, setRendered] = useState(visible)
+
+  useEscapeToClearSelection(visible, onClear)
 
   useEffect(() => {
     if (visible) {
@@ -48,7 +75,7 @@ export default function BulkBar({ count, unit = '件', hint, children, overflow,
     }
     if (!rendered) return
     // 「下がって消える」を見せるため、出し終わるまで描き続ける。
-    const timer = setTimeout(() => setRendered(false), 140)
+    const timer = setTimeout(() => setRendered(false), motionMs('--motion-fast', 120))
     return () => clearTimeout(timer)
   }, [visible, rendered])
 
@@ -60,7 +87,7 @@ export default function BulkBar({ count, unit = '件', hint, children, overflow,
       role="region"
       aria-label="選択中のまとめ操作"
     >
-      <strong className={styles.count}>
+      <strong className={styles.count} aria-live="polite" aria-atomic="true">
         {count}
         {unit}を選択中
       </strong>

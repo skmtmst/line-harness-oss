@@ -119,7 +119,8 @@ async function openSettings() {
   fixture.listMenus = vi.fn(async () => ({ menus: menus() }))
   render(<><MenusPage /><ToastHost /></>)
   if (fixture.tab === 'rules') {
-    await screen.findByRole('spinbutton', { name: '受付の締め切り' })
+    // ★V8 書き直し（src/v8/booking-menus）：締め切りは選ぶ欄になった。
+    await screen.findByLabelText('受付の締め切り')
   } else {
     await screen.findByRole('heading', { name: 'メニュー' })
   }

@@ -1,0 +1,260 @@
+/*
+ * ★V8-B たまる決めごとを作る（ctLwT・競合 BnrQp）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
+ * ここは段のカード（枠1・角12・余白20・間14）と、選ぶカード、右の列（試算・気をつけること）の中身だけ。
+ */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-compact-gap);
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-back-lh);
+}
+.backLink:hover {
+  text-decoration: underline;
+}
+
+/* 競合の帯（BnrQp）：頭と本文の間の段に、板いっぱいで出す。 */
+:global([data-theme='v8'] [data-page-template='create']) > :global(div):has(> .conflictBand) {
+  display: block;
+}
+.conflictBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-conflict-gap);
+  padding: var(--tpl-cn-conflict-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+}
+.conflictIcon {
+  flex-shrink: 0;
+  color: var(--color-status-warn-deep);
+}
+.conflictText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+  min-width: 0;
+}
+.conflictTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-name-lh);
+}
+.conflictNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+
+/* 段のカード。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-card-gap);
+  padding: var(--tpl-cn-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-cn-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-cn-card-title-lh);
+}
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+.field {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-cn-field-gap);
+  min-width: 0;
+}
+.fieldRow {
+  display: flex;
+  gap: var(--tpl-cn-field-row-gap);
+}
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-field-gap);
+}
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-cn-label-lh);
+}
+.optional {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-cn-main-lh);
+}
+.pickLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-cn-main-lh);
+}
+.input {
+  width: 100%;
+  min-width: 0;
+  height: var(--tpl-cn-control-h);
+  padding: var(--tpl-cn-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+/* 日付の欄は、ほかの欄と同じ高さにそろえる。 */
+.field :global(button) {
+  max-width: 100%;
+}
+.linkButton {
+  align-self: flex-start;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-cn-main-lh);
+  cursor: pointer;
+}
+.linkButton:hover {
+  text-decoration: underline;
+}
+.conditionBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-field-gap);
+}
+
+/* 選ぶカード（共通の RadioCard）を2つ横に並べる。 */
+.choiceRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-rsa-choice-gap);
+}
+
+/* 詳しい設定（絵に無い欄の置き場）。 */
+.detailsBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-panel-inner-gap);
+}
+.inlineRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-ops-gap);
+}
+
+/* 右の列：枠1・角12・余白16・間6 のカードを間14で縦に。 */
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-card-gap);
+  width: 100%;
+}
+.sideCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-field-gap);
+  padding: var(--tpl-cn-panel-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+.sideHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-cn-ops-gap);
+}
+.sideTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-rsa-side-title-lh);
+}
+.sideNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-cn-sub-lh);
+}
+.trialButton {
+  flex-shrink: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-cn-sub-lh);
+  cursor: pointer;
+}
+.trialButton:disabled {
+  color: var(--color-ink-faint);
+  cursor: default;
+}
+.trialRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-field-gap);
+  margin: 0;
+}
+.trialRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-cn-ops-gap);
+  padding: var(--tpl-rsa-trial-row-pad);
+}
+.trialRow dt {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-compact-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+.trialRow dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: var(--tpl-cn-name-lh);
+  white-space: nowrap;
+}
+.caution {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rsa-caution-lh);
+}

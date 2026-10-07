@@ -24,7 +24,10 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
+// 設定の中のメニュー（共通部品）はこの試験の対象外。localStorage と機能の出し分けを読むので外す。
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/line-notifications/operator/new',
   useRouter: () => ({ push: fixture.push }),
   useSearchParams: () => new URLSearchParams(''),
 }))
@@ -32,7 +35,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
 vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, useSettingsNavInline: () => undefined }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()

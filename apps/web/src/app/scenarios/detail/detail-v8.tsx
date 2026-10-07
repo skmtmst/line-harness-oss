@@ -13,6 +13,7 @@
  * v7 を直す必要が出たら scenario-detail-client.tsx 側も同じ判断を入れる
  * （V8 完成までの二重管理）。
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 
 import Link from 'next/link'
@@ -2239,22 +2240,15 @@ export default function ScenarioDetailV8({
       {error ? <Notice tone="danger" message={error} /> : null}
 
       {conflict && (
-        <div className={styles.conflictBar} data-design-node="kz2B6" role="alert">
-          <div>
-            <p className={styles.conflictTitle}>ほかの人がこのシナリオを更新しました</p>
-            <p className={styles.conflictBody}>
-              あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
-            </p>
-          </div>
-          <div className={styles.conflictActions}>
-            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)} disabled={!conflictLatest}>
-              違いを比べる
-            </Button>
-            <Button type="button" variant="primary" onClick={() => void acceptLatestAndContinue()}>
-              最新を読み込んで続ける
-            </Button>
-          </div>
-        </div>
+        /* 帯は共通部品（save-conflict）に寄せた。比べる窓はこの画面の要約の比べを使う。 */
+        <SaveConflictBand
+          title="ほかの人がこのシナリオを更新しました"
+          description="あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。"
+          designNode="kz2B6"
+          compareBusy={!conflictLatest}
+          onCompare={() => setCompareOpen(true)}
+          onReload={() => void acceptLatestAndContinue()}
+        />
       )}
 
       <div className={styles.split} data-design="Body">

@@ -15,7 +15,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import ScenarioModeV8 from '../mode-v8'
+import ScenarioModeV8 from '@/v8/scenarios/create'
 import './scenario-mode.css'
 
 /**

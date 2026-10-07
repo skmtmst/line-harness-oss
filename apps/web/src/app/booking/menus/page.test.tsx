@@ -238,7 +238,8 @@ describe('既存メニューの編集窓: 共有設備の割当', () => {
       resolveSave({ success: true, data: { id: 'menu-1', version: 2, resources: [] } })
       await Promise.resolve()
     })
-    expect(screen.getByRole('status').textContent).toContain('設備の割当を保存しました')
+    // 画面の中の知らせ（role=status）。置き場所の知らせの入れ物も role=status なので、全部の中から文で見る
+    expect(screen.getAllByRole('status').map((el) => el.textContent).join('\n')).toContain('設備の割当を保存しました')
   })
 
   test('409でも入力を保持し、最新内容の読み直しを案内する', async () => {
@@ -247,7 +248,7 @@ describe('既存メニューの編集窓: 共有設備の割当', () => {
     const quantity = await screen.findByRole('spinbutton', { name: '個室Aの必要数' })
     fireEvent.change(quantity, { target: { value: '2' } })
     fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存する' }))
-    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('最新の内容を読み直して'))
+    await waitFor(() => expect(screen.getAllByRole('status').map((el) => el.textContent).join('\n')).toContain('最新の内容を読み直して'))
     expect((quantity as HTMLInputElement).value).toBe('2')
   })
 
@@ -561,7 +562,7 @@ describe('店舗共通の予約ルール', () => {
       approvalMode: 'manual',
       slotGranularityMinutes: 15,
     }))
-    expect((await screen.findByRole('status')).textContent).toContain('予約の基本ルールを保存しました。')
+    expect((await screen.findByRole('status', { name: '知らせ' })).textContent).toContain('予約の基本ルールを保存しました。')
   })
 
   test('版競合は自動上書きせず、最新内容の読み直しを案内する', async () => {
@@ -601,7 +602,7 @@ describe('店舗共通の予約ルール', () => {
       expectedVersion: 3,
       holdMinutes: 30,
     }))
-    expect((await screen.findByRole('status')).textContent).toContain('予約の基本ルールを保存しました。')
+    expect((await screen.findByRole('status', { name: '知らせ' })).textContent).toContain('予約の基本ルールを保存しました。')
   })
 
   test('分・時間の入力の横に読み替えが出る（Issue #710）', async () => {
@@ -658,7 +659,8 @@ describe('店舗共通の予約ルール', () => {
     })
 
     expect((screen.getByRole('spinbutton', { name: '何日先まで受け付けるか' }) as HTMLInputElement).value).toBe('30')
-    expect(screen.queryByRole('status')).toBeNull()
+    // 知らせの入れ物（role=status）は最初からあるので、どの知らせも空であることで見る
+    expect(screen.getAllByRole('status').map((el) => el.textContent).join('')).toBe('')
   })
 
   test('日時を選ぶ画面の最初の形は2択で選び、保存に載る', async () => {

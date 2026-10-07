@@ -44,9 +44,15 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
   }
 
   return (
-    <LiffLookScope className="min-h-screen bg-ground" designNode="BjcuB">
+    <LiffLookScope className="min-h-screen bg-canvas" designNode="BjcuB">
       <LiffHeader title="イベント" />
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
+      <div
+        className={`mx-auto w-full max-w-md ${
+          state === 'ready' || state === 'submitting'
+            ? 'pb-[142px]'
+            : 'flex min-h-[calc(100dvh-var(--liff-header-h)-1px)] flex-col justify-center px-4 py-10'
+        }`}
+      >
         {state === 'confirmed' ? (
           <div className="space-y-4">
             <StatusView
@@ -98,20 +104,18 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
             </Button>
           </div>
         ) : (
-          <div className="pb-28">
-            <div className="flex flex-col items-center px-6 py-10 text-center">
-              <span
-                className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-soft text-liff-primary"
-                aria-hidden="true"
-              >
-                <Icon name="circle-check" className="h-9 w-9" />
-              </span>
-              <p className="mt-4 text-xl font-bold text-ink">空きが出ました</p>
-              <p className="mt-2 text-[13px] leading-6 text-pretty text-liff-sub">
-                下のボタンを押すと予約が確定します。
-                <br />
-                押すまでは予約になりません。
-              </p>
+          <>
+            {/* ★V8 (BjcuB)：上の帯と下の帯の間の真ん中に、丸・題・本文を置く。
+                絵の「10月11日（日）11:00〜 に 1 席」「あと 23時間 41分」は、案内の中身を
+                読む口が API に無いため出さない (API が入ったら足す)。 */}
+            <div className="flex min-h-[calc(100dvh-var(--liff-header-h)-1px-142px)] flex-col items-center justify-center px-6 py-4">
+              <StatusView
+                large
+                icon="party-popper"
+                tone="success"
+                title="空きが出ました"
+                body="下のボタンを押すまで、予約にはなりません。"
+              />
             </div>
             <BottomBar>
               <Button variant="primary" onClick={accept} disabled={state === 'submitting'}>
@@ -121,7 +125,7 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
                 今回は見送る
               </Button>
             </BottomBar>
-          </div>
+          </>
         )}
       </div>
     </LiffLookScope>

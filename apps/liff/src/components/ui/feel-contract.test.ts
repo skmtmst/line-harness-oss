@@ -55,6 +55,12 @@ describe('下の帯は浮いたボタン (12px・ふんわり影)', () => {
     expect(bar).toContain('max(0.75rem');
     expect(bar).toContain('shadow-lg');
   });
+
+  it('主ボタンの下端は板どおり画面の下から 30px (浮き 12＋帯の中 18)', () => {
+    const bar = src('components', 'ui', 'BottomBar.tsx');
+    expect(bar).toContain('max(0.75rem');
+    expect(bar).toContain('p-3 pb-[18px]');
+  });
 });
 
 describe('動きを減らす設定では薄く入れ替えるだけ', () => {

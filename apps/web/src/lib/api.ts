@@ -13702,6 +13702,9 @@ export const api = {
       ),
   },
   adPlatforms: {
+    retryLog: (id: string) => fetchApi<ApiResponse<import('@line-crm/shared').AdConversionRetryResult>>(
+      `/api/ad-platforms/logs/${encodeURIComponent(id)}/retry`, { method: 'POST' },
+    ),
     mappings: (accountId: string) => fetchApi<ApiResponse<import('@line-crm/shared').AdEventMapping[]>>(`/api/ad-platforms/mappings?account_id=${encodeURIComponent(accountId)}`),
     saveMapping: (pointId: string, data: import('@line-crm/shared').SaveAdEventMappingRequest) => fetchApi<ApiResponse<import('@line-crm/shared').AdEventMapping>>(`/api/ad-platforms/mappings/${encodeURIComponent(pointId)}`, { method: 'PUT', body: JSON.stringify(data) }),
     create: (data: {name: string;displayName?: string;lineAccountId: string;config: Record<string,unknown>}) => fetchApi<ApiResponse<AdPlatform>>('/api/ad-platforms',{method:'POST',body:JSON.stringify(data)}),

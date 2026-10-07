@@ -1,0 +1,271 @@
+/*
+ * ★V8 承認ワークフロー（t8WgD8・閲覧のみ n4DT7）。値は globals.css の `--tpl-rt-*`。
+ * カード：余白20・段の間10・角12・細い輪郭。頭の段は間8（札・状態・店舗・…・ボタン）。
+ */
+
+/* 閲覧のみの帯（n4DT7「帯/案内」）：上下10・左右14・間10・青い地・印16・文13/20。 */
+.readOnly {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+
+.readOnlyIcon {
+  width: var(--tpl-rt-icon-16);
+  height: var(--tpl-rt-icon-16);
+  flex-shrink: 0;
+  color: var(--color-status-info);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-card-gap);
+  padding: var(--tpl-rt-card-pad);
+  border-radius: var(--tpl-rt-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  min-width: 0;
+}
+
+/* 閲覧のみで承認待ちのカード：枠を緑（1.5）にして目立たせる。 */
+.cardPending {
+  outline: var(--tpl-rt-pending-outline);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  min-width: 0;
+}
+
+.kindChip {
+  flex: 0 0 auto;
+  padding: var(--tpl-rt-kind-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-success-bg);
+  color: var(--color-accent-deep);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.store {
+  flex: 0 0 auto;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.actionsSpace {
+  flex: 0 0 auto;
+  height: var(--tpl-rt-control-h);
+}
+
+.buttonIcon {
+  width: var(--tpl-rt-icon-15);
+  height: var(--tpl-rt-icon-15);
+  flex-shrink: 0;
+}
+
+.returnButton {
+  color: var(--tpl-rt-return-color);
+}
+
+.returnButton .buttonIcon {
+  color: var(--color-ink);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.requested {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+/* 変更内容：地 #fafafc・角8・余白14・段の間6。 */
+.payload {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: var(--tpl-rt-payload-gap);
+  padding: var(--tpl-rt-payload-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-table-head);
+}
+
+.payloadLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.payloadMeta {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.payloadTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+}
+
+.payloadBody {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+.payloadDiff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+.diffKey { color: var(--color-ink-faint); }
+.diffBefore { color: var(--color-ink-secondary); }
+.diffAfter { color: var(--color-ink); font-weight: 700; }
+
+.muted {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+/* 差戻しのコメント：琥珀の地・角8・上下8・左右12。 */
+.returnComment {
+  align-self: stretch;
+  margin: 0;
+  padding: var(--tpl-rt-comment-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--tpl-rt-comment-bg);
+  color: var(--color-warning);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+.emptyBox {
+  padding: var(--tpl-rt-state-pad);
+  border-radius: var(--tpl-rt-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+/* 公開境界：余白20・段の間4。 */
+.boundary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-note-gap);
+  padding: var(--tpl-rt-card-pad);
+  border-radius: var(--tpl-rt-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.boundaryTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.boundaryText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+/* 差し戻す理由の小窓（n4j0Rm）。 */
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-dialog-gap);
+}
+
+.dialogSummary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-note-gap);
+  padding: var(--tpl-rt-dialog-box-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  background: var(--color-table-head);
+}
+
+.dialogSummaryMeta {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.dialogSummaryMain {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.dialogField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+}
+
+.dialogFieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.dialogNote {
+  margin: 0;
+  padding: var(--tpl-rt-dialog-box-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-rt-chip-row-gap);
+}

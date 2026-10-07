@@ -1,0 +1,129 @@
+/*
+ * LINEアカウントの詳細から開く窓（CFAyf・Msb1j・WOfBN・n9Z2P）。
+ * 絵の窓は「余白24・段の間14・題17」で、頭・中身・下が同じ余白の中に並ぶ（下の線も内側）。
+ * 共通の窓（Dialog）の段の余白を、この窓の中身（.body）を持つときだけ絵の値に寄せる。
+ */
+:global([data-theme='v8']) :global([data-design-part='dialog']):has(.body) {
+  padding: var(--tpl-acd-dlg-pad);
+  gap: var(--tpl-acd-dlg-gap);
+}
+:global([data-theme='v8']) :global([data-design-part='dialog']):has(.body) > div:first-child {
+  padding: 0;
+}
+:global([data-theme='v8']) :global([data-design-part='dialog']):has(.body) h2 {
+  font-size: var(--tpl-acd-dlg-title-size);
+  line-height: var(--tpl-acd-dlg-title-lh);
+}
+:global([data-theme='v8']) :global([data-design-part='dialog']):has(.body) div:has(> .body) {
+  padding: 0;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-acd-dlg-gap);
+  width: 100%;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--tpl-acd-actions-gap);
+  padding: var(--tpl-acd-dlg-foot-pad);
+  box-shadow: var(--tpl-acd-line-top);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-acd-dlg-field-gap);
+  min-width: 0;
+  flex: 1;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-acd-inline-gap);
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--tpl-acd-dlg-label-size);
+  font-weight: 500;
+  line-height: var(--tpl-acd-dlg-label-lh);
+}
+
+.more {
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-accent-deep);
+  font: inherit;
+  font-size: var(--tpl-acd-note-size);
+  font-weight: 600;
+  line-height: var(--tpl-acd-dlg-label-lh);
+  cursor: pointer;
+}
+
+.pair {
+  display: flex;
+  gap: var(--tpl-acd-dlg-pair-gap);
+  width: 100%;
+}
+
+.narrow {
+  display: flex;
+  flex: 0 0 var(--tpl-acd-ho-choice-w);
+}
+
+.sub {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-acd-dlg-sub-size);
+  font-weight: 700;
+  line-height: var(--tpl-acd-dlg-sub-lh);
+}
+
+.warnBand,
+.infoBand {
+  margin: 0;
+  width: 100%;
+  padding: var(--tpl-acd-dlg-band-pad);
+  border-radius: var(--tpl-acd-dlg-band-radius);
+  font-size: var(--tpl-acd-dlg-band-size);
+  line-height: var(--tpl-acd-dlg-band-lh);
+}
+.warnBand {
+  background: var(--tpl-acd-warn-bg);
+  color: var(--tpl-acd-warn-ink);
+}
+.infoBand {
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+}
+
+.verify {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-acd-dlg-field-gap);
+}
+
+/* 絵のマスは 48×48（共通の部品は 48×56）。この窓の中だけ絵の高さにする。 */
+.otp input {
+  height: var(--tpl-acd-otp-h);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--tpl-acd-value-size);
+  line-height: var(--tpl-acd-sub-lh);
+}
+
+.fill {
+  width: 100%;
+}

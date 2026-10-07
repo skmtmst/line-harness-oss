@@ -1,0 +1,377 @@
+/*
+ * ★V8 組織・権限（bSp4h）。値は globals.css の `--tpl-rt-*`。
+ * 左の組織階層は幅280、右は段の間16。
+ */
+.readOnly {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+
+.readOnlyIcon {
+  width: var(--tpl-rt-icon-16);
+  height: var(--tpl-rt-icon-16);
+  flex-shrink: 0;
+  color: var(--color-status-info);
+}
+
+.layout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-rt-half-gap);
+  min-width: 0;
+}
+
+.main {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rt-body-gap);
+  min-width: 0;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.buttonIcon {
+  width: var(--tpl-rt-icon-15);
+  height: var(--tpl-rt-icon-15);
+  flex-shrink: 0;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+/* 組織階層：幅280・中身は余白16・段の間8。 */
+.tree {
+  flex: 0 0 var(--tpl-rt-tree-w);
+}
+
+.treeBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-chip-row-gap);
+  padding: var(--tpl-rt-stat-pad);
+}
+
+.treeTenant {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: normal;
+}
+
+.treeRoot {
+  margin: 0;
+  padding: var(--tpl-rt-tree-root-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--color-success-bg);
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.treeChildren {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+  padding-left: var(--tpl-rt-stat-pad);
+  box-shadow: var(--tpl-rt-line-left);
+}
+
+.treeStore {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  padding: var(--tpl-rt-tree-store-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  min-width: 0;
+}
+
+.treeStoreName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+/* 店舗管理の行：上下12・左右20・上に細い線。名前13/600＋札、下に11の2行。 */
+.storeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-action-gap);
+  padding: var(--tpl-rt-store-row-pad);
+  box-shadow: var(--tpl-rt-line-top);
+}
+
+.storeRow:first-child {
+  box-shadow: none;
+}
+
+.storeText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rt-cell-gap);
+  min-width: 0;
+}
+
+.storeName {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: normal;
+}
+
+.storeSub {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.storeLine {
+  margin: 0;
+  color: var(--color-action);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: normal;
+}
+
+/* 予約メール取り込みアドレス：中身は余白20・段の間10。 */
+.intakeBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-card-gap);
+}
+
+.intakeWarning {
+  margin: 0;
+  padding: var(--tpl-rt-notice-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--tpl-rt-comment-bg);
+  color: var(--color-warning);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.intakeNotice {
+  margin: 0;
+  color: var(--color-success);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.intakeError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.intakeEmpty {
+  margin: 0;
+  padding: var(--tpl-rt-payload-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--color-table-head);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.intakeCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+  padding: var(--tpl-rt-payload-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--color-table-head);
+}
+
+.intakeCardHead {
+  display: flex;
+  align-items: center;
+}
+
+.intakeState {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.intakeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+.intakeAddress {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.intakeMeta {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.intakeFoot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 表：見出し 上下9・左右20／行 上下10・左右20・上に細い線、欄の間16。 */
+.table {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.headRow,
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-col-gap);
+  padding: var(--tpl-rt-thead-pad);
+  min-width: 0;
+}
+
+.headRow {
+  background: var(--color-table-head);
+}
+
+.headRow .cell {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+
+.row {
+  padding: var(--tpl-rt-row-pad);
+  box-shadow: var(--tpl-rt-line-top);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-cell-gap);
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.colName { flex: 1 1 0; }
+.colRole { flex: 0 0 var(--tpl-rt-col-100); }
+.colLink { flex: 0 0 var(--tpl-rt-col-150); }
+.colState { flex: 0 0 var(--tpl-rt-col-80); align-items: flex-start; }
+.colOps { flex: 0 0 var(--tpl-rt-col-130); align-items: flex-end; }
+.colMatrix { flex: 0 0 var(--tpl-rt-col-110); align-items: center; }
+
+.memberName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.linkMain {
+  font-weight: 600;
+}
+
+.ops {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-rt-payload-gap);
+}
+
+.matrixYes {
+  color: var(--color-accent-deep);
+  font-weight: 700;
+}
+
+.matrixNo {
+  color: var(--color-ink-faint);
+}
+
+/* 窓の中のフォーム（vCEKM・ou60i）。 */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-dialog-gap);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-rt-form-gap);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+  min-width: 0;
+}
+
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.fieldRequired {
+  color: var(--color-danger);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+.loginBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+  padding: var(--tpl-rt-dialog-box-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  background: var(--color-table-head);
+}
+
+.loginRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+}

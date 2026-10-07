@@ -3,6 +3,7 @@
 import ReadonlyHeader from '@/app/hq/readonly-header-v8'
 import '@/app/hq/readonly-v8.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import HqBannerProjectV8 from '@/v8/hq-banners/project'
 import { Archive, ArchiveRestore, Copy, LoaderCircle, Pencil, Sparkles, Star } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -56,6 +57,9 @@ type Filter = 'all' | 'favorite' | 'delivered'
  * 途中で画面を離れても成功分は残り、戻ると続きから動く。
  */
 export default function HqBannerProjectPage() {
+  // V8 は src/v8/hq-banners に一から書いた画面（iMnph・p03ImY・zOpMG）。v7 は今の画面のまま。
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <HqBannerProjectV8 />
   return (
     <Suspense fallback={null}>
       <ProjectInner />

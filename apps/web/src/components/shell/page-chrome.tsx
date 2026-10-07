@@ -12,7 +12,7 @@ import type { ReactNode } from 'react'
  * 「タグを作る」「1通目を設定」のようにその画面固有の名前だった。
  * メニュー名で足りるのは約120枚しかない。
  *
- * 詳しくは `docs/v6-common-rules.md` §1。
+ * 詳しくは `docs/v8-design-rules.md` §5。
  */
 /**
  * 上の帯のパンくずの手前の段（★V8）。

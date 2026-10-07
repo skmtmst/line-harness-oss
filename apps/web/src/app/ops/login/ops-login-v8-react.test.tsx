@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 /*
- * 運営ログインの V8（板 D9JALJ）。
- * V8 では「または」の区切りを出さず、パスワード認証の次に
- * 認証アプリの6桁を入れる順路を書く。v7 はそのまま。
+ * 運営ログインの V8（板 D9JALJ・src/v8/ops/login.tsx）。
+ * 絵（2026-10 版）どおり、ログインの下に「または」の区切りと LINE でログイン。
+ * パスワードを忘れた方への入口と招待の案内はカードの下。v7 はそのまま。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -31,12 +31,13 @@ afterEach(async () => {
 })
 
 describe('運営ログインのV8（D9JALJ）', () => {
-  it('板IDを持ち、「または」を出さず6桁の順路を書く', async () => {
+  it('板IDを持ち、「または」の下に LINE の口・忘れた方への入口を出す', async () => {
     document.documentElement.dataset.theme = 'v8'
     await render()
     expect(host.querySelector('[data-design-node="D9JALJ"]')).not.toBeNull()
-    expect(host.textContent).not.toContain('または')
-    expect(host.textContent).toContain('ログインの次に、認証アプリの6桁の数字を入れます')
+    expect(host.textContent).toContain('または')
+    expect(host.querySelector('a[href="/password/forgot"]')).not.toBeNull()
+    expect(host.textContent).toContain('この画面は運営メンバーだけが開けます')
     // LINEで入る口は残す（LINEで登録した運営メンバーを締め出さない）。
     expect(host.textContent).toContain('LINE でログイン')
   })

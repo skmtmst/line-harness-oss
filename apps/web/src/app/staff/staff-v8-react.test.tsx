@@ -49,6 +49,8 @@ vi.mock('next/navigation', async importOriginal => ({
   useSearchParams: () => ({ get: () => null }),
   usePathname: () => '/staff',
 }))
+// ★V8 の画面（src/v8/settings/staff）は設定の中のメニューを板の中に置く。メニューは手元の保存値を読むので、ここでは置き物にする。
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
 
 let host: HTMLDivElement

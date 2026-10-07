@@ -30,6 +30,8 @@ import {
   type HqSupportKind,
   type HqSupportRequest,
 } from '@/lib/hq-support'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import HqSupportV8 from '@/v8/hq/support'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -41,6 +43,11 @@ type Attachment = { name: string; mimeType: string; data: string; size: number; 
  * 送るとこの統括の記録に残り、運営へメールで知らせ、送信者には控えが届く。
  */
 export default function HqSupportPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <HqSupportV8 /> : <HqSupportPageV7 />
+}
+
+function HqSupportPageV7() {
   usePageTitle('お問い合わせ')
   const tenantStatus = useTenantStatus()
   const tenantUnavailable = tenantStatus === 'suspended' || tenantStatus === 'archived'

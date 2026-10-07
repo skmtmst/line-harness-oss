@@ -25,6 +25,8 @@ import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-ses
 import { logoutAndGoToLogin } from '@/lib/logout'
 import OpsEnvBar from './ops-env-bar'
 import ImpersonationBar from './impersonation-bar'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import OpsShellV8 from '@/v8/ops/shell'
 
 /**
  * 運営コンソールの外枠。★V6 37 系。
@@ -52,6 +54,8 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   const [navOpen, setNavOpen] = useState(false)
   // ★V7：担当者の取得だけ落ちても外枠は落とさない。本文は普通に出す。
   const [meError, setMeError] = useState('')
+  // ★V8：外枠は src/v8/ops/shell.tsx（統括・店舗と同じ外側に運営のメニュー）。v7 は下のまま。
+  const isV8 = useAdminTheme() === 'v8'
 
   /*
    * 狭い画面のメニューは開閉式。画面を移ったら閉じ、開いている間は
@@ -145,6 +149,20 @@ export default function OpsShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </div>
+    )
+  }
+
+  if (isV8) {
+    return (
+      <OpsShellV8
+        me={me}
+        meError={meError}
+        onRetryMe={() => { setChecked(false); setMeError(''); void load() }}
+        pathname={pathname}
+        banner={me?.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
+      >
+        {children}
+      </OpsShellV8>
     )
   }
 

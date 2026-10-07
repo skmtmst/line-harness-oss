@@ -11,6 +11,7 @@
  * データの口・影響確認・保存・予約・削除・状態切替は `app/contents/vars/edit/edit-v8.tsx` から
  * 写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -21,14 +22,12 @@ import {
   ChevronDown,
   ChevronUp,
   CircleCheck,
-  CircleHelp,
   Download,
   Eye,
   GitCompare,
   Pause,
   Play,
   Plus,
-  RefreshCw,
   Smartphone,
   X,
 } from 'lucide-react'
@@ -1065,24 +1064,15 @@ function EditCommonVarV8Inner() {
           {`${placeholderText(item.varKey)}・${typeLabel}・${stateLabel}・${usageTotal === null ? '—' : `${formatNumber(usageTotal)}か所で使っています`}`}
           {/* 競合の帯（板 `piWhz`）。頭の下に横いっぱい。入力は残したまま、誰の保存かを見せる。 */}
           {conflict ? (
-            <div data-design-node="piWhz" className={styles.conflictBand} role="alert">
-              <CircleHelp size={18} aria-hidden="true" className={styles.conflictIcon} />
-              <div className={styles.conflictText}>
-                <p className={styles.conflictTitle}>
-                  {`${conflict.actorName ?? '別の担当者'}さんが ${conflict.savedAt && formatHourMinute(conflict.savedAt) ? `${formatHourMinute(conflict.savedAt)} に` : ''}共通情報「${item.name}」を保存しました`}
-                </p>
-                <p className={styles.conflictSub}>
-                  {`あなたが直した所はまだ保存されていません。このまま保存すると、${conflict.actorName ?? '別の担当者'}さんの変更が消えます。`}
-                </p>
-              </div>
-              <Button type="button" onClick={() => setCompareOpen(true)}>
-                <GitCompare size={14} aria-hidden="true" />
-                違いを比べる
-              </Button>
-              <Button type="button" variant="primary" onClick={adoptLatest}>
-                <RefreshCw size={14} aria-hidden="true" />
-                最新を読み込んで続ける
-              </Button>
+            /* 帯は共通部品（save-conflict）に寄せた。誰が・いつ保存したかの文はこの画面のまま。 */
+            <div className={styles.conflictSlot}>
+              <SaveConflictBand
+                title={`${conflict.actorName ?? '別の担当者'}さんが ${conflict.savedAt && formatHourMinute(conflict.savedAt) ? `${formatHourMinute(conflict.savedAt)} に` : ''}共通情報「${item.name}」を保存しました`}
+                description={`あなたが直した所はまだ保存されていません。このまま保存すると、${conflict.actorName ?? '別の担当者'}さんの変更が消えます。`}
+                designNode="piWhz"
+                onCompare={() => setCompareOpen(true)}
+                onReload={adoptLatest}
+              />
             </div>
           ) : null}
         </>

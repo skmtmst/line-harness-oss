@@ -10,7 +10,7 @@ import type { EventDetail, EventSlot, EventBookingMine } from '../lib/api.js';
  * - 予約上限に達している時 →「予約上限に達しています」(押せない)
  * - 全部の時間が満席の時 →「満席です」(押せない。
  *   キャンセル待ちを受けるイベントでは満席の枠を選んで
- *   「キャンセル待ちに入る」を押せる)
+ *   「キャンセル待ちで申し込む」を押せる)
  * - 選べる枠がある時 → 選ぶ前は「時間を選んでください」、
  *   選んだら「この時間で申し込む」
  */
@@ -118,7 +118,7 @@ describe('上限に達している時', () => {
     const button = await screen.findByRole('button', { name: '予約上限に達しています' });
     expect(button.hasAttribute('disabled')).toBe(true);
     // 枠はどれも選べない。
-    const slotButton = screen.getByRole('button', { name: '10/20(火) 10:00〜11:00 残り 5' });
+    const slotButton = screen.getByRole('button', { name: '10:00〜11:00 残り 5' });
     expect(slotButton.hasAttribute('disabled')).toBe(true);
   });
 });
@@ -134,7 +134,7 @@ describe('全部の時間が満席の時', () => {
     expect(button.hasAttribute('disabled')).toBe(true);
   });
 
-  it('待ちを受けるイベントは満席の枠を選んで「キャンセル待ちに入る」を押せる', async () => {
+  it('待ちを受けるイベントは満席の枠を選んで「キャンセル待ちで申し込む」を押せる', async () => {
     setup(
       eventDetail({ waitlist_enabled: 1 }),
       [
@@ -153,7 +153,7 @@ describe('全部の時間が満席の時', () => {
     expect(before.hasAttribute('disabled')).toBe(true);
     // 満席でも待ちがあれば枠は選べる。
     fireEvent.click(screen.getByRole('button', { name: '10/20(火) 10:00〜11:00 満席' }));
-    const after = await screen.findByRole('button', { name: 'キャンセル待ちに入る' });
+    const after = await screen.findByRole('button', { name: 'キャンセル待ちで申し込む' });
     expect(after.hasAttribute('disabled')).toBe(false);
   });
 });
@@ -163,7 +163,7 @@ describe('選べる枠がある時', () => {
     setup(eventDetail(), [slot({ id: 's1' }), slot({ id: 's2', remaining: 0 })], []);
     const before = await screen.findByRole('button', { name: '時間を選んでください' });
     expect(before.hasAttribute('disabled')).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: '10/20(火) 10:00〜11:00 残り 5' }));
+    fireEvent.click(screen.getByRole('button', { name: '10:00〜11:00 残り 5' }));
     const after = await screen.findByRole('button', { name: 'この時間で申し込む' });
     expect(after.hasAttribute('disabled')).toBe(false);
   });

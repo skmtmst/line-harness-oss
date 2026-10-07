@@ -200,6 +200,8 @@ const QR_CALL_SITES = [
   { file: 'apps/web/src/components/dashboard/qr-dialog.tsx', kind: 'bounded', fixedSize: null },
   // ★V8 流入と計測の QR 小窓（GtI4Y）。data は今の小窓と同じ「土台のURL + /r/ + 合言葉」。
   { file: 'apps/web/src/v8/inflow-links/qr-dialog.tsx', kind: 'bounded', fixedSize: '320x320' },
+  // ★V8 流入と計測の詳細（Q5le3）の「QRを保存」。data は同じく「土台のURL + /r/ + 合言葉」。
+  { file: 'apps/web/src/v8/inflow-links/detail.tsx', kind: 'bounded', fixedSize: '320x320' },
   { file: 'apps/worker/src/index.ts', kind: 'passthrough', fixedSize: '240x240' },
   { file: 'apps/worker/src/routes/liff.ts', kind: 'passthrough', fixedSize: '240x240' },
 ] as const;

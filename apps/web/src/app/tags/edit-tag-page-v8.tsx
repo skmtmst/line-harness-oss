@@ -15,11 +15,10 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import TargetMissing from '@/components/shared/target-missing'
 import Notice from '@/components/shared/notice'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import TagEditorV8 from './tag-editor-v8'
 import { describeTagDiff } from './edit/tag-conflict-diff'
+import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle } from '@/components/shared/save-conflict'
 import {
   ArchivedTagEditor,
   DeleteDialog,
@@ -243,22 +242,14 @@ export default function EditTagPageV8() {
         </div>
       ) : null}
       {conflictValues ? (
-        <div className="border-accent bg-accent-soft rounded-card flex flex-wrap items-center gap-3 border p-4" data-design-node="xn95q" role="alert">
-          <p className="text-ink min-w-0 flex-1 text-sm">
-            ほかの人が先に保存しました。
-            <span className="text-ink-secondary mt-0.5 block text-xs">
-              あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。
-            </span>
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
-              {compareBusy ? '比べています...' : '違いを比べる'}
-            </Button>
-            <Button type="button" variant="primary" onClick={() => void reloadAfterConflict()}>
-              最新を読み込んで続ける
-            </Button>
-          </div>
-        </div>
+        /* 競合の帯は共通部品（save-conflict）。絵は `xn95q`。 */
+        <SaveConflictBand
+          title={saveConflictTitle('', 'タグ', tag.name)}
+          designNode="xn95q"
+          compareBusy={compareBusy}
+          onCompare={() => void openCompare()}
+          onReload={() => void reloadAfterConflict()}
+        />
       ) : null}
       <TagEditorV8
         key={`${tag.id}:${tag.version ?? 1}`}
@@ -282,37 +273,17 @@ export default function EditTagPageV8() {
         onDelete={() => setDeleteOpen(true)}
       />
       {deleteOpen && <DeleteDialog tag={tag} dependencies={dependencies} dependenciesStatus={dependenciesStatus} deleting={deleting} onCancel={() => setDeleteOpen(false)} onDelete={() => void remove()} />}
-      <ConfirmDialog
+      <SaveConflictCompareDialog
         open={compareTarget !== null || compareError !== ''}
-        title="最新の保存と比べる"
-        description="あなたの入力と、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
-        confirmLabel="最新を読み込んで続ける"
         busy={compareBusy}
         error={compareError || undefined}
-        onConfirm={() => void reloadAfterConflict()}
+        lines={compareTarget && conflictValues ? describeTagDiff(conflictValues, compareTarget).map((text) => ({ text })) : null}
+        onReload={() => void reloadAfterConflict()}
         onCancel={() => {
           setCompareTarget(null)
           setCompareError('')
         }}
-      >
-        {compareTarget && conflictValues ? (
-          (() => {
-            const lines = describeTagDiff(conflictValues, compareTarget)
-            return lines.length === 0 ? (
-              <p className="text-ink-secondary mt-3 text-sm">違いは見つかりませんでした。そのまま読み込めます。</p>
-            ) : (
-              <ul className="mt-3 space-y-1.5 text-sm">
-                {lines.map((line, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <span aria-hidden className="text-accent-deep font-bold">・</span>
-                    <span className="text-ink">{line}</span>
-                  </li>
-                ))}
-              </ul>
-            )
-          })()
-        ) : null}
-      </ConfirmDialog>
+      />
     </>
   )
 }

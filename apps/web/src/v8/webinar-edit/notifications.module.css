@@ -1,0 +1,115 @@
+/* ★V8 ウェビナーの ④通知（E7iAYs）。カード・欄の形は form.module.css。 */
+
+.desc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wc-an-text-lh);
+}
+
+/* 送った数：数 18/700・下に題 11、横の間12。 */
+.counts { display: flex; gap: var(--tpl-wc-an-row-gap); margin: 0; }
+.countItem { display: flex; flex-direction: column-reverse; gap: var(--tpl-wc-cm-head-gap); }
+.countValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-wc-nt-count-size);
+  font-weight: 700;
+  line-height: var(--tpl-wc-nt-count-lh);
+  font-variant-numeric: tabular-nums;
+}
+.countLabel { color: var(--color-ink-secondary); font-size: var(--text-micro); line-height: var(--tpl-row-sub-lh); }
+
+/* 通知の行：題170・間16・中身・右端にスイッチ。行の上下9・下に線、行の間はカードの間と同じ12。 */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wc-an-row-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wc-nt-row-gap);
+  padding: var(--tpl-wc-nt-row-pad);
+  box-shadow: var(--shadow-row-line);
+}
+.rowLabel {
+  flex-shrink: 0;
+  width: var(--tpl-wc-nt-label-w);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-wc-tab-lh);
+  text-align: left;
+  cursor: pointer;
+}
+.row[data-selected] .rowLabel { text-decoration: underline; text-decoration-color: var(--color-hairline); text-underline-offset: var(--tpl-wc-nt-underline); }
+.rowExtra {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+}
+.rowText {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-wc-tab-lh);
+  white-space: nowrap;
+}
+.state { flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+
+/* 時刻・数の小さい箱（幅84・高さ36）。時計の印と消すボタンは出さない。 */
+.time { width: var(--tpl-wc-nt-time-w); flex-shrink: 0; }
+.time :global(svg) { display: none; }
+.time button[aria-label='時刻を消す'] { display: none; }
+:global([data-theme='v8']) .time > button { height: var(--tpl-wc-control-h); padding: var(--tpl-wc-nt-time-pad); font-size: var(--text-label); }
+.small { width: var(--tpl-wc-nt-small-w); flex-shrink: 0; }
+
+/* 視聴後の行：題120・説明・右端に「…」（高さ66）。 */
+.afterLabel {
+  flex-shrink: 0;
+  width: var(--tpl-wc-nt-after-label-w);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-wc-tab-lh);
+}
+.afterText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.policy { width: var(--tpl-wc-nt-policy-w); max-width: 100%; }
+
+.reasons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wc-cm-head-gap);
+  margin: 0;
+  padding: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  list-style: none;
+}
+.reasons li { display: flex; justify-content: space-between; gap: var(--tpl-wc-nt-row-gap); }
+
+.previewEmpty {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+
+.dialogBody { display: flex; flex-direction: column; gap: var(--tpl-wc-an-gap); }
+.dialogRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--tpl-toolbar-gap);
+  align-items: center;
+}

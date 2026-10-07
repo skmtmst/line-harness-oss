@@ -23,35 +23,37 @@ const PORT = Number(process.env.QA_MOCK_PORT ?? 8790);
 
 const state = { delayMs: 0, fail: null };
 
+// 見本の言葉・日付は ★V8 の絵 (gVjiC・EscPA・y1bs9A など) に合わせる。
 const QA_EVENT = {
   id: 'qa-event-1',
-  name: 'QA 撮影会',
-  venue_name: 'QA ホール',
-  venue_url: 'https://example.com/qa-hall',
+  name: '秋のわんこ撮影会',
+  venue_name: '然 渋谷店 2F',
+  venue_url: null,
   image_url: null,
-  description: '撮影モードの見本イベントです。',
+  description: 'プロのカメラマンが撮影します。おやつ付き。',
   description_centered: 0,
-  max_bookings_per_friend: 2,
+  max_bookings_per_friend: 3,
   requires_approval: 0,
-  cancel_deadline_hours_before: 24,
+  cancel_deadline_hours_before: 16,
+  waitlist_enabled: 1,
 };
 
 const QA_SLOTS = [
   {
     id: 'qa-slot-1',
     event_id: 'qa-event-1',
-    starts_at: '2026-10-01T10:00:00+09:00',
-    ends_at: '2026-10-01T11:00:00+09:00',
+    starts_at: '2026-10-11T10:00:00+09:00',
+    ends_at: '2026-10-11T11:00:00+09:00',
     capacity: 5,
     is_active: 1,
-    active_count: 2,
-    remaining: 3,
+    active_count: 3,
+    remaining: 2,
   },
   {
     id: 'qa-slot-2',
     event_id: 'qa-event-1',
-    starts_at: '2026-10-02T14:00:00+09:00',
-    ends_at: '2026-10-02T15:00:00+09:00',
+    starts_at: '2026-10-11T11:00:00+09:00',
+    ends_at: '2026-10-11T12:00:00+09:00',
     capacity: 5,
     is_active: 1,
     active_count: 5,
@@ -64,26 +66,37 @@ const QA_EVENT_BOOKING = {
   event_id: 'qa-event-1',
   status: 'confirmed',
   customer_note: null,
-  event_name: 'QA 撮影会',
+  event_name: '秋のわんこ撮影会',
   event_image_url: null,
-  venue_name: 'QA ホール',
+  venue_name: '然 渋谷店 2F',
   venue_url: 'https://example.com/qa-hall',
-  cancel_deadline_hours_before: 24,
-  slot_starts_at: '2026-10-01T10:00:00+09:00',
-  slot_ends_at: '2026-10-01T11:00:00+09:00',
+  cancel_deadline_hours_before: 16,
+  slot_starts_at: '2026-10-11T10:00:00+09:00',
+  slot_ends_at: '2026-10-11T11:00:00+09:00',
 };
 
+/** キャンセル待ちの2番目 (y1bs9A の2行目)。 */
+const QA_EVENT_WAITLIST = {
+  ...QA_EVENT_BOOKING,
+  id: 'qa-event-booking-2',
+  status: 'waitlisted',
+  waitlist_position: 2,
+  slot_starts_at: '2026-10-11T11:00:00+09:00',
+  slot_ends_at: '2026-10-11T12:00:00+09:00',
+};
+
+// 紹介のリンク・案件は ★V8 S3uBl の言葉に合わせる (秋の定期便キャンペーン・鹿肉ふりかけ)。
 const QA_LINK = {
   refCode: 'QA1234',
   label: 'ブログ用',
-  url: 'https://example.com/r/QA1234',
+  url: 'https://lin.ee/ref-QA1234',
   clickCount: 12,
-  friendAdds: 3,
-  conversions: 1,
+  friendAdds: 4,
+  conversions: 2,
   conversionsPending: 0,
-  conversionsApproved: 1,
-  offerId: null,
-  offerName: null,
+  conversionsApproved: 2,
+  offerId: 'qa-offer-1',
+  offerName: '秋の定期便キャンペーン',
 };
 
 function json(res, status, body) {
@@ -128,51 +141,103 @@ function webinarLive() {
   const now = Math.floor(Date.now() / 1000);
   return {
     live: true,
-    title: 'QA ウェビナー',
+    title: 'はじめての子犬のしつけ講座',
     durationSeconds: 3600,
     sessionStartAt: now - 120,
     offsetSeconds: 120,
     playlistUrl: 'https://example.com/qa/master.m3u8',
-    cta: { label: '申し込む', url: 'https://example.com/qa', showAtSeconds: 300 },
-    comments: [{ atSeconds: 5, authorName: 'QA はなこ', body: '楽しみにしています' }],
+    cta: { label: '個別相談を申し込む', url: 'https://example.com/qa', showAtSeconds: 60 },
+    comments: [
+      { atSeconds: 5, authorName: 'QA はなこ', body: '楽しみにしていました！' },
+      { atSeconds: 8, authorName: 'まる', body: 'トイレの話が知りたいです' },
+    ],
   };
 }
 
+/** 表紙の画像 (B8rCt の「画像」：地 #e9e2d4・店名)。外へ取りに行かないよう data URL で持つ。 */
+const QA_FORM_COVER = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="343" height="96" viewBox="0 0 343 96"><rect width="343" height="96" fill="#e9e2d4"/><text x="171.5" y="54" text-anchor="middle" font-family="Noto Sans JP, sans-serif" font-size="16" font-weight="700" fill="#6b5b3e">然 - NEN -</text></svg>',
+)}`;
+
+/** 来店アンケート (★V8 の B8rCt・g9osGN・aNZKe)。2ページ目に予約の欄。 */
 function qaForm() {
   return {
     id: 'qa-form-1',
-    name: 'QA アンケート',
-    description: '撮影モードの見本フォームです。',
+    name: '来店アンケート',
+    description: 'ご来店ありがとうございました。1分で終わります。',
     layout: {
       version: 2,
       header: [],
       sections: [
         {
           id: 'qa-section-1',
-          name: '基本情報',
+          name: '今日のご来店',
           blocks: [
-            { id: 'qa-b1', kind: 'input', type: 'text', name: 'お名前', label: 'お名前', required: true },
+            // ページ先頭の画像は題の上の表紙になる (B8rCt の「画像」)。
+            {
+              id: 'qa-b0',
+              kind: 'image',
+              size: 'full',
+              mediaUrl: QA_FORM_COVER,
+            },
+            {
+              id: 'qa-b1',
+              kind: 'input',
+              type: 'radio',
+              name: '目的',
+              label: '今日のご来店の目的は？',
+              required: true,
+              choices: [
+                { label: 'トリミング', value: 'trimming', defaultSelected: true },
+                { label: 'シャンプーのみ', value: 'shampoo' },
+                { label: 'ご相談', value: 'consult' },
+              ],
+            },
             {
               id: 'qa-b2',
               kind: 'input',
-              type: 'radio',
-              name: '来店回数',
-              label: '来店回数',
+              type: 'checkbox',
+              name: '気になったところ',
+              label: '気になったところ（いくつでも）',
               choices: [
-                { label: 'はじめて', value: 'first' },
-                { label: '2回目以降', value: 'repeat' },
+                { label: '待ち時間', value: 'wait', defaultSelected: true },
+                { label: '駐車場', value: 'parking', defaultSelected: true },
+                { label: '料金', value: 'price' },
               ],
             },
-            { id: 'qa-b3', kind: 'text', text: 'ご協力ありがとうございます。' },
+          ],
+        },
+        {
+          id: 'qa-section-2',
+          name: '次回について',
+          blocks: [
+            {
+              id: 'qa-b3',
+              kind: 'input',
+              type: 'booking',
+              name: '次回の予約',
+              label: '次回のご希望の日時を選んでください',
+              required: true,
+              // g9osGN は 10/14(水)〜18(日) の5日。16日は満席。
+              booking: { menuId: 'qa-menu-1', staffId: 'qa-staff-form', daysAhead: 5 },
+            },
+            {
+              id: 'qa-b4',
+              kind: 'input',
+              type: 'textarea',
+              name: 'ご要望',
+              label: 'ご要望があればお書きください',
+              placeholder: '自由にお書きください',
+            },
           ],
         },
       ],
       options: {
         thanksUrl: null,
-        thanksText: 'ご回答ありがとうございました。',
+        thanksText: 'ご回答ありがとうございました',
         restorePrevious: false,
-        pageTitle: 'QA アンケート',
-        submitLabel: '送信',
+        pageTitle: '来店アンケート',
+        submitLabel: '答えを送る',
         prevLabel: '前のページへ',
         nextLabel: '次へ',
         sectionHeader: 'pageNumber',
@@ -234,7 +299,7 @@ const server = createServer(async (req, res) => {
   if (method === 'GET' && pathname === '/api/liff/config') {
     json(res, 200, {
       success: true,
-      data: { botBasicId: '@qa', accountName: '然 -NEN-', accountId: 'qa-account' },
+      data: { botBasicId: '@qa', accountName: '然 - NEN -', accountId: 'qa-account' },
     });
     return;
   }
@@ -339,32 +404,48 @@ const server = createServer(async (req, res) => {
   }
   if (method === 'GET' && pathname === '/api/liff/booking/availability') {
     const staffId = url.searchParams.get('staff_id') ?? 'qa-staff-1';
-    // カレンダー撮影のため、求められた期間ぶんを動的に作る。
-    // 火曜はお休み（closed_dates）。期間先頭から4日ごとの4日目は満席
-    // （枠はあって残り0）、3日目は枠なし（印なしの空きなし）。
+    // ★V8 の絵 (M2p63S・k3aJKU) に合わせた日付で決める。月曜はお休み、
+    // 4・10・15・20・25・30 日は満席 (枠はあって残り0)。時刻は 9:00〜16:00 の6つで、
+    // 10:00 と 16:00 は埋まっている。
     const from = url.searchParams.get('from') ?? '2026-10-01';
     const to = url.searchParams.get('to') ?? '2026-10-01';
+    // フォームの「予約を入れる」(担当 qa-staff-form・g9osGN) は、絵どおり
+    // 16日だけ満席・時刻は 10:00 (埋まり)・13:00・15:00 の3つ。
+    const formBlock = staffId === 'qa-staff-form';
+    const FULL_DAYS = formBlock ? [16] : [4, 10, 15, 20, 25, 30];
+    const TIMES = formBlock
+      ? [
+          ['10:00', 0],
+          ['13:00', 3],
+          ['15:00', 3],
+        ]
+      : [
+          ['09:00', 3],
+          ['10:00', 0],
+          ['13:00', 3],
+          ['14:00', 3],
+          ['15:00', 3],
+          ['16:00', 0],
+        ];
     const slots = [];
     const closed = [];
-    const base = new Date(`${from}T00:00:00Z`);
     const end = new Date(`${to}T00:00:00Z`);
-    for (let d = new Date(base); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    for (let d = new Date(`${from}T00:00:00Z`); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
       const date = d.toISOString().slice(0, 10);
-      const offset = Math.round((d - base) / 86400000);
-      if (d.getUTCDay() === 2) {
+      if (d.getUTCDay() === 1) {
         closed.push(date);
         continue;
       }
-      if (offset % 4 === 2) continue;
-      const full = offset % 4 === 3;
-      for (const start of ['10:00', '11:00', '12:00', '14:00']) {
+      const full = FULL_DAYS.includes(d.getUTCDate());
+      for (const [start, left] of TIMES) {
         const [h, m] = start.split(':').map(Number);
+        const remaining = full ? 0 : left;
         slots.push({
           date,
           start,
           end: `${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-          remaining: full ? 0 : 3,
-          state: full ? 'full' : 'available',
+          remaining,
+          state: remaining > 0 ? 'available' : 'full',
         });
       }
     }
@@ -407,7 +488,7 @@ const server = createServer(async (req, res) => {
 
   // ---- イベント ----
   if (method === 'GET' && pathname === '/api/liff/events/me') {
-    json(res, 200, { items: [QA_EVENT_BOOKING] });
+    json(res, 200, { items: [QA_EVENT_BOOKING, QA_EVENT_WAITLIST] });
     return;
   }
   if (method === 'GET' && pathname.startsWith('/api/liff/events/me/')) {
@@ -554,10 +635,32 @@ const server = createServer(async (req, res) => {
       offers: [
         {
           id: 'qa-offer-1',
-          name: 'QA 紹介特典',
-          description: '撮影用の見本特典です。',
-          rewardAmount: 1000,
-          rewardMiles: 50,
+          name: '秋の定期便キャンペーン',
+          description: '紹介した人が予約すると、あなたに 500マイル。',
+          rewardAmount: 0,
+          rewardMiles: 500,
+          windowDays: null,
+          receptionFrom: null,
+          receptionTo: null,
+          halted: false,
+          totalRemaining: null,
+          monthlyRemaining: null,
+          enrolled: true,
+          refCode: 'QA1234',
+          url: 'https://lin.ee/ref-QA1234',
+        },
+        {
+          id: 'qa-offer-2',
+          name: '鹿肉ふりかけ',
+          description: '鹿肉ふりかけを紹介すると、1件 100マイル。',
+          rewardAmount: 0,
+          rewardMiles: 100,
+          windowDays: null,
+          receptionFrom: null,
+          receptionTo: null,
+          halted: false,
+          totalRemaining: null,
+          monthlyRemaining: null,
           enrolled: false,
           refCode: null,
           url: null,
@@ -578,10 +681,10 @@ const server = createServer(async (req, res) => {
       mileage: {
         programId: 'qa-program',
         programName: 'QA マイル',
-        available: 120,
-        pending: 30,
-        lifetimeEarned: 200,
-        spent: 50,
+        available: 1250,
+        pending: 500,
+        lifetimeEarned: 2000,
+        spent: 750,
       },
       history: [],
       insights: {

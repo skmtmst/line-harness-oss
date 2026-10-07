@@ -64,7 +64,7 @@
   },
   "required": {
     "$説明": "この数を下回るとCIを落とす。B3では入力・検索・選択まで契約へ追加した。減らす方向の変更は承認が要る。",
-    "$tokens履歴": "2026-09-03: 24 → 21。色と角丸を1系統にまとめ、同値の別名 --radius-tile(=--radius-card)、--color-status-warning(=--color-status-warn-deep)、--color-status-warning-soft(=--color-status-warn-soft) の3つを消した。承認は docs/v6-directives.md §4「色トークンの3系統を1本に」と台帳 kentavndng/line-harness-board#2。2026-09-26: 必須節点の ApbSZ・zPRvi・I5rKbM を uR9s8（★V7 共通部品その2 §1・§2）へ置き換え。",
+    "$tokens履歴": "2026-09-03: 24 → 21。色と角丸を1系統にまとめ、同値の別名 --radius-tile(=--radius-card)、--color-status-warning(=--color-status-warn-deep)、--color-status-warning-soft(=--color-status-warn-soft) の3つを消した。承認は 2026-09-03 のオーナー決定「色トークンの3系統を1本に」と台帳 kentavndng/line-harness-board#2。2026-09-26: 必須節点の ApbSZ・zPRvi・I5rKbM を uR9s8（★V7 共通部品その2 §1・§2）へ置き換え。",
     "tokens": 21,
     "parts": 20,
     "componentInventory": 87,

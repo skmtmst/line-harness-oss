@@ -1,6 +1,7 @@
 'use client'
 
 
+import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
@@ -17,6 +18,8 @@ import SearchField from '@/components/shared/search-field'
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
+import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -247,7 +250,8 @@ export default function AutoRepliesListV8() {
   const narrow = useNarrowViewport()
 
   const [items, setItems] = useState<AutoReply[]>([])
-  const [query, setQuery] = useState('')
+  /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
+  const [query, setQuery] = useListUrlParam('q')
   const [templates, setTemplates] = useState<TemplateLite[]>([])
   const [templateListAvailable, setTemplateListAvailable] = useState(true)
   const [conflictCount, setConflictCount] = useState<number | null>(null)
@@ -255,17 +259,19 @@ export default function AutoRepliesListV8() {
   const [loadError, setLoadError] = useState<unknown>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
-  const [folderFilter, setFolderFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('priority')
-  const [savedFilter, setSavedFilter] = useState('')
-  const [stoppedOnly, setStoppedOnly] = useState(false)
-  const [timedOnly, setTimedOnly] = useState(false)
-  const [zeroThisMonthOnly, setZeroThisMonthOnly] = useState(false)
+  const [savedFilter, setSavedFilter] = useListUrlParam('view')
+  const [stoppedOnly, setStoppedOnly] = useListUrlFlag('stopped')
+  const [timedOnly, setTimedOnly] = useListUrlFlag('timed')
+  const [zeroThisMonthOnly, setZeroThisMonthOnly] = useListUrlFlag('zero')
   /** 「重なりあり」の絞り込み。要確認の帯・行の札から入る。 */
-  const [conflictOnly, setConflictOnly] = useState(false)
+  const [conflictOnly, setConflictOnly] = useListUrlFlag('conflict')
   const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageParam, setPageParam] = useListUrlParam('page', '1')
+  const page = Math.max(1, Number.parseInt(pageParam, 10) || 1)
+  const setPage = useCallback((next: number) => setPageParam(String(next)), [setPageParam])
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -445,9 +451,12 @@ export default function AutoRepliesListV8() {
   const shownItems = sortedItems.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   // 絞り込みや件数の変更でページが溢れたら先頭へ戻す。
+  // 読み込みが終わる前は件数が 0 なので戻さない（URL のページを先頭へ潰さない）。
   useEffect(() => {
+    if (loadState !== 'ready') return
     if (page > pageCount) setPage(pageCount)
-  }, [page, pageCount])
+  }, [loadState, page, pageCount, setPage])
+  useListScrollMemory(loadState === 'ready')
 
   const nextPriority = items.length === 0
     ? 0
@@ -473,6 +482,9 @@ export default function AutoRepliesListV8() {
     })
   }
   const selectedCount = selectedIds.size
+  /* 選んでいる間は Esc で選択を外す（動きの点検 12 番）。 */
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+  useEscapeToClearSelection(selectedCount > 0, clearSelection)
   const selectedRules = rules.filter((r) => selectedIds.has(r.id))
   const stoppableIds = selectedRules.filter((r) => r.isActive).map((r) => r.id)
   const resumableIds = selectedRules.filter((r) => !r.isActive && r.lifecycleStatus !== 'draft').map((r) => r.id)
@@ -1136,7 +1148,7 @@ export default function AutoRepliesListV8() {
               {tableHeadCells}
             </TableHeadRow>
           </thead>
-          <tbody>
+          <RovingTbody>
             {shownItems.map((r) => {
               const name = displayName(r)
               const conflicts = r.conflictAttentionCount ?? 0
@@ -1305,7 +1317,7 @@ export default function AutoRepliesListV8() {
                 </Tr>
               )
             })}
-          </tbody>
+          </RovingTbody>
         </DataTable>
       </div>
 
@@ -1384,7 +1396,7 @@ export default function AutoRepliesListV8() {
       {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
       {canEdit && selectedCount > 0 ? (
         <div className={styles.bulkRow} style={{ padding: '10px 14px' }} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount}>{selectedCount}件を選択中</span>
+          <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount}件を選択中</span>
           <Button
             type="button"
             variant="secondary"
@@ -1505,8 +1517,8 @@ export default function AutoRepliesListV8() {
                 aria-label="よく使う絞り込み"
                 value={savedFilter}
                 onChange={(value) => {
-                  if (value === 'toggle-zero') setZeroThisMonthOnly((current) => !current)
-                  else if (value === 'toggle-conflict') setConflictOnly((current) => !current)
+                  if (value === 'toggle-zero') setZeroThisMonthOnly(!zeroThisMonthOnly)
+                  else if (value === 'toggle-conflict') setConflictOnly(!conflictOnly)
                   else setSavedFilter(value)
                   setPage(1)
                 }}

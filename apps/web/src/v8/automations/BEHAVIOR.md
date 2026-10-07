@@ -1,0 +1,46 @@
+# オートメーション（V8）の動き（BEHAVIOR.md）
+
+対象：src/v8/automations の画面。今までの V8（`app/automations/list-v8.tsx`・`runs-v8.tsx`・
+`app/common-actions/common-actions-v8.tsx`・`common-action-versions-v8.tsx`）から動きを写し、
+見た目だけを型（ListPage・DetailPage）で絵どおりに組み直した。v7 の画面・試験は触らない。
+
+| 画面 | ファイル | 絵 | 入口 |
+|---|---|---|---|
+| ルール | `list.tsx` | 一覧 `LWQXd`・1152 `En14p`・閲覧のみ `nH9L8`・状態 `S3pdQ` | `app/automations/page.tsx`（`?tab=templates` 以外） |
+| 動いた記録 | `runs.tsx` | `g98F9` | `app/automations/runs/page.tsx` |
+| 共通アクション | `common-actions.tsx` | `LnGNw` | `app/common-actions/page.tsx` |
+| 版と使われている場所 | `versions.tsx` | `ziSgL` | `app/common-actions/versions/page.tsx` |
+| 共通（頭・タブ・数の帯・閲覧のみの帯・権限） | `shell.tsx` | 上のすべて | — |
+
+見本（`?tab=templates`・`c7dxp`）と、ルールを作る（`/automations/new`・`M4torY`・`tJqST`）は今の V8 のまま。
+
+## 受け付ける URL と指定（今と同じ）
+- `/automations`（ルール）、`/automations?tab=templates`（見本）。
+- `/automations?search=<言葉>`：その言葉で探した状態から始める（動いた記録の「ルールを開く」から来る。新しく足した）。
+- `/automations/runs?search=<言葉>&status=<executed|skipped|problems>&run=<記録ID>`：今と同じ（検索は URL に書き戻す・`run` は中身を開く）。
+- `/common-actions`、`/common-actions/versions?id=<共通アクションID>`：今と同じ。
+- タブの行き先は今の V8 と同じ（共通アクション＝`/common-actions`・動いた記録＝`/automations/runs`）。
+
+## 呼ぶ口（今と同じ）
+- ルール：`api.automations.list`（数の帯の今月動いた・失敗は `summary`）、条件に外れたは `/api/automation-runs?limit=1` の `summary.skipped`。
+  編集＝`createDraftFromAutomation`→`/automations/drafts?id=`、複製＝`duplicate`、止める・動かす・削除＝`setStatus`（確認の窓）、1人で試す＝`test`（窓で友だちIDを入れる）。
+- タブの件数：ルール＝一覧の件数、共通アクション＝`api.commonActions.list` の件数、見本＝`api.automations.templates` の件数。読めないときは数を出さない。
+- 動いた記録：`/api/automation-runs`（`limit`・`offset`・`search`・`status`・`include_test`）、中身＝`getRun`、もう一度やる＝`POST /retry`、取りやめ＝`cancelRun`、CSV＝`runsCsvUrl`＋`downloadApiFile`。
+- 共通アクション：`api.commonActions.list`（`status`・`query`・`limit`・`offset`、数の帯は `summary`）、複製＝`duplicate`→編集、保管・戻す＝`archive`/`unarchive`、CSV＝`csvUrl`。
+- 版と使われている場所：`api.commonActions.get`、月次の件数は一覧の口、公開＝`publish`、新しい版＝`createDraft`、利用先の版を上げる＝`updateBinding`（確認の窓・変わった点つき）。
+- フォルダの箱：ルール＝`api.folders.list('automation')`、共通アクション＝`api.folders.list('common_action')`。追加は共通の `FolderAddDialog`。
+
+## 権限
+- 役割はサーバ（`/api/staff/me`）から読む。owner/admin は変えられる。staff は権限キー `/automations` があるときだけ（サーバの `requireAutomationPermission` と同じ）。
+- 閲覧のみ（変えられない人）には、作る・編集・複製・1人で試す・止める・削除・フォルダを追加・保管を**置かずに隠す**（場所だけ空ける。2026-10-06 オーナー決定）。行の「…」は「動いた記録を見る」（共通アクションは「版と使われている場所を見る」）だけ。タブの下・数の帯の上に「閲覧のみで見ています」の帯。
+- もう一度やる・取りやめ（`automation.run.retry`）、CSV（`automation.run.export`）は今と同じ権限キーで出し分ける。
+- 役割が読めるまでは今までどおり操作を出す（最後の守りはサーバの 403）。
+
+## 今の V8 と違うところ
+- ルール・共通アクションのフォルダ：箱は出すが、**ルール・共通アクションをフォルダへ入れる口がまだ無い**（表に folder_id が無い）ので、全件が未分類。箱を選ぶと0件。箱の件数は口が返さないので出さない。
+- ルールの並び：既定は更新が新しい順（絵の並び）。動いた回数順・名前順は「よく使う絞り込み」から。失敗があったルール・この30日に動いていないルールもそこから絞れる。
+- ルールの「きっかけ」：言葉で動くもの（メッセージ＋言葉）は「「〇〇」と送られた」、ほかは正本の名前。「この30日」の2行目は動いているものは失敗の回数、止めているものは最後に変えた日。
+- 数の帯の「先月より」は先月の集計の口が無いので出さない（今月動いた＝この30日の回数）。
+- 動いた記録：結果の札は「動いた・失敗・条件に外れた」の3つ（すべては数の帯）。テスト実行を含めるのは「よく使う絞り込み」から。中身は右の詳細パネル。行の「…」に ルールを開く・トークを開く を足した。
+- 共通アクション：状態の絞り込みは札（公開中・下書き・古い版あり・呼ばれていない・保管）。「中の処理」は処理の数（一覧の口に処理の並びが無い）。
+- 版と使われている場所：下書きがある間は「この版から新しい版」を押せない形で出す（サーバが draft_exists で断るため。理由は title）。

@@ -28,6 +28,8 @@ import {
   type BillingSummary,
 } from '@/lib/hq-billing'
 import './hq-billing-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import HqBillingV8 from '@/v8/hq/billing'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -40,6 +42,11 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
  * 金額は Stripe の価格が取れればそれを出し、取れなければ仮の表示（`priceFromStripe`）。
  */
 export default function HqBillingPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <HqBillingV8 /> : <HqBillingPageV7 />
+}
+
+function HqBillingPageV7() {
   return (
     <Suspense fallback={null}>
       <BillingInner />
