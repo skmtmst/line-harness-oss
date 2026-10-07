@@ -687,6 +687,9 @@ shared-button-importer v8/restaurant/dashboard/side.tsx
 shared-button-importer v8/restaurant/dashboard/today-table.tsx
 shared-button-importer v8/restaurant/front-desk/phone-drawer.tsx
 shared-button-importer v8/restaurant/close-tasks/close-tasks.tsx
+shared-button-importer v8/restaurant/closures/closures.tsx
+shared-button-importer v8/restaurant/closures/closure-dialog.tsx
+shared-button-importer v8/restaurant/inventory/inventory.tsx
 shared-button-importer v8/settings/sns/sns.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx

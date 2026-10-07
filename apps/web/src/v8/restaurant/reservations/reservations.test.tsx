@@ -37,6 +37,22 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
+  it('その日が臨時休業・貸切なら、帯と「休業日・貸切を見る」を出す（予約は取り消さない）', async () => {
+    fixture.reservationsDay.mockResolvedValue({ data: { date: '', reservations: today, closures: [
+      { id: 'cl-1', storeId: 'store-1', startDate: '2026-10-20', endDate: '2026-10-20', allDay: false, startTime: '18:00', endTime: '22:00', kind: 'private_event', memo: null, tableIds: ['pa', 't1'], createdBy: null, createdByName: null, createdAt: '', updatedAt: '', version: 1 },
+    ] } })
+    render(<ReservationsPage />)
+    await screen.findByText('山田 太郎')
+    const band = await waitFor(() => {
+      const found = document.querySelector('[data-closure-day]')
+      if (!found) throw new Error('まだ')
+      return found as HTMLElement
+    })
+    expect(band.textContent).toContain('貸切（18:00〜22:00 ・ 個室A・T1）です。閉じた時間帯は LINE からの予約を受け付けません。入っている予約は取り消していません。')
+    expect(within(band).getByRole('link', { name: '休業日・貸切を見る' }).getAttribute('href')).toBe('/restaurant-test/inventory?tab=closures')
+    expect(screen.getByText('佐藤 健')).not.toBeNull()
+  })
+
   it('数4・時間×卓の箱（予約元・アレルギー・承認待ち・押さえ）・右の4枚が出る', async () => {
     render(<ReservationsPage />)
     await screen.findByText('山田 太郎')

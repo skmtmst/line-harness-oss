@@ -7,6 +7,11 @@
   min-width: 0;
 }
 
+/* 休業日・貸切（UVnvR）：検証環境の帯が無いので、店のタブの下にタブを置く（絵の切り替えの文字の高さにそろえる） */
+.tabsClosures {
+  margin-top: var(--tpl-e10-tabs-top);
+}
+
 /* 案内の帯（薄い青）・競合の帯（琥珀）・読み込み失敗の帯 */
 .infoBand {
   display: flex;

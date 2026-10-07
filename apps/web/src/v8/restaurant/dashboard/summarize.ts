@@ -104,10 +104,10 @@ export function groupCloseTasks(tasks: RestaurantChannelCloseTask[], media: Stor
   const orderOf = (code: string) => { const index = media.findIndex((m) => m.code === code); return index < 0 ? media.length : index }
   const groups = new Map<string, CloseGroup>()
   for (const task of [...tasks].sort((a, b) => a.startsAt.localeCompare(b.startsAt) || orderOf(a.channel) - orderOf(b.channel) || a.channel.localeCompare(b.channel))) {
-    /* 臨時休業・貸切の知らせは枠を持たない（slotId が空）。その休みごとに1行にまとめる。 */
-    const key = task.slotId ?? task.closureId ?? task.id
-    const group = groups.get(key) ?? {
-      slotId: key, startsAt: task.startsAt, reason: task.reason, remainingSeats: task.remainingSeats, state: 'open' as CloseGroupState, items: [] as CloseGroup['items'],
+    /* 枠の知らせは枠ごと、予約・臨時休業の知らせ（枠を持たない）はその予約・記録ごとにまとめる。 */
+    const key = task.slotId ?? (task.closureId ? `closure:${task.closureId}` : task.reservationId ? `reservation:${task.reservationId}` : `task:${task.id}`)
+    const group: CloseGroup = groups.get(key) ?? {
+      slotId: key, startsAt: task.startsAt, reason: task.reason, remainingSeats: task.remainingSeats, state: 'open', items: [],
     }
     group.items.push({ id: task.id, channel: task.channel, name: nameOf(task.channel), status: task.status })
     groups.set(key, group)
@@ -137,6 +137,6 @@ export function slotTitle(iso: string): string {
 export function reasonText(group: Pick<CloseGroup, 'reason' | 'remainingSeats'>): string {
   if (group.reason === 'full') return '満席になりました'
   if (group.reason === 'table_conflict') return '卓が重なる予約が届きました'
-  if (group.reason === 'closure') return '臨時休業・貸切で閉じます'
+  if (group.reason === 'closure') return '臨時休業・貸切で閉じました'
   return `残り ${Math.max(0, group.remainingSeats ?? 0)}席になりました`
 }

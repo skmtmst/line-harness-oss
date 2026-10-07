@@ -41,6 +41,17 @@
   line-height: var(--tpl-rs-lh-13);
 }
 
+/* E 系の板の頭（休業日・貸切 UVnvR）：題 20/600・説明の行 20 */
+.headTitleCompact {
+  font-size: var(--text-title);
+  font-weight: 600;
+  line-height: var(--tpl-e10-head-title-lh);
+}
+
+.headDescriptionCompact {
+  line-height: var(--tpl-e1-lh-20);
+}
+
 .storePicker {
   display: block;
   flex: 0 0 auto;
@@ -70,6 +81,13 @@
 
 .bodyAfterTabs {
   margin-top: var(--tpl-rs-tabs-body-top);
+}
+
+/* 検証環境の帯を出さない中身（休業日・貸切）：段の間も上の余白も中身が持つ */
+.bodyFlush,
+.bodyAfterTabs.bodyFlush {
+  gap: 0;
+  margin-top: 0;
 }
 
 /* 予約台帳：題（362）・[店舗・見方・主ボタン]。狭い幅では右の組ごと2行目へ。今日は段の間が 14 */

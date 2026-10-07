@@ -1477,6 +1477,36 @@ const RESTAURANT_CLOSE_TASKS = [
   { id: 'cct-10', storeId: 'store-sby', slotId: 'slot-2000', startsAt: restaurantAt(20, 0), channel: 'tabelog', status: 'reopen', reason: 'limited', remainingSeats: 4, recipientIds: [], createdAt: restaurantAt(16, 10), updatedAt: restaurantAt(17, 20) },
   { id: 'cct-6', storeId: 'store-sby', slotId: 'slot-1800', startsAt: restaurantAt(18, 0), channel: 'hotpepper', status: 'done', reason: 'full', remainingSeats: 0, recipientIds: [], createdAt: restaurantAt(15, 0), updatedAt: restaurantAt(15, 10) },
 ]
+/*
+ * 提案 E-10（臨時休業・貸切 UVnvR・足す窓 nVvXy）：今月の 20日（臨時休業・終日全卓）・24日（貸切・18〜22時・個室A と T1）・月末（貸切・終日）。
+ * サーバ（/api/restaurant-test/closures）と同じ形。月は撮る日の今月にする（カレンダーに出るように）。
+ */
+const RESTAURANT_CLOSURE_MONTH = `${RESTAURANT_TODAY.getFullYear()}-${String(RESTAURANT_TODAY.getMonth() + 1).padStart(2, '0')}`
+const RESTAURANT_CLOSURE_LAST = String(new Date(RESTAURANT_TODAY.getFullYear(), RESTAURANT_TODAY.getMonth() + 1, 0).getDate())
+const restaurantClosure = (id, day, over) => ({
+  id, storeId: 'store-sby', startDate: `${RESTAURANT_CLOSURE_MONTH}-${day}`, endDate: `${RESTAURANT_CLOSURE_MONTH}-${day}`, allDay: true, startTime: null, endTime: null,
+  kind: 'temporary_closed', memo: null, tableIds: [], createdBy: 'mem-2', createdByName: '中川 由美', createdAt: restaurantAt(10, 0, -3), updatedAt: restaurantAt(10, 0, -3), version: 1, ...over,
+})
+const RESTAURANT_CLOSURES = [
+  restaurantClosure('cl-1', '20', { memo: '設備点検のため' }),
+  restaurantClosure('cl-2', '24', { kind: 'private_event', allDay: false, startTime: '18:00', endTime: '22:00', tableIds: ['tbl-8', 'tbl-1'], memo: '会社の宴会（30名）' }),
+  restaurantClosure('cl-3', RESTAURANT_CLOSURE_LAST, { kind: 'private_event', memo: 'ハロウィン貸切' }),
+]
+/* 臨時休業・貸切の窓の preview：この日の予約2件（LINE の友だち1件・ホットペッパー1件）。保存・送信はしない。 */
+const RESTAURANT_CLOSURE_PREVIEW = {
+  reservations: [
+    { id: 'cl-r1', startsAt: restaurantAt(12, 0, 13), endsAt: restaurantAt(14, 0, 13), guestCount: 2, customerName: '山田 花子', source: 'line', tableId: 'tbl-1', friendId: 'friend-1', isLineFriend: true },
+    { id: 'cl-r2', startsAt: restaurantAt(19, 0, 13), endsAt: restaurantAt(21, 0, 13), guestCount: 4, customerName: '佐藤 美咲', source: 'hotpepper', tableId: 'tbl-4', friendId: null, isLineFriend: false },
+  ],
+  waitlistCount: 0,
+  conflicts: [],
+}
+/* 提案 E-4・E-10：店ごとの媒体リンク（管理画面の URL と「予約が入ったら閉じる」）。サーバ（/api/restaurant-test/media-links）と同じ形。 */
+const RESTAURANT_MEDIA_LINKS = [
+  { code: 'hotpepper', name: 'ホットペッパー', acceptsReservations: 1, pageUrl: 'https://www.hotpepper.jp/strJ000000000/', loginUrl: 'https://www.cms.hotpepper.jp/', closeOnBooking: 1, version: 1 },
+  { code: 'tabelog', name: '食べログ', acceptsReservations: 1, pageUrl: 'https://tabelog.com/tokyo/A0000/A000000/00000000/', loginUrl: 'https://owner.tabelog.com/', closeOnBooking: 1, version: 1 },
+  { code: 'gurunavi', name: 'ぐるなび', acceptsReservations: 1, pageUrl: null, loginUrl: null, closeOnBooking: 0, version: 0 },
+]
 /* 板 hQQlt（予約経路の連携）：媒体ごとの受け取り。サーバ（/api/restaurant-test/channels）と同じ形。 */
 const RESTAURANT_CHANNELS = [
   { id: 'media-hp', code: 'hotpepper', name: 'Hot Pepper グルメ', todayCount: 9, lastReceivedAt: restaurantAt(18, 42), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
@@ -2612,7 +2642,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const storeId = query.get('storeId') || 'store-sby'
     const date = query.get('date') || ''
     const sameDay = (iso) => { const d = new Date(iso); const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${dd}` === date }
-    return { success: true, data: { date, reservations: RESTAURANT_RESERVATIONS.filter((r) => r.store_id === storeId && sameDay(r.starts_at)) } }
+    return { success: true, data: { date, reservations: RESTAURANT_RESERVATIONS.filter((r) => r.store_id === storeId && sameDay(r.starts_at)), closures: RESTAURANT_CLOSURES.filter((c) => c.storeId === storeId && c.startDate <= date && c.endDate >= date) } }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/customers/search') {
     return { success: true, data: [{ name: '山田 花子', phone: '090-1111-2222', lineUid: 'U-demo-3' }] }
@@ -2621,7 +2651,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: { visitCount: 3, visits: [{ id: 'v-1', starts_at: '2026-08-14T10:00:00.000Z', guest_count: 4, table_label: '個室A', course_name: '秋の鹿肉コース', allergy_note: 'えび' }] } }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/inventory/day') {
-    return { success: true, data: RESTAURANT_INVENTORY_DAY }
+    const date = query.get('date') || ''
+    return { success: true, data: RESTAURANT_INVENTORY_DAY, closures: RESTAURANT_CLOSURES.filter((c) => c.startDate <= date && c.endDate >= date) }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/closures') {
+    const month = query.get('month')
+    return { success: true, data: RESTAURANT_CLOSURES.filter((c) => !month || (c.startDate.slice(0, 7) <= month && c.endDate.slice(0, 7) >= month)) }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/media-links') {
+    return { success: true, data: RESTAURANT_MEDIA_LINKS }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/opening-hours') {
     return { success: true, data: RESTAURANT_OPENING_HOURS }
@@ -6838,6 +6876,11 @@ const server = createServer((req, res) => {
     // この1本だけ本物と同じPOSTの器で返す。実行・再試行・取り消しは405のまま。
     if (method === 'POST' && url.pathname === '/api/friends/bulk-runs/preview') {
       res.writeHead(200).end(JSON.stringify({ success: true, data: FRIEND_BULK_RUN.preview }))
+      return
+    }
+    /* 臨時休業・貸切の重なる予約（nVvXy）。preview は保存しないので本物と同じ器で返す。足す・変える・消すは405のまま。 */
+    if (method === 'POST' && url.pathname === '/api/restaurant-test/closures/preview') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: RESTAURANT_CLOSURE_PREVIEW }))
       return
     }
     res.writeHead(405).end(
