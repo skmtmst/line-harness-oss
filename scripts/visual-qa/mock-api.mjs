@@ -2362,6 +2362,32 @@ function nenMetricsBody(data, query) {
 }
 
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  /*
+    友だちのマイル詳細（V8 R6kIG・手で増やす・減らす M8zhjL）は1人に絞って読む。
+    絞ったときだけ絵の数（残高 1,240・確定待ち 120・期限が近い 200）と5行の明細を返す。
+    絞らない一覧（友だちの残高・履歴のタブ）は今までの見本のまま。
+  */
+  if (method === 'GET' && pathname === '/api/mileage/friends' && query.get('friendId') === 'friend-1') {
+    const base = MILEAGE_FRIENDS.items[0]
+    return { success: true, data: { ...MILEAGE_FRIENDS, items: [{
+      ...base, displayName: 'Kenta Kawano', available: 1240, pending: 120, monthChange: 180,
+      expiringMiles30d: 200, nextExpiringAt: '2026-10-31T00:00:00+09:00',
+    }], pagination: { total: 1, limit: 1, offset: 0 } } }
+  }
+  if (method === 'GET' && pathname === '/api/mileage/history' && query.get('friendId') === 'friend-1') {
+    const row = (id, entryType, status, amount, reason, ruleName, mode, executedByStaffName, occurredAt, balanceAfter) => ({
+      id, primaryFriendId: 'friend-1', displayName: 'Kenta Kawano', pictureUrl: null, entryType, status, amount, reason,
+      source: mode === 'manual' ? 'manual' : 'rule', hasSourceEvent: false, sourceReferenceId: null, ruleName, mode,
+      executedByStaffName, occurredAt, lineAccountName: '然 本店', balanceAfter,
+    })
+    return { success: true, data: { ...MILEAGE_HISTORY, items: [
+      row('mf-1', 'grant', 'available', 10, 'リンクをクリック', '秋の新商品のお知らせ', 'automatic', null, '2026-09-30T10:32:00+09:00', 1240),
+      row('mf-2', 'spend', 'available', -500, '送料無料クーポンと交換', '使い道：送料無料クーポン', 'automatic', null, '2026-09-29T18:05:00+09:00', 1230),
+      row('mf-3', 'grant', 'available', 48, '商品を買った', '購入 ¥4,800', 'automatic', null, '2026-09-28T21:40:00+09:00', 1730),
+      row('mf-4', 'adjustment', 'available', 100, 'おわびで付けた', '手で増やす', 'manual', '河野', '2026-09-27T12:10:00+09:00', 1682),
+      row('mf-5', 'reversal', 'available', -10, '付けすぎを取り消し', 'リンクをクリック（重複）', 'manual', '河野', '2026-09-20T09:00:00+09:00', 1582),
+    ], pagination: { total: 5, limit: 100, offset: 0 } } }
+  }
   if (method === 'GET' && pathname === '/api/hq/billing/summary') {
     return { success: true, data: BILLING_SUMMARY }
   }

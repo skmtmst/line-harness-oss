@@ -645,6 +645,8 @@
 }
 .miniTable tr:last-child td { border-bottom: 0; }
 .historyBody { margin-bottom: var(--tpl-af2-hist-pull); }
+.adjustBody { margin-bottom: var(--tpl-af2-adjust-pull); }
+.dateGrid { margin-bottom: var(--tpl-af2-date-pull); }
 .miniTable th.miniNum,
 .miniNum { text-align: right; font-variant-numeric: tabular-nums; }
 .miniColWhen { width: var(--tpl-af2-mini-when-w); }
@@ -792,6 +794,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--tpl-toolbar-gap);
+  /* ページ送りが1ページで消えても段の高さは変えない（下の2枚が上下に動かない）。 */
+  min-height: var(--tpl-af2-ml-pager-h);
   padding: var(--tpl-ml-detail-tools-pad);
 }
 .summaryRow {
@@ -841,3 +845,14 @@
 
 /* 閲覧のみで隠した作るボタン（フォルダの列の上）の場所だけ空ける。 */
 .viewerCreateSpace { display: block; height: var(--tpl-ml-viewer-create-h); }
+
+/* 手で増やす・減らす（M8zhjL）の「友だちに知らせる」：スイッチと題・説明の2行。 */
+.notifyRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-af2-notify-gap);
+  padding: var(--tpl-af2-notify-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+}
+.labelRow { display: flex; align-items: center; gap: var(--tpl-ml-dlg-label-gap); }
