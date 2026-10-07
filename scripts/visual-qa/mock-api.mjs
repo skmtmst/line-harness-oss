@@ -1340,6 +1340,15 @@ const RESTAURANT_OPENING_HOURS = {
     { weekday: 6, periods: [{ opensAt: '11:30', closesAt: '14:00' }, { opensAt: '17:00', closesAt: '23:00' }] },
   ],
 }
+/* 提案 E-1・E-5（枠を閉じる知らせ）：枠×媒体で1件。サーバ（/api/restaurant-test/channel-close-tasks）と同じ形。 */
+const RESTAURANT_CLOSE_TASKS = [
+  { id: 'cct-1', storeId: 'store-sby', slotId: 'slot-1900', startsAt: restaurantAt(19, 0), channel: 'hotpepper', status: 'close', reason: 'limited', remainingSeats: 2, recipientIds: [], createdAt: restaurantAt(17, 40), updatedAt: restaurantAt(17, 40) },
+  { id: 'cct-2', storeId: 'store-sby', slotId: 'slot-1900', startsAt: restaurantAt(19, 0), channel: 'tabelog', status: 'close', reason: 'limited', remainingSeats: 2, recipientIds: [], createdAt: restaurantAt(17, 40), updatedAt: restaurantAt(17, 40) },
+  { id: 'cct-3', storeId: 'store-sby', slotId: 'slot-1930', startsAt: restaurantAt(19, 30), channel: 'hotpepper', status: 'close', reason: 'full', remainingSeats: 0, recipientIds: [], createdAt: restaurantAt(17, 50), updatedAt: restaurantAt(17, 50) },
+  { id: 'cct-4', storeId: 'store-sby', slotId: 'slot-1930', startsAt: restaurantAt(19, 30), channel: 'tabelog', status: 'done', reason: 'full', remainingSeats: 0, recipientIds: [], createdAt: restaurantAt(17, 50), updatedAt: restaurantAt(17, 55) },
+  { id: 'cct-5', storeId: 'store-sby', slotId: 'slot-2000', startsAt: restaurantAt(20, 0), channel: 'hotpepper', status: 'reopen', reason: 'limited', remainingSeats: 4, recipientIds: [], createdAt: restaurantAt(16, 10), updatedAt: restaurantAt(17, 20) },
+  { id: 'cct-6', storeId: 'store-sby', slotId: 'slot-1800', startsAt: restaurantAt(18, 0), channel: 'hotpepper', status: 'done', reason: 'full', remainingSeats: 0, recipientIds: [], createdAt: restaurantAt(15, 0), updatedAt: restaurantAt(15, 10) },
+]
 /* 板 hQQlt（予約経路の連携）：媒体ごとの受け取り。サーバ（/api/restaurant-test/channels）と同じ形。 */
 const RESTAURANT_CHANNELS = [
   { id: 'media-hp', code: 'hotpepper', name: 'Hot Pepper グルメ', todayCount: 9, lastReceivedAt: restaurantAt(18, 42), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
@@ -2455,6 +2464,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/channels') {
     return { success: true, data: RESTAURANT_CHANNELS }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/channel-close-tasks') {
+    return { success: true, data: RESTAURANT_CLOSE_TASKS }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/inbound-emails') {
     return { success: true, data: RESTAURANT_INBOUND_EMAILS, total: RESTAURANT_INBOUND_EMAILS.length }

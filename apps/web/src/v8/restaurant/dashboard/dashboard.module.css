@@ -1,107 +1,224 @@
 /*
- * ★V8 店舗ダッシュボード（CHz31）。値は globals.css の `--tpl-rt-*`。
- * 表：見出し 上下9・左右20・地 table-head／行 上下10・左右20・上に細い線。欄の間16。
+ * ★V8 今日のお店（E-1 hKRRF）。寸法は Pencil の書き出しから読み、globals.css の --tpl-e1-* だけを使う。
+ * 板の頭・段（DashboardRow）・数のマス（KpiCard）・表（DataTable）の形は型と共通部品が持つ。
  */
-.table {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+
+.state {
+  padding: var(--tpl-e1-section-pad);
 }
 
-.headRow,
-.row {
+/* 他の予約サイトの枠を閉じる知らせ（上下16・左右24の段に、琥珀の帯） */
+.closeRow {
+  padding: var(--tpl-e1-section-pad);
+}
+
+.closeBand {
   display: flex;
   align-items: center;
-  gap: var(--tpl-rt-col-gap);
-  padding: var(--tpl-rt-thead-pad);
+  gap: var(--tpl-e1-gap-m);
+  padding: var(--tpl-e1-band-pad);
+  border-radius: var(--tpl-e1-radius-l);
+  background: var(--color-status-warn-soft);
+}
+
+.closeIcon {
+  flex: 0 0 auto;
+  color: var(--color-ink-secondary);
+}
+
+.closeText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-xxs);
   min-width: 0;
 }
 
-.headRow {
-  background: var(--color-table-head);
-}
-
-.headRow .cell {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
+.closeTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
   font-weight: 600;
-  line-height: normal;
+  line-height: var(--tpl-e1-lh-21);
 }
 
-.row {
-  padding: var(--tpl-rt-row-pad);
-  box-shadow: var(--tpl-rt-line-top);
+.closeDetail {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
 }
 
-.cell {
+/* 今日の数（数の帯は上下に線） */
+.stats {
+  border-block: 1px solid var(--color-hairline);
+}
+
+/* 今日の予約の表 */
+.today {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-rt-cell-gap);
+  gap: var(--tpl-e1-gap-m);
   min-width: 0;
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  line-height: normal;
+}
+
+.colTime {
+  width: var(--tpl-e1-col-time);
+}
+
+.colGuests {
+  width: var(--tpl-e1-col-guests);
   white-space: nowrap;
 }
 
-.colStore { flex: 1 1 0; }
-.colArea { flex: 0 0 var(--tpl-rt-col-100); }
-.colCount { flex: 0 0 var(--tpl-rt-col-64); }
-.colGuests { flex: 0 0 var(--tpl-rt-col-80); }
-.colCapacity { flex: 0 0 var(--tpl-rt-col-72); }
-.colState { flex: 0 0 var(--tpl-rt-col-90); align-items: flex-start; }
-
-.num {
-  align-items: flex-end;
-  padding-right: var(--tpl-rt-num-pad-end);
-  text-align: right;
+.colTable {
+  width: var(--tpl-e1-col-table);
+  white-space: nowrap;
 }
 
-.storeName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--color-action);
+.colRoute {
+  width: var(--tpl-e1-col-route);
+}
+
+.colState {
+  width: var(--tpl-e1-col-state);
+}
+
+.time {
   font-weight: 600;
+  white-space: nowrap;
 }
 
-.storeCode {
-  color: var(--color-ink-faint);
+.name {
+  display: block;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route {
+  display: inline-flex;
+  padding: var(--tpl-e1-route-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--tpl-e1-radius-s);
+  color: var(--color-ink-secondary);
   font-size: var(--text-micro);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.actionBody {
+.stateCell {
   display: flex;
-  gap: var(--tpl-rt-action-gap);
+  align-items: center;
+  gap: var(--tpl-e1-gap-s);
 }
 
-.actionButton {
+.stateSpacer {
   flex: 1 1 0;
+}
+
+/* 右の列 */
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-side-gap);
+  padding: var(--tpl-e1-side-pad);
+}
+
+.sideText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+}
+
+.media {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-m);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.medium {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-m);
   min-width: 0;
 }
 
-.actionIcon {
-  width: var(--tpl-rt-icon-15);
-  height: var(--tpl-rt-icon-15);
-  flex-shrink: 0;
-}
-
-.noteBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-rt-note-gap);
-}
-
-.noteTitle {
-  margin: 0;
-  color: var(--color-accent-deep);
-  font-size: var(--text-caption);
-  font-weight: 700;
-  line-height: normal;
-}
-
-.noteText {
-  margin: 0;
+.mediumMark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-e1-mark);
+  height: var(--tpl-e1-mark);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--tpl-e1-radius-m);
+  background: var(--color-table-head);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  line-height: normal;
+  font-weight: 600;
+}
+
+.mediumName {
+  flex: 1 1 0;
+  overflow: hidden;
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mediumLink {
+  flex: 0 0 auto;
+  color: var(--color-status-info);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sideCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-e1-gap-s);
+  padding: var(--tpl-e1-card-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--tpl-e1-radius-l);
+}
+
+.reviewHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-s);
+  width: 100%;
+  min-width: 0;
+}
+
+.reviewStars {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.reviewWho {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reviewText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
 }

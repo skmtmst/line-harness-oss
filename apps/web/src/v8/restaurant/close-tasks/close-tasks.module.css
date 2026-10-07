@@ -1,0 +1,61 @@
+/* ★V8 枠を閉じる知らせ（E-5 YMVFD）。寸法は globals.css の --tpl-e1-* だけを使う。表・タブ・道具の段は型と共通部品が持つ。 */
+
+.search {
+  display: block;
+  width: var(--tpl-e1-search-w);
+  max-width: 100%;
+}
+
+.colSlot {
+  width: var(--tpl-e1-col-slot);
+}
+
+.colState {
+  width: var(--tpl-e1-col-close-state);
+}
+
+.colActions {
+  width: var(--tpl-e1-col-close-actions);
+}
+
+.slot {
+  display: block;
+  color: var(--color-ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.reason {
+  display: block;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-e1-gap-xs);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-xxs);
+  padding: var(--tpl-e1-chip-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--tpl-e1-radius-s);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+
+.chipDone {
+  color: var(--color-ink-faint);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-s);
+}
