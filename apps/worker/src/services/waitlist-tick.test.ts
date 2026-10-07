@@ -1,0 +1,13 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { waitlistFixture, futureSlot } from '../test-utils/waitlist-fixture.js';
+import type { SqliteD1 } from '../test-utils/d1-sqlite.js';
+import type { Env } from '../index.js';
+import { processBookingWaitlists } from './waitlist-tick.js';
+vi.mock('./booking-automatic-line.js', () => ({ sendAutomaticBookingLine: vi.fn(async () => true) }));
+let test: SqliteD1, slot: string; beforeEach(() => { test = waitlistFixture(); slot = futureSlot(); }); afterEach(() => test.raw.close());
+function env() { return { DB: test.db, RESTAURANT_TEST_ENABLED: 'true', LIFF_URL: 'https://liff.example.test' } as Env['Bindings']; }
+function addPerson(id: string, friend: string) { test.raw.prepare(`INSERT INTO booking_waitlist(id,line_account_id,staff_id,menu_id,starts_at,friend_id,identity_key) VALUES(?,'a','s','m',?,?,?)`).run(id, slot, friend, 'friend:' + friend); }
+describe('定期実行の順送り', () => {
+  it('予約の変更で空いた枠を拾い、案内期限が切れたら次へ進める', async () => { addPerson('first', 'f0'); addPerson('second', 'f1'); test.raw.prepare(`INSERT INTO bookings(id,line_account_id,friend_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at) VALUES('full','a','f7','s','m',?,?,?,'confirmed',0,?)`).run(slot, new Date(Date.parse(slot) + 3600000).toISOString(), new Date(Date.parse(slot) + 3600000).toISOString(), slot); await processBookingWaitlists(env(), 'a'); expect(test.raw.prepare("SELECT COUNT(*) n FROM booking_waitlist WHERE status='invited'").get()).toMatchObject({ n: 0 }); test.raw.exec("UPDATE bookings SET status='cancelled' WHERE id='full'"); await processBookingWaitlists(env(), 'a'); expect(test.raw.prepare("SELECT status FROM booking_waitlist WHERE id='first'").get()).toMatchObject({ status: 'invited' }); test.raw.prepare("UPDATE booking_waitlist SET hold_expires_at=? WHERE id='first'").run(new Date(Date.now() - 1000).toISOString()); await processBookingWaitlists(env(), 'a'); expect(test.raw.prepare("SELECT status FROM booking_waitlist WHERE id='second'").get()).toMatchObject({ status: 'invited' }); });
+  it('先頭の大きい組から案内した後、小さい空き卓にも次の組を案内する', async () => { test.raw.prepare(`INSERT INTO rt_seat_waitlist(id,store_id,starts_at,guest_count,customer_name,line_uid,identity_key) VALUES('big','store',?,6,'試験の組','test-user-0','line:test-user-0'),('small','store',?,2,'試験の組','test-user-1','line:test-user-1')`).run(slot, slot); await processBookingWaitlists(env(), 'a'); expect(test.raw.prepare("SELECT COUNT(*) n FROM rt_seat_waitlist WHERE status='invited'").get()).toMatchObject({ n: 2 }); });
+});
