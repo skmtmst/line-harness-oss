@@ -1,3 +1,6 @@
+import { hqBroadcasts } from './routes/hq-broadcasts.js';
+import { visitStamps } from './routes/visit-stamps.js';
+import { processVisitStampQueue } from './services/visit-stamps.js';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { LineClient } from '@line-crm/line-sdk';
@@ -478,6 +481,7 @@ app.route('/', webhook);
 app.route('/', gettingStarted);
 app.route('/', recipes);
 app.route('/', hqTemplates);
+app.route('/', hqBroadcasts);
 app.route('/', ops);
 app.route('/', manualLinks);
 app.route('/', errorMessages);
@@ -589,6 +593,7 @@ app.route('/', analyticsExports);
 app.route('/', dashboard);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
+app.route('/', visitStamps);
 app.route('/', restaurantTest);
 app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
@@ -1634,6 +1639,7 @@ async function runFrequentHeavyJobs(
         }
       },
     },
+    { name: 'visit stamps', run: () => processVisitStampQueue(env) },
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
       name: 'broadcast insights',

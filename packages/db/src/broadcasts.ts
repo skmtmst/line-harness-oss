@@ -23,6 +23,7 @@ export type BroadcastMessageType =
   | 'carousel';
 
 export interface Broadcast {
+  hq_run_id?: string | null;
   id: string;
   title: string;
   message_type: BroadcastMessageType;

@@ -15,6 +15,8 @@ beforeEach(()=>{fixture=createTestD1();fixture.raw.exec(`
  INSERT INTO rt_organizations(id,account_id,name) VALUES('org','account','試験');
  INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','試験店舗','test','account');
  INSERT INTO rt_tables(id,store_id,code,label,seat_type,max_capacity) VALUES('table','store','t','卓','table',4);
+ INSERT INTO rt_media(id,code,name,sender_addresses,parser_key) VALUES('media-hp','hotpepper','試験媒体','[]','hp'),('media-tl','tabelog','試験媒体2','[]','tl');
+ INSERT INTO rt_store_media_links(store_id,media_id,close_on_booking) SELECT 'store',id,1 FROM rt_media WHERE code='hotpepper';
  INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity,line_capacity,same_day_capacity,walk_in_capacity) VALUES('slot','store','${at}',4,2,1,1);
  `);});
 afterEach(()=>fixture.raw.close());
@@ -76,4 +78,16 @@ describe('飲食店の枠の自動調整',()=>{
   expect((await restaurantResponsibleMembers(fixture.db,'store','2027-10-10')).map(m=>m.id)).toEqual(['duty']);
   expect((await restaurantResponsibleMembers(fixture.db,'store','2027-10-11')).map(m=>m.id)).toEqual(['manager']);
  });
+});
+
+it('在庫枠がなくてもLINE・電話の予約ごとに設定した媒体だけを閉じ、取消で再開を案内する',async()=>{
+ fixture.raw.exec(`INSERT INTO rt_store_media_links(store_id,media_id,close_on_booking) SELECT 'store',id,1 FROM rt_media WHERE code='tabelog';
+ DELETE FROM rt_inventory_slots;
+ INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,status) VALUES('direct','store','phone','試験',1,'${at}','2027-10-10T11:00:00Z','confirmed');`);
+ await reconcileRestaurantInventory({DB:fixture.db} as Env['Bindings'],'store');
+ const tasks=fixture.raw.prepare('SELECT channel,status FROM rt_reservation_close_tasks ORDER BY channel').all();expect(tasks).toEqual([{channel:'hotpepper',status:'close'},{channel:'tabelog',status:'close'}]);
+ fixture.raw.exec("UPDATE rt_reservation_close_tasks SET status='done' WHERE channel='hotpepper'");await reconcileRestaurantInventory({DB:fixture.db} as Env['Bindings'],'store');
+ expect(fixture.raw.prepare("SELECT status FROM rt_reservation_close_tasks WHERE channel='hotpepper'").get()).toEqual({status:'done'});
+ fixture.raw.exec("UPDATE rt_reservations SET status='cancelled' WHERE id='direct'");await reconcileRestaurantInventory({DB:fixture.db} as Env['Bindings'],'store');
+ expect(fixture.raw.prepare("SELECT COUNT(*) n FROM rt_reservation_close_tasks WHERE status='reopen'").get()).toEqual({n:2});
 });

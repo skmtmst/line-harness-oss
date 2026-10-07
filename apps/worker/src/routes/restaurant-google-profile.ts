@@ -1115,3 +1115,35 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/send', req
     return googleErrorResponse(c, error);
   }
 });
+
+/** 写しから案だけを作る。Googleの再取得・公開は既存の確認/送信手順に任せる。 */
+restaurantGoogleProfile.post('/api/restaurant-test/google/hours/from-closure',requireRole('owner','admin','staff'),async c=>{
+ const store=await storeFor(c);if(!store)return fail(c,404,'店舗がありません');
+ const body=await c.req.json<{closureId?:string;expectedVersion?:number;includePrivateEvent?:boolean}>().catch(()=>null);
+ if(!body||typeof body.closureId!=='string'||!Number.isSafeInteger(body.expectedVersion)||(body.expectedVersion??0)<1
+ ||(body.includePrivateEvent!==undefined&&typeof body.includePrivateEvent!=='boolean'))return fail(c,400,'休業・貸切の番号と版を指定してください');
+ const row=await dbFor(c.env,store.id).prepare('SELECT * FROM rt_closures WHERE id=? AND store_id=? AND archived_at IS NULL').bind(body.closureId,store.id).first<import('../services/restaurant-closures.js').ClosureRow>();
+ if(!row)return fail(c,404,'休業・貸切がありません');
+ if(row.version!==body.expectedVersion)return fail(c,409,'休業・貸切が変更されました。読み直してください',{code:'version_conflict'});
+ if(row.kind==='private_event'&&body.includePrivateEvent!==true)return fail(c,409,'貸切は通常Googleの営業時間を変更しません。変更する場合は明示的に選んでください',{code:'private_event_not_selected'});
+ if(JSON.parse(row.table_ids_json).length)return fail(c,409,'一部の卓の休業・貸切は店舗全体の営業時間にできません',{code:'partial_tables'});
+ const cached=await cachedProfile(c,store.id);
+ if(!cached)return fail(c,409,'先にGoogleの営業時間を読み込んでください',{code:'profile_not_loaded'});
+ if(storeClosed(cached.profile))return fail(c,409,'Google側で臨時休業または閉業になっています',{code:'store_closed'});
+ const timeZone=await storeTimeZone(c,store.id),days:DayHours[]=[];
+ const mins=(t:string)=>Number(t.slice(0,2))*60+Number(t.slice(3));
+ const time=(n:number)=>n===1440?'00:00':String(Math.floor(n/60)%24).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+ for(let date=row.start_date;date<=row.end_date;date=addDays(date,1)){
+  if(row.all_day){days.push({date,closed:true,periods:[]});continue;}
+  const current=effectiveHoursFor(cached.profile,date),periods:HoursPeriod[]=[];
+  const start=mins(row.start_time!),end=mins(row.end_time!);
+  // 深夜営業は翌日への持ち越しも編集対象にしないと誤案になるため、既存の暦日指定で確認してもらう。
+  if(current.periods.some(p=>mins(p.close)<mins(p.open)&&p.close!=='00:00'))return fail(c,409,'深夜営業をまたぐ時間帯はGoogleの営業時間で日ごとに確認してください',{code:'overnight_hours'});
+  for(const p of current.periods){const a=mins(p.open),z=p.close==='00:00'?1440:mins(p.close);
+   if(z<=start||a>=end)periods.push(p);
+   else {if(a<start)periods.push({open:p.open,close:time(start)});if(z>end)periods.push({open:time(end),close:p.close});}}
+  days.push({date,closed:periods.length===0,periods});
+ }
+ const change=await proposeSpecial(c,store,cached.profile,timeZone,'calendar',days,null);
+ return change instanceof Response?change:c.json({success:true,change:publicChange(change)});
+});
