@@ -1034,6 +1034,7 @@
   --tpl-tg2-option-gap: 8px; --tpl-tg2-default-w: 280px; --tpl-tg2-place-pad: 8px 0; --tpl-tg2-place-name-w: 110px; --tpl-tg2-key-w: 200px; --tpl-tg2-key-gap: 8px; --tpl-tg2-note-lh: 16px;
   --tpl-tg2-type-card-h: 98px; --tpl-tg2-type-card-gap: 8px; --tpl-tg2-type-radio: 16px; --tpl-tg2-radio-off: inset 0 0 0 1.5px var(--color-control-border); --tpl-tg2-radio-on: inset 0 0 0 5px var(--color-accent-deep); --tpl-tg2-ring-thin: 1.5px; --tpl-tg2-label-lh: 19px;
   --tpl-tg2-swatch: 28px; --tpl-tg2-swatch-gap: 10px; --tpl-tg2-swatch-ring: 2px; --tpl-tg2-rule-pad: 0 12px; --tpl-tg2-rule-h: 48px; --tpl-tg2-rule-icon: 14px; --tpl-tg2-icon-btn: 28px; --tpl-tg2-info-band-pad: 10px 14px; --tpl-tg2-info-band-lh: 20px; --tpl-tg2-sample-pad: 10px 14px; --tpl-tg2-sample-count-w: 26px; --tpl-tg2-sample-row-pad-bottom: 9px; --tpl-tg2-dialog-body-gap: 16px; --tpl-tg2-dialog-body-pull-bottom: -8px; --tpl-tg2-dialog-footer-pad: 0 24px 24px;
+  --tpl-tg2-step-no: 24px;
   --tpl-tg2-info-pad: 14px 24px 0; --tpl-tg2-pill-pad: 2px 8px; --tpl-tg2-pill-gap: 5px; --tpl-tg2-pill-dot: 6px; --tpl-tg2-pill-lh: 18px;
   --tpl-tg2-safety-pad: 16px 24px; --tpl-tg2-safety-gap: 6px; --tpl-tg2-safety-body-size: 11px;
   --tpl-tg2-reason-w: 150px; --tpl-tg2-dialog-pull: -10px; --tpl-tg2-dialog-pull-top: -18px; --tpl-tg2-choice-gap: 10px; --tpl-tg2-usage-lh: 17px; --tpl-tg2-dialog-gap: 14px;

@@ -44,3 +44,12 @@
 - 動いた記録：結果の札は「動いた・失敗・条件に外れた」の3つ（すべては数の帯）。テスト実行を含めるのは「よく使う絞り込み」から。中身は右の詳細パネル。行の「…」に ルールを開く・トークを開く を足した。
 - 共通アクション：状態の絞り込みは札（公開中・下書き・古い版あり・呼ばれていない・保管）。「中の処理」は処理の数（一覧の口に処理の並びが無い）。
 - 版と使われている場所：下書きがある間は「この版から新しい版」を押せない形で出す（サーバが draft_exists で断るため。理由は title）。
+
+## 共通アクションを作る（common-action-new.tsx・絵 j2hfkS）
+今の V8（`app/common-actions/common-action-new-v8.tsx`）と同じ口と動き：`api.commonActions.resources`（選択肢。失敗は帯と「もう一度読み込む」）、
+`api.commonActions.create`（名前・説明・処理・要求キー）→ `/common-actions/versions?id=`。閲覧のみ（権限なし）は作らせない。
+- 入口：`app/common-actions/new/page.tsx`（`/common-actions/new`）
+- 見せ方：処理は「番号・何を・どれを」の1行で並べ、押すとその処理の設定（今の部品 CommonActionEditor／分岐は BranchEditors の写し）を開く。↑↓は開いた設定の中
+- 足す：処理を足す・待ち時間を入れる・条件で分ける・見本から受け渡す（公開版を呼ぶ処理を足す）。足した行は閉じたまま
+- 「失敗したとき」の段：全部の処理の「失敗したとき」をまとめて決める。違うものがあれば「処理ごとに違う」と出す
+- 写したもの：`branch-editor.tsx`・`action-order.ts`（app/common-actions から。src/v8 は @/app を読めない）
