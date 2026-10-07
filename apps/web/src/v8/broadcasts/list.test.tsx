@@ -15,6 +15,7 @@ vi.hoisted(() => {
 const listBroadcasts = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
 const listViews = vi.hoisted(() => vi.fn())
+const deleteBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
 const role = vi.hoisted(() => ({ current: 'owner' as string | null }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -26,6 +27,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       broadcasts: {
         ...actual.api.broadcasts,
         list: listBroadcasts,
+        delete: deleteBroadcast,
         getInsight: async () => ({ success: false }),
         savedViews: { ...actual.api.broadcasts.savedViews, list: listViews },
       },
@@ -66,6 +68,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import BroadcastListV8 from './list'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -210,5 +213,42 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     routerPush.mockClear()
     act(() => { (items[1] as HTMLElement).click() })
     expect(routerPush).toHaveBeenCalledWith('/broadcasts/new')
+  })
+
+  it('下書きの削除は窓を出さずに行を外し、5秒は送らない。予約済みは今までどおり確かめの窓', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      deleteBroadcast.mockClear()
+      // 前の試験の検索語（URL に置かれる）を外す。
+      flushListUrlState()
+      window.history.replaceState(null, '', '/broadcasts')
+      act(() => { root.render(<BroadcastListV8 />) })
+      await flush()
+      const openMenuOf = (title: string) => {
+        const row = [...host.querySelectorAll('tr')].find((tr) => tr.textContent?.includes(title))
+        const trigger = row?.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement
+        act(() => { trigger.click() })
+      }
+      const clickMenuItem = (label: string) => {
+        const item = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes(label)) as HTMLElement
+        act(() => { item.click() })
+      }
+      openMenuOf('未購入者フォロー')
+      clickMenuItem('削除する')
+      await flush()
+      expect(document.querySelector('[role="dialog"],[role="alertdialog"]'), '下書きなのに確かめの窓が出ました').toBeNull()
+      expect([...host.querySelectorAll('tr')].some((tr) => tr.textContent?.includes('未購入者フォロー')), '行が外れていません').toBe(false)
+      expect(deleteBroadcast).not.toHaveBeenCalled()
+      await act(async () => { vi.advanceTimersByTime(5100) })
+      await flush()
+      expect(deleteBroadcast).toHaveBeenCalledWith('bc-2')
+
+      openMenuOf('8月キャンペーンのお知らせ')
+      clickMenuItem('削除する')
+      await flush()
+      expect(document.body.textContent).toContain('を削除しますか？')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

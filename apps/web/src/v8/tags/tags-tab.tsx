@@ -10,6 +10,7 @@
  * （components/friend-fields/tags-page-v4）を使う。見た目だけを型と絵に合わせた。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -43,6 +44,7 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import { withViewTransition } from '@/components/shared/view-transition'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -229,14 +231,30 @@ export default function TagsTab({
   const [actionError, setActionError] = useState('')
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsFailed, setStatsFailed] = useState(false)
-  const [query, setQuery] = useState('')
-  const [folder, setFolder] = useState('')
-  const [usageFilter, setUsageFilter] = useState('all')
-  const [sourceFilter, setSourceFilter] = useState('all')
-  const [quick, setQuick] = useState<string[]>([])
+  /*
+   * 検索語・フォルダ・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
+   * タグを開いて「戻る」と同じ一覧に戻る。絞り込みを変えたらページは 1 へ
+   * （同じ書き込みの中で戻す。効果で戻すと、来た瞬間に URL から戻したページまで消える）。
+   */
+  const [view, setView] = useListUrlState({ q: '', folder: '', usage: 'all', source: 'all', quick: '', size: '20', page: '1' })
+  const query = view.q
+  const folder = view.folder
+  const usageFilter = view.usage
+  const sourceFilter = view.source
+  const quick = useMemo(() => (view.quick ? view.quick.split(',') : []), [view.quick])
+  const pageSize = PAGE_SIZES.includes(Number(view.size)) ? Number(view.size) : 20
+  const page = Math.max(1, Number.parseInt(view.page, 10) || 1)
+  const setQuery = useCallback((next: string) => setView({ q: next, page: '1' }), [setView])
+  const setFolder = useCallback((next: string) => setView({ folder: next, page: '1' }), [setView])
+  const setUsageFilter = useCallback((next: string) => setView({ usage: next, page: '1' }), [setView])
+  const setSourceFilter = useCallback((next: string) => setView({ source: next, page: '1' }), [setView])
+  const setQuick = useCallback((update: string[] | ((current: string[]) => string[])) => {
+    const next = typeof update === 'function' ? update(quick) : update
+    setView({ quick: next.join(','), page: '1' })
+  }, [quick, setView])
+  const setPageSize = useCallback((next: number) => setView({ size: String(next), page: '1' }), [setView])
+  const setPage = useCallback((next: number) => setView({ page: String(next) }), [setView])
   const [quickOpen, setQuickOpen] = useState(false)
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
   const { leavingId, leave } = useRowLeaving()
@@ -298,11 +316,13 @@ export default function TagsTab({
     if (fixture) return
     setItems([])
     setGroups([])
-    setFolder('')
-    setPage(1)
     setOpenMenuId(null)
     setMenuMoveFor(null)
   }, [fixture, accountId])
+
+  // アカウントを替えたら、前のアカウントのフォルダとページを残さない（来た瞬間は URL のまま）。
+  useOnAccountSwitch(accountId, () => setView({ folder: '', page: '1' }))
+  useListScrollMemory(status === 'ready')
 
   const filtered = useMemo(() => items.filter((tag) => {
     // 保管して「元に戻す」を待っている行は出さない。
@@ -330,7 +350,6 @@ export default function TagsTab({
   const activeTag = items.find((tag) => tag.id === activeTagId) ?? null
   const activeTagIndex = visible.findIndex((tag) => tag.id === activeTagId)
   const activeGroup = activeTag ? groups.find((item) => item.id === activeTag.groupId) : undefined
-  useEffect(() => setPage(1), [query, folder, usageFilter, sourceFilter, quick, pageSize])
 
   /** アカウント切替直後の1フレームは「未取得」として扱う（v7 と同じ）。 */
   const staleAccount = !fixture && loadRequestRef.current.accountId !== accountId
@@ -599,7 +618,7 @@ export default function TagsTab({
   ]
 
   const filterActive = Boolean(query || folder || usageFilter !== 'all' || sourceFilter !== 'all' || quick.length)
-  const clearFilters = () => { setQuery(''); setFolder(''); setUsageFilter('all'); setSourceFilter('all'); setQuick([]) }
+  const clearFilters = () => { setView({ q: '', folder: '', usage: 'all', source: 'all', quick: '', page: '1' }) }
 
   // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
   const createButton = (wide: boolean) => status === 'forbidden' || !canEdit ? null : (
@@ -700,19 +719,19 @@ export default function TagsTab({
       <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
       <Button type="button" onClick={() => void load()}>もう一度試す</Button>
     </div>
-  ) : ready && items.length === 0 ? (
-    <div className={styles.stateCard} data-design-node="U0aKD">
-      <TagIcon className={styles.stateIcon} aria-hidden="true" />
-      <p className={styles.stateTitle}>まだタグはありません</p>
-      <p className={styles.stateDesc}>友だちを分けたり、配信の宛先を決めたりするときに使います</p>
-      {canEdit ? <Button href="/tags/new" variant="primary"><Plus size={15} aria-hidden="true" />タグを作る</Button> : null}
-    </div>
   ) : ready && visible.length === 0 ? (
-    <div className={styles.stateCard} data-design-node="U0aKD">
-      <p className={styles.stateTitle}>条件に合うものはありません</p>
-      <p className={styles.stateDesc}>検索や絞り込みを外すと、すべて出ます</p>
-      {filterActive ? <Button type="button" onClick={clearFilters}>条件を外す</Button> : null}
-    </div>
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      data-design-node="U0aKD"
+      icon={<TagIcon aria-hidden="true" />}
+      title="まだタグがありません"
+      description="友だちに目印を付けて、配信の絞り込みや対応の振り分けに使います。"
+      create={{ label: '最初のタグを作る', href: '/tags/new' }}
+      canCreate={canEdit}
+      filtered={items.length > 0}
+      onClearFilters={filterActive ? clearFilters : undefined}
+      filteredDescription="検索語・フォルダ・絞り込みを外すと、すべて出ます"
+    />
   ) : (
     <DelayedSkeleton loading={!ready} skeleton={<div className={styles.skeleton} data-design-node="U0aKD" aria-busy="true" />}>
       <DataTable className={styles.table} data-design="TagTable">

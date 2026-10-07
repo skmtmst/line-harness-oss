@@ -67,6 +67,15 @@ export function payloadLabel(types: readonly string[]): string {
 }
 
 /** URL の値や query を一覧へ出さず、相手を見分けられる範囲だけ残す（絵：https://crm.example.com/••••）。 */
+/** 送り先の URL のホスト名だけ（狭い幅の一覧の2行目「… → crm.example.com」）。 */
+export function urlHost(value: string): string {
+  try {
+    return new URL(value).host
+  } catch {
+    return 'URLを確かめてください'
+  }
+}
+
 export function maskedUrl(value: string): string {
   try {
     const url = new URL(value)

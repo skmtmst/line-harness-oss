@@ -334,6 +334,8 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['POST', '/api/auth/sessions/revoke-others'],
   ['GET', '/api/staff/me'],
   ['GET', '/api/tenants/me'],
+  // 自社の表示設定だけ読む。PUTは会社全体のowner/adminに限定する。
+  ['GET', '/api/settings/company'],
   ['POST', '/api/client-errors'],
   ['GET', '/api/capabilities'],
   ['GET', '/api/line-accounts'],

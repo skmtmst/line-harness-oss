@@ -1,0 +1,24 @@
+/* ★V8-B 予約の詳細（AjZhH）。値は globals.css の --tpl-rsv-*。 */
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rsv-facts-gap);
+  margin: 0;
+  padding: var(--tpl-rsv-facts-pad);
+  border-radius: var(--tpl-rsv-facts-radius);
+  background: var(--color-surface-pearl);
+}
+
+.fact {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rsv-fact-lh);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.allergy {
+  color: var(--tpl-rsv-allergy);
+}

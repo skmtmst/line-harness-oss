@@ -16,6 +16,7 @@ import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -503,15 +504,17 @@ export default function OffersTab() {
     <ListState kind="loading" title="案件を読み込んでいます" />
   ) : loadState === 'error' ? (
     <StateCard tone="error" title="案件を読み込めませんでした" description="数の帯は「—」にしています。道具はそのまま使えます。" action={<RetryButton onRetry={() => { void loadOffers() }} />} />
-  ) : offers.length === 0 ? (
-    <StateCard
-      icon={<Briefcase size={16} aria-hidden="true" />}
-      title="まだ案件はありません"
-      description="何をしたら成果になり、いくら払うかを決めると、アフィリエイターが紹介できるようになります"
-      action={readonly ? undefined : <Button variant="primary" onClick={openCreate}><Plus size={14} aria-hidden="true" /> 案件を作る</Button>}
-    />
   ) : shown.length === 0 ? (
-    <StateCard title="条件に合うものはありません" description="検索や絞り込みを外すと、すべて出ます" action={<Button type="button" onClick={resetConditions}>条件を外す</Button>} />
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<Briefcase aria-hidden="true" />}
+      title="まだ案件がありません"
+      description="何をしたら成果になり、いくら払うかを決めて、紹介してもらいます。"
+      create={{ label: '最初の案件を作る', onClick: openCreate }}
+      canCreate={!readonly}
+      filtered={offers.length > 0}
+      onClearFilters={resetConditions}
+    />
   ) : (
     <>
       {table}

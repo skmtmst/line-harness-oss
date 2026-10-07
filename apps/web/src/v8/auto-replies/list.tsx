@@ -37,7 +37,6 @@ import {
   MoreHorizontal,
   Pause,
   Pencil,
-  Search as SearchIcon,
   Square,
   Play,
   Trash2,
@@ -58,10 +57,13 @@ import { formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
 import { runUndoable } from '@/lib/undoable'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { useLiveReorder } from '@/lib/use-live-reorder'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
@@ -387,6 +389,33 @@ export default function AutoRepliesListV8() {
     page,
   })
   const rules = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : items
+  /*
+   * 止まっている自動応答の削除は、どこにも影響しない（もう返信していない）。確かめの窓を出さずに
+   * 一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。動いているものは今までどおり窓。
+   */
+  const deferredDelete = useDeferredDelete()
+  const requestDelete = (r: AutoReply) => {
+    setDeleteError('')
+    if (r.isActive) {
+      setPendingDelete({ item: r, accountId: selectedAccountId })
+      return
+    }
+    const requestAccountId = selectedAccountId
+    if (panelId === r.id) setPanelId(null)
+    setSelectedIds((current) => {
+      if (!current.has(r.id)) return current
+      const next = new Set(current)
+      next.delete(r.id)
+      return next
+    })
+    deferredDelete.schedule({
+      ids: [r.id],
+      message: `自動応答「${displayName(r)}」を削除しました`,
+      commit: () => api.autoReplies.delete(r.id),
+      onCommitted: () => (selectedAccountIdRef.current === requestAccountId ? load() : undefined),
+      failureMessage: '自動応答を削除できませんでした。状態を読み直してからお試しください。',
+    })
+  }
 
   /* ===== 数の帯 ===== */
   const hitsAllKnown = rules.length > 0 && rules.every((r) => r.hits !== undefined)
@@ -405,7 +434,7 @@ export default function AutoRepliesListV8() {
   const ready = visibleLoadState === 'ready'
 
   /* ===== 絞り込み ===== */
-  const afterQuery = rules.filter((r) => autoReplyMatchesQuery(r, query))
+  const afterQuery = rules.filter((r) => !deferredDelete.isHidden(r.id) && autoReplyMatchesQuery(r, query))
   const inFolder = afterQuery.filter((r) => {
     if (folderFilter === UNFILED) return !r.folderId
     if (folderFilter) return r.folderId === folderFilter
@@ -782,6 +811,9 @@ export default function AutoRepliesListV8() {
     applyPriorityUpdates(updates, `${name}を${direction === -1 ? '1つ上' : '1つ下'}へ動かしました`)
   }
 
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
+  const liveOrder = useLiveReorder(shownItems, (r) => r.id, dragId)
+
   const dropOn = (targetId: string) => {
     if (!dragId || dragId === targetId || !canEdit || sortKey !== 'priority') {
       setDragId(null)
@@ -881,10 +913,7 @@ export default function AutoRepliesListV8() {
       icon: <Trash2 size={14} aria-hidden="true" />,
       tone: 'danger',
       dividerBefore: true,
-      onSelect: () => {
-        setDeleteError('')
-        setPendingDelete({ item: r, accountId: selectedAccountId })
-      },
+      onSelect: () => requestDelete(r),
     })
     // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見る項目だけ残す。
     return readonly ? items.filter((item) => VIEW_ONLY_MENU_IDS.has(item.id)) : items
@@ -1093,38 +1122,18 @@ export default function AutoRepliesListV8() {
       )}
     </div>
   ) : sortedItems.length === 0 ? (
-    filterActive ? (
-      <div className={styles.stateCard} style={{ padding: '28px 24px' }} data-design-node="G8i4xP">
-        <span className={styles.stateIcon} style={{ width: 32, height: 32 }}>
-          <SearchIcon size={16} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>条件に合うルールはありません</p>
-        <p className={styles.stateDesc}>
-          「停止中のみ」「時間帯あり」「今月0回」や検索を外すと、すべて出ます。
-        </p>
-        <Button type="button" variant="secondary" onClick={clearFilters}>✕ 条件を外す</Button>
-      </div>
-    ) : (
-      <div className={styles.stateCard} style={{ padding: '28px 24px' }} data-design-node="G8i4xP">
-        <span className={styles.stateIcon} style={{ width: 32, height: 32 }}>
-          <MessageSquare size={16} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>まだ自動応答のルールはありません</p>
-        <p className={styles.stateDesc}>
-          よく届く質問や営業時間外の連絡に、自動で返せます。ひな形からも作れます。
-        </p>
-        {canEdit ? (
-          <>
-            <Button type="button" variant="primary" onClick={() => router.push('/auto-replies/edit')}>
-              ＋ ルールを作る
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setQuickOpen(true)}>
-              かんたんに作る
-            </Button>
-          </>
-        ) : null}
-      </div>
-    )
+    /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない。 */
+    <EmptyList
+      data-design-node="G8i4xP"
+      icon={<MessageSquare aria-hidden="true" />}
+      title="まだ自動応答がありません"
+      description="届いた言葉に合わせて、決めた返事を自動で送ります。"
+      create={{ label: '最初の自動応答を作る', onClick: () => router.push('/auto-replies/edit') }}
+      canCreate={canEdit}
+      filtered={filterActive}
+      onClearFilters={clearFilters}
+      filteredDescription="「停止中のみ」「時間帯あり」「今月0回」や検索を外すと、すべて出ます"
+    />
   ) : (
     <>
       <span className="sr-only" role="status" aria-live="polite">
@@ -1155,8 +1164,8 @@ export default function AutoRepliesListV8() {
               {tableHeadCells}
             </TableHeadRow>
           </thead>
-          <RovingTbody>
-            {shownItems.map((r) => {
+          <RovingTbody reorderKey={liveOrder.shown.map((r) => r.id).join(',')}>
+            {liveOrder.shown.map((r) => {
               const name = displayName(r)
               const conflicts = r.conflictAttentionCount ?? 0
               const actions = actionSummary(r)
@@ -1175,6 +1184,10 @@ export default function AutoRepliesListV8() {
               return (
                 <Tr interactive
                   key={r.id}
+                  data-reorder-id={r.id}
+                  onDragEnter={() => liveOrder.enter(r.id)}
+                  onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                  onDrop={dragId ? () => dropOn(liveOrder.dropTarget(r.id)) : undefined}
                   className={styles.rowClick}
                   tabIndex={0}
                   onClick={() => setPanelId(r.id)}
@@ -1198,8 +1211,7 @@ export default function AutoRepliesListV8() {
                     onClick={(event) => event.stopPropagation()}
                     draggable={canEdit && sortKey === 'priority'}
                     onDragStart={() => setDragId(r.id)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => dropOn(r.id)}
+                    onDragEnd={() => setDragId(null)}
                   >
                     {canEdit && <ReorderGrip
                       label={name}
@@ -1384,9 +1396,8 @@ export default function AutoRepliesListV8() {
                   {canEdit && <Button
                     variant="secondary"
                     onClick={() => {
-                      setDeleteError('')
-                      setPendingDelete({ item: panelRow, accountId: selectedAccountId })
                       setPanelId(null)
+                      requestDelete(panelRow)
                     }}
                   >
                     削除する

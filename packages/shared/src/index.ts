@@ -40,3 +40,5 @@ export * from './booking-waitlist.js';
 export * from './restaurant-inventory-rules.js';
 export * from './event-liff.js';
 export * from './webinar-liff.js';
+export * from './company-settings';
+export * from './hq-template-distribution-display';

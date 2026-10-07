@@ -11,10 +11,11 @@
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（フォルダへ入れる口が無い・
  * 「先月より」の集計が無い・複製の口が無い など）。
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bookmark, Inbox, LayoutTemplate, Pause, Play, Plus } from 'lucide-react'
+import { Bookmark, Inbox, LayoutTemplate, MoreHorizontal, Pause, Play, Plus, Send } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -26,6 +27,8 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import EmptyList from '@/components/shared/empty-list'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -54,7 +57,7 @@ import {
   useWebhookOverview,
 } from './shell'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
-import { eventLabel, isHttpsUrl, maskedUrl, payloadLabel, shortDateTime } from './words'
+import { eventLabel, isHttpsUrl, maskedUrl, payloadLabel, shortDateTime, urlHost } from './words'
 import styles from './outgoing.module.css'
 
 type SavedFilter = '' | 'active' | 'paused' | 'failed'
@@ -95,14 +98,26 @@ export default function WebhooksOutgoingV8() {
   const { outgoing, outgoingStatus, summary, loadedAccountId, reload } = overview
 
   const [folders, setFolders] = useState<Folder[]>([])
-  const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [chip, setChip] = useState<SavedFilter>('')
-  /* 並びの部品は絵に無い。つなぎ先は名前で探すことが多いので、既定は名前順（送った回数順は「よく使う絞り込み」から）。 */
-  const [sortKey, setSortKey] = useState<SortKey>('name')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  /*
+   * 検索語・フォルダ・絞り込み・並び順・件数・ページは URL に置く（動きの点検 5 番）。
+   * 送り先を開いて「戻る」と同じ一覧に戻る。絞り込みを変えたらページは 1 へ
+   * （同じ書き込みの中で戻す。効果で戻すと、来た瞬間に URL から戻したページまで消える）。
+   * 並びの部品は絵に無い。つなぎ先は名前で探すことが多いので、既定は名前順（送った回数順は「よく使う絞り込み」から）。
+   */
+  const [view, setView] = useListUrlState({ q: '', folder: '', view: '', sort: 'name', size: '20', page: '1' })
+  const query = view.q
+  const folderFilter = view.folder
+  const chip: SavedFilter = (['', 'active', 'paused', 'failed'] as const).includes(view.view as SavedFilter) ? view.view as SavedFilter : ''
+  const sortKey: SortKey = view.sort === 'volume' ? 'volume' : 'name'
+  const pageSize = [10, 20, 50].includes(Number(view.size)) ? Number(view.size) : 20
+  const page = Math.max(1, Number.parseInt(view.page, 10) || 1)
+  const setPage = useCallback((next: number) => setView({ page: String(next) }), [setView])
+  const setQuery = useCallback((next: string) => setView({ q: next, page: '1' }), [setView])
+  const setFolderFilter = useCallback((next: string) => setView({ folder: next, page: '1' }), [setView])
+  const setChip = useCallback((next: SavedFilter) => setView({ view: next, page: '1' }), [setView])
+  const setSortKey = useCallback((next: SortKey) => setView({ sort: next, page: '1' }), [setView])
+  const setPageSize = useCallback((next: number) => setView({ size: String(next), page: '1' }), [setView])
   const [menuId, setMenuId] = useState<string | null>(null)
   /* 右クリックされた行（「設定」と同じ中身を押した位置に出す。右クリックだけの操作は置かない）。 */
   const [ctxId, setCtxId] = useState<string | null>(null)
@@ -159,15 +174,15 @@ export default function WebhooksOutgoingV8() {
       : b.deliverySummary.total - a.deliverySummary.total))
   }, [displayed, query, folderFilter, chip, sortKey])
 
-  useEffect(() => { setPage(1) }, [query, folderFilter, chip, sortKey, pageSize, selectedAccountId])
+  // アカウントを替えたらページは 1 へ（来た瞬間は URL のまま）。
+  useOnAccountSwitch(selectedAccountId, () => setPage(1))
+  useListScrollMemory(ready)
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pageCount)
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const filterActive = Boolean(query || folderFilter || chip)
   const clearFilters = () => {
-    setQuery('')
-    setFolderFilter('')
-    setChip('')
+    setView({ q: '', folder: '', view: '', page: '1' })
   }
 
   /* ===== 動かす・止める（押した瞬間に札を変え、裏で保存する） ===== */
@@ -492,22 +507,18 @@ export default function WebhooksOutgoingV8() {
         action={<Button onClick={() => void reload()}>もう一度読み込む</Button>}
       />
     )
-  } else if (displayed.length === 0) {
-    listBody = (
-      <ListState
-        kind="empty"
-        title="まだ、送り先はありません"
-        description="送り先を作ると、友だちの動きをほかのシステムへ知らせられます"
-        action={canManage ? <Button variant="primary" href="/webhooks/new"><Plus size={15} aria-hidden="true" />送り先を作る</Button> : undefined}
-      />
-    )
   } else if (visible.length === 0) {
+    /* 修正案 D-2：空の一覧。 */
     listBody = (
-      <ListState
-        kind="empty"
-        title="条件に合う送り先はありません"
-        description="検索や絞り込みの札を外すと、すべて出ます"
-        action={filterActive ? <Button onClick={clearFilters}>条件を外す</Button> : undefined}
+      <EmptyList
+        icon={<Send aria-hidden="true" />}
+        title="まだ送り先がありません"
+        description="友だちの動きを、ほかのシステムへ自動で知らせます。"
+        create={{ label: '最初の送り先を作る', href: '/webhooks/new' }}
+        canCreate={canManage}
+        filtered={displayed.length > 0}
+        onClearFilters={filterActive ? clearFilters : undefined}
+        filteredDescription="検索や絞り込みの札を外すと、すべて出ます"
       />
     )
   } else {
@@ -533,8 +544,17 @@ export default function WebhooksOutgoingV8() {
           }}
         >
         <div className={styles.tableWrap}>
-          <DataTable className={styles.table}>
+          <DataTable className={`${styles.table} ${narrow ? styles.tableNarrow : ''}`}>
             <thead>
+              {narrow ? (
+                /* 1152 の絵 AsfFB：送り先・今月送った・状態・操作の4列。 */
+                <TableHeadRow className={styles.headRow} data-table-layout="columns">
+                  <Th className={`${styles.colName} ${styles.nameHead}`}>送り先（送るタイミング → URL）</Th>
+                  <Th className={styles.colMonth}>今月送った</Th>
+                  <Th className={styles.colStateNarrow}>状態</Th>
+                  <Th className={styles.colOpsNarrow}>操作</Th>
+                </TableHeadRow>
+              ) : (
               <TableHeadRow className={styles.headRow} data-table-layout="columns">
                 <Th className={styles.colName}>つなぎ先</Th>
                 <Th className={styles.colWhen}>いつ送るか</Th>
@@ -543,6 +563,7 @@ export default function WebhooksOutgoingV8() {
                 <Th className={styles.colState}>ようす</Th>
                 <Th className={styles.colOps}>操作</Th>
               </TableHeadRow>
+              )}
             </thead>
             <tbody>
               {visible.map((item) => {
@@ -555,6 +576,66 @@ export default function WebhooksOutgoingV8() {
                 const showMenu = canManage || canTest
                 const tone = toggling ? 'neutral' : failing ? 'danger' : item.isActive ? 'active' : 'neutral'
                 const stateWord = toggling ? '切り替え中' : failing ? '失敗あり' : item.isActive ? '動いている' : '止めている'
+                const nameNode = (
+                  <FolderDotName folder={null}>
+                    {canManage ? (
+                      <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
+                    ) : (
+                      <span className={styles.name} title={item.name}>{item.name}</span>
+                    )}
+                  </FolderDotName>
+                )
+                if (narrow) {
+                  const target = `${when} → ${urlHost(item.url)}`
+                  const countSub = item.deliverySummary.failed > 0
+                    ? `失敗 ${formatNumber(item.deliverySummary.failed)}`
+                    : completedAt ? `最後 ${shortDateTime(completedAt)}` : null
+                  return (
+                    <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
+                      <Td className={styles.colName}>
+                        {nameNode}
+                        <span className={`${styles.sub} ${styles.nameSub}`} title={`${when} → ${item.url}`}>{target}</span>
+                      </Td>
+                      <Td className={styles.colMonth}>
+                        <span className={styles.num}>{`${formatNumber(item.deliverySummary.total)} 回`}</span>
+                        {countSub ? <span className={styles.numSub}>{countSub}</span> : null}
+                      </Td>
+                      <Td className={styles.colStateNarrow}>
+                        <span className={styles.pill} data-tone={tone}>
+                          <span className={styles.pillDot} aria-hidden="true" />
+                          {stateWord}
+                        </span>
+                      </Td>
+                      <Td className={styles.colOpsNarrow}>
+                        {/* 狭い幅は「…」だけ（中身を見る・やり直すも中に入れる。絵 AsfFB の下の説明のとおり）。 */}
+                        <div className={styles.opsBox}>
+                          <IconButton
+                            aria-haspopup="menu"
+                            aria-expanded={menuId === item.id}
+                            aria-label={`「${item.name}」の操作`}
+                            title="操作"
+                            onClick={() => setMenuId((current) => (current === item.id ? null : item.id))}
+                          >
+                            <MoreHorizontal size={16} aria-hidden="true" />
+                          </IconButton>
+                          <ActionMenu
+                            open={menuId === item.id}
+                            onClose={() => setMenuId(null)}
+                            ariaLabel={`「${item.name}」の操作`}
+                            items={[
+                              { id: 'view', label: '中身を見る', onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } },
+                              ...(item.deliverySummary.canRetry && canManage
+                                ? [{ id: 'retry', label: '失敗をやり直す', onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } }]
+                                : []),
+                              ...menuItems,
+                            ]}
+                            note={canManage ? undefined : MANAGE_REASON}
+                          />
+                        </div>
+                      </Td>
+                    </Tr>
+                  )
+                }
                 return (
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
@@ -620,7 +701,9 @@ export default function WebhooksOutgoingV8() {
           </DataTable>
         </div>
         </ContextMenu>
-        <p className={styles.footNote}>行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。</p>
+        <p className={styles.footNote}>{narrow
+          ? '行の「…」から 中身を見る・試しに送る・失敗をやり直す・鍵を作り直す・止める・削除。'
+          : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}</p>
       </>
     )
   }

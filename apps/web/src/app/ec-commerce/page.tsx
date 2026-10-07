@@ -587,7 +587,6 @@ function EcCommercePageV8() {
       tab={tab}
       renderSubscriptions={(accountId) => <SubscriptionsPanel accountId={accountId} />}
       renderConnector={(accountId, canEdit) => <ConnectorPanel accountId={accountId} canEdit={canEdit} />}
-      renderOrderDrawer={(props) => <OrderDetailDrawer {...props} />}
     />
   )
 }

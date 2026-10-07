@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { greeting, headline } from './dashboard'
-import { summarizeSteps } from './getting-started'
+import { FIRST_STEPS, shouldShowFirstSteps, summarizeFirstSteps, type FirstStepFacts } from './first-steps'
 import { trendDay, trendRangeNote } from './trend'
 
 /*
  * ★V8 ダッシュボード（WQmep）の言葉の組み立て。
- * 絵の文字（あいさつ・更新の行・はじめの設定・グラフの日付）がデータから
+ * 絵の文字（あいさつ・更新の行・はじめにやること・グラフの日付）がデータから
  * どう出るかを見張る。
  */
 describe('V8 ダッシュボードの言葉', () => {
@@ -22,16 +22,26 @@ describe('V8 ダッシュボードの言葉', () => {
     expect(headline(undefined, null)).toBe('動きを確かめています')
   })
 
-  it('はじめの設定は終わった数・全体・次の段の名前。全部終わったら出さない', () => {
-    expect(summarizeSteps([
-      { key: 'accounts', state: 'done' },
-      { key: 'attributes', state: 'done' },
-      { key: 'friendAdd', state: 'stalled' },
-      { key: 'scenario', state: 'todo' },
-      { key: 'firstMessage', state: 'forbidden' },
-    ])).toEqual({ done: 2, total: 5, next: '友だち追加時の配信を作る' })
-    expect(summarizeSteps([{ key: 'accounts', state: 'done' }])).toBeNull()
-    expect(summarizeSteps([])).toBeNull()
+  it('はじめにやることは6つの判定を数える。1つでも判定できなければ出さない', () => {
+    const facts: FirstStepFacts = { connect: true, greeting: true, richMenu: true, broadcast: false, scenario: false, invite: false }
+    const summary = summarizeFirstSteps(facts)
+    expect(summary).toMatchObject({ done: 3, total: 6 })
+    expect(summary?.steps.map((step) => step.label)).toEqual(FIRST_STEPS.map((step) => step.label))
+    expect(summary?.steps.filter((step) => !step.done).map((step) => step.link)).toEqual(['作る →', '作る →', '招待する →'])
+    expect(summarizeFirstSteps({ ...facts, richMenu: null })).toBeNull()
+  })
+
+  it('はじめにやることはオーナー・管理者だけ、閉じたら・全部済んだら出さない', () => {
+    const some = summarizeFirstSteps({ connect: true, greeting: false, richMenu: false, broadcast: false, scenario: false, invite: false })
+    const all = summarizeFirstSteps({ connect: true, greeting: true, richMenu: true, broadcast: true, scenario: true, invite: true })
+    expect(shouldShowFirstSteps('owner', some, false)).toBe(true)
+    expect(shouldShowFirstSteps('admin', some, false)).toBe(true)
+    expect(shouldShowFirstSteps('staff', some, false)).toBe(false)
+    expect(shouldShowFirstSteps('viewer', some, false)).toBe(false)
+    expect(shouldShowFirstSteps(null, some, false)).toBe(false)
+    expect(shouldShowFirstSteps('owner', some, true)).toBe(false)
+    expect(shouldShowFirstSteps('owner', all, false)).toBe(false)
+    expect(shouldShowFirstSteps('owner', null, false)).toBe(false)
   })
 
   it('グラフの日付は暦の曜日つき、見出しの脇は期間の両端', () => {

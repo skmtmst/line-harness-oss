@@ -565,13 +565,27 @@ export const FRIEND_ADD_RUNS = {
       friend: { id: 'visual-friend-add-4', displayName: '山田 太郎' }, friendKind: 'first_time',
       attribution: { status: 'unavailable', routeId: null, routeName: null, reason: null },
       rule: { id: 'rule-fallback', name: '経路が分からなかった人', versionId: 'rule-fallback-v1', versionNumber: 1 },
+      /* 絵 REIxB の4行目・N43uVX：案内は届いたが、シナリオを始めるところで止まった。 */
+      scenario: { id: 'scenario-common', name: '共通のあいさつ', enrollmentId: null, started: false },
+      actions: { total: 2, failed: 1 }, deliveryCount: 1, status: 'failed', errorCode: 'action_failed',
+    },
+    /* 絵 REIxB の5行目：以前からの友だち（再追加）→ 案内なし・タグだけ。 */
+    {
+      id: 'friend-add-run-5', receivedAt: '2026-09-07T01:02:00.000Z', processedAt: null,
+      friend: { id: 'visual-friend-add-5', displayName: '坂本 真人' }, friendKind: 'returning',
+      attribution: { status: 'captured', routeId: 'route-instagram', routeName: 'Instagram プロフィール', reason: 'instagram-profile' },
+      rule: { id: 'rule-shop', name: '店頭QRの初回案内', versionId: 'rule-shop-v1', versionNumber: 1 },
       scenario: null,
-      actions: { total: 1, failed: 1 }, deliveryCount: 0, status: 'failed', errorCode: 'delivery_failed',
+      actions: { total: 1, failed: 0 }, deliveryCount: 0, status: 'suppressed', errorCode: null,
     },
   ],
   total: 214,
-  nextCursor: null,
+  nextCursor: 'friend-add-run-cursor-2',
   summary: {
+    /* 絵 REIxB の数の帯（直近28日 214人・送った案内 1,842通）。 */
+    recentFriends: 214,
+    recentEvents: 226,
+    lastDeliveryAt: '2026-09-07T01:32:00.800Z',
     totalRuns: 214,
     cumulativeDeliveries: 1842,
     scenarioStarts: 198,
@@ -1039,9 +1053,9 @@ export const FORM_DETAIL = {
   ],
   /* 編集画面（m1cWEy・ijxur・XXFT4・tpRRT・J1pdB・Z9wXm・ITBAB）の絵の中身。
    * 1ページ目：店のロゴ・見出し・本文・ラジオ・5段階。2ページ目：見出し・予約を入れる・自由に書く。 */
-  contentRevision: 7,
+  contentRevision: 4,
   publishedVersionId: 'form-1-version-3',
-  publishedContentRevision: 6,
+  publishedContentRevision: 3,
   layout: {
     version: 2,
     header: [],
@@ -1084,6 +1098,29 @@ export const FORM_DETAIL = {
     tags: [{ id: 'tag-visit-survey-answered', name: '来店アンケート回答済み' }],
     mileage: [{ id: 'mileage-visit-survey', label: '回答で50マイル', amount: 50 }],
     reminders: [{ id: 'reminder-next-visit', name: '次回来店の希望日をお知らせ' }],
+  },
+}
+
+/**
+ * 公開中の版（Z9wXm「変わること」の比べ元）。編集画面は `?view=published` で読む。
+ * 下書きとの違いは絵の3行に合わせる：目的の質問を足した・きっかけの質問を消した・答え終わったあとの言葉を変えた。
+ */
+export const FORM_DETAIL_PUBLISHED = {
+  id: FORM_DETAIL.id,
+  name: FORM_DETAIL.name,
+  description: FORM_DETAIL.description,
+  fields: FORM_DETAIL.fields,
+  isActive: true,
+  layout: {
+    ...FORM_DETAIL.layout,
+    sections: FORM_DETAIL.layout.sections.map((section) => section.id !== 'form-section-visit' ? section : {
+      ...section,
+      blocks: section.blocks.map((block) => block.id !== 'form-purpose' ? block : {
+        id: 'form-trigger', kind: 'input', type: 'radio', name: 'visit_trigger', label: 'ご来店のきっかけ', required: false,
+        choices: [{ id: 'trigger-1', label: '紹介' }, { id: 'trigger-2', label: 'SNS' }],
+      }),
+    }),
+    options: { ...FORM_DETAIL.layout.options, thanksText: 'ご回答ありがとうございました！' },
   },
 }
 
@@ -3261,8 +3298,34 @@ export const IDENTITY_CANDIDATE_LISTS = {
     statusCounts: { pending: 11, deferred: 2, linked: 5, different: 0 },
     lowConfidenceCount: 2,
   },
+  /*
+   * ★V8-B w1W8h：会員のつき合わせの3組（高い・中くらい・候補なし）。id は EC運用の集計（EC_IDENTITY_CANDIDATES）と同じにして、
+   * 1行目の下の行に「注文 3件 ¥18,600」が出るようにする。
+   */
   ec_member: {
-    items: [identityListItem(IDENTITY_CANDIDATE_EC)], total: 1, limit: 20, offset: 0,
+    items: [
+      {
+        ...identityListItem(IDENTITY_CANDIDATE_EC), id: 'ec-identity-1',
+        confidence: { score: 94, label: 'high' },
+        left: { ...IDENTITY_CANDIDATE_EC.left, label: '高橋 直人', detail: 'EC-10422' },
+        right: { ...IDENTITY_CANDIDATE_EC.right, label: '高橋 なおと', detail: '友だち追加 9/12' },
+        evidenceSummary: ['姓', '郵便番号', 'ペット名「もも」'],
+      },
+      {
+        ...identityListItem(IDENTITY_CANDIDATE_EC), id: 'ec-identity-2',
+        confidence: { score: 82, label: 'medium' },
+        left: { ...IDENTITY_CANDIDATE_EC.left, label: '佐藤 由美', detail: 'EC-10398' },
+        right: { ...IDENTITY_CANDIDATE_EC.right, label: 'ゆみ🐶', detail: '友だち追加 8/30' },
+        evidenceSummary: ['ペット名「きなこ」', '地域'],
+      },
+      {
+        ...identityListItem(IDENTITY_CANDIDATE_EC), id: 'ec-identity-3',
+        confidence: { score: 0, label: 'low' },
+        left: { ...IDENTITY_CANDIDATE_EC.left, label: '中村 彩', detail: 'EC-10377' },
+        right: { ...IDENTITY_CANDIDATE_EC.right, label: '', detail: null },
+        evidenceSummary: [],
+      },
+    ], total: 3, limit: 20, offset: 0,
   },
   empty: { items: [], total: 0, limit: 20, offset: 0 },
 }
@@ -5473,7 +5536,8 @@ export const CONVERSION_DEFINITION_REPORT = {
     netValue: netCount * CONVERSION_DAILY_VALUES[index]
       - (day === '2026-08-25' ? CONVERSION_DAILY_FINAL_ADJUSTMENTS[index] : 0),
   }))),
-  byDefinition: CONVERSION_REPORT_CURRENT.map((current) => {
+  /* 板 `AzrZq`：成果地点ごとの表は 商品を買った・予約が入った・初回の定期便が確定・体験申込… の順（絵の並び）。 */
+  byDefinition: ['cp-1', 'cp-3', 'cp-4', 'cp-2', 'cp-5', 'cp-6'].map((id) => CONVERSION_CURRENT_BY_ID.get(id)).map((current) => {
     const previous = CONVERSION_PREVIOUS_BY_ID.get(current.conversionPointId)
     return {
       conversionPointId: current.conversionPointId,
@@ -6047,6 +6111,52 @@ export const BOOKING_AVAILABILITY_STORE_VIEW = {
 }
 
 /*
+  V8 の絵（板 d5fmnM・E3YDK・CcA4k・wvGke・yRPxl・KRgTQ・x1OZS6 など）の右のスマホの見本が読む空き。
+  絵は 10/2（金）始まり：最初の空きが金曜で 9:00〜16:00 の6枠（10:00 と 16:00 は満）、
+  10/3（土）空き・10/4（日）満・10/5（月）休み・10/6（火）空き。
+  「トリミング（小型犬）」の90分＋間隔15分で 105 分の枠。
+  上の BOOKING_AVAILABILITY（9/3 始まり）は v6 の撮影と代理予約の手順が日付で選ぶので残し、
+  見本の API は「10/1 以降の範囲」を聞かれたときだけこちらを返す（V8 の画面は今日から聞く）。
+*/
+const OCT_SLOT = (date, start, remaining) => {
+  const [h, m] = start.split(':').map(Number)
+  const end = h * 60 + m + 105
+  return {
+    date, start, end: `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`,
+    capacity: 2, remaining, state: remaining === 0 ? 'full' : 'limited',
+  }
+}
+export const BOOKING_AVAILABILITY_OCT = {
+  by_staff: [
+    {
+      staff_id: 'bs-1', display_name: '佐々木',
+      slots: [
+        OCT_SLOT('2026-10-02', '09:00', 1), OCT_SLOT('2026-10-02', '10:00', 0), OCT_SLOT('2026-10-02', '13:00', 1),
+        OCT_SLOT('2026-10-02', '14:00', 1), OCT_SLOT('2026-10-02', '15:00', 1), OCT_SLOT('2026-10-02', '16:00', 0),
+        OCT_SLOT('2026-10-03', '10:00', 1), OCT_SLOT('2026-10-03', '13:00', 1),
+        OCT_SLOT('2026-10-04', '10:00', 0), OCT_SLOT('2026-10-04', '13:00', 0),
+        OCT_SLOT('2026-10-06', '09:00', 1), OCT_SLOT('2026-10-06', '13:00', 1),
+        OCT_SLOT('2026-10-09', '10:00', 1), OCT_SLOT('2026-10-10', '13:00', 1),
+        OCT_SLOT('2026-10-13', '09:00', 1), OCT_SLOT('2026-10-16', '15:00', 1),
+        OCT_SLOT('2026-10-17', '15:00', 1), OCT_SLOT('2026-10-19', '10:00', 1),
+        OCT_SLOT('2026-10-20', '13:00', 1),
+      ],
+    },
+    {
+      staff_id: 'bs-3', display_name: '高田',
+      slots: [
+        OCT_SLOT('2026-10-02', '15:00', 1), OCT_SLOT('2026-10-03', '09:00', 1),
+        OCT_SLOT('2026-10-06', '15:00', 1), OCT_SLOT('2026-10-08', '13:00', 1),
+        OCT_SLOT('2026-10-14', '09:00', 1), OCT_SLOT('2026-10-16', '13:00', 1),
+      ],
+    },
+  ],
+  closed_dates: ['2026-10-05'],
+}
+
+/*
+
+/*
   受付枠画面 `tksPc` が読む、担当者ごとの通常応答。
   現行APIが持つのは1曜日1区間と特別営業で、休けい・店舗上限・
   明示休業はまだ返せない。その項目は画面側で作らず「—」にする。
@@ -6514,6 +6624,11 @@ const operatorRule = (id, name, eventType, recipientLabel, occurredToday, status
   lastOccurredAt: occurredToday ? '2026-09-07T11:20:00+09:00' : null,
   createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-07T10:00:00+09:00',
 })
+
+/* 運用者へのお知らせのチーム。作る画面（gjUz3）は最初のチームを選んでおき、スタッフの箱を出さない。 */
+export const OPERATOR_NOTIFICATION_TEAMS = [
+  { id: 'team-nakameguro', lineAccountId: 'visual-qa-account', name: '中目黒店', staffIds: ['staff-owner', 'staff-support', 'staff-store'], version: 1, archivedAt: null },
+]
 
 export const OPERATOR_NOTIFICATION_RULES = [
   operatorRule('operator-rule-1', '新しい予約が入りました', 'message_received', '予約チーム 3人', 18, 'published', ['staff-owner', 'staff-support', 'staff-store']),
@@ -7144,7 +7259,7 @@ export const EC_IDENTITY_CANDIDATES = {
       left: { externalCustomerId: 'customer-3', displayName: '田中 美咲', attributes: [{ label: 'メール', valuePreview: 'mi***@example.jp' }, { label: '電話', valuePreview: '***4821' }] },
       right: { friendId: 'friend-candidate-1', displayName: '田中 みさき', attributes: [{ label: 'メール', valuePreview: 'mi***@example.jp' }] },
       evidence: [{ label: 'メールアドレス', matched: true }, { label: '氏名', matched: true }],
-      impact: [{ key: 'orders', value: 8, unit: '件' }, { key: 'revenue', value: 86400, unit: '円' }],
+      impact: [{ key: 'orders', value: 3, unit: '件' }, { key: 'revenue', value: 18600, unit: '円' }],
       detectedAt: '2026-08-25T08:40:00.000Z', reviewedAt: null,
     },
     {
@@ -7152,7 +7267,7 @@ export const EC_IDENTITY_CANDIDATES = {
       left: { externalCustomerId: 'customer-7', displayName: '佐藤 健', attributes: [{ label: 'メール', valuePreview: 'ke***@example.jp' }, { label: '電話', valuePreview: '***1034' }] },
       right: { friendId: 'friend-candidate-2', displayName: '佐藤 けん', attributes: [{ label: '電話', valuePreview: '***1034' }] },
       evidence: [{ label: '電話番号', matched: true }, { label: '氏名', matched: true }],
-      impact: [{ key: 'orders', value: 5, unit: '件' }, { key: 'revenue', value: 62800, unit: '円' }],
+      impact: [{ key: 'orders', value: 2, unit: '件' }, { key: 'revenue', value: 12400, unit: '円' }],
       detectedAt: '2026-08-25T08:12:00.000Z', reviewedAt: null,
     },
     {
@@ -7160,7 +7275,7 @@ export const EC_IDENTITY_CANDIDATES = {
       left: { externalCustomerId: 'customer-8', displayName: '鈴木 あおい', attributes: [{ label: 'メール', valuePreview: 'ao***@example.jp' }] },
       right: { friendId: 'friend-candidate-3', displayName: '鈴木 葵', attributes: [{ label: 'メール', valuePreview: 'ao***@example.jp' }] },
       evidence: [{ label: 'メールアドレス', matched: true }, { label: '氏名', matched: false }],
-      impact: [{ key: 'orders', value: 3, unit: '件' }, { key: 'revenue', value: 41200, unit: '円' }],
+      impact: [{ key: 'orders', value: 1, unit: '件' }, { key: 'revenue', value: 4800, unit: '円' }],
       detectedAt: '2026-08-25T07:50:00.000Z', reviewedAt: null,
     },
     {
@@ -7173,7 +7288,7 @@ export const EC_IDENTITY_CANDIDATES = {
     },
   ],
   total: 16,
-  summary: { unmatched: 24, candidates: 16, candidateExternalCustomers: 14, duplicateSuspicions: 2, linked: 2462, potentialRevenue: 312400 },
+  summary: { unmatched: 24, candidates: 6, candidateExternalCustomers: 6, withoutCandidates: 18, duplicateSuspicions: 2, linked: 1128, potentialRevenue: 84300 },
 }
 
 /**
@@ -8392,6 +8507,42 @@ export const FRIEND_ADD_RUN_DETAIL = {
   ],
   status: 'completed',
   errorCode: null,
+}
+
+/** 実行の詳細（失敗あり）。絵 N43uVX：案内は届き、タグは付いたが、シナリオを始めるところで止まった。 */
+export const FRIEND_ADD_RUN_DETAIL_FAILED = {
+  id: 'friend-add-run-4', receivedAt: '2026-09-07T01:14:01.000Z', processedAt: '2026-09-07T01:14:02.000Z',
+  friend: { id: 'visual-friend-add-4', displayName: '山田 太郎', redacted: false }, friendKind: 'first_time',
+  attribution: { status: 'unavailable', routeId: null, routeName: null, reason: null },
+  rule: {
+    id: 'rule-fallback', name: '経路が分からなかった人', versionId: 'rule-fallback-v1', versionNumber: 1,
+    definition: {
+      routeIds: [], scenarioId: 'scenario-common', messageType: 'text', messageText: 'ご登録ありがとうございます', timing: 'immediate',
+      actions: [
+        { type: 'add_tag', label: 'タグ「経路が分からない」を付ける', targetId: 'tag-unknown-route' },
+        { type: 'start_scenario', label: 'シナリオ「共通のあいさつ」を始める', targetId: 'scenario-common' },
+      ],
+      friendCondition: '', activeFrom: null, activeUntil: null,
+    },
+  },
+  configuredActions: [
+    { type: 'add_tag', label: 'タグ「経路が分からない」を付ける', targetId: 'tag-unknown-route' },
+    { type: 'start_scenario', label: 'シナリオ「共通のあいさつ」を始める', targetId: 'scenario-common' },
+  ],
+  actionRuns: [
+    {
+      id: 'friend-add-action-run-4a', stableId: 'rule-fallback-v1:0', type: 'tag', status: 'completed',
+      attemptCount: 1, nextRetryAt: null, errorCode: null,
+      startedAt: '2026-09-07T01:14:02.000Z', completedAt: '2026-09-07T01:14:02.000Z', updatedAt: '2026-09-07T01:14:02.000Z',
+    },
+    {
+      id: 'friend-add-action-run-4b', stableId: 'rule-fallback-v1:1', type: 'scenario', status: 'failed',
+      attemptCount: 1, nextRetryAt: null, errorCode: 'action_failed',
+      startedAt: '2026-09-07T01:14:02.000Z', completedAt: null, updatedAt: '2026-09-07T01:14:02.000Z',
+    },
+  ],
+  status: 'failed',
+  errorCode: 'action_failed',
 }
 
 /** 緊急停止の送信経路の台帳。本物は `GET /api/operations/send-paths` の形。 */

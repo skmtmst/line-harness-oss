@@ -1,3 +1,4 @@
+import { captureDistributionName } from './distribution-display.js';
 import { withTextOverride } from './text-overrides.js';
 import { HQ_AUTHORED_MESSAGE_ID, isRegisteredHqMedia } from './authoring-media.js';
 import { beginHqTemplateDistributionRun, beginHqTemplateStoreResult, recordHqTemplateOwnedR2Key, setHqTemplateOwnedR2KeyState, normalizeScopedTagName, type HqTemplateDistributionResult, type HqTemplatePreflight, type HqTemplatePreflightResolution, type HqTemplateStatement } from '@line-crm/db';
@@ -325,7 +326,9 @@ async function buildR2Plan(b:R2RuntimeBinding,context:HqTemplateAdapterContext,i
   // The adapter's first statement verifies the exact preflight snapshot. Run it
   // before reference clones, then create dependencies before rich-menu rows.
   return type==='rich_menu'
-    ? {...plan,resolutions:richContext!.resolutions,dbCommit:[plan.dbCommit[0],...sourceGuards,...plan.dbCommit.slice(1)]}
+    ? {...plan,resolutions:richContext!.resolutions.map(r => r.itemKind === 'rich_menu'
+      ? {...r, targetId: r.mode === 'overwrite' ? r.targetId : ids[r.sourceId]} : r),
+      dbCommit:[plan.dbCommit[0],...sourceGuards,...plan.dbCommit.slice(1)]}
     : {...plan,dbCommit:[...sourceGuards,...plan.dbCommit]};
 }
 
@@ -456,6 +459,7 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
     for (const r of plan.resolutions) statements.push({ sql: `UPDATE hq_template_preflight_resolutions SET resolution_mode=?,target_id=?,expected_revision=?,alias_name=? WHERE preflight_id=? AND tenant_id=? AND source_id=?`, bindings: [r.mode, r.targetId ?? null, r.expectedRevision ?? null, r.aliasName ?? null, p!.id, authority.tenantId, r.sourceId] });
     statements.push({ sql: `UPDATE hq_template_distribution_results SET status='succeeded',finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),error_code=NULL WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND attempt_count=?`, bindings: claimBindings }, { sql: `INSERT INTO audit_events(id,tenant_id,line_account_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,?,?,'business',?,?,'hq_template.distributed','hq_template',?,'success',?)`, bindings: [crypto.randomUUID(), authority.tenantId, context.targetAccountId, authority.actorId, authority.role, templateId, JSON.stringify({ runId })] });
     for(const o of plan.stage)statements.push({sql:`UPDATE hq_template_owned_r2_keys SET state='committed' WHERE run_id=? AND tenant_id=? AND target_account_id=? AND object_key=? AND owner_token=? AND state='staged'`,bindings:[runId,authority.tenantId,context.targetAccountId,o.key,o.ownerToken]});
+    statements.push(captureDistributionName(runId, authority.tenantId, context.targetAccountId));
     for (let commitAttempt = 1; commitAttempt <= MAX_IO_ATTEMPTS; commitAttempt++) {
       try {
         await db.batch(statements.map(s => db.prepare(s.sql).bind(...s.bindings)));

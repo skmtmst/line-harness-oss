@@ -42,6 +42,7 @@ describe('DB-bound R2 store executor',()=>{
   test('three stores get independent draft rich menus and committed owned objects',async()=>{
     const f=await fixture();for(const a of ['a','b','c'])expect((await f.execute(await f.preflight(a))).status).toBe('succeeded');
     expect(f.raw.prepare("SELECT COUNT(*) n FROM rich_menu_groups WHERE status='draft'").get()).toEqual({n:3});
+    expect(f.raw.prepare("SELECT created_name FROM hq_template_distribution_results ORDER BY target_account_id").all()).toEqual(Array(3).fill({created_name:'Menu'}));
     const rows=f.raw.prepare('SELECT p.image_r2_key,p.line_richmenu_id,g.account_id FROM rich_menu_pages p JOIN rich_menu_groups g ON g.id=p.group_id').all()as any[];
     expect(rows).toHaveLength(6);expect(rows.every(r=>r.line_richmenu_id===null&&r.image_r2_key.startsWith(`rich-menus/${r.account_id}/hq/`))).toBe(true);
     expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='committed'").get()).toEqual({n:6});expect(f.bucket.delete).not.toHaveBeenCalled();expect(f.raw.pragma('foreign_key_check')).toEqual([]);

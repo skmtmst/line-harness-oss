@@ -113,11 +113,12 @@ export function VirtualRows({
         })
       }
     }
-    window.addEventListener('scroll', schedule, { passive: true })
+    // 送るのは白い板（.main）の中。中の送りは window へ泡立たないので、捕まえる段で聞く。
+    window.addEventListener('scroll', schedule, { capture: true, passive: true })
     window.addEventListener('resize', schedule)
     return () => {
       if (frame !== 0) cancelAnimationFrame(frame)
-      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('scroll', schedule, { capture: true })
       window.removeEventListener('resize', schedule)
     }
   }, [theme, count, rowHeight, overscan, threshold])

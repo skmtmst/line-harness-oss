@@ -89,6 +89,7 @@
 
 .ticketSubject {
   overflow: hidden;
+  line-height: var(--tpl-st2-ticket-subject-lh);
   color: var(--color-ink);
   font-size: var(--text-caption);
   font-weight: 700;
@@ -98,6 +99,7 @@
 
 .ticketMeta {
   overflow: hidden;
+  line-height: var(--tpl-st2-ticket-meta-lh);
   color: var(--color-ink-secondary);
   font-size: var(--text-micro);
   text-overflow: ellipsis;

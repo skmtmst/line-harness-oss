@@ -11,6 +11,7 @@ import {
   useListUrlFlag,
   useListUrlParam,
   useListUrlState,
+  useOnAccountSwitch,
 } from './list-url-state'
 
 /*
@@ -114,6 +115,27 @@ describe('useListScrollMemory', () => {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)) })
     expect(scroller.scrollTop).toBe(420)
   })
+
+  it('V8 の PC 幅（送るのは白い板の中）では、板（#main-content）の位置を戻す', async () => {
+    window.sessionStorage.setItem('lh:list-scroll:/scenarios', '300')
+    const main = document.createElement('main')
+    main.id = 'main-content'
+    main.style.overflowY = 'auto'
+    Object.defineProperty(main, 'scrollHeight', { configurable: true, value: 2000 })
+    Object.defineProperty(main, 'clientHeight', { configurable: true, value: 600 })
+    document.body.appendChild(main)
+    const doc = document.scrollingElement as HTMLElement
+    doc.scrollTop = 0
+    try {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+      render(<ScrollProbe ready />, { container: main.appendChild(document.createElement('div')) })
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)) })
+      expect(main.scrollTop).toBe(300)
+      expect(doc.scrollTop).toBe(0)
+    } finally {
+      main.remove()
+    }
+  })
 })
 
 import { useOffsetServerList } from '@/lib/use-server-list'
@@ -163,5 +185,22 @@ describe('URL への書き込みは描いた後', () => {
     expect(spy).toHaveBeenCalledTimes(1)
     expect(window.location.search).toContain('stopped=1')
     spy.mockRestore()
+  })
+})
+
+describe('アカウントを替えたときだけ戻す', () => {
+  function SwitchProbe({ accountId, onSwitch }: { accountId: string | null; onSwitch: () => void }) {
+    useOnAccountSwitch(accountId, onSwitch)
+    return null
+  }
+
+  it('来た瞬間（未選択→いまのアカウント）は呼ばず、別のアカウントへ替えたときだけ呼ぶ', () => {
+    const onSwitch = vi.fn()
+    const view = render(<SwitchProbe accountId={null} onSwitch={onSwitch} />)
+    view.rerender(<SwitchProbe accountId="a" onSwitch={onSwitch} />)
+    view.rerender(<SwitchProbe accountId="a" onSwitch={onSwitch} />)
+    expect(onSwitch).not.toHaveBeenCalled()
+    view.rerender(<SwitchProbe accountId="b" onSwitch={onSwitch} />)
+    expect(onSwitch).toHaveBeenCalledTimes(1)
   })
 })

@@ -333,6 +333,17 @@ export default function CreateAffiliateV8() {
       description="登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。"
       identity={<Link href={LIST_PATH} className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />成果とアフィリエイトへ</Link>}
       preview={preview}
+      /* 競合の帯は2列の上に全幅で出す（絵 Gqve5）。 */
+      notice={codeConflict ? (
+      <div className={styles.conflict} role="alert">
+        <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
+        <div className={styles.conflictText}>
+          <p className={styles.conflictTitle}>この紹介コードは、ほかの人が先に登録しました</p>
+          <p className={styles.conflictNote}>入力は残っています。別の紹介コードに変えて保存してください</p>
+        </div>
+        <Button href={LIST_PATH}><List size={15} aria-hidden="true" /> 一覧で確かめる</Button>
+      </div>
+      ) : undefined}
       status={saving ? '登録しています' : partialSave ? '基本情報は保存済み・追加情報は未保存' : 'まだ保存していません'}
       footerActions={<>
         <Button href={LIST_PATH}>キャンセル</Button>
@@ -344,16 +355,6 @@ export default function CreateAffiliateV8() {
         </Button>
       </>}
     >
-      {codeConflict ? (
-        <div className={styles.conflict} role="alert">
-          <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-          <div className={styles.conflictText}>
-            <p className={styles.conflictTitle}>この紹介コードは、ほかの人が先に登録しました</p>
-            <p className={styles.conflictNote}>入力は残っています。別の紹介コードに変えて保存してください</p>
-          </div>
-          <Button href={LIST_PATH}><List size={15} aria-hidden="true" /> 一覧で確かめる</Button>
-        </div>
-      ) : null}
 
       {partialSave && createdId ? (
         <Notice tone="warn" action={<a href={`${LIST_PATH}?affiliate=${encodeURIComponent(createdId)}&highlight=${encodeURIComponent(createdId)}`}>未保存の追加情報を破棄して一覧へ戻る</a>}>

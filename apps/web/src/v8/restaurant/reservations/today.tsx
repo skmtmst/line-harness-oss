@@ -29,7 +29,7 @@ const SLOT = 30
 const ROW_START = 17 * 60
 const ROW_END = 22 * 60
 
-function Block({ item, onOpen }: { item: RestaurantReservation; onOpen: (id: string) => void }) {
+function Block({ item, onOpen, onDetail }: { item: RestaurantReservation; onOpen: (id: string) => void; onDetail: (id: string) => void }) {
   const hold = isHold(item)
   const pending = !hold && item.status === 'pending'
   const kind = sourceKind(item.source)
@@ -37,7 +37,7 @@ function Block({ item, onOpen }: { item: RestaurantReservation; onOpen: (id: str
     <button
       type="button"
       className={`${styles.block} ${hold ? styles.blockHold : pending ? styles.blockPending : kind === 'line' ? styles.blockLine : kind === 'phone' ? styles.blockPhone : styles.blockMedia}`}
-      onClick={() => onOpen(item.id)}
+      onClick={() => (hold ? onOpen(item.id) : onDetail(item.id))}
       aria-label={hold
         ? `押さえ ${hm(item.starts_at)}〜${hm(item.ends_at)}`
         : `${item.customer_name} ${item.guest_count}名 ${hm(item.starts_at)}〜${hm(item.ends_at)}`}
@@ -61,7 +61,7 @@ function Block({ item, onOpen }: { item: RestaurantReservation; onOpen: (id: str
   )
 }
 
-export default function TodayView({ rows, later, tables, day, isToday, busy, canWrite, source, onSource, onDay, onAdd, onOpen }: {
+export default function TodayView({ rows, later, tables, day, isToday, busy, canWrite, source, onSource, onDay, onAdd, onOpen, onDetail }: {
   /** その日の予約（取消・無断も含む。表と数では除く）。 */
   rows: RestaurantReservation[]
   /** 次の予約を探すための、その月の予約（その日の残りが無いとき、次の日以降から出す）。 */
@@ -75,7 +75,10 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
   onSource: (value: string) => void
   onDay: (day: Date) => void
   onAdd: (preset: PhonePreset) => void
+  /** 変更の窓（押さえの箱・卓を変える）。 */
   onOpen: (id: string) => void
+  /** 予約の詳細の窓（予約の箱・詳細を見る。板 AjZhH）。 */
+  onDetail: (id: string) => void
 }) {
   const live = useMemo(() => rows.filter((item) => !INACTIVE_STATUSES.includes(item.status)), [rows])
   const shown = useMemo(() => (source === 'all' ? live : live.filter((item) => item.source === source)), [live, source])
@@ -212,7 +215,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
                     if (found) {
                       return (
                         <Td key={table.id} rowSpan={found.span} className={styles.calCell}>
-                          <Block item={found.item} onOpen={onOpen} />
+                          <Block item={found.item} onOpen={onOpen} onDetail={onDetail} />
                         </Td>
                       )
                     }
@@ -249,8 +252,8 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
                   <p className={`${styles.nextFrom} ${next.status === 'pending' ? styles.srcPending : sourceKind(next.source) === 'line' ? styles.srcLine : sourceKind(next.source) === 'phone' ? styles.srcPhone : styles.srcMedia}`}>{`${sourceName(next.source)} から`}</p>
                 </div>
                 <div className={styles.nextActions}>
-                  <Button onClick={() => onOpen(next.id)}>詳細を見る</Button>
-                  <Button onClick={() => onOpen(next.id)}>卓を変える</Button>
+                  <Button onClick={() => onDetail(next.id)}>詳細を見る</Button>
+                  {canWrite ? <Button onClick={() => onOpen(next.id)}>卓を変える</Button> : null}
                 </div>
               </>
             ) : (

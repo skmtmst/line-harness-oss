@@ -391,6 +391,7 @@ export default function RankSettingsV8({
         designNode="dEv6G"
         designWidth={520}
         designTop={300}
+        designHeaderPadding="var(--tpl-fm2-rank-dialog-head-pad)"
         confirmation
         tone="destructive"
         title={`ランク「${removeName}」を消しますか？`}
