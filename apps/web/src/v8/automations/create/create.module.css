@@ -399,3 +399,25 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--tpl-rule-row-gap);
 }
+
+/* 下書きを仕上げる（J1VA8）：どの見本から作ったかの帯。頭の説明のすぐ下（間 8）。 */
+.sourceBand {
+  display: flex;
+  margin-top: var(--tpl-ro-band-after);
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.sourceBand > span {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sourceIcon {
+  flex-shrink: 0;
+  color: var(--color-status-info);
+}

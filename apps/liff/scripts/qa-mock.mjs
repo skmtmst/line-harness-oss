@@ -580,6 +580,11 @@ const server = createServer(async (req, res) => {
     json(res, 200, { booking_id: 'qa-booking-1', status: 'requested' });
     return;
   }
+  // F-6 本人の取消・日時変更（送ったことにする。版の確かめはしない）。
+  if (method === 'POST' && /^\/api\/liff\/booking\/[^/]+\/(cancel|reschedule)$/.test(pathname)) {
+    json(res, 200, { lock_version: 2, status: pathname.endsWith('/cancel') ? 'cancelled' : 'confirmed' });
+    return;
+  }
   if (method === 'GET' && pathname === '/api/liff/booking/me') {
     json(res, 200, {
       upcoming: [
@@ -591,6 +596,10 @@ const server = createServer(async (req, res) => {
           menu_name: 'トリミング（小型犬）',
           staff_name: 'QA スタッフ',
           profile_image_url: null,
+          // F-6 本人の変更・取消に要る値（履歴の口が返すようになったときの形）。
+          lock_version: 1,
+          menu_id: 'qa-menu-1',
+          staff_id: 'qa-staff-1',
         },
         {
           id: 'qa-history-2',
@@ -600,6 +609,9 @@ const server = createServer(async (req, res) => {
           menu_name: 'シャンプーのみ',
           staff_name: 'QA スタッフ',
           profile_image_url: null,
+          lock_version: 3,
+          menu_id: 'qa-menu-3',
+          staff_id: 'qa-staff-1',
         },
       ],
       past: [],

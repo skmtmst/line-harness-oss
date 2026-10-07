@@ -2301,3 +2301,19 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-ux5-help-mark-font: var(--font-inter), Inter, sans-serif;
   --tpl-ux5-combobox-h: 36px;
 }
+
+/* 機能追加の画面（テンプレートの種類を選ぶ窓・見本から作る）。 */
+[data-theme="v8"] {
+  --tpl-feat-picker-gap: 20px;
+  --tpl-feat-picker-col-gap: 12px;
+  --tpl-feat-kind-h: 184px;
+  --tpl-feat-kind-pad: 16px;
+  --tpl-feat-kind-gap: 6px;
+  --tpl-feat-kind-icon: 32px;
+  --tpl-feat-kind-icon-radius: 8px;
+  --tpl-feat-kind-desc-lh: 18px;
+  --tpl-feat-example-gap: 8px;
+  --tpl-feat-example-pad: 10px 12px;
+  --tpl-feat-example-radius: 10px;
+  --tpl-feat-example-inner-gap: 2px;
+}
