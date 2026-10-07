@@ -49,6 +49,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
+import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Dialog from '@/components/shared/dialog'
@@ -1125,15 +1126,20 @@ function MessagesStageV8({
     if (selectedStepId === stableStepId) setSelectedStepId(null)
   }
 
-  const moveStep = (stableStepId: string, direction: -1 | 1) => {
-    const index = settings.steps.findIndex((step) => step.stableStepId === stableStepId)
-    const next = index + direction
-    if (index < 0 || next < 0 || next >= settings.steps.length) return
-    const steps = [...settings.steps]
-    const [moved] = steps.splice(index, 1)
-    steps.splice(next, 0, moved)
-    onChange({ ...settings, steps })
-  }
+  /*
+   * 通知の並べ替え（共通の並び替え）。つまみのドラッグ・上下キー・「前へ／後ろへ」は
+   * どれも同じ入口で並びを変える。
+   */
+  const stepOrder = useReorder({
+    items: settings.steps,
+    idOf: (step) => step.stableStepId,
+    disabledReason: settings.steps.length < 2 ? '通知が1つのときは並び替えできません' : null,
+    onReorder: ({ ids }) => {
+      const byId = new Map(settings.steps.map((step) => [step.stableStepId, step]))
+      const steps = ids.map((id) => byId.get(id)).filter((step): step is typeof settings.steps[number] => Boolean(step))
+      if (steps.length === settings.steps.length) onChange({ ...settings, steps })
+    },
+  })
 
   /** 差し込みをカーソルの位置に入れる。 */
   const insertToken = (token: string) => {
@@ -1215,12 +1221,20 @@ function MessagesStageV8({
           {settings.steps.length === 0 ? (
             <p className={styles.fieldNote}>通知はまだありません。「通知を足す」で1通目を作成してください。本文が入るまで次へは進めません。</p>
           ) : null}
-          {settings.steps.map((step, index) => {
+          {stepOrder.shown.map((step, index) => {
             const open = step.stableStepId === (selectedStep?.stableStepId ?? null)
             return (
-              <div key={step.stableStepId} className={styles.stepCard} data-open={open || undefined}>
+              <div key={step.stableStepId} className={styles.stepCard} data-open={open || undefined} {...stepOrder.rowProps(step.stableStepId)}>
                 <div className={styles.stepHead}>
-                  <GripVertical size={16} aria-hidden="true" className={styles.grip} />
+                  <ReorderHandle
+                    look="bare"
+                    className={styles.grip}
+                    label={`${index + 1}通目の通知`}
+                    {...stepOrder.handle(step.stableStepId)}
+                    {...stepOrder.handleProps(step.stableStepId)}
+                  >
+                    <GripVertical size={16} aria-hidden="true" />
+                  </ReorderHandle>
                   <span className={styles.stepNum}>{index + 1}</span>
                   <button
                     type="button"
@@ -1231,10 +1245,10 @@ function MessagesStageV8({
                     {stepShortTiming(step, settings.deliveryMode)}
                   </button>
                   <span className={styles.spacer} aria-hidden="true" />
-                  <Button type="button" variant="text" disabled={index === 0} onClick={() => moveStep(step.stableStepId, -1)}>
+                  <Button type="button" variant="text" disabled={!stepOrder.canMoveBy(step.stableStepId, -1)} onClick={() => stepOrder.moveBy(step.stableStepId, -1, 'menu')}>
                     <ArrowUp size={15} aria-hidden="true" />前へ
                   </Button>
-                  <Button type="button" variant="text" disabled={index === settings.steps.length - 1} onClick={() => moveStep(step.stableStepId, 1)}>
+                  <Button type="button" variant="text" disabled={!stepOrder.canMoveBy(step.stableStepId, 1)} onClick={() => stepOrder.moveBy(step.stableStepId, 1, 'menu')}>
                     <ArrowDown size={15} aria-hidden="true" />後ろへ
                   </Button>
                   <Button type="button" variant="text" disabled={settings.steps.length <= 1} onClick={() => removeStep(step.stableStepId)}>

@@ -207,6 +207,35 @@ describe('V8 リマインダを作る②〜⑤', () => {
     expect(host.textContent).toContain('3通目')
   })
 
+  it('通知の並べ替え：つまみのドラッグ・上下キー・「後ろへ」は同じ結果になる', async () => {
+    const order = () => [...host.querySelectorAll<HTMLElement>('[data-reorder-id]')].map((el) => el.dataset.reorderId)
+    const results: Array<Array<string | undefined>> = []
+    for (const how of ['drag', 'key', 'button'] as const) {
+      act(() => { root.unmount() })
+      root = createRoot(host)
+      draftStore.draft = baseDraft()
+      await render(null)
+      expect(order()).toEqual(['s1', 's2'])
+      const grip = host.querySelector<HTMLButtonElement>('[data-reorder-id="s1"] button[data-reorder-handle]')
+      expect(grip, 'つまみが動かせる形で出ていません').toBeTruthy()
+      if (how === 'key') await act(async () => { grip!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })) })
+      if (how === 'button') {
+        const later = [...host.querySelectorAll<HTMLElement>('[data-reorder-id="s1"] button')].find((el) => el.textContent?.trim() === '後ろへ')
+        await act(async () => { later!.click() })
+      }
+      if (how === 'drag') {
+        const target = host.querySelector<HTMLElement>('[data-reorder-id="s2"]')!
+        await act(async () => { grip!.dispatchEvent(new Event('dragstart', { bubbles: true })) })
+        await act(async () => { target.dispatchEvent(new Event('dragenter', { bubbles: true })) })
+        await act(async () => { target.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true })) })
+        await act(async () => { target.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true })) })
+      }
+      for (let i = 0; i < 3; i += 1) await act(async () => {})
+      results.push(order())
+    }
+    expect(results).toEqual([['s2', 's1'], ['s2', 's1'], ['s2', 's1']])
+  })
+
   it('配信予定（T0nis）：重なりの行は「1通にまとめる」と出し、案内の帯で件数を言う', async () => {
     await render('preview')
     expect(host.querySelector('[data-page-template="create"]')?.getAttribute('data-design-node')).toBe('T0nis')
