@@ -3823,5 +3823,52 @@
       "parent": "rt_stores",
       "parentColumn": "id"
     }
+  },
+  "visit_stamp_card_accounts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "visit_stamp_cards": {
+    "category": "retain"
+  },
+  "visit_stamp_checkouts": {
+    "category": "retain"
+  },
+  "visit_stamp_entries": {
+    "category": "retain"
+  },
+  "visit_stamp_paper_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "visit_stamp_redemptions": {
+    "category": "retain"
+  },
+  "visit_stamp_staff_pins": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "visit_stamp_visit_queue": {
+    "category": "global"
+  },
+  "visit_stamp_wallets": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
   }
 }

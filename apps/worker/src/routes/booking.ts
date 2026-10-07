@@ -1,3 +1,4 @@
+import { processVisitStampQueue } from '../services/visit-stamps.js';
 // Booking feature HTTP routes.
 //
 // LIFF-facing endpoints live under /api/liff/booking/* (auth-bypassed by
@@ -134,6 +135,8 @@ import {
 } from '../services/booking-channels.js';
 
 const booking = new Hono<Env>();
+booking.use('/api/booking/*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.ok)await processVisitStampQueue(c.env);});
+
 booking.onError((error,c)=>{if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
 booking.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(/\/waitlist$|\/seat-waitlist$/.test(c.req.path)&&c.req.method==='POST')){try{const accountId=c.req.path.startsWith('/api/liff/')?await resolveAccountIdFromLiff(c):await resolveAccountIdAdmin(c);if(accountId)await processBookingWaitlists(c.env,accountId);}catch{console.error(JSON.stringify({event:'waitlist_reconcile_failed'}));}}});
 

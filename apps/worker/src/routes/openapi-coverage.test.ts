@@ -129,6 +129,21 @@ const ALLOWLIST_MAX = 772;
  */
 const BASELINE_DOCUMENTED = new Set<string>([
   // V8 integration endpoints.
+  'GET /api/visit-stamps/cards',
+  'POST /api/visit-stamps/cards',
+  'PUT /api/visit-stamps/cards/{id}',
+  'GET /api/visit-stamps/cards/{id}/wallet',
+  'POST /api/visit-stamps/cards/{id}/grants',
+  'POST /api/visit-stamps/entries/{id}/reverse',
+  'PUT /api/visit-stamps/pins/{staffId}',
+  'GET /api/visit-stamps/paper-requests',
+  'POST /api/visit-stamps/paper-requests/{id}/review',
+  'POST /api/visit-stamps/visits/{kind}/{id}/checkout',
+  'GET /api/liff/visit-stamps/cards',
+  'GET /api/liff/visit-stamps/cards/{id}',
+  'POST /api/liff/visit-stamps/cards/{id}/rewards',
+  'POST /api/liff/visit-stamps/redemptions/{id}/use',
+  'POST /api/liff/visit-stamps/cards/{id}/paper-requests',
   'GET /api/dashboard/activity',
   'GET /api/forms/{id}/submissions/{submissionId}',
   'GET /api/friends/{id}/summary',

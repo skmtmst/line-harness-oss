@@ -1,3 +1,4 @@
+import { processVisitStampQueue } from '../services/visit-stamps.js';
 import { safeRestaurantHttpsUrl, restaurantReservationEmbed } from '../services/restaurant-media-links.js';
 import { getRestaurantInventoryRules, saveRestaurantInventoryRules, validateRestaurantInventoryRules, listRestaurantCloseTasks } from '@line-crm/db';
 import { reconcileRestaurantInventory, recordRestaurantTableConflict } from '../services/restaurant-inventory-rules.js';
@@ -59,6 +60,7 @@ export const restaurantTest = new Hono<Env>();
 restaurantTest.use('/api/restaurant-test/*', async (c,next) => {
  await next();
  if(!['POST','PUT','PATCH','DELETE'].includes(c.req.method)||!c.res.ok)return;
+ await processVisitStampQueue(c.env);
  const organization=await organizationFor(c);if(!organization)return;
  const dirty=await dbFor(c.env).prepare(`SELECT q.store_id FROM rt_inventory_rule_queue q JOIN rt_stores s ON s.id=q.store_id
  WHERE s.organization_id=? AND (? IS NULL OR s.id=?) LIMIT 100`).bind(organization.id,organization.scopedStoreId,organization.scopedStoreId).all<{store_id:string}>();

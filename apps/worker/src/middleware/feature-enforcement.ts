@@ -145,6 +145,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/nen/pets', 'photo_review'),
   feature('/api/nen/health', 'photo_review'),
   feature('/api/restaurant-test', 'restaurant_test'),
+  exempt('/api/visit-stamps', 'core', '来店スタンプはマイルと独立。店舗・カード・本人の境界は各ルートで検証'),
 
   exempt('/api/settings', 'core', '機能を再度オンにするため停止対象外'),
   exempt('/api/auth', 'core', 'ログインとセッション管理'),
