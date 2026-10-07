@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useEffect, useId, useState, type ReactNode } from 'react'
+import React, { useContext, useEffect, useId, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { useOverlayFocus, useV8Leave } from './overlay-utils'
+import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './drawer.module.css'
 
 export type DrawerDetail = { label: string; value: ReactNode }
@@ -40,6 +40,7 @@ export default function Drawer({
   modal = true,
   width,
 }: DrawerProps) {
+  const depth = useContext(OverlayDepthContext)
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
@@ -80,9 +81,9 @@ export default function Drawer({
       {footer ? <footer className={styles.footer}>{footer}</footer> : null}
     </aside>
   )
-  if (!modal) return panel
+  if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}</OverlayDepthContext.Provider>
   const overlay = <div className={styles.overlay} role="presentation" data-closing={leaving || undefined} onMouseDown={(event) => {
     if (!busy && event.target === event.currentTarget) onClose()
   }}>{panel}</div>
-  return mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay
+  return <OverlayDepthContext.Provider value={depth + 1}>{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>
 }

@@ -444,14 +444,14 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
       setSwitchTarget(next)
       return
     }
-    router.push(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
+    router.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
   }
   function confirmSwitch() {
     const next = switchTarget
     setSwitchTarget(null)
     if (!next) return
     tabEdit?.onReset()
-    router.push(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
+    router.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
   }
 
   /*

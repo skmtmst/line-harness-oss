@@ -432,7 +432,7 @@ export default function TagsTab({
       }
       notifyToast(next ? `「${tag.name}」を一覧に出します` : `「${tag.name}」を一覧から外します`, {
         actionLabel: '元に戻す',
-        onAction: () => { void toggleStar({ ...tag, isStarred: next }) },
+        onAction: () => { void toggleStar({ ...tag, isStarred: next, version: typeof version === 'number' ? version : tag.version }) },
       })
     } catch (reason) {
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))

@@ -20,6 +20,9 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/settings/pools/create.tsx',
+  'v8/broadcasts/quick-send.tsx',
+  'v8/auto-replies/quick-create.tsx',
   'app/inflow-links/ad-event-mappings.tsx',
   'app/settings/feature-settings-v8.tsx',
   'components/ops/knowledge-editor.tsx',
@@ -206,6 +209,10 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'components/hq/account-menu.tsx':
+    '編集を持たないメニュー。アカウント解除と移動を共通の未保存確認へ委ねる',
+  'components/shell/app-top-bar.tsx':
+    '編集を持たない上部の帯。アカウント切替と移動を共通の未保存確認へ委ねる',
   'v8/restaurant/closures/closure-dialog.tsx': '臨時休業・貸切を足す・変える窓（提案 E-10 nVvXy）。保存の口は窓の中だけで、開くたびに押した日か記録から作り直し、閉じると入力を破棄する。',
   'v8/restaurant/front-desk/phone-drawer.tsx': '電話予約の引き出し（提案 E-2）。保存の口は引き出しの中だけで、開くたびに空から始まり、閉じると入力を破棄する（入力中は題に * が付く）。',
   'app/hq/account-browser-v8.tsx': 'タグ名だけの小さな窓。保存の口は窓内だけにあり、閉じると入力を破棄する。',
@@ -262,8 +269,6 @@ const EXEMPTIONS: Record<string, string> = {
     '重なりの共通部品。初回フォーカスの寄せ先を呼出側で選べるだけで、編集を持たない',
   'components/shared/button.tsx':
     'ボタンの共通部品。開いた直後の標的用の ref を受けられるだけで、編集を持たない',
-  'v8/settings/pools/create.tsx':
-    'new/page.tsx（hq 未判定）と同じ画面の★V8版（前の app/pools/new/pool-new-v8.tsx を置き換えた）。作る前の一時入力だけで下書きを持たないため、番兵の要否は元の画面と一緒に決める',
   'app/form-submissions/page.tsx':
     '一覧と絞り込みが中心。作る操作は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/inflow-links/page.tsx':
@@ -362,8 +367,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 案件を作る・編集する窓（app/affiliates/tabs.tsx の写し）。入力はすべて窓の中で、閉じると戻る',
   'v8/booking-staff/shifts.tsx':
     'app/booking/staff/shifts/staff-detail-v8.tsx と同じ画面の★V8版（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定する。元の画面と同じ扱い',
-  'v8/broadcasts/quick-send.tsx':
-    '★V8 一斉配信のかんたんに送る（P6vbxn）。小窓の中の入力で、閉じると戻る',
   'v8/common-vars/list.tsx':
     'app/contents/vars/list-v8.tsx と同じ一覧の★V8版。一覧上の操作は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。窓内の理由欄は閉じると戻る',
   'v8/contents/list.tsx':

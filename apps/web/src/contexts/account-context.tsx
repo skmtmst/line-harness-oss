@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { loadLineAccounts } from '@/lib/line-accounts-cache'
 
 const STORAGE_KEY = 'lh_selected_account'
@@ -97,21 +98,25 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const [refreshing, setRefreshing] = useState(false)
 
   const setSelectedAccountId = useCallback((id: string) => {
-    setSelectedAccountIdState(id)
-    try {
-      localStorage.setItem(STORAGE_KEY, id)
-    } catch {
-      // localStorage unavailable
-    }
+    requestUnsavedAction(() => {
+      setSelectedAccountIdState(id)
+      try {
+        localStorage.setItem(STORAGE_KEY, id)
+      } catch {
+        // localStorage unavailable
+      }
+    })
   }, [])
 
   const clearSelectedAccountId = useCallback(() => {
-    setSelectedAccountIdState(null)
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-    } catch {
-      // localStorage unavailable
-    }
+    requestUnsavedAction(() => {
+      setSelectedAccountIdState(null)
+      try {
+        localStorage.removeItem(STORAGE_KEY)
+      } catch {
+        // localStorage unavailable
+      }
+    })
   }, [])
 
   const refreshAccounts = useCallback(async () => {

@@ -170,6 +170,7 @@ export default function WebhooksIncomingV8() {
   const [rotateTarget, setRotateTarget] = useState<{ id: string; name: string } | null>(null)
   const [rotateSecret, setRotateSecret] = useState('')
   const [rotateError, setRotateError] = useState('')
+  const [rotating, setRotating] = useState(false)
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
 
   useEffect(() => {
@@ -340,6 +341,7 @@ export default function WebhooksIncomingV8() {
 
   /* ===== 合言葉を更新する ===== */
   const runRotate = async (stepUpToken?: string) => {
+    if (rotating) return
     setRotateError('')
     const accountId = selectedAccountId
     if (!rotateTarget) return
@@ -351,6 +353,7 @@ export default function WebhooksIncomingV8() {
       setRotateError(`合言葉は${MIN_SECRET_LENGTH}文字以上にしてください`)
       return
     }
+    setRotating(true)
     try {
       const res = await api.webhooks.incoming.update(rotateTarget.id, accountId, { secret: rotateSecret }, stepUpToken)
       if (accountRef.current !== accountId) return
@@ -370,6 +373,8 @@ export default function WebhooksIncomingV8() {
       setRotateError(describeApiFailure(caught, 'シークレットの更新', {
         forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
       }))
+    } finally {
+      setRotating(false)
     }
   }
 
@@ -919,6 +924,7 @@ export default function WebhooksIncomingV8() {
 
         <Dialog
           open={rotateTarget !== null}
+          busy={rotating}
           title={rotateTarget ? `「${rotateTarget.name}」の合言葉を更新する` : ''}
           description="新しい合言葉を設定します。保存したあとは二度と全部は表示されません。前の合言葉は24時間だけ使えるので、相手側の切り替え中も受け取りは止まりません。"
           error={rotateError || undefined}
