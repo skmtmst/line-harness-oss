@@ -7056,11 +7056,11 @@ booking.get('/api/booking/admin/staff/:id/shifts', requireOwnBookingStaffOrAdmin
   const from = c.req.query('from');
   const to = c.req.query('to');
   const sql = from && to
-    ? `SELECT id, work_date, start_time, end_time
+    ? `SELECT id, work_date, start_time, end_time, is_responsible
          FROM staff_shifts
         WHERE staff_id = ? AND work_date BETWEEN ? AND ?
         ORDER BY work_date ASC`
-    : `SELECT id, work_date, start_time, end_time
+    : `SELECT id, work_date, start_time, end_time, is_responsible
          FROM staff_shifts
         WHERE staff_id = ?
         ORDER BY work_date ASC`;
@@ -7077,9 +7077,11 @@ booking.put('/api/booking/admin/staff/:id/shifts', requireOwnBookingStaffOrAdmin
     return c.json({ error: 'staff_not_found_in_account' }, 404);
   }
   const b = await c.req.json<{
-    shifts?: Array<{ work_date: string; start_time: string; end_time: string }>;
+    shifts?: Array<{ work_date: string; start_time: string; end_time: string; is_responsible?: boolean }>;
   }>().catch(() => null);
   if (!b || !Array.isArray(b.shifts)) return c.json({ error: 'shifts_must_be_an_array' }, 400);
+  if(b.shifts.some(s=>s.is_responsible!==undefined&&typeof s.is_responsible!=='boolean'))return c.json({error:'責任者の指定を確認してください'},400);
+  if(b.shifts.some(s=>s.is_responsible!==undefined)&&!['owner','admin'].includes(c.get('staff')?.role??''))return c.json({error:'責任者を指定できるのは管理者です'},403);
   if (b.shifts.length > 366) return c.json({ error: 'too_many_shifts' }, 400);
   const invalid = b.shifts.find((shift) => (
     !isValidShiftDate(shift.work_date)
@@ -7089,14 +7091,15 @@ booking.put('/api/booking/admin/staff/:id/shifts', requireOwnBookingStaffOrAdmin
 
   const statements = b.shifts.map((s) => (
     c.env.DB.prepare(
-        `INSERT INTO staff_shifts (id, staff_id, work_date, start_time, end_time)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO staff_shifts (id, staff_id, work_date, start_time, end_time, is_responsible)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(staff_id, work_date) DO UPDATE
             SET start_time = excluded.start_time,
                 end_time = excluded.end_time,
+                is_responsible = CASE WHEN ? IS NULL THEN staff_shifts.is_responsible ELSE excluded.is_responsible END,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')`,
       )
-      .bind(crypto.randomUUID(), staffId, s.work_date, s.start_time, s.end_time)
+      .bind(crypto.randomUUID(), staffId, s.work_date, s.start_time, s.end_time,Number(s.is_responsible??false),s.is_responsible===undefined?null:Number(s.is_responsible))
   ));
   if (statements.length > 0) await c.env.DB.batch(statements);
   return c.json({ ok: true, count: b.shifts.length });

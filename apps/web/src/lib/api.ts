@@ -14001,6 +14001,7 @@ export interface BookingShift {
   work_date: string;
   start_time: string;
   end_time: string;
+  is_responsible?: number;
 }
 
 export interface StaffMenuMatrix {
@@ -14920,7 +14921,7 @@ export const bookingApi = {
   putShifts: (
     accountId: string,
     staffId: string,
-    shifts: Array<{ work_date: string; start_time: string; end_time: string }>,
+    shifts: Array<{ work_date: string; start_time: string; end_time: string; is_responsible?: boolean }>,
   ) =>
     fetchApi<{ ok: true; count: number }>(
       withAccount(`/api/booking/admin/staff/${staffId}/shifts`, accountId),

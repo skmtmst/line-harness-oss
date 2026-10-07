@@ -1,3 +1,4 @@
+import type { RestaurantInventoryRules, RestaurantInventoryRulesInput, RestaurantChannelCloseTask } from '@line-crm/shared'
 import type { RestaurantHoldInput, RestaurantHoldResult, RestaurantCustomer, RestaurantCustomerHistory, RestaurantOpeningHours, RestaurantAllocation, RestaurantLoginMember, RestaurantMenuChangeResult, RestaurantTableLayoutInput, RestaurantTablePosition, RestaurantApprovalDecision } from '@line-crm/shared'
 import { fetchApi } from './api'
 
@@ -46,7 +47,7 @@ export type SeatWaitlistEntry = {
 }
 export type RestaurantInventory = {
   id: string; store_id: string; starts_at: string; slot_minutes: 15 | 30; total_capacity: number;
-  ota_capacity: number; line_capacity: number; walk_in_capacity: number; reserved_count: number; version?: number; updated_by?: string | null; updated_by_name?: string | null; updated_at?: string;
+  ota_capacity: number; line_capacity: number; walk_in_capacity: number; same_day_capacity?: number; reserved_count: number; version?: number; updated_by?: string | null; updated_by_name?: string | null; updated_at?: string;
   guest_count?: number; occupied_seats?: number; occupiedTableIds?: string[]; freeSeats?: number
 }
 export type RestaurantMenuItem = {
@@ -95,6 +96,10 @@ const withOptionalAccount = (path: string, accountId: string | null) =>
   accountId ? withAccount(path, accountId) : path
 
 export const restaurantTestApi = {
+  inventoryRules: (accountId:string,storeId:string)=>fetchApi<{success:true;data:RestaurantInventoryRules}>(withAccount(`/api/restaurant-test/inventory-rules?storeId=${encodeURIComponent(storeId)}`,accountId)),
+  saveInventoryRules: (accountId:string,body:RestaurantInventoryRulesInput)=>fetchApi<{success:true;data:RestaurantInventoryRules}>(withAccount('/api/restaurant-test/inventory-rules',accountId),{method:'PUT',body:JSON.stringify(body)}),
+  channelCloseTasks: (accountId:string,storeId:string)=>fetchApi<{success:true;data:RestaurantChannelCloseTask[]}>(withAccount(`/api/restaurant-test/channel-close-tasks?storeId=${encodeURIComponent(storeId)}`,accountId)),
+  completeChannelCloseTask: (accountId:string,id:string)=>fetchApi<{success:true;data:{id:string;status:'done'}}>(withAccount(`/api/restaurant-test/channel-close-tasks/${encodeURIComponent(id)}/done`,accountId),{method:'POST'}),
   loginMembers: (accountId: string) => fetchApi<{ success: true; data: RestaurantLoginMember[] }>(withAccount('/api/restaurant-test/login-members', accountId)),
   linkMembershipLogin: (accountId: string, id: string, staffId: string | null) => fetchApi<{ success: true; data: { id: string; staffId: string | null } }>(withAccount(`/api/restaurant-test/memberships/${encodeURIComponent(id)}/login`, accountId), { method: 'PUT', body: JSON.stringify({ staffId }) }),
   openingHours: (accountId: string, storeId: string) => fetchApi<{ success: true; data: RestaurantOpeningHours }>(withAccount(`/api/restaurant-test/opening-hours?storeId=${encodeURIComponent(storeId)}`, accountId)),
