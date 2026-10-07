@@ -69,6 +69,8 @@ D1_DATABASE_ID = "00bd7aca-950b-4d67-b865-fd7427b9c43f"
 MANIFEST_URL = "https://github.com/Shudesu/line-harness-oss/releases/latest/download/release-manifest.json"
 WORKER_PUBLIC_URL = "https://stg-api.musubo.jp"
 WORKER_URL = "https://stg-api.musubo.jp"
+# 同じ検証Workerに届く別の入口。LINE の Webhook がこちらで登録されていても「この環境」と判定する。
+WORKER_ALIAS_URLS = "https://nen-line-stg.skmtmst.workers.dev"
 ADMIN_PUBLIC_URL = "https://stg-admin.musubo.jp"
 ADMIN_ORIGIN = "https://stg-admin.musubo.jp,https://nen-line-stg-admin.pages.dev"
 ADMIN_ALLOW_CROSS_SITE = "true"

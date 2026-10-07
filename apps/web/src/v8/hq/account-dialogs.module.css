@@ -62,6 +62,19 @@
   gap: var(--tpl-hq-plan-head-gap);
 }
 
+.reasonList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-field-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-status-warn-deep);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+  overflow-wrap: anywhere;
+}
+
 .buttonRow {
   display: flex;
   flex-wrap: wrap;

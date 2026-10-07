@@ -19,6 +19,7 @@ import { api, type LineAccountTag } from '@/lib/api'
 import type { AccountWithStats } from '@/contexts/account-context'
 import head from './dialog-head.module.css'
 import styles from './account-dialogs.module.css'
+import { FALLBACK_REASON, connectionReasons, lineHandle } from './connection-reasons'
 
 /** 絵 `HMpVx` の窓の幅と上からの位置（px）。 */
 const SETTINGS_WIDTH = 560
@@ -101,9 +102,9 @@ async function stepUpToken(code: string): Promise<string> {
   return res.data.token
 }
 
-/** 窓に出す呼び名。「然 -NEN- 渋谷店（@nen-shibuya）」。 */
+/** 窓に出す呼び名。「然 -NEN- 渋谷店（@nen-shibuya）」。@ は付けて返す（LINE の basicId は @ 付きで来るので二重にしない）。 */
 export function accountHandle(account: AccountWithStats): string {
-  return account.basicId || account.channelId
+  return lineHandle(account)
 }
 
 /* 板 `HMpVx`：アカウントの設定（名前・親・タグ・ほかの設定・アーカイブ）。 */
@@ -209,7 +210,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
     <Dialog
       open
       title="アカウントの設定"
-      description={`${account.displayName || account.name}（@${accountHandle(account)}）`}
+      description={`${account.displayName || account.name}（${accountHandle(account)}）`}
       designNode="HMpVx"
       designWidth={SETTINGS_WIDTH}
       designTop={SETTINGS_TOP}
@@ -290,6 +291,16 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
           ) : null}
           <p className={styles.note}>タグは アカウント一覧の左の列で絞り込みに使います</p>
         </div>
+        {!archived && account.connection?.status === 'warn' ? (
+          /* 要確認のときだけ：引っかかった確認ごとの理由（URL は折り返して全文）。 */
+          <div className={styles.field}>
+            <p className={styles.label}>接続の確認</p>
+            <ul className={styles.reasonList} aria-label="要確認の理由">
+              {(connectionReasons(account).length > 0 ? connectionReasons(account).map((reason) => reason.detail) : [FALLBACK_REASON])
+                .map((detail) => <li key={detail}>{detail}</li>)}
+            </ul>
+          </div>
+        ) : null}
         <div className={styles.field}>
           <p className={styles.label}>ほかの設定</p>
           <div className={styles.buttonRow}>

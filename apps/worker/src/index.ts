@@ -362,6 +362,12 @@ export type Env = {
     D1_DATABASE_ID?: string;
     MANIFEST_URL?: string;
     WORKER_PUBLIC_URL?: string;
+    /**
+     * Comma-separated extra origins that reach this same Worker (for example
+     * its workers.dev address). A LINE webhook registered on one of them is
+     * treated as pointing at this environment.
+     */
+    WORKER_ALIAS_URLS?: string;
     ADMIN_PUBLIC_URL?: string;
     LIFF_PUBLIC_URL?: string;
     // Google Calendar booking sync. Store the private key as a Worker secret.
