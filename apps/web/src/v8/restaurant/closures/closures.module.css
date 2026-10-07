@@ -373,6 +373,8 @@
 .form {
   display: flex;
   flex-direction: column;
+  /* 窓の中身は左寄せの縦並び（中身の幅に縮む）。文が短いと欄が細るので、窓の幅いっぱいに広げる */
+  align-self: stretch;
   gap: var(--tpl-e10-form-gap);
 }
 
