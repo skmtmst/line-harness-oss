@@ -248,3 +248,26 @@
     width: clamp(var(--tpl-inbox-list-w-min), var(--tpl-inbox-list-w-ratio), var(--tpl-inbox-list-w));
   }
 }
+
+/* 状態の切り替えの件数（絵 XqSvX「状態」の「数」：11/600・薄い字・文字との間4）。 */
+.statusCount {
+  margin-left: var(--tpl-inbox-status-count-gap);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 一覧の行の右上の時刻（XqSvX「時」：12px・薄い字、未読は濃い字・600）。 */
+.rowTime {
+  flex: none;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-inbox-chead-sub-lh);
+  white-space: nowrap;
+}
+
+.rowTime[data-unread] {
+  color: var(--color-ink);
+  font-weight: 600;
+}

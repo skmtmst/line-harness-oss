@@ -1403,6 +1403,7 @@
   --tpl-inbox-seg-gap: 2px;               /* 状態の切り替えの間 */
   --tpl-inbox-seg-item-pad: 5px 4px;      /* 状態の切り替え1つの内側 */
   --tpl-inbox-seg-item-radius: 8px;       /* 状態の切り替え1つの角丸 */
+  --tpl-inbox-status-count-gap: 4px;      /* 状態の名前と件数の間 */
   --tpl-inbox-row-pad: 12px 16px;         /* 会話の行の内側 */
   --tpl-inbox-row-gap: 10px;              /* 顔と文の間 */
   --tpl-inbox-row-line-gap: 2px;          /* 名前・内容・札の段の間 */

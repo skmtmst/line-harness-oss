@@ -44,6 +44,7 @@ import InboxRulesPopover from '@/v8/inbox-chat/rules-popover'
 import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog'
 import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css'
 import ConversationHead from '@/v8/inbox-chat/conversation-head'
+import { formatInboxListTime } from '@/v8/inbox-chat/list-time'
 import SegmentedControl from '@/components/shared/segmented'
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
@@ -100,6 +101,12 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'on_hold', label: '保留' },
   { key: 'resolved', label: '対応済み' },
 ]
+
+/*
+ * ★V8（M0393 XqSvX「状態」）：絵の切り替えは 未対応・対応中・保留・対応済み の4つで、件数つき。
+ * 「すべて」は無い。選んでいる所をもう一度押すと絞り込みを外す（すべてに戻る）。
+ */
+const statusFiltersV8 = statusFilters.filter((f) => f.key !== 'all')
 
 import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types'
 import { savedViewFailureMessage } from './saved-view-failure'
@@ -257,7 +264,9 @@ const INBOX_TIME_ZONE = 'Asia/Tokyo'
  * いま 文字・Flex・画像 だけを受ける。動画・ファイルは選んだときに理由を出して止める（送ったつもりにさせない）。
  */
 const ATTACH_ACCEPT_V8 = 'image/jpeg,image/png,video/mp4,application/pdf,.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv'
-const ATTACH_NOTE_V8 = '画像は JPEG / PNG・1枚 1MB まで（動画・ファイルはまだ送れません）'
+/* 案内は絵（XqSvX「画像の注」）の短さに。動画・ファイルがまだ送れないことは title と選んだときの文で伝える。 */
+const ATTACH_NOTE_V8 = 'JPEG / PNG・1枚 1MB まで'
+const ATTACH_NOTE_V8_TITLE = '画像は JPEG / PNG・1枚 1MB まで。動画・ファイルはまだ受信箱から送れません'
 
 function formatJstScheduledAt(iso: string): string {
   const d = new Date(iso)
@@ -1787,15 +1796,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // （ラジオの決まり）。左右・先頭・末尾のキーで選ぶ。
   const statusFilterButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
   const handleStatusFilterKeyDown = (event: React.KeyboardEvent) => {
-    const current = statusFilters.findIndex((f) => f.key === statusFilter)
+    const list = isV8 ? statusFiltersV8 : statusFilters
+    const current = Math.max(0, list.findIndex((f) => f.key === statusFilter))
     let next: number | null = null
-    if (event.key === 'ArrowRight') next = (current + 1) % statusFilters.length
-    else if (event.key === 'ArrowLeft') next = (current - 1 + statusFilters.length) % statusFilters.length
+    if (event.key === 'ArrowRight') next = (current + 1) % list.length
+    else if (event.key === 'ArrowLeft') next = (current - 1 + list.length) % list.length
     else if (event.key === 'Home') next = 0
-    else if (event.key === 'End') next = statusFilters.length - 1
+    else if (event.key === 'End') next = list.length - 1
     if (next == null) return
     event.preventDefault()
-    const filter = statusFilters[next]
+    const filter = list[next]
     setStatusFilter(filter.key)
     dropSavedViewParam()
     statusFilterButtonRefs.current[next]?.focus()
@@ -2304,6 +2314,40 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }, [quickCountsKey, statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
 
   /*
+   * ★V8 状態の切り替えの件数（未対応 5・対応中 2…）。一覧と同じ条件（アカウント・担当・名前・
+   * 未読だけ・経路）で、状態ごとに件数の口へ聞く。失敗は0件にせず数を出さない。v7 では聞かない。
+   */
+  const statusCountsKey = JSON.stringify([selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
+  const [statusCounts, setStatusCounts] = useState<{ key: string; counts: Record<Exclude<StatusFilter, 'all'>, number> } | null>(null)
+  const statusCountsRequestRef = useRef(0)
+  useEffect(() => {
+    if (!isV8) return
+    const requestId = ++statusCountsRequestRef.current
+    const key = statusCountsKey
+    const keys = ['unread', 'in_progress', 'on_hold', 'resolved'] as const
+    void Promise.all(keys.map((status) => withRequestTimeout(api.chats.quickCounts({
+      status,
+      operatorId: assigneeFilter === 'all' ? undefined : assigneeFilter,
+      accountId: selectedAccountId || undefined,
+      q: debouncedNameQuery || undefined,
+      unreadOnly,
+      channel,
+    })))).then((results) => {
+      if (statusCountsRequestRef.current !== requestId) return
+      const alls = results.map((res) => (res.success && res.data && typeof res.data.all === 'number' ? res.data.all : null))
+      if (alls.some((n) => n === null)) {
+        setStatusCounts(null)
+        return
+      }
+      const counts = Object.fromEntries(keys.map((status, i) => [status, alls[i]])) as Record<Exclude<StatusFilter, 'all'>, number>
+      setStatusCounts({ key, counts })
+    }).catch(() => {
+      if (statusCountsRequestRef.current === requestId) setStatusCounts(null)
+    })
+  }, [isV8, statusCountsKey, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
+  const statusCountsNow = statusCounts?.key === statusCountsKey ? statusCounts.counts : null
+
+  /*
    * 対応状況の切替は取り消せる軽い操作。押した瞬間に画面へ反映して
    * 裏で保存する（★V7 sTJsh §1）。失敗したら元の状況へ戻す。
    */
@@ -2807,8 +2851,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               onKeyDown={handleStatusFilterKeyDown}
               className={`bg-shell flex h-8 flex-nowrap items-stretch rounded-control p-0.5 ${styles.statusSeg}`}
             >
-              {statusFilters.map((f, index) => {
+              {(isV8 ? statusFiltersV8 : statusFilters).map((f, index) => {
                 const selected = statusFilter === f.key
+                // V8：「すべて」の所が無いので、何も選んでいない（すべて）ときは先頭に Tab で入れる。
+                const focusable = selected || (isV8 && statusFilter === 'all' && index === 0)
+                const count = isV8 && statusCountsNow ? statusCountsNow[f.key as Exclude<StatusFilter, 'all'>] : null
                 return (
                   <button
                     key={f.key}
@@ -2816,9 +2863,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     type="button"
                     role="radio"
                     aria-checked={selected}
-                    tabIndex={selected ? 0 : -1}
-                    title={f.label}
-                    onClick={() => { setStatusFilter(f.key); dropSavedViewParam() }}
+                    tabIndex={focusable ? 0 : -1}
+                    title={isV8 && selected ? `${f.label}（もう一度押すとすべて）` : f.label}
+                    onClick={() => { setStatusFilter(isV8 && selected ? 'all' : f.key); dropSavedViewParam() }}
                     // #639 の素のボタンの最小高さ32pxをここだけ外す。
                     // 切り替え全体の高さ32pxの中に収めるため。
                     style={{ minHeight: 0 }}
@@ -2829,6 +2876,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     }`}
                   >
                     {f.label}
+                    {count === null || count === undefined ? null : <span className={styles.statusCount}>{count}</span>}
                   </button>
                 )
               })}
@@ -2947,9 +2995,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           <div className="flex items-center justify-between gap-2">
                             {/* 板 `M0393`：未対応は顔の赤い点＋名前の太字。行の地は塗らない。 */}
                             <p className={`text-ink truncate text-sm ${item.isUnread ? 'font-semibold' : 'font-medium'}`}>{item.customerName}</p>
+                            {isV8 ? (
+                              <span className={styles.rowTime} data-unread={item.isUnread || undefined}>{formatInboxListTime(item.lastIncomingAt)}</span>
+                            ) : (
                             <span className="text-ink-faint shrink-0 text-xs tabular-nums">
                               {formatRelative(item.lastIncomingAt)}
                             </span>
+                            )}
                           </div>
                           <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
                             <p className={`text-ink-faint line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview}`}>
@@ -3043,7 +3095,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               {/* 板 `M0393`：未対応は名前の太字。行の地は塗らない。 */}
                               <p className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
                             </div>
-                            {waitingLabel ? (
+                            {isV8 ? (
+                              /* ★V8（XqSvX）：右上は「2時間前」「昨日」「8月16日」。未読は濃い字・太字。待ち時間の札は置かない。 */
+                              <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={waitingLabel ?? undefined}>{formatInboxListTime(chat.lastMessageAt)}</span>
+                            ) : waitingLabel ? (
                               <span className="text-status-warn-deep shrink-0 text-nano font-semibold">{waitingLabel}</span>
                             ) : (
                               <span className="text-ink-faint shrink-0 text-xs tabular-nums">{formatRelative(chat.lastMessageAt)}</span>
@@ -4060,7 +4115,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     */}
                     <span
                       className={`min-w-0 truncate text-xs ${imageError ? 'text-danger' : 'text-ink-faint'}`}
-                      title={imageError || (isV8 ? ATTACH_NOTE_V8 : 'JPEG / PNG・1枚 1MB まで')}
+                      title={imageError || (isV8 ? ATTACH_NOTE_V8_TITLE : 'JPEG / PNG・1枚 1MB まで')}
                     >
                       {imageError
                         ? imageError

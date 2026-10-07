@@ -57,8 +57,9 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
     expect(waiting).toContain('${hours}時間${minutes % 60}分')
   })
 
-  it('行は待ち時間があればそれを、無ければ日付を出す', () => {
-    expect(lineRow).toContain('{waitingLabel ? (')
+  it('行は待ち時間があればそれを、無ければ日付を出す（v7）。V8 は絵どおり時刻だけ', () => {
+    expect(lineRow).toContain('waitingLabel ? (')
+    expect(lineRow).toContain('formatInboxListTime(chat.lastMessageAt)')
     expect(lineRow).toContain('formatRelative(chat.lastMessageAt)')
     // 年入りの旧書式へ戻さない。
     expect(lineRow).not.toContain('formatDatetime(')

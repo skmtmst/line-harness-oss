@@ -10,6 +10,7 @@
 import { useState, type ReactNode } from 'react'
 import { ChevronLeft, PanelRight, Search, Star } from 'lucide-react'
 import type { OperatorOption } from '@/components/chats/inbox-dropdown'
+import Avatar from '@/components/shared/avatar'
 import { HeadOperatorMenu, HeadStatusMenu, type HeadStatus } from './head-menus'
 import styles from './inbox-chat.module.css'
 
@@ -42,7 +43,6 @@ export default function ConversationHead({
   extra?: ReactNode
 }) {
   const [nameExpanded, setNameExpanded] = useState(false)
-  const initial = Array.from(name.trim())[0] ?? '?'
   return (
     <div className={styles.chead} data-inbox-v8="conversation-head">
       <div className={styles.cheadWho}>
@@ -51,9 +51,8 @@ export default function ConversationHead({
             <ChevronLeft aria-hidden="true" />
           </button>
         ) : null}
-        <span className={styles.cheadFace} aria-hidden="true">
-          {pictureUrl ? <img src={pictureUrl} alt="" /> : initial}
-        </span>
+        {/* 顔は共通の Avatar（一覧の行と同じ色・頭文字の決まり）。 */}
+        <Avatar name={name} src={pictureUrl} size={28} />
         <div className={styles.cheadText}>
           <button
             type="button"
