@@ -63,6 +63,15 @@
   min-width: 0;
 }
 
+/* 店のタブ（E-1 と同じ段）：板の頭の下 12、タブの下 16 で中身 */
+.storeTabs {
+  margin-top: var(--tpl-rs-tabs-top);
+}
+
+.bodyAfterTabs {
+  margin-top: var(--tpl-rs-tabs-body-top);
+}
+
 /* 予約台帳：題（362）・[店舗・見方・主ボタン]。狭い幅では右の組ごと2行目へ。今日は段の間が 14 */
 .headLedger {
   flex-wrap: wrap;

@@ -45,6 +45,8 @@ vi.mock('@/lib/api', () => ({
     folders: { list: fixture.foldersList },
     friendFields: { list: fixture.friendFieldsList },
     reminders: { createDraft: fixture.createDraft },
+    // 下書きの自動保存は閲覧のみの人には動かさないため、役割を読む。
+    staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
   },
   eventsApi: { listEvents: fixture.listEvents },
 }))

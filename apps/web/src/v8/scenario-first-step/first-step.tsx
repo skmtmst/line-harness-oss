@@ -60,6 +60,8 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { restoreFirstStep, scheduleToPayload } from './first-step-form'
 import styles from './first-step.module.css'
+import { browserDraftKey, useBrowserDraft } from '@/v8/autosave/use-browser-draft'
+import { BrowserDraftNotice } from '@/v8/autosave/browser-draft-notice'
 
 const modeLabel: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
@@ -228,6 +230,50 @@ export default function ScenarioFirstStepV8() {
 
   const mode: DeliveryMode = scenario?.deliveryMode ?? 'absolute_time'
 
+  /*
+   * 1通目の保存は配信の行へ直に入る（下書きの口が無い）。書きかけはこのブラウザに
+   * だけ残し、開き直したときに「前の入力を戻す」を出す。比べる元は読み込み直後の形。
+   */
+  const formValue = {
+    body, targetMode, targetTagId, targetCondition, contentMode, kind, question, kindState,
+    templateId, image, offsetDays, deliveryTime, offsetHours, offsetMinutesRemainder, preserved,
+  }
+  const [formBaseline, setFormBaseline] = useState<typeof formValue | null>(null)
+  useEffect(() => {
+    if (loadState !== 'ready') {
+      if (formBaseline !== null) setFormBaseline(null)
+      return
+    }
+    if (formBaseline === null) setFormBaseline(formValue)
+    // 読み込みが済んだ瞬間の形だけを採る。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadState, formBaseline])
+  const browserDraft = useBrowserDraft({
+    storageKey: formBaseline && scenario ? browserDraftKey(['scenario-first-step', scenario.lineAccountId, id]) : null,
+    value: formValue,
+    baseline: formBaseline ?? formValue,
+    active: canEdit,
+  })
+  const restoreBrowserDraft = () => {
+    const stored = browserDraft.restore()
+    if (!stored) return
+    setBody(stored.body)
+    setTargetMode(stored.targetMode)
+    setTargetTagId(stored.targetTagId)
+    setTargetCondition(stored.targetCondition)
+    setContentMode(stored.contentMode)
+    setKind(stored.kind)
+    setQuestion(stored.question)
+    setKindState(stored.kindState)
+    setTemplateId(stored.templateId)
+    setImage(stored.image)
+    setOffsetDays(stored.offsetDays)
+    setDeliveryTime(stored.deliveryTime)
+    setOffsetHours(stored.offsetHours)
+    setOffsetMinutesRemainder(stored.offsetMinutesRemainder)
+    setPreserved(stored.preserved)
+  }
+
   /** 1通目に付ける配信対象。タグだけでも詳細条件と同じ形で持ち、書きかけの行は落として送る。 */
   const stepTargetCondition = (): SegmentCondition | null => {
     if (targetMode === 'all') return null
@@ -340,6 +386,7 @@ export default function ScenarioFirstStepV8() {
         return
       }
       scenarioReferenceData.invalidateScenario(id)
+      browserDraft.clear()
       notifyToast('1通目を保存しました')
       goDetail()
     } catch (submitError) {
@@ -491,7 +538,7 @@ export default function ScenarioFirstStepV8() {
       )}
       description={`配信方式：${modeLabel[mode]}・シナリオ：${scenario?.name ?? '読み込み中'}`}
       preview={preview}
-      status={saving ? '保存しています' : undefined}
+      status={saving ? '保存しています' : browserDraft.label ?? undefined}
       footerActions={(
         <>
           <Button href="/scenarios">キャンセル</Button>
@@ -515,6 +562,7 @@ export default function ScenarioFirstStepV8() {
         <p className={styles.viewerBand} role="status">閲覧のみで見ています。1通目を作る操作は管理者に頼んでください。</p>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
+      <BrowserDraftNotice ago={browserDraft.pendingAgo} onRestore={restoreBrowserDraft} onDiscard={browserDraft.clear} />
 
       {/*
         ここで決めるのは「この1通目を誰に送るか」。シナリオがいつ始まるか（友だち追加時など）は
