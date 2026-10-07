@@ -520,7 +520,8 @@
     "579_banner_color_roles.sql",
     "580_banner_reference_images.sql",
     "581_banner_emphasis_lines.sql",
+    "583_restaurant_inventory_rules.sql",
     "590_scenario_stop_reason.sql"
   ],
-  "migrationCount": 521
+  "migrationCount": 522
 }

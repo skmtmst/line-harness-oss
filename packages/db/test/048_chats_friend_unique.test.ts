@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,23 +31,17 @@ function execSafe(db: Database.Database, sql: string): void {
 }
 
 /*
- * 移行の再生は全部同期で走る。テストごとに繰り返すとその間ワーカーが
- * 止まり、CI が vitest の状況報告待ちで落ちる。1度だけ組み立てて中身を
- * 控え、以後は写しから起こす。写しは独立したDBなので、テスト同士は
- * 影響し合わない。
+ * pretest で全移行から生成した bootstrap.sql を使う。全移行をフック内で
+ * 再生すると、並列実行時に初回のフックが10秒を超えることがある。
+ * 同じ移行後のDBを1度だけ組み立て、以後は独立した写しから起こす。
+ * 試験対象の048の再適用は各試験内で行い、重複行の修復を確かめる。
  */
 let migratedSnapshot: Buffer | null = null;
 
 function setupDb(): Database.Database {
   if (migratedSnapshot) return new Database(migratedSnapshot);
   const db = new Database(':memory:');
-  execSafe(db, readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
-  const migrationFiles = readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith('.sql'))
-    .sort();
-  for (const file of migrationFiles) {
-    execSafe(db, readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
-  }
+  db.exec(readFileSync(join(PKG_ROOT, 'bootstrap.sql'), 'utf8'));
   migratedSnapshot = db.serialize();
   return db;
 }

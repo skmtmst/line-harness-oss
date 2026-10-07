@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { ListChecks, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
@@ -123,10 +124,10 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   return (
     <div className={styles.tabStack} data-design="Table">
       <div className={styles.staffHeadRow}>
-        <h2 className={styles.staffHeadTitle}>担当スタッフ <b>{staff.length}人</b></h2>
+        <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length}人`}</h2>
         <div className={styles.staffHeadActions}>
-          <Button href="/booking/menus/staff">担当メニューをまとめて決める</Button>
-          {canEdit ? <Button variant="primary" onClick={() => setEditing(EMPTY_STAFF)}>＋ スタッフを登録</Button> : null}
+          <Button href="/booking/menus/staff"><ListChecks size={15} aria-hidden="true" />担当メニューをまとめて決める</Button>
+          {canEdit ? <Button variant="primary" onClick={() => setEditing(EMPTY_STAFF)}><Plus size={15} aria-hidden="true" />スタッフを登録</Button> : null}
         </div>
       </div>
 
@@ -138,8 +139,8 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
           action={canEdit ? <Button variant="primary" onClick={() => setEditing(EMPTY_STAFF)}>スタッフを登録</Button> : undefined}
         />
       ) : (
-      <section className={styles.section}>
-      <div className={`${styles.staffRow} ${styles.tableHead}`} aria-hidden="true">
+      <section className={styles.staffTable}>
+      <div className={`${styles.staffRow} ${styles.staffTableHead}`} aria-hidden="true">
         <span className={styles.staffName}>スタッフ</span>
         <span className={styles.staffColMenus}>担当メニュー</span>
         <span className={styles.staffColNoAssign}>指名なし</span>
@@ -252,7 +253,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       </section>
       )}
 
-      <p className={`${styles.noteText} mt-4`}>
+      <p className={styles.staffNote}>
         行の「…」から 勤務とシフト・編集・止める。名前を押すと勤務とシフトが開きます。カレンダーにつないでいないスタッフは、ほかの予約サービスの予約で枠が埋まらないので、つなぐのをおすすめします。
       </p>
 

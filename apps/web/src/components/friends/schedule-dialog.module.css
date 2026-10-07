@@ -3,6 +3,7 @@
 /* ★V8 予約して送るの小窓（板 MyJP7）。値は globals.css の --tpl-hb2-*。 */
 .body {
   display: flex;
+  width: 100%;
   flex-direction: column;
   gap: var(--tpl-hb2-op-col-gap);
 }
