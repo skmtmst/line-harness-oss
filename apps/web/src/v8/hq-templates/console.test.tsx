@@ -78,6 +78,34 @@ describe('統括のテンプレートを作る（店の作る画面＋保存し�
   })
 })
 
+describe('統括のテンプレートを作る（質問・カルーセル）', () => {
+  it('質問は店の質問を作る画面で作り、質問の JSON を統括のひな形にする（押したときの動きは出さない）', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click(await screen.findByRole('tab', { name: /質問/ }))
+    fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    expect(await screen.findByRole('heading', { name: '質問を作る' })).toBeTruthy()
+    expect(screen.queryByText('押されたら')).toBeNull()
+    fireEvent.change(screen.getByPlaceholderText('例：継続の意思をうかがう'), { target: { value: '好みのコース' } })
+    fireEvent.change(screen.getByLabelText(/^質問文/), { target: { value: 'どのコースが好きですか？' } })
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    await waitFor(() => expect(calls.create).toHaveBeenCalled())
+    const definition = calls.create.mock.calls[0][0].definition
+    expect(JSON.parse(definition.template.questionJson)).toMatchObject({ text: 'どのコースが好きですか？', tapMode: 'single' })
+    expect(definition.asset).toBeUndefined()
+  })
+
+  it('カルーセルは店のカルーセルを作る画面で作り、ボタンは URL を開くだけ', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click(await screen.findByRole('tab', { name: /カルーセル/ }))
+    fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    expect(await screen.findByRole('heading', { name: 'カルーセルを作る' })).toBeTruthy()
+    fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '定期便のご案内' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存して配る' }))
+    expect((await screen.findByText('すべてのカードに本文を入力してください'))).toBeTruthy()
+    expect(calls.create).not.toHaveBeenCalled()
+  })
+})
+
 describe('統括のテンプレートの詳細（pQ4fH）', () => {
   it('名前を押すと詳細。配った先のアカウント名と［このアカウントへ入る］・［アカウントへ配る］を出す', async () => {
     render(<HqTemplatesV8 type="template" />)

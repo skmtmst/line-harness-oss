@@ -34,11 +34,12 @@ import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TemplateEditFrame } from '../template-edit/frame'
+import type { TemplateEditHost } from '../template-edit/host'
 import MediaPickerDialog from '../template-edit/media-picker'
 import te from '../template-edit/edit.module.css'
 import {
   MAX_ACTIONS, MAX_COLUMNS, TEXT_MAX_WITH_IMAGE, TEXT_MAX_WITHOUT_IMAGE, TITLE_MAX,
-  carouselSnapshot, emptyChoice, emptyPanel, saveCarousel, visualPanels, type Panel,
+  buildCarouselContent, carouselSnapshot, emptyChoice, emptyPanel, saveCarousel, visualPanels, type Panel,
 } from './carousel-core'
 import styles from './question-new.module.css'
 import own from './carousel.module.css'
@@ -63,11 +64,12 @@ export function inlineActionsText(actions: InlineAction[], tags: Array<{ id: str
   return actions.length > 1 ? `${text} ほか${actions.length - 1}` : text
 }
 
-function Carousel() {
+function Carousel({ host }: { host?: TemplateEditHost }) {
   const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
   const params = useSearchParams()
-  const id = params.get('id')
+  /* 統括の入口（host）では店のテンプレートを読まない（新しく作るだけ）。 */
+  const id = host ? null : params.get('id')
   const visual = params.get('visual') === '1'
   usePageTitle(id ? 'カルーセルを編集' : 'カルーセルを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'テンプレート', href: '/templates' }])
@@ -102,7 +104,7 @@ function Carousel() {
   const folderAccountId = id ? templateAccountId : selectedAccountId
   useEffect(() => {
     setFolders([])
-    if (!folderAccountId) return
+    if (!folderAccountId || host) return
     let cancelled = false
     void api.folders.list('template', folderAccountId).then((res) => {
       if (!cancelled && res.success) setFolders(res.data)
@@ -238,13 +240,23 @@ function Carousel() {
       setPublishing(false)
     }
   }
-  const onSaveDraft = async () => { if (await saveNow()) { disarm(); router.push('/templates') } }
-  const onPublish = async () => { const savedId = await saveNow(); if (savedId) await publishSaved(savedId) }
+  /* 統括の入口：中身を組み立てて呼ぶ側へ渡す。選択肢は URL を開くだけ（押したら動く選択肢は配った先で動かせない）。 */
+  const hostSave = (distribute: boolean) => {
+    if (!host) return
+    if (!name.trim()) { setError('名前を入力してください'); return }
+    if (panels.some((p) => p.actions.some((a) => a.label.trim() && a.kind === 'action'))) { setError('統括のカルーセルのボタンは「URLを開く」だけにしてください'); return }
+    if (panels.some((p) => !p.text.trim())) { setError('すべてのカードに本文を入力してください'); return }
+    setError('')
+    disarm()
+    host.onSave({ kind: 'carousel', name: name.trim(), messageContent: buildCarouselContent(panels, 'hq'), tapLimitMode, tapLimitText: tapLimitText.trim() || null }, distribute)
+  }
+  const onSaveDraft = async () => { if (host) { hostSave(false); return } if (await saveNow()) { disarm(); router.push('/templates') } }
+  const onPublish = async () => { if (host) { hostSave(true); return } const savedId = await saveNow(); if (savedId) await publishSaved(savedId) }
 
   const panel = panels[selected] ?? panels[0]
   const selectedIndex = panels[selected] ? selected : 0
 
-  if (!canMutate) {
+  if (host ? host.readOnly : !canMutate) {
     return (
       <TemplateEditFrame boardId="J60utH" title="カルーセル" description="カルーセルの作成・変更はオーナーと管理者だけができます" side={null}>
         <p className={styles.note}>一覧で中身を確認できます。</p>
@@ -253,7 +265,7 @@ function Carousel() {
     )
   }
 
-  const busy = saving || publishing
+  const busy = saving || publishing || Boolean(host?.busy)
   const onChipKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (event.key === 'ArrowLeft' && event.altKey) { event.preventDefault(); moveTo(index, index - 1) }
     if (event.key === 'ArrowRight' && event.altKey) { event.preventDefault(); moveTo(index, index + 1) }
@@ -264,7 +276,7 @@ function Carousel() {
     setDragIndex(null)
   }
   /* 届き方：アイコンと横に並ぶカード（いま開いているカードを先頭に、次のカードの端を見せる）。 */
-  const sender = selectedAccount?.name ?? '公式アカウント'
+  const sender = host ? '公式アカウント' : selectedAccount?.name ?? '公式アカウント'
   const shown = panels.slice(selectedIndex, selectedIndex + 2)
   const phone = (
     <LinePreview note="カルーセルの見え方（横にスワイプして見えます）" accountName={sender} caption="配信日 10:00">
@@ -300,6 +312,7 @@ function Carousel() {
         boardId="J60utH"
         title={id ? 'カルーセルを編集' : 'カルーセルを作る'}
         description={`横にめくるカード。最大 ${MAX_COLUMNS} 枚`}
+        backHref={host?.backHref}
         side={(
           <>
             <section className={te.sideCard}>
@@ -316,12 +329,13 @@ function Carousel() {
         )}
         footerActions={(
           <>
-            <Button type="button" onClick={() => guarded(() => router.push('/templates'))} disabled={busy}>キャンセル</Button>
+            <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || loadFailed} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || loadFailed} busy={publishing}><Send size={15} aria-hidden="true" />保存して公開</Button>
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || loadFailed} busy={publishing || Boolean(host?.busy)}><Send size={15} aria-hidden="true" />{host ? host.primaryLabel ?? '保存して配る' : '保存して公開'}</Button>
           </>
         )}
       >
+        {host?.notice}
         {error ? <Notice tone="danger" message={error} /> : null}
         {publishError ? <Notice tone="danger" message={publishError} /> : null}
         {saveFailed ? <Notice tone="warn" message="入力した内容はそのまま残っています。もう一度保存を押してください。" /> : null}
@@ -336,7 +350,7 @@ function Carousel() {
                 </label>
                 <div className={`${styles.field} ${styles.folder}`}>
                   <span className={styles.pickLabel}>フォルダ</span>
-                  <Select size="full" aria-label="フォルダ" value={folderId ?? ''} onChange={(value) => setFolderId(value || null)} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+                  <Select size="full" aria-label="フォルダ" value={host ? host.folder : folderId ?? ''} onChange={host ? host.onFolderChange : (value) => setFolderId(value || null)} options={[{ value: '', label: '未分類' }, ...(host ? host.folders : folders.map((folder) => ({ value: folder.id, label: folder.name })))]} />
                 </div>
               </div>
             </section>
@@ -376,7 +390,7 @@ function Carousel() {
                 <h2 className={styles.cardTitle} id="cr-panel">{`カード ${selectedIndex + 1} の中身`}</h2>
                 <div className={own.panelRow}>
                   <div className={own.imageCol}>
-                    <button type="button" className={own.imageBox} onClick={() => setPickerOpen(true)} title="登録メディアから画像を選ぶ（1040 × 1040px または横1024 × 縦678px）">
+                    <button type="button" className={own.imageBox} onClick={() => (host ? setUrlOpen(true) : setPickerOpen(true))} title="登録メディアから画像を選ぶ（1040 × 1040px または横1024 × 縦678px）">
                       {/^https?:\/\//.test(panel.thumbnailImageUrl.trim()) ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={panel.thumbnailImageUrl} alt="" className={own.imageThumb} />
@@ -422,7 +436,7 @@ function Carousel() {
                     <div key={ai} className={own.buttonRow}>
                       <input className={`${styles.input} ${own.colLabel}`} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} />
                       <span className={own.colKind}>
-                        <Select size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`} value={action.kind} onChange={(value) => setAction({ kind: value as 'uri' | 'action' })} options={[{ value: 'uri', label: 'URLを開く' }, { value: 'action', label: '動きを実行する' }]} />
+                        <Select size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`} value={action.kind} onChange={(value) => setAction({ kind: value as 'uri' | 'action' })} options={host ? [{ value: 'uri', label: 'URLを開く' }] : [{ value: 'uri', label: 'URLを開く' }, { value: 'action', label: '動きを実行する' }]} />
                       </span>
                       {action.kind === 'uri' ? (
                         <input className={`${styles.input} ${own.colBody}`} type="url" value={action.uri} placeholder="https://example.com" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}のURL`} onChange={(event) => setAction({ uri: event.target.value })} />
@@ -450,8 +464,8 @@ function Carousel() {
               </section>
             ) : null}
 
-            {/* 絵に無いが今ある設定：押せる回数（「動きを実行する」ボタンだけが対象）。 */}
-            <section className={styles.card} aria-labelledby="cr-limit">
+            {/* 絵に無いが今ある設定：押せる回数（「動きを実行する」ボタンだけが対象）。統括の入口は URL だけなので出さない。 */}
+            {host ? null : <section className={styles.card} aria-labelledby="cr-limit">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle} id="cr-limit">押せる回数</h2>
                 <p className={styles.note}>「動きを実行する」ボタンだけが対象です。URLを開くボタンはLINEの外へ出るので数えられません。</p>
@@ -466,7 +480,7 @@ function Carousel() {
                   <input className={styles.input} value={tapLimitText} placeholder="例：こちらはすでに受け付けています。" onChange={(event) => setTapLimitText(event.target.value)} />
                 </label>
               ) : null}
-            </section>
+            </section>}
           </>
         )}
       </TemplateEditFrame>
@@ -516,10 +530,11 @@ function Carousel() {
   )
 }
 
-export default function CarouselV8() {
+/** `host` を渡すと統括のテンプレートの入口から使う（template-edit/host.ts）。ボタンは URL を開くだけ。 */
+export default function CarouselV8({ host }: { host?: TemplateEditHost } = {}) {
   return (
     <Suspense fallback={<ListState kind="loading" title="カルーセルを読み込んでいます" />}>
-      <Carousel />
+      <Carousel host={host} />
     </Suspense>
   )
 }

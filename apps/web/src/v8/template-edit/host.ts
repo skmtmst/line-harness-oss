@@ -13,6 +13,10 @@ import type { ReactNode } from 'react'
 export type TemplateHostContent =
   | { kind: 'message'; name: string; messageType: string; messageContent: string }
   | { kind: 'coupon' | 'research'; name: string; payload: Record<string, unknown> }
+  /** 質問：店の質問テンプレートと同じ形（質問文・選択肢）。本文は前文か質問文。 */
+  | { kind: 'question'; name: string; question: Record<string, unknown>; messageContent: string }
+  /** カルーセル：店のカルーセルと同じ形の本文（LINE のカルーセルの列）。押したら動く選択肢は使わない。 */
+  | { kind: 'carousel'; name: string; messageContent: string; tapLimitMode: 'none' | 'once'; tapLimitText: string | null }
 
 export interface TemplateEditHost {
   /** 板の頭の「← テンプレートへ」の行き先。 */

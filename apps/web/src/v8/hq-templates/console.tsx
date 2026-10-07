@@ -43,6 +43,8 @@ import {
 import MessageForm from './message-form'
 import TemplateMessageEditor from '@/v8/template-edit/message'
 import TemplateAssetEditor from '@/v8/template-edit/asset'
+import CarouselV8 from '@/v8/templates/carousel'
+import QuestionNewV8 from '@/v8/templates/question-new'
 import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/host'
 import HqStoreList from './store-list'
 import HqTemplateDetail from './detail'
@@ -491,7 +493,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
    * 前回の保存が結果不明のときは、入力を固定した今の画面（下）で再確認する。
    */
   const editKind: TemplateKind = detail && 'template' in detail.definition ? templateKind(detail.definition) : kind
-  const sharedEditor = type === 'template' && !createUncertain && (editKind === 'message' || ((editKind === 'coupon' || editKind === 'research') && !detail))
+  const sharedEditor = type === 'template' && !createUncertain && (editKind === 'message' || (['coupon', 'research', 'carousel', 'question'].includes(editKind) && !detail))
   if (stage === 'edit' && sharedEditor) {
     const current = ('template' in definition ? definition : freshDefinition('template')) as MessageTemplateDefinition
     const host: TemplateEditHost = {
@@ -511,9 +513,10 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
       initialMessage: detail && editKind === 'message' ? { name, messageType: current.template.messageType, messageContent: current.template.messageContent } : undefined,
       readOnly: !canEdit,
     }
-    return editKind === 'message'
-      ? <TemplateMessageEditor key={`${detail?.template.id ?? 'new'}-${formKey}`} id={null} visual={false} host={host} />
-      : <TemplateAssetEditor key={`${editKind}-${formKey}`} kind={editKind as 'coupon' | 'research'} host={host} />
+    if (editKind === 'message') return <TemplateMessageEditor key={`${detail?.template.id ?? 'new'}-${formKey}`} id={null} visual={false} host={host} />
+    if (editKind === 'carousel') return <CarouselV8 key={`carousel-${formKey}`} host={host} />
+    if (editKind === 'question') return <QuestionNewV8 key={`question-${formKey}`} host={host} />
+    return <TemplateAssetEditor key={`${editKind}-${formKey}`} kind={editKind as 'coupon' | 'research'} host={host} />
   }
 
   /* ───── 作る・編集（X4JcOf：前回の保存の再確認・カード型・カルーセル・質問・リッチメッセージ） ───── */
@@ -798,6 +801,12 @@ export function hostDefinition(current: MessageTemplateDefinition, content: Temp
   void _card; void _asset
   if (content.kind === 'message') {
     return { ...rest, template: { ...rest.template, messageType: content.messageType as MessageTemplateDefinition['template']['messageType'], messageContent: content.messageContent, questionJson: null } }
+  }
+  if (content.kind === 'question') {
+    return { ...rest, template: { ...rest.template, messageType: 'text', messageContent: content.messageContent, questionJson: JSON.stringify(content.question), questionStatus: 'published' } }
+  }
+  if (content.kind === 'carousel') {
+    return { ...rest, template: { ...rest.template, messageType: 'carousel', messageContent: content.messageContent, carouselActionsJson: null, carouselTapLimitMode: content.tapLimitMode, carouselTapLimitText: content.tapLimitText, questionJson: null } }
   }
   return { ...rest, asset: { kind: content.kind, payload: content.payload as never }, template: { ...rest.template, messageType: 'text', messageContent: '', questionJson: null } }
 }
