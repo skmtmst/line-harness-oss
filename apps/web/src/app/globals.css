@@ -696,6 +696,9 @@
   --tpl-an-col-58: 58px; --tpl-an-col-70: 70px; --tpl-an-col-80: 80px; --tpl-an-col-88: 88px; --tpl-an-col-100: 100px; --tpl-an-col-116: 116px;
   /* 予約設定・予約台帳の残り（bk2）。板 x1OZS6 ほか：中身が短くても下の帯を板の下に置く（上の帯 60・板の下 12・枠 2）。 */
   --tpl-bk2-shell-min-h: calc(100dvh - 74px);
+  /* 担当スタッフの表（VLEaj）：頭の段 40・行 60、列は 88・56・104・140・72・32、間 16、左右 20。 */
+  --tpl-bk2-staff-head-h: 40px; --tpl-bk2-staff-row-h: 60px; --tpl-bk2-staff-gap: 16px; --tpl-bk2-staff-pad-x: 20px; --tpl-bk2-staff-row-pad-y: 9px;
+  --tpl-bk2-staff-col-menus: 88px; --tpl-bk2-staff-col-noassign: 56px; --tpl-bk2-staff-col-work: 104px; --tpl-bk2-staff-col-link: 140px; --tpl-bk2-staff-col-status: 72px; --tpl-bk2-staff-col-menu: 32px;
   /* 予約スタッフの登録・勤務とシフト・自分の勤務（CcA4k・d5fmnM・E3YDK・wvGke）。 */
   --tpl-bks-shell-margin: -20px -24px -28px; --tpl-bks-head-pad: 20px 24px 16px; --tpl-bks-head-gap: 8px; --tpl-bks-ring: 2px; --tpl-bks-back-gap: 4px; --tpl-bks-back-lh: 19px;
   --tpl-bks-title-size: 22px; --tpl-bks-title-lh: 32px; --tpl-bks-desc-lh: 17px; --tpl-bks-main-pad: 24px 28px; --tpl-bks-main-gap: 16px;
