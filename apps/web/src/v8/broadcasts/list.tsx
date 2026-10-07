@@ -1156,6 +1156,7 @@ export default function BroadcastListV8() {
           ))}
         </KpiBand>
       </>}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
       folders={narrow ? undefined : (
         <FolderPanel
           createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}

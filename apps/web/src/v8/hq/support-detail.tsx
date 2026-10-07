@@ -27,7 +27,7 @@ import {
   type HqSupportDetail,
   type HqSupportRequest,
 } from '@/lib/hq-support'
-import HqSettingsNavV8 from './settings-nav'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import { SUPPORT_STATUS_WORDS, supportTime } from './support-words'
 import styles from './support-detail.module.css'
 
@@ -51,6 +51,7 @@ function sentNotice(hasEmail: boolean): string {
 
 export default function HqSupportDetailV8() {
   usePageTitle('お問い合わせ')
+  const settingsNav = useHqSettingsFolderNav('contact')
   const uid = useId()
   const fileRef = useRef<HTMLInputElement>(null)
   /* U099: `undefined` はまだ URL を読んでいない、`null` は URL に id が無い。 */
@@ -157,7 +158,7 @@ export default function HqSupportDetailV8() {
     : '問い合わせの内容と運営からの返事を確認します。'
 
   return (
-    <ListPage boardId="OhguS" title={title} description={description} folders={<HqSettingsNavV8 active="contact" />}>
+    <ListPage boardId="OhguS" title={title} description={description} folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}>
       <div className={styles.body}>
         <div className={styles.main}>
           {idMissing ? (

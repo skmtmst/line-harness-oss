@@ -1827,6 +1827,7 @@ export default function FormsListV8() {
             ))}
           </KpiBand>
         )}
+        folderNav={narrow ? undefined : { rows: folderRows, activeId: activeFolderId, onSelect: selectFolder, createAction: createButton(false) }}
         folders={reviewMode ? undefined : <>{createButton(true)}{folderPanel}</>}
         toolbar={(
           <>
