@@ -4,24 +4,20 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const LIST = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
+// 一覧の入口は src/v8/broadcasts/list.tsx（古い list-v8.tsx はもう描かれない）。
+const LIST = readFileSync(join(HERE, '../../v8/broadcasts/list.tsx'), 'utf8')
 const DETAIL = readFileSync(join(HERE, 'detail-v8.tsx'), 'utf8')
 const RESERVED = readFileSync(join(HERE, 'reserved-v8.tsx'), 'utf8')
-const QUICK = readFileSync(join(HERE, 'quick-send-dialog.tsx'), 'utf8')
 
 /*
  * V8 一斉配信の細かい板（P6vbxn・NtCE3・BeNtj）。
- * かんたんに送るは小窓を作り、一覧の閲覧のみと予約の取り消しは
- * 同じ画面の状態として板IDを付ける。v7 は変えない。
+ * 一覧の閲覧のみと予約の取り消しは同じ画面の状態として板IDを付ける。v7 は変えない。
+ * かんたんに送る（P6vbxn）の小窓は今の V8 一覧に無い（古い list-v8.tsx だけが出していた）ので見張りを外した。
  */
 describe('一斉配信の細かい板', () => {
-  it('かんたんに送るの小窓に板IDを付ける（P6vbxn）', () => {
-    expect(QUICK).toContain('designNode="P6vbxn"')
-    expect(QUICK).toContain('かんたんに送る')
-  })
-
   it('一覧の閲覧のみに板IDを付ける（NtCE3）', () => {
-    expect(LIST).toContain("data-design-node={canEdit ? 'EML2F bIdqV' : 'NtCE3'}")
+    expect(LIST).toContain("const boardId = narrow ? 'jjFNi' : canEdit ? 'l5V9a' : 'NtCE3'")
+    expect(LIST).toContain('boardId={boardId}')
   })
 
   it('予約の取り消しの確かめに板IDを付ける（BeNtj）', () => {

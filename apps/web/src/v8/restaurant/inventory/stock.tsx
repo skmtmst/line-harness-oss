@@ -23,6 +23,8 @@ import { TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { useAccount } from '@/contexts/account-context'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { ApiError, fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantInventory, type RestaurantTable } from '@/lib/restaurant-test-api'
 import { QuietError, type RestaurantV8Context } from '../booking-kit/shell'
@@ -212,6 +214,16 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
   const changeDate = (next: string) => {
     setDate(next); setAllocOverride(null); setAllocVersions(null); setSlotAlloc(null); setSlotVersion(undefined); setSelectedId('')
   }
+
+  /*
+   * 配分（上の欄・時間帯ごと）と開ける時間は、下の帯の「保存」まで画面にしか無い。
+   * 触ったまま左メニューなどで離れると消えるので、離れる前に確かめる。保存・キャンセルで外れる。
+   */
+  const hoursChanged = hours !== null && hoursDraft !== null && JSON.stringify(hoursDraft) !== JSON.stringify(hours)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: canEdit && (allocOverride !== null || slotAlloc !== null || hoursChanged),
+    busy,
+  })
 
   /* 409 のあと：最新を読み直し、誰がいつ保存したかと、違う所（配分・曜日の開ける時間）を出す。 */
   const raiseConflict = async (attemptedAlloc: Alloc | null, attemptedHours: Hours | null) => {
@@ -590,6 +602,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
           )}
         />
       ) : null}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="配分と開ける時間の変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <RsDialog
         open={closeNoteOpen && Boolean(selected)}
         title={selected ? `${selected.time} が残り ${selected.free} 席になりました` : ''}

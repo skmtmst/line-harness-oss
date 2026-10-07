@@ -13,16 +13,15 @@ const read = (relative: string) => readFileSync(join(HERE, relative), 'utf8')
  * 数えられない。v7・見せ方・API は何も変えない。
  */
 describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
-  it('一覧の外枠に EML2F（一覧）と bIdqV（一覧の状態）を付ける', () => {
-    const list = read('list-v8.tsx')
-    // 閲覧のみは NtCE3 に切り替わる形で両方の印を残す（印を消さない）。
-    expect(list, '一覧の板が無い').toContain("data-design-node={canEdit ? 'EML2F bIdqV' : 'NtCE3'}")
+  /*
+   * 一覧の入口は src/v8/broadcasts/list.tsx（古い list-v8.tsx はもう描かれない）。
+   * 新しい一覧は板IDを型（ListPage の boardId）に渡す：1440＝l5V9a・閲覧のみ＝NtCE3・1152＝jjFNi。
+   */
+  it('一覧は板IDを型へ渡し、閲覧のみは NtCE3 と帯を出す', () => {
+    const list = read('../../v8/broadcasts/list.tsx')
+    expect(list, '一覧の板が無い').toContain("const boardId = narrow ? 'jjFNi' : canEdit ? 'l5V9a' : 'NtCE3'")
+    expect(list).toContain('boardId={boardId}')
     expect(list).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
-  })
-
-  it('一覧の道具の段に rfdmA（1152）を付ける', () => {
-    const list = read('list-v8.tsx')
-    expect(list, '1152 の板が無い').toContain('data-design-node="rfdmA"')
   })
 
   it('予約した後の外枠に CRtK8 を付ける', () => {

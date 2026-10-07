@@ -108,6 +108,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   act(() => { root.unmount() })
   host.remove()
   vi.unstubAllGlobals()
@@ -248,6 +249,8 @@ test('v8 でフォルダの追加を押すと右のパネルで名前を入れ�
 test('v8 の読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {
   vi.stubGlobal('fetch', () => new Promise<Response>(() => {}))
   document.documentElement.dataset.theme = 'v8'
+  // 待ちは偽の時計で進める（本物の時間を待たない）。骨組みの 0.3 秒は描いた瞬間から数えるので、描く前に替える。
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
   await act(async () => {
     root.render(<WebinarsPage />)
   })
@@ -257,7 +260,7 @@ test('v8 の読み込み中は骨組みで場所を取り「読み込み中」�
   expect(host.textContent).not.toContain('読み込み中')
   // 0.3秒たつと骨組みの5行が出る（見出し＋行の高さは本物と同じ）。
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 350))
+    await vi.advanceTimersByTimeAsync(350)
   })
   const skeletons = host.querySelectorAll('[data-skeleton]')
   expect(skeletons.length).toBeGreaterThanOrEqual(5)
