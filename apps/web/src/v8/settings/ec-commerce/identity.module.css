@@ -1,0 +1,89 @@
+/*
+ * ★V8-B `w1W8h` 会員のつき合わせ。外側・数の帯・表の枠は取り込みの記録（screen.module.css）と同じ。
+ * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-st2-id-*・--tpl-sb-*）。
+ */
+.kpis {
+  gap: var(--tpl-sb-group-gap);
+}
+
+/* 自動で結びつく条件の帯（薄い青の地・角丸 8・余白 10/12・字 11）。1行で、入りきらないときは「…」と title。 */
+.band {
+  margin: 0;
+  overflow: hidden;
+  padding: var(--tpl-st2-id-band-pad);
+  border-radius: var(--tpl-sb-seg-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-st2-id-band-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+.sortBox {
+  flex-shrink: 0;
+}
+
+.note {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 候補の表：名前 残り・候補 180・似ているところ 200・確からしさ 90・操作 190（間 14・余白 9/14）。 */
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tpl-st2-id-col-friend) var(--tpl-st2-id-col-evidence) var(--tpl-st2-id-col-confidence) var(--tpl-st2-id-col-ops);
+  align-items: center;
+  column-gap: var(--tpl-sb-ec-gap);
+  padding: var(--tpl-st2-id-row-pad);
+  box-shadow: var(--tpl-sb-line-top);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+}
+
+.name {
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-st2-id-ops-gap);
+}
+
+.emptyRow {
+  padding: var(--tpl-st2-id-row-pad);
+  box-shadow: var(--tpl-sb-line-top);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-group-gap);
+}
+
+.detailPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-sb-group-gap);
+}

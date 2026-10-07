@@ -58,3 +58,8 @@
   --tpl-settings-content-pad-side: var(--tpl-sb-narrow-pad-side);
   --tpl-settings-content-gap: var(--tpl-sb-narrow-gap);
 }
+
+/* 機能設定の下の2つ（マニュアルの正本表・ファイルの検査）は、絵では上下の余白が小さい（字 12 の行）。 */
+:global([data-theme='v8'] [data-page-template='settings']):has(.screen) :global([data-settings-nav='inline'] li > ul) {
+  --tpl-setnav-item-pad: var(--tpl-st2-setnav-child-pad);
+}

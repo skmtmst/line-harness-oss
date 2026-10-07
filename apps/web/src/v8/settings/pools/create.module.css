@@ -1,0 +1,155 @@
+/*
+ * ★V8-B `D0AOyx` プールを作る。左の2枚（残り）と右のプレビュー（340）、間 14。カードは角丸 12・枠・余白 18・間 12。
+ * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-st2-pc-*・--tpl-sb-*）。
+ */
+.columns {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-sb-conflict-gap);
+}
+
+.main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-sb-group-gap);
+}
+
+.side {
+  display: flex;
+  width: var(--tpl-st2-pc-side-w);
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: var(--tpl-sb-group-gap);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-group-gap);
+  padding: var(--tpl-st2-pc-card-pad);
+  border-radius: var(--tpl-sb-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-row-sub-gap);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--tpl-sb-group-title);
+  font-weight: 700;
+  line-height: var(--tpl-st2-pc-title-lh);
+}
+
+.cardSub,
+.hint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-sb-row-sub-lh);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-field-gap);
+}
+
+.label {
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-st2-pc-label-lh);
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-st2-pc-account-gap);
+  padding: var(--tpl-st2-pc-account-pad);
+  border-radius: var(--tpl-sb-seg-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.accountName {
+  overflow: hidden;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountSub {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.addRow {
+  align-self: flex-start;
+}
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+.pickerSelect {
+  min-width: 0;
+  flex: 1;
+}
+
+.facts {
+  margin: 0;
+}
+
+.fact {
+  display: flex;
+  gap: var(--tpl-sb-group-gap);
+  padding: var(--tpl-st2-pc-fact-pad);
+  box-shadow: var(--tpl-sb-line-top);
+}
+
+.fact dt {
+  flex-shrink: 0;
+  width: var(--tpl-st2-od-fact-label-w);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.fact dd {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-st2-od-text-lh);
+  overflow-wrap: anywhere;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+.retry {
+  text-decoration: underline;
+}
+
+.btnIcon {
+  width: var(--tpl-sb-icon-m);
+  height: var(--tpl-sb-icon-m);
+  flex-shrink: 0;
+}

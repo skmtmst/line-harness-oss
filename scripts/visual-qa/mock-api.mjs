@@ -2770,6 +2770,38 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     /* 締めの期間は頼まれた期間を返す（本物と同じ）。無いときは見本の期間。 */
     return { success: true, data: { ...AFFILIATE_SETTLEMENT_PREVIEW, periodFrom: query.get('periodFrom') ?? AFFILIATE_SETTLEMENT_PREVIEW.periodFrom, periodTo: query.get('periodTo') ?? AFFILIATE_SETTLEMENT_PREVIEW.periodTo } }
   }
+  /* ★V8-B nAesv：注文1件の状況（引き出し）。出来事2件・成果とマイルとスコア・発送後の案内2件。 */
+  {
+    const orderDetail = /^\/api\/ec-commerce\/orders\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && orderDetail) {
+      const id = decodeURIComponent(orderDetail[1])
+      const order = EC_ORDERS.items.find((item) => item.id === id) ?? EC_ORDERS.items[0]
+      const action = (eventId, eventType, receivedAt) => ({
+        id: `${eventId}-action`, eventId, eventType, actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded',
+        attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: receivedAt, nextRetryAt: null, version: 1,
+        receivedAt, orderNumber: order.orderNumber, customerName: order.customerName, retryAvailable: false, attempts: [],
+      })
+      return {
+        success: true,
+        data: {
+          order,
+          events: [
+            { id: 'ece-detail-1', externalEventId: 'ext-ece-1', eventType: 'ec.order.confirmed', status: 'processed', failureKind: null, receivedAt: '2026-10-01T12:02:00.000Z', processedAt: '2026-10-01T12:02:30.000Z', actions: [action('ece-detail-1', 'ec.order.confirmed', '2026-10-01T12:02:00.000Z')], dispatches: [], deliveries: [] },
+            { id: 'ece-detail-2', externalEventId: 'ext-ece-2', eventType: 'ec.order.shipped', status: 'processed', failureKind: null, receivedAt: '2026-10-02T00:40:00.000Z', processedAt: '2026-10-02T00:40:30.000Z', actions: [action('ece-detail-2', 'ec.order.shipped', '2026-10-02T00:40:00.000Z')], dispatches: [], deliveries: [] },
+          ],
+          followUps: [
+            { id: 'fu-1', campaignKey: 'delivered_check', campaignLabel: 'お荷物は届きましたか（NEN配信）', scheduledAt: '2026-10-04T01:00:00.000Z', status: 'pending', attempts: 0, sentAt: null, reason: null, failureKind: null },
+            { id: 'fu-2', campaignKey: 'review_request', campaignLabel: '口コミのお願い（NEN配信）', scheduledAt: '2026-10-12T01:00:00.000Z', status: 'pending', attempts: 0, sentAt: null, reason: null, failureKind: null },
+          ],
+          outcomes: {
+            conversions: [{ id: 'cv-detail-1', pointName: '商品を買った', approvalStatus: 'approved', value: 7540, createdAt: '2026-10-01T12:03:00.000Z', orderNumber: order.orderNumber, ecEventId: 'ece-detail-1', affiliateName: null, rewardAmount: null, rewardEntryStatus: null, reversedAmount: null, settlementState: null, payoutBatchState: null, payoutResult: null, duplicateCandidate: false }],
+            mileage: [{ id: 'ml-detail-1', entryType: 'earn', amount: 75, status: 'confirmed', reason: '商品を買った', occurredAt: '2026-10-01T12:03:00.000Z' }],
+            scores: [{ id: 'sc-detail-1', scoreChange: 30, reason: '商品を買った', occurredAt: '2026-10-01T12:03:00.000Z' }],
+          },
+        },
+      }
+    }
+  }
   if (pathname === '/api/ec-commerce/orders') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
     const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
@@ -3263,8 +3295,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const identityCandidate = /^\/api\/identity-candidates\/([^/]+)$/.exec(pathname)
   if (identityCandidate) {
     if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
-    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id
-      ? IDENTITY_CANDIDATE_EC
+    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id || identityCandidate[1].startsWith('ec-identity-')
+      ? { ...IDENTITY_CANDIDATE_EC, id: identityCandidate[1] }
       : IDENTITY_CANDIDATE_FRIEND
     return { success: true, data: candidate }
   }
@@ -4775,13 +4807,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
        * `data.items` が取れず「読み込めませんでした」になっていた。
        * 本物と同じ処理1件ずつの器で返す。
        */
-      const items = EC_ACTION_EXECUTIONS.items.map((execution) => ({
-        ...execution,
-        eventLabel: '',
-        friendId: null,
-        failureKind: null,
-        order: null,
-      }))
+      /* 本物と同じく注文番号で注文を結ぶ（★V8-B nAesv：行の「…」から注文の状況を開ける）。 */
+      const items = EC_ACTION_EXECUTIONS.items.map((execution) => {
+        const order = EC_ORDERS.items.find((item) => item.orderNumber === execution.orderNumber) ?? null
+        return {
+          ...execution,
+          eventLabel: '',
+          friendId: order?.friendId ?? null,
+          failureKind: null,
+          order,
+        }
+      })
       return {
         success: true,
         data: { items, total: items.length, summary: EC_ACTION_EXECUTIONS.summary },

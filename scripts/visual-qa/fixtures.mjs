@@ -3261,8 +3261,34 @@ export const IDENTITY_CANDIDATE_LISTS = {
     statusCounts: { pending: 11, deferred: 2, linked: 5, different: 0 },
     lowConfidenceCount: 2,
   },
+  /*
+   * ★V8-B w1W8h：会員のつき合わせの3組（高い・中くらい・候補なし）。id は EC運用の集計（EC_IDENTITY_CANDIDATES）と同じにして、
+   * 1行目の下の行に「注文 3件 ¥18,600」が出るようにする。
+   */
   ec_member: {
-    items: [identityListItem(IDENTITY_CANDIDATE_EC)], total: 1, limit: 20, offset: 0,
+    items: [
+      {
+        ...identityListItem(IDENTITY_CANDIDATE_EC), id: 'ec-identity-1',
+        confidence: { score: 94, label: 'high' },
+        left: { ...IDENTITY_CANDIDATE_EC.left, label: '高橋 直人', detail: 'EC-10422' },
+        right: { ...IDENTITY_CANDIDATE_EC.right, label: '高橋 なおと', detail: '友だち追加 9/12' },
+        evidenceSummary: ['姓', '郵便番号', 'ペット名「もも」'],
+      },
+      {
+        ...identityListItem(IDENTITY_CANDIDATE_EC), id: 'ec-identity-2',
+        confidence: { score: 82, label: 'medium' },
+        left: { ...IDENTITY_CANDIDATE_EC.left, label: '佐藤 由美', detail: 'EC-10398' },
+        right: { ...IDENTITY_CANDIDATE_EC.right, label: 'ゆみ🐶', detail: '友だち追加 8/30' },
+        evidenceSummary: ['ペット名「きなこ」', '地域'],
+      },
+      {
+        ...identityListItem(IDENTITY_CANDIDATE_EC), id: 'ec-identity-3',
+        confidence: { score: 0, label: 'low' },
+        left: { ...IDENTITY_CANDIDATE_EC.left, label: '中村 彩', detail: 'EC-10377' },
+        right: { ...IDENTITY_CANDIDATE_EC.right, label: '', detail: null },
+        evidenceSummary: [],
+      },
+    ], total: 3, limit: 20, offset: 0,
   },
   empty: { items: [], total: 0, limit: 20, offset: 0 },
 }
@@ -5473,7 +5499,8 @@ export const CONVERSION_DEFINITION_REPORT = {
     netValue: netCount * CONVERSION_DAILY_VALUES[index]
       - (day === '2026-08-25' ? CONVERSION_DAILY_FINAL_ADJUSTMENTS[index] : 0),
   }))),
-  byDefinition: CONVERSION_REPORT_CURRENT.map((current) => {
+  /* 板 `AzrZq`：成果地点ごとの表は 商品を買った・予約が入った・初回の定期便が確定・体験申込… の順（絵の並び）。 */
+  byDefinition: ['cp-1', 'cp-3', 'cp-4', 'cp-2', 'cp-5', 'cp-6'].map((id) => CONVERSION_CURRENT_BY_ID.get(id)).map((current) => {
     const previous = CONVERSION_PREVIOUS_BY_ID.get(current.conversionPointId)
     return {
       conversionPointId: current.conversionPointId,
@@ -7144,7 +7171,7 @@ export const EC_IDENTITY_CANDIDATES = {
       left: { externalCustomerId: 'customer-3', displayName: '田中 美咲', attributes: [{ label: 'メール', valuePreview: 'mi***@example.jp' }, { label: '電話', valuePreview: '***4821' }] },
       right: { friendId: 'friend-candidate-1', displayName: '田中 みさき', attributes: [{ label: 'メール', valuePreview: 'mi***@example.jp' }] },
       evidence: [{ label: 'メールアドレス', matched: true }, { label: '氏名', matched: true }],
-      impact: [{ key: 'orders', value: 8, unit: '件' }, { key: 'revenue', value: 86400, unit: '円' }],
+      impact: [{ key: 'orders', value: 3, unit: '件' }, { key: 'revenue', value: 18600, unit: '円' }],
       detectedAt: '2026-08-25T08:40:00.000Z', reviewedAt: null,
     },
     {
@@ -7152,7 +7179,7 @@ export const EC_IDENTITY_CANDIDATES = {
       left: { externalCustomerId: 'customer-7', displayName: '佐藤 健', attributes: [{ label: 'メール', valuePreview: 'ke***@example.jp' }, { label: '電話', valuePreview: '***1034' }] },
       right: { friendId: 'friend-candidate-2', displayName: '佐藤 けん', attributes: [{ label: '電話', valuePreview: '***1034' }] },
       evidence: [{ label: '電話番号', matched: true }, { label: '氏名', matched: true }],
-      impact: [{ key: 'orders', value: 5, unit: '件' }, { key: 'revenue', value: 62800, unit: '円' }],
+      impact: [{ key: 'orders', value: 2, unit: '件' }, { key: 'revenue', value: 12400, unit: '円' }],
       detectedAt: '2026-08-25T08:12:00.000Z', reviewedAt: null,
     },
     {
@@ -7160,7 +7187,7 @@ export const EC_IDENTITY_CANDIDATES = {
       left: { externalCustomerId: 'customer-8', displayName: '鈴木 あおい', attributes: [{ label: 'メール', valuePreview: 'ao***@example.jp' }] },
       right: { friendId: 'friend-candidate-3', displayName: '鈴木 葵', attributes: [{ label: 'メール', valuePreview: 'ao***@example.jp' }] },
       evidence: [{ label: 'メールアドレス', matched: true }, { label: '氏名', matched: false }],
-      impact: [{ key: 'orders', value: 3, unit: '件' }, { key: 'revenue', value: 41200, unit: '円' }],
+      impact: [{ key: 'orders', value: 1, unit: '件' }, { key: 'revenue', value: 4800, unit: '円' }],
       detectedAt: '2026-08-25T07:50:00.000Z', reviewedAt: null,
     },
     {
@@ -7173,7 +7200,7 @@ export const EC_IDENTITY_CANDIDATES = {
     },
   ],
   total: 16,
-  summary: { unmatched: 24, candidates: 16, candidateExternalCustomers: 14, duplicateSuspicions: 2, linked: 2462, potentialRevenue: 312400 },
+  summary: { unmatched: 24, candidates: 6, candidateExternalCustomers: 6, withoutCandidates: 18, duplicateSuspicions: 2, linked: 1128, potentialRevenue: 84300 },
 }
 
 /**
