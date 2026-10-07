@@ -2790,6 +2790,15 @@
       "parentColumn": "id"
     }
   },
+  "rt_channel_close_tasks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "slot_id",
+      "parent": "rt_inventory_slots",
+      "parentColumn": "id"
+    }
+  },
   "rt_connector_status": {
     "category": "purge",
     "scope": {
@@ -2913,6 +2922,42 @@
     }
   },
   "rt_intake_addresses": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_inventory_notification_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "task_id",
+      "parent": "rt_channel_close_tasks",
+      "parentColumn": "id"
+    }
+  },
+  "rt_inventory_rule_log": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_inventory_rule_queue": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_inventory_rules": {
     "category": "purge",
     "scope": {
       "by": "parent",
