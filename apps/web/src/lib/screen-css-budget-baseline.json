@@ -14,25 +14,10 @@
     "height": 17,
     "font": 41
   },
-  "app/auto-replies/list-v8.module.css": {
-    "spacing": 35,
-    "height": 16,
-    "font": 33
-  },
-  "app/auto-replies/quick-create-v8.module.css": {
-    "spacing": 9,
-    "height": 6,
-    "font": 8
-  },
   "app/auto-replies/runs/auto-reply-runs.module.css": {
     "spacing": 10,
     "height": 8,
     "font": 0
-  },
-  "app/auto-replies/runs/runs-v8.module.css": {
-    "spacing": 20,
-    "height": 6,
-    "font": 22
   },
   "app/automations/automation-api-v8.module.css": {
     "spacing": 27,
@@ -84,11 +69,6 @@
     "height": 10,
     "font": 23
   },
-  "app/broadcasts/list-v8.module.css": {
-    "spacing": 27,
-    "height": 16,
-    "font": 27
-  },
   "app/broadcasts/phone-mock-v8.module.css": {
     "spacing": 5,
     "height": 4,
@@ -104,40 +84,20 @@
     "height": 15,
     "font": 19
   },
-  "app/contents/vars/edit/edit-v8.module.css": {
-    "spacing": 47,
-    "height": 14,
-    "font": 31
-  },
   "app/contents/vars/list-v8.module.css": {
     "spacing": 38,
     "height": 17,
     "font": 30
-  },
-  "app/contents/vars/new/new-v8.module.css": {
-    "spacing": 27,
-    "height": 11,
-    "font": 22
   },
   "app/conversions/conversion-points-v8.module.css": {
     "spacing": 33,
     "height": 12,
     "font": 23
   },
-  "app/conversions/conversions-v8.module.css": {
-    "spacing": 2,
-    "height": 1,
-    "font": 0
-  },
   "app/conversions/list-v8.module.css": {
     "spacing": 1,
     "height": 1,
     "font": 0
-  },
-  "app/conversions/new/conversion-create-v8.module.css": {
-    "spacing": 37,
-    "height": 7,
-    "font": 19
   },
   "app/conversions/new/create-v8.module.css": {
     "spacing": 9,
@@ -178,21 +138,6 @@
     "spacing": 2,
     "height": 2,
     "font": 3
-  },
-  "app/form-submissions/list-v8.module.css": {
-    "spacing": 35,
-    "height": 13,
-    "font": 30
-  },
-  "app/friend-add-settings/editor-v8.module.css": {
-    "spacing": 61,
-    "height": 19,
-    "font": 42
-  },
-  "app/friend-add-settings/list-v8.module.css": {
-    "spacing": 26,
-    "height": 16,
-    "font": 25
   },
   "app/friend-add-settings/publish/done-v8.module.css": {
     "spacing": 11,
@@ -274,11 +219,6 @@
     "height": 4,
     "font": 13
   },
-  "app/nen-campaigns/columns/new/column.module.css": {
-    "spacing": 8,
-    "height": 8,
-    "font": 0
-  },
   "app/nen-campaigns/edit/campaign-editor-v8.module.css": {
     "spacing": 30,
     "height": 8,
@@ -293,11 +233,6 @@
     "spacing": 59,
     "height": 28,
     "font": 38
-  },
-  "app/nen-members/photo-review.module.css": {
-    "spacing": 4,
-    "height": 1,
-    "font": 0
   },
   "app/nen/health/health-v8.module.css": {
     "spacing": 28,
@@ -399,11 +334,6 @@
     "height": 3,
     "font": 11
   },
-  "app/rich-menus/list-v8.module.css": {
-    "spacing": 26,
-    "height": 14,
-    "font": 25
-  },
   "app/rich-menus/new/create-v8.module.css": {
     "spacing": 40,
     "height": 15,
@@ -424,11 +354,6 @@
     "height": 4,
     "font": 0
   },
-  "app/scenarios/list-v8.module.css": {
-    "spacing": 28,
-    "height": 14,
-    "font": 24
-  },
   "app/scenarios/mode-v8.module.css": {
     "spacing": 20,
     "height": 7,
@@ -448,11 +373,6 @@
     "spacing": 9,
     "height": 2,
     "font": 5
-  },
-  "app/settings/manual-links/manual-links.module.css": {
-    "spacing": 5,
-    "height": 2,
-    "font": 0
   },
   "app/settings/settings-v8.module.css": {
     "spacing": 59,
@@ -509,75 +429,15 @@
     "height": 0,
     "font": 0
   },
-  "app/webhooks/_components/webhooks-v8-api-tokens.module.css": {
-    "spacing": 13,
-    "height": 1,
-    "font": 6
-  },
-  "app/webhooks/_components/webhooks-v8-incoming.module.css": {
-    "spacing": 53,
-    "height": 11,
-    "font": 33
-  },
-  "app/webhooks/_components/webhooks-v8-interactions.module.css": {
-    "spacing": 17,
-    "height": 2,
-    "font": 8
-  },
-  "app/webhooks/_components/webhooks-v8-outgoing.module.css": {
-    "spacing": 32,
-    "height": 7,
-    "font": 19
-  },
-  "app/webhooks/_components/webhooks-v8-samples.module.css": {
-    "spacing": 9,
-    "height": 2,
-    "font": 4
-  },
-  "app/webhooks/_components/webhooks-v8-sheets.module.css": {
-    "spacing": 29,
-    "height": 5,
-    "font": 14
-  },
-  "app/webhooks/_components/webhooks-v8-shell.module.css": {
-    "spacing": 4,
-    "height": 2,
-    "font": 3
-  },
   "app/webhooks/apitokens-v8.module.css": {
     "spacing": 16,
     "height": 1,
     "font": 12
   },
-  "app/webhooks/incoming-v8.module.css": {
-    "spacing": 30,
-    "height": 4,
-    "font": 22
-  },
-  "app/webhooks/interactions-v8.module.css": {
-    "spacing": 17,
-    "height": 1,
-    "font": 12
-  },
-  "app/webhooks/new/new-v8.module.css": {
-    "spacing": 27,
-    "height": 5,
-    "font": 14
-  },
   "app/webhooks/outgoing-v8.module.css": {
     "spacing": 13,
     "height": 6,
     "font": 15
-  },
-  "app/webhooks/samples-v8.module.css": {
-    "spacing": 13,
-    "height": 4,
-    "font": 7
-  },
-  "app/webhooks/sheets-v8.module.css": {
-    "spacing": 22,
-    "height": 3,
-    "font": 11
   },
   "app/webhooks/webhook-interactions.module.css": {
     "spacing": 4,

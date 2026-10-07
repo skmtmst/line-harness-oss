@@ -28,6 +28,8 @@ import TargetMissing from '@/components/shared/target-missing'
 import { TextField } from '@/components/shared/text-field'
 import { notifyToast } from '@/components/shared/toast'
 import { useStepUpGate } from '@/components/step-up-prompt'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { DIFFERENT_PROVIDER_DETAIL, DIFFERENT_PROVIDER_LEAD, HANDOVER_PILLS, countsLine, decisionLabel, handoverPill, totalsMatch } from './handover-view'
 import styles from './handover.module.css'
 
@@ -87,6 +89,14 @@ export default function AccountHandoverV8() {
   const [decisionError, setDecisionError] = useState('')
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  /*
+   * 段4で書き換えた判断は「判断を保存する」まで端末にしか無い（下の帯が「まだ保存していません」と出す）。
+   * その間に画面を離れると書き換えが消えるので、離れる前に確かめる。保存・読み直しで空になると外れる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: canManage && Object.keys(decisionEdits).length > 0,
+    busy: savingDecisions,
+  })
 
   const loadAccounts = useCallback(async () => {
     try {
@@ -575,6 +585,7 @@ export default function AccountHandoverV8() {
         <Notice tone="info" message={`切り戻し済みです（${formatDateTime(handover.rolledBackAt)}）。${handover.rollbackNote ? `理由: ${handover.rollbackNote}` : ''}`} />
       ) : null}
 
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="保存していない判断の書き換え" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <ConfirmDialog
         open={confirmOpen}
         title="本実行しますか？"

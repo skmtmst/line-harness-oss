@@ -15,7 +15,8 @@ import { describe, expect, it } from 'vitest'
 const BOOKINGS = readFileSync(new URL('./bookings/page.tsx', import.meta.url), 'utf8')
 const MATRIX = readFileSync(new URL('./menus/staff/page.tsx', import.meta.url), 'utf8')
 const MENU_NEW = readFileSync(new URL('./menus/new/page.tsx', import.meta.url), 'utf8')
-const FORMS = readFileSync(new URL('../form-submissions/list-v8.tsx', import.meta.url), 'utf8')
+// 回答フォームの入口は src/v8/forms/list.tsx（古い list-v8.tsx はもう描かれない）。
+const FORMS = readFileSync(new URL('../../v8/forms/list.tsx', import.meta.url), 'utf8')
 
 describe('予約カレンダーの空き枠取得（#1060）', () => {
   it('一括口（menu_ids）で全メニュー分を1要求にまとめる', () => {

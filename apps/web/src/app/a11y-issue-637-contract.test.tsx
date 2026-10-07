@@ -5,7 +5,6 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { conversionsTabTitle } from './conversions/conversions-tab-title'
 import { MENU_SECTIONS } from '@/lib/menu'
 import PageHeaderH2 from '@/components/layout/page-header-h2'
 
@@ -65,7 +64,8 @@ describe('Issue #637 h1は1画面に1つ', () => {
 
   it('/nen-members の深い画面（掲載管理・1枚表示）もh1を置かない', () => {
     // トップバーの「投稿」（h1）と並ぶと1画面に h1 が2つになるため h2 へ。
-    for (const rel of ['app/nen-members/photo-publications.tsx', 'app/nen-members/photo-review-detail.tsx']) {
+    // 掲載管理の古い photo-publications.tsx はどこからも描かれないので 2026-10-07 に消した。
+    for (const rel of ['app/nen-members/photo-review-detail.tsx']) {
       const src = read(rel)
         .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
         .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -95,16 +95,8 @@ describe('Issue #637 画面名とナビ名の一致', () => {
   })
 
   it('独立したコンバージョンと成果・アフィリエイトが上部バーへ画面名を渡す', () => {
-    // アフィリエイト系タブ（旧 /affiliates の実体）
-    expect(conversionsTabTitle('affiliates')).toBe('成果とアフィリエイト')
-    expect(conversionsTabTitle('offers')).toBe('成果とアフィリエイト')
-    expect(conversionsTabTitle('approvals')).toBe('成果とアフィリエイト')
-    expect(conversionsTabTitle('payment')).toBe('成果とアフィリエイト')
-    // コンバージョン系タブと既定
-    expect(conversionsTabTitle('points')).toBe('コンバージョン')
-    expect(conversionsTabTitle('report')).toBe('コンバージョン')
-    expect(conversionsTabTitle('unknown')).toBe('コンバージョン')
-
+    // タブ名を引く古い関数（conversions/conversions-tab-title.ts）はどの画面も使っていないので 2026-10-07 に消した。
+    // 画面名を渡すのは下の page.tsx と affiliates-v8.tsx（今の画面）。
     const src = read('app/conversions/page.tsx')
     expect(src).toContain("usePageTitle('コンバージョン')")
     expect(src).toContain('router.replace(target)')
