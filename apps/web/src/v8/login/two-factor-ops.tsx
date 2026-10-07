@@ -21,7 +21,7 @@ import {
 } from '@/lib/admin-session'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import OtpInput from '@/components/shared/otp-input'
+import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import styles from './two-factor-ops.module.css'
 
 /* 通信断・JSON でない返事は技術文言を出さない（v7 の two-factor-error と同じ決まりを写した）。 */
@@ -38,7 +38,7 @@ export function opsTwoFactorFailureMessage(caught: unknown, fallback = '認証�
 }
 
 export default function OpsTwoFactorV8() {
-  const [code, setCode] = useState('')
+  const [typedCode, setCode] = useState('')
   const [succeeded, setSucceeded] = useState(false)
   /** 失敗のたびに6マスを作り直し、1マス目へ戻す。 */
   const [attempt, setAttempt] = useState(0)
@@ -57,7 +57,10 @@ export default function OpsTwoFactorV8() {
     window.setTimeout(() => window.location.assign(href), 420)
   }
 
-  const submit = async () => {
+  /* 6桁目が入った瞬間に送る（送るボタンも残す）。送っている間・送り終えた後は二重に送らない。 */
+  const submit = async (entered?: string) => {
+    const code = entered ?? typedCode
+    if (loading || succeeded) return
     if (!challenge) return setError('ログインの情報が見つかりませんでした。ログインからやり直してください。')
     if (code.length !== 6) return setError('6桁の認証コードを入力してください')
     setLoading(true)
@@ -96,7 +99,7 @@ export default function OpsTwoFactorV8() {
       clearTwoFactorChallenge()
       finish(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
     } catch (caught) {
-      setError(opsTwoFactorFailureMessage(caught))
+      setError(otpFailureMessage(opsTwoFactorFailureMessage(caught)))
       setCode('')
       setAttempt((current) => current + 1)
     } finally { setLoading(false) }
@@ -114,13 +117,15 @@ export default function OpsTwoFactorV8() {
           <p id="ops-two-factor-code-label" className={styles.label}>認証コード（6桁）</p>
           <OtpInput
             key={attempt}
-            value={code}
+            value={typedCode}
+            onComplete={(entered) => void submit(entered)}
             onChange={(next) => { setCode(next); if (error) setError('') }}
             labelledBy="ops-two-factor-code-label"
             describedBy={missingChallenge ? 'ops-two-factor-missing' : error ? 'ops-two-factor-error' : undefined}
             invalid={Boolean(error)}
             success={succeeded}
-            disabled={loading || missingChallenge || succeeded}
+            busy={loading}
+            disabled={missingChallenge || succeeded}
             autoFocus
           />
         </div>

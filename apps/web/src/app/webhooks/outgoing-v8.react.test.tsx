@@ -159,7 +159,7 @@ test('v8 で何も無いときは wWrpY の「まだ無い」が出る', async (
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="ZSbFY"]')
-  expect(board?.textContent).toContain('まだ、送り先はありません')
+  expect(board?.textContent).toContain('まだ送り先がありません')
 })
 
 test('v8 の閲覧のみ（l5SRfT）は帯が出て、押せない作るボタン・設定は置かない', async () => {

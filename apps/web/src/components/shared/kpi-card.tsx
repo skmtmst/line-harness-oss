@@ -8,6 +8,7 @@ import HelpTip from './help-tip'
 import { isCountableValue } from './not-connected'
 import styles from './kpi-card.module.css'
 import { formatNumber } from '@/lib/format'
+import { RetryLabel } from './retry-label'
 
 export type KpiCardProps = {
   title: string
@@ -211,7 +212,7 @@ export default function KpiCard({
         <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
-            {retryLabel ?? 'もう一度読み込む'}
+            {retryLabel ?? <RetryLabel />}
           </button>
         ) : null}
         {action ? (

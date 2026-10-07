@@ -535,7 +535,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
         ) : null}
 
         <div className={styles.body} data-design="Body">
-          <div className={styles.main} data-design-node={tab === 'menus' && !canEditMenus ? 'C9fv7A' : tabNode}>
+          <div className={tab === 'channels' ? `${styles.main} ${styles.mainChannels}` : styles.main} data-design-node={tab === 'menus' && !canEditMenus ? 'C9fv7A' : tabNode}>
             {!accountId ? (
               <StateCard
                 icon={<AccountIcon />}
@@ -608,7 +608,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                 onReload={reloadCore}
               />
             ) : (
-              <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} />
+              <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} staff={staff} />
             )}
           </div>
 

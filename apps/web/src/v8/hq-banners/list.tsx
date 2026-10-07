@@ -14,6 +14,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import { notifyToast } from '@/components/shared/toast'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
@@ -239,17 +240,18 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     }
   }
 
+  /* お気に入りは押した瞬間に変え、裏で保存する（動きの点検・7）。失敗したら戻して知らせる。 */
   const toggleFavorite = async (project: BannerProject) => {
-    setBusyId(project.id)
+    const next = !project.isFavorite
     setActionError('')
+    setProjects((prev) => prev.map((p) => (p.id === project.id ? { ...p, isFavorite: next } : p)))
     try {
-      const res = await api.hqBanners.projects.update(project.id, { isFavorite: !project.isFavorite })
+      const res = await api.hqBanners.projects.update(project.id, { isFavorite: next })
       if (!res.success) throw new Error(res.error)
       setProjects((prev) => prev.map((p) => (p.id === project.id ? res.data : p)))
     } catch {
-      setActionError('お気に入りを変更できませんでした。もう一度お試しください。')
-    } finally {
-      setBusyId(null)
+      setProjects((prev) => prev.map((p) => (p.id === project.id ? { ...p, isFavorite: project.isFavorite } : p)))
+      notifyToast('お気に入りを変えられませんでした。', { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleFavorite(project) } })
     }
   }
 

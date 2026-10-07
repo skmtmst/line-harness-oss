@@ -6,7 +6,7 @@ import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
 import Select from '@/components/shared/select'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import PoolNewV8 from './pool-new-v8'
+import PoolNewV8 from '@/v8/settings/pools/create'
 
 /** slug は URL に出る。日本語や記号を許すと /pool/xxx が壊れる。 */
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,31}$/
@@ -167,7 +167,7 @@ function NewPoolPageV7() {
 
 /*
  * ★V8-B（板 `D0AOyx`）：見た目テーマが v8 のときだけ新しい作り方
- * （`pool-new-v8.tsx`）に切り替える。v7 の見た目はそのまま変えない。
+ * （`src/v8/settings/pools/create.tsx`）に切り替える。v7 の見た目はそのまま変えない。
  */
 export default function NewPoolPage() {
   const theme = useAdminTheme()

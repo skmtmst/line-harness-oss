@@ -17,12 +17,13 @@ import { Banknote, CircleDot, CircleHelp, Download, Plus, Trophy, Users } from '
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel from '@/components/shared/folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
 import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -537,9 +538,7 @@ export default function AffiliatorsTab() {
               <Td className={styles.colName}>
                 <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
                   <FolderDotName folder={folderDotOf(row)} dot={!narrow}>
-                    <button type="button" className={styles.rowName} title={row.name} onClick={() => openDrawer(row.id, false)}>
-                      {row.name}
-                    </button>
+                    {nameButton(row)}
                   </FolderDotName>
                   <span className={styles.rowCode} title={row.code}>{row.code}</span>
                   <span className={styles.rowPlan}>{planText(row)}</span>
@@ -581,20 +580,16 @@ export default function AffiliatorsTab() {
       description="数の帯は「—」にしています。道具はそのまま使えます。"
       action={<RetryButton onRetry={() => { void loadList() }} />}
     />
-  ) : rows.length === 0 ? (
-    <StateCard
-      icon={<Users size={16} aria-hidden="true" />}
-      title="まだアフィリエイターはいません"
-      description="紹介してくれる人を登録すると、紹介リンクができます。先にコンバージョンで「何を成果にするか」を決めておきます"
-      action={readonly ? undefined : (
-        <Button variant="primary" href="/affiliates/new"><Plus size={14} aria-hidden="true" /> アフィリエイターを作る</Button>
-      )}
-    />
   ) : shownRows.length === 0 ? (
-    <StateCard
-      title="条件に合うものはありません"
-      description="検索や絞り込みを外すと、すべて出ます"
-      action={<Button type="button" onClick={resetConditions}>条件を外す</Button>}
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<Users aria-hidden="true" />}
+      title="まだアフィリエイターがいません"
+      description="紹介してくれる人を登録して、その人だけの紹介リンクを作ります。"
+      create={{ label: '最初のアフィリエイターを登録する', href: '/affiliates/new' }}
+      canCreate={!readonly}
+      filtered={rows.length > 0}
+      onClearFilters={resetConditions}
     />
   ) : (
     <>
@@ -615,6 +610,13 @@ export default function AffiliatorsTab() {
     </ListPagePagination>
   ) : undefined
 
+  function nameButton(row: { id: string; name: string }) {
+    return (
+      <button type="button" className={styles.rowName} title={row.name} onClick={() => openDrawer(row.id, false)}>
+        {row.name}
+      </button>
+    )
+  }
   const drawerRow = drawerId ? rows.find((row) => row.id === drawerId) ?? null : null
 
   return (

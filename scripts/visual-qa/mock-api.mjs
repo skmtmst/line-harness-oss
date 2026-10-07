@@ -94,17 +94,17 @@ import {
   OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, COMMON_ACTION_DETAIL_PURCHASE, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
-  BOOKING_MENUS, BOOKING_CHANNELS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_AVAILABILITY_STORE_VIEW, BOOKING_RESOURCES,
+  BOOKING_MENUS, BOOKING_CHANNELS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_AVAILABILITY_STORE_VIEW, BOOKING_AVAILABILITY_OCT, BOOKING_RESOURCES,
   BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_EXCEPTIONS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_SEND_COUNTS, LINE_NOTIFICATION_DELIVERIES,
-  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_FOLDERS, EVENT_DETAIL, EVENT_SLOTS, EVENT_OCCURRENCE_APPLICANTS, EVENT_WAITLIST, EVENT_BOOKINGS, EVENT_CHANGE_PREVIEW, EVENT_CHANGE_APPLY_RESULT, EVENT_LIFECYCLE_RESULT, EVENT_WAITLIST_REORDER_RESULT, EVENT_WAITLIST_SKIP_RESULT, EVENT_LIFF_CHANGE_RESULT, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, OPERATOR_NOTIFICATION_TEAMS, ADMIN_EVENTS, EVENT_FOLDERS, EVENT_DETAIL, EVENT_SLOTS, EVENT_OCCURRENCE_APPLICANTS, EVENT_WAITLIST, EVENT_BOOKINGS, EVENT_CHANGE_PREVIEW, EVENT_CHANGE_APPLY_RESULT, EVENT_LIFECYCLE_RESULT, EVENT_WAITLIST_REORDER_RESULT, EVENT_WAITLIST_SKIP_RESULT, EVENT_LIFF_CHANGE_RESULT, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
   NEN_PHOTO_REWARD_POLICY_VERSIONS,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
-  FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS,
+  FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_DETAIL_PUBLISHED, FORM_SUBMISSIONS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_TAGS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_DETAIL_STOPPED, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   ACCOUNT_HEALTH_LOGS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
@@ -120,7 +120,7 @@ import {
   HQ_BANNER_PRESETS, HQ_BANNER_USAGE, HQ_BANNER_STATS, HQ_BANNER_PROJECTS, HQ_BANNER_IMAGES,
   HQ_BANNER_ARCHIVED_PROJECTS, HQ_BANNER_IMAGE_COUNTS,
   NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST, NEN_FEEDING_PRODUCTS, NEN_HEALTH_SUMMARY_KOMUGI,
-  FRIEND_ADD_RUN_DETAIL, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
+  FRIEND_ADD_RUN_DETAIL, FRIEND_ADD_RUN_DETAIL_FAILED, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
 } from './fixtures.mjs'
 
 /* リッチメニューの公開の進み（K-1）。default は今までの見本（割り当てで失敗）。 */
@@ -2068,6 +2068,14 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   if (method === 'POST' && /^\/api\/(line-)?notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
     return { accepted: 2, excluded: 0, failed: 0, duplicate: 0 }
   }
+  /*
+   * 運用者へのお知らせを作る（板 gjUz3）→ 公開前の確認（板 sDXNy）。公開を押すと先に下書きを保存し、
+   * 保存できたときだけ確認の窓が出る。405 だと窓が出ず「下書きを保存できませんでした」で撮られていた。
+   */
+  if ((method === 'POST' && pathname === '/api/line-notifications/operator-rules')
+    || (method === 'PUT' && /^\/api\/line-notifications\/operator-rules\/[^/]+\/draft$/.test(pathname))) {
+    return { ...OPERATOR_NOTIFICATION_RULES[0], id: 'operator-rule-new', status: 'draft', isActive: false, version: 1 }
+  }
   const scenarioSimulation = /^\/api\/scenarios\/([^/]+)\/simulate$/.exec(pathname)
   if (method === 'POST' && scenarioSimulation) {
     return { ...SCENARIO_SIMULATION, scenarioId: scenarioSimulation[1] }
@@ -2493,6 +2501,32 @@ function nenMetricsBody(data, query) {
 }
 
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  /*
+    友だちのマイル詳細（V8 R6kIG・手で増やす・減らす M8zhjL）は1人に絞って読む。
+    絞ったときだけ絵の数（残高 1,240・確定待ち 120・期限が近い 200）と5行の明細を返す。
+    絞らない一覧（友だちの残高・履歴のタブ）は今までの見本のまま。
+  */
+  if (method === 'GET' && pathname === '/api/mileage/friends' && query.get('friendId') === 'friend-1') {
+    const base = MILEAGE_FRIENDS.items[0]
+    return { success: true, data: { ...MILEAGE_FRIENDS, items: [{
+      ...base, displayName: 'Kenta Kawano', available: 1240, pending: 120, monthChange: 180,
+      expiringMiles30d: 200, nextExpiringAt: '2026-10-31T00:00:00+09:00',
+    }], pagination: { total: 1, limit: 1, offset: 0 } } }
+  }
+  if (method === 'GET' && pathname === '/api/mileage/history' && query.get('friendId') === 'friend-1') {
+    const row = (id, entryType, status, amount, reason, ruleName, mode, executedByStaffName, occurredAt, balanceAfter) => ({
+      id, primaryFriendId: 'friend-1', displayName: 'Kenta Kawano', pictureUrl: null, entryType, status, amount, reason,
+      source: mode === 'manual' ? 'manual' : 'rule', hasSourceEvent: false, sourceReferenceId: null, ruleName, mode,
+      executedByStaffName, occurredAt, lineAccountName: '然 本店', balanceAfter,
+    })
+    return { success: true, data: { ...MILEAGE_HISTORY, items: [
+      row('mf-1', 'grant', 'available', 10, 'リンクをクリック', '秋の新商品のお知らせ', 'automatic', null, '2026-09-30T10:32:00+09:00', 1240),
+      row('mf-2', 'spend', 'available', -500, '送料無料クーポンと交換', '使い道：送料無料クーポン', 'automatic', null, '2026-09-29T18:05:00+09:00', 1230),
+      row('mf-3', 'grant', 'available', 48, '商品を買った', '購入 ¥4,800', 'automatic', null, '2026-09-28T21:40:00+09:00', 1730),
+      row('mf-4', 'adjustment', 'available', 100, 'おわびで付けた', '手で増やす', 'manual', '河野', '2026-09-27T12:10:00+09:00', 1682),
+      row('mf-5', 'reversal', 'available', -10, '付けすぎを取り消し', 'リンクをクリック（重複）', 'manual', '河野', '2026-09-20T09:00:00+09:00', 1582),
+    ], pagination: { total: 5, limit: 100, offset: 0 } } }
+  }
   if (method === 'GET' && pathname === '/api/hq/billing/summary') {
     return { success: true, data: BILLING_SUMMARY }
   }
@@ -2769,6 +2803,38 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/affiliate-settlements/preview') {
     /* 締めの期間は頼まれた期間を返す（本物と同じ）。無いときは見本の期間。 */
     return { success: true, data: { ...AFFILIATE_SETTLEMENT_PREVIEW, periodFrom: query.get('periodFrom') ?? AFFILIATE_SETTLEMENT_PREVIEW.periodFrom, periodTo: query.get('periodTo') ?? AFFILIATE_SETTLEMENT_PREVIEW.periodTo } }
+  }
+  /* ★V8-B nAesv：注文1件の状況（引き出し）。出来事2件・成果とマイルとスコア・発送後の案内2件。 */
+  {
+    const orderDetail = /^\/api\/ec-commerce\/orders\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && orderDetail) {
+      const id = decodeURIComponent(orderDetail[1])
+      const order = EC_ORDERS.items.find((item) => item.id === id) ?? EC_ORDERS.items[0]
+      const action = (eventId, eventType, receivedAt) => ({
+        id: `${eventId}-action`, eventId, eventType, actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded',
+        attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: receivedAt, nextRetryAt: null, version: 1,
+        receivedAt, orderNumber: order.orderNumber, customerName: order.customerName, retryAvailable: false, attempts: [],
+      })
+      return {
+        success: true,
+        data: {
+          order,
+          events: [
+            { id: 'ece-detail-1', externalEventId: 'ext-ece-1', eventType: 'ec.order.confirmed', status: 'processed', failureKind: null, receivedAt: '2026-10-01T12:02:00.000Z', processedAt: '2026-10-01T12:02:30.000Z', actions: [action('ece-detail-1', 'ec.order.confirmed', '2026-10-01T12:02:00.000Z')], dispatches: [], deliveries: [] },
+            { id: 'ece-detail-2', externalEventId: 'ext-ece-2', eventType: 'ec.order.shipped', status: 'processed', failureKind: null, receivedAt: '2026-10-02T00:40:00.000Z', processedAt: '2026-10-02T00:40:30.000Z', actions: [action('ece-detail-2', 'ec.order.shipped', '2026-10-02T00:40:00.000Z')], dispatches: [], deliveries: [] },
+          ],
+          followUps: [
+            { id: 'fu-1', campaignKey: 'delivered_check', campaignLabel: 'お荷物は届きましたか（NEN配信）', scheduledAt: '2026-10-04T01:00:00.000Z', status: 'pending', attempts: 0, sentAt: null, reason: null, failureKind: null },
+            { id: 'fu-2', campaignKey: 'review_request', campaignLabel: '口コミのお願い（NEN配信）', scheduledAt: '2026-10-12T01:00:00.000Z', status: 'pending', attempts: 0, sentAt: null, reason: null, failureKind: null },
+          ],
+          outcomes: {
+            conversions: [{ id: 'cv-detail-1', pointName: '商品を買った', approvalStatus: 'approved', value: 7540, createdAt: '2026-10-01T12:03:00.000Z', orderNumber: order.orderNumber, ecEventId: 'ece-detail-1', affiliateName: null, rewardAmount: null, rewardEntryStatus: null, reversedAmount: null, settlementState: null, payoutBatchState: null, payoutResult: null, duplicateCandidate: false }],
+            mileage: [{ id: 'ml-detail-1', entryType: 'earn', amount: 75, status: 'confirmed', reason: '商品を買った', occurredAt: '2026-10-01T12:03:00.000Z' }],
+            scores: [{ id: 'sc-detail-1', scoreChange: 30, reason: '商品を買った', occurredAt: '2026-10-01T12:03:00.000Z' }],
+          },
+        },
+      }
+    }
   }
   if (pathname === '/api/ec-commerce/orders') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
@@ -3263,8 +3329,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const identityCandidate = /^\/api\/identity-candidates\/([^/]+)$/.exec(pathname)
   if (identityCandidate) {
     if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
-    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id
-      ? IDENTITY_CANDIDATE_EC
+    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id || identityCandidate[1].startsWith('ec-identity-')
+      ? { ...IDENTITY_CANDIDATE_EC, id: identityCandidate[1] }
       : IDENTITY_CANDIDATE_FRIEND
     return { success: true, data: candidate }
   }
@@ -3333,6 +3399,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 友だち詳細（★V8 Q5F2QE・JCDRm）の履歴・次の予定・回答。friend-1 だけ。
    * 絵の「最近の履歴」3行・「進行中」1行・回答カード2枚と同じ形にする（2026-10-07）。
    */
+  /* 行動スコアの明細（V8 R8NNi「点数の変化の明細」）。新しい順に5件、合計は上から足し引きが合う。 */
+  const friendScore = pathname.match(/^\/api\/friends\/([^/]+)\/score$/)
+  if (friendScore) {
+    const row = (id, reason, scoreChange, scoreAfter, occurredAt) => ({
+      id, scoringRuleId: null, ruleKey: null, scoreChange, scoreBefore: scoreAfter - scoreChange, scoreAfter,
+      reason, eventType: null, source: null, occurredAt, createdAt: occurredAt, mode: 'automatic', executedByStaffName: null,
+    })
+    return { success: true, data: { friendId: friendScore[1], currentScore: 36, history: [
+      row('fs-1', '配信のURLを押した', 3, 36, '2026-09-30T10:32:00+09:00'),
+      row('fs-2', '購入した', 30, 33, '2026-09-28T21:40:00+09:00'),
+      row('fs-3', '配信のURLを押した', 3, 3, '2026-09-24T08:12:00+09:00'),
+      row('fs-4', '「返信した」の点が消えた（14日）', -5, 0, '2026-09-16T09:00:00+09:00'),
+      row('fs-5', 'メッセージに返信した', 5, 5, '2026-09-02T19:20:00+09:00'),
+    ] } }
+  }
   if (pathname === '/api/friends/friend-1/timeline') {
     const item = (id, type, summary, occurredAt, source, account = { id: 'visual-qa-account', name: '然-NEN-TEST' }) => ({
       id, type, summary, status: null, source, occurredAt, lineAccount: account,
@@ -3609,6 +3690,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* V8「集まった回答」の絵のフォーム（v0SbYR・MKQyJ）。form-1 とは別の ID。 */
   if (pathname === `/api/forms/${FORM_VISIT_DETAIL.id}`) return { success: true, data: FORM_VISIT_DETAIL }
   if (pathname === `/api/forms/${FORM_VISIT_DETAIL.id}/submissions`) return { success: true, data: FORM_VISIT_SUBMISSIONS }
+  /* 公開中の版（実口は account_id が無いと公開中の版を返す。編集画面は `?view=published` を付けて読む）。 */
+  if (pathname === `/api/forms/${FORM_DETAIL.id}` && query.get('view') === 'published') return { success: true, data: FORM_DETAIL_PUBLISHED }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
@@ -3888,8 +3971,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
      * 本物は `actionRuns` まで含めた1件（`friend-add-rules.ts`）。
      * 未知IDは本物と同じく失敗にする。
      */
-    if (friendAddRunDetail[1] !== FRIEND_ADD_RUN_DETAIL.id) return { success: false, error: '実行結果が見つかりません' }
-    return { success: true, data: FRIEND_ADD_RUN_DETAIL }
+    const found = [FRIEND_ADD_RUN_DETAIL, FRIEND_ADD_RUN_DETAIL_FAILED].find((item) => item.id === friendAddRunDetail[1])
+    if (!found) return { success: false, error: '実行結果が見つかりません' }
+    return { success: true, data: found }
   }
   if (pathname === '/api/scenarios') {
     const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
@@ -4620,6 +4704,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     ).map(toPublic)
     return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
   }
+  /* 運用者へのお知らせのチーム（板 gjUz3 の「チーム」欄・sDXNy の宛先）。高橋・佐々木・中川の3人（LINE は2人）。 */
+  if (pathname === '/api/notifications/teams') {
+    return { success: true, data: OPERATOR_NOTIFICATION_TEAMS }
+  }
   if (pathname === '/api/notifications/operator-rules' || pathname === '/api/line-notifications/operator-rules') {
     /*
      * 本物は両方の名で同じ一覧を返す（`notifications.ts`）。
@@ -4775,13 +4863,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
        * `data.items` が取れず「読み込めませんでした」になっていた。
        * 本物と同じ処理1件ずつの器で返す。
        */
-      const items = EC_ACTION_EXECUTIONS.items.map((execution) => ({
-        ...execution,
-        eventLabel: '',
-        friendId: null,
-        failureKind: null,
-        order: null,
-      }))
+      /* 本物と同じく注文番号で注文を結ぶ（★V8-B nAesv：行の「…」から注文の状況を開ける）。 */
+      const items = EC_ACTION_EXECUTIONS.items.map((execution) => {
+        const order = EC_ORDERS.items.find((item) => item.orderNumber === execution.orderNumber) ?? null
+        return {
+          ...execution,
+          eventLabel: '',
+          friendId: order?.friendId ?? null,
+          failureKind: null,
+          order,
+        }
+      })
       return {
         success: true,
         data: { items, total: items.length, summary: EC_ACTION_EXECUTIONS.summary },
@@ -6727,9 +6819,17 @@ const server = createServer((req, res) => {
     return
   }
 
-  /* 予約設定の右の写し（お客さまの予約画面）は店舗のルールを当てた空きを読む。ほかの画面は従来の空き。 */
+  /* 予約設定の右の写し（お客さまの予約画面）は店舗のルールを当てた空きを読む。ほかの画面は下の日付での分け方。 */
   if (url.pathname === '/api/booking/admin/availability' && url.searchParams.get('apply_store_rules') === '1') {
     res.writeHead(200).end(JSON.stringify(BOOKING_AVAILABILITY_STORE_VIEW))
+    return
+  }
+  /*
+    空いている時間：V8 の画面（右のスマホの見本）は今日から聞く。10/1 以降の範囲なら絵（10/2 金 始まり）の空きを返す。
+    それより前の範囲（v6 の撮影・代理予約の手順は 9/3 を選ぶ）は今までどおり。
+  */
+  if (url.pathname === '/api/booking/admin/availability' && (url.searchParams.get('from') ?? '') >= '2026-10-01') {
+    res.writeHead(200).end(JSON.stringify(BOOKING_AVAILABILITY_OCT))
     return
   }
   if (url.pathname in RAW) {

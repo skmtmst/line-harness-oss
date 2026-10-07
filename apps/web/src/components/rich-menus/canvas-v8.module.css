@@ -3,3 +3,6 @@
 .canvas { position: relative; margin-inline: auto; }
 .area { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--color-ink); overflow: hidden; }
 .area:focus-visible { outline: 2px solid var(--color-action); outline-offset: -2px; }
+/* 面の名前（絵の面の中の 13px・太字）。画像の上でも読めるよう白い縁取りを付け、長い名前は1行で切る。 */
+.areaName { max-width: 100%; padding-inline: var(--tpl-bm-6); overflow: hidden; color: var(--color-ink); font-size: var(--tpl-bm-13); font-weight: 600; line-height: var(--tpl-bm-19); text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 0 var(--tpl-bm-3) var(--color-canvas), 0 0 var(--tpl-bm-3) var(--color-canvas); pointer-events: none; }
+.areaIcon { flex-shrink: 0; color: var(--color-ink); pointer-events: none; }

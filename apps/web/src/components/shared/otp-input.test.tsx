@@ -112,3 +112,51 @@ describe('認証コード入力（★V7 xHzFK）', () => {
     expect(slot(1).disabled).toBe(true)
   })
 })
+
+describe('2段階認証の6桁（動きの点検・6）', () => {
+  function Controlled({ onComplete, invalid = false, busy = false }: { onComplete?: (value: string) => void; invalid?: boolean; busy?: boolean }) {
+    const [value, setValue] = useState('')
+    return (
+      <>
+        <OtpInput value={value} onChange={setValue} onComplete={onComplete} invalid={invalid} busy={busy} label="認証コード" />
+        <output data-testid="value">{value}</output>
+      </>
+    )
+  }
+
+  it('全角の数字は半角にして入る', () => {
+    render(<Controlled />)
+    fireEvent.change(slot(1), { target: { value: '１２３' } })
+    expect(value()).toBe('123')
+  })
+
+  it('6桁目が入った瞬間に1回だけ送る。確かめている間は送らない', () => {
+    const onComplete = vi.fn()
+    const view = render(<Controlled onComplete={onComplete} />)
+    fireEvent.change(slot(1), { target: { value: '482917' } })
+    expect(onComplete).toHaveBeenCalledTimes(1)
+    expect(onComplete).toHaveBeenCalledWith('482917')
+    view.unmount()
+    const busyComplete = vi.fn()
+    render(<Controlled onComplete={busyComplete} busy />)
+    fireEvent.change(slot(1), { target: { value: '482917' } })
+    expect(busyComplete).not.toHaveBeenCalled()
+    expect(slot(1).disabled).toBe(true)
+  })
+
+  it('違ったら6桁を消して1マス目へ戻る', () => {
+    const view = render(<Controlled />)
+    fireEvent.change(slot(1), { target: { value: '482917' } })
+    expect(value()).toBe('482917')
+    view.rerender(<Controlled invalid />)
+    expect(value()).toBe('')
+    expect(document.activeElement).toBe(slot(1))
+  })
+
+  it('サーバーの「正しくありません」は人の言葉にする', async () => {
+    const { otpFailureMessage } = await import('./otp-input')
+    expect(otpFailureMessage('認証コードが正しくありません')).toBe('コードが違います。もう一度入れてください')
+    expect(otpFailureMessage('入力回数を超えました。LINEログインからやり直してください')).toBe('入力回数を超えました。LINEログインからやり直してください')
+    expect(otpFailureMessage('too many attempts')).toContain('少し待って')
+  })
+})

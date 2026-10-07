@@ -24,7 +24,6 @@ import {
   MoreHorizontal,
   Percent,
   Plus,
-  SearchX,
   TriangleAlert,
 } from 'lucide-react'
 import { displayFormName, hasStoredDestination, type Folder } from '@line-crm/shared'
@@ -35,9 +34,11 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { runUndoable } from '@/lib/undoable'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
@@ -496,13 +497,16 @@ export default function FormsListV8() {
     })
   }, [formFilter, query, formSort, forms])
 
+  /* 取り消し待ちの削除（5秒）の行は一覧から外して描く（動きの点検 17 番）。 */
+  const deferredDelete = useDeferredDelete()
   const listTotal = reviewMode ? clientFilteredForms.length : formTotal
   const pageCount = Math.max(1, Math.ceil(listTotal / pageSize))
   const visiblePage = Math.min(page, pageCount)
   const pageStart = (visiblePage - 1) * pageSize
-  const visibleForms = reviewMode
+  const pageForms = reviewMode
     ? clientFilteredForms.slice(pageStart, pageStart + pageSize)
     : forms
+  const visibleForms = deferredDelete.hiddenCount === 0 ? pageForms : pageForms.filter((form) => !deferredDelete.isHidden(form.id))
   /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。無ければ未分類の輪。 */
   const folderDotOf = (folderId: string | null | undefined) => {
     const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
@@ -575,6 +579,53 @@ export default function FormsListV8() {
     } finally {
       setDeleteImpactLoading(false)
     }
+  }
+
+  /*
+   * 「削除」：影響を先に読み、消しても何も失われないフォーム（未公開・回答 0・利用先 0 で、
+   * 完全削除ができるもの）だけ、確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で
+   * 取り消せる（動きの点検 17 番）。そうでなければ今までどおり窓（アーカイブを勧める）。
+   */
+  const requestDelete = async (form: Form) => {
+    const accountId = selectedAccountId
+    if (!accountId) {
+      void openDelete(form)
+      return
+    }
+    let impact: FormDeleteImpact | null = null
+    try {
+      const result = await api.forms.deleteImpact(form.id, accountId)
+      if (result.success) impact = result.data
+    } catch {
+      impact = null
+    }
+    const harmless = impact !== null && impact.canDelete && impact.submissionCount === 0 && impact.referenceCount === 0 && !impact.form.isActive
+    if (!impact || !harmless) {
+      void openDelete(form)
+      return
+    }
+    const revision = impact.revision
+    closeDetail()
+    deferredDelete.schedule({
+      ids: [form.id],
+      message: `回答フォーム「${displayFormName(form.name)}」を削除しました`,
+      commit: async () => {
+        try {
+          const result = await api.forms.remove(form.id, accountId, revision)
+          if (!result.success) throw new Error('delete_failed')
+        } catch (reason) {
+          // 応答が失われても、もう消えていれば成功（窓の扱いと同じ）。
+          try {
+            await api.forms.get(form.id, accountId)
+          } catch (checkError) {
+            if (checkError instanceof ApiError && checkError.status === 404) return
+          }
+          throw reason
+        }
+      },
+      onCommitted: () => Promise.all([loadForms(), loadStats()]),
+      failureMessage: 'この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。',
+    })
   }
 
   const closeDelete = () => {
@@ -826,22 +877,25 @@ export default function FormsListV8() {
       setMoveTarget(null)
       return
     }
-    setMoveBusy(true)
+    /* 押した瞬間に移した形を見せて窓を閉じ、裏で保存する（動きの点検・7）。失敗したら戻して知らせる。 */
+    const target = moveTarget
+    const previousFolderId = target.folderId ?? null
+    const setFolderOf = (folderId: string | null) => setForms((current) => current.map((form) => (form.id === target.id ? { ...form, folderId } : form)))
+    setFolderOf(nextFolderId)
+    setMoveTarget(null)
     setMoveError('')
     try {
       const res = await fetchApi<{ success: boolean; data: Form }>(
-        `/api/forms/${moveTarget.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+        `/api/forms/${target.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
         { method: 'PUT', body: JSON.stringify({ folderId: nextFolderId }) },
       )
       if (!res.success) throw new Error('move_failed')
-      setMoveTarget(null)
-      await loadForms()
+      void loadForms()
     } catch (error) {
-      setMoveError(error instanceof ApiError && error.status === 422
+      setFolderOf(previousFolderId)
+      notifyToast(error instanceof ApiError && error.status === 422
         ? 'そのフォルダはありません。開き直して、もう一度お試しください。'
-        : 'フォルダへ移せませんでした。もう一度お試しください。')
-    } finally {
-      setMoveBusy(false)
+        : 'フォルダへ移せませんでした。', { tone: 'error' })
     }
   }
 
@@ -944,7 +998,7 @@ export default function FormsListV8() {
       : []),
     { id: 'move', label: 'フォルダへ移す', onSelect: () => openMove(form) },
     { id: 'archive', label: 'アーカイブ', dividerBefore: true, onSelect: () => void openDelete(form) },
-    { id: 'delete', label: '削除', tone: 'danger' as const, onSelect: () => void openDelete(form) },
+    { id: 'delete', label: '削除', tone: 'danger' as const, onSelect: () => void requestDelete(form) },
   ]
 
   /* ===== フォルダの列 ===== */
@@ -1200,21 +1254,24 @@ export default function FormsListV8() {
       '担当未割り当てのフォームはありません',
       '担当の決まっていない旧フォームはここに出ます。',
     )
-  } else if (folderTotal === 0 && !filterActive) {
-    listBody = stateCard(
-      <ClipboardList size={18} aria-hidden="true" />,
-      'まだ回答フォームはありません',
-      'アンケートや申し込みを LINE の中で受け付けられます。答えは友だち情報に保存できます。',
-      createButton(false),
-      false,
-      'I3L41O-empty',
-    )
-  } else if (listTotal === 0) {
-    listBody = stateCard(
-      <SearchX size={18} aria-hidden="true" />,
-      '条件に合うフォームはありません',
-      '「公開中」「下書き」「情報欄に保存」や検索を外すと、すべて出ます。',
-      <Button type="button" variant="secondary" onClick={clearFilters}>条件を外す</Button>,
+  } else if (listTotal === 0 || folderTotal === 0) {
+    /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない。 */
+    listBody = (
+      <EmptyList
+        icon={<ClipboardList aria-hidden="true" />}
+        title="まだ回答フォームがありません"
+        description="アンケートや申し込みを LINE の中で受け付け、答えを友だち情報に保存します。"
+        canCreate={canManageFolders}
+        action={
+          <Button type="button" variant="primary" onClick={createDraft} disabled={creating} busy={creating} busyLabel="下書きを作成中">
+            <Plus size={15} aria-hidden="true" />最初のフォームを作る
+          </Button>
+        }
+        filtered={filterActive}
+        onClearFilters={clearFilters}
+        filteredDescription="「公開中」「下書き」「情報欄に保存」や検索を外すと、すべて出ます"
+        data-design-node="I3L41O-empty"
+      />
     )
   } else {
     listBody = (
@@ -1615,11 +1672,11 @@ export default function FormsListV8() {
       <Dialog
         open={deleteTarget !== null}
         designNode="GVizd"
-        /* 絵は幅 640・上から 222。共通の窓が受け取れるようになったら（designWidth・designTop）渡す。 */
+        /* 絵は幅 640・上から 220。 */
+        designWidth={640}
+        designTop={220}
         title={deleteTarget ? `「${displayFormName(deleteTarget.name)}」をどうしますか` : 'フォームをどうしますか'}
-        description={deleteImpact?.form.isActive
-          ? '配っている URL を開いた人には「受付を終了しました」と出ます。'
-          : undefined}
+        designHeaderPadding="var(--tpl-fm2-dialog-head-pad)"
         busy={deleting || deleteImpactLoading}
         onCancel={closeDelete}
         footer={(
@@ -1653,9 +1710,15 @@ export default function FormsListV8() {
           </div>
         )}
       >
+        {/* 絵は頭（題と×）・説明・2枚のカード・注意の帯・ボタンを 14 ずつで並べる。共通の窓の中身の余白（上下24）を詰める。 */}
+        <div className={styles.archiveBody}>
+        {deleteImpact?.form.isActive ? (
+          <p className={styles.archiveLead}>配っている URL を開いた人には「受付を終了しました」と出ます。</p>
+        ) : null}
         {deleteImpactLoading ? (
           <p className={styles.dialogNote}>公開状態・回答数・利用中の場所を確認しています。</p>
         ) : deleteImpact ? (
+          <>
           <div className={styles.impactOptions}>
             <div className={styles.impactOption} data-tone="recommended">
               <p className={styles.impactOptionTitle}>アーカイブする（おすすめ）</p>
@@ -1663,7 +1726,7 @@ export default function FormsListV8() {
                 {`一覧から隠します。集まった回答 ${formatNumber(deleteImpact.submissionCount)}件 と友だち情報に保存した答えは残ります。`}
               </p>
             </div>
-            <div className={styles.impactOption}>
+            <div className={styles.impactOption} data-disabled={deleteImpact.canDelete ? undefined : ''}>
               <p className={styles.impactOptionTitle} data-tone="danger">削除する</p>
               <p className={styles.impactOptionDesc}>
                 {deleteImpact.canDelete
@@ -1671,20 +1734,23 @@ export default function FormsListV8() {
                   : '回答や利用先があるので削除できません。削除できるのは、未公開・回答なし・利用先なしのフォームだけです。'}
               </p>
             </div>
+          </div>
             {deleteImpact.references.length > 0 ? (
-              <p className={styles.impactWarn}>
+              <p className={styles.impactWarn} title={deleteImpact.answerUrl ? `開けなくなる公開URL：${deleteImpact.answerUrl}` : undefined}>
                 <TriangleAlert size={16} aria-hidden="true" />
                 <span>{`${deleteImpact.references.map(referenceLabel).join('と')}がこのフォームを開きます。`}</span>
               </p>
             ) : null}
-            {deleteImpact.answerUrl ? (
+            {/* 利用先の注意があるときは、その札の title に URL を入れる（絵の窓に URL の行は無い）。 */}
+            {deleteImpact.answerUrl && deleteImpact.references.length === 0 ? (
               <p className={styles.dialogNote}>
                 開けなくなる公開URL：<span className={styles.breakAll}>{deleteImpact.answerUrl}</span>
               </p>
             ) : null}
-          </div>
+          </>
         ) : null}
         {deleteError ? <p className={styles.alertText} role="alert">{deleteError}</p> : null}
+        </div>
       </Dialog>
 
       {/* 名前を変更。回答データやURLは変わらない。 */}

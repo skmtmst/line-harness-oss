@@ -12,7 +12,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, Copy, FlaskConical, Smartphone, Upload } from 'lucide-react'
+import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react'
 import {
   emptyLayout,
   formThemeContrastError,
@@ -126,6 +126,12 @@ function FormEditInner() {
   const [testError, setTestError] = useState('')
   const [showPublish, setShowPublish] = useState(false)
   /*
+   * 公開の確かめ（Z9wXm）の「変わること」は、いま公開中の版との違い。
+   * 公開中の版は、account_id を付けない取得（お客さまに見えている形）で読む。
+   * 読めないとき（未公開・受付停止・通信失敗）は、保存した下書きとの違いに戻す。
+   */
+  const [publishedSide, setPublishedSide] = useState<ConflictSide | null>(null)
+  /*
    * ほかの人が先に保存していたとき（409）。入力は捨てない。
    * 帯・比べる窓・読み直しは共通の save-conflict（動きの点検 16 番）。
    */
@@ -207,6 +213,30 @@ function FormEditInner() {
       setError('読み込みに失敗しました。もう一度読み込んでください。')
     }
   }
+
+  /* 公開の確かめを開いたら、公開中の版を読む（`?view=published` は印だけ。API は account_id が無いと公開中の版を返す）。 */
+  useEffect(() => {
+    if (!showPublish || !id || !publishedVersionId) {
+      setPublishedSide(null)
+      return
+    }
+    let alive = true
+    void (async () => {
+      try {
+        const res = await fetchApi<{ success: boolean; data?: { name?: string; description?: string | null; layout?: FormLayout } }>(
+          `/api/forms/${encodeURIComponent(id)}?view=published`,
+          { suppressFeatureDisabledEvent: true },
+        )
+        if (!alive) return
+        setPublishedSide(res.success && res.data?.layout
+          ? { name: res.data.name ?? '', description: res.data.description ?? '', layout: res.data.layout }
+          : null)
+      } catch {
+        if (alive) setPublishedSide(null)
+      }
+    })()
+    return () => { alive = false }
+  }, [showPublish, id, publishedVersionId, contentRevision])
 
   useEffect(() => {
     setFormLoadFailed(null)
@@ -660,7 +690,7 @@ function FormEditInner() {
     const saved = JSON.parse(savedSnapshot.current) as Snapshot
     return { name: saved.name, description: saved.description, layout: saved.layout }
   })()
-  const publishChanges = describePublishChanges(savedSide, { name, description, layout })
+  const publishChanges = describePublishChanges(publishedSide ?? savedSide, { name, description, layout })
 
   const phone = (
     <FormPhone layout={layout} pageIndex={page} accountName={selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} />
@@ -742,9 +772,9 @@ function FormEditInner() {
       boardId={narrow ? 'ITBAB' : conflict ? 'J1pdB' : TAB_NODE[editTab]}
       title={name || 'フォーム名未設定'}
       identity={(
+        /* 絵は矢印も文字の1つ（「← 回答フォームへ」）。 */
         <Link href="/form-submissions" className={styles.backLink}>
-          <ArrowLeft size={14} aria-hidden="true" />
-          回答フォームへ
+          {'← 回答フォームへ'}
         </Link>
       )}
       steps={(
@@ -815,7 +845,7 @@ function FormEditInner() {
       <Dialog
         open={showPublish}
         title="この版を公開する"
-        description="公開すると、配っている URL を開いた人に新しい内容が出ます。"
+        designHeaderPadding="var(--tpl-fm2-dialog-head-pad)"
         busy={saving}
         error={error || undefined}
         designNode="Z9wXm"
@@ -824,9 +854,15 @@ function FormEditInner() {
         footer={<></>}
         onCancel={() => setShowPublish(false)}
       >
+        {/* 絵は頭（題と×）・説明・変わること・残ること・ボタンを 14 ずつで並べる。共通の窓の中身の余白（上下24）を詰める。 */}
         <div className={styles.publishBody}>
+          <p className={styles.publishLead}>公開すると、配っている URL を開いた人に新しい内容が出ます。</p>
           <div className={styles.changes}>
-            <p className={styles.changesTitle}>変わること</p>
+            <p className={styles.changesTitle}>
+              {publishedContentRevision !== null && contentRevision !== null && publishedContentRevision !== contentRevision
+                ? `変わること（版${publishedContentRevision} → 版${contentRevision}）`
+                : '変わること'}
+            </p>
             {publishChanges.length === 0 ? (
               <p className={styles.changeLine}>保存した下書きをそのまま公開します</p>
             ) : (
@@ -840,7 +876,7 @@ function FormEditInner() {
           </div>
           <ul className={styles.publishNotes}>
             <li>・すでに集まった回答（{submitCount.toLocaleString('ja-JP')}件）は消えません。消した質問の答えも残ります。</li>
-            <li>・公開するまで、いまの版がそのまま使われます。</li>
+            <li>{publishedContentRevision !== null ? `・公開するまで、いまの版${publishedContentRevision}がそのまま使われます。` : '・公開するまで、いまの版がそのまま使われます。'}</li>
           </ul>
           {/* 絵の操作は真ん中（下の帯と同じ）。窓の既定の右寄せの帯は使わない。 */}
           <div className={styles.publishActions}>

@@ -199,6 +199,8 @@ describe('共通部品の影響範囲', () => {
       'v8/broadcasts/list.tsx',
       // ★V8 回答フォームの一覧（I3L41O）。新しい置き場（src/v8）に一から書いた。
       'v8/forms/list.tsx',
+      // ★V8 友だち追加時の配信の実行結果（REIxB）：表の下のページ送りに共通 Pagination。
+      'v8/friend-add-runs/runs.tsx',
       // ★V8 回答フォームの編集（m1cWEy ほか）。登録メディアから選ぶ窓の写しにページ送り。
       'v8/form-edit/media-picker.tsx',
       // V8 のリッチメニュー一覧（src/v8 に一から書いた）。

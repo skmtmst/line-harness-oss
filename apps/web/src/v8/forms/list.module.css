@@ -526,6 +526,31 @@ a.answerCount:hover {
   word-break: break-all;
 }
 
+/* アーカイブ・削除の窓の中身。絵は頭の下 14・段の間 14・ボタンの上 14。共通の中身の余白 24 との差を詰める。 */
+.archiveBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-fm2-dialog-gap);
+  width: 100%;
+  margin-block: var(--tpl-fm2-dialog-pull);
+}
+
+.archiveLead {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-fm2-lh-label);
+}
+
+.archiveBody .impactOptionTitle {
+  line-height: var(--tpl-fm2-lh-label);
+}
+
+.archiveBody .impactOptionDesc,
+.archiveBody .impactWarn {
+  line-height: var(--tpl-fm2-lh-caption);
+}
+
 .impactOptions {
   display: flex;
   flex-direction: column;
@@ -555,6 +580,11 @@ a.answerCount:hover {
 
 .impactOptionTitle[data-tone='danger'] {
   color: var(--color-status-danger);
+}
+
+/* 削除できないときは、絵どおりカードの文字を薄くする（押せる道はアーカイブだけ）。 */
+.impactOption[data-disabled] {
+  opacity: var(--tpl-fm2-disabled-opacity);
 }
 
 .impactOptionDesc {

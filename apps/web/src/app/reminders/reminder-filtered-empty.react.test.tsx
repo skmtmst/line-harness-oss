@@ -115,7 +115,7 @@ describe('リマインダ一覧の絞り込み0件 (#635)', () => {
     await flush()
 
     // 「0件」と分かる表示＋次の行動提案（別の言葉・絞り込み解除）。
-    expect(host.textContent).toContain('条件に合うリマインダはありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
     expect(host.textContent).toContain('検索を外すと、すべて出ます')
     expect(host.textContent).not.toContain('まだリマインダがありません')
     expect(buttonByText('条件を外す')).toBeTruthy()
@@ -127,7 +127,7 @@ describe('リマインダ一覧の絞り込み0件 (#635)', () => {
 
     typeSearch('存在しない言葉xyz')
     await flush()
-    expect(host.textContent).toContain('条件に合うリマインダはありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
 
     const clear = buttonByText('条件を外す')
     expect(clear).toBeTruthy()

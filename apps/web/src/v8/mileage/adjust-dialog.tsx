@@ -14,12 +14,13 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Minus, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
 import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import Toggle from '@/components/shared/toggle'
 import { ApiError, api, type MileageAdjustmentPolicy } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import styles from './mileage.module.css'
@@ -244,11 +245,15 @@ export default function MileageAdjustDialog({
   return (
     <Dialog
       open={open}
+      designNode="M8zhjL"
+      designWidth={600}
+      designTop={75}
       title="マイルを手で増やす・減らす"
       description="記録に残ります。あとから理由をたどれるようにしてください。"
       busy={busy || policyLoading}
       error={error}
       confirmLabel={step === 'input' ? confirmLabel : undefined}
+      confirmIcon={step === 'input' && valid && !highValue ? (delta < 0 ? <Minus size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />) : undefined}
       cancelLabel={step === 'input' ? 'キャンセル' : undefined}
       onConfirm={() => { if (step === 'input') void submit() }}
       onCancel={() => { if (!busy) onCancel() }}
@@ -321,7 +326,7 @@ export default function MileageAdjustDialog({
           </div>
         </section>
       ) : (
-        <div className={styles.dlgBody}>
+        <div className={`${styles.dlgBody} ${styles.adjustBody}`}>
           <p className={styles.dlgCaption}>だれのマイルを動かしますか</p>
           <div className={styles.dlgPerson}>
             <span className={styles.dlgAvatar} aria-hidden="true">{friendName.slice(0, 1)}</span>
@@ -333,6 +338,7 @@ export default function MileageAdjustDialog({
             </div>
           </div>
 
+          <div className={styles.dlgGroup}>
           <p className={styles.dlgCaption}>増やすか減らすか</p>
           <div className={styles.seg} role="group" aria-label="増やすか減らすか">
             {([
@@ -352,10 +358,12 @@ export default function MileageAdjustDialog({
               </button>
             ))}
           </div>
+          </div>
 
-          <div className={styles.dlgGrid2}>
+          {/* 共通の日付欄は高さ 40（ほかの欄は 36）。絵の段の間 14 に合わせ、下の間で吸収する。 */}
+          <div className={`${styles.dlgGrid2} ${styles.dateGrid}`}>
             <div>
-              <p className={styles.dlgCaption}>マイル数</p>
+              <p className={styles.dlgFieldLabel}>マイル数</p>
               <input
                 className={styles.dlgInput}
                 inputMode="numeric"
@@ -366,7 +374,7 @@ export default function MileageAdjustDialog({
               />
             </div>
             <div>
-              <p className={styles.dlgCaption}>この分の有効期限</p>
+              <p className={styles.dlgFieldLabel}>この分の有効期限</p>
               <DateField
                 value={expiresOn}
                 disabled={direction !== 'increase'}
@@ -388,7 +396,7 @@ export default function MileageAdjustDialog({
               />
             </div>
             <div>
-              <p className={styles.dlgCaption}>問い合わせ・注文・調整元ID <span className={styles.dlgPersonSub}>任意</span></p>
+              <p className={`${styles.dlgFieldLabel} ${styles.labelRow}`}>問い合わせ・注文・調整元ID<span className={styles.dlgPersonSub}>任意</span></p>
               <input
                 className={styles.dlgInput}
                 value={sourceReferenceId}
@@ -399,22 +407,23 @@ export default function MileageAdjustDialog({
             </div>
           </div>
 
-          <p className={styles.dlgCaption}>詳しい理由</p>
-          <textarea
-            className={styles.dlgTextarea}
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            aria-label="詳しい理由"
-          />
+          <div className={styles.dlgGroup}>
+            <p className={styles.dlgCaption}>詳しい理由</p>
+            <textarea
+              className={styles.dlgTextarea}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              aria-label="詳しい理由"
+            />
+          </div>
 
-          <div>
-            <Checkbox
-              checked={notifyFriend}
-              onCheckedChange={setNotifyFriend}
-              description="増減したマイルと変更後の残高をLINEで知らせます。"
-            >
-              友だちに知らせる（LINE通知）
-            </Checkbox>
+          {/* 絵 M8zhjL：スイッチ＋題と説明の2行。 */}
+          <div className={styles.notifyRow}>
+            <Toggle checked={notifyFriend} onChange={setNotifyFriend} label="友だちに知らせる（LINE通知）" />
+            <div className={styles.dlgPersonText}>
+              <span className={styles.dlgPersonName}>友だちに知らせる（LINE通知）</span>
+              <span className={styles.dlgPersonSub}>増減したマイルと変更後の残高をLINEで知らせます。</span>
+            </div>
           </div>
 
           {!policyLoading && !policy?.configured && canConfigurePolicy ? (

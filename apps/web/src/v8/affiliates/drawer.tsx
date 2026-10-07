@@ -10,7 +10,7 @@
  * 世代番号で、別の人へ開き直した途中に届いた古い応答を捨てる。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, X } from 'lucide-react'
+import { Check, Copy, PauseCircle, X } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -516,6 +516,7 @@ export default function AffiliateDrawer({
         <footer className={styles.foot}>
           {readonly ? <span /> : (
             <button type="button" className={styles.stop} onClick={() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }} disabled={!affiliate.isActive}>
+              <PauseCircle size={14} aria-hidden="true" />
               紹介を止める
             </button>
           )}
@@ -532,6 +533,7 @@ export default function AffiliateDrawer({
                 title={settlement ? undefined : '今回締められる報酬がありません'}
                 onClick={() => setPaymentOpen(true)}
               >
+                <Check size={15} aria-hidden="true" />
                 支払いを確定する
               </Button>
             </>

@@ -30,6 +30,8 @@ import { ORDER_IMPACT_KEYS, REVENUE_IMPACT_KEYS, type IdentityCandidateImpactMet
 import EcTabs from '../ec-tabs-view'
 import ListRange from '@/components/ui/list-range'
 import ecStyles from '../ec-commerce-v6.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import EcIdentityCandidatesV8 from '@/v8/settings/ec-commerce/identity'
 
 // #517 軽4: 計量キーは共有の正本を使う。手書きの重複を持たない。
 // 影響の計量は共有の型で受け、表示は `impactText` 系に寄せる。
@@ -62,7 +64,12 @@ function candidateImpactText(value: unknown): string {
  * 一覧・判定は共通の本人照合APIを使い、件数と売上影響はEC運用APIの
  * account scope付き集計を使う。推測した数字は表示しない。
  */
+/** ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/ec-commerce/identity.tsx）。v7 は下のまま。 */
 export default function EcIdentityCandidatesPage() {
+  return useAdminTheme() === 'v8' ? <EcIdentityCandidatesV8 /> : <EcIdentityCandidatesPageV7 />
+}
+
+function EcIdentityCandidatesPageV7() {
   const { selectedAccountId } = useAccount()
   const review = useIdentityReview('ec_member', { lineAccountId: selectedAccountId })
   const detail = review.detail

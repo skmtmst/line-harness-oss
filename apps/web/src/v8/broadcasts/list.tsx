@@ -31,7 +31,6 @@ import {
   Send,
   SendHorizontal,
   UserCheck,
-  X,
 } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
@@ -51,6 +50,7 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import DateField from '@/components/shared/date-field'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -61,6 +61,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { runOptimistic } from '@/lib/undoable'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
@@ -460,6 +461,27 @@ export default function BroadcastListV8() {
     }
   }
 
+  /*
+   * 下書きの削除は、まだ誰にも届いていない・予約もしていないので影響が無い。確かめの窓を出さずに
+   * 一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。予約・送信済みなどは今までどおり窓。
+   */
+  const deferredDelete = useDeferredDelete()
+  const requestDelete = (broadcast: ApiBroadcast) => {
+    setDeleteError('')
+    if (broadcast.status !== 'draft') {
+      setDeleteTarget(broadcast)
+      return
+    }
+    if (panelId === broadcast.id) setPanelId(null)
+    deferredDelete.schedule({
+      ids: [broadcast.id],
+      message: `下書き「${broadcast.title}」を削除しました`,
+      commit: () => api.broadcasts.delete(broadcast.id),
+      onCommitted: () => loadList((page - 1) * pageSize),
+      failureMessage: 'この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。',
+    })
+  }
+
   const handleDelete = async () => {
     if (!deleteTarget || deleting) return
     const targetId = deleteTarget.id
@@ -503,6 +525,7 @@ export default function BroadcastListV8() {
 
   /* タイトル・内容は手元で絞る。フォルダも手元で当て直す（移動の重ねをすぐ表へ出すため）。 */
   const visibleBroadcasts = broadcasts.filter((b) => {
+    if (deferredDelete.isHidden(b.id)) return false
     if (folderFilter === UNFILED && b.folderId) return false
     if (folderFilter && folderFilter !== UNFILED && b.folderId !== folderFilter) return false
     const query = titleQuery.trim().toLowerCase()
@@ -644,7 +667,7 @@ export default function BroadcastListV8() {
       label: '削除する',
       tone: 'danger',
       dividerBefore: true,
-      onSelect: () => { setDeleteError(''); setDeleteTarget(broadcast) },
+      onSelect: () => requestDelete(broadcast),
     })
     return items
   }
@@ -940,12 +963,17 @@ export default function BroadcastListV8() {
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', null,
       <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度試す</Button>, true)
   ) : visibleBroadcasts.length === 0 ? (
-    filterActive
-      ? stateCard(null, '条件に合う配信はありません', '「予約中のみ」「下書き」や配信日を外すと、すべて出ます',
-        <Button type="button" onClick={clearFilters}><X size={14} aria-hidden="true" />条件を外す</Button>)
-      : stateCard(<Send size={20} aria-hidden="true" />, 'まだ一斉配信はありません', '友だちにまとめてお知らせを送れます',
-        /* 閲覧のみには押せない「配信を作る」を置かずに隠す（2026-10-06 オーナー決定）。 */
-        canEdit ? <Button type="button" variant="primary" onClick={() => openCreate(false)}><Plus size={15} aria-hidden="true" />配信を作る</Button> : null)
+    /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない（2026-10-06 オーナー決定）。 */
+    <EmptyList
+      icon={<Send aria-hidden="true" />}
+      title="まだ一斉配信がありません"
+      description="友だちみんなや絞り込んだ人に、お知らせをまとめて送ります。"
+      create={{ label: '最初の一斉配信を作る', onClick: () => openCreate(false) }}
+      canCreate={canEdit}
+      filtered={filterActive}
+      onClearFilters={clearFilters}
+      filteredDescription="「予約中のみ」「下書き」や配信日を外すと、すべて出ます"
+    />
   ) : (
     <DataTable className={styles.table}>
       {tableHead}
@@ -1197,7 +1225,7 @@ export default function BroadcastListV8() {
                   </Button>
                   <Button
                     variant="secondary"
-                    onClick={() => { setDeleteError(''); setDeleteTarget(panelRow); setPanelId(null) }}
+                    onClick={() => { setPanelId(null); requestDelete(panelRow) }}
                   >
                     削除する
                   </Button>
