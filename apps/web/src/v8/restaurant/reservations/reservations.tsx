@@ -362,6 +362,7 @@ export default function ReservationsPage() {
       description={DESCRIPTION[view === 'today' ? 'today' : 'list']}
       query={query}
       layout={view === 'today' ? 'ledgerTight' : 'ledger'}
+      storeTab="reservations"
       headAfter={(ctx, storePicker) => (
         <HeadControls
           storePicker={storePicker}

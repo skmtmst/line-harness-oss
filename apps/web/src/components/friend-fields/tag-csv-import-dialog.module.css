@@ -267,6 +267,14 @@
   border-radius: var(--radius-card);
 }
 
+/* 確認の表の続き（100 行ごと）。表の枠の中、表の下に置く。 */
+.moreRows {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+  border-top: 1px solid var(--color-hairline);
+}
+
 .table {
   width: 100%;
   table-layout: fixed;

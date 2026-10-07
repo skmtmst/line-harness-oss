@@ -756,7 +756,11 @@ export default function Sidebar({
           const collapsible = isV8 && Boolean(section.label)
           const sectionOpen =
             !collapsible || groupIsOpen(section) || section.items.some((item) => isActive(item))
-          const hideItems = isV8 && !sectionOpen && !(collapsed && !drawer)
+          /*
+           * 開閉で高さを滑らかに変える（触り心地 5 回目）。畳める組は項目を消さずに包みへ入れ、
+           * 畳んだら高さ 0・押せない・読み上げない。動きを減らす設定では一瞬で開閉する。
+           */
+          const animatedGroup = collapsible && !(collapsed && !drawer)
           return (
           <div key={section.id} className={styles.section}>
             {section.label && (
@@ -784,7 +788,8 @@ export default function Sidebar({
                 </div>
               )
             )}
-            {!hideItems && section.items.map((item) => {
+            {(() => {
+              const links = section.items.map((item) => {
               const active = isActive(item)
               const isDanger = 'danger' in item && item.danger
               const visibleLabel = item.label
@@ -830,7 +835,19 @@ export default function Sidebar({
                   )}
                 </Link>
               )
-            })}
+            })
+              if (!animatedGroup) return links
+              return (
+                <div
+                  className={`${styles.sectionItems} ${sectionOpen ? '' : styles.sectionItemsClosed}`}
+                  inert={!sectionOpen}
+                  aria-hidden={sectionOpen ? undefined : true}
+                  data-group-open={sectionOpen ? 'true' : 'false'}
+                >
+                  <div className={styles.sectionItemsInner}>{links}</div>
+                </div>
+              )
+            })()}
           </div>
           )
         })}

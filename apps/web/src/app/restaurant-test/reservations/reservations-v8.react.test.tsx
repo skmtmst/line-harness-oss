@@ -144,3 +144,31 @@ test('V8の枠だけ押さえる操作は有効で、期限を入力できる', 
   const option = host.querySelector('input[value="hold"]') as HTMLInputElement
   expect(option?.disabled).toBe(false)
 })
+
+test('見方を続けて変えても、先に出した古い問い合わせの返事で一覧が上書きされない', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  const named = (name: string) => ({ ...snapshot, reservations: [{ ...snapshot.reservations[0], customer_name: name }] })
+  const releaseOld: Array<() => void> = []
+  vi.stubGlobal('fetch', async (url: string) => {
+    const u = String(url)
+    if (u.includes('/reservations/day')) return json({ success: true, data: { date: '2026-10-04', reservations: [] } })
+    if (u.includes('/snapshot') && u.includes('reservationLimit=500')) {
+      // 今日の見方の問い合わせ（月の取り直し）は遅れて返る
+      await new Promise<void>((resolve) => { releaseOld.push(resolve) })
+      return json({ success: true, data: named('古い 返事') })
+    }
+    if (u.includes('/snapshot')) return json({ success: true, data: named('新しい 返事') })
+    return json({ success: true, data: snapshot })
+  })
+  await renderPage()
+  click('一覧')
+  await act(async () => {})
+  await act(async () => {})
+  expect(text()).toContain('新しい 返事')
+  // 遅れていた古い返事が後から届く
+  expect(releaseOld.length).toBeGreaterThan(0)
+  await act(async () => { for (const release of releaseOld) release() })
+  await act(async () => {})
+  expect(text()).toContain('新しい 返事')
+  expect(text()).not.toContain('古い 返事')
+})

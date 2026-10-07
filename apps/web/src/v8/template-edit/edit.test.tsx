@@ -174,6 +174,75 @@ describe('V8 メッセージを作る・編集', () => {
   })
 })
 
+describe('V8 テンプレートの下書き自動保存（一斉配信と同じ形）', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+  const wait = async (ms: number) => { await act(async () => { await vi.advanceTimersByTimeAsync(ms) }) }
+  const status = () => document.querySelector('[data-autosave-status]')?.textContent ?? null
+
+  it('作る：入力が止まって2秒で1件だけ作り、続きは同じテンプレートへ上書きする。帯に「下書き保存済み・n秒前」', async () => {
+    templatesApi.create.mockResolvedValue({ success: true, data: { id: 'template-auto' } })
+    templatesApi.update.mockResolvedValue({ success: true, data: { id: 'template-auto' } })
+    await mount()
+    type(screen.getByLabelText('テンプレート名'), '予約前日のご案内')
+    type(screen.getByLabelText('本文'), 'こんにちは')
+    expect(status()).toBe('下書きはまだ保存していません')
+    await wait(1900)
+    expect(templatesApi.create).not.toHaveBeenCalled()
+    await wait(200)
+    await flush()
+    expect(templatesApi.create).toHaveBeenCalledTimes(1)
+    expect(status()).toBe('下書き保存済み・0秒前')
+    expect(push).not.toHaveBeenCalled()
+    await wait(10_000)
+    expect(status()).toBe('下書き保存済み・10秒前')
+
+    type(screen.getByLabelText('本文'), 'こんにちは。明日です')
+    await wait(2100)
+    await flush()
+    expect(templatesApi.create).toHaveBeenCalledTimes(1)
+    expect(templatesApi.update).toHaveBeenCalledWith('template-auto', expect.objectContaining({ messageContent: 'こんにちは。明日です' }))
+
+    // 手の「下書きを保存」も同じ行への上書き（2件目を作らない）。
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await flush()
+    expect(templatesApi.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('名前が空のうちは送らず、帯は「まだ保存していません」のまま', async () => {
+    await mount()
+    type(screen.getByLabelText('本文'), 'こんにちは')
+    await wait(5000)
+    expect(templatesApi.create).not.toHaveBeenCalled()
+    expect(status()).toBe('下書きはまだ保存していません')
+  })
+
+  it('保存に失敗したら帯に出し、同じ入力では繰り返さない。「下書きを保存」で手で保存できる', async () => {
+    templatesApi.update.mockResolvedValueOnce({ success: false, error: 'サーバが応えませんでした' })
+    await mount('id=template-1')
+    type(screen.getByLabelText('本文'), '直した本文')
+    await wait(2100)
+    await flush()
+    expect(templatesApi.update).toHaveBeenCalledTimes(1)
+    expect(status()).toContain('自動保存できませんでした')
+    expect(screen.queryByRole('alert')).toBeNull()
+    await wait(10_000)
+    expect(templatesApi.update).toHaveBeenCalledTimes(1)
+    templatesApi.update.mockResolvedValue({ success: true, data: { id: 'template-1' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await flush()
+    expect(templatesApi.update).toHaveBeenCalledTimes(2)
+  })
+
+  it('閲覧のみ（staff）は自動保存しない', async () => {
+    role.value = 'staff'
+    await mount('id=template-1')
+    await wait(5000)
+    expect(templatesApi.update).not.toHaveBeenCalled()
+    expect(status()).toBeNull()
+  })
+})
+
 describe('V8 クーポン・リサーチを作る', () => {
   it('クーポン：期間が無ければ保存の口を呼ばない', async () => {
     await mount('kind=coupon')

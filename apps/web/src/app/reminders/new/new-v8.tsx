@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowRight, ChevronLeft } from 'lucide-react'
@@ -17,6 +17,8 @@ import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict } from '@/components/shared/save-conflict'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import {
   EMPTY_BASICS,
   basicsBaseSummary,
@@ -94,7 +96,20 @@ export default function NewReminderV8() {
       value.repeatYearly ||
       appliedTemplateId,
   )
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving === 'saving' })
+  /*
+   * 最後に保存した形の指紋。入れた値がこれと同じ間は「保存済み」（一斉配信と同じ）。
+   * 保存したあとも入力が残る画面なので、入力の有無だけで未保存と見なさない。
+   */
+  const fingerprint = JSON.stringify({ value, appliedTemplateId })
+  const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null)
+  const unsaved = dirty && fingerprint !== savedFingerprint
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: unsaved, busy: saving === 'saving' })
+  /* 自動保存と手の保存が重なって下書きが2件できないよう、送っている途中の保存を待つ。 */
+  const saveInFlight = useRef<Promise<unknown> | null>(null)
+  const savedIdRef = useRef(savedId)
+  savedIdRef.current = savedId
+  const savedDraftRef = useRef(savedDraft)
+  savedDraftRef.current = savedDraft
 
   const appliedTemplate = reminderTemplatesV8.find((template) => template.id === appliedTemplateId) ?? null
 
@@ -149,16 +164,28 @@ export default function NewReminderV8() {
     return null
   }
 
-  /** 下書きを保存する。作成済みなら上書きする。成功したら下書きの id を返す。 */
-  async function save(): Promise<string | null> {
+  /**
+   * 下書きを保存する。作成済みなら上書きする。成功したら下書きの id を返す。
+   * silent は自動保存：保存中の印・赤い帯・トーストを出さない（失敗は保存の帯に出る）。
+   * 競合（409）だけは自動でも帯を出す。
+   */
+  async function save({ silent = false }: { silent?: boolean } = {}): Promise<string | null> {
     const message = validate()
     if (message) {
-      setError(message)
+      if (!silent) setError(message)
       return null
     }
-    setSaving('saving')
-    setError('')
-    saveConflict.clear()
+    if (!silent) {
+      setSaving('saving')
+      setError('')
+      saveConflict.clear()
+    }
+    while (saveInFlight.current) await saveInFlight.current.catch(() => undefined)
+    const savedId = savedIdRef.current
+    const savedDraft = savedDraftRef.current
+    const sentFingerprint = fingerprint
+    let settle: () => void = () => {}
+    saveInFlight.current = new Promise<void>((resolve) => { settle = resolve })
     try {
       if (savedId) {
         // 最後に保存した版が手元に無いとき（取れなかったなど）だけ読み直す。
@@ -173,9 +200,11 @@ export default function NewReminderV8() {
           { expectedVersionId: base.versionId, expectedUpdatedAt: base.updatedAt },
         )
         if (!res.success) throw new Error(res.error)
+        savedDraftRef.current = res.data
         setSavedDraft(res.data)
+        setSavedFingerprint(sentFingerprint)
         setSaving('saved')
-        notifyToast('下書きを保存しました')
+        if (!silent) notifyToast('下書きを保存しました')
         return savedId
       }
       /*
@@ -212,13 +241,16 @@ export default function NewReminderV8() {
       }
       const res = await api.reminders.createDraft(settings)
       if (!res.success) throw new Error(res.error)
+      savedIdRef.current = res.data.reminderId
+      savedDraftRef.current = res.data
       setSavedId(res.data.reminderId)
       setSavedDraft(res.data)
+      setSavedFingerprint(sentFingerprint)
       setSaving('saved')
-      notifyToast('下書きを保存しました')
+      if (!silent) notifyToast('下書きを保存しました')
       return res.data.reminderId
     } catch (caught) {
-      setSaving('failed')
+      if (!silent) setSaving('failed')
       // 作った下書きが別の画面で先に保存されていた（409）。入力は捨てず、比べる・読み込むを選んでもらう。
       if (savedId && caught instanceof ApiError && caught.status === 409) {
         const data = caught.data as { updatedAt?: unknown } | null
@@ -226,10 +258,27 @@ export default function NewReminderV8() {
         return null
       }
       // 機械の文（API error: 500）は出さず、何が起きた・どうすればよいかを出す（動きの点検 7 番）。
-      setError(caught instanceof Error ? humanizeErrorText(caught.message) : '下書きを保存できませんでした')
+      if (!silent) setError(caught instanceof Error ? humanizeErrorText(caught.message) : '下書きを保存できませんでした')
       return null
+    } finally {
+      saveInFlight.current = null
+      settle()
     }
   }
+
+  /*
+   * 入力が止まって2秒で下書きへ静かに保存する（一斉配信と同じ）。最初の1回で
+   * 下書きを作り、あとは同じ下書きへ上書きする。閲覧のみの人には動かさない。
+   */
+  const role = useStaffRole()
+  const autosave = useDraftAutosave({
+    fingerprint,
+    dirty: unsaved,
+    active: role === null || canManageRole(role),
+    enabled: validate() === null && !candidatesPending && !saveConflict.conflict,
+    paused: leaveTarget !== null || saving === 'saving' || pendingTemplate !== null,
+    save: async () => (await save({ silent: true })) !== null,
+  })
 
   async function next() {
     const id = await save()
@@ -258,13 +307,14 @@ export default function NewReminderV8() {
       description="いまは下書きとして作ります。最後の「確認」で有効にします。"
       identity={<Link href="/reminders" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />リマインダへ</Link>}
       steps={<ReminderV8Stepper current="basics" reminderId={savedId} />}
+      status={autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined}
       preview={preview}
       previewToggle={<Button onClick={() => setPreviewOpen(true)}>設定内容を見る</Button>}
       footerActions={
         <WizardFooterV8 embedded
         onCancel={() => router.push('/reminders')}
         cancelDisabled={saving === 'saving'}
-        onDraft={() => void save()}
+        onDraft={() => void save().then((id) => { if (id) autosave.markSaved() })}
         draftBusy={saving === 'saving'}
         nextLabel="次へ：対象者と止める条件"
         nextIcon={<ArrowRight size={15} aria-hidden="true" />}

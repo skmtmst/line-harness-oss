@@ -278,6 +278,16 @@
 [data-theme='v8'] .compact .note { font-size: 10px; line-height: 14px; }
 [data-theme='v8'] .compact.checked .title { color: var(--color-accent-deep); }
 
+/*
+ * 高さ 90 の箱（height="short"・★V8 E-3 PUWyq の卓のカード）。
+ * 絵は高さ 90 の固定で、中身（印 16＋題 20＋説明 18＋間 8×2）が下の余白へはみ出す形。
+ * 上・左右の余白 14 はそのまま、下だけ 6 にして 90 に収める。既定の箱（98）は変えない。
+ */
+[data-theme='v8'] .short {
+  min-height: 90px;
+  padding-bottom: 6px;
+}
+
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .card { -webkit-font-smoothing: auto; }
 

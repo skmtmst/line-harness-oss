@@ -548,5 +548,9 @@
     "603_instagram_connections.sql",
     "604_auto_reply_unmatched_settings.sql"
   ],
+<<<<<<< HEAD
   "migrationCount": 547
+=======
+  "migrationCount": 543
+>>>>>>> codex/kenta-v8-ux-polish5-10071731
 }
