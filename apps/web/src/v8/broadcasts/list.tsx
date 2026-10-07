@@ -67,7 +67,6 @@ import styles from './list.module.css'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
-const READONLY_REASON = '閲覧のみのため変更できません'
 const EDIT_KEY = 'broadcast.definition.edit'
 
 /**
@@ -612,15 +611,14 @@ export default function BroadcastListV8() {
         ...folders.map((f) => ({ id: `move-${f.id}`, label: f.name, onSelect: () => void moveBroadcastToFolder(broadcast, f.id) })),
       ]
     }
-    const readonly = !canEdit
+    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
+    if (!canEdit) return []
     const items: ActionMenuItem[] = []
     if (broadcast.status === 'draft' || broadcast.status === 'scheduled') {
       items.push({
         id: 'resume',
         label: '編集を続ける',
         external: true,
-        disabled: readonly,
-        disabledReason: readonly ? READONLY_REASON : undefined,
         onSelect: () => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`),
       })
     }
@@ -629,15 +627,13 @@ export default function BroadcastListV8() {
       label: '複製',
       external: true,
       icon: <Copy size={14} aria-hidden="true" />,
-      disabled: readonly,
-      disabledReason: readonly ? READONLY_REASON : undefined,
       onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`),
     })
     items.push({
       id: 'move-folder',
       label: 'フォルダへ移す',
-      disabled: readonly || folders.length === 0,
-      disabledReason: readonly ? READONLY_REASON : '移せるフォルダがありません',
+      disabled: folders.length === 0,
+      disabledReason: folders.length === 0 ? '移せるフォルダがありません' : undefined,
       onSelect: () => {
         keepMenuOpenRef.current = true
         setMenuMoveFor(broadcast.id)
@@ -648,8 +644,6 @@ export default function BroadcastListV8() {
       label: '削除する',
       tone: 'danger',
       dividerBefore: true,
-      disabled: readonly,
-      disabledReason: readonly ? READONLY_REASON : undefined,
       onSelect: () => { setDeleteError(''); setDeleteTarget(broadcast) },
     })
     return items
@@ -1026,7 +1020,8 @@ export default function BroadcastListV8() {
                 )}
               </Td>
               <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
-                <div className={styles.menuBox}>
+                {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
+                {canEdit ? <div className={styles.menuBox}>
                   <ContextMenu label={menuLabel} items={rowContextItems(broadcast)}>
                     <button
                       type="button"
@@ -1055,7 +1050,7 @@ export default function BroadcastListV8() {
                     ariaLabel={menuLabel}
                     items={rowMenuItems(broadcast)}
                   />
-                </div>
+                </div> : null}
               </Td>
             </Tr>
           )
@@ -1109,7 +1104,7 @@ export default function BroadcastListV8() {
       </>}
       folders={narrow ? undefined : (
         <FolderPanel
-          createAction={createButton(true)}
+          createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
           activeId={folderFilter}
           onSelect={setFolderFilter}
           onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
