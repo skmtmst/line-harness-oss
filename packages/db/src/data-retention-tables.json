@@ -735,6 +735,15 @@
       "column": "line_account_id"
     }
   },
+  "booking_waitlist_resources": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "waitlist_id",
+      "parent": "booking_waitlist",
+      "parentColumn": "id"
+    }
+  },
   "bookings": {
     "category": "purge",
     "scope": {
