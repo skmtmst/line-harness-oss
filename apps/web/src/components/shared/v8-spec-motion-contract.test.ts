@@ -30,11 +30,15 @@ describe('V8 仕上げ3回目の動き', () => {
     expect(button).toMatch(/busyLabel = '保存中…'/)
   })
 
-  it('⑤ …・プルダウンの開きは200msで統一（色・暦ポップは120msのまま）', () => {
-    for (const file of ['./action-menu.module.css', './select.module.css']) {
+  it('⑤ プルダウンの開きは200msで統一（色・暦ポップは120msのまま）。「…」は提案 F で 120ms', () => {
+    for (const file of ['./select.module.css']) {
       const css = readFileSync(new URL(file, import.meta.url), 'utf8')
       expect(css).toContain('var(--motion-base) var(--motion-ease-out)')
     }
+    // 「…」のメニューは動きの決まり（提案 F・採用）で押した角から 120ms・0.96→1。
+    // 起点と縮みは v8-motion-root-causes.test.tsx が見る。
+    const menu = readFileSync(new URL('./action-menu.module.css', import.meta.url), 'utf8')
+    expect(menu).toContain('animation: action-menu-v8-enter var(--motion-fast) var(--motion-ease-out)')
     // 選ぶ箱は名前＋長さの分離指定（combobox-v8-in・motion-base）。
     const combo = readFileSync(new URL('./combobox.module.css', import.meta.url), 'utf8')
     expect(combo).toMatch(/animation-duration:\s*var\(--motion-base\)/s)
@@ -55,11 +59,11 @@ describe('V8 仕上げ3回目の動き', () => {
     expect(tsx).toMatch(/data-leaving=\{leaving \|\| undefined\}/)
   })
 
-  it('①④ 表の行は上から順に少しずつ（200ms・40msずらし・4行目以降同時）', () => {
+  it('①④ 表の行は上から順に少しずつ（200ms・40msずらし・4行目以降同時）。初回だけ・消える行には当てない', () => {
     const css = read('../../app/globals.css')
-    expect(css).toMatch(/\[data-theme="v8"\] tbody > tr \{\s*animation:\s*v8-content-in var\(--motion-base\)/s)
+    expect(css).toMatch(/\[data-theme="v8"\] tbody:not\(\[data-rows-settled\]\) > tr:not\(\[data-leaving="true"\]\) \{\s*animation:\s*v8-content-in var\(--motion-base\)/s)
     expect(css).toMatch(/--motion-stagger:\s*40ms;/)
-    expect(css).toMatch(/tbody > tr:nth-child\(2\) \{\s*animation-delay:\s*var\(--motion-stagger\)/s)
-    expect(css).toMatch(/tbody > tr:nth-child\(n \+ 4\) \{\s*animation-delay:\s*calc\(var\(--motion-stagger\) \* 3\)/s)
+    expect(css).toMatch(/tbody:not\(\[data-rows-settled\]\) > tr:nth-child\(2\) \{\s*animation-delay:\s*var\(--motion-stagger\)/s)
+    expect(css).toMatch(/tbody:not\(\[data-rows-settled\]\) > tr:nth-child\(n \+ 4\) \{\s*animation-delay:\s*calc\(var\(--motion-stagger\) \* 3\)/s)
   })
 })

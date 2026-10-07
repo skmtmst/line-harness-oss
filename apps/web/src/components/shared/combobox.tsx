@@ -5,6 +5,7 @@ import { useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './combobox.module.css'
+import { isImeComposing } from './ime'
 
 export type ComboboxDot = 'green' | 'blue' | 'amber' | 'gray'
 
@@ -129,6 +130,8 @@ export default function Combobox({
   }
 
   const onInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    // 変換中のキー（確定の Enter・候補の上下・Esc）は日本語入力のもの。候補を選ばない。
+    if (isImeComposing(event)) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       if (!open) {

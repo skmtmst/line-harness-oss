@@ -122,6 +122,31 @@ async function get<T>(path: string): Promise<T> {
   return res.json();
 }
 
+/**
+ * Worker が `{ success: true, data }` の包みで返す口だけ、ここで中身を取り出す。
+ * GET を一律に剥がすと、包み無しで返す口（イベント・ウェビナーなど）が壊れるので、
+ * 包みで返すと確かめた口だけがこれを通す。包みが無い・success が true でない応答は
+ * 契約違反として投げる（黙って undefined を画面へ渡さない）。
+ */
+export function unwrapSuccessData<T>(body: unknown, path: string): T {
+  if (
+    body !== null
+    && typeof body === 'object'
+    && (body as { success?: unknown }).success === true
+    && 'data' in (body as object)
+  ) {
+    return (body as { data: T }).data;
+  }
+  const err = new Error(`API 応答の形が違います: ${path}`) as Error & { status: number; body: unknown };
+  err.status = 0;
+  err.body = body;
+  throw err;
+}
+
+async function getData<T>(path: string): Promise<T> {
+  return unwrapSuccessData<T>(await get<unknown>(path), path);
+}
+
 async function remove<T>(path:string):Promise<T>{
  const url=new URL(`${BASE}${path}`,window.location.origin);url.searchParams.set('liffId',getLiffId());
  const res=await fetch(url,{method:'DELETE',headers:authHeaders()});if(!res.ok)throw new Error(`API ${res.status}`);return res.json();
@@ -438,11 +463,15 @@ export const api = {
    * P（試し回答）：試し合言葉を添えると、未公開の下書きをお客さまの形で返す。
    * 合言葉が違うときは 403 になる（本物としては扱わない）。
    */
+  // Worker（routes/forms.ts）は `{ success: true, data: PublicForm }` で返す。
   getForm: (id: string, testToken?: string) =>
-    get<PublicForm>(`/api/forms/${id}${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`),
-  /** 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る */
+    getData<PublicForm>(`/api/forms/${id}${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`),
+  /**
+   * 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る。
+   * Worker は `{ success: true, data: { answers, createdAt } | null }` で返す。
+   */
   getMyLatestFormAnswer: (id: string) =>
-    get<{ answers: Record<string, unknown>; createdAt: string } | null>(
+    getData<{ answers: Record<string, unknown>; createdAt: string } | null>(
       `/api/forms/${id}/my-latest`,
     ),
   /**

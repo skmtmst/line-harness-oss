@@ -343,10 +343,11 @@ export default function HqBroadcastCreate() {
 
   return (
     <>
-      <div className={styles.screen}>
       <CreatePage
         boardId="p17Qku"
         headingSize="compact"
+        contentSpacing="flush-top"
+        previewSurface="plain"
         title="一括配信を作る"
         help="選んだアカウント（店）に、同じ内容を一度に送ります。各店のアカウントに入らずに送れます。店ごとに変わる差し込みは、送る店の名前・共通情報に置き換わります。"
         preview={preview}
@@ -530,7 +531,6 @@ export default function HqBroadcastCreate() {
           </section>
         </div>
       </CreatePage>
-      </div>
 
       <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
         <div className={styles.previewDialog}>{phone}</div>
