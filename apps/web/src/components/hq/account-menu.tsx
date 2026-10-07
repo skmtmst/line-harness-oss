@@ -11,6 +11,7 @@ import { billingChip, trialDaysLabel, type BillingSummary } from '@/lib/hq-billi
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useAccount } from '@/contexts/account-context'
 import { canReturnToHqFrom } from '@/lib/hq-return'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import styles from './account-menu.module.css'
 
 /**
@@ -328,9 +329,11 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
 
   const close = () => setOpen(false)
   const returnToHq = () => {
-    close()
-    clearSelectedAccountId()
-    router.push('/hq')
+    requestUnsavedAction(() => {
+      close()
+      clearSelectedAccountId()
+      router.push('/hq')
+    })
   }
 
   return (
