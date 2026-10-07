@@ -217,7 +217,7 @@ export default function GenerationPanel({
           */}
         <Field
           label="画像に入れるテキスト"
-          note={`1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」。同じ条件で指定した枚数ぶん作ります（絵柄は毎回少しずつ変わります）`}
+          note={`1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」`}
         >
           <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
             {value.textLines.map((line, i) => (
@@ -307,9 +307,15 @@ export default function GenerationPanel({
           />
         </Field>
 
+        {/*
+          * ★BG-B `ELZIS`：枚数の注記は2つとも「つくる枚数」に付く。
+          * `KCFAX`「一度に 4 枚まで」と `swcu2`「同じ条件で…」。絵では
+          * 前者がラベル行・後者が4択の下だが、Field の注記は1つなので
+          * 絵の読む順のまま1行に並べる。
+          */}
         <Field
           label="つくる枚数"
-          note="一度に 4 枚まで"
+          note="一度に 4 枚まで。同じ条件で指定した枚数ぶん作ります（絵柄は毎回少しずつ変わります）"
         >
           <fieldset className="grid grid-cols-4 gap-1.5" disabled={disabled}>
             <legend className="sr-only">枚数</legend>

@@ -260,3 +260,43 @@ describe('zOpMG パネル内の上限の帯', () => {
     expect(screen.queryByText('今月の生成上限に達しました')).toBeNull()
   })
 })
+
+/*
+ * 承認済み BG-B（`qIp42`）の補足文は「どの欄の下に出るか」まで絵のとおりにする。
+ * 文字があるかだけを見ると、別の欄に付いていても気づけない（実際に
+ * `swcu2` が「画像に入れるテキスト」に付いていた）。欄ごとに押さえる。
+ */
+describe('補足文はPencil BG-Bと同じ欄に付く', () => {
+  /** Field 部品は <div 欄><div ラベル行><label>…</label></div>{中身}<p 注記> の形。 */
+  function fieldTextOf(label: string): string {
+    const el = screen.getByText(label)
+    const field = el.parentElement?.parentElement
+    if (!field) throw new Error(`「${label}」の欄が見つからない`)
+    return field.textContent ?? ''
+  }
+
+  it('「同じ条件で…」はつくる枚数の下（`swcu2`・`ELZIS`）', () => {
+    open()
+    expect(fieldTextOf('つくる枚数')).toContain('同じ条件で指定した枚数ぶん作ります（絵柄は毎回少しずつ変わります）')
+  })
+
+  it('「同じ条件で…」を画像に入れるテキストには付けない', () => {
+    open()
+    expect(fieldTextOf('画像に入れるテキスト')).not.toContain('同じ条件で指定した枚数ぶん作ります')
+  })
+
+  it('つくる枚数の注記「一度に 4 枚まで」（`KCFAX`）', () => {
+    open()
+    expect(fieldTextOf('つくる枚数')).toContain('一度に 4 枚まで')
+  })
+
+  it('画像に入れるテキストの注記（`l5Dsb1`）', () => {
+    open()
+    expect(fieldTextOf('画像に入れるテキスト')).toContain('1行に1つ・40文字まで／強調したい行は「強調」')
+  })
+
+  it('書き出す大きさはパネルのいちばん下（`GcuH5`）', () => {
+    open()
+    expect(screen.getByText('1040 × 1040 で書き出します')).toBeTruthy()
+  })
+})
