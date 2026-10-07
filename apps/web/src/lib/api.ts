@@ -8828,7 +8828,7 @@ export const api = {
       const response = await fetch(prepared.data.uploadUrl,{method:'PUT',headers:prepared.data.requiredHeaders,body:file,credentials:'omit'})
       if (!response.ok) throw new Error('動画をアップロードできませんでした。もう一度選んでください')
       const etag = response.headers.get('ETag')
-      if (!etag) throw new Error('アップロードの確認情報を取得できませんでした')
+      if (!etag) throw new Error('アップロードの確認情報が届きませんでした。もう一度選んでください')
       return fetchApi(`/api/broadcast-message-assets/upload-sessions/${encodeURIComponent(prepared.data.id)}/complete`,{method:'POST',body:JSON.stringify({etag})})
     },
   },
