@@ -336,7 +336,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
     </div>
   ) : (
     <DelayedSkeleton loading={!listReady} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
-      <DataTable className={styles.table} data-design="MarkTable">
+      <DataTable className={styles.table}>
         <thead>
           <TableHeadRow>
             <Th className={styles.markColGrip}><span className="sr-only">並び替え</span></Th>

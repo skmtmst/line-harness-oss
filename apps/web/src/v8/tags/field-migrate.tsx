@@ -23,6 +23,7 @@ import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
+import SegmentedControl from '@/components/shared/segmented'
 import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import type { FriendFieldMigrationPreview, FriendFieldMigrationRun } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
@@ -40,7 +41,7 @@ const RUN_STATUS_LABELS: Record<FriendFieldMigrationRun['status'], string> = {
   running: '実行中',
   partial: '一部の友だちだけ移行できました',
   succeeded: '移行が完了しました',
-  failed: '移行に失敗しました',
+  failed: '移行できませんでした。事前確認からやり直してください',
   stale: '確認後に内容が変わったため停止しました',
 }
 
@@ -541,16 +542,12 @@ function FieldMigrate() {
           </div>
         ) : (
           <>
-            <div className={styles.choiceRow} role="radiogroup" aria-label="移行先の決め方">
-              <label className={styles.choice}>
-                <input type="radio" name="field-migrate-target" value="new" checked={targetMode === 'new'} onChange={() => { setTargetMode('new'); resetConfirmation() }} />
-                新しい項目を作る
-              </label>
-              <label className={styles.choice}>
-                <input type="radio" name="field-migrate-target" value="existing" checked={targetMode === 'existing'} onChange={() => { setTargetMode('existing'); resetConfirmation() }} />
-                今ある項目へ移す
-              </label>
-            </div>
+            <SegmentedControl
+              aria-label="移行先の決め方"
+              options={[{ value: 'new' as const, label: '新しい項目を作る' }, { value: 'existing' as const, label: '今ある項目へ移す' }]}
+              value={targetMode}
+              onChange={(value) => { setTargetMode(value); resetConfirmation() }}
+            />
             {targetMode === 'new' ? (
               <div className={styles.twoCols}>
                 <label className={styles.field}>

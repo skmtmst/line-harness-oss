@@ -368,7 +368,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
     </div>
   ) : (
     <DelayedSkeleton loading={status !== 'ready'} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
-      <DataTable className={styles.table} data-design="FieldTable">
+      <DataTable className={styles.table}>
         <thead>
           <TableHeadRow>
             <Th className={styles.markColGrip}><span className="sr-only">並び替え</span></Th>

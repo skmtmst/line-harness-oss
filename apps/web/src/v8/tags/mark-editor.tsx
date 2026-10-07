@@ -488,7 +488,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
               </div>
               {editing ? (
                 <>
-                  {rulesState === 'not-connected' ? <p className={styles.fieldNote}>自動で変えるきまりは、まだこの環境で使えません（準備中）。</p> : null}
+                  {rulesState === 'not-connected' ? <p className={styles.fieldNote}>自動で変えるきまりは、まだこの環境で使えません。</p> : null}
                   {rulesState === 'forbidden' ? <p className={styles.fieldNote}>きまりを見る権限がありません。オーナーか管理者に確認してください。</p> : null}
                   {rulesState === 'error' ? (
                     <div className={styles.inlineRetry}>

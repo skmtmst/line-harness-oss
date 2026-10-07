@@ -236,7 +236,7 @@ export default function FieldEditor({
           <h2 className={styles.sideCardTitle} id="ff-more-types">{`種類（つづき：全${TYPE_COUNT}種）`}</h2>
           <div className={styles.chipColumn} role="radiogroup" aria-label="項目の種類（つづき）">
             {SECONDARY_TYPES.flatMap((item) => item === 'datetime' ? [item, PENDING_TYPES[0]] : [item]).map((item) => item === '時刻' ? (
-              <button key={item} type="button" disabled className={styles.typeChip} title="時刻の種類はまだ選べません（準備中）">
+              <button key={item} type="button" disabled className={styles.typeChip} title="時刻の種類はまだ選べません（サーバーが対応したら選べます）">
                 <Star className={styles.typeChipIcon} aria-hidden="true" />
                 {item}
               </button>

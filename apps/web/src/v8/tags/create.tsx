@@ -250,7 +250,7 @@ function TagCreate() {
             <p className={styles.cardNote}>作ったあとに、回答フォーム・オートメーション・タグ連動からこのタグを付けられます</p>
           </div>
           <div className={styles.waysRow}>
-            <Link href="/forms" className={styles.way}>
+            <Link href="/form-submissions" className={styles.way}>
               <ClipboardList className={styles.wayIcon} aria-hidden="true" />
               <span className={styles.wayTitle}>回答フォーム</span>
               <span className={styles.wayNote}>答えに合わせて付ける</span>

@@ -335,7 +335,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
     </div>
   ) : (
     <DelayedSkeleton loading={loading} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
-      <DataTable className={styles.table} data-design="SearchTable">
+      <DataTable className={styles.table}>
         <thead>
           <TableHeadRow>
             <Th className={styles.searchColName}>条件名・内容</Th>
