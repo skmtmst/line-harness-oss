@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronUp, CircleAlert, Copy, GitCompare, Info, Plus, RefreshCw, Save, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronUp, Copy, GitCompare, Info, Plus, Save, Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, describeSaveFailure, type TagDefinition, type TagDependencies, type TagRetroactivePreview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -23,6 +23,7 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { formatDay } from '@/lib/format'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -367,21 +368,16 @@ function TagEditForm({
 
   /* 使っている所：削除の影響確認と同じ数え方（dependencies）。取れないときはタグの一覧の数。 */
   const usageRows = buildUsageRows(dependencies, tag.usedIn)
+  /* 競合の帯は共通部品（save-conflict）。絵は `xn95q`（頭の説明の下・横いっぱい）。 */
   const conflictBand = conflict ? (
-    <div className={styles.conflictBand} role="alert" data-design-node="xn95q">
-      <CircleAlert size={18} aria-hidden="true" className={styles.conflictIcon} />
-      <div className={styles.conflictText}>
-        <p className={styles.conflictTitle}>{`ほかの人がタグ「${tag.name}」を先に保存しました`}</p>
-        <p className={styles.conflictSub}>あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。</p>
-      </div>
-      <Button type="button" variant="secondary" onClick={onCompare} busy={compareBusy} busyLabel="比べています…">
-        <GitCompare size={14} aria-hidden="true" />
-        違いを比べる
-      </Button>
-      <Button type="button" variant="primary" onClick={onReloadLatest}>
-        <RefreshCw size={14} aria-hidden="true" />
-        最新を読み込んで続ける
-      </Button>
+    <div className={styles.conflictSlot}>
+      <SaveConflictBand
+        title={`ほかの人がタグ「${tag.name}」を先に保存しました`}
+        designNode="xn95q"
+        compareBusy={compareBusy}
+        onCompare={onCompare}
+        onReload={onReloadLatest}
+      />
     </div>
   ) : null
 

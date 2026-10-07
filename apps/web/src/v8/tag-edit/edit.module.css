@@ -15,11 +15,8 @@
 
 /* 閲覧のみの帯・競合の帯（頭の説明の下に横いっぱい）。 */
 .roBand { margin: var(--tpl-eds-band-mt) 0 var(--tpl-eds-band-mb); padding: var(--tpl-ro-band-pad); border-radius: var(--tpl-ro-band-radius); background: var(--color-info-bg); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-ro-band-lh); }
-.conflictBand { display: flex; align-items: center; gap: var(--tpl-eds-band-gap); margin: var(--tpl-eds-band-mt) 0 var(--tpl-eds-band-mb); padding: var(--tpl-eds-band-pad); border-radius: var(--radius-control); outline: 1px solid var(--color-warning); outline-offset: -1px; background: var(--color-status-warn-soft); }
-.conflictIcon { flex-shrink: 0; color: var(--color-warning); }
-.conflictText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-title-gap); min-width: 0; }
-.conflictTitle { margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; line-height: var(--tpl-eds-band-title2-lh); text-overflow: ellipsis; white-space: nowrap; }
-.conflictSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-eds-band-sub-lh); }
+/* 競合の帯の置き場。帯の見た目は共通部品（save-conflict）が持つ。 */
+.conflictSlot { display: block; margin: var(--tpl-eds-band-mt) 0 var(--tpl-eds-band-mb); }
 
 /* カード：枠1本・角12・余白20・間14。題 15/700・説明 12。 */
 .card { display: flex; flex-direction: column; gap: var(--tpl-eds-tag-card-gap); padding: var(--tpl-eds-card-pad); border-radius: var(--radius-card); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); }
