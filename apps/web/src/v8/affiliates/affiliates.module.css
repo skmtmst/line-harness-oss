@@ -429,15 +429,28 @@
 .closeBody {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-af-close-gap);
+  gap: var(--tpl-af2-close-gap);
+  margin-top: var(--tpl-af2-close-pull);
 }
-.closeLines { margin: 0; }
+.closeLines { display: flex; flex-direction: column; gap: var(--tpl-af2-close-gap); margin: 0; }
+.closeDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-af2-close-desc-lh);
+}
+.closeFooter {
+  display: flex;
+  justify-content: center;
+  gap: var(--tpl-cell-gap-half);
+  padding-top: var(--tpl-af2-close-foot-pad);
+}
 .closeLines > div {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--tpl-toolbar-gap);
-  padding: var(--tpl-af-close-line-pad);
+  padding: var(--tpl-af2-close-line-pad);
   border-bottom: 1px solid var(--color-divider-soft);
 }
 .closeLines dt {
@@ -462,17 +475,19 @@
 }
 .closeWarn {
   display: flex;
-  align-items: flex-start;
-  gap: var(--tpl-af-dr-row-gap);
+  align-items: center;
+  gap: var(--tpl-af2-close-warn-gap);
   margin: 0;
-  padding: var(--tpl-af-bulk-target-pad);
+  padding: var(--tpl-af2-close-warn-pad);
   border-radius: var(--radius-control);
   background: var(--color-status-warn-soft);
   color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-af-dr-text-lh);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-af2-close-warn-lh);
 }
-.closeWarn > svg { flex-shrink: 0; margin-top: var(--tpl-af-stack-gap); color: var(--color-status-warn-deep); }
+/* 文の途中で言葉のまとまりごとに早く折れないように（絵は字の途中で折る）。 */
+.closeWarn > span { word-break: normal; }
+.closeWarn > svg { flex-shrink: 0; color: var(--color-status-warn-deep); }
 .closeExcluded {
   padding: var(--tpl-af-bulk-target-pad);
   border: 1px solid var(--color-hairline);

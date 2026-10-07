@@ -72,18 +72,18 @@ export function SettlementCloseDialog({
       open={Boolean(preview)}
       designNode="usDpO"
       designWidth={520}
+      confirmation
+      designHeaderPadding="29px 24px 0"
+      designHeaderHeight={52}
       title={preview ? `${periodText(preview)} を締めますか？` : '期間を締めますか？'}
-      description="締めると、この期間に認めた成果の金額が固定されます。締めたあとに成果を取り消すと、次の支払いで差し引きます。"
       busy={busy}
       error={error}
       onCancel={onClose}
-      cancelLabel="やめる"
-      confirmLabel="締める"
-      confirmIcon={<Lock size={15} />}
-      onConfirm={() => { if (preview?.conversionCount) void closeSettlement() }}
     >
       {preview ? (
         <div className={styles.closeBody}>
+          {/* 絵 usDpO：説明・対象・合計・注意・ボタンを間 12 で縦に並べる。ボタンは窓の帯ではなく本文の続き（真ん中）。 */}
+          <p className={styles.closeDesc}>締めると、この期間に認めた成果の金額が固定されます。締めたあとに成果を取り消すと、次の支払いで差し引きます。</p>
           <dl className={styles.closeLines}>
             <div><dt>対象</dt><dd>{`${formatNumber(preview.affiliates.length)}人・${formatNumber(preview.conversionCount)}件`}</dd></div>
             <div>
@@ -98,7 +98,7 @@ export function SettlementCloseDialog({
           </dl>
           {missing.length > 0 ? (
             <p className={styles.closeWarn} role="note">
-              <CircleHelp size={15} aria-hidden="true" />
+              <CircleHelp size={14} aria-hidden="true" />
               <span>
                 {`振込先が未登録の人が ${formatNumber(missing.length)} 人います（${missing.slice(0, 3).map((item) => `${item.affiliateName} ${formatYen(item.amount)}`).join('・')}${missing.length > 3 ? ` ほか${formatNumber(missing.length - 3)}人` : ''}）。締めても、登録されるまで振り込めません。`}
               </span>
@@ -115,6 +115,20 @@ export function SettlementCloseDialog({
               {excludedZero.count > excludedZero.rows.length ? <p>{`ほか ${formatNumber(excludedZero.count - excludedZero.rows.length)}件`}</p> : null}
             </div>
           ) : null}
+          <div className={styles.closeFooter}>
+            <Button type="button" onClick={onClose} disabled={busy}>やめる</Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => { if (preview.conversionCount) void closeSettlement() }}
+              disabled={busy || !preview.conversionCount}
+              busy={busy}
+              busyLabel="締めています"
+            >
+              <Lock size={15} aria-hidden="true" />
+              締める
+            </Button>
+          </div>
         </div>
       ) : null}
     </Dialog>
