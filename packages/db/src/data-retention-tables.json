@@ -3944,5 +3944,32 @@
       "parent": "friends",
       "parentColumn": "id"
     }
+  },
+  "rt_closures": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_closure_close_tasks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "closure_id",
+      "parent": "rt_closures",
+      "parentColumn": "id"
+    }
+  },
+  "rt_closure_close_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "task_id",
+      "parent": "rt_closure_close_tasks",
+      "parentColumn": "id"
+    }
   }
 }

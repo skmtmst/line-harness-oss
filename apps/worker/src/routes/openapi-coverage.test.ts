@@ -15,7 +15,7 @@ import { routeClassification } from '../middleware/feature-enforcement.js';
  * 対象: `/api/*` と `/webhook`、認証なし公開メタデータ 2 件
  * （GET /admin/version、GET /admin/manifest）。
  * 対象外とその理由:
- * - `/api/restaurant-test/*` … 飲食店向け機能（`RESTAURANT_TEST_ENABLED` で環境ごとに切替）
+ * - `/api/restaurant-test/*`（休業・貸切と席の空きの口以外） … 飲食店向け機能（`RESTAURANT_TEST_ENABLED` で環境ごとに切替）
  * - `/api/internal/*` … 内部サービス間経路（内部専用口）
  * - `/admin/update/*` … 管理キー必須の内部保守口
  * - `ALL` メソッド … ミドルウェア掛け（同じ path の具体メソッドが別にある）
@@ -43,7 +43,10 @@ const INFRASTRUCTURE_PATHS = new Set(['/*', '/api/*', '/openapi.json', '/docs'])
 function isCoveredRoute(method: string, path: string): boolean {
   if (method === 'ALL' || method === 'OPTIONS') return false;
   if (INFRASTRUCTURE_PATHS.has(path)) return false;
-  if (path.startsWith('/api/restaurant-test')) return false;
+  if (path.startsWith('/api/restaurant-test') && ![
+    '/api/restaurant-test/closures', '/api/restaurant-test/closures/preview', '/api/restaurant-test/closures/:id',
+    '/api/restaurant-test/availability', '/api/restaurant-test/google/hours/from-closure',
+  ].includes(path)) return false;
   if (path.startsWith('/api/internal')) return false;
   if (path.startsWith('/admin/update')) return false;
   return (
@@ -138,6 +141,14 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/mileage/rewards/{id}/folder',
   'POST /api/broadcast-message-assets/upload-sessions',
   'POST /api/broadcast-message-assets/upload-sessions/{id}/complete',
+  'DELETE /api/restaurant-test/closures/{id}',
+  'GET /api/liff/booking/seat-availability',
+  'GET /api/restaurant-test/availability',
+  'GET /api/restaurant-test/closures',
+  'PATCH /api/restaurant-test/closures/{id}',
+  'POST /api/restaurant-test/closures',
+  'POST /api/restaurant-test/closures/preview',
+  'POST /api/restaurant-test/google/hours/from-closure',
   // V8 integration endpoints.
   'GET /api/visit-stamps/cards',
   'POST /api/visit-stamps/cards',

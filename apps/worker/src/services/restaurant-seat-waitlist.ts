@@ -1,3 +1,4 @@
+import { openSeatTables } from './restaurant-closures.js';
 import type { Env } from '../index.js';
 import { dispatchWaitlistInvites, finishExpiredWaitlists, waitlistHoldMinutes } from './booking-waitlist.js';
 export const DEFAULT_SEAT_WAITLIST_HOLD_MINUTES = 30;
@@ -18,7 +19,9 @@ export async function promoteSeatWaitlist(db: D1Database, slot: SeatWaitlistSlot
   if (!table || next.guest_count < table.min_capacity || next.guest_count > table.max_capacity) return { promoted: false, reason: 'no_fitting_table' };
   const now = new Date(), holdMinutes = waitlistHoldMinutes(next.starts_at, now), start = Date.parse(next.starts_at);
   const ends = next.ends_at ?? new Date(start + 120 * 60_000).toISOString();
-  const result = await db.prepare(`UPDATE rt_seat_waitlist SET status='invited',hold_minutes=?,invited_at=?,hold_expires_at=?,table_id=?,ends_at=?,notification_retry_key=?,updated_at=? WHERE id=? AND status='waiting'`).bind(holdMinutes, now.toISOString(), new Date(Math.min(start, now.getTime() + holdMinutes * 60_000)).toISOString(), slot.tableId, ends, crypto.randomUUID(), now.toISOString(), next.id).run();
+  if (!(await openSeatTables(db,slot.storeId,next.starts_at,ends,next.guest_count,true)).some(t=>t.id===slot.tableId)) return {promoted:false,reason:'unavailable'};
+  let result;
+  try { result = await db.prepare(`UPDATE rt_seat_waitlist SET status='invited',hold_minutes=?,invited_at=?,hold_expires_at=?,table_id=?,ends_at=?,notification_retry_key=?,updated_at=? WHERE id=? AND status='waiting'`).bind(holdMinutes, now.toISOString(), new Date(Math.min(start, now.getTime() + holdMinutes * 60_000)).toISOString(), slot.tableId, ends, crypto.randomUUID(), now.toISOString(), next.id).run(); } catch(error) { if(String(error).includes('closure_conflict')) return {promoted:false,reason:'unavailable'}; throw error; }
   if (!result.meta.changes) return { promoted: false, reason: 'hold_active' };
   const entry = (await db.prepare('SELECT * FROM rt_seat_waitlist WHERE id=?').bind(next.id).first<SeatWaitlistEntry>())!;
   if (env) await dispatchWaitlistInvites(env, store.line_account_id ?? undefined, liffBaseUrl);

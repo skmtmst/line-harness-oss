@@ -271,6 +271,8 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/restaurant-test/media-links', '/restaurant-test/channels'],
   ['/api/restaurant-test/reservation-link', '/restaurant-test/channels'],
   ['/api/restaurant-test/media', '/restaurant-test/channels'],
+  ['/api/restaurant-test/closures', '/restaurant-test/inventory'],
+  ['/api/restaurant-test/availability', '/restaurant-test/inventory'],
   ['/api/restaurant-test/inventory-rules', '/restaurant-test/inventory'],
   ['/api/restaurant-test/channel-close-tasks', '/restaurant-test/inventory'],
 ];
@@ -435,6 +437,11 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/customers/history'],
   ['GET', '/api/restaurant-test/inventory/day'],
   // 既存の在庫閲覧と同じく担当者も確認できる。ルールの保存は管理者以上。
+  ['GET', '/api/restaurant-test/closures'],
+  ['POST', '/api/restaurant-test/closures'],
+  ['POST', '/api/restaurant-test/closures/preview'],
+  ['GET', '/api/restaurant-test/availability'],
+  ['POST', '/api/restaurant-test/google/hours/from-closure'],
   ['GET', '/api/restaurant-test/inventory-rules'],
   ['GET', '/api/restaurant-test/channel-close-tasks'],
   // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
@@ -470,6 +477,8 @@ const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = 
   ['POST', /^\/api\/restaurant-test\/seat-waitlist\/[^/]+\/convert$/],
   ['POST', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
   ['DELETE', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
+  ['PATCH', /^\/api\/restaurant-test\/closures\/[^/]+$/],
+  ['DELETE', /^\/api\/restaurant-test\/closures\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/channel-close-tasks\/[^/]+\/done$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
