@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ClipboardList, FileText, GripVertical, Info, MoreHorizontal, PenLine, Plus, Users } from 'lucide-react'
+import { AlertCircle, ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Users } from 'lucide-react'
 import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
@@ -21,7 +21,8 @@ import { ListPageBody } from '@/components/templates'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -451,22 +452,12 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
                 <Td className={styles.fieldColPlace}><span className={styles.cellText} title={destinationLabel(field)}>{destinationLabel(field)}</span></Td>
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
-                    <button
-                      type="button"
+                    <RowMenu
                       className={styles.menuButton}
-                      aria-label={`項目「${field.name}」の操作`}
-                      aria-haspopup="menu"
-                      aria-expanded={openMenuId === field.id}
-                      title={`項目「${field.name}」の操作`}
-                      onClick={() => setOpenMenuId((current) => (current === field.id ? null : field.id))}
-                    >
-                      <MoreHorizontal className={styles.menuIcon} aria-hidden="true" />
-                    </button>
-                    <ActionMenu
-                      open={openMenuId === field.id}
-                      onClose={() => setOpenMenuId(null)}
-                      ariaLabel={`項目「${field.name}」の操作`}
+                      label={`項目「${field.name}」の操作`}
                       items={rowMenuItems(field)}
+                      open={openMenuId === field.id}
+                      onOpenChange={(next) => setOpenMenuId(next ? field.id : null)}
                     />
                   </span>
                 </Td>

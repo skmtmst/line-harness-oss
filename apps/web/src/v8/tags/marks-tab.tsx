@@ -12,11 +12,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, CircleDot, Flag, GripVertical, History, Info, Loader, MoreHorizontal } from 'lucide-react'
+import { AlertCircle, CircleDot, Flag, GripVertical, History, Info, Loader } from 'lucide-react'
 import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { ListPageBody } from '@/components/templates'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -416,22 +417,12 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
                 <Td className={styles.markColPlace}><span className={styles.cellText} title={usageLabel(mark)}>{usageLabel(mark)}</span></Td>
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
-                    <button
-                      type="button"
+                    <RowMenu
                       className={styles.menuButton}
-                      aria-label={`対応マーク「${mark.name}」の操作`}
-                      aria-haspopup="menu"
-                      aria-expanded={openMenuId === mark.id}
-                      title={`対応マーク「${mark.name}」の操作`}
-                      onClick={() => setOpenMenuId((current) => (current === mark.id ? null : mark.id))}
-                    >
-                      <MoreHorizontal className={styles.menuIcon} aria-hidden="true" />
-                    </button>
-                    <ActionMenu
-                      open={openMenuId === mark.id}
-                      onClose={() => setOpenMenuId(null)}
-                      ariaLabel={`対応マーク「${mark.name}」の操作`}
+                      label={`対応マーク「${mark.name}」の操作`}
                       items={rowMenuItems(mark)}
+                      open={openMenuId === mark.id}
+                      onOpenChange={(next) => setOpenMenuId(next ? mark.id : null)}
                     />
                   </span>
                 </Td>

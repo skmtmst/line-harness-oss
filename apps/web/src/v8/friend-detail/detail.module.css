@@ -7,7 +7,8 @@
 .name { margin: 0; font-size: var(--tpl-fdt-name-size); line-height: var(--tpl-fdt-name-lh); font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sub { margin: 0; font-size: var(--tpl-fdt-sub-size); line-height: var(--tpl-fdt-sub-lh); color: var(--color-ink-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menuAnchor { position: relative; display: inline-flex; flex-shrink: 0; }
-.square { width: var(--tpl-fdt-square); padding: 0; justify-content: center; }
+/* 「…」は共通の RowMenu。前の共通ボタン（副）の色（墨）と影を、共通の印ボタンより強く当てる。 */
+.menuAnchor > button.square { width: var(--tpl-fdt-square); height: var(--tpl-fdt-square); flex: 0 0 var(--tpl-fdt-square); padding: 0; justify-content: center; color: var(--color-ink); box-shadow: var(--shadow-board); }
 .headActions { display: contents; }
 
 .band { margin: 0 var(--tpl-fdt-pad-side) var(--tpl-fdt-group-gap); }

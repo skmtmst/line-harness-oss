@@ -5,14 +5,14 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Pagination from '@/components/shared/pagination'
-import { DragHandle, MoreAction } from '@/components/shared/row-actions'
+import { DragHandle, RowMenu } from '@/components/shared/row-actions'
 import SearchField from '@/components/shared/search-field'
 import ListRange from '@/components/ui/list-range'
 import { bookingApi, type BookingMenu } from '@/lib/api'
@@ -331,17 +331,13 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                   </span>
                 </span>
                 <span className={styles.colMenu}>
-                  <MoreAction
-                    label={`「${menu.name}」のそのほかの操作`}
-                    aria-expanded={openMenuId === menu.id}
-                    onClick={() => setOpenMenuId((current) => (current === menu.id ? null : menu.id))}
+                  <RowMenu
+                    appearance="plain"
                     className={styles.rowMenuButton}
-                  />
-                  <ActionMenu
+                    label={`「${menu.name}」のそのほかの操作`}
+                    menuLabel={`「${menu.name}」の操作`}
                     open={openMenuId === menu.id}
-                    inline
-                    ariaLabel={`「${menu.name}」の操作`}
-                    onClose={() => setOpenMenuId(null)}
+                    onOpenChange={(next) => setOpenMenuId(next ? menu.id : null)}
                     items={[
                       { id: 'edit', label: '中身を編集', onSelect: () => openMenuForm(menu) },
                       ...menuItems,

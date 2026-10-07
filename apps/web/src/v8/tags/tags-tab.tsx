@@ -22,7 +22,6 @@ import {
   FolderOpen,
   GripVertical,
   Inbox,
-  MoreHorizontal,
   Plus,
   Sparkles,
   Star,
@@ -38,6 +37,7 @@ import { ListPageBody } from '@/components/templates'
 import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
@@ -862,25 +862,15 @@ export default function TagsTab({
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                   {canEdit ? <span className={styles.menuAnchor}>
-                    <button
-                      type="button"
+                    <RowMenu
                       className={styles.menuButton}
-                      aria-label={`タグ「${tag.name}」の操作`}
-                      aria-haspopup="menu"
-                      aria-expanded={openMenuId === tag.id}
-                      title={`タグ「${tag.name}」の操作`}
-                      onClick={() => {
-                        setMenuMoveFor(null)
-                        setOpenMenuId((current) => (current === tag.id ? null : tag.id))
-                      }}
-                    >
-                      <MoreHorizontal className={styles.menuIcon} aria-hidden="true" />
-                    </button>
-                    <ActionMenu
-                      open={openMenuId === tag.id}
-                      onClose={() => { setOpenMenuId(null); setMenuMoveFor(null) }}
-                      ariaLabel={`タグ「${tag.name}」の操作`}
+                      label={`タグ「${tag.name}」の操作`}
                       items={rowMenuItems(tag)}
+                      open={openMenuId === tag.id}
+                      onOpenChange={(next) => {
+                        setMenuMoveFor(null)
+                        setOpenMenuId(next ? tag.id : null)
+                      }}
                     />
                   </span> : null}
                 </Td>

@@ -246,19 +246,23 @@
   display: flex;
   align-items: center;
 }
-.menuButton {
+/* 「…」は共通の RowMenu。今の見た目（枠・大きさ・地）を共通の印ボタンより強く当てる。 */
+.menuBox > button.menuButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: var(--tpl-nph-menu-size);
   height: var(--tpl-nph-menu-size);
+  flex: 0 0 var(--tpl-nph-menu-size);
+  padding: 0;
   border: 1px solid var(--color-hairline);
+  outline: 0;
   border-radius: var(--radius-control);
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
   cursor: pointer;
 }
-.menuButton:hover {
+.menuBox > button.menuButton:hover {
   background: var(--color-table-head);
 }
 
