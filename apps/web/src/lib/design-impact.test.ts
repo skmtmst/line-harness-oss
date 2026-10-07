@@ -76,48 +76,24 @@ describe('共通部品の影響範囲', () => {
       'app/accounts/migration.tsx',
       // ★V8 LINEユーザーIDの移行（Z0jHp）。判断一覧は50件ずつのページ送り。
       'app/accounts/uid-migration-v8.tsx',
-      // 2026-09-02: 案件一覧が自前のページ送りを持たないまま全件を出していた。
-      // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
-      'app/affiliates/tabs.tsx',
-      // ★V8-B 成果とアフィリエイト（OylSV 成果承認・h7dmB 案件・aINnz 支払い）。
-      // parity-D: アフィリエイター一覧に表の下のページ送りを足した。
-      'app/affiliates/v8-affiliates-tab.tsx',
-      'app/affiliates/v8-approvals-tab.tsx',
-      'app/affiliates/v8-offers-tab.tsx',
-      'app/affiliates/v8-payment-tab.tsx',
       // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
       'app/auto-replies/runs/page.tsx',
       // ★V8 自動応答の実行結果（app/auto-replies/runs/runs-v8.tsx）は描かれなくなった。入口は src/v8/auto-replies/runs.tsx（下）。
-      // ★V8 オートメーション一覧（LWQXd）。表の下にページ送りを置く。
-      'app/automations/list-v8.tsx',
       'app/automations/page.tsx',
-      // ★V8-B オートメーション（g98F9 動いた記録）。一覧は #1297 が正本。
-      // 札・表の下にページ送りを置く。
-      'app/automations/runs-v8.tsx',
       // 2026-09-27 R24: 実行記録が先頭20件に固定で21件目以降へ届かなかった。
       // 20件ずつのページ送りに寄せた。
       'app/automations/runs/page.tsx',
       'app/booking/bookings/page.tsx',
       // #370: 予約メニュー8件を設計どおり1ページ6件に区切る。
       'app/booking/menus/page.tsx',
-      // 予約設定V8（owaS3）のメニュー表も1ページ6件で区切る。
-      // タブ分割で settings-v8.tsx から移った。
-      'app/booking/menus/settings-tabs/menus-tab.tsx',
-      'app/booking/menus/settings-tabs/staff-tab.tsx',
       // #1145(★V8) の一斉配信の一覧（app/broadcasts/list-v8.tsx）は描かれなくなった。入口は src/v8/broadcasts/list.tsx（下）。
-      // ★V8-B 共通アクション（LnGNw）。表の下にページ送りを置く。
-      'app/common-actions/common-actions-v8.tsx',
       'app/common-actions/page.tsx',
       // N-193/N-205: 登録メディア選択窓。20件ずつのページ送りを共通へ寄せた。
-      // ★V8 登録メディア一覧（O7hUt7）。表の下に表示範囲と10/20/50のページ送りを置く。
-      'app/contents/list-v8.tsx',
       'app/contents/media-picker-dialog.tsx',
       'app/contents/media-replacement-dialog.tsx',
       'app/contents/page.tsx',
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
       'app/contents/vars/impact-review.tsx',
-      // ★V8 共通情報の一覧（FM94M）。表の下にページ送りを置く。
-      'app/contents/vars/list-v8.tsx',
       'app/contents/vars/page.tsx',
       // ★V8-B コンバージョンの一覧（r6dJFy）。表の下にページ送りを置く。
       'app/conversions/conversion-points-v8.tsx',
@@ -136,8 +112,6 @@ describe('共通部品の影響範囲', () => {
       // 2026-09-04: イベント一覧も自前のページ送りをやめて共通へ寄せた。
       // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
       'app/events/bookings/page.tsx',
-      // ★V8-B イベント一覧（Ih3xS）。表の下にページ送りを置く。
-      'app/events/events-list-v8.tsx',
       'app/events/page.tsx',
       // #543: 一覧の到達不能な回答表（M2削除）と共に共通Paginationの利用を外した。
       'app/form-submissions/responses/page.tsx',
@@ -154,20 +128,11 @@ describe('共通部品の影響範囲', () => {
       'app/inflow-links/page.tsx',
       // #291: 顧客へのお知らせ9種類を、設計どおり1ページ6件に区切る。
       'app/mileage/action-score-tab.tsx',
-      // ★V8-B マイルの友だち詳細（R6kIG）。表の下にページ送りを置く。
-      'app/mileage/friends/detail/v8-friend-detail.tsx',
       'app/mileage/mileage-history-tab.tsx',
       // R365: 要対応の交換が21件以上あっても残りを出せるよう、20件ずつのページ送りに寄せた。
       'app/mileage/mileage-rewards-tab.tsx',
       'app/mileage/page.tsx',
-      // ★V8-B マイル5タブ（OC0gy・S35pO・CJlf4・oRbJi・IRPw8）。表の下にページ送りを置く。
-      'app/mileage/v8-balances-tab.tsx',
-      'app/mileage/v8-earning-rules-tab.tsx',
-      'app/mileage/v8-history-tab.tsx',
-      'app/mileage/v8-rewards-tab.tsx',
-      'app/mileage/v8-score-tab.tsx',
       // 2026-09-18: NEN配信のコラム一覧（★V6 37-6-A）。8本ずつのページ送り。
-      'app/nen-campaigns/nen-campaigns-v8.tsx',
       'app/nen-campaigns/nen-overview.tsx',
       // 2026-09-16 採用: 然の健康日記（★V6 37-4）とマイペット（★V6 37-3）。20頭ずつのページ送り。
       'app/nen/health/health-tab.tsx',
@@ -175,14 +140,11 @@ describe('共通部品の影響範囲', () => {
       'app/nen/health/health-v8.tsx',
       // 2026-09-16: 然の会員一覧（★V6 37-1）。20人ずつのページ送り。
       'app/nen/members/members-tab.tsx',
-      // ★V8-B 会員一覧（AOWoJ）。表の下にページ送りを置く。
-      'app/nen/members/members-v8.tsx',
       'app/nen/pets/pets-tab.tsx',
       // ★V8-B マイペット一覧（wTIej）。表の下にページ送りを置く。
       'app/nen/pets/pets-v8.tsx',
       'app/ops/audit/page.tsx',
       // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
-      'app/reminders/detail/detail-v8.tsx',
       'app/reminders/detail/page.tsx',
       // ★V8 リマインダの登録者（担当 b の作り直し）。表の下に共通のページ送り。
       'app/reminders/detail/registrants-panel.tsx',
@@ -196,29 +158,15 @@ describe('共通部品の影響範囲', () => {
       'app/restaurant-test/google/google-profile.tsx',
       // #919: 予約台帳が増えても消えないよう、期間・状態の絞り込みと20件ずつのページ送りに寄せた。
       'app/restaurant-test/restaurant-console.tsx',
-      // ★V8-B Googleビジネス（j0Wcg）。口コミ一覧の表の下にページ送りを置く。
-      'app/restaurant-test/v8/google.tsx',
-      // ★V8-B 予約台帳 一覧（Z3FoM）。表の下にページ送りを置く。
-      'app/restaurant-test/v8/reservations.tsx',
       'app/rich-menus/page.tsx',
-      // 監査 R132: ファイル検査の一覧が先頭50件固定で検索・ページ送りが
-      // なかった。サーバが数えた総数でページ送りを出すため共通へ寄せた。
-      // ★V8 ファイルの検査（PfA4o）。表の下にページ送りを置く。
-      'app/settings/file-scan/file-scan-v8.tsx',
       'app/staff/page.tsx',
       // 友だち属性V8の4タブ（タグ・情報欄・対応マーク・保存した検索）。
       // 表の下にページ送りがあり、1ページごとの件数を選べる。
       'app/tags/fields-tab-v8.tsx',
       'app/tags/marks-v8.tsx',
       'app/tags/searches-v8.tsx',
-      'app/tags/tags-tab-v8.tsx',
-      // ★V8 テンプレート一覧（v19Ivv）。表の下にページ送りがあり、
-      // 1ページごとの件数を選べる。
-      'app/templates/list-v8.tsx',
       // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
       'app/users/users-v8.tsx',
-      // ★V8-B 外部連携の一覧（ZSbFY）。表の下にページ送りがある。
-      'app/webhooks/outgoing-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
       // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
@@ -232,6 +180,12 @@ describe('共通部品の影響範囲', () => {
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
+      /*
+       * 2026-10-07: 入口が src/v8 の新しい画面を出すようになり、描かれなくなった古い画面ファイル
+       * （成果とアフィリエイト・オートメーション・共通アクション・予約設定のタブ・登録メディア・共通情報・
+       * イベント一覧・マイル・NEN配信・会員・リマインダ詳細・Googleビジネス・予約台帳・ファイルの検査・
+       * タグ・テンプレート・外部連携）も外した。代わりは下の src/v8 の新しい画面。
+       */
       /*
        * もう描かれない古い画面ファイル（自動応答・回答フォーム・流入の一覧・リッチメニュー・
        * シナリオ・外部連携のやり取りと送る・受信一覧の旧部品）は 2026-10-06 に外した。
