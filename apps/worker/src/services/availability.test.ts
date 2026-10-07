@@ -206,7 +206,7 @@ function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>):
           if (sql.includes('booking_availability_exceptions')) {
             return { results: data.exceptions ?? [] };
           }
-          if (sql.includes('booking_resource_consumptions')) {
+          if (sql.includes('booking_slot_resources')) {
             return { results: data.resourceBookings ?? [] };
           }
           if (sql.includes('booking_menu_resources')) {
@@ -233,7 +233,7 @@ function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>):
           if (sql.includes('FROM staff_breaks')) {
             return { results: data.breaks ?? [] };
           }
-          if (sql.includes('FROM bookings')) {
+          if (sql.includes('FROM booking_slot_allocations')) {
             return { results: data.bookings ?? [] };
           }
           return { results: [] };
@@ -799,7 +799,7 @@ describe('getAvailability の例外日（休業日・終日・時間帯）', () 
       now: new Date('2026-05-08T00:00:00Z'), minLeadTimeMinutes: 0,
     });
     expect(result.by_staff[0].slots).toEqual([]);
-    expect(seen.some((call) => call.sql.includes('booking_resource_consumptions'))).toBe(false);
+    expect(seen.some((call) => call.sql.includes('booking_slot_resources'))).toBe(false);
   });
 
   test('未知の種類の行は無視する', async () => {
