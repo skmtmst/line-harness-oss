@@ -110,7 +110,13 @@ export default function GenerationPanel({
       style={{ maxWidth: 390 }}
       aria-label="画像を生成"
     >
-      <div className="flex min-h-14 flex-wrap items-center gap-2 px-4 py-2">
+      {/*
+        見出しの行。`min-h-14` は 2026-10-06 のオーナー指示で外した「バナー／自由入力」の
+        切替ボタン（板 `pj2tz`・`hPRmn`。板では見出しと同じ y156 の行にあった）を
+        押せる大きさに保つための最小高さだった。切替が無い今は題だけの行なので外す。
+        板Δ（`S0ay0i`画像を生成 → `RJIyX`出力サイズ）49 に対し、外すと 55 → 46 になる。
+      */}
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2">
         <Sparkles aria-hidden="true" className="h-4.5 w-4.5 text-ink-faint" />
         <h2 className="text-body font-bold text-ink">画像を生成</h2>
       </div>
@@ -336,9 +342,19 @@ export default function GenerationPanel({
 
         {/* ★BG-B `dT1xq`: 任意であることと上限を同じ行に出す */}
         <Field label="追加の指示" note={`任意・${CUSTOM_PROMPT_MAX}文字まで`} htmlFor={`${uid}-custom`}>
+          {/*
+            板はこの欄を 1 行ぶんの高さで描いている。板の間隔定数（組と組の間 16px・
+            組の中 6px）で板Δ（`WMhuQ`任意・600文字まで → `coo4b`つくる枚数）90 を割ると
+            90 − 16 − 6 − 題17 = 51px。共通部品の `.multi` は 2 行ぶん（min-height 120px）
+            なので、この 1 か所だけ最小高さを外して 1 行ぶん（上下の余白14×2＋1行23.8＋枠2
+            ＝54px）にする。共通部品そのものは V5 公認の `keKe3`（22 か所）なので変えない。
+            たたんだ高さを板に合わせるだけで、`.multi` の `resize: vertical` は残るので
+            長い指示は引き伸ばして書ける。
+          */}
           <TextArea
             id={`${uid}-custom`}
-            rows={2}
+            rows={1}
+            style={{ minHeight: 0 }}
             maxLength={CUSTOM_PROMPT_MAX}
             disabled={disabled}
             value={value.customPrompt}
@@ -612,7 +628,16 @@ export function ColorRoles({
         <span className="shrink-0 text-caption font-semibold text-ink">カラー</span>
         <span className="min-w-0 text-micro text-ink-faint">4つの役割で指定します</span>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      {/*
+        4つの役割の並び。縦の間隔は板から逆算する。板の上下のピッチは
+        （`VVBfu`メインカラー y1355 → `ZdLJ8`サブカラー y1420）65px。
+        実画面の 1 区画は 題18 + 組の中の間隔6 + 色の枠36 = 60px なので、
+        縦の間隔は 4px（`gap-y-1`）でピッチ 64 になり板と 1px 差に収まる。
+        6px にすると板ちょうどだが、`size-scale-contract.test.tsx` の
+        「4の倍数でない gap 段を増やさない」ラチェットに引っかかるので 4px を採る。
+        横は板どおり 12px のままにする。
+      */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
         {COLOR_ROLES.map((role) => (
           <div key={role.key} className="flex flex-col gap-1.5">
             <span className="text-caption font-semibold text-ink">{role.label}</span>
