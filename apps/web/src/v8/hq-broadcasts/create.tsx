@@ -30,17 +30,18 @@ import { RowActions } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ApiError, api } from '@/lib/api'
+import { ApiError, api, describeSaveFailure, type BroadcastMessageAsset } from '@/lib/api'
+import { assetBubbleError, bubbleLegacyMessage } from '@/lib/broadcast-template'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { STORE_INSERTS, preflightBadge, splitPreflightRows, previewText, runTitle, scheduledIso, sendTotals, toApiContent } from './model'
+import { ASSET_KIND, STORE_INSERTS, type HqKind, fromApiContent, preflightBadge, splitPreflightRows, previewText, runTitle, scheduledIso, sendTotals, toApiContent } from './model'
 import styles from './create.module.css'
 
 type Store = Pick<LineAccount, 'id' | 'name' | 'tags'> & { friendCount: number }
 type Mode = 'tag' | 'store'
-type Kind = 'text' | 'coupon' | 'rich'
+type Kind = HqKind
 
 /** 表に1行ずつ出すのは4店まで。残りは「ほか N店」にまとめ、「…」から全部を開く。 */
 const ROWS_SHOWN = 4
@@ -69,10 +70,22 @@ const n = (value: number) => value.toLocaleString('ja-JP')
 function errorText(caught: unknown, fallback: string): string {
   if (caught instanceof ApiError) {
     if (caught.status === 403) return '統括全体の編集権限がある人だけが一括配信を作れます。'
-    if (caught.status === 409) return 'ほかの人が先に操作しました。もう一度確かめてください。'
-    if (caught.message) return caught.message
+    if (caught.status === 409) return caught.message && !/^API error: /.test(caught.message) ? caught.message : 'ほかの人が先に操作しました。もう一度確かめてください。'
+    return describeSaveFailure(caught)
   }
   return fallback
+}
+
+/** 下書きの日時（ISO）を、選ぶ日と時刻（端末の時刻・30 分ごと）に戻す。 */
+function splitIso(iso: string): { date: string; time: string } | null {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return { date: ymd(d), time: `${String(d.getHours()).padStart(2, '0')}:${d.getMinutes() < 30 ? '00' : '30'}` }
+}
+
+/** 素材（クーポン・リッチメッセージ）の吹き出し。口の messageBubblesJson と同じ形（店側の一斉配信と同じ）。 */
+function assetBubble(asset: BroadcastMessageAsset) {
+  return { id: 'hq-asset-1', type: asset.kind, content: { assetId: asset.id, assetName: asset.name, ...asset.payload } }
 }
 
 export default function HqBroadcastCreate() {
@@ -87,11 +100,17 @@ export default function HqBroadcastCreate() {
   const [tags, setTags] = useState<LineAccountTagSummary[]>([])
   const [loadError, setLoadError] = useState<unknown>(null)
   const [mode, setMode] = useState<Mode>('tag')
+  /* 下書きを直すとき（?id=）。読んだ下書きの中身を入れ、確かめるときは同じ下書きを直す（作り直さない）。 */
+  const draftId = params.get('id') ?? ''
+  const [draftState, setDraftState] = useState<'none' | 'loading' | 'ready' | 'sent' | 'error'>(draftId ? 'loading' : 'none')
   const [tagIds, setTagIds] = useState<string[]>(() => (params.get('tag') ? [params.get('tag')!] : []))
   const [accountIds, setAccountIds] = useState<string[]>([])
   const [excluded, setExcluded] = useState<string[]>([])
   const [kind, setKind] = useState<Kind>('text')
   const [body, setBody] = useState('')
+  /* 統括で使える共有の素材（どの店にも属さないクーポン・リッチメッセージ）。 */
+  const [assets, setAssets] = useState<BroadcastMessageAsset[] | null>(null)
+  const [assetId, setAssetId] = useState('')
   const [when, setWhen] = useState<'now' | 'later'>('later')
   const [date, setDate] = useState(tomorrow)
   const [time, setTime] = useState('11:00')
@@ -106,6 +125,8 @@ export default function HqBroadcastCreate() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const insertRef = useRef<HTMLButtonElement>(null)
+  /* 下書きの依頼番号。作ったとき（または読んだ下書き）のものを、直すときもそのまま使う（口の決まり）。 */
+  const requestRef = useRef('')
 
   useEffect(() => {
     let current = true
@@ -122,6 +143,41 @@ export default function HqBroadcastCreate() {
     return () => { current = false }
   }, [])
 
+  useEffect(() => {
+    if (kind === 'text' || assets) return
+    let current = true
+    void api.broadcastMessageAssets.list()
+      .then((res) => { if (current) setAssets(res.success ? res.data.filter((a) => a.lineAccountId === null && (a.kind === 'coupon' || a.kind === 'rich_message')) : []) })
+      .catch(() => { if (current) setAssets([]) })
+    return () => { current = false }
+  }, [kind, assets])
+
+  useEffect(() => {
+    if (!draftId) return
+    let current = true
+    void hqBroadcastsApi.get(draftId)
+      .then((res) => {
+        if (!current) return
+        const draft = res.data
+        if (draft.status !== 'prepared') { setDraftState('sent'); return }
+        const saved = draft.input
+        setMode(saved.accountTagIds.length > 0 ? 'tag' : 'store')
+        setTagIds(saved.accountTagIds); setAccountIds(saved.accountIds); setExcluded(saved.excludedAccountIds)
+        let bubbles: Array<{ type?: string; content?: { assetId?: string } }> = []
+        try { bubbles = saved.messageBubblesJson ? JSON.parse(saved.messageBubblesJson) : [] } catch { bubbles = [] }
+        const asset = bubbles.find((b) => b.type === 'coupon' || b.type === 'rich_message')
+        if (asset) { setKind(asset.type === 'coupon' ? 'coupon' : 'rich'); setAssetId(String(asset.content?.assetId ?? '')) }
+        else { setKind('text'); setBody(fromApiContent(saved.messageContent)) }
+        const at = saved.scheduledAt ? splitIso(saved.scheduledAt) : null
+        if (at) { setWhen('later'); setDate(at.date); setTime(at.time) } else setWhen('now')
+        requestRef.current = saved.requestId
+        setRun(draft)
+        setDraftState('ready')
+      })
+      .catch(() => { if (current) setDraftState('error') })
+    return () => { current = false }
+  }, [draftId])
+
   const tagCount = useCallback((tagId: string) => (stores ?? []).filter((s) => s.tags?.some((t) => t.id === tagId)).length, [stores])
   const chosen = useMemo(() => {
     const list = stores ?? []
@@ -133,10 +189,17 @@ export default function HqBroadcastCreate() {
   const friendTotal = sending_.reduce((sum, s) => sum + s.friendCount, 0)
 
   const scheduledAt = when === 'now' ? null : scheduledIso(date, time)
+  const kindAssets = (assets ?? []).filter((a) => kind !== 'text' && a.kind === ASSET_KIND[kind])
+  const asset = kind === 'text' ? null : kindAssets.find((a) => a.id === assetId) ?? null
+  const bubble = asset ? assetBubble(asset) : null
+  const legacy = bubble ? bubbleLegacyMessage(bubble as never) : null
+  const assetProblem = kind === 'text' ? '' : !asset ? `${kind === 'coupon' ? 'クーポン' : 'リッチメッセージ'}を選んでください` : assetBubbleError(bubble as never)
   const input: Omit<HqBroadcastInput, 'requestId'> = {
-    title: runTitle(body),
-    messageType: 'text',
-    messageContent: toApiContent(body),
+    title: kind === 'text' ? runTitle(body) : (asset?.name.slice(0, 40) || '統括の一括配信'),
+    /* 素材は LINE へ渡せる種類（flex・imagemap など）に直して送る。口はどれも受ける。 */
+    messageType: kind === 'text' ? 'text' : ((legacy?.messageType ?? 'flex') as HqBroadcastInput['messageType']),
+    messageContent: kind === 'text' ? toApiContent(body) : (legacy?.messageContent ?? ''),
+    ...(bubble ? { messageBubblesJson: JSON.stringify([bubble]) } : {}),
     accountIds: mode === 'store' ? accountIds : [],
     accountTagIds: mode === 'tag' ? tagIds : [],
     excludedAccountIds: excluded.filter((id) => chosen.some((s) => s.id === id)),
@@ -144,20 +207,25 @@ export default function HqBroadcastCreate() {
     scheduledAt,
   }
   const key = JSON.stringify(input)
-  const stale = !!run && runKey !== key
-  const ready = chosen.length > 0 && body.trim().length > 0 && kind === 'text' && (when === 'now' || !!scheduledAt)
-  const missing = chosen.length === 0 ? '宛先の店を選んでください' : !body.trim() ? '本文を入れてください' : kind !== 'text' ? '文章で送ってください' : when === 'later' && !scheduledAt ? '送る日時を選んでください' : ''
+  const stale = !!run && !!checks && runKey !== key
+  const contentMissing = kind === 'text' ? (!body.trim() ? '本文を入れてください' : '') : assetProblem
+  const ready = chosen.length > 0 && !contentMissing && (when === 'now' || !!scheduledAt)
+  const missing = chosen.length === 0 ? '宛先の店を選んでください' : contentMissing || (when === 'later' && !scheduledAt ? '送る日時を選んでください' : '')
 
-  /** 作る（下書きを固定）→ 確かめる → 問題のある店を外す。中身が変わったら作り直し、前の下書きは取り消す。 */
+  /** 作る（下書きを固定）→ 確かめる → 問題のある店を外す。中身が変わったら同じ下書きを直す（版つき・依頼番号はそのまま）。 */
   const check = async (): Promise<{ run: HqBroadcastRun; checks: HqBroadcastPreflight[] } | null> => {
     if (!ready) { setError(missing); return null }
     setChecking(true); setError('')
     try {
       let current = run
       if (!current || runKey !== key) {
-        if (current && current.status === 'prepared') await hqBroadcastsApi.cancel(current.id, current.version).catch(() => null)
-        const created = await hqBroadcastsApi.create({ ...input, requestId: crypto.randomUUID() })
-        current = created.data
+        const requestId = current?.input?.requestId || requestRef.current
+        if (current && current.status === 'prepared' && requestId) {
+          current = (await hqBroadcastsApi.update(current.id, { ...input, requestId, expectedVersion: current.version })).data
+        } else {
+          requestRef.current = crypto.randomUUID()
+          current = (await hqBroadcastsApi.create({ ...input, requestId: requestRef.current })).data
+        }
       }
       let list = (await hqBroadcastsApi.preflight(current.id)).data
       const blocked = list.filter((p) => p.blockedReasons.length > 0 && !p.excluded).map((p) => p.accountId)
@@ -240,6 +308,7 @@ export default function HqBroadcastCreate() {
   const sendCount = totals ? totals.sendStores : sending_.length
   const { shown, rest } = splitPreflightRows(checks ?? [], showAll ? Infinity : ROWS_SHOWN)
   const exampleStore = (checks ?? []).find((p) => !p.excluded && !p.blockedReasons.length)?.accountName ?? sending_[0]?.name ?? '店の名前'
+  const previewBody = kind === 'text' ? previewText(body, exampleStore) : asset ? `［${kind === 'coupon' ? 'クーポン' : 'リッチメッセージ'}］${asset.name}` : ''
 
   if (!canManage) {
     return (
@@ -253,7 +322,7 @@ export default function HqBroadcastCreate() {
     <div className={styles.previewCol}>
       <LinePreview accountName={exampleStore} caption="今日" note={`${exampleStore}の例です。差し込みは店ごとに変わります（{予約ページ}は省いて見せています）。`}>
         <LinePreviewMessage accountName={exampleStore} avatar={exampleStore.slice(0, 1)} time={when === 'now' ? '今' : time}>
-          {previewText(body, exampleStore) || '（本文がまだありません）'}
+          {previewBody || '（本文がまだありません）'}
         </LinePreviewMessage>
       </LinePreview>
     </div>
@@ -281,6 +350,13 @@ export default function HqBroadcastCreate() {
       >
         <div className={styles.body}>
           {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
+          {draftState === 'loading' ? <Notice tone="info" role="status">下書きを読み込んでいます…</Notice> : null}
+          {draftState === 'sent' ? (
+            <Notice tone="warn" role="alert" action={<Button size="compact" href={`/hq/broadcasts/detail?id=${encodeURIComponent(draftId)}`}>詳細を見る</Button>}>
+              この一括配信はもう送った（予約した）ので直せません。新しく作るときは、宛先と中身を入れて確かめてください。
+            </Notice>
+          ) : null}
+          {draftState === 'error' ? <Notice tone="danger" role="alert">下書きを読み込めませんでした。一括配信の一覧から開き直してください。</Notice> : null}
 
           <section className={styles.section} aria-label="① 宛先">
             <SectionHeader title="① 宛先" help="アカウントのタグ（統括の分類）でまとめて選ぶか、店を1つずつ選びます。送る直前の店の組み合わせで固定され、あとでタグに店が増えてもこの配信には入りません。" helpLabel="宛先の説明" />
@@ -313,11 +389,24 @@ export default function HqBroadcastCreate() {
             <SegmentedControl<Kind>
               aria-label="中身の種類"
               value={kind}
-              onChange={setKind}
+              onChange={(next) => { setKind(next); setAssetId('') }}
               options={[{ value: 'text', label: '文章' }, { value: 'coupon', label: 'クーポン' }, { value: 'rich', label: 'リッチメッセージ' }]}
             />
             {kind !== 'text' ? (
-              <Notice tone="info" role="status">統括からのクーポン・リッチメッセージの一括配信は、まだ使えません。文章で送ってください。</Notice>
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>{kind === 'coupon' ? 'クーポン' : 'リッチメッセージ'}</span>
+                {assets === null ? <span className={styles.muted}>読み込んでいます…</span> : kindAssets.length === 0 ? (
+                  <span className={styles.muted}>{`統括で使える${kind === 'coupon' ? 'クーポン' : 'リッチメッセージ'}がありません。「コンテンツ ＞ テンプレート」で、どの店にも属さない素材として作ってください。`}</span>
+                ) : (
+                  <Select
+                    aria-label={kind === 'coupon' ? 'クーポンを選ぶ' : 'リッチメッセージを選ぶ'}
+                    value={assetId}
+                    onChange={setAssetId}
+                    options={[{ value: '', label: '選んでください' }, ...kindAssets.map((a) => ({ value: a.id, label: a.name }))]}
+                  />
+                )}
+                {asset && assetProblem ? <span className={styles.muted} role="alert">{assetProblem}</span> : null}
+              </div>
             ) : (
               <>
                 <label className={styles.field}>
@@ -380,7 +469,7 @@ export default function HqBroadcastCreate() {
                   </thead>
                   <tbody>
                     {shown.map((p) => {
-                      const badge = preflightBadge(p)
+                      const badge = preflightBadge(p, body)
                       const go = !p.excluded && p.blockedReasons.length === 0
                       return (
                         <Tr key={p.accountId} className={styles.row}>

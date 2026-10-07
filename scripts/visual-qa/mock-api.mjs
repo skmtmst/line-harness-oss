@@ -2091,6 +2091,8 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   }
   if (method === 'POST' && pathname === '/api/restaurant-test/reservation-link') return RESTAURANT_RESERVATION_LINK
   if (method === 'POST' && pathname === '/api/hq/broadcasts') return { ...HQ_RUN_DRAFT, id: 'hq-run-new', version: 1 }
+  /* 下書きを直す（PATCH・版つき）。依頼番号と ID はそのまま、版を1つ上げる。 */
+  if (method === 'PATCH' && /^\/api\/hq\/broadcasts\/[^/]+$/.test(pathname)) return { ...HQ_RUN_DRAFT, id: pathname.split('/')[4], version: HQ_RUN_DRAFT.version + 1 }
   if (method === 'POST' && /^\/api\/hq\/broadcasts\/[^/]+\/preflight$/.test(pathname)) return HQ_PREFLIGHT.map((c) => ({ ...c, excluded: false }))
   if (method === 'PUT' && /^\/api\/hq\/broadcasts\/[^/]+\/exclusions$/.test(pathname)) return { ...HQ_RUN_DRAFT, id: pathname.split('/')[4], version: 3 }
   if (method === 'POST' && /^\/api\/hq\/broadcasts\/[^/]+\/(send|stop|cancel)$/.test(pathname)) return { ...HQ_RUN_SENT, id: pathname.split('/')[4] }
@@ -2597,13 +2599,19 @@ const HQ_PREFLIGHT = [
     .map(([id, name, count]) => hqCheck(id, name, count, 20000)),
 ]
 const hqTarget = (check, status, totalCount, successCount, extra = {}) => ({ ...check, status, totalCount, successCount, version: 2, retryableCount: 0, stopped: false, ...extra })
-const HQ_RUN_DRAFT = { id: 'hq-run-draft', title: '1月の限定メニュー「寒ぶりのしゃぶしゃぶ」を始めました', status: 'prepared', version: 2, scheduledAt: '2027-01-15T02:00:00.000Z', targets: HQ_PREFLIGHT.map((c) => hqTarget(c, c.excluded ? 'excluded' : 'prepared', 0, 0)) }
+/* 下書きの中身（API-10：GET で input を返す。画面はここから本文・宛先・時刻を戻す）。 */
+const HQ_RUN_INPUT = {
+  requestId: 'hq-req-draft', title: '1月の限定メニュー「寒ぶりのしゃぶしゃぶ」を始めました', messageType: 'text',
+  messageContent: '{{account.name}}より：1月の限定メニュー「寒ぶりのしゃぶしゃぶ」を始めました。ご予約は LINE から → {{var.reservation_url}}',
+  accountIds: [], accountTagIds: ['tag-shibuya'], excludedAccountIds: [], audience: { kind: 'all' }, scheduledAt: '2027-01-15T02:00:00.000Z',
+}
+const HQ_RUN_DRAFT = { id: 'hq-run-draft', title: '1月の限定メニュー「寒ぶりのしゃぶしゃぶ」を始めました', status: 'prepared', version: 2, scheduledAt: '2027-01-15T02:00:00.000Z', input: HQ_RUN_INPUT, targets: HQ_PREFLIGHT.map((c) => hqTarget(c, c.excluded ? 'excluded' : 'prepared', 0, 0)) }
 const HQ_RUN_SENT = {
-  id: 'hq-run-sent', title: '1月の限定メニュー「寒ぶりのしゃぶしゃぶ」を始めました', status: 'scheduled', version: 4, scheduledAt: '2026-01-15T02:00:00.000Z',
+  id: 'hq-run-sent', title: '1月の限定メニュー「寒ぶりのしゃぶしゃぶ」を始めました', status: 'scheduled', version: 4, scheduledAt: '2026-01-15T02:00:00.000Z', input: { ...HQ_RUN_INPUT, requestId: 'hq-req-sent' },
   targets: [
     hqTarget(hqCheck('hq-ginza', '銀座店', 6120, 18400), 'sent', 6120, 6118, { broadcastId: 'b-ginza' }),
     hqTarget(hqCheck('hq-ikebukuro', '池袋店', 4050, 20000), 'sent', 4050, 4050, { broadcastId: 'b-ikebukuro' }),
-    hqTarget(hqCheck('hq-nagoya', '名古屋店', 460, 20000), 'failed', 460, 0, { broadcastId: 'b-nagoya', retryableCount: 460 }),
+    hqTarget(hqCheck('hq-nagoya', '名古屋店', 460, 20000), 'failed', 460, 0, { broadcastId: 'b-nagoya', retryableCount: 460, failureReasons: [{ code: 'line_busy', label: 'LINEが混雑しています', count: 460, retryable: true }] }),
     hqTarget(hqCheck('hq-shinjuku', '新宿店', 5880, 2100, ['今月の送信枠が足りません']), 'excluded', 0, 0),
     hqTarget(hqCheck('hq-others', 'ほか 6店', 23450, 120000), 'sent', 23450, 23450, { broadcastId: 'b-others' }),
   ],

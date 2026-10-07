@@ -20,6 +20,21 @@ export function toApiContent(body: string): string {
   return text
 }
 
+/** 口の書き方（{{account.name}} など）を画面の差し込み（{店名} など）に戻す。下書きを読み直すときに使う。 */
+export function fromApiContent(content: string): string {
+  let text = content
+  for (const insert of STORE_INSERTS) {
+    const inner = insert.token.slice(2, -2).replace('.', '\\.')
+    text = text.replace(new RegExp(`\\{\\{\\s*${inner}\\s*\\}\\}`, 'g'), insert.label)
+  }
+  return text
+}
+
+/** 本文で使っている、店の共通情報から差し込むもの（{店の電話番号}・{予約ページ}）。 */
+export function storeVarsUsed(body: string): string[] {
+  return STORE_INSERTS.filter((i) => i.token.startsWith('{{var.') && body.includes(i.label)).map((i) => i.label.slice(1, -1))
+}
+
 /** 見え方の例：{店名} をその店の名前に、ほかの差し込みは例の値に。 */
 export function previewText(body: string, storeName: string): string {
   /* 予約ページの URL は例では省く（「→ {予約ページ}」ごと消す）。 */
@@ -41,7 +56,7 @@ export function runTitle(body: string): string {
 }
 
 /** 送る前の確かめの札。理由は口の blockedReasons（文）から読む。 */
-export function preflightBadge(p: HqBroadcastPreflight): { label: string; tone: StatusBadgeTone } {
+export function preflightBadge(p: HqBroadcastPreflight, body = ''): { label: string; tone: StatusBadgeTone } {
   const reasons = p.blockedReasons
   if (reasons.length === 0) return { label: '足りる', tone: 'success' }
   if (p.paused || reasons.some((r) => r.includes('停止'))) return { label: '配信を止めている', tone: 'neutral' }
@@ -52,7 +67,12 @@ export function preflightBadge(p: HqBroadcastPreflight): { label: string; tone: 
   }
   if (reasons.some((r) => r.includes('送信枠・LINE接続を確認できません'))) return { label: '送信枠を確かめられない', tone: 'warning' }
   if (reasons.some((r) => r.includes('タグ'))) return { label: '同じ名前のタグが無い', tone: 'warning' }
-  if (reasons.some((r) => r.includes('共通情報'))) return { label: '共通情報が足りない', tone: 'warning' }
+  if (reasons.some((r) => r.includes('共通情報'))) {
+    /* 本文で使っている店の共通情報（電話番号・予約ページ）が、その店に入っていない。 */
+    const used = storeVarsUsed(body)
+    return { label: used.length > 0 ? `${used.join('・')}が未設定` : '共通情報が足りない', tone: 'warning' }
+  }
+  if (reasons.some((r) => r.includes('友だちが0人'))) return { label: '友だちが0人', tone: 'neutral' }
   return { label: '確かめが必要', tone: 'warning' }
 }
 
@@ -111,6 +131,7 @@ export function excludedReason(t: Pick<HqBroadcastPreflight, 'blockedReasons' | 
   if (reasons.some((r) => r.includes('送信枠'))) return '枠が足りない'
   if (reasons.some((r) => r.includes('タグ'))) return 'タグが無い'
   if (reasons.some((r) => r.includes('共通情報'))) return '共通情報が無い'
+  if (reasons.some((r) => r.includes('友だちが0人'))) return '友だちが0人'
   return ''
 }
 
@@ -154,3 +175,24 @@ export function scheduledIso(date: string, time: string): string | null {
   const d = new Date(`${date}T${time}:00`)
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
+
+/** 店ごとの失敗の理由（口の failureReasons）。運用者の言葉の label と人数・やり直せるか。 */
+export function failureLines(run: Pick<HqBroadcastRun, 'targets'>): Array<{ accountId: string; store: string; text: string; retryable: boolean }> {
+  const lines: Array<{ accountId: string; store: string; text: string; retryable: boolean }> = []
+  for (const t of run.targets) {
+    if (t.excluded) continue
+    for (const f of t.failureReasons ?? []) {
+      lines.push({
+        accountId: t.accountId,
+        store: t.accountName,
+        text: `${f.label}${f.count > 0 ? `（${f.count.toLocaleString('ja-JP')}人）` : ''}${f.retryable ? '・やり直せます' : ''}`,
+        retryable: f.retryable,
+      })
+    }
+  }
+  return lines
+}
+
+/** 中身の種類（画面）と、配信用素材の種類（口）。 */
+export type HqKind = 'text' | 'coupon' | 'rich'
+export const ASSET_KIND = { coupon: 'coupon', rich: 'rich_message' } as const
