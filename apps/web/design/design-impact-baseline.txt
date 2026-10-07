@@ -554,6 +554,7 @@ shared-button-importer v8/hq/home.tsx
 shared-button-importer v8/hq/member-dialog.tsx
 shared-button-importer v8/hq/members.tsx
 shared-button-importer v8/hq/notice-line-dialog.tsx
+shared-button-importer v8/hq/settings.tsx
 shared-button-importer v8/hq/support-detail.tsx
 shared-button-importer v8/hq/support.tsx
 shared-button-importer v8/affiliates/frame.tsx

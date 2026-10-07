@@ -7,7 +7,7 @@
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左のタグの列（型のフォルダの列＋共通 FolderPanel）・
  * 数のカード4枚・探す欄と状態の札・カード／表の切り替え・並び・件数・アカウントのカード・件数と注。
  */
-import { CircleDot, Info, Inbox, LogIn, Plus, RotateCcw, Settings, Star, MessageCircle } from 'lucide-react'
+import { CircleDot, Inbox, LogIn, Plus, RotateCcw, Settings, Star, MessageCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ListPage } from '@/components/templates'
@@ -34,6 +34,7 @@ import { api, fetchApi, type LineAccountTag } from '@/lib/api'
 import { resolveStoreReturnPath } from '@/lib/hq-navigation'
 import { formatNumber } from '@/lib/format'
 import { useStaffRole } from '@/lib/staff-role'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs'
 import { connectionReasonLine } from './connection-reasons'
@@ -96,8 +97,13 @@ export default function HqHomeV8() {
   usePageTitle('アカウント')
   const router = useRouter()
   const role = useStaffRole()
-  const canManage = role === 'owner' || role === 'admin'
-  const isOwner = role === 'owner'
+  /*
+   * 運営が「閲覧のみ」で代理ログインしているあいだ（絵 VtJQ6）は、役割がオーナーでも変える口を出さない。
+   * サーバも書き込みを断る。決まり：閲覧のみには押せないボタンを置かず隠す（2026-10-06）。
+   */
+  const readOnlyImpersonation = readSessionSnapshot()?.impersonation?.mode === 'read'
+  const canManage = !readOnlyImpersonation && (role === 'owner' || role === 'admin')
+  const isOwner = !readOnlyImpersonation && role === 'owner'
   const { setSelectedAccountId, refreshAccounts } = useAccount()
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [tenantName, setTenantName] = useState('')
@@ -309,9 +315,10 @@ export default function HqHomeV8() {
   ) : null
   const selectTag = (id: string) => { setTag(id); resetPage() }
   const folders = (
-    <div className={styles.folderInset}>
+    <div className={styles.folderBox}>
       <FolderPanel
-        createAction={createAccount}
+        /* 閲覧のみで登録ボタンを隠したときも、その場所は空けておく（下のタグの列が上へ詰まらない。絵 VtJQ6）。 */
+        createAction={createAccount ?? <span className={styles.createSpace} aria-hidden="true" />}
         heading="タグ"
         rows={folderRows}
         activeId={tag}
@@ -329,7 +336,8 @@ export default function HqHomeV8() {
       return (
         <div className={styles.cardButtons}>
           <Button className={styles.grow} onClick={() => setEditingAccount(account)}>
-            <Info aria-hidden="true" className={styles.buttonIcon} />詳細
+            {/* 絵 JKjsE：「詳細」の印は log-in。 */}
+            <LogIn aria-hidden="true" className={styles.buttonIcon} />詳細
           </Button>
           {isOwner ? (
             <Button onClick={() => setArchiveTarget({ account, mode: 'restore' })}>
@@ -443,7 +451,7 @@ export default function HqHomeV8() {
             return (
               <article key={account.id} className={warned ? `${styles.card} ${styles.cardWarn}` : styles.card} aria-label={name}>
                 <div className={styles.cardHead}>
-                  <span className={styles.logo} aria-hidden="true">{brandInitial(name)}</span>
+                  <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <div className={styles.cardName}>
                     {/* 絵 `JKjsE`：名前の前に左の列（タグ）の色の丸。付けたタグが無ければ色の無い輪。 */}
                     <p className={styles.name} title={name}>
@@ -502,7 +510,7 @@ export default function HqHomeV8() {
             return (
               <div key={account.id} className={styles.row} role="row">
                 <span role="cell" className={styles.rowName}>
-                  <span className={styles.logo} aria-hidden="true">{brandInitial(name)}</span>
+                  <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <span className={styles.cardName}>
                     <span className={styles.name} title={name}>{name}</span>
                     <span className={styles.meta}>{metaOf(account)}</span>
@@ -533,12 +541,8 @@ export default function HqHomeV8() {
       boardId="JKjsE"
       title="統括のアカウント"
       description={`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}
-      actions={accounts.length > 0 && canManage ? (
-        <button type="button" className={`${styles.linkButton} ${styles.headAction}`} onClick={() => void refreshConnectionInfo()} disabled={checkingConnections || loading}>
-          {checkingConnections ? '接続情報を更新中…' : 'LINE ID・接続状態を更新する'}
-        </button>
-      ) : undefined}
       folders={folders}
+      folderInset
       folderNav={{ rows: folderRows, activeId: tag, onSelect: selectTag, createAction: createAccount, label: 'タグ' }}
     >
       <div className={styles.body}>

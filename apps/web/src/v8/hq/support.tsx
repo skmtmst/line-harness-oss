@@ -36,7 +36,7 @@ import {
 } from '@/lib/hq-support'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import NoticeLineDialogV8 from './notice-line-dialog'
-import { SUPPORT_STATUS_WORDS, supportTime } from './support-words'
+import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support.module.css'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
@@ -223,7 +223,7 @@ export default function HqSupportV8() {
                 value={input.kind}
                 disabled={sending}
                 onChange={(value) => set('kind', value as HqSupportKind | '')}
-                options={[{ value: '', label: '種類を選んでください' }, ...kinds.map((k) => ({ value: k.key, label: k.label }))]}
+                options={[{ value: '', label: '種類を選んでください' }, ...kinds.map((k) => ({ value: k.key, label: supportKindWord(k.key, k.label) }))]}
               />
             </Field>
             <Field label="関係する店舗" htmlFor={`${uid}-account`}>
@@ -344,7 +344,7 @@ export default function HqSupportV8() {
                       <span className={styles.replyNote}>運営からの返信 {item.replies.length}件・開いて続きを送れます</span>
                     ) : null}
                   </span>
-                  <span role="cell" className={styles.cell} title={item.kindLabel}>{item.kindLabel}</span>
+                  <span role="cell" className={styles.cell} title={item.kindLabel}>{supportKindWord(item.kind, item.kindLabel)}</span>
                   <span role="cell">
                     <span className={item.status === 'open' ? `${styles.pill} ${styles.pillInfo}` : `${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />{SUPPORT_STATUS_WORDS[item.status]}</span>
                   </span>

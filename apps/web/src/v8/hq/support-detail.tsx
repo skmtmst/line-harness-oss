@@ -28,7 +28,7 @@ import {
   type HqSupportRequest,
 } from '@/lib/hq-support'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
-import { SUPPORT_STATUS_WORDS, supportTime } from './support-words'
+import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support-detail.module.css'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
@@ -157,7 +157,7 @@ export default function HqSupportDetailV8() {
   usePageTitle(ticketLabel || 'お問い合わせ')
   usePageCrumbs(ticketLabel ? [{ label: '統括の設定', href: '/hq/settings' }, { label: 'お問い合わせ', href: '/hq/support' }] : [{ label: '統括の設定', href: '/hq/settings' }])
   const description = ready
-    ? [detail.ticketLabel, detail.kindLabel, accountName, `${supportTime(detail.createdAt)} に送信`].filter(Boolean).join(' ・ ')
+    ? [detail.ticketLabel, supportKindWord(detail.kind, detail.kindLabel), accountName, `${supportTime(detail.createdAt)} に送信`].filter(Boolean).join(' ・ ')
     : '問い合わせの内容と運営からの返事を確認します。'
 
   return (

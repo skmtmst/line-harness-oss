@@ -13,6 +13,7 @@ export default function StatusBadge({
   help,
   helpLabel,
   helpHref,
+  dot = true,
   ...props
 }: Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
   children: ReactNode
@@ -27,8 +28,13 @@ export default function StatusBadge({
   helpLabel?: string
   /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
   helpHref?: string
+  /**
+   * ★V8 の色の点。既定は出す。「変わる」のように状態ではなく変化の印として使う札は false
+   * （絵 `M4jS9` の「変わる」は点なしの札）。
+   */
+  dot?: boolean
 }) {
-  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : null, className]
+  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : null, dot ? null : styles.noDot, className]
     .filter(Boolean)
     .join(' ')
   const hasHelp = help !== undefined && help !== null

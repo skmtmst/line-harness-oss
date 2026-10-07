@@ -16,6 +16,7 @@ import { logoutAndGoToLogin } from '@/lib/logout'
 import { useManualHref } from '@/lib/use-manual-href'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import { setDocumentTitle } from '@/lib/document-title'
+import { canReturnToHqFrom } from '@/lib/hq-return'
 
 /**
  * 共通トップバーを、いまの画面の値へつなぐ層。
@@ -173,7 +174,7 @@ export default function AppTopBar() {
    * すでに統括の画面にいるときも押せない。
    */
   // 統括へ戻る口はオーナーと管理者に出す（管理者も統括を開ける。2026-10-07 オーナーの役割が管理者のため）
-  const canReturnToHq = (staffRole === 'owner' || staffRole === 'admin') && !pathname.startsWith('/hq') && !hqShell
+  const canReturnToHq = canReturnToHqFrom(staffRole, pathname, hqShell)
   const returnToHq = () => {
     requestUnsavedAction(() => {
       clearSelectedAccountId()
@@ -185,7 +186,8 @@ export default function AppTopBar() {
 
   /*
    * ★V8 店の画面から統括へ戻る口（絵 V8 `DIHFx/Psg7n`・オーナー 2026-10-07）。
-   * 統括の権限がある人（オーナー。役割の札から統括へ戻れる人と同じ）にだけ出す。
+   * 統括の権限がある人（オーナー・管理者）にだけ、切り替えの一覧のいちばん上に「統括に戻る」を出す。
+   * 帯の［統括へ］ボタンはやめ、左下の自分のメニューへまとめた（オーナー 2026-10-07）。
    * 店だけの担当には出さない。
    */
   const brand = useBrand()
@@ -246,6 +248,11 @@ export default function AppTopBar() {
       hq={hqPill}
       homeHref={hqShell ? '/hq' : '/'}
       hqReturn={hqReturn}
+      /*
+        ★V8：自分の名前・役割・ログアウトは左下の自分のメニューへ移した
+        （オーナー 2026-10-07・絵 zUg8S の zyFtB・l0VY4 を隠した）。v7 は今までどおり。
+      */
+      showIdentity={!isV8}
     />
     </div>
     {accountsLoadFailed ? (

@@ -9,10 +9,21 @@ const transport = vi.hoisted(() => {
   return { request: vi.fn(), ApiError }
 })
 vi.mock('./api', () => ({ fetchApi: transport.request, ApiError: transport.ApiError }))
-import { hqTemplatesApi, HqTemplatesApiError } from './hq-templates-api'
+import { hqTemplatesApi, HqTemplatesApiError, type HqTemplateListItem } from './hq-templates-api'
 const request = transport.request
 beforeEach(() => { request.mockReset(); request.mockResolvedValue({ success: true, data: { value: 'ok' } }) })
 describe('HQ template API transport', () => {
+  it('一覧の配布先名・残り件数・要約を共有型のまま返す', async () => {
+    const rows: HqTemplateListItem[] = [{ id: 't1', name: 'ご案内', description: null, template_type: 'template', revision: 1,
+      updated_at: '2026-10-07T00:00:00Z', distributed_account_names: ['本店','渋谷店','イベント'],
+      distributed_account_more: 2, distributed_account_count: 5, content_summary: '本文・画像 1' }];
+    request.mockResolvedValue({ success: true, data: rows });
+    const list = await hqTemplatesApi.list('template');
+    expect(list).toEqual(rows);
+    expect(request).toHaveBeenCalledWith('/api/hq/templates?type=template', { method: 'GET' });
+    request.mockResolvedValue({ success: true, data: [{ ...rows[0], content_summary: null }] });
+    expect((await hqTemplatesApi.list())[0].content_summary).toBeNull();
+  });
   it('配布先の版と作った名前を、既存の項目や件数を残して返す', async () => {
     const preflight = { preflightId: 'p1', expiresAt: '2026-10-07T00:00:00Z', stores: [{ accountId: 'a', accountName: '試験店舗',
       items: [], targetVersion: { version: 2, latestVersion: 2, status: 'latest', label: '版2（最新）' } }] };
