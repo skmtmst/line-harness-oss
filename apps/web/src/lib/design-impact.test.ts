@@ -241,6 +241,8 @@ describe('共通部品の影響範囲', () => {
       'v8/tags/marks-tab.tsx',
       // ★V8 友だち属性 保存した検索（IWnYX）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
       'v8/tags/searches-tab.tsx',
+      // ★V8 友だち属性 友だち情報欄（q5gbcM）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
+      'v8/tags/fields-tab.tsx',
       // ★V8 テンプレートの一覧（v19Ivv）。新しい置き場（src/v8）に一から書いた。
       'v8/templates/list.tsx',
       // ★V8 一斉配信の一覧（l5V9a）。新しい置き場（src/v8）に一から書いた。

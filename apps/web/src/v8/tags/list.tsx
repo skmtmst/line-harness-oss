@@ -4,14 +4,12 @@
  * ★V8 友だち属性の一覧（Pencil：タグ `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`）。
  *
  * 型（PageFrame・PageHeading）で板の頭・閲覧のみの帯・タブの段を組み、
- * 本文はタブごとに切り替える。タグのタブはこの場所の `tags-tab.tsx`。
- * 友だち情報欄・対応マーク・保存した検索のタブは、入口（app/tags/page.tsx）から
- * `renderTab` で受け取る（src/v8 は古い画面ファイルを import しないため）。
+ * 本文はタブごとに切り替える。どのタブもこの場所に一から書いた
+ * （tags-tab・fields-tab・marks-tab・searches-tab）。
  *
  * 受け付ける URL と指定は今と同じ：`/tags`・`/tags?tab=fields|marks|searches`・
  * 行の詳細は `?tag=<id>`。
  */
-import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, Plus, Upload } from 'lucide-react'
@@ -28,6 +26,7 @@ import Button from '@/components/shared/button'
 import TagsTab from './tags-tab'
 import MarksTab from './marks-tab'
 import SearchesTab from './searches-tab'
+import FieldsTab from './fields-tab'
 import styles from './list.module.css'
 
 const TABS = [
@@ -37,7 +36,6 @@ const TABS = [
   ['searches', '保存した検索'],
 ] as const
 export type TagsTabKey = (typeof TABS)[number][0]
-export type OtherTabKey = Exclude<TagsTabKey, 'tags'>
 
 /** タブと機能設定キーの対応（v7 `tags-page-v4.tsx` の TAB_FEATURE と同じ）。「タグ」は必須機能。 */
 const TAB_FEATURE: Partial<Record<TagsTabKey, FeatureKey>> = {
@@ -49,13 +47,10 @@ const TAB_FEATURE: Partial<Record<TagsTabKey, FeatureKey>> = {
 export default function TagsList({
   accountId = null,
   fixture,
-  renderTab,
 }: {
   accountId?: string | null
   /** 試験用の固定表示。渡すと読みに行かない。 */
   fixture?: { items: Tag[]; groups: TagGroup[] }
-  /** タグ以外のタブの本文。入口から渡す。 */
-  renderTab?: (tab: OtherTabKey, context: { accountId: string | null; canEdit: boolean }) => ReactNode
 }) {
   usePageTitle('友だち属性')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -88,7 +83,7 @@ export default function TagsList({
   const currentTabBlocked =
     !fixture && !!currentTabFeature && visibility.status === 'ready' && !visibility.enabled(currentTabFeature)
 
-  const boardId = tab === 'marks' ? 'vKDj5' : tab === 'searches' ? 'IWnYX' : tab !== 'tags' ? undefined : readOnly ? 'fkGUR' : narrow ? 'aPeD8' : 'I1E7Bt'
+  const boardId = tab === 'marks' ? 'vKDj5' : tab === 'searches' ? 'IWnYX' : tab === 'fields' ? 'q5gbcM' : tab !== 'tags' ? undefined : readOnly ? 'fkGUR' : narrow ? 'aPeD8' : 'I1E7Bt'
 
   /* 見出しの右はタブごとの作る口。 */
   const actions = currentTabBlocked ? null : tab === 'tags' ? (
@@ -151,7 +146,7 @@ export default function TagsList({
       ) : tab === 'searches' ? (
         <SearchesTab accountId={accountId} canEdit={canEdit} />
       ) : (
-        <div className={styles.otherTab}>{renderTab?.(tab, { accountId, canEdit })}</div>
+        <FieldsTab accountId={accountId} canEdit={canEdit} narrow={narrow} />
       )}
     </PageFrame>
   )

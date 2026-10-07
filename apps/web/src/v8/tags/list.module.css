@@ -610,3 +610,27 @@
   color: var(--color-ink-secondary);
   font-size: var(--tpl-tg2-safety-body-size);
 }
+
+/* ★V8 友だち情報欄のタブ（q5gbcM）：行58（名前19＋間2＋差し込み名13、上下12）。 */
+.fieldRow > td {
+  height: var(--tpl-tg2-field-row-h);
+  padding-block: 0;
+  vertical-align: middle;
+}
+
+.fieldColType { width: var(--tpl-tg2-field-col-type); }
+.fieldColPlace { width: var(--tpl-tg2-field-col-place); }
+
+/* 差し込み名は丸の分（16）下げて名前にそろえる。 */
+.fieldKey {
+  padding-inline-start: var(--tpl-folder-dot-indent);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--tpl-tg2-key-size);
+  line-height: var(--tpl-tg2-key-lh);
+}
+
+/* 道具の段の上の案内の帯（段の幅いっぱい、下の部品との間は絵の 14）。 */
+.toolbarBand {
+  flex-basis: 100%;
+  margin-bottom: var(--tpl-tg2-band-after);
+}

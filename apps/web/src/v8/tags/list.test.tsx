@@ -113,9 +113,10 @@ describe('V8 友だち属性 タグの一覧', () => {
   })
 
   it('タブを押すとそのタブの本文に切り替わる', async () => {
-    await render(<TagsList fixture={fixture} renderTab={(tab) => <p>本文:{tab}</p>} />)
-    await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '友だち情報欄' })) })
-    expect(screen.getByText('本文:fields')).toBeTruthy()
+    await render(<TagsList fixture={fixture} />)
+    await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '対応マーク' })) })
+    expect(container.querySelector('[data-design-node="vKDj5"]')).not.toBeNull()
+    expect(screen.getByText('対応マークを読み込めませんでした')).toBeTruthy()
   })
 
   it('連動は絵の書き方（本人+10・1.2倍 他1）', () => {
