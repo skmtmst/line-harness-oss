@@ -20,6 +20,8 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useTenantStatus } from '@/components/tenant-access-context'
 import { api } from '@/lib/api'
 import { readFileAsBase64 } from '@/lib/hq-banners'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   EMPTY_SUPPORT_INPUT,
   SUPPORT_ATTACHMENT_MAX,
@@ -158,6 +160,15 @@ export default function HqSupportV8() {
     }
   }
 
+  /*
+   * 書きかけの件名・内容・添えた画像は送るまで画面にしか無い。左の列やメニューで離れると
+   * 消えるので、離れる前に確かめる。送る・消すで空になると外れる（種類・アカウントの選択だけでは出さない）。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: input.subject.trim() !== '' || input.body.trim() !== '' || attachments.length > 0,
+    busy: sending,
+  })
+
   const clear = () => {
     setInput(EMPTY_SUPPORT_INPUT)
     attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl))
@@ -176,6 +187,8 @@ export default function HqSupportV8() {
       <div className={styles.body}>
         {/* 契約者専用LINEの登録案内（2026-09-18 決定：ここからもいつでも開ける。開いた状態が板 D6fh3） */}
         {!tenantUnavailable ? <NoticeLineDialogV8 open={lineGuide} onClose={() => setLineGuide(false)} /> : null}
+
+        <UnsavedLeaveDialog open={leaveTarget !== null} subject="書きかけの問い合わせ" onConfirm={confirmLeave} onCancel={cancelLeave} />
 
         {/* 送信完了の知らせ（2026-09-18 決定：帯だけでは気づきにくいので、窓で止めて伝える） */}
         <Dialog

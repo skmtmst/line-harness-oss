@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const stores = readFileSync(new URL('./stores/store-list.tsx', import.meta.url), 'utf8')
+// 旧一覧の転送の部品（stores/store-list.tsx）はどこからも読まれないので 2026-10-07 に消した。転送は stores/page.tsx の redirect が担う。
 const wizard = readFileSync(new URL('./stores/new/page.tsx', import.meta.url), 'utf8')
 const terms = readFileSync(new URL('./terms/page.tsx', import.meta.url), 'utf8')
 const banner = readFileSync(new URL('./stores/store-context-banner.tsx', import.meta.url), 'utf8')
@@ -18,7 +18,6 @@ describe('飲食店向けHQと店舗追加動線', () => {
     // D-3: 旧URLを消さず、店舗の一覧と追加の正本だけを1か所にする。
     expect(index).toContain("redirect('/hq')")
     expect(storesPage).toContain("redirect('/hq')")
-    expect(stores).toContain("router.replace('/hq')")
     /*
       2026-09-04: `/accounts` と `/accounts/new` の転送はどちらもやめた。
       **統括の店舗管理と、LINE公式アカウントの設定は別のもの。**
