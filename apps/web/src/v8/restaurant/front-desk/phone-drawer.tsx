@@ -223,6 +223,8 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
         </div>
         <div className={styles.field}>
           <span className={styles.label} id="e2-times">時刻（空いている時刻だけ）</span>
+          {/* 時刻の札が1行出る高さを先に取る（空きが無い日・日付を選ぶ前でも下の卓・メモが上下しない）。 */}
+          <div className={styles.timeBox}>
           {!date ? (
             <p className={styles.hint}>日付を選ぶと空いている時刻が出ます。</p>
           ) : times.filter(freeAt).length === 0 ? (
@@ -234,6 +236,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
               ))}
             </div>
           )}
+          </div>
         </div>
         <div className={styles.tableRow}>
           <div className={styles.tableText}>
