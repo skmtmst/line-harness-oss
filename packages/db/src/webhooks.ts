@@ -88,6 +88,8 @@ export interface OutgoingWebhookDeliverySummaryRow {
 }
 
 export interface OutgoingWebhookRow {
+  version?: number;
+  updated_by_staff_id?: string | null;
   id: string;
   name: string;
   url: string;
@@ -1362,7 +1364,8 @@ export async function updateOutgoingWebhook(
     maxRetries: number;
   }>,
   keys?: WebhookKeyInput | string,
-): Promise<void> {
+  options: { expectedVersion?: number; updatedByStaffId?: string } = {},
+): Promise<boolean> {
   const sets: string[] = [];
   const values: unknown[] = [];
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
@@ -1382,13 +1385,21 @@ export async function updateOutgoingWebhook(
     if (updates.isActive) sets.push('auto_stopped_at = NULL');
   }
   if (updates.maxRetries !== undefined) { sets.push('max_retries = ?'); values.push(updates.maxRetries); }
-  if (sets.length === 0) return;
+  if (sets.length === 0) {
+    const current = await getOutgoingWebhookById(db, id, lineAccountId);
+    return Boolean(current && (options.expectedVersion === undefined || current.version === options.expectedVersion));
+  }
+  sets.push('version = version + 1', 'updated_by_staff_id = ?');
+  values.push(options.updatedByStaffId ?? null);
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
   values.push(lineAccountId);
-  await db.prepare(`UPDATE outgoing_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
+  const versionClause = options.expectedVersion === undefined ? '' : ' AND version = ?';
+  if (options.expectedVersion !== undefined) values.push(options.expectedVersion);
+  const result = await db.prepare(`UPDATE outgoing_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL${versionClause}`)
     .bind(...values).run();
+  return (result.meta.changes ?? 0) > 0;
 }
 
 /** N-368 (#939): 受信側と同じく、削除は履歴を残す印。返り値は印を付けられたか。 */
