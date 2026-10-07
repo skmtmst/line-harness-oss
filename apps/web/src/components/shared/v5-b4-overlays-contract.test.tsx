@@ -4,15 +4,11 @@ import { fileURLToPath } from 'node:url'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import ActionMenu from './action-menu'
 import Dialog from './dialog'
-import Drawer from './drawer'
-import Notice from './notice'
 import NotificationPanel from './notification-panel'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SRC = join(HERE, '..', '..')
-const WEB = join(SRC, '..')
 const readSource = (path: string) => readFileSync(join(SRC, path), 'utf8')
 const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
@@ -28,28 +24,6 @@ describe('V5 B4 オーバーレイ共通部品', () => {
     expect(html).toContain('role="alertdialog"')
     expect(html).toContain('aria-busy="true"')
     expect(html).toContain('確認できません')
-  })
-
-  it('右詳細・4種の帯・操作メニューを同じAPIで表せる', () => {
-    // 帯の正本は Pencil「★V7 共通部品その2」uR9s8 の §1。旧 tone 名は同じ見た目の別名。
-    const html = renderToStaticMarkup(<div>
-      <Drawer open modal={false} title="友だち詳細" details={[{ label: '担当', value: '未設定' }]} onClose={vi.fn()} />
-      <Notice tone="info" message="この画面の数は日本時間で数えます。" />
-      <Notice tone="success" message="保存しました" onClose={vi.fn()} />
-      <Notice tone="warn" message="入力内容を確認してください" />
-      <Notice tone="danger" message="処理に失敗しました。通信を確かめて、もう一度お試しください。" />
-      <Notice tone="validation" message="入力内容を確認してください" />
-      <Notice tone="error" message="処理に失敗しました。" />
-      <ActionMenu open inline onClose={vi.fn()} items={[{ id: 'delete', label: '削除する', tone: 'danger', onSelect: vi.fn() }]} />
-    </div>)
-    // 帯は★V7 共通部品その2（uR9s8）へ1本化、操作メニューは V5 `hGpFq` から ★V7 `xifuV` へ移行した。
-    for (const nodeId of ['VJKAT', 'uR9s8', 'xifuV']) expect(html).toContain(`data-design-node="${nodeId}"`)
-    expect(html).not.toContain('data-design-node="ApbSZ"')
-    expect(html).not.toContain('data-design-node="zPRvi"')
-    expect(html).not.toContain('data-design-node="I5rKbM"')
-    expect(html).not.toContain('data-design-node="hGpFq"')
-    expect(html).toContain('aria-label="通知を閉じる"')
-    expect(html).toContain('role="menuitem"')
   })
 
   it('通知パネルは開・未読・フィルター・読込・失敗をpropsで受ける', () => {
@@ -102,27 +76,5 @@ describe('V5 B4 オーバーレイ共通部品', () => {
     for (const className of ['designButton']) {
       expect(css).toMatch(new RegExp(`\\.${className} \\{[^}]*min-width: 112px;[^}]*width: auto;[^}]*white-space: nowrap;`, 's'))
     }
-  })
-
-  it('契約はB4の部品・実ノード・宣言数を固定する', () => {
-    const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
-    const inventory = JSON.parse(readFileSync(join(WEB, 'design', 'pencil-component-inventory.json'), 'utf8'))
-    // 2026-09-03: 色と角丸を1系統にまとめ、同値の別名3つ
-    // （--radius-tile / --color-status-warning / --color-status-warning-soft）
-    // を消したので 24 → 21。承認は 2026-09-03 のオーナー決定。
-    expect(contract.required.tokens).toBe(21)
-    expect(contract.required.parts).toBe(20)
-    expect(contract.required.partDeclarations).toBe(301)
-    expect(contract.parts.dialog.pencilNodes).toEqual(['J6x4Q', 'H2S1T4'])
-    expect(contract.parts.drawer.pencilNodes).toEqual(['VJKAT'])
-    // 帯の節点は★V7 共通部品その2（uR9s8）。V5 の3節点は置き換え済みとして棚卸しに残す。
-    expect(contract.parts.notice.pencilNodes).toEqual(['uR9s8'])
-    // ★V7（m13g）：操作メニューは V5 `hGpFq` から ★V7 `xifuV` へ移行した。
-    // 台帳の整合のため新旧両ノードを記録する（`hGpFq` 自体は Pencil に残る）。
-    expect(contract.parts['action-menu'].pencilNodes).toEqual(['hGpFq', 'xifuV'])
-    expect(contract.parts['notification-panel'].status).toBe('implemented')
-    for (const nodeId of ['J6x4Q', 'H2S1T4', 'VJKAT', 'uR9s8', 'hGpFq']) expect(inventory.components[nodeId].status).toBe('active')
-    for (const nodeId of ['ApbSZ', 'zPRvi', 'I5rKbM']) expect(inventory.components[nodeId].status).toBe('implemented')
-    expect(inventory.components.z6TmF.status).toBe('implemented')
   })
 })

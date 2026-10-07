@@ -82,6 +82,7 @@ import {
 } from '@/components/broadcasts/broadcast-approval'
 import type { BroadcastApprovalCandidate } from '@/lib/api'
 import { formatDateTime, formatDay, formatNumber, formatRelative, formatTime } from '@/lib/format'
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
@@ -1395,9 +1396,7 @@ export default function BroadcastForm({
   /** 予約の日時。JST で入れてもらい、UTC に直して送る。 */
   const scheduledAtIso = (): string | null => {
     if (sendMode !== 'scheduled' || !scheduledDate) return null
-    const [h, m] = scheduledTime.split(':').map(Number)
-    const [y, mo, d] = scheduledDate.split('-').map(Number)
-    return new Date(Date.UTC(y, mo - 1, d, h - 9, m)).toISOString()
+    return datetimeLocalJstToUtcIso(`${scheduledDate}T${scheduledTime}`)
   }
 
   const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => {

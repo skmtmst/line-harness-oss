@@ -68,8 +68,9 @@
 /* 右の列：操作（一斉配信で使う・複製する は同じ幅、…は36角）。 */
 .sideActions { display: flex; gap: var(--tpl-eds-side-actions-gap); }
 .sideActions > :not(.moreButton) { flex: 1 1 0; min-width: 0; }
-.moreButton { display: inline-flex; flex: 0 0 var(--tpl-eds-more); align-items: center; justify-content: center; height: var(--tpl-eds-more); padding: 0; border: 0; border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); color: var(--color-ink); cursor: pointer; }
-.moreButton:hover { background: var(--color-surface-pearl); }
+/* 「…」は共通の RowMenu。絵の色（墨）と大きさを共通の印ボタンより強く当てる。 */
+.sideActions > button.moreButton { display: inline-flex; width: var(--tpl-eds-more); flex: 0 0 var(--tpl-eds-more); align-items: center; justify-content: center; height: var(--tpl-eds-more); padding: 0; border: 0; border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); color: var(--color-ink); cursor: pointer; }
+.sideActions > button.moreButton:hover { background: var(--color-surface-pearl); }
 .aboutBox { display: flex; flex-direction: column; gap: var(--tpl-eds-about-gap); padding: var(--tpl-eds-about-pad); border-radius: var(--radius-card); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 .aboutTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-eds-band-title-lh); }
 .aboutList { display: flex; flex-direction: column; gap: var(--tpl-eds-about-gap); margin: 0; }

@@ -13,6 +13,9 @@ const Affiliate = lazy(() => import('./pages/Affiliate.js'));
 const Webinar = lazy(() => import('./pages/Webinar.js'));
 const Form = lazy(() => import('./pages/Form.js'));
 const EventWaitlistOffer = lazy(() => import('./pages/EventWaitlistOffer.js'));
+const VisitStamps = lazy(() => import('./pages/VisitStamps.js'));
+const SeatReserve = lazy(() => import('./pages/seat/SeatReserve.js'));
+const NotFound = lazy(() => import('./pages/NotFound.js'));
 
 function Loading() {
   return <LoadingView />;
@@ -39,17 +42,13 @@ export default function App() {
         <Route path="/events/:id/done" element={<EventDone />} />
         <Route path="/events/:id" element={<Event />} />
         <Route path="/affiliate" element={<Affiliate />} />
+        <Route path="/visit-stamps" element={<VisitStamps />} />
         <Route path="/webinar/:slug" element={<Webinar />} />
         <Route path="/forms/:id" element={<Form />} />
+        <Route path="/restaurant/reserve/:token" element={<SeatReserve />} />
         <Route path="/" element={<Navigate to="/booking" replace />} />
-        <Route
-          path="*"
-          element={
-            <div className="p-8 text-center text-gray-500">
-              ページが見つかりませんでした
-            </div>
-          }
-        />
+        {/* どの住所にも当たらないとき（板 aLU3r）。 */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );

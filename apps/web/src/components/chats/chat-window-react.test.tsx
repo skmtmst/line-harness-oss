@@ -29,6 +29,15 @@ function stubLayout(withViewport: boolean) {
     configurable: true,
     get() { return (this as HTMLElement).hasAttribute('data-vw-key') ? 50 : 0 },
   })
+  // 欄の中身の高さ（下にいるかの判定に使う）。行の数 × 50px。
+  const scrollHeight = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollHeight')
+  Object.defineProperty(Element.prototype, 'scrollHeight', {
+    configurable: true,
+    get() {
+      const feed = (this as Element).hasAttribute('data-test-scroller') ? (this as Element).querySelector('[data-loaded]') : null
+      return feed ? Number(feed.getAttribute('data-loaded')) * 50 : 0
+    },
+  })
   // 位置：欄の上端を 0 とし、行 i は i*50 - scrollTop に置く（行の高さ 50px）。
   const rect = Element.prototype.getBoundingClientRect
   const scrollTopDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop')
@@ -50,6 +59,8 @@ function stubLayout(withViewport: boolean) {
   restore.push(() => {
     if (client) Object.defineProperty(HTMLElement.prototype, 'clientHeight', client)
     if (offset) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offset)
+    if (scrollHeight) Object.defineProperty(Element.prototype, 'scrollHeight', scrollHeight)
+    else delete (Element.prototype as unknown as Record<string, unknown>).scrollHeight
     if (scrollTopDesc) Object.defineProperty(Element.prototype, 'scrollTop', scrollTopDesc)
     Element.prototype.getBoundingClientRect = rect
   })
@@ -66,7 +77,9 @@ afterEach(() => {
 
 const messages = Array.from({ length: 1000 }, (_, i) => ({ id: `m${i}`, text: `本文 ${i}` }))
 
-function Thread({ hasMore, onLoadOlder = () => {} }: { hasMore: boolean; onLoadOlder?: () => void }) {
+function Thread({ hasMore, onLoadOlder = () => {}, total, scrollToId, scrollSeq }: {
+  hasMore: boolean; onLoadOlder?: () => void; total?: number; scrollToId?: string | null; scrollSeq?: number
+}) {
   const ref = useRef<HTMLDivElement | null>(null)
   return (
     <div ref={ref} data-test-scroller="" style={{ overflowY: 'auto', height: 400 }}>
@@ -77,6 +90,9 @@ function Thread({ hasMore, onLoadOlder = () => {} }: { hasMore: boolean; onLoadO
         loadingOlder={false}
         onLoadOlder={onLoadOlder}
         renderMessage={(m) => <span>{m.text}</span>}
+        total={total}
+        scrollToId={scrollToId}
+        scrollSeq={scrollSeq}
       />
     </div>
   )
@@ -105,6 +121,31 @@ describe('吹き出しの窓分け', () => {
     await act(async () => { view = render(<Thread hasMore />) })
     const last = [...view.container.querySelectorAll('[role="article"]')].pop()
     expect(last?.getAttribute('aria-setsize')).toBe('-1')
+  })
+
+  test('全件数（API-9 の total）があれば、前がまだあっても本当の数で伝える', async () => {
+    stubLayout(false)
+    let view!: ReturnType<typeof render>
+    await act(async () => { view = render(<Thread hasMore total={5000} />) })
+    const rows = view.container.querySelectorAll('[role="article"]')
+    // 読み込んだ 1,000 個は新しい方の 1,000 個＝4,001〜5,000 件目
+    expect(rows[0].getAttribute('aria-posinset')).toBe('4001')
+    expect(rows[rows.length - 1].getAttribute('aria-posinset')).toBe('5000')
+    expect(rows[rows.length - 1].getAttribute('aria-setsize')).toBe('5000')
+  })
+
+  test('会話の中を探す：当たりの吹き出しを欄の真ん中へ出す（窓の外でも）', async () => {
+    stubLayout(true)
+    let view!: ReturnType<typeof render>
+    await act(async () => { view = render(<Thread hasMore={false} />) })
+    expect(view.container.querySelector('[data-index="10"]')).toBeNull()
+    await act(async () => { view.rerender(<Thread hasMore={false} scrollToId="m10" scrollSeq={1} />) })
+    // 送った位置で描き直す（スクロールの知らせの代わり）
+    const scroller = view.container.querySelector<HTMLElement>('[data-test-scroller]')!
+    await act(async () => { scroller.dispatchEvent(new Event('scroll')); await new Promise((r) => requestAnimationFrame(() => r(null))) })
+    expect(view.container.querySelector('[data-index="10"]')).not.toBeNull()
+    // 行 10 の上端 500 − (400 − 50) / 2 = 325
+    expect(scroller.scrollTop).toBe(325)
   })
 
   test('↑ で1つ前の吹き出しへ移る', async () => {

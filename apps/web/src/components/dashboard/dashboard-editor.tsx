@@ -49,6 +49,8 @@ import {
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 
@@ -131,6 +133,8 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
   onToggle: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+  /* V8 は説明文どおりスイッチ（絵 mcOqK・部品 トグル/オン・オフ）。v7 はチェックの箱のまま。 */
+  const theme = useAdminTheme()
   const style = { transform: CSS.Transform.toString(transform), transition }
 
   return (
@@ -166,12 +170,16 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
           <ChevronDown aria-hidden="true" className="h-4 w-4" />
         </button>
       </div>
-      <Checkbox
-        checked={item.visible}
-        onCheckedChange={onToggle}
-        aria-label={`${definition.label}を${item.visible ? '非表示' : '表示'}にする`}
-        className="shrink-0"
-      />
+      {theme === 'v8' ? (
+        <Toggle checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} />
+      ) : (
+        <Checkbox
+          checked={item.visible}
+          onCheckedChange={onToggle}
+          aria-label={`${definition.label}を${item.visible ? '非表示' : '表示'}にする`}
+          className="shrink-0"
+        />
+      )}
     </div>
   )
 }

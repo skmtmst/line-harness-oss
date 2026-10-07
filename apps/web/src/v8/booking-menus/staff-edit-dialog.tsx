@@ -82,7 +82,7 @@ export function StaffEditModal({
       <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="booking-staff-modal-title" className="bg-canvas rounded-card shadow-float w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
           <h2 id="booking-staff-modal-title" className="text-base font-semibold">{form.id ? 'スタッフ編集' : '新規スタッフ'}</h2>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+          <button type="button" onClick={onClose} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
@@ -174,6 +174,7 @@ export function StaffEditModal({
         <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">
           <button
             onClick={onClose}
+            disabled={saving}
             className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-shell-gray rounded-control"
           >
             キャンセル

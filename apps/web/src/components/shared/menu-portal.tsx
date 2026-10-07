@@ -22,8 +22,15 @@ export type MenuPortalProps = {
   matchWidth?: boolean | 'min'
   /** 外を押した・Esc で閉じるとき。開くボタンの押下は含まない。 */
   onClose: () => void
+  /**
+   * 位置だけ別の箱に合わせるとき（ベルの小窓は上の帯の右端から 8 内側・帯の下）。
+   * 外を押したかの判定は getAnchor のまま（開くボタンの押下は外にしない）。
+   */
+  getPositionRect?: () => MenuPortalRect | null
   children: ReactNode
 }
+
+export type MenuPortalRect = Pick<DOMRect, 'top' | 'bottom' | 'left' | 'right' | 'width'>
 
 type Geometry = {
   top: number
@@ -72,6 +79,7 @@ export default function MenuPortal({
   gap = 4,
   matchWidth = false,
   onClose,
+  getPositionRect,
   children,
 }: MenuPortalProps) {
   const [mounted, setMounted] = useState(false)
@@ -82,6 +90,8 @@ export default function MenuPortal({
   closeRef.current = onClose
   const anchorRef = useRef(getAnchor)
   anchorRef.current = getAnchor
+  const positionRef = useRef(getPositionRect)
+  positionRef.current = getPositionRect
 
   useLayoutEffect(() => {
     setMounted(true)
@@ -93,7 +103,7 @@ export default function MenuPortal({
       const anchor = anchorRef.current()
       const panel = panelRef.current
       if (!anchor || !panel) return
-      const anchorRect = anchor.getBoundingClientRect()
+      const anchorRect = positionRef.current?.() ?? anchor.getBoundingClientRect()
       const panelWidth = matchWidth === true ? anchorRect.width : panel.offsetWidth
       const minWidth = matchWidth === 'min' ? anchorRect.width : undefined
       // 上限で切った後の高さではなく中身の全部の高さで開く向きを決める。

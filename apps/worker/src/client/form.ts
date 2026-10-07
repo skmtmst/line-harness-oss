@@ -20,6 +20,7 @@ import {
   toFormIdempotencyKey,
   type FormIdempotencyKey,
 } from '@line-crm/shared';
+import { customerMessage } from './customer-message.js';
 
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
@@ -439,7 +440,7 @@ function render(): void {
           </div>
           <form id="liff-form" class="form-body" novalidate>
             ${xFieldHtml}
-            <button type="submit" class="submit-btn" id="submitBtn">X Harness を受け取る</button>
+            <button type="submit" class="submit-btn" id="submitBtn">受け取る</button>
           </form>
         </div>
       </div>
@@ -924,7 +925,7 @@ async function submitForm(): Promise<void> {
         ? '送信の有効期限が切れました。もう一度送る場合は下のボタンから送り直してください。'
         : '送信済みの内容と異なるため、そのままでは送れません。別の回答として送る場合は下のボタンから送り直してください。';
     } else {
-      errEl.textContent = err instanceof Error ? err.message : '送信に失敗しました';
+      errEl.textContent = customerMessage(err, '送信に失敗しました');
     }
     const btn = document.getElementById('submitBtn');
     btn?.parentElement?.insertBefore(errEl, btn);
@@ -1311,6 +1312,8 @@ export async function initForm(formId: string | null): Promise<void> {
     }
 
     state.formDef = json.data;
+    // ブラウザ・LINE の上の帯に出る題。フォームの名前（1行目）にする。
+    document.title = json.data.name.split(/\\n|\n/)[0] || document.title;
 
     // Use only the trusted origin derived from the stored webhook. The raw
     // webhook path/query and secret headers never reach the browser.
@@ -1336,6 +1339,8 @@ export async function initForm(formId: string | null): Promise<void> {
       body: JSON.stringify({}),
     }).catch(() => { /* silent */ });
   } catch (err) {
-    renderFormError(err instanceof Error ? err.message : 'エラーが発生しました');
+    // 内部の英語の文（通信の失敗など）はお客さまに出さない。
+    console.error(err);
+    renderFormError('フォームを読み込めませんでした。時間をおいて、もう一度開いてください。');
   }
 }

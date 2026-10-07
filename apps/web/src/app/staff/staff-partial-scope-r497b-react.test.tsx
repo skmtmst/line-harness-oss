@@ -154,9 +154,9 @@ describe('R497b 一部だけ許可の表示と保存', () => {
 
   test('右欄の「出さない」数に一部行を数えず、一部の行を別に示す', async () => {
     await openScopeView()
-    // 機能10行のうち出るのは受信箱だけ、一部（分析）はどちらにも数えない。
+    // 機能11行（来店スタンプを含む）のうち出るのは受信箱だけ、一部（分析）はどちらにも数えない。
     expect(screen.getByText(/メニューに出るのは1項目/)).toBeTruthy()
-    expect(screen.getByText(/出さないのは8項目/)).toBeTruthy()
+    expect(screen.getByText(/出さないのは9項目/)).toBeTruthy()
     expect(screen.getByText(/一部だけ許可が1行あります/)).toBeTruthy()
   })
 

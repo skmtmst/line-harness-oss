@@ -1,0 +1,3 @@
+# musubo の管理画面・お客さま向け画面は検索に出さない。
+User-agent: *
+Disallow: /

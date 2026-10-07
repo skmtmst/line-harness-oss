@@ -537,7 +537,7 @@ export default function AffiliatorsTab() {
               </Td>
               <Td className={styles.colName}>
                 <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
-                  <FolderDotName folder={folderDotOf(row)} dot={!narrow}>
+                  <FolderDotName folder={folderDotOf(row)}>
                     {nameButton(row)}
                   </FolderDotName>
                   <span className={styles.rowCode} title={row.code}>{row.code}</span>
@@ -627,6 +627,7 @@ export default function AffiliatorsTab() {
         </Button>
       }
       stats={stats}
+      folderNav={{ rows: GROUPS.map((item) => ({ id: item.key, label: item.label })), activeId: group, onSelect: (id) => resetPage(() => { setSaved(''); setGroup(id as GroupKey) }), createAction: readonly ? undefined : createButton(false) }}
       folders={narrow ? undefined : <>{createButton(true)}{folderPanel}</>}
       toolbar={toolbar}
       pagination={pager}

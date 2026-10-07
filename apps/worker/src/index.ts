@@ -1,4 +1,16 @@
+import { autoReplyUnmatched } from './routes/auto-reply-unmatched.js';
+import { instagram } from './routes/instagram.js';
+import { purgeInstagramTransientData } from './services/instagram.js';
+import { restaurantCustomerBooking } from './routes/restaurant-customer-booking.js';
+import { processRestaurantCustomerNotices } from './services/restaurant-customer-booking.js';
+import { chatMessages } from './routes/chat-messages.js';
+import { scenarioDrafts, purgeExpiredScenarioDrafts } from './routes/scenario-drafts.js';
+import { broadcastMediaDirect } from './routes/broadcast-media-direct.js';
+import { hqBroadcasts } from './routes/hq-broadcasts.js';
+import { visitStamps } from './routes/visit-stamps.js';
+import { processVisitStampQueue } from './services/visit-stamps.js';
 import { Hono, type Context } from 'hono';
+import { noindexHeaderMiddleware, robotsTxtHandler } from './lib/robots.js';
 import { cors } from 'hono/cors';
 import { LineClient } from '@line-crm/line-sdk';
 import {
@@ -61,6 +73,7 @@ import { tags } from './routes/tags.js';
 import { scenarios } from './routes/scenarios.js';
 import { broadcasts } from './routes/broadcasts.js';
 import { broadcastApprovals } from './routes/broadcast-approvals.js';
+import { chatAttachments } from './routes/chat-attachments.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
 import { lineAccountTags } from './routes/line-account-tags.js';
@@ -324,6 +337,12 @@ export type Env = {
     ADMIN_COOKIE_SAMESITE?: string; // Optional override: 'Strict' | 'Lax' | 'None'
     ADMIN_ALLOW_CROSS_SITE?: string; // 'true' opts into SameSite=None cross-site cookies
     X_HARNESS_URL?: string;  // Optional: X Harness API URL for account linking
+    META_APP_ID?: string;
+    META_APP_SECRET?: string;
+    META_REDIRECT_URI?: string;
+    META_GRAPH_API_VERSION?: string;
+    META_TOKEN_ENCRYPTION_KEY?: string;
+    META_WEBHOOK_VERIFY_TOKEN?: string;
     IG_HARNESS_URL?: string;  // Optional: IG Harness API URL for cross-platform linking
     IG_HARNESS_LINK_SECRET?: string;  // Shared secret for IG Harness link-line webhook
     // Phase 5 self-update — consumed by /admin/update/*. Defaults live in
@@ -344,6 +363,12 @@ export type Env = {
     D1_DATABASE_ID?: string;
     MANIFEST_URL?: string;
     WORKER_PUBLIC_URL?: string;
+    /**
+     * Comma-separated extra origins that reach this same Worker (for example
+     * its workers.dev address). A LINE webhook registered on one of them is
+     * treated as pointing at this environment.
+     */
+    WORKER_ALIAS_URLS?: string;
     ADMIN_PUBLIC_URL?: string;
     LIFF_PUBLIC_URL?: string;
     // Google Calendar booking sync. Store the private key as a Worker secret.
@@ -433,6 +458,10 @@ export const ADMIN_REQUEST_HEADERS = [
 // same-origin requests and origins on the ADMIN_ORIGIN allowlist; everything
 // else gets no Access-Control-Allow-Origin header (browser blocks it). Bearer
 // SDK/MCP callers send no Origin header and are unaffected.
+// 検索に出さない：本物の robots.txt と、全部の応答に X-Robots-Tag（リリース前点検 2026-10-07）。
+app.use('*', noindexHeaderMiddleware);
+app.get('/robots.txt', robotsTxtHandler);
+
 // 段ごとの経過時間を Server-Timing で返す（V6R-CX-a）。ログイン済みの職員への応答だけ。
 app.use('*', timingStart());
 app.use('*', cors({
@@ -478,6 +507,7 @@ app.route('/', webhook);
 app.route('/', gettingStarted);
 app.route('/', recipes);
 app.route('/', hqTemplates);
+app.route('/', hqBroadcasts);
 app.route('/', ops);
 app.route('/', manualLinks);
 app.route('/', errorMessages);
@@ -491,11 +521,14 @@ app.route('/', duplicates);
 app.route('/', friends);
 app.route('/', tags);
 app.route('/', scenarios);
+app.route('/', scenarioDrafts);
 // NOTE: 承認の口（approval-threshold 等の固定名）は :id より先に載せる。
 // broadcasts の PUT /:id が先だと approval-threshold を id と読んで404になる。
 app.route('/', broadcastApprovals);
 app.route('/', broadcasts);
+app.route('/', chatAttachments);
 app.route('/', broadcastMessageAssets);
+app.route('/', broadcastMediaDirect);
 app.route('/', users);
 app.route('/', lineAccountTags);
 app.route('/', lineAccounts);
@@ -520,6 +553,7 @@ app.route('/', scoring);
 app.route('/', actionScoreRules);
 app.route('/', templates);
 app.route('/', chats);
+app.route('/', chatMessages);
 app.route('/', conversations);
 app.route('/', notificationCenter);
 // 運用者通知ルール(/api/notifications/rules)。2026-08-29 の下書き画面がこの経路を呼ぶが、
@@ -544,6 +578,7 @@ app.route('/', access);
 app.route('/', capabilities);
 app.route('/', images);
 app.route('/', setup);
+app.route('/', autoReplyUnmatched);
 app.route('/', autoReplies);
 app.route('/', autoReplyRuns);
 app.route('/', adminAuth);
@@ -561,6 +596,7 @@ app.route('/', profileRefresh);
 app.route('/', richMenuGroups);
 app.route('/', webinarRoutes);
 app.route('/', instagramEngagement);
+app.route('/', instagram);
 // LINE Messaging API 互換プロキシ — 外部エージェントの直接送信を messages_log に残す
 app.route('/', lineProxy);
 // EC-CUBEの取引イベント。管理者認証ではなく署名・時刻・重複IDで検証する。
@@ -589,7 +625,9 @@ app.route('/', analyticsExports);
 app.route('/', dashboard);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
+app.route('/', visitStamps);
 app.route('/', restaurantTest);
+app.route('/', restaurantCustomerBooking);
 app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
 app.route('/', restaurantGooglePosts);
@@ -1366,8 +1404,14 @@ async function runFrequentHeavyJobs(
   for (const account of dbAccounts) {
     if (account.is_active) lineClients.set(account.id, new LineClient(account.channel_access_token));
   }
+  try {
+    const { processAutoReplyDeliveries } = await import('./services/auto-reply-delivery.js');
+    await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
+  } catch (error) { console.error('delayed auto reply error:',error); }
+
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'API draft and integration retention',run:async()=>{const now=new Date(event.scheduledTime);await purgeExpiredScenarioDrafts(env.DB,now);await purgeInstagramTransientData(env.DB,now);}},
     {name:'booking waitlist expiry and promotion',run:async()=>{const {processBookingWaitlists}=await import('./services/waitlist-tick.js');await processBookingWaitlists(env);}},
     {
       name: 'follower import continuation',
@@ -1634,6 +1678,7 @@ async function runFrequentHeavyJobs(
         }
       },
     },
+    { name: 'visit stamps', run: () => processVisitStampQueue(env) },
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
       name: 'broadcast insights',
@@ -1682,6 +1727,7 @@ async function runFrequentHeavyJobs(
         await expireRestaurantHolds(dbFor(env), new Date(event.scheduledTime).toISOString());
         const { processRestaurantInventoryRuleQueue } = await import('./services/restaurant-inventory-rules.js');
         await processRestaurantInventoryRuleQueue(env);
+        await processRestaurantCustomerNotices(env);
         await applyDueRestaurantMenuPrices(dbFor(env));
       },
     });
@@ -2065,6 +2111,11 @@ async function scheduled(
   } catch (error) {
     console.error('outgoing webhook delivery sweep error:', error);
   }
+
+  try {
+    const { processAutoReplyDeliveries } = await import('./services/auto-reply-delivery.js');
+    await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
+  } catch (error) { console.error('delayed auto reply error:',error); }
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const dispatchObservedAt = new Date(event.scheduledTime).toISOString();

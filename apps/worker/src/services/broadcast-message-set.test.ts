@@ -84,11 +84,11 @@ describe('一斉配信の複数吹き出し契約', () => {
       },
       {
         id: 'r1', type: 'rich_message',
-        content: { assetId: 'a2', assetName: '便り', imageUrl: 'https://example.com/a.png', description: '新米です', actionUrl: 'https://example.com/lp' },
+        content: { assetId: 'a2', assetName: '便り',baseUrl:'https://example.com/images/map',baseSize:{width:1040,height:520},tapAreas:[{x:0,y:0,width:100,height:100,actionType:'uri',uri:'https://example.com/lp'}], imageUrl: 'https://example.com/a.png', description: '新米です', actionUrl: 'https://example.com/lp' },
       },
       {
         id: 'q1', type: 'coupon',
-        content: { assetId: 'a3', assetName: '夏クーポン', description: '500円引き', actionUrl: 'https://example.com/c' },
+        content: { assetId: 'a3', assetName: '夏クーポン',startsAt:'2026-01-01T00:00',endsAt:'2027-01-01T00:00', description: '500円引き', actionUrl: 'https://example.com/c' },
       },
       {
         id: 's1', type: 'research',
@@ -96,12 +96,12 @@ describe('一斉配信の複数吹き出し契約', () => {
       },
     ];
     const parts = parseBroadcastMessageParts({ messageType: 'text', messageContent: 'legacy', messageBubbles: assetBubbles });
-    expect(parts.map((part) => part.messageType)).toEqual(['carousel', 'flex', 'text', 'text']);
+    expect(parts.map((part) => part.messageType)).toEqual(['carousel', 'imagemap', 'flex', 'text']);
     for (const part of parts) {
       expect(part.messageContent).not.toContain('assetId');
     }
-    expect(parts[2].messageContent).toBe('500円引き\nhttps://example.com/c');
-    expect(buildMessages(parts).map((message) => message.type)).toEqual(['template', 'flex', 'text', 'text']);
+    expect(parts[2].messageContent).toContain('coupon_use:a3');
+    expect(buildMessages(parts).map((message) => message.type)).toEqual(['template', 'imagemap', 'flex', 'text']);
   });
 
   it('直せない素材は直し方で止める', () => {

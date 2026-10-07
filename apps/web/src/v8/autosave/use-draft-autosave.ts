@@ -130,12 +130,16 @@ export function useDraftAutosave({ fingerprint, dirty, active = true, enabled, p
     setFailedFingerprint(null)
   }, [])
 
+  /** 失敗の印だけ外し、同じ入力でもう一度送れるようにする（競合を解いたあとなど）。 */
+  const retry = useCallback(() => setFailedFingerprint(null), [])
+
   const failed = failedFingerprint !== null && failedFingerprint === fingerprint
   return {
     autosaving,
     savedAt,
     failed,
     markSaved,
+    retry,
     label: active ? autosaveLabel({ autosaving, failed, dirty, savedAt, now }) : null,
   }
 }

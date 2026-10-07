@@ -525,6 +525,9 @@ export default function OpsSupportV8() {
           busy={busy}
           error={error || undefined}
           designNode="GgP2d"
+          /* 絵 GgP2d：幅 600・窓の上 202（本文の長さで上下しない）。 */
+          designWidth={600}
+          designTop={202}
           onCancel={() => { if (!busy) setConfirmReply(false) }}
           footer={(
             <div className={styles.confirmActions}>

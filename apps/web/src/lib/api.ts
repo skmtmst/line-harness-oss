@@ -1,5 +1,8 @@
+import { CHAT_FILE_TYPES } from '@line-crm/shared';
+import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
-import type { BookingWaitlistSlotSummary,SeatWaitlistSlotSummary,CustomerSeatWaitlist } from '@line-crm/shared';
+import type { BookingConflictsResponse, BookingReassignInput, BookingCustomerNotification } from '@line-crm/shared';
+import type { LineMessageType, BookingWaitlistSlotSummary,SeatWaitlistSlotSummary,CustomerSeatWaitlist } from '@line-crm/shared';
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
 import type {
@@ -789,6 +792,7 @@ export type ChatDetail = Pick<ChatListItem,
   updatedAt?: string
   messages: ChatDetailMessage[]
   hasMoreMessages: boolean
+  total: number
 }
 
 /** 受信箱の保存検索は友だち検索と条件JSONの形が違うため、ここでは未知値として受ける。 */
@@ -2942,7 +2946,7 @@ export async function refreshCachedList<T>(path: string): Promise<T> {
   return body
 }
 
-async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
+export async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
     credentials: 'include',
@@ -3327,6 +3331,7 @@ export type MileageRewardVersion = {
 }
 
 export type MileageRewardSummary = {
+  folderId?: string | null
   id: string
   lineAccountId: string
   programId: string
@@ -4159,6 +4164,12 @@ export type RichMenuAreaResponse = {
   formId: string | null
   trackedLinkId: string | null
 }
+
+/** シナリオ停止時の入力。理由は任意・200字まで。 */
+export type ScenarioStopInput = { reason?: string }
+export type ScenarioUpdateInput = Partial<Omit<Scenario,
+  'id' | 'createdAt' | 'updatedAt' | 'stoppedReason' | 'stoppedBy' | 'stoppedAt'
+>> & ScenarioStopInput
 
 /** シナリオの開始のきっかけ（128）。1本に複数持てる。 */
 export type ScenarioTriggerItem = {
@@ -5775,6 +5786,7 @@ export type FriendAddRuleConflictData = {
 }
 
 export type FriendAddRunList = {
+  period?: { key: string; from: string | null; to: string | null }
   items: Array<{
     id: string
     receivedAt: string
@@ -5798,6 +5810,11 @@ export type FriendAddRunList = {
   total: number
   nextCursor: string | null
   summary: {
+    capturedFriends?: number
+    returning?: number
+    testPending?: number | null
+    testPendingState?: { state: 'unavailable'; reason: string }
+    failureKinds?: Array<{ kind: 'delivery_unknown' | 'delivery_failed' | 'action_failed' | 'invalid_reference' | 'other'; count: number }>
     /** 直近28日に追加された人数（同じ人の再追加は1人）。 */
     recentFriends: number
     /** 直近28日の追加記録の件数（同じ人の再追加も数える）。 */
@@ -8136,15 +8153,21 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ ids }),
       }),
-    create: (data: Omit<Scenario, 'id' | 'createdAt' | 'updatedAt'>) =>
+    create: (data: Omit<Scenario, 'id' | 'createdAt' | 'updatedAt' | 'stoppedReason' | 'stoppedBy' | 'stoppedAt'>) =>
       fetchApi<ApiResponse<Scenario>>('/api/scenarios', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<Omit<Scenario, 'id' | 'createdAt' | 'updatedAt'>>) =>
+    update: (id: string, data: ScenarioUpdateInput) =>
       fetchApi<ApiResponse<Scenario>>(`/api/scenarios/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
+      }),
+    /** 配信を一時停止する。理由を省略しても止められる。 */
+    stop: (id: string, data: ScenarioStopInput = {}) =>
+      fetchApi<ApiResponse<Scenario>>(`/api/scenarios/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...data, isActive: false }),
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE' }),
@@ -8160,7 +8183,7 @@ export const api = {
       id: string,
       data: {
         stepOrder: number
-        messageType: ScenarioStep['messageType']
+        messageType: LineMessageType
         messageContent: string
         delayMinutes?: number
         offsetDays?: number
@@ -8185,7 +8208,7 @@ export const api = {
       stepId: string,
       data: {
         stepOrder?: number
-        messageType?: ScenarioStep['messageType']
+        messageType?: LineMessageType
         messageContent?: string
         delayMinutes?: number
         offsetDays?: number
@@ -8464,7 +8487,7 @@ export const api = {
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`),
     create: (data: {
       title: string
-      messageType: ApiBroadcast['messageType']
+      messageType: LineMessageType
       messageContent: string
       messageBubbles?: BroadcastBubble[]
       targetType: ApiBroadcast['targetType']
@@ -8528,7 +8551,7 @@ export const api = {
       id: string,
       data: {
         title?: string
-        messageType?: ApiBroadcast['messageType']
+        messageType?: LineMessageType
         messageContent?: string
         messageBubbles?: BroadcastBubble[]
         targetType?: ApiBroadcast['targetType']
@@ -8794,12 +8817,24 @@ export const api = {
       fetchApi<ApiResponse<BroadcastMessageAsset>>(`/api/broadcast-message-assets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/broadcast-message-assets/${id}`, { method: 'DELETE' }),
-    upload: (file: File) =>
-      fetchApi<ApiResponse<{ key: string; url: string; mimeType: string; size: number }>>('/api/broadcast-message-assets/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': file.type, 'X-Filename': encodeURIComponent(file.name) },
-        body: file,
-      }),
+    upload: async (file: File, lineAccountId?: string | null): Promise<ApiResponse<{ key: string; url: string; mimeType: string; size: number }>> => {
+      if (file.type !== 'video/mp4') return fetchApi('/api/broadcast-message-assets/upload', {
+        method: 'POST', headers: { 'Content-Type': file.type, 'X-Filename': encodeURIComponent(file.name) }, body: file,
+      })
+      let accountId = lineAccountId
+      if (accountId === undefined && typeof window !== 'undefined') {
+        try { accountId = localStorage.getItem('lh_selected_account') } catch { accountId = null }
+      }
+      const prepared = await fetchApi<ApiResponse<{id:string;uploadUrl:string;requiredHeaders:Record<string,string>}>>('/api/broadcast-message-assets/upload-sessions', {
+        method:'POST',body:JSON.stringify({lineAccountId:accountId??null,filename:file.name,mimeType:file.type,sizeBytes:file.size}),
+      })
+      if (!prepared.success) return prepared
+      const response = await fetch(prepared.data.uploadUrl,{method:'PUT',headers:prepared.data.requiredHeaders,body:file,credentials:'omit'})
+      if (!response.ok) throw new Error('動画をアップロードできませんでした。もう一度選んでください')
+      const etag = response.headers.get('ETag')
+      if (!etag) throw new Error('アップロードの確認情報が届きませんでした。もう一度選んでください')
+      return fetchApi(`/api/broadcast-message-assets/upload-sessions/${encodeURIComponent(prepared.data.id)}/complete`,{method:'POST',body:JSON.stringify({etag})})
+    },
   },
 
   segments: {
@@ -9372,7 +9407,7 @@ export const api = {
       ),
     execute: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}/execute`, { method: 'POST' }),
     rollback: (id: string) => fetchApi<ApiResponse<UidMigrationRun>>(`/api/friends/migrations/${id}/rollback`, { method: 'POST' }),
-    createExport: (input: { accountId: string; columns: Array<'basic' | 'tags_fields' | 'support'>; encoding: 'utf-8' | 'shift_jis' }) =>
+    createExport: (input: { accountId: string; columns: Array<'basic' | 'friend_fields' | 'tags_fields' | 'support'>; encoding: 'utf-8' | 'shift_jis' }) =>
       fetchApi<ApiResponse<{ id: string; rowCount: number | null; status: string; downloadUrl: string }>>('/api/friends/exports', {
         method: 'POST', body: JSON.stringify(input),
       }),
@@ -9380,7 +9415,7 @@ export const api = {
       accountId: string
       sourceFilename: string
       sourceChecksum: string
-      rows: Array<{ lineUid: string; displayName: string | null; realName: string | null; systemDisplayName: string | null }>
+      rows: Array<{ lineUid: string; friendFields?: Record<string, string | null>; displayName: string | null; realName: string | null; systemDisplayName: string | null }>
     }) => fetchApi<ApiResponse<{
       id: string
       status: string
@@ -10523,6 +10558,7 @@ export const api = {
       /** 158: 管理用の名前。 */
       name?: string | null;
       /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+      normalizeKeywords?: boolean
       keywordMatchMode?: 'any' | 'all';
       /** フォルダ。 */
       folderId?: string | null;
@@ -10571,6 +10607,7 @@ export const api = {
       /** 158: 管理用の名前。 */
       name?: string | null;
       /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+      normalizeKeywords?: boolean
       keywordMatchMode?: 'any' | 'all';
       /** フォルダ。 */
       folderId?: string | null;
@@ -11176,6 +11213,9 @@ export const api = {
         },
       ),
     runs: (accountId: string, params?: {
+      period?: 'all' | 'last28days' | 'today' | 'this_month' | 'last_month'
+      from?: string
+      to?: string
       status?: FriendAddEventRoutingStatus
       ruleId?: string
       /** 追加の種類での絞り込み。サーバ側で全ページに効かせる。 */
@@ -11186,6 +11226,9 @@ export const api = {
       limit?: number
     }) => {
       const query = new URLSearchParams({ account_id: accountId })
+      if (params?.period) query.set('period', params.period)
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       if (params?.status) query.set('status', params.status)
       if (params?.ruleId) query.set('rule_id', params.ruleId)
       if (params?.kind) query.set('kind', params.kind)
@@ -11629,7 +11672,65 @@ export const api = {
     consultations: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/consultations'),
     installRichMenu: (accountId: string) => fetchApi<ApiResponse<{ richMenuId: string; liffId: string }>>('/api/nen-members/rich-menu/install', { method: 'POST', body: JSON.stringify({ accountId }) }),
   },
+  instagram: {
+    connection: (accountId:string)=>fetchApi<ApiResponse<import('@line-crm/shared').InstagramConnectionStatus>>(`/api/instagram/connection?${new URLSearchParams({lineAccountId:accountId})}`),
+    start: (accountId:string)=>fetchApi<ApiResponse<{url:string;expiresAt:string}>>(`/api/instagram/oauth/start?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:'{}'}),
+    callback: (state:string,code:string)=>fetchApi<ApiResponse<{state:string;lineAccountId:string;pages:import('@line-crm/shared').InstagramOAuthPage[]}>>(`/api/instagram/oauth/callback?${new URLSearchParams({state,code})}`),
+    connect: (accountId:string,body:{state:string;pageId:string;expectedVersion:number})=>fetchApi<ApiResponse<{connected:true;version:number}>>(`/api/instagram/oauth/connect?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:JSON.stringify(body)}),
+    refresh: (accountId:string)=>fetchApi<ApiResponse<{expiresAt:string;dataAccessExpiresAt:string|null;version:number}>>(`/api/instagram/refresh?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:'{}'}),
+    disconnect: (accountId:string,expectedVersion:number)=>fetchApi<ApiResponse<{disconnected:true}>>(`/api/instagram/connection?${new URLSearchParams({lineAccountId:accountId})}`,{method:'DELETE',body:JSON.stringify({expectedVersion})}),
+    profile: (accountId:string)=>fetchApi<ApiResponse<{state:string;value:import('@line-crm/shared').InstagramProfile|null;syncedAt?:string|null}>>(`/api/instagram/profile?${new URLSearchParams({lineAccountId:accountId})}`),
+    posts: (accountId:string)=>fetchApi<ApiResponse<{state:string;value:import('@line-crm/shared').InstagramPost[]|null;syncedAt?:string|null}>>(`/api/instagram/posts?${new URLSearchParams({lineAccountId:accountId})}`),
+    sync: (accountId:string)=>fetchApi<ApiResponse<{profile:import('@line-crm/shared').InstagramProfile;posts:import('@line-crm/shared').InstagramPost[]}>>(`/api/instagram/sync?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:'{}'}),
+    messages: (accountId:string,limit=50,beforeId?:string)=>fetchApi<ApiResponse<{messages:import('@line-crm/shared').InstagramReceivedMessage[];total:number|null}>>(`/api/instagram/messages?${new URLSearchParams({lineAccountId:accountId,limit:String(limit),...(beforeId?{beforeId}:{})})}`),
+    reply: (accountId:string,id:string,text:string)=>fetchApi<ApiResponse<{enabled:false}>>(`/api/instagram/messages/${encodeURIComponent(id)}/reply?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:JSON.stringify({text})}),
+  },
+  autoReplyUnmatched: {
+    get: (accountId:string)=>fetchApi<ApiResponse<import('@line-crm/shared').AutoReplyUnmatchedSettings>>(`/api/auto-replies/unmatched-settings?${new URLSearchParams({lineAccountId:accountId})}`),
+    save: (accountId:string,body:import('@line-crm/shared').AutoReplyUnmatchedInput)=>fetchApi<ApiResponse<import('@line-crm/shared').AutoReplyUnmatchedSettings>>(`/api/auto-replies/unmatched-settings?${new URLSearchParams({lineAccountId:accountId})}`,{method:'PUT',body:JSON.stringify(body)}),
+  },
+  scenarioDrafts: {
+    get: (accountId:string,key:string) => fetchApi<ApiResponse<import('@line-crm/shared').ScenarioDraft>>(`/api/scenario-drafts/${encodeURIComponent(key)}?${new URLSearchParams({lineAccountId:accountId})}`),
+    save: (accountId:string,key:string,body:import('@line-crm/shared').ScenarioDraftInput) => fetchApi<ApiResponse<import('@line-crm/shared').ScenarioDraft>>(`/api/scenario-drafts/${encodeURIComponent(key)}?${new URLSearchParams({lineAccountId:accountId})}`,{method:'PUT',body:JSON.stringify(body)}),
+    delete: (accountId:string,key:string,expectedVersion:string) => fetchApi<ApiResponse<unknown>>(`/api/scenario-drafts/${encodeURIComponent(key)}?${new URLSearchParams({lineAccountId:accountId})}`,{method:'DELETE',body:JSON.stringify({expectedVersion})}),
+  },
   chats: {
+    attachments: {
+      createUploadSession: (id: string, input: { filename: string; mimeType: 'video/mp4'; sizeBytes: number }) =>
+        fetchApi<ApiResponse<ChatAttachmentUploadSession>>(`/api/chats/${encodeURIComponent(id)}/attachments/upload-sessions`, {
+          method: 'POST', body: JSON.stringify(input),
+        }),
+      completeUploadSession: (id: string, sessionId: string, etag: string) =>
+        fetchApi<ApiResponse<ChatAttachment>>(`/api/chats/${encodeURIComponent(id)}/attachments/upload-sessions/${encodeURIComponent(sessionId)}/complete`, {
+          method: 'POST', body: JSON.stringify({ etag }),
+        }),
+      upload: async (id: string, file: File): Promise<ApiResponse<ChatAttachment>> => {
+        const path = `/api/chats/${encodeURIComponent(id)}/attachments`;
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        const inferredMime = Object.entries(CHAT_FILE_TYPES).find(([, ext]) => ext === extension)?.[0];
+        const mimeType = !file.type || ['application/octet-stream', 'application/x-zip-compressed'].includes(file.type)
+          ? inferredMime ?? file.type : file.type;
+        if (mimeType !== 'video/mp4') return fetchApi<ApiResponse<ChatAttachment>>(`${path}/upload`, {
+          method: 'POST', body: file,
+          headers: { 'Content-Type': mimeType || 'application/octet-stream', 'X-Filename': encodeURIComponent(file.name) },
+        });
+        const prepared = await fetchApi<ApiResponse<ChatAttachmentUploadSession>>(`${path}/upload-sessions`, {
+          method: 'POST', body: JSON.stringify({ filename: file.name, mimeType: file.type, sizeBytes: file.size }),
+        });
+        if (!prepared.success || !prepared.data) return prepared as unknown as ApiResponse<ChatAttachment>;
+        const response = await fetch(prepared.data.uploadUrl, {
+          method: 'PUT', headers: prepared.data.requiredHeaders, body: file, credentials: 'omit',
+        });
+        if (!response.ok) throw new Error('動画をアップロードできませんでした');
+        const etag = response.headers.get('etag');
+        if (!etag) throw new Error('アップロード結果を確認できませんでした。R2のCORS設定を確認してください');
+        return fetchApi<ApiResponse<ChatAttachment>>(`${path}/upload-sessions/${encodeURIComponent(prepared.data.id)}/complete`, {
+          method: 'POST', body: JSON.stringify({ etag }),
+        });
+      },
+    },
+    searchMessages: (friendId:string,q:string,offset=0,limit=30) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationSearchResult>>(`/api/chats/${encodeURIComponent(friendId)}/messages/search?${new URLSearchParams({q,offset:String(offset),limit:String(limit)})}`),
+    messagesAt: (friendId:string,params:{cursorAt?:string;cursorId?:string;direction?:'before'|'after'|'around';limit?:number}={}) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationMessagePage>>(`/api/chats/${encodeURIComponent(friendId)}/messages?${new URLSearchParams(Object.entries(params).map(([k,v])=>[k,String(v)]))}`),
     list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
       const query: Record<string, string> = {}
       if (params?.status) query.status = params.status
@@ -11696,7 +11797,7 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    send: (id: string, data: { content: string; messageType?: string; revision?: number; quotedMessageId?: string }, idempotencyKey: string) =>
+    send: (id: string, data: ChatSendInput, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ sent: true; messageId: string; sentByStaffName: string; revision: number }>>(`/api/chats/${id}/send`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
@@ -11718,7 +11819,7 @@ export const api = {
       }),
     // N-025: 送信予約。scheduledAt は JST の datetime-local 値でも受け付ける
     // (サーバー側でUTCへ正規化)。取消・変更は送信中以降になると409で拒否される。
-    schedule: (id: string, data: { content: string; scheduledAt: string; quotedMessageId?: string }, idempotencyKey: string) =>
+    schedule: (id: string, data: ChatScheduleInput, idempotencyKey: string) =>
       fetchApi<ApiResponse<ScheduledChatSend & { replayed: boolean }>>(`/api/chats/${id}/schedule`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
@@ -12002,6 +12103,10 @@ export const api = {
       fetchApi<ApiResponse<FriendScoreDetail>>(`/api/friends/${friendId}/score`),
   },
   mileage: {
+    rewardFolders: (accountId: string) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>(`/api/mileage/reward-folders?accountId=${encodeURIComponent(accountId)}`),
+    createRewardFolder: (accountId: string, name: string) => fetchApi<ApiResponse<{ id: string; name: string; displayOrder: number; count: number }>>('/api/mileage/reward-folders', { method: 'POST', body: JSON.stringify({ accountId, name }) }),
+    reorderRewardFolders: (accountId: string, ids: string[]) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>('/api/mileage/reward-folders/order', { method: 'PUT', body: JSON.stringify({ accountId, ids }) }),
+    moveRewardToFolder: (id: string, accountId: string, folderId: string | null) => fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${encodeURIComponent(id)}/folder`, { method: 'PUT', body: JSON.stringify({ accountId, folderId }) }),
     /*
       使い道の一覧（#772 の口）。**アカウント単位で返る。**
       渡さないと、ほかの店の使い道まで混ざる。
@@ -14629,6 +14734,15 @@ export const bookingApi = {
   },
   getBooking: (accountId: string, id: string) =>
     fetchApi<{ booking: BookingAdminDetail }>(withAccount(`/api/booking/admin/bookings/${id}`, accountId)),
+  /** 重なった2件の表示情報と理由、カレンダー連携の案内。 */
+  getConflicts: (accountId: string) =>
+    fetchApi<ApiResponse<BookingConflictsResponse>>(withAccount('/api/booking/admin/conflicts', accountId)),
+  /** 既存の枠照合・変更通知を使う。LINE未連携なら電話連絡の案内が返る。 */
+  reassignBooking: (accountId: string, id: string, body: BookingReassignInput) =>
+    fetchApi<UpdateBookingResult & { customerNotification: BookingCustomerNotification }>(
+      withAccount(`/api/booking/admin/bookings/${encodeURIComponent(id)}/reassign`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   getAlternatives: (
     accountId: string,
     input: { menuId: string; staffId: string; startsAt: string },
@@ -16260,11 +16374,12 @@ export const webinarApi = {
       method: 'PUT',
       body: JSON.stringify({ comments: comments.map(({ atSeconds, authorName, body }) => ({ atSeconds, authorName, body })) }),
     }),
-  ctas: (id: string) => fetchApi<{ data: WebinarCtaCard[] }>(`/api/webinars/${id}/ctas`),
-  saveCtas: (id: string, ctas: WebinarCtaCard[]) =>
-    fetchApi<{ data: { count: number } }>(`/api/webinars/${id}/ctas`, {
+  ctas: (id: string) => fetchApi<{ data: WebinarCtaCard[]; version: number; updatedBy: string | null; updatedAt: string | null }>(`/api/webinars/${id}/ctas`),
+  saveCtas: (id: string, ctas: WebinarCtaCard[], expectedVersion?: number) =>
+    fetchApi<{ data: { count: number; version: number } }>(`/api/webinars/${id}/ctas`, {
       method: 'PUT',
       body: JSON.stringify({
+        ...(expectedVersion === undefined ? {} : { expectedVersion }),
         ctas: ctas.map(({ atSeconds, kind, title, body, buttonLabel, autoOpen, formId, url }) => ({
           atSeconds, kind, title, body, buttonLabel, autoOpen, formId, url,
         })),

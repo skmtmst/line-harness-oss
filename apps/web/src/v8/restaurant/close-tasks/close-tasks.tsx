@@ -22,11 +22,10 @@ import { Tabs } from '@/components/shared/tabs'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { fetchApi } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { type CloseGroup, canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle } from '../dashboard/summarize'
-import { type StoreMedium, toMedia } from '../dashboard/use-store-today'
+import { type StoreMedium, loadStoreMedia } from '../dashboard/use-store-today'
 import styles from './close-tasks.module.css'
 
 type Tab = 'open' | 'done'
@@ -77,8 +76,7 @@ export default function CloseTasksPage() {
     try {
       const [list, channels] = await Promise.all([
         restaurantTestApi.channelCloseTasks(selectedAccountId, storeId),
-        fetchApi<{ success: true; data: Array<{ code: string; name: string; receiveMethod?: string }> }>(`/api/restaurant-test/channels?account_id=${encodeURIComponent(selectedAccountId)}&storeId=${encodeURIComponent(storeId)}`)
-          .then((res) => toMedia(res.data)).catch(() => [] as StoreMedium[]),
+        loadStoreMedia(selectedAccountId, storeId).catch(() => [] as StoreMedium[]),
       ])
       setTasks(list.data); setMedia(channels); setError(null)
     } catch (caught) {
@@ -166,6 +164,7 @@ export default function CloseTasksPage() {
                       </Button>
                     ) : null}
                     <RowActions
+                      className={styles.more}
                       subjectName={slotTitle(group.startsAt)}
                       menuItems={[
                         ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) })) : []),

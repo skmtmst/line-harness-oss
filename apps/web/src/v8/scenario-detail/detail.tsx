@@ -111,16 +111,16 @@ import ScheduleInput, {
   type ScheduleValue,
 } from '@/components/scenarios/schedule-input'
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
-import ActionMenu from '@/components/shared/action-menu'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StatusChip from '@/components/shared/status-chip'
 import Notice from '@/components/shared/notice'
-import { browserDraftKey, useBrowserDraft } from '@/v8/autosave/use-browser-draft'
-import { BrowserDraftNotice } from '@/v8/autosave/browser-draft-notice'
+import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
+import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
 import Select from '@/components/shared/select'
 import {
   scenarioReachBarWidth,
@@ -1683,17 +1683,29 @@ export default function ScenarioDetailV8({
     // 開いた直後の形だけを採る。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepFormOpen, stepFormNonce, stepFormBaseline])
-  const stepDraft = useBrowserDraft({
-    storageKey: stepFormOpen && scenario && stepFormBaseline?.nonce === stepFormNonce
-      ? browserDraftKey(['scenario-step', scenario.lineAccountId, id, editingStepId ?? 'new'])
+  // 書きかけはシナリオの下書きの口（本物の通とは別の行・配信に使わない）へ残す。
+  const stepDraft = useScenarioDraft({
+    accountId: scenario?.lineAccountId ?? selectedAccountId,
+    draftKey: stepFormOpen && scenario && stepFormBaseline?.nonce === stepFormNonce
+      ? scenarioDraftKey(id, { stepId: editingStepId })
       : null,
+    // 共通（アカウントなし）のシナリオは本物に紐づけられないので、キーだけで置く。
+    scenarioId: scenario?.lineAccountId ? id : null,
+    stepId: scenario?.lineAccountId ? editingStepId : null,
+    legacyKey: scenario ? browserDraftKey(['scenario-step', scenario.lineAccountId, id, editingStepId ?? 'new']) : null,
     value: stepFormValue,
     baseline: stepFormBaseline?.value ?? stepFormValue,
     active: canEdit,
   })
   const restoreStepDraft = () => {
     const stored = stepDraft.restore()
-    if (!stored) return
+    if (stored) applyStepDraft(stored)
+  }
+  const loadLatestStepDraft = () => {
+    const latest = stepDraft.loadLatest()
+    if (latest) applyStepDraft(latest)
+  }
+  function applyStepDraft(stored: typeof stepFormValue) {
     // 新しく足す通の番号は今の並びで決める（残っていた番号は古いことがある）。
     setStepForm(editingStepId ? stored.stepForm : { ...stored.stepForm, stepOrder: stepForm.stepOrder })
     setKindState(stored.kindState)
@@ -1707,6 +1719,7 @@ export default function ScenarioDetailV8({
         <h4 className="text-sm font-semibold text-ink-secondary mb-3">新しいステップを追加</h4>
       )}
       <BrowserDraftNotice ago={stepDraft.pendingAgo} onRestore={restoreStepDraft} onDiscard={stepDraft.clear} />
+      <ScenarioDraftConflictNotice ago={stepDraft.conflictAgo} onLoadLatest={loadLatestStepDraft} onOverwrite={stepDraft.overwrite} />
       {/* 左が編集、右が「いまどの通を触っているか」。任意値の桁指定ではなく
           3列の標準段で組む（2:1）。直書きの数を増やさない。 */}
       <div className="grid gap-4 lg:grid-cols-3">
@@ -2326,15 +2339,12 @@ export default function ScenarioDetailV8({
           ) : null}
           {canEdit ? (
             <span className={styles.menuBox}>
-              <MoreAction
+              <RowMenu
+                appearance="plain"
                 label="このシナリオのその他操作"
-                aria-expanded={stepMenuId === '__head__'}
-                onClick={() => setStepMenuId((current) => (current === '__head__' ? null : '__head__'))}
-              />
-              <ActionMenu
+                menuLabel="このシナリオの操作"
                 open={stepMenuId === '__head__'}
-                ariaLabel="このシナリオの操作"
-                onClose={() => setStepMenuId(null)}
+                onOpenChange={(next) => setStepMenuId(next ? '__head__' : null)}
                 items={[
                   {
                     id: 'duplicate',
@@ -2663,17 +2673,12 @@ export default function ScenarioDetailV8({
                             <ArrowDown aria-hidden />
                           </button>
                           <span className={styles.menuBox} onClick={(e) => e.stopPropagation()}>
-                            <MoreAction
+                            <RowMenu
+                              appearance="plain"
                               label={`${step.stepOrder}通目のその他操作`}
-                              aria-expanded={stepMenuId === step.id}
-                              onClick={() =>
-                                setStepMenuId((current) => (current === step.id ? null : step.id))
-                              }
-                            />
-                            <ActionMenu
+                              menuLabel={`${step.stepOrder}通目の操作`}
                               open={stepMenuId === step.id}
-                              ariaLabel={`${step.stepOrder}通目の操作`}
-                              onClose={() => setStepMenuId(null)}
+                              onOpenChange={(next) => setStepMenuId(next ? step.id : null)}
                               items={[
                                 { id: 'edit', label: '編集', onSelect: () => openEditStep(step) },
                                 { id: 'preview', label: 'プレビュー', onSelect: () => setSelectedStepId(step.id) },
@@ -2902,6 +2907,7 @@ export default function ScenarioDetailV8({
       {/* 名前・説明・置き場を変える鉛筆の小窓。 */}
       <Dialog
         open={renameOpen}
+        busy={saving}
         title="名前・説明・置き場を変える"
         description="ここで変えた内容は、下の「保存する」で確定します。"
         onCancel={() => {
@@ -2920,6 +2926,7 @@ export default function ScenarioDetailV8({
         footer={
           <>
             <Button
+              disabled={saving}
               onClick={() => {
                 if (scenario) {
                   setEditForm({

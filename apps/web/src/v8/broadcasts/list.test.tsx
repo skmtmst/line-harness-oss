@@ -14,6 +14,7 @@ vi.hoisted(() => {
 
 const listBroadcasts = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
+const createView = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'new-view' } })))
 const listViews = vi.hoisted(() => vi.fn())
 const deleteBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
 const role = vi.hoisted(() => ({ current: 'owner' as string | null }))
@@ -29,7 +30,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         list: listBroadcasts,
         delete: deleteBroadcast,
         getInsight: async () => ({ success: false }),
-        savedViews: { ...actual.api.broadcasts.savedViews, list: listViews },
+        savedViews: { ...actual.api.broadcasts.savedViews, list: listViews, create: createView },
       },
       folders: { ...actual.api.folders, list: listFolders },
       tags: { ...actual.api.tags, list: async () => ({ success: true, data: [] }) },
@@ -251,4 +252,104 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
       vi.useRealTimers()
     }
   })
+  it('統括から来た配信（提案 E-9・l3RQH）は「統括から」の札と鍵を出し、「…」は見る・複製だけ（編集・削除を出さない）', async () => {
+    flushListUrlState()
+    window.history.replaceState(null, '', '/broadcasts')
+    const hqRow = { ...base, id: 'bc-hq', title: '1月の限定メニュー', fromHeadquarters: true, hqRunId: 'run-1', editable: false }
+    listBroadcasts.mockImplementation(async () => ({
+      success: true,
+      data: [hqRow, rowB],
+      kpis: { scheduled: 1, thisMonth: 2, delivered: 0, openRate: 0, drafts: 1 },
+      statusCounts: { all: 2, scheduled: 1, draft: 1, pending_approval: 0, sent: 0, failed: 0 },
+      pagination: { total: 2, limit: 20, cursor: 0, nextCursor: null },
+    }))
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    const rowOf = (title: string) => [...host.querySelectorAll('tr')].find((tr) => tr.textContent?.includes(title))
+    expect(rowOf('1月の限定メニュー')?.textContent).toContain('統括から')
+    expect(rowOf('未購入者フォロー')?.textContent).not.toContain('統括から')
+    const trigger = rowOf('1月の限定メニュー')?.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement
+    act(() => { trigger.click() })
+    const labels = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent?.trim())
+    expect(labels).toContain('見る')
+    expect(labels).toContain('複製')
+    expect(labels.some((label) => label?.includes('削除'))).toBe(false)
+    expect(labels.some((label) => label?.includes('編集'))).toBe(false)
+    expect(labels.some((label) => label?.includes('フォルダへ移す'))).toBe(false)
+  })
+})
+
+function resetUrl() {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/broadcasts')
+}
+it('2ページ目を含む全配信を検索し、検索結果を20件ずつ表示する', async () => {
+  resetUrl()
+  const rows = Array.from({ length: 125 }, (_, i) => ({ ...rowB, id: `row-${i}`, title: i < 100 ? `通常${i}` : `検索対象${i}` }))
+  listBroadcasts.mockImplementation(async (params) => {
+    const cursor = Number(params.cursor ?? 0)
+    const limit = params.limit ?? 20
+    return { success: true, data: rows.slice(cursor, cursor + limit), pagination: { total: rows.length, nextCursor: cursor + limit < rows.length ? String(cursor + limit) : null } }
+  })
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '検索対象' } })
+  await flush()
+  expect(host.textContent).toContain('検索対象100')
+  expect(host.textContent).not.toContain('検索対象124')
+  expect(host.textContent).toContain('25件中 1〜20件')
+  const next = host.querySelector('button[aria-label="次のページ"]') as HTMLButtonElement
+  expect(next).toBeTruthy()
+  act(() => next.click())
+  await flush()
+  expect(host.textContent).toContain('検索対象124')
+  expect(host.textContent).toContain('25件中 21〜25件')
+  fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '見つからない' } })
+  await flush()
+  expect(host.textContent).toContain('0件')
+  fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '' } })
+  await flush()
+  expect(host.textContent).toContain('通常0')
+})
+it('全件検索が上限を超えたら部分的な検索結果を表示しない', async () => {
+  resetUrl()
+  listBroadcasts.mockResolvedValue({ success: true, data: [rowB], pagination: { total: 10001, nextCursor: '100' } })
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  fireEvent.change(host.querySelector('input[placeholder="タイトル・内容で探す"]')!, { target: { value: '未購入' } })
+  await flush()
+  expect(host.textContent).toContain('10,000件')
+  expect(host.querySelector('tbody')?.textContent ?? '').not.toContain('未購入者フォロー')
+})
+it('保存した検索の送信済み・表示件数・古い順も復元する', async () => {
+  resetUrl()
+  listViews.mockResolvedValue({ success: true, data: [{ id: 'v1', name: '前月の送信', filters: { statusFilter: 'sent' }, sortKey: 'oldest', pageSize: 50 }] })
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  act(() => { buttonByText('保存した検索')!.click() })
+  await flush()
+  act(() => { ([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('前月の送信')) as HTMLElement).click() })
+  await flush()
+  expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({ displayStatus: 'sent', limit: 50, sort: 'oldest', cursor: 0 }))
+})
+it('検索保存は現在の並び順と表示件数を保存する', async () => {
+  resetUrl()
+  createView.mockClear()
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  act(() => { buttonByText('新しい順')!.click(); buttonByText('この条件を保存する')!.click() })
+  await flush()
+  fireEvent.change(host.querySelector('input[aria-label="保存する検索の名前"]')!, { target: { value: '古い配信' } })
+  act(() => { buttonByText('保存する')!.click() })
+  await flush()
+  expect(createView).toHaveBeenCalledWith('account-a', expect.objectContaining({ sortKey: 'oldest', pageSize: 20 }))
+})
+
+it('検索の通信失敗は内部の英語を出さず、読み直す案内を出す', async () => {
+  listBroadcasts.mockRejectedValue(new Error('API error: 500'))
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  expect(host.textContent).not.toContain('API error: 500')
+  expect(host.textContent).toContain('再読み込みしても直らない場合はエラー報告へ')
+  expect(buttonByText('もう一度試す')).toBeTruthy()
 })

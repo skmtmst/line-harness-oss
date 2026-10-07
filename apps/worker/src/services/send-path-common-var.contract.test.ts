@@ -19,6 +19,7 @@ function read(rel: string): string {
 
 // LINE送信に繋がる経路と、そこで必須の厳格resolver呼び出し。
 const SEND_PATHS: Array<{ file: string; mustCall: string; label: string }> = [
+  {file:'services/auto-reply-unmatched.ts',mustCall:'expandSendCommonVars',label:'LINEのキーワード未一致時の返事'},
   { file: 'services/step-delivery.ts', mustCall: 'resolveSendInterpolationExtra', label: 'シナリオ配信' },
   { file: 'services/immediate-first-step.ts', mustCall: 'resolveSendInterpolationExtra', label: '初回配信' },
   { file: 'services/reminder-delivery.ts', mustCall: 'resolveSendInterpolationExtra', label: 'リマインド' },
@@ -52,6 +53,7 @@ const SEND_PATHS: Array<{ file: string; mustCall: string; label: string }> = [
  * 漏れうる）。この一覧は新規のLINE送信経路を足したとき必ず見直す。
  */
 const NON_TEMPLATE_PATHS: Array<{ file: string; label: string }> = [
+  {file:'services/auto-reply-delivery.ts',label:'遅延返信（auto-reply.tsで厳格に差し込み済みのJSONを固定して送る）'},
   { file: 'services/affiliate-notifier.ts', label: 'アフィリエイト通知（固定文）' },
   { file: 'services/analytics-reports.ts', label: '集計レポート通知（固定文）' },
   { file: 'services/booking-notifier.ts', label: '予約通知（固定文）' },

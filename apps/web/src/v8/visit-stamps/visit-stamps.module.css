@@ -1,0 +1,462 @@
+/* ★V8 来店スタンプ（提案 E-7 w4SBbv）。寸法は globals.css の --tpl-e78-* だけを使う。表・ボタン・選ぶ欄は共通部品が持つ。 */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e78-body-gap);
+  padding: var(--tpl-e78-body-pad);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.pair {
+  display: flex;
+  gap: var(--tpl-e78-row-gap);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.card {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e78-card-gap);
+  padding: var(--tpl-e78-card-pad);
+  border-radius: var(--tpl-e78-radius);
+  box-shadow: var(--tpl-e78-ring);
+}
+
+.cardTall {
+  min-height: var(--tpl-e78-card-h);
+}
+
+.cardRules {
+  gap: var(--tpl-e78-card-gap-s);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e78-title-gap);
+  margin: 0;
+  font-size: var(--tpl-e78-title-size);
+  line-height: var(--tpl-e78-title-lh);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e78-title-gap);
+}
+
+.grow {
+  flex: 1;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e78-field-gap);
+  min-width: 0;
+}
+
+.fieldGrow {
+  flex: 1;
+}
+
+.label {
+  font-size: var(--tpl-e78-label-size);
+  line-height: var(--tpl-e78-label-lh);
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+.optional {
+  margin-left: var(--tpl-e78-title-gap);
+  font-size: var(--tpl-e78-sub-size);
+  font-weight: 400;
+  color: var(--color-ink-faint);
+}
+
+.row2 {
+  display: flex;
+  gap: var(--tpl-e78-pair-gap);
+  min-width: 0;
+}
+
+.row2 > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.row2 :global(*) {
+  max-width: 100%;
+}
+
+.rewards {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--tpl-e78-radius-s);
+  box-shadow: var(--tpl-e78-ring);
+}
+
+.reward {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e78-pair-gap);
+  padding: var(--tpl-e78-reward-pad);
+}
+
+.reward + .reward {
+  box-shadow: var(--tpl-rt-line-top);
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tpl-e78-chip-w);
+  height: var(--tpl-e78-chip-h);
+  border-radius: var(--tpl-e78-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-e78-sub-size);
+  line-height: var(--tpl-e78-sub-lh);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.texts {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: var(--tpl-e78-name-size);
+  line-height: var(--tpl-e78-name-lh);
+  font-weight: 500;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub {
+  font-size: var(--tpl-e78-sub-size);
+  line-height: var(--tpl-e78-sub-lh);
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.addLine {
+  display: flex;
+  align-self: flex-start;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e78-slot-gap);
+  padding: var(--tpl-e78-preview-pad);
+  border-radius: var(--tpl-e78-radius);
+  background: var(--color-surface-pearl);
+}
+
+.previewLabel {
+  font-size: var(--tpl-e78-sub-size);
+  line-height: var(--tpl-e78-sub-lh);
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+}
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(5, var(--tpl-e78-slot));
+  gap: var(--tpl-e78-slot-gap);
+}
+
+.slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-e78-slot);
+  height: var(--tpl-e78-slot);
+  border-radius: var(--tpl-e78-pill);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-e78-ring);
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-e78-sub-size);
+  line-height: var(--tpl-e78-sub-lh);
+  font-weight: 600;
+}
+
+.slotDone {
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+}
+
+.slotReward {
+  box-shadow: var(--tpl-e78-ring-reward);
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-e78-tiny-size);
+  line-height: var(--tpl-e78-tiny-lh);
+}
+
+.radio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e78-card-gap-s);
+}
+
+.amount {
+  padding-left: var(--tpl-e78-indent);
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e78-pair-gap);
+  padding: var(--tpl-e78-switch-pad);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e78-section-gap);
+  min-width: 0;
+}
+
+.paperRow {
+  display: flex;
+  gap: var(--tpl-e78-row-gap);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.paperRow > .section {
+  flex: 1;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-e78-title-gap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--tpl-e78-sub-size);
+  line-height: var(--tpl-e78-sub-lh);
+  font-weight: 500;
+  cursor: pointer;
+  height: var(--tpl-e78-sub-lh);
+  min-height: 0;
+}
+
+.table {
+  border: 0;
+}
+
+:global([data-theme='v8']) .table .headRow > th,
+:global([data-theme='v8']) .table .row > td {
+  height: auto;
+  border: 0;
+  box-shadow: none;
+}
+
+:global([data-theme='v8']) .table .headRow > th {
+  padding: var(--tpl-e78-head-pad);
+  padding-inline: 0;
+  line-height: var(--tpl-e78-sub-lh);
+}
+
+:global([data-theme='v8']) .table .row > td {
+  padding-block: 0;
+  padding-inline: 0;
+}
+
+/* 表の列：両端は 20、列の間は 16（絵の「表の行」padding 9/13・20、gap 16）。列の幅は中身の幅＋左の余白。 */
+:global([data-theme='v8']) .table .headRow > th,
+:global([data-theme='v8']) .table .row > td {
+  padding-left: var(--tpl-e78-col-gap);
+}
+
+:global([data-theme='v8']) .table .headRow > th:first-child,
+:global([data-theme='v8']) .table .row > td:first-child {
+  padding-left: var(--tpl-e78-edge);
+}
+
+:global([data-theme='v8']) .table .headRow > th:last-child,
+:global([data-theme='v8']) .table .row > td:last-child {
+  padding-right: var(--tpl-e78-edge);
+}
+
+:global([data-theme='v8']) .table .row {
+  height: var(--tpl-e78-row-h);
+  box-shadow: var(--shadow-row-line);
+}
+
+:global([data-theme='v8']) .table .paperLine {
+  height: var(--tpl-e78-paper-row-h);
+}
+
+.table { table-layout: fixed; width: 100%; }
+.colPhoto { width: calc(var(--tpl-e78-col-photo) + var(--tpl-e78-edge)); }
+.colStamps { width: calc(var(--tpl-e78-col-stamps) + var(--tpl-e78-col-gap)); }
+.colDate { width: calc(var(--tpl-e78-col-date) + var(--tpl-e78-col-gap)); }
+.colState { width: calc(var(--tpl-e78-col-state) + var(--tpl-e78-col-gap) + var(--tpl-e78-edge)); }
+.colWhen { width: calc(var(--tpl-e78-col-when) + var(--tpl-e78-edge)); }
+.colCount { width: calc(var(--tpl-e78-col-count) + var(--tpl-e78-col-gap)); }
+.colWhy { width: calc(var(--tpl-e78-col-why) + var(--tpl-e78-col-gap)); }
+.colActor { width: calc(var(--tpl-e78-col-actor) + var(--tpl-e78-col-gap)); }
+.colMenu { width: calc(var(--tpl-e78-col-menu) + var(--tpl-e78-col-gap) + var(--tpl-e78-edge)); }
+
+.thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-e78-thumb-w);
+  height: var(--tpl-e78-thumb-h);
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--tpl-e78-radius-xs);
+  background: var(--color-surface-pearl);
+  box-shadow: var(--tpl-e78-ring);
+  color: var(--color-ink-faint);
+  cursor: zoom-in;
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.strong {
+  font-size: var(--tpl-e78-name-size);
+  line-height: var(--tpl-e78-name-lh);
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.muted {
+  font-size: var(--tpl-e78-label-size);
+  line-height: var(--tpl-e78-label-lh);
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plain {
+  font-size: var(--tpl-e78-label-size);
+  line-height: var(--tpl-e78-label-lh);
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.countText {
+  font-size: var(--tpl-e78-label-size);
+  line-height: var(--tpl-e78-label-lh);
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.countReversed {
+  font-weight: 400;
+  color: var(--color-ink-secondary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e78-step-gap);
+}
+
+.side {
+  width: var(--tpl-e78-side-w);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e78-card-gap-s);
+  padding: var(--tpl-e78-card-pad);
+  border-radius: var(--tpl-e78-radius);
+  box-shadow: var(--tpl-e78-ring);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e78-step-gap);
+}
+
+.stepValue {
+  font-size: var(--tpl-e78-step-size);
+  line-height: var(--tpl-e78-step-lh);
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.empty {
+  padding: var(--tpl-e78-head-pad);
+  font-size: var(--tpl-e78-label-size);
+  line-height: var(--tpl-e78-label-lh);
+  color: var(--color-ink-secondary);
+}
+
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e78-card-gap-s);
+}
+
+.weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-e78-step-gap);
+}
+
+.photo {
+  display: block;
+  max-width: 100%;
+  max-height: var(--tpl-e78-photo-max);
+  margin: 0 auto;
+  border-radius: var(--tpl-e78-radius-s);
+}
+
+.pin {
+  width: var(--tpl-e78-pin-w);
+}
+
+@media (max-width: 1100px) {
+  .pair,
+  .paperRow {
+    flex-direction: column;
+  }
+
+  .side {
+    width: 100%;
+  }
+}
+
+/* ④ の「すべて見る」で 50件ごとに送る。 */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tpl-e78-row-gap);
+}

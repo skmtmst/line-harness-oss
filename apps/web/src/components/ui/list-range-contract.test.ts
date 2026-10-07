@@ -45,7 +45,6 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['友だち詳細 回答一覧', '../../app/friends/detail/page.tsx'],
   ['Webhook のやり取り', '../../app/webhooks/webhook-interactions.tsx'],
   // 受信一覧（旧inbox部品 ../inbox/inbox-list.tsx）は、どの入口からも読まれなくなったので外した（2026-10-06）。
-  ['タグ一覧', '../friend-attributes-v2/tag-list-v2.tsx'],
   ['スタッフの操作記録', '../staff/login-audit.tsx'],
 ]
 

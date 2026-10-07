@@ -173,6 +173,33 @@ const REBUILD_MARKER = /--\s*migration-policy:\s*table-rebuild\b/i;
  * ここに無い `*_backup` の DROP は今までどおり止まる。
  */
 const SIDECAR_BACKUP_TABLES: Record<string, ReadonlySet<string>> = {
+  // イメージマップ種類追加：D1のCASCADE履歴とログの参照を退避・復元する。
+  '595_imagemap_message_kinds.sql': new Set([
+    'migration_595_broadcast_after_action_runs_backup',
+    'migration_595_broadcast_approval_events_backup',
+    'migration_595_broadcast_insights_backup',
+    'migration_595_broadcast_lifecycle_events_backup',
+    'migration_595_broadcast_send_claims_backup',
+    'migration_595_broadcast_tracked_links_backup',
+    'migration_595_scenario_actions_backup',
+    'migration_595_scenario_action_fires_backup',
+    'migration_595_message_refs_backup',
+    'migration_595_template_versions_backup',
+    'migration_595_template_references_backup',
+    'migration_595_template_publish_keys_backup',
+    'migration_595_auto_replies_template_refs_backup',
+    'migration_595_scenario_steps_template_refs_backup',
+  ]),
+  // 予約の受付元に「来店（walk_in）」を足す作り直しで、来店印を退避・復元する。
+  '596_restaurant_walk_in.sql': new Set([
+    'migration_596_seat_visit_marks_backup',
+  ]),
+  // 媒体の種類を増やす作り直しで、予約・取り込みメール・日次件数の参照を退避・復元する。
+  '597_restaurant_media_links.sql': new Set([
+    'migration_597_reservations_media_backup',
+    'migration_597_inbound_emails_backup',
+    'migration_597_email_digests_backup',
+  ]),
   // 予約媒体のCHECK制約拡張で、既存予約と日次件数の参照を退避・復元する。
   '545_restaurant_channels.sql': new Set([
     'migration_545_media_links_backup',

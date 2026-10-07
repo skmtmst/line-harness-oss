@@ -191,3 +191,27 @@ describe('LINEでの見え方の題（#1482 で基本の見た目が消えた再
     expect(css).toMatch(/(^|\n)\.phoneTitle \{[^}]*display:\s*flex[^}]*margin:\s*0 0 10px/)
   })
 })
+
+describe('ラジオカードの高さ 90 の口（★V8 E-3 ウォークインの卓 PUWyq）', () => {
+  const css = () => readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'radio-card.module.css'), 'utf8')
+
+  it('既定の箱には付かず、height="short" を渡したときだけ付く', () => {
+    render(
+      <RadioCardGroup legend="卓">
+        <RadioCard name="t" value="a" checked onChange={() => {}} title="既定" />
+        <RadioCard name="t" value="b" checked={false} onChange={() => {}} title="低い" height="short" />
+        <RadioCard name="t" value="c" checked={false} onChange={() => {}} title="行" variant="row" height="short" />
+      </RadioCardGroup>,
+    )
+    const labelOf = (name: string) => screen.getByRole('radio', { name: new RegExp(name) }).closest('label')!
+    expect(labelOf('既定').className).not.toMatch(/short/)
+    expect(labelOf('低い').className).toMatch(/short/)
+    // 箱でない形（行）には効かせない
+    expect(labelOf('行').className).not.toMatch(/short/)
+  })
+
+  it('高さ 90 は V8 の段の .short にだけあり、既定の箱の 98 は変えない', () => {
+    expect(css()).toMatch(/\[data-theme='v8'\] \.short \{[^}]*min-height:\s*90px[^}]*padding-bottom:\s*6px/)
+    expect(css()).toMatch(/\[data-theme='v8'\] \.card \{[^}]*min-height:\s*98px/)
+  })
+})

@@ -12,7 +12,6 @@
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8-B 完成までの二重管理）。
  */
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import Link from 'next/link'
 import { Eye, PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import {
@@ -287,7 +286,7 @@ const EmergencyControlV8 = (
 
   const targetLabels: Record<StopTarget, { label: string; note: string }> = {
     broadcasts: { label: '予約中の一斉配信', note: '予約を下書きに戻します' },
-    scenarios: { label: 'シナリオ配信', note: '稼働中のものを止めます' },
+    scenarios: { label: 'シナリオ', note: '稼働中のシナリオ配信を止めます' },
     reminders: { label: 'リマインダ', note: '稼働中のものを止めます' },
     automations: { label: '自動処理', note: 'オートメーションと自動応答を止めます' },
   }
@@ -594,22 +593,24 @@ const EmergencyControlV8 = (
       <section className={styles.card} aria-labelledby="emergency-targets-heading">
         <h2 id="emergency-targets-heading" className={styles.cardTitle}>何を止めますか</h2>
         <p className={styles.cardNote}>選んだものだけを止めます。止めると、予約中の一斉配信は下書きに戻ります。</p>
-        {(Object.keys(targetLabels) as StopTarget[]).map((key) => (
-          <div key={key} className={styles.targetRow}>
-            <Checkbox
-              checked={targets[key]}
-              onCheckedChange={(checked) => setTargets((current) => ({ ...current, [key]: checked }))}
-              disabled={mutationLocked || isStopped || !canControl}
-              description={targetLabels[key].note}
-            >
-              {targetLabels[key].label}
-            </Checkbox>
-            <span className={styles.targetImpact}>{impactText(key)}</span>
-          </div>
-        ))}
+        {/* 絵：止めるものは1行に並べる。何と何人に関わるかは、押す前に確認の窓で実測を見せる（行の上では title）。 */}
+        <div className={styles.targetRow} role="group" aria-label="止めるもの">
+          {(Object.keys(targetLabels) as StopTarget[]).map((key) => (
+            <span key={key} className={styles.targetItem} title={`${targetLabels[key].note}・${impactText(key)}`}>
+              <Checkbox
+                checked={targets[key]}
+                onCheckedChange={(checked) => setTargets((current) => ({ ...current, [key]: checked }))}
+                disabled={mutationLocked || isStopped || !canControl}
+              >
+                {targetLabels[key].label}
+              </Checkbox>
+            </span>
+          ))}
+        </div>
         <div className={styles.accountRow}>
           <div className={styles.accountField}>
             <label htmlFor="emergency-account-v8" className={styles.fieldLabel}>止めるアカウント</label>
+            <span className={styles.accountSelect}>
             <Select
               size="full"
               id="emergency-account-v8"
@@ -631,6 +632,7 @@ const EmergencyControlV8 = (
                 ...accounts.map((account) => ({ value: account.id, label: `${account.name}（いまのアカウント）` })),
               ]}
             />
+            </span>
           </div>
           <Button
             type="button"
@@ -642,39 +644,8 @@ const EmergencyControlV8 = (
           </Button>
         </div>
 
-        <div className={styles.accountRow}>
-          <div className={styles.accountField}>
-            <label htmlFor="emergency-reason-v8-body" className={styles.fieldLabel}>止める理由（記録に残ります）</label>
-            <Select
-              size="full"
-              id="emergency-reason-v8-body"
-              value={reason}
-              onChange={(value) => setReason(value)}
-              disabled={mutationLocked || isStopped}
-              aria-label="緊急停止の理由"
-              options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))}
-            />
-          </div>
-        </div>
-        <div className={styles.detailBlock}>
-          <div className={styles.detailHead}>
-            <label htmlFor="emergency-detail-v8-body" className={styles.fieldLabel}>補足（任意）</label>
-            <p className={styles.detailCounter}>あと{1000 - reasonDetail.length}文字</p>
-          </div>
-          <textarea
-            id="emergency-detail-v8-body"
-            value={reasonDetail}
-            onChange={(event) => setReasonDetail(event.target.value)}
-            disabled={mutationLocked || isStopped}
-            rows={2}
-            maxLength={1000}
-            placeholder="発生していることを短く入力"
-            className={styles.detailTextarea}
-          />
-        </div>
-
         {isStopped && control ? (
-          <div className={styles.stoppedBand} role="status">
+          <div className={`${styles.stoppedBand} ${styles.stoppedBandOn}`} role="status">
             <p className={styles.stoppedTitle}>止めているとき</p>
             <div className={styles.stoppedLine}>
               <p className={styles.stoppedText}>
@@ -695,10 +666,19 @@ const EmergencyControlV8 = (
               復旧するとき：止める前に動いていたものだけを戻します。理由を書いて、本人確認（6桁）をしてから戻します。
             </p>
           </div>
-        ) : null}
+        ) : (
+          /* 絵：止めているときの帯の置き場は、動いているあいだも空けておく（止めると、ここに時刻・担当・止めたものと「復旧する」が出る）。 */
+          <div className={styles.stoppedBand}>
+            <p className={styles.stoppedTitle}>止めているとき</p>
+            <div className={styles.stoppedLine}>
+              <p className={styles.stoppedText}>いまは止めていません。止めると、ここに止めた時刻・担当・止めたものが出ます。</p>
+            </div>
+            <p className={styles.stoppedNote}>
+              復旧するとき：止める前に動いていたものだけを戻します。理由を書いて、本人確認（6桁）をしてから戻します。
+            </p>
+          </div>
+        )}
       </section>
-
-      <SendPathCoveragePanel accountId={targetAccountId === 'all' ? null : targetAccountId} revision={control?.version ?? 0} />
 
       <div className={styles.infoGrid}>
         <section className={styles.card} aria-labelledby="emergency-after-stop-heading">
@@ -717,14 +697,6 @@ const EmergencyControlV8 = (
             <li>変更・追加があった配信は再開しません</li>
             <li>期限を過ぎた予約配信は戻りません（下書きへ）</li>
             <li>止めているあいだの時刻ぶんは、戻しても送りません</li>
-          </ul>
-        </section>
-        <section className={styles.card} aria-labelledby="emergency-links-heading">
-          <h2 id="emergency-links-heading" className={styles.cardTitle}>つながる先</h2>
-          <ul className={styles.infoList}>
-            <li><Link href="/emergency?tab=health" className={styles.relatedLink}>→ 健全性チェック</Link><br />止める前に、どこが変かを確認</li>
-            <li><Link href="/emergency?tab=history" className={styles.relatedLink}>→ 更新履歴</Link><br />止めた・戻した記録</li>
-            <li><Link href="/broadcasts" className={styles.relatedLink}>→ 一斉配信</Link><br />下書きに戻った配信</li>
           </ul>
         </section>
       </div>
@@ -809,27 +781,8 @@ const EmergencyControlV8 = (
         </p>
       </section>
 
-      <div className={styles.stickyBar} role="region" aria-label="緊急停止の操作">
-        <p className={styles.stickySummary}>4つのうち{selectedTargets.length}つを選択 ／ {accountName} ／ 理由「{reason}」</p>
-        <div className={styles.stickyActions}>
-          <button
-            type="button"
-            onClick={() => { setTargets({ broadcasts: true, scenarios: true, reminders: true, automations: false }); setReason('障害対応'); setReasonDetail('') }}
-            disabled={mutationLocked || isStopped}
-            className={styles.stickyCancel}
-          >
-            キャンセル
-          </button>
-          <Button
-            type="button"
-            variant="danger"
-            onClick={openStopConfirm}
-            disabled={mutationLocked || isStopped || impactFailed || !impact || !control || !canControl}
-          >
-            緊急停止する
-          </Button>
-        </div>
-      </div>
+      {/* 送る経路の網羅（止めると止まる経路）。絵の外なので記録の下に置く。 */}
+      <SendPathCoveragePanel accountId={targetAccountId === 'all' ? null : targetAccountId} revision={control?.version ?? 0} />
 
       {/* 確認の窓：止めるときは板 `EA8rM` の1枚（対象・理由必須・言葉・番号）。戻すときは今までどおり。 */}
       <Dialog
@@ -896,6 +849,22 @@ const EmergencyControlV8 = (
                   placeholder="例：宛先の絞り込みを間違えた"
                   className={styles.dialogInput}
                   style={{ maxWidth: '100%' }}
+                />
+              </div>
+              <div className={styles.detailBlock}>
+                <div className={styles.detailHead}>
+                  <label htmlFor="emergency-detail-v8" className={styles.dialogLabel}>補足（任意）</label>
+                  <p className={styles.detailCounter}>あと{1000 - reasonDetail.length}文字</p>
+                </div>
+                <textarea
+                  id="emergency-detail-v8"
+                  value={reasonDetail}
+                  onChange={(event) => setReasonDetail(event.target.value)}
+                  disabled={mutationLocked || running}
+                  rows={2}
+                  maxLength={1000}
+                  placeholder="発生していることを短く入力"
+                  className={styles.detailTextarea}
                 />
               </div>
               <p className={styles.dialogHint}>停止前にすでに LINE へ渡したものは取り消せません。</p>

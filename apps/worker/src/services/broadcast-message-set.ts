@@ -1,5 +1,5 @@
 import type { Message } from '@line-crm/line-sdk';
-import { convertBroadcastAsset, isBroadcastAssetKind } from '@line-crm/shared';
+import { normalizeStoreInterpolations, convertBroadcastAsset, isBroadcastAssetKind, splitBroadcastText, validateFlexMessage, validateImagemapMessage } from '@line-crm/shared';
 import { autoTrackContent } from './auto-track.js';
 import { buildMessage } from './line-message.js';
 import {
@@ -16,7 +16,7 @@ import { addMessageVariation } from './stealth.js';
 export const MAX_BROADCAST_MESSAGES = 5;
 
 const SUPPORTED_TYPES = new Set([
-  'text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel',
+  'text', 'image', 'imagemap', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel',
   // 配信用素材（カルーセル・リッチ・クーポン・リサーチ）は、画面の保存と
   // 同じ変換（`@line-crm/shared`）で LINE の種別に直してから送る。
   // 画面では通るのに送信で断られる形にしない（監査 R144）。
@@ -60,6 +60,7 @@ function jsonObject(value: string, field: string): Record<string, unknown> {
 
 function contentForBubble(type: string, value: unknown): string {
   const content = record(value);
+  if (type === 'imagemap') return typeof content.text === 'string' ? content.text : JSON.stringify(content);
   if (type === 'text') return nonEmptyString(content.text, 'text');
   if (type === 'image' || type === 'video') {
     /*
@@ -86,6 +87,8 @@ function contentForBubble(type: string, value: unknown): string {
     if (parsed.type !== 'bubble' && parsed.type !== 'carousel') {
       throw new Error('Flexはバブルかカルーセルの形にしてください');
     }
+    const error = validateFlexMessage(parsed);
+    if (error) throw new Error(error);
     return flexJson;
   }
   if (type === 'carousel') {
@@ -165,11 +168,13 @@ function contentForBubble(type: string, value: unknown): string {
   throw new Error(`Unsupported broadcast bubble type: ${type}`);
 }
 
-export function parseBroadcastMessageParts(input: {
+function parseStoredBroadcastMessageParts(input: {
   messageType: string;
   messageContent: string;
   messageBubblesJson?: string | null;
   messageBubbles?: unknown;
+  messageOptions?: unknown;
+  messageOptionsJson?: string | null;
   altText?: string | null;
 }): BroadcastMessagePart[] {
   let bubbles: unknown = input.messageBubbles;
@@ -223,6 +228,32 @@ export function parseBroadcastMessageParts(input: {
   });
 }
 
+/** 保存・配信・テスト送信は、分割後と追加ボタンを含めて5通を数える。 */
+export function parseBroadcastMessageParts(input: Parameters<typeof parseStoredBroadcastMessageParts>[0]): BroadcastMessagePart[] {
+  const parts = parseStoredBroadcastMessageParts(input).flatMap(part => part.messageType === 'text'
+    ? splitBroadcastText(part.messageContent).map((messageContent,index) => ({ ...part, id: index === 0 ? part.id : `${part.id}-${index}`, messageContent }))
+    : [part]);
+  let options = input.messageOptions as { buttons?: Array<{ label: string; value: string; type?: string }> } | undefined;
+  if (options === undefined && input.messageOptionsJson) options = JSON.parse(input.messageOptionsJson);
+  if (options?.buttons?.length) {
+    parts.push({ id: 'message-buttons', messageType: 'flex', altText: 'ボタン', messageContent: JSON.stringify({
+      type: 'bubble', body: { type: 'box', layout: 'vertical', contents: options.buttons.map(button => ({
+        type: 'button', action: button.type === 'postback'
+          ? {type:'postback',label:button.label,data:button.value}
+          : {type:'uri',label:button.label,uri:button.value},
+      })) },
+    }) });
+  }
+  if (parts.length > MAX_BROADCAST_MESSAGES) throw new Error('文章の自動分割とボタンを合わせて5通までです。本文や吹き出しを減らしてください');
+  for (const part of parts) {
+    if (part.messageType === 'flex' || part.messageType === 'imagemap') {
+      const error = (part.messageType === 'flex' ? validateFlexMessage : validateImagemapMessage)(JSON.parse(part.messageContent));
+      if (error) throw new Error(error);
+    }
+  }
+  return parts.map(p=>({...p,messageContent:normalizeStoreInterpolations(p.messageContent)}));
+}
+
 export function combinedMessageContent(parts: BroadcastMessagePart[]): string {
   return parts.map((part) => part.messageContent).join('\n');
 }
@@ -257,10 +288,12 @@ export function renderMessageParts(
   parts: BroadcastMessagePart[],
   context: BroadcastRenderContext,
 ): BroadcastMessagePart[] {
-  return parts.map((part) => ({
-    ...part,
-    messageContent: renderBroadcastMessageContent(part.messageType, part.messageContent, context),
-  }));
+  const rendered = parts.flatMap(part => {
+    const messageContent = renderBroadcastMessageContent(part.messageType, part.messageContent, context);
+    return part.messageType === 'text' ? splitBroadcastText(messageContent).map(content => ({ ...part, messageContent: content })) : [{ ...part, messageContent }];
+  });
+  if (rendered.length > 5) throw new Error('差し込み後の文章が5通を超えています');
+  return rendered;
 }
 
 export function assertMessagePartsResolved(parts: BroadcastMessagePart[]): void {

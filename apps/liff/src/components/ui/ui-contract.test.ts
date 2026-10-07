@@ -45,6 +45,11 @@ const V7_FILES = [
   src('pages', 'Form.tsx'),
   src('pages', 'Affiliate.tsx'),
   src('pages', 'Webinar.tsx'),
+  src('pages', 'seat', 'SeatReserve.tsx'),
+  src('pages', 'seat', 'SeatPick.tsx'),
+  src('pages', 'seat', 'SeatConfirm.tsx'),
+  src('pages', 'seat', 'SeatDone.tsx'),
+  src('pages', 'seat', 'SeatMine.tsx'),
 ];
 
 describe('★V8 の色はトークンだけ', () => {
@@ -109,15 +114,21 @@ describe('LoadErrorView は日本語＋読み直しだけ', () => {
   });
 });
 
-describe('予約の履歴に操作は無い', () => {
-  it('キャンセル・変更のボタンが無く、連絡先の案内がある', () => {
+/*
+ * 2026-10-07：F-6（本人の日時変更・取消）の口ができたので「操作は無い」から書き換えた。
+ * 操作は、履歴の口が版（lock_version）を返した予約にだけ出す。返さない予約には出さず、連絡先の案内を残す。
+ * 動き（送る値・確認・失敗の文）は BookingHistory-self-change.test.tsx が見る。
+ */
+describe('予約の履歴の操作（F-6）', () => {
+  it('日時を変える・キャンセルは版がある予約にだけ出し、無いときは連絡先の案内を出す', () => {
     const page = src('pages', 'BookingHistory.tsx');
     const card = src('components', 'HistoryCard.tsx');
-    expect(page).not.toContain('キャンセルする');
-    expect(page).not.toContain('変更する');
-    expect(page).not.toContain('onCancel');
-    expect(card).not.toContain('<button');
+    expect(page).toContain("typeof b.lock_version === 'number'");
+    expect(page).toContain('api.cancelMyBooking');
+    expect(page).toContain('api.rescheduleMyBooking');
     expect(page).toContain('お店に LINE でご連絡ください');
+    expect(card).toContain('日時を変える');
+    expect(card).toContain('{onCancel && (');
   });
 
   it('札は確認待ち・確定の文字を出す', () => {

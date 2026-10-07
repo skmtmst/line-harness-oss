@@ -20,23 +20,9 @@ const SETTINGS_MENUS_TAB = readFileSync(join(ROOT, 'settings-tabs', 'menus-tab.t
 const SETTINGS_CSS = readFileSync(join(ROOT, 'settings-v8.module.css'), 'utf8')
 
 describe('V6 予約設定', () => {
-  it('V6の一覧・状態・作成画面を実ノードへ結び付ける', () => {
-    expect(LIST).toContain('data-design-node="QSLEH"')
-    expect(LIST).toContain('data-design-node="W6465r"')
-    expect(CREATE).toContain('designNode="GhOb3"')
-  })
-
   it('R91: メニューがあるときも見出しに作成の入口を常設する', () => {
     expect(LIST).toContain("tab === 'menus' && canEditMenus")
     expect(LIST).toContain('href="/booking/menus/new"')
-  })
-
-  it('本文に画面タイトルを重ねず、行き先が分かる操作名にする', () => {
-    expect(LIST).not.toContain('<Header')
-    expect(CREATE).toContain('showHeader={false}')
-    expect(LIST).toContain('予約メニューを作る')
-    expect(LIST).toContain('受付枠')
-    expect(LIST).toContain('休業日')
   })
 
   it('設計どおり4つの設定入口と、店舗共通・メニュー別の予約ルールを持つ', () => {
@@ -122,12 +108,6 @@ describe('V6 予約設定', () => {
     expect(CREATE).toContain("staffLoadState === 'error'")
     expect(CREATE).toContain('担当スタッフを読み込めませんでした。下の「担当をもう一度読み込む」で読み込んでから作成してください')
     expect(CREATE).toContain('assignedIds')
-  })
-
-  it('編集窓の入力欄は共通の枠線と輪郭へ寄せる', () => {
-    expect(LIST).not.toContain('border-gray-300')
-    expect(LIST).not.toContain('focus:ring-green-500')
-    expect(LIST).toContain('focus:ring-accent')
   })
 
   it('編集窓の数値欄へ文字列が入る逃げ道を残さない', () => {

@@ -6,7 +6,8 @@ import { usePathname } from 'next/navigation'
 import { api } from '@/lib/api'
 import { canEditTable } from './manual-links/manual-link-view'
 import styles from './settings-v8.module.css'
-import { Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Share2, Bell, type LucideIcon } from 'lucide-react'
+import { Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Share2, Bell, Store, type LucideIcon } from 'lucide-react'
+import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 
 /**
@@ -54,6 +55,11 @@ const TAIL_LINKS: NavLink[] = [
   { href: '/settings/sns', label: 'SNS 連携', icon: Share2 },
 ]
 
+/* 予約サイト・グルメ媒体（提案 E-4）。飲食店向け（テスト）が使える環境だけ、SNS 連携の下に足す。 */
+const RESTAURANT_LINKS: NavLink[] = [
+  { href: '/settings/booking-media', label: '予約サイト・グルメ媒体', icon: Store },
+]
+
 export function SettingsNavV8() {
   const pathname = usePathname()
   const showManualLinks = useManualLinkAccess()
@@ -89,6 +95,7 @@ export function SettingsNavV8() {
         {showManualLinks && item({ href: '/settings/manual-links', label: 'マニュアルの正本表' }, true)}
         {FEATURE_SUB_LINKS.map((link) => item(link, true))}
         {TAIL_LINKS.map((link) => item(link))}
+        {restaurantTestUiEnabled() ? RESTAURANT_LINKS.map((link) => item(link)) : null}
       </ul>
     </nav>
   )

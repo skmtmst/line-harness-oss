@@ -1,0 +1,232 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * ★V8 ベルの小窓（V8.pen `DIHFx/D2eAyQ`・小窓 `mV28V`）。
+ * 値は globals.css の `[data-theme="v8"]` の `--bell-*`。
+ *   器：幅 380・白・角丸 radius-card・枠 border-soft・影
+ *   頭：お知らせ 15/600・未読 12 灰・すべて既読にする 12/600 緑
+ *   分類：切り替え（3つ）の詰めた形
+ *   行：印 28（エラーは赤の薄い地、アップデートは緑の薄い地）・題 13（未読は 600）・
+ *       時刻 11 と行き先 11 緑・未読は青い点 8 と薄い青の地・行の間に線
+ *   下：すべて見る 13/600 緑・歯車（通知設定）
+ */
+
+.panel {
+  display: flex;
+  width: var(--bell-w);
+  max-width: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--bell-shadow);
+  color: var(--color-ink);
+  line-height: var(--bell-lh);
+}
+
+.panel:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.panel:focus-visible {
+  outline: var(--bell-focus-ring) solid var(--color-action);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--bell-head-gap);
+  padding: var(--bell-head-pad);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--bell-title-size);
+  font-weight: 600;
+  line-height: var(--bell-lh);
+  white-space: nowrap;
+}
+
+.unread {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+
+.markAll,
+.viewAll,
+.retry {
+  border: 0;
+  background: none;
+  color: var(--color-accent-deep);
+  font: inherit;
+  font-weight: 600;
+  min-height: 0;
+  padding: 0;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.markAll {
+  font-size: var(--text-caption);
+}
+
+.markAll:disabled {
+  color: var(--color-ink-faint);
+  cursor: default;
+}
+
+.markAll:hover:not(:disabled),
+.viewAll:hover,
+.retry:hover {
+  text-decoration: underline;
+}
+
+.filters {
+  padding: var(--bell-seg-pad);
+}
+
+.state {
+  display: flex;
+  align-items: center;
+  gap: var(--bell-meta-gap);
+  margin: 0;
+  padding: var(--bell-state-pad);
+  border-top: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-hairline);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+
+.state[role='alert'] {
+  color: var(--color-danger);
+}
+
+.retry {
+  font-size: var(--text-label);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-hairline);
+  list-style: none;
+}
+
+.item + .item {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.item[data-unread='true'] {
+  background: var(--bell-unread-bg);
+}
+
+.row {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: var(--bell-row-gap);
+  padding: var(--bell-row-pad);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.row:focus-visible {
+  outline: var(--bell-focus-ring) solid var(--color-action);
+  outline-offset: var(--bell-focus-offset);
+}
+
+.icon {
+  display: inline-flex;
+  width: var(--bell-icon);
+  height: var(--bell-icon);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--bell-icon-radius);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.icon[data-category='error'] {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
+
+.icon > svg {
+  width: var(--bell-icon-glyph);
+  height: var(--bell-icon-glyph);
+}
+
+.text {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--bell-text-gap);
+}
+
+.itemTitle {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--bell-lh);
+  overflow-wrap: anywhere;
+}
+
+.item[data-unread='true'] .itemTitle {
+  font-weight: 600;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--bell-meta-gap);
+  font-size: var(--text-micro);
+  line-height: var(--bell-lh);
+  white-space: nowrap;
+}
+
+.time {
+  color: var(--color-ink-faint);
+}
+
+.go {
+  overflow: hidden;
+  color: var(--color-accent-deep);
+  text-overflow: ellipsis;
+}
+
+.dot {
+  width: var(--bell-dot);
+  height: var(--bell-dot);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--bell-dot-color);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  padding: var(--bell-foot-pad);
+}
+
+.viewAll {
+  font-size: var(--text-label);
+}
+
+[data-theme='v8'] .foot .settings {
+  width: var(--bell-settings);
+  height: var(--bell-settings);
+  flex-basis: var(--bell-settings);
+}
+}

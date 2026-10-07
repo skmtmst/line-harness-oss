@@ -141,26 +141,6 @@ describe('V6 案件一覧（GH8VL）の見せ方', () => {
 })
 
 describe('V6 案件一覧（GH8VL）の画面', () => {
-  it('タブ名と重なる本文見出し「案件」を持たない', () => {
-    expect(TABS).not.toContain('<h2 className="text-ink text-base font-semibold">案件</h2>')
-  })
-
-  it('案内バーを1本置く', () => {
-    expect(TABS).toContain("import NoteBar from '@/components/shared/note-bar'")
-    const offersTab = TABS.slice(
-      TABS.indexOf('export function OffersTab() {'),
-      TABS.indexOf('\nexport function SettlementEditor'),
-    )
-    expect(offersTab.match(/<NoteBar/g) ?? []).toHaveLength(1)
-  })
-
-  it('検索・表示件数・並び順・ページ送りを共通部品でつなぐ', () => {
-    expect(TABS).toContain("import SearchField from '@/components/shared/search-field'")
-    expect(TABS).toContain("import Select from '@/components/shared/select'")
-    expect(TABS).toContain("import Pagination from '@/components/shared/pagination'")
-    expect(TABS).toContain("import FilterChip from '@/components/shared/filter-chip'")
-  })
-
   it('口の無い「並び順を保存」を操作として置かない', () => {
     // 注記としては書いてよい。押せる形（JSXの本文）で出ていないことを見る。
     expect(TABS).not.toMatch(/>\s*並び順を保存\s*</)

@@ -1849,3 +1849,35 @@ it('掲載順と新規掲載のID・版・冪等キーをWorkerへ渡す', async
   expect(String(fetcher.mock.calls[2][0])).toContain('/photos/photo%2Fa/publish')
   expect(fetcher.mock.calls[2][1]).toMatchObject({method:'POST',headers:expect.objectContaining({'Idempotency-Key':'publication-key'})})
 })
+
+describe('一斉配信動画の直接アップロード',()=>{
+  it('動画本体を署名URLへPUTし、Workerには開始と完了だけを知らせる',async()=>{
+    const file=new File(['video'],'clip.mp4',{type:'video/mp4'})
+    Object.defineProperty(file,'size',{value:150*1024*1024})
+    const fetchSpy=vi.fn(async(_url: string | URL | Request,_options?: RequestInit)=>new Response())
+      .mockResolvedValueOnce(new Response(JSON.stringify({success:true,data:{id:'session',uploadUrl:'https://r2.example/signed',requiredHeaders:{'Content-Type':'video/mp4'}}}),{status:201,headers:{'Content-Type':'application/json'}}))
+      .mockResolvedValueOnce(new Response(null,{status:200,headers:{ETag:'"etag"'}}))
+      .mockResolvedValueOnce(new Response(JSON.stringify({success:true,data:{key:'public.mp4',url:'https://worker.example.com/images/public.mp4',mimeType:'video/mp4',size:file.size}}),{status:201,headers:{'Content-Type':'application/json'}}))
+    vi.stubGlobal('fetch',fetchSpy)
+    const result=await api.broadcastMessageAssets.upload(file,'account-a')
+    expect(result.success).toBe(true)
+    expect(fetchSpy.mock.calls.map(call=>call[0])).toEqual(['https://worker.example.com/api/broadcast-message-assets/upload-sessions','https://r2.example/signed','https://worker.example.com/api/broadcast-message-assets/upload-sessions/session/complete'])
+    expect(JSON.parse(fetchSpy.mock.calls[0][1]!.body as string)).toMatchObject({lineAccountId:'account-a',sizeBytes:150*1024*1024})
+    expect(fetchSpy.mock.calls[1][1]).toMatchObject({method:'PUT',body:file,credentials:'omit'})
+    expect(JSON.parse(fetchSpy.mock.calls[2][1]!.body as string)).toEqual({etag:'"etag"'})
+  })
+  it('R2が受け付けなければ完了扱いにしない',async()=>{
+    const file=new File(['video'],'clip.mp4',{type:'video/mp4'})
+    const fetchSpy=vi.fn(async(_url: string | URL | Request,_options?: RequestInit)=>new Response())
+      .mockResolvedValueOnce(new Response(JSON.stringify({success:true,data:{id:'session',uploadUrl:'https://r2.example/signed',requiredHeaders:{}}}),{status:201,headers:{'Content-Type':'application/json'}}))
+      .mockResolvedValueOnce(new Response(null,{status:500}))
+    vi.stubGlobal('fetch',fetchSpy)
+    await expect(api.broadcastMessageAssets.upload(file,'account-a')).rejects.toThrow('動画をアップロードできませんでした')
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+})
+
+it('休業の409から画面が重なる記録の名前・日付をdataとして取得する',()=>{
+ const data={conflicts:[{id:'closure',name:'設備点検',startDate:'2026-11-10',endDate:'2026-11-11'}]};const raw=JSON.stringify({success:false,error:'休業・貸切が重なっています',code:'closure_overlap',data});
+ expect(extractApiErrorCode(raw)).toBe('closure_overlap');expect(extractApiErrorData(raw)).toEqual(data);expect(extractApiErrorMessage(raw,409)).toBe('休業・貸切が重なっています');
+});

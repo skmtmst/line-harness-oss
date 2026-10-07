@@ -99,6 +99,17 @@ describe('型の見出し（379板の絵）', () => {
     expect(css).not.toMatch(/\[data-page-template='create'\] \.heading \{[^}]*padding-block:\s*16px/s)
   })
 
+  /*
+   * 承認済み ★BG-B `qIp42`：来た道の案内（`HLq5w` y=100・`Y5UR7`）と操作のボタン（`e3LG3u` y=99）が
+   * 同じ行で、題（y=24）と説明（y=57）はその上の行。crumbs を渡した一覧の頭だけ2段にする。
+   */
+  it('一覧の頭に来た道の案内を渡したときだけ、題を全幅にして案内と操作を下の行へ並べる', () => {
+    expect(css).toMatch(/\.heading\[data-has-crumbs\] > \.headingText \{[^}]*flex-basis:\s*100%/s)
+    expect(css).toMatch(/\.heading > \.crumbs \{[^}]*order:\s*2/s)
+    expect(css).toMatch(/\.heading\[data-has-crumbs\] > \.actions \{[^}]*order:\s*3/s)
+    expect(css).toMatch(/\.heading\[data-has-crumbs\] > \.actions \{[^}]*margin-left:\s*auto/s)
+  })
+
   it('詳細の頭は20/24/16・間12・操作の間6・タブは下の行', () => {
     expect(css).toMatch(/\[data-page-template='detail'\] \.heading \{[^}]*padding:\s*var\(--tpl-detail-head-pad-top\) var\(--tpl-detail-head-pad-side\) var\(--tpl-detail-head-pad-bottom\)/s)
     expect(css).toMatch(/\[data-page-template='detail'\] \.actions \{[^}]*gap:\s*var\(--tpl-detail-actions-gap\)/s)

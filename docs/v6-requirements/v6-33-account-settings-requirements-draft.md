@@ -1,5 +1,7 @@
 # V6 33 LINE公式アカウント設定 要件定義（実装照合版・下書き）
 
+> この文書は機能（動き）の正本。見た目は ★V8（[docs/v8-design-rules.md](../v8-design-rules.md)）が正本で、この文書の見た目・ノードID・V6 の絵の指定は使わない。
+
 作成日: 2026-09-03
 対象: LINE公式アカウントの登録・検証・切替・停止・archive・乗り換え。現行 `/accounts`（`/hq` へ転送）、`/api/line-accounts`、`line_accounts`、資格情報暗号化、Webhook状態照合、BAN検知、トラフィックプール、Lステップのアカウント設定・データ移行
 

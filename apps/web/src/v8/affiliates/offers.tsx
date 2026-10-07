@@ -259,15 +259,27 @@ export default function OffersTab() {
     return '—'
   }
 
+  /*
+   * 公開する・公開を止める：押した瞬間に札を変え、裏で保存する（触り心地 5 回目）。
+   * 成功したら返ってきた中身に置き換える（一覧は読み直さない）。失敗したら元に戻してトーストで知らせる。
+   */
   const togglePublish = async (offer: AffiliateOffer) => {
+    const next = !offer.isActive
+    const setActive = (isActive: boolean) => setOffers((current) => current.map((item) => (item.id === offer.id ? { ...item, isActive } : item)))
     setBusyId(offer.id)
+    setActive(next)
     try {
-      const res = await api.affiliateOffers.update(offer.id, { isActive: !offer.isActive })
+      const res = await api.affiliateOffers.update(offer.id, { isActive: next })
       if (!res.success) throw new Error('update failed')
-      notifyToast(offer.isActive ? `「${offer.name}」の公開を止めました。紹介リンクに出なくなります。` : `「${offer.name}」を公開しました。`)
-      void loadOffers()
+      if (res.data && res.data.id === offer.id) setOffers((current) => current.map((item) => (item.id === offer.id ? { ...item, ...res.data } : item)))
+      notifyToast(next ? `「${offer.name}」を公開しました。` : `「${offer.name}」の公開を止めました。紹介リンクに出なくなります。`)
     } catch {
-      notifyToast('変えられませんでした。もう一度お試しください。')
+      setActive(offer.isActive)
+      notifyToast(`「${offer.name}」を${next ? '公開でき' : '止められ'}ませんでした。元に戻しました。`, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void togglePublish(offer) },
+      })
     } finally {
       setBusyId(null)
     }
@@ -535,6 +547,7 @@ export default function OffersTab() {
     <AffiliateFrame
       actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
       stats={stats}
+      folderNav={{ rows: FOLDERS.map((item) => ({ id: item.key, label: item.label })), activeId: folder, onSelect: (id) => resetPage(() => { setSaved(''); setFolder(id as FolderKey) }), createAction: readonly ? undefined : createButton(false) }}
       folders={narrow ? undefined : <>{createButton(true)}{folderPanel}</>}
       toolbar={toolbar}
       pagination={pager}

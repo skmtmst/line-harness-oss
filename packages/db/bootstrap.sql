@@ -1055,6 +1055,21 @@ CREATE TABLE auto_reply_create_requests (
   UNIQUE(idempotency_key)
 );
 
+CREATE TABLE auto_reply_deliveries (
+  id TEXT PRIMARY KEY,
+  evaluation_id TEXT NOT NULL UNIQUE REFERENCES auto_reply_evaluations(id),
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  line_account_id TEXT REFERENCES line_accounts(id),
+  version_id TEXT NOT NULL REFERENCES auto_reply_versions(id),
+  message_json TEXT NOT NULL,
+  action_summary TEXT NOT NULL,
+  due_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','claimed','accepted','failed','skipped')),
+  completed_at TEXT,
+  error_code TEXT,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE auto_reply_evaluation_details (
   id                 TEXT PRIMARY KEY,
   evaluation_id      TEXT NOT NULL,
@@ -1105,6 +1120,12 @@ CREATE TABLE auto_reply_hits (
   line_account_id TEXT,
   matched_keyword TEXT,
   hit_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE auto_reply_unmatched_settings (
+ line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+ message TEXT CHECK(message IS NULL OR length(message) BETWEEN 1 AND 5000),
+ version INTEGER NOT NULL DEFAULT 1, updated_by TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 
 CREATE TABLE auto_reply_versions (
@@ -1777,6 +1798,20 @@ CREATE TABLE broadcast_lifecycle_events (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE broadcast_media_upload_sessions (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT REFERENCES line_accounts(id),
+  created_by TEXT NOT NULL,
+  r2_key TEXT NOT NULL UNIQUE,
+  public_key TEXT,
+  filename TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  expected_size INTEGER NOT NULL,
+  expires_at TEXT NOT NULL,
+  completed_at TEXT,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE broadcast_message_assets (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -1829,7 +1864,7 @@ CREATE TABLE broadcast_tracked_links (
 CREATE TABLE "broadcasts" (
   id                 TEXT PRIMARY KEY,
   title              TEXT NOT NULL,
-  message_type       TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel')),
+  message_type       TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel', 'imagemap', 'rich_message', 'coupon')),
   message_content    TEXT NOT NULL,
   target_type        TEXT NOT NULL CHECK (target_type IN ('all', 'tag', 'segment', 'multi-account-dedup')) DEFAULT 'all',
   target_tag_id      TEXT REFERENCES tags (id) ON DELETE SET NULL,
@@ -1859,7 +1894,7 @@ CREATE TABLE "broadcasts" (
   CHECK (message_options_json IS NULL OR json_valid(message_options_json)), after_action_version_id TEXT
   REFERENCES common_action_versions(id) ON DELETE RESTRICT, lock_version INTEGER NOT NULL DEFAULT 1
   CHECK (lock_version > 0), stopped_at TEXT, stopped_by TEXT, send_attempt_no INTEGER NOT NULL DEFAULT 1, common_var_snapshot TEXT
-  CHECK (common_var_snapshot IS NULL OR json_valid(common_var_snapshot)), common_var_snapshot_at TEXT, approval_status TEXT NOT NULL DEFAULT 'none', approval_requested_by_staff_id TEXT, approval_requested_at TEXT, approval_approver_staff_id TEXT, approval_note TEXT, approval_decided_by_staff_id TEXT, approval_decided_at TEXT, approval_reject_reason TEXT, approval_confirmed_count INTEGER);
+  CHECK (common_var_snapshot IS NULL OR json_valid(common_var_snapshot)), common_var_snapshot_at TEXT, approval_status TEXT NOT NULL DEFAULT 'none', approval_requested_by_staff_id TEXT, approval_requested_at TEXT, approval_approver_staff_id TEXT, approval_note TEXT, approval_decided_by_staff_id TEXT, approval_decided_at TEXT, approval_reject_reason TEXT, approval_confirmed_count INTEGER, hq_run_id TEXT REFERENCES hq_broadcast_runs(id));
 
 CREATE TABLE calendar_bookings (
   id             TEXT PRIMARY KEY,
@@ -2182,6 +2217,18 @@ CREATE TABLE "conversion_points" (
   ingest_secret_encrypted TEXT,
   ingest_disabled_at TEXT
 , count_anonymous INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
+
+CREATE TABLE coupon_redemptions (
+  id TEXT PRIMARY KEY,
+  -- 素材を削除しても使用履歴を残す。設定はpayload_snapshotに固定する。
+  asset_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  line_account_id TEXT REFERENCES line_accounts(id),
+  incoming_event_id TEXT NOT NULL UNIQUE,
+  used_at TEXT NOT NULL,
+  use_number INTEGER NOT NULL,
+  payload_snapshot TEXT NOT NULL
+);
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -3175,7 +3222,8 @@ CREATE TABLE friend_fields (
   CHECK (type_v6 IS NULL OR type_v6 IN (
     'text','textarea','number','date','datetime','tel','email','url',
     'select','multi_select','checkbox','image','pdf'
-  )));
+  )), type_v8 TEXT
+  CHECK (type_v8 IS NULL OR type_v8 = 'time'));
 
 CREATE TABLE friend_identity_links (
   id TEXT PRIMARY KEY,
@@ -3391,6 +3439,25 @@ CREATE TABLE google_sheets_sync_runs (
   finished_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , run_date TEXT, spreadsheet_id TEXT);
+
+CREATE TABLE hq_broadcast_audit (
+ id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES hq_broadcast_runs(id), line_account_id TEXT NOT NULL,
+ actor_id TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT(datetime('now'))
+);
+
+CREATE TABLE hq_broadcast_runs (
+ id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), request_id TEXT NOT NULL, actor_id TEXT NOT NULL,
+ input_json TEXT NOT NULL CHECK(json_valid(input_json)), status TEXT NOT NULL DEFAULT 'prepared' CHECK(status IN ('prepared','scheduled','stopped','cancelled')),
+ version INTEGER NOT NULL DEFAULT 1, scheduled_at TEXT, dispatch_token TEXT,
+ created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), UNIQUE(tenant_id,request_id)
+);
+
+CREATE TABLE hq_broadcast_targets (
+ run_id TEXT NOT NULL REFERENCES hq_broadcast_runs(id), line_account_id TEXT NOT NULL,
+ account_name TEXT NOT NULL, tag_id TEXT, excluded INTEGER NOT NULL DEFAULT 0 CHECK(excluded IN (0,1)),
+ broadcast_id TEXT UNIQUE, preflight_json TEXT CHECK(preflight_json IS NULL OR json_valid(preflight_json)),
+ PRIMARY KEY(run_id,line_account_id)
+);
 
 CREATE TABLE hq_support_messages (
   id               TEXT PRIMARY KEY,
@@ -3676,6 +3743,13 @@ CREATE TABLE identity_events (
   correlation_id TEXT NOT NULL
 );
 
+CREATE TABLE imagemap_images (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT REFERENCES line_accounts(id),
+  r2_key TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE impersonation_sessions (
   id             TEXT PRIMARY KEY,
   staff_id       TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
@@ -3789,6 +3863,28 @@ CREATE TABLE incoming_webhooks (
 , version INTEGER NOT NULL DEFAULT 1
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
   '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
+
+CREATE TABLE instagram_connections (
+ line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id), page_id TEXT NOT NULL,
+ instagram_id TEXT NOT NULL UNIQUE, page_name TEXT NOT NULL, username TEXT,
+ page_token_encrypted TEXT NOT NULL, user_token_encrypted TEXT NOT NULL,
+ expires_at TEXT NOT NULL, data_access_expires_at TEXT, profile_json TEXT, posts_json TEXT,
+ refreshed_at TEXT NOT NULL, synced_at TEXT, connected_by TEXT NOT NULL,
+ version INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE instagram_messages (
+ id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+ instagram_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL,
+ content TEXT NOT NULL, attachments_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(attachments_json)), received_at TEXT NOT NULL, created_at TEXT NOT NULL,
+ UNIQUE(line_account_id,id)
+);
+
+CREATE TABLE instagram_oauth_states (
+ state_hash TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+ staff_id TEXT NOT NULL, phase TEXT NOT NULL CHECK(phase IN ('started','exchanging','selecting','connecting')),
+ candidates_encrypted TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL
+);
 
 CREATE TABLE integration_api_tokens (
   id              TEXT PRIMARY KEY,
@@ -4204,7 +4300,7 @@ CREATE TABLE messages_log (
   sent_by_staff_id TEXT,
   line_event_at    TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT);
+, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT, search_content TEXT);
 
 CREATE TABLE mileage_adjustment_approval_events (
   id              TEXT PRIMARY KEY,
@@ -4414,6 +4510,15 @@ CREATE TABLE mileage_reward_codes (
   UNIQUE (reward_version_id, code_fingerprint)
 );
 
+CREATE TABLE mileage_reward_folders (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 100),
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE mileage_reward_versions (
   id                       TEXT PRIMARY KEY,
   reward_id                TEXT NOT NULL REFERENCES mileage_rewards(id),
@@ -4459,7 +4564,7 @@ CREATE TABLE mileage_rewards (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-);
+, folder_id TEXT REFERENCES mileage_reward_folders(id));
 
 CREATE TABLE mileage_rules (
   id             TEXT PRIMARY KEY,
@@ -6100,6 +6205,40 @@ CREATE TABLE rt_channel_close_tasks (
  UNIQUE(slot_id,channel)
 );
 
+CREATE TABLE rt_close_notification_settings (
+ store_id TEXT PRIMARY KEY REFERENCES rt_stores(id), notify_reopen INTEGER NOT NULL DEFAULT 1 CHECK(notify_reopen IN (0,1)),
+ recipient_mode TEXT NOT NULL DEFAULT 'responsible' CHECK(recipient_mode IN ('responsible','manager','selected')),
+ membership_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(membership_ids_json)), version INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE rt_closure_close_outbox (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES rt_closure_close_tasks(id), generation INTEGER NOT NULL,
+ membership_id TEXT NOT NULL REFERENCES rt_memberships(id), retry_key TEXT NOT NULL, sent_at TEXT, lease_until TEXT, lease_token TEXT,
+ UNIQUE(task_id,generation,membership_id)
+);
+
+CREATE TABLE rt_closure_close_tasks (
+ id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES rt_stores(id), closure_id TEXT NOT NULL REFERENCES rt_closures(id),
+ closure_version INTEGER NOT NULL, channel TEXT NOT NULL, kind TEXT NOT NULL,
+ start_date TEXT NOT NULL, end_date TEXT NOT NULL, all_day INTEGER NOT NULL, start_time TEXT, end_time TEXT,
+ table_ids_json TEXT NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('close','done','reopen')), generation INTEGER NOT NULL DEFAULT 1,
+ created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')),
+ UNIQUE(closure_id,closure_version,channel)
+);
+
+CREATE TABLE rt_closures (
+ id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES rt_stores(id),
+ start_date TEXT NOT NULL, end_date TEXT NOT NULL CHECK(end_date>=start_date),
+ all_day INTEGER NOT NULL CHECK(all_day IN (0,1)), start_time TEXT, end_time TEXT,
+ kind TEXT NOT NULL CHECK(kind IN ('temporary_closed','private_event','maintenance','other')),
+ memo TEXT, table_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(table_ids_json) AND json_type(table_ids_json)='array'),
+ periods_json TEXT NOT NULL CHECK(json_valid(periods_json) AND json_type(periods_json)='array' AND json_array_length(periods_json)>0),
+ created_by TEXT, created_by_name TEXT, version INTEGER NOT NULL DEFAULT 1 CHECK(version>0),
+ created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), archived_at TEXT, notify_media INTEGER NOT NULL DEFAULT 1 CHECK(notify_media IN (0,1)),
+ CHECK((all_day=1 AND start_time IS NULL AND end_time IS NULL) OR (all_day=0 AND start_time IS NOT NULL AND end_time>start_time))
+);
+
 CREATE TABLE rt_connector_status (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -6110,6 +6249,14 @@ CREATE TABLE rt_connector_status (
   last_error TEXT,
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(store_id, provider)
+);
+
+CREATE TABLE rt_customer_notice_outbox (
+ id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES rt_stores(id),
+ reservation_id TEXT NOT NULL REFERENCES rt_reservations(id), customer_version INTEGER NOT NULL,
+ line_uid TEXT NOT NULL, message TEXT NOT NULL, retry_key TEXT NOT NULL UNIQUE,
+ sent_at TEXT, lease_until TEXT, lease_token TEXT, created_at TEXT NOT NULL DEFAULT(datetime('now')),
+ UNIQUE(reservation_id,customer_version)
 );
 
 CREATE TABLE rt_email_digests (
@@ -6427,12 +6574,12 @@ CREATE TABLE rt_line_flows (
 
 CREATE TABLE "rt_media" (
   id TEXT PRIMARY KEY,
-  code TEXT NOT NULL UNIQUE CHECK (code IN ('retty', 'gurunavi', 'tabelog', 'hotpepper', 'google_reservation', 'ikyu', 'tablecheck')),
+  code TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   sender_addresses TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(sender_addresses)),
   parser_key TEXT NOT NULL UNIQUE,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
-);
+, accepts_reservations INTEGER NOT NULL DEFAULT 1 CHECK(accepts_reservations IN (0,1)));
 
 CREATE TABLE rt_memberships (
   id TEXT PRIMARY KEY,
@@ -6484,7 +6631,7 @@ CREATE TABLE rt_opening_hours_settings (
   version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
   updated_by TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, late_cancel_after_minutes INTEGER CHECK(late_cancel_after_minutes BETWEEN 1 AND 1440), late_arrival_message TEXT CHECK(length(late_arrival_message)<=1000));
 
 CREATE TABLE rt_organization_agreements (
   id TEXT PRIMARY KEY,
@@ -6505,10 +6652,28 @@ CREATE TABLE rt_organizations (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 , tenant_id TEXT REFERENCES tenants(id));
 
-CREATE TABLE rt_reservations (
+CREATE TABLE rt_reservation_close_outbox (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES rt_reservation_close_tasks(id), generation INTEGER NOT NULL,
+ membership_id TEXT NOT NULL REFERENCES rt_memberships(id), retry_key TEXT NOT NULL, sent_at TEXT, lease_until TEXT, lease_token TEXT,
+ UNIQUE(task_id,generation,membership_id)
+);
+
+CREATE TABLE rt_reservation_close_tasks (
+ id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES rt_stores(id), reservation_id TEXT NOT NULL REFERENCES rt_reservations(id),
+ channel TEXT NOT NULL, starts_at TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('close','done','reopen')),
+ generation INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')),
+ UNIQUE(reservation_id,channel,starts_at)
+);
+
+CREATE TABLE rt_reservation_links (
+ store_id TEXT PRIMARY KEY REFERENCES rt_stores(id), token TEXT NOT NULL UNIQUE,
+ created_at TEXT NOT NULL DEFAULT(datetime('now'))
+);
+
+CREATE TABLE "rt_reservations" (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
-  source TEXT NOT NULL CHECK (source IN ('restaurant_board', 'reszaiko', 'hotpepper', 'tabelog', 'gurunavi', 'ikyu', 'retty', 'line', 'phone', 'manual')),
+  source TEXT NOT NULL CHECK (source IN ('restaurant_board', 'reszaiko', 'hotpepper', 'tabelog', 'gurunavi', 'ikyu', 'retty', 'line', 'phone', 'manual', 'walk_in')),
   external_id TEXT,
   hub_source TEXT,
   customer_name TEXT NOT NULL,
@@ -6526,7 +6691,7 @@ CREATE TABLE rt_reservations (
   source_updated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT);
+, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT);
 
 CREATE TABLE rt_resource_locks (
   resource_key TEXT PRIMARY KEY,
@@ -6548,7 +6713,7 @@ CREATE TABLE rt_seat_visit_marks (
   marked_by_name        TEXT,
   -- UTC ISO8601。付けた時刻。
   marked_at             TEXT NOT NULL,
-  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')), undone_at TEXT, undone_by TEXT,
   CHECK ((kind = 'late' AND late_minutes IS NOT NULL)
       OR (kind != 'late' AND late_minutes IS NULL))
 );
@@ -6577,6 +6742,13 @@ CREATE TABLE "rt_seat_waitlist" (
   created_at            TEXT NOT NULL DEFAULT (datetime('now')),
   ends_at TEXT, finish_reason TEXT, notification_retry_key TEXT, notification_claim_until TEXT, last_processed_at TEXT,
   updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE rt_store_media_links (
+ store_id TEXT NOT NULL REFERENCES rt_stores(id), media_id TEXT NOT NULL REFERENCES rt_media(id),
+ page_url TEXT, login_url TEXT, close_on_booking INTEGER NOT NULL DEFAULT 0 CHECK(close_on_booking IN (0,1)),
+ version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT(datetime('now')),
+ PRIMARY KEY(store_id,media_id)
 );
 
 CREATE TABLE rt_stores (
@@ -6717,6 +6889,17 @@ CREATE TABLE scenario_drafts (
   updated_at         TEXT NOT NULL
 );
 
+CREATE TABLE scenario_edit_drafts (
+ line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+ draft_key TEXT NOT NULL,
+ content_json TEXT NOT NULL CHECK(json_valid(content_json)),
+ scenario_id TEXT REFERENCES scenarios(id) ON DELETE SET NULL, step_id TEXT REFERENCES scenario_steps(id) ON DELETE SET NULL,
+ version TEXT NOT NULL CHECK(length(version) = 36),
+ updated_by TEXT NOT NULL, updated_at TEXT NOT NULL,
+ expires_at TEXT NOT NULL,
+ PRIMARY KEY(line_account_id,draft_key)
+);
+
 CREATE TABLE scenario_pinned_action_fires (
   action_key TEXT NOT NULL,
   friend_id  TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
@@ -6737,7 +6920,7 @@ CREATE TABLE "scenario_steps" (
   scenario_id     TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
   step_order      INTEGER NOT NULL,
   delay_minutes   INTEGER NOT NULL DEFAULT 0,
-  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel')),
+  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel', 'imagemap', 'rich_message', 'coupon')),
   message_content TEXT NOT NULL,
   message_bubbles_json TEXT CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)),
   offset_days     INTEGER,
@@ -6798,7 +6981,8 @@ CREATE TABLE scenarios (
   delivery_mode   TEXT NOT NULL DEFAULT 'relative' CHECK (delivery_mode IN ('relative', 'elapsed', 'absolute_time')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), current_published_version_id TEXT);
+, line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), current_published_version_id TEXT, stopped_reason TEXT
+  CHECK (stopped_reason IS NULL OR length(stopped_reason) <= 200), stopped_by TEXT, stopped_at TEXT);
 
 CREATE TABLE scheduled_chat_sends (
   id TEXT PRIMARY KEY,
@@ -7209,11 +7393,11 @@ CREATE TABLE template_versions (
   UNIQUE (template_id, version_number)
 );
 
-CREATE TABLE templates (
+CREATE TABLE "templates" (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
   category        TEXT NOT NULL DEFAULT 'general',
-  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'carousel')),
+  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'carousel', 'imagemap', 'rich_message', 'coupon')),
   message_content TEXT NOT NULL,
   -- 162: カルーセルの選択肢を押したときの動き。
   -- { "0": { "0": [アクションの並び] } }（パネル番号 → 選択肢番号 → 中身）
@@ -7463,6 +7647,71 @@ CREATE TABLE users (
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , tenant_id TEXT REFERENCES tenants(id) ON DELETE RESTRICT, status TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active', 'review', 'archived')), primary_display_name TEXT, revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1), created_by TEXT, archived_at TEXT);
+
+CREATE TABLE visit_stamp_card_accounts (
+ card_id TEXT NOT NULL REFERENCES visit_stamp_cards(id), line_account_id TEXT NOT NULL REFERENCES line_accounts(id), PRIMARY KEY(card_id,line_account_id)
+);
+
+CREATE TABLE visit_stamp_cards (
+ id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), name TEXT NOT NULL,
+ settings_json TEXT NOT NULL CHECK(json_valid(settings_json)), active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
+ write_token TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now'))
+);
+
+CREATE TABLE visit_stamp_checkouts (
+ kind TEXT NOT NULL CHECK(kind IN ('restaurant','booking')), visit_id TEXT NOT NULL, line_account_id TEXT NOT NULL,
+ amount INTEGER NOT NULL CHECK(amount>=0), recorded_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT(datetime('now')), PRIMARY KEY(kind,visit_id)
+);
+
+CREATE TABLE visit_stamp_entries (
+ id TEXT PRIMARY KEY, card_id TEXT NOT NULL REFERENCES visit_stamp_cards(id), friend_id TEXT NOT NULL, line_account_id TEXT NOT NULL,
+ kind TEXT NOT NULL CHECK(kind IN ('visit','manual','paper','redeem','reverse','restore','expire')), delta INTEGER NOT NULL,
+ actor_id TEXT, reason TEXT NOT NULL, idempotency_key TEXT NOT NULL, original_id TEXT UNIQUE REFERENCES visit_stamp_entries(id),
+ visit_key TEXT, expires_at TEXT, occurred_at TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT(datetime('now')),
+ UNIQUE(card_id,friend_id,idempotency_key)
+);
+
+CREATE TABLE visit_stamp_paper_photos (
+ id TEXT PRIMARY KEY, card_id TEXT NOT NULL REFERENCES visit_stamp_cards(id), friend_id TEXT NOT NULL REFERENCES friends(id),
+ line_account_id TEXT NOT NULL REFERENCES line_accounts(id), object_key TEXT NOT NULL UNIQUE, content_type TEXT NOT NULL,
+ size INTEGER NOT NULL CHECK(size BETWEEN 1 AND 5242880), created_at TEXT NOT NULL DEFAULT(datetime('now'))
+);
+
+CREATE TABLE visit_stamp_paper_requests (
+ id TEXT PRIMARY KEY, card_id TEXT NOT NULL REFERENCES visit_stamp_cards(id), friend_id TEXT NOT NULL REFERENCES friends(id),
+ line_account_id TEXT NOT NULL REFERENCES line_accounts(id), photo_url TEXT NOT NULL, stamps INTEGER NOT NULL CHECK(stamps BETWEEN 1 AND 10000),
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')), reason TEXT, reviewed_by TEXT, reviewed_at TEXT,
+ created_at TEXT NOT NULL DEFAULT(datetime('now'))
+, submitted_friend_id TEXT REFERENCES friends(id));
+
+CREATE TABLE visit_stamp_pin_attempts (
+ line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id), attempts INTEGER NOT NULL DEFAULT 0, locked_until TEXT
+);
+
+CREATE TABLE visit_stamp_redemptions (
+ id TEXT PRIMARY KEY, card_id TEXT NOT NULL REFERENCES visit_stamp_cards(id), friend_id TEXT NOT NULL, line_account_id TEXT NOT NULL,
+ reward_id TEXT NOT NULL, reward_name TEXT NOT NULL, stamps INTEGER NOT NULL CHECK(stamps>0),
+ status TEXT NOT NULL DEFAULT 'offered' CHECK(status IN ('offered','used','cancelled')), request_id TEXT NOT NULL,
+ used_by TEXT, used_at TEXT, cancelled_at TEXT, created_at TEXT NOT NULL DEFAULT(datetime('now')),
+ UNIQUE(card_id,friend_id,request_id)
+);
+
+CREATE TABLE visit_stamp_staff_pins (
+ line_account_id TEXT NOT NULL REFERENCES line_accounts(id), staff_id TEXT NOT NULL REFERENCES staff_members(id),
+ salt TEXT NOT NULL, hash TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, locked_until TEXT,
+ updated_at TEXT NOT NULL DEFAULT(datetime('now')), PRIMARY KEY(line_account_id,staff_id)
+);
+
+CREATE TABLE visit_stamp_visit_queue (
+ kind TEXT NOT NULL CHECK(kind IN ('restaurant','booking')), visit_id TEXT NOT NULL, generation INTEGER NOT NULL DEFAULT 1,
+ updated_at TEXT NOT NULL DEFAULT(datetime('now')), PRIMARY KEY(kind,visit_id)
+);
+
+CREATE TABLE visit_stamp_wallets (
+ card_id TEXT NOT NULL REFERENCES visit_stamp_cards(id), friend_id TEXT NOT NULL REFERENCES friends(id),
+ version INTEGER NOT NULL DEFAULT 0, balance INTEGER NOT NULL DEFAULT 0, earned_total INTEGER NOT NULL DEFAULT 0, visit_count INTEGER NOT NULL DEFAULT 0, expires_at TEXT, last_visit_at TEXT,
+ PRIMARY KEY(card_id,friend_id)
+);
 
 CREATE TABLE "webhook_interaction_logs" (
   id                 TEXT PRIMARY KEY,
@@ -7795,9 +8044,11 @@ CREATE TABLE webinars (
   tag_on_cta_click TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL, cta_version INTEGER NOT NULL DEFAULT 0, cta_updated_by TEXT, cta_updated_at TEXT, cta_write_token TEXT);
 
 CREATE INDEX booking_sync_notices_account ON booking_sync_notices(line_account_id,status,target_date);
+
+CREATE INDEX broadcasts_hq_run ON broadcasts(hq_run_id);
 
 CREATE INDEX idx_account_handovers_from ON account_handovers (from_account_id);
 
@@ -8030,6 +8281,8 @@ CREATE INDEX idx_auto_reply_action_runs_evaluation
 
 CREATE INDEX idx_auto_reply_create_requests_rule
   ON auto_reply_create_requests(auto_reply_id, created_at DESC);
+
+CREATE INDEX idx_auto_reply_deliveries_due ON auto_reply_deliveries(status, due_at);
 
 CREATE INDEX idx_auto_reply_evaluation_details_evaluation
   ON auto_reply_evaluation_details (evaluation_id, evaluation_order);
@@ -8368,6 +8621,8 @@ CREATE INDEX idx_conversion_points_ingest ON conversion_points(id)
 CREATE INDEX idx_conversion_points_status ON conversion_points(status, created_at DESC);
 
 CREATE INDEX idx_conversion_points_tenant ON conversion_points(tenant_id);
+
+CREATE INDEX idx_coupon_redemptions_friend ON coupon_redemptions(asset_id, friend_id);
 
 CREATE INDEX idx_customer_notification_definitions_account
   ON customer_notification_definitions(line_account_id, status, category, name, id);
@@ -8832,6 +9087,8 @@ CREATE INDEX idx_incoming_webhooks_folder ON incoming_webhooks(line_account_id, 
 
 CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
 
+CREATE INDEX idx_instagram_messages_account_time ON instagram_messages(line_account_id,received_at,id);
+
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);
 
@@ -8935,6 +9192,8 @@ CREATE INDEX idx_menus_account_sort ON menus (line_account_id, sort_order);
 
 CREATE INDEX idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);
 
+CREATE INDEX idx_messages_conversation_position ON messages_log(friend_id,COALESCE(line_event_at,created_at),id) WHERE delivery_type IS NULL OR delivery_type!='test';
+
 CREATE INDEX idx_messages_log_broadcast_friend_direction
   ON messages_log (broadcast_id, friend_id, direction);
 
@@ -8966,6 +9225,8 @@ CREATE INDEX idx_messages_log_quoted
 CREATE INDEX idx_messages_log_version_step
   ON messages_log (friend_id, scenario_version_step_id)
   WHERE scenario_version_step_id IS NOT NULL;
+
+CREATE INDEX idx_messages_search_pending ON messages_log(friend_id,id) WHERE search_content IS NULL AND unsent_at IS NULL AND (delivery_type IS NULL OR delivery_type!='test');
 
 CREATE INDEX idx_mileage_adj_approval_account
   ON mileage_adjustment_approval_requests (line_account_id, status, created_at DESC);
@@ -9021,11 +9282,15 @@ CREATE INDEX idx_mileage_redemptions_reward_created
 CREATE INDEX idx_mileage_reward_codes_available
   ON mileage_reward_codes(reward_version_id, status, created_at);
 
+CREATE INDEX idx_mileage_reward_folders_account ON mileage_reward_folders(line_account_id, display_order);
+
 CREATE INDEX idx_mileage_reward_versions_reward_status
   ON mileage_reward_versions(reward_id, status, version_number DESC);
 
 CREATE INDEX idx_mileage_rewards_account_status
   ON mileage_rewards(line_account_id, status, sort_order, updated_at DESC);
+
+CREATE INDEX idx_mileage_rewards_folder ON mileage_rewards(line_account_id, folder_id);
 
 CREATE INDEX idx_mileage_rules_account ON mileage_rules(line_account_id);
 
@@ -9414,6 +9679,8 @@ CREATE INDEX idx_rich_menu_versions_group_status
 
 CREATE INDEX idx_rt_approvals_queue ON rt_approval_requests(organization_id, status, created_at DESC);
 
+CREATE UNIQUE INDEX idx_rt_customer_request ON rt_reservations(store_id,line_uid,customer_request_id) WHERE customer_request_id IS NOT NULL;
+
 CREATE INDEX idx_rt_email_digests_store_date
   ON rt_email_digests (store_id, target_date, media_id);
 
@@ -9533,6 +9800,8 @@ CREATE INDEX idx_scenario_actions_lookup
 
 CREATE INDEX idx_scenario_drafts_account_updated
   ON scenario_drafts(line_account_id, updated_at DESC, scenario_id);
+
+CREATE INDEX idx_scenario_edit_drafts_expiry ON scenario_edit_drafts(expires_at);
 
 CREATE INDEX idx_scenario_pinned_action_fires_friend
   ON scenario_pinned_action_fires (friend_id);
@@ -9864,11 +10133,17 @@ CREATE INDEX idx_webinar_viewers_webinar
 CREATE INDEX idx_webinars_account_status_folder
   ON webinars (account_id, status, folder_id);
 
+CREATE INDEX rt_closures_store_dates ON rt_closures(store_id,start_date,end_date) WHERE archived_at IS NULL;
+
 CREATE INDEX rt_inventory_outbox_pending ON rt_inventory_notification_outbox(sent_at,lease_until);
 
 CREATE UNIQUE INDEX uq_google_calendar_connections_active_staff
   ON google_calendar_connections (staff_id)
   WHERE staff_id IS NOT NULL AND is_active = 1;
+
+CREATE UNIQUE INDEX visit_stamp_one_paper ON visit_stamp_paper_requests(card_id,friend_id) WHERE status IN ('pending','approved');
+
+CREATE UNIQUE INDEX visit_stamp_one_visit ON visit_stamp_entries(card_id,friend_id,visit_key) WHERE kind='visit';
 
 CREATE TRIGGER analytics_projection_friend_stage_count
 AFTER INSERT ON analytics_projection_friend_stage
@@ -10113,6 +10388,10 @@ WHEN NOT EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'ACCOUNT_TAG_SCOPE_INVALID'); END;
 
+CREATE TRIGGER messages_search_invalidate AFTER UPDATE OF content,unsent_at,delivery_type ON messages_log
+WHEN OLD.content IS NOT NEW.content OR OLD.unsent_at IS NOT NEW.unsent_at OR OLD.delivery_type IS NOT NEW.delivery_type
+BEGIN UPDATE messages_log SET search_content=NULL WHERE id=NEW.id; END;
+
 CREATE TRIGGER outgoing_webhook_config_version
 AFTER UPDATE OF name, url, event_types, secret, secret_encrypted, is_active, max_retries, deleted_at
 ON outgoing_webhooks
@@ -10134,6 +10413,34 @@ CREATE TRIGGER outgoing_webhooks_folder_update BEFORE UPDATE OF folder_id, line_
 WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
 ) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER rt_closure_reservation_insert BEFORE INSERT ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) p WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND julianday(json_extract(p.value,'$.startsAt'))<julianday(NEW.ends_at) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at) AND (json_array_length(c.table_ids_json)=0 OR NEW.table_id IS NULL OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) t WHERE t.value=NEW.table_id))) BEGIN SELECT RAISE(ABORT,'closure_conflict'); END;
+
+CREATE TRIGGER rt_closure_reservation_update BEFORE UPDATE ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND (NEW.store_id<>OLD.store_id OR NEW.table_id IS NOT OLD.table_id OR julianday(NEW.starts_at)<>julianday(OLD.starts_at) OR julianday(NEW.ends_at)<>julianday(OLD.ends_at) OR OLD.status IN ('cancelled','no_show') OR (OLD.status='pending' AND OLD.hold_expires_at IS NOT NULL AND NEW.status<>'pending')) AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) p WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND julianday(json_extract(p.value,'$.startsAt'))<julianday(NEW.ends_at) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at) AND (json_array_length(c.table_ids_json)=0 OR NEW.table_id IS NULL OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) t WHERE t.value=NEW.table_id))) BEGIN SELECT RAISE(ABORT,'closure_conflict'); END;
+
+CREATE TRIGGER rt_closure_tasks_insert AFTER INSERT ON rt_closures WHEN NEW.archived_at IS NULL BEGIN INSERT INTO rt_closure_close_tasks(id,store_id,closure_id,closure_version,channel,kind,start_date,end_date,all_day,start_time,end_time,table_ids_json,starts_at,ends_at,status) SELECT lower(hex(randomblob(16))),NEW.store_id,NEW.id,NEW.version,m.code,NEW.kind,NEW.start_date,NEW.end_date,NEW.all_day,NEW.start_time,NEW.end_time,NEW.table_ids_json, json_extract(NEW.periods_json,'$[0].startsAt'),json_extract(NEW.periods_json,'$[#-1].endsAt'),'close' FROM rt_store_media_links l JOIN rt_media m ON m.id=l.media_id WHERE NEW.notify_media=1 AND l.store_id=NEW.store_id AND l.close_on_booking=1 AND m.accepts_reservations=1; INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(NEW.store_id,'closure_saved') ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
+
+CREATE TRIGGER rt_closure_tasks_update AFTER UPDATE ON rt_closures BEGIN UPDATE rt_closure_close_tasks SET status='reopen',generation=generation+1,updated_at=datetime('now') WHERE closure_id=NEW.id AND status<>'reopen'; INSERT INTO rt_closure_close_tasks(id,store_id,closure_id,closure_version,channel,kind,start_date,end_date,all_day,start_time,end_time,table_ids_json,starts_at,ends_at,status) SELECT lower(hex(randomblob(16))),NEW.store_id,NEW.id,NEW.version,m.code,NEW.kind,NEW.start_date,NEW.end_date,NEW.all_day,NEW.start_time,NEW.end_time,NEW.table_ids_json, json_extract(NEW.periods_json,'$[0].startsAt'),json_extract(NEW.periods_json,'$[#-1].endsAt'),'close' FROM rt_store_media_links l JOIN rt_media m ON m.id=l.media_id WHERE NEW.notify_media=1 AND NEW.archived_at IS NULL AND l.store_id=NEW.store_id AND l.close_on_booking=1 AND m.accepts_reservations=1; INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(NEW.store_id,'closure_changed') ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
+
+CREATE TRIGGER rt_closure_waitlist_insert BEFORE INSERT ON rt_seat_waitlist WHEN NEW.status IN ('waiting','invited') AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) p WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND julianday(json_extract(p.value,'$.startsAt'))<julianday(COALESCE(NEW.ends_at,datetime(NEW.starts_at,'+120 minutes'))) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at)) AND NOT EXISTS( SELECT 1 FROM rt_tables t WHERE t.store_id=NEW.store_id AND t.is_active=1 AND t.min_capacity<=NEW.guest_count AND t.max_capacity>=NEW.guest_count AND (NEW.status='waiting' OR t.id=NEW.table_id) AND NOT EXISTS(SELECT 1 FROM rt_closures c,json_each(c.periods_json) p WHERE c.store_id=t.store_id AND c.archived_at IS NULL AND (json_array_length(c.table_ids_json)=0 OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) ct WHERE ct.value=t.id)) AND julianday(json_extract(p.value,'$.startsAt'))<julianday(COALESCE(NEW.ends_at,datetime(NEW.starts_at,'+120 minutes'))) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at))) BEGIN SELECT RAISE(ABORT,'closure_conflict'); END;
+
+CREATE TRIGGER rt_closure_waitlist_update BEFORE UPDATE ON rt_seat_waitlist WHEN NEW.status IN ('waiting','invited') AND (NEW.status<>OLD.status OR NEW.store_id<>OLD.store_id OR NEW.table_id IS NOT OLD.table_id OR NEW.starts_at<>OLD.starts_at OR NEW.ends_at IS NOT OLD.ends_at OR NEW.guest_count<>OLD.guest_count) AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) p WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND julianday(json_extract(p.value,'$.startsAt'))<julianday(COALESCE(NEW.ends_at,datetime(NEW.starts_at,'+120 minutes'))) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at)) AND NOT EXISTS( SELECT 1 FROM rt_tables t WHERE t.store_id=NEW.store_id AND t.is_active=1 AND t.min_capacity<=NEW.guest_count AND t.max_capacity>=NEW.guest_count AND (NEW.status='waiting' OR t.id=NEW.table_id) AND NOT EXISTS(SELECT 1 FROM rt_closures c,json_each(c.periods_json) p WHERE c.store_id=t.store_id AND c.archived_at IS NULL AND (json_array_length(c.table_ids_json)=0 OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) ct WHERE ct.value=t.id)) AND julianday(json_extract(p.value,'$.startsAt'))<julianday(COALESCE(NEW.ends_at,datetime(NEW.starts_at,'+120 minutes'))) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at))) BEGIN SELECT RAISE(ABORT,'closure_conflict'); END;
+
+CREATE TRIGGER rt_closures_overlap_insert BEFORE INSERT ON rt_closures WHEN NEW.archived_at IS NULL AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) cp, json_each(NEW.periods_json) np WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND c.id<>NEW.id AND julianday(json_extract(cp.value,'$.startsAt'))<julianday(json_extract(np.value,'$.endsAt')) AND julianday(json_extract(cp.value,'$.endsAt'))>julianday(json_extract(np.value,'$.startsAt')) AND (json_array_length(c.table_ids_json)=0 OR json_array_length(NEW.table_ids_json)=0 OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) a JOIN json_each(NEW.table_ids_json) b ON a.value=b.value))) BEGIN SELECT RAISE(ABORT,'closure_overlap'); END;
+
+CREATE TRIGGER rt_closures_overlap_update BEFORE UPDATE ON rt_closures WHEN NEW.archived_at IS NULL AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) cp, json_each(NEW.periods_json) np WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND c.id<>NEW.id AND julianday(json_extract(cp.value,'$.startsAt'))<julianday(json_extract(np.value,'$.endsAt')) AND julianday(json_extract(cp.value,'$.endsAt'))>julianday(json_extract(np.value,'$.startsAt')) AND (json_array_length(c.table_ids_json)=0 OR json_array_length(NEW.table_ids_json)=0 OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) a JOIN json_each(NEW.table_ids_json) b ON a.value=b.value))) BEGIN SELECT RAISE(ABORT,'closure_overlap'); END;
+
+CREATE TRIGGER rt_customer_identity_insert BEFORE INSERT ON rt_reservations WHEN NEW.customer_request_id IS NOT NULL AND NEW.status NOT IN ('cancelled','no_show') AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=NEW.store_id AND r.line_uid=NEW.line_uid AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) BEGIN SELECT RAISE(ABORT,'customer_duplicate_booking'); END;
+
+CREATE TRIGGER rt_customer_identity_update BEFORE UPDATE OF starts_at,ends_at ON rt_reservations WHEN NEW.customer_request_id IS NOT NULL AND NEW.status NOT IN ('cancelled','no_show') AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.id<>NEW.id AND r.store_id=NEW.store_id AND r.line_uid=NEW.line_uid AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) BEGIN SELECT RAISE(ABORT,'customer_duplicate_booking'); END;
+
+CREATE TRIGGER rt_customer_line_capacity_insert BEFORE INSERT ON rt_reservations WHEN NEW.customer_request_id IS NOT NULL AND NEW.status NOT IN ('cancelled','no_show') AND EXISTS(SELECT 1 FROM rt_inventory_slots i WHERE i.store_id=NEW.store_id AND julianday(i.starts_at)<julianday(NEW.ends_at) AND julianday(i.starts_at,'+'||i.slot_minutes||' minutes')>julianday(NEW.starts_at) AND i.line_capacity < NEW.guest_count + (SELECT COALESCE(SUM(r.guest_count),0) FROM rt_reservations r WHERE r.id<>NEW.id AND r.store_id=NEW.store_id AND r.source='line' AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(i.starts_at,'+'||i.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(i.starts_at))) BEGIN SELECT RAISE(ABORT,'customer_line_capacity'); END;
+
+CREATE TRIGGER rt_customer_line_capacity_update BEFORE UPDATE OF table_id,starts_at,ends_at,guest_count ON rt_reservations WHEN NEW.customer_request_id IS NOT NULL AND NEW.status NOT IN ('cancelled','no_show') AND (NEW.table_id<>OLD.table_id OR NEW.starts_at<>OLD.starts_at OR NEW.ends_at<>OLD.ends_at OR NEW.guest_count<>OLD.guest_count) AND EXISTS(SELECT 1 FROM rt_inventory_slots i WHERE i.store_id=NEW.store_id AND julianday(i.starts_at)<julianday(NEW.ends_at) AND julianday(i.starts_at,'+'||i.slot_minutes||' minutes')>julianday(NEW.starts_at) AND i.line_capacity < NEW.guest_count + (SELECT COALESCE(SUM(r.guest_count),0) FROM rt_reservations r WHERE r.id<>NEW.id AND r.store_id=NEW.store_id AND r.source='line' AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(i.starts_at,'+'||i.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(i.starts_at))) BEGIN SELECT RAISE(ABORT,'customer_line_capacity'); END;
+
+CREATE TRIGGER rt_customer_table_insert BEFORE INSERT ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND (NEW.status<>'pending' OR NEW.hold_expires_at IS NULL OR julianday(NEW.hold_expires_at)>julianday('now')) AND NEW.table_id IS NOT NULL AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=NEW.store_id AND r.table_id=NEW.table_id AND r.id<>NEW.id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND (NEW.customer_request_id IS NOT NULL OR r.customer_request_id IS NOT NULL) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) BEGIN SELECT RAISE(ABORT,'customer_table_conflict'); END;
+
+CREATE TRIGGER rt_customer_table_update BEFORE UPDATE OF table_id,starts_at,ends_at,status ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND (NEW.status<>'pending' OR NEW.hold_expires_at IS NULL OR julianday(NEW.hold_expires_at)>julianday('now')) AND NEW.table_id IS NOT NULL AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=NEW.store_id AND r.table_id=NEW.table_id AND r.id<>NEW.id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND (NEW.customer_request_id IS NOT NULL OR r.customer_request_id IS NOT NULL) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) BEGIN SELECT RAISE(ABORT,'customer_table_conflict'); END;
 
 CREATE TRIGGER rt_inventory_reservation_delete AFTER DELETE ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE store_id IN (OLD.store_id); END;
 
@@ -10677,6 +10984,16 @@ BEGIN INSERT INTO nen_photo_publication_reward_outbox (id,photo_id,line_account_
 
 CREATE TRIGGER v8_photo_publication_reward_snapshot AFTER UPDATE OF reward_points ON nen_photo_publications
 BEGIN INSERT INTO nen_photo_publication_reward_outbox (id,photo_id,line_account_id,friend_id,customer_id,provider_award_key,policy_version,points,status,last_error,created_at,updated_at) SELECT 'photo-publication-reward:' || ps.id,ps.id,ps.line_account_id,ps.friend_id,COALESCE(member.customer_id,''), 'photo-publication-reward:' || ps.id,pub.reward_policy_key,pub.reward_points, CASE WHEN member.customer_id IS NOT NULL AND member.customer_id != '' THEN 'pending' ELSE 'failed' END, CASE WHEN member.customer_id IS NOT NULL AND member.customer_id != '' THEN NULL ELSE 'customer_unlinked' END, (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours') || '+09:00'),(strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours') || '+09:00') FROM nen_photo_submissions ps JOIN nen_photo_publications pub ON pub.photo_id=ps.id AND pub.line_account_id=ps.line_account_id AND pub.status='published' JOIN friends f ON f.id=ps.friend_id AND f.line_account_id=ps.line_account_id LEFT JOIN nen_ec_member_snapshots member ON member.friend_id=ps.friend_id WHERE pub.id=NEW.id AND ps.status='adopted' AND ps.publication_consent_at IS NOT NULL AND ps.publication_withdrawn_at IS NULL AND pub.reward_policy_key IS NOT NULL AND pub.reward_points>0 ON CONFLICT DO NOTHING; END;
+
+CREATE TRIGGER visit_stamp_booking_mark AFTER INSERT ON booking_visit_marks WHEN NEW.kind='visited' BEGIN INSERT INTO visit_stamp_visit_queue(kind,visit_id) VALUES('booking',NEW.booking_id) ON CONFLICT(kind,visit_id) DO UPDATE SET generation=generation+1; END;
+
+CREATE TRIGGER visit_stamp_booking_update AFTER UPDATE OF status ON bookings WHEN NEW.status<>OLD.status AND (NEW.status='completed' OR OLD.status='completed') BEGIN INSERT INTO visit_stamp_visit_queue(kind,visit_id) VALUES('booking',NEW.id) ON CONFLICT(kind,visit_id) DO UPDATE SET generation=generation+1; END;
+
+CREATE TRIGGER visit_stamp_entry_balance AFTER INSERT ON visit_stamp_entries BEGIN UPDATE visit_stamp_wallets SET version=version+1, visit_count=CASE WHEN NEW.kind='visit' THEN visit_count+1 WHEN NEW.kind='paper' AND NEW.delta>0 THEN MAX(visit_count,1) ELSE visit_count END, balance=balance+NEW.delta, earned_total=earned_total+CASE WHEN NEW.kind IN ('visit','manual','paper') AND NEW.delta>0 THEN NEW.delta ELSE 0 END, last_visit_at=CASE WHEN NEW.kind='visit' THEN NEW.occurred_at ELSE last_visit_at END, expires_at=CASE WHEN NEW.kind IN ('visit','manual','paper') THEN NEW.expires_at ELSE expires_at END WHERE card_id=NEW.card_id AND friend_id=NEW.friend_id; END;
+
+CREATE TRIGGER visit_stamp_rt_insert AFTER INSERT ON rt_reservations WHEN NEW.status IN ('visited','seated') BEGIN INSERT INTO visit_stamp_visit_queue(kind,visit_id) VALUES('restaurant',NEW.id) ON CONFLICT(kind,visit_id) DO UPDATE SET generation=generation+1; END;
+
+CREATE TRIGGER visit_stamp_rt_update AFTER UPDATE OF status ON rt_reservations WHEN NEW.status<>OLD.status AND (NEW.status IN ('visited','seated') OR OLD.status IN ('visited','seated')) BEGIN INSERT INTO visit_stamp_visit_queue(kind,visit_id) VALUES('restaurant',NEW.id) ON CONFLICT(kind,visit_id) DO UPDATE SET generation=generation+1; END;
 
 CREATE VIEW booking_slot_allocations AS SELECT id,line_account_id,staff_id,menu_id,starts_at,block_ends_at,NULL AS waitlist_id FROM bookings WHERE status IN ('requested','confirmed') UNION ALL SELECT 'waitlist:'||id,line_account_id,staff_id,menu_id,starts_at,block_ends_at,id FROM booking_waitlist WHERE status='invited' AND julianday(hold_expires_at)>julianday('now');
 

@@ -12,7 +12,7 @@ import {
 } from '@/lib/api'
 import Link from 'next/link'
 import {
-  ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, MessageCircle, MoreHorizontal, Pencil, Play,
+  ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, FilePen, MessageCircle, Pencil, Play,
   RefreshCw, Tag as TagIcon, Trash2, TriangleAlert, UserPlus, UserRound, Zap,
 } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
@@ -21,7 +21,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import HelpTip from '@/components/shared/help-tip'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -288,6 +288,12 @@ interface ActionDraft {
   scenarioId: string
   /** #942 N-356: 共通アクションを呼ぶときの選択。 */
   commonActionId: string
+  /**
+   * 担当へ知らせる（notify_staff）の中身。この画面では選び直せないので、
+   * 読んだ下書き（見本から作ったもの）の知らせのルールと文面をそのまま持って戻す。
+   * 持たずに保存すると、見本の「担当へ知らせる」が文面の送信に化けて消える。
+   */
+  kept?: Record<string, unknown>
 }
 
 let actionKeySeed = 0
@@ -509,8 +515,11 @@ const formSnapshotHasContent = (snapshot: FormSnapshot): boolean =>
   )
 
 /** 「すること」1行を、保存で送る形へ直す。指紋とも同じ形を使う。 */
-const actionDraftToPayload = (row: ActionDraft, index: number): AutomationDraftAction => (
-  row.type === 'add_tag'
+export const actionDraftToPayload = (row: ActionDraft, index: number): AutomationDraftAction => (
+  row.type === 'notify_staff'
+    /* 担当へ知らせる：読んだときの知らせのルール・文面をそのまま戻す（口は F-14 で受け付ける）。 */
+    ? ({ id: `step-${index + 1}`, type: 'notify_staff', params: { ...(row.kept ?? {}) }, onFailure: 'stop' } as unknown as AutomationDraftAction)
+    : row.type === 'add_tag'
     ? { id: `step-${index + 1}`, type: 'add_tag' as const, params: { tagId: row.tagId }, onFailure: 'stop' as const }
     : row.type === 'start_scenario'
       ? { id: `step-${index + 1}`, type: 'start_scenario' as const, params: { scenarioId: row.scenarioId }, onFailure: 'stop' as const }
@@ -605,7 +614,7 @@ const isoToDatetimeLocal = isoToJstDatetimeLocal
  * 番号だけを戻すのは**しない**。以前はそれで空の画面から上書きしていた。
  * 再開では名前・きっかけ・条件・することまで全部戻し、保存は読み終わってから。
  */
-const draftDetailToForm = (detail: AutomationDraftDetail): {
+export const draftDetailToForm = (detail: AutomationDraftDetail): {
   name: string
   eventType: string
   keyword: string
@@ -659,6 +668,7 @@ const draftDetailToForm = (detail: AutomationDraftDetail): {
         message: String(step.params.content ?? ''),
         scenarioId: String(step.params.scenarioId ?? ''),
         commonActionId: String(step.params.commonActionId ?? ''),
+        kept: (step.type as string) === 'notify_staff' ? { ...step.params } : undefined,
       }))
   return {
     name: detail.name,
@@ -802,6 +812,8 @@ export function NewAutomationV8({
    */
   const [resumeTarget, setResumeTarget] = useState<string | null | undefined>(draftId ?? undefined)
   const [resumeStatus, setResumeStatus] = useState<'none' | 'loading' | 'ready' | 'failed'>('none')
+  /* 下書きを仕上げる（J1VA8）の帯に出す、読んだときの名前（入力で名前を変えても帯は動かさない）。 */
+  const [sourceName, setSourceName] = useState('')
   /*
    * R532: 再開の読み込みが失敗した理由。通信断・対象なし・権限なしで
    * 案内を分け、通信断では同じ下書きの再試行だけを出し、保存は止める。
@@ -1112,12 +1124,14 @@ export function NewAutomationV8({
     const accountId = selectedAccountId
     const draftId = resumeTarget
     let cancelled = false
+    let settled = false
     setResumeStatus('loading')
     setResumeErrorKind(null)
     setError('')
     setNotice('')
     api.automations
       .getDraft(draftId, accountId)
+      .finally(() => { settled = true })
       .then((res) => {
         if (cancelled || selectedAccountRef.current !== accountId) return
         if (!res.success) {
@@ -1132,6 +1146,7 @@ export function NewAutomationV8({
         const draft = { id: res.data.id, draftVersionId: res.data.draftVersionId }
         if (restored.eventType !== eventType) suppressTriggerResetRef.current = true
         setName(restored.name)
+        setSourceName(restored.name)
         setEventType(restored.eventType)
         setKeyword(restored.keyword)
         setCondition(restored.condition)
@@ -1187,6 +1202,12 @@ export function NewAutomationV8({
       })
     return () => {
       cancelled = true
+      /*
+       * 読み終わる前に片付けられた（開いた直後の二度目の実行・番号の切り替え）なら、
+       * 同じ番号をもう一度読めるように印を戻す。戻さないと「読み込んでいます」のまま止まる
+       * （番号を最初から持って開く「下書きを仕上げる」で起きた）。
+       */
+      if (!settled && resumedKeyRef.current === key) resumedKeyRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId, resumeTarget, resumeRetry])
@@ -1240,6 +1261,7 @@ export function NewAutomationV8({
       const scenarioName = scenarios.find((item) => item.id === row.scenarioId)?.name
       return scenarioName ? `シナリオ「${scenarioName}」を始める` : 'シナリオを始める'
     }
+    if (row.type === 'notify_staff') return '担当へ知らせる'
     return row.message.trim() ? '入力したメッセージを送る' : 'メッセージを送る'
   }).join('、')
 
@@ -1443,6 +1465,10 @@ export function NewAutomationV8({
       if (row.type === 'start_scenario' && !row.scenarioId) return '始めるシナリオを選んでください'
       if (row.type === 'common_action' && !row.commonActionId) return '使う共通アクションを選んでください'
       if (row.type === 'send_message' && !row.message.trim()) return '送る文面を入力してください'
+      if (row.type === 'notify_staff'
+        && (!String(row.kept?.notificationRuleId ?? '').trim() || !String(row.kept?.message ?? '').trim())) {
+        return '担当へ知らせる中身が読めません。することを選び直してください'
+      }
     }
     return null
   }
@@ -2199,6 +2225,10 @@ export function NewAutomationV8({
       const commonActionName = commonActions.find((item) => item.id === row.commonActionId)?.name
       return commonActionName ? `共通アクション「${commonActionName}」` : '共通アクションを選んでください'
     }
+    if (row.type === 'notify_staff') {
+      const note = String(row.kept?.message ?? '').trim().replace(/\s+/g, ' ')
+      return note || '知らせのルールのとおりに知らせます'
+    }
     return row.message.trim() ? row.message.trim().replace(/\s+/g, ' ') : '送る文面を入れてください'
   }
   const representativeIcon: Record<string, ReactNode> = {
@@ -2231,6 +2261,7 @@ export function NewAutomationV8({
     if (row.type === 'add_tag') return `${tagName ? `タグ「${tagName}」` : 'タグ'}を付け${last ? 'ます' : 'て'}`
     if (row.type === 'start_scenario') return `${scenarioName ? `シナリオ「${scenarioName}」` : 'シナリオ'}を始め${last ? 'ます' : 'て'}`
     if (row.type === 'common_action') return `${commonName ? `共通アクション「${commonName}」` : '共通アクション'}を実行し${last ? 'ます' : 'て'}`
+    if (row.type === 'notify_staff') return `担当へ知らせ${last ? 'ます' : 'て'}`
     return `メッセージを送${last ? 'ります' : 'り'}`
   })
   const ruleSentence = conditionUnreadable
@@ -2402,19 +2433,45 @@ export function NewAutomationV8({
     </div>
   )
 
+  /*
+   * 下書きを仕上げる（J1VA8）：見本から作った下書き。頭の下に「どの見本から作ったか」の帯を出し、
+   * 段の見出しに番号を付ける。戻る先・キャンセルは見本の一覧。
+   */
+  const isDraft = chrome === 'draft'
+  const backHref = isDraft ? '/automations?tab=templates' : '/automations'
+  const sourceBand = isDraft && resumeStatus === 'ready' ? (
+    <div className={styles.sourceBand} role="note">
+      <FilePen size={16} aria-hidden="true" className={styles.sourceIcon} />
+      <span>{`見本「${sourceName.trim() || '見本'}」から作った下書きです。${usedTagNames.length > 0 || usedScenarioNames.length > 0
+        ? `${[
+          ...usedTagNames.map((tagName) => `タグ「${tagName}」`),
+          ...usedScenarioNames.map((scenarioName) => `シナリオ「${scenarioName}」`),
+        ].join('と')}を、このアカウントのものに選び直してください。`
+        : 'タグやシナリオを、このアカウントのものに選び直してください。'}`}</span>
+    </div>
+  ) : null
+
   return (
     <CreatePage
-      boardId={conflict ? 'tJqST' : 'M4torY'}
-      title="ルールを作る"
-      identity={<Link href="/automations" className={styles.backLink}>← オートメーションへ</Link>}
-      description="きっかけ・だれに・何をするかを決めます。1人で試してから動かすと、まちがいを防げます。"
+      boardId={conflict ? 'tJqST' : isDraft ? 'J1VA8' : 'M4torY'}
+      title={isDraft ? '下書きを仕上げる' : 'ルールを作る'}
+      identity={<Link href={backHref} className={styles.backLink}>{isDraft ? '← 見本へ' : '← オートメーションへ'}</Link>}
+      /* 見本の帯（J1VA8）は頭の中、説明のすぐ下（絵では頭の線より上）。 */
+      description={isDraft
+        ? (
+          <>
+            見本に実データは入っていません。このアカウントで使うタグやシナリオを選び、下書きとして保存します。
+            {sourceBand}
+          </>
+        )
+        : 'きっかけ・だれに・何をするかを決めます。1人で試してから動かすと、まちがいを防げます。'}
       /* 競合の帯（tJqST）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
       previewToggle={conflictBand}
       preview={sideColumn}
       status={saveStatusText}
       footerActions={(
         <>
-          <Button href="/automations">キャンセル</Button>
+          <Button href={backHref}>キャンセル</Button>
           {canEdit ? (
             <>
               <Button disabled={saving || Boolean(blockedReason)} onClick={() => void save(false)}>下書きを保存</Button>
@@ -2465,11 +2522,11 @@ export function NewAutomationV8({
 
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="名前">
         <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>名前</h2>
+          <h2 className={styles.cardTitle}>{isDraft ? '1. どのルールか' : '名前'}</h2>
           <p className={styles.cardDesc}>一覧で見分けるための名前。お客さまには見えません</p>
         </div>
         <label className={styles.field} htmlFor="v8-rule-name">
-          <span className={styles.label}>名前</span>
+          <span className={styles.label}>{isDraft ? 'ルール名' : '名前'}</span>
           <TextField
             id="v8-rule-name"
             value={name}
@@ -2482,7 +2539,7 @@ export function NewAutomationV8({
 
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="どんなときに動かしますか">
         <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>どんなときに動かしますか</h2>
+          <h2 className={styles.cardTitle}>{isDraft ? '2. 何が起きたら動かすか' : 'どんなときに動かしますか'}</h2>
         </div>
         {expandedEvents || normalizedEventQuery ? (
           <TextField
@@ -2610,7 +2667,7 @@ export function NewAutomationV8({
 
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="何をするか">
         <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>何をするか</h2>
+          <h2 className={styles.cardTitle}>{isDraft ? '3. 何をするか' : '何をするか'}</h2>
           <p className={styles.cardDesc}>上から順に動きます</p>
         </div>
         <ol className={styles.actionList}>
@@ -2625,21 +2682,11 @@ export function NewAutomationV8({
                 </span>
                 {canEdit ? (
                   <span className={styles.menuBox}>
-                    <button
-                      type="button"
+                    <RowMenu
                       className={styles.menuButton}
-                      aria-label={menuLabel}
-                      aria-haspopup="menu"
-                      aria-expanded={actionMenuKey === row.key}
-                      title={menuLabel}
-                      onClick={() => setActionMenuKey((current) => (current === row.key ? null : row.key))}
-                    >
-                      <MoreHorizontal size={16} aria-hidden="true" />
-                    </button>
-                    <ActionMenu
+                      label={menuLabel}
                       open={actionMenuKey === row.key}
-                      onClose={() => setActionMenuKey(null)}
-                      ariaLabel={menuLabel}
+                      onOpenChange={(next) => setActionMenuKey(next ? row.key : null)}
                       items={[
                         { id: 'edit', label: '中身を直す', icon: <Pencil size={14} />, onSelect: () => { setActionMenuKey(null); setEditingActionKey(row.key) } },
                         { id: 'up', label: '上へ', icon: <ArrowUp size={14} />, disabled: index === 0, onSelect: () => { setActionMenuKey(null); moveAction(row.key, -1) } },
@@ -2690,7 +2737,8 @@ export function NewAutomationV8({
                 aria-label="すること"
                 value={editingRow.type}
                 onChange={(value) => updateAction(editingRow.key, { type: value as ActionType })}
-                options={EDITABLE_ACTIONS.map((action) => ({ value: action.value, label: action.label }))}
+                options={(editingRow.type === 'notify_staff' ? ACTIONS : EDITABLE_ACTIONS)
+                  .map((action) => ({ value: action.value, label: action.label }))}
                 size="full"
               />
             </label>
@@ -2730,6 +2778,10 @@ export function NewAutomationV8({
                 failed={tagsFailed}
                 failedNote="共通アクションを読み込めませんでした。画面を再読み込みしてください。"
               />
+            ) : editingRow.type === 'notify_staff' ? (
+              <p className={styles.cardDesc}>
+                知らせる相手と文面は、見本から作ったときのまま保ちます。変えるときは、することを選び直してください。
+              </p>
             ) : (
               <label className={styles.field} htmlFor={`v8-message-${editingRow.key}`}>
                 <span className={styles.label}>送る文面</span>
@@ -2835,6 +2887,7 @@ function actionRowTitle(type: string): string {
   if (type === 'add_tag') return 'タグを付ける'
   if (type === 'start_scenario') return 'シナリオを始める'
   if (type === 'common_action') return '共通アクションを実行'
+  if (type === 'notify_staff') return '担当へ知らせる'
   return 'メッセージを送る'
 }
 

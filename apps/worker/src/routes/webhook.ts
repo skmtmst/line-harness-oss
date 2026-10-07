@@ -1,3 +1,4 @@
+import { redeemCoupon } from '../services/coupon-redemption.js';
 import { Hono } from 'hono';
 import { verifySignature, LineClient } from '@line-crm/line-sdk';
 import { parseTapPostbackData } from '../lib/rich-menu-tap.js';
@@ -1190,6 +1191,13 @@ async function handleEvent(
     if (!friend) return;
 
     const rawPostbackData = (event as unknown as { postback: { data: string } }).postback.data;
+    if (rawPostbackData.startsWith('coupon_use:')) {
+      const assetId = rawPostbackData.slice('coupon_use:'.length);
+      const result = await redeemCoupon(db, friend, lineAccountId ?? null, assetId, event.webhookEventId);
+      if (!result.replayed && event.replyToken) await lineClient.replyMessage(event.replyToken, [{ type: 'text', text: result.message }]);
+      return;
+    }
+
 
     /*
      * リッチメニューのボタン。

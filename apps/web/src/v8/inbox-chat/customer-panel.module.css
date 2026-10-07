@@ -1,0 +1,46 @@
+/*
+ * ★V8 受信箱の右の列「その人の要点」（M0393 XqSvX）：顔52・名前15/600・追加日12、
+ * 要点の行（鍵12 薄い字・値13/500）、その下に「顧客情報」の節。値は --tpl-inbox-*。
+ */
+.person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-inbox-head-tools-gap);
+  padding: var(--tpl-inbox-summary-pad) var(--tpl-inbox-summary-pad) 0;
+  text-align: center;
+}
+.personName {
+  max-width: 100%;
+  color: var(--color-ink);
+  font-size: var(--tpl-inbox-chead-name);
+  font-weight: 600;
+  line-height: var(--tpl-inbox-chead-name-lh);
+}
+.personSub { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); }
+.blocked { color: var(--color-ink-faint); font-size: var(--text-micro); }
+.personActions { display: flex; align-items: center; justify-content: center; gap: var(--tpl-inbox-composer-gap); margin-top: var(--tpl-inbox-head-tools-gap); }
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-inbox-summary-gap);
+  padding: var(--tpl-inbox-summary-gap) var(--tpl-inbox-summary-pad) var(--tpl-inbox-summary-pad);
+}
+.summaryRow { display: flex; min-width: 0; flex-direction: column; gap: var(--tpl-inbox-seg-gap); }
+.summaryRow dt { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); }
+.summaryRow dd {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-inbox-row-preview-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.empty { color: var(--color-ink-faint); font-weight: 400; }
+.infoTitle {
+  padding: var(--tpl-inbox-summary-gap) var(--tpl-inbox-summary-pad) 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+}

@@ -8,6 +8,8 @@
  * 4. Submit booking → show confirmation
  */
 
+import { customerMessage } from './customer-message.js';
+
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
   isLoggedIn(): boolean;
@@ -414,7 +416,7 @@ async function submitBooking(): Promise<void> {
     renderSuccess(selectedDate, selectedSlot);
   } catch (err) {
     state.submitting = false;
-    renderError(err instanceof Error ? err.message : '予約に失敗しました');
+    renderError(customerMessage(err, '予約に失敗しました'));
   }
 }
 

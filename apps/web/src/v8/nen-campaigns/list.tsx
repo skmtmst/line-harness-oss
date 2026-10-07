@@ -19,7 +19,6 @@ import {
   Download,
   Eye,
   History,
-  MoreHorizontal,
   PenLine,
   Undo2,
 } from 'lucide-react'
@@ -34,6 +33,7 @@ import type {
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Drawer from '@/components/shared/drawer'
 import FilterChip from '@/components/shared/filter-chip'
@@ -172,24 +172,10 @@ function Pill({ tone, children }: { tone: 'ok' | 'info' | 'off' | 'danger'; chil
 
 /** 行の右端の「…」。押すと行の操作のメニュー（右クリックだけにしない）。 */
 function RowMenu({ subject, items }: { subject: string; items: ActionMenuItem[] }) {
-  const [open, setOpen] = useState(false)
-  const anchorRef = useRef<HTMLButtonElement | null>(null)
   if (items.length === 0) return <span className={styles.menuSpace} aria-hidden="true" />
   return (
     <span className={styles.menuBox}>
-      <button
-        ref={anchorRef}
-        type="button"
-        className={styles.menuButton}
-        aria-label={`「${subject}」の操作`}
-        title={`「${subject}」の操作`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </button>
-      <ActionMenu open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} ariaLabel={`「${subject}」の操作`} items={items} />
+      <SharedRowMenu className={styles.menuButton} label={`「${subject}」の操作`} items={items} />
     </span>
   )
 }

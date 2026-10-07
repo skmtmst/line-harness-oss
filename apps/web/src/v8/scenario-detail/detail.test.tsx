@@ -209,3 +209,20 @@ describe('V8 シナリオ配信の編集', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 })
+
+it('名前の保存中は×・閉じる・Escを止め、入力を残す', async () => {
+  let finish!: (value: unknown) => void
+  updateScenario.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変える' }))
+  const dialog = screen.getByRole('dialog', { name: '名前・説明・置き場を変える' })
+  fireEvent.change(within(dialog).getByLabelText('シナリオ名'), { target: { value: '変更した名前' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'この内容で保存する' }))
+  for (const button of within(dialog).getAllByRole('button', { name: '閉じる' })) {
+    fireEvent.click(button)
+  }
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect((within(dialog).getByLabelText('シナリオ名') as HTMLInputElement).value).toBe('変更した名前')
+  expect(screen.getByRole('dialog', { name: '名前・説明・置き場を変える' })).toBeTruthy()
+  await act(async () => { finish({ success: true, data: { id: 'sc-1' } }); await Promise.resolve() })
+})

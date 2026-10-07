@@ -1,6 +1,10 @@
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getScoringRules,
+  listMileageRewardFolders,
+  createMileageRewardFolder,
+  reorderMileageRewardFolders,
+  moveMileageRewardToFolder,
   getScoringRuleById,
   createScoringRule,
   updateScoringRule,
@@ -194,6 +198,44 @@ async function handleMileageRewardDraftUpdate(c: Context<Env>) {
 }
 
 // ========== マイル管理 ==========
+
+// 使い道の分類はLINEアカウントごと。分類の変更は交換内容や公開版を変えない。
+scoring.get('/api/mileage/reward-folders', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!await canUseMileageAccount(c, accountId)) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: await listMileageRewardFolders(c.env.DB, accountId) });
+  } catch (error) { return mileageRewardError(c, error); }
+});
+scoring.post('/api/mileage/reward-folders', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: unknown; name?: unknown }>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!await canUseMileageAccount(c, accountId)) return c.json({ success: false, error: 'Not found' }, 404);
+    if (typeof body.name !== 'string') return c.json({ success: false, error: 'フォルダ名を入力してください' }, 422);
+    return c.json({ success: true, data: await createMileageRewardFolder(c.env.DB, accountId, body.name) }, 201);
+  } catch (error) { return mileageRewardError(c, error); }
+});
+scoring.put('/api/mileage/reward-folders/order', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: unknown; ids?: unknown }>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!await canUseMileageAccount(c, accountId)) return c.json({ success: false, error: 'Not found' }, 404);
+    if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== 'string')) return c.json({ success: false, error: 'フォルダの順番を指定してください' }, 422);
+    await reorderMileageRewardFolders(c.env.DB, accountId, body.ids);
+    return c.json({ success: true, data: await listMileageRewardFolders(c.env.DB, accountId) });
+  } catch (error) { return mileageRewardError(c, error); }
+});
+scoring.put('/api/mileage/rewards/:id/folder', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: unknown; folderId?: unknown }>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!await canUseMileageAccount(c, accountId)) return c.json({ success: false, error: 'Not found' }, 404);
+    if (body.folderId !== null && (typeof body.folderId !== 'string' || !body.folderId)) return c.json({ success: false, error: 'フォルダか未分類を指定してください' }, 422);
+    await moveMileageRewardToFolder(c.env.DB, accountId, c.req.param('id'), body.folderId);
+    return c.json({ success: true, data: await getMileageReward(c.env.DB, { id: c.req.param('id'), lineAccountId: accountId }) });
+  } catch (error) { return mileageRewardError(c, error); }
+});
 
 scoring.get('/api/mileage/rewards', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {

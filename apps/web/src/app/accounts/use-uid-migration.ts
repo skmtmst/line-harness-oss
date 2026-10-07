@@ -5,6 +5,7 @@ import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import { api, ApiError, fetchApi, type UidMigrationItem, type UidMigrationRun } from '@/lib/api'
 import { splitCsvRecords } from '@/app/friends/migrations/friend-csv'
 import { formatNumber } from '@/lib/format'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 export const MIGRATION_STEPS: readonly string[] = ['移行の登録', '対応表の取込', '事前確認', '要確認の判断', '本移行と照合']
 
@@ -80,7 +81,9 @@ export const decisionLabel = { pending: '未判断', link: '結び付ける', cr
 
 /** 失敗応答の日本語だけを画面へ出す。内部文言・HTML は ApiError が捨てている。 */
 function apiErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.message) return error.message
+  // 「API error: 500」のような内部の文は出さない。画面で作った日本語の文はそのまま出す。
+  if (error instanceof ApiError) return japaneseDetailOf(error) || fallback
+  if (error instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) return error.message
   return fallback
 }
 
@@ -233,7 +236,7 @@ export function useUidMigration() {
       setRuns((current) => [{ ...detail, items: undefined }, ...current.filter((run) => run.id !== detail.id)])
       setMessage('テスト移行が完了しました。実データはまだ変更していません。')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'テスト移行を実行できませんでした。')
+      setMessage(apiErrorMessage(error, 'テスト移行を実行できませんでした。'))
     } finally {
       setBusy(false)
     }

@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { setDocumentTitle } from '@/lib/document-title'
 
 /**
  * 画面の枠（トップバーと本文の幅）に、ページから値を渡すための口。
@@ -86,13 +87,11 @@ export function usePageTitle(title: string | null | undefined) {
     if (!setTitle) return
     setTitle(next)
     /*
-     * ブラウザのタブ題が空のままにならないようにする。/hq/support で
-     * <title> が無いと監査で落ちた。既にある題は変えない（BrandTitle の
-     * 公式アカウント名を上書きしない）。空のときだけ画面名を入れる。
+     * ブラウザのタブの題も「<画面名> | musubo」にする（タブを並べて見分けられるように）。
+     * 帯の外の画面（運営・ログイン前）もこれで題が付く。名前が分からない間（null）は
+     * 上の帯の既定（左メニューの画面名）に任せる。
      */
-    if (next && typeof document !== 'undefined' && document.title.trim() === '') {
-      document.title = next
-    }
+    if (next) setDocumentTitle(next)
     // 画面を離れたら既定へ戻す。戻さないと、次の画面に前の名前が残る。
     return () => setTitle(null)
   }, [next, setTitle])

@@ -531,7 +531,25 @@
     "586_outgoing_webhook_version.sql",
     "587_form_step_completion_times.sql",
     "588_company_settings.sql",
-    "589_hq_distribution_created_name.sql"
+    "589_hq_distribution_created_name.sql",
+    "590_scenario_stop_reason.sql",
+    "591_friend_field_time.sql",
+    "592_mileage_reward_folders.sql",
+    "593_webinar_cta_version.sql",
+    "594_message_type_delivery.sql",
+    "595_imagemap_message_kinds.sql",
+    "596_restaurant_walk_in.sql",
+    "597_restaurant_media_links.sql",
+    "598_visit_stamps.sql",
+    "599_hq_broadcast_runs.sql",
+    "600_restaurant_closures.sql",
+    "601_scenario_drafts.sql",
+    "602_restaurant_liff_booking.sql",
+    "603_instagram_connections.sql",
+    "604_auto_reply_unmatched_settings.sql",
+    "605_restaurant_screen_api_additions.sql",
+    "606_restaurant_liff_details.sql",
+    "607_conversation_search_content.sql"
   ],
-  "migrationCount": 532
+  "migrationCount": 550
 }

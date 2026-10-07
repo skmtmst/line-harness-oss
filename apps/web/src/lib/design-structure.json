@@ -1,6 +1,6 @@
 {
-  "_comment": "Pen.dev の承認済み設計から書き写した、各画面の Main 直下の並び。ダッシュボードと共通レイアウトはV4、未改修画面はV2を参照する。実装側は data-design 属性で同じ名前を付け、ずれたら design-structure.test.ts が落ちる。設計を変えたときは、ここも一緒に直す（そのとき差分に『設計を更新した』と残る）。 V8へ切り替えた分析・Search Console・たまる決めごとの新規作成・NEN配信編集は旧V2/V6の節名と文言を固定しない。各機能のV8契約・操作試験で板IDと動きを確認する。",
-  "_source": "docs/design-node-ids.md",
+  "_comment": "Pen.dev の承認済み設計から書き写した、各画面の Main 直下の並び。ダッシュボードと共通レイアウトはV4、未改修画面はV2を参照する。実装側は data-design 属性で同じ名前を付け、ずれたら design-structure.test.ts が落ちる。設計を変えたときは、ここも一緒に直す（そのとき差分に『設計を更新した』と残る）。 V8へ切り替えた分析・Search Console・たまる決めごとの新規作成・NEN配信編集は旧V2/V6の節名と文言を固定しない。各機能のV8契約・操作試験で板IDと動きを確認する。 2026-10-08: V2〜V6 の画像比較の記録（visualVerification）は外した。見た目の合格は ★V8 の絵との照合（docs/v8-design-rules.md）。ここに残る節と語は、本番 v7 の画面から節・機能が消えていないかの見張り。",
+  "_source": "docs/archive/design-node-ids.md（V2/V4 の旧表。比較には使わない）",
   "screens": {
     "/ops/knowledge": {
       "node": "csVox",
@@ -11,22 +11,7 @@
         "解決の根拠",
         "下書き保存",
         "承認して有効にする"
-      ],
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "csVox",
-          "UWx1S",
-          "DHdsw",
-          "o5u371",
-          "ZAOc7"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "実ノードを2026-09-21に再取得。画面比較中。共通アクセント色とマニュアル導線の差分・全状態の確認が残る。"
-      }
+      ]
     },
     "/hq/billing": {
       "node": "OjkqO clQZw",
@@ -62,18 +47,6 @@
           "CqhfL",
           "N4u2jV"
         ]
-      },
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "OjkqO",
-          "clQZw"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "既存の共通シェル・配色などに正本との差分があるため、機能・表示確認と画面全体の完全一致は区別する。プロの申込みはMasatoの追加指示を優先。"
       }
     },
     "/hq": {
@@ -141,19 +114,6 @@
     "/": {
       "node": "hmBzC kuTR2 QEThZ",
       "name": "V4 ダッシュボード（編集・QRコードを含む）",
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "hmBzC",
-          "kuTR2",
-          "QEThZ"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "同じ状態・同じ横幅の設計画像と実装画像をPR証拠として再登録するまで未検証"
-      },
       "sections": [
         "Head",
         "TodayTasks",
@@ -206,35 +166,6 @@
     "/chats": {
       "node": "xGLVe NfgOs H3lAOB Xi4x9 f0zn6 NWbuF B7CER8 YZaDK L35UOV IYjvu TUveA w72a2 ASsb3 ANgda tBlkL AuSDY LHjwD ohj8J",
       "name": "V6 受信箱（全18状態）",
-      "visualVerification": {
-        "status": "verified",
-        "referenceNodeIds": [
-          "xGLVe",
-          "NfgOs",
-          "H3lAOB",
-          "Xi4x9",
-          "f0zn6",
-          "NWbuF",
-          "B7CER8",
-          "YZaDK",
-          "L35UOV",
-          "IYjvu",
-          "TUveA",
-          "w72a2",
-          "ASsb3",
-          "ANgda",
-          "tBlkL",
-          "AuSDY",
-          "LHjwD",
-          "ohj8J"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "checkedAt": "2026-09-07T17:55:00+09:00",
-        "evidence": "docs/design-reference/inbox-v6 と docs/design-qa/inbox-v6 の同状態画像を上端から比較し、Issue #455 で更新"
-      },
       "sections": [
         "Filters",
         "Panes",
@@ -264,20 +195,6 @@
     "/friends": {
       "node": "ywJ5H",
       "name": "V8 友だち一覧",
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "ywJ5H",
-          "x6QsVz",
-          "CYJ0L"
-        ],
-        "requiredViewports": [
-          1152,
-          1440,
-          1920
-        ],
-        "reason": "V8へ完全切替。画像撮影と幅の確認は司令塔が実施する。"
-      },
       "sections": [
         "Steps",
         "V8FriendKpis",
@@ -350,23 +267,6 @@
     "/tags": {
       "node": "hqrOv HBTk0 rIhbN QKx8Q",
       "name": "V6 4 友だち属性（4タブ・タグの表は★V8 I1E7Bt）",
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "hqrOv",
-          "HBTk0",
-          "rIhbN",
-          "QKx8Q"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "referenceScreenshots": [],
-        "implementationScreenshots": [],
-        "checkedAt": "2026-08-27T12:50:00+09:00",
-        "reason": "2026-09-02: 2026-08-21 の verified は、描かれない旧V5コードを見ていた可能性が高い。節の印がすべて死んだ枝側にあり、正本の `tags-page-v4.tsx` には1つも付いていなかった。設計の4タブと実装を突き合わせ直したので、撮り直すまで verified に戻さない。"
-      },
       "sections": [
         "Body",
         "GroupTabs",
@@ -1062,21 +962,7 @@
         "使う場所を足す",
         "表示件数",
         "CSVで書き出す"
-      ],
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "r6dJFy",
-          "WSGvo",
-          "BygrU"
-        ],
-        "requiredViewports": [
-          1152,
-          1440,
-          1920
-        ],
-        "reason": "V8の骨格へ変更。司令塔による本番ビルドの撮影・幅の確認待ち。フォルダ分類と作成画面の変更比較はAPIとの対応が未完了。"
-      }
+      ]
     },
     "/conversions/new": {
       "node": "j8p3yj",
@@ -1099,57 +985,10 @@
         "キャンセル",
         "保存して続けて作る",
         "保存して数えはじめる"
-      ],
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "j8p3yj",
-          "cXqlS"
-        ],
-        "requiredViewports": [
-          1152,
-          1440,
-          1920
-        ],
-        "reason": "V8の骨格へ変更。司令塔による本番ビルドの撮影・幅の確認待ち。フォルダ分類と作成画面の変更比較はAPIとの対応が未完了。"
-      }
+      ]
     },
     "/inflow-links": {
       "node": "Q4bkTg IhSBB v0HaI BuVDB Im2b1",
-      "visualVerification": {
-        "status": "verified",
-        "referenceNodeIds": [
-          "Q4bkTg",
-          "IhSBB",
-          "v0HaI",
-          "BuVDB",
-          "Im2b1"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "referenceScreenshots": [
-          "docs/design-reference/inflow-v6/Q4bkTg.png",
-          "docs/design-reference/inflow-v6/IhSBB.png",
-          "docs/design-reference/inflow-v6/v0HaI.png",
-          "docs/design-reference/inflow-v6/BuVDB.png",
-          "docs/design-reference/inflow-v6/Im2b1.png"
-        ],
-        "implementationScreenshots": [
-          "docs/design-qa/inflow-v6/Q4bkTg-1440.png",
-          "docs/design-qa/inflow-v6/Q4bkTg-1920.png",
-          "docs/design-qa/inflow-v6/IhSBB-1440.png",
-          "docs/design-qa/inflow-v6/IhSBB-1920.png",
-          "docs/design-qa/inflow-v6/v0HaI-1440.png",
-          "docs/design-qa/inflow-v6/v0HaI-1920.png",
-          "docs/design-qa/inflow-v6/BuVDB-1440.png",
-          "docs/design-qa/inflow-v6/BuVDB-1920.png",
-          "docs/design-qa/inflow-v6/Im2b1-1440.png",
-          "docs/design-qa/inflow-v6/Im2b1-1920.png"
-        ],
-        "checkedAt": "2026-09-06T20:00:00+09:00"
-      },
       "name": "V6 18 流入と計測（4タブ）",
       "sections": [
         "Head",
@@ -1248,24 +1087,6 @@
     },
     "/inflow-links/new": {
       "node": "TEVk8",
-      "visualVerification": {
-        "status": "verified",
-        "referenceNodeIds": [
-          "TEVk8"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "referenceScreenshots": [
-          "docs/design-reference/inflow-v6/TEVk8.png"
-        ],
-        "implementationScreenshots": [
-          "docs/design-qa/inflow-v6/TEVk8-1440.png",
-          "docs/design-qa/inflow-v6/TEVk8-1920.png"
-        ],
-        "checkedAt": "2026-09-06T20:00:00+09:00"
-      },
       "name": "V6 18-1-C 流入リンクをつくる",
       "sections": [
         "Body",
@@ -1322,28 +1143,6 @@
     },
     "/inflow-links/detail": {
       "node": "JupxW UIaM7",
-      "visualVerification": {
-        "status": "verified",
-        "referenceNodeIds": [
-          "JupxW",
-          "UIaM7"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "referenceScreenshots": [
-          "docs/design-reference/inflow-v6/JupxW.png",
-          "docs/design-reference/inflow-v6/UIaM7.png"
-        ],
-        "implementationScreenshots": [
-          "docs/design-qa/inflow-v6/JupxW-1440.png",
-          "docs/design-qa/inflow-v6/JupxW-1920.png",
-          "docs/design-qa/inflow-v6/UIaM7-open-1440.png",
-          "docs/design-qa/inflow-v6/UIaM7-open-1920.png"
-        ],
-        "checkedAt": "2026-09-06T20:00:00+09:00"
-      },
       "name": "V6 18-1-D 流入元の詳細・18-1-E 削除確認",
       "sections": [
         "Body",
@@ -1478,18 +1277,7 @@
         "作成",
         "最終更新",
         "使われている数"
-      ],
-      "visualVerification": {
-        "status": "blocked",
-        "referenceNodeIds": [
-          "O4ultt"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "V6の詳細専用Nodeが未確定。共通トップバーと安全な削除だけ先に反映し、V2との画像一致は完了扱いにしない。"
-      }
+      ]
     },
     "/templates/edit": {
       "node": "GFlD7",
@@ -1566,19 +1354,6 @@
     "/scenarios/detail": {
       "node": "PMLkX nMSiE ARuZ4",
       "name": "★V8 シナリオ編集（稼働中・開始直後・停止中）",
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "PMLkX",
-          "nMSiE",
-          "ARuZ4"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "★V8（オーナー決定 2026-10-01、Pencil PMLkX/nMSiE/ARuZ4）へ V8 版 detail-v8 を実装。左に流れ（3箱・数の帯・メッセージ）、右の欄に本物のスマホ、下の帯は削除＝左端・ほか＝真ん中。節の印は v7 側との和集合。同条件の画像比較は未実施"
-      },
       "sections": [
         "Body",
         "Crumb",
@@ -1859,22 +1634,7 @@
         "公開期間",
         "未分類",
         "編集"
-      ],
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "UyUMw",
-          "jiNg0",
-          "uBMuB"
-        ],
-        "requiredViewports": [
-          1152,
-          1280,
-          1440,
-          1920
-        ],
-        "reason": "司令塔による本番ビルドの撮影と幅の確認待ち。"
-      }
+      ]
     },
     "/webinars/new": {
       "node": "j7PP04",
@@ -1916,29 +1676,7 @@
         "通知",
         "確認",
         "下書きを保存"
-      ],
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "j7PP04",
-          "VWNaA",
-          "LPOe7",
-          "Q0Jrk",
-          "pvimJ",
-          "E7iAYs",
-          "XCUNf",
-          "Omqd4",
-          "uNsEy",
-          "z2dgw"
-        ],
-        "requiredViewports": [
-          1152,
-          1280,
-          1440,
-          1920
-        ],
-        "reason": "実データをつなぎ直した。画像の比較と幅の確認は司令塔が行う。"
-      }
+      ]
     },
     "/staff": {
       "node": "nku0f",
@@ -2050,18 +1788,6 @@
     "/tags/new": {
       "node": "d9xoI",
       "name": "★V8 タグを作る",
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "d9xoI",
-          "Qat9s"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "★V8（オーナー決定 2026-10-01、Pencil d9xoI/Qat9s）へ V8 版エディタ tag-editor-v8 を実装。節の印は Body/Head/Left/Right。同条件の画像比較は未実施"
-      },
       "sections": [
         "Body",
         "Head",
@@ -2095,17 +1821,6 @@
     "/tags/fields/new": {
       "node": "EhEXu",
       "name": "★V8 友だち情報欄を作る・編集",
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "EhEXu"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "★V8（オーナー決定 2026-10-01、Pencil EhEXu）へ V8 版エディタ field-editor-v8 を実装。節の印は v7 分（Basic/Value/Immutable）と V8 分（Head/Body/Left/Right）の和集合。同条件の画像比較は未実施"
-      },
       "sections": [
         "Basic",
         "Body",
@@ -2140,17 +1855,6 @@
     "/tags/fields/migrate": {
       "node": "GobMd",
       "name": "★V8 友だち情報欄を移行",
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "GobMd"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "★V8（オーナー決定 2026-10-01、Pencil GobMd）へ V8 版移行画面 field-migrate-v8 を実装。節の印は Head/Fields/Preview/Usage/Result。同条件の画像比較は未実施"
-      },
       "sections": [
         "Fields",
         "Head",
@@ -2349,19 +2053,7 @@
         "まだ共通情報がありません",
         "条件に合う共通情報はありません",
         "選択した共通情報を削除"
-      ],
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "WuKzU",
-          "yPkWe"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "Claudeの設計画像・実装画像比較待ち"
-      }
+      ]
     },
     "/automations/new": {
       "node": "Rv8Jv",
@@ -2539,16 +2231,6 @@
     "/friends/detail": {
       "node": "hsWaL",
       "name": "V6 3-1-D 友だち詳細",
-      "visualVerification": {
-        "status": "verified",
-        "referenceNodeIds": [
-          "I6UAdr"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ]
-      },
       "sections": [
         "Crumb",
         "Left",
@@ -2646,17 +2328,6 @@
     "/scenarios/mode": {
       "node": "dnzqC",
       "name": "★V8 シナリオを作る①（シナリオ情報・配信方式）",
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "dnzqC"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "★V8（オーナー決定 2026-10-01、Pencil dnzqC）へ V8 版 mode-v8 を実装。節の印は v7 側（Crumb/Head/Notice/Name/Choices）と共用部品（Steps）の和集合。同条件の画像比較は未実施"
-      },
       "sections": [
         "Crumb",
         "Head",
@@ -2693,17 +2364,6 @@
     "/scenarios/first-step": {
       "node": "V6xAo",
       "name": "★V8 シナリオを作る②（1通目を設定）",
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "V6xAo"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "★V8（Pencil V6xAo・1152 U5rxyH）は src/v8/scenario-first-step に一から書いた（2026-10-07）。枠・頭・右の列は型（CreatePage）が持つので、節の印は v7 側（Crumb・Form・Head・Notice・Steps）だけ。measure.sh で V6xAo 98%・U5rxyH 100%"
-      },
       "sections": [
         "Crumb",
         "Form",
@@ -2741,22 +2401,6 @@
     "/accounts/new": {
       "node": "a8qMXX oeVQQ YEHCR K1zHyx VPh1U t3Mlu",
       "name": "V6 33-2 LINEアカウント登録（全5手順）",
-      "visualVerification": {
-        "status": "unverified",
-        "referenceNodeIds": [
-          "a8qMXX",
-          "oeVQQ",
-          "YEHCR",
-          "K1zHyx",
-          "VPh1U",
-          "t3Mlu"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "V6正本.penの新1〜5を実装済み。保存済みの設計PNGと同寸法の実装画像をPR証拠として比較するまで未検証"
-      },
       "sections": [
         "Head",
         "Steps",

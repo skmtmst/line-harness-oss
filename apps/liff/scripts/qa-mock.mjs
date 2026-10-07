@@ -85,6 +85,28 @@ const QA_EVENT_WAITLIST = {
   slot_ends_at: '2026-10-11T12:00:00+09:00',
 };
 
+/** 自分のキャンセル待ちの行 (GET /api/liff/events/me/waitlist・EventWaitlistMine の形)。qa-slot-2 の 2 番目。 */
+const QA_EVENT_WAITLIST_MINE = {
+  source: 'waitlist',
+  id: 'qa-event-waitlist-1',
+  event_id: 'qa-event-1',
+  slot_id: 'qa-slot-2',
+  status: 'waiting',
+  customer_note: null,
+  event_name: '秋のわんこ撮影会',
+  event_image_url: null,
+  venue_name: '然 渋谷店 2F',
+  venue_address: null,
+  venue_url: null,
+  cancel_deadline_hours_before: null,
+  slot_starts_at: '2026-10-11T11:00:00+09:00',
+  slot_ends_at: '2026-10-11T12:00:00+09:00',
+  party_size: 1,
+  created_at: '2026-10-02T09:00:00+09:00',
+  offer_expires_at: null,
+  queue_position: 2,
+};
+
 // 紹介のリンク・案件は ★V8 S3uBl の言葉に合わせる (秋の定期便キャンペーン・鹿肉ふりかけ)。
 const QA_LINK = {
   refCode: 'QA1234',
@@ -98,6 +120,81 @@ const QA_LINK = {
   offerId: 'qa-offer-1',
   offerName: '秋の定期便キャンペーン',
 };
+
+// ---- 飲食店の席の予約の見本 ----
+const SEAT_QA_NOW = Date.parse('2026-10-07T00:00:00Z');
+const SEAT_STORE = { id: 'qa-store', name: '然 - NEN - 本店', timezone: 'Asia/Tokyo' };
+const seatBookings = new Map();
+/** 1日の席：17:00〜21:00 を 30 分ごと。19:00 は残り1席、19:30・21:00 は満席。10/12 は臨時休業で全部満席。 */
+function seatSlots(date) {
+  if (date < '2026-10-07') return null;
+  const closed = date === '2026-10-12';
+  return ['17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00'].map((hm) => {
+    const startsAt = new Date(`${date}T${hm}:00+09:00`).toISOString();
+    const full = closed || hm === '19:30' || hm === '21:00';
+    return {
+      startsAt,
+      endsAt: new Date(Date.parse(startsAt) + 120 * 60000).toISOString(),
+      available: !full,
+      remainingTables: full ? 0 : hm === '19:00' ? 1 : 4,
+      // API-11：空いている候補卓の種類と、空いていない理由（10/12 は臨時休業）。
+      seatTypes: full ? [] : ['table'],
+      ...(full ? { unavailableReason: closed ? 'temporary_closed' : 'full' } : {}),
+    };
+  });
+}
+/** 店の遅れたときの決まり（API-11 の lateArrivalPolicy）。 */
+const SEAT_LATE = { cancelAfterMinutes: 15, message: '15分を過ぎてご連絡がない場合は、取り消しになることがあります' };
+function seatMock(method, pathname, url, body) {
+  if (method === 'GET' && pathname.startsWith('/api/liff/restaurant/link/')) {
+    return pathname.endsWith('/qa-seat') ? [200, { success: true, data: SEAT_STORE }] : [404, { success: false, error: 'not_found' }];
+  }
+  if (method === 'GET' && pathname === '/api/liff/restaurant/availability') {
+    const date = url.searchParams.get('date') ?? '';
+    const slots = seatSlots(date);
+    if (!slots) return [400, { success: false, error: 'invalid_date_or_unconfigured_hours' }];
+    const closed = date === '2026-10-12';
+    return [200, { success: true, data: { storeId: SEAT_STORE.id, date, guestCount: Number(url.searchParams.get('guestCount')), slots, ...(closed ? { unavailableReason: 'temporary_closed' } : {}), lateArrivalPolicy: SEAT_LATE, cancelDeadlineMinutesBefore: 120, cutoffMinutesBefore: 60 } }];
+  }
+  if (method === 'POST' && pathname === '/api/liff/restaurant/holds') {
+    const b = {
+      id: `qa-seat-${seatBookings.size + 1}`,
+      storeId: SEAT_STORE.id,
+      startsAt: body.startsAt,
+      endsAt: new Date(Date.parse(body.startsAt) + 120 * 60000).toISOString(),
+      guestCount: body.guestCount,
+      status: 'pending',
+      version: 1,
+      holdExpiresAt: new Date(SEAT_QA_NOW + 10 * 60000).toISOString(),
+      note: body.note ?? null,
+      customerPhone: body.customerPhone ?? null,
+      seatType: 'table',
+    };
+    seatBookings.set(b.id, b);
+    return [201, { success: true, data: b }];
+  }
+  if (method === 'GET' && pathname === '/api/liff/restaurant/reservations') {
+    return [200, { success: true, data: [...seatBookings.values()] }];
+  }
+  const m = pathname.match(/^\/api\/liff\/restaurant\/reservations\/([^/]+)\/(confirm|cancel|reschedule)$/);
+  if (method === 'POST' && m) {
+    const old = seatBookings.get(decodeURIComponent(m[1]));
+    if (!old) return [404, { success: false, error: 'not_found' }];
+    const next = { ...old, version: old.version + 1, holdExpiresAt: null, status: m[2] === 'cancel' ? 'cancelled' : 'confirmed' };
+    if (m[2] === 'confirm') {
+      if (body && 'note' in body) next.note = body.note ?? null;
+      if (body && 'customerPhone' in body) next.customerPhone = body.customerPhone ?? null;
+    }
+    if (m[2] === 'reschedule') {
+      next.startsAt = body.startsAt;
+      next.endsAt = new Date(Date.parse(body.startsAt) + 120 * 60000).toISOString();
+      next.guestCount = body.guestCount;
+    }
+    seatBookings.set(next.id, next);
+    return [200, { success: true, data: next }];
+  }
+  return null;
+}
 
 function json(res, status, body) {
   const text = JSON.stringify(body);
@@ -304,6 +401,52 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // ---- 来店スタンプ (★V8 jQRsr・V2HU7・xe8ga・h2HKh・etLd8) ----
+  // カード1枚・6個たまった本人。特典を見せる→店員の暗証番号で使用済み→残り 1個（サーバは特典の個数だけ減らす）。
+  {
+    const card = {
+      id: 'vs-card-1', name: '然 来店スタンプカード', accountIds: ['qa-account'], active: true, version: 1, expectedVersion: 1,
+      settings: {
+        mode: 'visit', amountUnit: 1000, maxPerVisit: 3, firstVisitBonus: 0, expiryMonths: 6, timezone: 'Asia/Tokyo',
+        multipliers: [], rankMultipliers: [],
+        rewards: [{ id: 'reward-drink', name: 'ドリンク 1杯', stamps: 5 }, { id: 'reward-dessert', name: 'デザート 1品', stamps: 10 }],
+      },
+    };
+    const wallet = { cardId: 'vs-card-1', friendId: 'qa-friend', balance: 6, earnedTotal: 6, expiresAt: '2026-07-13T03:00:00.000Z' };
+    if (method === 'GET' && pathname === '/api/liff/visit-stamps/cards') {
+      json(res, 200, { success: true, data: [{ card, wallet }] });
+      return;
+    }
+    if (method === 'GET' && pathname === '/api/liff/visit-stamps/cards/vs-card-1') {
+      json(res, 200, { success: true, data: { card, wallet, entries: [] } });
+      return;
+    }
+    if (method === 'POST' && pathname === '/api/liff/visit-stamps/cards/vs-card-1/rewards') {
+      json(res, 201, { success: true, data: { id: 'vs-redeem-1', cardId: 'vs-card-1', rewardId: 'reward-drink', rewardName: 'ドリンク 1杯', stamps: 5, status: 'offered' } });
+      return;
+    }
+    if (method === 'POST' && pathname === '/api/liff/visit-stamps/redemptions/vs-redeem-1/use') {
+      // 暗証番号だけで店員を当てる（API-10）。使った店員の名前を返す（xe8ga の「担当」）。
+      json(res, 200, { success: true, data: { id: 'vs-redeem-1', status: 'used', staffId: 'staff-tamura', staffName: '田村' } });
+      return;
+    }
+    // 自分の紙のカードの申請（確認待ち etLd8 は map の api で確認待ちを1件返す）。ふだんは無し。
+    if (method === 'GET' && pathname === '/api/liff/visit-stamps/cards/vs-card-1/paper-requests') {
+      json(res, 200, { success: true, data: [] });
+      return;
+    }
+    // 紙のカードの写真を預ける（multipart）。中身は読み捨て、本人だけが読める URL を返す。
+    if (method === 'POST' && pathname === '/api/liff/visit-stamps/cards/vs-card-1/paper-photos') {
+      for await (const _chunk of req) { /* 読み捨て */ }
+      json(res, 201, { success: true, data: { id: 'vs-photo-1', photoUrl: 'https://qa.example/api/liff/visit-stamps/paper-photos/vs-photo-1', contentType: 'image/jpeg', size: 1024 } });
+      return;
+    }
+    if (method === 'POST' && pathname === '/api/liff/visit-stamps/cards/vs-card-1/paper-requests') {
+      json(res, 201, { success: true, data: { id: 'vs-paper-1', status: 'pending' } });
+      return;
+    }
+  }
+
   // ---- 予約 ----
   if (method === 'GET' && pathname === '/api/liff/booking/menus') {
     json(res, 200, {
@@ -459,6 +602,11 @@ const server = createServer(async (req, res) => {
     json(res, 200, { booking_id: 'qa-booking-1', status: 'requested' });
     return;
   }
+  // F-6 本人の取消・日時変更（送ったことにする。版の確かめはしない）。
+  if (method === 'POST' && /^\/api\/liff\/booking\/[^/]+\/(cancel|reschedule)$/.test(pathname)) {
+    json(res, 200, { lock_version: 2, status: pathname.endsWith('/cancel') ? 'cancelled' : 'confirmed' });
+    return;
+  }
   if (method === 'GET' && pathname === '/api/liff/booking/me') {
     json(res, 200, {
       upcoming: [
@@ -470,6 +618,10 @@ const server = createServer(async (req, res) => {
           menu_name: 'トリミング（小型犬）',
           staff_name: 'QA スタッフ',
           profile_image_url: null,
+          // F-6 本人の変更・取消に要る値（履歴の口が返すようになったときの形）。
+          lock_version: 1,
+          menu_id: 'qa-menu-1',
+          staff_id: 'qa-staff-1',
         },
         {
           id: 'qa-history-2',
@@ -479,6 +631,9 @@ const server = createServer(async (req, res) => {
           menu_name: 'シャンプーのみ',
           staff_name: 'QA スタッフ',
           profile_image_url: null,
+          lock_version: 3,
+          menu_id: 'qa-menu-3',
+          staff_id: 'qa-staff-1',
         },
       ],
       past: [],
@@ -491,6 +646,15 @@ const server = createServer(async (req, res) => {
     json(res, 200, { items: [QA_EVENT_BOOKING, QA_EVENT_WAITLIST] });
     return;
   }
+  // 自分のキャンセル待ち (qVdiX の「順番 2 番目」「キャンセル待ちをやめる」)。
+  if (method === 'GET' && pathname === '/api/liff/events/me/waitlist') {
+    json(res, 200, { items: [QA_EVENT_WAITLIST_MINE] });
+    return;
+  }
+  if (method === 'POST' && /^\/api\/liff\/events\/me\/waitlist\/[^/]+\/cancel$/.test(pathname)) {
+    json(res, 200, { ok: true });
+    return;
+  }
   if (method === 'GET' && pathname.startsWith('/api/liff/events/me/')) {
     json(res, 200, QA_EVENT_BOOKING);
     return;
@@ -499,6 +663,21 @@ const server = createServer(async (req, res) => {
     const m = pathname.match(/^\/api\/liff\/events\/me\/([^/]+)\/cancel$/);
     if (method === 'POST' && m) {
       json(res, 200, { ok: true });
+      return;
+    }
+  }
+  // 空きが出た案内の中身 (BjcuB「10月11日（日）11:00〜 に 1 席」「あと 23時間 41分」)。
+  {
+    const m = pathname.match(/^\/api\/liff\/events\/waitlist\/([^/]+)$/);
+    if (method === 'GET' && m) {
+      json(res, 200, {
+        success: true,
+        data: {
+          waitlistId: 'qa-event-waitlist-1', eventId: 'qa-event-1', slotId: 'qa-slot-2', eventName: '秋のわんこ撮影会',
+          startsAt: '2026-10-11T11:00:00+09:00', endsAt: '2026-10-11T12:00:00+09:00', venueName: '然 渋谷店 2F',
+          partySize: 1, status: 'offered', expiresAt: '2026-10-03T08:41:30+09:00', remainingSeconds: 23 * 3600 + 41 * 60 + 30, canAccept: true,
+        },
+      });
       return;
     }
   }
@@ -592,6 +771,16 @@ const server = createServer(async (req, res) => {
         return;
       }
       json(res, 200, webinarLive());
+      return;
+    }
+  }
+
+  // ---- 飲食店の席の予約 (E-11・glL3g・km8EG・sAnyy) ----
+  // 撮影は時計を 2026-10-07 09:00 (JST) に合わせる。仮押さえはそこから 10 分。
+  if (pathname.startsWith('/api/liff/restaurant/')) {
+    const seat = seatMock(method, pathname, url, method === 'POST' ? await readBody(req) : null);
+    if (seat) {
+      json(res, seat[0], seat[1]);
       return;
     }
   }

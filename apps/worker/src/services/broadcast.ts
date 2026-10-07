@@ -102,6 +102,11 @@ async function broadcastWideContext(
   broadcastId: string,
 ): Promise<BroadcastRenderContext> {
   const context: BroadcastRenderContext = { deliveredAt: new Date() };
+  if(/\{\{\s*account\.name\s*\}\}/.test(content)) {
+    if(!accountId)throw new Error('店名の差し込みには店舗が必要です');
+    const a=await db.prepare('SELECT name FROM line_accounts WHERE id=?').bind(accountId).first<{name:string}>();
+    if(!a)throw new Error('店名を確認できません');context.accountName=a.name;
+  }
   if (accountId) {
     const { getLineAccountById: getLA } = await import('@line-crm/db');
     const acct = await getLA(db, accountId);
@@ -139,6 +144,7 @@ export async function processBroadcastSend(
     messageType: broadcast.message_type,
     messageContent: broadcast.message_content,
     messageBubblesJson: broadcast.message_bubbles_json,
+    messageOptionsJson: broadcast.message_options_json,
     altText: broadcast.alt_text,
   });
   const commonVarSnapshot = await prepareBroadcastCommonVarSnapshot(
@@ -898,6 +904,7 @@ async function processQueuedBroadcastBatches(
     messageType: broadcast.message_type,
     messageContent: broadcast.message_content,
     messageBubblesJson: broadcast.message_bubbles_json,
+    messageOptionsJson: broadcast.message_options_json,
     altText: broadcast.alt_text,
   });
   const commonVarSnapshot = await prepareBroadcastCommonVarSnapshot(

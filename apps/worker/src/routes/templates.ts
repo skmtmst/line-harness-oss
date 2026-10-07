@@ -368,24 +368,28 @@ templates.get('/api/templates', async (c) => {
 export const TEMPLATE_EXAMPLES = [
   {
     id: 'template-example-business-hours',
+    messageType: 'text',
     name: '営業時間のご案内',
     body: 'いつもご利用ありがとうございます。営業時間のご案内です。平日 10:00〜19:00、土日祝 10:00〜18:00です。ご来店をお待ちしております。',
     imageSlot: '/images/template-examples/business-hours.png',
   },
   {
     id: 'template-example-campaign',
+    messageType: 'rich_message',
     name: 'キャンペーンのお知らせ',
     body: '期間限定キャンペーンのお知らせです。対象商品が10%お得になります。この機会にぜひご利用ください。',
     imageSlot: '/images/template-examples/campaign.png',
   },
   {
     id: 'template-example-booking',
+    messageType: 'text',
     name: '予約の受付',
     body: 'ご予約を受け付けました。日時が近づきましたらご案内をお送りします。変更・キャンセルはお早めにご連絡ください。',
     imageSlot: '/images/template-examples/booking.png',
   },
   {
     id: 'template-example-thanks-coupon',
+    messageType: 'coupon',
     name: '来店のお礼とクーポン',
     body: 'ご来店ありがとうございました。次回使えるクーポンをお送りします。またのご利用をお待ちしております。',
     imageSlot: '/images/template-examples/thanks-coupon.png',
@@ -560,7 +564,7 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (isBlankText(body.name) || isBlankText(body.messageType) || isBlankText(body.messageContent)) {
       return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
     }
-    const message = validateTemplateMessage(body.messageType, body.messageContent);
+    const message = validateTemplateMessage(body.messageType, body.messageContent, false);
     if (!message.ok) {
       const { ok: _ok, ...failure } = message;
       return c.json({ success: false, ...failure }, 422);
@@ -667,7 +671,7 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
       ?? existing.draft_message_content
       ?? existing.message_content;
     const message = changesMessage
-      ? validateTemplateMessage(baseMessageType, baseMessageContent)
+      ? validateTemplateMessage(baseMessageType, baseMessageContent, false)
       : { ok: true as const };
     if (!message.ok) {
       const { ok: _ok, ...failure } = message;
@@ -808,7 +812,7 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
     const draftType = existing.draft_message_type ?? existing.message_type;
     const draftContent = existing.draft_message_content ?? existing.message_content;
     if (hasTemplateDraft(existing)) {
-      const message = validateTemplateMessage(draftType, draftContent);
+      const message = validateTemplateMessage(draftType, draftContent, false);
       if (!message.ok) {
         const { ok: _ok, ...failure } = message;
         return c.json({ success: false, ...failure }, 422);

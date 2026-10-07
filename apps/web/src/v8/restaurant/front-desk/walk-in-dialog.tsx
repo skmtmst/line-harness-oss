@@ -94,6 +94,8 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
       open={open}
       designNode="nNujj"
       designWidth={560}
+      /* 絵 PUWyq：窓の上は 140（座れる卓の数で上下しない）。 */
+      designTop={140}
       footerAlign="center"
       title="ウォークインを入れる"
       description={`いま ${hm(now)} ・ 空いている卓 ${freeAll}`}
@@ -133,6 +135,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
                 title={table.code}
                 note={tableNote(table)}
                 icon={<Armchair size={16} aria-hidden="true" />}
+                height="short"
                 disabled={busy}
               />
             ))}

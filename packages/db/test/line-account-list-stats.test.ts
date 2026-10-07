@@ -70,12 +70,45 @@ describe('LINEアカウント一覧の一括集計', () => {
     await expect(
       getLineAccountListStats(countingDb, ['account-a', 'account-b', 'account-c', 'account-d']),
     ).resolves.toEqual({
-      'account-a': { friendCount: 2, activeScenarios: 1, messagesThisMonth: 1, staffCount: 2, connection: { status: 'ok', checkedAt: '2026-09-15T10:01:00.000Z' } },
-      'account-b': { friendCount: 1, activeScenarios: 1, messagesThisMonth: 1, staffCount: 1, connection: { status: 'warn', checkedAt: '2026-09-15T10:02:30.000Z' } },
-      'account-c': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 1, connection: { status: 'unknown', checkedAt: null } },
-      'account-d': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 1, connection: { status: 'warn', checkedAt: '2026-09-15T10:03:00.000Z' } },
+      'account-a': { friendCount: 2, activeScenarios: 1, messagesThisMonth: 1, staffCount: 2, connection: { status: 'ok', checkedAt: '2026-09-15T10:01:00.000Z', tokenExpired: false, issues: [] } },
+      'account-b': { friendCount: 1, activeScenarios: 1, messagesThisMonth: 1, staffCount: 1, connection: { status: 'warn', checkedAt: '2026-09-15T10:02:30.000Z', tokenExpired: false, issues: [
+        { kind: 'webhook_endpoint', result: 'mismatched', expectedUrl: null, registeredUrl: null, webhookActive: null, httpStatus: null },
+      ] } },
+      'account-c': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 1, connection: { status: 'unknown', checkedAt: null, tokenExpired: false, issues: [] } },
+      'account-d': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 1, connection: { status: 'warn', checkedAt: '2026-09-15T10:03:00.000Z', tokenExpired: true, issues: [] } },
     });
     expect(prepareCalls).toHaveLength(1);
+  });
+
+  test('要確認の理由として、最新の確認のうち引っかかったものだけを URL ごと返す', async () => {
+    sqlite.exec(`
+      INSERT INTO line_account_connection_checks
+        (id, line_account_id, check_kind, result, expected_url, registered_url, webhook_active, http_status,
+         checked_by, checked_at, correlation_id, idempotency_key, account_revision)
+      VALUES ('check-c-bot-old', 'account-c', 'bot_info', 'failed', NULL, NULL, NULL, 401,
+              'staff-all', '2026-09-14T10:00:00.000Z', 'corr-c0', 'idem-c0', 1),
+             ('check-c-bot', 'account-c', 'bot_info', 'ok', NULL, NULL, NULL, 200,
+              'staff-all', '2026-09-15T10:00:00.000Z', 'corr-c', 'idem-c', 1),
+             ('check-c-webhook', 'account-c', 'webhook_endpoint', 'mismatched',
+              'https://stg-api.example.test/webhook', 'https://old.example.test/webhook', 1, 200,
+              'staff-all', '2026-09-15T10:00:01.000Z', 'corr-c', 'idem-c', 1),
+             ('check-c-liff', 'account-c', 'liff_config', 'failed', NULL, NULL, NULL, NULL,
+              'staff-all', '2026-09-15T10:00:02.000Z', 'corr-c', 'idem-c', 1);
+    `);
+    const stats = await getLineAccountListStats(db, ['account-c']);
+    expect(stats['account-c'].connection).toEqual({
+      status: 'warn',
+      checkedAt: '2026-09-15T10:00:01.000Z',
+      tokenExpired: false,
+      issues: [{
+        kind: 'webhook_endpoint',
+        result: 'mismatched',
+        expectedUrl: 'https://stg-api.example.test/webhook',
+        registeredUrl: 'https://old.example.test/webhook',
+        webhookActive: true,
+        httpStatus: 200,
+      }],
+    });
   });
 
   test('アカウント数を増やしてもD1問い合わせとbindは1回のまま', async () => {

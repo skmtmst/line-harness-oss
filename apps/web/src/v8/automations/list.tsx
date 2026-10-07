@@ -18,7 +18,6 @@ import {
   Filter,
   LayoutTemplate,
   ListChecks,
-  MoreHorizontal,
   Pause,
   Play,
   Plus,
@@ -39,7 +38,6 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
@@ -47,10 +45,12 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import { Field, TextInput } from '@/components/shared/form-controls'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import {
@@ -521,19 +521,10 @@ export default function AutomationListV8() {
                         {canEdit
                           ? <Button onClick={() => void openEditor(item.id, false)} disabled={busy}>編集する</Button>
                           : <span className={styles.editSpace} aria-hidden="true" />}
-                        <IconButton
-                          title={menuLabel}
-                          aria-label={menuLabel}
-                          aria-haspopup="menu"
-                          aria-expanded={openMenuId === item.id}
-                          onClick={() => setOpenMenuId((currentId) => (currentId === item.id ? null : item.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
-                        <ActionMenu
+                        <RowMenu
+                          label={menuLabel}
                           open={openMenuId === item.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={menuLabel}
+                          onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                           note={canEdit ? undefined : READONLY_REASON}
                           items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect() } }))}
                         />
@@ -637,7 +628,7 @@ export default function AutomationListV8() {
           {testing ? (
             <div className={styles.testBody}>
               <Field label="試す友だちのID">
-                <TextInput
+                <TextField
                   aria-label="試す友だちのID"
                   value={testFriendId}
                   onChange={(event) => setTestFriendId(event.target.value)}

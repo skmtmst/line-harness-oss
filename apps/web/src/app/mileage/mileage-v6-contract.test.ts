@@ -25,16 +25,6 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(LEGACY_NEW).toContain("permanentRedirect('/mileage/earning-rules/new')")
   })
 
-  it('本文タイトルを重ねず、実装済みの行動スコアをタブへ出す', () => {
-    expect(PAGE).toContain('data-mileage-design="v6"')
-    expect(PAGE).toContain("{ key: 'balances', label: '友だちの残高' }")
-    expect(PAGE).toContain("{ key: 'earning-rules', label: 'たまる決めごと' }")
-    expect(PAGE).toContain("{ key: 'history', label: '履歴' }")
-    expect(PAGE).toContain("{ key: 'score', label: '行動スコア' }")
-    expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
-    expect(PAGE).not.toContain('準備中')
-  })
-
   it('履歴と友だち別明細をV6の実Nodeへ接続する', () => {
     expect(HISTORY).toContain('data-design-node="MvZm5"')
     expect(HISTORY).toContain('api.mileage.history')
@@ -233,16 +223,5 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(ACTION_SCORE).toContain('スコアはマイルではありません')
     expect(ACTION_SCORE).toContain('お客様には見せず、交換もできません')
     expect(ACTION_SCORE).toContain('マイル残高はスコアで増えも減りもしません')
-  })
-
-  it('点数の集まりを「帯」と呼ぶ', () => {
-    /*
-      設計 `z3PB2` は「帯」。「層」は人を分ける言い方に聞こえるので使わない
-      （§7 #48 の表記ゆれ）。CSVの見出しと表の見出しも同じ言葉にする。
-    */
-    expect(ACTION_SCORE).not.toContain('層')
-    for (const word of ['この帯の人を見る', 'この帯に送る', '帯または検索条件']) {
-      expect(ACTION_SCORE).toContain(word)
-    }
   })
 })

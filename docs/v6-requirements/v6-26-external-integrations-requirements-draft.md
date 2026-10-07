@@ -1,5 +1,7 @@
 # V6 26 外部連携 要件定義（実装照合版・下書き）
 
+> この文書は機能（動き）の正本。見た目は ★V8（[docs/v8-design-rules.md](../v8-design-rules.md)）が正本で、この文書の見た目・ノードID・V6 の絵の指定は使わない。
+
 更新日: 2026-08-26
 対象: V6 26-x、現行 `/webhooks`・`/webhooks/new`、Webhook DB/API、イベントバス、LステップのWebhook・API連携
 

@@ -12,6 +12,8 @@ const listTemplates = vi.hoisted(() => vi.fn())
 const usages = vi.hoisted(() => vi.fn())
 const removeTemplate = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+const push = vi.hoisted(() => vi.fn())
+const fetchApi = vi.hoisted(() => vi.fn())
 
 vi.mock('next/link', () => ({
   default: ({ children, href, className, title }: { children: React.ReactNode; href: string; className?: string; title?: string }) => (
@@ -19,7 +21,7 @@ vi.mock('next/link', () => ({
   ),
 }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push, replace: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/templates',
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -40,6 +42,7 @@ vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
     status = 0
   },
+  fetchApi,
   api: {
     templates: { list: listTemplates, usages, delete: removeTemplate },
     broadcastMessageAssets: { counts: () => Promise.resolve({ success: true, data: { card_message: 4 } }) },
@@ -187,5 +190,47 @@ describe('V8 テンプレートの一覧', () => {
     expect(screen.getByText('ほか 9 か所')).toBeTruthy()
     expect(screen.getAllByText('開いて差し替える')).toHaveLength(2)
     expect(removeTemplate).not.toHaveBeenCalled()
+  })
+})
+
+describe('テンプレートの種類を選ぶ窓（R9XUMr）：見本から作る（F-5）', () => {
+  beforeEach(() => {
+    role.value = 'owner'
+    push.mockReset()
+    fetchApi.mockReset()
+    listTemplates.mockResolvedValue({ success: true, data: [used] })
+  })
+  afterEach(() => cleanup())
+
+  it('窓を開くと見本の口を読み、見本を押すとメッセージを作るへ見本の番号つきで進む', async () => {
+    fetchApi.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 'template-example-booking', name: '予約の受付', body: 'ご予約を受け付けました。' },
+        { id: 'broken', name: 1 },
+      ],
+    })
+    await renderList()
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: /テンプレートを作る/ })[0])
+    })
+    await act(async () => { await Promise.resolve() })
+    expect(fetchApi).toHaveBeenCalledWith('/api/templates/examples')
+    expect(screen.getByRole('heading', { name: '見本から作る' })).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /予約の受付/ }))
+    })
+    expect(push).toHaveBeenCalledWith('/templates/edit?example=template-example-booking')
+  })
+
+  it('見本が読めないときは段を出さず、種類のカードはそのまま押せる', async () => {
+    fetchApi.mockRejectedValue(new Error('network'))
+    await renderList()
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: /テンプレートを作る/ })[0])
+    })
+    await act(async () => { await Promise.resolve() })
+    expect(screen.queryByRole('heading', { name: '見本から作る' })).toBeNull()
+    expect(screen.getByRole('button', { name: /カルーセル/ })).toBeTruthy()
   })
 })

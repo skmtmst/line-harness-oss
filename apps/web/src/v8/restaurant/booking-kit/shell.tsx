@@ -8,7 +8,7 @@
  * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
  * restaurantTestApi.snapshot。src/v8 は古い画面を import できないので写した。
  */
-import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import {
@@ -131,11 +131,12 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', storeTab, children }: {
+export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, children }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
-  description: string
+  /** 説明の行。店舗によって変わるとき（休業日・貸切の「然-NEN 本店 ・ 総数 26席」）は ctx から作る関数を渡す。 */
+  description: string | ((ctx: RestaurantV8Context | null) => string)
   query?: ReservationQuery
   /**
    * 板の頭の右に置く物（予約台帳の見方の切り替え・主ボタンなど）。店舗を選ぶ欄は2つ目の引数で渡すので、
@@ -151,6 +152,13 @@ export default function RestaurantShell({ boardId, title, description, query, he
   layout?: 'standard' | 'ledger' | 'ledgerTight'
   /** 板の頭の下に店のタブ（提案 E-1：ダッシュボード・予約・座席・卓・予約枠・在庫）を出す。今の画面の印。 */
   storeTab?: StoreTabKey
+  /**
+   * 検証環境の帯を出すか（既定 true）。false のときは中身を段の間なしで置く（中身が自分で余白を持つ。
+   * 予約枠・在庫の「休業日・貸切」タブ UVnvR は帯が無く、タブ・知らせ・本文が板の幅で続く）。
+   */
+  boundary?: boolean
+  /** 板の頭の大きさ。compact は E 系の板（題 20・説明の行 20）。 */
+  headSize?: 'compact'
   children: (ctx: RestaurantV8Context) => ReactNode
 }) {
   usePageTitle(title)
@@ -164,20 +172,25 @@ export default function RestaurantShell({ boardId, title, description, query, he
   /* 取得失敗と未登録を混ぜない（今の画面と同じ決まり）。 */
   const [loadError, setLoadError] = useState<unknown>(null)
 
+  /* 見方・絞り込みを続けて変えたとき、先に出した古い問い合わせの返事が後から来て新しい結果を上書きしないように、最後の1件だけを使う。 */
+  const latest = useRef(0)
   const load = useCallback(async () => {
+    const ticket = ++latest.current
     if (!selectedAccountId) { setSnapshot(null); setLoadError(null); setLoading(false); return }
     setLoading(true)
     try {
       const res = await restaurantTestApi.snapshot(selectedAccountId, query)
+      if (ticket !== latest.current) return
       setSnapshot(res.data)
       setLoadError(null)
       setSelectedStoreId((current) => (res.data.stores.some((item) => item.id === current)
         ? current
         : res.data.stores[0]?.id || ''))
     } catch (caught) {
+      if (ticket !== latest.current) return
       setLoadError(caught)
     } finally {
-      setLoading(false)
+      if (ticket === latest.current) setLoading(false)
     }
   }, [selectedAccountId, query])
   useEffect(() => { void load() }, [load])
@@ -248,14 +261,14 @@ export default function RestaurantShell({ boardId, title, description, query, he
     <div data-design-node={boardId} className={styles.page}>
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>{title}</h1>
-          <p className={styles.headDescription}>{description}</p>
+          <h1 className={`${styles.headTitle} ${headSize === 'compact' ? styles.headTitleCompact : ''}`}>{title}</h1>
+          <p className={`${styles.headDescription} ${headSize === 'compact' ? styles.headDescriptionCompact : ''}`}>{typeof description === 'function' ? description(ctx) : description}</p>
         </div>
         {headAfter ? headAfter(ctx, storePicker) : storePicker}
       </div>
       {storeTab ? <div className={styles.storeTabs}><StoreTabs current={storeTab} flush /></div> : null}
-      <div className={`${styles.body} ${layout === 'ledgerTight' ? styles.bodyTight : ''} ${storeTab ? styles.bodyAfterTabs : ''}`}>
-        <BoundaryBanner />
+      <div className={`${styles.body} ${layout === 'ledgerTight' ? styles.bodyTight : ''} ${storeTab ? styles.bodyAfterTabs : ''} ${boundary ? '' : styles.bodyFlush}`}>
+        {boundary ? <BoundaryBanner /> : null}
         {noticeBand}
         {content}
       </div>

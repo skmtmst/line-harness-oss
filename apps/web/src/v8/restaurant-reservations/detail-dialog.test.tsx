@@ -53,10 +53,18 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
   })
 
   it('「次の予約」の「詳細を見る」でも開く', async () => {
-    render(<ReservationsPage />)
-    await screen.findByRole('button', { name: /^鈴木 真理 4名/ })
-    fireEvent.click(screen.getByRole('button', { name: '詳細を見る' }))
-    expect(await screen.findByRole('dialog', { name: '鈴木 真理さん・4名' })).not.toBeNull()
+    // 「次の予約」は今より後の予約だけ出る。19:00 の予約が「次」になるよう、今日の 12:00 に時計を止める
+    // （止めないと、夜に回したときだけ落ちる）。時計だけを止め、待ち合わせの時間は止めない。
+    const noon = new Date(); noon.setHours(12, 0, 0, 0)
+    vi.useFakeTimers({ toFake: ['Date'], now: noon })
+    try {
+      render(<ReservationsPage />)
+      await screen.findByRole('button', { name: /^鈴木 真理 4名/ })
+      fireEvent.click(screen.getByRole('button', { name: '詳細を見る' }))
+      expect(await screen.findByRole('dialog', { name: '鈴木 真理さん・4名' })).not.toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('取り消すは確かめの窓を通してから今の口へ取消を送る', async () => {
@@ -71,7 +79,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
   it('変更するで今の変更の窓へ移る', async () => {
     const dialog = await openDetail()
     fireEvent.click(within(dialog).getByRole('button', { name: '変更する' }))
-    expect(await screen.findByRole('dialog', { name: '鈴木 真理さんの予約' })).not.toBeNull()
+    expect(await screen.findByRole('dialog', { name: '鈴木 真理さんの予約を変更' })).not.toBeNull()
     expect(screen.queryByRole('dialog', { name: '鈴木 真理さん・4名' })).toBeNull()
   })
 

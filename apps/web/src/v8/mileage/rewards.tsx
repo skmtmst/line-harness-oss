@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ArrowLeftRight, CircleDot, Download, FilePen, Gift, MoreHorizontal, Plus, Star } from 'lucide-react'
+import { AlertCircle, ArrowLeftRight, CircleDot, Download, FilePen, Gift, Plus, Star } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -26,13 +26,13 @@ import {
 } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import HelpTip from '@/components/shared/help-tip'
-import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -44,6 +44,7 @@ import { ListPagePagination } from '@/components/templates'
 import { formatMileageDate, formatMileageNumber } from './display'
 import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
+import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
@@ -281,27 +282,55 @@ export default function RewardsTab() {
   const changeState = async (reward: MileageRewardSummary) => {
     if (readonly || !accountId
       || (reward.status !== 'published' && reward.status !== 'draft' && reward.status !== 'stopped')) return
+    /*
+     * 出すのを止める・また出す：押した瞬間に状態を変え、裏で保存する（触り心地 5 回目）。
+     * 失敗したら元に戻してトーストで知らせる。下書きを公開するのは中身の確かめがあるので今までどおり。
+     */
+    if (reward.status === 'published' || reward.status === 'stopped') {
+      const before = reward.status
+      const next = before === 'published' ? 'stopped' : 'published'
+      const setStatus = (status: MileageRewardSummary['status']) => setRewards((current) => current.map((item) => (
+        item.id === reward.id ? { ...item, status } : item
+      )))
+      setBusyId(reward.id)
+      setActionError('')
+      setStatus(next)
+      try {
+        const response = before === 'published'
+          ? await api.mileage.stopReward(reward.id, accountId)
+          : await api.mileage.resumeReward(reward.id, accountId)
+        if (!response.success) throw new Error(response.error)
+        const saved = response.data
+        if (saved && typeof saved === 'object' && saved.id === reward.id) {
+          setRewards((current) => current.map((item) => (item.id === reward.id ? { ...item, ...saved } : item)))
+        }
+      } catch {
+        setStatus(before)
+        notifyToast(before === 'published'
+          ? `「${reward.name}」を止められませんでした。元に戻しました。`
+          : `「${reward.name}」をまた出せませんでした。元に戻しました。`, {
+          tone: 'error',
+          actionLabel: 'もう一度',
+          onAction: () => { void changeState({ ...reward, status: before }) },
+        })
+      } finally {
+        setBusyId(null)
+      }
+      return
+    }
     setBusyId(reward.id)
     setActionError('')
     try {
-      const response = reward.status === 'published'
-        ? await api.mileage.stopReward(reward.id, accountId)
-        : reward.status === 'stopped'
-          ? await api.mileage.resumeReward(reward.id, accountId)
-          : await api.mileage.publishReward(
-            reward.id,
-            accountId,
-            reward.currentDraftVersionId ?? reward.currentVersion?.id ?? undefined,
-            reward.currentVersion?.revision,
-          )
+      const response = await api.mileage.publishReward(
+        reward.id,
+        accountId,
+        reward.currentDraftVersionId ?? reward.currentVersion?.id ?? undefined,
+        reward.currentVersion?.revision,
+      )
       if (!response.success) throw new Error(response.error)
       await load()
     } catch {
-      setActionError(reward.status === 'published'
-        ? '使い道を止められませんでした。もう一度お試しください。'
-        : reward.status === 'stopped'
-          ? '使い道をまた出せませんでした。もう一度お試しください。'
-          : '使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+      setActionError('使い道を公開できませんでした。内容を確認してもう一度お試しください。')
     } finally {
       setBusyId(null)
     }
@@ -583,18 +612,10 @@ export default function RewardsTab() {
     const operable = !readonly && (reward.status === 'published' || reward.status === 'draft' || reward.status === 'stopped')
     return (
       <div className={styles.menuBox}>
-        <IconButton
-          aria-label={`${reward.name}の操作`}
-          title={`${reward.name}の操作`}
-          aria-expanded={menuId === reward.id}
-          onClick={() => setMenuId((current) => (current === reward.id ? null : reward.id))}
-        >
-          <MoreHorizontal size={16} aria-hidden="true" />
-        </IconButton>
-        <ActionMenu
+        <RowMenu
+          label={`${reward.name}の操作`}
           open={menuId === reward.id}
-          ariaLabel={`${reward.name}の操作`}
-          onClose={() => setMenuId(null)}
+          onOpenChange={(next) => setMenuId(next ? reward.id : null)}
           items={[
             {
               id: 'open',
@@ -653,8 +674,11 @@ export default function RewardsTab() {
             return (
               <Tr key={reward.id} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
-                  <span className={styles.rowName} title={reward.name}>{reward.name}</span>
-                  <span className={styles.rowSub}>
+                  {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
+                  <FolderDotName folder={folderOf(reward) === '未分類' ? null : { name: folderOf(reward) }}>
+                    <span className={styles.rowName} title={reward.name}>{reward.name}</span>
+                  </FolderDotName>
+                  <span className={`${styles.rowSub} ${styles.dotIndent}`}>
                     {reach ? `今すぐ交換できる人 ${formatMileageNumber(reach.reachableFriendCount)}` : '今すぐ交換できる人 —'}
                   </span>
                 </Td>
@@ -808,6 +832,7 @@ export default function RewardsTab() {
       }
       stats={stats}
       folders={<>{createButton(true)}{folderPanel}</>}
+      folderNav={narrow ? undefined : { rows: FOLDERS.map((key) => ({ id: key, label: key })), activeId: folder, onSelect: (id) => { setPage(1); setFolder(id as Folder) }, createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
     >

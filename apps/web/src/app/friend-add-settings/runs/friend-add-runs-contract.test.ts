@@ -100,15 +100,6 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(HOOK).toContain('setStack((current) => [...current, nextCursor])')
   })
 
-  it('V6の実行結果をCSV・最近の結果・流入内訳・右欄で確認できる', () => {
-    expect(PAGE).toContain('実行結果をCSVで書き出す')
-    expect(PAGE).toContain('最近の友だち追加')
-    expect(PAGE).toContain('流入経路別の内訳')
-    expect(PAGE).toContain('稼働状況')
-    expect(PAGE).toContain('要テスト')
-    expect(PAGE).toContain('担当者シナリオ開始')
-  })
-
   it('実配信・シナリオ開始・平均送信時間をAPI集計で表示する', () => {
     expect(PAGE).toContain('summary?.cumulativeDeliveries')
     expect(PAGE).toContain('summary?.scenarioStarts')

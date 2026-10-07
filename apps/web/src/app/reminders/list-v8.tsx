@@ -3,7 +3,6 @@
 
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
-import { useLiveReorder } from '@/lib/use-live-reorder'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { ListPageBody } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -79,7 +78,7 @@ import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-
 import { runUndoable } from '@/lib/undoable'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import { formatTriggerOffset } from './reminder-timing'
 import styles from './list-v8.module.css'
 
@@ -226,7 +225,6 @@ export default function RemindersListV8() {
   const [duplicateTarget, setDuplicateTarget] = useState<ReminderRow | null>(null)
   const [duplicating, setDuplicating] = useState(false)
   const [duplicateError, setDuplicateError] = useState('')
-  const [dragId, setDragId] = useState<string | null>(null)
   const [moveNotice, setMoveNotice] = useState('')
 
   const loadFolders = useCallback(async () => {
@@ -591,35 +589,39 @@ export default function RemindersListV8() {
     })
   }
 
-  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
-  const liveOrder = useLiveReorder(reminders, (row) => row.id, dragId)
+  /*
+   * 動かせるのは「自分で並べた順」で、絞り込みが無く、全件が1ページに出ているときだけ
+   * （リッチメニュー・自動応答と同じ決まり）。保存は渡した行に 0 からの番号を振り直すため、
+   * 別の順・一部の行のまま保存すると、読み直したときに並べた順が崩れる。
+   */
+  const reorderDisabledReason = !canEdit
+    ? '閲覧のみのため並び替えできません'
+    : sort !== 'order'
+      ? '並びを「自分で並べた順」にすると動かせます'
+      : filterActive
+        ? '絞り込みを外すと動かせます'
+        : reminderList.pageCount > 1
+          ? '全件が1ページに収まる表示件数にすると動かせます'
+          : null
 
-  const dropOn = (targetId: string) => {
-    const from = dragId
-    setDragId(null)
-    if (!from || from === targetId || !canEdit) return
-    const order = reminders.map((row) => row.id)
-    const fromIdx = order.indexOf(from)
-    const toIdx = order.indexOf(targetId)
-    if (fromIdx < 0 || toIdx < 0) return
-    order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
-    void handleReorder(order)
-  }
-
-  const keyboardMove = (id: string, direction: -1 | 1) => {
-    const order = reminders.map((row) => row.id)
-    const fromIdx = order.indexOf(id)
-    const toIdx = fromIdx + direction
-    const name = reminders.find((row) => row.id === id)?.name ?? 'このリマインダ'
-    if (fromIdx < 0 || !canEdit) return
-    if (toIdx < 0 || toIdx >= order.length) {
+  /* ドラッグ・上下キー・「…」の上へ／下へを1つの入口にする（共通の並び替え）。 */
+  const reorder = useReorder({
+    items: reminders,
+    idOf: (row) => row.id,
+    disabledReason: reorderDisabledReason,
+    onReorder: ({ id, to, ids, via }) => {
+      if (via !== 'drag') {
+        const name = reminders.find((row) => row.id === id)?.name ?? 'このリマインダ'
+        const direction = to < reminders.findIndex((row) => row.id === id) ? '上' : '下'
+        setMoveNotice(`「${name}」を${direction}へ移動しました。${to + 1}番目です`)
+      }
+      handleReorder(ids)
+    },
+    onEdge: (id, direction) => {
+      const name = reminders.find((row) => row.id === id)?.name ?? 'このリマインダ'
       setMoveNotice(`「${name}」は${direction < 0 ? '先頭' : '末尾'}にあるため、これ以上動かせません`)
-      return
-    }
-    order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
-    setMoveNotice(`「${name}」を${direction < 0 ? '上' : '下'}へ移動しました。${toIdx + 1}番目です`)
-    void handleReorder(order)
-  }
+    },
+  })
 
   /* ===== フォルダの列 ===== */
 
@@ -768,6 +770,8 @@ export default function RemindersListV8() {
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => openMove([row.id]),
       },
+      /* 並べた順で見ているときだけ、つまみと同じ「上へ／下へ」（共通の並び替え）。 */
+      ...reorder.menuItems(row.id, () => setOpenMenuId(null)),
       {
         id: 'delete',
         label: '削除',
@@ -883,8 +887,8 @@ export default function RemindersListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <RovingTbody reorderKey={liveOrder.shown.map((row) => row.id).join(',')}>
-              {liveOrder.shown.map((row) => {
+            <RovingTbody reorderKey={reorder.shown.map((row) => row.id).join(',')}>
+              {reorder.shown.map((row) => {
                 const view = rowView(row)
                 const planned =
                   view.status === 'draft' || view.status === 'stopped'
@@ -897,10 +901,7 @@ export default function RemindersListV8() {
                 return (
                   <Tr interactive
                     key={row.id}
-                    data-reorder-id={row.id}
-                    onDragEnter={() => liveOrder.enter(row.id)}
-                    onDragOver={dragId ? (event) => event.preventDefault() : undefined}
-                    onDrop={dragId ? () => dropOn(liveOrder.dropTarget(row.id)) : undefined}
+                    {...reorder.rowProps(row.id)}
                     className={styles.rowClick}
                     tabIndex={0}
                     onClick={() => setPanelId(row.id)}
@@ -924,24 +925,17 @@ export default function RemindersListV8() {
                     <Td
                       className={styles.gripCell}
                       onClick={(event) => event.stopPropagation()}
-                      draggable={canEdit}
-                      onDragStart={() => setDragId(row.id)}
-                      onDragEnd={() => setDragId(null)}
-                      title="上下に動かして並び替え"
+                      {...reorder.handleProps(row.id)}
+                      title={reorder.blocked ? undefined : '上下に動かして並び替え'}
                     >
-                      {/* 閲覧のみ：つまみは隠し、同じ大きさの見えない印で位置を保つ。 */}
-                      {canEdit ? (
-                        <ReorderGrip
-                          label={row.name}
-                          onMove={(direction) => keyboardMove(row.id, direction)}
-                        >
-                          <span aria-hidden>⠿</span>
-                        </ReorderGrip>
-                      ) : <span className={styles.gripSpace} aria-hidden="true">⠿</span>}
+                      {/* 動かせない時（閲覧のみ・別の並び・絞り込み中）はつまみを出さず、理由を title と読み上げで言う。 */}
+                      <ReorderHandle label={row.name} {...reorder.handle(row.id)}>
+                        <span aria-hidden>⠿</span>
+                      </ReorderHandle>
                     </Td>
                     <NameCell
                       name={<div className={styles.nameRow}>
-                        <FolderDotName folder={folderDotOf(row)} dot={!narrow}>
+                        <FolderDotName folder={folderDotOf(row)}>
                           <Link
                             href={detailHref(row.id)}
                             title={row.name}
@@ -971,7 +965,7 @@ export default function RemindersListV8() {
                           </button>
                         ) : null}
                       </div>}
-                      sub={<span className={narrow ? undefined : styles.dotIndent} title={view.subtitle}>
+                      sub={<span className={styles.dotIndent} title={view.subtitle}>
                         <CalendarClock size={11} aria-hidden="true" className={styles.cellSubIcon} />
                         {view.subtitle}
                       </span>}

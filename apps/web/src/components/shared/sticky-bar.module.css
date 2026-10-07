@@ -39,6 +39,29 @@
   box-shadow: var(--shadow-bar-float);
 }
 
+/*
+ * **板が枠線のある帯を描いている画面だけ、その板どおりに戻す。**
+ *
+ * 承認済み ★BG-B `qIp42` の `X2oLn`「下部追従バー」は
+ * **height 72 ／ stroke `#DADDE2` 1px ／ 影の指定なし ／ cornerRadius 12**。
+ * すぐ上の ★A/M10 の浮かせ（高さ60・枠なし・ふんわり影）は**別の板**なので、
+ * この画面に当てると絵と違う帯になる。
+ *
+ * 順位の根拠は `docs/v8-design-rules.md` §1——
+ * 「2. Pencil の ★V8（**画面ごとに、その板の絵のとおり**。1枚の絵を全部の
+ * 画面の決まりにしない）」が「4. 共通部品」より上。だから共通部品の
+ * `[data-theme='v8'] .bar` は**弱めない**（40画面以上がその板のまま）。
+ * ここは渡された画面だけに効く、より強い札として足す。
+ *
+ * 下から 12px 浮かせるかは `X2oLn` に指定が無い（板は帯を画面の端から
+ * 24px 内側に描いている）。推測で 0 へ戻さず、★A のまま 12px を使う。
+ */
+[data-theme='v8'] .bar.outlined {
+  min-height: 72px; /* height: 72 */
+  border: 1px solid var(--color-hairline); /* stroke: #DADDE2 / strokeWidth: 1 */
+  box-shadow: none;
+}
+
 /* 左端。削除と、あれば状態の文字。 */
 .lead {
   display: flex;
@@ -51,6 +74,36 @@
   color: var(--color-ink-faint); /* fill: $ink-faint */
   font-size: var(--text-caption); /* fontSize: $size-caption */
   font-weight: 600; /* fontWeight: 600 */
+}
+
+/*
+ * 操作の手前の一言（★BG-B `WDJak`「中 サイズ確認」→ `GcuH5`）。
+ * 渡さない画面では列が増えないので、今までの3列のままで見た目は変わらない。
+ *
+ * 2026-10-07 の2度目の差し戻し: 承認済み ★BG-B `qIp42` の帯 `X2oLn` は
+ * 右の列（`J94Yj` 右 ボタン）が `fill_container` ＋ `justifyContent: end` で、
+ * **ボタンが帯の右端に付く**。4列にして右端へ空き列を足していたため、
+ * 操作が中央寄りになって絵と違っていた。一言を渡した画面だけ、
+ * 3列目を操作そのものにして右そろえにする。
+ * 一言を渡さない画面（40画面以上）は3列・中央寄せのままで変わらない。
+ */
+.withInfo {
+  grid-template-columns: 1fr auto 1fr;
+}
+
+.withInfo .actions {
+  justify-content: flex-end;
+}
+
+/*
+ * ここは**置き場所だけ**を決める。色・形・アイコンは中身の部品が持つ
+ * （★BG-B の札は `components/hq/banners/export-size-chip.module.css`）。
+ * 帯は40画面以上で共有しているので、ひとつの画面の見た目をここへ埋めない。
+ */
+.info {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .actions {
@@ -66,12 +119,18 @@
  * **横スクロールさせずに2段へ折る。**
  */
 @media (max-width: 1100px) {
-  .bar {
+  .bar,
+  .withInfo {
     grid-template-columns: 1fr;
     justify-items: stretch;
   }
 
   .actions {
+    justify-content: flex-end;
+  }
+
+  /* 2段に折れたら、一言は操作と同じ右そろえにする（横スクロールは出さない）。 */
+  .info {
     justify-content: flex-end;
   }
 }

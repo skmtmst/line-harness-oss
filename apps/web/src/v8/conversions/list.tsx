@@ -23,7 +23,6 @@ import {
   Eye,
   FilePen,
   Inbox,
-  MoreHorizontal,
   Pause,
   Play,
   Plus,
@@ -37,7 +36,6 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
@@ -46,8 +44,10 @@ import Select from '@/components/shared/select'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -83,6 +83,7 @@ import {
   type ConversionStopAction,
   type EditForm,
 } from './dialogs'
+import { notifyToast } from '@/components/shared/toast'
 import styles from './list.module.css'
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
@@ -559,18 +560,35 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     }
   }
 
-  /* 受け口の停止・再開。止めても鍵は残る。 */
+  /*
+   * 受け口の停止・再開。止めても鍵は残る。押した瞬間に窓を閉じて札を変え、裏で保存する
+   * （触り心地 5 回目）。成功したら返ってきた版に置き換える。失敗したら元に戻してトーストで知らせる。
+   */
   const toggleIngest = async (target: ConversionDefinitionListItem) => {
     if (ingestBusy || !canEdit) return
+    const before = target.ingest.disabledAt
+    const disable = !before
+    const patch = (id: string, change: Partial<Pick<ConversionDefinitionListItem, 'version'>> & { disabledAt: string | null }) => setDefinitions((current) => current && ({
+      ...current,
+      items: current.items.map((item) => (item.id === id
+        ? { ...item, ...(change.version !== undefined ? { version: change.version } : {}), ingest: { ...item.ingest, disabledAt: change.disabledAt } }
+        : item)),
+    }))
     setIngestBusy('toggle')
     setIngestError('')
+    setDetailTarget(null)
+    patch(target.id, { disabledAt: disable ? new Date().toISOString() : null })
     try {
-      const res = await api.conversions.setIngestDisabled(target.id, { expectedVersion: target.version, disabled: !target.ingest.disabledAt })
+      const res = await api.conversions.setIngestDisabled(target.id, { expectedVersion: target.version, disabled: disable })
       if (!res.success) throw new Error(res.error)
-      setDetailTarget(null)
-      await load()
+      patch(target.id, { disabledAt: res.data.disabledAt, version: res.data.version })
     } catch {
-      setIngestError('受け口を切り替えられませんでした。画面を閉じて読み直してから、もう一度お試しください。')
+      patch(target.id, { disabledAt: before })
+      notifyToast(`「${target.name}」の受け口を${disable ? '止められ' : '再開でき'}ませんでした。元に戻しました。`, {
+        tone: 'error',
+        actionLabel: '読み直す',
+        onAction: () => { void load() },
+      })
     } finally {
       setIngestBusy('')
     }
@@ -1017,6 +1035,8 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                     onClick={() => setPanelId((currentId) => (currentId === point.id ? null : point.id))}
                   >
                     <Td className={styles.colName}>
+                      {/* 名前の前にフォルダの丸（成果地点はまだフォルダの口が無いので未分類の輪）。札は名前の頭にそろえる。 */}
+                      <FolderDotName folder={null}>
                       <button
                         type="button"
                         className={styles.nameButton}
@@ -1027,7 +1047,8 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                       >
                         {point.name}
                       </button>
-                      <StatePill point={point} />
+                      </FolderDotName>
+                      <span className={styles.pillIndent}><StatePill point={point} /></span>
                     </Td>
                     <Td className={styles.colTrigger}>
                       <span className={styles.cellMain} title={sourceTriggerLabel(point)}>{shortTrigger(point)}</span>
@@ -1046,19 +1067,10 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                         {canEdit
                           ? <Button href={addUsageHref(point)}>使う場所を足す</Button>
                           : <span className={styles.opsSpace} aria-hidden="true" />}
-                        <IconButton
-                          title={menuLabel}
-                          aria-label={menuLabel}
-                          aria-haspopup="menu"
-                          aria-expanded={openMenuId === point.id}
-                          onClick={() => setOpenMenuId((currentId) => (currentId === point.id ? null : point.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
-                        <ActionMenu
+                        <RowMenu
+                          label={menuLabel}
                           open={openMenuId === point.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={menuLabel}
+                          onOpenChange={(next) => setOpenMenuId(next ? point.id : null)}
                           items={rowMenuItems(point).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
                         />
                       </div>

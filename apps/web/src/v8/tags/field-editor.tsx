@@ -28,7 +28,7 @@ import styles from './create.module.css'
 
 /* よく使う 6 つは左の選ぶカード、残りは右の札。 */
 const PRIMARY_TYPES: FriendFieldType[] = ['text', 'textarea', 'select', 'multi_select', 'date', 'number']
-const SECONDARY_TYPES: FriendFieldType[] = ['datetime', 'checkbox', 'url', 'tel', 'email', 'image', 'pdf']
+const SECONDARY_TYPES: FriendFieldType[] = ['datetime', 'time', 'checkbox', 'url', 'tel', 'email', 'image', 'pdf']
 export const FIELD_TYPE_WORDS: Record<FriendFieldType, string> = {
   text: '1行テキスト',
   textarea: '文章',
@@ -37,6 +37,7 @@ export const FIELD_TYPE_WORDS: Record<FriendFieldType, string> = {
   date: '日付',
   number: '数',
   datetime: '日時',
+  time: '時刻',
   checkbox: 'はい／いいえ',
   url: 'リンク',
   tel: '電話番号',
@@ -55,9 +56,8 @@ const TYPE_HINTS: Partial<Record<FriendFieldType, string>> = {
 const TYPE_ICONS: Partial<Record<FriendFieldType, typeof Type>> = {
   text: Type, textarea: AlignLeft, select: CircleDot, multi_select: ListChecks, date: Calendar, number: Hash,
 }
-/* 絵の「時刻」はサーバーの種類にまだ無い（FriendFieldType に time が無い）。札は出し、押せない形にする。 */
-const PENDING_TYPES = ['時刻'] as const
-const TYPE_COUNT = PRIMARY_TYPES.length + SECONDARY_TYPES.length + PENDING_TYPES.length
+/* 「時刻」は保存できるようになった（時刻の口・既定値は HH:MM）。ほかの種類と同じく押して選ぶ。 */
+const TYPE_COUNT = PRIMARY_TYPES.length + SECONDARY_TYPES.length
 const NEEDS_OPTIONS = new Set<FriendFieldType>(['select', 'multi_select'])
 const FILE_TYPES = new Set<FriendFieldType>(['image', 'pdf'])
 /* 選択肢は絵のとおり3つの欄から（足すと増える）。 */
@@ -190,6 +190,10 @@ export default function FieldEditor({
       const missing = defaultOptions.filter((item) => !optionList.includes(item))
       if (missing.length > 0) return setValidationError(`既定値の「${missing[0]}」は選択肢にありません。選択肢か既定値を直してください`)
     }
+    /* 時刻の既定値は 24 時間の HH:MM（例 09:30）。サーバーと同じ形で送る前に止める。 */
+    if (effectiveType === 'time' && defaultValue.trim() && !/^([01]\d|2[0-3]):[0-5]\d$/.test(defaultValue.trim())) {
+      return setValidationError('時刻の既定値は「09:30」のように 24 時間の時:分で入力してください')
+    }
     if (effectiveType === 'select' && defaultValue && !optionList.includes(defaultValue)) {
       return setValidationError(`既定値の「${defaultValue}」は選択肢にありません。選択肢か既定値を直してください`)
     }
@@ -235,12 +239,7 @@ export default function FieldEditor({
         <section className={styles.sideCard} aria-labelledby="ff-more-types">
           <h2 className={styles.sideCardTitle} id="ff-more-types">{`種類（つづき：全${TYPE_COUNT}種）`}</h2>
           <div className={styles.chipColumn} role="radiogroup" aria-label="項目の種類（つづき）">
-            {SECONDARY_TYPES.flatMap((item) => item === 'datetime' ? [item, PENDING_TYPES[0]] : [item]).map((item) => item === '時刻' ? (
-              <button key={item} type="button" disabled className={styles.typeChip} title="時刻の種類はまだ選べません（サーバーが対応したら選べます）">
-                <Star className={styles.typeChipIcon} aria-hidden="true" />
-                {item}
-              </button>
-            ) : (
+            {SECONDARY_TYPES.map((item) => (
               <button
                 key={item}
                 type="button"
@@ -248,10 +247,10 @@ export default function FieldEditor({
                 aria-checked={effectiveType === item}
                 disabled={typeLocked}
                 className={styles.typeChip}
-                onClick={() => selectType(item as FriendFieldType)}
+                onClick={() => selectType(item)}
               >
                 <Star className={styles.typeChipIcon} aria-hidden="true" />
-                {FIELD_TYPE_WORDS[item as FriendFieldType]}
+                {FIELD_TYPE_WORDS[item]}
               </button>
             ))}
           </div>

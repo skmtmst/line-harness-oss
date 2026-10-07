@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
   snapshot: vi.fn(), storeContext: vi.fn(), reservationsDay: vi.fn(), channelCloseTasks: vi.fn(), openingHours: vi.fn(),
-  postSeatVisitMark: vi.fn(), deleteSeatVisitMark: vi.fn(), completeChannelCloseTask: vi.fn(),
+  postSeatVisitMark: vi.fn(), deleteSeatVisitMark: vi.fn(), completeChannelCloseTask: vi.fn(), mediaLinks: vi.fn(),
 }))
 const google = vi.hoisted(() => ({ connection: vi.fn(), listReviews: vi.fn() }))
 const fetchApi = vi.hoisted(() => vi.fn())
@@ -38,6 +38,8 @@ beforeEach(() => {
   api.postSeatVisitMark.mockResolvedValue({ success: true })
   api.completeChannelCloseTask.mockResolvedValue({ success: true })
   fetchApi.mockResolvedValue({ data: [{ code: 'hotpepper', name: 'ホットペッパー', receiveMethod: 'email_forward' }] })
+  /* 提案 E-4 の設定で保存した URL。管理画面の URL があると知らせに［…の管理画面を開く ↗］が出る。 */
+  api.mediaLinks.mockResolvedValue({ data: [{ code: 'hotpepper', name: 'ホットペッパー', acceptsReservations: 1, pageUrl: 'https://hotpepper.jp/x/', loginUrl: 'https://manager.hotpepper.jp/', closeOnBooking: 1, version: 1 }] })
   google.connection.mockResolvedValue({ connection: { status: 'disconnected' }, summary: { unrepliedCount: 0 }, store: { name: '渋谷店' } })
   google.listReviews.mockResolvedValue({ reviews: [] })
 })
@@ -53,6 +55,9 @@ describe('hKRRF 今日のお店', () => {
     }
     expect(board.textContent).toContain('他の予約サイトの枠を閉じてください（未対応 1件）')
     expect(board.textContent).toContain('ホットペッパー')
+    /* 設定で保存した管理画面の URL が、知らせのボタンと右の列のリンクに使われる（提案 E-4 とのつなぎ）。 */
+    expect(screen.getByRole('link', { name: 'ホットペッパーの管理画面を開く ↗' }).getAttribute('href')).toBe('https://manager.hotpepper.jp/')
+    expect(screen.getByRole('link', { name: '店舗ページ ↗' }).getAttribute('href')).toBe('https://hotpepper.jp/x/')
     expect(screen.getByRole('button', { name: /電話予約/ })).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '鈴木 美咲さんを来店にする' }))
     await waitFor(() => expect(api.postSeatVisitMark).toHaveBeenCalledWith('account-1', 'r1', { kind: 'visited' }))

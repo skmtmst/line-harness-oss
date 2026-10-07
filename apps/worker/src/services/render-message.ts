@@ -9,6 +9,7 @@
  * 画面では入れられるのに配信時刻になって初めて弾かれる、という壊れ方をする。
  */
 import {
+  normalizeStoreInterpolations,
   findUnsupportedInterpolations,
   listInterpolations,
   needsPerRecipientDelivery,
@@ -29,6 +30,7 @@ export function hasRecipientVariables(content: string): boolean {
 }
 
 export interface BroadcastRenderContext {
+  accountName?: string | null;
   liffId?: string | null;
   displayName?: string | null;
   /** 友だち情報欄。field_key => 値 */
@@ -54,25 +56,18 @@ export function renderMessageContent(
    * いた場合に二重に置き換わる。差し込みの値は利用者が入れたもので、
    * それが差し込みとして解釈されるのは事故のもと。
    */
-  let result = expandDateVariables(content, context.deliveredAt ?? new Date());
+  let result = expandDateVariables(normalizeStoreInterpolations(content), context.deliveredAt ?? new Date());
 
-  if (context.liffId) { const liffId = context.liffId; result = result.replace(/\{\{\s*liff_id\s*\}\}/g, () => liffId); }
-  if (context.displayName) { const displayName = context.displayName; result = result.replace(/\{\{\s*name\s*\}\}/g, () => displayName); }
-
-  /*
-   * 未設定の項目は空文字にする。
-   *
-   * 「未設定」と書くとそのまま相手に届く。空にしておけば、文として
-   * 不格好でも意味は壊れない。差し込みを本文に残すのがいちばん困る。
-   */
-  const fields = context.fields;
-  if (fields) {
-    result = result.replace(/\{\{\s*field\.([a-z][a-z0-9_]*)\s*\}\}/g, (_m, key: string) => fields[key] ?? '');
-  }
-  const vars = context.vars;
-  if (vars) {
-    result = result.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g, (_m, key: string) => vars[key] ?? '');
-  }
+  // 差し込み値を再び差し込みとして扱わない。店名・共通情報の文字はそのまま届ける。
+  result = result.replace(/\{\{\s*(liff_id|name|account\.name|field\.[a-z][a-z0-9_]*|var\.[a-z][a-z0-9_]*)\s*\}\}/g, (original,key:string)=>{
+    if(key==='liff_id')return context.liffId||original;
+    if(key==='name')return context.displayName||original;
+    if(key==='account.name')return context.accountName??original;
+    if(key.startsWith('field.'))return context.fields?context.fields[key.slice(6)]??'':original;
+    const value=context.vars?.[key.slice(4)];
+    if(['var.store_phone','var.reservation_url'].includes(key)&&!value?.trim())return original;
+    return context.vars?value??'':original;
+  });
 
   return result;
 }
@@ -102,7 +97,7 @@ export function renderBroadcastMessageContent(
   content: string,
   context: BroadcastRenderContext,
 ): string {
-  if (messageType === 'flex') {
+  if (['flex','imagemap','rich_message','coupon','card_message','research'].includes(messageType)) {
     const parsed = JSON.parse(content) as unknown;
     return JSON.stringify(renderJsonValue(parsed, context));
   }

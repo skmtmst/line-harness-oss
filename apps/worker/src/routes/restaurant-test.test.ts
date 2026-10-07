@@ -1603,3 +1603,83 @@ describe('枠の自動調整ルールと媒体閉鎖通知のAPI',()=>{
   expect((await requestWithMethod(done,'POST',{})).status).toBe(409);
  });
 });
+
+
+describe('提案E 来店記録', () => {
+  it('来店の印と取消が履歴に反映され、過去の案内済みも数える', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec("UPDATE rt_reservations SET customer_phone='09000000000' WHERE id='reservation-ginza'");
+    const path='/api/restaurant-test/reservations/reservation-ginza/visit?account_id=account-1';
+    expect((await request(path,{kind:'visited'})).status).toBe(200);
+    expect((await request(path,{kind:'visited'})).status).toBe(409);
+    const history=()=>request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-ginza&phone=09000000000');
+    expect((await (await history()).json() as any).data.visitCount).toBe(1);
+    expect((await requestWithMethod(path,'DELETE')).status).toBe(200);
+    expect((await (await history()).json() as any).data.visitCount).toBe(0);
+    expect(testDb.raw.prepare('SELECT undone_at FROM rt_seat_visit_marks').get()).toMatchObject({undone_at:expect.any(String)});
+    testDb.raw.exec("UPDATE rt_reservations SET status='seated' WHERE id='reservation-ginza'");
+    expect((await (await history()).json() as any).data.visitCount).toBe(1);
+  });
+  it('予約なしの来店は名前なしで記録でき、同じ卓の重なり・人数違い・他店を拒否する', async () => {
+    seedRestaurantFixture();
+    const path='/api/restaurant-test/reservations/walk-in?account_id=account-1';
+    const body={storeId:'store-ginza',tableId:'table-ginza',guestCount:2};
+    expect((await request(path,{...body,guestCount:5})).status).toBe(400);
+    expect((await request(path,{...body,storeId:'store-yokohama'})).status).toBe(400);
+    const res=await request(path,body);expect(res.status).toBe(201);
+    const data=(await res.json() as any).data;
+    expect(data).toMatchObject({status:'visited',source:'walk_in',tableId:'table-ginza'});
+    expect(Math.abs(Date.now()-Date.parse(data.startsAt))).toBeLessThan(10000);
+    expect((await request(path,body)).status).toBe(409);
+  });
+});
+
+
+describe('提案E 媒体リンク',()=>{
+  it('HTTPSだけ保存し、店舗ごとに読み直し、版の競合を拒む',async()=>{
+    seedRestaurantFixture();testDb.raw.exec("INSERT INTO rt_media(id,code,name,parser_key) VALUES('hp','hotpepper','媒体','hp')");const path='/api/restaurant-test/media-links/hotpepper?account_id=account-1';
+    const input={storeId:'store-ginza',pageUrl:'https://example.com/shop',loginUrl:'https://example.com/login',closeOnBooking:true,expectedVersion:0};
+    expect((await requestWithMethod(path,'PUT',{...input,pageUrl:'http://example.com'})).status).toBe(400);
+    expect((await requestWithMethod(path,'PUT',input)).status).toBe(200);
+    expect((await requestWithMethod(path,'PUT',input)).status).toBe(409);
+    expect((await requestWithMethod(path,'PUT',{...input,expectedVersion:1})).status).toBe(200);
+    const data=(await (await request('/api/restaurant-test/media-links?account_id=account-1&storeId=store-ginza')).json() as any).data;
+    expect(data.find((x:any)=>x.code==='hotpepper')).toMatchObject({pageUrl:input.pageUrl,version:2,closeOnBooking:1});
+  });
+  it('予約を受けないグルメ媒体を追加でき、閉じる対象にはできない',async()=>{
+    seedRestaurantFixture();
+    expect((await request('/api/restaurant-test/media?account_id=account-1',{code:'gourmet_review',name:'口コミサイト'})).status).toBe(201);
+    expect((await requestWithMethod('/api/restaurant-test/media-links/gourmet_review?account_id=account-1','PUT',{storeId:'store-ginza',pageUrl:null,loginUrl:null,closeOnBooking:true,expectedVersion:0})).status).toBe(400);
+  });
+  it('貼り付けURLは再発行でも同じで、お客さま向け予約を利用可能として返す',async()=>{
+    seedRestaurantFixture();env.LIFF_URL='https://liff.line.me/wrong-global';testDb.raw.exec("INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,liff_id) VALUES('account-1','統括','hq','','','hq-liff'),('account-2','店','shop','','','shop-liff')");const path='/api/restaurant-test/reservation-link?account_id=account-1';
+    const a=(await (await request(path,{storeId:'store-ginza'})).json() as any).data;
+    const b=(await (await request(path,{storeId:'store-ginza'})).json() as any).data;
+    expect(a).toEqual(b);expect(a.available).toBe(true);expect(a.url).toMatch(/^https:\/\/liff\.line\.me\/shop-liff\/restaurant\/reserve\/[a-z0-9-]+$/);expect(a.html).toContain('noopener');
+  });
+});
+
+it('店のLIFF ID未設定と停止アカウントにはリンクを発行しない',async()=>{
+  seedRestaurantFixture();const path='/api/restaurant-test/reservation-link?account_id=account-1';
+  expect((await request(path,{storeId:'store-ginza'})).status).toBe(503);
+  expect(testDb.raw.prepare('SELECT COUNT(*) n FROM rt_reservation_links').get()).toEqual({n:0});
+  testDb.raw.exec("INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,liff_id,is_active) VALUES('account-2','店','shop','','','shop-liff',0)");
+  expect((await request(path,{storeId:'store-ginza'})).status).toBe(503);
+});
+it('店の遅刻案内を版付きで保存・維持・解除し、他店・閲覧のみ・不正入力を拒否する',async()=>{
+  seedRestaurantFixture();const path='/api/restaurant-test/opening-hours?account_id=account-1';
+  const hours=Array.from({length:7},(_,weekday)=>({weekday,periods:[{opensAt:'12:00',closesAt:'16:00'}]}));
+  const policy={cancelAfterMinutes:15,message:'15分を過ぎたら取消になります'};
+  expect((await requestWithMethod(path,'PUT',{storeId:'store-ginza',hours,expectedVersion:0,lateArrivalPolicy:policy})).status).toBe(200);
+  const readPolicy=async()=> (await (await request(path+'&storeId=store-ginza')).json() as any).data.lateArrivalPolicy;
+  expect(await readPolicy()).toEqual(policy);
+  expect((await requestWithMethod(path,'PUT',{storeId:'store-ginza',hours,expectedVersion:1})).status).toBe(200);
+  expect(await readPolicy()).toEqual(policy);
+  expect((await requestWithMethod(path,'PUT',{storeId:'store-ginza',hours,expectedVersion:1,lateArrivalPolicy:null})).status).toBe(409);
+  for(const lateArrivalPolicy of [{...policy,cancelAfterMinutes:0},{...policy,cancelAfterMinutes:1.5},{...policy,message:''}]) expect((await requestWithMethod(path,'PUT',{storeId:'store-ginza',hours,expectedVersion:2,lateArrivalPolicy})).status).toBe(400);
+  expect((await requestWithMethod(path,'PUT',{storeId:'store-ginza',hours,expectedVersion:2,lateArrivalPolicy:null})).status).toBe(200);
+  expect(await readPolicy()).toBeNull();
+  authMocks.getStaffByApiKey.mockResolvedValueOnce({id:'viewer',name:'閲覧',role:'admin',access_level:'read_only',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1});
+  expect((await requestWithMethod(path,'PUT',{storeId:'store-ginza',hours,expectedVersion:3,lateArrivalPolicy:policy},'viewer-key')).status).toBe(403);
+  expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-2','PUT',{storeId:'store-yokohama',hours,expectedVersion:0,lateArrivalPolicy:policy})).status).toBe(400);
+});

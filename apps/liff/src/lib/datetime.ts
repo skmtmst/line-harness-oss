@@ -81,6 +81,19 @@ export function formatJstEventSpan(startsAt: string, endsAt: string): string {
   return `${head} 〜 ${formatJstEventAt(endsAt)}`;
 }
 
+/** 始まりの何時間前かの締め切り → '10月10日 18:00' (JST)。イベントの申し込み確認の注意で使う。 */
+export function formatJstDeadline(startsAt: string, hoursBefore: number): string {
+  const d = jstParts(new Date(new Date(startsAt).getTime() - hoursBefore * 3600_000).toISOString());
+  return `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日 ${d.slice(11, 16)}`;
+}
+
+/** 取っておく残り時間 (秒) → '23時間 41分'。1時間未満は '41分'。空きが出た案内で使う。 */
+export function formatHoldLeft(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return h > 0 ? `${h}時間 ${m}分` : `${m}分`;
+}
+
 export function jstStartsAtIso(date: string, hhmm: string): string {
   // `+09:00` suffix tells JS to treat the wall-clock time as JST.
   return new Date(`${date}T${hhmm}:00+09:00`).toISOString();

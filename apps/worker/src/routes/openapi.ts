@@ -1,3 +1,7 @@
+import { chatAttachmentPaths } from './chat-attachments-openapi.js';
+import { api9Paths, api9Schemas } from './api9-openapi.js';
+import { restaurantClosurePaths } from './restaurant-closures-openapi.js';
+import { stampPaths,hqBroadcastPaths } from './proposal-e-openapi.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
@@ -15,6 +19,7 @@ const spec = {
   security: [{ bearerAuth: [] }],
   components: {
     securitySchemes: {
+      liffIdToken: {type:'http',scheme:'bearer',description:'指定した店舗のLINE Login IDトークン。APIキーとは別。'},
       bearerAuth: {
         type: 'http',
         scheme: 'bearer',
@@ -22,6 +27,7 @@ const spec = {
       },
     },
     schemas: {
+      ...api9Schemas,
       BookingSyncRules: {
         type: 'object',
         required: ['lineAccountId', 'excludeCalendarBusy', 'writeLineBookingsToCalendar', 'autoAssign', 'notifyConflicts', 'notifyCalendarDisconnected', 'notifyDailyLimit', 'dailyLimit', 'nearLimitRemaining', 'version'],
@@ -239,6 +245,9 @@ const spec = {
           triggerType: { type: 'string', enum: ['friend_add', 'tag_added', 'manual'] },
           triggerTagId: { type: 'string', nullable: true },
           isActive: { type: 'boolean' },
+          stoppedReason: { type: 'string', nullable: true, maxLength: 200, readOnly: true, description: '最後の停止理由。未入力・記録なしはnull。再開しても保持する' },
+          stoppedBy: { type: 'string', nullable: true, readOnly: true, description: '最後に止めた担当者ID' },
+          stoppedAt: { type: 'string', nullable: true, readOnly: true, description: '最後に止めた日時（日本時間）' },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
         },
@@ -386,6 +395,30 @@ const spec = {
     },
   },
   paths: {
+    ...chatAttachmentPaths,
+    '/api/mileage/reward-folders': {
+      get: { tags: ['Mileage'], summary: '使い道のフォルダと件数を読む', parameters: [{ name: 'accountId', in: 'query', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Folders: id, name, displayOrder, count' }, '404': { description: 'Account not found' } } },
+      post: { tags: ['Mileage'], summary: '使い道のフォルダを作る（統括・管理者）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'name'], properties: { accountId: { type: 'string' }, name: { type: 'string', minLength: 1, maxLength: 100 } } } } } }, responses: { '201': { description: 'Created folder' }, '403': { description: 'Forbidden' }, '404': { description: 'Account not found' }, '422': { description: 'Invalid name' } } },
+    },
+    '/api/mileage/reward-folders/order': {
+      put: { tags: ['Mileage'], summary: 'アカウントの全フォルダを並べ替える（統括・管理者）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'ids'], properties: { accountId: { type: 'string' }, ids: { type: 'array', uniqueItems: true, items: { type: 'string' } } } } } } }, responses: { '200': { description: 'Ordered folders' }, '403': { description: 'Forbidden' }, '404': { description: 'Account not found' }, '422': { description: 'All account folder IDs required exactly once' } } },
+    },
+    '/api/mileage/rewards/{id}/folder': {
+      put: { tags: ['Mileage'], summary: '使い道をフォルダに入れる（nullは未分類、統括・管理者）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'folderId'], properties: { accountId: { type: 'string' }, folderId: { type: ['string', 'null'] } } } } } }, responses: { '200': { description: 'Reward with folderId' }, '403': { description: 'Forbidden' }, '404': { description: 'Account, reward or folder not found' }, '422': { description: 'Invalid folderId' } } },
+    },
+    '/api/broadcast-message-assets/upload-sessions': {
+      post: { tags:['Broadcasts'],summary:'R2への直接アップロードを準備する',
+        requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['filename','mimeType','sizeBytes'],properties:{lineAccountId:{type:['string','null']},filename:{type:'string'},mimeType:{enum:['video/mp4','image/jpeg','image/png']},sizeBytes:{type:'integer',minimum:1,maximum:209715200}}}}}},
+        responses:{'201':{description:'15分有効の署名付きPUT URLと必須ヘッダー'},'403':{description:'配信の編集権限または所属がない'},'503':{description:'直接アップロード未設定'}} },
+    },
+    '/api/broadcast-message-assets/upload-sessions/{id}/complete': {
+      post:{tags:['Broadcasts'],summary:'容量・形式・所属・ETagを検査して配信用URLを返す',parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}}],requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['etag'],properties:{etag:{type:'string'}}}}}},responses:{'201':{description:'安全性の検査対象として登録し、配信用URLを発行'},'200':{description:'確定済みの再要求'},'409':{description:'期限切れまたは内容不一致'},'422':{description:'ファイルの形式が不正'}}},
+    },
+    ...api9Paths,
+    ...restaurantClosurePaths,
+    ...stampPaths,
+    ...hqBroadcastPaths,
+
     // V8 API integration: authenticated endpoints, with account scope and revision checks.
   "/api/hq/templates/folders": {
     "get": {
@@ -3196,7 +3229,8 @@ const spec = {
               schema: {
                 type: 'object',
                 properties: {
-                  content: { type: 'string' },
+                  messageType: { type: 'string', enum: ['text', 'flex', 'image', 'video', 'file'], default: 'text' },
+                  content: { type: 'string', description: '添付は送信口と同じJSON。ファイルの予約はアップロードから30日以内。' },
                   scheduledAt: { type: 'string', format: 'date-time' },
                   quotedMessageId: { type: 'string' },
                 },
@@ -3814,7 +3848,15 @@ const spec = {
         summary: 'シナリオ詳細取得 (ステップ含む)',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: {
-          '200': { description: 'Scenario with steps' },
+          '200': { description: '最後の停止記録とステップを含むシナリオ', content: { 'application/json': { schema: {
+            type: 'object', properties: {
+              success: { type: 'boolean' },
+              data: { allOf: [
+                { $ref: '#/components/schemas/Scenario' },
+                { type: 'object', properties: { steps: { type: 'array', items: { $ref: '#/components/schemas/ScenarioStep' } } } },
+              ] },
+            },
+          } } } },
           '403': { description: 'Scenario view permission required' },
           '404': { description: 'Not found in account scope' },
         },
@@ -3823,7 +3865,28 @@ const spec = {
         tags: ['Scenarios'],
         summary: 'シナリオ更新',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'Updated' } },
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', properties: {
+            name: { type: 'string' }, description: { type: 'string', nullable: true },
+            triggerType: { type: 'string', enum: ['friend_add', 'tag_added', 'form_answer', 'booking_confirmed', 'manual'] },
+            triggerTagId: { type: 'string', nullable: true },
+            isActive: { type: 'boolean', description: 'falseで停止、trueで再開。再開しても最後の停止記録は残る' },
+            reason: { type: 'string', maxLength: 200, description: 'isActive:falseのときだけ指定できる任意の理由。省略・空白のみはnullで記録。すでに停止中なら記録を上書きしない' },
+            deliveryMode: { type: 'string', enum: ['relative', 'elapsed', 'absolute_time'] },
+            allowConcurrent: { type: 'boolean' }, folderId: { type: 'string', nullable: true },
+            audienceCondition: { type: 'object', nullable: true },
+            onCompleteMode: { type: 'string', enum: ['pause', 'resume_previous', 'move'] },
+            onCompleteScenarioId: { type: 'string', nullable: true },
+          },
+        } } } },
+        responses: {
+          '200': { description: '更新後のシナリオと最後の停止記録', content: { 'application/json': { schema: {
+            type: 'object', properties: { success: { type: 'boolean' }, data: { $ref: '#/components/schemas/Scenario' } },
+          } } } },
+          '400': { description: '入力不正（理由が200字超・文字列でない・停止以外で指定など）' },
+          '403': { description: 'シナリオ編集権限が必要' },
+          '404': { description: '担当範囲内にシナリオが見つからない' },
+        },
       },
       delete: {
         tags: ['Scenarios'],

@@ -6,11 +6,11 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ListChecks, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Pagination from '@/components/shared/pagination'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import ListRange from '@/components/ui/list-range'
 import { ApiError, bookingApi, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
@@ -221,17 +221,13 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
               </span>
             </span>
             <span className={styles.staffColMenu}>
-              <MoreAction
-                label={`${person.display_name}のそのほかの操作`}
-                aria-expanded={openMenuId === person.id}
-                onClick={() => setOpenMenuId((current) => (current === person.id ? null : person.id))}
+              <RowMenu
+                appearance="plain"
                 className={styles.rowMenuButton}
-              />
-              <ActionMenu
+                label={`${person.display_name}のそのほかの操作`}
+                menuLabel={`${person.display_name}の操作`}
                 open={openMenuId === person.id}
-                inline
-                ariaLabel={`${person.display_name}の操作`}
-                onClose={() => setOpenMenuId(null)}
+                onOpenChange={(next) => setOpenMenuId(next ? person.id : null)}
                 items={menuItems}
               />
             </span>

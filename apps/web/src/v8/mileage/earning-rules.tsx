@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, MoreHorizontal, Plus, TriangleAlert, Wallet } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, TriangleAlert, Wallet } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -25,7 +25,7 @@ import {
   type MileageEarningRuleV6,
   type MileageEarningRulesV6Overview,
 } from '@/lib/api'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -54,6 +54,7 @@ import {
   ruleEventLabel,
 } from './display'
 import { CreateButton, MileageFrame, useMileageShell } from './frame'
+import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
 
 const EVENT_LABELS: Record<string, string> = {
@@ -387,16 +388,30 @@ export default function EarningRulesTab() {
     }
   }
 
+  /*
+   * 止める・再開する（行の「…」から）。押した瞬間に状態の札を変え、裏で保存する（触り心地 5 回目）。
+   * 公開内容・版は変わらないので、成功しても一覧を読み直さない。失敗したら元に戻してトーストで知らせる。
+   */
   const toggleRule = async (rule: MileageEarningRuleV6) => {
     if (readonly) return
+    const before = rule.published.status
+    const next = before === 'published' ? 'stopped' : 'published'
+    const setStatus = (status: MileageEarningRuleV6['published']['status']) => setRules((current) => current.map((item) => (
+      item.id === rule.id ? { ...item, published: { ...item.published, status } } : item
+    )))
     setSavingId(rule.id)
     setActionError('')
+    setStatus(next)
     try {
-      const res = await api.mileage.updateRule(rule.id, { isActive: rule.published.status !== 'published' })
+      const res = await api.mileage.updateRule(rule.id, { isActive: next === 'published' })
       if (!res.success) throw new Error(res.error)
-      await load()
     } catch {
-      setActionError('たまる決めごとを更新できませんでした。もう一度お試しください。')
+      setStatus(before)
+      notifyToast(`「${rule.draft.name}」を${next === 'published' ? '再開' : '停止'}できませんでした。元に戻しました。`, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void toggleRule({ ...rule, published: { ...rule.published, status: before } }) },
+      })
     } finally {
       setSavingId(null)
     }
@@ -707,18 +722,10 @@ export default function EarningRulesTab() {
     const active = rule.published.status === 'published'
     return (
       <div className={styles.menuBox}>
-        <IconButton
-          aria-label={`${rule.draft.name}の操作`}
-          title={`${rule.draft.name}の操作`}
-          aria-expanded={menuId === rule.id}
-          onClick={() => setMenuId((current) => (current === rule.id ? null : rule.id))}
-        >
-          <MoreHorizontal size={16} aria-hidden="true" />
-        </IconButton>
-        <ActionMenu
+        <RowMenu
+          label={`${rule.draft.name}の操作`}
           open={menuId === rule.id}
-          ariaLabel={`${rule.draft.name}の操作`}
-          onClose={() => setMenuId(null)}
+          onOpenChange={(next) => setMenuId(next ? rule.id : null)}
           items={[
             /* 閲覧のみの人には、変える操作を出さない（押せない形で残さない）。 */
             ...(readonly ? [] : [
@@ -800,7 +807,7 @@ export default function EarningRulesTab() {
               <Tr key={rule.id} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
                   <div className={styles.rowNameLine}>
-                    <FolderDotName folder={folderDotOf(rule)} dot={!narrow}>
+                    <FolderDotName folder={folderDotOf(rule)}>
                       <span className={styles.rowName} title={rule.draft.name}>{rule.draft.name}</span>
                     </FolderDotName>
                   </div>
@@ -901,7 +908,7 @@ export default function EarningRulesTab() {
       }
       stats={stats}
       folders={<>{createButton(true)}{folderPanel}</>}
-      collapsedFolders={undefined}
+      folderNav={narrow ? undefined : { rows: FOLDERS.map((item) => ({ id: item.key, label: item.label })), activeId: folder, onSelect: (id) => resetPage(() => setFolder(id as FolderKey)), createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

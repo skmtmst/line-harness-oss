@@ -57,6 +57,7 @@
 
 .codeLead {
   margin: 0;
+  word-break: normal;
   color: var(--color-ink);
   font-size: var(--text-caption);
   line-height: var(--tpl-hq-cell-lh);
@@ -89,6 +90,7 @@
 
 .note {
   margin: 0;
+  word-break: normal;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-hq-small-lh);

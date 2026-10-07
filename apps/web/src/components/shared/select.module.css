@@ -306,3 +306,20 @@
   width: 15px;
   height: 15px;
 }
+
+/*
+ * 1つだけ選ぶプルダウンに四角い箱は出さない（オーナー 2026-10-07「複数選択できないのにチェックボックス」）。
+ * 選んでいる行は薄い緑の地と ✓ だけで示す。複数選びは multi-select の箱のまま。v8 だけ。
+ */
+[data-theme='v8'] .check,
+[data-theme='v8'] .checked {
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-deep);
+}
+
+[data-theme='v8'] .checkIcon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5;
+}

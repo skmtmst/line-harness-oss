@@ -10,7 +10,7 @@
  */
 import { createContext, useContext, type ReactNode } from 'react'
 import { Eye } from 'lucide-react'
-import { ListPage } from '@/components/templates'
+import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import styles from './affiliates.module.css'
@@ -98,6 +98,8 @@ export interface AffiliateFrameProps {
   actions?: ReactNode
   stats?: ReactNode
   folders?: ReactNode
+  /** 板が狭く左の列が畳まれたときに型が道具の段へ出す「作る・フォルダ」。 */
+  folderNav?: ListFolderNav
   toolbar?: ReactNode
   pagination?: ReactNode
   overlays?: ReactNode
@@ -105,7 +107,7 @@ export interface AffiliateFrameProps {
 }
 
 /** 5つのタブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
-export function AffiliateFrame({ actions, stats, folders, toolbar, pagination, overlays, children }: AffiliateFrameProps) {
+export function AffiliateFrame({ actions, stats, folders, folderNav, toolbar, pagination, overlays, children }: AffiliateFrameProps) {
   const { tab, readonly, narrow, counts } = useAffiliateShell()
   const board = tab === 'affiliates' && narrow
     ? 'KdFRI'
@@ -134,6 +136,7 @@ export function AffiliateFrame({ actions, stats, folders, toolbar, pagination, o
       }
       stats={stats ? <>{readonly ? <ViewerBand /> : null}{stats}</> : readonly ? <ViewerBand /> : undefined}
       folders={folders}
+      folderNav={folderNav}
       toolbar={toolbar}
       pagination={pagination}
       overlays={overlays}

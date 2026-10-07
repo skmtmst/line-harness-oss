@@ -32,6 +32,7 @@ vi.mock('./auto-reply-conditions.js', () => conditionMocks);
 vi.mock('./scenario-actions.js', () => actionMocks);
 vi.mock('./event-bus.js', () => eventMocks);
 vi.mock('./interpolation-context.js', () => ({
+  expandSendCommonVars: vi.fn(async (_db:unknown,value:string)=>value),
   resolveInterpolationExtra: vi.fn().mockResolvedValue({}),
   resolveSendInterpolationExtra: vi.fn().mockResolvedValue({}),
   resolveSendCommonVars: vi.fn().mockResolvedValue(undefined),
@@ -92,10 +93,12 @@ function rule(responseType = 'text', actions: unknown[] = []) {
   };
 }
 
-function dbWithRules(items: unknown[]) {
+function dbWithRules(items: unknown[], unmatched: string|null = null) {
   const statement = {
     bind: vi.fn(),
     all: vi.fn().mockResolvedValue({ results: items }),
+    first: vi.fn().mockResolvedValue(unmatched ? {message:unmatched}:null),
+    run: vi.fn().mockResolvedValue({meta:{changes:1}}),
   };
   statement.bind.mockReturnValue(statement);
   return { prepare: vi.fn().mockReturnValue(statement) } as unknown as D1Database;
@@ -275,4 +278,34 @@ describe('自動応答の受信イベント台帳', () => {
     );
     expect(dbMocks.markAutoReplyEvaluationFinished).not.toHaveBeenCalled();
   });
+});
+
+it('公開版の待つ時間を使って予約し、期限切れになる返信トークンを保存しない', async () => {
+ const db=dbWithRules([{...rule(),definition_snapshot:JSON.stringify({replyDelaySeconds:60,normalizeKeywords:true,receiveSources:['line']})}]);
+ const replyMessageWithRequestId=vi.fn();
+ const result=await matchAndReply(db,{replyMessageWithRequestId} as unknown as LineClient,friend,'予約','token',opts());
+ expect(result).toEqual({matched:true,replyTokenConsumed:false});
+ expect(replyMessageWithRequestId).not.toHaveBeenCalled();
+ expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT OR IGNORE INTO auto_reply_deliveries'));
+ expect(dbMocks.recordAutoReplyHit).not.toHaveBeenCalled();
+});
+it('公開版がメール受信だけならLINEに返信しない',async()=>{
+ const db=dbWithRules([{...rule(),definition_snapshot:JSON.stringify({receiveSources:['email']})}]);
+ const replyMessageWithRequestId=vi.fn();
+ expect(await matchAndReply(db,{replyMessageWithRequestId} as unknown as LineClient,friend,'予約','token',opts())).toEqual({matched:false,replyTokenConsumed:false});
+ expect(replyMessageWithRequestId).not.toHaveBeenCalled();
+});
+
+
+it('キーワード未一致なら設定した返事だけを送り、未設定・有人対応停止では送らない', async () => {
+ const replyMessageWithRequestId=vi.fn().mockResolvedValue({requestId:'fallback-request'});
+ const line={replyMessageWithRequestId} as unknown as LineClient;
+ expect(await matchAndReply(dbWithRules([rule()],'受信しました'),line,friend,'こんにちは','reply-token',opts('fallback'))).toEqual({matched:true,replyTokenConsumed:true});
+ expect(replyMessageWithRequestId).toHaveBeenCalledWith('reply-token',[{type:'text',text:'受信しました'}]);
+ replyMessageWithRequestId.mockClear();
+ expect(await matchAndReply(dbWithRules([rule()]),line,friend,'こんにちは','reply-token',opts('unset'))).toEqual({matched:false,replyTokenConsumed:false});
+ expect(replyMessageWithRequestId).not.toHaveBeenCalled();
+ conditionMocks.evaluateAutoReplyConditions.mockResolvedValue({matches:false,reasonCodes:['operator_active']});
+ await matchAndReply(dbWithRules([rule()],'受信しました'),line,friend,'予約したい','reply-token',opts('operator'));
+ expect(replyMessageWithRequestId).not.toHaveBeenCalled();
 });

@@ -2,6 +2,8 @@ import type { CustomerBookingWaitlist,CustomerSeatWaitlist,RegisterSeatWaitlistI
 import type { FormLayout } from '@line-crm/shared';
 import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
 import type { WebinarAudience } from '@line-crm/shared';
+import type { BookingHistoryResponse, LiffBookingChangeResponse } from '@line-crm/shared';
+export type { BookingHistoryItem } from '@line-crm/shared';
 export type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
 export type { WebinarAudience } from '@line-crm/shared';
 import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
@@ -62,16 +64,6 @@ export interface LiffBookingSettings extends LiffLookApiSettings {
   booking_window_days: number;
   /** 予約のルール「お店が承認してから確定する」。無いときは承認あり扱い。 */
   approval_mode?: 'automatic' | 'manual';
-}
-
-export interface BookingHistoryItem {
-  id: string;
-  starts_at: string;
-  status: string;
-  customer_note?: string | null;
-  menu_name: string;
-  staff_name: string;
-  profile_image_url: string | null;
 }
 
 /** 予約作成の応答。お支払いありの店・メニューだけ payment が付く。 */
@@ -355,13 +347,20 @@ export const api = {
     get<{ payment: BookingPayment | null }>(
       `/api/liff/booking/payments/by-booking?bookingId=${encodeURIComponent(bookingId)}`,
     ),
-  me: () => get<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] }>('/api/liff/booking/me'),
+  me: () => get<BookingHistoryResponse>('/api/liff/booking/me'),
+  /** F-6 本人の取消。版（lock_version）が合わないと 409。期限を過ぎると 403 self_deadline_passed。 */
+  cancelMyBooking: (id: string, lockVersion: number) =>
+    post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/cancel`, { lock_version: lockVersion }),
+  /** F-6 本人の日時変更。starts_at は UTC の ISO。埋まっていると 409 slot_not_available。 */
+  rescheduleMyBooking: (id: string, body: { lock_version: number; starts_at: string; reason?: string }) =>
+    post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/reschedule`, body),
   /** 前回と同じで予約：本人の前回の予約を返す。失敗・対象外は呼び側が黙って隠す。 */
   lastBooking: () => get<LastBookingResponse>('/api/liff/booking/last-booking'),
   /** 満席の枠に「空いたら知らせる」を登録する。 */
   registerWaitlist: (body: { staff_id: string; menu_id: string; starts_at: string }) =>
     post<{ id: string }>('/api/liff/booking/waitlist', body),
   bookingWaitlists:(id?:string)=>get<{waitlist:CustomerBookingWaitlist[]}>(`/api/liff/booking/waitlist${id?'?id='+encodeURIComponent(id):''}`),
+  seatAvailability:(query:{storeId:string;startsAt:string;endsAt:string;guestCount:number})=>get<{success:true;data:import('@line-crm/shared').RestaurantSeatAvailability}>(`/api/liff/booking/seat-availability?${new URLSearchParams({store_id:query.storeId,starts_at:query.startsAt,ends_at:query.endsAt,guest_count:String(query.guestCount)})}`),
   seatWaitlists:(id?:string)=>get<{waitlist:CustomerSeatWaitlist[]}>(`/api/liff/booking/seat-waitlist${id?'?id='+encodeURIComponent(id):''}`),
   registerSeatWaitlist:(body:RegisterSeatWaitlistInput)=>post<{id:string}>('/api/liff/booking/seat-waitlist',body),
   acceptWaitlist:(body:AcceptBookingWaitlistInput,key:string)=>post<CreateBookingResponse>('/api/liff/booking/requests',body,{'Idempotency-Key':key}),
@@ -526,4 +525,34 @@ export const api = {
     post<{ ok: true }>(`/api/liff/webinars/${slug}/comments`, { sessionStartAt, atSeconds, body }),
   webinarCtaClick: (slug: string, sessionStartAt: number) =>
     post<{ ok: true }>(`/api/liff/webinars/${slug}/cta-click`, { sessionStartAt }),
+};
+
+/** 来店スタンプ。PINを使う口には本人のIDトークンを常に送る。 */
+export const visitStampsApi = {
+  cards: (accountId:string) => get<{success:true;data:Array<{card:import('@line-crm/shared').VisitStampCard;wallet:import('@line-crm/shared').VisitStampWallet}>}>(`/api/liff/visit-stamps/cards?${new URLSearchParams({accountId})}`),
+  card: (accountId:string,id:string) => get<{success:true;data:{card:import('@line-crm/shared').VisitStampCard;wallet:import('@line-crm/shared').VisitStampWallet;entries:import('@line-crm/shared').VisitStampEntry[]}}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}?${new URLSearchParams({accountId})}`),
+  showReward: (accountId:string,id:string,rewardId:string,requestId:string) => post<{success:true;data:import('@line-crm/shared').VisitStampRedemption}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}/rewards?${new URLSearchParams({accountId})}`,{rewardId,requestId}),
+  useReward: (accountId:string,id:string,pin:string) => post<{success:true;data:import('@line-crm/shared').VisitStampUseResult}>(`/api/liff/visit-stamps/redemptions/${encodeURIComponent(id)}/use?${new URLSearchParams({accountId})}`,{pin}),
+  paperRequests:(accountId:string,id:string)=>get<{success:true;data:import('@line-crm/shared').VisitStampPaperRequest[]}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}/paper-requests?${new URLSearchParams({accountId})}`),
+  uploadPaperPhoto:async(accountId:string,id:string,file:File)=>{
+    const body=new FormData();body.append('file',file);
+    const response=await fetch(`${BASE}/api/liff/visit-stamps/cards/${encodeURIComponent(id)}/paper-photos?${new URLSearchParams({accountId})}`,{method:'POST',headers:{Authorization:`Bearer ${getIdToken()}`},body});
+    if(!response.ok)throw new Error('写真を預けられませんでした');return response.json() as Promise<{success:true;data:import('@line-crm/shared').VisitStampPhoto}>;
+  },
+  paperPhoto:async(accountId:string,id:string)=>{
+    const response=await fetch(`${BASE}/api/liff/visit-stamps/paper-photos/${encodeURIComponent(id)}?${new URLSearchParams({accountId})}`,{headers:{Authorization:`Bearer ${getIdToken()}`}});
+    if(!response.ok)throw new Error('写真を読み込めませんでした');return response.blob();
+  },
+  requestPaper: (accountId:string,id:string,body:import('@line-crm/shared').VisitStampPaperInput) => post<{success:true;data:{id:string;status:'pending'}}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}/paper-requests?${new URLSearchParams({accountId})}`,body),
+};
+
+/** 飲食店の席予約。既存get/postと同じくliffIdと本人のIDトークンを送る。 */
+export const restaurantBookingApi = {
+  link: (token:string)=>get<{success:true;data:{id:string;name:string;timezone:string}}>(`/api/liff/restaurant/link/${encodeURIComponent(token)}`),
+  availability: (storeId:string,date:string,guestCount:number)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerAvailability}>(`/api/liff/restaurant/availability?${new URLSearchParams({storeId,date,guestCount:String(guestCount)})}`),
+  hold: (body:import('@line-crm/shared').RestaurantCustomerHoldInput)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>('/api/liff/restaurant/holds',body),
+  mine: (storeId:string)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking[]}>(`/api/liff/restaurant/reservations?${new URLSearchParams({storeId})}`),
+  confirm: (id:string,expectedVersion:number,details:import('@line-crm/shared').RestaurantCustomerDetails={})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/confirm`,{...details,expectedVersion}),
+  cancel: (id:string,expectedVersion:number)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/cancel`,{expectedVersion}),
+  reschedule: (id:string,body:{expectedVersion:number;startsAt:string;guestCount:number})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/reschedule`,body),
 };

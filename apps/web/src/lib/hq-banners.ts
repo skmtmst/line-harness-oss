@@ -457,6 +457,16 @@ export function presetSizeLabel(preset: BannerPreset): string {
 }
 
 /**
+ * 下の帯の真ん中に出す「1040 × 1040 で書き出します」（★BG-B `GcuH5`）。
+ * 選んでいる用途の寸法をそのまま使う。用途が未選択のときは出さない
+ * （寸法が決まっていないので書けない）。
+ */
+export function exportSizeText(presets: BannerPreset[], presetKey: string): string {
+  const preset = presets.find((p) => p.key === presetKey)
+  return preset ? `${presetSizeLabel(preset)} で書き出します` : ''
+}
+
+/**
  * 画像ライブラリの用途の絞り込み。設計 35-3 `H0n2G` は「正方形／リッチメニュー／横長／縦長」。
  * 用途の並びが増えても、この4つに畳む。
  */

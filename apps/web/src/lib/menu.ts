@@ -16,6 +16,8 @@ export interface MenuItem {
   label: string
   /** 24x24 の path。lucide 相当の形を手で写している。 */
   icon: string
+  /** V8 だけ違う形にするときの path（lucide の形）。無ければ icon を使う。 */
+  iconV8?: string
   /** 出す数の種類（仕様 §5）。無ければバッジを出さない。 */
   badge?: 'unanswered' | 'photos' | 'unmatched' | 'operations'
   /** 機能設定に出す一行説明。 */
@@ -51,18 +53,26 @@ export interface MenuSection {
 }
 
 /** 統括コンソールだけで使う、アカウント横断の管理メニュー。 */
+/** 統括の外側（左メニュー・上の帯）を出す住所（/hq の下と、統括から開く LINEアカウントの登録）。 */
+export function isHqShellPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new'
+}
+
 export const HQ_MENU_SECTIONS: MenuSection[] = [
   {
     id: 'hq',
     label: null,
     title: '統括コンソール',
     items: [
-      { href: '/hq', label: 'アカウント', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', id: 'hq-stores', note: '統括に属するLINE公式アカウントを管理します', required: true },
+      { href: '/hq', label: 'アカウント', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', iconV8: 'M10 12h4M10 8h4M14 21v-3a2 2 0 0 0-4 0v3M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16', id: 'hq-stores', note: '統括に属するLINE公式アカウントを管理します', required: true },
       { href: '/hq/friend-attributes', label: '友だち属性', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', id: 'hq-tags', note: 'タグのひな形を作成し、アカウントへ配布します', required: true },
       { href: '/hq/templates', label: 'テンプレート', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', id: 'hq-templates', note: 'メッセージのひな形を作成し、アカウントへ配布します', required: true },
       { href: '/hq/rich-menus', label: 'リッチメニュー', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z', id: 'hq-rich-menus', note: 'リッチメニューのひな形を作成し、アカウントへ配布します', required: true },
       { href: '/hq/form-submissions', label: '回答フォーム', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', id: 'hq-forms', note: '回答フォームのひな形を作成し、アカウントへ配布します', required: true },
       { href: '/hq/banners', label: 'バナー生成', icon: 'M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm4 5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm12 5l-5-5L5 21', id: 'hq-banners', note: '配信やリッチメニューに使う画像をAIで作り、アカウントへ渡します', required: true },
+      /* 統括の一括配信（提案 E-9）。今ある並びを動かさないよう末尾に足す。V8 の印は lucide の send（絵 V8-B の統括の板）。 */
+      { href: '/hq/broadcasts', label: '一括配信', icon: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8', iconV8: 'M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11zM21.854 2.147l-10.94 10.939', id: 'hq-broadcasts', note: '選んだアカウントに同じ内容を一度に送ります。各店に入らずに送れます', required: true },
     ],
   },
 ]
@@ -139,6 +149,8 @@ export const MENU_SECTIONS: MenuSection[] = [
       { href: '/booking/bookings', label: '予約管理', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' , id: 'booking-bookings', note: '入った予約の確認と変更', featureKey: 'booking' },
       { href: '/booking/menus', label: '予約設定', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' , id: 'booking-menus', note: '予約メニュー・受付枠・休業日', featureKey: 'booking' },
       { href: '/events', label: 'イベント予約', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m5-7v3m4-3v3' , id: 'events', note: '日時と定員を決めた申込の受付', featureKey: 'events' },
+      // 提案 E-7（オーナー 2026-10-07）: 来店スタンプは飲食店もサロンも使うので「予約」の組に置く。マイルとは別のカード。
+      { href: '/visit-stamps', label: '来店スタンプ', icon: 'M5 22h14M19.27 13.73A2.5 2.5 0 0 0 17.5 13h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1.5c0-.66-.26-1.3-.73-1.77zM14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13', id: 'visit-stamps', note: '来店で押すスタンプカード・特典・紙のカードの移行', featureKey: 'visit_stamps' },
       // N-411 本人勤務: 予約スタッフと紐づいたログインユーザーだけの入口。
       // owner/admin は担当スタッフ一覧から開くため出さない。
       { href: '/booking/staff/shifts', label: '自分の勤務', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', id: 'booking-own-shifts', note: '自分のシフト・休憩・外部カレンダー連携', featureKey: 'booking', permissionKey: 'booking.staff.own', staffOnly: true },

@@ -60,7 +60,6 @@ shared-button-importer app/auto-replies/page.tsx
 shared-button-importer app/auto-replies/publish/page.tsx
 shared-button-importer app/auto-replies/runs/page.tsx
 shared-button-importer app/automations/automations-v8.tsx
-shared-button-importer app/automations/drafts/draft-v8.tsx
 shared-button-importer app/automations/list-v8.tsx
 shared-button-importer app/automations/new/friend-multi-select.tsx
 shared-button-importer app/automations/new/new-v8.tsx
@@ -327,7 +326,6 @@ shared-button-importer app/templates/list-v8.tsx
 shared-button-importer app/templates/page.tsx
 shared-button-importer app/templates/questions/new/page.tsx
 shared-button-importer app/templates/template-asset-editor.tsx
-shared-button-importer app/updates/page.tsx
 shared-button-importer app/users/page.tsx
 shared-button-importer app/users/users-v8.tsx
 shared-button-importer app/webhooks/api-tokens-panel.tsx
@@ -386,7 +384,6 @@ shared-button-importer components/forms/action-editor.tsx
 shared-button-importer components/forms/choice-table.tsx
 shared-button-importer components/forms/hq-form-definition-editor.tsx
 shared-button-importer components/forms/options-dialog.tsx
-shared-button-importer components/friend-attributes-v2/tag-list-v2.tsx
 shared-button-importer components/friend-fields/edit-tag-page-v4.tsx
 shared-button-importer components/friend-fields/mark-list.tsx
 shared-button-importer components/friend-fields/saved-search-list.tsx
@@ -482,6 +479,7 @@ shared-button-importer v8/tags/searches-tab.tsx
 shared-button-importer v8/tags/tags-tab.tsx
 shared-button-importer v8/templates/list.tsx
 shared-button-importer v8/templates/question-new.tsx
+shared-button-importer v8/visit-stamps/visit-stamps.tsx
 shared-button-importer v8/templates/carousel.tsx
 shared-button-importer v8/broadcasts/list.tsx
 shared-button-importer v8/broadcasts/quick-send.tsx
@@ -556,8 +554,11 @@ shared-button-importer v8/hq/home.tsx
 shared-button-importer v8/hq/member-dialog.tsx
 shared-button-importer v8/hq/members.tsx
 shared-button-importer v8/hq/notice-line-dialog.tsx
+shared-button-importer v8/hq/settings.tsx
 shared-button-importer v8/hq/support-detail.tsx
 shared-button-importer v8/hq/support.tsx
+shared-button-importer v8/inbox-chat/rules-popover.tsx
+shared-button-importer v8/inbox-chat/template-picker-view.tsx
 shared-button-importer v8/affiliates/frame.tsx
 shared-button-importer v8/affiliates/parts.tsx
 shared-button-importer v8/affiliates/affiliators.tsx
@@ -675,11 +676,15 @@ shared-button-importer v8/settings/features/screen.tsx
 shared-button-importer v8/settings/manual-links/screen.tsx
 shared-button-importer v8/settings/file-scan/screen.tsx
 shared-button-importer v8/settings/ec-commerce/screen.tsx
+shared-button-importer v8/settings/ec-commerce/connector.tsx
 shared-button-importer v8/settings/ec-commerce/order-drawer.tsx
 shared-button-importer v8/settings/ec-commerce/identity.tsx
 shared-button-importer v8/settings/pools/create.tsx
 shared-button-importer v8/settings/line-notifications/screen.tsx
+shared-button-importer v8/settings/line-notifications/operator-tab.tsx
+shared-button-importer v8/settings/line-notifications/runs-tab.tsx
 shared-button-importer v8/settings/emergency/screen.tsx
+shared-button-importer v8/settings/emergency/history.tsx
 shared-button-importer v8/settings/emergency/health.tsx
 shared-button-importer v8/restaurant-reservations/detail-dialog.tsx
 # ★V8 飲食店 提案 E（今日のお店 hKRRF・電話予約 wEzuG・枠を閉じる知らせ YMVFD・SNS 連携 y3GGTs）。全店の一覧 CHz31 は stores.tsx へ移した。
@@ -688,7 +693,15 @@ shared-button-importer v8/restaurant/dashboard/side.tsx
 shared-button-importer v8/restaurant/dashboard/today-table.tsx
 shared-button-importer v8/restaurant/front-desk/phone-drawer.tsx
 shared-button-importer v8/restaurant/close-tasks/close-tasks.tsx
+shared-button-importer v8/restaurant/closures/closures.tsx
+shared-button-importer v8/restaurant/closures/closure-dialog.tsx
+shared-button-importer v8/restaurant/inventory/inventory.tsx
 shared-button-importer v8/settings/sns/sns.tsx
+# ★V8 提案 E-4 予約サイト・グルメ媒体（aSmph）・E-9 統括の一括配信（p17Qku・xOXuY）。
+shared-button-importer v8/settings/booking-media/screen.tsx
+shared-button-importer v8/hq-broadcasts/create.tsx
+shared-button-importer v8/hq-broadcasts/detail.tsx
+shared-button-importer v8/hq-broadcasts/list.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx
@@ -715,6 +728,7 @@ shared-button-importer v8/contents/media-replacement-dialog.tsx
 shared-button-importer v8/contents/media-upload-dialog.tsx
 shared-button-importer v8/line-notifications/operator-edit.tsx
 shared-button-importer v8/no-permission/no-permission.tsx
+shared-button-importer v8/not-found/not-found.tsx
 shared-button-importer components/friends/schedule-dialog.tsx
 # ★V8 予約スタッフの登録（CcA4k）・勤務とシフト（d5fmnM・E3YDK・wvGke）を src/v8/booking-staff に一から書いた。
 shared-button-importer v8/booking-staff/shifts.tsx

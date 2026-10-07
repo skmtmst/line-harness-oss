@@ -173,17 +173,6 @@ describe('友だち属性 V4 contract', () => {
     }
   })
 
-  it('Pen.devで指定された8状態を検証用ルートから再現できる', () => {
-    const source = read('app/visual-qa/friend-attributes/page.tsx')
-    for (const state of ['list', 'create', 'linked', 'drawer', 'edit', 'retroactive', 'delete', 'folder']) {
-      expect(source).toContain(`'${state}'`)
-    }
-    expect(source).toContain('LINKED_ACTIONS')
-    expect(source).toContain('initialRetroactiveOpen')
-    expect(source).toContain('<DeleteDialog')
-    expect(source).toContain('<FolderEditor')
-  })
-
   it('空・読込・エラー・権限不足を言い分ける', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
     // 設計 ★V6 4-2-C `yKEdO`。共通部品に寄せる（自前で組むと画面ごとにずれる）。

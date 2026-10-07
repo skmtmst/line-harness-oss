@@ -115,8 +115,12 @@ function buildCondition(table: string, scope: RetentionScope, seen: Set<string>)
 export const RETENTION_R2_KEY_COLUMNS: ReadonlyArray<{ table: string; column: string }> = [
   { table: 'affiliate_payout_batches', column: 'export_object_key' },
   { table: 'affiliate_statements', column: 'pdf_object_key' },
+  { table: 'visit_stamp_paper_photos', column: 'object_key' },
   { table: 'hq_template_owned_r2_keys', column: 'object_key' },
   { table: 'media', column: 'r2_key' },
+  { table: 'imagemap_images', column: 'r2_key' },
+  { table: 'broadcast_media_upload_sessions', column: 'r2_key' },
+  { table: 'broadcast_media_upload_sessions', column: 'public_key' },
   { table: 'media_upload_sessions', column: 'r2_key' },
   { table: 'media_versions', column: 'r2_key' },
   { table: 'nen_pet_profiles', column: 'image_r2_key' },

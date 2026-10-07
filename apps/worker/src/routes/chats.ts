@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { FlexContainer, Message } from '@line-crm/line-sdk';
-import { extractFlexAltText } from '../utils/flex-alt-text.js';
+import type { Message } from '@line-crm/line-sdk';
 import {
   getOperators,
   getOperatorById,
@@ -25,6 +24,7 @@ import {
   type SavedSearch,
   type SavedSearchAccess,
   createScheduledChatSend,
+  getScheduledChatSend,
   listPendingScheduledChatSends,
   cancelScheduledChatSend,
   updateScheduledChatSend,
@@ -59,6 +59,8 @@ import {
   renderChatMessageContent,
   unresolvedVariablesPayload,
 } from '../services/manual-send-interpolation.js';
+
+import { buildChatMessage, ChatAttachmentError } from '../services/chat-attachments.js';
 
 const chats = new Hono<Env>();
 
@@ -1288,6 +1290,7 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
         createdAt,
         // 古い履歴が残っているか。画面は「前のメッセージ」ボタンで遡る。
         hasMoreMessages,
+        total: (await c.env.DB.prepare("SELECT COUNT(*) total FROM messages_log WHERE friend_id=? AND (delivery_type IS NULL OR delivery_type!='test')").bind(resolvedFriendId).first<{total:number}>())!.total,
         messages: messageRows.map((m) => ({
           id: m.id,
           direction: m.direction,
@@ -1746,7 +1749,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     } catch {
       return c.json({ success: false, error: 'content is required' }, 400);
     }
-    if (!body.content) return c.json({ success: false, error: 'content is required' }, 400);
+    if (typeof body?.content !== 'string' || !body.content) return c.json({ success: false, error: 'content is required' }, 400);
     if (body.revision !== undefined && body.revision !== chat.revision) {
       return c.json({
         success: false,
@@ -1821,47 +1824,17 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     const lineClient = new LineClient(accessToken);
     const messageType = body.messageType ?? 'text';
     let message: Message;
-    if (messageType === 'text') {
-      // LINEのtext上限(5000字)を超える本文はここで止める。送ってから弾かれると
-      // 送信済みか未送信かが分からなくなり、運用者が二重送信しかねない。
-      // 差し込みは解決後の長さで判定する(展開で5000字を超え得る)。
-      if (rendered.content.length > 5000) {
-        return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
-      }
-      message = { type: 'text', text: rendered.content };
-    } else if (messageType === 'flex') {
-      // 壊れたJSONは外側catchの500に落とさず400で返す(形式が合うJSONは従来どおり送る)。
-      let contents: FlexContainer;
-      try {
-        contents = JSON.parse(rendered.content) as FlexContainer;
-      } catch {
-        return c.json({ success: false, error: 'Flexメッセージの形式が正しくありません' }, 400);
-      }
-      message = { type: 'flex', altText: extractFlexAltText(contents), contents };
-    } else if (messageType === 'image') {
-      let parsed: {
-        originalContentUrl: string;
-        previewImageUrl: string;
-      };
-      try {
-        parsed = JSON.parse(rendered.content) as {
-          originalContentUrl: string;
-          previewImageUrl: string;
-        };
-      } catch {
-        return c.json({ success: false, error: '画像メッセージの形式が正しくありません' }, 400);
-      }
-      message = {
-        type: 'image',
-        originalContentUrl: parsed.originalContentUrl,
-        previewImageUrl: parsed.previewImageUrl,
-      };
-    } else {
-      await releaseInboxReplyLease(c.env.DB, {
-        channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+    try {
+      const built = await buildChatMessage({
+        messageType, content: rendered.content, bucket: c.env.IMAGES,
+        owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
+        origin: c.env.WORKER_URL || new URL(c.req.url).origin,
       });
-      leasedConversationId = null;
-      return c.json({ success: false, error: 'messageType is not supported' }, 400);
+      message = built.message;
+      rendered.content = built.content;
+    } catch (error) {
+      if (error instanceof ChatAttachmentError) return c.json({ success: false, code: error.code, error: error.message }, 400);
+      throw error;
     }
 
     // 引用元にLINEのquoteTokenが残っていれば、顧客側にも引用表示として届く。
@@ -2102,7 +2075,7 @@ chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff
     } catch {
       return c.json({ success: false, error: 'content is required' }, 400);
     }
-    const content = typeof body.content === 'string' ? body.content : '';
+    const content = typeof body?.content === 'string' ? body.content : '';
     if (!content) return c.json({ success: false, error: 'content is required' }, 400);
     const messageType = typeof body.messageType === 'string' ? body.messageType : 'text';
 
@@ -2520,15 +2493,17 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
-    let body: { content?: unknown; scheduledAt?: unknown; quotedMessageId?: unknown };
+    let body: { messageType?: unknown; content?: unknown; scheduledAt?: unknown; quotedMessageId?: unknown };
     try {
       body = await c.req.json();
     } catch {
       return c.json({ success: false, error: 'content is required' }, 400);
     }
-    const content = typeof body.content === 'string' ? body.content : '';
+    const content = typeof body?.content === 'string' ? body.content : '';
+    const messageType = body?.messageType === undefined ? 'text' : body.messageType;
+    if (typeof messageType !== 'string') return c.json({ success: false, error: 'messageType is not supported' }, 400);
     if (!content) return c.json({ success: false, error: 'content is required' }, 400);
-    if (content.length > 5000) {
+    if (messageType === 'text' && content.length > 5000) {
       return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
     }
     // N-026: 送信時に解決される差し込み(name/field/var/date等)は予約へ通すが、
@@ -2571,19 +2546,40 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
       quotedMessageId = quoted.id;
     }
 
+    let validatedContent = content;
+    try {
+      // text/Flexの差し込みは送信時に展開する。添付は予約時と送信時の両方で検証する。
+      if (messageType !== 'text') {
+        validatedContent = (await buildChatMessage({ messageType, content, bucket: c.env.IMAGES,
+          owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
+          origin: c.env.WORKER_URL || new URL(c.req.url).origin, neededAt: Date.parse(time.scheduledAt),
+        })).content;
+      }
+    } catch (error) {
+      if (error instanceof ChatAttachmentError) return c.json({ success: false, code: error.code, error: error.message }, 400);
+      throw error;
+    }
+
     const { row, created } = await createScheduledChatSend(c.env.DB, {
       id: crypto.randomUUID(),
       friendId: friend.id,
       lineAccountId: friend.line_account_id ?? null,
       staffId: c.get('staff').id,
-      messageType: 'text',
-      content,
+      messageType,
+      content: validatedContent,
       quotedMessageId,
       idempotencyKey,
       scheduledAt: time.scheduledAt,
       now: new Date().toISOString(),
     });
 
+    // 同じ予約キーを別の友だち・内容へ使わせない。既存行の添付を返さない。
+    // 再送時に日時を再計算した呼び出しも、最初の予約日時のまま返す。
+    if (row.friend_id !== friend.id || row.line_account_id !== (friend.line_account_id ?? null)
+      || row.message_type !== messageType || row.content !== validatedContent
+      || row.quoted_message_id !== quotedMessageId) {
+      return c.json({ success: false, error: '同じ予約キーを別の内容には使用できません' }, 409);
+    }
     return c.json({
       success: true,
       data: { ...scheduledSendResponse(row), replayed: !created },
@@ -2624,6 +2620,10 @@ chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin'
       ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
+    const existing = await getScheduledChatSend(c.env.DB, scheduleId);
+    if (!existing || existing.friend_id !== chat.friend_id) return c.json({ success: false, error: '予約が見つかりません' }, 404);
+    if (existing.status !== 'scheduled') return c.json({ success: false, error: '送信処理が始まったか、すでに処理済みの予約です', code: 'SCHEDULE_LOCKED' }, 409);
+
     let body: { scheduledAt?: unknown; content?: unknown };
     try {
       body = await c.req.json();
@@ -2642,7 +2642,7 @@ chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin'
       if (typeof body.content !== 'string' || !body.content) {
         return c.json({ success: false, error: 'content is required' }, 400);
       }
-      if (body.content.length > 5000) {
+      if (existing.message_type === 'text' && body.content.length > 5000) {
         return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
       }
       // N-026: 予約作成と同じく、カタログに無い差し込み名はここで拒否する。
@@ -2654,6 +2654,23 @@ chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin'
     }
     if (updates.scheduledAt === undefined && updates.content === undefined) {
       return c.json({ success: false, error: '変更する項目がありません' }, 400);
+    }
+
+    try {
+      if (!['text', 'flex'].includes(existing.message_type)) {
+        const friend = await getFriendById(c.env.DB, chat.friend_id);
+        if (!friend) return c.notFound();
+        const built = await buildChatMessage({ messageType: existing.message_type,
+          content: updates.content ?? existing.content, bucket: c.env.IMAGES,
+          owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
+          origin: c.env.WORKER_URL || new URL(c.req.url).origin,
+          neededAt: Date.parse(updates.scheduledAt ?? existing.scheduled_at),
+        });
+        if (updates.content !== undefined) updates.content = built.content;
+      }
+    } catch (error) {
+      if (error instanceof ChatAttachmentError) return c.json({ success: false, code: error.code, error: error.message }, 400);
+      throw error;
     }
 
     const result = await updateScheduledChatSend(c.env.DB, {

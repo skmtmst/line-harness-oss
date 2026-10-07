@@ -14,23 +14,26 @@
  * が今の編集部品を `DefinitionEditor` として渡す（src/v8 から @/app を読まないため）。
  */
 import { useEffect, useRef, useState, type ComponentType } from 'react'
-import { ArrowLeft, Check, Copy, MoreHorizontal, Pencil, Plus, Search, Send, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Inbox, Pencil, Plus, RotateCw, Search, Send, Trash2 } from 'lucide-react'
 import type { HqTemplateFolder } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import FolderPanel from '@/components/shared/folder-panel'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { Th } from '@/components/shared/table'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { freshDefinition } from '@/lib/hq-template-authoring'
+import { distributedAccountsLine, templateSubLine } from './list-row'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
 import {
   hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type MessageTemplateDefinition,
@@ -58,6 +61,10 @@ const LIST_DESCRIPTIONS: Record<TemplateType, string> = {
 /** 左の列の「種類」。絵の順（テンプレート・リッチメニュー・回答フォーム・タグ）＋シナリオ。 */
 const TYPE_ORDER: TemplateType[] = ['template', 'rich_menu', 'form', 'tag', 'scenario']
 const TYPE_COLORS: Record<TemplateType, string | null> = { template: null, rich_menu: 'var(--color-icon-tile-blue)', form: 'var(--color-icon-tile-green)', tag: 'var(--color-icon-tile-orange)', scenario: 'var(--color-icon-tile-purple)' }
+/** 種類ごとの正規の住所（左メニューと同じ）。シナリオは専用の住所が無いので旧URLのまま。 */
+const TYPE_ROUTES: Record<TemplateType, string> = { template: '/hq/templates', tag: '/hq/friend-attributes', rich_menu: '/hq/rich-menus', form: '/hq/form-submissions', scenario: '/hq/templates?type=scenario' }
+/** 1280 などで畳んだ「種類：リッチメニュー」が切れない幅（共通の 150 では「種類：回答フォ…」になる）。 */
+const TYPE_PICK_WIDTH = 176
 const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る' }
 
 type Stage = 'list' | 'edit' | 'accounts' | 'duplicates' | 'result'
@@ -99,6 +106,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   const [folderFilter, setFolderFilter] = useState<string>('all')
   const [folderName, setFolderName] = useState('')
   const [folderFormOpen, setFolderFormOpen] = useState(false)
+  const [folderEditId, setFolderEditId] = useState<string | null>(null)
   const [textOverrides, setTextOverrides] = useState<Record<string, string>>({})
   const [overrideOpen, setOverrideOpen] = useState<string | null>(null)
   const duplicateAttempts = useRef(new Map<string, string>())
@@ -115,6 +123,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   const [bulkMode, setBulkMode] = useState<'' | DistributionMode>('')
   const [result, setResult] = useState<DistributionResult | null>(null)
   const [pendingRun, setPendingRun] = useState<string | null>(null)
+  /** 配った結果の窓（★V8-B dEvJM）。結果が出たら開く。閉じても同じ画面の進み具合と操作は残る。 */
+  const [resultDialogFor, setResultDialogFor] = useState<string | null>(null)
   const [requestBusy, setBusy] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
   const busy = requestBusy || uploadBusy
@@ -149,8 +159,9 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   }
 
   const editTitle = `${EDIT_TITLES[type]}を${detail ? '編集' : '作る'}`
-  const pageTitle = stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : stage === 'result' ? '配布結果' : `アカウントへ配る：${detail?.template.name ?? ''}`
-  usePageTitle(stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? `${PAGE_TITLES[type]} › ${type === 'template' ? 'ひな形を作る' : editTitle}` : PAGE_TITLES[type])
+  /* 絵（meBRB の進み具合・dEvJM の窓の後ろ）：配っている間も結果のあとも題は「アカウントへ配る：名前」のまま。 */
+  const pageTitle = stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : `アカウントへ配る：${detail?.template.name ?? ''}`
+  usePageTitle(stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? `${PAGE_TITLES[type]} › ${type === 'template' ? (detail ? 'ひな形を編集' : 'ひな形を作る') : editTitle}` : PAGE_TITLES[type])
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   useEffect(() => {
@@ -363,6 +374,9 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready])
 
+  useEffect(() => {
+    if (result && result.status !== 'running') setResultDialogFor(`${result.runId}:${result.status}`)
+  }, [result])
   const reloadFolders = async () => setFolders(await hqTemplatesApi.folders.list())
   const expiry = preflight ? Date.parse(preflight.expiresAt) : NaN
   const expired = !Number.isFinite(expiry) || expiry <= now
@@ -405,56 +419,74 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
       }) },
       { id: 'remove', label: '削除する', icon: <Trash2 size={14} aria-hidden="true" />, tone: 'danger', dividerBefore: true, onSelect: () => setRemove(row) },
     ]
+    const createButton = canEdit
+      ? <Button variant="primary" disabled={!ready || busy} onClick={startCreate}><Plus size={15} aria-hidden="true" />{CREATE_LABELS[type]}</Button>
+      : null
+    /* 絵：テンプレートの行は受信箱の印（inbox）、ほかは色付きのフォルダ。 */
+    const typeRows = TYPE_ORDER.map((kind) => ({ id: kind, label: LABELS[kind], count: typeCounts(kind), color: TYPE_COLORS[kind], ...(kind === 'template' ? { icon: <Inbox size={15} /> } : {}) }))
+    const selectType = (id: string) => { if (id !== type) window.location.assign(TYPE_ROUTES[id as TemplateType] ?? `/hq/templates?type=${id}`) }
+    const folderNavRows = [{ id: 'all', label: 'すべて' }, { id: 'none', label: '未分類' }, ...folders.map((folder) => ({ id: folder.id, label: folder.name }))]
     return (
       <ListPage
         boardId="LRc93"
         title={PAGE_TITLES[type]}
         description={LIST_DESCRIPTIONS[type]}
+        folderNav={[
+          { label: '種類', rows: typeRows, activeId: type, onSelect: selectType, createAction: createButton ?? undefined, width: TYPE_PICK_WIDTH },
+          ...(folderLoadFailed ? [] : [{ label: '分類', rows: folderNavRows, activeId: folderFilter, onSelect: setFolderFilter }]),
+        ]}
         folders={(
           <div className={styles.rail}>
           <FolderPanel
             heading="種類"
-            createAction={canEdit
-              ? <Button variant="primary" disabled={!ready || busy} onClick={startCreate}><Plus size={15} aria-hidden="true" />{CREATE_LABELS[type]}</Button>
-              : <span className={styles.createSpace} aria-hidden="true" />}
-            rows={TYPE_ORDER.map((kind) => ({ id: kind, label: LABELS[kind], count: typeCounts(kind), color: TYPE_COLORS[kind] }))}
+            createAction={createButton ?? <span className={styles.createSpace} aria-hidden="true" />}
+            rows={typeRows}
             activeId={type}
-            onSelect={(id) => { if (id !== type) window.location.assign(`/hq/templates?type=${id}`) }}
+            onSelect={selectType}
           >
             <p className={styles.railNote}>配るときは、行の「アカウントへ配る」から。種類ごとに一覧を切り替えます。</p>
+          </FolderPanel>
+          {/* 絵（LRc93・2026-10-07 足した「分類」）：種類と同じ形の行（すべて＝受信箱・未分類＝開いたフォルダ）と「分類を追加」。 */}
+          {folderLoadFailed ? <p role="alert" className={styles.railNote}>分類を読み込めませんでした。ページを再読み込みしてください。</p> : (
             <div className={styles.folderBlock} aria-label="分類（フォルダ）">
-              <span className={styles.folderHead}>分類</span>
-              {folderLoadFailed ? <p role="alert" className={styles.railNote}>分類を読み込めませんでした。ページを再読み込みしてください。</p> : <>
-                {[{ id: 'all', name: 'すべて' }, { id: 'none', name: '未分類' }, ...folders].map((folder) => (
-                  <button key={folder.id} type="button" className={styles.folderItem} aria-pressed={folderFilter === folder.id} onClick={() => setFolderFilter(folder.id)}>
-                    {folder.id === 'all' ? null : <span className={styles.dotSlot} aria-hidden="true"><FolderDot folder={folder.id === 'none' ? null : { name: folder.name }} /></span>}
-                    <span>{folder.name}</span>
-                  </button>
-                ))}
-                {canEdit ? (folderFormOpen ? (
+              <FolderPanel
+                heading="分類"
+                rows={[
+                  { id: 'all', label: 'すべて', count: null, icon: <Inbox size={15} /> },
+                  { id: 'none', label: '未分類', count: null },
+                  ...folders.map((folder) => ({
+                    id: folder.id, label: folder.name, count: null,
+                    ...(canEdit ? {
+                      onEdit: () => { setFolderEditId(folder.id); setFolderName(folder.name); setFolderFormOpen(true) },
+                      onDelete: () => void perform(async () => {
+                        await hqTemplatesApi.folders.remove(folder.id, folder.revision)
+                        await reloadFolders(); setTemplates(await hqTemplatesApi.list(type)); setFolderFilter('all')
+                        setMessage('分類を外しました。ひな形は未分類に残ります。')
+                      }),
+                      deleteNote: '分類を外しても、中のひな形は未分類に残ります。',
+                    } : {}),
+                  })),
+                ]}
+                activeId={folderFilter}
+                onSelect={setFolderFilter}
+                onAddFolder={canEdit && !folderFormOpen ? () => { setFolderEditId(null); setFolderName(''); setFolderFormOpen(true) } : undefined}
+                addFolderLabel="分類を追加"
+              >
+                {canEdit && folderFormOpen ? (
                   <span className={styles.folderForm}>
                     <input aria-label="分類の名前" className={styles.input} value={folderName} maxLength={100} disabled={busy} onChange={(event) => setFolderName(event.target.value)} />
                     <Button size="compact" disabled={busy || !folderName.trim()} onClick={() => void perform(async () => {
-                      const target = folders.find((folder) => folder.id === folderFilter)
+                      const target = folders.find((folder) => folder.id === folderEditId)
                       if (target) await hqTemplatesApi.folders.update(target.id, folderName.trim(), target.revision)
                       else await hqTemplatesApi.folders.create(folderName.trim())
-                      await reloadFolders(); setFolderName(''); setFolderFormOpen(false)
-                    })}>{folders.some((folder) => folder.id === folderFilter) ? '名前を変える' : '分類を追加'}</Button>
+                      await reloadFolders(); setFolderName(''); setFolderEditId(null); setFolderFormOpen(false)
+                    })}>{folderEditId ? '名前を変える' : '追加する'}</Button>
+                    <Button size="compact" variant="text" disabled={busy} onClick={() => { setFolderName(''); setFolderEditId(null); setFolderFormOpen(false) }}>やめる</Button>
                   </span>
-                ) : (
-                  <span className={styles.folderTools}>
-                    <Button size="compact" variant="text" onClick={() => setFolderFormOpen(true)}>{folders.some((folder) => folder.id === folderFilter) ? '名前を変える' : '分類を追加'}</Button>
-                    {folders.some((folder) => folder.id === folderFilter) ? <Button size="compact" variant="text" disabled={busy} onClick={() => void perform(async () => {
-                      const target = folders.find((folder) => folder.id === folderFilter)!
-                      await hqTemplatesApi.folders.remove(target.id, target.revision)
-                      await reloadFolders(); setTemplates(await hqTemplatesApi.list(type)); setFolderFilter('all')
-                      setMessage('分類を外しました。ひな形は未分類に残ります。')
-                    })}>分類を外す</Button> : null}
-                  </span>
-                )) : null}
-              </>}
+                ) : null}
+              </FolderPanel>
             </div>
-          </FolderPanel>
+          )}
           </div>
         )}
         toolbar={(
@@ -485,13 +517,16 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
                           <FolderDot folder={folder ? { name: folder.name } : null} />
                           <span className={styles.name} title={row.name}>{row.name}</span>
                         </span>
-                        <span className={styles.sub}>{row.description || LABELS[row.template_type]}</span>
+                        <span className={styles.sub} title={templateSubLine(row, LABELS[row.template_type])}>{templateSubLine(row, LABELS[row.template_type])}</span>
                       </td>
-                      <td><span className={styles.cell} title={row.reference_summary}>{row.reference_summary || '—'}</span></td>
+                      <td><span className={row.reference_summary ? styles.cell : `${styles.cell} ${styles.cellEmpty}`} title={row.reference_summary}>{row.reference_summary || '—'}</span></td>
                       <td><span className={styles.cell}>{shortDate(row.updated_at)}</span></td>
                       <td className={styles.topCell}>
-                        {row.distributed_account_count === undefined ? <span className={styles.cell}>—</span>
-                          : row.distributed_account_count ? <span className={styles.strong}>{`${row.distributed_account_count} アカウント`}</span>
+                        {row.distributed_account_count === undefined ? <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span>
+                          : row.distributed_account_count ? <>
+                            <span className={styles.strong}>{`${row.distributed_account_count} アカウント`}</span>
+                            {distributedAccountsLine(row) ? <span className={styles.sub} title={distributedAccountsLine(row) ?? undefined}>{distributedAccountsLine(row)}</span> : null}
+                          </>
                           : <span className={styles.strong}>まだ配っていない</span>}
                       </td>
                       <td>
@@ -499,10 +534,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
                           {canEdit ? <>
                             <Button disabled={busy} onClick={() => open(row.id, 'accounts')} aria-label={`${row.name}をアカウントへ配る`}><Send size={15} aria-hidden="true" />アカウントへ配る</Button>
                             <span className={styles.menuBox}>
-                              <IconButton title={`${row.name}の操作`} aria-label={`${row.name}の操作`} aria-expanded={openMenuId === row.id} onClick={() => setOpenMenuId((current) => current === row.id ? null : row.id)}>
-                                <MoreHorizontal size={16} aria-hidden="true" />
-                              </IconButton>
-                              <ActionMenu open={openMenuId === row.id} onClose={() => setOpenMenuId(null)} ariaLabel={`${row.name}の操作`} items={rowMenu(row)} />
+                              <RowMenu label={`${row.name}の操作`} items={rowMenu(row)} open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
                             </span>
                           </> : null}
                         </span>
@@ -627,7 +659,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     const store = storeOf(accountId)
     if (!store) return '—'
     const main = store.items[0]
-    return main?.duplicate ? (main.expectedRevision != null ? `版 ${main.expectedRevision}` : '配布済み') : '未配布'
+    /* 絵（meBRB）：ひな形と同じ版が配布先にあれば「版 2（最新）」。 */
+    return main?.duplicate ? (main.expectedRevision != null ? `版 ${main.expectedRevision}${detail && main.expectedRevision === detail.template.revision ? '（最新）' : ''}` : '配布済み') : '未配布'
   }
   const rowsForTable = stage === 'accounts' ? shownAccounts : accounts.filter((account) => selected.includes(account.id) || shownAccounts.includes(account))
   const targetIds = stage === 'accounts' ? selected : preflight?.stores.map((store) => store.accountId) ?? selected
@@ -639,7 +672,6 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     return store.status === 'succeeded' ? '完了' : failures.includes(store) ? '失敗' : '作成中'
   }
   const shortName = (accountName: string) => accountName.replace(/^然\s*-NEN-\s*/, '')
-  const selectAll = (checked: boolean) => setSelected((current) => checked ? [...new Set([...current, ...shownAccounts.map((a) => a.id)])] : current.filter((id) => !shownAccounts.some((a) => a.id === id)))
 
   return (
     <PageFrame kind="wizard" boardId={stage === 'result' ? 'dEvJM' : 'meBRB'}>
@@ -666,7 +698,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
           <table className={styles.table} data-kind="distribute">
             <colgroup><col className={styles.colCheck} /><col /><col className={styles.colItem} /><col className={styles.colVersion} /><col className={styles.colMode} /></colgroup>
             <thead><tr>
-              <Th><Checkbox aria-label="表示中をすべて選択" disabled={busy || stage !== 'accounts' || !shownAccounts.length} checked={!!shownAccounts.length && shownAccounts.every((a) => selected.includes(a.id))} onCheckedChange={selectAll} /></Th>
+              {/* 絵（meBRB）の頭の1列目は空。まとめて選ぶ箱は置かない（行ごとに選ぶ）。 */}
+              <Th><span className={styles.srOnly}>選ぶ</span></Th>
               <Th>アカウント</Th><Th>項目</Th><Th>配布先の版</Th><Th>配布方法</Th>
             </tr></thead>
             <tbody>
@@ -689,11 +722,11 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
                       {on ? <span className={styles.cellLine}>
                         <span className={styles.cell}>{`${summary}（${textOverrides[account.id] !== undefined || store?.textOverride !== undefined ? '個別の本文' : '一括と同じ'}）`}</span>
                         {textMessage && stage === 'accounts' ? <Button size="compact" variant="text" disabled={busy} onClick={() => setOverrideOpen(overrideOpen === account.id ? null : account.id)}>本文を変える</Button> : null}
-                      </span> : <span className={styles.cell}>—</span>}
+                      </span> : <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span>}
                     </td>
-                    <td><span className={styles.cell}>{on ? storeVersion(account.id) : '—'}</span></td>
+                    <td><span className={on ? styles.cell : `${styles.cell} ${styles.cellEmpty}`}>{on ? storeVersion(account.id) : '—'}</span></td>
                     <td>
-                      {!on ? <span className={styles.cell}>—</span> : !store ? <span className={styles.cell}>確認のあとで選ぶ</span>
+                      {!on ? <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span> : !store ? <span className={styles.cell}>確認のあとで選ぶ</span>
                         : allowed.length === 0 ? <span className={styles.modePick}><Select aria-label={`${account.name}の配布方法`} size="full" disabled value="create" onChange={() => undefined} options={[{ value: 'create', label: MODE_LABELS.create }]} /></span>
                         : <span className={styles.modePick}><Select
                           aria-label={`${account.name}の配布方法`}
@@ -757,8 +790,51 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
           </>}
         </div>
       </div>
+      <Dialog
+        open={Boolean(result && done && resultDialogFor === `${result.runId}:${result.status}`)}
+        designWidth={640}
+        designTop={220}
+        title={`配った結果：${detail?.template.name ?? ''}`}
+        designHeaderPadding="24px 24px 0"
+        busy={busy}
+        cancelLabel="閉じる"
+        onCancel={() => setResultDialogFor(null)}
+        {...(failures.length ? {
+          confirmLabel: `失敗した ${failures.length} 件をやり直す`,
+          confirmIcon: <RotateCw size={15} />,
+          onConfirm: () => { setResultDialogFor(null); checkStores(failures.map((s) => s.accountId)) },
+        } : {})}
+      >
+        {result ? <p className={styles.resultSummary}>{`${result.stores.length} アカウントへ配りました。成功 ${successes.length}・失敗 ${failures.length}。${successes.length ? '成功した所はもう使えます。' : ''}`}</p> : null}
+        <div className={styles.resultList}>
+          {result?.stores.map((store) => {
+            const failed = failures.includes(store)
+            const name = store.accountName ?? accountName(accounts, store.accountId)
+            return (
+              <div key={store.accountId} className={styles.resultRow}>
+                <span className={styles.resultName} title={name}>{name}</span>
+                <span className={styles.resultText}>{failed ? (store.reason || '配布できませんでした。アカウントの現在版を再確認してください。') : resultSentence(store)}</span>
+                {store.status === 'succeeded' ? <StatusBadge tone="success" size="compact">成功</StatusBadge>
+                  : failed ? <StatusBadge tone="danger" size="compact">失敗</StatusBadge>
+                  : <StatusBadge tone="neutral" size="compact">作成中</StatusBadge>}
+              </div>
+            )
+          })}
+        </div>
+        {failures.length ? <p className={styles.resultBand}>{`失敗した ${failures.length} 件だけやり直せます。各行の理由を直してから、やり直してください。`}</p> : null}
+      </Dialog>
     </PageFrame>
   )
+}
+
+/** 配った結果の1行の文（dEvJM）。成功したアカウントで何をしたか。 */
+function resultSentence(store: DistributionResult['stores'][number]): string {
+  if (store.status !== 'succeeded') return '配っています'
+  if (store.counts.aliased > 0) return store.createdName ? `同じ名前があったため「${store.createdName}」で作りました` : '同じ名前があったため、別名で作りました'
+  if (store.counts.overwritten > 0) return '上書きしました'
+  if (store.counts.created > 0) return '新しく作りました'
+  if ((store.counts.reused ?? 0) > 0) return '今あるものを使いました'
+  return '配りました'
 }
 
 function accountName(accounts: HqAccount[], id: string): string {

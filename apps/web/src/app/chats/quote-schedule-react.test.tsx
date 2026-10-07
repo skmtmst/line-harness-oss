@@ -310,3 +310,102 @@ describe('N-025 引用返信と送信予約', () => {
     })
   })
 })
+
+/*
+ * ★V8（M0393 段2）：書く欄の上に「送る日時」の段を出さず、［予約］から窓で開く。
+ * 送信の設定は「送るキー」の切り替え、画像は「添付」で動画・ファイルは理由を出して止める。
+ */
+describe('★V8 書く欄：予約は窓・送るキーの切り替え・添付', () => {
+  let host: HTMLDivElement
+  let root: Root
+  let values: Map<string, string>
+
+  beforeEach(() => {
+    fixture.params = new URLSearchParams('friend=friend-a')
+    fixture.scheduled = []
+    fixture.sentBodies = []
+    values = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    })
+    vi.stubGlobal('fetch', (input: string | URL, init?: RequestInit) =>
+      Promise.resolve(responseFor(new URL(String(input), 'http://localhost'), init)))
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    document.documentElement.dataset.theme = 'v8'
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+
+  afterEach(async () => {
+    await act(async () => { root.unmount() })
+    host.remove()
+    delete document.documentElement.dataset.theme
+    vi.unstubAllGlobals()
+  })
+
+  it('［予約］で窓が開き、すぐ選ぶの日時で予約が作られ、窓が閉じる（書く欄の上の段は出ない）', async () => {
+    await act(async () => { root.render(<ChatsPage />) })
+    await eventually(() => { expect(host.textContent).toContain('値段はいくらですか？') })
+    await typeText(host, '明日の朝に送ります')
+    await act(async () => {
+      document.querySelector<HTMLElement>('[data-inbox-v6="schedule-toggle"]')!.click()
+    })
+    await eventually(() => {
+      expect(document.querySelector('[role="dialog"][aria-labelledby]')?.textContent).toContain('予約して送る')
+    })
+    expect(document.querySelector('[data-inbox-v6="schedule-panel"]')).toBeNull()
+    await act(async () => {
+      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === '明日 13:00')!.click()
+    })
+    const confirm = Array.from(document.querySelectorAll('button')).find((b) => /13:00 に予約$/.test(b.textContent ?? ''))!
+    expect(confirm).toBeTruthy()
+    await act(async () => { confirm.click() })
+    await eventually(() => {
+      expect(fixture.scheduled).toHaveLength(1)
+      expect(fixture.scheduled[0].content).toBe('明日の朝に送ります')
+      // 日本時間の 13:00 として送る（04:00 UTC）
+      expect(fixture.scheduled[0].scheduledAt).toMatch(/T04:00:00/)
+    })
+    await eventually(() => {
+      expect(Array.from(document.querySelectorAll('h2')).some((h) => h.textContent === '予約して送る')).toBe(false)
+    })
+    expect(fixture.sentBodies).toHaveLength(0)
+  })
+
+  it('送信の設定は「送るキー」の切り替え。選んだキーをこの端末に覚え、Enter で送れる', async () => {
+    await act(async () => { root.render(<ChatsPage />) })
+    await eventually(() => { expect(host.textContent).toContain('値段はいくらですか？') })
+    await act(async () => {
+      Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === '送信の設定')!.click()
+    })
+    const group = document.querySelector('[role="group"][aria-label="送るキー"]')!
+    expect(group).toBeTruthy()
+    await act(async () => {
+      Array.from(group.querySelectorAll('button')).find((b) => b.textContent === 'Enter')!.click()
+    })
+    await eventually(() => { expect(values.get('chat.sendMode')).toBe('enter') })
+    expect(host.textContent).toContain('Enter で送る／Shift+Enter で改行（この端末に覚える）')
+    await typeText(host, 'Enterで送る')
+    const textarea = document.querySelector('textarea[aria-label="メッセージを入力"]') as HTMLTextAreaElement
+    await act(async () => {
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    await eventually(() => { expect(fixture.sentBodies).toHaveLength(1) })
+  })
+
+  it('「添付」で動画を選ぶと、送れない理由を出して止める（何も上げない・送らない）', async () => {
+    await act(async () => { root.render(<ChatsPage />) })
+    await eventually(() => { expect(host.textContent).toContain('値段はいくらですか？') })
+    expect(Array.from(document.querySelectorAll('button')).some((b) => b.textContent?.trim() === '添付')).toBe(true)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    expect(input.accept).toContain('video/mp4')
+    const file = new File(['x'], 'clip.mp4', { type: 'video/mp4' })
+    Object.defineProperty(input, 'files', { value: [file], configurable: true })
+    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })) })
+    await eventually(() => { expect(host.textContent).toContain('動画はまだ受信箱から送れません') })
+    expect(fixture.sentBodies).toHaveLength(0)
+  })
+})

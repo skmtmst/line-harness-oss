@@ -1,0 +1,177 @@
+/* ★V8 統括 一括配信の詳細（E-9 xOXuY「⑤ 送った結果」）。寸法は globals.css の --tpl-e49-* だけを使う。板の頭は型（PageHeading）が持つ。 */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-gap-l);
+  padding: var(--tpl-e49-content-pad);
+}
+
+/* 結果のカード（角丸 12・上下 20 左右 24・行の間 12） */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-gap-l);
+  padding: var(--tpl-e49-result-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--tpl-e49-radius-l);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e49-gap-l);
+}
+
+.cardText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-e49-result-title);
+  font-weight: 600;
+  line-height: var(--tpl-e49-result-title-lh);
+}
+
+.cardSub {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e49-lh-20);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+:global([data-theme='v8']) .table .headRow.headRow > th {
+  height: auto;
+  padding: var(--tpl-e49-head-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-e49-lh-18);
+}
+
+:global([data-theme='v8']) .table .row.row > td {
+  height: var(--tpl-e49-row-h);
+  padding: var(--tpl-e49-row-pad);
+}
+
+:global([data-theme='v8']) .table .headRow.headRow > th:first-child,
+:global([data-theme='v8']) .table .row.row > td:first-child {
+  padding-left: var(--tpl-e49-edge);
+}
+
+:global([data-theme='v8']) .table .headRow.headRow > th:last-child,
+:global([data-theme='v8']) .table .row.row > td:last-child {
+  padding-right: var(--tpl-e49-edge);
+}
+
+.colStore {
+  width: auto;
+}
+
+.colNum {
+  width: var(--tpl-e49-col-result-num);
+}
+
+.colFail {
+  width: var(--tpl-e49-col-result-fail);
+}
+
+.colState {
+  width: var(--tpl-e49-col-result-state);
+}
+
+.colMenu {
+  width: var(--tpl-e49-col-menu);
+}
+
+.store {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 500;
+  line-height: var(--tpl-e49-lh-21);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.num {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e49-lh-20);
+  font-variant-numeric: tabular-nums;
+}
+
+.numStrong {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-e49-lh-20);
+  font-variant-numeric: tabular-nums;
+}
+
+.faint {
+  color: var(--color-ink-faint);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e49-lh-20);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 店ごとの失敗の理由。表の下に1行ずつ。 */
+.reasons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-gap-xs);
+}
+
+.reasonsTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-e49-lh-20);
+}
+
+.reasonList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-gap-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reason {
+  display: flex;
+  gap: var(--tpl-e49-gap-l);
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e49-lh-20);
+}
+
+.reasonStore {
+  flex: 0 0 var(--tpl-e49-col-name);
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reasonText {
+  min-width: 0;
+}

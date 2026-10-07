@@ -34,3 +34,7 @@ describe('feature catalog dependencies', () => {
     ])).toThrow(/循環依存.*a.*b.*c.*a/);
   });
 });
+
+it('来店スタンプは予約から独立したキーを持ち、既存の順番を変えず末尾に追加する',()=>{
+ expect(FEATURE_IDS.at(-1)).toBe('visit_stamps');expect(FEATURE_CATALOG.find(f=>f.featureId==='visit_stamps')?.dependencies).toEqual([]);
+});

@@ -369,7 +369,7 @@
     "arbitrary-value": 10
   },
   "components/chats/friend-info-sidebar.tsx": {
-    "unresolved-classname": 12,
+    "unresolved-classname": 13,
     "arbitrary-value": 3
   },
   "components/chats/inbox-dropdown.tsx": {
@@ -415,14 +415,6 @@
   "components/forms/form-preview.tsx": {
     "arbitrary-value": 2,
     "unresolved-classname": 1
-  },
-  "components/friend-attributes-v2/tag-list-v2.tsx": {
-    "arbitrary-value": 51,
-    "unresolved-classname": 6,
-    "direct-th": 3
-  },
-  "components/friend-attributes-v3/friend-attributes-v3-static.tsx": {
-    "unresolved-classname": 3
   },
   "components/friend-fields/edit-tag-page-v4.tsx": {
     "arbitrary-value": 1
@@ -539,6 +531,9 @@
   "components/shared/file-drop.tsx": {
     "unresolved-classname": 2
   },
+  "components/shared/form-controls.tsx": {
+    "unresolved-classname": 3
+  },
   "components/shared/help-tip.tsx": {
     "unresolved-classname": 1
   },
@@ -569,8 +564,11 @@
   "components/shared/refresh-cover.tsx": {
     "unresolved-classname": 1
   },
-  "components/shared/row-actions.tsx": {
+  "components/shared/reorder-handle.tsx": {
     "unresolved-classname": 2
+  },
+  "components/shared/row-actions.tsx": {
+    "unresolved-classname": 4
   },
   "components/shared/segmented.tsx": {
     "unresolved-classname": 2

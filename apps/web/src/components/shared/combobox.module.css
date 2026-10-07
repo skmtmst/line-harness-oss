@@ -139,7 +139,7 @@
 @keyframes combobox-in {
   from {
     opacity: 0;
-    scale: 0.97;
+    scale: var(--popover-enter-scale);
   }
 }
 
@@ -343,6 +343,18 @@
 
   .input {
     font-size: var(--text-lead);
+  }
+}
+}
+
+/*
+ * 触り心地 5 回目（司令塔の許可）：★V8 の「探して選ぶ欄」は、ほかの入れる欄・選ぶ欄と同じ高さ 36。
+ * 絵（友だちを選ぶ欄など）に合わせる。v7 は 40 のまま。指で触る画面の 44 も変えない。
+ */
+@layer components {
+@media not (pointer: coarse) {
+  [data-theme='v8'] .field {
+    height: var(--tpl-ux5-combobox-h);
   }
 }
 }

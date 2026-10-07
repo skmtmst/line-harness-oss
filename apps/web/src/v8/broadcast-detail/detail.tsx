@@ -13,7 +13,7 @@
  * ここは見せ方と、この画面だけの操作（テスト送信・削除・予約の取り消し）を持つ。
  * 宛先・記録のタブの中身は入口から差し込む（古い画面の部品を import しないため）。
  */
-import { useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useState, type ReactNode, type RefObject } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -24,7 +24,6 @@ import {
   Copy,
   Download,
   FileClock,
-  MoreHorizontal,
   Pencil,
   RefreshCw,
   Send,
@@ -39,7 +38,8 @@ import {
   type BroadcastApprovalState,
   type BroadcastInsight,
 } from '@/lib/api'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -161,8 +161,6 @@ export default function BroadcastDetail({
   const isDraft = broadcast.status === 'draft'
   const isSent = broadcast.status === 'sent'
   const isScheduled = broadcast.status === 'scheduled'
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuButtonRef = useRef<HTMLButtonElement>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -273,23 +271,10 @@ export default function BroadcastDetail({
         <div className={styles.actions}>
           {canEdit ? (
             <>
-              <button
-                ref={menuButtonRef}
-                type="button"
+              <RowMenu
                 className={styles.iconButton}
-                aria-label={`配信「${broadcast.title}」の操作`}
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-                onClick={() => setMenuOpen((open) => !open)}
-              >
-                <MoreHorizontal size={16} aria-hidden="true" />
-              </button>
-              <ActionMenu
-                open={menuOpen}
-                onClose={() => setMenuOpen(false)}
-                ariaLabel={`配信「${broadcast.title}」の操作`}
+                label={`配信「${broadcast.title}」の操作`}
                 items={menuItems}
-                anchorRef={menuButtonRef}
               />
             </>
           ) : null}

@@ -159,6 +159,9 @@ function serializeScenario(row: DbScenario) {
     // owner account was deleted.
     lineAccountId: (row as { line_account_id?: string | null }).line_account_id ?? null,
     isActive: Boolean(row.is_active),
+    stoppedReason: row.stopped_reason ?? null,
+    stoppedBy: row.stopped_by ?? null,
+    stoppedAt: row.stopped_at ?? null,
     deliveryMode: (row.delivery_mode ?? 'relative') as DeliveryMode,
     // 既定は「並行を許す」。104 で既存の行を 1 に寄せてある。
     allowConcurrent: (row.allow_concurrent ?? 1) !== 0,
@@ -661,6 +664,8 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, async (c) => {
       triggerType?: ScenarioTriggerType;
       triggerTagId?: string | null;
       isActive?: boolean;
+      /** isActive: false で止めるときの理由（任意・200字まで）。 */
+      reason?: string;
       deliveryMode?: DeliveryMode;
       allowConcurrent?: boolean;
       folderId?: string | null;
@@ -670,6 +675,17 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, async (c) => {
       onCompleteMode?: 'pause' | 'resume_previous' | 'move';
       onCompleteScenarioId?: string | null;
     }>();
+
+    if (body.reason !== undefined && (
+      body.isActive !== false
+      || typeof body.reason !== 'string'
+      || Array.from(body.reason).length > 200
+    )) {
+      return c.json({ success: false, error: '止める理由は停止時だけ指定でき、200字以内の文字列が必要です' }, 400);
+    }
+    if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
+      return c.json({ success: false, error: 'isActive は真偽値で指定してください' }, 400);
+    }
 
     /*
      * 配信方式は「通がまだ1つも無いとき」だけ変えられる。
@@ -739,7 +755,9 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, async (c) => {
       on_complete_mode: body.onCompleteMode,
       on_complete_scenario_id:
         body.onCompleteScenarioId === undefined ? undefined : (body.onCompleteScenarioId || null),
-    });
+    }, body.isActive === false ? {
+      stop: { reason: body.reason?.trim() || null, staffId: c.get('staff')!.id },
+    } : undefined);
 
     if (!updated) {
       return c.json({ success: false, error: 'Scenario not found' }, 404);

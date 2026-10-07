@@ -693,6 +693,7 @@ describe('POST /webhook — first-contact existing friends', () => {
       bind: vi.fn(),
       run: vi.fn().mockResolvedValue({}),
       all: vi.fn().mockResolvedValue({ results: [] }),
+      first: vi.fn().mockResolvedValue(null),
     };
     stmt.bind.mockReturnValue(stmt);
     const db = { prepare: vi.fn().mockReturnValue(stmt) } as unknown as D1Database;

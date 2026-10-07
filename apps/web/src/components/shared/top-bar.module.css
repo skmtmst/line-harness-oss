@@ -563,6 +563,8 @@
 [data-theme='v8'] .iconButton:not(:focus-visible) { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
 
 /* zUg8S / Yw24X: 統括の別の絵は既存の default variant に残す。 */
+/* 帯の右端は白い板の右端にそろえる（絵 JKjsE・ziYCN のログアウトの右端 1420）。 */
+[data-theme='v8'] .root[data-v8-chrome='shell'] { padding-right: var(--tpl-hq2-topbar-pad-end); }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .actions { gap: 10px; }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .crumbs { gap: 6px; }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .crumbHome { gap: 6px; font-size: 13px; font-weight: 400; line-height: 20px; color: var(--color-ink-faint); }
@@ -584,6 +586,8 @@
 [data-theme='v8'] .root[data-v8-chrome='shell'] .user { font-size: 13px; font-weight: 600; line-height: 17px; }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .role,
 [data-theme='v8'] .root[data-v8-chrome='shell'] .roleButton { font-size: 11px; font-weight: 400; line-height: 13px; }
+/* 押せる役割（統括へ戻る）は文字の高さのまま。ボタンの最低の高さで名前が上へ押し出されていた（絵 ziYCN の名前と役割の2行）。指で触る端末は今までどおり。 */
+@media (pointer: fine) { [data-theme='v8'] .root[data-v8-chrome='shell'] .identityText .roleButton { min-height: 0; } }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .logout { gap: 6px; padding: 0 14px; border: 0; border-radius: 10px; outline: 1px solid var(--color-hairline); outline-offset: -.5px; box-shadow: var(--shadow-board); font-size: 13px; font-weight: 600; line-height: 20px; }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .logout svg { width: 15px; height: 15px; }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .v8Left > .iconButton:not(:focus-visible) { outline-color: transparent; }

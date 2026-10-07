@@ -34,7 +34,22 @@
 :global([data-theme='v8']) .content { min-width: 0; }
 :global([data-theme='v8']) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
 :global([data-theme='v8']) .folders { width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: 2px; }
+/*
+ * 統括（/hq）の列（絵 JKjsE・LRc93 ほか）：中身の幅 200 に左24・右12の余白と線を足した外寸（content-box）。
+ * border-box のままだと中身が 164 に縮み、右の中身が 36px 左へずれていた（2026-10-08）。
+ * 統括以外の一覧も絵の外寸は 224（中身200＋左右12）で同じずれがあるが、画面ごとの補正が残っているので司令塔の判断で広げる。
+ */
+:global([data-theme='v8']) .folders[data-folder-inset] { box-sizing: content-box; padding-left: var(--tpl-folder-inset-pad-start); }
 :global([data-theme='v8']) .collapsedFolders { display: none; }
+/* 中身の高さで止まる列（統括の設定の中のメニュー・絵 JB8V1・K7HYu・b8xBtZ）。縦の仕切り線も中身まで。 */
+:global([data-theme='v8']) .folders:has(> [data-folder-fit]) { align-self: flex-start; }
+/* 型が組む畳んだ段（folderNav）。作るボタンは列の幅いっぱいにせず中身の幅。選ぶ欄は 1152 の板（Iffil・L7zA7C）の幅。 */
+:global([data-theme='v8']) .collapsedCreate { display: flex; flex-shrink: 0; }
+:global([data-theme='v8']) .collapsedCreate > * { width: auto; }
+:global([data-theme='v8']) .collapsedSelect { display: block; flex-shrink: 0; width: var(--tpl-narrow-folder-w); }
+:global([data-theme='v8']) .collapsedSelect > :global(*) { width: 100%; min-width: 0; }
+/* 道具を渡さない画面で、広い板に空の段を出さない。 */
+:global([data-theme='v8']) .toolbar[data-collapsed-only] { display: none; }
 :global([data-theme='v8']) .listBody { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 :global([data-theme='v8']) [data-page-template='dashboard'] .heading { padding-bottom: 16px; }
 :global([data-theme='v8']) .dashboardRow { display: flex; min-width: 0; border-bottom: 1px solid var(--color-hairline); }
@@ -42,6 +57,10 @@
 :global([data-theme='v8']) .dashboardCell + .dashboardCell { border-left: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .dashboardAside { width: 297px; flex-shrink: 0; border-left: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .dashboardAside[data-aside-size='wide'] { width: var(--tpl-dash-aside-wide); }
+/* 右の列を数の帯の1マス分にする口。帯（等分の格子・隙間0）と同じ格子に載せ、どの幅でも縦の線を一直線にする。 */
+:global([data-theme='v8']) .dashboardRow[data-aside-size='column'] { display: grid; grid-template-columns: repeat(var(--tpl-dash-cols), minmax(0, 1fr)); }
+:global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardCell { grid-column: 1 / -2; }
+:global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: -2 / -1; width: auto; }
 :global([data-theme='v8']) .createContent { padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side); display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; flex: 1; }
 :global([data-theme='v8']) .preview { width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
 :global([data-theme='v8']) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); border-bottom: 1px solid var(--color-hairline); flex-wrap: wrap; }
@@ -51,6 +70,15 @@
 /* 作る型の手順は題と説明の下の行。FU2aU の同行版は stepsPlacement="inline" で残す。 */
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { flex-basis: 100%; order: 3; margin-inline: 0; }
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 2; margin-left: auto; }
+/*
+ * 来た道の案内（crumbs）は題と説明の下の行で、操作のボタンと同じ行の左。
+ * 承認済み ★BG-B `qIp42`：`HLq5w`「プロジェクト一覧」`Y5UR7`（プロジェクト名）が y=100、
+ * 右の5ボタン（`e3LG3u`）が y=99 で**同じ行**。題 y=24・説明 y=57 はその上の行。
+ * 既定の頭は1行（題＋説明 ／ 操作）なので、crumbs を渡した画面だけ題を全幅にして折り返す。
+ */
+:global([data-theme='v8']) [data-page-template='list'] .heading[data-has-crumbs] > .headingText { flex-basis: 100%; }
+:global([data-theme='v8']) [data-page-template='list'] .heading > .crumbs { flex: 1; min-width: 0; order: 2; }
+:global([data-theme='v8']) [data-page-template='list'] .heading[data-has-crumbs] > .actions { order: 3; margin-left: auto; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] { flex-wrap: nowrap; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .steps { flex-basis: auto; order: 0; margin-inline: auto; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .actions { order: 0; margin-left: 0; }
@@ -77,9 +105,10 @@
 
 :global([data-theme='v8']) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 
-:global([data-theme='v8']) .dashboardRow[data-row='trend'] { height: 300px; }
-:global([data-theme='v8']) .dashboardRow[data-row='inbox'] { height: 350px; }
-:global([data-theme='v8']) .dashboardRow[data-row='link'] { height: 172px; }
+/* 段の高さは絵の高さを下限に、右の列の中身（理由の行など）が増えたら伸びる（下の段に重ねない）。 */
+:global([data-theme='v8']) .dashboardRow[data-row='trend'] { min-height: 300px; }
+:global([data-theme='v8']) .dashboardRow[data-row='inbox'] { min-height: 350px; }
+:global([data-theme='v8']) .dashboardRow[data-row='link'] { min-height: 172px; }
 
 :global([data-theme='v8']) [data-page-template='list'] .stats { border-top: 0; }
 
@@ -88,7 +117,8 @@
 :global([data-theme='v8']) [data-page-template='create'] .description { font-size: var(--tpl-create-desc-size); line-height: var(--tpl-create-desc-lh); }
 :global([data-theme='v8']) [data-page-template='create'] .actions { gap: 14px; }
 :global([data-theme='v8']) [data-page-template='detail'] .tabs { border-bottom: 1px solid var(--color-hairline); }
-:global([data-theme='v8']) .dashboardColumns { min-height: 200px; }
+/* 横並びの段も数の帯と同じ等分の格子（隙間0）。flex の配分だと線の太さ分ずれる。高さは中身（並ぶマスは同じ高さ）。 */
+:global([data-theme='v8']) .dashboardColumns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 :global([data-theme='v8']) .dashboardColumns .dashboardCell { padding-inline: 20px; }
 :global([data-theme='v8']) .dashboardRow[data-row] .dashboardCell { display: flex; flex-direction: column; gap: 12px; }
 :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
@@ -146,14 +176,15 @@
 @container v8-page (max-width: 1099px) {
   :global([data-theme='v8']) .folders { display: none; }
   :global([data-theme='v8']) .collapsedFolders { display: flex; align-items: center; gap: 8px; }
+  :global([data-theme='v8']) .toolbar[data-collapsed-only] { display: flex; }
   /* 900 の板でも右の列は残す（幅 280）。消すのは狭い幅だけ。 */
   :global([data-theme='v8']) .preview { width: var(--tpl-preview-narrow-width); }
   :global([data-theme='v8']) .previewContent { width: var(--tpl-preview-narrow-content-width); }
   /* 画面が詰めた右の列を頼んだとき（CreatePage の previewCompactWhenNarrow・絵 kmTab）。 */
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] { padding: var(--tpl-r2-rail-compact-pad); }
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] .previewContent { width: var(--tpl-r2-rail-compact-content-width); }
-  :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside { display: none; }
-  :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { display: none; }
+  :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside:not([data-aside-size='column']) { display: none; }
+  :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global([data-theme='v8']) .asideToggle { display: block; }
   :global([data-theme='v8']) .inboxList { width: 348px; }
   :global([data-theme='v8']) .settings { flex-direction: column; gap: 16px; }
@@ -162,6 +193,11 @@
 @media (max-width: 1023px) {
   :global([data-theme='v8']) .frame:not([data-standalone]) { margin: 0; width: 100%; min-height: 0; }
   :global([data-theme='v8']) .split, :global([data-theme='v8']) .dashboardRow { flex-direction: column; }
+  /* 1マス分の右の列は、段が縦に積まれる幅で下へ回す。 */
+  :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] { grid-template-columns: minmax(0, 1fr); }
+  :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardCell,
+  :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: 1 / -1; }
+  :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardAside { border-left: 0; border-top: 1px solid var(--color-hairline); }
   :global([data-theme='v8']) .detailSummary { width: 100%; border-right: 0; border-bottom: 1px solid var(--color-hairline); }
   :global([data-theme='v8']) .preview { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
 }

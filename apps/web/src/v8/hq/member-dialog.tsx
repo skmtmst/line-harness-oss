@@ -14,11 +14,12 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Send, ShieldCheck } from 'lucide-react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import Chip from '@/components/shared/chip'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
+import { Field as FormField } from '@/components/shared/form-controls'
 import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import head from './dialog-head.module.css'
 import styles from './member-dialog.module.css'
@@ -113,20 +114,35 @@ export default function MemberDialogV8({
   const uid = useId()
   const [value, setValue] = useState<MemberDialogValue>(initial(member, accounts))
   const [localError, setLocalError] = useState('')
+  /* 板 `ukPgd`：名前・メールの間違いは欄の下に赤で出し、直すまで送るボタンを押せなくする。 */
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string }>({})
 
   useEffect(() => {
     setValue(initial(member, accounts))
     setLocalError('')
+    setFieldErrors({})
   }, [session, member, accounts])
 
-  const set = <K extends keyof MemberDialogValue>(key: K, next: MemberDialogValue[K]) => setValue((v) => ({ ...v, [key]: next }))
+  const set = <K extends keyof MemberDialogValue>(key: K, next: MemberDialogValue[K]) => {
+    setValue((v) => ({ ...v, [key]: next }))
+    if (key === 'name' || key === 'email') {
+      const field = key as 'name' | 'email'
+      setFieldErrors((errors) => (errors[field] ? { ...errors, [field]: undefined } : errors))
+    }
+  }
   const toggleAccount = (id: string) =>
     set('scopedLineAccountIds', value.scopedLineAccountIds.includes(id) ? value.scopedLineAccountIds.filter((x) => x !== id) : [...value.scopedLineAccountIds, id])
 
   const submit = () => {
     if (!member) {
-      if (!value.name.trim()) return setLocalError('名前を入力してください')
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim())) return setLocalError('正しいメールアドレスを入力してください')
+      const errors = {
+        name: value.name.trim() ? undefined : '名前を入力してください',
+        email: !value.email.trim()
+          ? 'メールアドレスを入力してください'
+          : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim()) ? undefined : 'メールアドレスの形が正しくありません（@ のあとに .com などが要ります）',
+      }
+      setFieldErrors(errors)
+      if (errors.name || errors.email) return setLocalError('')
       if (!value.assignedLineAccountId) return setLocalError('最初に表示するアカウントを選んでください')
     }
     if (value.accountScope === 'accounts' && value.scopedLineAccountIds.length === 0) {
@@ -156,7 +172,7 @@ export default function MemberDialogV8({
           : `招待メールは送った日から 7 日（${inviteExpiryLabel()} まで）有効です。メールの確認と LINE の連携が済むとログインできます。`
       }
       /* 板 `ukPgd`：招待の入力の間違いは同じ窓の状態として印を付ける。 */
-      designNode={member ? 'BHEl9' : localError ? 'ukPgd' : 'yLKwV'}
+      designNode={member ? 'BHEl9' : fieldErrors.name || fieldErrors.email ? 'ukPgd' : 'yLKwV'}
       designWidth={MEMBER_WIDTH}
       designTop={MEMBER_TOP}
       busy={busy}
@@ -165,7 +181,7 @@ export default function MemberDialogV8({
       footer={
         <div className={`${head.footer} ${head.footerCenter}`}>
           <Button type="button" onClick={onCancel} disabled={busy}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={submit} disabled={busy} busy={busy} busyLabel="処理中…">
+          <Button type="button" variant="primary" onClick={submit} disabled={busy || Boolean(fieldErrors.name || fieldErrors.email)} busy={busy} busyLabel="処理中…">
             {member ? null : <Send aria-hidden="true" className={styles.icon} />}
             {member ? '変更を保存' : '招待メールを送る'}
           </Button>
@@ -181,12 +197,12 @@ export default function MemberDialogV8({
       >
         {!member ? (
           <div className={styles.pair}>
-            <InputField label="名前" htmlFor={`${uid}-name`}>
-              <TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例: 山田 太郎" />
-            </InputField>
-            <InputField label="メールアドレス" htmlFor={`${uid}-email`}>
-              <TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例: staff@example.com" />
-            </InputField>
+            <FormField label="名前" htmlFor={`${uid}-name`} error={fieldErrors.name}>
+              <TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例: 山田 太郎" />
+            </FormField>
+            <FormField label="メールアドレス" htmlFor={`${uid}-email`} error={fieldErrors.email}>
+              <TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例: staff@example.com" />
+            </FormField>
           </div>
         ) : null}
 
@@ -255,16 +271,6 @@ function Field({ label, note, htmlFor, children }: { label: string; note?: strin
         <label htmlFor={htmlFor} className={styles.label}>{label}</label>
         {note ? <span className={styles.note}>{note}</span> : null}
       </div>
-      {children}
-    </div>
-  )
-}
-
-/* 招待の名前・メール（絵は 13/中太のラベル）。 */
-function InputField({ label, htmlFor, children }: { label: string; htmlFor: string; children: ReactNode }) {
-  return (
-    <div className={styles.field}>
-      <label htmlFor={htmlFor} className={styles.inputLabel}>{label}</label>
       {children}
     </div>
   )
@@ -339,7 +345,8 @@ export function MemberChangeConfirmV8({ member, value, accountNames, busy, error
             <div key={row.label} className={styles.confirmRow}>
               <dt className={styles.confirmLabel}>{row.label}</dt>
               <dd className={styles.confirmValue}>{row.before} → {row.after}</dd>
-              {row.changed ? <Chip tone="warn">変わる</Chip> : null}
+              {/* 絵 `M4jS9`：点なしの薄い琥珀の札（状態の札の形）。 */}
+              {row.changed ? <StatusBadge tone="warning" dot={false}>変わる</StatusBadge> : null}
             </div>
           ))}
         </dl>

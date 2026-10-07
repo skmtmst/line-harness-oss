@@ -12,7 +12,7 @@
 .board {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--tpl-rest3-em-gap);
   min-width: 0;
   container-type: inline-size;
 }
@@ -34,27 +34,26 @@
 .kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
+  gap: var(--tpl-rest3-em-kpi-gap);
 }
 
 .kpi {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--tpl-rest3-em-kpi-inner-gap);
   min-width: 0;
-  padding: 12px 16px;
+  padding: var(--tpl-rest3-em-kpi-pad);
+  border-radius: var(--tpl-rest3-em-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
 }
 
-.kpi + .kpi {
-  border-left: 1px solid var(--color-hairline);
-}
 
 .kpiHead {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--tpl-rest3-em-kpi-inner-gap);
   min-width: 0;
 }
 
@@ -63,29 +62,36 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-tile-sm);
-  background: var(--color-surface-pearl);
+  width: var(--tpl-rest3-em-tile);
+  height: var(--tpl-rest3-em-tile);
+  border-radius: var(--tpl-rest3-em-tile-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
   color: var(--color-ink-secondary);
 }
 
 .kpiLabel {
   overflow: hidden;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-em-small);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-em-small-lh);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .kpiValue {
+  display: flex;
+  align-items: baseline;
+  height: var(--tpl-rest3-em-num-lh);
   margin: 0;
   color: var(--color-ink);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.3;
+  font-size: var(--tpl-rest3-em-num);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-em-num-lh);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .kpiValueDanger {
@@ -93,9 +99,9 @@
 }
 
 .kpiUnit {
-  margin-left: 2px;
+  margin-left: var(--tpl-rest3-em-unit-gap);
   color: var(--color-ink-secondary);
-  font-size: 12px;
+  font-size: var(--tpl-rest3-em-small);
   font-weight: 400;
 }
 
@@ -103,82 +109,77 @@
   margin: 0;
   overflow: hidden;
   color: var(--color-ink-faint);
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: var(--tpl-rest3-em-small);
+  line-height: var(--tpl-rest3-em-small-lh);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .card {
-  padding: 20px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  padding: var(--tpl-rest3-em-card-pad);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  border-radius: var(--tpl-rest3-em-radius);
   background: var(--color-canvas);
 }
 
 .cardTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.5;
+  font-size: var(--tpl-rest3-em-title);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-em-title-lh);
 }
 
 .cardNote {
-  margin: 4px 0 0;
+  margin: var(--tpl-rest3-em-row-gap) 0 0;
   color: var(--color-ink-secondary);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--tpl-rest3-em-small);
+  line-height: var(--tpl-rest3-em-small-lh);
 }
 
 /* 止める対象の行：左にチェック、右に実測の影響。 */
 .targetRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0;
-  border-top: 1px solid var(--color-hairline);
+  gap: var(--tpl-rest3-em-target-gap);
+  margin-top: var(--tpl-rest3-em-row-gap);
 }
 
-.targetRow:first-of-type {
-  margin-top: 12px;
-}
 
 .targetImpact {
-  flex-shrink: 0;
-  max-width: 45%;
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  text-align: right;
+  display: none;
 }
 
 .accountRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
+  gap: var(--tpl-rest3-em-row-gap);
+  margin-top: var(--tpl-rest3-em-row-gap);
 }
 
 .accountField {
-  min-width: 240px;
-  flex: 1 1 auto;
-  max-width: 420px;
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rest3-em-row-gap);
+  min-width: 0;
 }
 
 .fieldLabel {
   display: block;
-  margin-bottom: 4px;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-em-body);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 /* 理由・補足（本体）。窓の中と同じ Select＋複数行入力。 */
 .detailBlock {
-  margin-top: 12px;
+  margin-top: var(--tpl-rest3-em-row-gap);
 }
 
 .detailHead {
@@ -213,71 +214,30 @@
   resize: vertical;
 }
 
-/* 下に張り付く操作帯。選択の概要・初期値に戻す・止める。 */
-.stickyBar {
-  position: sticky;
-  bottom: 0;
-  z-index: 20;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
-}
 
-.stickySummary {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: 12px;
-  font-weight: 600;
-}
 
-.stickyActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 
-.stickyCancel {
-  padding: 8px 16px;
-  border: 0;
-  border-radius: var(--radius-control, 8px);
-  background: transparent;
-  color: var(--color-action);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
 
-.stickyCancel:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
-/* つながる先。 */
-.relatedLink {
-  color: var(--color-action);
-  font-weight: 600;
-}
 
 /* 止めているときの赤い帯。 */
 .stoppedBand {
-  margin-top: 16px;
-  padding: 16px;
-  border-radius: var(--radius-card, 12px);
+  margin-top: var(--tpl-rest3-em-row-gap);
+  padding: var(--tpl-rest3-em-band-pad);
+  border-radius: var(--tpl-rest3-em-band-radius);
+  background: var(--color-canvas-sunken);
+}
+
+.stoppedBandOn {
   background: var(--color-status-danger-soft);
 }
 
 .stoppedTitle {
   margin: 0;
-  color: var(--color-danger);
-  font-size: 13px;
-  font-weight: 700;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-em-body);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-em-body-lh);
 }
 
 .stoppedLine {
@@ -285,14 +245,16 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 12px;
-  margin-top: 8px;
+  gap: var(--tpl-rest3-em-line-gap) var(--tpl-rest3-em-row-gap);
+  min-height: var(--tpl-rest3-em-ctl-h);
+  margin-top: var(--tpl-rest3-em-line-gap);
 }
 
 .stoppedText {
   margin: 0;
   color: var(--color-ink);
-  font-size: 13px;
+  font-size: var(--tpl-rest3-em-body);
+  line-height: var(--tpl-rest3-em-body-lh);
 }
 
 .stoppedDot {
@@ -301,57 +263,60 @@
 }
 
 .stoppedNote {
-  margin: 8px 0 0;
+  margin: var(--tpl-rest3-em-line-gap) 0 0;
   color: var(--color-ink-secondary);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--tpl-rest3-em-small);
+  line-height: var(--tpl-rest3-em-note-lh);
 }
 
 /* 止めるとどうなるか・止めたあとにすること。 */
 .infoGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--tpl-rest3-em-kpi-gap);
 }
 
 .infoList {
-  margin: 12px 0 0;
-  padding-left: 20px;
+  margin: var(--tpl-rest3-em-list-top) 0 0;
+  padding-left: 0;
+  list-style: '・' inside;
   color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 1.9;
+  font-size: var(--tpl-rest3-em-body);
+  line-height: var(--tpl-rest3-em-list-lh);
 }
 
 /* 記録の表。 */
 .tableWrap {
   overflow-x: auto;
-  margin-top: 12px;
+  margin-top: var(--tpl-rest3-em-row-gap);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-radius: var(--tpl-rest3-em-radius);
   background: var(--color-canvas);
 }
 
 .table {
   width: 100%;
-  min-width: 760px;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--tpl-rest3-em-body);
+  line-height: var(--tpl-rest3-em-body-lh);
 }
 
 .table th {
-  padding: 10px 12px;
+  padding: var(--tpl-rest3-em-th-pad);
   border-bottom: 1px solid var(--color-hairline);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: var(--tpl-rest3-em-th);
   font-weight: 600;
+  line-height: var(--tpl-rest3-em-th-lh);
   text-align: left;
   white-space: nowrap;
 }
 
 .table td {
-  padding: 12px;
+  padding: var(--tpl-rest3-em-td-pad);
+  line-height: var(--tpl-rest3-em-td-lh);
   border-bottom: 1px solid var(--color-hairline);
   vertical-align: middle;
 }
@@ -360,6 +325,13 @@
   border-bottom: 0;
 }
 
+.table th:nth-child(1), .table td:nth-child(1) { width: var(--tpl-rest3-em-col-when); }
+.table th:nth-child(2), .table td:nth-child(2) { width: var(--tpl-rest3-em-col-who); }
+.table th:nth-child(3), .table td:nth-child(3) { width: var(--tpl-rest3-em-col-what); }
+.table th:nth-child(4), .table td:nth-child(4) { width: var(--tpl-rest3-em-col-why); }
+.table th:nth-child(5), .table td:nth-child(5) { width: var(--tpl-rest3-em-col-minutes); padding-right: var(--tpl-rest3-em-num-pad); text-align: right; }
+.table th:nth-child(6), .table td:nth-child(6) { padding-right: var(--tpl-rest3-em-last-pad); text-align: right; }
+
 .cellTruncate {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -367,13 +339,13 @@
 }
 
 .tableNote {
-  margin: 12px 0 0;
-  padding: 10px 16px;
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-canvas-sunken);
+  margin: var(--tpl-rest3-em-row-gap) 0 0;
+  padding: var(--tpl-rest3-em-note-pad);
+  border-radius: var(--tpl-rest3-em-band-radius);
+  background: var(--color-status-info-soft);
   color: var(--color-ink-secondary);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--tpl-rest3-em-small);
+  line-height: var(--tpl-rest3-em-small-lh);
 }
 
 /* 止められない理由・競合・結果の帯。 */
@@ -474,22 +446,18 @@
   font-weight: 600;
 }
 
-/* 板が狭いときは数の帯を2列に、説明の2枚を1列に。 */
-@container (max-width: 1099px) {
+/* 板が狭いとき（1152 など）は数の帯を2列に、説明の2枚を1列に。表は列の幅を中身に任せて横に送る。 */
+@container (max-width: 760px) {
   .kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .kpi:nth-child(3) {
-    border-left: 0;
-  }
-
-  .kpi:nth-child(n + 3) {
-    border-top: 1px solid var(--color-hairline);
-  }
-
   .infoGrid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .table {
+    min-width: var(--tpl-rest3-em-table-min);
   }
 }
 
@@ -497,9 +465,17 @@
   .kpis {
     grid-template-columns: minmax(0, 1fr);
   }
+}
 
-  .kpi + .kpi {
-    border-left: 0;
-    border-top: 1px solid var(--color-hairline);
-  }
+.targetItem {
+  display: inline-flex;
+}
+
+.accountSelect {
+  width: var(--tpl-rest3-em-select-w);
+  max-width: 100%;
+}
+
+.accountSelect :global(*) {
+  max-width: 100%;
 }

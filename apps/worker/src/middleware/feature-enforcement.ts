@@ -63,6 +63,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/support-marks', 'support_marks'),
   feature('/api/saved-searches', 'saved_searches'),
   feature('/api/scenarios', 'scenarios'),
+  feature('/api/scenario-drafts', 'scenarios'),
   // 購読1本への操作（止める・再開・失敗を再送・移す）。アカウントは
   // requestAccountIds が購読→友だちから引く。
   feature('/api/scenario-subscriptions', 'scenarios'),
@@ -145,6 +146,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/nen/pets', 'photo_review'),
   feature('/api/nen/health', 'photo_review'),
   feature('/api/restaurant-test', 'restaurant_test'),
+  feature('/api/visit-stamps', 'visit_stamps'),
 
   exempt('/api/settings', 'core', '機能を再度オンにするため停止対象外'),
   exempt('/api/auth', 'core', 'ログインとセッション管理'),
@@ -179,6 +181,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/hq/billing', 'core', '統括の契約・課金基盤。管理APIはtenant境界と役割、WebhookはStripe署名を検証'),
   exempt('/api/hq/support', 'core', '統括利用者から運営への問い合わせ。ルート内でtenant境界と役割を検証'),
   exempt('/api/hq/notices', 'core', '運営からのお知らせと契約者専用LINEの登録案内（★V6 37-7）。ルート内で staff.tenantId に絞る'),
+  exempt('/api/hq/broadcasts', 'core', '統括全体のowner/adminだけ。店舗の配信停止は通常配信でも検証'),
   exempt('/api/hq/templates', 'core', '統括ひな形。ルート内でtenantと統括編集権限を検証'),
   exempt('/api/recipes', 'core', '設定テンプレート'),
   exempt('/api/manual-links', 'core', 'ヘルプ導線設定'),
@@ -210,6 +213,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/webhook', 'public', 'LINE署名で検証する受信経路'),
   exempt('/webhooks', 'public', '外部署名で検証する受信経路'),
   exempt('/openapi.json', 'public', '公開API仕様'),
+  exempt('/robots.txt', 'public', '検索に出さない robots（全部拒否）'),
   exempt('/docs', 'public', '公開API仕様'),
   exempt('/auth', 'public', 'ログイン開始とcallback'),
   exempt('/health', 'system', '稼働確認'),
@@ -229,6 +233,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 
 /** 同じ prefix 内で公開経路と管理経路が分かれる例外。 */
 export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadata[] = [
+  {pattern:/^\/api\/instagram\/webhook$/,methods:['GET','POST'],accountResolver:'none',classification:{kind:'public',reason:'Metaの確認用トークン・HMAC署名で個別認証する受信口'}},
   {
     pattern: /^\/api\/auth\/(?:register|password)\//,
     methods: ['GET', 'POST'],
@@ -376,6 +381,11 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   /** 本体で行が見つからないときだけ試す予備の照合（新旧の表の同居用）。 */
   fallbackSql?: string;
 }> = [
+  {pattern:/^\/api\/visit-stamps\/entries\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_entries WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/paper-requests\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_paper_requests WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/paper-photos\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_paper_photos WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/visits\/restaurant\/([^/]+)/,sql:'SELECT s.line_account_id AS account_id FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE r.id=?'},
+  {pattern:/^\/api\/visit-stamps\/visits\/booking\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM bookings WHERE id=?'},
   { pattern: /^\/api\/templates\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM templates WHERE id = ?' },
   { pattern: /^\/api\/scenarios\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM scenarios WHERE id = ?' },
   { pattern: /^\/api\/broadcasts\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcasts WHERE id = ?' },

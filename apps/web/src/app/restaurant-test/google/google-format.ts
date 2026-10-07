@@ -1,6 +1,6 @@
-import { ApiError } from '@/lib/api'
 import type { GoogleHoursPeriod, GoogleWeekday } from '@/lib/restaurant-google-api'
 import { formatDay, formatTime } from '@/lib/format'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 /** Googleビジネス画面で共通に使う表示用の小さな道具（第1段・第2段で共有）。 */
 
@@ -42,8 +42,8 @@ export function reviewReceivedAt(review: { createTime?: string | null; updateTim
 }
 
 export function errorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.message) return error.message
-  return fallback
+  // 「API error: 500」のような内部の文は出さない。日本語の案内だけを出す。
+  return japaneseDetailOf(error) || fallback
 }
 
 /** "YYYY-MM-DD" → 曜日。 */
