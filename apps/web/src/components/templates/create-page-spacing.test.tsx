@@ -48,10 +48,12 @@ describe('作成の型の余白の口', () => {
     expect(globals).toMatch(/--tpl-create-flush-gap:\s*28px;/)
   })
 
-  it('統括の一括配信を作るは口で選び、画面の CSS で型の余白を上書きしない', () => {
+  it('統括の一括配信を作るは店の一斉配信を作る画面と同じ枠（店の CSS）を使い、画面の CSS で型の余白を上書きしない', () => {
     expect(read('src/v8/hq-broadcasts/create.module.css')).not.toContain('data-template-region')
     const tsx = read('src/v8/hq-broadcasts/create.tsx')
-    expect(tsx).toMatch(/<CreatePage[\s\S]*?contentSpacing="flush-top"[\s\S]*?previewSurface="plain"/)
+    /* B-37（10-08）：店の一斉配信と同じ5段。枠・段の帯・右の列・下の帯は店の作る画面の CSS をそのまま読む（写さない）。 */
+    expect(tsx).toContain("import formStyles from '@/components/broadcasts/broadcast-form-v8.module.css'")
+    expect(tsx).toMatch(/<StickyBar className=\{formStyles\.footer\}/)
   })
 })
 
