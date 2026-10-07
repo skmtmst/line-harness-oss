@@ -6631,7 +6631,7 @@ CREATE TABLE rt_opening_hours_settings (
   version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
   updated_by TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, late_cancel_after_minutes INTEGER CHECK(late_cancel_after_minutes BETWEEN 1 AND 1440), late_arrival_message TEXT CHECK(length(late_arrival_message)<=1000));
 
 CREATE TABLE rt_organization_agreements (
   id TEXT PRIMARY KEY,

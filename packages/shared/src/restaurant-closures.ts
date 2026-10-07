@@ -20,7 +20,7 @@ export interface RestaurantClosurePreview {
 export interface RestaurantClosureSaveResult extends RestaurantClosurePreview { closure: RestaurantClosure; }
 export interface RestaurantSeatAvailability {
   storeId: string; startsAt: string; endsAt: string; guestCount: number;
-  tables: Array<{ id: string; label: string; minCapacity: number; maxCapacity: number }>;
+  tables: Array<{ id: string; label: string; minCapacity: number; maxCapacity: number; seatType?: string }>;
 }
 
 export type RestaurantClosurePreviewInput = RestaurantClosureInput & { excludeId?: string };

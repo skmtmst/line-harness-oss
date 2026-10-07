@@ -547,7 +547,8 @@
     "602_restaurant_liff_booking.sql",
     "603_instagram_connections.sql",
     "604_auto_reply_unmatched_settings.sql",
-    "605_restaurant_screen_api_additions.sql"
+    "605_restaurant_screen_api_additions.sql",
+    "606_restaurant_liff_details.sql"
   ],
-  "migrationCount": 548
+  "migrationCount": 549
 }

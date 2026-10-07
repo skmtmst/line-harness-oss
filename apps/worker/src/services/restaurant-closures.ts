@@ -66,7 +66,7 @@ export async function closurePreview(db:D1Database,input:RestaurantClosureInput,
 /** 空き照会・手動の自動配席・待機登録で共通。予約で埋まっていても閉じていない卓は候補に残せる。 */
 export async function openSeatTables(db:D1Database,storeId:string,startsAt:string,endsAt:string,guestCount:number,ignoreReservations=false):Promise<RestaurantSeatAvailability['tables']> {
  const closed=await closuresForRange(db,storeId,startsAt,endsAt);
- const tables=(await db.prepare(`SELECT t.id,t.label,t.min_capacity AS minCapacity,t.max_capacity AS maxCapacity FROM rt_tables t
+ const tables=(await db.prepare(`SELECT t.id,t.label,t.seat_type AS seatType,t.min_capacity AS minCapacity,t.max_capacity AS maxCapacity FROM rt_tables t
  WHERE t.store_id=? AND t.is_active=1 AND t.min_capacity<=? AND t.max_capacity>=?
  AND (?=1 OR (NOT EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=t.store_id AND r.table_id=t.id AND r.status NOT IN ('cancelled','no_show')
  AND (r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(?) AND julianday(r.ends_at)>julianday(?))

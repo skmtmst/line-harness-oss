@@ -7,8 +7,8 @@ export function safeRestaurantHttpsUrl(value: unknown): string | null | undefine
     return url.protocol === 'https:' && !url.username && !url.password ? url.href : undefined;
   } catch { return undefined; }
 }
-export function restaurantReservationEmbed(base: string, token: string) {
-  const url = new URL(`/restaurant/reserve/${encodeURIComponent(token)}`, base).href;
+export function restaurantReservationEmbed(liffId: string, token: string) {
+  const url = `https://liff.line.me/${encodeURIComponent(liffId)}/restaurant/reserve/${encodeURIComponent(token)}`;
   const escaped = url.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   return { url, html: `<a href="${escaped}" target="_blank" rel="noopener noreferrer">LINEで予約する</a>`, available: true as const };
 }

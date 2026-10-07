@@ -554,7 +554,7 @@ export const restaurantBookingApi = {
   availability: (storeId:string,date:string,guestCount:number)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerAvailability}>(`/api/liff/restaurant/availability?${new URLSearchParams({storeId,date,guestCount:String(guestCount)})}`),
   hold: (body:import('@line-crm/shared').RestaurantCustomerHoldInput)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>('/api/liff/restaurant/holds',body),
   mine: (storeId:string)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking[]}>(`/api/liff/restaurant/reservations?${new URLSearchParams({storeId})}`),
-  confirm: (id:string,expectedVersion:number)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/confirm`,{expectedVersion}),
+  confirm: (id:string,expectedVersion:number,details:import('@line-crm/shared').RestaurantCustomerDetails={})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/confirm`,{...details,expectedVersion}),
   cancel: (id:string,expectedVersion:number)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/cancel`,{expectedVersion}),
   reschedule: (id:string,body:{expectedVersion:number;startsAt:string;guestCount:number})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/reschedule`,body),
 };

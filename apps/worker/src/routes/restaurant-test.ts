@@ -2153,28 +2153,30 @@ restaurantTest.get('/api/restaurant-test/opening-hours', requireRole('owner', 'a
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const storeId = c.req.query('storeId') || organization.scopedStoreId;
   if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
-  const row = await dbFor(c.env, storeId).prepare('SELECT hours_json, version, updated_by, updated_at FROM rt_opening_hours_settings WHERE store_id = ?')
-    .bind(storeId).first<{ hours_json: string; version: number; updated_by: string; updated_at: string }>();
-  return c.json({ success: true, data: { storeId, hours: row ? JSON.parse(row.hours_json) : null, version: row?.version ?? 0, updatedBy: row?.updated_by ?? null, updatedAt: row?.updated_at ?? null } });
+  const row = await dbFor(c.env, storeId).prepare('SELECT hours_json, version, updated_by, updated_at, late_cancel_after_minutes, late_arrival_message FROM rt_opening_hours_settings WHERE store_id = ?')
+    .bind(storeId).first<{ hours_json: string; version: number; updated_by: string; updated_at: string; late_cancel_after_minutes: number | null; late_arrival_message: string | null }>();
+  return c.json({ success: true, data: { storeId, hours: row ? JSON.parse(row.hours_json) : null, version: row?.version ?? 0, updatedBy: row?.updated_by ?? null, updatedAt: row?.updated_at ?? null, lateArrivalPolicy: row?.late_cancel_after_minutes != null && row.late_arrival_message ? {cancelAfterMinutes:row.late_cancel_after_minutes,message:row.late_arrival_message} : null } });
 });
 
 restaurantTest.put('/api/restaurant-test/opening-hours', requireRole('owner', 'admin'), async (c) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
-  const body: { storeId?: string; hours?: unknown; expectedVersion?: number } = (await c.req.json().catch(() => null)) || {};
+  const body: { storeId?: string; hours?: unknown; expectedVersion?: number; lateArrivalPolicy?: import('@line-crm/shared').RestaurantLateArrivalPolicy | null } = (await c.req.json().catch(() => null)) || {};
   const storeId = typeof body.storeId === 'string' ? body.storeId : body.storeId === undefined ? organization.scopedStoreId : null;
   if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
   const hours = validateRestaurantOpeningHours(body.hours);
   if (!hours || !Number.isSafeInteger(body.expectedVersion) || (body.expectedVersion ?? -1) < 0) {
     return c.json({ success: false, error: '曜日0〜6の営業時間とexpectedVersionを指定してください。重なる営業時間は保存できません' }, 400);
   }
+  const policy = body.lateArrivalPolicy;
+  if (policy != null && (typeof policy !== 'object' || !Number.isInteger(policy.cancelAfterMinutes) || policy.cancelAfterMinutes<1 || policy.cancelAfterMinutes>1440 || typeof policy.message!=='string' || !policy.message.trim() || Array.from(policy.message).length>1000)) return c.json({success:false,error:'遅刻の取消分数と案内文を確認してください'},400);
   const db = dbFor(c.env, storeId);
   const result = body.expectedVersion === 0
-    ? await db.prepare(`INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES (?, ?, ?) ON CONFLICT(store_id) DO NOTHING`)
-      .bind(storeId, JSON.stringify(hours), c.get('staff')?.id || '管理者').run()
-    : await db.prepare(`UPDATE rt_opening_hours_settings SET hours_json = ?, version = version + 1, updated_by = ?, updated_at = datetime('now')
-      WHERE store_id = ? AND version = ?`).bind(JSON.stringify(hours), c.get('staff')?.id || '管理者', storeId, body.expectedVersion).run();
+    ? await db.prepare(`INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by, late_cancel_after_minutes, late_arrival_message) VALUES (?, ?, ?, ?, ?) ON CONFLICT(store_id) DO NOTHING`)
+      .bind(storeId, JSON.stringify(hours), c.get('staff')?.id || '管理者',policy?.cancelAfterMinutes??null,policy?.message.trim()??null).run()
+    : await db.prepare(`UPDATE rt_opening_hours_settings SET hours_json = ?, version = version + 1, updated_by = ?, updated_at = datetime('now'), late_cancel_after_minutes=CASE WHEN ? THEN ? ELSE late_cancel_after_minutes END, late_arrival_message=CASE WHEN ? THEN ? ELSE late_arrival_message END
+      WHERE store_id = ? AND version = ?`).bind(JSON.stringify(hours), c.get('staff')?.id || '管理者',Number(policy!==undefined),policy?.cancelAfterMinutes??null,Number(policy!==undefined),policy?.message.trim()??null,storeId, body.expectedVersion).run();
   if (!result.meta.changes) return c.json({ success: false, error: 'ほかの担当者が先に保存しました。読み直してください' }, 409);
   return c.json({ success: true, data: { storeId, hours, version: body.expectedVersion! + 1 } });
 });
@@ -2567,12 +2569,12 @@ restaurantTest.put('/api/restaurant-test/media-links/:code', requireRole('owner'
 restaurantTest.post('/api/restaurant-test/reservation-link', requireRole('owner','admin'),async c=>{
   const b=await c.req.json<{storeId?:string}>().catch(()=>null),org=await organizationFor(c);
   if(!b?.storeId||!org||!await storeBelongsTo(c,org.id,b.storeId))return c.json({success:false,error:'店舗を確認してください'},400);
-  const base=safeRestaurantHttpsUrl(c.env.LIFF_URL);
-  if(!base)return c.json({success:false,error:'お客さま向けURLの設定が必要です'},503);
+  const account=await dbFor(c.env).prepare(`SELECT a.liff_id FROM rt_stores s JOIN line_accounts a ON a.id=s.line_account_id WHERE s.id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(b.storeId).first<{liff_id:string|null}>();
+  if(!account?.liff_id?.trim())return c.json({success:false,error:'店舗のLIFF IDの設定が必要です'},503);
   const db=dbFor(c.env,b.storeId);
   await db.prepare('INSERT OR IGNORE INTO rt_reservation_links(store_id,token) VALUES(?,?)').bind(b.storeId,crypto.randomUUID()).run();
   const link=await db.prepare('SELECT token FROM rt_reservation_links WHERE store_id=?').bind(b.storeId).first<{token:string}>();
-  return c.json({success:true,data:restaurantReservationEmbed(base,link!.token)});
+  return c.json({success:true,data:restaurantReservationEmbed(account.liff_id.trim(),link!.token)});
 });
 
 restaurantTest.get('/api/restaurant-test/closures', requireRole('owner','admin','staff'), async c => {

@@ -47,6 +47,7 @@ function isCoveredRoute(method: string, path: string): boolean {
     '/api/restaurant-test/closures', '/api/restaurant-test/closures/preview', '/api/restaurant-test/closures/:id',
     '/api/restaurant-test/availability', '/api/restaurant-test/google/hours/from-closure',
     '/api/restaurant-test/closures/:id/contact-status', '/api/restaurant-test/close-notification-settings',
+    '/api/restaurant-test/opening-hours', '/api/restaurant-test/reservation-link',
   ].includes(path)) return false;
   if (path.startsWith('/api/internal')) return false;
   if (path.startsWith('/admin/update')) return false;
@@ -132,6 +133,9 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/restaurant-test/opening-hours',
+  'PUT /api/restaurant-test/opening-hours',
+  'POST /api/restaurant-test/reservation-link',
   'GET /api/liff/visit-stamps/cards/{id}/paper-requests',
   'GET /api/liff/visit-stamps/paper-photos/{id}',
   'GET /api/restaurant-test/close-notification-settings',
