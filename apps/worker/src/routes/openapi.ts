@@ -6201,6 +6201,41 @@ const spec = {
       },
     },
     // ── Settings ─────────────────────────────────────────────────────────────
+    '/api/settings/company': {
+      get: {
+        tags: ['Settings'],
+        summary: '自社の会社名・ログイン表示名・ロゴを取得',
+        description: 'ログイン中スタッフの所属会社だけを返す。版（version）付き。所属を確認できない場合は403。',
+        responses: {
+          '200': { description: '会社設定 { companyName・loginDisplayName・logoMediaId・logoUrl・logoBackgroundColor・version }' },
+          '403': { description: '所属する会社を確認できない' },
+          '404': { description: '会社が見つからない' },
+        },
+      },
+      put: {
+        tags: ['Settings'],
+        summary: '自社の会社名・ログイン表示名・ロゴを版付きで保存',
+        description: '会社全体のowner/adminだけが保存できる。ロゴはこの会社に登録された公開済みの画像だけ。expectedVersionが最新でなければ409で読み直しを求める。',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['companyName', 'loginDisplayName', 'logoMediaId', 'logoBackgroundColor', 'expectedVersion'],
+          properties: {
+            companyName: { type: 'string', maxLength: 200 },
+            loginDisplayName: { type: 'string', maxLength: 200 },
+            logoMediaId: { type: 'string', nullable: true },
+            logoBackgroundColor: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' },
+            expectedVersion: { type: 'integer', minimum: 0 },
+          },
+        } } } },
+        responses: {
+          '200': { description: '保存後の会社設定' },
+          '400': { description: '入力不正' },
+          '403': { description: '会社全体の編集権限がない' },
+          '409': { description: '版の競合。読み直しが必要' },
+          '422': { description: 'この会社の公開済み画像ではない' },
+        },
+      },
+    },
     '/api/settings/features/visibility': {
       get: {
         tags: ['Settings'],
