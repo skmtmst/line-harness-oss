@@ -63,6 +63,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/support-marks', 'support_marks'),
   feature('/api/saved-searches', 'saved_searches'),
   feature('/api/scenarios', 'scenarios'),
+  feature('/api/scenario-drafts', 'scenarios'),
   // 購読1本への操作（止める・再開・失敗を再送・移す）。アカウントは
   // requestAccountIds が購読→友だちから引く。
   feature('/api/scenario-subscriptions', 'scenarios'),
@@ -231,6 +232,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 
 /** 同じ prefix 内で公開経路と管理経路が分かれる例外。 */
 export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadata[] = [
+  {pattern:/^\/api\/instagram\/webhook$/,methods:['GET','POST'],accountResolver:'none',classification:{kind:'public',reason:'Metaの確認用トークン・HMAC署名で個別認証する受信口'}},
   {
     pattern: /^\/api\/auth\/(?:register|password)\//,
     methods: ['GET', 'POST'],

@@ -17,7 +17,7 @@
  *   node scripts/visual-qa/mock-api.mjs            # 既定 8788番
  *   PORT=9000 node scripts/visual-qa/mock-api.mjs
  */
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { fileURLToPath } from 'node:url'
@@ -256,6 +256,8 @@ const HOST = '127.0.0.1'
 
 // 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
 let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
+/** シナリオの下書きの口（API-9）の見本の行。キーは「アカウント＋改行＋下書きのキー」。 */
+const scenarioDraftRows = new Map()
 
 // J-1・N 撮影用。動画の準備の段と開催回の定員を同じプロセス内で保存結果として返す。
 let mockVideoAsset = WEBINAR_VIDEO_ASSET ? { ...WEBINAR_VIDEO_ASSET } : null
@@ -3523,6 +3525,26 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   // 設計と画像で比べるための中身。空の表しか描けないと、
   // 「空の状態」だけを見て一致したと言えてしまう。
   // 受信箱（設計 `xGLVe`）。空で返すと一覧も吹き出しも出ない。
+  // 会話の中を探す（API-9 の会話の検索の口）。吹き出しを NFKC＋小文字で数える。素の値を返す（外側で包む）。
+  const chatSearch = pathname.match(/^\/api\/chats\/([^/]+)\/messages\/search$/)
+  if (chatSearch) {
+    const q = String(query.get('q') ?? '').trim().normalize('NFKC').toLowerCase()
+    const offset = Number(query.get('offset') ?? 0)
+    const limit = Number(query.get('limit') ?? 30)
+    const rows = FRIEND_MESSAGES[decodeURIComponent(chatSearch[1])] ?? []
+    const all = q ? rows.filter((m) => m.messageType === 'text' && String(m.content).normalize('NFKC').toLowerCase().includes(q)) : []
+    const hits = all.slice(offset, offset + limit).map((m) => {
+      const i = rows.indexOf(m)
+      const at = m.lineEventAt ?? m.createdAt
+      return {
+        id: m.id, at, excerpt: m.content,
+        before: i > 0 ? { id: rows[i - 1].id, excerpt: rows[i - 1].content } : null,
+        after: i < rows.length - 1 ? { id: rows[i + 1].id, excerpt: rows[i + 1].content } : null,
+        cursor: { at, id: m.id },
+      }
+    })
+    return { success: true, data: { total: all.length, hits, nextOffset: offset + hits.length < all.length ? offset + hits.length : null } }
+  }
   const chat = pathname.match(/^\/api\/chats\/([^/]+)$/)
   if (chat) {
     // 一覧と同じ行を返す。`{items,total}` のままだと、開いた会話の名前が
@@ -3537,6 +3559,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           friendRealName: friend?.realName ?? null,
           isAttention: friend?.metadata?.__attention === '1',
           messages: FRIEND_MESSAGES[row.friendId] ?? [],
+          hasMoreMessages: false,
+          total: (FRIEND_MESSAGES[row.friendId] ?? []).length,
         },
       }
     }
@@ -5944,6 +5968,49 @@ const server = createServer((req, res) => {
   */
   if (url.pathname === '/__mock-fingerprint') {
     res.writeHead(200).end(JSON.stringify({ fingerprint: FINGERPRINT }))
+    return
+  }
+
+  // シナリオの下書きの口（API-9）。撮る板は書きかけの無い状態なので、読むと 404。
+  // 保存・消すは本物と同じく版（UUID）で照合する（作る①・1通目・通の編集の自動保存）。
+  const scenarioDraftPath = /^\/api\/scenario-drafts\/([^/]+)$/.exec(url.pathname)
+  if (scenarioDraftPath) {
+    const key = `${url.searchParams.get('lineAccountId') ?? ''}\n${decodeURIComponent(scenarioDraftPath[1])}`
+    const row = scenarioDraftRows.get(key)
+    if (method === 'GET') {
+      if (!row) res.writeHead(404).end(JSON.stringify({ success: false, error: 'not_found' }))
+      else res.writeHead(200).end(JSON.stringify({ success: true, data: row }))
+      return
+    }
+    let raw = ''
+    req.on('data', (chunk) => { raw += chunk })
+    req.on('end', () => {
+      let body = {}
+      try { body = JSON.parse(raw || '{}') } catch { body = {} }
+      if ((row?.version ?? 0) !== body.expectedVersion) {
+        res.writeHead(409).end(JSON.stringify({ success: false, error: 'version_conflict' }))
+        return
+      }
+      if (method === 'DELETE') {
+        scenarioDraftRows.delete(key)
+        res.writeHead(200).end(JSON.stringify({ success: true }))
+        return
+      }
+      const now = new Date().toISOString()
+      const next = {
+        key: decodeURIComponent(scenarioDraftPath[1]),
+        lineAccountId: url.searchParams.get('lineAccountId'),
+        content: body.content ?? {},
+        scenarioId: body.scenarioId ?? null,
+        stepId: body.stepId ?? null,
+        version: randomUUID(),
+        updatedBy: 'visual-qa-staff',
+        updatedAt: now,
+        expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+      }
+      scenarioDraftRows.set(key, next)
+      res.writeHead(row ? 200 : 201).end(JSON.stringify({ success: true, data: next }))
+    })
     return
   }
 

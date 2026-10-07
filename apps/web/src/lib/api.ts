@@ -789,6 +789,7 @@ export type ChatDetail = Pick<ChatListItem,
   updatedAt?: string
   messages: ChatDetailMessage[]
   hasMoreMessages: boolean
+  total: number
 }
 
 /** 受信箱の保存検索は友だち検索と条件JSONの形が違うため、ここでは未知値として受ける。 */
@@ -11668,7 +11669,31 @@ export const api = {
     consultations: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/consultations'),
     installRichMenu: (accountId: string) => fetchApi<ApiResponse<{ richMenuId: string; liffId: string }>>('/api/nen-members/rich-menu/install', { method: 'POST', body: JSON.stringify({ accountId }) }),
   },
+  instagram: {
+    connection: (accountId:string)=>fetchApi<ApiResponse<import('@line-crm/shared').InstagramConnectionStatus>>(`/api/instagram/connection?${new URLSearchParams({lineAccountId:accountId})}`),
+    start: (accountId:string)=>fetchApi<ApiResponse<{url:string;expiresAt:string}>>(`/api/instagram/oauth/start?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:'{}'}),
+    callback: (state:string,code:string)=>fetchApi<ApiResponse<{state:string;lineAccountId:string;pages:import('@line-crm/shared').InstagramOAuthPage[]}>>(`/api/instagram/oauth/callback?${new URLSearchParams({state,code})}`),
+    connect: (accountId:string,body:{state:string;pageId:string;expectedVersion:number})=>fetchApi<ApiResponse<{connected:true;version:number}>>(`/api/instagram/oauth/connect?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:JSON.stringify(body)}),
+    refresh: (accountId:string)=>fetchApi<ApiResponse<{expiresAt:string;dataAccessExpiresAt:string|null;version:number}>>(`/api/instagram/refresh?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:'{}'}),
+    disconnect: (accountId:string,expectedVersion:number)=>fetchApi<ApiResponse<{disconnected:true}>>(`/api/instagram/connection?${new URLSearchParams({lineAccountId:accountId})}`,{method:'DELETE',body:JSON.stringify({expectedVersion})}),
+    profile: (accountId:string)=>fetchApi<ApiResponse<{state:string;value:import('@line-crm/shared').InstagramProfile|null;syncedAt?:string|null}>>(`/api/instagram/profile?${new URLSearchParams({lineAccountId:accountId})}`),
+    posts: (accountId:string)=>fetchApi<ApiResponse<{state:string;value:import('@line-crm/shared').InstagramPost[]|null;syncedAt?:string|null}>>(`/api/instagram/posts?${new URLSearchParams({lineAccountId:accountId})}`),
+    sync: (accountId:string)=>fetchApi<ApiResponse<{profile:import('@line-crm/shared').InstagramProfile;posts:import('@line-crm/shared').InstagramPost[]}>>(`/api/instagram/sync?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:'{}'}),
+    messages: (accountId:string,limit=50,beforeId?:string)=>fetchApi<ApiResponse<{messages:import('@line-crm/shared').InstagramReceivedMessage[];total:number|null}>>(`/api/instagram/messages?${new URLSearchParams({lineAccountId:accountId,limit:String(limit),...(beforeId?{beforeId}:{})})}`),
+    reply: (accountId:string,id:string,text:string)=>fetchApi<ApiResponse<{enabled:false}>>(`/api/instagram/messages/${encodeURIComponent(id)}/reply?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:JSON.stringify({text})}),
+  },
+  autoReplyUnmatched: {
+    get: (accountId:string)=>fetchApi<ApiResponse<import('@line-crm/shared').AutoReplyUnmatchedSettings>>(`/api/auto-replies/unmatched-settings?${new URLSearchParams({lineAccountId:accountId})}`),
+    save: (accountId:string,body:import('@line-crm/shared').AutoReplyUnmatchedInput)=>fetchApi<ApiResponse<import('@line-crm/shared').AutoReplyUnmatchedSettings>>(`/api/auto-replies/unmatched-settings?${new URLSearchParams({lineAccountId:accountId})}`,{method:'PUT',body:JSON.stringify(body)}),
+  },
+  scenarioDrafts: {
+    get: (accountId:string,key:string) => fetchApi<ApiResponse<import('@line-crm/shared').ScenarioDraft>>(`/api/scenario-drafts/${encodeURIComponent(key)}?${new URLSearchParams({lineAccountId:accountId})}`),
+    save: (accountId:string,key:string,body:import('@line-crm/shared').ScenarioDraftInput) => fetchApi<ApiResponse<import('@line-crm/shared').ScenarioDraft>>(`/api/scenario-drafts/${encodeURIComponent(key)}?${new URLSearchParams({lineAccountId:accountId})}`,{method:'PUT',body:JSON.stringify(body)}),
+    delete: (accountId:string,key:string,expectedVersion:string) => fetchApi<ApiResponse<unknown>>(`/api/scenario-drafts/${encodeURIComponent(key)}?${new URLSearchParams({lineAccountId:accountId})}`,{method:'DELETE',body:JSON.stringify({expectedVersion})}),
+  },
   chats: {
+    searchMessages: (friendId:string,q:string,offset=0,limit=30) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationSearchResult>>(`/api/chats/${encodeURIComponent(friendId)}/messages/search?${new URLSearchParams({q,offset:String(offset),limit:String(limit)})}`),
+    messagesAt: (friendId:string,params:{cursorAt?:string;cursorId?:string;direction?:'before'|'after'|'around';limit?:number}={}) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationMessagePage>>(`/api/chats/${encodeURIComponent(friendId)}/messages?${new URLSearchParams(Object.entries(params).map(([k,v])=>[k,String(v)]))}`),
     list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
       const query: Record<string, string> = {}
       if (params?.status) query.status = params.status

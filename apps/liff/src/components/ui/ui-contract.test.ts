@@ -45,6 +45,11 @@ const V7_FILES = [
   src('pages', 'Form.tsx'),
   src('pages', 'Affiliate.tsx'),
   src('pages', 'Webinar.tsx'),
+  src('pages', 'seat', 'SeatReserve.tsx'),
+  src('pages', 'seat', 'SeatPick.tsx'),
+  src('pages', 'seat', 'SeatConfirm.tsx'),
+  src('pages', 'seat', 'SeatDone.tsx'),
+  src('pages', 'seat', 'SeatMine.tsx'),
 ];
 
 describe('★V8 の色はトークンだけ', () => {

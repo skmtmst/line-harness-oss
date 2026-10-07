@@ -1651,10 +1651,10 @@ describe('提案E 媒体リンク',()=>{
     expect((await request('/api/restaurant-test/media?account_id=account-1',{code:'gourmet_review',name:'口コミサイト'})).status).toBe(201);
     expect((await requestWithMethod('/api/restaurant-test/media-links/gourmet_review?account_id=account-1','PUT',{storeId:'store-ginza',pageUrl:null,loginUrl:null,closeOnBooking:true,expectedVersion:0})).status).toBe(400);
   });
-  it('貼り付けURLは再発行でも同じで、お客さま向けページ未提供を明示する',async()=>{
+  it('貼り付けURLは再発行でも同じで、お客さま向け予約を利用可能として返す',async()=>{
     seedRestaurantFixture();const path='/api/restaurant-test/reservation-link?account_id=account-1';
     const a=(await (await request(path,{storeId:'store-ginza'})).json() as any).data;
     const b=(await (await request(path,{storeId:'store-ginza'})).json() as any).data;
-    expect(a).toEqual(b);expect(a.available).toBe(false);expect(a.url).toMatch(/^https:\/\//);expect(a.html).toContain('noopener');
+    expect(a).toEqual(b);expect(a.available).toBe(true);expect(a.url).toMatch(/^https:\/\//);expect(a.html).toContain('noopener');
   });
 });

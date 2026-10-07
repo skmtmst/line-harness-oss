@@ -1,3 +1,4 @@
+import { replyToUnmatchedLine } from './auto-reply-unmatched.js';
 import { runAutoReplyAction, type AutoReplyExecutionAction } from './auto-reply-operator-action.js';
 import type { Env } from '../index.js';
 import type { LineClient } from '@line-crm/line-sdk';
@@ -614,6 +615,11 @@ export async function matchAndReply(
     }
   }
   if (!rule) {
+    // キーワード一致後に有人対応・期間・連投抑制で止まった場合は、代わりの返事で制限を回避しない。
+    if (lineAccountId && (opts.messageKind === undefined || opts.messageKind === 'text') && candidateEvaluations.every(e => e.result === 'not_matched')) {
+      const fallback = await replyToUnmatchedLine(db,{lineAccountId,friendId:friend.id,evaluationId,replyToken,client:lineClient});
+      if (fallback) return fallback;
+    }
     for (const evaluation of candidateEvaluations) {
       const candidate = evaluation.rule;
       if (!candidate.unmatched_action || !(candidate.receive_sources ?? ['line']).includes('line') || !evaluation.reasonCodes.includes('keyword_not_matched')) continue;
