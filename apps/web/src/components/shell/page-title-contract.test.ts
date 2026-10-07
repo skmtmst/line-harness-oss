@@ -54,7 +54,6 @@ const NOT_YET_MIGRATED = [
   'friends/detail/page.tsx',
   'inflow-links/detail/page.tsx',
   'inflow-links/page.tsx',
-  'nen-campaigns/edit/campaign-editor.tsx',
   'nen-campaigns/edit/page.tsx',
   'nen-campaigns/page.tsx',
   'notifications/page.tsx',
@@ -95,7 +94,7 @@ describe('画面名は上部バーだけが持つ', () => {
       'broadcasts/detail/page.tsx',
       'webinars/edit/page.tsx',
       'health/page.tsx',
-      'nen-campaigns/edit/campaign-editor.tsx',
+      // NEN配信の編集の古い campaign-editor.tsx はどこからも描かれないので 2026-10-07 に消した（入口は campaign-editor-v8.tsx。上部バーの名前は持たず、本文のパンくずで戻す）。
       'templates/detail/page.tsx',
       'scenarios/detail/scenario-detail-client.tsx',
       'events/edit/page.tsx',
@@ -120,7 +119,7 @@ describe('画面名は上部バーだけが持つ', () => {
     const cleaned: Array<[string, string]> = [
       ['health/page.tsx', 'BAN検知ダッシュボード'],
       ['templates/detail/page.tsx', 'テンプレートの詳細'],
-      ['nen-campaigns/edit/campaign-editor.tsx', 'NEN配信を編集する'],
+      ['nen-campaigns/edit/campaign-editor-v8.tsx', 'NEN配信を編集する'],
       ['scenarios/detail/scenario-detail-client.tsx', 'シナリオ詳細'],
       ['webinars/edit/page.tsx', 'ウェビナー編集'],
     ]

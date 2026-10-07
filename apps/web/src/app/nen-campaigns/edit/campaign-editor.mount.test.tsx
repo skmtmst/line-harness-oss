@@ -58,7 +58,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 const { AccountProvider } = await import('@/contexts/account-context')
-const { default: CampaignEditor } = await import('./campaign-editor')
+// 編集の入口（page.tsx）は campaign-editor-v8 を出す（古い campaign-editor.tsx はどこからも描かれないので 2026-10-07 に消した）。
+const { default: CampaignEditor } = await import('./campaign-editor-v8')
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -255,7 +256,7 @@ describe('文言と実態の一致・書きかけの保護（実mount・#935）'
     await setBody('書きかけの本文')
 
     const link = Array.from(container.querySelectorAll('a[href]'))
-      .find((a) => a.getAttribute('href') === '/nen-campaigns?tab=auto')
+      .find((a) => a.getAttribute('href') === '/nen-campaigns')
     expect(link).toBeDefined()
     await click(link!)
 
@@ -266,7 +267,7 @@ describe('文言と実態の一致・書きかけの保護（実mount・#935）'
     const leave = Array.from(document.body.querySelectorAll('button'))
       .find((b) => b.textContent === '保存せずに移る')
     await click(leave!)
-    expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns?tab=auto')
+    expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns')
   })
 
   it('N-301: 書きかけでブラウザを閉じる操作を止め、保存後は止めない', async () => {

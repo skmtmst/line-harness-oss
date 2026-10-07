@@ -19,7 +19,8 @@ const DASHBOARD_EDITOR = read('components/dashboard/dashboard-editor.tsx')
 const DASHBOARD = read('app/page.tsx')
 const TEMPLATE_EDIT = read('app/templates/edit-v8.tsx')
 const REMINDER_EDIT = read('app/reminders/edit/edit-v8.tsx')
-const FRIEND_ADD_EDITOR = read('app/friend-add-settings/editor-v8.tsx')
+// 友だち追加の作る・直すの入口は src/v8/friend-add/editor.tsx（古い editor-v8.tsx はもう描かれない）。
+const FRIEND_ADD_EDITOR = read('v8/friend-add/editor.tsx')
 
 /*
  * V8 の最後の細かい板（last-boards-4）。作ってある画面には板IDを付け、
@@ -54,7 +55,8 @@ describe('最後の細かい板の印', () => {
     expect(TEMPLATE_EDIT).toContain('data-design-node={designNode}')
     expect(REMINDER_EDIT).toContain("narrowBoard ? 'r1l0bT' : 'p5YuP'")
     expect(REMINDER_EDIT).toContain('data-design-node={designNode}')
-    expect(FRIEND_ADD_EDITOR).toContain('h8uNW xHpkS')
+    expect(FRIEND_ADD_EDITOR).toContain("boardId={step === 'routes' && narrow ? 'xHpkS' :")
+    expect(FRIEND_ADD_EDITOR).toContain("{ key: 'routes', label: '流入リンク', node: 'h8uNW' }")
   })
 
   it('予約して送る小窓にMyJP7を付ける', () => {

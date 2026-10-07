@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const LIST_CSS = readFileSync(join(HERE, 'list-v8.module.css'), 'utf8')
+/* 一覧の入口は V8 のとき src/v8/rich-menus/list.tsx（2026-10-06〜。古い list-v8.module.css はもう描かれない）。 */
+const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'rich-menus', 'list.tsx'), 'utf8')
 const CREATE_CSS = readFileSync(join(HERE, 'new', 'create-v8.module.css'), 'utf8')
 
 /*
@@ -14,9 +15,9 @@ const CREATE_CSS = readFileSync(join(HERE, 'new', 'create-v8.module.css'), 'utf8
  */
 describe('リッチメニューの数字合わせ', () => {
   it('一覧の数の帯は1本の帯で狭い板でも2段にしない', () => {
-    expect(LIST_CSS).toMatch(/\.kpis \{[^}]*display: flex/)
-    expect(LIST_CSS).toMatch(/\.kpi \{[^}]*flex: 1 1 0/)
-    expect(LIST_CSS).not.toMatch(/\.kpis \{\s*grid-template-columns: repeat\(2/)
+    // 新しい一覧は共通の数の帯（KpiBand）を使う。1本の帯の形は部品が持つ。
+    expect(LIST).toContain('<KpiBand data-design="KPIs"')
+    expect(LIST).not.toMatch(/grid-template-columns: repeat\(2/)
   })
 
   it('作る画面の右の列は380', () => {

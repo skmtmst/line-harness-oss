@@ -29,6 +29,12 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
+/* 役割はサーバへ聞かず、手元の値（lh_staff_role）で決める。新しい一覧は答えが来るまで手元の値を使う。 */
+vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
+  const actual = await importOriginal()
+  return { ...actual, useStaffRole: () => null }
+})
+
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
@@ -43,7 +49,8 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
-import FormSubmissionsPage from './list-v8'
+/* 新しい一覧（src/v8/forms/list.tsx）を描く。2026-10-06 に `./list-v8` から向け直した。 */
+import FormSubmissionsPage from '@/v8/forms/list'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
