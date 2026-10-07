@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
-const LIST_PAGE = readFileSync(new URL('../list-v8.tsx', import.meta.url), 'utf8')
+/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 を見る。入口は src/v8/scenarios/list.tsx（古い list-v8.tsx はもう描かれない）。 */
+const LIST_PAGE = readFileSync(new URL('../../../v8/scenarios/list.tsx', import.meta.url), 'utf8')
 const DETAIL_PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const DETAIL = readFileSync(new URL('./scenario-detail-client.tsx', import.meta.url), 'utf8')
 

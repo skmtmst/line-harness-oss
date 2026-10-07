@@ -11,8 +11,8 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const DETAIL = readFileSync(join(HERE, 'scenario-detail-client.tsx'), 'utf8')
-/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
-const LIST = readFileSync(join(HERE, '..', 'list-v8.tsx'), 'utf8')
+/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 を見る。入口は src/v8/scenarios/list.tsx（古い list-v8.tsx はもう描かれない）。 */
+const LIST = readFileSync(join(HERE, '..', '..', '..', 'v8', 'scenarios', 'list.tsx'), 'utf8')
 
 describe('U007: 同時購読のラベルと説明を一致させる', () => {
   it('許可中・不許可で説明を切り替える。固定の説明ではない', () => {
@@ -40,7 +40,8 @@ describe('U007: 同時購読のラベルと説明を一致させる', () => {
 describe('U027: シナリオ一覧のフォルダ領域を折り畳む', () => {
   it('狭い板では左の列を道具の段の選ぶ欄へ畳む', () => {
     // 板 `wjfLe`：フォルダの列は道具の段の「フォルダ：すべて」へ畳まれる。
-    expect(LIST).toContain('folderSelectWrap')
+    // 新しい一覧は狭い板で道具の段に narrowFolder の枠を置き、その中に選ぶ欄を出す。
+    expect(LIST).toContain('styles.narrowFolder}>{folderSelect}')
     expect(LIST).toContain('フォルダ：すべて')
     expect(LIST).toContain('aria-label="フォルダ"')
   })
