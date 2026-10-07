@@ -17,7 +17,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
-import { RowActions } from '@/components/shared/row-actions'
+import RowMenu from './row-menu'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -89,7 +89,7 @@ export function ResultCard({ run, canManage, onRetry, onRetryAll }: {
                 <Td className={styles.colState}><StatusBadge tone={badge.tone} title={t.blockedReasons.join('・') || undefined}>{badge.label}</StatusBadge></Td>
                 <Td className={styles.colMenu}>
                   {canManage && canRetry(run, t) ? (
-                    <RowActions subjectName={t.accountName} menuItems={[{ id: 'retry', label: 'この店にやり直す', onSelect: () => onRetry(t) }]} />
+                    <RowMenu subjectName={t.accountName} items={[{ id: 'retry', label: 'この店にやり直す', onSelect: () => onRetry(t) }]} />
                   ) : null}
                 </Td>
               </Tr>
