@@ -99,6 +99,68 @@ const QA_LINK = {
   offerName: '秋の定期便キャンペーン',
 };
 
+// ---- 飲食店の席の予約の見本 ----
+const SEAT_QA_NOW = Date.parse('2026-10-07T00:00:00Z');
+const SEAT_STORE = { id: 'qa-store', name: '然 - NEN - 本店', timezone: 'Asia/Tokyo' };
+const seatBookings = new Map();
+/** 1日の席：17:00〜21:00 を 30 分ごと。19:00 は残り1席、19:30・21:00 は満席。10/12 は臨時休業で全部満席。 */
+function seatSlots(date) {
+  if (date < '2026-10-07') return null;
+  const closed = date === '2026-10-12';
+  return ['17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00'].map((hm) => {
+    const startsAt = new Date(`${date}T${hm}:00+09:00`).toISOString();
+    const full = closed || hm === '19:30' || hm === '21:00';
+    return {
+      startsAt,
+      endsAt: new Date(Date.parse(startsAt) + 120 * 60000).toISOString(),
+      available: !full,
+      remainingTables: full ? 0 : hm === '19:00' ? 1 : 4,
+    };
+  });
+}
+function seatMock(method, pathname, url, body) {
+  if (method === 'GET' && pathname.startsWith('/api/liff/restaurant/link/')) {
+    return pathname.endsWith('/qa-seat') ? [200, { success: true, data: SEAT_STORE }] : [404, { success: false, error: 'not_found' }];
+  }
+  if (method === 'GET' && pathname === '/api/liff/restaurant/availability') {
+    const date = url.searchParams.get('date') ?? '';
+    const slots = seatSlots(date);
+    if (!slots) return [400, { success: false, error: 'invalid_date_or_unconfigured_hours' }];
+    return [200, { success: true, data: { storeId: SEAT_STORE.id, date, guestCount: Number(url.searchParams.get('guestCount')), slots, cancelDeadlineMinutesBefore: 120, cutoffMinutesBefore: 60 } }];
+  }
+  if (method === 'POST' && pathname === '/api/liff/restaurant/holds') {
+    const b = {
+      id: `qa-seat-${seatBookings.size + 1}`,
+      storeId: SEAT_STORE.id,
+      startsAt: body.startsAt,
+      endsAt: new Date(Date.parse(body.startsAt) + 120 * 60000).toISOString(),
+      guestCount: body.guestCount,
+      status: 'pending',
+      version: 1,
+      holdExpiresAt: new Date(SEAT_QA_NOW + 10 * 60000).toISOString(),
+    };
+    seatBookings.set(b.id, b);
+    return [201, { success: true, data: b }];
+  }
+  if (method === 'GET' && pathname === '/api/liff/restaurant/reservations') {
+    return [200, { success: true, data: [...seatBookings.values()] }];
+  }
+  const m = pathname.match(/^\/api\/liff\/restaurant\/reservations\/([^/]+)\/(confirm|cancel|reschedule)$/);
+  if (method === 'POST' && m) {
+    const old = seatBookings.get(decodeURIComponent(m[1]));
+    if (!old) return [404, { success: false, error: 'not_found' }];
+    const next = { ...old, version: old.version + 1, holdExpiresAt: null, status: m[2] === 'cancel' ? 'cancelled' : 'confirmed' };
+    if (m[2] === 'reschedule') {
+      next.startsAt = body.startsAt;
+      next.endsAt = new Date(Date.parse(body.startsAt) + 120 * 60000).toISOString();
+      next.guestCount = body.guestCount;
+    }
+    seatBookings.set(next.id, next);
+    return [200, { success: true, data: next }];
+  }
+  return null;
+}
+
 function json(res, status, body) {
   const text = JSON.stringify(body);
   res.writeHead(status, {
@@ -626,6 +688,16 @@ const server = createServer(async (req, res) => {
         return;
       }
       json(res, 200, webinarLive());
+      return;
+    }
+  }
+
+  // ---- 飲食店の席の予約 (E-11・glL3g・km8EG・sAnyy) ----
+  // 撮影は時計を 2026-10-07 09:00 (JST) に合わせる。仮押さえはそこから 10 分。
+  if (pathname.startsWith('/api/liff/restaurant/')) {
+    const seat = seatMock(method, pathname, url, method === 'POST' ? await readBody(req) : null);
+    if (seat) {
+      json(res, seat[0], seat[1]);
       return;
     }
   }

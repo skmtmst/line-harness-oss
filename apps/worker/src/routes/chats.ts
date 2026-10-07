@@ -1288,6 +1288,7 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
         createdAt,
         // 古い履歴が残っているか。画面は「前のメッセージ」ボタンで遡る。
         hasMoreMessages,
+        total: (await c.env.DB.prepare("SELECT COUNT(*) total FROM messages_log WHERE friend_id=? AND (delivery_type IS NULL OR delivery_type!='test')").bind(resolvedFriendId).first<{total:number}>())!.total,
         messages: messageRows.map((m) => ({
           id: m.id,
           direction: m.direction,
