@@ -1197,23 +1197,67 @@
 
 /* ===== 設備 ===== */
 
-.equipHead {
+/* 絵 yRPxl：開ける時間の板の中に、設備と空きの確かめを入れ子の箱で置く（曜日の行の下から20・箱の間12）。 */
+.innerStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-12);
+}
+
+.innerSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-12);
+  padding: var(--tpl-bm-16);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+/* 説明の1行と「設備を追加する」を同じ行に（題はその上に1行）。 */
+.innerHeadRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--tpl-bm-8);
+  gap: var(--tpl-bm-12);
 }
 
-.equipRow {
+.innerTitleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+}
+
+/* 表の頭と行は間を空けずに積む（箱の間12を入れない）。 */
+.equipTable {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 表の頭：灰の帯36・字12。列は 名前（残り）・種類140・受付上限100・…36（間12）。 */
+.equipHead {
   display: flex;
   align-items: center;
   gap: var(--tpl-bm-12);
-  padding: var(--tpl-bm-12) var(--tpl-bm-8);
-  border-bottom: 1px solid var(--color-divider);
+  height: var(--tpl-bm-36);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
 }
 
-.equipRow:last-child {
-  border-bottom: 0;
+/* 行：63。中身の高さ32の中心が行の上から37（絵 yRPxl）なので上21・下9。線は行の下。字14。 */
+.equipRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+  padding: var(--tpl-bm-21) 0 var(--tpl-bm-9);
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-14);
+  line-height: var(--tpl-bm-19);
 }
 
 .equipName {
@@ -1222,21 +1266,32 @@
 }
 
 .equipType {
-  width: var(--tpl-bm-120);
+  width: var(--tpl-bm-140);
   flex-shrink: 0;
 }
 
 .equipCap {
-  width: var(--tpl-bm-88);
+  width: var(--tpl-bm-100);
   flex-shrink: 0;
+}
+
+.equipHead > .colMenu,
+.equipRow > .colMenu {
+  width: var(--tpl-bm-36);
 }
 
 /* ===== 空きを確かめる ===== */
 
+/* 欄の間は絵 yRPxl で8。日付・時刻の欄が絵より4高い（共通部品の40）ので、間を6にして下の段の位置を合わせる。 */
 .checkGrid {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-bm-12);
+  gap: var(--tpl-bm-6);
+}
+
+.checkGrid > .fieldLabel {
+  margin-bottom: 0;
+  line-height: var(--tpl-bm-20);
 }
 
 /* 見本：「確かめる」ボタンと結果を横に並べる。 */
