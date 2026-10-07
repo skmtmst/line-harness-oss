@@ -17,7 +17,7 @@
  *   node scripts/visual-qa/mock-api.mjs            # 既定 8788番
  *   PORT=9000 node scripts/visual-qa/mock-api.mjs
  */
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { fileURLToPath } from 'node:url'
@@ -256,6 +256,8 @@ const HOST = '127.0.0.1'
 
 // 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
 let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
+/** シナリオの下書きの口（API-9）の見本の行。キーは「アカウント＋改行＋下書きのキー」。 */
+const scenarioDraftRows = new Map()
 
 // J-1・N 撮影用。動画の準備の段と開催回の定員を同じプロセス内で保存結果として返す。
 let mockVideoAsset = WEBINAR_VIDEO_ASSET ? { ...WEBINAR_VIDEO_ASSET } : null
@@ -5803,6 +5805,49 @@ const server = createServer((req, res) => {
   */
   if (url.pathname === '/__mock-fingerprint') {
     res.writeHead(200).end(JSON.stringify({ fingerprint: FINGERPRINT }))
+    return
+  }
+
+  // シナリオの下書きの口（API-9）。撮る板は書きかけの無い状態なので、読むと 404。
+  // 保存・消すは本物と同じく版（UUID）で照合する（作る①・1通目・通の編集の自動保存）。
+  const scenarioDraftPath = /^\/api\/scenario-drafts\/([^/]+)$/.exec(url.pathname)
+  if (scenarioDraftPath) {
+    const key = `${url.searchParams.get('lineAccountId') ?? ''}\n${decodeURIComponent(scenarioDraftPath[1])}`
+    const row = scenarioDraftRows.get(key)
+    if (method === 'GET') {
+      if (!row) res.writeHead(404).end(JSON.stringify({ success: false, error: 'not_found' }))
+      else res.writeHead(200).end(JSON.stringify({ success: true, data: row }))
+      return
+    }
+    let raw = ''
+    req.on('data', (chunk) => { raw += chunk })
+    req.on('end', () => {
+      let body = {}
+      try { body = JSON.parse(raw || '{}') } catch { body = {} }
+      if ((row?.version ?? 0) !== body.expectedVersion) {
+        res.writeHead(409).end(JSON.stringify({ success: false, error: 'version_conflict' }))
+        return
+      }
+      if (method === 'DELETE') {
+        scenarioDraftRows.delete(key)
+        res.writeHead(200).end(JSON.stringify({ success: true }))
+        return
+      }
+      const now = new Date().toISOString()
+      const next = {
+        key: decodeURIComponent(scenarioDraftPath[1]),
+        lineAccountId: url.searchParams.get('lineAccountId'),
+        content: body.content ?? {},
+        scenarioId: body.scenarioId ?? null,
+        stepId: body.stepId ?? null,
+        version: randomUUID(),
+        updatedBy: 'visual-qa-staff',
+        updatedAt: now,
+        expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+      }
+      scenarioDraftRows.set(key, next)
+      res.writeHead(row ? 200 : 201).end(JSON.stringify({ success: true, data: next }))
+    })
     return
   }
 
