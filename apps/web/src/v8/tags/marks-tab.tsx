@@ -33,7 +33,7 @@ import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { notifyToast } from '@/components/shared/toast'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list'
@@ -386,14 +386,13 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
                       onDragStart={() => setDragId(mark.id)}
                       onDragEnd={() => setDragId(null)}
                     >
-                      <ReorderGrip
+                      <ReorderHandle
                         label={mark.name}
-                        disabled={fixed}
-                        disabledReason="共有マークは編集後に並び替えできます"
+                        disabledReason={fixed ? '共有マークは編集後に並び替えできます' : null}
                         onMove={(direction) => void keyboardMove(mark.id, direction)}
                       >
                         <GripVertical className={styles.gripIcon} aria-hidden="true" />
-                      </ReorderGrip>
+                      </ReorderHandle>
                     </span>
                   ) : <span className={styles.gripSpace} aria-hidden="true" />}
                 </Td>

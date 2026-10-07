@@ -77,7 +77,7 @@ import { TextField } from '@/components/shared/text-field'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Pagination from '@/components/shared/pagination'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
 import styles from './list.module.css'
@@ -611,13 +611,26 @@ export default function ScenariosListV8() {
 
   /* ===== 並び替え ===== */
 
+  /*
+   * 動かせるのは絞り込みが無く、全件が1ページに出ているときだけ（リマインダ・リッチメニューと同じ決まり）。
+   * 保存は渡した行に 0 から番号を振り直すため、一部の行だけで保存すると隠れた行と番号がぶつかる。
+   */
+  const reorderDisabledReason = !canEdit
+    ? '閲覧のみのため並び替えできません'
+    : serverQuery || activeParam !== undefined || createdThisMonthOnly || folderFilter
+      ? '絞り込みを外すと動かせます'
+      : scenarioList.pageCount > 1
+        ? '全件が1ページに収まる表示件数にすると動かせます'
+        : null
+  const canReorder = reorderDisabledReason === null
+
   /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
   const liveOrder = useLiveReorder(scenarios, (row) => row.id, dragId)
 
   const dropOn = (targetId: string) => {
     const from = dragId
     setDragId(null)
-    if (!from || from === targetId || !canEdit) return
+    if (!from || from === targetId || !canReorder) return
     const order = scenarios.map((s) => s.id)
     const fromIdx = order.indexOf(from)
     const toIdx = order.indexOf(targetId)
@@ -631,7 +644,7 @@ export default function ScenariosListV8() {
     const fromIdx = order.indexOf(id)
     const toIdx = fromIdx + direction
     const name = scenarios.find((s) => s.id === id)?.name ?? 'このシナリオ'
-    if (fromIdx < 0 || !canEdit) return
+    if (fromIdx < 0 || !canReorder) return
     if (toIdx < 0 || toIdx >= order.length) {
       setMoveNotice(`「${name}」は${direction < 0 ? '先頭' : '末尾'}にあるため、これ以上動かせません`)
       return
@@ -937,18 +950,19 @@ export default function ScenariosListV8() {
                     <Td
                       className={styles.gripCell}
                       onClick={(event) => event.stopPropagation()}
-                      draggable={canEdit}
+                      draggable={canReorder}
                       onDragStart={() => setDragId(s.id)}
                       onDragEnd={() => setDragId(null)}
-                      title={canEdit ? '上下に動かして並び替え' : undefined}
+                      title={canReorder ? '上下に動かして並び替え' : undefined}
                     >
-                      {/* 閲覧のみ：つまみは置かない（列の幅は残る） */}
-                      {canEdit && <ReorderGrip
+                      {/* 閲覧のみ：つまみは置かない（列の幅は残る）。絞り込み中などはつまみを出さず理由を言う。 */}
+                      {canEdit && <ReorderHandle
                         label={s.name}
+                        disabledReason={reorderDisabledReason}
                         onMove={(direction) => keyboardMove(s.id, direction)}
                       >
                         <span aria-hidden>⠿</span>
-                      </ReorderGrip>}
+                      </ReorderHandle>}
                     </Td>
                     <NameCell
                       name={

@@ -60,7 +60,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import {
@@ -1044,14 +1044,13 @@ export default function RichMenusListV8() {
                     <span className={styles.orderInner}>
                       {/* 閲覧のみ：つまみは隠し、幅だけ空けて順番の数字の位置を保つ */}
                       {!canEdit && <span className={styles.gripSpace} aria-hidden="true">⠿</span>}
-                      {canEdit && <ReorderGrip
+                      {canEdit && <ReorderHandle
                         label={g.name}
-                        disabled={reorderDisabledReason !== null}
-                        disabledReason={reorderDisabledReason ?? undefined}
+                        disabledReason={reorderDisabledReason}
                         onMove={(direction) => void keyboardMove(g.id, direction)}
                       >
                         <span aria-hidden>⠿</span>
-                      </ReorderGrip>}
+                      </ReorderHandle>}
                       <span className={styles.orderNumber}>{g.targetingPriority + 1}</span>
                     </span>
                   </Td>

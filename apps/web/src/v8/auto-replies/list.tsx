@@ -80,7 +80,7 @@ import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { movePriorityUpdates } from './order'
 import {
   LOAD_STATE_WORDS,
@@ -1212,14 +1212,13 @@ export default function AutoRepliesListV8() {
                     onDragStart={() => setDragId(r.id)}
                     onDragEnd={() => setDragId(null)}
                   >
-                    {canEdit && <ReorderGrip
+                    {canEdit && <ReorderHandle
                       label={name}
-                      disabled={sortKey !== 'priority'}
-                      disabledReason={sortKey !== 'priority' ? '並びを「評価順」にすると動かせます' : undefined}
+                      disabledReason={sortKey !== 'priority' ? '並びを「評価順」にすると動かせます' : null}
                       onMove={(direction) => keyboardMove(r.id, direction)}
                     >
                       <span aria-hidden>⠿</span>
-                    </ReorderGrip>}
+                    </ReorderHandle>}
                   </Td>
                   <NameCell
                     name={<div className={styles.nameRow}>

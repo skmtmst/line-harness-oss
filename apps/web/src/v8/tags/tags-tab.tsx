@@ -43,6 +43,7 @@ import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { notifyToast } from '@/components/shared/toast'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -54,7 +55,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
 import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
@@ -369,10 +370,17 @@ export default function TagsTab({
   /* 並び替え。絞り込み中は見えている行だけを入れ替え、隠れた行の位置を保つ。失敗は元に戻す。 */
   const applyTagOrder = async (order: string[]) => {
     const previous = items
-    const result = await api.tags.reorder(order)
-    if (!result.success) {
+    /* 返事が失敗でも、通信が例外で落ちても、元の順へ戻して「もう一度」を出す。 */
+    let message: string | null = null
+    try {
+      const result = await api.tags.reorder(order)
+      if (!result.success) message = `並び順を保存できませんでした（${result.error}）`
+    } catch (caught) {
+      const detail = japaneseDetailOf(caught)
+      message = `並び順を保存できませんでした。${detail ? `${detail}。` : ''}通信を確かめて、もう一度お試しください。`
+    }
+    if (message !== null) {
       setItems(previous)
-      const message = `並び順を保存できませんでした（${result.error}）`
       setActionError(message)
       notifyToast(message, {
         tone: 'error',
@@ -816,9 +824,9 @@ export default function TagsTab({
                       >
                         {/* 閲覧のみ：つまみは隠し、幅だけ空けて名前の位置を保つ */}
                         {canEdit ? (
-                          <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}>
+                          <ReorderHandle label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}>
                             <GripVertical className={styles.gripIcon} aria-hidden="true" />
-                          </ReorderGrip>
+                          </ReorderHandle>
                         ) : (
                           <span className={styles.gripSpace} aria-hidden="true"><GripVertical className={styles.gripIcon} /></span>
                         )}

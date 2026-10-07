@@ -39,7 +39,7 @@ import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { notifyToast } from '@/components/shared/toast'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from '@/components/friend-fields/field-list'
@@ -419,14 +419,13 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
                       onDragStart={() => setDragId(field.id)}
                       onDragEnd={() => setDragId(null)}
                     >
-                      <ReorderGrip
+                      <ReorderHandle
                         label={field.name}
-                        disabled={field.isInherited === true}
-                        disabledReason="共通項目は移行後に並び替えできます"
+                        disabledReason={field.isInherited === true ? '共通項目は移行後に並び替えできます' : null}
                         onMove={(direction) => void keyboardMove(field.id, direction)}
                       >
                         <GripVertical className={styles.gripIcon} aria-hidden="true" />
-                      </ReorderGrip>
+                      </ReorderHandle>
                     </span>
                   ) : <span className={styles.gripSpace} aria-hidden="true" />}
                 </Td>
