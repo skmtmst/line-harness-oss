@@ -28,7 +28,14 @@ const DEFAULT_TITLE = 'musubo LINE管理システム'
  * 下の短いスクリプトで `<html>` の data-theme を差し替える。
  */
 const ADMIN_THEME = process.env.NEXT_PUBLIC_ADMIN_THEME === 'v8' ? 'v8' : 'v7'
-const THEME_BOOT = `(function(){try{var t=localStorage.getItem('lh-admin-theme');if(t==='v7'||t==='v8'){document.documentElement.dataset.theme=t}}catch(e){}})()`
+/*
+ * 既定が v8 の環境（検証環境）は V8 だけにする（2026-10-07 オーナー「検証環境は V8 に切り替えて」）。
+ * 前に「画面の見た目（試作）」で v7 を選んだブラウザでも v8 で開く（localStorage の選択を読まない）。
+ */
+const ADMIN_THEME_LOCKED = ADMIN_THEME === 'v8'
+const THEME_BOOT = ADMIN_THEME_LOCKED
+  ? ''
+  : `(function(){try{var t=localStorage.getItem('lh-admin-theme');if(t==='v7'||t==='v8'){document.documentElement.dataset.theme=t}}catch(e){}})()`
 
 /*
  * ★V7 の書体。英字と数字は Inter、かなと漢字は Noto Sans JP に見える
@@ -78,7 +85,7 @@ export default function RootLayout({
       {/* 書体は globals.css の --font-sans が正本（#976 U080）。inline style はやめる。 */}
       <body className="bg-canvas-sunken text-ink antialiased font-sans">
         {/* localStorage のテーマ指定を描画前に反映する（白い板のちらつき防止） */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+        {THEME_BOOT ? <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} /> : null}
         <ClientErrorReporter />
         <AppShell>
           {children}

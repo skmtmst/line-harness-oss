@@ -35,6 +35,7 @@ import { formatNumber } from '@/lib/format'
 import { useStaffRole } from '@/lib/staff-role'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs'
+import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
@@ -351,7 +352,7 @@ export default function HqHomeV8() {
 
   const metaOf = (account: AccountWithStats) => {
     const parent = nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId)
-    return [`@${accountHandle(account)}`, parent ? `親：${parent}` : null, `権限者 ${formatNumber(account.stats?.staffCount ?? 0)} 人`].filter(Boolean).join(' ・ ')
+    return [accountHandle(account), parent ? `親：${parent}` : null, `権限者 ${formatNumber(account.stats?.staffCount ?? 0)} 人`].filter(Boolean).join(' ・ ')
   }
 
   const body = loadError ? (
@@ -465,12 +466,18 @@ export default function HqHomeV8() {
                   </div>
                 </dl>
                 {cardActions(account)}
-                {warned ? (
-                  <p className={styles.warnLine}>
-                    <span>LINE ID・接続状態を確かめてください</span>
-                    <button type="button" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections} className={styles.linkButton}>更新する</button>
-                  </p>
-                ) : null}
+                {warned ? (() => {
+                  /* 要確認の理由を、引っかかった確認ごとの言葉で1行に。長ければ省略し title で全文。 */
+                  const reason = connectionReasonLine(account)
+                  return (
+                    <p className={styles.warnLine}>
+                      <span className={styles.warnText} title={reason.title}>{reason.text}</span>
+                      {canManage ? (
+                        <button type="button" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections} className={styles.linkButton}>更新する</button>
+                      ) : null}
+                    </p>
+                  )
+                })() : null}
               </article>
             )
           })}
