@@ -63,6 +63,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -802,6 +803,12 @@ export default function TemplatesListV8() {
     : []
 
   /* ===== フォルダの列 ===== */
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。未分類は色の無い輪。 */
+  const folderDotOf = (t: { folderId: string | null }): FolderDotFolder | null => {
+    if (!t.folderId) return null
+    const folder = folders.find((f) => f.id === t.folderId)
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
   const folderRows: FolderPanelRow[] = [
     { id: 'all', label: 'すべて', count: ready ? tabItems.length : null },
     ...folders.map((folder, index) => ({
@@ -1122,11 +1129,15 @@ export default function TemplatesListV8() {
                     </Td>
                     <NameCell
                       name={
-                        <Link href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
-                          {t.name}
-                        </Link>
+                        <div className={styles.dotLine}>
+                          <FolderDotName folder={folderDotOf(t)} dot={!narrow}>
+                            <Link href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
+                              {t.name}
+                            </Link>
+                          </FolderDotName>
+                        </div>
                       }
-                      sub={<span className={styles.cellSub} title={excerpt}>{excerpt}</span>}
+                      sub={<span className={narrow ? styles.cellSub : `${styles.cellSub} ${styles.dotIndent}`} title={excerpt}>{excerpt}</span>}
                     />
                     <Td>
                       <span className={styles.kindBadge}>{messageTypeText(kindLabel)}</span>
