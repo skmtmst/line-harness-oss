@@ -6,6 +6,7 @@ import TopBar from '@/components/shared/top-bar'
 import BellNotifications from './bell-notifications'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { usePageChrome } from './page-chrome'
 import { HQ_MENU_SECTIONS, MENU_SECTIONS, isHqShellPath } from '@/lib/menu'
 import { brandInitial } from '@/components/layout/brand-initial'
@@ -153,8 +154,10 @@ export default function AppTopBar() {
   const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (ROLE_LABELS[staffRole] ?? '')
   /* 統括の札から店を選んだら、その店へ入る（カードの「このアカウントへ入る」と同じ）。 */
   const changeAccount = (accountId: string) => {
-    setSelectedAccountId(accountId)
-    if (hqShell && accountId) router.push('/')
+    requestUnsavedAction(() => {
+      setSelectedAccountId(accountId)
+      if (hqShell && accountId) router.push('/')
+    })
   }
 
   const options = useMemo(
@@ -172,8 +175,10 @@ export default function AppTopBar() {
   // 統括へ戻る口はオーナーと管理者に出す（管理者も統括を開ける。2026-10-07 オーナーの役割が管理者のため）
   const canReturnToHq = (staffRole === 'owner' || staffRole === 'admin') && !pathname.startsWith('/hq') && !hqShell
   const returnToHq = () => {
-    clearSelectedAccountId()
-    router.push('/hq')
+    requestUnsavedAction(() => {
+      clearSelectedAccountId()
+      router.push('/hq')
+    })
   }
 
   const logout = () => logoutAndGoToLogin()
