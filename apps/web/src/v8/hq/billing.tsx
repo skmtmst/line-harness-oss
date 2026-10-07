@@ -16,7 +16,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import {
@@ -60,7 +60,9 @@ function invoiceDate(iso: string): string {
 }
 
 function BillingInner() {
-  usePageTitle('課金プラン')
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/JB8V1`）。
+  usePageTitle('請求')
+  usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
   const settingsNav = useHqSettingsFolderNav('billing')
   const params = useSearchParams()
   const checkoutResult = params.get('checkout')

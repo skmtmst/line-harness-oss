@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useEffect, type ChangeEvent } from 'react'
+import { Building2, ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import AccountSwitchMenu, { type AccountSwitchMenuHq } from './account-switch-menu'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
 import styles from './top-bar.module.css'
 
@@ -57,6 +58,18 @@ export interface TopBarProps {
    * v7 では描かない。
    */
   crumbs?: { label: string; href?: string }[] | null
+  /**
+   * ★V8 統括の画面（/hq）のとき、切替の札に「統括」と統括名を出す（絵 `V8-B/JKjsE`）。
+   * 渡さなければ店の画面の札（「LINEアカウント」と選んでいるアカウント）。v7 では描かない。
+   */
+  hq?: { name: string; mark: string } | null
+  /** ★V8 パンくずの「ホーム」の行き先。統括の画面は統括のホーム（/hq）。 */
+  homeHref?: string
+  /**
+   * ★V8 店の画面から統括へ戻る口（絵 V8 `DIHFx/Psg7n`）。統括の権限がある人にだけ渡す。
+   * 渡すと切り替えの左に［統括へ］、切り替えを開いた一覧のいちばん上に「統括に戻る」を出す。v7 では描かない。
+   */
+  hqReturn?: AccountSwitchMenuHq | null
   className?: string
 }
 
@@ -83,8 +96,13 @@ export default function TopBar({
   chromeVariant = 'default',
   menuCollapsed = false,
   crumbs,
+  hq = null,
+  homeHref = '/',
+  hqReturn = null,
   className,
 }: TopBarProps) {
+  const [switchOpen, setSwitchOpen] = useState(false)
+  const switchRef = useRef<HTMLButtonElement>(null)
   const classes = [styles.root, className].filter(Boolean).join(' ')
   const handleAccountChange = (event: ChangeEvent<HTMLSelectElement>) => {
     onAccountChange(event.target.value)
@@ -135,7 +153,7 @@ export default function TopBar({
               「ホーム」で最初の画面へ（統括もふだんの画面も同じ殻）。
               v8-only の帯にだけ出すので v7 は変わらない。
             */}
-            <Link href="/" className={styles.crumbHome}>
+            <Link href={homeHref} className={styles.crumbHome}>
               <HomeGridIcon /><span>ホーム</span>
             </Link>
             <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
@@ -179,6 +197,13 @@ export default function TopBar({
             探すのは各一覧の中の欄が受ける。ここには行き先の曖昧な
             全体検索を置かない。
           */}
+          {/* ★V8 店の画面から統括へ（絵 DIHFx/Psg7n）。狭い帯では印だけ。 */}
+          {hqReturn ? (
+            <button type="button" className={`${styles.hqReturn} v8-only`} onClick={hqReturn.onReturn} title="統括のアカウント一覧へ戻る">
+              <Building2 aria-hidden="true" className={styles.hqReturnIcon} />
+              <span className={styles.hqReturnLabel}>統括へ</span>
+            </button>
+          ) : null}
           <label className={styles.accountField}>
           <span>LINEアカウント</span>
           {/*
@@ -188,7 +213,14 @@ export default function TopBar({
             ブラウザの実装のまま使えるほうが確かなため。
           */}
           <span className={styles.accountPill}>
-            <span className={styles.accountMark} aria-hidden="true">{current?.mark ?? current?.label.slice(0, 1) ?? ''}</span>
+            <span className={styles.accountMark} aria-hidden="true">
+              {hq ? (
+                <>
+                  <span className="v7-only">{current?.mark ?? current?.label.slice(0, 1) ?? ''}</span>
+                  <span className="v8-only">{hq.mark}</span>
+                </>
+              ) : (current?.mark ?? current?.label.slice(0, 1) ?? '')}
+            </span>
             {/*
               ★V8 殻合わせ（絵 `V8-B/JKjsE`）：札に役割（統括など）を小さい
               行で添える。v8-only なので v7 の1行札は変わらない。
@@ -199,15 +231,23 @@ export default function TopBar({
                   札の中の小さい字は「LINEアカウント」で固定（絵の指示）。
                   v8-only の行なので v7 の札は変わらない。
                 */}
-                <span className={`${styles.pillRole} v8-only`}>LINEアカウント</span>
-                <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+                <span className={`${styles.pillRole} v8-only`}>{hq ? '統括' : 'LINEアカウント'}</span>
+                {/* ★V8 統括の画面：札は統括にいることを示す（絵 `V8-B/JKjsE`）。v7 は今までどおり。 */}
+                {hq ? (
+                  <>
+                    <span className={`${styles.accountName} v7-only`}>{current?.label ?? '店舗を選択'}</span>
+                    <span className={`${styles.accountName} v8-only`} title={hq.name}>{hq.name}</span>
+                  </>
+                ) : (
+                  <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+                )}
               </span>
             ) : (
               <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
             )}
             {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
             <select
-              className={styles.accountSelect}
+              className={`${styles.accountSelect} v7-only`}
               value={selectedAccountId}
               onChange={handleAccountChange}
               aria-label="LINEアカウント"
@@ -222,8 +262,31 @@ export default function TopBar({
                 <option key={account.id} value={account.id}>{account.label}</option>
               ))}
             </select>
+            {/*
+              ★V8：開くと自前の一覧（統括に戻る・店の一覧）。v7 はブラウザの選ぶ欄のまま。
+              札の上に透明のボタンを敷き、押すと一覧を出す。
+              選ぶ欄より後ろに置く（外の見出しが指すのは選ぶ欄のまま）。
+            */}
+            <button
+              ref={switchRef}
+              type="button"
+              className={`${styles.accountSelect} v8-only`}
+              aria-label="アカウントを切り替える"
+              aria-haspopup="menu"
+              aria-expanded={switchOpen}
+              onClick={(event) => { event.preventDefault(); setSwitchOpen((current) => !current) }}
+            />
           </span>
           </label>
+          <AccountSwitchMenu
+            open={switchOpen}
+            onClose={() => setSwitchOpen(false)}
+            getAnchor={() => switchRef.current}
+            accounts={accounts}
+            selectedAccountId={selectedAccountId}
+            onSelect={onAccountChange}
+            hq={hqReturn}
+          />
           {/*
             ★V8: 通知。押すと通知の一覧（/notifications）を開く。
             未読は赤い丸で右上に出す（100以上は 99+）。

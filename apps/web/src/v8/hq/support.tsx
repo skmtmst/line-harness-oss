@@ -16,7 +16,7 @@ import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-er
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useTenantStatus } from '@/components/tenant-access-context'
 import { api } from '@/lib/api'
 import { readFileAsBase64 } from '@/lib/hq-banners'
@@ -42,8 +42,10 @@ import styles from './support.module.css'
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
 export default function HqSupportV8() {
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/b8xBtZ`）。
   usePageTitle('お問い合わせ')
   const settingsNav = useHqSettingsFolderNav('contact')
+  usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
   const tenantStatus = useTenantStatus()
   const tenantUnavailable = tenantStatus === 'suspended' || tenantStatus === 'archived'
   const uid = useId()

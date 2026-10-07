@@ -17,7 +17,7 @@ import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import TargetMissing from '@/components/shared/target-missing'
 import { TextArea } from '@/components/shared/text-field'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
 import { readFileAsBase64 } from '@/lib/hq-banners'
 import {
@@ -50,7 +50,6 @@ function sentNotice(hasEmail: boolean): string {
 }
 
 export default function HqSupportDetailV8() {
-  usePageTitle('お問い合わせ')
   const settingsNav = useHqSettingsFolderNav('contact')
   const uid = useId()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -153,6 +152,10 @@ export default function HqSupportDetailV8() {
   const ready = !idMissing && !detailLoading && id !== undefined && !detailMissing && !loadError && detail
   const accountName = detail?.lineAccountId ? accounts.find((a) => a.id === detail.lineAccountId)?.name ?? null : null
   const title = ready ? detail.subject : 'お問い合わせのやり取り'
+  // ★V8 パンくずは「ホーム › 統括の設定 › お問い合わせ › 番号」（絵 `V8-B/OhguS`）。番号が無い・読み込み中は「お問い合わせ」。
+  const ticketLabel = ready ? detail.ticketLabel ?? '' : ''
+  usePageTitle(ticketLabel || 'お問い合わせ')
+  usePageCrumbs(ticketLabel ? [{ label: '統括の設定', href: '/hq/settings' }, { label: 'お問い合わせ', href: '/hq/support' }] : [{ label: '統括の設定', href: '/hq/settings' }])
   const description = ready
     ? [detail.ticketLabel, detail.kindLabel, accountName, `${supportTime(detail.createdAt)} に送信`].filter(Boolean).join(' ・ ')
     : '問い合わせの内容と運営からの返事を確認します。'
