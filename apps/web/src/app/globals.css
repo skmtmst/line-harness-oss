@@ -606,7 +606,7 @@
   --tpl-af-close-box-gap: 28px; --tpl-af-close-box-pad: 14px 18px; --tpl-af-close-box-margin: -6px 0 6px; --tpl-af-close-value-size: 15px;
   --tpl-af-rep-head-h: 40px; --tpl-af-rep-row-h: 61px; --tpl-af-rep-pad: 12px 24px; --tpl-af-col-rep-conv: 130px; --tpl-af-col-rep-reward: 160px; --tpl-af-col-rep-ops: 28px;
   --tpl-af-cr-card-gap: 14px; --tpl-af-cr-card-pad: 20px; --tpl-af-cr-title-size: 15px; --tpl-af-cr-grid-gap: 12px; --tpl-af-cr-label-lh: 20px; --tpl-af-cr-switch-pad: 10px 12px;
-  --tpl-af-cr-rail-gap: 14px; --tpl-af-cr-side-pad: 16px; --tpl-af-cr-list-lh: 19px; --tpl-af-cr-kv-pad: 8px 0; --tpl-af-cr-conflict-pad: 14px 16px; --tpl-af-cr-choice-pad: 12px 10px; --tpl-af-cr-choice-gap: 4px; --tpl-af-cr-choice-title-lh: 19px; --tpl-af-cr-choice-note-lh: 16px;
+  --tpl-af-cr-rail-gap: 14px; --tpl-af-cr-side-pad: 16px; --tpl-af-cr-list-lh: 19px; --tpl-af-cr-kv-pad: 8px 0; --tpl-af-cr-conflict-pad: 12px 16px; --tpl-af-cr-choice-pad: 12px 10px; --tpl-af-cr-choice-gap: 4px; --tpl-af-cr-choice-title-lh: 19px; --tpl-af-cr-choice-note-lh: 16px;
   --tpl-af-stack-gap: 3px; --tpl-af-pill-pad: 2px 8px; --tpl-af-pill-gap: 5px; --tpl-af-pill-lh: 18px; --tpl-af-ops-gap: 6px;
   --tpl-af-notice-after: 0px; --tpl-af-num-pad-end: 8px; --tpl-af-tab-pad-bottom: 6px; --tpl-af-ro-before: 8px; --tpl-af-ro-after: 16px;
   --tpl-af-saved-w: 154px; --tpl-af-search-w: 240px; --tpl-af-foot-pad: 12px 24px; --tpl-af-viewer-create-h: 52px;
