@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Building2, ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import AccountSwitchMenu, { type AccountSwitchMenuHq } from './account-switch-menu'
 import type { MenuPortalRect } from './menu-portal'
@@ -91,6 +91,11 @@ export interface TopBarProps {
    * 渡すと切り替えの左に［統括へ］、切り替えを開いた一覧のいちばん上に「統括に戻る」を出す。v7 では描かない。
    */
   hqReturn?: AccountSwitchMenuHq | null
+  /**
+   * 右端の自分（顔・名前・役割）とログアウトを出すか。既定は出す。
+   * ★V8 の管理画面は左下の自分のメニューへ移したので `false` を渡す（オーナー 2026-10-07）。
+   */
+  showIdentity?: boolean
   className?: string
 }
 
@@ -121,6 +126,7 @@ export default function TopBar({
   hq = null,
   homeHref = '/',
   hqReturn = null,
+  showIdentity = true,
   className,
 }: TopBarProps) {
   const [switchOpen, setSwitchOpen] = useState(false)
@@ -231,13 +237,10 @@ export default function TopBar({
             探すのは各一覧の中の欄が受ける。ここには行き先の曖昧な
             全体検索を置かない。
           */}
-          {/* ★V8 店の画面から統括へ（絵 DIHFx/Psg7n）。狭い帯では印だけ。 */}
-          {hqReturn ? (
-            <button type="button" className={`${styles.hqReturn} v8-only`} onClick={hqReturn.onReturn} title="統括のアカウント一覧へ戻る">
-              <Building2 aria-hidden="true" className={styles.hqReturnIcon} />
-              <span className={styles.hqReturnLabel}>統括へ</span>
-            </button>
-          ) : null}
+          {/*
+            ★V8 の［統括へ］ボタンはやめた（オーナー 2026-10-07）。統括へ戻るのは、
+            切り替えの一覧の頭の「統括に戻る」と、左下の自分のメニュー。
+          */}
           <label className={styles.accountField}>
           <span>LINEアカウント</span>
           {/*
@@ -356,6 +359,7 @@ export default function TopBar({
           <span className={styles.separator} aria-hidden="true" />
         </> : null}
 
+        {showIdentity ? <>
         {/*
           ★V8 殻合わせ（絵 `V8-B/JKjsE`）：名前を太字・役割を下の小さい行に
           積む。v7 は中箱を素通し（display: contents）にするので並びは不変。
@@ -379,6 +383,7 @@ export default function TopBar({
         <button type="button" className={styles.logout} onClick={onLogout} aria-label="ログアウト">
           <LogOutIcon /><span aria-hidden="true">ログアウト</span>
         </button>
+        </> : null}
       </div>
     </header>
   )
