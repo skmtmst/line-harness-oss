@@ -2916,6 +2916,7 @@ export default function ScenarioDetailV8({
       {/* 名前・説明・置き場を変える鉛筆の小窓。 */}
       <Dialog
         open={renameOpen}
+        busy={saving}
         title="名前・説明・置き場を変える"
         description="ここで変えた内容は、下の「保存する」で確定します。"
         onCancel={() => {
@@ -2934,6 +2935,7 @@ export default function ScenarioDetailV8({
         footer={
           <>
             <Button
+              disabled={saving}
               onClick={() => {
                 if (scenario) {
                   setEditForm({
