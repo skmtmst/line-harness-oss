@@ -87,7 +87,7 @@ export default function Confirm({
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="mt-1.5 min-h-18 w-full rounded-(--liff-radius) bg-canvas px-3.5 py-3 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
+          className="mt-1.5 h-18 w-full resize-none rounded-(--liff-radius) bg-canvas p-3 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
           rows={3}
           placeholder="例：前髪は短めにしたい"
         />
