@@ -11,11 +11,13 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
+  allowedMax,
   applyJsBaselineAllowance,
   expandFriends,
   judge,
   median,
   parseArgs,
+  PRESS_FRAME_SLACK_MS,
   SPEED_ROUTES,
   targetMisses,
 } from '../../scripts/v8-guard/speed-budget.mjs'
@@ -117,6 +119,42 @@ describe('悪化だけ落とす判定（20%・JS 1KB）', () => {
 
   it('反応が測れない画面（null）は飛ばす', () => {
     expect(judge([row({ pressMs: null })], { friends: base() })).toEqual([])
+  })
+})
+
+describe('反応は1フレームのぶれで落とさない（20% と 17ms の大きい方）', () => {
+  /* CI の実測：関係ない PR で friends の反応が 66/67 と 82/83 を行き来した。
+     差は描画1回（約16.7ms）。基準 67 の20%（80.4）では1フレームで落ちていた。 */
+  const friends = base({ pressMs: 67 })
+
+  it('1フレーム遅れ（83）は通る', () => {
+    expect(judge([row({ pressMs: 83 })], { friends })).toEqual([])
+    expect(judge([row({ pressMs: 84 })], { friends })).toEqual([])
+  })
+
+  it('1フレームを超える遅れ（85）は落ちる', () => {
+    expect(judge([row({ pressMs: 85 })], { friends }).length).toBe(1)
+  })
+
+  it('本当の悪化（+40ms）は落ちる', () => {
+    const [line] = judge([row({ pressMs: 67 + 40 })], { friends })
+    expect(line).toContain('friends pressMs=107')
+    expect(line).toContain('1フレーム')
+  })
+
+  it('基準が大きい画面では20%の方が広い（187 → 224.4 まで）', () => {
+    const broadcasts = base({ pressMs: 187 })
+    expect(allowedMax('pressMs', 187)).toBeCloseTo(224.4)
+    expect(judge([row({ pressMs: 224 })], { friends: broadcasts })).toEqual([])
+    expect(judge([row({ pressMs: 225 })], { friends: broadcasts }).length).toBe(1)
+  })
+
+  it('ほかの時間は20%のまま（1フレームの許しを広げない）', () => {
+    expect(PRESS_FRAME_SLACK_MS).toBe(17)
+    for (const key of ['showMs', 'lcpMs', 'longTaskMs']) {
+      expect(allowedMax(key, 67)).toBeCloseTo(67 * 1.2)
+      expect(judge([row({ [key]: 83 })], { friends: base({ [key]: 67 }) }).length, key).toBe(1)
+    }
   })
 })
 

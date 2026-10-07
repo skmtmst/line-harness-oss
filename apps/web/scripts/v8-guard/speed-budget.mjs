@@ -20,6 +20,8 @@
  * 判定は「悪くなったら落とす」だけ（2026-10-04 司令塔決定）。
  *   時間（表示・LCP・反応・長い作業）… 1画面3回測って真ん中の値で比べ、
  *     基準より 20% を超えて悪くなったら落ちる
+ *     反応 pressMs だけは「20% と 1フレーム 17ms の大きい方」を超えたら落ちる
+ *     （描画1回ぶんのぶれで落ちないため）
  *   JS jsBytes … 基準より 1KB を超えて増えたら落ちる。
  *     ただし同じ PR で speed-budget.json の基準を更新していれば通す
  *     （機能を足すと JS は増えるため。理由は PR に書くこと）
@@ -57,6 +59,17 @@ export const SPEED_ROUTES = {
 /* 悪くなったら落とす幅（2026-10-04 司令塔決定①）。時間は20%、JS は1KB。 */
 export const REGRESSION_FACTOR = 1.2
 export const JS_SLACK_BYTES = 1024
+/* 反応 pressMs は描画1回（約16.7ms）単位でしか動かない。基準 67ms の20%は
+   13ms で1フレームより狭く、関係ない PR が 67↔83 で交互に落ちた（2026-10-04）。
+   反応だけは「20% と 1フレーム（17ms）の大きい方」まで許す。ほかの時間は20%のまま。 */
+export const PRESS_FRAME_SLACK_MS = 17
+
+/* その項目で「ここまでは通す」上限。超えたら落ちる。 */
+export function allowedMax(key, baseline) {
+  const byFactor = baseline * REGRESSION_FACTOR
+  if (key === 'pressMs') return Math.max(byFactor, baseline + PRESS_FRAME_SLACK_MS)
+  return byFactor
+}
 
 /* 3回測って真ん中。1回のぶれ（CIで表示が15〜24%揺れた）に引っ張られないため。 */
 export function median(values) {
@@ -285,8 +298,9 @@ function judge(measured, baselines) {
       const value = m[key]
       const b = base[key]
       if (typeof value !== 'number' || typeof b !== 'number') continue
-      if (value > b * REGRESSION_FACTOR) {
-        failures.push(`${m.name} ${key}=${value} が基準 ${b} より20%を超えて悪い`)
+      if (value > allowedMax(key, b)) {
+        const margin = key === 'pressMs' ? `20%と1フレーム（${PRESS_FRAME_SLACK_MS}ms）の大きい方` : '20%'
+        failures.push(`${m.name} ${key}=${value} が基準 ${b} より${margin}を超えて悪い`)
       }
     }
     if (typeof m.jsBytes === 'number' && typeof base.jsBytes === 'number'
