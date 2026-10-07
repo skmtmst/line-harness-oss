@@ -82,6 +82,12 @@ export interface RadioCardProps {
    * 画面の絵で行で並んでいる選択肢には `'row'` を使う。箱の合格は変えない。
    */
   variant?: 'card' | 'row' | 'compact'
+  /**
+   * 箱（card）の高さ。既定は絵の「選ぶカード」の 98。
+   * `'short'` は高さ 90 の箱（★V8 E-3 ウォークインの卓のカード PUWyq：上に印・右上に丸・題・説明）。
+   * 渡したときだけ効き、既定の見た目は変えない。
+   */
+  height?: 'default' | 'short'
 }
 
 export default function RadioCard({
@@ -98,12 +104,14 @@ export default function RadioCard({
   className,
   icon,
   variant = 'card',
+  height = 'default',
 }: RadioCardProps) {
   return (
     <label
       className={[
         variant === 'row' ? styles.row : styles.card,
         variant === 'compact' ? styles.compact : null,
+        variant === 'card' && height === 'short' ? styles.short : null,
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,
         invalid ? styles.invalid : null,
