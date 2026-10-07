@@ -252,7 +252,11 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/hq/templates',
     'GET /api/hq/templates/:id',
     'GET /api/hq/templates/:id/distributions/:runId',
+    'GET /api/hq/templates/:id/received-versions',
+    'GET /api/hq/templates/:id/versions',
+    'GET /api/hq/templates/:id/versions/compare',
     'GET /api/hq/templates/accounts',
+    'GET /api/hq/templates/attribute-kind-counts',
     'GET /api/hq/templates/folders',
     'GET /api/hq/templates/kind-counts',
     'GET /api/hq/templates/message-references',
@@ -401,6 +405,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/hq/templates/:id/distribute',
     'POST /api/hq/templates/:id/duplicate',
     'POST /api/hq/templates/:id/preflight',
+    'POST /api/hq/templates/:id/versions/:version/restore',
     'POST /api/hq/templates/folders',
     'POST /api/hq/templates/media',
     'POST /api/identity-candidates/:id/decide',
@@ -526,6 +531,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'PUT /api/traffic-pools/:id',
     'PUT /api/traffic-pools/:id/accounts/:accountId',
     'PUT /api/users/:id',
+
 ];
 
 describe('staff 権限の deny-by-default の網羅 (N-423 #670)', () => {

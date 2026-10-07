@@ -3445,11 +3445,17 @@ CREATE TABLE hq_broadcast_audit (
  actor_id TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT(datetime('now'))
 );
 
+CREATE TABLE hq_broadcast_folders (
+ id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), name TEXT NOT NULL,
+ revision INTEGER NOT NULL DEFAULT 1, archived_at TEXT,
+ created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE hq_broadcast_runs (
  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), request_id TEXT NOT NULL, actor_id TEXT NOT NULL,
  input_json TEXT NOT NULL CHECK(json_valid(input_json)), status TEXT NOT NULL DEFAULT 'prepared' CHECK(status IN ('prepared','scheduled','stopped','cancelled')),
  version INTEGER NOT NULL DEFAULT 1, scheduled_at TEXT, dispatch_token TEXT,
- created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), UNIQUE(tenant_id,request_id)
+ created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), approval_json TEXT CHECK(approval_json IS NULL OR json_valid(approval_json)), UNIQUE(tenant_id,request_id)
 );
 
 CREATE TABLE hq_broadcast_targets (
@@ -8996,6 +9002,8 @@ CREATE INDEX idx_handover_decisions_handover
   ON account_handover_decisions (handover_id);
 
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
+
+CREATE UNIQUE INDEX idx_hq_broadcast_folder_name ON hq_broadcast_folders(tenant_id,name) WHERE archived_at IS NULL;
 
 CREATE UNIQUE INDEX idx_hq_folder_name ON hq_template_folders(tenant_id, name) WHERE archived_at IS NULL;
 
