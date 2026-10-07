@@ -3164,8 +3164,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const identityCandidate = /^\/api\/identity-candidates\/([^/]+)$/.exec(pathname)
   if (identityCandidate) {
     if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
-    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id
-      ? IDENTITY_CANDIDATE_EC
+    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id || identityCandidate[1].startsWith('ec-identity-')
+      ? { ...IDENTITY_CANDIDATE_EC, id: identityCandidate[1] }
       : IDENTITY_CANDIDATE_FRIEND
     return { success: true, data: candidate }
   }

@@ -517,7 +517,8 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 }
 
 /** 4つの入口と、各 API が数えた実件数（取得できない数は作らない）。 */
-function EcTabsV8({ accountId, active }: { accountId: string | null; active: EcTabKey }) {
+/** EC連携の中の切り替え（取り込みの記録・会員のつき合わせ・定期便・つなぎ先）。会員のつき合わせの画面も使う。 */
+export function EcTabsV8({ accountId, active }: { accountId: string | null; active: EcTabKey }) {
   const [counts, setCounts] = useState<Partial<Record<EcTabKey, number>>>({})
   useEffect(() => {
     let alive = true
