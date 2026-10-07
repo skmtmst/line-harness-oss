@@ -165,7 +165,7 @@ export default function Event() {
         {isHttpsUrl(event.image_url) ? (
           <img
             src={event.image_url}
-            alt=""
+            alt={event.name}
             className="h-40 w-full rounded-xl border border-hairline object-cover"
           />
         ) : (
