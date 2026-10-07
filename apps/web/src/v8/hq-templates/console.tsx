@@ -405,21 +405,29 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
       }) },
       { id: 'remove', label: '削除する', icon: <Trash2 size={14} aria-hidden="true" />, tone: 'danger', dividerBefore: true, onSelect: () => setRemove(row) },
     ]
+    const createButton = canEdit
+      ? <Button variant="primary" disabled={!ready || busy} onClick={startCreate}><Plus size={15} aria-hidden="true" />{CREATE_LABELS[type]}</Button>
+      : null
+    const typeRows = TYPE_ORDER.map((kind) => ({ id: kind, label: LABELS[kind], count: typeCounts(kind), color: TYPE_COLORS[kind] }))
+    const selectType = (id: string) => { if (id !== type) window.location.assign(`/hq/templates?type=${id}`) }
+    const folderNavRows = [{ id: 'all', label: 'すべて' }, { id: 'none', label: '未分類' }, ...folders.map((folder) => ({ id: folder.id, label: folder.name }))]
     return (
       <ListPage
         boardId="LRc93"
         title={PAGE_TITLES[type]}
         description={LIST_DESCRIPTIONS[type]}
+        folderNav={[
+          { label: '種類', rows: typeRows, activeId: type, onSelect: selectType, createAction: createButton ?? undefined },
+          ...(folderLoadFailed ? [] : [{ label: '分類', rows: folderNavRows, activeId: folderFilter, onSelect: setFolderFilter }]),
+        ]}
         folders={(
           <div className={styles.rail}>
           <FolderPanel
             heading="種類"
-            createAction={canEdit
-              ? <Button variant="primary" disabled={!ready || busy} onClick={startCreate}><Plus size={15} aria-hidden="true" />{CREATE_LABELS[type]}</Button>
-              : <span className={styles.createSpace} aria-hidden="true" />}
-            rows={TYPE_ORDER.map((kind) => ({ id: kind, label: LABELS[kind], count: typeCounts(kind), color: TYPE_COLORS[kind] }))}
+            createAction={createButton ?? <span className={styles.createSpace} aria-hidden="true" />}
+            rows={typeRows}
             activeId={type}
-            onSelect={(id) => { if (id !== type) window.location.assign(`/hq/templates?type=${id}`) }}
+            onSelect={selectType}
           >
             <p className={styles.railNote}>配るときは、行の「アカウントへ配る」から。種類ごとに一覧を切り替えます。</p>
             <div className={styles.folderBlock} aria-label="分類（フォルダ）">

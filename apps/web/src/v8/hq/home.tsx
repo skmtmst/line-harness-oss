@@ -301,18 +301,20 @@ export default function HqHomeV8() {
     { id: UNTAGGED, label: 'タグなし', count: untaggedCount },
   ]
 
+  const createAccount = canManage ? (
+    <Button href="/accounts/new" variant="primary" className={styles.createButton}>
+      <Plus aria-hidden="true" className={styles.buttonIcon} />アカウントを登録
+    </Button>
+  ) : null
+  const selectTag = (id: string) => { setTag(id); resetPage() }
   const folders = (
     <div className={styles.folderInset}>
       <FolderPanel
-        createAction={canManage ? (
-          <Button href="/accounts/new" variant="primary" className={styles.createButton}>
-            <Plus aria-hidden="true" className={styles.buttonIcon} />アカウントを登録
-          </Button>
-        ) : null}
+        createAction={createAccount}
         heading="タグ"
         rows={folderRows}
         activeId={tag}
-        onSelect={(id) => { setTag(id); resetPage() }}
+        onSelect={selectTag}
         onAddFolder={canManage ? () => { setTagName(''); setTagColor(''); setTagError(''); setTagDialog(true) } : undefined}
         addFolderLabel="タグを追加"
       >
@@ -534,6 +536,7 @@ export default function HqHomeV8() {
         </button>
       ) : undefined}
       folders={folders}
+      folderNav={{ rows: folderRows, activeId: tag, onSelect: selectTag, createAction: createAccount, label: 'タグ' }}
     >
       <div className={styles.body}>
         <PlatformNotices />

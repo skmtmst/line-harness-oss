@@ -31,7 +31,7 @@ import {
   type BillingSummary,
 } from '@/lib/hq-billing'
 import { billingFailureMessage } from './billing-failure'
-import HqSettingsNavV8 from './settings-nav'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -61,6 +61,7 @@ function invoiceDate(iso: string): string {
 
 function BillingInner() {
   usePageTitle('課金プラン')
+  const settingsNav = useHqSettingsFolderNav('billing')
   const params = useSearchParams()
   const checkoutResult = params.get('checkout')
   /* 役割はサーバ（/api/staff/me）から読む。手元の保存値は使わない。 */
@@ -140,7 +141,7 @@ function BillingInner() {
   const invoiceUnreachable = invoiceError instanceof ApiError && invoiceError.status === 502
 
   const frame = (body: React.ReactNode) => (
-    <ListPage boardId="JB8V1" title={TITLE} description={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />}>
+    <ListPage boardId="JB8V1" title={TITLE} description={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}>
       <div className={styles.body}>{body}</div>
     </ListPage>
   )

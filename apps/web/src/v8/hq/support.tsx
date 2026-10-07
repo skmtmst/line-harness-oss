@@ -34,7 +34,7 @@ import {
   type HqSupportKind,
   type HqSupportRequest,
 } from '@/lib/hq-support'
-import HqSettingsNavV8 from './settings-nav'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import NoticeLineDialogV8 from './notice-line-dialog'
 import { SUPPORT_STATUS_WORDS, supportTime } from './support-words'
 import styles from './support.module.css'
@@ -43,6 +43,7 @@ type Attachment = { name: string; mimeType: string; data: string; size: number; 
 
 export default function HqSupportV8() {
   usePageTitle('お問い合わせ')
+  const settingsNav = useHqSettingsFolderNav('contact')
   const tenantStatus = useTenantStatus()
   const tenantUnavailable = tenantStatus === 'suspended' || tenantStatus === 'archived'
   const uid = useId()
@@ -182,7 +183,7 @@ export default function HqSupportV8() {
       boardId="b8xBtZ"
       title="お問い合わせ"
       description="使い方の質問・不具合・料金の相談を運営へ送れます。返信は登録メールアドレスと、下の「これまでの問い合わせ」に届きます（平日 2 営業日以内）。"
-      folders={<HqSettingsNavV8 active="contact" />}
+      folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}
     >
       <div className={styles.body}>
         {/* 契約者専用LINEの登録案内（2026-09-18 決定：ここからもいつでも開ける。開いた状態が板 D6fh3） */}

@@ -19,7 +19,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api, ApiError } from '@/lib/api'
 import { canResendInvite, lastLoginLabel, memberKpis, memberStatus, sortMembers, type MemberStatus } from '@/lib/hq-members'
-import HqSettingsNavV8 from './settings-nav'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
 
@@ -53,6 +53,7 @@ export default function HqMembersV8() {
 
 function MembersInner() {
   usePageTitle('メンバー管理')
+  const settingsNav = useHqSettingsFolderNav('members')
 
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [members, setMembers] = useState<StaffMember[]>([])
@@ -187,7 +188,7 @@ function MembersInner() {
           権限者を招待
         </Button>
       ) : undefined}
-      folders={<HqSettingsNavV8 active="members" />}
+      folders={<HqSettingsNavV8 active="members" />} folderNav={settingsNav}
     >
       <div className={styles.body}>
         {ready && !canManage ? <p className={styles.viewerBand} role="status">{VIEWER_NOTE}</p> : null}

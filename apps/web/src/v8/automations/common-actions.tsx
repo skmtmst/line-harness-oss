@@ -423,6 +423,7 @@ export default function CommonActionsV8() {
           <p className={styles.folderNote}>フォルダを消しても、中の共通アクションは未分類に残ります</p>
         </FolderPanel>
       </>}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

@@ -529,6 +529,10 @@ function FriendAddList() {
 
   /* ===== 道具 ===== */
   /* 閲覧のみの人には、作る・追加・編集・削除の操作を置かない（押せない形でも出さない。オーナー 2026-10-06）。 */
+  const folderRows = [
+    { id: '', label: 'すべて', count: data?.total ?? items.length },
+    ...folders.map((entry) => ({ id: entry.key, label: entry.name, count: entry.count })),
+  ]
   const createButton = canEdit ? (
     <Button variant="primary" href="/friend-add-settings?view=new" className={styles.createButton}>
       <Plus size={15} aria-hidden="true" />初回案内を作る
@@ -862,14 +866,12 @@ function FriendAddList() {
           onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
           addFolderLabel="フォルダを追加"
           addFolderDisabled={folderBusy}
-          rows={[
-            { id: '', label: 'すべて', count: data?.total ?? items.length },
-            ...folders.map((entry) => ({ id: entry.key, label: entry.name, count: entry.count })),
-          ]}
+          rows={folderRows}
         >
           <p className={styles.folderNote}>フォルダを消しても、中の設定は未分類に残ります</p>
         </FolderPanel>
       </>}
+      folderNav={narrow ? undefined : { rows: folderRows, activeId: folder ?? '', onSelect: (id) => selectFolder(id || null), createAction: createButton ?? undefined }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

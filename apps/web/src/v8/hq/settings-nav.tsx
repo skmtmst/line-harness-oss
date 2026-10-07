@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import type { ListFolderNav } from '@/components/templates'
 import { Building2, Headset, ReceiptText, Users } from 'lucide-react'
 import styles from './settings-nav.module.css'
 
@@ -38,4 +40,21 @@ export default function HqSettingsNavV8({ active }: { active: HqSettingsNavKey }
       </ul>
     </nav>
   )
+}
+
+/**
+ * 白い板が狭く左の列が畳まれたとき、型（ListPage の folderNav）が道具の段に出す「設定：〇〇」の選ぶ欄。
+ * 行き先・並びは左の列と同じ。
+ */
+export function useHqSettingsFolderNav(active: HqSettingsNavKey): ListFolderNav {
+  const router = useRouter()
+  return {
+    label: '設定',
+    rows: ITEMS.map(({ key, label }) => ({ id: key, label })),
+    activeId: active,
+    onSelect: (id) => {
+      const item = ITEMS.find((candidate) => candidate.key === id)
+      if (item && item.key !== active) router.push(item.href)
+    },
+  }
 }

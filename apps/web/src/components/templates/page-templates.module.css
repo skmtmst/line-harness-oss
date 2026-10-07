@@ -35,6 +35,13 @@
 :global([data-theme='v8']) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
 :global([data-theme='v8']) .folders { width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: 2px; }
 :global([data-theme='v8']) .collapsedFolders { display: none; }
+/* 型が組む畳んだ段（folderNav）。作るボタンは列の幅いっぱいにせず中身の幅。選ぶ欄は 1152 の板（Iffil・L7zA7C）の幅。 */
+:global([data-theme='v8']) .collapsedCreate { display: flex; flex-shrink: 0; }
+:global([data-theme='v8']) .collapsedCreate > * { width: auto; }
+:global([data-theme='v8']) .collapsedSelect { display: block; flex-shrink: 0; width: var(--tpl-narrow-folder-w); }
+:global([data-theme='v8']) .collapsedSelect > :global(*) { width: 100%; min-width: 0; }
+/* 道具を渡さない画面で、広い板に空の段を出さない。 */
+:global([data-theme='v8']) .toolbar[data-collapsed-only] { display: none; }
 :global([data-theme='v8']) .listBody { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 :global([data-theme='v8']) [data-page-template='dashboard'] .heading { padding-bottom: 16px; }
 :global([data-theme='v8']) .dashboardRow { display: flex; min-width: 0; border-bottom: 1px solid var(--color-hairline); }
@@ -146,6 +153,7 @@
 @container v8-page (max-width: 1099px) {
   :global([data-theme='v8']) .folders { display: none; }
   :global([data-theme='v8']) .collapsedFolders { display: flex; align-items: center; gap: 8px; }
+  :global([data-theme='v8']) .toolbar[data-collapsed-only] { display: flex; }
   /* 900 の板でも右の列は残す（幅 280）。消すのは狭い幅だけ。 */
   :global([data-theme='v8']) .preview { width: var(--tpl-preview-narrow-width); }
   :global([data-theme='v8']) .previewContent { width: var(--tpl-preview-narrow-content-width); }

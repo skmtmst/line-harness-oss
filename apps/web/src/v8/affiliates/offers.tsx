@@ -547,6 +547,7 @@ export default function OffersTab() {
     <AffiliateFrame
       actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
       stats={stats}
+      folderNav={{ rows: FOLDERS.map((item) => ({ id: item.key, label: item.label })), activeId: folder, onSelect: (id) => resetPage(() => { setSaved(''); setFolder(id as FolderKey) }), createAction: readonly ? undefined : createButton(false) }}
       folders={narrow ? undefined : <>{createButton(true)}{folderPanel}</>}
       toolbar={toolbar}
       pagination={pager}
