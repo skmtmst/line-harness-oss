@@ -28,6 +28,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-hq-body-gap);
+  /* 共通の Dialog の本文は子を左に寄せる（align-items: flex-start）。統括の窓の欄は絵で幅いっぱい（HMpVx の名前・親アカウント）。 */
+  width: 100%;
 }
 
 /* 下の帯（線の上12・窓の余白24）。真ん中寄せ・左右に分けるは画面が選ぶ。 */

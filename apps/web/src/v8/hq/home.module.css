@@ -2,12 +2,10 @@
  * ★V8 統括のアカウント（ホーム）（Pencil `JKjsE`）。頭・左の列の枠は型（ListPage）。
  * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
  */
-.folderInset {
-  margin-left: var(--tpl-hq-folder-inset);
-  min-width: 0;
-}
+.folderBox { min-width: 0; }
 
 .createButton { width: 100%; }
+.createSpace { display: block; height: var(--tpl-htn-input-h); }
 .buttonIcon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
 .full { width: 100%; }
 
@@ -116,7 +114,7 @@
   background: var(--color-canvas);
 }
 
-.cardWarn { outline-color: var(--color-status-warn); }
+.cardWarn { outline-color: var(--color-status-warn-deep); }
 /*
  * 絵 JKjsE（2026-10-07 直し）：並ぶカードは全部同じ高さ240、余白は上下左右18。
  * ボタンの段は「すき間」（.cardGap）でカードの下へ押し、名前が2行のカードでも位置をそろえる。
@@ -125,6 +123,8 @@
  */
 .cardGap { flex: 1 1 0; }
 .cardWarn { padding-bottom: var(--tpl-hq-home-warn-pad-end); }
+/* 要確認の行はボタンのすぐ下（間2）に置き、下の余白の中に収める。名前の下が2行になっても高さ240のまま（絵 JKjsE）。 */
+.cardWarn .warnLine { margin-top: var(--tpl-hq-home-warn-pull); }
 
 .cardHead {
   display: flex;
@@ -187,6 +187,7 @@
 
 .tag {
   padding: var(--tpl-hq-pill-pad);
+  background: var(--color-canvas);
   border-radius: var(--radius-mini);
   outline: 1px solid var(--color-hairline);
   outline-offset: -1px;
@@ -248,7 +249,6 @@
 }
 
 .linkButton:hover { text-decoration: underline; }
-.headAction { font-size: var(--text-caption); }
 .linkButton:disabled { cursor: not-allowed; opacity: 0.5; }
 
 .pill {
@@ -321,6 +321,8 @@
 
 .footNote {
   flex: 1;
+  /* 絵は言葉のまとまりで折らず、行の端まで詰めて折る（全体の auto-phrase を外す）。 */
+  word-break: normal;
   min-width: 0;
   margin: 0;
   color: var(--color-ink-faint);

@@ -28,6 +28,8 @@ export interface ListPageBodyProps {
    * 左の列に選ぶものが2つある画面（統括のテンプレートの種類と分類など）は配列で渡す。
    */
   folderNav?: ListFolderNav | ListFolderNav[]
+  /** 左の列の左の余白を 24 にする（統括の画面。絵 JKjsE・LRc93 ほか）。ふつうの一覧は 12。 */
+  folderInset?: boolean
   toolbar?: ReactNode
   children: ReactNode
   pagination?: ReactNode
@@ -39,13 +41,13 @@ export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   tabs?: ReactNode
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ stats, folders, collapsedFolders, folderNav, toolbar, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ stats, folders, collapsedFolders, folderNav, folderInset, toolbar, children, pagination, overlays }: ListPageBodyProps) {
   const navs = folderNav ? (Array.isArray(folderNav) ? folderNav : [folderNav]) : []
   const collapsed = collapsedFolders ?? (folders && navs.length > 0 ? navs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
   return <div className={styles.listBody}>
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     <div className={styles.split} data-template-region="body">
-      {folders ? <aside className={styles.folders} data-template-region="folders">{folders}</aside> : null}
+      {folders ? <aside className={styles.folders} data-template-region="folders" data-folder-inset={folderInset || undefined}>{folders}</aside> : null}
       <div className={styles.main}>
         {toolbar || collapsed ? <div className={styles.toolbar} data-template-region="toolbar" data-collapsed-only={toolbar ? undefined : ''}>
           {collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders">{collapsed}</div> : null}{toolbar}

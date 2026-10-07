@@ -800,7 +800,7 @@ export default function Sidebar({
                         : ''
                   }`}
                 >
-                  <span className="shrink-0"><NavIcon d={item.icon} /></span>
+                  <span className="shrink-0"><NavIcon d={isV8 && item.iconV8 ? item.iconV8 : item.icon} /></span>
                   <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>{visibleLabel}</span>
                   {badgeCount(item) > 0 && (
                     <>
