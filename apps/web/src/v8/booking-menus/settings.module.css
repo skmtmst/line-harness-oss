@@ -959,6 +959,12 @@
   box-shadow: var(--shadow-row-line);
 }
 
+/* 行の中の文字ボタンは全体のボタンの最低の高さ（32）を受けない（絵 KRgTQ の行は 17 の文字1行）。 */
+.exceptionRow > button {
+  min-height: var(--tpl-bm-17);
+  line-height: var(--tpl-bm-17);
+}
+
 .exceptionDates {
   padding: 0;
   border: 0;
