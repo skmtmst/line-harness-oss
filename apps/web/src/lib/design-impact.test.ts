@@ -240,6 +240,9 @@ describe('共通部品の影響範囲', () => {
       'v8/webhooks/interactions.tsx',
       // ★V8 会員一覧（AOWoJ）を src/v8 に一から書いた。ページ送りは共通のまま。
       'v8/nen-members/list.tsx',
+      // ★V8 マイペット（wTIej）・健康日記（mIwA4）を src/v8 に一から書いた。ページ送りは共通のまま。
+      'v8/nen-pets/list.tsx',
+      'v8/nen-health/health.tsx',
       // ★V8 オートメーション（LWQXd・g98F9・LnGNw）。新しい置き場（src/v8）に一から書いた。
       'v8/automations/list.tsx',
       'v8/automations/runs.tsx',

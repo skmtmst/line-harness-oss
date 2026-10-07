@@ -3061,32 +3061,43 @@ export default function ScenarioDetailV8({
         )}
       </ConfirmDialog>
 
-      {/* 一時停止の確認（OPGU2）。板の「止める理由（任意）」は受け口（保存先）が API に無いので置かない（BEHAVIOR.md）。 */}
-      <ConfirmDialog
+      {/* 一時停止の確認（OPGU2）。板の「止める理由（任意）」は受け口（保存先）が API に無いので置かない（BEHAVIOR.md）。
+          絵：幅 560・余白 24・間 12。題の左と実行ボタンに印は無い。説明は題の行（×の 36）の下 12。
+          ボタンは窓の帯ではなく本文の続き（上に線・間 14・右寄せ）。 */}
+      <Dialog
         open={stopOpen}
         title="配信を止めますか"
-        description="止めても、途中の人の記録は残ります。再開すると止めたところから続きを送ります。"
+        tone="destructive"
+        confirmation
         designNode="OPGU2"
-        confirmLabel="一時停止する"
-        destructive
+        designWidth={560}
+        designTop={37}
+        designHeaderPadding="24px 24px 0"
+        designHeaderHeight={48}
         busy={stopBusy}
         error={stopError}
-        onConfirm={() => void handleStop()}
         onCancel={() => {
           if (stopBusy) return
           setStopOpen(false)
           setStopError('')
         }}
       >
-        <dl className={styles.stopRow}>
-          <dt>いま途中の人</dt>
-          <dd>
-            {stats?.activeNow === undefined
-              ? '確認できません'
-              : `${formatNumber(stats.activeNow)}人（止まっているあいだ、新しい人は入りません）`}
-          </dd>
-        </dl>
-      </ConfirmDialog>
+        <div className={styles.stopBody}>
+          <p className={styles.stopDesc}>止めても、途中の人の記録は残ります。再開すると止めたところから続きを送ります。</p>
+          <dl className={styles.stopRow}>
+            <dt>いま途中の人</dt>
+            <dd>
+              {stats?.activeNow === undefined
+                ? '確認できません'
+                : `${formatNumber(stats.activeNow)}人（止まっているあいだ、新しい人は入りません）`}
+            </dd>
+          </dl>
+          <div className={styles.stopFooter}>
+            <Button type="button" onClick={() => { setStopOpen(false); setStopError('') }} disabled={stopBusy}>キャンセル</Button>
+            <Button type="button" variant="danger" onClick={() => void handleStop()} disabled={stopBusy} busy={stopBusy} busyLabel="処理中…">一時停止する</Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* 複製（Al4Ek）。通・アクション・きっかけを写し、止めた状態で作る。名前は本人が決める。 */}
       <Dialog

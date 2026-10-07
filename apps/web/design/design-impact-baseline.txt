@@ -584,6 +584,11 @@ shared-button-importer v8/nen-members/members.tsx
 shared-button-importer v8/nen-members/list.tsx
 shared-button-importer v8/nen-members/ranks.tsx
 shared-button-importer v8/nen-members/lifetime.tsx
+shared-button-importer v8/nen-pets/pets.tsx
+shared-button-importer v8/nen-pets/list.tsx
+shared-button-importer v8/nen-pets/feeding.tsx
+shared-button-importer v8/nen-health/health.tsx
+shared-button-importer v8/nen-health/summary.tsx
 shared-button-importer v8/scenario-detail/detail.tsx
 shared-button-importer v8/ops/login.tsx
 shared-button-importer v8/ops/two-factor.tsx
