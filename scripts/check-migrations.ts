@@ -190,6 +190,16 @@ const SIDECAR_BACKUP_TABLES: Record<string, ReadonlySet<string>> = {
     'migration_595_auto_replies_template_refs_backup',
     'migration_595_scenario_steps_template_refs_backup',
   ]),
+  // 予約の受付元に「来店（walk_in）」を足す作り直しで、来店印を退避・復元する。
+  '596_restaurant_walk_in.sql': new Set([
+    'migration_596_seat_visit_marks_backup',
+  ]),
+  // 媒体の種類を増やす作り直しで、予約・取り込みメール・日次件数の参照を退避・復元する。
+  '597_restaurant_media_links.sql': new Set([
+    'migration_597_reservations_media_backup',
+    'migration_597_inbound_emails_backup',
+    'migration_597_email_digests_backup',
+  ]),
   // 予約媒体のCHECK制約拡張で、既存予約と日次件数の参照を退避・復元する。
   '545_restaurant_channels.sql': new Set([
     'migration_545_media_links_backup',

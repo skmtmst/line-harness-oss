@@ -11,20 +11,20 @@ CREATE TABLE rt_media_next (
 );
 INSERT INTO rt_media_next SELECT * FROM rt_media;
 -- 参照をいったん退避する。外部キーを切らずに親表を作り直す。
-CREATE TABLE rt_reservations_media_next AS SELECT id,media_id FROM rt_reservations WHERE media_id IS NOT NULL;
-CREATE TABLE rt_inbound_emails_next AS SELECT id,media_id FROM rt_inbound_emails WHERE media_id IS NOT NULL;
-CREATE TABLE rt_email_digests_next AS SELECT * FROM rt_email_digests;
+CREATE TABLE migration_597_reservations_media_backup AS SELECT id,media_id FROM rt_reservations WHERE media_id IS NOT NULL;
+CREATE TABLE migration_597_inbound_emails_backup AS SELECT id,media_id FROM rt_inbound_emails WHERE media_id IS NOT NULL;
+CREATE TABLE migration_597_email_digests_backup AS SELECT * FROM rt_email_digests;
 DELETE FROM rt_email_digests;
 UPDATE rt_reservations SET media_id=NULL WHERE media_id IS NOT NULL;
 UPDATE rt_inbound_emails SET media_id=NULL WHERE media_id IS NOT NULL;
 DROP TABLE rt_media;
 ALTER TABLE rt_media_next RENAME TO rt_media;
-UPDATE rt_reservations SET media_id=(SELECT media_id FROM rt_reservations_media_next WHERE id=rt_reservations.id) WHERE id IN (SELECT id FROM rt_reservations_media_next);
-UPDATE rt_inbound_emails SET media_id=(SELECT media_id FROM rt_inbound_emails_next WHERE id=rt_inbound_emails.id) WHERE id IN (SELECT id FROM rt_inbound_emails_next);
-INSERT INTO rt_email_digests SELECT * FROM rt_email_digests_next;
-DROP TABLE rt_reservations_media_next;
-DROP TABLE rt_inbound_emails_next;
-DROP TABLE rt_email_digests_next;
+UPDATE rt_reservations SET media_id=(SELECT media_id FROM migration_597_reservations_media_backup WHERE id=rt_reservations.id) WHERE id IN (SELECT id FROM migration_597_reservations_media_backup);
+UPDATE rt_inbound_emails SET media_id=(SELECT media_id FROM migration_597_inbound_emails_backup WHERE id=rt_inbound_emails.id) WHERE id IN (SELECT id FROM migration_597_inbound_emails_backup);
+INSERT INTO rt_email_digests SELECT * FROM migration_597_email_digests_backup;
+DROP TABLE migration_597_reservations_media_backup;
+DROP TABLE migration_597_inbound_emails_backup;
+DROP TABLE migration_597_email_digests_backup;
 ALTER TABLE rt_media ADD COLUMN accepts_reservations INTEGER NOT NULL DEFAULT 1 CHECK(accepts_reservations IN (0,1));
 CREATE TABLE rt_store_media_links (
  store_id TEXT NOT NULL REFERENCES rt_stores(id), media_id TEXT NOT NULL REFERENCES rt_media(id),

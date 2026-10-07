@@ -39,12 +39,12 @@ CREATE TABLE rt_reservations_next (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 , media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT);
 INSERT INTO rt_reservations_next SELECT * FROM rt_reservations;
-CREATE TABLE rt_seat_visit_marks_next AS SELECT * FROM rt_seat_visit_marks;
+CREATE TABLE migration_596_seat_visit_marks_backup AS SELECT * FROM rt_seat_visit_marks;
 DELETE FROM rt_seat_visit_marks;
 DROP TABLE rt_reservations;
 ALTER TABLE rt_reservations_next RENAME TO rt_reservations;
-INSERT INTO rt_seat_visit_marks SELECT * FROM rt_seat_visit_marks_next;
-DROP TABLE rt_seat_visit_marks_next;
+INSERT INTO rt_seat_visit_marks SELECT * FROM migration_596_seat_visit_marks_backup;
+DROP TABLE migration_596_seat_visit_marks_backup;
 CREATE VIEW rt_inventory_occupancy AS SELECT i.*,
  COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=i.store_id
   AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now'))
