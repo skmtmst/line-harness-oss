@@ -25,9 +25,9 @@ describe('シナリオ配信の細かい板', () => {
   })
 
   it('編集の競合は帯・比べる・読み直しを出す（kz2B6）', () => {
-    expect(DETAIL).toContain('data-design-node="kz2B6"')
+    // 帯は共通部品（save-conflict）に寄せた（2026-10-07）。ボタンの文言は共通部品が持つ。
+    expect(DETAIL).toMatch(/<SaveConflictBand[\s\S]{0,400}designNode="kz2B6"/)
     expect(DETAIL).toContain('ほかの人がこのシナリオを更新しました')
-    expect(DETAIL).toContain('違いを比べる')
     expect(DETAIL).toContain('最新を読み込んで続ける')
     expect(DETAIL).toContain('比べてから保存')
   })

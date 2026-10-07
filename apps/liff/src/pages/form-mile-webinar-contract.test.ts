@@ -78,14 +78,16 @@ describe('回答フォームの動きは変えない', () => {
   });
 });
 
-describe('マイル・紹介は中身を全部残し、6-mile の順に並べる', () => {
-  it('並びは「貯まった → 増やす → 紹介の成果」', () => {
-    const src = affiliate();
+describe('マイル・紹介は中身を全部残し、★V8 S3uBl の順に並べる', () => {
+  it('並びは「貯まった → お友だちを紹介する → マイルの履歴 → 増やす → 案件」', () => {
+    // 紹介者に登録済みの画面 (S3uBl) の並びを見る。
+    const all = affiliate();
+    const src = all.slice(all.indexOf('並びは ★V8 S3uBl'));
     const order = [
       '<MileageSummaryCard',
-      '<MileageOpportunities',
+      '<ReferralCard',
       '<MileageHistory',
-      '<ReferralSummary',
+      '<MileageOpportunities',
       'aria-label="参加中の案件"',
       'aria-label="参加できる案件"',
       'aria-label="その他のリンク"',
@@ -94,22 +96,23 @@ describe('マイル・紹介は中身を全部残し、6-mile の順に並べる
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  it('貯まったマイル (使える・確定待ち・内訳4つ・合算の注記) がある', () => {
+  it('貯まったマイル (使える・内訳2つ・合算の注記) と、紹介の箱の確定待ちがある', () => {
     const src = affiliate();
     expect(src).toContain('使えるマイル');
-    expect(src).toContain('確定待ち');
     expect(src).toContain('これまでに得た');
-    expect(src).toContain('紹介で得た');
     expect(src).toContain('使った');
-    expect(src).toContain('良質な紹介');
     expect(src).toContain('合算しています');
+    // ★V8 S3uBl：深い緑の箱。確定待ちは紹介の箱の中の一行。
+    expect(src).toContain('bg-liff-deep');
+    expect(src).toContain('（成果の確認後に入ります）');
+    expect(src).toContain('紹介のリンクを送る');
   });
 
   it('増やす (取り組み・登録マイル・履歴) と未登録の紹介者になるがある', () => {
     const src = affiliate();
     expect(src).toContain('今、マイルを増やせます');
     expect(src).toContain('LINEアカウント登録マイル');
-    expect(src).toContain('マイル履歴');
+    expect(src).toContain('マイルの履歴');
     expect(src).toContain('紹介者になる');
     expect(src).toContain('お友だちを紹介してマイルをもらう');
     expect(src).toContain('vqu9B');
@@ -184,16 +187,17 @@ describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・�
     expect(src).toContain("!== '送信'");
   });
 
-  it('背景は決めた色だけ。決めていなければ殻の灰色のまま', () => {
+  it('背景は決めた色だけ。決めていなければ ★V8 (B8rCt) の白い地', () => {
     const src = formSrc();
     expect(src).toContain('hasCustomTheme');
     expect(src).toContain('options.theme !== undefined');
     expect(src).toContain('backgroundColor: hasCustomTheme ? theme.sub : undefined');
-    expect(src).toContain('bg-ground');
+    expect(src).toContain('bg-canvas');
+    expect(src).not.toContain('bg-ground');
   });
 });
 
-describe('ウェビナーは白地 (⑤LINEらしい。夜の型はM2の型が入ってから)、時刻の同期はそのまま', () => {
+describe('ウェビナーの配信中は ★V8 RpW2h の暗い地、時刻の同期はそのまま', () => {
   it('同期・補正・ハートビート・計測が残る', () => {
     const src = webinar();
     expect(src).toContain('expectedPosition');
@@ -204,11 +208,15 @@ describe('ウェビナーは白地 (⑤LINEらしい。夜の型はM2の型が�
     expect(src).toContain('webinarComment');
   });
 
-  it('地は白く、ボタンと送信は濃い緑', () => {
+  it('配信中は暗い地・16:9 の動画・途中のボタンは LINE の緑・送信は主の緑', () => {
     const src = webinar();
+    const live = src.slice(src.indexOf('ライブ中 (★V8 RpW2h)'));
+    expect(live).toContain('bg-night-deep');
+    expect(live).toContain('aspect-video');
+    expect(live).toContain('bg-night-cta');
+    expect(live).toContain('bg-liff-primary');
+    // 待機・終了などは白い殻のまま
     expect(src).toContain('bg-canvas');
-    expect(src).not.toContain('bg-night');
-    expect(src).toContain('bg-accent-deep');
   });
 
   it('残り時間は箱で大きく出す (分・秒)', () => {
@@ -228,9 +236,9 @@ describe('ウェビナーは白地 (⑤LINEらしい。夜の型はM2の型が�
     expect(src).toContain('読み込めませんでした');
   });
 
-  it('会話はほか・自分を文字色で分ける', () => {
+  it('会話は「名前　本文」の1行。自分の名前だけ色を変える', () => {
     const src = webinar();
-    expect(src).toContain('text-ink-secondary');
-    expect(src).toContain('text-liff-primary');
+    expect(src).toContain('text-night-mine');
+    expect(src).toContain('\\u3000');
   });
 });

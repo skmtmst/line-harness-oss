@@ -13,7 +13,7 @@ export default function ReportHeadV8({ editing }: { editing: boolean }) {
     <div className="report-v8-head">
       <Link className="report-v8-back" href="/analytics">← 分析へ</Link>
       <h1 className="report-v8-title">{editing ? '定期レポートを直す' : 'レポートを作る'}</h1>
-      <p className="report-v8-lead">見たい数をまとめて、決まった曜日・時刻にLINEやメールで届けます。数が急に動いたときだけ知らせることもできます。</p>
+      <p className="report-v8-lead">見たい数をまとめて、決まった曜日・時刻に LINE やメールで届けます。数が急に動いたときだけ知らせることもできます。</p>
     </div>
   )
 }

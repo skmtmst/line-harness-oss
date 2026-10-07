@@ -156,6 +156,8 @@
   font-size: var(--tpl-row-sub-size);
   line-height: var(--tpl-row-sub-lh);
 }
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 MRhef の説明の行）。 */
+.nameSub { padding-inline-start: var(--tpl-folder-dot-indent); }
 .sub > svg {
   flex-shrink: 0;
   color: var(--color-ink-faint);
@@ -338,3 +340,17 @@
 /* 閲覧のみ：隠した作るボタンとつまみの場所だけ空けて、並びを絵どおりに保つ。 */
 .viewerCreateSpace { display: block; height: var(--tpl-fa-viewer-create-h); }
 .gripSpace { visibility: hidden; }
+
+/* 初回の読み込みの骨組み（動きの点検 15 番）。行の高さ・余白は一覧の行と同じ。 */
+.loadingRows {
+  display: block;
+}
+.loadingRow {
+  display: flex;
+  height: var(--tpl-fa-row-h);
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--tpl-sub-gap);
+  padding: var(--tpl-fa-row-pad);
+  border-bottom: 1px solid var(--color-hairline);
+}

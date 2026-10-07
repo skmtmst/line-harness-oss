@@ -114,7 +114,8 @@ test('v8 で行を右クリックすると「…」と同じ止めるが出る',
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="ralAc"]')!
-  const row = board.querySelector('tbody tr') as HTMLElement
+  // 2026-10-07：入口は src/v8/webhooks/api-tokens.tsx（行は表の tr ではなく行の箱）。
+  const row = board.querySelector('[data-ctx-row]') as HTMLElement
   await act(async () => {
     row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 320, clientY: 180 }))
   })

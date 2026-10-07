@@ -1,0 +1,215 @@
+/* 運営コンソールの入口の画面（ログイン D9JALJ・2要素認証 qod6X・招待 tVaUh）。値は --tpl-op-*。 */
+
+.page {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tpl-op-auth-gap);
+  background: var(--color-shell);
+  padding: var(--tpl-op-auth-page-pad);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-brand-gap);
+}
+
+.mark {
+  display: flex;
+  width: var(--tpl-op-brand-mark);
+  height: var(--tpl-op-brand-mark);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-control);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-size: var(--text-heading);
+  font-weight: 700;
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+}
+
+.brandName {
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+}
+
+.brandSub {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.card {
+  display: flex;
+  width: 100%;
+  max-width: var(--tpl-op-auth-card-w);
+  flex-direction: column;
+  gap: var(--tpl-op-auth-card-gap);
+  border-radius: var(--radius-panel);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-board);
+  padding: var(--tpl-op-auth-card-pad);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-title);
+  font-weight: 700;
+  line-height: var(--tpl-op-auth-title-lh);
+}
+
+.lead {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-op-auth-lead-lh);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-auth-card-gap);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-auth-field-gap);
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-op-auth-label-lh);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+.wide {
+  width: 100%;
+}
+
+.wide svg {
+  width: var(--tpl-op-auth-icon);
+  height: var(--tpl-op-auth-icon);
+}
+
+.or {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.rule {
+  height: 1px;
+  flex: 1;
+  background: var(--color-hairline);
+}
+
+.forgot {
+  align-self: flex-start;
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.forgot:hover {
+  text-decoration: underline;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  text-align: center;
+}
+
+.foot {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+/* 2要素認証：QR とキー */
+.qrRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-auth-qr-gap);
+}
+
+.qr {
+  display: flex;
+  width: var(--tpl-op-auth-qr);
+  height: var(--tpl-op-auth-qr);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--tpl-op-caution-radius);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+}
+
+.qr img {
+  width: 100%;
+  height: 100%;
+}
+
+.qrSide {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-op-auth-field-gap);
+}
+
+.qrHint {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.secret {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.digits {
+  display: flex;
+  gap: var(--tpl-op-me-gap);
+}
+
+.digit {
+  width: var(--tpl-op-auth-digit);
+  height: var(--tpl-op-auth-digit);
+  border-radius: var(--radius-card);
+  background: var(--color-shell);
+  outline: 1px solid var(--color-control-border, var(--color-hairline));
+  color: var(--color-ink);
+  font-size: var(--text-title);
+  font-weight: 500;
+  text-align: center;
+}
+
+.digit:focus {
+  outline: var(--tpl-op-auth-digit-focus) solid var(--color-accent-deep);
+}

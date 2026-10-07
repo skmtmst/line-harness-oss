@@ -9,7 +9,7 @@ import Form from './Form.js';
  * 回答フォーム ★V8 (B8rCt・aNZKe) の形。
  * - 上の帯 (LiffHeader)・進みの棒・題と説明
  * - 選択肢は大きな枠・戻るは主ボタンの下の小さな文字
- * - 送ったら「送信しました」＋ LINEに戻る
+ * - 送ったら「ご回答ありがとうございました」＋ LINEに戻る
  * 送信・検証・ページ送りの動きは変えない。
  */
 
@@ -102,7 +102,7 @@ describe('V8 の形', () => {
     setup();
     expect(await screen.findByRole('heading', { name: '来店アンケート' })).toBeTruthy();
     expect(screen.getByText('ご来店ありがとうございました。1分で終わります。')).toBeTruthy();
-    expect(screen.getByText('1 / 2ページ')).toBeTruthy();
+    expect(screen.getByText('1 / 2 ページ')).toBeTruthy();
     expect(screen.getByRole('radio', { name: 'トリミング' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '次へ' })).toBeTruthy();
   });
@@ -113,8 +113,40 @@ describe('V8 の形', () => {
     expect(await screen.findByText('今日のご来店の目的は？ は必須項目です')).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: 'トリミング' }));
     fireEvent.click(screen.getByRole('button', { name: '次へ' }));
-    expect(await screen.findByText('2 / 2ページ')).toBeTruthy();
+    expect(await screen.findByText('2 / 2 ページ')).toBeTruthy();
     expect(screen.getByRole('button', { name: '← 前のページへ' })).toBeTruthy();
+  });
+});
+
+describe('★V8 B8rCt・g9osGN の題', () => {
+  it('ページの先頭の画像は題の上の表紙に出し、2ページ目の題はそのページの名前にする', async () => {
+    const base = layout();
+    base.sections[0].blocks.unshift({
+      id: 'cover', kind: 'image', mediaUrl: 'https://example.com/cover.png', size: 'full',
+    });
+    getForm.mockResolvedValue({
+      id: 'f1',
+      name: '来店アンケート',
+      description: 'ご来店ありがとうございました。1分で終わります。',
+      layout: base,
+      isActive: true,
+    });
+    render(
+      <MemoryRouter initialEntries={['/forms/f1?liffId=test']}>
+        <Routes>
+          <Route path="/forms/:id" element={<Form />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const heading = await screen.findByRole('heading', { level: 1, name: '来店アンケート' });
+    const cover = document.querySelector('img[src="https://example.com/cover.png"]');
+    expect(cover).toBeTruthy();
+    // 表紙は題より前 (上) にある
+    expect(cover!.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'トリミング' }));
+    fireEvent.click(screen.getByRole('button', { name: '次へ' }));
+    expect(await screen.findByRole('heading', { level: 1, name: '次回' })).toBeTruthy();
+    expect(screen.queryByText('ご来店ありがとうございました。1分で終わります。')).toBeNull();
   });
 });
 
@@ -178,13 +210,13 @@ describe('F-11 5段階評価・住所', () => {
 });
 
 describe('送ったら終わりの画面', () => {
-  it('「送信しました」と LINEに戻るを出す', async () => {
+  it('「ご回答ありがとうございました」と LINEに戻るを出す', async () => {
     setup();
     fireEvent.click(await screen.findByRole('radio', { name: 'トリミング' }));
     fireEvent.click(screen.getByRole('button', { name: '次へ' }));
     submitForm.mockResolvedValue({ status: 200, body: { success: true, data: {} } });
     fireEvent.click(await screen.findByRole('button', { name: '送信する' }));
-    expect(await screen.findByText('送信しました')).toBeTruthy();
+    expect(await screen.findByText('ご回答ありがとうございました')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'LINEに戻る' })).toBeTruthy();
   });
 });

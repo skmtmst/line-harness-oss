@@ -157,7 +157,7 @@ describe('ログイン中の端末 (N-427)', () => {
     // 2件目が他端末
     await act(async () => { fireEvent.click(buttons[1]) })
     expect(fixture.sessionsRevoke).toHaveBeenCalledWith('hash-phone', { confirmCurrent: false })
-    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('ログインを終了しました'))
+    await waitFor(() => expect(screen.getByRole('status', { name: '知らせ' }).textContent).toContain('ログインを終了しました'))
   })
 
   it('今の端末は確認を挟み、確定するとログイン画面へ戻る', async () => {
@@ -179,7 +179,7 @@ describe('ログイン中の端末 (N-427)', () => {
     await screen.findByText('この端末以外のログインをすべて終了しますか？')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'すべて終了する' })) })
     expect(fixture.sessionsRevokeOthers).toHaveBeenCalledTimes(1)
-    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('1 件のログインを終了しました'))
+    await waitFor(() => expect(screen.getByRole('status', { name: '知らせ' }).textContent).toContain('1 件のログインを終了しました'))
   })
 })
 

@@ -16,13 +16,18 @@
 }
 
 .report-v8-head {
-  padding: 20px 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-an-rp-head-gap);
+  padding: var(--tpl-an-rp-head-pad);
   border-bottom: 1px solid var(--color-hairline);
 }
 
 .report-v8-back {
   display: inline-block;
-  font-size: 13px;
+  line-height: normal;
+  font-size: var(--tpl-an-rp-back-size);
   font-weight: 600;
   color: var(--color-action);
   text-decoration: none;
@@ -33,15 +38,17 @@
 }
 
 .report-v8-title {
-  margin-top: 4px;
-  font-size: 20px;
-  font-weight: 600;
+  margin: 0;
+  line-height: normal;
+  font-size: var(--tpl-an-rp-title-size);
+  font-weight: var(--tpl-an-rp-bold);
   color: var(--color-ink);
 }
 
 .report-v8-lead {
-  margin-top: 4px;
-  font-size: 13px;
+  margin: 0;
+  line-height: normal;
+  font-size: var(--tpl-an-rp-lead-size);
   color: var(--color-ink-secondary);
 }
 
@@ -63,169 +70,14 @@
   color: var(--color-danger);
 }
 
-/* 競合の帯（G83vi）。板の頭の下に置く。 */
-.report-v8-conflict {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 12px 24px 0;
-  padding: 12px 16px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  background: var(--color-warning-bg);
-}
-
-.report-v8-conflictTitle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.report-v8-conflictSub {
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--color-ink-secondary);
-}
-
-.report-v8-conflictActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* 見本は1列のカード並び。 */
-.report-v8-sectionCards {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-/* 見本は2×2。 */
-.report-v8-scheduleGrid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-/* 右の欄。板どおり幅 340〜380（親の列が持つ）。 */
-.report-v8-rail {
-  flex: 0 0 32%;
-  padding-left: 24px;
-  border-left: 1px solid var(--color-hairline);
-  display: grid;
-  gap: 16px;
-  align-content: start;
-  min-width: 0;
-}
-
-.report-v8-railCard {
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  padding: 20px;
-  min-width: 0;
-}
-
-.report-v8-railTitle {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.report-v8-railSub {
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--color-ink-faint);
-}
-
-.report-v8-preview {
-  margin-top: 12px;
-  border-radius: var(--radius-control);
-  background: var(--color-surface-pearl);
-  padding: 12px;
-}
-
-.report-v8-previewTitle {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.report-v8-previewRows {
-  display: grid;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.report-v8-previewRow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--color-ink-secondary);
-}
-
-.report-v8-previewRow strong {
-  font-weight: 600;
-  color: var(--color-ink);
-  text-align: right;
-}
-
-.report-v8-previewMore {
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--color-ink-faint);
-}
-
-.report-v8-kvList {
-  display: grid;
-  gap: 10px;
-  margin-top: 12px;
-  list-style: none;
-  padding: 0;
-}
-
-.report-v8-kvRow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--color-ink-secondary);
-}
-
-.report-v8-kvRow strong {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-weight: 600;
-  color: var(--color-ink);
-  text-align: right;
-}
-
-.report-v8-notes {
-  display: grid;
-  gap: 6px;
-  margin-top: 12px;
-  padding: 0;
-  list-style: none;
-  font-size: 12px;
-  color: var(--color-ink-secondary);
-}
-
-.report-v8-notes li {
-  padding-left: 14px;
-  position: relative;
-}
-
-.report-v8-notes li::before {
-  content: "・";
-  position: absolute;
-  left: 0;
-}
+/* 競合の帯（G83vi）。板の頭の下（余白 12/24）。左に印と2行、右に操作。 */
+.report-v8-conflictWrap { padding: var(--tpl-an-rp-conflict-wrap-pad); }
+.report-v8-conflict { display: flex; align-items: center; gap: var(--tpl-an-rp-grid-gap); padding: var(--tpl-an-rp-conflict-pad); border-radius: var(--tpl-an-rp-choice-radius); background: var(--color-warning-bg); min-width: 0; }
+.report-v8-conflictIcon { flex-shrink: 0; color: var(--color-warning); }
+.report-v8-conflictText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-an-rp-stack-gap); min-width: 0; }
+.report-v8-conflictTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-choice-title); font-weight: var(--tpl-an-rp-bold); line-height: normal; }
+.report-v8-conflictSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--tpl-an-rp-sub-size); line-height: normal; }
+.report-v8-conflictActions { display: flex; flex-wrap: wrap; flex-shrink: 0; gap: var(--tpl-an-rp-grid-gap); }
 
 .report-v8-page a:focus-visible,
 .report-v8-page button:focus-visible,
@@ -235,32 +87,68 @@
 }
 
 
-.report-v8-columns { display: flex; align-items: flex-start; gap: 24px; padding: 24px 28px; min-width: 0; }
-.report-v8-fields { display: flex; flex: 1 1 0; flex-direction: column; gap: 16px; min-width: 0; border: 0; padding: 0; margin: 0; }
-.report-v8-card { display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); background: var(--color-canvas); padding: 20px; min-width: 0; }
-.report-v8-cardTitle { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--color-ink); font-size: 15px; font-weight: 600; }
-.report-v8-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: var(--color-ink-secondary); font-size: 13px; font-weight: 600; }
-.report-v8-label { display: flex; align-items: center; gap: 6px; }
-.report-v8-scheduleGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
-.report-v8-sectionCards, .report-v8-alerts { display: grid; gap: 14px; padding: 0; list-style: none; }
-.report-v8-selectionCard { display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); padding: 12px; min-width: 0; }
-.report-v8-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
-.report-v8-chips:empty { display: none; }
-.report-v8-chips > span { max-width: 100%; }
-.report-v8-chips > span > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.report-v8-chips button { padding: 0; width: 24px; height: 24px; min-height: 24px; border: 0; box-shadow: none; background: transparent; }
-.report-v8-recipients { border: 1px solid var(--color-hairline); border-radius: var(--radius-control); padding: 0; margin: 0 0 12px; list-style: none; }
-.report-v8-recipient { padding: 10px 12px; min-width: 0; }
-.report-v8-emailRow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* 本文：左は段の列（余白 24/28・段の間 16）、右は幅 380 の列（線で区切る）。 */
+.report-v8-columns { display: flex; align-items: flex-start; min-width: 0; }
+.report-v8-fields { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-an-rp-col-gap); min-width: 0; border: 0; padding: var(--tpl-an-rp-body-pad); margin: 0; }
+.report-v8-card { display: flex; flex-direction: column; gap: var(--tpl-an-rp-card-gap); outline: 1px solid var(--color-hairline); outline-offset: -1px; border-radius: var(--tpl-an-rp-card-radius); background: var(--color-canvas); padding: var(--tpl-an-rp-card-pad); min-width: 0; }
+.report-v8-cardTitle { display: flex; align-items: center; gap: var(--tpl-an-rp-field-gap); margin: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-card-title); font-weight: var(--tpl-an-rp-bold); line-height: normal; }
+.report-v8-cardHead { position: relative; min-width: 0; }
+.report-v8-cardHeadStack { display: flex; flex-direction: column; gap: var(--tpl-an-rp-stack-gap); min-width: 0; }
+.report-v8-cardSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--tpl-an-rp-sub-size); line-height: normal; }
+.report-v8-headCheck { position: absolute; top: 0; right: 0; font-size: var(--tpl-an-rp-sub-size); color: var(--color-ink-secondary); }
+.report-v8-field { display: flex; flex-direction: column; gap: var(--tpl-an-rp-field-gap); min-width: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-sub-size); font-weight: 600; line-height: normal; }
+.report-v8-inputField { font-size: var(--tpl-an-rp-label-size); font-weight: 500; line-height: var(--tpl-an-rp-label-lh); }
+.report-v8-label { display: flex; align-items: center; gap: var(--tpl-an-rp-field-gap); }
+.report-v8-scheduleGrid, .report-v8-alertGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-an-rp-card-gap) var(--tpl-an-rp-grid-gap); align-items: start; }
+.report-v8-sectionCards, .report-v8-alerts { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--tpl-an-rp-list-gap); padding: 0; margin: 0; list-style: none; }
+/* 何を入れますか：1つずつ枠の中に、題と説明を縦に（説明も題と同じ左端）。 */
+.report-v8-selectionCard { display: flex; align-items: center; outline: 1px solid var(--color-hairline); outline-offset: -1px; border-radius: var(--tpl-an-rp-choice-radius); padding: var(--tpl-an-rp-choice-pad); min-width: 0; }
+.report-v8-selectionCard > span { min-width: 0; }
+.report-v8-choice { display: flex; flex-direction: column; gap: var(--tpl-an-rp-stack-gap); min-width: 0; }
+.report-v8-choiceTitle { color: var(--color-ink); font-size: var(--tpl-an-rp-choice-title); font-weight: 600; line-height: normal; }
+.report-v8-choiceDetail { overflow: hidden; color: var(--color-ink-secondary); font-size: var(--tpl-an-rp-choice-detail); line-height: normal; white-space: nowrap; text-overflow: ellipsis; }
+/* 知らせの決めごと：条件ごとの枠（題の行と、2つの入力）。 */
+.report-v8-alertCard { display: flex; flex-direction: column; gap: var(--tpl-an-rp-alert-gap); outline: 1px solid var(--color-hairline); outline-offset: -1px; border-radius: var(--tpl-an-rp-choice-radius); padding: var(--tpl-an-rp-alert-pad); min-width: 0; }
+/* 選んだもの（札）。選んでいないときは同じ高さの1行で知らせる。 */
+.report-v8-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-an-rp-chips-gap); min-width: 0; min-height: var(--tpl-an-rp-chip-h); }
+.report-v8-chip { display: inline-flex; align-items: center; gap: var(--tpl-an-rp-chip-gap); max-width: 100%; padding: var(--tpl-an-rp-chip-pad); border-radius: var(--radius-pill); background: var(--color-surface-pearl); font-size: var(--tpl-an-rp-chip-size); line-height: normal; }
+.report-v8-chipText { overflow: hidden; color: var(--color-ink); white-space: nowrap; text-overflow: ellipsis; }
+.report-v8-chipRemove { padding: 0; border: 0; background: transparent; color: var(--color-ink-secondary); font: inherit; cursor: pointer; }
+.report-v8-chipEmpty { color: var(--color-ink-faint); font-size: var(--tpl-an-rp-chip-size); line-height: normal; }
+.report-v8-linkRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-an-rp-grid-gap); min-width: 0; }
+.report-v8-addLink, .report-v8-sideLink { display: inline-flex; align-items: center; gap: var(--tpl-an-rp-chip-gap); padding: 0; border: 0; background: transparent; font-size: var(--tpl-an-rp-chip-size); font-weight: 600; line-height: normal; cursor: pointer; }
+.report-v8-addLink { color: var(--color-action); }
+.report-v8-sideLink { margin-left: auto; color: var(--color-ink-secondary); }
+.report-v8-addLink, .report-v8-sideLink, .report-v8-chipRemove { min-height: 0; }
+.report-v8-addLink:hover, .report-v8-sideLink:hover { text-decoration: underline; }
+.report-v8-panel { display: grid; gap: var(--tpl-an-rp-alert-gap); min-width: 0; }
+.report-v8-panel[hidden] { display: none; }
+.report-v8-recipients { border: 1px solid var(--color-hairline); border-radius: var(--tpl-an-rp-choice-radius); padding: 0; margin: 0; list-style: none; }
+.report-v8-recipient { padding: var(--tpl-an-rp-choice-pad); min-width: 0; }
+.report-v8-emailRow { display: flex; align-items: center; gap: var(--tpl-an-rp-chips-gap); min-width: 0; }
 .report-v8-emailRow > div { flex: 1 1 0; min-width: 0; }
-.report-v8-sub { margin: 0; font-size: 12px; color: var(--color-ink-secondary); }
+.report-v8-sub { margin: 0; font-size: var(--tpl-an-rp-sub-size); color: var(--color-ink-secondary); }
+
+/* 右の列（幅 380・左に線）。カードは余白 16・間 8。 */
+.report-v8-rail { flex: 0 0 var(--tpl-an-rp-rail-w); display: flex; flex-direction: column; gap: var(--tpl-an-rp-rail-gap); align-self: stretch; padding: var(--tpl-an-rp-rail-pad); border-left: 1px solid var(--color-hairline); min-width: 0; }
+.report-v8-railCard { display: flex; flex-direction: column; gap: var(--tpl-an-rp-railcard-gap); outline: 1px solid var(--color-hairline); outline-offset: -1px; border-radius: var(--tpl-an-rp-card-radius); background: var(--color-canvas); padding: var(--tpl-an-rp-railcard-pad); min-width: 0; }
+.report-v8-railTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-rail-title); font-weight: var(--tpl-an-rp-bold); line-height: normal; }
+.report-v8-railSub { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-an-rp-rail-sub); line-height: normal; }
+.report-v8-preview { display: flex; flex-direction: column; gap: var(--tpl-an-rp-preview-gap); border-radius: var(--tpl-an-rp-choice-radius); background: var(--color-surface-pearl); padding: var(--tpl-an-rp-preview-pad); }
+.report-v8-previewTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-preview-title); font-weight: var(--tpl-an-rp-bold); line-height: normal; }
+.report-v8-previewRow, .report-v8-kvRow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--tpl-an-rp-grid-gap); margin: 0; color: var(--color-ink-secondary); font-size: var(--tpl-an-rp-sub-size); line-height: normal; }
+.report-v8-previewRow strong, .report-v8-kvRow strong { min-width: 0; overflow: hidden; color: var(--color-ink); font-weight: var(--tpl-an-rp-bold); text-align: right; white-space: nowrap; text-overflow: ellipsis; }
+.report-v8-previewMore { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-an-rp-rail-sub); line-height: normal; }
+.report-v8-notes { margin: 0; padding: 0; list-style: none; color: var(--color-ink-secondary); font-size: var(--tpl-an-rp-sub-size); line-height: var(--tpl-an-rp-notes-lh); }
+.report-v8-notes li::before { content: "・"; }
+
 @container (max-width: 1099px) {
   .report-v8-columns { flex-direction: column; }
   .report-v8-fields, .report-v8-rail { width: 100%; }
-  .report-v8-rail { flex-basis: auto; border-left: 0; padding-left: 0; }
+  .report-v8-rail { flex-basis: auto; border-left: 0; }
 }
 @container (max-width: 600px) {
-  .report-v8-columns { padding: 16px; }
-  .report-v8-card { padding: 16px; }
-  .report-v8-scheduleGrid { grid-template-columns: minmax(0, 1fr); }
+  .report-v8-fields { padding: var(--tpl-an-rp-railcard-pad); }
+  .report-v8-card { padding: var(--tpl-an-rp-railcard-pad); }
+  .report-v8-scheduleGrid, .report-v8-alertGrid { grid-template-columns: minmax(0, 1fr); }
 }

@@ -91,7 +91,7 @@
 .loadingIcon {
   flex: 0 0 16px;
   color: var(--color-ink-faint);
-  animation: search-spin 900ms linear infinite;
+  animation: search-spin var(--motion-spin) linear infinite;
 }
 
 @keyframes search-spin {

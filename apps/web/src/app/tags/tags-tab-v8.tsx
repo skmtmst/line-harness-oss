@@ -8,7 +8,9 @@
  * 同じ関数を使う。変えたのは置き場だけ——作る口はフォルダの列の上、
  * フォルダの追加は列の下、行の操作は右端の「…」、人数はリンク。
  */
+import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, CalendarPlus, ListChecks, MoreHorizontal, Tag as TagIcon, Users } from 'lucide-react'
@@ -191,13 +193,15 @@ export default function TagsTabV8({
   const [actionError, setActionError] = useState('')
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsFailed, setStatsFailed] = useState(false)
-  const [query, setQuery] = useState('')
-  const [folder, setFolder] = useState('')
-  const [usageFilter, setUsageFilter] = useState('all')
-  const [sourceFilter, setSourceFilter] = useState('all')
+  /* 絞り込み・検索語は URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
+  const [query, setQuery] = useListUrlParam('q')
+  const [folder, setFolder] = useListUrlParam('folder')
+  const [usageFilter, setUsageFilter] = useListUrlParam('usage', 'all')
+  const [sourceFilter, setSourceFilter] = useListUrlParam('source', 'all')
   const [quick, setQuick] = useState<string[]>([])
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
+  useListScrollMemory(status === 'ready')
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
   const { leavingId, leave } = useRowLeaving()
@@ -263,11 +267,14 @@ export default function TagsTabV8({
    * アカウントを切り替えたら、前のアカウントのフォルダ選択と件数を残さない
    * （v7 と同じ、#981 A04-02）。
    */
+  const previousAccountRef = useRef(accountId)
   useEffect(() => {
     if (fixture) return
     setItems([])
     setGroups([])
-    setFolder('')
+    // 最初の描画では URL のフォルダを残す。切り替えたときだけ外す。
+    if (previousAccountRef.current && previousAccountRef.current !== accountId) setFolder('')
+    previousAccountRef.current = accountId
     setPage(1)
     setOpenMenuId(null)
     setMenuMoveFor(null)
@@ -692,7 +699,11 @@ export default function TagsTabV8({
               <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
               <Button type="button" onClick={() => void load()}>もう一度試す</Button>
             </div>
-          ) : items.length === 0 ? (
+          ) : status === 'ready' && !staleAccount && items.length === 0 ? (
+            /*
+             * 読み込み中は「まだタグがありません」と言わない（動きの点検 15 番）。
+             * 以前は最初の読み込みの間ずっと空の案内が出ていた。読み込み中は下の骨組みへ。
+             */
             <div className={styles.stateCard} data-design-node="U0aKD">
               <span className={styles.stateIcon}>
                 <TagIcon size={20} aria-hidden="true" />
@@ -700,7 +711,7 @@ export default function TagsTabV8({
               <p className={styles.stateTitle}>まだタグがありません</p>
               <p className={styles.stateDesc}>「＋ タグを作る」から最初の1つを作ると、ここに並びます。</p>
             </div>
-          ) : visible.length === 0 ? (
+          ) : status === 'ready' && !staleAccount && visible.length === 0 ? (
             <div className={styles.stateCard} data-design-node="U0aKD">
               <p className={styles.stateTitle}>条件に合うタグはありません</p>
               <p className={styles.stateDesc}>検索語・フォルダ・絞り込みを変えてください。</p>
@@ -727,7 +738,7 @@ export default function TagsTabV8({
                       <Th className={styles.menuCell}><span className="sr-only">操作</span></Th>
                     </TableHeadRow>
                   </thead>
-                  <tbody>
+                  <RovingTbody>
                     {visible.map((tag) => {
                       const group = groups.find((item) => item.id === tag.groupId)
                       const chips = tagLinkChips(tag)
@@ -824,7 +835,7 @@ export default function TagsTabV8({
                         </tr>
                       )
                     })}
-                  </tbody>
+                  </RovingTbody>
                 </table>
               </div>
 

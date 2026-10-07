@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { motionMs } from '@/components/shared/overlay-utils'
 
 /*
  * 行を消すときの合図。`leave(id)` で消え始めの印を付け、150ms
@@ -8,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * 動きを減らす設定では CSS 側が一瞬にするので、待ち自体は残す。
  * まとめて消すときは `leaveMany(ids, finish)` を使う。
  */
+/** 読めないとき（試験・サーバ描画）の控え。本来は --motion-exit から読む（動きの点検 18 番）。 */
 const LEAVE_MS = 150
 
 export function useRowLeaving(): {
@@ -35,7 +37,7 @@ export function useRowLeaving(): {
       timerRef.current = null
       setLeavingIds([])
       void finish()
-    }, LEAVE_MS)
+    }, motionMs('--motion-exit', LEAVE_MS))
   }, [])
 
   const leave = useCallback((id: string, finish: () => void | Promise<void>) => {

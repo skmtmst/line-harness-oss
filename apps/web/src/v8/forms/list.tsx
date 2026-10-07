@@ -9,6 +9,7 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { useListScrollMemory } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -46,6 +47,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -226,6 +228,8 @@ export default function FormsListV8() {
   const [folderTotal, setFolderTotal] = useState(0)
   const [activeFolderId, setActiveFolderId] = useState('all')
   const [loading, setLoading] = useState(true)
+  /* 戻ってきたら前のスクロール位置へ（絞り込みは前から URL に置いている）。 */
+  useListScrollMemory(!loading)
   const [loadError, setLoadError] = useState('')
   /** 掴んだ失敗そのもの。403（権限不足）と 503（通信失敗）の案内を言い分ける。 */
   const [loadFailure, setLoadFailure] = useState<unknown>(null)
@@ -499,6 +503,11 @@ export default function FormsListV8() {
   const visibleForms = reviewMode
     ? clientFilteredForms.slice(pageStart, pageStart + pageSize)
     : forms
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。無ければ未分類の輪。 */
+  const folderDotOf = (folderId: string | null | undefined) => {
+    const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
 
   const activeIndex = reviewMode ? -1 : visibleForms.findIndex((form) => form.id === activeId)
   const active = activeIndex >= 0 ? visibleForms[activeIndex] : null
@@ -1239,7 +1248,7 @@ export default function FormsListV8() {
                   <NameCell
                     name={
                       <span className={styles.nameLine}>
-                        {nameNode}
+                        <FolderDotName folder={folderDotOf(form.folderId)}>{nameNode}</FolderDotName>
                         {reviewMode && form.accountScopeReviewRequired ? (
                           <span className={styles.reviewBadge}>管理者確認</span>
                         ) : null}

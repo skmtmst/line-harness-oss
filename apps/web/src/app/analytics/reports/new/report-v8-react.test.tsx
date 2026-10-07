@@ -58,6 +58,7 @@ const net = vi.hoisted(() => ({
   getDeferred: [] as Array<(value: Response) => void>,
   latestVersion: '2026-09-01T00:00:00.000Z',
   latestName: null as string | null,
+  role: 'owner' as 'owner' | 'staff',
 }))
 
 function installFetch() {
@@ -65,7 +66,7 @@ function installFetch() {
     const raw = typeof input === 'string' ? input : String(input)
     const url = new URL(raw.startsWith('http') ? raw : `https://worker.example.com${raw}`)
     if (url.pathname === '/api/staff/me') {
-      return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200 })
+      return new Response(JSON.stringify({ success: true, data: { role: net.role } }), { status: 200 })
     }
     if (url.pathname.startsWith('/api/analytics/report-schedules/report-1') && (init?.method ?? 'GET') === 'PUT') {
       if (net.putMode === 'failure') {
@@ -184,7 +185,24 @@ describe('V8 レポート作成（H5UoIu）', () => {
     expect(container.textContent).toContain('こう届きます')
     expect(container.textContent).toContain('レポートが見ているもの')
     expect(container.textContent).toContain('数は送る時刻の時点で集めます')
-    expect(container.textContent).toContain('宛先がブロックしていると、LINEでは届きません')
+    expect(container.textContent).toContain('宛先がブロックしていると、LINE では届きません')
+  })
+
+  it('閲覧のみ：作る・送る・宛先を足す・選ぶ・札の × を置かない（帯は出す）', async () => {
+    net.role = 'staff'
+    try {
+      await mount()
+      await settle()
+      const text = container.textContent ?? ''
+      expect(text).toContain('運用担当は内容を確認できます')
+      for (const label of ['つくって動かす', '今すぐ1回だけ送る', '＋ 宛先を足す', '＋ 保存した分析を選ぶ']) {
+        expect([...container.querySelectorAll('button, a')].some((item) => item.textContent?.trim() === label)).toBe(false)
+      }
+      expect(container.querySelector('.report-v8-chipRemove')).toBeNull()
+      expect([...container.querySelectorAll('button, a')].some((item) => item.textContent?.trim() === 'キャンセル')).toBe(true)
+    } finally {
+      net.role = 'owner'
+    }
   })
 
   it('名前が空のまま押すと欄の下に文が出る', async () => {
@@ -310,8 +328,8 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
 
     // 板が競合になり、帯が出る。入力は残る（最新の名前で上書きしない）。
     expect(container.querySelector('[data-design-node="G83vi"]')).toBeTruthy()
-    expect(container.textContent).toContain('ほかの人がこのレポートを先に保存しました')
-    expect(container.textContent).toContain('入力は残っています。相手の変更を確認してから保存してください。')
+    expect(container.textContent).toMatch(/ほかの人が.*このレポートを.*保存しました/)
+    expect(container.textContent).toContain('このまま保存すると、相手の変更が消えます。入力は残っています。')
     expect((container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('わたしの入力')
     // 下の帯の主ボタンは比べる向きになる
     expect(buttonByText('比べてから保存')).toBeTruthy()

@@ -10,7 +10,7 @@
  * 読み込みの失敗を画面に出すときの1文。題の「読み込めませんでした」と
  * 重ねない (★V7)。画面ごとの一言は LoadErrorView の note に足す。
  */
-export const LOAD_FAILED_MESSAGE = '電波の良いところで、もう一度お試しください。';
+export const LOAD_FAILED_MESSAGE = '電波のよいところで、もう一度お試しください。';
 
 /** 読み直しのボタンの文言。全画面で同じにする。 */
 export const RETRY_LABEL = 'もう一度読み込む';

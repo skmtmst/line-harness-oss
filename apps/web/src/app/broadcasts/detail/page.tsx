@@ -34,7 +34,7 @@ import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useStaffRole } from '@/lib/staff-role'
 import { canEditFeature } from '@/lib/staff-capability'
-import BroadcastDetailV8 from '../detail-v8'
+import BroadcastDetailV8 from '@/v8/broadcast-detail/detail'
 
 function BroadcastDetailInner() {
   const params = useSearchParams()
@@ -501,6 +501,8 @@ function BroadcastDetailInner() {
           accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
           tab={tab}
           onSelectTab={selectTab}
+          recipients={<BroadcastRecipients broadcastId={broadcast.id} total={broadcast.totalCount} version={broadcast.version ?? 1} />}
+          activity={<BroadcastActivity broadcastId={broadcast.id} formatDateTime={formatBroadcastDateTime} />}
           onExportCsv={exportCsv}
           onReload={() => setReloadToken((value) => value + 1)}
           conflict={conflict}

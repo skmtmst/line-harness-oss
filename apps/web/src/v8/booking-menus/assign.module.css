@@ -1,0 +1,267 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8「担当メニューをまとめて決める」（板 ooufy）の、升目表と升の編集段だけの
+ * 見た目。板の外枠・頭・帯は settings-v8.module.css（shell）を借りる。
+ * 値は全部トークン（直書きを数える試験がある）。
+ */
+
+/* ===== メニュー×スタッフの升目表 ===== */
+
+/* スタッフが多いときは表の中だけ横に送る（画面全体を横スクロールさせない）。 */
+.matrixWrap {
+  overflow-x: auto;
+}
+
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.matrix th,
+.matrix td {
+  height: var(--tpl-bm-48);
+  padding: 0 var(--tpl-bm-8);
+  box-shadow: var(--shadow-row-line);
+  vertical-align: middle;
+}
+
+.matrix thead th {
+  height: auto;
+  padding-top: 0;
+  padding-bottom: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-17);
+}
+
+.matrixMenuHead {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  text-align: left;
+}
+
+/* スタッフの列は中身に合わせた固定幅。名は1行のまま省略。 */
+.matrixStaffHead {
+  width: var(--tpl-bm-120);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  text-align: center;
+}
+
+.matrixStaffName {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matrixStaffOff {
+  margin-left: var(--tpl-bm-4);
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-10);
+  font-weight: 400;
+}
+
+.matrixRowFocus {
+  background: var(--color-accent-soft);
+}
+
+/* 1列目（メニュー名）が伸び縮みする。名は左寄せ（th の既定は中央なので戻す）。 */
+.matrixMenuCell {
+  min-width: 0;
+  text-align: left;
+}
+
+.matrixMenuName {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 600;
+  line-height: var(--tpl-bm-19);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 升：押すとその升が「升を押したとき」の段の対象になる。板は升自体に色を付けない。 */
+.matrixCell {
+  text-align: center;
+  cursor: pointer;
+}
+
+.cellBox {
+  position: relative;
+  display: inline-flex;
+  /*
+   * 中のチェックの押せる範囲は見た目より外へ 3px 広い（24×24）。
+   * 枠をその分だけ内に余白を足して、外へのはみ出しに数えない。
+   * 外側の -3px で升の並びは動かさない。上書きの点（外へ4px）も中に収まる。
+   */
+  padding: var(--tpl-bm-3);
+  margin: calc(var(--tpl-bm-3) * -1);
+}
+
+/* 上書きがある升の印（小さい黄の点）。 */
+.ovrDot {
+  position: absolute;
+  right: calc(var(--tpl-bm-4) * -1);
+  bottom: calc(var(--tpl-bm-4) * -1);
+  width: var(--tpl-bm-8);
+  height: var(--tpl-bm-8);
+  border: var(--tpl-bm-2) solid var(--color-canvas);
+  border-radius: var(--radius-pill);
+  background: var(--color-warning);
+}
+
+/* ===== 升の中身を変える段（升目表の内側にある、枠付きの小段） ===== */
+
+.overrideCard {
+  padding: var(--tpl-bm-16);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.overrideTitle {
+  margin: 0 0 var(--tpl-bm-12);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-14);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.overrideFields {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-bm-12);
+}
+
+.field {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-bm-6);
+  margin-bottom: var(--tpl-bm-6);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 500;
+}
+
+.unitField {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+  height: var(--tpl-bm-36);
+  padding: 0 var(--tpl-bm-12);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-board);
+}
+
+.unitField:focus-within {
+  border-color: var(--color-accent);
+  outline: var(--tpl-bm-2) solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.unitField input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-14);
+  font-variant-numeric: tabular-nums;
+}
+
+.unitField input:focus-visible {
+  outline: none;
+}
+
+.unitField input:disabled {
+  color: var(--color-ink-faint);
+}
+
+.unitSuffix {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-12);
+  white-space: nowrap;
+}
+
+.overrideClear {
+  flex-shrink: 0;
+}
+
+/* 段の下の説明行：升の印の見本。 */
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-8);
+  margin-top: var(--tpl-bm-12);
+}
+
+.legendCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-bm-18);
+  height: var(--tpl-bm-18);
+  flex-shrink: 0;
+  border-radius: var(--radius-icon);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+}
+
+.legendName {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 600;
+}
+
+.ovrBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bm-4);
+  padding: var(--tpl-bm-2) var(--tpl-bm-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+  font-size: var(--tpl-bm-11);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ovrBadgeDot {
+  width: var(--tpl-bm-6);
+  height: var(--tpl-bm-6);
+  border-radius: var(--radius-pill);
+  background: var(--color-warning);
+}
+
+.legendCaption {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-12);
+}
+
+/* ===== 下の帯（保存）：板ではボタンが真ん中 ===== */
+
+.saveBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tpl-bm-8);
+  padding: var(--tpl-bm-12) var(--tpl-bm-24);
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  box-shadow: var(--v8-savebar-shadow);
+}

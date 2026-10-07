@@ -180,13 +180,13 @@ async function typeNumber(ariaLabel: string, value: string) {
 const writeCalls = (method: string) => net.calls.filter((call) => call.method === method)
 
 describe('定期レポートの「入れる項目」(N-284)', () => {
-  it('数字を出せない「マイルと紹介」は新規には選べず、理由を添える', async () => {
+  it('数字を出せない「マイル」は新規には選べず、理由を添える', async () => {
     await render()
 
-    const mileage = sectionCheckbox('マイルと紹介')
+    const mileage = sectionCheckbox('マイル')
     expect(mileage.disabled).toBe(true)
     expect(mileage.checked).toBe(false)
-    expect(host.textContent).toContain('まだ接続されていません')
+    expect(host.textContent).toContain('まだ集計できません')
 
     // ほかの節はふつうに選べる。
     expect(sectionCheckbox('友だちの増減').disabled).toBe(false)
@@ -204,14 +204,14 @@ describe('定期レポートの「入れる項目」(N-284)', () => {
     fixture.editId = 'report-1'
     await render()
 
-    const mileage = sectionCheckbox('マイルと紹介')
+    const mileage = sectionCheckbox('マイル')
     expect(mileage.disabled).toBe(false)
     expect(mileage.checked).toBe(true)
 
     // 外すと保存できる。外したあとはもう付け直せない。
     await act(async () => { mileage.click(); await Promise.resolve() })
-    expect(sectionCheckbox('マイルと紹介').checked).toBe(false)
-    expect(sectionCheckbox('マイルと紹介').disabled).toBe(true)
+    expect(sectionCheckbox('マイル').checked).toBe(false)
+    expect(sectionCheckbox('マイル').disabled).toBe(true)
 
     await act(async () => { button('変更を保存する').click(); await Promise.resolve() })
     const put = writeCalls('PUT').at(-1)

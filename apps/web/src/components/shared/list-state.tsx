@@ -18,7 +18,7 @@ import styles from './list-state.module.css'
  *       `OLMp0` 表示できませんでした（★V6 4-2-C `yKEdO` で3つ並べてある）
  *
  * **`forbidden` に対応する設計の部品は無い。** 設計は「権限不足とエラーは
- * 今までどおり」としか決めていない（`docs/v6-design-review-handoff.md`）。
+ * 今までどおり」としか決めていない。
  * 見た目は `BDOJu` と同じ枠のまま、絵と文言だけ変えている。
  * 専用の部品が描かれたら、ここを合わせ直す。
  */

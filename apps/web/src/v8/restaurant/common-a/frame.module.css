@@ -1,0 +1,94 @@
+/*
+ * ★V8 飲食店向けの器（担当 a）。値は globals.css の `[data-theme="v8"]` の `--tpl-rt-*`。
+ * 中身 V8（CHz31）：上16・左右24・下24、段の間16。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-body-gap);
+  padding: var(--tpl-rt-body-pad);
+  min-width: 0;
+}
+
+/* 検証環境の帯（CHz31「検証環境の帯」）：薄い金色の地＋緑の札＋右の注意。間12。 */
+.boundary {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-band-gap);
+  padding: var(--tpl-rt-band-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  outline: 1px solid var(--tpl-rt-band-line);
+  outline-offset: -1px;
+  background: var(--tpl-rt-band-bg);
+  min-width: 0;
+}
+
+.boundaryBadge {
+  flex: 0 0 auto;
+  padding: var(--tpl-rt-band-badge-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.boundaryText {
+  margin: 0;
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.boundarySpacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.boundaryDot {
+  flex: 0 0 auto;
+  width: var(--tpl-rt-band-dot);
+  height: var(--tpl-rt-band-dot);
+  border-radius: var(--radius-pill);
+  background: var(--tpl-rt-band-dot-color);
+}
+
+.boundaryNote {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.notice {
+  padding: var(--tpl-rt-notice-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.noticeSuccess {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.noticeError {
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+}
+
+.stateBox {
+  padding: var(--tpl-rt-state-pad);
+  border-radius: var(--tpl-rt-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}

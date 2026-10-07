@@ -47,7 +47,7 @@ import {
 } from './first-step-form'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import ScenarioFirstStepV8 from '../first-step-v8'
+import ScenarioFirstStepV8 from '@/v8/scenario-first-step/first-step'
 
 /**
  * ステップの作成（設計の3段目）。
@@ -278,7 +278,7 @@ function FirstStepContent() {
    * 本文が上限を超えているか。
    *
    * 超えたまま保存を押せると、LINEに渡してから弾かれる。押せない形にして、
-   * 理由を操作のそばに出す（`docs/v6-common-rules.md` §1 の言葉の決まり）。
+   * 理由を操作のそばに出す（`docs/v8-design-rules.md` §5 の言葉の決まり）。
    */
   const bodyLength = countTemplateTextCharacters(body)
   const bodyOverLimit =
@@ -844,7 +844,7 @@ function FirstStepContent() {
 
       {/*
         保存系の操作は本文の最下部の追従バーにだけ置く
-        （`docs/v6-common-rules.md` §1-6、#642）。左は削除・状態用に
+        （`docs/v8-design-rules.md` §5、#642）。左は削除・状態用に
         空け、操作群は中央へ揃える。
       */}
       <StickyBar

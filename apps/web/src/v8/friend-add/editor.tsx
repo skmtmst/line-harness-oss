@@ -12,6 +12,7 @@
  * （口・版・下書き・冪等の鍵の扱いを変えない）。違うのは見せ方と、先に保存された
  * ときの帯（違いを比べる・最新を読み込んで続ける）。BEHAVIOR.md に書き出した。
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import Link from 'next/link'
@@ -627,16 +628,15 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
           : `名前：${rule.name || '（未入力）'}・いまは${statusLabel}です`}
         {/* 先に保存されたとき（h5rm8t）：頭の中、説明の下に横いっぱいの帯。 */}
         {conflict ? (
-          <div className={styles.conflictBand} role="alert">
-            <CircleAlert size={18} aria-hidden="true" className={styles.conflictIcon} />
-            <div className={styles.conflictText}>
-              <p className={styles.conflictTitle}>ほかの人が先に初回案内「{rule.name}」を保存しました</p>
-              <p className={styles.conflictDesc}>あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。</p>
-            </div>
-            <div className={styles.conflictActions}>
-              <Button type="button" onClick={() => void openCompare()} disabled={compareBusy} busy={compareBusy} busyLabel="比べています…">違いを比べる</Button>
-              <Button type="button" variant="primary" onClick={() => void reloadAfterConflict()}>最新を読み込んで続ける</Button>
-            </div>
+          /* 帯は共通部品（save-conflict）に寄せた。比べる窓は項目を左右に並べるこの画面のものを使う。 */
+          <div className={styles.conflictSlot}>
+            <SaveConflictBand
+              title={`ほかの人が先に初回案内「${rule.name}」を保存しました`}
+              designNode="h5rm8t"
+              compareBusy={compareBusy}
+              onCompare={() => void openCompare()}
+              onReload={() => void reloadAfterConflict()}
+            />
           </div>
         ) : null}
       </>}

@@ -1,0 +1,201 @@
+/*
+ * ★V8 予約スタッフの画面の骨組み（CcA4k・d5fmnM・E3YDK・wvGke 共通）。
+ * 白い板1枚：頭（戻る・題・説明・下に線）→ 中身（左＝カードの列、右＝お客さまの画面の見本・左に線）。
+ * 白い板そのものは外側（app-shell）が持つ。ここでは中身だけ。値は全部 --tpl-bks-*。
+ */
+.shell {
+  display: flex;
+  flex-direction: column;
+  margin: var(--tpl-bks-shell-margin);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bks-head-gap);
+  padding: var(--tpl-bks-head-pad);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bks-back-gap);
+  width: fit-content;
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-bks-back-lh);
+  text-decoration: none;
+}
+
+.backLink:hover { text-decoration: underline; }
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bks-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-bks-title-lh);
+}
+
+.desc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-bks-desc-lh);
+}
+
+.body {
+  display: flex;
+  align-items: stretch;
+}
+
+.main {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-bks-main-gap);
+  min-width: 0;
+  padding: var(--tpl-bks-main-pad);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--tpl-bks-side-gap);
+  width: var(--tpl-bks-side-w);
+  padding: var(--tpl-bks-side-pad);
+  border-left: 1px solid var(--color-hairline);
+}
+
+.sideActions { display: flex; flex-direction: column; }
+
+/* 絵は1行（列の右の余白へ少しはみ出す）。折り返さない。 */
+.sideTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bks-side-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-bks-side-title-lh);
+  white-space: nowrap;
+}
+
+.phoneSlot { display: flex; justify-content: center; }
+
+/* 枠1本・角12・余白20・間12 のカード。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bks-card-gap);
+  padding: var(--tpl-bks-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bks-head-row-gap);
+}
+
+.cardTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bks-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-bks-card-title-lh);
+}
+
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-bks-note-lh);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bks-field-gap);
+  min-width: 0;
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-bks-label-lh);
+}
+
+.smallLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-bks-small-label-lh);
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  height: var(--tpl-bks-input-h);
+  padding: var(--tpl-bks-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-body);
+  line-height: var(--tpl-bks-input-lh);
+}
+
+.input:focus-visible { outline: var(--tpl-bks-ring) solid var(--color-action); }
+.input[aria-invalid='true'] { outline-color: var(--color-danger); }
+.input:disabled { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
+
+.fieldError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-bks-note-lh);
+}
+
+.warnBand {
+  margin: 0;
+  padding: var(--tpl-bks-link-band-pad);
+  border-radius: var(--tpl-bks-link-band-radius);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+  font-size: var(--text-label);
+  line-height: var(--tpl-bks-switch-lh);
+}
+
+/* 下の操作（キャンセル・保存）。中身が短いときはカードのすぐ下、長いときは画面の下に追従する。 */
+.actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: var(--tpl-bks-actions-gap);
+  padding: var(--tpl-bks-actions-pad);
+  background: var(--color-canvas);
+}
+
+/* 板が狭いとき（1152 の画面）：右の列は畳む（スマホの見本は「お客さまに見える画面を確かめる」から開く）。 */
+@media (max-width: 1279px) {
+  .side { width: auto; max-width: 40%; }
+  .phoneSlot { display: none; }
+}
+
+@media (max-width: 767px) {
+  .body { flex-direction: column; }
+  .side { max-width: none; border-left: 0; border-top: 1px solid var(--color-hairline); }
+}
