@@ -545,6 +545,8 @@ shared-button-importer v8/webhooks/sheets.tsx
 shared-button-importer v8/analytics/funnel-form.tsx
 shared-button-importer v8/login/two-factor-ops.tsx
 shared-button-importer v8/scenarios/list.tsx
+shared-button-importer v8/scenarios/create.tsx
+shared-button-importer v8/scenarios/results.tsx
 shared-button-importer v8/webinars/list.tsx
 shared-button-importer v8/mileage/frame.tsx
 shared-button-importer v8/mileage/parts.tsx
