@@ -12,7 +12,8 @@ import type { FormRefs } from '@/components/forms/form-refs'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { TextInput } from '@/components/shared/form-controls'
-import { DragHandle, RowActions } from '@/components/shared/row-actions'
+import { RowActions } from '@/components/shared/row-actions'
+import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import Segmented from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { ACTION_ADDERS, describeAfterAction, emptyAction } from './model'
@@ -44,13 +45,16 @@ export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChan
   const ending = options.thanksUrl ? 'url' : 'thanks'
 
   const setActions = (next: FormAction[]) => onChangeOptions({ afterActions: next })
-  const move = (from: number, to: number) => {
-    if (to < 0 || to >= actions.length || from === to) return
-    const next = [...actions]
-    const [row] = next.splice(from, 1)
-    next.splice(to, 0, row)
-    setActions(next)
-  }
+  /*
+   * 並べ替え（共通の並び替え）。つまみのドラッグ・上下キー・「…」の上へ／下へは
+   * どれも同じ入口で並びを変える。行うことには id が無いので、今の位置を目印にする。
+   */
+  const slots = actions.map((_, index) => String(index))
+  const reorder = useReorder({
+    items: slots,
+    idOf: (slot) => slot,
+    onReorder: ({ ids }) => setActions(ids.map((slot) => actions[Number(slot)])),
+  })
 
   return (
     <>
@@ -95,29 +99,28 @@ export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChan
           <p className={styles.cardNote}>上から順に行います。カルーセル・質問・自動応答からも同じ画面が開きます</p>
         </div>
         {actions.length === 0 ? <p className={styles.emptyBlocks}>行うことはまだありません。下から足せます</p> : null}
-        {actions.map((action, index) => {
+        {reorder.shown.map((slot, position) => {
+          const index = Number(slot)
+          const action = actions[index]
           const text = describeAfterAction(action, refs)
           return (
-            <div key={index} className={styles.actionRow}>
-              <DragHandle
-                label={`「${text}」を並べ替える`}
+            <div key={slot} className={styles.actionRow} {...reorder.rowProps(slot)}>
+              <ReorderHandle
+                look="icon"
+                label={text}
+                ariaLabel={`「${text}」を並べ替える`}
                 className={styles.grip}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                    e.preventDefault()
-                    move(index, index + (e.key === 'ArrowUp' ? -1 : 1))
-                  }
-                }}
+                {...reorder.handle(slot)}
+                {...reorder.handleProps(slot)}
               />
-              <span className={styles.actionNum}>{index + 1}</span>
+              <span className={styles.actionNum}>{position + 1}</span>
               <button type="button" className={styles.actionText} title={text} onClick={() => setEditing(actions)}>{text}</button>
               <RowActions
                 className={styles.more}
                 subjectName={`「${text}」`}
                 menuItems={[
                   { id: 'edit', label: '直す', onSelect: () => setEditing(actions) },
-                  { id: 'up', label: '上へ', disabled: index === 0, onSelect: () => move(index, index - 1) },
-                  { id: 'down', label: '下へ', disabled: index === actions.length - 1, onSelect: () => move(index, index + 1) },
+                  ...reorder.menuItems(slot).map((item) => ({ ...item, id: item.id === 'move-up' ? 'up' : 'down', disabledReason: undefined })),
                 ]}
                 destructiveItem={{ id: 'remove', label: '消す', onSelect: () => setActions(actions.filter((_, i) => i !== index)) }}
               />
