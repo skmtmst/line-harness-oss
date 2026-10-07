@@ -722,6 +722,7 @@ shared-button-importer v8/contents/media-replacement-dialog.tsx
 shared-button-importer v8/contents/media-upload-dialog.tsx
 shared-button-importer v8/line-notifications/operator-edit.tsx
 shared-button-importer v8/no-permission/no-permission.tsx
+shared-button-importer v8/not-found/not-found.tsx
 shared-button-importer components/friends/schedule-dialog.tsx
 # ★V8 予約スタッフの登録（CcA4k）・勤務とシフト（d5fmnM・E3YDK・wvGke）を src/v8/booking-staff に一から書いた。
 shared-button-importer v8/booking-staff/shifts.tsx
