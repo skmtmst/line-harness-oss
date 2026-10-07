@@ -1,0 +1,207 @@
+/*
+ * ★V8 友だち属性の作る・直す画面（タグを作る d9xoI ほか）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
+ * ここは段のカード（枠1・角12・余白20・間14）と欄・右の列の中身だけ。寸法は globals.css の --tpl-cn-*・--tpl-tg2-*。
+ */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-compact-gap);
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-back-lh);
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-card-gap);
+  padding: var(--tpl-cn-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-card-head-gap);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-cn-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-cn-card-title-lh);
+}
+
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-field-gap);
+  min-width: 0;
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-cn-label-lh);
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  height: var(--tpl-cn-control-h);
+  padding: var(--tpl-cn-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--tpl-tg2-input-lh);
+}
+
+.input:focus-visible {
+  outline: var(--tpl-tag-ring) solid var(--color-action);
+}
+
+.input:disabled {
+  background: var(--color-canvas-sunken);
+}
+
+/* 選ぶ欄（絵 320）。 */
+.selectBox {
+  width: var(--tpl-tg2-select-w);
+  max-width: 100%;
+}
+
+.selectBox :global(*) {
+  max-width: 100%;
+}
+
+.fieldNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.inlineRetry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-cn-field-gap);
+}
+
+/* 切り替えの行（左に題と説明、右にスイッチ）。 */
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-field-row-gap);
+}
+
+.switchText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-tg2-card-head-gap);
+  min-width: 0;
+}
+
+.switchTitle {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-name-lh);
+}
+
+.switchNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tg2-safety-body-size);
+  line-height: var(--tpl-cn-sub-lh);
+}
+
+/* 付け方の3枚（地は薄い灰・角10・余白14・間6）。 */
+.waysRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-tg2-ways-gap);
+}
+
+.way {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-field-gap);
+  padding: var(--tpl-tg2-way-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+  color: var(--color-ink);
+}
+
+a.way:hover {
+  outline: 1px solid var(--color-hairline);
+}
+
+.wayIcon {
+  width: var(--tpl-tag-ro-icon);
+  height: var(--tpl-tag-ro-icon);
+  color: var(--color-ink-secondary);
+}
+
+.wayTitle {
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-name-lh);
+}
+
+.wayNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tg2-safety-body-size);
+  line-height: var(--tpl-cn-sub-lh);
+}
+
+/* 右の列（このあと）。型の右の列の地を白にし、上に寄せる。 */
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-aside-gap);
+  width: 100%;
+}
+
+.asideTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-cn-card-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-tg2-aside-title-lh);
+}
+
+.asideText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-tg2-aside-text-lh);
+}
