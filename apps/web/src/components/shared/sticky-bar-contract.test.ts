@@ -157,6 +157,22 @@ describe('下部追従バーの並びを部品で固定する', () => {
     expect(CSS).not.toMatch(/\.bar\s*\{[^}]*1fr auto auto 1fr/s)
   })
 
+  /*
+   * 2026-10-07: `GcuH5` を薄い文字で出していて絵と違った（差し戻し）。
+   * 直し方は「帯に色を足す」ではなく「札の部品を渡す」。帯は40画面以上で
+   * 共有していて、ここへ色を埋めると関係のない画面まで緑になる。
+   */
+  it('一言の置き場所だけを持ち、画面ごとの見た目は埋めない', () => {
+    const info = CSS.match(/\.info \{([^}]*)\}/s)?.[1] ?? ''
+    expect(info, '.info の規定が無い').not.toBe('')
+    expect(info).not.toMatch(/background/)
+    expect(info).not.toMatch(/border-radius/)
+    expect(info).not.toMatch(/--color-accent/)
+    expect(info).not.toMatch(/font-size/)
+    // 札は中身の部品が描く。帯がアイコンを持たない。
+    expect(BAR).not.toMatch(/lucide-react/)
+  })
+
   it('一言を置いても右端は空ける', () => {
     // 一言は `actions` の前。右端の空き箱はそのまま残す。
     expect(BAR.indexOf('{info ?')).toBeLessThan(BAR.indexOf('styles.actions'))

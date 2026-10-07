@@ -61,10 +61,15 @@
   grid-template-columns: 1fr auto auto 1fr;
 }
 
+/*
+ * ここは**置き場所だけ**を決める。色・形・アイコンは中身の部品が持つ
+ * （★BG-B の札は `components/hq/banners/export-size-chip.module.css`）。
+ * 帯は40画面以上で共有しているので、ひとつの画面の見た目をここへ埋めない。
+ */
 .info {
-  color: var(--color-ink-faint); /* fill: $ink-faint */
-  font-size: var(--text-caption); /* fontSize: $size-caption */
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .actions {
@@ -90,9 +95,9 @@
     justify-content: flex-end;
   }
 
-  /* 2段に折れたら、長い一言は折り返してよい（横には出さない）。 */
+  /* 2段に折れたら、一言は操作と同じ右そろえにする（横スクロールは出さない）。 */
   .info {
-    white-space: normal;
+    justify-content: flex-end;
   }
 }
 }

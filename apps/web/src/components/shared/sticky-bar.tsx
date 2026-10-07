@@ -39,7 +39,11 @@ export default function StickyBar({
   status?: ReactNode
   /**
    * 操作の手前に添える**読むだけの一言**。押したときに何が起きるかを
-   * 先に見せる用（例: ★BG-B `GcuH5`「1040 × 1040 で書き出します」）。
+   * 先に見せる用（例: ★BG-B `WDJak`「中 サイズ確認」の札
+   * `components/hq/banners/export-size-chip.tsx`）。
+   *
+   * **帯は置き場所だけを持つ。** 色・形・アイコンは渡す側の部品が持つ。
+   * 帯は40画面以上で共有しているので、ひとつの画面の見た目をここへ埋めない。
    *
    * ここにボタンや入力を置かない。置くと「操作は中央」が崩れる。
    * 渡さない画面は今までどおり左=状態／中央=操作のままで、見た目は変わらない。
@@ -59,7 +63,7 @@ export default function StickyBar({
         {destructive}
         {status ? <p className={styles.status}>{status}</p> : null}
       </div>
-      {info ? <p className={styles.info}>{info}</p> : null}
+      {info ? <div className={styles.info}>{info}</div> : null}
       <div className={styles.actions}>{actions}</div>
       {/* 右端は空ける。ここに何か置くと中央が中央でなくなる。 */}
       <div aria-hidden="true" />
