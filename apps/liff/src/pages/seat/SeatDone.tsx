@@ -1,6 +1,6 @@
 import type { RestaurantCustomerBooking } from '@line-crm/shared';
 import Icon from '../../components/ui/Icon.js';
-import { STATUS_LABEL, changeRule, longDate, zonedParts } from '../../lib/seat-reserve.js';
+import { STATUS_LABEL, changeRule, longDate, seatTypeLabel, zonedParts } from '../../lib/seat-reserve.js';
 
 /**
  * ③ 受け付けました (★V8 sAnyy)。緑の丸の印＋題＋説明＋日時・人数・状態の箱。
@@ -21,7 +21,7 @@ export default function SeatDone({
   const p = zonedParts(booking.startsAt, timeZone);
   const rows: Array<[string, string]> = [
     ['日時', `${longDate(p.date)}${p.hm}〜`],
-    ['人数', `${booking.guestCount}名`],
+    ['人数', `${booking.guestCount}名${seatTypeLabel(booking.seatType) ? `・${seatTypeLabel(booking.seatType)}` : ''}`],
     ['状態', STATUS_LABEL[booking.status] ?? booking.status],
   ];
   return (

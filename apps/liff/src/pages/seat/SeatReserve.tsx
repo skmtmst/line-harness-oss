@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import liff from '@line/liff';
-import type { RestaurantCustomerBooking } from '@line-crm/shared';
+import type { RestaurantCustomerBooking, RestaurantLateArrivalPolicy, RestaurantUnavailableReason } from '@line-crm/shared';
 import LiffHeader from '../../components/ui/LiffHeader.js';
 import LiffLookScope from '../../components/LiffLookScope.js';
 import Stepper from '../../components/ui/Stepper.js';
@@ -16,8 +16,15 @@ import { logFailure } from '../../lib/user-message.js';
 import {
   addDays,
   dayChips,
+  dayReason,
+  hasOpenSlot,
+  lateRule,
   longDate,
   newRequestId,
+  normalizePhone,
+  noteProblem,
+  phoneProblem,
+  seatText,
   seatErrorMessage,
   upcomingBookings,
   zonedParts,
@@ -50,6 +57,12 @@ export default function SeatReserve() {
   const [today, setToday] = useState('');
   const [chips, setChips] = useState<DayChip[]>([]);
   const [days, setDays] = useState<Record<string, DaySlots>>({});
+  /* 空きが無い日の理由と、店の遅れたときの決まり（空きの口が返す）。 */
+  const [reasons, setReasons] = useState<Record<string, RestaurantUnavailableReason | undefined>>({});
+  const [late, setLate] = useState<RestaurantLateArrivalPolicy | null>(null);
+  /* ご要望・電話（任意）。確定の口へ送る。 */
+  const [note, setNote] = useState('');
+  const [phone, setPhone] = useState('');
   const [guestCount, setGuestCount] = useState(DEFAULT_GUESTS);
   const [date, setDate] = useState('');
   const [startsAt, setStartsAt] = useState<string | null>(null);
@@ -75,6 +88,8 @@ export default function SeatReserve() {
         const r = await restaurantBookingApi.availability(s.id, d, guests);
         if (gen !== generation.current) return;
         setCancelMinutes(r.data.cancelDeadlineMinutesBefore);
+        setLate(r.data.lateArrivalPolicy ?? null);
+        setReasons((prev) => ({ ...prev, [d]: hasOpenSlot(r.data.slots) ? undefined : dayReason(r.data.slots, r.data.unavailableReason) }));
         setDays((prev) => ({ ...prev, [d]: r.data.slots }));
       } catch (e) {
         if (gen !== generation.current) return;
@@ -216,6 +231,11 @@ export default function SeatReserve() {
 
   async function finish() {
     if (!store) return;
+    const problem = target ? '' : noteProblem(note) || phoneProblem(phone);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -225,7 +245,10 @@ export default function SeatReserve() {
             startsAt: slot!.startsAt,
             guestCount,
           })
-        : await restaurantBookingApi.confirm(hold!.id, hold!.version);
+        : await restaurantBookingApi.confirm(hold!.id, hold!.version, {
+            note: note.trim() || null,
+            customerPhone: normalizePhone(phone) || null,
+          });
       setResult({ booking: r.data, changed: !!target });
       setHold(null);
       setTarget(null);
@@ -296,6 +319,8 @@ export default function SeatReserve() {
   }
 
   function newBooking() {
+    setNote('');
+    setPhone('');
     setTarget(null);
     setResult(null);
     setStartsAt(null);
@@ -342,6 +367,7 @@ export default function SeatReserve() {
               today={today}
               chips={chips}
               days={days}
+              reasons={reasons}
               guestCount={guestCount}
               date={date}
               startsAt={startsAt}
@@ -361,6 +387,12 @@ export default function SeatReserve() {
                 endsAt={slot.endsAt}
                 guestCount={guestCount}
                 cancelDeadlineMinutesBefore={minutes}
+                seat={seatText(target ? target.seatType : hold?.seatType, slot.seatTypes)}
+                late={lateRule(late)}
+                note={target ? (target.note ?? '') : note}
+                phone={target ? (target.customerPhone ?? '') : phone}
+                onNote={setNote}
+                onPhone={setPhone}
                 holdExpiresAt={target ? null : (hold?.holdExpiresAt ?? null)}
                 holdMinutes={holdMinutes}
                 reschedule={!!target}

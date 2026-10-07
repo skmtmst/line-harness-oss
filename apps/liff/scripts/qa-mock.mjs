@@ -115,9 +115,14 @@ function seatSlots(date) {
       endsAt: new Date(Date.parse(startsAt) + 120 * 60000).toISOString(),
       available: !full,
       remainingTables: full ? 0 : hm === '19:00' ? 1 : 4,
+      // API-11：空いている候補卓の種類と、空いていない理由（10/12 は臨時休業）。
+      seatTypes: full ? [] : ['table'],
+      ...(full ? { unavailableReason: closed ? 'temporary_closed' : 'full' } : {}),
     };
   });
 }
+/** 店の遅れたときの決まり（API-11 の lateArrivalPolicy）。 */
+const SEAT_LATE = { cancelAfterMinutes: 15, message: '15分を過ぎてご連絡がない場合は、取り消しになることがあります' };
 function seatMock(method, pathname, url, body) {
   if (method === 'GET' && pathname.startsWith('/api/liff/restaurant/link/')) {
     return pathname.endsWith('/qa-seat') ? [200, { success: true, data: SEAT_STORE }] : [404, { success: false, error: 'not_found' }];
@@ -126,7 +131,8 @@ function seatMock(method, pathname, url, body) {
     const date = url.searchParams.get('date') ?? '';
     const slots = seatSlots(date);
     if (!slots) return [400, { success: false, error: 'invalid_date_or_unconfigured_hours' }];
-    return [200, { success: true, data: { storeId: SEAT_STORE.id, date, guestCount: Number(url.searchParams.get('guestCount')), slots, cancelDeadlineMinutesBefore: 120, cutoffMinutesBefore: 60 } }];
+    const closed = date === '2026-10-12';
+    return [200, { success: true, data: { storeId: SEAT_STORE.id, date, guestCount: Number(url.searchParams.get('guestCount')), slots, ...(closed ? { unavailableReason: 'temporary_closed' } : {}), lateArrivalPolicy: SEAT_LATE, cancelDeadlineMinutesBefore: 120, cutoffMinutesBefore: 60 } }];
   }
   if (method === 'POST' && pathname === '/api/liff/restaurant/holds') {
     const b = {
@@ -138,6 +144,9 @@ function seatMock(method, pathname, url, body) {
       status: 'pending',
       version: 1,
       holdExpiresAt: new Date(SEAT_QA_NOW + 10 * 60000).toISOString(),
+      note: body.note ?? null,
+      customerPhone: body.customerPhone ?? null,
+      seatType: 'table',
     };
     seatBookings.set(b.id, b);
     return [201, { success: true, data: b }];
@@ -150,6 +159,10 @@ function seatMock(method, pathname, url, body) {
     const old = seatBookings.get(decodeURIComponent(m[1]));
     if (!old) return [404, { success: false, error: 'not_found' }];
     const next = { ...old, version: old.version + 1, holdExpiresAt: null, status: m[2] === 'cancel' ? 'cancelled' : 'confirmed' };
+    if (m[2] === 'confirm') {
+      if (body && 'note' in body) next.note = body.note ?? null;
+      if (body && 'customerPhone' in body) next.customerPhone = body.customerPhone ?? null;
+    }
     if (m[2] === 'reschedule') {
       next.startsAt = body.startsAt;
       next.endsAt = new Date(Date.parse(body.startsAt) + 120 * 60000).toISOString();
