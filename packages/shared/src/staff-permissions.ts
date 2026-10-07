@@ -88,7 +88,6 @@ export interface ScopeItem {
 }
 
 export const SCOPE_ITEMS: readonly ScopeItem[] = [
-  { id: 'visit_stamps', label: '来店スタンプ', note: 'カード・押印・紙の移行', kind: 'feature', keys: ['/visit-stamps'] },
   {
     id: 'friends',
     label: '友だち',
@@ -200,6 +199,7 @@ export const SCOPE_ITEMS: readonly ScopeItem[] = [
     kind: 'feature',
     keys: ['/health'],
   },
+  { id: 'visit_stamps', label: '来店スタンプ', note: 'カード・押印・紙の移行', kind: 'feature', keys: ['/visit-stamps'] },
 ];
 
 export const SCOPE_ITEM_IDS: readonly string[] = SCOPE_ITEMS.map((item) => item.id);
@@ -239,6 +239,7 @@ export const BUNDLE_PRESETS: Record<Exclude<AccessRoleBundleId, 'custom'>, Bundl
       analytics: 'view',
       settings: 'none',
       operations: 'view',
+      visit_stamps: 'edit',
     },
     emailMask: 'masked',
   },
@@ -255,6 +256,7 @@ export const BUNDLE_PRESETS: Record<Exclude<AccessRoleBundleId, 'custom'>, Bundl
       analytics: 'none',
       settings: 'none',
       operations: 'view',
+      visit_stamps: 'edit',
     },
     emailMask: 'masked',
   },
