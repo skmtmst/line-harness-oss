@@ -49,6 +49,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import BulkBar from '@/components/shared/bulk-bar'
@@ -681,6 +682,13 @@ export default function InflowListV8({
                 const [becameFirst, becameSecond] = becameLines(r, sc, tag)
                 const menuItems = rowMenuItems(r)
                 const menuLabel = `「${r.name}」の操作`
+                const nameNode = r.source === 'entry_route' && r.entryRouteId ? (
+                  <Link href={`/inflow-links/detail?id=${r.entryRouteId}`} className={styles.nameLink} title={r.name}>
+                    {r.name}
+                  </Link>
+                ) : (
+                  <span className={styles.nameText} title={r.name}>{r.name}</span>
+                )
                 return (
                   <Tr key={r.refCode} interactive className={styles.row} data-table-layout="columns" data-row-id={r.refCode}>
                     <Td className={styles.colCheck}>
@@ -705,17 +713,17 @@ export default function InflowListV8({
                       )}
                     </Td>
                     <Td className={styles.colName}>
-                      {r.source === 'entry_route' && r.entryRouteId ? (
-                        <Link href={`/inflow-links/detail?id=${r.entryRouteId}`} className={styles.nameLink} title={r.name}>
-                          {r.name}
-                        </Link>
-                      ) : (
-                        <span className={styles.nameText} title={r.name}>{r.name}</span>
+                      {/* 名前の前にフォルダの色の丸（2026-10-07 オーナー決定・絵 xbHxg「フォルダの丸」）。
+                          流入のフォルダには色の値が無いので、丸は薄い灰（未分類は輪）。1152（y1ztx）はフォルダの列が無いので出さない。 */}
+                      {narrow ? nameNode : (
+                        <div className={styles.nameLine}>
+                          <FolderDotName folder={r.genre ? { name: r.genre } : null}>{nameNode}</FolderDotName>
+                        </div>
                       )}
-                      <span className={styles.refCode} title={r.refCode}>{r.refCode}</span>
+                      <span className={narrow ? styles.refCode : `${styles.refCode} ${styles.dotIndentPad}`} title={r.refCode}>{r.refCode}</span>
                       {status ? (
                         <span
-                          className={styles.pill}
+                          className={narrow ? styles.pill : `${styles.pill} ${styles.dotIndentMargin}`}
                           data-tone={status}
                           title={status === 'measured'
                             ? (r.source === 'tracked_link'
