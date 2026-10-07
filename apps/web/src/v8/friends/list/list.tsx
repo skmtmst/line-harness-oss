@@ -47,6 +47,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
+import { useListScrollMemory } from '@/components/shared/list-url-state'
 import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
@@ -242,6 +243,8 @@ export default function FriendsListV8() {
       attentionOnly, sortMode, page, pageSize, advanced,
     })
   }, [restored, selectedAccountId, searchInput, searchSubmitted, selectedTagId, responseFilter, operatorId, scenarioId, attentionOnly, sortMode, page, pageSize, advanced])
+  /* 絞り込みは上の控えが戻す。スクロール位置も、戻ったときだけ同じ所へ戻す（動きの点検 5 番）。 */
+  useListScrollMemory(restored && loadStatus === 'ready')
 
   const emptyMessage = emptyMessageOf({
     search: searchSubmitted,
