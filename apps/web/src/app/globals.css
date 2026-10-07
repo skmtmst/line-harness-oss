@@ -856,6 +856,8 @@
   --tpl-hq-folder-inset: 12px; --tpl-hq-home-pad: 16px 24px 24px 16px; --tpl-hq-home-card-pad: 14px; --tpl-hq-home-value-lh: 24px; --tpl-hq-search-w: 280px;
   --tpl-hq-home-account-pad: 18px; --tpl-hq-logo: 40px; --tpl-hq-logo-font: 15px; --tpl-hq-name-lh: 22px; --tpl-hq-stat-lh: 23px; --tpl-hq-col-actions: 260px;
   --tpl-hq-pill-gap: 5px; --tpl-hq-pill-pad: 2px 8px; --tpl-hq-pill-lh: 18px; --tpl-hq-dot: 6px; --tpl-hq-confirm-gap: 6px; --tpl-hq-confirm-label: 64px;
+  /* 上の帯（統括・店の共通の外側。絵 V8-B/JKjsE）：帯は右の白い板の端（右の余白 12）までで、中の右の間は 8。 */ --tpl-hq2-topbar-pad-end: 20px;
+  /* 店の画面から統括へ戻る（絵 V8 DIHFx/Psg7n）：［統括へ］と切り替えを開いた一覧。 */ --tpl-hq2-return-pad: 0 12px; --tpl-hq2-return-gap: 6px; --tpl-hq2-return-icon: 15px; --tpl-hq2-switch-w: 280px; --tpl-hq2-switch-pad: 6px; --tpl-hq2-switch-gap: 10px; --tpl-hq2-switch-hq-pad: 10px 10px; --tpl-hq2-switch-icon: 16px; --tpl-hq2-switch-title-lh: 18px; --tpl-hq2-switch-sub-lh: 16px; --tpl-hq2-switch-rule-margin: 6px 0; --tpl-hq2-switch-heading-pad: 2px 10px 4px; --tpl-hq2-switch-row-h: 36px; --tpl-hq2-switch-row-pad: 0 10px; --tpl-hq2-switch-mark: 20px;
   /* 運営コンソール（V8・CyW0E ほか運営の板）。外枠の頭・板の頭・注意の帯。 */
   --tpl-op-brand-gap: 10px; --tpl-op-brand-pad: 4px 20px 16px; --tpl-op-brand-mark: 36px; --tpl-op-brand-mark-text: 15px; --tpl-op-brand-mark-lh: 23px; --tpl-op-brand-lh: 18px;
   --tpl-op-me-pad: 4px 10px; --tpl-op-me-gap: 8px; --tpl-op-mobile-pad: 0 16px; --tpl-op-mobile-button-pad: 0 8px; --tpl-op-touch: 44px; --tpl-op-icon: 20px; --tpl-op-drawer-w: 260px; --tpl-op-drawer-top: 8px;

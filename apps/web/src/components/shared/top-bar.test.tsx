@@ -58,8 +58,10 @@ describe('V6共通トップバー', () => {
  * v7 の土台クラスは触らない（V8 の上書きだけ）。
  */
 describe('V8 の帯は絵どおり（殻合わせ）', () => {
-  it('パンくずの手前はホーム（格子印＋リンク）', () => {
-    expect(source).toContain('href="/"')
+  it('パンくずの手前はホーム（格子印＋リンク。統括の画面は統括のホームへ）', () => {
+    expect(source).toContain('<Link href={homeHref} className={styles.crumbHome}>')
+    expect(source).toContain("homeHref = '/'")
+    expect(appTopBar).toContain("homeHref={hqShell ? '/hq' : '/'}")
     expect(source).toContain('ホーム')
     expect(source).toContain('crumbHome')
     expect(source).toContain('HomeGridIcon')
