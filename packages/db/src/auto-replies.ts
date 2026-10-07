@@ -12,6 +12,12 @@ import type { AutoReplyCreateIdempotency } from './auto-reply-runs.js';
 // =============================================================================
 
 export interface AutoReply {
+  /** 公開版から読み込む実行設定。旧行は既定値で動く。 */
+  normalize_keywords?: boolean;
+  receive_sources?: Array<'line' | 'email'>;
+  reply_delay_seconds?: number | null;
+  unmatched_action?: string | null;
+
   id: string;
   keyword: string;
   match_type: 'exact' | 'contains';
@@ -145,6 +151,7 @@ export interface CreateAutoReplyInput {
   name?: string | null;
   /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
   keywordMatchMode?: 'any' | 'all';
+  normalizeKeywords?: boolean;
   /** フォルダ。分けていなければ null。 */
   folderId?: string | null;
   /**
@@ -227,7 +234,7 @@ export async function createAutoReply(
    * lifecycle_status（stopped）は変えない。新規行に下書きは無いので、
    * メモの plan は公開版の作成文だけを返す。
    */
-  const memoPlanned = await planAutoReplyInternalMemoStatements(db, created, input.internalMemo ?? null);
+  const memoPlanned = await planAutoReplyInternalMemoStatements(db, created, input.internalMemo ?? null,input.normalizeKeywords);
   // 467: 保存で参照表を書き換える。どの版を使っているかの正本。
   const refStatements = await planSyncTemplateReferenceStatements(
     db,
@@ -346,6 +353,7 @@ export interface UpdateAutoReplyInput {
   name?: string | null;
   /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
   keywordMatchMode?: 'any' | 'all';
+  normalizeKeywords?: boolean;
   /** フォルダ。分けていなければ null。 */
   folderId?: string | null;
   /**
@@ -426,8 +434,8 @@ export async function updateAutoReply(
       : existing.keyword_match_mode,
     folder_id: 'folderId' in input ? (input.folderId ?? null) : existing.folder_id,
   };
-  const memoPlanned = 'internalMemo' in input
-    ? await planAutoReplyInternalMemoStatements(db, merged, input.internalMemo ?? null)
+  const memoPlanned = 'internalMemo' in input || 'normalizeKeywords' in input
+    ? await planAutoReplyInternalMemoStatements(db, merged, 'internalMemo' in input ? input.internalMemo ?? null : undefined,input.normalizeKeywords)
     : { statements: [], draftUpdated: false };
   // 467: 保存で参照表を書き換える。外した参照はここで消える。
   const refStatements = await planSyncTemplateReferenceStatements(

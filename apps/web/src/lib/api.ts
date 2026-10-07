@@ -1,5 +1,5 @@
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
-import type { BookingWaitlistSlotSummary,SeatWaitlistSlotSummary,CustomerSeatWaitlist } from '@line-crm/shared';
+import type { LineMessageType, BookingWaitlistSlotSummary,SeatWaitlistSlotSummary,CustomerSeatWaitlist } from '@line-crm/shared';
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
 import type {
@@ -8179,7 +8179,7 @@ export const api = {
       id: string,
       data: {
         stepOrder: number
-        messageType: ScenarioStep['messageType']
+        messageType: LineMessageType
         messageContent: string
         delayMinutes?: number
         offsetDays?: number
@@ -8204,7 +8204,7 @@ export const api = {
       stepId: string,
       data: {
         stepOrder?: number
-        messageType?: ScenarioStep['messageType']
+        messageType?: LineMessageType
         messageContent?: string
         delayMinutes?: number
         offsetDays?: number
@@ -8483,7 +8483,7 @@ export const api = {
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`),
     create: (data: {
       title: string
-      messageType: ApiBroadcast['messageType']
+      messageType: LineMessageType
       messageContent: string
       messageBubbles?: BroadcastBubble[]
       targetType: ApiBroadcast['targetType']
@@ -8547,7 +8547,7 @@ export const api = {
       id: string,
       data: {
         title?: string
-        messageType?: ApiBroadcast['messageType']
+        messageType?: LineMessageType
         messageContent?: string
         messageBubbles?: BroadcastBubble[]
         targetType?: ApiBroadcast['targetType']
@@ -8813,12 +8813,24 @@ export const api = {
       fetchApi<ApiResponse<BroadcastMessageAsset>>(`/api/broadcast-message-assets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/broadcast-message-assets/${id}`, { method: 'DELETE' }),
-    upload: (file: File) =>
-      fetchApi<ApiResponse<{ key: string; url: string; mimeType: string; size: number }>>('/api/broadcast-message-assets/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': file.type, 'X-Filename': encodeURIComponent(file.name) },
-        body: file,
-      }),
+    upload: async (file: File, lineAccountId?: string | null): Promise<ApiResponse<{ key: string; url: string; mimeType: string; size: number }>> => {
+      if (file.type !== 'video/mp4') return fetchApi('/api/broadcast-message-assets/upload', {
+        method: 'POST', headers: { 'Content-Type': file.type, 'X-Filename': encodeURIComponent(file.name) }, body: file,
+      })
+      let accountId = lineAccountId
+      if (accountId === undefined && typeof window !== 'undefined') {
+        try { accountId = localStorage.getItem('lh_selected_account') } catch { accountId = null }
+      }
+      const prepared = await fetchApi<ApiResponse<{id:string;uploadUrl:string;requiredHeaders:Record<string,string>}>>('/api/broadcast-message-assets/upload-sessions', {
+        method:'POST',body:JSON.stringify({lineAccountId:accountId??null,filename:file.name,mimeType:file.type,sizeBytes:file.size}),
+      })
+      if (!prepared.success) return prepared
+      const response = await fetch(prepared.data.uploadUrl,{method:'PUT',headers:prepared.data.requiredHeaders,body:file,credentials:'omit'})
+      if (!response.ok) throw new Error('動画をアップロードできませんでした。もう一度選んでください')
+      const etag = response.headers.get('ETag')
+      if (!etag) throw new Error('アップロードの確認情報を取得できませんでした')
+      return fetchApi(`/api/broadcast-message-assets/upload-sessions/${encodeURIComponent(prepared.data.id)}/complete`,{method:'POST',body:JSON.stringify({etag})})
+    },
   },
 
   segments: {
@@ -10542,6 +10554,7 @@ export const api = {
       /** 158: 管理用の名前。 */
       name?: string | null;
       /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+      normalizeKeywords?: boolean
       keywordMatchMode?: 'any' | 'all';
       /** フォルダ。 */
       folderId?: string | null;
@@ -10590,6 +10603,7 @@ export const api = {
       /** 158: 管理用の名前。 */
       name?: string | null;
       /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+      normalizeKeywords?: boolean
       keywordMatchMode?: 'any' | 'all';
       /** フォルダ。 */
       folderId?: string | null;

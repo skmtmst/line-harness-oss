@@ -3824,5 +3824,33 @@
       "by": "tenant",
       "column": "tenant_id"
     }
+  },
+  "auto_reply_deliveries": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "broadcast_media_upload_sessions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "coupon_redemptions": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "imagemap_images": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
   }
 }

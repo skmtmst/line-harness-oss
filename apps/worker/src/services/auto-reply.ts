@@ -67,7 +67,7 @@ export interface KeywordRule {
 function normalizeForLooseMatch(text: string): string {
   return text
     .normalize('NFKC') // 全角英数・半角カナをそろえる
-    .toLowerCase();
+    .toLowerCase().trim();
 }
 
 /** キーワード1行ぶんの判定。 */
@@ -76,7 +76,7 @@ export function keywordRuleMatches(rule: KeywordRule, text: string): boolean {
   if (keyword === '') return false;
   if (rule.minLength && [...text].length < rule.minLength) return false;
 
-  const caseSensitive = rule.caseSensitive !== false;
+  const caseSensitive = rule.caseSensitive === true;
   const haystack = caseSensitive ? text : normalizeForLooseMatch(text);
   const needle = caseSensitive ? keyword : normalizeForLooseMatch(keyword);
 
@@ -95,9 +95,10 @@ export function resolveKeywordRules(rule: {
   keyword: string;
   match_type: string;
   keywords_json?: string | null;
+  normalize_keywords?: boolean;
 }): KeywordRule[] {
   const fallback: KeywordRule[] = [
-    { keyword: rule.keyword, matchType: rule.match_type as KeywordRule['matchType'] },
+    { keyword: rule.keyword, matchType: rule.match_type as KeywordRule['matchType'], caseSensitive: rule.normalize_keywords === false },
   ];
   if (!rule.keywords_json) return fallback;
   try {
@@ -114,7 +115,7 @@ export function resolveKeywordRules(rule: {
           keyword,
           matchType,
           minLength: typeof r.minLength === 'number' ? r.minLength : undefined,
-          caseSensitive: r.caseSensitive === false ? false : undefined,
+          caseSensitive: rule.normalize_keywords === false,
         },
       ];
     });
@@ -144,6 +145,7 @@ export function keywordMatches(
     keyword: string;
     match_type: string;
     keywords_json?: string | null;
+    normalize_keywords?: boolean;
     respond_to_all?: number;
     keyword_match_mode?: string | null;
   },
@@ -410,6 +412,7 @@ export async function evaluateAutoReplyCandidates(
   input: {
     friendId: string;
     incomingText: string;
+    receiveSource?: 'line' | 'email';
     messageKind?: string;
     now: Date;
   },
@@ -418,7 +421,7 @@ export async function evaluateAutoReplyCandidates(
   const evaluations: AutoReplyCandidateEvaluation[] = [];
   let winnerFound = false;
   for (const [index, candidate] of candidates.entries()) {
-    if (!matchesMessageKind(candidate, input.messageKind)) {
+    if (!(candidate.receive_sources ?? ['line']).includes(input.receiveSource ?? 'line') || !matchesMessageKind(candidate, input.messageKind)) {
       evaluations.push({
         rule: candidate,
         order: index + 1,
@@ -562,13 +565,26 @@ export async function matchAndReply(
    */
   const autoReplies = await db
     .prepare(
-      `SELECT * FROM auto_replies WHERE is_active = 1 AND deleted_at IS NULL
-        AND (line_account_id IS NULL OR line_account_id = ?)
-        ORDER BY CASE WHEN line_account_id = ? THEN 0 ELSE 1 END,
-                 priority ASC, respond_to_all ASC, created_at ASC`,
+      `SELECT ar.*,arv.definition_snapshot FROM auto_replies ar
+        LEFT JOIN auto_reply_versions arv ON arv.id = ar.current_published_version_id AND arv.status = 'published'
+        WHERE ar.is_active = 1 AND ar.deleted_at IS NULL
+        AND (ar.line_account_id IS NULL OR ar.line_account_id = ?)
+        ORDER BY CASE WHEN ar.line_account_id = ? THEN 0 ELSE 1 END,
+                 ar.priority ASC, ar.respond_to_all ASC, ar.created_at ASC`,
     )
     .bind(lineAccountId, lineAccountId)
     .all<AutoReply>();
+
+  // 公開版の実行設定を同じクエリで読む。社内メモは本文へ混ぜない。
+  for (const candidate of autoReplies.results) {
+    const snapshot = (candidate as AutoReply & {definition_snapshot?:string}).definition_snapshot;
+    if (!snapshot) continue;
+    const settings = JSON.parse(snapshot) as {receiveSources?: Array<'line'|'email'>;normalizeKeywords?:boolean;replyDelaySeconds?:number|null;unmatchedAction?:string|null};
+    candidate.receive_sources = settings.receiveSources ?? ['line'];
+    candidate.normalize_keywords = settings.normalizeKeywords !== false;
+    candidate.reply_delay_seconds = settings.replyDelaySeconds ?? null;
+    candidate.unmatched_action = settings.unmatchedAction ?? null;
+  }
 
   // キーワードが合っても、時間帯・連投抑制・有人対応で返さないことがある。
   // 合ったものを1件だけ見るのではなく、条件まで通る最初の1件を探す。
@@ -598,6 +614,19 @@ export async function matchAndReply(
     }
   }
   if (!rule) {
+    for (const evaluation of candidateEvaluations) {
+      const candidate = evaluation.rule;
+      if (!candidate.unmatched_action || !(candidate.receive_sources ?? ['line']).includes('line') || !evaluation.reasonCodes.includes('keyword_not_matched')) continue;
+      const action = JSON.parse(candidate.unmatched_action) as Record<string,unknown>;
+      if (action.type !== 'notify_operator' || typeof action.notificationRuleId !== 'string' || !lineAccountId || !opts.operatorMailEnv) continue;
+      const { dispatchOperatorRule } = await import('./operator-notification-dispatch.js');
+      if (typeof action.notificationRuleId === 'string') {
+        const { getNotificationRuleById } = await import('@line-crm/db');
+        const target = await getNotificationRuleById(db,action.notificationRuleId,lineAccountId);
+        if (target && target.is_active===1) await dispatchOperatorRule(db,opts.operatorMailEnv,target,{lineAccountId,sourceEventId:`auto-reply-unmatched:${incomingEventId}`,message:'自動応答に当たらないメッセージがあります。受信箱を確認してください',executionMode:'automatic'});
+      }
+      break;
+    }
     await markAutoReplyEvaluationSkipped(db, evaluationId, 'no_matching_rule');
     return { matched: false, replyTokenConsumed: false };
   }
@@ -697,6 +726,14 @@ export async function matchAndReply(
       kind: 'auto_reply', id: rule.id,
     });
     const replyMsg = buildMessage(resolved.messageType, resolved.content);
+    if (rule.reply_delay_seconds && rule.reply_delay_seconds > 0) {
+      const dueAt = new Date(Date.now() + rule.reply_delay_seconds * 1000).toISOString();
+      await db.prepare(`INSERT OR IGNORE INTO auto_reply_deliveries
+        (id,evaluation_id,friend_id,line_account_id,version_id,message_json,action_summary,due_at,created_at)
+        VALUES (?,?,?,?,?,?,?,?,?)`).bind(crypto.randomUUID(),evaluationId,friend.id,lineAccountId,ruleVersionId,JSON.stringify(replyMsg),JSON.stringify(actionCounts(actionSummary)),dueAt,new Date().toISOString()).run();
+      // 返信トークンは遅延先へ持ち越さない。後のpush送信で結果を記録する。
+      return { matched:true,replyTokenConsumed:false };
+    }
     const response = await lineClient.replyMessageWithRequestId(replyToken, [replyMsg]);
     replyTokenConsumed = true;
     lineRequestId = response.requestId;
