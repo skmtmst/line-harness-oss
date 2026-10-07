@@ -1,0 +1,414 @@
+<title>本番テイク 10:10</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --ink:#0D1315;
+    --panel:#161F22;
+    --line:#273439;
+    --paper:#EDF1F0;
+    --muted:#8DA2A5;
+    --tally:#E8A13A;
+    --caution:#E4756B;
+    --jp:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic Medium",system-ui,sans-serif;
+    --en:"Hiragino Mincho ProN","Yu Mincho",ui-serif,Georgia,serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100dvh;
+    background:var(--ink);
+    color:var(--paper);
+    font-family:var(--jp);
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    min-height:100dvh;
+    display:grid;
+    grid-template-rows:auto 1fr auto;
+    gap:clamp(12px,2.2vh,28px);
+    padding:clamp(14px,2.4vw,28px);
+    max-width:1180px;
+    margin:0 auto;
+  }
+
+  /* ---- top rail ---------------------------------------------------- */
+  .rail{display:flex;flex-direction:column;gap:10px}
+  .rail-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+  .clock{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    font-size:clamp(28px,5.4vw,46px);
+    letter-spacing:-.02em;
+    line-height:1;
+  }
+  .clock .of{color:var(--muted);font-size:.5em;margin-left:.5em;letter-spacing:0}
+  .count{
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    color:var(--muted);
+    font-size:clamp(12px,1.6vw,15px);
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+  .count b{color:var(--paper);font-weight:600}
+  .track{height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+  .track i{display:block;height:100%;width:0;background:var(--tally)}
+
+  .rec{display:inline-flex;align-items:center;gap:8px;color:var(--muted);
+    font-size:clamp(11px,1.5vw,13px);letter-spacing:.14em;text-transform:uppercase;
+    font-family:var(--mono)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--line)}
+  body.rolling .dot{background:var(--tally);animation:tally 1.6s ease-in-out infinite}
+  body.rolling .rec{color:var(--tally)}
+  @keyframes tally{0%,100%{opacity:1}50%{opacity:.28}}
+  @media (prefers-reduced-motion:reduce){body.rolling .dot{animation:none}}
+
+  /* ---- stage ------------------------------------------------------- */
+  .stage{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:clamp(18px,3vw,38px);
+    display:flex;
+    flex-direction:column;
+    gap:clamp(14px,2.4vh,26px);
+    min-height:0;
+  }
+  .eyebrow{
+    display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;
+    font-family:var(--mono);font-size:clamp(11px,1.5vw,14px);
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+    font-variant-numeric:tabular-nums;
+  }
+  .eyebrow .no{color:var(--paper)}
+  .tag{
+    border:1px solid currentColor;border-radius:3px;
+    padding:3px 8px;font-size:.92em;letter-spacing:.1em;
+  }
+  .tag.read{color:var(--muted)}
+  .tag.write{color:var(--tally)}
+  .action{
+    margin:0;
+    font-size:clamp(24px,4.6vw,46px);
+    font-weight:600;
+    line-height:1.34;
+    letter-spacing:-.01em;
+    text-wrap:balance;
+  }
+  .action code{
+    font-family:var(--mono);
+    font-size:.84em;
+    font-weight:400;
+    background:#0B1113;
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:.08em .34em;
+    word-break:break-all;
+  }
+  .action .hot{color:var(--caution);font-weight:600}
+  .sub{
+    margin:0;
+    font-family:var(--en);
+    font-size:clamp(14px,1.9vw,20px);
+    line-height:1.6;
+    color:var(--muted);
+    max-width:66ch;
+    border-top:1px solid var(--line);
+    padding-top:clamp(12px,2vh,20px);
+    margin-top:auto;
+  }
+  .sub::before{
+    content:"字幕";
+    display:block;
+    font-family:var(--mono);
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--line);
+    margin-bottom:8px;
+  }
+  .steptrack{height:2px;background:var(--line);border-radius:2px;overflow:hidden}
+  .steptrack i{display:block;height:100%;width:0;background:var(--muted)}
+
+  .ahead{
+    font-size:clamp(13px,1.7vw,16px);
+    color:var(--muted);
+    display:flex;gap:12px;align-items:baseline;
+  }
+  .ahead span{
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--line);flex:none;padding-top:.2em;
+  }
+  .ahead p{margin:0;flex:1}
+
+  /* ---- deck -------------------------------------------------------- */
+  .deck{display:flex;gap:10px;align-items:stretch}
+  button{
+    font-family:var(--jp);
+    font-size:clamp(14px,1.9vw,17px);
+    font-weight:600;
+    color:var(--paper);
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:clamp(14px,2.2vh,20px) 18px;
+    cursor:pointer;
+    min-height:54px;
+  }
+  button:hover{border-color:var(--muted)}
+  button:focus-visible{outline:2px solid var(--tally);outline-offset:2px}
+  #go{flex:1;background:var(--tally);border-color:var(--tally);color:#140D02}
+  #go:hover{filter:brightness(1.08)}
+  body.rolling #go{background:var(--panel);border-color:var(--line);color:var(--paper)}
+  .ghost{flex:none;min-width:84px}
+  #reset{color:var(--muted);font-weight:400}
+
+  /* ---- preflight --------------------------------------------------- */
+  .pre{
+    position:fixed;inset:0;z-index:5;
+    background:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    padding:clamp(16px,4vw,40px);
+    overflow-y:auto;
+  }
+  .pre[hidden]{display:none}
+  .card{width:100%;max-width:620px;display:flex;flex-direction:column;gap:22px}
+  .card h1{
+    margin:0;font-size:clamp(22px,3.4vw,32px);line-height:1.3;
+    text-wrap:balance;
+  }
+  .card h1 em{font-style:normal;color:var(--tally)}
+  .pre ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+  .pre li{
+    display:flex;gap:12px;align-items:flex-start;
+    padding:14px 0;border-top:1px solid var(--line);
+    font-size:clamp(14px,1.8vw,16px);line-height:1.55;
+  }
+  .pre li:last-child{border-bottom:1px solid var(--line)}
+  .pre li b{
+    font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+    color:var(--muted);flex:none;padding-top:.35em;min-width:3.2em;
+    text-transform:uppercase;font-weight:400;
+  }
+  .pre li.done{color:var(--muted)}
+  .pre li.done b{color:var(--tally)}
+  .pre code{font-family:var(--mono);font-size:.88em;word-break:break-all}
+  .pre p{margin:0;color:var(--muted);font-size:clamp(13px,1.7vw,15px);line-height:1.6}
+  .pre em{font-style:normal;font-weight:600;color:var(--paper)}
+  .pre em.warn{color:var(--caution)}
+</style>
+
+<div class="pre" id="pre">
+  <div class="card">
+    <h1>1本撮り <em>10分10秒</em>。声は要りません。<br>画面に出る順に押すだけです。</h1>
+    <ul>
+      <li><b>済</b><span>本番クライアントの承認済みリダイレクトURIは <code>https://api.musubo.jp/api/restaurant-test/google/oauth/callback</code> の1行だけ（確認済み）</span></li>
+      <li><b>要</b><span>「Googleビジネス」→「設定」が<em>未接続</em>から始まる（接続済みなら先に解除）</span></li>
+      <li><b>要</b><span>ブラウザの表示言語を English にする（同意画面を英語で写すため。管理画面は日本語のまま）</span></li>
+      <li><b>要</b><span>録画範囲に<em class="warn">この台本ページを入れない</em>。スマホで見るか、<code>Cmd+Shift+5</code> で「選択部分を収録」にしてブラウザだけ撮る</span></li>
+      <li><b>要</b><span>クライアントIDは写ってよい。<em class="warn">シークレットとパスワードは絶対に写さない</em></span></li>
+    </ul>
+    <p>録画を始めてから「開始」を押してください。時計は字幕ファイルの秒数と同じです。ずれたら「前」「次」で合わせ直せます。</p>
+    <button id="begin">準備できた</button>
+  </div>
+</div>
+
+<div class="app">
+  <header class="rail">
+    <div class="rail-row">
+      <div class="clock"><span id="now">0:00</span><span class="of">/ 10:10</span></div>
+      <div class="rec"><span class="dot"></span><span id="recLabel">待機中</span></div>
+    </div>
+    <div class="track"><i id="bar"></i></div>
+    <div class="rail-row">
+      <div class="count">手順 <b id="idx">1</b> / 33</div>
+      <div class="count" id="window">0:00 – 0:15</div>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="eyebrow">
+      <span class="no">字幕 <span id="cue">1</span></span>
+      <span>台本 <span id="script">0-1</span></span>
+      <span id="tagSlot"></span>
+    </div>
+    <p class="action" id="action">—</p>
+    <div class="steptrack"><i id="stepbar"></i></div>
+    <p class="sub" id="sub">—</p>
+  </main>
+
+  <div>
+    <div class="ahead"><span>次</span><p id="next">—</p></div>
+    <div class="deck" style="margin-top:14px">
+      <button class="ghost" id="prev">◀ 前</button>
+      <button id="go">開始</button>
+      <button class="ghost" id="fwd">次 ▶</button>
+      <button class="ghost" id="reset">最初から</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STEPS = [
+  {n:1,a:0,b:15,s:"0-1",t:"`https://musubo.jp/` をログインなしで開く",h:[],
+   e:"musubo is a LINE-based customer communication tool for small restaurants and shops in Japan. This is our public home page, open without signing in."},
+  {n:2,a:15,b:35,s:"0-2",t:"フッターから `/privacy/` を開き、第6節までスクロール",h:[],
+   e:"From the footer we open our privacy policy at musubo.jp/privacy. Section 6 describes exactly what Google user data we read and write."},
+  {n:3,a:35,b:55,s:"0-2",t:"`/terms/` を開き、第3節までスクロール",h:[],
+   e:"And our terms of service at musubo.jp/terms. Section 3 describes the Google Business Profile features. The dashboard UI is Japanese only, so these subtitles explain each screen."},
+  {n:4,a:55,b:70,s:"0-3",t:"`admin.musubo.jp` でログイン（パスワード入力中は手元を映さない）",h:["パスワード入力中は手元を映さない"],
+   e:"Now we sign in to our dashboard at admin.musubo.jp. Store staff always sign in here themselves; there is no indirect access to our Business Profile project."},
+  {n:5,a:70,b:82,s:"1",t:"管理画面のトップとアドレスバーのドメインを映す",h:[],
+   e:"This is the musubo dashboard. The same screen where the owner handles LINE messages."},
+  {n:6,a:82,b:95,s:"2",t:"左メニュー「Googleビジネス」→「設定」の未接続状態",h:["未接続状態"],
+   e:'In the left menu we open "Google Business". The Settings tab shows that no Google account is connected yet.'},
+  {n:7,a:95,b:110,s:"3",t:"「Googleアカウントを接続」を押し、`client_id=` が写った状態で2〜3秒静止",h:["2〜3秒静止"],
+   e:'We press "Connect Google account". The address bar now shows Google\'s own OAuth endpoint with our client_id.'},
+  {n:8,a:110,b:120,s:"4",t:"アカウント選択で店舗を管理しているアカウントを選ぶ",h:[],
+   e:"Google asks which account to use. We choose the account that already administers this store's Google Business Profile."},
+  {n:9,a:120,b:135,s:"5",t:"同意画面。アプリ名 `musubo` と3つのスコープが読めるよう静止",h:["読めるよう静止"],
+   e:'This is Google\'s consent screen. The app name is "musubo". We request exactly three scopes: Manage your Business Profile, email, and openid.'},
+  {n:10,a:135,b:150,s:"5",t:"チェックは外さずに「Allow」",h:["チェックは外さずに"],
+   e:'We do not send include_granted_scopes. If "Manage your Business Profile" is left unchecked, we refuse to save the connection and ask the owner to connect again with that permission granted. Here we keep it checked and allow.'},
+  {n:11,a:150,b:165,s:"6",t:"接続済み表示と接続したGoogleアカウントのメール",h:[],
+   e:"Back in the dashboard, the connection is shown together with the connected Google account's email address. This is the only use of openid and userinfo.email: so the owner can confirm which account is linked."},
+  {n:12,a:165,b:180,s:"7",t:"「接続する店舗を選ぶ」で一覧を出し1つ選ぶ（読み取り1）",h:[],g:"READ 1 of 5",
+   e:"READ 1 of 5: the list of locations this signed-in user already administers, so the owner can choose which store to link."},
+  {n:13,a:180,b:205,s:"8",t:"「プロフィール」タブ（読み取り2）",h:[],g:"READ 2 of 5",
+   e:"READ 2 of 5: that store's profile details - name, address, phone number, regular and special hours, website URL, description and photos - as currently published on Google."},
+  {n:14,a:205,b:230,s:"9",t:"「口コミ」タブ→「同期する」（読み取り3）",h:[],g:"READ 3 of 5",
+   e:"READ 3 of 5: the store's Google reviews. Text, rating, time, reviewer display name and any existing reply."},
+  {n:15,a:230,b:245,s:"10",t:"「投稿」タブ（読み取り4）",h:[],g:"READ 4 of 5",
+   e:"READ 4 of 5: the store's local posts on Google."},
+  {n:16,a:245,b:260,s:"10",t:"「パフォーマンス」タブの直近28日グラフ（読み取り5）",h:[],g:"READ 5 of 5",
+   e:"READ 5 of 5: daily performance metrics - profile impressions, direction requests, call clicks and website clicks - shown as a simple chart."},
+  {n:17,a:260,b:285,s:"11",t:"口コミ1件を開き「AIで下書きを作る」",h:[],
+   e:'Now the write operations. We open one review and press "Draft with AI" to generate a suggested reply.'},
+  {n:18,a:285,b:305,s:"11",t:"下書きを手で書き換えて「下書きを保存する」",h:[],
+   e:"The owner edits that draft by hand and saves it as a draft. Nothing has been sent to Google at this point."},
+  {n:19,a:305,b:330,s:"12",t:"「返信内容を確認」。送信本文がそのまま出る確認画面を映す",h:["確認画面を映す"],g:"WRITE 1 of 4",
+   e:'WRITE 1 of 4: we press "Review the reply". This confirmation screen shows the exact text that will be sent to Google.'},
+  {n:20,a:330,b:345,s:"12",t:"「この内容で返信する」（書き込み1）",h:[],
+   e:"Only after the owner reads it and presses the confirm button is the reply sent. Nothing is ever sent automatically, on a schedule, or in the background."},
+  {n:21,a:345,b:360,s:"12",t:"別タブでGoogle側に返信が反映されたところ",h:[],
+   e:"In another tab we open the store's Google Business Profile. The reply is now published on Google."},
+  {n:22,a:360,b:385,s:"13",t:"「プロフィール」で営業時間を1か所直し「変更案を確認」",h:["1か所"],g:"WRITE 2 of 4",
+   e:'WRITE 2 of 4: back in the Profile tab we change one field - the business hours - and press "Review the change".'},
+  {n:23,a:385,b:405,s:"13",t:"変更前後が並ぶ確認画面→「Googleに変更を送信」（書き込み2）",h:[],
+   e:'The confirmation screen shows the old value and the new value side by side. We press "Send change to Google".'},
+  {n:24,a:405,b:415,s:"13",t:"「変更履歴」に記録が残るところ",h:[],
+   e:"The change history records who sent what, and when, so the owner can review their own actions."},
+  {n:25,a:415,b:440,s:"14",t:"「写真」で1枚追加し「変更案を確認」",h:[],g:"WRITE 3 of 4",
+   e:'WRITE 3 of 4: in the Photos section we add one store photo and press "Review the change".'},
+  {n:26,a:440,b:460,s:"14",t:"「写真を追加（ファイル名）」の行と「他の項目は変更しない」→送信（書き込み3）。Google側への反映は映さない",h:["Google側への反映は映さない"],
+   e:'The confirmation screen lists "add photo" with the file name, and states that no other field will be changed. We confirm. Google reviews new photos on their side before publishing them.'},
+  {n:27,a:460,b:485,s:"15",t:"「投稿」タブ→「投稿を作る」で最新情報を1件書く",h:[],g:"WRITE 4 of 4",
+   e:"WRITE 4 of 4: in the Posts tab we create a local post."},
+  {n:28,a:485,b:505,s:"15",t:"「公開前の最終確認」で本文と日時→「この内容で予約する」（書き込み4）",h:[],
+   e:"The final confirmation screen shows the exact body and the publish time that will go to Google. We confirm."},
+  {n:29,a:505,b:520,s:"15",t:"別タブでGoogle側に投稿が反映されたところ",h:[],
+   e:"In another tab, the post is now visible on the store's Google Business Profile."},
+  {n:30,a:520,b:545,s:"16",t:"「設定」→「接続を解除」。削除の説明文も映す",h:["削除の説明文も映す"],
+   e:'Now we disconnect. In the Settings tab we press "Disconnect". The on-screen notice states that the OAuth tokens and all content fetched from Google will be deleted.'},
+  {n:31,a:545,b:565,s:"17",t:"解除後に「口コミ」「プロフィール」が空になっているところ",h:[],
+   e:"After disconnecting, the Reviews and Profile tabs no longer hold any Google content. Cached content is also deleted automatically 28 days after it was last fetched, so nothing is kept beyond the 30 calendar day limit."},
+  {n:32,a:565,b:590,s:"18",t:"`https://myaccount.google.com/connections` でmusuboの認可が消えているところ",h:[],
+   e:"Finally, in Google account settings under Connections, musubo no longer appears: disconnecting also sends a revoke request to Google."},
+  {n:33,a:590,b:610,s:"—",t:"最後の画面のまま。自動送信しないことを字幕で締める",h:[],
+   e:"To summarise: replies, profile changes, photos and posts are sent to Google only when the store's own staff read a confirmation screen and press the confirm button. There is no automatic reply, no scheduled posting and no automatic profile editing. The only background processing is a read-only refresh."}
+];
+const TOTAL = 610;
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const mmss = s => Math.floor(s/60) + ":" + String(Math.floor(s%60)).padStart(2,"0");
+
+function markup(text, hot){
+  let s = esc(text);
+  (hot||[]).forEach(h => { s = s.split(esc(h)).join("@@HOT@@"+esc(h)+"@@ENDHOT@@"); });
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+  return s.split("@@HOT@@").join('<b class="hot">').split("@@ENDHOT@@").join("</b>");
+}
+
+let t = 0, rolling = false, shown = -1, origin = 0, raf = null;
+
+function indexAt(sec){
+  for (let i = STEPS.length - 1; i >= 0; i--) if (sec >= STEPS[i].a) return i;
+  return 0;
+}
+
+function paint(){
+  const i = indexAt(t), st = STEPS[i];
+  $("now").textContent = mmss(Math.min(t, TOTAL));
+  $("bar").style.width = Math.min(100, t / TOTAL * 100) + "%";
+  $("stepbar").style.width =
+    Math.max(0, Math.min(100, (t - st.a) / (st.b - st.a) * 100)) + "%";
+
+  if (i !== shown){
+    shown = i;
+    $("idx").textContent = st.n;
+    $("cue").textContent = st.n;
+    $("script").textContent = st.s;
+    $("window").textContent = mmss(st.a) + " – " + mmss(st.b);
+    $("action").innerHTML = markup(st.t, st.h);
+    $("sub").textContent = st.e;
+    $("tagSlot").innerHTML = st.g
+      ? '<span class="tag ' + (st.g.indexOf("READ") === 0 ? "read" : "write") + '">' + st.g + "</span>"
+      : "";
+    const nx = STEPS[i+1];
+    $("next").textContent = nx ? mmss(nx.a) + "　" + nx.t.replace(/`/g,"") : "撮影終了。録画を止めてください";
+  }
+}
+
+function tick(now){
+  if (!rolling) return;
+  t = (now - origin) / 1000;
+  if (t >= TOTAL){ t = TOTAL; stop(); paint(); return; }
+  paint();
+  raf = requestAnimationFrame(tick);
+}
+
+function start(){
+  rolling = true;
+  document.body.classList.add("rolling");
+  $("go").textContent = "一時停止";
+  $("recLabel").textContent = "進行中";
+  origin = performance.now() - t * 1000;
+  raf = requestAnimationFrame(tick);
+}
+function stop(){
+  rolling = false;
+  document.body.classList.remove("rolling");
+  $("go").textContent = t >= TOTAL ? "終了" : "再開";
+  $("recLabel").textContent = t >= TOTAL ? "終了" : "一時停止";
+  if (raf) cancelAnimationFrame(raf);
+}
+function jump(d){
+  const i = Math.max(0, Math.min(STEPS.length - 1, indexAt(t) + d));
+  t = STEPS[i].a;
+  if (rolling) origin = performance.now() - t * 1000;
+  else { $("go").textContent = t > 0 ? "再開" : "開始"; }
+  paint();
+}
+
+$("go").onclick = () => rolling ? stop() : start();
+$("prev").onclick = () => jump(-1);
+$("fwd").onclick = () => jump(1);
+$("reset").onclick = () => {
+  stop(); t = 0; shown = -1;
+  $("go").textContent = "開始"; $("recLabel").textContent = "待機中";
+  paint();
+};
+$("begin").onclick = () => { $("pre").hidden = true; $("go").focus(); };
+
+addEventListener("keydown", e => {
+  if (!$("pre").hidden){
+    if (e.code === "Space" || e.code === "Enter"){ e.preventDefault(); $("begin").click(); }
+    return;
+  }
+  if (e.code === "Space"){ e.preventDefault(); $("go").click(); }
+  if (e.code === "ArrowLeft"){ e.preventDefault(); jump(-1); }
+  if (e.code === "ArrowRight"){ e.preventDefault(); jump(1); }
+});
+
+paint();
+</script>
