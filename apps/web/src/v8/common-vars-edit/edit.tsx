@@ -184,6 +184,7 @@ function EditCommonVarV8Inner() {
 
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
   const [clearSchedulesOpen, setClearSchedulesOpen] = useState(false)
+  const [addingSchedule, setAddingSchedule] = useState(false)
   const [clearSchedulesBusy, setClearSchedulesBusy] = useState(false)
   const [clearSchedulesError, setClearSchedulesError] = useState('')
 
@@ -599,7 +600,7 @@ function EditCommonVarV8Inner() {
   }
 
   const addSchedule = async () => {
-    if (!item || !draft || !selectedAccountId) return
+    if (addingSchedule || !item || !draft || !selectedAccountId) return
     if (!draft.date) {
       setError('開始日を入れてください')
       return
@@ -611,6 +612,7 @@ function EditCommonVarV8Inner() {
       return
     }
     setError('')
+    setAddingSchedule(true)
     try {
       const res = await api.commonVars.addSchedule(item.id, selectedAccountId, {
         effectiveFrom: `${draft.date}T${draft.time || '00:00'}`,
@@ -627,6 +629,8 @@ function EditCommonVarV8Inner() {
       await refreshBaseline(item.id, selectedAccountId)
     } catch (e) {
       setError(scheduleErrorText(e))
+    } finally {
+      setAddingSchedule(false)
     }
   }
 
@@ -1333,16 +1337,17 @@ function EditCommonVarV8Inner() {
       {/* 予定を足す窓。 */}
       <Dialog
         open={draft !== null}
+        busy={addingSchedule}
         designNode="AYc6O-schedule"
         title="予定を足す"
         description="決めた日時から、ここに入れた値へ変わります。"
         onCancel={() => setDraft(null)}
         footer={
           <div className={styles.dialogActions}>
-            <Button type="button" onClick={() => setDraft(null)}>
+            <Button type="button" disabled={addingSchedule} onClick={() => setDraft(null)}>
               キャンセル
             </Button>
-            <Button type="button" variant="primary" onClick={() => void addSchedule()}>
+            <Button type="button" variant="primary" disabled={addingSchedule} busy={addingSchedule} onClick={() => void addSchedule()}>
               登録する
             </Button>
           </div>

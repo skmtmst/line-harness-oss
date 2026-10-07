@@ -493,12 +493,13 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
   return (
     <Dialog
       open={editTarget !== null && editForm !== null}
+      busy={editSaving}
       title={editTarget ? `「${editTarget.name}」を編集` : ''}
       description="直すと次の版になります。過去に数えた成果と金額は、そのまま残ります。"
       onCancel={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}
       footer={(
         <div className="flex justify-end gap-2">
-          <Button onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>キャンセル</Button>
+          <Button disabled={editSaving} onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>キャンセル</Button>
           <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()} busy={editSaving} busyLabel="保存中...">この内容にする
           </Button>
         </div>
