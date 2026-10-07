@@ -87,7 +87,7 @@ export default function SeatPick({
               role="radio"
               aria-checked={on}
               onClick={() => onGuest(n === 5 && many ? guestCount : n)}
-              className={`liff-press rounded-full px-3.5 py-[7px] text-[13px] leading-5 font-semibold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ink ${
+              className={`liff-hit liff-press rounded-full px-3.5 py-[7px] text-[13px] leading-5 font-semibold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ink ${
                 on ? 'bg-ink text-canvas' : 'bg-liff-chip text-ink'
               }`}
             >
@@ -150,7 +150,7 @@ export default function SeatPick({
         <button
           type="button"
           onClick={openOther}
-          className={`text-[13px] leading-5 font-semibold text-liff-primary focus-visible:outline-2 focus-visible:outline-ink ${
+          className={`liff-hit text-[13px] leading-5 font-semibold text-liff-primary focus-visible:outline-2 focus-visible:outline-ink ${
             inChips ? '' : 'underline underline-offset-2'
           }`}
         >

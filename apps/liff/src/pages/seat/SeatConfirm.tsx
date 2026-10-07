@@ -104,7 +104,7 @@ export default function SeatConfirm({
         <button
           type="button"
           onClick={onBack}
-          className="text-xs leading-[18px] text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+          className="liff-hit text-xs leading-[18px] text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
         >
           ← 時刻を選び直す
         </button>

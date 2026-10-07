@@ -735,7 +735,7 @@ export default function Form() {
           <button
             type="button"
             onClick={goBack}
-            className="self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+            className="liff-hit self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
           >
             ← {options.prevLabel || '前のページへ'}
           </button>
@@ -1178,7 +1178,7 @@ export function BookingSlotPicker({
                   onChange(active ? '' : { menuId, staffId: fixedStaffId ?? staffId, startsAt })
                 }
                 aria-pressed={active}
-                className={`liff-num h-[42px] rounded-[10px] text-sm tabular-nums -outline-offset-1 ${
+                className={`liff-hit liff-num h-[42px] rounded-[10px] text-sm tabular-nums -outline-offset-1 ${
                   active
                     ? 'bg-liff-primary font-bold text-white'
                     : t.open

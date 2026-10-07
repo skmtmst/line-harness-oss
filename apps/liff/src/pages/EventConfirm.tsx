@@ -301,7 +301,7 @@ export default function EventConfirm() {
         <button
           type="button"
           onClick={back}
-          className="self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+          className="liff-hit self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
         >
           ←戻る
         </button>

@@ -243,7 +243,7 @@ function DaySlots({
                   type="button"
                   onClick={() => onWaitlist({ date: day, start: t.start })}
                   aria-label={`${t.start}に空いたら知らせる`}
-                  className="liff-press absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-canvas text-liff-primary shadow outline-1 -outline-offset-1 outline-liff-line-strong focus-visible:outline-2 focus-visible:outline-ink"
+                  className="liff-hit liff-press absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-canvas text-liff-primary shadow outline-1 -outline-offset-1 outline-liff-line-strong focus-visible:outline-2 focus-visible:outline-ink"
                 >
                   <Icon name="bell" className="h-[14px] w-[14px]" />
                 </button>
@@ -631,7 +631,7 @@ export default function DateTimePicker({
         role="radio"
         aria-checked={active}
         onClick={() => switchView(target)}
-        className={`flex h-8 flex-1 items-center justify-center rounded-lg px-1 text-xs focus-visible:outline-2 focus-visible:outline-ink ${
+        className={`liff-hit flex h-8 flex-1 items-center justify-center rounded-lg px-1 text-xs focus-visible:outline-2 focus-visible:outline-ink ${
           active ? 'bg-canvas font-bold text-ink' : 'font-semibold text-liff-sub'
         }`}
       >
@@ -666,7 +666,7 @@ export default function DateTimePicker({
       <button
         type="button"
         onClick={onBackToStaff}
-        className="self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+        className="liff-hit self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
       >
         ← 担当を選び直す
       </button>
@@ -731,7 +731,7 @@ export default function DateTimePicker({
                 onClick={() => moveWeek(-1)}
                 disabled={!canPrevWeek}
                 aria-label="前の週"
-                className="flex h-10 w-[18px] shrink-0 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
+                className="liff-hit flex h-10 w-[18px] shrink-0 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
               </button>
@@ -801,7 +801,7 @@ export default function DateTimePicker({
                 onClick={() => moveWeek(1)}
                 disabled={!canNextWeek}
                 aria-label="次の週"
-                className="flex h-10 w-[18px] shrink-0 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
+                className="liff-hit flex h-10 w-[18px] shrink-0 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
               >
                 <Icon name="chevron-right" className="h-[18px] w-[18px]" />
               </button>
@@ -856,7 +856,7 @@ export default function DateTimePicker({
                 onClick={() => setMonth(addMonths(month, -1))}
                 disabled={!canPrevMonth}
                 aria-label="前の月"
-                className="flex h-9 w-9 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
+                className="liff-hit flex h-9 w-9 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
               </button>
@@ -868,7 +868,7 @@ export default function DateTimePicker({
                 onClick={() => setMonth(addMonths(month, 1))}
                 disabled={!canNextMonth}
                 aria-label="次の月"
-                className="flex h-9 w-9 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
+                className="liff-hit flex h-9 w-9 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
               >
                 <Icon name="chevron-right" className="h-[18px] w-[18px]" />
               </button>

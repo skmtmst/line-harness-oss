@@ -69,7 +69,7 @@ export default function BookingHistory() {
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className={`flex h-8 flex-1 items-center justify-center rounded-lg text-xs focus-visible:outline-2 focus-visible:outline-ink ${
+                  className={`liff-hit flex h-8 flex-1 items-center justify-center rounded-lg text-xs focus-visible:outline-2 focus-visible:outline-ink ${
                     tab === t.key
                       ? 'bg-canvas font-bold text-ink'
                       : 'font-semibold text-liff-sub'

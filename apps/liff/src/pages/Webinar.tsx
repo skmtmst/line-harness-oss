@@ -414,7 +414,7 @@ export default function Webinar() {
           {needsTap && (
             <button
               type="button"
-              className="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white"
+              className="liff-hit pointer-events-auto inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white"
               onClick={() => {
                 const v = videoRef.current;
                 if (v) {
@@ -487,7 +487,7 @@ export default function Webinar() {
           type="button"
           onClick={() => void sendComment()}
           aria-label="送信"
-          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-liff-primary text-white"
+          className="liff-hit flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-liff-primary text-white"
         >
           <Icon name="send" className="h-[18px] w-[18px]" />
         </button>

@@ -46,7 +46,7 @@ export default function LiffHeader({ title }: { title: string }) {
           type="button"
           aria-label="閉じる"
           onClick={() => liff.closeWindow()}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink focus-visible:outline-2 focus-visible:outline-ink"
+          className="liff-hit flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink focus-visible:outline-2 focus-visible:outline-ink"
         >
           <Icon name="x" className="h-5 w-5" />
         </button>
