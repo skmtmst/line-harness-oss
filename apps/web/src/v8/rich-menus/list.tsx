@@ -55,6 +55,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
@@ -741,6 +742,11 @@ export default function RichMenusListV8() {
   }
 
   /* ===== フォルダ ===== */
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。無ければ未分類の輪。 */
+  const folderDotOf = (folderId: string | null | undefined) => {
+    const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal },
     ...folders.map((f) => ({
@@ -1055,15 +1061,17 @@ export default function RichMenusListV8() {
                     </span>
                   </Td>
                   <Td className={styles.nameCell}>
-                    <Link
-                      href={`/rich-menus/edit?id=${g.id}`}
-                      title={g.name}
-                      className={styles.name}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {g.name}
-                    </Link>
-                    <span className={styles.sub} title={`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}>
+                    <FolderDotName folder={folderDotOf(g.folderId)}>
+                      <Link
+                        href={`/rich-menus/edit?id=${g.id}`}
+                        title={g.name}
+                        className={styles.name}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {g.name}
+                      </Link>
+                    </FolderDotName>
+                    <span className={`${styles.sub} ${styles.nameSub}`} title={`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}>
                       {`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}
                     </span>
                   </Td>

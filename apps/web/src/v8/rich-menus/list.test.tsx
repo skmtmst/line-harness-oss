@@ -39,7 +39,7 @@ const group = (id: string, name: string, extra: Record<string, unknown> = {}) =>
 })
 
 const items = [
-  group('g-default', '通常メニュー', { isDefaultForAll: true, targetingPriority: 0 }),
+  group('g-default', '通常メニュー', { isDefaultForAll: true, targetingPriority: 0, folderId: 'rmf-normal' }),
   group('g-autumn', '秋のキャンペーン', { status: 'draft', isDefaultForAll: true, publishingAt: '2026-10-05T00:00:00.000+09:00', targetingPriority: 1 }),
 ]
 
@@ -83,7 +83,13 @@ vi.mock('@/lib/api', () => ({
       deleteImpact: (id: string) => fixture.deleteImpact(id),
       imageUrl: (key: string) => `/img/${key}`,
     },
-    folders: { list: () => Promise.resolve({ success: true, data: [], unfiledCount: 0 }) },
+    folders: {
+      list: () => Promise.resolve({
+        success: true,
+        data: [{ id: 'rmf-normal', kind: 'rich_menu', name: '通常', parentId: null, displayOrder: 1, color: '#2f6fde' }],
+        unfiledCount: 1,
+      }),
+    },
     tags: { list: () => Promise.resolve({ success: true, data: [] }) },
     staff: {
       me: () => Promise.resolve({ success: true, data: { id: 's', name: 'S', role: fixture.role, email: null } }),
@@ -114,6 +120,17 @@ describe('V8 リッチメニュー一覧', () => {
     expect(second.textContent).toContain('10/5 公開')
     expect(second.textContent).toContain('10/5 から既定')
     expect(second.textContent).toContain('—')
+  })
+
+  test('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）', async () => {
+    const view = render(<RichMenusListV8 />)
+    const filedRow = (await view.findByText('通常メニュー')).closest('tr') as HTMLElement
+    await waitFor(() => expect(filedRow.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('filed'))
+    expect(filedRow.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(filedRow.querySelector('[data-folder-dot]')?.getAttribute('aria-label')).toBe('フォルダ：通常')
+    const unfiledRow = view.getByText('秋のキャンペーン').closest('tr') as HTMLElement
+    expect(unfiledRow.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(unfiledRow.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
   })
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。

@@ -115,6 +115,8 @@
   display: block;
   margin-top: calc(var(--tpl-scn-sub-gap) - var(--tpl-row-sub-gap));
   overflow: hidden;
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 axFrW の説明の行）。 */
+  padding-inline-start: var(--tpl-folder-dot-indent);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
