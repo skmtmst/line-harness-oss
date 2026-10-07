@@ -13,6 +13,18 @@ import { hqTemplatesApi, HqTemplatesApiError, type HqTemplateListItem } from './
 const request = transport.request
 beforeEach(() => { request.mockReset(); request.mockResolvedValue({ success: true, data: { value: 'ok' } }) })
 describe('HQ template API transport', () => {
+  it('6種類のフィルタと件数を取得し、リッチ画像の5サイズを同じtransportで送る',async()=>{
+    await hqTemplatesApi.listByKind('carousel')
+    expect(request).toHaveBeenCalledWith('/api/hq/templates?type=template&kind=carousel',{method:'GET'})
+    const counts={message:1,carousel:2,rich_message:3,question:4,coupon:5,research:6}
+    request.mockResolvedValue({success:true,data:counts})
+    expect(await hqTemplatesApi.kindCounts()).toEqual(counts)
+    const file=new File(['fixture'],'rich.png',{type:'image/png'})
+    const uploaded={media:[],payload:{baseSize:{width:1040,height:1040}}}
+    request.mockResolvedValue({success:true,data:uploaded})
+    expect(await hqTemplatesApi.uploadRichMessageImage(file)).toEqual(uploaded)
+    expect(request).toHaveBeenLastCalledWith('/api/hq/templates/media?purpose=rich_message&filename=rich.png',{method:'POST',headers:{'Content-Type':'image/png'},body:file})
+  })
   it('一覧の配布先名・残り件数・要約を共有型のまま返す', async () => {
     const rows: HqTemplateListItem[] = [{ id: 't1', name: 'ご案内', description: null, template_type: 'template', revision: 1,
       updated_at: '2026-10-07T00:00:00Z', distributed_account_names: ['本店','渋谷店','イベント'],

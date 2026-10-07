@@ -23,6 +23,7 @@ async function resolveCredentialEncryptionKey(explicit?: string): Promise<string
 }
 
 export interface LineAccount {
+  folder_id?: string | null;
   id: string;
   channel_id: string;
   name: string;

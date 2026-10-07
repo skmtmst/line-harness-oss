@@ -569,6 +569,7 @@ type NamedReference = {
   name: string;
   account_id: string | null;
   account_ids?: string | null;
+  asset_kind?: string | null;
   owner_id?: string | null;
 };
 
@@ -632,10 +633,14 @@ async function describeMediaUsageInner(
   switch (usage.ref_kind as MediaDeleteImpactReferenceKind) {
     case 'template':
       row = await db.prepare(
-        `SELECT name, line_account_id AS account_id FROM templates WHERE id = ?`,
-      ).bind(usage.ref_id).first<NamedReference>();
+        `SELECT name, line_account_id AS account_id, NULL AS asset_kind FROM templates WHERE id = ?
+         UNION ALL SELECT name, line_account_id AS account_id, kind AS asset_kind
+           FROM broadcast_message_assets WHERE id = ?`,
+      ).bind(usage.ref_id, usage.ref_id).first<NamedReference>();
       if (row && belongsToAccount(row, lineAccountId)) {
-        href = `/templates/edit?id=${encodeURIComponent(usage.ref_id)}`;
+        href = row.asset_kind === 'card_message'
+          ? `/templates/carousel/edit?id=${encodeURIComponent(usage.ref_id)}`
+          : `/templates/edit?${row.asset_kind ? `kind=${encodeURIComponent(row.asset_kind)}&` : ''}id=${encodeURIComponent(usage.ref_id)}`;
       }
       break;
     case 'broadcast':
@@ -778,6 +783,17 @@ async function describeMediaReplacementUsage(
       replaceable: false,
       blocker: 'unavailable_reference',
       reason: '使用先の正本を確認できないため、一括では差し替えられません。',
+    };
+  }
+  if (usage.ref_kind === 'template') {
+    const asset = await db.prepare(
+      'SELECT id FROM broadcast_message_assets WHERE id = ? AND line_account_id = ?',
+    ).bind(usage.ref_id, lineAccountId).first();
+    if (asset) return {
+      ...described,
+      replaceable: false,
+      blocker: 'unsupported_reference',
+      reason: 'この種類のテンプレートは編集画面で画像を変更してください。',
     };
   }
   if (usage.ref_kind === 'webinar') {
@@ -1227,8 +1243,10 @@ async function loadUsageContent(
   switch (usage.ref_kind) {
     case 'template': {
       const row = await db.prepare(
-        `SELECT message_content FROM templates WHERE id = ? AND line_account_id = ?`,
-      ).bind(usage.ref_id, lineAccountId).first<Record<string, unknown>>();
+        `SELECT message_content FROM templates WHERE id = ? AND line_account_id = ?
+         UNION ALL SELECT payload_json AS message_content FROM broadcast_message_assets
+           WHERE id = ? AND line_account_id = ?`,
+      ).bind(usage.ref_id, lineAccountId, usage.ref_id, lineAccountId).first<Record<string, unknown>>();
       return row ? { shared: false, columns: usageTextColumns(row, ['message_content']) } : null;
     }
     case 'broadcast': {

@@ -20,22 +20,8 @@ export interface TagDefinition {
   }
   folders: { id: string; name: string; parentId?: string | null; color?: string | null }[]
 }
-export interface MessageTemplateDefinition {
-  card?: import('@line-crm/shared').HqMessageCard
-  schemaVersion: 1
-  template: {
-    id: string; name: string; category: string
-    messageType: 'text' | 'image' | 'flex' | 'carousel'
-    messageContent: string; carouselActionsJson: string | null
-    carouselTapLimitMode: 'none' | 'once'; carouselTapLimitText: string | null
-    questionJson: string | null; questionStatus: 'draft' | 'published'
-  }
-  media: Array<{
-    id: string; kind: 'image' | 'video' | 'audio' | 'file'; filename: string; mimeType: string
-    sizeBytes: number; width: number | null; height: number | null; durationMs: number | null
-    r2Key: string; publicUrl: string | null; versionId: string; versionNo: number; contentHash: string
-  }>
-}
+export type { MessageTemplateDefinition } from '@line-crm/shared'
+import type { MessageTemplateDefinition, TemplateKind, TemplateKindCounts } from '@line-crm/shared'
 export interface RichMenuDefinition {
   schemaVersion: 1
   richMenu: {
@@ -138,6 +124,11 @@ async function request<T>(path: string, method = 'GET', body?: unknown, headers?
 }
 const idPath = (id: string) => `/${encodeURIComponent(id)}`
 export const hqTemplatesApi = {
+  uploadRichMessageImage: async (file:File):Promise<import('@line-crm/shared').TemplateImagemapUpload> => {
+    if(!['image/png','image/jpeg'].includes(file.type) || !file.size || file.size>8*1024*1024) throw new Error('PNG・JPEGの画像を8MB以内で選んでください。')
+    const response=await fetchApi<{success:true;data:import('@line-crm/shared').TemplateImagemapUpload}>(`/api/hq/templates/media?purpose=rich_message&filename=${encodeURIComponent(file.name)}`,{method:'POST',headers:{'Content-Type':file.type},body:file})
+    return response.data
+  },
   uploadImage: async (file: File, purpose: 'message' | 'rich_menu', expected?: { width: number; height: number }): Promise<MessageTemplateDefinition['media'][number]> => {
     const max = purpose === 'rich_menu' ? 1024 * 1024 : 8 * 1024 * 1024
     if (!['image/png', 'image/jpeg'].includes(file.type) || file.size < 1 || file.size > max) throw new Error('PNG・JPEGの画像を、表示されたサイズ上限内で選んでください。')
@@ -161,6 +152,9 @@ export const hqTemplatesApi = {
     }
     return { tenantId, actorId: id }
   },
+  /** 店と同じ6種類のタブ用。省略時はテンプレートの6種類すべて。 */
+  listByKind: (kind?: TemplateKind) => request<HqTemplateListItem[]>(`?type=template${kind ? `&kind=${kind}` : ''}`),
+  kindCounts: () => request<TemplateKindCounts>('/kind-counts'),
   /**
    * 種類を指定すればその種類だけ、省けば全部の種類を返す（R119）。
    * リッチメニューや回答フォームの編集では、別種類のタグやテンプレートを
