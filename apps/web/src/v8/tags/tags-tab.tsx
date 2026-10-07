@@ -54,7 +54,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
 import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
@@ -816,9 +816,9 @@ export default function TagsTab({
                       >
                         {/* 閲覧のみ：つまみは隠し、幅だけ空けて名前の位置を保つ */}
                         {canEdit ? (
-                          <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}>
+                          <ReorderHandle label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}>
                             <GripVertical className={styles.gripIcon} aria-hidden="true" />
-                          </ReorderGrip>
+                          </ReorderHandle>
                         ) : (
                           <span className={styles.gripSpace} aria-hidden="true"><GripVertical className={styles.gripIcon} /></span>
                         )}
