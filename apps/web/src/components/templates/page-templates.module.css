@@ -49,6 +49,10 @@
 :global([data-theme='v8']) .dashboardCell + .dashboardCell { border-left: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .dashboardAside { width: 297px; flex-shrink: 0; border-left: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .dashboardAside[data-aside-size='wide'] { width: var(--tpl-dash-aside-wide); }
+/* 右の列を数の帯の1マス分にする口。帯（等分の格子・隙間0）と同じ格子に載せ、どの幅でも縦の線を一直線にする。 */
+:global([data-theme='v8']) .dashboardRow[data-aside-size='column'] { display: grid; grid-template-columns: repeat(var(--tpl-dash-cols), minmax(0, 1fr)); }
+:global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardCell { grid-column: 1 / -2; }
+:global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: -2 / -1; width: auto; }
 :global([data-theme='v8']) .createContent { padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side); display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; flex: 1; }
 :global([data-theme='v8']) .preview { width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
 :global([data-theme='v8']) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); border-bottom: 1px solid var(--color-hairline); flex-wrap: wrap; }
@@ -95,7 +99,8 @@
 :global([data-theme='v8']) [data-page-template='create'] .description { font-size: var(--tpl-create-desc-size); line-height: var(--tpl-create-desc-lh); }
 :global([data-theme='v8']) [data-page-template='create'] .actions { gap: 14px; }
 :global([data-theme='v8']) [data-page-template='detail'] .tabs { border-bottom: 1px solid var(--color-hairline); }
-:global([data-theme='v8']) .dashboardColumns { min-height: 200px; }
+/* 横並びの段も数の帯と同じ等分の格子（隙間0）。flex の配分だと線の太さ分ずれる。高さは中身（並ぶマスは同じ高さ）。 */
+:global([data-theme='v8']) .dashboardColumns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 :global([data-theme='v8']) .dashboardColumns .dashboardCell { padding-inline: 20px; }
 :global([data-theme='v8']) .dashboardRow[data-row] .dashboardCell { display: flex; flex-direction: column; gap: 12px; }
 :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
@@ -160,8 +165,8 @@
   /* 画面が詰めた右の列を頼んだとき（CreatePage の previewCompactWhenNarrow・絵 kmTab）。 */
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] { padding: var(--tpl-r2-rail-compact-pad); }
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] .previewContent { width: var(--tpl-r2-rail-compact-content-width); }
-  :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside { display: none; }
-  :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { display: none; }
+  :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside:not([data-aside-size='column']) { display: none; }
+  :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global([data-theme='v8']) .asideToggle { display: block; }
   :global([data-theme='v8']) .inboxList { width: 348px; }
   :global([data-theme='v8']) .settings { flex-direction: column; gap: 16px; }
@@ -170,6 +175,12 @@
 @media (max-width: 1023px) {
   :global([data-theme='v8']) .frame:not([data-standalone]) { margin: 0; width: 100%; min-height: 0; }
   :global([data-theme='v8']) .split, :global([data-theme='v8']) .dashboardRow { flex-direction: column; }
+  /* 1マス分の右の列は、段が縦に積まれる幅で下へ回す。 */
+  :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] { grid-template-columns: minmax(0, 1fr); }
+  :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardCell,
+  :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: 1 / -1; }
+  :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardAside { border-left: 0; border-top: 1px solid var(--color-hairline); }
+  :global([data-theme='v8']) .dashboardRow[data-aside-size='column'][data-row] { height: auto; }
   :global([data-theme='v8']) .detailSummary { width: 100%; border-right: 0; border-bottom: 1px solid var(--color-hairline); }
   :global([data-theme='v8']) .preview { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
 }

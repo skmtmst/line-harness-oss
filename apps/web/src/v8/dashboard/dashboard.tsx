@@ -17,6 +17,9 @@ import { STATE_TEXT } from '@/components/shared/not-connected'
 import ShipmentPanel from '@/components/dashboard/shipment-panel'
 import { dashboardPeriodLabel, formatDashboardAsOf } from '@/components/dashboard/freshness'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useAccount } from '@/contexts/account-context'
+import Notice from '@/components/shared/notice'
+import { partialFailureLabels, partialFailuresWithoutCard } from '@/components/dashboard/partial-failure-labels'
 import { formatWaitRough } from '@/lib/format-duration'
 import { formatNumber, formatTime } from '@/lib/format'
 import { PERIODS, jstDay, useDashboard, type PeriodKey } from './use-dashboard'
@@ -97,6 +100,7 @@ export default function DashboardV8() {
   const router = useRouter()
   const d = useDashboard()
   const role = useStaffRole()
+  const { refreshAccounts } = useAccount()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
   const canManage = role === null || canManageRole(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
@@ -226,7 +230,7 @@ export default function DashboardV8() {
     if (id === 'send-quota') return <SendQuota delivery={d.sectionAvailable('quota') ? data?.delivery ?? null : null} metric={data?.metrics?.monthlyQuota} section={data?.sections?.quota} onRetry={() => void d.load()} />
     if (id === 'operational-alerts') return <OperationalAlerts risk={d.displayedHealthRisk} healthIssues={d.healthIssueCount} oldestWaitMinutes={d.pendingOldest} twoFactor={d.displayedTwoFactor} referenceCount={reference?.operationalAlerts} failed={d.healthFailed} updatedAt={d.supplementLoadedAt} />
     if (id === 'support-mark-status') return <SupportStatus inbox={d.sectionAvailable('inbox') ? (data && reference?.supportInbox ? { ...data.inbox, ...reference.supportInbox } : data?.inbox ?? null) : null} autoOnInbound={d.supportMarkAutoOnInbound} />
-    if (id === 'connection-status') return <ConnectionStatus webhook={d.selectedAccount?.webhook?.status} risk={d.displayedHealthRisk} activeFriends={d.activeFriends} healthFailed={d.healthFailed} />
+    if (id === 'connection-status') return <ConnectionStatus account={d.selectedAccount} canCheck={role !== null && canManageRole(role)} onChecked={refreshAccounts} risk={d.displayedHealthRisk} activeFriends={d.activeFriends} healthFailed={d.healthFailed} />
     if (id === 'friend-status') return unavailable('friends')
       ? <><SectionHeader title="友だちの状態" /><Unavailable section={data?.sections?.friends} onRetry={() => void d.load()} /></>
       : data ? <FriendStatus friends={data.friends} /> : <><SectionHeader title="友だちの状態" /><Loading label="友だちの状態" /></>
@@ -250,6 +254,8 @@ export default function DashboardV8() {
   }
 
   /* ── 本文の段（編集の並び順どおり） ───────────────── */
+  /* 右の列は上の数の帯の1マス分（帯が3・4マスのとき。帯が無い・2マス以下は4等分の1列）。 */
+  const asideColumns = todayCells.length >= 3 ? todayCells.length : undefined
   const visibleRightIds = new Set(d.visibleRight.map((item) => item.id))
   const placedAside = new Set<DashboardCardId>()
   const rows: ReactNode[] = []
@@ -303,6 +309,8 @@ export default function DashboardV8() {
       <DashboardRow
         key={item.id}
         variant={variant}
+        asideSize="column"
+        asideColumns={asideColumns}
         aside={asideIds.length > 0 ? (
           variant === 'link'
             ? <>{asideIds.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</>
@@ -311,19 +319,6 @@ export default function DashboardV8() {
       >
         {main}
       </DashboardRow>,
-    )
-  }
-  /*
-   * 板が狭い（型が右の列を隠す幅）ときは、右の列のカードを段Dと同じ並びで出し直す。
-   * 隠したまま数字を落とさないため。広い板では CSS で隠れている。
-   */
-  const placedList = [...placedAside]
-  for (let index = 0; index < placedList.length; index += 4) {
-    const chunk = placedList.slice(index, index + 4)
-    rows.push(
-      <div key={`narrow-${index}`} className={styles.narrowAside}>
-        <DashboardColumns>{chunk.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</DashboardColumns>
-      </div>,
     )
   }
   const columnIds: DashboardCardId[] = [
@@ -345,7 +340,13 @@ export default function DashboardV8() {
   }
 
   const viewer = role !== null && !canManageRole(role)
-  const notice = start.summary || viewer || d.error || data?.partialFailures?.length ? (
+  /* 部品の中で自分のエラーを出すものは帯に重ねない。出し先の無いものだけ日本語の名前で帯に出す。 */
+  const shownCardIds = new Set<string>([
+    ...d.preferences.main.filter((item) => item.visible).map((item) => item.id),
+    ...d.visibleRight.map((item) => item.id),
+  ])
+  const looseFailures = partialFailuresWithoutCard(data?.partialFailures ?? [], shownCardIds)
+  const notice = start.summary || viewer || d.error || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
         <div className={styles.viewerBand} role="status">
@@ -360,8 +361,13 @@ export default function DashboardV8() {
           <Button type="button" onClick={() => void d.load()}>もう一度読み込む</Button>
         </div>
       ) : null}
-      {data?.partialFailures?.length ? (
-        <p className={styles.note} role="status">{`一部のデータを${STATE_TEXT.error}（${data.partialFailures.join('、')}）。0件としては表示していません。`}</p>
+      {looseFailures.length ? (
+        <Notice
+          tone="warn"
+          role="status"
+          message={`${partialFailureLabels(looseFailures)}を${STATE_TEXT.error}。0件としては表示していません。`}
+          action={<Button type="button" onClick={() => void d.load()}>もう一度読み込む</Button>}
+        />
       ) : null}
     </div>
   ) : undefined
