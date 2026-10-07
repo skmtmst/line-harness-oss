@@ -25,6 +25,7 @@ export default function StickyBar({
   status,
   info,
   actions,
+  outlined,
   className,
 }: {
   /**
@@ -51,11 +52,27 @@ export default function StickyBar({
   info?: ReactNode
   /** 中央に並べる操作。実行がいちばん右。 */
   actions: ReactNode
+  /**
+   * **その画面の板が「枠線のある高さ72の帯」を描いているときに渡す。**
+   * （承認済み ★BG-B `qIp42` の `X2oLn`：height 72・stroke `#DADDE2` 1px・影なし）
+   *
+   * V8 の既定は ★A/M10 の板の浮かせ（高さ60・枠なし・ふんわり影）。これは
+   * **別の板**なので、全画面の決まりにはしない（`docs/v8-design-rules.md` §1
+   * 「画面ごとに、その板の絵のとおり」）。板が違う画面はこれを渡して戻す。
+   *
+   * v7 の土台は元から枠線のある高さ72なので、渡しても何も変わらない。
+   */
+  outlined?: boolean
   className?: string
 }) {
   return (
     <div
-      className={[styles.bar, info ? styles.withInfo : null, className]
+      className={[
+        styles.bar,
+        info ? styles.withInfo : null,
+        outlined ? styles.outlined : null,
+        className,
+      ]
         .filter(Boolean)
         .join(' ')}
     >

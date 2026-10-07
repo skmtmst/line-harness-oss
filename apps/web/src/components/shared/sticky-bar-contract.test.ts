@@ -212,4 +212,47 @@ describe('下部追従バーの並びを部品で固定する', () => {
     // 並びは変えない（3列・中央寄せの決まりは別の試験が守る）。
     expect(v8).not.toMatch(/grid-template-columns/)
   })
+
+  /*
+   * **承認済みの板が共通部品より上。** `docs/v8-design-rules.md` §1 の順位は
+   * 「2. Pencil の ★V8（画面ごとに、その板の絵のとおり。1枚の絵を全部の画面の
+   * 決まりにしない）」＞「4. 共通部品」。
+   *
+   * 2026-10-07 の停止の原因はここを逆にしたこと——★A/M10 の板で決めた
+   * V8 の浮かせ（高さ60・枠なし・ふんわり影）を、承認済み ★BG-B `qIp42` の
+   * 帯 `X2oLn`（**高さ72・stroke `#DADDE2` 1px・影の指定なし**）より優先し、
+   * 板どおりに直すことを利用者への選択の質問にしてしまった。
+   *
+   * 直し方は「★A の規定を弱める」ではない（40画面以上がその板のまま）。
+   * **板が違う画面だけが渡す札**を足し、より強い指定で戻す。
+   * ★A の規定を消す・弱めると上の試験が落ちる。ひと組で見張る。
+   */
+  it('板が枠線の帯を描く画面は、その板どおりに戻せる（★BG-B X2oLn）', () => {
+    const outlined = CSS.match(/\[data-theme='v8'\] \.bar\.outlined \{([^}]*)\}/s)?.[1] ?? ''
+    expect(outlined, 'V8 の .bar.outlined の規定が無い').not.toBe('')
+    expect(outlined).toMatch(/min-height:\s*72px/) // height: 72
+    expect(outlined).toMatch(/border:\s*1px solid var\(--color-hairline\)/) // stroke: #DADDE2 / 1
+    expect(outlined).toMatch(/box-shadow:\s*none/) // 影の指定なし
+    // 並びは共通のまま（板ごとに列を変えない）。
+    expect(outlined).not.toMatch(/grid-template-columns/)
+    // 画面側で部品の見た目を上書きせず、部品の口で受ける（§2）。
+    expect(BAR).toMatch(/outlined\?:\s*boolean/)
+    expect(BAR).toMatch(/outlined \? styles\.outlined : null/)
+    // 渡した画面だけに効く。渡さない画面は ★A の浮かせのまま。
+    expect(CSS).toMatch(/\[data-theme='v8'\] \.bar \{/)
+  })
+
+  it('同じ板の2画面（v7・V8 のバナーのプロジェクト）が札を渡している', () => {
+    const v8Page = fs.readFileSync(path.join(SRC, 'v8/hq-banners/project.tsx'), 'utf8')
+    const v7Page = fs.readFileSync(path.join(SRC, 'app/hq/banners/project/page.tsx'), 'utf8')
+    for (const [name, source] of [
+      ['V8', v8Page],
+      ['v7', v7Page],
+    ] as const) {
+      const call = source.slice(source.indexOf('<StickyBar'))
+      expect(call.slice(0, call.indexOf('/>')), `${name} が outlined を渡していない`).toMatch(
+        /\boutlined\b/,
+      )
+    }
+  })
 })

@@ -577,6 +577,12 @@ function ProjectInner() {
           */}
         {canManage ? (
           <StickyBar
+            /*
+             * 承認済み ★BG-B `qIp42` の帯 `X2oLn` は **枠線つき・高さ72・影なし**。
+             * V8 の既定（★A/M10 の浮かせ）は**別の板**なので、この画面は板どおりに戻す。
+             * 根拠は `docs/v8-design-rules.md` §1「画面ごとに、その板の絵のとおり」。
+             */
+            outlined
             status={
               running
                 ? `${running.requestedCount}枚中 ${running.doneCount}枚できました・今月の残り ${usage?.month.remaining ?? '—'}枚`

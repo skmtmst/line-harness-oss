@@ -590,6 +590,12 @@ function ProjectInner() {
 
       <div data-design-node={running ? 'Kg13T' : 'SIT0Z'} className="sticky bottom-0 z-10">
         <StickyBar
+          /*
+           * 同じ板（★BG-B `qIp42` の `X2oLn`：枠線つき・高さ72・影なし）。
+           * v7 の土台は元からこの姿なので、渡しても見た目は変わらない。
+           * V8 へ切り替えたときに板どおりのままにするための札。
+           */
+          outlined
           status={
             running ? (
               `${running.requestedCount}枚中 ${running.doneCount}枚できました・今月の残り ${usage?.month.remaining ?? '—'}枚`
