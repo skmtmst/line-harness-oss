@@ -94,7 +94,7 @@ import {
   OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, COMMON_ACTION_DETAIL_PURCHASE, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
-  BOOKING_MENUS, BOOKING_CHANNELS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
+  BOOKING_MENUS, BOOKING_CHANNELS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_AVAILABILITY_STORE_VIEW, BOOKING_RESOURCES,
   BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_EXCEPTIONS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
@@ -119,7 +119,7 @@ import {
   TEST_RECIPIENT_LOGIN_USERS,
   HQ_BANNER_PRESETS, HQ_BANNER_USAGE, HQ_BANNER_STATS, HQ_BANNER_PROJECTS, HQ_BANNER_IMAGES,
   HQ_BANNER_ARCHIVED_PROJECTS, HQ_BANNER_IMAGE_COUNTS,
-  NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST,
+  NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST, NEN_FEEDING_PRODUCTS, NEN_HEALTH_SUMMARY_KOMUGI,
   FRIEND_ADD_RUN_DETAIL, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
 } from './fixtures.mjs'
 
@@ -4491,13 +4491,23 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/nen/health') {
     return { success: true, data: NEN_HEALTH_LIST }
   }
+  if (pathname === '/api/nen/feeding-products') {
+    /*
+     * 本物は `GET/PUT /api/nen/feeding-products`（apps/worker/src/routes/nen-ranks.ts）。
+     * 無いと既定の器が返り、ごはんの目安（板 h7A2F）が読み込めなかった。
+     */
+    return { success: true, data: method === 'PUT' ? { ...NEN_FEEDING_PRODUCTS, refreshedPets: 5 } : NEN_FEEDING_PRODUCTS }
+  }
   const nenHealthSummary = /^\/api\/nen\/health\/([^/]+)\/summary$/.exec(pathname)
   if (method === 'GET' && nenHealthSummary) {
     /*
      * 本物は `GET /api/nen/health/:petId/summary` の形（apps/worker/src/routes/nen-pets.ts）。
      * 無いと既定の器が返り、まとめ窓の `summary.pet.callName` で `/nen/health` が落ちていた。
      */
-    const item = NEN_HEALTH_LIST.items.find((entry) => entry.pet.id === decodeURIComponent(nenHealthSummary[1]))
+    const petId = decodeURIComponent(nenHealthSummary[1])
+    // 板 BVuYh（こむぎの 30日のまとめ）は絵の記録をそのまま返す。
+    if (petId === NEN_HEALTH_SUMMARY_KOMUGI.pet.id) return { success: true, data: NEN_HEALTH_SUMMARY_KOMUGI }
+    const item = NEN_HEALTH_LIST.items.find((entry) => entry.pet.id === petId)
     if (!item) return { success: false, error: 'Pet not found' }
     const weights = (item.weightSeries ?? []).filter((value) => value != null)
     const stoolCounts = item.latestStool ? { [item.latestStool]: item.count30d } : {}
@@ -5631,6 +5641,11 @@ const server = createServer((req, res) => {
       res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
       return
     }
+    /* 予約メニューの保存は、ほかの人が先に保存した形（409）を返す。板 v5L19Z（メニュー編集の競合）の帯を撮る。 */
+    if (method === 'PUT' && /^\/api\/booking\/admin\/menus\/[^/]+$/.test(url.pathname)) {
+      res.writeHead(409).end(JSON.stringify({ success: false, error: 'version_conflict' }))
+      return
+    }
     // 運営のお知らせ（V8 tQ2MJ・TJUUl）の宛先の見込み。数えるだけで何も変えない。
     if (method === 'POST' && url.pathname === '/api/ops/announcements/preview') {
       res.writeHead(200).end(JSON.stringify({ success: true, data: { tenants: 18, staff: 18, lineLinked: 11, withEmail: 18 } }))
@@ -6514,6 +6529,11 @@ const server = createServer((req, res) => {
     return
   }
 
+  /* 予約設定の右の写し（お客さまの予約画面）は店舗のルールを当てた空きを読む。ほかの画面は従来の空き。 */
+  if (url.pathname === '/api/booking/admin/availability' && url.searchParams.get('apply_store_rules') === '1') {
+    res.writeHead(200).end(JSON.stringify(BOOKING_AVAILABILITY_STORE_VIEW))
+    return
+  }
   if (url.pathname in RAW) {
     res.writeHead(200).end(JSON.stringify(RAW[url.pathname]))
     return
