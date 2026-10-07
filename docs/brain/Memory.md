@@ -1,59 +1,44 @@
 ---
 type: memory
 status: 常時更新
-date: 2026-09-03
-topic: LINE Harness V6 の引き継ぎ書
+date: 2026-10-07
+topic: LINE Harness V8 の引き継ぎ書
 tags: [memory, core]
 ---
 
 # Memory.md — 引き継ぎ書(全エージェント必読・最重要)
 
-> 新しく入った優秀なアシスタントに渡すオンボーディング文書。司令塔・デザイン・実装のどのセッションも、**起動時に最初にこれを読む**。`AGENTS.md` が振る舞いのルール(憲法)なら、ここは「この仕事についての事実」。古くなったらその場で直す。
+> 新しく入ったアシスタントに渡す「この仕事についての事実」。`AGENTS.md` が振る舞いのルール(憲法)。細かい決まりはここに書かず、下の「正本」を指す。古くなったらその場で直す。
 
 ## 事業・活動の概要
 
-- LINE 公式アカウントの CRM「LINE Harness」を、Lステップ / Liny の無料代替として作っている。Cloudflare Workers + D1 + Next.js 管理画面 + LIFF。MIT。
+- LINE 公式アカウントの CRM（画面の名前は musubo。画面に LINE Harness は出さない）を、Lステップ / Liny の無料代替として作っている。Cloudflare Workers + D1 + Next.js 管理画面 + LIFF。MIT。
 - 最初の顧客は 然-NEN(ペットフード EC)。飲食店向けは本番では無効のテスト機能。
-- ゴール: Pencil(Pen.dev)の ★V6 260 画面と要件書どおりに仕上げ、機能・安全性・使い勝手で Lステップを超える。
+- **ゴール：Pencil ★V8 の板（管理画面 434＋LIFF 28＝462 枚）をすべて合格させ、本番を V8 に切り替える。**切り替えの条件と手順は `docs/v8-requirements/v8-switch.md`。
 
-## 体制・役割(2026-09-04 14:30 オーナー決定で改訂)
+## 体制・役割(2026-10-06 オーナー決定)
 
-- オーナー: Kenta(kengdom53、GitHub は kentavndng 名義のセッションが多い)。共同開発者 Masato(skmtmst)。
-- **作業はすべて Codex が行う。Claude は司令塔(hq)のみ。** 司令塔の役目: 割り当て、判断を Issue に残す、統合 PR 後の台帳更新、台帳の整合(担当・対象・所有パス・完了条件・依存がそろっているか)、共通部品変更中の印の管理。他ノードの端末には書かない(指示は Issue コメントで渡す)。
-- 運用規則の正本: 台帳 README(kentavndng/line-harness-board)と台帳 #143。要点: 各レーンの作業中は 1 件まで、全体のマージ待ちは 5 件まで、1 PR = 利用者向けの目的 1 つ、ブランチは毎回最新の codex/development から、共通部品変更中は依存する画面作業を止める、判断と完了条件は Issue に残す(Claude が停止中でも Codex が Issue だけで進める)。
-- 統合: 合格済み PR は司令塔(人)が 3〜5 本ずつ統合 PR にまとめて通す。lane は自分の PR に update-branch もマージもしない。
-- 正本: GitHub の Issue と PR。NodeTerm は動かす場所。Slack は見える化。
-- (改訂前の体制: デザインは Claude Opus 5 の 4 セッション S0〜S3、Pencil の修正は人が Pencil の AI に貼る。lane ラベル s0〜s3・pen は台帳に残っているが、作業者は Codex。)
+- オーナー: Kenta(kengdom53)。共同開発者 Masato(skmtmst)。
+- **司令塔（Claude）**：画面・型・共通部品・Pencil・撮影と照合・要件・統合（push・PR・マージ・検証への配備）。
+- **作業役（司令塔が起動する Claude のサブエージェント）**：画面や文書の作業。**コミットまで**で止めて報告する。
+- **Codex**：API・DB・Worker・共有の型（F-1〜F-25 などの機能追加）。**コミットまで**。D1 の適用はオーナー承認のあと司令塔。画面（見た目）は作らない。
+- 所有の表は `AGENTS.md`「Claude / Codex のファイル所有」。
 
-## いま進行中のこと(2026-09-06 時点)
+## 正本（迷ったらここを開く）
 
-- 基準点: 統合 PR 15(#893)まで codex/development に入った(2026-09-06)。9/4〜9/6 の 2 日間は PC 障害で止まっていた。
-- 進捗台帳(docs/design-qa/v6-progress-ledger.md): 272 画面のうち 一致 0、構造一致・データ未接続 29、要修正 113、未実装 28、未判定 98(完了まで 268)。9 月末の目標「262 画面が設計と一致」には、1 日 15〜20 画面の直しが要る。
-- 台帳の作り: 未判定の判定は lane ごとの #210(s1)#211(s2)#212(s3)#213(s0)。要修正の直しは機能ごとに 1 チケット 1 PR(#217〜#245、[lane] 機能N …を一致にする)。未実装の口と画面は Codex の #246〜#258(機能ごと)。依存脆弱性は #216 に 14 件をまとめた。各 lane の着手順は #210〜#213・#216 のコメントにある。
-- 統合: 合格済み PR は司令塔が最新化してマージする(統合 PR に 3〜5 本まとめるか、単体で通す)。lane は自分の PR に update-branch もマージもしない。基準点が動いて競合したら lane が取り込む(rebase・force push なし)。
-- 停止中: #76・#77(共同開発者の PR、本人の判断待ち)、#104・#88(ステージング検証、オーナーが見られる日に再開)、#22〜#25(qa・fix ノード停止中)。
-- 作業場所は内蔵 SSD の ~/lh-work(lane ごとの worktree)。依存は導入済み。Pencil の MCP はこのマシンで接続に失敗することがある(Pen.app の場所が変わったため)。
-- git 履歴は 632 MB で、書き換えは今はしない。
-
-## よく使うもの
-
-- 進捗の正本: docs/design-qa/v6-progress-ledger.md(機械生成、手で直さない)
-- 要件の正本: docs/v6-requirements/v6-requirements-master-index.md と §5 の横断契約
-- 画面の正本: Pencil ★V6 → docs/v6-common-rules.md → 要件書 → 共通部品 → 契約テスト
-- 役割と指示: docs/v6-directives.md、docs/v6-parallel-plan.md、docs/v6-pencil-fix-prompt.md、docs/v6-orchestration-nodeterm.md
-- Pencil の修正一覧: docs/v6-requirements/v6-32-feature-cross-review.md §7(50 件)
-
-## 目標
-
-- 短期(9 月末): 262 画面が設計と一致、「準備中」0 件、動かない操作は文言で理由が出る。ステージングまで。
-- 中長期: バックエンド未接続 16 件の実装、本番(main)への配備、Lステップ超えの公開。
+- 振る舞い：`AGENTS.md`
+- 見た目の決まり：`docs/v8-design-rules.md`（使いやすさ → ★V8 の絵 → この文書 → 型・共通部品 → 動きの試験）
+- V8 の画面の置き場と書き方：`apps/web/src/v8/README.md`、手順書 `~/lh-work/design/v8/HOW-TO-90.md`
+- 動きの要件：`docs/v6-requirements/v6-requirements-master-index.md`（34 本）と `docs/v8-requirements/`（V8 で足した機能・LIFF・切り替え）
+- 進み具合：`~/lh-work/design/v8/SWITCH-READINESS.md` と `PASSED.tsv`（司令塔の手元）
+- 反映履歴：`docs/release-log/README.md`（PR ごとに `unreleased/<PR番号>-<担当>-<内容>.md`）
 
 ## 判断基準(迷ったときの軸)
 
-- 設計を変えるときは Pencil が先。コードだけ直さない。
-- 「一致」は文言一致 + 寸法一致 + 全状態撮影済みのときだけ。撮れなかった画面は空欄のまま残す。
+- 合格＝絵の文字の位置が ±4px で 90% 以上合う（measure.sh）＋重ねた絵を目で確かめる。幅は 1440 と 1152。
+- 設計を変えるときは Pencil が先。コードだけ直さない。絵と古い案がぶつかったら絵どおり。
 - 取れない数字を 0 にしない。未取得は「—」+ ラベル。
-- 1 PR = 1 話題 = 1 日。別の PR の上に PR を作らない。PR 番号は採番してから書く。
+- 1 PR = 1 話題。PR 番号は採番してから書く。
 - 相手の領域(所有パス)は触らない。必要なら司令塔に依頼を出す。
 - 削除は物理削除ではなく archive。履歴・監査・支払・審査の記録は消さない。
 - 決められないことは「停止」にして人に渡す。推測で埋めない。

@@ -1,7 +1,7 @@
 # 外部連携（V8）の動き
 
 入口：`app/webhooks/page.tsx`（V8 のときだけ、タブごとに `src/v8/webhooks/*.tsx`）と `app/webhooks/new/page.tsx`（V8 のときだけ `src/v8/webhooks/create.tsx`）。
-API 接続のタブ（`ralAc`）は今の V8（`app/webhooks/apitokens-v8.tsx`）のまま。v7 の画面・試験は触らない。
+API 接続のタブ（`ralAc`）も `src/v8/webhooks/api-tokens.tsx`（今までの V8 `app/webhooks/apitokens-v8.tsx` の動きを写して一から書いた。古いファイルは残す）。v7 の画面・試験は触らない。
 
 | タブ・画面 | ファイル | 絵 |
 |---|---|---|
@@ -10,6 +10,7 @@ API 接続のタブ（`ralAc`）は今の V8（`app/webhooks/apitokens-v8.tsx`�
 | Google Sheets | `sheets.tsx` | `DxAAA`・解除の窓 `YZ57z` |
 | やり取りの記録 | `interactions.tsx` | `Uv9AA`・中身 `DA0Ag` |
 | 見本 | `samples.tsx` | `SAUCs` |
+| API 接続 | `api-tokens.tsx` | `ralAc`・発行した鍵の窓 `UkZLi` |
 | 送り先を作る | `create.tsx` | `hsD8e`（競合 `NGh7b` は口が無い） |
 | 共通（頭・タブ・数の帯・閲覧のみの帯） | `shell.tsx` | 上のすべて |
 
@@ -43,3 +44,11 @@ API 接続のタブ（`ralAc`）は今の V8（`app/webhooks/apitokens-v8.tsx`�
 - やり取りの記録：「CSV で書き出す」は口が無いので置かない。期間は道具の段の右、件数はページ送りの段の左。中身は口の文（`triggerSummary`）の最初の「・」の前を1行目にする。
 - 作る：「いつ送りますか」の既定は「選んだものだけ送る」（要らない個人情報まで送らない）。絵の箱（友だち・運用・EC）に無い出来事は「詳細条件」を開くと選べる。「それでも送れないとき」は保存する口が無いので置かない。
 - 作る（競合 `NGh7b`）：作る口（POST）にも直す口（PUT）にも版の競合の返事（409）が無く、作る画面に「保存する」も無いので、この状態は出ない。
+
+## API 接続（`api-tokens.tsx`）
+- 呼ぶ口（今と同じ）：`api.webhooks.apiTokens.list / create / rotate / revoke`、本人確認（`webhook.api_token`）。入れ替えの競合（`TOKEN_ROTATE_CONFLICT`）は一覧を読み直して一言。
+- 「API 接続の鍵を発行する」→ 発行の窓（名前・できること）→ 発行した鍵の窓（`UkZLi`）。平文の鍵はこの窓にだけ1回出す。× と「写したので閉じる」は閉じるだけ。入れ替えたあとも同じ窓。アカウントを替えたら窓は閉じる。
+- 今までの V8 との違い：発行の入力を本文の箱から窓へ移した（絵に入力の箱が無く、窓で開けば一覧が下へずれない）。
+- 行の右は「入れ替える」と「…」（止める）。右クリックでも同じ一覧。名前を変える・できることを変える口は無いので置かない。止めた鍵は一覧の口が返さないので「止めている」行と「動かす」は出ない（動かす口も無い）。
+- 日時は絵の書き方（作った日 `2026/06/02`・最後に使った `9/30 10:02`・まだなら「まだ使っていません」）。
+- 統括でない人：発行・入れ替え・「…」を置かない（発行のボタンは場所だけ空ける）。タブの下に閲覧のみの帯。

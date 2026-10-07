@@ -1,0 +1,102 @@
+/*
+ * ★V8 利用規約の本文。見出し 14/700・本文 12/22（VdKOK）、小さい字は見出し 12/700・本文 11/19（ao15G）。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-card-gap);
+  min-width: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-card-gap);
+  scroll-margin-top: var(--tpl-rt-stat-pad);
+}
+
+.heading {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.text {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rt-terms-lh);
+}
+
+.nested {
+  padding-left: var(--tpl-rt-terms-indent);
+}
+
+.number {
+  margin-right: var(--tpl-rt-chip-row-gap);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.strong {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.meta {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.draft {
+  margin: 0;
+  padding: var(--tpl-rt-gray-note-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--tpl-rt-comment-bg);
+  color: var(--color-warning);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-micro);
+}
+
+.th,
+.td {
+  padding: var(--tpl-rt-terms-cell-pad);
+  box-shadow: var(--tpl-rt-line-bottom);
+  text-align: left;
+  vertical-align: top;
+}
+
+.th {
+  background: var(--color-table-head);
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.td {
+  color: var(--color-ink-secondary);
+}
+
+/* ①の枠の中（ao15G）：見出し 12/700・本文 11/19・段の間8。 */
+.compact,
+.compact .section {
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+.compact .heading {
+  font-size: var(--text-caption);
+}
+
+.compact .text {
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rt-draft-lh);
+}

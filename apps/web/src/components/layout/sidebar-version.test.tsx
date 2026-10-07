@@ -37,6 +37,16 @@ describe('メニューの下の版の表示（m18e・設計E）', () => {
     clearAdminVersionCache()
   })
 
+  it('読み込む間も2行ぶんの高さを見えない形で取っておく（動きの点検 11 番）', async () => {
+    fetchMock.mockReturnValue(new Promise(() => {}))
+    act(() => { root.render(<SidebarVersion />) })
+    const reserve = host.querySelector('[data-version-reserve]')
+    expect(reserve).not.toBeNull()
+    expect(reserve?.getAttribute('aria-hidden')).toBe('true')
+    expect(reserve?.className).toContain('invisible')
+    expect(reserve?.querySelectorAll('p').length).toBe(2)
+  })
+
   it('版・commit・日時・環境が取れると2行出す', async () => {
     process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
     fetchMock.mockResolvedValue(json({

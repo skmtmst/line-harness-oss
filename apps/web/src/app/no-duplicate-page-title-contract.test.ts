@@ -70,8 +70,8 @@ const ALLOWED_H1: Record<string, string> = {
   // 出しているのはテナント名（「株式会社 然」）で、画面名ではない。
   // 画面名の「統括コンソール」は、その上に小さく出る別の行。
   'app/hq/open/page.tsx': '出しているのはテナント名',
-  // 消す予定の画面。docs/v6-directives.md §4「/updates を /emergency へ
-  // 一本化」「V2/V3 の検証島を消す」。触らない。
+  // 消す予定の画面（2026-09 のオーナー決定「/updates を /emergency へ
+  // 一本化」「V2/V3 の検証島を消す」）。触らない。
   'app/updates/page.tsx': '消す予定（/emergency へ一本化）',
   'app/visual-qa/friend-attributes/page.tsx': '消す予定（V2/V3 の検証島）',
 }

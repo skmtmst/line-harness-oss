@@ -1,0 +1,261 @@
+/*
+ * ★V8 統括のお問い合わせ（Pencil `b8xBtZ`）。頭・左の列は型（ListPage）。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-body-gap);
+  padding: var(--tpl-hq-body-pad);
+  min-width: 0;
+}
+
+.buttonIcon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
+.smallIcon { width: var(--tpl-hq-check); height: var(--tpl-hq-check); }
+.doneIcon { width: var(--tpl-hq-attach-icon); height: var(--tpl-hq-attach-icon); color: var(--color-accent-deep); }
+.sentLine { margin: 0; color: var(--color-ink); font-size: var(--text-label); }
+.full { width: 100%; }
+.hiddenInput { display: none; }
+
+/* 問い合わせのカード（角丸12・余白20・間12） */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-form-gap);
+  min-width: 0;
+  padding: var(--tpl-hq-plan-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-hq-form-gap);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-field-gap);
+  min-width: 0;
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-hq-cell-lh);
+}
+
+.labelLarge {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-hq-nav-item-lh-20);
+}
+
+.textarea {
+  width: 100%;
+  height: var(--tpl-hq-textarea-h);
+  min-height: var(--tpl-hq-textarea-h);
+  padding: var(--tpl-hq-contract-pad);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-cell-lh);
+  resize: vertical;
+}
+
+/* 画像を添える（1行の枠・印16・間10） */
+.attach {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-attach-gap);
+  width: 100%;
+  padding: var(--tpl-hq-attach-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-cell-lh);
+  text-align: left;
+  cursor: pointer;
+}
+
+.attach:hover { background: var(--color-table-head); }
+.attach:disabled { cursor: not-allowed; opacity: 0.6; }
+
+.attachIcon {
+  width: var(--tpl-hq-attach-icon);
+  height: var(--tpl-hq-attach-icon);
+  flex-shrink: 0;
+}
+
+.thumbs { display: flex; flex-wrap: wrap; gap: var(--tpl-hq-plan-head-gap); margin: 0; padding: 0; list-style: none; }
+.thumb { position: relative; overflow: hidden; border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); }
+.thumbImage { display: block; width: var(--tpl-hq-thumb-w); height: var(--tpl-hq-thumb-h); object-fit: cover; }
+.thumbRemove {
+  position: absolute;
+  top: var(--tpl-hq-thumb-inset);
+  right: var(--tpl-hq-thumb-inset);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+/* 送信者の帯（灰の地・11px） */
+.sender {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-hq-col-gap);
+  padding: var(--tpl-hq-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+}
+
+.senderText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkButton {
+  flex-shrink: 0;
+  white-space: nowrap;
+  line-height: inherit;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkButton:hover { text-decoration: underline; }
+
+.error { margin: 0; color: var(--color-danger); font-size: var(--text-label); }
+.warn { margin: 0; color: var(--color-status-warn-deep); font-size: var(--text-label); }
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-hq-plan-head-gap);
+}
+
+/* これまでの問い合わせ */
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-body-gap);
+  min-width: 0;
+}
+
+.historyTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-hq-nav-item-lh-20);
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-plan-head-gap);
+  margin: 0;
+  padding: var(--tpl-hq-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.table {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.head,
+.row {
+  display: grid;
+  grid-template-columns: var(--tpl-hq-col-ticket) minmax(0, 1fr) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-ticket);
+  align-items: center;
+  column-gap: var(--tpl-hq-col-gap);
+}
+
+.head {
+  padding: var(--tpl-hq-head-pad);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-hq-small-lh);
+  white-space: nowrap;
+}
+
+.row {
+  padding: var(--tpl-hq-pay-row-pad);
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-cell-lh);
+}
+
+.cell,
+.subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subjectCell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.subject {
+  color: inherit;
+  text-decoration: none;
+}
+
+.subject:hover { color: var(--color-action); text-decoration: underline; }
+
+.replyNote { color: var(--color-ink-secondary); font-size: var(--text-micro); }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-hq-pill-gap);
+  padding: var(--tpl-hq-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-hq-pill-lh);
+  white-space: nowrap;
+}
+
+.dot { width: var(--tpl-hq-dot); height: var(--tpl-hq-dot); border-radius: var(--radius-pill); background: currentColor; }
+.pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.pillInfo { background: var(--color-status-info-soft); color: var(--color-status-info); }

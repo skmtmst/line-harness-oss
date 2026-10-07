@@ -30,6 +30,7 @@ import {
   supportSendStatus,
   supportSentNotice,
 } from './reply-guidance'
+import HqSupportDetailV8 from '@/v8/hq/support-detail'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -41,6 +42,11 @@ type Attachment = { name: string; mimeType: string; data: string; size: number; 
  * 静的書き出しのため動的セグメントは使わず `?id=` で受ける。
  */
 export default function HqSupportDetailPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <HqSupportDetailV8 /> : <HqSupportDetailPageV7 />
+}
+
+function HqSupportDetailPageV7() {
   const theme = useAdminTheme()
   usePageTitle('お問い合わせ')
   const router = useRouter()

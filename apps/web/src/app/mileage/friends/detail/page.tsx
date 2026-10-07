@@ -12,7 +12,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, Td, Th, Tr } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import V8FriendDetail from './v8-friend-detail'
+import V8FriendDetail from '@/v8/mileage/friend-detail'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   api,

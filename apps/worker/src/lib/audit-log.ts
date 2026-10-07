@@ -16,6 +16,7 @@ import type { Env } from '../index.js';
  */
 
 export type AuditAction =
+  | 'ad_conversion.retry'
   | 'line_account_tag.create'
   | 'line_account_tag.update'
   | 'line_account_tag.delete'

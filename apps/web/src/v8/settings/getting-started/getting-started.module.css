@@ -1,0 +1,166 @@
+/*
+ * ★V8 はじめの設定（xuJ7D）。寸法は globals.css の --tpl-sa-*。
+ * 外側（設定の型の中身の幅）は ../sa-frame.module.css。
+ */
+/* 進み具合の帯：薄い緑の板に「2 / 6 済み」と棒。 */
+.progress {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sa-progress-gap);
+  padding: var(--tpl-sa-progress-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-success-bg);
+}
+
+.progressText {
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-sa-progress-size);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bar {
+  flex: 1;
+  min-width: 0;
+  height: var(--tpl-sa-bar-h);
+  border: 0;
+  border-radius: var(--tpl-sa-bar-radius);
+  background: var(--color-canvas);
+  overflow: hidden;
+  appearance: none;
+}
+
+.bar::-webkit-progress-bar {
+  border-radius: var(--tpl-sa-bar-radius);
+  background: var(--color-canvas);
+}
+
+.bar::-webkit-progress-value {
+  border-radius: var(--tpl-sa-bar-radius);
+  background: var(--color-accent-deep);
+}
+
+.bar::-moz-progress-bar {
+  border-radius: var(--tpl-sa-bar-radius);
+  background: var(--color-accent-deep);
+}
+
+/* 6段の表：枠1本・角丸 12・行の上に線。 */
+.steps {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-sa-ring);
+  overflow: hidden;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sa-step-gap);
+  padding: var(--tpl-sa-step-pad);
+  box-shadow: var(--tpl-sa-line-top);
+}
+
+/* 線は行の内側に描く（線の分だけ行が下へずれない）。 */
+.step:first-child {
+  box-shadow: none;
+}
+
+.mark {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-sa-mark);
+  height: var(--tpl-sa-mark);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--tpl-sa-ring-mark);
+  background: var(--color-canvas);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.markDone {
+  box-shadow: none;
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+}
+
+.stepBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-sa-step-text-gap);
+  min-width: 0;
+}
+
+.stepTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-sa-title-lh);
+  white-space: nowrap;
+}
+
+.stepTitleDone {
+  color: var(--color-ink-secondary);
+}
+
+.stepSub {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-sa-sub-lh);
+  white-space: nowrap;
+}
+
+.stepSide {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.stepBlocked {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sa-card-line-lh);
+}
+
+/* 下の2枚。 */
+.bottom {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-sa-pair-gap);
+}
+
+.card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-sa-card-gap);
+  min-width: 0;
+  padding: var(--tpl-sa-card-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-sa-card-title-lh);
+}
+
+.cardLine {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sa-card-line-lh);
+}

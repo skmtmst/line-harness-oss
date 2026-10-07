@@ -74,7 +74,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-test('一覧口の403は1枚の案内になり読み直しの口が残る', async () => {
+test('一覧口の403は権限なしの板（★V8 O5tUeE）になり、生の文は出さない', async () => {
+  // 2026-10-07：403 は読み直しても開けないので、読み直しの口ではなく権限なしの板にする（絵 O5tUeE）。
   handler = (url) => {
     if (url.pathname === '/api/scenarios') {
       return response({ success: false, error: 'forbidden' }, 403)
@@ -84,12 +85,10 @@ test('一覧口の403は1枚の案内になり読み直しの口が残る', asyn
   await act(async () => root.render(<ScenariosPage />))
   await settle()
   await eventually(() => {
-    expect(host.textContent).toContain('シナリオを読み込めませんでした')
+    expect(host.textContent).toContain('シナリオ配信を開く権限がありません')
   })
   expect(host.textContent).not.toContain('API error')
-  const retry = [...host.querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === 'もう一度試す')
-  expect(retry).toBeTruthy()
+  expect(host.querySelector('[data-design-node="O5tUeE"]')).not.toBeNull()
 })
 
 test('一覧口の429は1枚の案内になり読み直しの口が残る', async () => {

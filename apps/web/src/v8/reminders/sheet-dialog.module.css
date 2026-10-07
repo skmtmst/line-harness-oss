@@ -1,0 +1,60 @@
+/* ★V8 リマインダの確かめる窓（RwVo5・VsSyu）：幅600・上から260・余白24・段の間14・下に線なし。寸法は --tpl-rm-dlg-*。 */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: var(--tpl-rm-dlg-top) var(--tpl-body-pad) var(--tpl-body-pad);
+  background: var(--color-scrim);
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-section-gap);
+  width: min(var(--tpl-rm-dlg-w), 100%);
+  padding: var(--tpl-rm-dlg-pad);
+  border-radius: var(--radius-panel);
+  background: var(--color-canvas);
+  box-shadow: var(--v8-parts-dialog-shadow);
+}
+.panel:focus-visible { outline: revert; }
+.head { display: flex; align-items: center; gap: var(--tpl-cell-gap-half); }
+.panel .head .close { width: var(--tpl-rm-dlg-close); height: var(--tpl-rm-dlg-close); flex-shrink: 0; }
+.title {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rm-dlg-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-rm-dlg-title-lh);
+}
+.description {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-rm-rule-lh);
+}
+.band {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rm-row-gap);
+  padding: var(--tpl-rm-info-pad);
+  border-radius: var(--tpl-rm-band-radius);
+  background: var(--color-status-warn-soft);
+  color: var(--color-ink);
+  font-size: var(--tpl-rm-note-size);
+  line-height: var(--tpl-rm-note-lh);
+}
+.band[data-tone='danger'] { background: var(--color-status-danger-soft); color: var(--color-danger); }
+.bandIcon { flex: none; color: var(--color-warning); }
+.band[data-tone='danger'] .bandIcon { color: var(--color-danger); }
+.bandText { flex: 1; min-width: 0; }
+.error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); font-weight: 600; }
+.footer { display: flex; align-items: center; justify-content: center; gap: var(--tpl-toolbar-gap); }
+.footerSplit { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+.footerLead { display: flex; flex: 1 1 0; align-items: center; min-width: 0; }
+.footerCenter { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }

@@ -1,0 +1,114 @@
+/* ★V8 ウェビナーの ③CTA・フォーム（Q0Jrk・pvimJ）。カード・欄・行の形は form.module.css。 */
+
+.desc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wc-an-text-lh);
+}
+
+/* カードの行：時刻56・見出し・種類の札。行を押すと下の中身がそのカードになる。 */
+.cardPick {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--tpl-wc-nt-row-gap);
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cardTime {
+  flex-shrink: 0;
+  width: var(--tpl-wc-ct-time-w);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-wc-tab-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 選んでいるカードの中身：淡い地・角10・内側16・間12。 */
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wc-an-gap);
+  min-width: 0;
+  margin: 0;
+  padding: var(--tpl-wc-cm-side-pad);
+  border: 0;
+  border-radius: var(--tpl-wc-vd-row-radius);
+  background: var(--color-table-head);
+}
+.editorTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-wc-tab-lh);
+}
+.toggleRow { display: flex; align-items: center; gap: var(--tpl-wc-ct-toggle-gap); }
+.toggleText { color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-wc-tab-lh); }
+.formSelect { width: 100%; }
+
+/* 同時編集の帯：琥珀の地・角10・内側 14/16・右に2つのボタン。 */
+.conflict {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wc-an-row-gap);
+  padding: var(--tpl-wc-ct-band-pad);
+  border-radius: var(--tpl-wc-vd-row-radius);
+  background: var(--color-warning-bg);
+}
+.conflictIcon { flex-shrink: 0; color: var(--color-warning); }
+.conflictText { display: flex; flex: 1; flex-direction: column; gap: var(--tpl-wc-cm-head-gap); min-width: 0; }
+.conflictTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-wc-tab-lh); }
+.conflictNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+
+/* 右の列：カードの見え方（線1・角12・内側16）。黒い再生の窓の下に CTA のカード。 */
+.previewCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wc-ct-preview-gap);
+  align-self: stretch;
+  padding: var(--tpl-wc-cm-side-pad);
+  border-radius: var(--tpl-wc-card-radius);
+  box-shadow: var(--tpl-an-ring);
+  background: var(--color-canvas);
+}
+.player {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--tpl-wc-ct-player-h);
+  border-radius: var(--tpl-wc-an-chart-radius);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+.ctaCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wc-ct-card-gap);
+  padding: var(--tpl-wc-an-row-gap);
+  border-radius: var(--tpl-wc-vd-row-radius);
+  box-shadow: var(--tpl-an-ring);
+}
+.ctaTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-wc-tab-lh); }
+.ctaBody { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-micro); line-height: var(--tpl-row-sub-lh); }
+.ctaButton {
+  margin: 0;
+  padding: var(--tpl-wc-ct-button-pad);
+  border-radius: var(--tpl-wc-an-chart-radius);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-text-sm-lh);
+  text-align: center;
+}
+
+.compare { width: 100%; font-size: var(--text-caption); }

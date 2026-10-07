@@ -30,7 +30,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isFriendAttributesV2 = pathname === '/visual-qa/friend-attributes-v2'
   const isFriendAttributesV3 = pathname === '/visual-qa/friend-attributes-v3'
-  const isAccountCreate = pathname === '/accounts/new'
+  /*
+   * LINEアカウントを登録（/accounts/new）。v7 は外枠の無い専用の全画面。
+   * ★V8 は絵（xj3zz〜TvXII）どおり、ほかの画面と同じ外枠（左メニュー・上の帯）で出す（2026-10-07 司令塔）。
+   */
+  const isV8 = useAdminTheme() === 'v8'
+  const isAccountCreate = pathname === '/accounts/new' && !isV8
 
   if (isPublicAuthPath(pathname)) {
     return <>{children}</>
@@ -186,7 +191,7 @@ function AccountCreateWorkspace({ children }: { children: React.ReactNode }) {
  *
  * `PageChromeProvider` の中でしか使えない（`usePageChrome` を読むため）。
  * 本文の幅は既定で `--container-shell` までにし、**ページが明示したときだけ**外す。
- * ルート名で自動判定しない（`docs/v6-common-rules.md` §1）。
+ * ルート名で自動判定しない（`docs/v8-design-rules.md` §5）。
  */
 export function Workspace({ children }: { children: React.ReactNode }) {
   const { fullWidth, settingsNavInline } = usePageChrome()
@@ -198,7 +203,8 @@ export function Workspace({ children }: { children: React.ReactNode }) {
    */
   const isV8 = useAdminTheme() === 'v8'
   // 画面がメニューを白い板の中に置いたら（settingsNavInline）、外には出さない。
-  const settingsArea = isSettingsAreaPath(pathname ?? '')
+  // LINEアカウントを登録（/accounts/new）は統括の画面。設定の中のメニューは付けない（絵 xj3zz〜TvXII）。
+  const settingsArea = isSettingsAreaPath(pathname ?? '') && pathname !== '/accounts/new'
   const withSettingsNav = isV8 && !fullWidth && !settingsNavInline && settingsArea
   return (
     <div className={styles.side}>

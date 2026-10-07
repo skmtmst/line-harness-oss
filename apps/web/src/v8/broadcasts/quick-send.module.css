@@ -1,0 +1,223 @@
+/*
+ * ★V8 一斉配信 かんたんに送る（板 `P6vbxn`・小窓 640）。窓の枠・題・× は共通の Dialog。
+ * この窓は「余白24・題18太字・欄の間14・選ぶ札は緑の地に青の字・見込みは灰の箱・承認は琥珀の箱・
+ * キャンセルと送るは真ん中」。× は題の行に重ねる（かんたんに作る G4GejG と同じ）。値は globals.css の --tpl-ms-*。
+ */
+:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:first-child) {
+  position: relative;
+  padding: var(--tpl-ms-qc-head-pad);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:first-child) > :global(button) {
+  position: absolute;
+  top: var(--tpl-ms-qc-close-inset);
+  right: var(--tpl-ms-qc-close-inset);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.body) :global(h2) {
+  font-size: var(--tpl-ms-qc-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-ms-qc-title-lh);
+}
+
+:global([data-theme='v8'] [data-design-part='dialog']):has(.body) > :global(div:nth-child(2)) {
+  padding: var(--tpl-ms-key-content-pad);
+}
+
+.body {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--tpl-ms-key-gap);
+}
+
+.label {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-ms-key-token-size);
+  font-weight: 600;
+  line-height: var(--tpl-ms-key-cell-lh);
+}
+
+.textarea {
+  width: 100%;
+  height: var(--tpl-ms-qs-textarea-h);
+  padding: var(--tpl-ms-key-box-pad);
+  border: 0;
+  border-radius: var(--tpl-ms-key-box-radius);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ms-fn-input-lh);
+  resize: vertical;
+}
+
+.textarea:focus-visible {
+  outline: var(--tpl-ms-focus-w) solid var(--color-action);
+  outline-offset: var(--tpl-ms-focus-offset);
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ms-key-row-gap);
+}
+
+.meta {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-ms-key-micro-lh);
+  white-space: nowrap;
+}
+
+.insert {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: var(--tpl-ms-key-token-size);
+  font-weight: 600;
+  line-height: var(--tpl-ms-key-cell-lh);
+  cursor: pointer;
+}
+
+.insert:hover {
+  text-decoration: underline;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-ms-fn-field-gap);
+}
+
+.chip {
+  /* 絵の札は高さ29（上下6＋文字17）。共通の押せる高さ32は札には当てない（24 以上は保つ）。 */
+  min-height: 0;
+  padding: var(--tpl-ms-qc-chip-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--tpl-ms-key-token-size);
+  font-weight: 500;
+  line-height: var(--tpl-ms-key-cell-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip[aria-checked='true'] {
+  outline-color: var(--color-action);
+  background: var(--color-success-bg);
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+.chip:focus-visible {
+  outline: var(--tpl-ms-focus-w) solid var(--color-action);
+  outline-offset: var(--tpl-ms-focus-offset);
+}
+
+.tagPick,
+.whenPick {
+  min-width: 0;
+}
+
+/* 日時の欄は札と同じ段に並ぶので、絵の高さ（31）にそろえる。 */
+.whenPick :global(button) {
+  height: var(--tpl-ms-qs-when-h);
+  min-height: 0;
+}
+
+.estimateBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ms-key-info-gap);
+  padding: var(--tpl-ms-key-box-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+}
+
+.estimate {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  align-items: center;
+  gap: var(--tpl-ms-key-info-gap);
+  color: var(--color-ink);
+  font-size: var(--tpl-ms-key-token-size);
+  line-height: var(--tpl-ms-key-cell-lh);
+}
+
+.estimateIcon {
+  flex: none;
+  color: var(--color-ink-secondary);
+}
+
+.approval {
+  display: flex;
+  flex: 0 0 var(--tpl-ms-qs-approval-w);
+  flex-direction: column;
+  gap: var(--tpl-ms-key-row-gap);
+  padding: var(--tpl-ms-key-info-pad);
+  border-radius: var(--tpl-ms-key-box-radius);
+  background: var(--color-warning-bg);
+}
+
+.approvalTitle,
+.approvalNote {
+  margin: 0;
+  color: var(--color-warning);
+}
+
+.approvalTitle {
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-ms-qs-approval-lh);
+}
+
+.approvalNote {
+  font-size: var(--tpl-ms-key-token-size);
+  line-height: var(--tpl-ms-key-cell-lh);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ms-key-row-gap);
+  margin: var(--tpl-ms-qc-foot-margin);
+  padding-top: var(--tpl-ms-key-row-gap);
+}
+
+.detailLink {
+  display: inline-flex;
+  height: var(--tpl-ms-key-btn-h);
+  align-items: center;
+  gap: var(--tpl-ms-fn-field-gap);
+  padding: var(--tpl-ms-qc-text-btn-pad);
+  border-radius: var(--radius-control);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-ms-key-info-lh);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.detailLink:hover {
+  color: var(--color-ink);
+}
+
+.balance {
+  flex: 0 0 var(--tpl-ms-qc-balance-w);
+}

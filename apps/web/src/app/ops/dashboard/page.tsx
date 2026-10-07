@@ -18,6 +18,7 @@ import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { contractDetail, minutesLabel, revenueDetail, revenueSourceLabel } from './format'
 import { formatNumber } from '@/lib/format'
+import OpsDashboardV8 from '@/v8/ops/dashboard'
 
 /**
  * 運営ダッシュボード ★V6 37-2 `Xvofy`。
@@ -33,6 +34,11 @@ const PERIODS: Array<{ key: OpsDashboardPeriod; label: string }> = [
 ]
 
 export default function OpsDashboardPage() {
+  // ★V8 は src/v8/ops/dashboard.tsx。v7 は下のまま。
+  return useAdminTheme() === 'v8' ? <OpsDashboardV8 /> : <OpsDashboardV7 />
+}
+
+function OpsDashboardV7() {
   const theme = useAdminTheme()
   const [period, setPeriod] = useState<OpsDashboardPeriod>('month')
   const [data, setData] = useState<OpsDashboard | null>(null)

@@ -16,6 +16,8 @@ import NewOperatorNotificationPage from './page'
  * staff では閲覧のみの帯が出て保存の押し口が押せない形になることを
  * 実DOMで固定する。
  */
+// 設定の中のメニュー（共通部品）はこの試験の対象外。localStorage と機能の出し分けを読むので外す。
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
   usePathname: () => '/line-notifications/operator/new',
@@ -129,13 +131,16 @@ test('公開の前に確認の窓（sDXNy）で宛先と届く人数を確かめ
   expect(confirmButton?.textContent).toContain('2人')
 })
 
-test('staff では閲覧のみの帯が出て保存の押し口が押せない', async () => {
+test('staff では閲覧のみの帯が出て、保存・公開・テスト送信のボタンは置かない（2026-10-06 オーナー決定）', async () => {
   window.localStorage.setItem('lh_staff_role', 'staff')
   await renderPage()
   expect(host?.textContent).toContain('閲覧のみで見ています')
-  const publishButton = Array.from(host?.querySelectorAll('button') ?? [])
-    .find((button) => button.textContent?.includes('運用者へのお知らせを公開'))
-  expect(publishButton?.hasAttribute('disabled')).toBe(true)
+  const labels = Array.from(host?.querySelectorAll('button') ?? []).map((button) => button.textContent ?? '')
+  expect(labels.some((label) => label.includes('運用者へのお知らせを公開'))).toBe(false)
+  expect(labels.some((label) => label.includes('下書きを保存'))).toBe(false)
+  expect(labels.some((label) => label.includes('テストを送る'))).toBe(false)
+  // やめる道は残す。
+  expect(Array.from(host?.querySelectorAll('a') ?? []).some((a) => a.textContent === 'キャンセル')).toBe(true)
 })
 
 
@@ -155,6 +160,9 @@ test('選んだスタッフでチームを作り、保存する通知の条件�
     return response({success:true,data:{id:'rule-1',version:1}})
   }))
   await renderPage()
+  // チームを作る欄は絵に無いので、受け取るスタッフの箱の右上から開く。
+  expect(host!.querySelector('[aria-label="チーム名"]')).toBeNull()
+  await act(async () => { Array.from(host!.querySelectorAll('button')).find(button=>button.textContent==='この顔ぶれをチームにする…')!.click() })
   const input = host!.querySelector<HTMLInputElement>('[aria-label="チーム名"]')!
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'対応チーム')

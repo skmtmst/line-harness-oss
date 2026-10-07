@@ -97,7 +97,9 @@ describe('#673 A. カード・パネルの立体感', () => {
 
 describe('#673 B. 触った感触', () => {
   it('ボタンは motion-instant(80ms) で 0.98倍に沈む（★V7 仕上げ §2）', () => {
-    expect(GLOBALS_CODE).toMatch(/:active[\s\S]*?scale:\s*0\.98/)
+    // 0.98 は変数（--press-scale）に置いた（動きの点検 6 番）。
+    expect(GLOBALS_CODE).toMatch(/--press-scale:\s*0\.98;/)
+    expect(GLOBALS_CODE).toMatch(/:active[\s\S]*?scale:\s*var\(--press-scale\)/)
     expect(GLOBALS_CODE).toMatch(/scale var\(--motion-instant\)/)
     // 旧 #673 の transform: scale(0.97) は scale 規定と二重に効くため外した
     expect(GLOBALS_CODE).not.toContain('transform: scale(0.97)')

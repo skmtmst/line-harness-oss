@@ -10,7 +10,10 @@
  * 「シナリオを作る」は左のフォルダの列の上、行の右端は「…」（複製・配信結果・削除）、
  * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
  */
+import { RovingTbody } from '@/components/shared/row-roving'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
+import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -41,6 +44,9 @@ import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { ROLE_LABELS } from '@/lib/hq-members'
+import { isForbidden } from '@/components/shared/api-error-message'
+import NoPermissionBoard from '@/v8/no-permission/no-permission'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { runUndoable } from '@/lib/undoable'
@@ -59,6 +65,7 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -135,17 +142,18 @@ export default function ScenariosListV8() {
   const staffRole = useStaffRole()
   const canEdit = staffRole === null || canManageRole(staffRole)
 
-  const [nameQuery, setNameQuery] = useState('')
-  const [serverQuery, setServerQuery] = useState('')
+  /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
+  const [nameQuery, setNameQuery] = useListUrlParam('q')
+  const [serverQuery, setServerQuery] = useState(() => clampSearchQuery(readListUrlParam('q').trim()))
   /** よく使う絞り込み。いま数えられるのは「停止中のみ」「今月作った」「稼働中のみ」。 */
-  const [stoppedOnly, setStoppedOnly] = useState(false)
-  const [createdThisMonthOnly, setCreatedThisMonthOnly] = useState(false)
-  const [savedFilter, setSavedFilter] = useState('')
+  const [stoppedOnly, setStoppedOnly] = useListUrlFlag('stopped')
+  const [createdThisMonthOnly, setCreatedThisMonthOnly] = useListUrlFlag('thisMonth')
+  const [savedFilter, setSavedFilter] = useListUrlParam('view')
   const [actionError, setActionError] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
   /** 「未分類」の件数。`null` は数えていない。 */
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
-  const [folderFilter, setFolderFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   /** 絞り込みを掛けない「すべて」の件数。`null` は「まだ数えられていない」。 */
   const [overallTotal, setOverallTotal] = useState<number | null>(null)
@@ -187,11 +195,14 @@ export default function ScenariosListV8() {
    */
   const activeAccountRef = useRef<string | null>(selectedAccountId)
 
+  /* アカウントを切り替えたときだけフォルダの絞り込みを外す（最初の描画では URL の値を残す）。 */
+  const previousAccountRef = useRef(selectedAccountId)
   useEffect(() => {
     activeAccountRef.current = selectedAccountId
     setFolders([])
     setUnfiledCount(null)
-    setFolderFilter('')
+    if (previousAccountRef.current && previousAccountRef.current !== selectedAccountId) setFolderFilter('')
+    previousAccountRef.current = selectedAccountId
     setOverallTotal(null)
     setStats(null)
     setStatsFailed(false)
@@ -293,6 +304,7 @@ export default function ScenariosListV8() {
     }),
     load: loadScenarioPage,
     initialLimit: perPage,
+    pageUrlKey: 'page',
   })
   /*
    * 押した瞬間の見せ方（★V8 サクサク感 B）。軽い操作は先にこの重ねで
@@ -309,6 +321,8 @@ export default function ScenariosListV8() {
     page: scenarioList.page,
   })
   const scenarios = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : scenarioList.items
+  /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
+  useListScrollMemory(scenarioList.loaded)
   const loadScenarios = scenarioList.retry
 
   /*
@@ -386,6 +400,9 @@ export default function ScenariosListV8() {
 
   const allOnPageSelected = scenarios.length > 0 && scenarios.every((s) => selectedIds.has(s.id))
   const selectedCount = selectedIds.size
+  /* 選んでいる間は Esc で選択を外す（動きの点検 12 番）。 */
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+  useEscapeToClearSelection(selectedCount > 0, clearSelection)
   const selectedRows = scenarios.filter((s) => selectedIds.has(s.id))
   const stoppableIds = selectedRows.filter((s) => s.isActive).map((s) => s.id)
   const resumableIds = selectedRows.filter((s) => !s.isActive).map((s) => s.id)
@@ -850,10 +867,11 @@ export default function ScenariosListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <tbody>
+            <RovingTbody>
               {scenarios.map((s) => {
+                const rowFolder = s.folderId ? folders.find((f) => f.id === s.folderId) : undefined
                 const folderName = s.folderId
-                  ? folders.find((f) => f.id === s.folderId)?.name ?? 'フォルダ'
+                  ? rowFolder?.name ?? 'フォルダ'
                   : '未分類'
                 const showFolder = folders.length > 0 || s.folderId
                 const meta = [
@@ -907,19 +925,21 @@ export default function ScenariosListV8() {
                     <NameCell
                       name={
                         <div className={styles.nameRow}>
-                          <Link
-                            href={`/scenarios/detail?id=${s.id}`}
-                            title={s.name}
-                            className={styles.cellTitle}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                              event.preventDefault()
-                              goDetail(s.id)
-                            }}
-                          >
-                            {s.name}
-                          </Link>
+                          <FolderDotName folder={rowFolder ? { name: rowFolder.name, color: rowFolder.color } : null}>
+                            <Link
+                              href={`/scenarios/detail?id=${s.id}`}
+                              title={s.name}
+                              className={styles.cellTitle}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                                event.preventDefault()
+                                goDetail(s.id)
+                              }}
+                            >
+                              {s.name}
+                            </Link>
+                          </FolderDotName>
                           {s.lineAccountId === null && (
                             <span className={styles.miniBadge} title="全アカウントに適用されるシナリオです">
                               全アカウント共通
@@ -966,14 +986,14 @@ export default function ScenariosListV8() {
                   </Tr>
                 )
               })}
-            </tbody>
+            </RovingTbody>
           </DataTable>
         </div>
 
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
         {selectedCount > 0 ? (
           <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-            <span className={styles.bulkCount}>{selectedCount}件を選択中</span>
+            <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount}件を選択中</span>
             <Button
               type="button"
               variant="secondary"
@@ -1154,6 +1174,17 @@ export default function ScenariosListV8() {
       {filteredCount ? <div className={styles.noteRow}>{filteredCount}</div> : null}
     </>
   )
+
+  /* 板 `O5tUeE`：一覧の口が 403（この役割では開けない）なら、画面ごと権限なしの板にする。 */
+  if (scenarioList.error && isForbidden(scenarioList.error)) {
+    return (
+      <NoPermissionBoard
+        featureName="シナリオ配信"
+        roleLabel={staffRole && staffRole in ROLE_LABELS ? ROLE_LABELS[staffRole as keyof typeof ROLE_LABELS] : null}
+        capabilitiesHref="/staff"
+      />
+    )
+  }
 
   return (
     <ListPage

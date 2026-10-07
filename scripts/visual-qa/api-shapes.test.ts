@@ -89,24 +89,26 @@ describe('ウェビナーフォルダの画面確認データ', () => {
 });
 
 describe('オートメーションの画面確認データ', () => {
-  it('設計と同じ稼働14本・停止4本・見本12件を返す', () => {
-    expect(AUTOMATIONS.filter((item: { isActive: boolean }) => item.isActive)).toHaveLength(14);
-    expect(AUTOMATIONS.filter((item: { isActive: boolean }) => !item.isActive)).toHaveLength(4);
+  it('V8 の板（LWQXd）と同じ稼働5本・停止1本・見本12件を返す', () => {
+    expect(AUTOMATIONS.filter((item: { isActive: boolean }) => item.isActive)).toHaveLength(5);
+    expect(AUTOMATIONS.filter((item: { isActive: boolean }) => !item.isActive)).toHaveLength(1);
     expect(AUTOMATION_TEMPLATES).toHaveLength(12);
   });
 
   it('一覧の30日実績を設計と同じ合計で返す', () => {
-    expect(AUTOMATIONS.reduce((sum: number, item: { executionCount30d: number }) => sum + item.executionCount30d, 0)).toBe(8_420);
+    expect(AUTOMATIONS.reduce((sum: number, item: { executionCount30d: number }) => sum + item.executionCount30d, 0)).toBe(2_988);
     expect(AUTOMATIONS.reduce((sum: number, item: { failureCount30d: number }) => sum + item.failureCount30d, 0)).toBe(6);
-    expect(AUTOMATIONS.filter((item: { executionCount30d: number }) => item.executionCount30d === 0)).toHaveLength(3);
+    expect(AUTOMATIONS.filter((item: { executionCount30d: number }) => item.executionCount30d === 0)).toHaveLength(1);
   });
 
-  it('共通アクションの件数・呼び出し元・今月実績を設計と同じ合計で返す', () => {
-    expect(COMMON_ACTIONS).toHaveLength(14);
-    expect(COMMON_ACTIONS.filter((item: { status: string }) => item.status === 'published')).toHaveLength(11);
-    expect(COMMON_ACTIONS.reduce((sum: number, item: { bindingCount: number }) => sum + item.bindingCount, 0)).toBe(38);
-    expect(COMMON_ACTIONS.reduce((sum: number, item: { executionCountThisMonth: number }) => sum + item.executionCountThisMonth, 0)).toBe(2_847);
-    expect(COMMON_ACTIONS.reduce((sum: number, item: { failureCountThisMonth: number }) => sum + item.failureCountThisMonth, 0)).toBe(6);
+  it('共通アクションの件数・呼び出し元・今月実績を V8 の板（LnGNw）と同じ合計で返す', () => {
+    expect(COMMON_ACTIONS).toHaveLength(8);
+    expect(COMMON_ACTIONS.filter((item: { status: string }) => item.status === 'published')).toHaveLength(5);
+    expect(COMMON_ACTIONS.filter((item: { status: string }) => item.status === 'draft')).toHaveLength(1);
+    expect(COMMON_ACTIONS.filter((item: { status: string }) => item.status === 'archived')).toHaveLength(2);
+    expect(COMMON_ACTIONS.reduce((sum: number, item: { bindingCount: number }) => sum + item.bindingCount, 0)).toBe(12);
+    expect(COMMON_ACTIONS.reduce((sum: number, item: { executionCountThisMonth: number }) => sum + item.executionCountThisMonth, 0)).toBe(3_210);
+    expect(COMMON_ACTIONS.reduce((sum: number, item: { failureCountThisMonth: number }) => sum + item.failureCountThisMonth, 0)).toBe(2);
   });
 
   it('共通アクションの公開4版と5つの利用先を同じ契約で返す', () => {
@@ -284,7 +286,9 @@ describe('本人照合候補の画面確認データ', () => {
 
   it('通常・空・失敗を別の形で用意する', () => {
     expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate).toMatchObject({ total: 18, limit: 20, offset: 0 });
-    expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate.items).toHaveLength(4);
+    // ★V8 重複検出 hn6Y8：絵どおり3組（最高・高・低）。状態別の数と根拠不足の数も持つ。
+    expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate.items).toHaveLength(3);
+    expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate).toMatchObject({ statusCounts: { pending: 11, deferred: 2, linked: 5, different: 0 }, lowConfidenceCount: 2 });
     expect(IDENTITY_CANDIDATE_LISTS.empty).toEqual({ items: [], total: 0, limit: 20, offset: 0 });
     expect(IDENTITY_CANDIDATE_ERROR).toMatchObject({ success: false, code: 'VISUAL_QA_ERROR' });
     expect(IDENTITY_CANDIDATE_DETECTION.normal).toEqual({

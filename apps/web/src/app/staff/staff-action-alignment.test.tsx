@@ -139,7 +139,8 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'コピー元さん（閲覧のみ）' }))
 
     expect(fixture.updateStaff).not.toHaveBeenCalled()
-    expect(screen.getByRole('status').textContent).toContain('コピー元さんの「閲覧のみ」を下書きに反映しました')
+    // 画面の中の知らせ（role=status）。置き場所の知らせの入れ物も role=status なので、全部の中から文で見る
+    expect(screen.getAllByRole('status').map((el) => el.textContent).join('\n')).toContain('コピー元さんの「閲覧のみ」を下書きに反映しました')
 
     fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
     expect(fixture.updateStaff).not.toHaveBeenCalled()
@@ -290,6 +291,6 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
 
     fixture.updateStaff.mockResolvedValueOnce({ success: true, data: state.members[0] })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('対象者のすべてのログインを終了したため、新しい権限で使うにはもう一度ログインが必要です。'))
+    await waitFor(() => expect(screen.getByRole('status', { name: '知らせ' }).textContent).toContain('対象者のすべてのログインを終了したため、新しい権限で使うにはもう一度ログインが必要です。'))
   })
 })

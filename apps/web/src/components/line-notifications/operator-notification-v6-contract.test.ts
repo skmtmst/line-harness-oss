@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 const list = readFileSync(new URL('../../app/line-notifications/operator-notification-rules.tsx', import.meta.url), 'utf8')
 const page = readFileSync(new URL('../../app/line-notifications/page.tsx', import.meta.url), 'utf8')
 const createPage = readFileSync(new URL('../../app/line-notifications/operator/new/page.tsx', import.meta.url), 'utf8')
-const create = readFileSync(new URL('../../app/line-notifications/operator/new/operator-new-v8.tsx', import.meta.url), 'utf8')
+// 2026-10-07：作る・なおす画面は src/v8/line-notifications/operator-edit に一から書いた（板 gjUz3・hiBO8）。
+const create = readFileSync(new URL('../../v8/line-notifications/operator-edit.tsx', import.meta.url), 'utf8')
 const db = readFileSync(new URL('../../../../../packages/db/src/notifications.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../../../../worker/src/routes/notifications.ts', import.meta.url), 'utf8')
 const dispatch = readFileSync(new URL('../../../../worker/src/services/operator-notification-dispatch.ts', import.meta.url), 'utf8')
@@ -18,8 +19,9 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
   it('板の印を一覧と作成画面に固定する', () => {
     expect(list).toContain('data-design-node="DpxOK"')
     // 板 gjUz3：作る画面はV8だけ。v7の作成画面は捨てた。
-    expect(create).toContain('data-design-node="gjUz3"')
-    expect(createPage).toContain('./operator-new-v8')
+    expect(create).toContain("'gjUz3'")
+    expect(create).toContain("'hiBO8'")
+    expect(createPage).toContain('@/v8/line-notifications/operator-edit')
     expect(createPage).not.toContain('NewOperatorNotificationInner')
   })
 

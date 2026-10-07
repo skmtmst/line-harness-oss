@@ -1,0 +1,150 @@
+/*
+ * ★V8 マイル「使い道を作る」（Pencil `L2Bzp`）。
+ * 枠・見出し・左右の分け・下の帯は作る型（CreatePage）が持つ。ここは段（カード）の中身だけ。
+ * 寸法は globals.css の --tpl-ml-*。
+ */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-ml-back-gap);
+  width: fit-content;
+  color: var(--color-action);
+  font-size: var(--text-label);
+  text-decoration: none;
+}
+.backLink:hover { text-decoration: underline; }
+
+/* 段（白・薄い枠・角丸12・中20・間14）。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ml-card-gap);
+  padding: var(--tpl-ml-card-pad);
+  /* 枠は外へ場所を取らない線（絵の outline と同じ。高さを足さない）。 */
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  border-radius: var(--tpl-ml-card-radius);
+  background: var(--color-canvas);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-ml-card-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-ml-card-title-lh);
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-ml-grid-gap);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ml-side-inner-gap);
+  min-width: 0;
+}
+.label {
+  display: inline-flex;
+  align-items: baseline;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-ml-seg-lh);
+}
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+.conditionBox {
+  padding: var(--tpl-ml-phone-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+}
+.linkButton {
+  display: inline-flex;
+  min-height: 0;
+  height: var(--tpl-ml-select-label-h);
+  line-height: normal;
+  align-items: center;
+  gap: var(--tpl-ml-back-gap);
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  cursor: pointer;
+}
+.linkButton:hover { text-decoration: underline; }
+
+/* 右の列：お客さまの画面での見え方・出す前に。 */
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ml-side-gap);
+  width: 100%;
+}
+.sideCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ml-side-inner-gap);
+  padding: var(--tpl-ml-side-pad);
+  /* 枠は外へ場所を取らない線（絵の outline と同じ。高さを足さない）。 */
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  border-radius: var(--tpl-ml-card-radius);
+  background: var(--color-canvas);
+}
+.sideTitle {
+  line-height: normal;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-ml-side-title-size);
+  font-weight: 600;
+}
+.sideNote {
+  line-height: normal;
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-row-sub-size);
+}
+.phoneRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ml-phone-gap);
+  padding: var(--tpl-ml-phone-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+}
+.phoneName {
+  line-height: normal;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.phoneMiles {
+  line-height: normal;
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.phoneSub {
+  line-height: normal;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+}
+
+.selectLabelRow {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-ml-select-label-h);
+  gap: var(--tpl-ml-back-gap);
+}
+.selectLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+}

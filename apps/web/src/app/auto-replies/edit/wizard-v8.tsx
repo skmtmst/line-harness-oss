@@ -1,6 +1,7 @@
 'use client'
 
 import { CreatePage } from '@/components/templates'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import InlineActionRowsV8, { actionRowTitle } from '@/components/auto-replies/inline-action-rows-v8'
 import { CreatePreviewNote, CreateStarterCards, CreateSummaryCard } from '@/components/templates/create-parts'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -9,7 +10,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
   Check,
-  CheckCircle2,
   ChevronRight,
   CircleAlert,
   GripVertical,
@@ -39,6 +39,10 @@ import {
   Mic,
   File,
   MousePointerClick,
+  Smartphone,
+  List,
+  Activity,
+  Plus,
 } from 'lucide-react'
 import type {
   AutoReplyConflict,
@@ -59,10 +63,10 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import SearchField from '@/components/shared/search-field'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
+import { SaveConflictBand, SaveConflictCompareDialog } from '@/components/shared/save-conflict'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -832,8 +836,8 @@ function AutoReplyWizardV8Inner() {
       return { id: savedId!, accountId: body.lineAccountId }
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {
+        // 帯（頭の下）が知らせるので、本文の上に同じ知らせを重ねない。
         setSaveConflict(true)
-        setError('ほかの変更が先に保存されました。比べるか、最新を読み込んでから続けてください。')
       } else {
         setError(describeSaveFailure(caught))
       }
@@ -1164,50 +1168,56 @@ function AutoReplyWizardV8Inner() {
   }
 
   /* ===== 完了（V4LjH） ===== */
+  // 絵：作る型の頭（手順はすべて済み）の下に、中央の完了カード（幅560）。保存の帯と右の列は無い。
   if (stage === 'done') {
+    const doneSteps: StepperStep[] = STEP_ORDER.map((key) => ({ key, label: STEP_LABELS_V8[key], state: 'done' }))
+    const doneKeywords = form.respondToAll
+      ? 'すべてのメッセージ'
+      : effectiveKeywords.map((r) => r.keyword.trim()).filter(Boolean).join('・') || '—'
     return (
-      <div className={styles.page} data-design-node={DONE_DESIGN_NODE}>
-        <Link href="/auto-replies" className={styles.backLink}>
-          <ArrowLeft size={14} aria-hidden="true" />
-          自動応答へ
-        </Link>
-        <section className={styles.done}>
-          <span className={styles.doneIcon} aria-hidden="true">
-            <CheckCircle2 size={36} />
-          </span>
-          <h1 className={styles.doneTitle}>「{published!.name}」を有効にしました</h1>
-          <p className={styles.doneNote}>
-            届いたメッセージの中に合うものがあれば、いまの設定で自動で返します。
-            止めたいときは一覧の「止める」からいつでも止められます。
-          </p>
-          <dl className={`${styles.kvList} ${styles.doneRows}`}>
-            <div className={styles.kvRow}>
-              <dt className="text-ink-faint text-xs">動く順番</dt>
-              <dd className={styles.kvVal}>{myPositionLabel}</dd>
+      <PageFrame kind="create" boardId={DONE_DESIGN_NODE}>
+        <PageHeading
+          title="ルールを作る"
+          description={`ルール名：${published!.name}`}
+          identity={<Link href="/auto-replies" className={styles.backLink}>
+            <ArrowLeft size={14} aria-hidden="true" />
+            自動応答へ
+          </Link>}
+          steps={<Stepper label="自動応答を作る進み方" steps={doneSteps} />}
+        />
+        <div className={styles.doneBody}>
+          <section className={styles.done} aria-labelledby="auto-reply-done-title">
+            <span className={styles.doneIcon} aria-hidden="true">
+              <Check size={24} />
+            </span>
+            <h1 id="auto-reply-done-title" className={styles.doneTitle}>{`「${published!.name}」を有効にしました`}</h1>
+            <p className={styles.doneNote}>
+              これから届くメッセージで動き始めます。止めているあいだに届いた分には、さかのぼって返しません。止めたいときは、一覧の「…」から止められます。
+            </p>
+            <dl className={styles.doneRows}>
+              <div className={styles.doneRow}>
+                <dt>動く順番</dt>
+                <dd>{myPositionLabel}</dd>
+              </div>
+              <div className={styles.doneRow}>
+                <dt>反応する言葉</dt>
+                <dd title={doneKeywords}>{doneKeywords}</dd>
+              </div>
+            </dl>
+            <div className={styles.doneActions}>
+              <Button href="/auto-replies"><List size={14} aria-hidden="true" />一覧へ戻る</Button>
+              <Button href={`/auto-replies/runs?id=${encodeURIComponent(autoReplyId ?? '')}`}>
+                <Activity size={14} aria-hidden="true" />
+                実行結果を見る
+              </Button>
+              <Button href="/auto-replies/edit" variant="primary">
+                <Plus size={14} aria-hidden="true" />
+                もう1つ作る
+              </Button>
             </div>
-            <div className={styles.kvRow}>
-              <dt className="text-ink-faint text-xs">反応する言葉</dt>
-              <dd className={styles.kvVal}>
-                {form.respondToAll
-                  ? 'すべてのメッセージ'
-                  : effectiveKeywords.map((r) => `「${r.keyword.trim()}」`).join('') || '—'}
-              </dd>
-            </div>
-          </dl>
-          <div className={styles.doneActions}>
-            <Button href="/auto-replies">一覧へ戻る</Button>
-            <Button href={`/auto-replies/runs?id=${encodeURIComponent(autoReplyId ?? '')}`}>
-              実行結果を見る
-            </Button>
-            <Button
-              href="/auto-replies/edit"
-              variant="primary"
-            >
-              もう1つ作る
-            </Button>
-          </div>
-        </section>
-      </div>
+          </section>
+        </div>
+      </PageFrame>
     )
   }
 
@@ -1224,7 +1234,12 @@ function AutoReplyWizardV8Inner() {
   // 絵（A0pDt ほか）：まだ有効にしていない下書きは「停止中として作っています」。
   const statusBadge = isActive ? '有効' : '停止中'
 
-  const previewContent = (<>
+  const moreKindsButton = !showMoreKinds && MESSAGE_KIND_WORDS.some((k) => !MAIN_KINDS.includes(k.label) && !form.messageKinds.includes(k.key)) ? (
+    <button type="button" className={styles.moreKinds} onClick={() => setShowMoreKinds(true)}>ほかの種類</button>
+  ) : null
+
+  // 1152 の板（Z2LIUx）では右の列にスマホを置かず、上の「LINEでの見え方を見る」から窓で開く。
+  const renderPreview = (withPhone: boolean) => (<>
           {step === 'basic' && (
             <CreateSummaryCard rows={[
               { label: '状態', value: '停止中' },
@@ -1257,14 +1272,14 @@ function AutoReplyWizardV8Inner() {
                   ))}
                 </dl>
               </Card>
-              <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName="公式アカウント">
                 <div className={styles.talkStack}>
                   <p className={styles.bubbleReply}>
                     {triggerSamples[0].text}
                   </p>
                   <p className={styles.bubbleMeta}>届いた側の見え方</p>
                 </div>
-              </LinePreview>
+              </LinePreview> : null}
             </>
           )}
 
@@ -1303,7 +1318,7 @@ function AutoReplyWizardV8Inner() {
                   })()}
                 </dl>
               </Card>
-              <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName="公式アカウント">
                 <div className={styles.talkStack}>
                   {form.mode === 'inline-image' && imageContent ? (
                     <img
@@ -1317,7 +1332,7 @@ function AutoReplyWizardV8Inner() {
                   )}
                   <p className={styles.bubbleMeta}>返す側の見え方</p>
                 </div>
-              </LinePreview>
+              </LinePreview> : null}
             </>
           )}
 
@@ -1370,7 +1385,7 @@ function AutoReplyWizardV8Inner() {
                   { label: '試した結果', value: dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません' },
                 ]}
               />
-              <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName="公式アカウント">
                 <div className={styles.talkStack}>
                   {testMessage.trim() ? <p className={styles.bubbleIn}>{testMessage.trim()}</p> : null}
                   <p className={styles.bubbleReply}>
@@ -1382,7 +1397,7 @@ function AutoReplyWizardV8Inner() {
                     <p className={styles.bubbleMeta}>このルールが返します</p>
                   )}
                 </div>
-              </LinePreview>
+              </LinePreview> : null}
             </>
           )}
 
@@ -1409,12 +1424,12 @@ function AutoReplyWizardV8Inner() {
                   </div>
                 </dl>
               </Card>
-              <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName="公式アカウント">
                 <div className={styles.talkStack}>
                   <p className={styles.bubbleReply}>{replyPreviewText}</p>
                   <p className={styles.bubbleMeta}>返す側の見え方</p>
                 </div>
-              </LinePreview>
+              </LinePreview> : null}
             </>
           )}
         </>
@@ -1427,10 +1442,28 @@ function AutoReplyWizardV8Inner() {
           ) : (
             `ルール名：${thisRuleName}・${statusBadge}として作っています`
           )}
+          {/* 編集の競合（UGrd2）：頭の下に横いっぱいの帯。入力は捨てず、比べる・読み込むを選んでもらう。 */}
+          {saveConflict ? (
+            /* 帯は共通部品（save-conflict）に寄せた。文はこの画面の絵のまま。 */
+            <div className={styles.conflictBandSlot}>
+              <SaveConflictBand
+                title={`ほかの人がルール「${thisRuleName}」を先に保存しました`}
+                designNode="UGrd2"
+                compareBusy={compareBusy}
+                onCompare={() => void openCompare()}
+                onReload={() => void reloadAfterConflict()}
+              />
+            </div>
+          ) : null}
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
           <ArrowLeft size={14} aria-hidden="true" />
           自動応答へ
-        </Link>} steps={<Stepper label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={previewContent} previewToggle={<Button onClick={() => setPreviewOpen(true)}>設定内容とLINEプレビューを見る</Button>} footerActions={
+        </Link>} steps={<Stepper label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={narrow ? <>
+            <div className={styles.narrowPhoneOpen}>
+              <Button onClick={() => setPreviewOpen(true)}><Smartphone size={14} aria-hidden="true" />LINEでの見え方を見る</Button>
+            </div>
+            {renderPreview(false)}
+          </> : renderPreview(true)} previewToggle={narrow ? undefined : <Button onClick={() => setPreviewOpen(true)}>設定内容とLINEプレビューを見る</Button>} footerActions={
           <>
             <Button
               type="button"
@@ -1443,7 +1476,8 @@ function AutoReplyWizardV8Inner() {
               type="button"
               onClick={() =>
                 void saveDraftNow().then((saved) => {
-                  if (saved || autoReplyId) setSaveNotice('下書きを保存しました')
+                  // 失敗（競合・入力の不足）のときは「保存しました」を出さない。
+                  if (saved) setSaveNotice('下書きを保存しました')
                 })
               }
               disabled={saving}
@@ -1483,24 +1517,6 @@ function AutoReplyWizardV8Inner() {
         } status={dirty ? '下書きに未保存の変更があります' : undefined}>
 
 
-      {saveConflict && (
-        <div className="border-accent bg-accent-soft rounded-card flex flex-wrap items-center gap-3 border p-4" data-design-node="UGrd2" role="alert">
-          <p className="text-ink min-w-0 flex-1 text-sm">
-            ほかの人が先に保存しました。
-            <span className="text-ink-secondary mt-0.5 block text-xs">
-              あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。
-            </span>
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
-              {compareBusy ? '比べています...' : '違いを比べる'}
-            </Button>
-            <Button type="button" variant="primary" onClick={() => void reloadAfterConflict()}>
-              最新を読み込んで続ける
-            </Button>
-          </div>
-        </div>
-      )}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {saveNotice ? <Notice tone="success" message={saveNotice} onClose={() => setSaveNotice('')} /> : null}
       {staleTest ? (
@@ -1713,6 +1729,8 @@ function AutoReplyWizardV8Inner() {
                 <div className={styles.field}>
                   <div className={styles.labelRow}>
                     <span className={styles.label}>反応するメッセージの種類</span>
+                    {/* 1152 の板（Z2LIUx）は札の行に余地が無いので、題の行の右に置く。 */}
+                    {narrow ? moreKindsButton : null}
                     {/* 受け取る場所（LINE・メール）は機能として残す。絵に場所が無いので題の行の右に小さく。 */}
                     <span className={styles.sourceInline} role="group" aria-label="受け取る場所">
                       受け取る場所
@@ -1767,9 +1785,7 @@ function AutoReplyWizardV8Inner() {
                         </button>
                       )
                     })}
-                    {!showMoreKinds && MESSAGE_KIND_WORDS.some((k) => !MAIN_KINDS.includes(k.label) && !form.messageKinds.includes(k.key)) ? (
-                      <button type="button" className={styles.moreKinds} onClick={() => setShowMoreKinds(true)}>ほかの種類</button>
-                    ) : null}
+                    {!narrow && moreKindsButton}
                     <span className={styles.kindsNote}>
                       {form.messageKinds.length === 0
                         ? '何も選ばなければ、どの種類にも反応'
@@ -2442,39 +2458,21 @@ function AutoReplyWizardV8Inner() {
       {/* ===== 下の帯 ===== */}
 
 
-      <ConfirmDialog
+      <SaveConflictCompareDialog
         open={compareTarget !== null || compareError !== ''}
-        title="最新の保存と比べる"
-        description="あなたの下書きと、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
-        confirmLabel="最新を読み込んで続ける"
         busy={compareBusy}
         error={compareError || undefined}
-        onConfirm={() => void reloadAfterConflict()}
+        lines={compareTarget ? describeAutoReplyDiff(form, compareTarget).map((text) => ({ text })) : null}
+        onReload={() => void reloadAfterConflict()}
         onCancel={() => {
           setCompareTarget(null)
           setCompareError('')
         }}
-      >
-        {compareTarget && (() => {
-          const lines = describeAutoReplyDiff(form, compareTarget)
-          return lines.length === 0 ? (
-            <p className="text-ink-secondary mt-3 text-sm">違いは見つかりませんでした。そのまま読み込めます。</p>
-          ) : (
-            <ul className="mt-3 space-y-1.5 text-sm">
-              {lines.map((line, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <span aria-hidden className="text-accent-deep font-bold">・</span>
-                  <span className="text-ink">{line}</span>
-                </li>
-              ))}
-            </ul>
-          )
-        })()}
-      </ConfirmDialog>
+      />
 
       <Dialog open={previewOpen} title="設定内容とLINEプレビュー" onCancel={() => setPreviewOpen(false)}
         footer={<Button onClick={() => setPreviewOpen(false)}>閉じる</Button>}>
-        {previewContent}
+        {renderPreview(true)}
       </Dialog>
 
       <UnsavedLeaveDialog

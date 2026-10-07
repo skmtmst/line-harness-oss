@@ -37,7 +37,7 @@ const FACTOR_ROWS: Array<{ label: string; dog: string; cat: string }> = [
  *
  * 主食の「100g あたり kcal」を商品ごとに持つ。マイページ「今日の目安」（★V6 37-2）のグラム数はここから決まる。
  * 左：主食の表（商品名・kcal・既定）。右：計算のしかた（NRC／FEDIAF の式と係数。表示だけ）。
- * 保存は下部追従バー（`docs/v6-common-rules.md` §1-6）。
+ * 保存は下部追従バー（`docs/v8-design-rules.md` §5）。
  */
 export default function FeedingTab({ accountId }: { accountId: string }) {
   const [status, setStatus] = useState<Status>('loading')

@@ -37,6 +37,14 @@ interface ConfirmDialogProps {
   confirmIcon?: ReactNode
   /** この確認画面に対応するPencilの実Node。 */
   designNode?: string
+  /** ★V8：絵の窓の頭の余白（Dialog の designHeaderPadding と同じ）。渡さなければ今までどおり。 */
+  designHeaderPadding?: string
+  /** ★V8：絵の窓の頭の高さ px（Dialog の designHeaderHeight と同じ）。渡さなければ今までどおり。 */
+  designHeaderHeight?: number
+  /** ★V8：絵の窓の幅 px（Dialog の designWidth と同じ）。 */
+  designWidth?: number
+  /** ★V8：絵の窓の上からの位置 px（Dialog の designTop と同じ）。 */
+  designTop?: number
   /**
    * 主にする操作。`'cancel'` は取消（残る方）を主の緑にし、実行を枠線にする。
    * 未保存の離脱確認で使い、うっかり Enter や緑で入力が消える向きにしない。
@@ -67,6 +75,10 @@ export default function ConfirmDialog({
   titleIcon,
   confirmIcon,
   designNode,
+  designHeaderPadding,
+  designHeaderHeight,
+  designWidth,
+  designTop,
   primaryAction = 'confirm',
   onConfirm,
   onCancel,
@@ -98,6 +110,10 @@ export default function ConfirmDialog({
       titleIcon={shownTitleIcon}
       confirmIcon={shownConfirmIcon}
       designNode={designNode}
+      designHeaderPadding={designHeaderPadding}
+      designHeaderHeight={designHeaderHeight}
+      designWidth={designWidth}
+      designTop={designTop}
       confirmation
       compact={!children}
       onConfirm={onConfirm}

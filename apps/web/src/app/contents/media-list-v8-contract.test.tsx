@@ -34,7 +34,7 @@ const mediaItems = [
   {
     id: 'media-photo',
     lineAccountId: 'account-a',
-    folderId: null,
+    folderId: 'mf-photo',
     filename: '秋の新商品.jpg',
     kind: 'image',
     mimeType: 'image/jpeg',
@@ -147,7 +147,11 @@ beforeEach(() => {
       return response({ success: true, data: { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset } })
     }
     if (url.includes('/api/folders')) {
-      return response({ success: true, data: [], unfiledCount: 3 })
+      return response({
+        success: true,
+        data: [{ id: 'mf-photo', kind: 'media', name: '01_商品写真', parentId: null, displayOrder: 0, color: '#2f6fde', itemCount: 1 }],
+        unfiledCount: 2,
+      })
     }
     return response({ success: false, error: 'not mocked' }, 500)
   }))
@@ -199,6 +203,17 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
     expect(registerButton?.hasAttribute('disabled')).toBe(false)
     // 選ぶ札（まとめて削除の口）は管理者だけ。
     expect(host?.textContent).not.toContain('すべてのメディアを選択')
+  })
+
+  test('札の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）。閲覧のみでも出す', async () => {
+    staffRole = 'staff'
+    document.documentElement.dataset.theme = 'v8'
+    await renderPage()
+    const dots = [...(host?.querySelectorAll('[data-design-node="O7hUt7"] [data-folder-dot]') ?? [])]
+    expect(dots).toHaveLength(mediaItems.length)
+    expect(dots.map((dot) => dot.getAttribute('aria-label'))).toEqual(['フォルダ：01_商品写真', 'フォルダ：未分類', 'フォルダ：未分類'])
+    expect(dots[0].getAttribute('data-folder-dot')).toBe('filed')
+    expect(dots[1].getAttribute('data-folder-dot')).toBe('unfiled')
   })
 
   test('v7 では従来の一覧が出て、新しい一覧は出ない', async () => {

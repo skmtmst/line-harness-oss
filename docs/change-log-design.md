@@ -87,13 +87,13 @@ released: 2026-08-20
 
 | 時点 | 誰が | 何を |
 |---|---|---|
-| PRを出すとき | 実装者 | `docs/release-log/unreleased.md` に、運用者に伝わる言葉で1行足す |
-| リリースするとき | リリース担当 | `unreleased.md` を `<version>.md` に改名し、`released` に日付を入れ、空の `unreleased.md` を作り直す |
+| PRを出すとき | 実装者 | `docs/release-log/unreleased/<PR番号>-<担当>-<内容>.md` を作り、PR 番号入りの1行を運用者に伝わる言葉で書く（`unreleased.md` への追加は CI が落とす） |
+| リリースするとき | リリース担当（人） | `unreleased.md` と `unreleased/` の各ファイルの行をまとめて `<version>.md` へ移し、`released` に日付を入れる |
 
 「PRを出すとき」にしたのは、**変更した本人が、変更した直後に書くのが一番正確**だから。
 リリース時にまとめて書くと、後から差分を読んで推測することになり、内容が薄くなる。
 
-`unreleased.md` は画面上「次回反映予定」として、リリース済みの履歴とは分けて表示する。
+`unreleased.md` と `unreleased/` の行は画面上「次回反映予定」として、リリース済みの履歴とは分けて表示する。
 
 ## 5. 表示項目
 
@@ -124,7 +124,7 @@ released: 2026-08-20
 
 | ファイル | 内容 |
 |---|---|
-| `docs/release-log/unreleased.md` ほか | 履歴の実体 |
+| `docs/release-log/unreleased/*.md`・`<version>.md` ほか | 履歴の実体 |
 | `apps/web/scripts/build-release-log.mjs` | Markdown → JSON。`prebuild` で走らせる |
 | `apps/web/src/app/settings/changelog/page.tsx` | 画面 |
 | `apps/web/src/components/layout/sidebar.tsx` | 行き先の変更（1行） |
