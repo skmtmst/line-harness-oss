@@ -101,7 +101,7 @@ images.get('/images/*', async (c) => {
     return c.json({ success: false, error: 'Invalid image key' }, 400);
   }
   // 写真審査の原本は公開配信しない。管理画面もreview/public派生画像だけを使う。
-  if (key.startsWith('nen-photo-originals/')) {
+  if (key.startsWith('nen-photo-originals/') || key.startsWith('private/')) {
     return c.json({ success: false, error: 'Image not found' }, 404);
   }
   // 検査が終わるまで出さない。記録が無い古いファイルは通す。

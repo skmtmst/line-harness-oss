@@ -91,3 +91,33 @@ describe('来店スタンプの台帳',()=>{
   await reconcileStampVisit(fixture.db,'restaurant','visit');expect((await stampWallet(fixture.db,card,'friend','shop')).balance).toBe(2);
  });
 });
+
+it('マス数は特典個数と別に保存し、停止した倍率・順序・二つの上限を計算する',async()=>{
+ const s={...settings,slotCount:30,maxPerVisit:3,maxStackedStamps:20,firstVisitBonus:1,multipliers:[{name:'二倍',multiplier:2,active:true},{name:'休止中',multiplier:10,active:false}]};
+ await saveStampCard(fixture.db,tenant,{name:'設定変更',active:true,settings:s,accountIds:['shop'],expectedVersion:1},card);
+ expect(calculateVisitStamps(s,0,'2026-10-07T09:00:00Z',true,[])).toBe(4);
+ expect(calculateVisitStamps({...s,stackingOrder:'multipliers_then_bonus'},0,'2026-10-07T09:00:00Z',true,[])).toBe(3);
+ expect(calculateVisitStamps({...s,mode:'amount'},10000,'2026-10-07T09:00:00Z',false,[])).toBe(6);
+ expect(calculateVisitStamps({...s,maxStackedStamps:5,mode:'amount'},10000,'2026-10-07T09:00:00Z',false,[])).toBe(5);
+ await expect(saveStampCard(fixture.db,tenant,{name:'不正',active:true,settings:{...s,slotCount:0},accountIds:['shop'],expectedVersion:2},card)).rejects.toThrow('マス');
+});
+it('PINだけで有効な店員を特定し、スタッフ名を返して必要な個数だけ減らす',async()=>{
+ await grant();await setStampPin(fixture.db,'shop','staff','1234');const offer=await offerStampReward(fixture.db,card,'friend','shop','coffee','pin-only');
+ expect(await useStampReward(fixture.db,offer.id,'friend','shop',null,'1234')).toEqual({id:offer.id,status:'used',staffId:'staff',staffName:'店員'});
+ expect((await stampWallet(fixture.db,card,'friend','shop')).balance).toBe(2);
+ await expect(useStampReward(fixture.db,offer.id,'friend','shop',null,'1234')).rejects.toMatchObject({status:409});
+});
+it('PINだけの試行も5回で店全体を15分ロックし、別の店員の番号でも回避できない',async()=>{
+ const {identifyStampStaff}=await import('./visit-stamps.js');await setStampPin(fixture.db,'shop','staff','1234');
+ for(let i=0;i<5;i++)await expect(identifyStampStaff(fixture.db,'shop','9999')).rejects.toMatchObject({status:403});
+ await expect(identifyStampStaff(fixture.db,'shop','1234')).rejects.toMatchObject({status:429});
+ fixture.raw.exec("UPDATE visit_stamp_pin_attempts SET locked_until=datetime('now','-1 minute')");
+ expect((await identifyStampStaff(fixture.db,'shop','1234')).name).toBe('店員');
+ fixture.raw.exec("UPDATE staff_members SET is_active=0 WHERE id='staff'");await expect(identifyStampStaff(fixture.db,'shop','1234')).rejects.toMatchObject({status:403});
+});
+it('予約がオフでも来店スタンプの鍵がオンなら自動押印でき、専用鍵がオフなら止まる',async()=>{
+ fixture.raw.exec("INSERT INTO rt_organizations(id,account_id,name) VALUES('org','shop','店');INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','店','test','shop');INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,status,line_uid) VALUES('independent','store','walk_in','試験',1,datetime('now'),datetime('now','+1 hour'),'visited','U-test');INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','feature.booking','false')");
+ await reconcileStampVisit(fixture.db,'restaurant','independent');expect((await stampWallet(fixture.db,card,'friend','shop')).balance).toBe(2);
+ fixture.raw.exec("INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','feature.visit_stamps','false');INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,status,line_uid) VALUES('stopped','store','walk_in','試験',1,datetime('now'),datetime('now','+1 hour'),'visited','U-test')");
+ await reconcileStampVisit(fixture.db,'restaurant','stopped');expect((await stampWallet(fixture.db,card,'friend','shop')).balance).toBe(2);
+});

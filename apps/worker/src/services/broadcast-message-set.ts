@@ -1,5 +1,5 @@
 import type { Message } from '@line-crm/line-sdk';
-import { convertBroadcastAsset, isBroadcastAssetKind, splitBroadcastText, validateFlexMessage, validateImagemapMessage } from '@line-crm/shared';
+import { normalizeStoreInterpolations, convertBroadcastAsset, isBroadcastAssetKind, splitBroadcastText, validateFlexMessage, validateImagemapMessage } from '@line-crm/shared';
 import { autoTrackContent } from './auto-track.js';
 import { buildMessage } from './line-message.js';
 import {
@@ -251,7 +251,7 @@ export function parseBroadcastMessageParts(input: Parameters<typeof parseStoredB
       if (error) throw new Error(error);
     }
   }
-  return parts;
+  return parts.map(p=>({...p,messageContent:normalizeStoreInterpolations(p.messageContent)}));
 }
 
 export function combinedMessageContent(parts: BroadcastMessagePart[]): string {

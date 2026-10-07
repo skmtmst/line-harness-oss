@@ -629,6 +629,12 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       },
     ],
   },
+  visit_stamps: {
+    scope:'counted',sources:[
+      {kind:'published',targetType:'有効な来店スタンプカード',fromWhere:'FROM visit_stamp_cards c JOIN visit_stamp_card_accounts ca ON ca.card_id=c.id WHERE c.active=1 AND ca.line_account_id=?',idColumn:'c.id',params:1},
+      {kind:'scheduled',targetType:'確認待ちの紙カード申請',fromWhere:"FROM visit_stamp_paper_requests p WHERE p.status='pending' AND p.line_account_id=?",idColumn:'p.id',params:1},
+    ],
+  },
   restaurant_test: {
     scope: 'none',
     reason: '検証用のため、本番の稼働対象としない',

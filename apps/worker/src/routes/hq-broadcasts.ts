@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
-import type { HqBroadcastInput } from '@line-crm/shared';
+import type { HqBroadcastInput, HqBroadcastDraftInput } from '@line-crm/shared';
 import { dbFor } from '../services/db-router.js';
 import { requireRole, requireIrreversibleConfirmation } from '../middleware/role-guard.js';
 import { StampError } from '../services/visit-stamps.js';
@@ -46,4 +46,11 @@ hqBroadcasts.post('/api/hq/broadcasts/:id/cancel',async c=>{
 hqBroadcasts.post('/api/hq/broadcasts/:id/targets/:accountId/retry',requireIrreversibleConfirmation('broadcast-send'),async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{expectedVersion:number}>();
   return c.json({success:true,data:await retryHqBroadcastTarget(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),c.req.param('accountId'),a.actorId,b.expectedVersion)});
+});
+
+hqBroadcasts.patch('/api/hq/broadcasts/:id',async c=>{
+ const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<HqBroadcastDraftInput>().catch(()=>null);
+ if(!b||typeof b!=='object'||Array.isArray(b))throw new StampError('入力を確認してください');
+ const {expectedVersion,...input}=b,run=await getHqBroadcastRun(db,a.tenantId,c.req.param('id'));
+ return c.json({success:true,data:await readHqBroadcastResult(db,await prepareHqBroadcast(db,a.tenantId,a.actorId,input,{run,expectedVersion}))});
 });

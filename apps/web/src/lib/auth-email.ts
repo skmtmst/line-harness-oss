@@ -123,19 +123,25 @@ export function recallSignupEmail(): string {
   }
 }
 
-/** 同意欄のリンク先。ページができるまでは未設定（文字だけ出す）。 */
+/**
+ * 同意欄・ログイン前のフッターのリンク先。
+ *
+ * 文面はサービスサイト（musubo.jp）に 2026-10-04 に承認・公開済み。配備の変数が
+ * 無くてもリンクが空にならないよう、既定は公開先にする（変数があればそちらを使う）。
+ */
+export const MUSUBO_SITE_URL = 'https://musubo.jp'
 export const LEGAL_LINKS = {
-  terms: process.env.NEXT_PUBLIC_TERMS_URL || null,
-  privacy: process.env.NEXT_PUBLIC_PRIVACY_URL || null,
-  commerce: process.env.NEXT_PUBLIC_COMMERCE_LAW_URL || null,
-}
+  terms: process.env.NEXT_PUBLIC_TERMS_URL || `${MUSUBO_SITE_URL}/terms/`,
+  privacy: process.env.NEXT_PUBLIC_PRIVACY_URL || `${MUSUBO_SITE_URL}/privacy/`,
+  commerce: process.env.NEXT_PUBLIC_COMMERCE_LAW_URL || `${MUSUBO_SITE_URL}/legal/`,
+} as { terms: string | null; privacy: string | null; commerce: string | null }
 
 /**
  * ログイン前に開けるお問い合わせの口。サービスサイトの /contact/ へつなぐ。
  * 新しい公開フォームは作らない（監査 m18e・2026-09-27 司令塔の決定）。
  * 管理画面の /hq/support はログインが要るので、ログイン前の導線には使わない。
  */
-export const CONTACT_URL = process.env.NEXT_PUBLIC_CONTACT_URL || 'https://nen-petfood.com/contact/'
+export const CONTACT_URL = process.env.NEXT_PUBLIC_CONTACT_URL || `${MUSUBO_SITE_URL}/contact/`
 
 export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null
 

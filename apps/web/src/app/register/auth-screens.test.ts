@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PUBLIC_AUTH_PATHS } from '@/lib/auth-email'
+import { CONTACT_URL, LEGAL_LINKS, PUBLIC_AUTH_PATHS } from '@/lib/auth-email'
 
 const SRC = join(__dirname, '..', '..')
 const read = (p: string) => readFileSync(join(SRC, p), 'utf8')
@@ -98,5 +98,16 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
     expect(card).toContain('CONTACT_URL')
     expect(card).toContain('target="_blank"')
     expect(card).not.toContain('href="/hq/support"')
+  })
+})
+
+describe('ログイン前のリンク先の既定（リリース前点検 2026-10-07）', () => {
+  it('配備の変数が無くても、規約・方針・表記・お問い合わせは musubo.jp の公開ページへ向く', () => {
+    // 変数の無い試験の環境で読む＝既定値。別事業（ペットフード店）の窓口へ落とさない。
+    expect(LEGAL_LINKS.terms).toBe('https://musubo.jp/terms/')
+    expect(LEGAL_LINKS.privacy).toBe('https://musubo.jp/privacy/')
+    expect(LEGAL_LINKS.commerce).toBe('https://musubo.jp/legal/')
+    expect(CONTACT_URL).toBe('https://musubo.jp/contact/')
+    expect(read('lib/auth-email.ts')).not.toContain('nen-petfood.com')
   })
 })

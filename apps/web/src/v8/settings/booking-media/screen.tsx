@@ -22,14 +22,17 @@ import SectionHeader from '@/components/shared/section-header'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
+import Checkbox from '@/components/shared/checkbox'
+import Radio from '@/components/shared/radio'
 import { TextField } from '@/components/shared/text-field'
 import { RowActions } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { useHideSettingsNav, usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { ApiError, fetchApi } from '@/lib/api'
-import { restaurantTestApi, type RestaurantStore } from '@/lib/restaurant-test-api'
+import { ApiError, describeSaveFailure, fetchApi } from '@/lib/api'
+import { restaurantTestApi, type RestaurantMembership, type RestaurantStore } from '@/lib/restaurant-test-api'
+import type { RestaurantCloseNotificationSettings } from '@line-crm/shared'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -82,6 +85,22 @@ export function gourmetCode(now = Date.now()): string {
   return `gourmet_${now.toString(36)}`
 }
 
+type NoticeSettings = Pick<RestaurantCloseNotificationSettings, 'notifyReopen' | 'recipientMode' | 'membershipIds' | 'version'>
+
+/** 知らせる相手の見え方。選んだスタッフは名前を「・」でつなぎ人数を添える。 */
+export function recipientText(settings: Pick<NoticeSettings, 'recipientMode' | 'membershipIds'>, members: Array<Pick<RestaurantMembership, 'id' | 'staff_name'>>): string {
+  if (settings.recipientMode === 'manager') return '店長'
+  if (settings.recipientMode === 'selected') {
+    const names = settings.membershipIds.map((id) => members.find((m) => m.id === id)?.staff_name).filter((name): name is string => !!name)
+    return names.length > 0 ? `${names.join('・')}（${names.length}人）` : `選んだスタッフ（${settings.membershipIds.length}人）`
+  }
+  return '当日の責任者（いなければ店長）'
+}
+
+function sameNotice(a: NoticeSettings, b: NoticeSettings): boolean {
+  return a.notifyReopen === b.notifyReopen && a.recipientMode === b.recipientMode && a.membershipIds.join(',') === b.membershipIds.join(',')
+}
+
 function sameRow(a: MediaRow, b: MediaRow): boolean {
   return a.pageUrl === b.pageUrl && a.loginUrl === b.loginUrl && a.closeOnBooking === b.closeOnBooking
 }
@@ -124,6 +143,12 @@ export default function BookingMediaPage() {
   const [addName, setAddName] = useState('')
   const [addError, setAddError] = useState('')
   const [addBusy, setAddBusy] = useState(false)
+  /* キャンセルで席が空いたときの「もう開けてよい」と、知らせる相手（店ごと）。 */
+  const [noticeSaved, setNoticeSaved] = useState<NoticeSettings | null>(null)
+  const [notice, setNotice] = useState<NoticeSettings | null>(null)
+  const [members, setMembers] = useState<RestaurantMembership[]>([])
+  const [picking, setPicking] = useState<Pick<NoticeSettings, 'recipientMode' | 'membershipIds'> | null>(null)
+  const [pickError, setPickError] = useState('')
 
   /* 店舗：選んでいる店舗（store-context）→ 無ければ先頭（今日のお店と同じ）。 */
   useEffect(() => {
@@ -166,6 +191,28 @@ export default function BookingMediaPage() {
   }, [selectedAccountId, storeId])
   useEffect(() => { void load() }, [load])
 
+  const loadNotice = useCallback(async () => {
+    if (!selectedAccountId || !storeId) return
+    try {
+      const res = await restaurantTestApi.closeNotificationSettings(selectedAccountId, storeId)
+      const next = { notifyReopen: res.data.notifyReopen, recipientMode: res.data.recipientMode, membershipIds: res.data.membershipIds, version: res.data.version }
+      setNoticeSaved(next); setNotice(next)
+    } catch {
+      setNoticeSaved(null); setNotice(null)
+    }
+  }, [selectedAccountId, storeId])
+  useEffect(() => { void loadNotice() }, [loadNotice])
+
+  /* 選べるスタッフ：この店の担当（店を決めていない人を含む）で、有効な人。 */
+  useEffect(() => {
+    let current = true
+    if (!selectedAccountId || !storeId) return
+    void restaurantTestApi.snapshot(selectedAccountId, { limit: 1, offset: 0 })
+      .then((res) => { if (current) setMembers(res.data.memberships.filter((m) => m.status === 'active' && (m.store_id === null || m.store_id === storeId))) })
+      .catch(() => { if (current) setMembers([]) })
+    return () => { current = false }
+  }, [selectedAccountId, storeId])
+
   /* 貼り付け用の URL は管理者だけが出せる口（POST）。担当者には案内だけ。 */
   useEffect(() => {
     let current = true
@@ -188,8 +235,11 @@ export default function BookingMediaPage() {
     })
   }, [rows, saved])
 
+  const noticeDirty = !!notice && !!noticeSaved && !sameNotice(notice, noticeSaved)
+  const changes = dirty.length + (noticeDirty ? 1 : 0)
+
   /* 保存していない変更があるまま離れるときは確かめる。 */
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: dirty.length > 0, busy: saving })
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: changes > 0, busy: saving })
 
   const bookable = rows.filter((row) => row.acceptsReservations)
   const closeOn = bookable.some((row) => row.closeOnBooking)
@@ -227,7 +277,7 @@ export default function BookingMediaPage() {
   }
 
   const save = async () => {
-    if (!selectedAccountId || !storeId || dirty.length === 0) return
+    if (!selectedAccountId || !storeId || changes === 0) return
     setSaving(true); setSaveError('')
     try {
       for (const row of dirty) {
@@ -235,11 +285,17 @@ export default function BookingMediaPage() {
           storeId, pageUrl: row.pageUrl, loginUrl: row.loginUrl, closeOnBooking: row.acceptsReservations && row.closeOnBooking, expectedVersion: row.version,
         })
       }
+      if (notice && noticeDirty) {
+        await restaurantTestApi.saveCloseNotificationSettings(selectedAccountId, {
+          storeId, notifyReopen: notice.notifyReopen, recipientMode: notice.recipientMode,
+          membershipIds: notice.recipientMode === 'selected' ? notice.membershipIds : [], expectedVersion: notice.version,
+        })
+      }
       notifyToast('予約サイト・グルメ媒体の設定を保存しました')
-      await load()
+      await Promise.all([load(), loadNotice()])
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) setConflict(true)
-      else setSaveError(caught instanceof ApiError && caught.status === 400 ? 'URL は https:// で始まるものだけ保存できます。行の「…」から直してください。' : '保存できませんでした。もう一度お試しください。')
+      else setSaveError(caught instanceof ApiError && caught.status === 400 ? 'URL は https:// で始まるものだけ保存できます。行の「…」から直してください。' : describeSaveFailure(caught))
       /* 途中まで保存できた行があるので、版を読み直す（入力は残す）。 */
     } finally {
       setSaving(false)
@@ -409,16 +465,32 @@ export default function BookingMediaPage() {
               </span>
             </div>
             <div className={styles.switchRow}>
-              {/* 切り替える口が無い（取消・終了・日時変更では、いつも「もう開けてよい」を出す）。オンのまま押せない形。 */}
-              {canManage ? <Toggle checked locked label="キャンセルで席が空いたら「もう開けてよい」を知らせる" /> : <StatusBadge tone="success">オン</StatusBadge>}
+              {/* オフにすると LINE の知らせだけ止める（管理画面の「もう開けてよい」は残る）。閲覧のみは札。 */}
+              {canManage && notice ? (
+                <Toggle checked={notice.notifyReopen} label="キャンセルで席が空いたら「もう開けてよい」を知らせる" onChange={(next) => setNotice({ ...notice, notifyReopen: next })} />
+              ) : <StatusBadge tone={notice?.notifyReopen === false ? 'neutral' : 'success'}>{notice?.notifyReopen === false ? 'オフ' : 'オン'}</StatusBadge>}
               <span className={styles.switchText}>
                 <span className={styles.switchTitle}>キャンセルで席が空いたら「もう開けてよい」を知らせる</span>
+                {notice?.notifyReopen === false ? <span className={styles.switchSub}>LINE では知らせません。「枠を閉じる知らせ」の一覧には出ます</span> : null}
               </span>
             </div>
             <div className={styles.targetRow}>
               <span className={styles.targetLabel}>知らせる相手</span>
-              {/* 相手を選ぶ口が無い。今の決まり（当日の責任者、いなければ店長）を出すだけ。 */}
-              <span className={styles.targetValue} title="当日の責任者に届きます。責任者が決まっていない日は店長に届きます">当日の責任者（いなければ店長）</span>
+              {canManage && notice ? (
+                <button
+                  type="button"
+                  className={`${styles.targetValue} ${styles.targetButton}`}
+                  title={recipientText(notice, members)}
+                  aria-haspopup="dialog"
+                  onClick={() => { setPicking({ recipientMode: notice.recipientMode, membershipIds: notice.membershipIds }); setPickError('') }}
+                >
+                  {recipientText(notice, members)}
+                </button>
+              ) : (
+                <span className={styles.targetValue} title={recipientText(notice ?? { recipientMode: 'responsible', membershipIds: [] }, members)}>
+                  {recipientText(notice ?? { recipientMode: 'responsible', membershipIds: [] }, members)}
+                </span>
+              )}
               <span className={styles.cardText}>管理画面とスタッフの LINE に届きます</span>
             </div>
           </section>
@@ -428,13 +500,13 @@ export default function BookingMediaPage() {
             <StickyBar
               actions={(
                 <>
-                  <Button onClick={() => { if (saved) setRows(saved); setSaveError('') }} disabled={saving}>キャンセル</Button>
-                  <Button variant="primary" onClick={() => void save()} busy={saving} busyLabel="保存中…" disabled={dirty.length === 0 || saving} title={dirty.length === 0 ? '変えた所がありません' : undefined}>
+                  <Button onClick={() => { if (saved) setRows(saved); if (noticeSaved) setNotice(noticeSaved); setSaveError('') }} disabled={saving}>キャンセル</Button>
+                  <Button variant="primary" onClick={() => void save()} busy={saving} busyLabel="保存中…" disabled={changes === 0 || saving} title={changes === 0 ? '変えた所がありません' : undefined}>
                     <Check size={15} aria-hidden="true" />保存する
                   </Button>
                 </>
               )}
-              status={dirty.length > 0 ? <span aria-live="polite">{`変えた媒体 ${dirty.length}件（まだ保存していません）`}</span> : undefined}
+              status={changes > 0 ? <span aria-live="polite">{dirty.length > 0 ? `変えた媒体 ${dirty.length}件${noticeDirty ? '・知らせの設定' : ''}（まだ保存していません）` : '知らせの設定を変えました（まだ保存していません）'}</span> : undefined}
             />
           </div>
         ) : null}
@@ -467,6 +539,45 @@ export default function BookingMediaPage() {
             <TextField value={editLogin} onChange={(event) => setEditLogin(event.target.value)} placeholder="https://" inputMode="url" />
           </label>
         </div>
+      </Dialog>
+
+      <Dialog
+        open={picking !== null}
+        title="知らせる相手"
+        description="キャンセルで席が空いたときの「もう開けてよい」を、誰の LINE に知らせるかを選びます。保存は画面の下の［保存する］で行います。"
+        confirmLabel="決める"
+        onConfirm={() => {
+          if (!picking || !notice) return
+          if (picking.recipientMode === 'selected' && picking.membershipIds.length === 0) { setPickError('知らせるスタッフを1人以上選んでください'); return }
+          setNotice({ ...notice, recipientMode: picking.recipientMode, membershipIds: picking.recipientMode === 'selected' ? picking.membershipIds : [] })
+          setPicking(null)
+        }}
+        onCancel={() => setPicking(null)}
+        error={pickError || undefined}
+      >
+        {picking ? (
+          <div className={styles.dialogFields} role="radiogroup" aria-label="知らせる相手">
+            <Radio name="close-notice-recipient" checked={picking.recipientMode === 'responsible'} onChange={() => setPicking({ ...picking, recipientMode: 'responsible' })}>当日の責任者（いなければ店長）</Radio>
+            <Radio name="close-notice-recipient" checked={picking.recipientMode === 'manager'} onChange={() => setPicking({ ...picking, recipientMode: 'manager' })}>店長</Radio>
+            <Radio name="close-notice-recipient" checked={picking.recipientMode === 'selected'} onChange={() => setPicking({ ...picking, recipientMode: 'selected' })}>スタッフを選ぶ</Radio>
+            {picking.recipientMode === 'selected' ? (
+              members.length > 0 ? (
+                <div className={styles.memberPicks}>
+                  {members.map((m) => (
+                    <Checkbox
+                      key={m.id}
+                      checked={picking.membershipIds.includes(m.id)}
+                      onCheckedChange={(on) => setPicking({ ...picking, membershipIds: on ? [...picking.membershipIds, m.id] : picking.membershipIds.filter((id) => id !== m.id) })}
+                      description={m.line_uid ? undefined : 'LINE とつないでいません（管理画面で確かめます）'}
+                    >
+                      {m.staff_name}
+                    </Checkbox>
+                  ))}
+                </div>
+              ) : <p className={styles.cardText}>この店の担当のスタッフがいません。組織・権限で足せます。</p>
+            ) : null}
+          </div>
+        ) : null}
       </Dialog>
 
       <Dialog

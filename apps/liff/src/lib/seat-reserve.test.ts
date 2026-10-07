@@ -13,6 +13,13 @@ import {
   upcomingBookings,
   zonedParts,
   zonedToday,
+  dayReason,
+  slotLabel,
+  seatText,
+  lateRule,
+  noteProblem,
+  phoneProblem,
+  normalizePhone,
 } from './seat-reserve.js';
 
 const TZ = 'Asia/Tokyo';
@@ -33,7 +40,7 @@ describe('席の予約の計算 (E-11)', () => {
   });
 
   it('時刻は 空きあり／残りわずか (2席以下)／満席 (空きなし)', () => {
-    const s = { startsAt: '', endsAt: '' };
+    const s = { startsAt: '', endsAt: '', seatTypes: [] };
     expect(slotState({ ...s, available: true, remainingTables: 4 })).toBe('open');
     expect(slotState({ ...s, available: true, remainingTables: 2 })).toBe('few');
     expect(slotState({ ...s, available: false, remainingTables: 3 })).toBe('full');
@@ -46,6 +53,37 @@ describe('席の予約の計算 (E-11)', () => {
     expect(closedNote(['2026-10-12'])).toBe('10/12（月）は空きがないため選べません');
     expect(closedNote(['2026-10-12', '2026-10-13'])).toBe('10/12（月）・10/13（火）は空きがないため選べません');
     expect(closedNote([])).toBeNull();
+  });
+
+  it('休みの理由（臨時休業・貸切・定休日・満席）を注に書き、理由ごとにまとめる', () => {
+    expect(closedNote(['2026-10-12'], { '2026-10-12': 'temporary_closed' })).toBe('10/12（月）は臨時休業のため選べません');
+    expect(closedNote(['2026-10-12', '2026-10-13', '2026-10-14'], { '2026-10-12': 'private_event', '2026-10-13': 'full', '2026-10-14': 'full' }))
+      .toBe('10/12（月）は貸切、10/13（火）・10/14（水）は満席のため選べません');
+    expect(closedNote(['2026-10-12'], { '2026-10-12': 'regular_closed' })).toBe('10/12（月）は定休日のため選べません');
+    const s = { startsAt: '', endsAt: '', remainingTables: 0, available: false, seatTypes: [] };
+    expect(dayReason([{ ...s, unavailableReason: 'private_event' }], undefined)).toBe('private_event');
+    expect(dayReason([{ ...s, unavailableReason: 'full' }], 'temporary_closed')).toBe('temporary_closed');
+    expect(dayReason([{ ...s, unavailableReason: 'full' }, { ...s, unavailableReason: 'private_event' }])).toBeUndefined();
+    expect(slotLabel({ ...s, unavailableReason: 'private_event' })).toBe('貸切');
+    expect(slotLabel({ ...s, unavailableReason: 'full' })).toBe('満席');
+  });
+
+  it('お席：割り当てた卓の種類、無ければ空いている候補の種類。遅れたときの決まり', () => {
+    expect(seatText('table')).toBe('テーブル席（お店で決めます）');
+    expect(seatText(null, ['counter', 'table'])).toBe('カウンター席・テーブル席（お店で決めます）');
+    expect(seatText(null, [])).toBe('お店で決めます');
+    expect(lateRule({ cancelAfterMinutes: 15, message: '15分を過ぎてご連絡がない場合は、取り消しになることがあります。' })).toBe('15分を過ぎてご連絡がない場合は、取り消しになることがあります');
+    expect(lateRule({ cancelAfterMinutes: 20, message: '' })).toBe('20分を過ぎてご連絡がない場合は、取り消しになることがあります');
+    expect(lateRule(null)).toBe('遅れるときや人数が変わるときは、この LINE でお店へお知らせください');
+  });
+
+  it('ご要望と電話の確かめ（口と同じ境目）', () => {
+    expect(noteProblem('あ'.repeat(200))).toBe('');
+    expect(noteProblem('あ'.repeat(201))).toContain('200字');
+    expect(phoneProblem('')).toBe('');
+    expect(phoneProblem('090－1111－2222')).toBe('');
+    expect(normalizePhone(' 090ー1111ー2222 ')).toBe('090-1111-2222');
+    expect(phoneProblem('090-1111-abcd')).toContain('数字');
   });
 
   it('取り消しの締め切りは 前日・当日・それより前の日付で書き分ける', () => {
@@ -74,7 +112,7 @@ describe('席の予約の計算 (E-11)', () => {
 
   it('これからの予約だけを早い順に。取り消し・過ぎた・期限切れの仮押さえは外す', () => {
     const now = Date.parse('2026-10-07T09:00:00+09:00');
-    const base = { storeId: 's', endsAt: '', guestCount: 2, version: 1, holdExpiresAt: null };
+    const base = { storeId: 's', endsAt: '', guestCount: 2, version: 1, holdExpiresAt: null, note: null, customerPhone: null, seatType: null };
     const rows = [
       { ...base, id: 'late', startsAt: at('2026-10-09T18:00:00+09:00'), status: 'confirmed' },
       { ...base, id: 'early', startsAt: at('2026-10-08T18:00:00+09:00'), status: 'confirmed' },

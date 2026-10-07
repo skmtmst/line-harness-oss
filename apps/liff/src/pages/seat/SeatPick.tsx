@@ -1,10 +1,10 @@
 import { useRef } from 'react';
-import type { RestaurantCustomerSlot } from '@line-crm/shared';
+import type { RestaurantCustomerSlot, RestaurantUnavailableReason } from '@line-crm/shared';
 import {
-  SLOT_LABEL,
   closedNote,
   hasOpenSlot,
   md,
+  slotLabel,
   slotState,
   weekday,
   zonedParts,
@@ -26,6 +26,7 @@ export default function SeatPick({
   today,
   chips,
   days,
+  reasons = {},
   guestCount,
   date,
   startsAt,
@@ -40,6 +41,8 @@ export default function SeatPick({
   chips: DayChip[];
   /** 日ごとの空き。札の日＋その次の日を先に読む。 */
   days: Record<string, DaySlots>;
+  /** 空きが無い日の理由（臨時休業・貸切・定休日・満席）。 */
+  reasons?: Record<string, RestaurantUnavailableReason | undefined>;
   guestCount: number;
   date: string;
   startsAt: string | null;
@@ -59,7 +62,7 @@ export default function SeatPick({
       const v = days[d];
       return v === 'closed' || (Array.isArray(v) && !hasOpenSlot(v));
     });
-  const note = closedNote(noted);
+  const note = closedNote(noted, reasons);
   const many = guestCount >= 5;
 
   function openOther() {
@@ -87,7 +90,7 @@ export default function SeatPick({
               role="radio"
               aria-checked={on}
               onClick={() => onGuest(n === 5 && many ? guestCount : n)}
-              className={`liff-press rounded-full px-3.5 py-[7px] text-[13px] leading-5 font-semibold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ink ${
+              className={`liff-hit liff-press rounded-full px-3.5 py-[7px] text-[13px] leading-5 font-semibold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ink ${
                 on ? 'bg-ink text-canvas' : 'bg-liff-chip text-ink'
               }`}
             >
@@ -150,7 +153,7 @@ export default function SeatPick({
         <button
           type="button"
           onClick={openOther}
-          className={`text-[13px] leading-5 font-semibold text-liff-primary focus-visible:outline-2 focus-visible:outline-ink ${
+          className={`liff-hit text-[13px] leading-5 font-semibold text-liff-primary focus-visible:outline-2 focus-visible:outline-ink ${
             inChips ? '' : 'underline underline-offset-2'
           }`}
         >
@@ -196,7 +199,7 @@ export default function SeatPick({
                 type="button"
                 role="radio"
                 aria-checked={on}
-                aria-label={`${hm} ${SLOT_LABEL[st]}`}
+                aria-label={`${hm} ${slotLabel(s)}`}
                 disabled={st === 'full'}
                 onClick={() => onTime(s.startsAt)}
                 className={`liff-press flex flex-col items-center rounded-(--liff-radius) py-2 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
@@ -215,7 +218,7 @@ export default function SeatPick({
                     st === 'full' ? 'text-liff-full' : st === 'few' ? 'text-liff-dot-few' : 'text-liff-sub'
                   }`}
                 >
-                  {SLOT_LABEL[st]}
+                  {slotLabel(s)}
                 </span>
               </button>
             );

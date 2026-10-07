@@ -343,6 +343,12 @@ jobs:
           NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
           # G6 移し替え：検証環境の開いたときの見た目は V8。本番は付けない（v7 のまま）。
           NEXT_PUBLIC_ADMIN_THEME: 'v8'
+          # リリース前点検：ログイン前の規約・方針・表記・お問い合わせの公開先（秘密ではない）。
+          # 本番の配備（deploy-cloudflare-admin.yml）には切り替えのときに同じ4つを足す。
+          NEXT_PUBLIC_TERMS_URL: 'https://musubo.jp/terms/'
+          NEXT_PUBLIC_PRIVACY_URL: 'https://musubo.jp/privacy/'
+          NEXT_PUBLIC_COMMERCE_LAW_URL: 'https://musubo.jp/legal/'
+          NEXT_PUBLIC_CONTACT_URL: 'https://musubo.jp/contact/'
 
       - name: Deploy Admin Panel to staging
         if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'worker'

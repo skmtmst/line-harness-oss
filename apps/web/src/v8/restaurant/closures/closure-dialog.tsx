@@ -19,17 +19,17 @@ import Radio from '@/components/shared/radio'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import { ApiError } from '@/lib/api'
+import { ApiError, describeSaveFailure } from '@/lib/api'
 import { restaurantGoogleApi } from '@/lib/restaurant-google-api'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
 import {
-  KIND_LABEL, KIND_ORDER, clock, dayOfIso, dayShort, emptyInput, inputError, inputOf, overlapping, sourceLabel, timeOptions,
+  KIND_LABEL, KIND_ORDER, clock, conflictsOf, dayOfIso, dayShort, emptyInput, inputError, inputOf, overlapMessage, overlapping, sourceLabel, timeOptions,
 } from './format'
 import styles from './closures.module.css'
 
 export type ClosureDialogTarget = { mode: 'add'; day: string } | { mode: 'edit'; closure: RestaurantClosure }
 
-type Row = { id: string; startsAt: string; guestCount: number; customerName: string; source: string; friendId: string | null; phone: string | null }
+type Row = { id: string; startsAt: string; guestCount: number; customerName: string; source: string; friendId: string | null; phone: string | null; contacted: boolean }
 
 export type ClosureSaved = { closure: RestaurantClosure; reservations: number; google: 'made' | 'failed' | 'skipped' }
 
@@ -37,21 +37,22 @@ function rowsFromPreview(preview: RestaurantClosurePreview, known: RestaurantRes
   return preview.reservations.map((r) => ({
     id: r.id, startsAt: r.startsAt, guestCount: r.guestCount, customerName: r.customerName, source: r.source,
     friendId: r.isLineFriend ? r.friendId : null,
-    phone: known.find((k) => k.id === r.id)?.customer_phone ?? null,
+    phone: r.customerPhone ?? known.find((k) => k.id === r.id)?.customer_phone ?? null,
+    contacted: r.contacted === true,
   }))
 }
 
 function rowsFromLedger(rows: RestaurantReservation[]): Row[] {
-  return rows.map((r) => ({ id: r.id, startsAt: r.starts_at, guestCount: r.guest_count, customerName: r.customer_name, source: r.source, friendId: null, phone: r.customer_phone }))
+  return rows.map((r) => ({ id: r.id, startsAt: r.starts_at, guestCount: r.guest_count, customerName: r.customer_name, source: r.source, friendId: null, phone: r.customer_phone, contacted: false }))
 }
 
 function saveMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.code === 'closure_overlap') return '同じ日・同じ卓に、ほかの休業・貸切があります。日付か卓を変えてください。'
+    if (error.code === 'closure_overlap') return overlapMessage(conflictsOf(error.data))
     if (error.code === 'version_conflict') return 'ほかの人が先に変えました。閉じて、読み直してからもう一度変えてください。'
     if (error.status === 403) return 'この店舗の予約枠を変える権限がありません。'
   }
-  return error instanceof Error && error.message ? error.message : '保存できませんでした。もう一度お試しください。'
+  return describeSaveFailure(error)
 }
 
 export default function ClosureDialog({
@@ -78,7 +79,7 @@ export default function ClosureDialog({
   const [input, setInput] = useState<RestaurantClosureInput>(() => emptyInput(storeId, today))
   const [pickTables, setPickTables] = useState(false)
   const [google, setGoogle] = useState(true)
-  const [preview, setPreview] = useState<{ rows: Row[]; waitlist: number; overlap: boolean } | null>(null)
+  const [preview, setPreview] = useState<{ rows: Row[]; waitlist: number; contacted: number; overlap: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const seq = useRef(0)
@@ -101,27 +102,27 @@ export default function ClosureDialog({
   const partial = (input.tableIds ?? []).length > 0
 
   /*
-   * 重なる予約。足す窓は preview の口（LINE の友だちかどうかも返る）。
-   * 変える窓は、口が自分自身と重なって 409 になるので、画面が読んだ予約から数える。
+   * 重なる予約。preview の口（電話番号・LINE の友だちか・連絡済みも返る）。
+   * 変える窓は自分自身を除く（excludeId）。口が読めないときは画面が読んだ予約から数える。
    */
   useEffect(() => {
     if (!open || problem || !accountId) { setPreview(null); return }
     const id = ++seq.current
     const timer = setTimeout(() => {
-      if (editing) {
-        const rows = overlapping(input, reservations, timezone)
-        setPreview({ rows: rowsFromLedger(rows), waitlist: 0, overlap: false })
-        return
-      }
-      void restaurantTestApi.previewClosure(accountId, input)
-        .then((res) => { if (id === seq.current) setPreview({ rows: rowsFromPreview(res.data, reservations), waitlist: res.data.waitlistCount, overlap: false }) })
+      const fallback = () => rowsFromLedger(overlapping(input, reservations, timezone))
+      void restaurantTestApi.previewClosure(accountId, editing ? { ...input, excludeId: editing.id } : input)
+        .then((res) => {
+          if (id !== seq.current) return
+          const conflicts = res.data.conflicts ?? []
+          setPreview({
+            rows: rowsFromPreview(res.data, reservations), waitlist: res.data.waitlistCount, contacted: res.data.contactedCount ?? 0,
+            overlap: conflicts.length > 0 ? overlapMessage(conflicts) : '',
+          })
+        })
         .catch((caught) => {
           if (id !== seq.current) return
-          if (caught instanceof ApiError && caught.code === 'closure_overlap') {
-            setPreview({ rows: rowsFromLedger(overlapping(input, reservations, timezone)), waitlist: 0, overlap: true })
-          } else {
-            setPreview({ rows: rowsFromLedger(overlapping(input, reservations, timezone)), waitlist: 0, overlap: false })
-          }
+          const overlap = caught instanceof ApiError && caught.code === 'closure_overlap' ? overlapMessage(conflictsOf(caught.data)) : ''
+          setPreview({ rows: fallback(), waitlist: 0, contacted: 0, overlap })
         })
     }, 300)
     return () => clearTimeout(timer)
@@ -134,7 +135,7 @@ export default function ClosureDialog({
     if (pickTables && !partial) { setError('閉じる卓を1つ以上選んでください。'); return }
     setBusy(true); setError('')
     try {
-      const body: RestaurantClosureInput = { ...input, tableIds: pickTables ? input.tableIds : [], memo: input.memo?.trim() || null }
+      const body: RestaurantClosureInput = { ...input, tableIds: pickTables ? input.tableIds : [], memo: input.memo?.trim() || null, notifyMedia: input.notifyMedia !== false }
       const res = editing
         ? await restaurantTestApi.updateClosure(accountId, editing.id, { ...body, expectedVersion: editing.version })
         : await restaurantTestApi.createClosure(accountId, body)
@@ -254,20 +255,22 @@ export default function ClosureDialog({
         ) : (
           <>
             {preview.overlap ? (
-              <p className={styles.overlap} role="alert">同じ日・同じ卓に、ほかの休業・貸切があります。日付か卓を変えてください。</p>
+              <p className={styles.overlap} role="alert">{preview.overlap}</p>
             ) : null}
             {rows.length > 0 ? (
               <div className={styles.affected} data-affected="">
                 <p className={styles.affectedTitle}>
                   <AlertTriangle size={16} aria-hidden="true" />
-                  {`${days}の予約が ${rows.length}件あります（保存しても取り消しません）`}
+                  {`${days}の予約が ${rows.length}件あります（保存しても取り消しません${editing && preview.contacted > 0 ? `・連絡済み ${preview.contacted}件` : ''}）`}
                 </p>
                 {rows.map((row) => (
                   <div key={row.id} className={styles.affectedRow}>
                     <span className={styles.affectedTime}>{input.startDate === input.endDate ? clock(row.startsAt, timezone) : `${dayShort(dayOfIso(row.startsAt, timezone))} ${clock(row.startsAt, timezone)}`}</span>
                     <span className={styles.affectedName} title={row.customerName}>{`${row.customerName} さま・${row.guestCount}名`}</span>
                     <span className={styles.route}>{sourceLabel(row.source, media)}</span>
-                    {row.friendId ? (
+                    {row.contacted && row.friendId ? (
+                      <Button variant="text" data-contacted="" href={`/chats?friend=${encodeURIComponent(row.friendId)}`}>連絡済み（会話を見る）</Button>
+                    ) : row.friendId ? (
                       <Button href={`/chats?friend=${encodeURIComponent(row.friendId)}`}>LINE で連絡する</Button>
                     ) : (
                       <Button variant="text" href={`/restaurant-test/reservations?date=${dayOfIso(row.startsAt, timezone)}`}>
@@ -288,7 +291,11 @@ export default function ClosureDialog({
           <span className={styles.label}>他の予約サイトと Google</span>
           <div className={styles.checks}>
             {media.length > 0 ? (
-              <Checkbox checked onCheckedChange={() => {}} disabled title="閉じた日は、店が選んだ媒体へ必ず知らせを出します">
+              <Checkbox
+                checked={input.notifyMedia !== false}
+                onCheckedChange={(on) => set({ notifyMedia: on })}
+                description={input.notifyMedia === false ? '知らせを出しません。他の予約サイトの枠は、それぞれの管理画面で閉じてください。' : undefined}
+              >
                 {`${mediaNames}に「閉じる知らせ」を出す（媒体ごとに［閉じた］を押す）`}
               </Checkbox>
             ) : (

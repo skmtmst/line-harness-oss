@@ -138,6 +138,12 @@ const liff = (
     { name: 'Authorization', in: 'header', required: true, schema: string },
   ],
 });
+const customerDetails = {
+  note: {type:['string','null'],maxLength:200,description:'ご要望（任意）。空欄またはnullで消す'},
+  customerPhone: {type:['string','null'],maxLength:50,description:'電話（任意）。数字・空白・括弧・ハイフン・+。空欄またはnullで消す'},
+};
+const lateArrivalPolicy = {type:'object',required:['cancelAfterMinutes','message'],properties:{cancelAfterMinutes:{type:'integer',minimum:1,maximum:1440},message:{type:'string',minLength:1,maxLength:1000}}};
+const unavailableReason = {type:'string',enum:['temporary_closed','private_event','regular_closed','full']};
 const versionBody = {
   type: 'object',
   required: ['expectedVersion'],
@@ -171,6 +177,7 @@ Object.assign(api9Paths, {
           startsAt: { type: 'string', format: 'date-time' },
           guestCount: { type: 'integer', minimum: 1, maximum: 100 },
           requestId: { type: 'string', pattern: '^[a-zA-Z0-9_-]{8,128}$' },
+          ...customerDetails,
         },
       },
     ),
@@ -187,7 +194,7 @@ Object.assign(api9Paths, {
     post: liff(
       '期限内の仮押さえを確定し、自動LINEと媒体閉鎖の作業を台帳に作る',
       ['id'],
-      versionBody,
+      {...versionBody,properties:{...versionBody.properties,...customerDetails}},
     ),
   },
   '/api/liff/restaurant/reservations/{id}/cancel': {
@@ -471,6 +478,9 @@ export const api9Schemas: Record<string, Schema> = {
       'status',
       'version',
       'holdExpiresAt',
+      'note',
+      'customerPhone',
+      'seatType',
     ],
     properties: {
       id: string,
@@ -481,6 +491,8 @@ export const api9Schemas: Record<string, Schema> = {
       status: string,
       version: { type: 'integer', minimum: 1 },
       holdExpiresAt: { type: ['string', 'null'] },
+      ...customerDetails,
+      seatType: {type:['string','null']},
     },
   },
   AutoReplyUnmatchedSettings: {
@@ -558,3 +570,19 @@ documentResponse('/api/liff/restaurant/reservations', 'get', {
   type: 'array',
   items: { $ref: '#/components/schemas/RestaurantCustomerBooking' },
 });
+
+documentResponse('/api/liff/restaurant/availability','get',{
+  type:'object',required:['storeId','date','guestCount','slots','cancelDeadlineMinutesBefore','cutoffMinutesBefore'],
+  properties:{storeId:string,date:{type:'string',format:'date'},guestCount:{type:'integer',minimum:1,maximum:100},unavailableReason,lateArrivalPolicy,
+    cancelDeadlineMinutesBefore:integer,cutoffMinutesBefore:integer,
+    slots:{type:'array',items:{type:'object',required:['startsAt','endsAt','available','remainingTables','seatTypes'],properties:{startsAt:{type:'string',format:'date-time'},endsAt:{type:'string',format:'date-time'},available:{type:'boolean'},remainingTables:integer,seatTypes:{type:'array',items:string},unavailableReason}}}}
+});
+const hours = {type:'array',minItems:7,maxItems:7,items:{type:'object',required:['weekday','periods'],properties:{weekday:{type:'integer',minimum:0,maximum:6},periods:{type:'array',items:{type:'object',required:['opensAt','closesAt'],properties:{opensAt:string,closesAt:string}}}}}};
+api9Paths['/api/restaurant-test/opening-hours']={
+  get:operation('営業時間と遅刻の案内を読む',[],undefined,{account_id:string,storeId:string}),
+  put:operation('営業時間と遅刻の案内を版付きで保存。lateArrivalPolicy省略なら維持、nullなら解除',[],{type:'object',required:['storeId','hours','expectedVersion'],properties:{storeId:string,hours,expectedVersion:integer,lateArrivalPolicy:{...lateArrivalPolicy,type:['object','null']}}},{account_id:string})
+};
+documentResponse('/api/restaurant-test/opening-hours','get',{type:'object',properties:{storeId:string,hours:{...hours,type:['array','null']},version:integer,updatedBy:{type:['string','null']},updatedAt:{type:['string','null']},lateArrivalPolicy:{...lateArrivalPolicy,type:['object','null']}}});
+documentResponse('/api/restaurant-test/opening-hours','put',{type:'object',properties:{storeId:string,hours,version:integer}});
+api9Paths['/api/restaurant-test/reservation-link']={post:operation('店舗自身のLIFF IDで席予約リンクを発行。未設定・停止アカウントは503',[],{type:'object',required:['storeId'],properties:{storeId:string}},{account_id:string})};
+documentResponse('/api/restaurant-test/reservation-link','post',{type:'object',required:['url','html','available'],properties:{url:{type:'string',format:'uri',description:'https://liff.line.me/<店舗のLIFF ID>/restaurant/reserve/<token>'},html:string,available:{type:'boolean',const:true}}});

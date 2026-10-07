@@ -55,7 +55,7 @@ export type FeatureJobMetadata = {
  */
 export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   {name:'API draft and integration retention',classification:{kind:'core',reason:'保存期限を過ぎた下書きと連携の一時情報の消去'},enforcement:{mode:'exempt',reason:'外部送信をせず、機能の有効・無効にかかわらず保存期限を守る'}},
-  {name:'visit stamps',classification:{kind:'core',reason:'来店・会計からのスタンプ台帳の整合'},enforcement:{mode:'exempt',reason:'外部送信をしない。カード停止と許可店舗は台帳の計算側で検証する'}},
+  {name:'visit stamps',classification:{kind:'feature',featureId:'visit_stamps'},enforcement:{mode:'gated',sources:['apps/worker/src/services/visit-stamps.ts'],markers:["featureId:'visit_stamps'","job:'visit stamps'"]}},
   {name:'booking waitlist expiry and promotion',classification:{kind:'core',reason:'人・席の待ちの期限と先着順を保つ'},enforcement:{mode:'exempt',reason:'保存済みの待ちの後始末。LINE送信はsendAutomaticBookingLineで機能停止・外部更新停止を個別判定する'}},
   {
     name: 'booking sync notices',

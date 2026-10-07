@@ -2,8 +2,8 @@
  * ★V8 Googleビジネスの表示の道具（今の画面 app/restaurant-test/google/google-format.ts から写した）。
  * src/v8 からは @/app を読めないので、使う分だけ写す。日時は店舗の時刻（日本時間）で出す。
  */
-import { ApiError } from '@/lib/api'
 import type { GoogleHoursPeriod, GoogleWeekday } from '@/lib/restaurant-google-api'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 export const STORE_TIME_ZONE = 'Asia/Tokyo'
 export const WEEKDAYS: GoogleWeekday[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
@@ -58,8 +58,8 @@ export function reviewReceivedAt(review: { createTime?: string | null; updateTim
 }
 
 export function errorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.message) return error.message
-  return fallback
+  // 「API error: 500」のような内部の文は出さない。日本語の案内だけを出す。
+  return japaneseDetailOf(error) || fallback
 }
 
 /** "YYYY-MM-DD" → 曜日。 */

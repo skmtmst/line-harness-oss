@@ -27,6 +27,7 @@ import OpsEnvBar from './ops-env-bar'
 import ImpersonationBar from './impersonation-bar'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import OpsShellV8 from '@/v8/ops/shell'
+import { setDocumentTitle } from '@/lib/document-title'
 
 /**
  * 運営コンソールの外枠。★V6 37 系。
@@ -62,6 +63,11 @@ export default function OpsShell({ children }: { children: ReactNode }) {
    * Escape と背面のスクロール停止に対応する。
    */
   useEffect(() => { setNavOpen(false) }, [pathname])
+  // タブの題（「<画面名> | musubo」）。運営の画面は左メニューの名前を使う。
+  useEffect(() => {
+    const item = MENU.find((m) => pathname === m.href || pathname.startsWith(`${m.href}/`))
+    setDocumentTitle(item ? `${item.label}（運営）` : '運営コンソール')
+  }, [pathname])
   useEffect(() => {
     if (!navOpen) return
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setNavOpen(false) }

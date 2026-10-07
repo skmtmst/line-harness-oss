@@ -1,6 +1,7 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
+import { setDocumentTitle } from '@/lib/document-title'
 import { CONTACT_URL, LEGAL_LINKS } from '@/lib/auth-email'
 
 /**
@@ -25,6 +26,8 @@ export default function AuthCard({
   /** Pencil のカードノード。 */
   cardNode: string
 }) {
+  // ログイン前の画面もタブの題を「<見出し> | musubo」にする。
+  useEffect(() => { setDocumentTitle(title) }, [title])
   return (
     <main data-design-node={node} className="flex min-h-svh flex-col items-center justify-center bg-shell px-4 py-8 sm:px-6">
       <section

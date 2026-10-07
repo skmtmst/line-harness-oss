@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
@@ -10,11 +9,9 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatDateTime } from '@/lib/format'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
-// self-update を構成した環境 (create-line-harness セットアップ) でのみ設定される。
+// self-update を構成した環境でのみ設定される。
 // 未設定 = 自動アップデート非構成環境なので、この画面は fetch せず案内のみ表示する。
 const ADMIN_KEY = process.env.NEXT_PUBLIC_ADMIN_API_KEY
-const MANUAL_UPDATE_GUIDE_URL =
-  'https://github.com/Shudesu/line-harness-oss/blob/main/docs/wiki/26-Manual-Update.md' 
 
 interface Row {
   id: string
@@ -75,8 +72,7 @@ export default function UpdatesPage() {
               kind="empty"
               emptyPreset="readonly"
               title="更新履歴はまだありません"
-              description="自動アップデートは create-line-harness でセットアップした環境で利用できます。自前でデプロイしている場合は手動アップデートガイドをご覧ください。"
-              action={<Button href={MANUAL_UPDATE_GUIDE_URL} target="_blank" rel="noreferrer">手動アップデートガイドを開く</Button>}
+              description="musubo の更新は運営が行います。この画面には、自動で更新した記録だけが出ます。"
             />
           </section>
         </>

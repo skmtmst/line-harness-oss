@@ -2,7 +2,12 @@
  * 飲食店の席の予約 (E-11・★V8 glL3g→km8EG→sAnyy) の計算だけを集めた所。
  * 画面から切り離して試験する。時刻は店の時間帯 (link の timezone) で見せる。
  */
-import type { RestaurantCustomerBooking, RestaurantCustomerSlot } from '@line-crm/shared';
+import type {
+  RestaurantCustomerBooking,
+  RestaurantCustomerSlot,
+  RestaurantLateArrivalPolicy,
+  RestaurantUnavailableReason,
+} from '@line-crm/shared';
 
 const WEEKDAY_JA = '日月火水木金土';
 
@@ -83,15 +88,102 @@ export const SLOT_LABEL: Record<SlotState, string> = {
   full: '満席',
 };
 
-/** 空きを1つも持たない日 (休み・貸切・満席)。空きの口が理由を返さないので理由は書かない。 */
+/** 空きを1つも持たない日 (休み・貸切・満席)。 */
 export function hasOpenSlot(slots: RestaurantCustomerSlot[] | undefined): boolean {
   return (slots ?? []).some((s) => slotState(s) !== 'full');
 }
 
-/** 選べない日の注。「10/12（月）・10/13（火）は空きがないため選べません」。無ければ null。 */
-export function closedNote(dates: string[]): string | null {
+/** 空きが無い理由の言葉 (口の unavailableReason)。お店の内部のメモは口が返さない。 */
+export const UNAVAILABLE_LABEL: Record<RestaurantUnavailableReason, string> = {
+  temporary_closed: '臨時休業',
+  private_event: '貸切',
+  regular_closed: '定休日',
+  full: '満席',
+};
+
+/** 時刻の札の下の言葉。空いていない時刻は理由 (貸切・臨時休業など) があればそれ、無ければ満席。 */
+export function slotLabel(slot: RestaurantCustomerSlot): string {
+  const st = slotState(slot);
+  if (st !== 'full') return SLOT_LABEL[st];
+  if (slot.unavailableReason === 'private_event') return '貸切';
+  if (slot.unavailableReason === 'temporary_closed') return '休業';
+  return SLOT_LABEL.full;
+}
+
+/**
+ * 選べない日の注。理由ごとにまとめる。「10/12（月）は臨時休業のため選べません」
+ * 「10/12（月）は臨時休業、10/13（火）・10/14（水）は満席のため選べません」。理由が分からない日だけなら「空きがないため」。
+ */
+export function closedNote(dates: string[], reasons: Record<string, RestaurantUnavailableReason | undefined> = {}): string | null {
   if (!dates.length) return null;
-  return `${dates.map((d) => `${md(d)}（${weekday(d)}）`).join('・')}は空きがないため選べません`;
+  const days = (list: string[]) => list.map((d) => `${md(d)}（${weekday(d)}）`).join('・');
+  if (dates.every((d) => !reasons[d])) return `${days(dates)}は空きがないため選べません`;
+  const groups: Array<{ label: string; dates: string[] }> = [];
+  for (const d of dates) {
+    const r = reasons[d];
+    const label = r ? UNAVAILABLE_LABEL[r] : '空きなし';
+    const g = groups.find((x) => x.label === label);
+    if (g) g.dates.push(d);
+    else groups.push({ label, dates: [d] });
+  }
+  return `${groups.map((g) => `${days(g.dates)}は${g.label}`).join('、')}のため選べません`;
+}
+
+/** 日全体の理由。口の日の理由が無ければ、時刻の理由がそろっていればそれ。 */
+export function dayReason(
+  slots: RestaurantCustomerSlot[],
+  day?: RestaurantUnavailableReason,
+): RestaurantUnavailableReason | undefined {
+  if (day) return day;
+  const list = [...new Set(slots.map((s) => s.unavailableReason).filter(Boolean))];
+  return list.length === 1 ? list[0] : undefined;
+}
+
+/** 席の種類の言葉 (卓の設定の seat_type)。知らない種類はそのまま。 */
+export const SEAT_TYPE_LABEL: Record<string, string> = {
+  table: 'テーブル席',
+  counter: 'カウンター席',
+  private_room: '個室',
+  terrace: 'テラス席',
+};
+
+export function seatTypeLabel(type: string | null | undefined): string | null {
+  if (!type) return null;
+  return SEAT_TYPE_LABEL[type] ?? type;
+}
+
+/** ② の「お席」。割り当てた卓の種類か、空いている候補の種類 (1つならそれ、いくつもなら「・」でつなぐ)。 */
+export function seatText(assigned: string | null | undefined, candidates: string[] = []): string {
+  const one = seatTypeLabel(assigned);
+  if (one) return `${one}（お店で決めます）`;
+  const list = [...new Set(candidates)].map((t) => seatTypeLabel(t)!).filter(Boolean);
+  return list.length ? `${list.join('・')}（お店で決めます）` : 'お店で決めます';
+}
+
+/** 遅れたときの決まりの1文 (句点なし)。お店の決まりが無ければ、LINE で知らせる案内。 */
+export function lateRule(policy: RestaurantLateArrivalPolicy | null | undefined): string {
+  const text = policy?.message?.trim().replace(/[。.]$/, '');
+  if (text) return text;
+  if (policy?.cancelAfterMinutes) return `${policy.cancelAfterMinutes}分を過ぎてご連絡がない場合は、取り消しになることがあります`;
+  return '遅れるときや人数が変わるときは、この LINE でお店へお知らせください';
+}
+
+/** ご要望の確かめ (口と同じ：200字まで)。空は送らない。 */
+export function noteProblem(note: string): string {
+  return [...note.trim()].length > 200 ? 'ご要望は200字までで書いてください。' : '';
+}
+
+/** 電話の書き方をそろえる (全角のハイフン・長音・＋を半角へ)。 */
+export function normalizePhone(phone: string): string {
+  return phone.trim().replace(/[－‐ー―−]/g, '-').replace(/＋/g, '+');
+}
+
+/** 電話の確かめ (口と同じ：50字まで・数字・空白・括弧・ハイフン・+)。空は送らない。 */
+export function phoneProblem(phone: string): string {
+  const t = normalizePhone(phone);
+  if (!t) return '';
+  if (t.length > 50 || !/^[+0-9０-９()（）\s-]+$/.test(t)) return '電話番号は数字とハイフンで入れてください。';
+  return '';
 }
 
 /**

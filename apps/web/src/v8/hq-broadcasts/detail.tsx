@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Ban, CirclePause, RotateCcw, Send } from 'lucide-react'
+import { Ban, CirclePause, PencilLine, RotateCcw, Send } from 'lucide-react'
 import type { HqBroadcastRun } from '@line-crm/shared'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
@@ -21,11 +21,12 @@ import { RowActions } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ApiError } from '@/lib/api'
+import { ApiError, describeSaveFailure } from '@/lib/api'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { type ResultTarget, canRetry, failedCount, jpDateTime, preflightBadge, resultBadge, runBadge, sendTotals } from './model'
+import { type ResultTarget, canRetry, failedCount, failureLines, fromApiContent, jpDateTime, preflightBadge, resultBadge, runBadge, sendTotals } from './model'
 import styles from './detail.module.css'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 const n = (value: number) => value.toLocaleString('ja-JP')
 
@@ -33,11 +34,12 @@ type Ask = { kind: 'send' | 'stop' | 'cancel' | 'retry-all' } | { kind: 'retry';
 
 function errorText(caught: unknown, fallback: string): string {
   if (caught instanceof ApiError) {
-    if (caught.status === 409) return caught.message || 'ほかの人が先に操作しました。読み直してください。'
+    if (caught.status === 409) return japaneseDetailOf(caught) || 'ほかの人が先に操作しました。読み直してください。'
     if (caught.status === 403) return '統括全体の編集権限がある人だけが操作できます。'
-    if (caught.message) return caught.message
+    return describeSaveFailure(caught)
   }
-  return fallback
+  // 「API error: 500」のような内部の文は出さない。
+  return japaneseDetailOf(caught) || fallback
 }
 
 /** ⑤ 送った結果（店ごと）。 */
@@ -95,7 +97,27 @@ export function ResultCard({ run, canManage, onRetry, onRetryAll }: {
           })}
         </tbody>
       </DataTable>
+      <FailureReasons run={run} />
     </section>
+  )
+}
+
+/** 店ごとの失敗の理由（「LINE が混雑しています」など。口の failureReasons）。 */
+function FailureReasons({ run }: { run: HqBroadcastRun }) {
+  const lines = failureLines(run)
+  if (lines.length === 0) return null
+  return (
+    <div className={styles.reasons} data-failure-reasons="">
+      <p className={styles.reasonsTitle}>失敗・送れなかった理由</p>
+      <ul className={styles.reasonList}>
+        {lines.map((line, i) => (
+          <li key={`${line.accountId}-${i}`} className={styles.reason}>
+            <span className={styles.reasonStore} title={line.store}>{line.store}</span>
+            <span className={styles.reasonText}>{line.text}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -122,7 +144,7 @@ function PreparedCard({ run }: { run: HqBroadcastRun }) {
         </thead>
         <tbody>
           {run.targets.map((t) => {
-            const badge = preflightBadge(t)
+            const badge = preflightBadge(t, fromApiContent(run.input?.messageContent ?? ''))
             const go = !t.excluded && t.blockedReasons.length === 0
             return (
               <Tr key={t.accountId} className={styles.row}>
@@ -245,6 +267,9 @@ export default function HqBroadcastDetail() {
               ) : null}
               {live && run.status !== 'stopped' ? (
                 <Button onClick={() => setAsk({ kind: 'stop' })}><CirclePause size={15} aria-hidden="true" />止める</Button>
+              ) : null}
+              {run.status === 'prepared' ? (
+                <Button href={`/hq/broadcasts/new?id=${encodeURIComponent(run.id)}`}><PencilLine size={15} aria-hidden="true" />下書きを直す</Button>
               ) : null}
               {run.status === 'prepared' ? (
                 <Button variant="primary" onClick={() => setAsk({ kind: 'send' })} disabled={(totals?.sendStores ?? 0) === 0} title={(totals?.sendStores ?? 0) === 0 ? '送れる店がありません' : undefined}>

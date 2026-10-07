@@ -46,6 +46,7 @@ function slots(date: string): RestaurantCustomerSlot[] {
       endsAt: new Date(Date.parse(startsAt) + 7200000).toISOString(),
       available: hm !== '19:30',
       remainingTables: hm === '19:30' ? 0 : 3,
+      seatTypes: ['table'],
     };
   });
 }
@@ -59,6 +60,9 @@ function held(over: Partial<RestaurantCustomerBooking> = {}): RestaurantCustomer
     status: 'pending',
     version: 3,
     holdExpiresAt: new Date(Date.now() + 600000).toISOString(),
+    note: null,
+    customerPhone: null,
+    seatType: 'table',
     ...over,
   };
 }
@@ -107,8 +111,45 @@ describe('席の予約の流れ', () => {
     expect(screen.getByRole('timer').textContent).toContain('10分 お取りしています');
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
     await screen.findByText('ご予約を受け付けました');
-    expect(seat.confirm).toHaveBeenCalledWith('r1', 3);
+    expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null });
     expect(screen.getByText('予約済み')).toBeTruthy();
+    expect(screen.getByText('2名・テーブル席')).toBeTruthy();
+  });
+
+  it('ご要望と電話（任意）を入れて確定の口へ送る。お席・遅れたときの決まり・休みの理由を出す', async () => {
+    vi.mocked(seat.availability).mockImplementation(async (_s, date, guestCount) => ({
+      success: true,
+      data: date === '2026-10-09'
+        ? { storeId: 'st', date, guestCount, slots: [], unavailableReason: 'temporary_closed' as const, cancelDeadlineMinutesBefore: 120, cutoffMinutesBefore: 60 }
+        : { storeId: 'st', date, guestCount, slots: slots(date), cancelDeadlineMinutesBefore: 120, cutoffMinutesBefore: 60,
+          lateArrivalPolicy: { cancelAfterMinutes: 15, message: '15分を過ぎてご連絡がない場合は、取り消しになることがあります' } },
+    }));
+    vi.mocked(seat.hold).mockResolvedValue({ success: true, data: held() });
+    vi.mocked(seat.confirm).mockResolvedValue({ success: true, data: held({ status: 'confirmed', version: 4, holdExpiresAt: null, note: '記念日です' }) });
+    open();
+    expect(await screen.findByText('10/9（金）は臨時休業のため選べません')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
+    fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
+    await screen.findByText('この内容で予約します');
+    expect(screen.getByText('テーブル席（お店で決めます）')).toBeTruthy();
+    expect(screen.getByText('・15分を過ぎてご連絡がない場合は、取り消しになることがあります')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/ご要望/), { target: { value: '記念日です' } });
+    fireEvent.change(screen.getByLabelText('電話'), { target: { value: '090ー1111ー2222' } });
+    fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
+    await screen.findByText('ご予約を受け付けました');
+    expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: '記念日です', customerPhone: '090-1111-2222' });
+  });
+
+  it('電話の形が違うときは送らずに理由を出す', async () => {
+    vi.mocked(seat.hold).mockResolvedValue({ success: true, data: held() });
+    open();
+    fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
+    fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
+    await screen.findByText('この内容で予約します');
+    fireEvent.change(screen.getByLabelText('電話'), { target: { value: 'でんわ' } });
+    fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
+    expect(await screen.findByText('電話番号は数字とハイフンで入れてください。')).toBeTruthy();
+    expect(seat.confirm).not.toHaveBeenCalled();
   });
 
   it('届いたか分からない失敗の再試行は同じ受付番号、断られたら新しい番号', async () => {

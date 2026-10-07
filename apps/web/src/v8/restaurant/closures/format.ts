@@ -199,22 +199,25 @@ export function tasksFor(closure: Pick<RestaurantClosure, 'id'>, tasks: Restaura
 }
 
 /** 右の列の3行目「予約 2件 ・ 他サイト 未対応 2」。件数が分からないとき（null）は予約を書かない。 */
-export function statusLine(reservations: number | null, tasks: ClosureTasks): string {
+export function statusLine(reservations: number | null, tasks: ClosureTasks, contacted: number | null = null): string {
   const parts: string[] = []
   if (reservations !== null) parts.push(`予約 ${reservations}件`)
+  /* 連絡済み：休業を作った後に担当者が LINE で連絡した予約の数（重なる予約があるときだけ）。 */
+  if (reservations !== null && reservations > 0 && contacted !== null) parts.push(`連絡済み ${contacted}件`)
   if (tasks.total > 0) parts.push(tasks.open.length > 0 ? `他サイト 未対応 ${tasks.open.length}` : `他サイト 閉じた ${tasks.done}/${tasks.total}`)
   return parts.join(' ・ ')
 }
 
 /** 入力の初めの形。日付は押した日（無ければ今日）。 */
 export function emptyInput(storeId: string, day: string): RestaurantClosureInput {
-  return { storeId, startDate: day, endDate: day, allDay: true, startTime: null, endTime: null, kind: 'temporary_closed', memo: null, tableIds: [] }
+  return { storeId, startDate: day, endDate: day, allDay: true, startTime: null, endTime: null, kind: 'temporary_closed', memo: null, tableIds: [], notifyMedia: true }
 }
 
 export function inputOf(closure: RestaurantClosure): RestaurantClosureInput {
   return {
     storeId: closure.storeId, startDate: closure.startDate, endDate: closure.endDate, allDay: closure.allDay,
     startTime: closure.startTime, endTime: closure.endTime, kind: closure.kind, memo: closure.memo, tableIds: [...closure.tableIds],
+    notifyMedia: closure.notifyMedia !== false,
   }
 }
 
@@ -255,4 +258,25 @@ export const SOURCE_LABEL: Record<string, string> = {
 
 export function sourceLabel(source: string, media: Array<{ code: string; name: string }> = []): string {
   return SOURCE_LABEL[source] ?? media.find((m) => m.code === source)?.name ?? source
+}
+
+/**
+ * ほかの休業・貸切と重なる（409 `closure_overlap`）ときの文。口が返す相手の記録（名前・日付・時刻）を書く。
+ * 相手が分からないときは、相手を書かない文にする。
+ */
+export function overlapMessage(conflicts: ReadonlyArray<Pick<RestaurantClosure, 'name' | 'kind' | 'startDate' | 'endDate' | 'allDay' | 'startTime' | 'endTime'>>): string {
+  const tail = '日付か卓を変えてください。'
+  if (conflicts.length === 0) return `同じ日・同じ卓に、ほかの休業・貸切があります。${tail}`
+  const first = conflicts[0]
+  const when = first.allDay || !first.startTime || !first.endTime ? rangeTitle(first) : `${rangeTitle(first)} ${first.startTime}〜${first.endTime}`
+  const name = first.name && first.name !== KIND_LABEL[first.kind] ? `${KIND_LABEL[first.kind]}「${first.name}」` : KIND_LABEL[first.kind]
+  const more = conflicts.length > 1 ? `ほか ${conflicts.length - 1}件` : ''
+  return `${when}の${name}${more ? `（${more}）` : ''}と重なっています。${tail}`
+}
+
+/** ApiError の data から、重なる相手の記録を取り出す（形が違えば空）。 */
+export function conflictsOf(data: unknown): RestaurantClosure[] {
+  if (!data || typeof data !== 'object') return []
+  const list = (data as { conflicts?: unknown }).conflicts
+  return Array.isArray(list) ? list.filter((c): c is RestaurantClosure => !!c && typeof c === 'object' && typeof (c as RestaurantClosure).startDate === 'string') : []
 }

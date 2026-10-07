@@ -1,5 +1,8 @@
 import type { VisitStampSettings, VisitStampCardInput, VisitStampCard, VisitStampWallet, VisitStampEntry, VisitStampRedemption } from '@line-crm/shared';
 import type { Env } from '../index.js';
+import { getStaffById } from '@line-crm/db';
+import { getVisibleLineAccountScope } from './account-access.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { dbFor } from './db-router.js';
 import { safeRestaurantHttpsUrl } from './restaurant-media-links.js';
 
@@ -18,13 +21,14 @@ export function validateStampSettings(s: VisitStampSettings): void {
     || typeof s.timezone!=='string'||!s.timezone||s.timezone.length>100
     || !Array.isArray(s.multipliers)||s.multipliers.length>20 || !Array.isArray(s.rankMultipliers)||s.rankMultipliers.length>20
     || !Array.isArray(s.rewards)||!s.rewards.length||s.rewards.length>20) throw new StampError('スタンプの設定を確認してください');
+  if((s.slotCount!==undefined&&(!Number.isSafeInteger(s.slotCount)||s.slotCount<1||s.slotCount>10000))||(s.maxStackedStamps!==undefined&&(!Number.isSafeInteger(s.maxStackedStamps)||s.maxStackedStamps<1||s.maxStackedStamps>10000))||(s.stackingOrder!==undefined&&!['bonus_then_multipliers','multipliers_then_bonus'].includes(s.stackingOrder)))throw new StampError('マスの数・重ねた上限・順序を確認してください');
   try { new Intl.DateTimeFormat('en',{timeZone:s.timezone}).format(); } catch { throw new StampError('時間帯を確認してください'); }
   const ids=new Set<string>();
   for(const r of s.rewards) {
     stampId(r.id);if(ids.has(r.id)||typeof r.name!=='string'||!r.name.trim()||r.name.length>100||!Number.isSafeInteger(r.stamps)||r.stamps<1||r.stamps>10000)throw new StampError('特典を確認してください');ids.add(r.id);
   }
   for(const m of [...s.multipliers,...s.rankMultipliers]) {
-    if(!m||!Number.isFinite(m.multiplier)||m.multiplier<1||m.multiplier>100)throw new StampError('倍率を確認してください');
+    if(!m||(m.name!==undefined&&(typeof m.name!=='string'||!m.name.trim()||m.name.length>100))||(m.active!==undefined&&typeof m.active!=='boolean')||!Number.isFinite(m.multiplier)||m.multiplier<1||m.multiplier>100)throw new StampError('倍率を確認してください');
   }
   for(const m of s.multipliers) {
     if((m.from!==undefined&&!Number.isFinite(Date.parse(m.from)))||(m.to!==undefined&&!Number.isFinite(Date.parse(m.to)))||(m.from&&m.to&&Date.parse(m.from)>=Date.parse(m.to))
@@ -40,11 +44,13 @@ export function calculateVisitStamps(s:VisitStampSettings,amount:number,at:strin
   const date=new Date(at),parts=new Intl.DateTimeFormat('en-US',{timeZone:s.timezone,weekday:'short',hour:'numeric',minute:'numeric',hourCycle:'h23'}).formatToParts(date);
   const part=(key:string)=>parts.find(p=>p.type===key)!.value;
   const weekday=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(part('weekday')),minute=Number(part('hour'))*60+Number(part('minute'));
-  let count=(s.mode==='visit'?1:Math.floor(amount/s.amountUnit))+(first?s.firstVisitBonus:0);
-  for(const m of s.multipliers) if((!m.from||date.getTime()>=Date.parse(m.from))&&(!m.to||date.getTime()<Date.parse(m.to))&&(!m.weekdays||m.weekdays.includes(weekday))
+  const bonus=first?s.firstVisitBonus:0,after=s.stackingOrder==='multipliers_then_bonus';
+  let count=(s.mode==='visit'?1:Math.floor(amount/s.amountUnit))+(after?0:bonus);
+  if(s.maxStackedStamps!==undefined)count=Math.min(s.maxPerVisit,count);
+  for(const m of s.multipliers) if(m.active!==false&&(!m.from||date.getTime()>=Date.parse(m.from))&&(!m.to||date.getTime()<Date.parse(m.to))&&(!m.weekdays||m.weekdays.includes(weekday))
     &&(m.startMinute===undefined||(minute>=m.startMinute&&minute<m.endMinute!)))count*=m.multiplier;
-  count*=Math.max(1,...s.rankMultipliers.filter(m=>tagNames.includes(m.tagName)).map(m=>m.multiplier));
-  return Math.min(s.maxPerVisit,Math.floor(count));
+  count*=Math.max(1,...s.rankMultipliers.filter(m=>m.active!==false&&tagNames.includes(m.tagName)).map(m=>m.multiplier));
+  return Math.min(s.maxStackedStamps??s.maxPerVisit,Math.floor(count+(after?bonus:0)));
 }
 export function stampExpiry(at:string,months:number|null):string|null {
   if(months===null)return null;const d=new Date(at),day=d.getUTCDate();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+months);
@@ -57,7 +63,8 @@ export async function stampCard(db:D1Database,id:string,tenantId?:string):Promis
 }
 export async function readStampCard(db:D1Database,r:CardRow):Promise<VisitStampCard> {
   const accounts=await db.prepare('SELECT line_account_id FROM visit_stamp_card_accounts WHERE card_id=? ORDER BY line_account_id').bind(r.id).all<{line_account_id:string}>();
-  return {id:r.id,name:r.name,settings:JSON.parse(r.settings_json),active:!!r.active,version:r.version,expectedVersion:r.version,accountIds:accounts.results.map(x=>x.line_account_id)};
+  const settings=JSON.parse(r.settings_json) as VisitStampSettings;
+  return {id:r.id,name:r.name,settings:{slotCount:Math.max(...settings.rewards.map(r=>r.stamps)),stackingOrder:'bonus_then_multipliers',...settings},active:!!r.active,version:r.version,expectedVersion:r.version,accountIds:accounts.results.map(x=>x.line_account_id)};
 }
 export async function saveStampCard(db:D1Database,tenantId:string,input:VisitStampCardInput,id?:string):Promise<VisitStampCard> {
   if(!input||typeof input.name!=='string'||!input.name.trim()||input.name.length>100||typeof input.active!=='boolean'||!Number.isSafeInteger(input.expectedVersion)
@@ -141,6 +148,8 @@ export async function stampPinHash(pin:string,salt:string):Promise<string> {
 }
 export async function setStampPin(db:D1Database,accountId:string,staffId:string,pin:string) {
   if(typeof pin!=='string'||!/^\d{4}$/.test(pin))throw new StampError('暗証番号は4桁です');
+  const others=(await db.prepare('SELECT staff_id,salt,hash FROM visit_stamp_staff_pins WHERE line_account_id=? AND staff_id<>?').bind(accountId,staffId).all<{staff_id:string;salt:string;hash:string}>()).results;
+  for(const r of others)if(await stampPinHash(pin,r.salt)===r.hash)throw new StampError('この店では別の店員が同じ暗証番号を使っています',409);
   const salt=crypto.randomUUID(),hash=await stampPinHash(pin,salt);
   await db.prepare(`INSERT INTO visit_stamp_staff_pins(line_account_id,staff_id,salt,hash) VALUES(?,?,?,?)
     ON CONFLICT(line_account_id,staff_id) DO UPDATE SET salt=excluded.salt,hash=excluded.hash,attempts=0,locked_until=NULL,updated_at=datetime('now')`).bind(accountId,staffId,salt,hash).run();
@@ -166,13 +175,14 @@ export async function offerStampReward(db:D1Database,cardId:string,friendId:stri
   const r=await db.prepare('SELECT id,card_id AS cardId,reward_id AS rewardId,reward_name AS rewardName,stamps,status FROM visit_stamp_redemptions WHERE card_id=? AND friend_id=? AND request_id=?').bind(cardId,friendId,requestId).first<VisitStampRedemption>();
   if(r!.rewardId!==rewardId)throw new StampError('同じ使用依頼の内容が変わっています',409);return r!;
 }
-export async function useStampReward(db:D1Database,id:string,friendId:string,accountId:string,staffId:string,pin:string) {
+export async function useStampReward(db:D1Database,id:string,friendId:string,accountId:string,staffId:string|null,pin:string) {
   const selected=await db.prepare('SELECT card_id FROM visit_stamp_redemptions WHERE id=?').bind(stampId(id)).first<{card_id:string}>();
   if(!selected)throw new StampError('特典が見つかりません',404);
   friendId=(await stampWallet(db,selected.card_id,friendId,accountId)).friendId;
   const r=await db.prepare('SELECT * FROM visit_stamp_redemptions WHERE id=? AND friend_id=? AND line_account_id=?').bind(stampId(id),friendId,accountId).first<{card_id:string;status:string;stamps:number;reward_name:string}>();
   if(!r)throw new StampError('特典が見つかりません',404);if(r.status!=='offered')throw new StampError('この特典はすでに処理済みです',409);
-  await readStampWallet(db,r.card_id,friendId);await verifyStampPin(db,accountId,staffId,pin);
+  await readStampWallet(db,r.card_id,friendId);
+  if(staffId===null)staffId=(await identifyStampStaff(db,accountId,pin)).id;else await verifyStampPin(db,accountId,staffId,pin);
   const results=await db.batch([
     db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,actor_id,reason,idempotency_key,occurred_at)
       SELECT ?,r.card_id,r.friend_id,r.line_account_id,'redeem',-r.stamps,?,r.reward_name,'redeem:'||r.id,datetime('now') FROM visit_stamp_redemptions r
@@ -183,7 +193,8 @@ export async function useStampReward(db:D1Database,id:string,friendId:string,acc
       AND EXISTS(SELECT 1 FROM visit_stamp_entries WHERE idempotency_key='redeem:'||? AND card_id=? AND friend_id=?)`).bind(staffId,id,id,r.card_id,friendId),
   ]);
   if(!results[0].meta.changes)throw new StampError('使用済み、期限切れ、またはスタンプ不足です',409);
-  return {id,status:'used' as const};
+  const member=await getStaffById(db,staffId);
+  return {id,status:'used' as const,staffId,staffName:member?.name??'店員'};
 }
 export async function applyPaperStamps(db:D1Database,id:string,tenantId:string,actorId:string,approve:boolean,reason:string) {
   if(typeof reason!=='string'||!reason.trim()||reason.length>500)throw new StampError('承認・却下の理由を入力してください');
@@ -200,8 +211,8 @@ export async function applyPaperStamps(db:D1Database,id:string,tenantId:string,a
 }
 export async function requestPaperStamps(db:D1Database,cardId:string,friendId:string,accountId:string,photo:unknown,count:number) {
   const url=safeRestaurantHttpsUrl(photo);if(!url||!Number.isSafeInteger(count)||count<1||count>10000)throw new StampError('写真のHTTPS URLと押印数を確認してください');
-  friendId=(await stampWallet(db,cardId,friendId,accountId)).friendId;const id=crypto.randomUUID();
-  const res=await db.prepare(`INSERT OR IGNORE INTO visit_stamp_paper_requests(id,card_id,friend_id,line_account_id,photo_url,stamps) VALUES(?,?,?,?,?,?)`).bind(id,cardId,friendId,accountId,url,count).run();
+  const submittedFriendId=friendId;friendId=(await stampWallet(db,cardId,friendId,accountId)).friendId;const id=crypto.randomUUID();
+  const res=await db.prepare(`INSERT OR IGNORE INTO visit_stamp_paper_requests(id,card_id,friend_id,line_account_id,photo_url,stamps,submitted_friend_id) VALUES(?,?,?,?,?,?,?)`).bind(id,cardId,friendId,accountId,url,count,submittedFriendId).run();
   if(!res.meta.changes)throw new StampError('申請済みまたは移行済みです',409);return {id,status:'pending' as const};
 }
 
@@ -234,11 +245,11 @@ export async function reconcileStampVisit(db:D1Database,kind:StampVisitKind,id:s
     if(original) {
       const cancelled=await db.prepare(`SELECT r.id,r.delta FROM visit_stamp_entries r WHERE r.card_id=? AND r.friend_id=? AND r.visit_key=? AND r.kind='reverse' AND r.reason='来店記録の取消'
         AND NOT EXISTS(SELECT 1 FROM visit_stamp_entries e WHERE e.original_id=r.id) ORDER BY r.created_at DESC LIMIT 1`).bind(card.id,subject,key).first<{id:string;delta:number}>();
-      if(cancelled&&card.active)await db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,original_id,visit_key,occurred_at)
+      if(cancelled&&card.active&&await featureJobCanRun(db,{accountId:visit.account_id,featureId:'visit_stamps',job:'visit stamps'}))await db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,original_id,visit_key,occurred_at)
         VALUES(?,?,?,?,'restore',?,'来店記録の再確認',?,?,?,datetime('now'))`).bind(crypto.randomUUID(),card.id,subject,visit.account_id,-cancelled.delta,'restore:'+cancelled.id,cancelled.id,key).run();
       continue;
     }
-    if(!card.active)continue;
+    if(!card.active||!await featureJobCanRun(db,{accountId:visit.account_id,featureId:'visit_stamps',job:'visit stamps'}))continue;
     const s=JSON.parse(card.settings_json) as VisitStampSettings;
     const checkout=await db.prepare('SELECT amount FROM visit_stamp_checkouts WHERE kind=? AND visit_id=?').bind(kind,id).first<{amount:number}>();
     if(s.mode==='amount'&&!checkout)continue;
@@ -262,4 +273,27 @@ export async function processVisitStampQueue(env:Env['Bindings']) {
     try {await reconcileStampVisit(db,q.kind,q.visit_id);await db.prepare('DELETE FROM visit_stamp_visit_queue WHERE kind=? AND visit_id=? AND generation=?').bind(q.kind,q.visit_id,q.generation).run();}
     catch {console.error(JSON.stringify({event:'visit_stamp_reconcile_pending'}));}
   }
+}
+
+/** 店舗全体にも5回/15分の制限を置き、店員IDを知らない試行でも制限を回避できない。 */
+export async function identifyStampStaff(db:D1Database,accountId:string,pin:string) {
+ if(typeof pin!=='string'||!/^\d{4}$/.test(pin))throw new StampError('暗証番号は4桁です');
+ await db.prepare('INSERT OR IGNORE INTO visit_stamp_pin_attempts(line_account_id) VALUES(?)').bind(accountId).run();
+ const attempt=await db.prepare(`UPDATE visit_stamp_pin_attempts SET attempts=CASE WHEN julianday(locked_until)<=julianday('now') THEN 1 ELSE attempts+1 END,
+ locked_until=CASE WHEN julianday(locked_until)<=julianday('now') THEN NULL ELSE locked_until END
+ WHERE line_account_id=? AND (locked_until IS NULL OR julianday(locked_until)<=julianday('now')) RETURNING attempts`).bind(accountId).first<{attempts:number}>();
+ if(!attempt)throw new StampError('試行回数の上限です。15分後に確認してください',429);
+ if(attempt.attempts>5){await db.prepare("UPDATE visit_stamp_pin_attempts SET locked_until=datetime('now','+15 minutes') WHERE line_account_id=? AND attempts>=? AND locked_until IS NULL").bind(accountId,attempt.attempts).run();throw new StampError('試行回数の上限です。15分後に確認してください',429);}
+ const rows=(await db.prepare(`SELECT p.* FROM visit_stamp_staff_pins p JOIN staff_members s ON s.id=p.staff_id JOIN line_accounts a ON a.id=p.line_account_id
+ WHERE p.line_account_id=? AND s.is_active=1 AND s.tenant_id=a.tenant_id AND s.access_level<>'read_only'`).bind(accountId).all<{staff_id:string;salt:string;hash:string}>()).results;
+ const matches=[];
+ for(const row of rows){const member=await getStaffById(db,row.staff_id);if(!member)continue;
+  if(!(await getVisibleLineAccountScope(db,{id:member.id,name:member.name,role:member.role,tenantId:member.tenant_id!,readOnly:false})).ids.includes(accountId))continue;
+  if(await stampPinHash(pin,row.salt)===row.hash)matches.push(member);
+ }
+ if(matches.length!==1){if(attempt.attempts>=5)await db.prepare("UPDATE visit_stamp_pin_attempts SET locked_until=datetime('now','+15 minutes') WHERE line_account_id=?").bind(accountId).run();
+  throw new StampError(matches.length?'暗証番号が重複しています。管理者へお知らせください':'暗証番号が違います',matches.length?409:403);}
+ await verifyStampPin(db,accountId,matches[0].id,pin);
+ await db.prepare('UPDATE visit_stamp_pin_attempts SET attempts=0,locked_until=NULL WHERE line_account_id=? AND attempts=?').bind(accountId,attempt.attempts).run();
+ return matches[0];
 }

@@ -146,7 +146,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/nen/pets', 'photo_review'),
   feature('/api/nen/health', 'photo_review'),
   feature('/api/restaurant-test', 'restaurant_test'),
-  exempt('/api/visit-stamps', 'core', '来店スタンプはマイルと独立。店舗・カード・本人の境界は各ルートで検証'),
+  feature('/api/visit-stamps', 'visit_stamps'),
 
   exempt('/api/settings', 'core', '機能を再度オンにするため停止対象外'),
   exempt('/api/auth', 'core', 'ログインとセッション管理'),
@@ -213,6 +213,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/webhook', 'public', 'LINE署名で検証する受信経路'),
   exempt('/webhooks', 'public', '外部署名で検証する受信経路'),
   exempt('/openapi.json', 'public', '公開API仕様'),
+  exempt('/robots.txt', 'public', '検索に出さない robots（全部拒否）'),
   exempt('/docs', 'public', '公開API仕様'),
   exempt('/auth', 'public', 'ログイン開始とcallback'),
   exempt('/health', 'system', '稼働確認'),
@@ -380,6 +381,11 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   /** 本体で行が見つからないときだけ試す予備の照合（新旧の表の同居用）。 */
   fallbackSql?: string;
 }> = [
+  {pattern:/^\/api\/visit-stamps\/entries\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_entries WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/paper-requests\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_paper_requests WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/paper-photos\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_paper_photos WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/visits\/restaurant\/([^/]+)/,sql:'SELECT s.line_account_id AS account_id FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE r.id=?'},
+  {pattern:/^\/api\/visit-stamps\/visits\/booking\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM bookings WHERE id=?'},
   { pattern: /^\/api\/templates\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM templates WHERE id = ?' },
   { pattern: /^\/api\/scenarios\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM scenarios WHERE id = ?' },
   { pattern: /^\/api\/broadcasts\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcasts WHERE id = ?' },

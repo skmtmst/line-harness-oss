@@ -117,6 +117,24 @@ body {
   font-family: "Inter", "Noto Sans JP", sans-serif;
 }
 
+/*
+ * 押せる所の大きさ（リリース前点検 2026-10-07）。見た目が 44px より小さいボタン・リンクも、
+ * 指で押せる範囲は 44×44 以上にする。見た目と並び（絵との一致）は変えず、透明な ::after で
+ * 押せる範囲だけ広げる。
+ */
+.liff-hit:not(.absolute):not(.fixed):not(.sticky) {
+  position: relative;
+}
+.liff-hit::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+
 /* 読み込み中は中身の形 (LoadingView の骨組み) を出す。回る印は使わない。 */
 
 /* ─── ★A LIFF の手応え (V8.pen 修正案 L-1・L-4)。色・書体は変えない ─── */

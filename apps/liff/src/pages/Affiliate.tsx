@@ -271,7 +271,7 @@ function CopyButton({
         onClick={handleCopy}
         className={
           compact
-            ? 'shrink-0 rounded-lg border border-hairline bg-canvas px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-ink'
+            ? 'liff-hit shrink-0 rounded-lg border border-hairline bg-canvas px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-ink'
             : 'inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink'
         }
       >
@@ -595,7 +595,7 @@ function CompactOfferRow({
         type="button"
         onClick={() => void handleEnroll()}
         disabled={busy || offer.halted}
-        className="shrink-0 rounded-lg border border-hairline bg-canvas px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-ink disabled:opacity-50"
+        className="liff-hit shrink-0 rounded-lg border border-hairline bg-canvas px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-ink disabled:opacity-50"
       >
         {busy ? '発行中…' : '発行する'}
       </button>

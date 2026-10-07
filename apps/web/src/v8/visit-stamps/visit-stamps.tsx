@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Check, ImageIcon, KeyRound, Minus, Plus, Stamp, Store } from 'lucide-react'
-import type { VisitStampCard, VisitStampEntry, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
+import type { VisitStampCard, VisitStampEntryPage, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import tpl from '@/components/templates/page-templates.module.css'
 import Button from '@/components/shared/button'
@@ -29,14 +29,14 @@ import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { api } from '@/lib/api'
+import { api, describeSaveFailure } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { visitStampsApi } from '@/lib/visit-stamps-api'
 import {
-  MANUAL_REASONS, type ManualReason, defaultSettings, expiryLabel, friendLabel, friendNames, historyRows, manualReasonText,
-  multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsProblem, shortDateTime, slotCount, sortedRewards, withSlotCount,
+  MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, expiryLabel, friendLabel, friendNames, historyRows, manualReasonText,
+  multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsProblem, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount,
 } from './display'
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs'
 import styles from './visit-stamps.module.css'
@@ -48,8 +48,43 @@ const SLOT_OPTIONS = [5, 6, 8, 10, 12, 15, 20, 30].map((n) => ({ value: String(n
 const EXPIRY_OPTIONS = [{ value: 'none', label: expiryLabel(null) }, ...[3, 6, 12, 24].map((n) => ({ value: String(n), label: expiryLabel(n) }))]
 const CAP_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10, 20].map((n) => ({ value: String(n), label: `1回 ${n}個まで` }))
 const HISTORY_SHORT = 5
+/* 短く見せるときも少し多めに読む（取り消しは元の行にまとめるので、5件だけ読むと行が欠ける）。 */
+const HISTORY_SHORT_FETCH = 20
+const HISTORY_PAGE = 50
 
-const message = (caught: unknown, fallback: string) => (caught instanceof Error && caught.message && !/^API \d+/.test(caught.message) ? caught.message : fallback)
+/* 口の日本語の理由があればそれ。英語の内部文（API error など）は出さず、運用者の言葉にする。 */
+const message = (caught: unknown, fallback: string) => {
+  const text = describeSaveFailure(caught)
+  return /[ぁ-んァ-ヶ一-龠]/u.test(text) ? text : fallback
+}
+
+/** 紙のカードの写真の ID（非公開の置き場の URL の末尾）。公開の https の古い写真は null。 */
+export function paperPhotoId(url: string): string | null {
+  const hit = /\/paper-photos\/([^/?#]+)/.exec(url)
+  return hit ? decodeURIComponent(hit[1]) : null
+}
+
+/** 写真を担当店舗の権限で読んで、画面で見られる URL にする（非公開の写真）。古い公開の URL はそのまま。 */
+function usePhotoUrl(accountId: string | null, url: string | null | undefined): string | null {
+  const [objectUrl, setObjectUrl] = useState<string | null>(null)
+  const id = url ? paperPhotoId(url) : null
+  useEffect(() => {
+    if (!accountId || !id) { setObjectUrl(null); return }
+    let live = true
+    let made: string | null = null
+    void visitStampsApi.paperPhoto(accountId, id)
+      .then((blob) => { if (!live) return; made = URL.createObjectURL(blob); setObjectUrl(made) })
+      .catch(() => { if (live) setObjectUrl(null) })
+    return () => { live = false; if (made) URL.revokeObjectURL(made) }
+  }, [accountId, id])
+  if (!url) return null
+  return id ? objectUrl : /^https:\/\//.test(url) ? url : null
+}
+
+function PaperThumb({ accountId, url }: { accountId: string | null; url: string }) {
+  const src = usePhotoUrl(accountId, url)
+  return src ? <img src={src} alt="" /> : <ImageIcon size={16} aria-hidden="true" />
+}
 const newRequestId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `req-${Date.now()}-${Math.random().toString(36).slice(2)}`)
 
 function SectionTitle({ children, help, extra }: { children: string; help: string; extra?: React.ReactNode }) {
@@ -150,8 +185,22 @@ export default function VisitStampsV8() {
   }, [selectedAccountId])
   useEffect(() => { void loadPaper() }, [loadPaper])
   /* 一覧に名前が無い友だちだけ、1人ずつ読む（申請は多くても 200 件）。 */
+  /* ④ 店全体の押した・使った記録（期間・友だち・種類で絞れる口。ここは新しい順に全部）。 */
+  const [log, setLog] = useState<VisitStampEntryPage | null>(null)
+  const [logError, setLogError] = useState<unknown>(null)
+  const [showAll, setShowAll] = useState(false)
+  const [logPage, setLogPage] = useState(1)
+  const loadLog = useCallback(async () => {
+    if (!selectedAccountId) return
+    try {
+      const res = await visitStampsApi.entries({ accountId: selectedAccountId, page: logPage, pageSize: showAll ? HISTORY_PAGE : HISTORY_SHORT_FETCH })
+      setLog(res.data); setLogError(null)
+    } catch (caught) { setLogError(caught) }
+  }, [selectedAccountId, logPage, showAll])
+  useEffect(() => { void loadLog() }, [loadLog])
+
   useEffect(() => {
-    const missing = [...new Set((paper ?? []).map((p) => p.friend_id))].filter((id) => !friendById(id))
+    const missing = [...new Set([...(paper ?? []).map((p) => p.friend_id), ...(log?.items ?? []).map((e) => e.friendId)])].filter((id) => !friendById(id))
     if (!missing.length) return
     let live = true
     void Promise.allSettled(missing.slice(0, 50).map((id) => api.friends.get(id, { includeSubmissions: false }))).then((results) => {
@@ -161,7 +210,7 @@ export default function VisitStampsV8() {
       setFriendCache((prev) => ({ ...prev, ...add }))
     })
     return () => { live = false }
-  }, [paper, friendById])
+  }, [paper, log, friendById])
 
   const [busy, setBusy] = useState('')
   const [rejecting, setRejecting] = useState<PaperRow | null>(null)
@@ -174,7 +223,7 @@ export default function VisitStampsV8() {
       notifyToast(action === 'approve' ? `${row.stamps}個をカードに足しました。お客さまに LINE でお知らせします。` : '申請を却下しました。')
       setRejecting(null)
       await loadPaper()
-      if (row.friend_id === friendId) await loadWallet()
+      await loadLog()
     } catch (caught) {
       const text = message(caught, action === 'approve' ? '承認できませんでした。' : '却下できませんでした。')
       if (action === 'reject') setDialogError(text); else notifyToast(text, { tone: 'error' })
@@ -212,25 +261,14 @@ export default function VisitStampsV8() {
       grantRequest.current = newRequestId()
       notifyToast(`${count}個 押しました。`)
       setCount(1); setMemo('')
-      await loadWallet()
+      await loadLog()
     } catch (caught) {
       notifyToast(message(caught, '押印を足せませんでした。'), { tone: 'error' })
     } finally { setBusy('') }
   }
 
-  /* ── ④ 押した・使った記録（選んだ友だちの台帳） ── */
-  const [entries, setEntries] = useState<VisitStampEntry[] | null>(null)
-  const [walletError, setWalletError] = useState<unknown>(null)
-  const [showAll, setShowAll] = useState(false)
-  const loadWallet = useCallback(async () => {
-    if (!card || !selectedAccountId || !friendId) { setEntries(null); return }
-    try {
-      const res = await visitStampsApi.wallet(card.id, selectedAccountId, friendId)
-      setEntries(res.data.entries); setWalletError(null)
-    } catch (caught) { setWalletError(caught) }
-  }, [card, selectedAccountId, friendId])
-  useEffect(() => { void loadWallet() }, [loadWallet])
-  const rows = useMemo(() => historyRows(entries ?? [], staffName), [entries, staffName])
+  /* ── ④ の行（取り消しは元の行にまとめる） ── */
+  const rows = useMemo(() => historyRows(log?.items ?? [], staffName), [log, staffName])
   const [reversing, setReversing] = useState<string | null>(null)
   const reverse = async (entryId: string, why: string) => {
     setBusy(entryId); setDialogError('')
@@ -238,7 +276,7 @@ export default function VisitStampsV8() {
       await visitStampsApi.reverse(entryId, why)
       notifyToast('記録を取り消しました。')
       setReversing(null)
-      await loadWallet()
+      await loadLog()
     } catch (caught) { setDialogError(message(caught, '取り消せませんでした。')) } finally { setBusy('') }
   }
 
@@ -262,6 +300,8 @@ export default function VisitStampsV8() {
     } catch (caught) { setDialogError(message(caught, '暗証番号を保存できませんでした。')) } finally { setPinBusy(false) }
   }
 
+  const photoUrl = usePhotoUrl(selectedAccountId, photo?.photo_url)
+
   if (loadError && cards === null) {
     return <PageFrame kind="visit-stamps" boardId="w4SBbv"><PageHeading headingSize="compact" title="来店スタンプ" /><ListState kind="error" error={loadError} onRetry={() => void loadCards()} /></PageFrame>
   }
@@ -273,6 +313,8 @@ export default function VisitStampsV8() {
   const filled = Math.min(3, slotCount(settings))
   const storeNames = accounts.filter((a) => accountIds.includes(a.id)).map((a) => a.displayName || a.name)
   const shownRows = showAll ? rows : rows.slice(0, HISTORY_SHORT)
+  const logTotal = log?.total ?? 0
+  const logPages = Math.max(1, Math.ceil(logTotal / HISTORY_PAGE))
   const friendOptions = [...friends, ...Object.values(friendCache).filter((f) => !friends.some((x) => x.id === f.id))].map((f) => ({ value: f.id, label: friendLabel(f) }))
   const selectedFriend = friendById(friendId)
   const stampable = canStamp && !!card
@@ -295,7 +337,7 @@ export default function VisitStampsV8() {
           <div className={styles.pair}>
             {/* ① カードの設定 */}
             <section className={`${styles.card} ${styles.cardTall}`} aria-label="① カードの設定">
-              <SectionTitle help="カードの名前・マスの数・期限と、何個で何を渡すか（特典）を決めます。マスの数は、いちばん大きい特典の個数です。">① カードの設定</SectionTitle>
+              <SectionTitle help="カードの名前・マスの数・期限と、何個で何を渡すか（特典）を決めます。マスの数と特典の個数は別々に決めます（特典はマスの数以下）。特典を使うと、その個数だけスタンプが減ります。">① カードの設定</SectionTitle>
               <label className={styles.field}>
                 <span className={styles.label}>カードの名前</span>
                 <TextField value={name} onChange={(e) => setName(e.target.value)} readOnly={ro} maxLength={100} />
@@ -345,7 +387,7 @@ export default function VisitStampsV8() {
 
             {/* ② たまる決まり */}
             <section className={`${styles.card} ${styles.cardTall} ${styles.cardRules}`} aria-label="② たまる決まり">
-              <SectionTitle help="来店1回ごとか、会計の金額ごとかを選びます。倍率は 曜日・時間・期間 で決め、いくつも当たるときはかけ合わせます。会員ランクは当たる中でいちばん高い倍率だけを使います。最後に1回の上限で切ります（上限は1つで、倍率を重ねたあとにかかります）。">② たまる決まり</SectionTitle>
+              <SectionTitle help="来店1回ごとか、会計の金額ごとかを選びます。倍率は 曜日・時間・期間 で決め、いくつも当たるときはかけ合わせます。会員ランクは当たる中でいちばん高い倍率だけを使います。1回の上限は倍率の前、重ねたときの上限は倍率と初回ボーナスを重ねたあとにかかります。止めた倍率は使いません。">② たまる決まり</SectionTitle>
               <div className={styles.radio} role="radiogroup" aria-label="たまり方">
                 <Radio name="stamp-mode" checked={settings.mode === 'visit'} disabled={ro} onChange={() => set({ mode: 'visit' })}>来店 1回で 1個</Radio>
                 <Radio name="stamp-mode" checked={settings.mode === 'amount'} disabled={ro} onChange={() => set({ mode: 'amount' })}>会計の金額で</Radio>
@@ -367,10 +409,11 @@ export default function VisitStampsV8() {
               <span className={styles.label}>倍率・ボーナス</span>
               {settings.multipliers.map((m, i) => (
                 <div key={i} className={styles.switchRow}>
-                  <Toggle checked label={`${multiplierName(m)}を使う`} locked={ro} onChange={ro ? undefined : () => set({ multipliers: settings.multipliers.filter((_, k) => k !== i) })} />
+                  {/* 切る＝止める（消さない）。消すのは「…」から。 */}
+                  <Toggle checked={m.active !== false} label={`${multiplierName(m)}を使う`} locked={ro} onChange={ro ? undefined : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} />
                   <span className={styles.texts}>
                     <span className={styles.name}>{multiplierName(m)}</span>
-                    <span className={styles.sub} title={multiplierDetail(m)}>{multiplierDetail(m)}</span>
+                    <span className={styles.sub} title={multiplierDetail(m)}>{m.active === false ? `止めています ・ ${multiplierDetail(m)}` : multiplierDetail(m)}</span>
                   </span>
                   {ro ? null : <RowActions subjectName={multiplierName(m)} menuItems={[{ id: 'edit', label: '倍率を変える', onSelect: () => setMultEdit(i) }]}
                     destructiveItem={{ id: 'delete', label: '倍率を消す', onSelect: () => set({ multipliers: settings.multipliers.filter((_, k) => k !== i) }) }} />}
@@ -395,13 +438,14 @@ export default function VisitStampsV8() {
               <div className={styles.row2}>
                 <div className={styles.field}>
                   <span className={styles.label}>重ねたときの順番</span>
-                  {/* 計算の順はサーバが決めている（時間の倍率はかけ合わせ、ランクはいちばん高い倍率だけ）。選べないので1つだけ出す。 */}
-                  <Select aria-label="重ねたときの順番" size="full" disabled value="fixed" onChange={() => {}} options={[{ value: 'fixed', label: 'かけ合わせる（ランクは高い方）' }]} />
+                  {/* 初回ボーナスを倍率の前に足すか後に足すか（口の stackingOrder）。倍率どうしはかけ合わせ、ランクはいちばん高い倍率だけ。 */}
+                  <Select aria-label="重ねたときの順番" size="full" disabled={ro} value={settings.stackingOrder ?? 'bonus_then_multipliers'}
+                    onChange={(v) => set({ stackingOrder: v as VisitStampSettings['stackingOrder'] })} options={STACKING_ORDERS.map((o) => ({ value: o.value, label: o.label }))} />
                 </div>
                 <div className={styles.field}>
                   <span className={styles.label}>重ねたときの上限</span>
-                  <Select aria-label="重ねたときの上限" size="full" disabled={ro} value={String(settings.maxPerVisit)} onChange={(v) => set({ maxPerVisit: Number(v) })}
-                    options={CAP_OPTIONS.some((o) => o.value === String(settings.maxPerVisit)) ? CAP_OPTIONS : [...CAP_OPTIONS, { value: String(settings.maxPerVisit), label: `1回 ${settings.maxPerVisit}個まで` }]} />
+                  <Select aria-label="重ねたときの上限" size="full" disabled={ro} value={String(stackedCap(settings))} onChange={(v) => set({ maxStackedStamps: Number(v) })}
+                    options={CAP_OPTIONS.some((o) => o.value === String(stackedCap(settings))) ? CAP_OPTIONS : [...CAP_OPTIONS, { value: String(stackedCap(settings)), label: `1回 ${stackedCap(settings)}個まで` }]} />
                 </div>
               </div>
               {ro || settings.multipliers.length >= 20 ? null : (
@@ -436,7 +480,7 @@ export default function VisitStampsV8() {
                               <Tr key={row.id} className={`${styles.row} ${styles.paperLine}`}>
                                 <Td className={styles.colPhoto}>
                                   <button type="button" className={styles.thumb} onClick={() => setPhoto(row)} aria-label={`${names.name}さんの写真を大きく見る`}>
-                                    {/^https:\/\//.test(row.photo_url) ? <img src={row.photo_url} alt="" /> : <ImageIcon size={16} aria-hidden="true" />}
+                                    <PaperThumb accountId={selectedAccountId} url={row.photo_url} />
                                   </button>
                                 </Td>
                                 <Td>
@@ -511,13 +555,12 @@ export default function VisitStampsV8() {
           {/* ④ 押した・使った記録 */}
           <section className={styles.section} aria-label="④ 押した・使った記録">
             <SectionTitle
-              help="選んだ友だちのカードの台帳です。来店・会計で自動で押したもの、店で足したもの、紙のカードから移したもの、特典で使ったものが並びます。まちがいは「…」から取り消せます（取り消しも記録に残ります）。"
-              extra={rows.length > HISTORY_SHORT ? <button type="button" className={styles.link} onClick={() => setShowAll((v) => !v)}>{showAll ? '少なく見る' : 'すべて見る'}<ArrowRight size={14} aria-hidden="true" /></button> : undefined}
+              help="この店で押した・使った記録です（共通のカードでも、この店で押した・使ったものだけ）。来店・会計で自動で押したもの、店で足したもの、紙のカードから移したもの、特典で使ったものが新しい順に並びます。まちがいは「…」から取り消せます（取り消しも記録に残ります）。"
+              extra={rows.length > HISTORY_SHORT || logTotal > HISTORY_SHORT_FETCH || showAll ? <button type="button" className={styles.link} onClick={() => { setShowAll((v) => !v); setLogPage(1) }}>{showAll ? '少なく見る' : 'すべて見る'}<ArrowRight size={14} aria-hidden="true" /></button> : undefined}
             >④ 押した・使った記録</SectionTitle>
-            {!friendId ? <p className={styles.empty}>「店で手入力」で友だちを選ぶと、その人の記録が出ます。</p>
-              : walletError && entries === null ? <ListState kind="error" error={walletError} onRetry={() => void loadWallet()} />
-                : entries === null ? <ListState kind="loading" />
-                  : rows.length === 0 ? <p className={styles.empty}>{`${selectedFriend ? friendNames(selectedFriend).name : 'この友だち'}さんの記録はまだありません。`}</p>
+            {logError && log === null ? <ListState kind="error" error={logError} onRetry={() => void loadLog()} />
+              : log === null ? <ListState kind="loading" />
+                : rows.length === 0 ? <p className={styles.empty}>この店の記録はまだありません。来店・会計で押したり、店で手入力したりすると、ここに出ます。</p>
                     : (
                       <DataTable className={styles.table} data-design="visit-stamp-history">
                         <thead>
@@ -534,13 +577,13 @@ export default function VisitStampsV8() {
                           {shownRows.map((row) => (
                             <Tr key={row.id} className={styles.row}>
                               <Td className={styles.colWhen}><span className={styles.plain}>{shortDateTime(row.at)}</span></Td>
-                              <Td><span className={styles.name}>{selectedFriend ? friendNames(selectedFriend).name : '友だち'}</span></Td>
+                              <Td><span className={styles.name}>{friendById(row.friendId) ? friendNames(friendById(row.friendId)!).name : '友だち'}</span></Td>
                               <Td className={styles.colCount}><span className={`${styles.countText} ${row.reversed ? styles.countReversed : ''}`}>{row.count}</span></Td>
                               <Td className={styles.colWhy}><span className={styles.muted} title={row.why}>{row.why}</span></Td>
                               <Td className={styles.colActor}><span className={styles.muted} title={row.actor}>{row.actor}</span></Td>
                               <Td className={styles.colMenu}>
                                 <RowActions subjectName={`${shortDateTime(row.at)} の記録`}
-                                  menuItems={[{ id: 'friend', label: '友だちの詳細を開く', external: true, onSelect: () => { window.location.href = `/friends/detail?id=${encodeURIComponent(friendId)}` } }]}
+                                  menuItems={[{ id: 'friend', label: '友だちの詳細を開く', external: true, onSelect: () => { window.location.href = `/friends/detail?id=${encodeURIComponent(row.friendId)}` } }]}
                                   destructiveItem={canManage && row.reversible ? { id: 'reverse', label: 'この記録を取り消す', onSelect: () => { setDialogError(''); setReversing(row.id) } } : undefined} />
                               </Td>
                             </Tr>
@@ -548,6 +591,13 @@ export default function VisitStampsV8() {
                         </tbody>
                       </DataTable>
                     )}
+            {showAll && logPages > 1 ? (
+              <div className={styles.pager}>
+                <Button size="compact" disabled={logPage <= 1} onClick={() => setLogPage((n) => Math.max(1, n - 1))}>前の{HISTORY_PAGE}件</Button>
+                <span className={styles.muted}>{`${logPage} / ${logPages}ページ（全 ${logTotal.toLocaleString('ja-JP')}件）`}</span>
+                <Button size="compact" disabled={logPage >= logPages} onClick={() => setLogPage((n) => Math.min(logPages, n + 1))}>次の{HISTORY_PAGE}件</Button>
+              </div>
+            ) : null}
           </section>
         </div>
       </div>
@@ -578,7 +628,7 @@ export default function VisitStampsV8() {
       <ReasonDialog open={!!reversing} title="記録を取り消す" description="スタンプの数を元に戻します。取り消したことも記録に残ります。" confirmLabel="取り消す" busy={!!busy} error={dialogError || undefined}
         onClose={() => setReversing(null)} onConfirm={(why) => { if (reversing) void reverse(reversing, why) }} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="保存していないカードの設定" onConfirm={confirmLeave} onCancel={cancelLeave} />
-      <PhotoDialog url={photo && /^https:\/\//.test(photo.photo_url) ? photo.photo_url : null} name={photo ? friendNames(friendById(photo.friend_id) ?? { displayName: '友だち' }).name : ''} onClose={() => setPhoto(null)} />
+      <PhotoDialog url={photoUrl} name={photo ? friendNames(friendById(photo.friend_id) ?? { displayName: '友だち' }).name : ''} onClose={() => setPhoto(null)} />
     </PageFrame>
   )
 }

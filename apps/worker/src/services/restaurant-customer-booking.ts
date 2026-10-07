@@ -4,7 +4,7 @@ import type {
   RestaurantCustomerAvailability,
   RestaurantCustomerBooking,
 } from '@line-crm/shared';
-import { openSeatTables } from './restaurant-closures.js';
+import { closuresForRange, closureAffectsTable, openSeatTables } from './restaurant-closures.js';
 import {
   restaurantCivilTime,
   validRestaurantDate,
@@ -23,19 +23,21 @@ export type CustomerReservationRow = {
   table_id: string | null;
   line_uid: string;
   customer_request_id: string | null;
+  note: string | null;
+  customer_phone: string | null;
+  seat_type: string | null;
 };
-export const customerBooking = (
-  r: CustomerReservationRow,
-): RestaurantCustomerBooking => ({
-  id: r.id,
-  storeId: r.store_id,
-  startsAt: r.starts_at,
-  endsAt: r.ends_at,
-  guestCount: r.guest_count,
-  status: r.status,
-  version: r.customer_version,
-  holdExpiresAt: r.hold_expires_at,
-});
+export function customerBooking(r: CustomerReservationRow): RestaurantCustomerBooking {
+  return { id:r.id, storeId:r.store_id, startsAt:r.starts_at, endsAt:r.ends_at, guestCount:r.guest_count,
+    status:r.status, version:r.customer_version, holdExpiresAt:r.hold_expires_at,
+    note:r.note, customerPhone:r.customer_phone, seatType:r.seat_type };
+}
+/** 任意欄はUnicodeの文字数で検査。空欄・nullは保存済みの値を消す。 */
+export function validCustomerDetails(b: {note?: unknown; customerPhone?: unknown}): boolean {
+  return (b.note == null || (typeof b.note === 'string' && Array.from(b.note).length <= 200))
+    && (b.customerPhone == null || (typeof b.customerPhone === 'string' && b.customerPhone.length <= 50 && (!b.customerPhone.trim() || /^[+0-9０-９()（）\s-]+$/.test(b.customerPhone))));
+}
+export const customerDetailValue = (v: string | null | undefined) => v?.trim() || null;
 export type CustomerStore = {
   id: string;
   name: string;
@@ -72,10 +74,10 @@ export async function customerAvailability(
     return null;
   const hours = await db
     .prepare(
-      'SELECT hours_json,version FROM rt_opening_hours_settings WHERE store_id=?',
+      'SELECT hours_json,version,late_cancel_after_minutes,late_arrival_message FROM rt_opening_hours_settings WHERE store_id=?',
     )
     .bind(store.id)
-    .first<{ hours_json: string; version: number }>();
+    .first<{ hours_json: string; version: number; late_cancel_after_minutes: number | null; late_arrival_message: string | null }>();
   if (!hours) return null;
   const parsed = JSON.parse(hours.hours_json) as Array<{
     weekday: number;
@@ -83,6 +85,18 @@ export async function customerAvailability(
   }>;
   const minute = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
   const slots: RestaurantCustomerAvailability['slots'] = [];
+  let hasOperatingSlot = false;
+  const eligible = (await db.prepare('SELECT id,seat_type FROM rt_tables WHERE store_id=? AND is_active=1 AND min_capacity<=? AND max_capacity>=?').bind(store.id,count,count).all<{id:string;seat_type:string}>()).results;
+  const from = restaurantCivilTime(date,0,store.timezone), to = restaurantCivilTime(date,1440,store.timezone);
+  const closures = await closuresForRange(db,store.id,from,to);
+  const reasonFor = (startsAt:string,endsAt:string): import('@line-crm/shared').RestaurantUnavailableReason => {
+    const overlapping = closures.filter(c => (JSON.parse(c.periods_json) as Array<{startsAt:string;endsAt:string}>).some(p => Date.parse(p.startsAt)<Date.parse(endsAt) && Date.parse(p.endsAt)>Date.parse(startsAt)));
+    if (overlapping.some(c=>JSON.parse(c.table_ids_json).length===0)
+      || (eligible.length && eligible.every(t => overlapping.some(c=>closureAffectsTable(c,t.id))))) {
+      return overlapping.some(c=>c.kind==='private_event') ? 'private_event' : 'temporary_closed';
+    }
+    return 'full';
+  };
   // 席の標準滞在時間は既存の席待ちと同じ120分。前日の深夜営業も読む。
   for (const dayOffset of [-1, 0]) {
     const civilDate = new Date(Date.parse(date) + dayOffset * 86400000)
@@ -102,11 +116,9 @@ export async function customerAvailability(
       ) {
         const startsAt = restaurantCivilTime(civilDate, m, store.timezone),
           endsAt = new Date(Date.parse(startsAt) + 120 * 60000).toISOString();
-        if (
-          tzDateStr(store.timezone, new Date(startsAt)) !== date ||
-          Date.parse(startsAt) <= now + settings.cutoffMinutesBefore * 60000
-        )
-          continue;
+        if (tzDateStr(store.timezone,new Date(startsAt)) !== date) continue;
+        hasOperatingSlot = true;
+        if (Date.parse(startsAt) <= now + settings.cutoffMinutesBefore * 60000) continue;
         let tables = await openSeatTables(
           db,
           store.id,
@@ -151,6 +163,8 @@ export async function customerAvailability(
           endsAt,
           available: tables.length > 0,
           remainingTables: tables.length,
+          seatTypes: [...new Set(tables.map(t=>t.seatType!).filter(Boolean))],
+          ...(tables.length ? {} : {unavailableReason:reasonFor(startsAt,endsAt)}),
         });
       }
     }
@@ -160,6 +174,9 @@ export async function customerAvailability(
       storeId: store.id,
       date,
       guestCount: count,
+      ...(slots.length === 0 ? {unavailableReason:reasonFor(from,to)==='full' ? (hasOperatingSlot ? 'full' as const : 'regular_closed' as const) : reasonFor(from,to)}
+        : slots.every(s=>!s.available) ? {unavailableReason: slots.every(s=>s.unavailableReason===slots[0]!.unavailableReason) ? slots[0]!.unavailableReason : 'full' as const} : {}),
+      ...(hours.late_cancel_after_minutes != null && hours.late_arrival_message ? {lateArrivalPolicy:{cancelAfterMinutes:hours.late_cancel_after_minutes,message:hours.late_arrival_message}} : {}),
       slots: slots.sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
       cancelDeadlineMinutesBefore: settings.cancelDeadlineMinutesBefore,
       cutoffMinutesBefore: settings.cutoffMinutesBefore,

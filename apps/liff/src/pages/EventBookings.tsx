@@ -218,7 +218,7 @@ export default function EventBookings() {
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className={`flex h-8 flex-1 items-center justify-center rounded-lg px-1 text-xs focus-visible:outline-2 focus-visible:outline-ink ${
+                  className={`liff-hit flex h-8 flex-1 items-center justify-center rounded-lg px-1 text-xs focus-visible:outline-2 focus-visible:outline-ink ${
                     tab === t.key
                       ? 'bg-canvas font-bold text-ink'
                       : 'font-semibold text-liff-sub'
@@ -282,7 +282,7 @@ export default function EventBookings() {
                                     void openChange(b);
                                   }}
                                   disabled={busy}
-                                  className="inline-flex items-center justify-center rounded-lg border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                                  className="liff-hit inline-flex items-center justify-center rounded-lg border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                                 >
                                   時間を変える
                                 </button>
@@ -293,7 +293,7 @@ export default function EventBookings() {
                                     setPendingCancel(b);
                                   }}
                                   disabled={busy}
-                                  className="inline-flex items-center justify-center rounded-lg border border-danger/40 bg-canvas px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                                  className="liff-hit inline-flex items-center justify-center rounded-lg border border-danger/40 bg-canvas px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                                 >
                                   キャンセルする
                                 </button>
@@ -306,7 +306,7 @@ export default function EventBookings() {
                             onClick={() =>
                               navigate({ pathname: `/events/${b.event_id}`, search })
                             }
-                            className="relative flex h-11 w-[18px] shrink-0 items-center justify-center text-ink-faint after:absolute after:inset-y-0 after:-right-2 after:-left-2 focus-visible:outline-2 focus-visible:outline-ink"
+                            className="liff-hit flex h-11 w-[18px] shrink-0 items-center justify-center text-ink-faint focus-visible:outline-2 focus-visible:outline-ink"
                           >
                             <Icon name="chevron-right" className="h-[18px] w-[18px]" />
                           </button>

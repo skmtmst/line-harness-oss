@@ -56,6 +56,7 @@ const toDate = (iso: string | undefined, prevDay = false) => {
 export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
   open: boolean; multiplier: VisitStampMultiplier | null; onClose: () => void; onSave: (m: VisitStampMultiplier) => void
 }) {
+  const [label, setLabel] = useState('')
   const [rate, setRate] = useState('2')
   const [days, setDays] = useState<number[]>([])
   const [start, setStart] = useState('')
@@ -64,6 +65,7 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
   const [to, setTo] = useState('')
   useEffect(() => {
     if (!open) return
+    setLabel(multiplier?.name ?? '')
     setRate(String(multiplier?.multiplier ?? 2)); setDays(multiplier?.weekdays ?? [])
     setStart(multiplier?.startMinute !== undefined ? String(multiplier.startMinute) : '')
     setEnd(multiplier?.endMinute !== undefined ? String(multiplier.endMinute) : '')
@@ -81,6 +83,9 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
       onConfirm={() => {
         if (error) return
         onSave({
+          ...(label.trim() ? { name: label.trim() } : {}),
+          /* 止めている倍率は、変えても止めたまま。 */
+          ...(multiplier?.active === false ? { active: false } : {}),
           multiplier: r,
           ...(days.length ? { weekdays: [...days].sort() } : {}),
           ...(start !== '' ? { startMinute: Number(start), endMinute: Number(end) } : {}),
@@ -89,6 +94,7 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
         })
       }}>
       <div className={styles.dialogBody}>
+        <Field label="名前（任意）"><TextField value={label} onChange={(e) => setLabel(e.target.value)} maxLength={100} placeholder="例：火曜の夕方 2倍デー" /></Field>
         <Field label="倍率"><TextField value={rate} onChange={(e) => setRate(e.target.value)} inputMode="decimal" /></Field>
         <div className={styles.field}>
           <span className={styles.label}>曜日（選ばなければ毎日）</span>
@@ -135,7 +141,14 @@ export function RankDialog({ open, settings, onClose, onSave }: {
   const error = used.some((r) => !(Number(r.multiplier) >= 1 && Number(r.multiplier) <= 100)) ? '倍率は 1〜100 で入れてください。' : ''
   return (
     <Dialog open={open} title="会員ランクの倍率" description="友だちに付いたタグの名前ごとに倍率を決めます。いくつも当たるときは、いちばん高い倍率だけを使います。" confirmLabel="変える" onCancel={onClose} error={error || undefined}
-      onConfirm={() => { if (!error) onSave(used.map((r) => ({ tagName: r.tagName.trim(), multiplier: Number(r.multiplier) }))) }}>
+      onConfirm={() => {
+        if (error) return
+        /* 前からあるランクの名前・止めているかは残す（タグの名前で突き合わせる）。 */
+        onSave(used.map((r) => {
+          const before = settings.rankMultipliers.find((x) => x.tagName === r.tagName.trim())
+          return { ...(before?.name ? { name: before.name } : {}), ...(before?.active === false ? { active: false } : {}), tagName: r.tagName.trim(), multiplier: Number(r.multiplier) }
+        }))
+      }}>
       <div className={styles.dialogBody}>
         {rows.map((row, i) => (
           <div key={i} className={styles.row2}>
@@ -203,7 +216,7 @@ export function StoresDialog({ open, accounts, value, onClose, onSave }: {
 export function PhotoDialog({ url, name, onClose }: { url: string | null; name: string; onClose: () => void }) {
   return (
     <Dialog open={!!url} title={`${name}さんの紙のカード`} onCancel={onClose} cancelLabel="閉じる" size="large">
-      {/* 写真はお客さまが送った HTTPS の URL。大きさは窓に合わせる。 */}
+      {/* 写真は担当店舗の権限で読んだもの（本人だけが預けた非公開の写真）。大きさは窓に合わせる。 */}
       {url ? <img src={url} alt={`${name}さんが送った紙のスタンプカードの写真`} className={styles.photo} /> : null}
     </Dialog>
   )

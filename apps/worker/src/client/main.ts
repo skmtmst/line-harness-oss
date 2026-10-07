@@ -22,6 +22,7 @@ import { initBooking } from './booking.js';
 import { initForm } from './form.js';
 import { safeRedirectTarget } from '../lib/safe-redirect.js';
 import { restoreLiffStateInCurrentUrl } from './liff-query.js';
+import { customerMessage } from './customer-message.js';
 
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
@@ -347,7 +348,7 @@ async function linkAndAddFlow() {
     if (redirectUrl) {
       window.location.href = redirectUrl;
     } else {
-      showError(err instanceof Error ? err.message : 'エラーが発生しました');
+      showError(customerMessage(err, 'うまくいきませんでした。時間をおいて、もう一度お試しください。'));
     }
   }
 }
@@ -738,7 +739,7 @@ async function main() {
       await linkAndAddFlow();
     }
   } catch (err) {
-    showError(err instanceof Error ? err.message : 'LIFF初期化エラー');
+    showError(customerMessage(err, '画面を開けませんでした。LINE から、もう一度開いてください。'));
   }
 }
 

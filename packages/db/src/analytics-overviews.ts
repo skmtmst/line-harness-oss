@@ -1241,6 +1241,7 @@ const FEATURE_USAGE_DEFINITIONS: Record<FeatureId, FeatureUsageDefinition> = {
   ec_commerce: { unit: '連携', basis: 'last90days' },
   line_notifications: { unit: '送信', basis: 'last90days' },
   nen_campaigns: { unit: '配信', basis: 'last90days' },
+  visit_stamps: { unit:null,basis:null,unmeasuredReason:'来店スタンプの利用状況はこの一覧では計測していません' },
   restaurant_test: {
     unit: null,
     basis: null,
