@@ -91,6 +91,17 @@ export function toV8CheckRows(connection: LineAccountConnectData | null): V8Chec
   ]
 }
 
+/**
+ * ④の行に出す説明。止まった行は「なぜ止まったか」を1つだけ出す（同じことを2回書かない）。
+ * Webhook は内訳から作った説明（オフ・登録先違い）がそのまま理由なので、段の文を重ねない。
+ * 内訳が無いときだけ段の文を括弧で足す。チャネル・プロバイダーは「認証済み」の説明を出さず理由を出す。
+ */
+export function checkRowText(row: V8CheckRow): string {
+  if (row.state !== 'failed' || !row.message) return row.detail
+  if (row.key === 'webhook') return row.detail === '受け口へ届きませんでした' ? `${row.detail}（${row.message}）` : row.detail
+  return row.message
+}
+
 export function allV8RowsPassed(rows: V8CheckRow[]): boolean {
   return rows.every((row) => row.state === 'passed')
 }

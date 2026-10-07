@@ -16,6 +16,8 @@ export interface MenuItem {
   label: string
   /** 24x24 の path。lucide 相当の形を手で写している。 */
   icon: string
+  /** V8 だけ違う形にするときの path（lucide の形）。無ければ icon を使う。 */
+  iconV8?: string
   /** 出す数の種類（仕様 §5）。無ければバッジを出さない。 */
   badge?: 'unanswered' | 'photos' | 'unmatched' | 'operations'
   /** 機能設定に出す一行説明。 */
@@ -63,14 +65,14 @@ export const HQ_MENU_SECTIONS: MenuSection[] = [
     label: null,
     title: '統括コンソール',
     items: [
-      { href: '/hq', label: 'アカウント', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', id: 'hq-stores', note: '統括に属するLINE公式アカウントを管理します', required: true },
+      { href: '/hq', label: 'アカウント', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', iconV8: 'M10 12h4M10 8h4M14 21v-3a2 2 0 0 0-4 0v3M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16', id: 'hq-stores', note: '統括に属するLINE公式アカウントを管理します', required: true },
       { href: '/hq/friend-attributes', label: '友だち属性', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', id: 'hq-tags', note: 'タグのひな形を作成し、アカウントへ配布します', required: true },
       { href: '/hq/templates', label: 'テンプレート', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', id: 'hq-templates', note: 'メッセージのひな形を作成し、アカウントへ配布します', required: true },
       { href: '/hq/rich-menus', label: 'リッチメニュー', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z', id: 'hq-rich-menus', note: 'リッチメニューのひな形を作成し、アカウントへ配布します', required: true },
       { href: '/hq/form-submissions', label: '回答フォーム', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', id: 'hq-forms', note: '回答フォームのひな形を作成し、アカウントへ配布します', required: true },
       { href: '/hq/banners', label: 'バナー生成', icon: 'M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm4 5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm12 5l-5-5L5 21', id: 'hq-banners', note: '配信やリッチメニューに使う画像をAIで作り、アカウントへ渡します', required: true },
-      /* 統括の一括配信（提案 E-9）。今ある並びを動かさないよう末尾に足す。 */
-      { href: '/hq/broadcasts', label: '一括配信', icon: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8', id: 'hq-broadcasts', note: '選んだアカウントに同じ内容を一度に送ります。各店に入らずに送れます', required: true },
+      /* 統括の一括配信（提案 E-9）。今ある並びを動かさないよう末尾に足す。V8 の印は lucide の send（絵 V8-B の統括の板）。 */
+      { href: '/hq/broadcasts', label: '一括配信', icon: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8', iconV8: 'M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11zM21.854 2.147l-10.94 10.939', id: 'hq-broadcasts', note: '選んだアカウントに同じ内容を一度に送ります。各店に入らずに送れます', required: true },
     ],
   },
 ]

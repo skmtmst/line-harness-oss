@@ -17,6 +17,8 @@ export interface ListFolderNav {
   createAction?: ReactNode
   /** 選ぶ欄の呼び名（「フォルダ」「タグ」など）。選択肢は「呼び名：名前」で出す。 */
   label?: string
+  /** 畳んだ選ぶ欄の幅（px）。「種類：リッチメニュー」のように選択肢が長い画面だけ渡す。省くと共通の幅（150）。 */
+  width?: number
 }
 export interface ListPageBodyProps {
   stats?: ReactNode
@@ -28,6 +30,8 @@ export interface ListPageBodyProps {
    * 左の列に選ぶものが2つある画面（統括のテンプレートの種類と分類など）は配列で渡す。
    */
   folderNav?: ListFolderNav | ListFolderNav[]
+  /** 左の列の左の余白を 24 にする（統括の画面。絵 JKjsE・LRc93 ほか）。ふつうの一覧は 12。 */
+  folderInset?: boolean
   toolbar?: ReactNode
   children: ReactNode
   pagination?: ReactNode
@@ -39,13 +43,13 @@ export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   tabs?: ReactNode
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ stats, folders, collapsedFolders, folderNav, toolbar, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ stats, folders, collapsedFolders, folderNav, folderInset, toolbar, children, pagination, overlays }: ListPageBodyProps) {
   const navs = folderNav ? (Array.isArray(folderNav) ? folderNav : [folderNav]) : []
   const collapsed = collapsedFolders ?? (folders && navs.length > 0 ? navs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
   return <div className={styles.listBody}>
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     <div className={styles.split} data-template-region="body">
-      {folders ? <aside className={styles.folders} data-template-region="folders">{folders}</aside> : null}
+      {folders ? <aside className={styles.folders} data-template-region="folders" data-folder-inset={folderInset || undefined}>{folders}</aside> : null}
       <div className={styles.main}>
         {toolbar || collapsed ? <div className={styles.toolbar} data-template-region="toolbar" data-collapsed-only={toolbar ? undefined : ''}>
           {collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders">{collapsed}</div> : null}{toolbar}
@@ -57,10 +61,10 @@ export function ListPageBody({ stats, folders, collapsedFolders, folderNav, tool
   </div>
 }
 /** folderNav から組む、畳んだときの「作る・フォルダを選ぶ欄」。 */
-function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = 'フォルダ' }: ListFolderNav) {
+function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = 'フォルダ', width }: ListFolderNav) {
   return <>
     {createAction ? <span className={styles.collapsedCreate}>{createAction}</span> : null}
-    <span className={styles.collapsedSelect}>
+    <span className={styles.collapsedSelect} style={width ? { width } : undefined}>
       <Select aria-label={label} value={activeId} onChange={onSelect} options={rows.map((row) => ({ value: row.id, label: `${label}：${row.label}` }))} />
     </span>
   </>

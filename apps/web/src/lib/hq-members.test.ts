@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
-import { canResendInvite, lastLoginLabel, memberKpis, memberStatus, scopeLabel, sortMembers } from './hq-members'
+import { canResendInvite, lastLoginLabel, lastLoginShort, memberKpis, memberStatus, scopeLabel, sortMembers, sortMembersByRole } from './hq-members'
 
 const base: StaffMember = {
   id: 's1', name: '山田 太郎', email: 'm@example.com', role: 'admin', lineLinked: true, twoFactorEnabled: false,
@@ -39,5 +39,23 @@ describe('メンバー管理の計算', () => {
     expect(scopeLabel(scoped, names)).toBe('然-NEN- TEST')
     expect(memberKpis([base, scoped, invited])).toEqual({ total: 3, active: 2, invited: 1, viewers: 1, scopedAccounts: 1, allScope: 2 })
     expect(sortMembers([invited, scoped, base], 's2').map((m) => m.id)).toEqual(['s2', 's1', 's3'])
+  })
+
+  it('★V8 の最終ログインは「9/30 10:12」。今年でなければ年を付ける', () => {
+    const now = new Date('2026-10-07T03:00:00Z')
+    expect(lastLoginShort('2026-09-30T10:12:00+09:00', now)).toBe('9/30 10:12')
+    expect(lastLoginShort('2026-09-28T09:02:00.000', now)).toBe('9/28 09:02')
+    expect(lastLoginShort('2025-08-31T12:00:00+09:00', now)).toBe('2025/8/31 12:00')
+    expect(lastLoginShort(undefined, now)).toBe('—')
+    expect(lastLoginShort('壊れた値', now)).toBe('—')
+  })
+
+  it('★V8 の並びは状態→役割→名前（絵 r4ARpV の順）', () => {
+    const owner: StaffMember = { ...base, id: 'o', name: '高田 誠', role: 'owner' }
+    const admin: StaffMember = { ...base, id: 'a', name: '中川 由美', role: 'admin' }
+    const viewer: StaffMember = { ...base, id: 'v', name: '佐野 直人', role: 'viewer' }
+    const invited: StaffMember = { ...base, id: 'i', name: '外部デザイン', role: 'viewer', isActive: false, inviteStatus: 'pending_line' }
+    const stopped: StaffMember = { ...base, id: 's', name: '森 涼太', role: 'viewer', isActive: false, inviteStatus: 'disabled' as StaffMember['inviteStatus'] }
+    expect(sortMembersByRole([stopped, viewer, invited, admin, owner]).map((m) => m.id)).toEqual(['o', 'a', 'v', 'i', 's'])
   })
 })
