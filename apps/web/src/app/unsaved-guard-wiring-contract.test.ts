@@ -131,6 +131,8 @@ const GUARDED = [
   'v8/restaurant/google/reviews.tsx',
   'v8/restaurant/reservations/phone.tsx',
   'v8/restaurant/store-new/store-new.tsx',
+  'v8/hq-broadcasts/create.tsx',
+  'v8/settings/booking-media/screen.tsx',
   'v8/template-edit/asset.tsx',
   'v8/template-edit/message.tsx',
   'v8/webinar-edit/edit.tsx',
