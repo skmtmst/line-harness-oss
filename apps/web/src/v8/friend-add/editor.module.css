@@ -378,10 +378,6 @@
   font-size: var(--text-caption);
 }
 
-/* 先に保存されたとき（h5rm8t）：本文の上の帯の置き場。帯の見た目は共通部品（save-conflict）。 */
-.conflictSlot {
-  margin-top: var(--tpl-rule-row-gap);
-}
 .compareRows {
   display: flex;
   flex-direction: column;

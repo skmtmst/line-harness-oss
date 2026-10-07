@@ -127,6 +127,12 @@
 }
 
 /* 条件の行の中の時計の絵（絵どおり・色だけ）。 */
+.dotIndent {
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 uE9gf の説明の行）。 */
+  display: block;
+  padding-inline-start: var(--tpl-folder-dot-indent);
+}
+
 .cellSubIcon {
   color: var(--color-ink-faint);
 }

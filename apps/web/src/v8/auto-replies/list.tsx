@@ -60,6 +60,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { runUndoable } from '@/lib/undoable'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import KpiCard from '@/components/shared/kpi-card'
@@ -926,6 +927,12 @@ export default function AutoRepliesListV8() {
   }
 
   /* ===== フォルダの列 ===== */
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。未分類は色の無い輪。 */
+  const folderDotOf = (r: { folderId: string | null }): FolderDotFolder | null => {
+    if (!r.folderId) return null
+    const folder = folders.find((f) => f.id === r.folderId)
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: rules.length, icon: <Inbox size={15} aria-hidden="true" /> },
     ...folders.map((f) => ({
@@ -1205,19 +1212,21 @@ export default function AutoRepliesListV8() {
                   </Td>
                   <NameCell
                     name={<div className={styles.nameRow}>
-                      <Link
-                        href={`/auto-replies/edit?id=${r.id}`}
-                        title={name}
-                        className={styles.cellTitle}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                          event.preventDefault()
-                          goEdit(r.id)
-                        }}
-                      >
-                        {name}
-                      </Link>
+                      <FolderDotName folder={folderDotOf(r)} dot={!narrow}>
+                        <Link
+                          href={`/auto-replies/edit?id=${r.id}`}
+                          title={name}
+                          className={styles.cellTitle}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                            event.preventDefault()
+                            goEdit(r.id)
+                          }}
+                        >
+                          {name}
+                        </Link>
+                      </FolderDotName>
                       {conflicts > 0 && (
                         <button
                           type="button"
@@ -1233,7 +1242,7 @@ export default function AutoRepliesListV8() {
                         </button>
                       )}
                     </div>}
-                    sub={<span title={schedule ? `${trigger.title} ／ ${schedule}` : trigger.title}>
+                    sub={<span className={narrow ? undefined : styles.dotIndent} title={schedule ? `${trigger.title} ／ ${schedule}` : trigger.title}>
                       {trigger.text}
                       {schedule ? (
                         <>
@@ -1244,7 +1253,7 @@ export default function AutoRepliesListV8() {
                       ) : null}
                     </span>}
                     memo={extraChips.length > 0 ? (
-                      <div>
+                      <div className={narrow ? undefined : styles.dotIndent}>
                         {extraChips.map((label) => (
                           <span key={label} className={styles.condChip} title={label}>
                             {label}
