@@ -1028,6 +1028,13 @@
   --tpl-acd-dlg-field-gap: 6px; --tpl-acd-dlg-label-size: 13px; --tpl-acd-dlg-label-lh: 20px; --tpl-acd-dlg-foot-pad: 14px 0 0 0; --tpl-acd-dlg-sub-size: 12px; --tpl-acd-dlg-pair-gap: 12px; --tpl-acd-otp-h: 48px; --tpl-acd-dlg-sub-lh: 17px;
   --tpl-acd-ho-step-pad: 8px 12px; --tpl-acd-ho-step-radius: 10px; --tpl-acd-ho-step-size: 12px; --tpl-acd-ho-box-pad: 12px 14px; --tpl-acd-ho-box-gap: 6px; --tpl-acd-ho-result-w: 340px;
   --tpl-acd-ho-head-pad: 9px 14px; --tpl-acd-ho-row-pad: 9px 14px; --tpl-acd-ho-evidence-w: 220px; --tpl-acd-ho-choice-w: 150px; --tpl-acd-ho-name-size: 12px; --tpl-acd-ho-sub-size: 10px; --tpl-acd-ho-band-pad: 12px 16px; --tpl-acd-ho-band-size: 13px; --tpl-acd-ho-list-gap: 4px; --tpl-acd-ho-title-size: 13px; --tpl-acd-ho-name-gap: 1px; --tpl-acd-ho-fixed-h: 36px; --tpl-acd-ho-fixed-pad: 0 12px; --tpl-acd-ring-current: inset 0 0 0 2px var(--color-accent-deep);
+  /* シナリオを作る①（dnzqC）・シナリオの配信結果（X4STXS）・一斉配信の予約を取り消す窓（BeNtj）。 */
+  --tpl-sc2-cancel-foot-pad: 20px 24px 24px; --tpl-sc2-cancel-keep-gap: 8px;
+  --tpl-sc2-card-pad: 19px; --tpl-sc2-head-gap: 2px; --tpl-sc2-title-lh: 22px; --tpl-sc2-row-gap: 12px; --tpl-sc2-field-gap: 6px; --tpl-sc2-folder-w: 280px; --tpl-sc2-mode-gap: 10px; --tpl-sc2-mode-h: 98px;
+  --tpl-sc2-ex-gap: 6px; --tpl-sc2-ex-row-pad: 8px 12px; --tpl-sc2-ex-row-gap: 12px; --tpl-sc2-ex-radius: 8px; --tpl-sc2-ex-lh: 17px; --tpl-sc2-ex-note-lh: 16px; --tpl-sc2-notice-gap: 8px;
+  --tpl-sc2-kpi-pad-block: 11px; --tpl-sc2-kpi-num-lh: 21px; --tpl-sc2-kpi-pad-side: 16px; --tpl-sc2-kpi-gap: 2px; --tpl-sc2-radius: 12px; --tpl-sc2-section-gap: 8px; --tpl-sc2-title-size: 15px; --tpl-sc2-section-title-lh: 23px;
+  --tpl-sc2-step-pad: 12px 14px; --tpl-sc2-step-gap: 6px; --tpl-sc2-step-top-gap: 12px; --tpl-sc2-bar-h: 6px; --tpl-sc2-bar-track: #1d1d1f0a; --tpl-sc2-bar-fill: #06c755; --tpl-sc2-text-lh: 17px; --tpl-sc2-reach-lh: 19px;
+  --tpl-sc2-tools-gap: 8px; --tpl-sc2-ring: inset 0 0 0 1px var(--color-hairline); --tpl-sc2-line-b: inset 0 -1px 0 var(--color-divider); --tpl-sc2-line-b-strong: inset 0 -1px 0 var(--color-hairline); --tpl-sc2-line-t: inset 0 1px 0 var(--color-hairline); --tpl-sc2-head-pull: 19px; --tpl-sc2-row-pad: 10px 14px; --tpl-sc2-col-gap: 16px; --tpl-sc2-col-state: 110px; --tpl-sc2-col-now: 90px; --tpl-sc2-col-next: 150px; --tpl-sc2-col-plan: 120px; --tpl-sc2-col-menu: 28px; --tpl-sc2-head-bg: #fafafb; --tpl-sc2-name-lh: 19px;
   --tpl-starter-gap: 12px; --tpl-starter-card-h: 168px; --tpl-card-title-size: 15px;
   --tpl-side-card-pad: 16px; --tpl-side-card-gap: 4px; --tpl-side-row-gap: 3px; --tpl-side-row-pad: 9px;
   --tpl-side-title-lh: 19px; --tpl-text-sm-lh: 17px; --tpl-side-note-pad: 12px 14px; --tpl-label-tag-gap: 6px;
