@@ -141,11 +141,10 @@
 }
 
 .stepperValue {
-  min-width: var(--tpl-e1-stepper-value);
   color: var(--color-ink);
   font-size: var(--text-lead);
   font-weight: 600;
-  text-align: center;
+  line-height: var(--tpl-e1-lh-24);
   white-space: nowrap;
 }
 
@@ -211,8 +210,10 @@
 /* ウォークインの窓 */
 .walkIn {
   display: flex;
+  align-self: stretch;
   flex-direction: column;
   gap: var(--tpl-e1-form-gap);
+  min-width: 0;
 }
 
 .tableCards {

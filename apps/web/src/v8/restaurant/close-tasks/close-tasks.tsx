@@ -31,6 +31,9 @@ import styles from './close-tasks.module.css'
 
 type Tab = 'open' | 'done'
 
+/* 手を動かす順：未対応 → 残りあり → もう開けてよい → 閉じた（同じ状態の中は時刻順）。 */
+const STATE_ORDER: Record<CloseGroup['state'], number> = { open: 0, partly: 1, reopen: 2, done: 3 }
+
 const STATE_BADGE: Record<CloseGroup['state'], { label: string; tone: 'danger' | 'warning' | 'info' | 'success' }> = {
   open: { label: '未対応', tone: 'danger' },
   partly: { label: '残りあり', tone: 'warning' },
@@ -91,6 +94,7 @@ export default function CloseTasksPage() {
     .filter((g) => (tab === 'open' ? g.state !== 'done' : g.state === 'done'))
     .filter((g) => medium === 'all' || g.items.some((item) => item.channel === medium))
     .filter((g) => !query.trim() || slotTitle(g.startsAt).includes(query.trim()) || g.items.some((item) => item.name.includes(query.trim())))
+    .sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state] || a.startsAt.localeCompare(b.startsAt))
   const mediaOptions = [...new Map(groups.flatMap((g) => g.items).map((item) => [item.channel, item.name])).entries()]
 
   const close = async (taskId: string, name: string) => {
@@ -114,11 +118,13 @@ export default function CloseTasksPage() {
     content = <ListState kind="empty" title={tab === 'open' ? '未対応の知らせはありません' : '閉じた知らせはありません'} description={tab === 'open' ? '他の予約サイトの枠を閉じる必要があると、ここに出ます。' : undefined} />
   } else {
     content = (
-      <DataTable data-design="restaurant-close-tasks">
+      <div className={styles.tableWrap}>
+      <DataTable className={styles.table} data-design="restaurant-close-tasks">
         <thead>
-          <TableHeadRow>
+          <TableHeadRow className={styles.headRow} data-table-layout="columns">
             <Th className={styles.colSlot}>枠の日時</Th>
-            <Th>閉じる媒体</Th>
+            <Th className={styles.colRoute}>入った経路</Th>
+            <Th className={styles.colMedia}>閉じる媒体</Th>
             <Th className={styles.colState}>状態</Th>
             <Th className={styles.colActions}>操作</Th>
           </TableHeadRow>
@@ -127,15 +133,18 @@ export default function CloseTasksPage() {
           {shown.map((group) => {
             const remaining = openItems(group)
             const target = remaining[0] ?? null
+            const targetMedium = target ? media.find((m) => m.code === target.channel) ?? null : null
             const badge = STATE_BADGE[group.state]
             return (
-              <Tr key={group.slotId}>
+              <Tr key={group.slotId} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colSlot}>
                   <span className={styles.slot}>{slotTitle(group.startsAt)}</span>
                   <span className={styles.reason}>{reasonText(group)}</span>
                 </Td>
-                <Td>
-                  <span className={styles.chips}>
+                {/* 予約と知らせの結び付け（どの経路で入った予約か）は口がまだ無い（Codex 担当）。来たらここに経路の札。 */}
+                <Td className={styles.colRoute}><span className={styles.none} title="どの経路の予約で出た知らせかは、まだ出せません">—</span></Td>
+                <Td className={styles.colMedia}>
+                  <span className={styles.chips} title={group.items.map((item) => `${item.name}${item.status === 'done' ? '（閉じた）' : ''}`).join('・')}>
                     {group.items.map((item) => (
                       <span key={item.id} className={`${styles.chip} ${item.status === 'done' ? styles.chipDone : ''}`}>
                         {item.name}{item.status === 'done' ? <Check size={12} aria-label="閉じた" /> : null}
@@ -148,17 +157,21 @@ export default function CloseTasksPage() {
                 </Td>
                 <Td className={styles.colActions}>
                   <span className={styles.actions}>
+                    {targetMedium?.adminUrl ? (
+                      <Button size="compact" href={targetMedium.adminUrl} target="_blank" rel="noopener noreferrer">管理画面を開く ↗</Button>
+                    ) : null}
                     {canWrite && target ? (
                       <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`}>
                         <Check size={15} aria-hidden="true" />閉じた
                       </Button>
                     ) : null}
-                    {canWrite && remaining.length > 1 ? (
-                      <RowActions
-                        subjectName={slotTitle(group.startsAt)}
-                        menuItems={remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) }))}
-                      />
-                    ) : null}
+                    <RowActions
+                      subjectName={slotTitle(group.startsAt)}
+                      menuItems={[
+                        ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) })) : []),
+                        { id: 'ledger', label: '予約台帳でこの日を見る', external: true, onSelect: () => { window.location.href = `/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}` } },
+                      ]}
+                    />
                   </span>
                 </Td>
               </Tr>
@@ -166,22 +179,24 @@ export default function CloseTasksPage() {
           })}
         </tbody>
       </DataTable>
+      </div>
     )
   }
 
   return (
     <ListPage
       boardId="YMVFD"
+      headingSize="compact"
       title="他のサイトの枠を閉じる知らせ"
       help="LINE や電話で予約が入って席が少なくなった枠を、ほかの予約サイトでも閉じるための知らせです。閉じたら［閉じた］を押します。キャンセルで席が戻った枠は「もう開けてよい」になります。"
       tabs={(
-        <Tabs
+        <span className={styles.tabsRow}><Tabs
           label="知らせの状態"
           items={[
-            { label: '未対応', count: openCount, current: tab === 'open', onClick: () => setTab('open') },
-            { label: '閉じた', count: doneCount, current: tab === 'done', onClick: () => setTab('done') },
+            { label: `未対応（${openCount}）`, current: tab === 'open', onClick: () => setTab('open') },
+            { label: `閉じた（${doneCount}）`, current: tab === 'done', onClick: () => setTab('done') },
           ]}
-        />
+        /></span>
       )}
       toolbar={(
         <>

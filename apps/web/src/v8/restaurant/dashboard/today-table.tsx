@@ -52,11 +52,11 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
       ) : list.length === 0 ? (
         <ListState kind="empty" title="今日の予約はまだありません" description={canWrite ? '電話予約・ウォークインから入れられます。' : undefined} />
       ) : (
-        <DataTable data-design="restaurant-today">
+        <DataTable className={styles.table} data-design="restaurant-today">
           <thead>
-            <TableHeadRow>
+            <TableHeadRow className={styles.headRow} data-table-layout="columns">
               <Th className={styles.colTime}>時刻</Th>
-              <Th>名前</Th>
+              <Th className={styles.colName}>名前</Th>
               <Th className={styles.colGuests}>人数</Th>
               <Th className={styles.colTable}>卓</Th>
               <Th className={styles.colRoute}>経路</Th>
@@ -72,9 +72,9 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
                 ...(canWrite && seated ? [{ id: 'undo', label: '来店の印を取り消す', onSelect: () => onUndo(r.id) }] : []),
               ]
               return (
-                <Tr key={r.id}>
+                <Tr key={r.id} className={styles.row} data-table-layout="columns">
                   <Td className={styles.colTime}><span className={styles.time}>{hm(r.starts_at)}</span></Td>
-                  <Td><span className={styles.name} title={r.customer_name}>{r.customer_name}</span></Td>
+                  <Td className={styles.colName}><span className={styles.name} title={r.customer_name}>{r.customer_name}</span></Td>
                   <Td className={styles.colGuests}>{`${r.guest_count}名`}</Td>
                   <Td className={styles.colTable}>{r.table_label || '未配席'}</Td>
                   <Td className={styles.colRoute}><span className={styles.route}>{routeLabel(r)}</span></Td>
@@ -83,7 +83,7 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
                       <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
                       <span className={styles.stateSpacer} />
                       {canWrite && canMarkVisited(r) ? (
-                        <Button size="compact" onClick={() => onVisited(r.id)} disabled={busyId === r.id} aria-label={`${r.customer_name}さんを来店にする`}>
+                        <Button onClick={() => onVisited(r.id)} disabled={busyId === r.id} aria-label={`${r.customer_name}さんを来店にする`}>
                           <Check size={15} aria-hidden="true" />来店
                         </Button>
                       ) : null}

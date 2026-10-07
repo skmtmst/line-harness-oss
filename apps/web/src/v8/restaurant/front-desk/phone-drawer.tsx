@@ -167,7 +167,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   )
 
   return (
-    <Drawer open={open} title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
+    <Drawer open={open} width="narrow" title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
       <div className={styles.form} data-design-node="wEzuG">
         <label className={styles.field}>
           <span className={styles.label}>電話番号</span>

@@ -10,8 +10,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, Bell, CalendarCheck, Check, Plus, Star, Users } from 'lucide-react'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { DashboardRow } from '@/components/templates/dashboard-page'
+import { DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -209,6 +208,7 @@ function TodayStore() {
           </KpiBand>
         </div>
         <DashboardRow
+          asideSize="wide"
           aside={<SidePanel media={d.media} google={google} latestReview={d.latestReview} canWrite={canWrite} now={now} />}
         >
           <TodayTable
@@ -224,9 +224,14 @@ function TodayStore() {
   }
 
   return (
-    <PageFrame kind="dashboard" boardId="hKRRF">
-      <PageHeading title="今日のお店" description={d.store ? headDescription(d.hours, d.updatedAt) : undefined} actions={actions} />
-      <StoreTabs current="dashboard" />
+    <DashboardPage
+      boardId="hKRRF"
+      headingSize="compact"
+      title="今日のお店"
+      description={d.store ? headDescription(d.hours, d.updatedAt) : undefined}
+      actions={actions}
+      tabs={<StoreTabs current="dashboard" flush />}
+    >
       {body}
       {d.store ? (
         <>
@@ -256,7 +261,7 @@ function TodayStore() {
           />
         </>
       ) : null}
-    </PageFrame>
+    </DashboardPage>
   )
 }
 

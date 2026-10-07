@@ -94,6 +94,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
       open={open}
       designNode="nNujj"
       designWidth={560}
+      footerAlign="center"
       title="ウォークインを入れる"
       description={`いま ${hm(now)} ・ 空いている卓 ${freeAll}`}
       busy={busy}

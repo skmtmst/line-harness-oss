@@ -100,8 +100,10 @@ export type CloseGroup = {
  */
 export function groupCloseTasks(tasks: RestaurantChannelCloseTask[], media: StoreMedium[]): CloseGroup[] {
   const nameOf = (code: string) => media.find((m) => m.code === code)?.name ?? code
+  /* 同じ枠の媒体は、媒体の一覧（予約サイト・グルメ媒体）と同じ並び。一覧に無い媒体は後ろ。 */
+  const orderOf = (code: string) => { const index = media.findIndex((m) => m.code === code); return index < 0 ? media.length : index }
   const groups = new Map<string, CloseGroup>()
-  for (const task of [...tasks].sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.channel.localeCompare(b.channel))) {
+  for (const task of [...tasks].sort((a, b) => a.startsAt.localeCompare(b.startsAt) || orderOf(a.channel) - orderOf(b.channel) || a.channel.localeCompare(b.channel))) {
     const group = groups.get(task.slotId) ?? {
       slotId: task.slotId, startsAt: task.startsAt, reason: task.reason, remainingSeats: task.remainingSeats, state: 'open' as CloseGroupState, items: [],
     }

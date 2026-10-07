@@ -253,8 +253,8 @@ export default function RestaurantShell({ boardId, title, description, query, he
         </div>
         {headAfter ? headAfter(ctx, storePicker) : storePicker}
       </div>
-      {storeTab ? <StoreTabs current={storeTab} flush /> : null}
-      <div className={`${styles.body} ${layout === 'ledgerTight' ? styles.bodyTight : ''}`}>
+      {storeTab ? <div className={styles.storeTabs}><StoreTabs current={storeTab} flush /></div> : null}
+      <div className={`${styles.body} ${layout === 'ledgerTight' ? styles.bodyTight : ''} ${storeTab ? styles.bodyAfterTabs : ''}`}>
         <BoundaryBanner />
         {noticeBand}
         {content}

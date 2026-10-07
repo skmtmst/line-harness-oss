@@ -79,4 +79,10 @@ describe('枠を閉じる知らせ（E-1 の帯・E-5）', () => {
     expect(groupCloseTasks([task('5', 'x', 'hotpepper', 'done')], media)[0].state).toBe('done')
     expect(groupCloseTasks([task('6', 'x', 'hotpepper', 'close')], media)[0].state).toBe('open')
   })
+
+  it('同じ枠の媒体は媒体の一覧の並び（一覧に無い媒体は後ろ）', () => {
+    const order = toMedia([{ code: 'tabelog', name: '食べログ' }, { code: 'ikyu', name: '一休' }])
+    const groups = groupCloseTasks([task('1', 'x', 'ikyu', 'close'), task('2', 'x', 'zzz', 'close'), task('3', 'x', 'tabelog', 'close')], order)
+    expect(groups[0].items.map((i) => i.channel)).toEqual(['tabelog', 'ikyu', 'zzz'])
+  })
 })

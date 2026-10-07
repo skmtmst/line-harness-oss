@@ -27,6 +27,7 @@ export default function StoreTabs({ current, flush = false }: {
     <div className={flush ? undefined : styles.row} data-store-tabs="">
       <Tabs
         label="店の中の画面"
+        size="compact"
         items={STORE_TABS.map((tab) => ({ label: tab.label, href: tab.href, current: tab.key === current }))}
       />
     </div>
