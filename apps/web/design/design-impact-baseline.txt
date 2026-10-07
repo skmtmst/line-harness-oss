@@ -545,6 +545,8 @@ shared-button-importer v8/webhooks/sheets.tsx
 shared-button-importer v8/analytics/funnel-form.tsx
 shared-button-importer v8/login/two-factor-ops.tsx
 shared-button-importer v8/scenarios/list.tsx
+shared-button-importer v8/scenarios/create.tsx
+shared-button-importer v8/scenarios/results.tsx
 shared-button-importer v8/webinars/list.tsx
 shared-button-importer v8/mileage/frame.tsx
 shared-button-importer v8/mileage/parts.tsx
@@ -618,6 +620,11 @@ shared-button-importer v8/nen-members/members.tsx
 shared-button-importer v8/nen-members/list.tsx
 shared-button-importer v8/nen-members/ranks.tsx
 shared-button-importer v8/nen-members/lifetime.tsx
+shared-button-importer v8/nen-pets/pets.tsx
+shared-button-importer v8/nen-pets/list.tsx
+shared-button-importer v8/nen-pets/feeding.tsx
+shared-button-importer v8/nen-health/health.tsx
+shared-button-importer v8/nen-health/summary.tsx
 shared-button-importer v8/scenario-detail/detail.tsx
 shared-button-importer v8/ops/login.tsx
 shared-button-importer v8/ops/two-factor.tsx
