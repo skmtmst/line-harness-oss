@@ -70,7 +70,6 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
 import HelpTip from '@/components/shared/help-tip'
-import { FolderDotName } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
