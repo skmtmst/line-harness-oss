@@ -12,6 +12,8 @@
 
 撮影を始める前に、上から順に全部「はい」になっていることを確認する。1つでも「いいえ」があると撮り直しになる。
 
+秒数つきの時間割と申請フォームの貼り付け表は `docs/manuals/google-business-demo-video-shoot-sheet.md`、英語字幕は `docs/manuals/google-business-demo-video-subtitles.srt`。
+
 ### 1-1. 本番側の準備（申請書5章の #7・#8・#9-3 が終わっていること）
 
 | # | 確認すること | 確認のしかた | 済 |
@@ -21,7 +23,7 @@
 | 3 | privacy 第6項・terms 第3項が、読み取り5件・書き込み4件の説明になっている | ページ内を目で読む | ☐ |
 | 4 | `admin.musubo.jp` にログインすると左メニューに「Googleビジネス」が出る | ログインして見る（出ない場合は管理画面の再ビルドが未了） | ☐ |
 | 5 | 「Googleビジネス」→「設定」で、まだ接続されていない状態から始められる | 既に接続済みなら、撮影のために一度解除する | ☐ |
-| 6 | 本番のOAuthクライアントが設定済みで、リダイレクトURIが2行入っている | 接続ボタンを押して `redirect_uri_mismatch` が出ないこと | ☐ |
+| 6 | 本番のOAuthクライアントが設定済みで、承認済みのリダイレクトURIが**1行だけ**（`https://api.musubo.jp/api/restaurant-test/google/oauth/callback`）入っている。スプレッドシート連携のコールバックは**このクライアントに登録しない** | Google Cloud コンソールの「クライアント」→本番クライアントを開き、承認済みリダイレクトURIが1行だけであることを目で確認する。そのうえで接続ボタンを押して `redirect_uri_mismatch` が出ないこと（理由は `google-business-verification-application.md` 5章の注） | ☐ |
 | 7 | 書き込みが本当にGoogleへ届く設定になっている | 返信の確認画面まで進み、送信後にGoogle側へ反映されること（下の 1-3 で戻せる対象を選ぶ） | ☐ |
 
 ### 1-2. 画面と録画の準備

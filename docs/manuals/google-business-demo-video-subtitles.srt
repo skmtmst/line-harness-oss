@@ -1,0 +1,131 @@
+1
+00:00:00,000 --> 00:00:15,000
+musubo is a LINE-based customer communication tool for small restaurants and shops in Japan. This is our public home page, open without signing in.
+
+2
+00:00:15,000 --> 00:00:35,000
+From the footer we open our privacy policy at musubo.jp/privacy. Section 6 describes exactly what Google user data we read and write.
+
+3
+00:00:35,000 --> 00:00:55,000
+And our terms of service at musubo.jp/terms. Section 3 describes the Google Business Profile features. The dashboard UI is Japanese only, so these subtitles explain each screen.
+
+4
+00:00:55,000 --> 00:01:10,000
+Now we sign in to our dashboard at admin.musubo.jp. Store staff always sign in here themselves; there is no indirect access to our Business Profile project.
+
+5
+00:01:10,000 --> 00:01:22,000
+This is the musubo dashboard. The same screen where the owner handles LINE messages.
+
+6
+00:01:22,000 --> 00:01:35,000
+In the left menu we open "Google Business". The Settings tab shows that no Google account is connected yet.
+
+7
+00:01:35,000 --> 00:01:50,000
+We press "Connect Google account". The address bar now shows Google's own OAuth endpoint with our client_id.
+
+8
+00:01:50,000 --> 00:02:00,000
+Google asks which account to use. We choose the account that already administers this store's Google Business Profile.
+
+9
+00:02:00,000 --> 00:02:15,000
+This is Google's consent screen. The app name is "musubo". We request exactly three scopes: Manage your Business Profile, email, and openid.
+
+10
+00:02:15,000 --> 00:02:30,000
+We do not send include_granted_scopes. If "Manage your Business Profile" is left unchecked, we refuse to save the connection and ask the owner to connect again with that permission granted. Here we keep it checked and allow.
+
+11
+00:02:30,000 --> 00:02:45,000
+Back in the dashboard, the connection is shown together with the connected Google account's email address. This is the only use of openid and userinfo.email: so the owner can confirm which account is linked.
+
+12
+00:02:45,000 --> 00:03:00,000
+READ 1 of 5: the list of locations this signed-in user already administers, so the owner can choose which store to link.
+
+13
+00:03:00,000 --> 00:03:25,000
+READ 2 of 5: that store's profile details - name, address, phone number, regular and special hours, website URL, description and photos - as currently published on Google.
+
+14
+00:03:25,000 --> 00:03:50,000
+READ 3 of 5: the store's Google reviews. Text, rating, time, reviewer display name and any existing reply.
+
+15
+00:03:50,000 --> 00:04:05,000
+READ 4 of 5: the store's local posts on Google.
+
+16
+00:04:05,000 --> 00:04:20,000
+READ 5 of 5: daily performance metrics - profile impressions, direction requests, call clicks and website clicks - shown as a simple chart.
+
+17
+00:04:20,000 --> 00:04:45,000
+Now the write operations. We open one review and press "Draft with AI" to generate a suggested reply.
+
+18
+00:04:45,000 --> 00:05:05,000
+The owner edits that draft by hand and saves it as a draft. Nothing has been sent to Google at this point.
+
+19
+00:05:05,000 --> 00:05:30,000
+WRITE 1 of 4: we press "Review the reply". This confirmation screen shows the exact text that will be sent to Google.
+
+20
+00:05:30,000 --> 00:05:45,000
+Only after the owner reads it and presses the confirm button is the reply sent. Nothing is ever sent automatically, on a schedule, or in the background.
+
+21
+00:05:45,000 --> 00:06:00,000
+In another tab we open the store's Google Business Profile. The reply is now published on Google.
+
+22
+00:06:00,000 --> 00:06:25,000
+WRITE 2 of 4: back in the Profile tab we change one field - the business hours - and press "Review the change".
+
+23
+00:06:25,000 --> 00:06:45,000
+The confirmation screen shows the old value and the new value side by side. We press "Send change to Google".
+
+24
+00:06:45,000 --> 00:06:55,000
+The change history records who sent what, and when, so the owner can review their own actions.
+
+25
+00:06:55,000 --> 00:07:20,000
+WRITE 3 of 4: in the Photos section we add one store photo and press "Review the change".
+
+26
+00:07:20,000 --> 00:07:40,000
+The confirmation screen lists "add photo" with the file name, and states that no other field will be changed. We confirm. Google reviews new photos on their side before publishing them.
+
+27
+00:07:40,000 --> 00:08:05,000
+WRITE 4 of 4: in the Posts tab we create a local post.
+
+28
+00:08:05,000 --> 00:08:25,000
+The final confirmation screen shows the exact body and the publish time that will go to Google. We confirm.
+
+29
+00:08:25,000 --> 00:08:40,000
+In another tab, the post is now visible on the store's Google Business Profile.
+
+30
+00:08:40,000 --> 00:09:05,000
+Now we disconnect. In the Settings tab we press "Disconnect". The on-screen notice states that the OAuth tokens and all content fetched from Google will be deleted.
+
+31
+00:09:05,000 --> 00:09:25,000
+After disconnecting, the Reviews and Profile tabs no longer hold any Google content. Cached content is also deleted automatically 28 days after it was last fetched, so nothing is kept beyond the 30 calendar day limit.
+
+32
+00:09:25,000 --> 00:09:50,000
+Finally, in Google account settings under Connections, musubo no longer appears: disconnecting also sends a revoke request to Google.
+
+33
+00:09:50,000 --> 00:10:10,000
+To summarise: replies, profile changes, photos and posts are sent to Google only when the store's own staff read a confirmation screen and press the confirm button. There is no automatic reply, no scheduled posting and no automatic profile editing. The only background processing is a read-only refresh.
