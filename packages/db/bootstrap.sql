@@ -1122,6 +1122,12 @@ CREATE TABLE auto_reply_hits (
   hit_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE auto_reply_unmatched_settings (
+ line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+ message TEXT CHECK(message IS NULL OR length(message) BETWEEN 1 AND 5000),
+ version INTEGER NOT NULL DEFAULT 1, updated_by TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
 CREATE TABLE auto_reply_versions (
   id                    TEXT PRIMARY KEY,
   auto_reply_id         TEXT NOT NULL,
@@ -3858,6 +3864,28 @@ CREATE TABLE incoming_webhooks (
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
   '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
+CREATE TABLE instagram_connections (
+ line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id), page_id TEXT NOT NULL,
+ instagram_id TEXT NOT NULL UNIQUE, page_name TEXT NOT NULL, username TEXT,
+ page_token_encrypted TEXT NOT NULL, user_token_encrypted TEXT NOT NULL,
+ expires_at TEXT NOT NULL, data_access_expires_at TEXT, profile_json TEXT, posts_json TEXT,
+ refreshed_at TEXT NOT NULL, synced_at TEXT, connected_by TEXT NOT NULL,
+ version INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE instagram_messages (
+ id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+ instagram_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL,
+ content TEXT NOT NULL, attachments_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(attachments_json)), received_at TEXT NOT NULL, created_at TEXT NOT NULL,
+ UNIQUE(line_account_id,id)
+);
+
+CREATE TABLE instagram_oauth_states (
+ state_hash TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+ staff_id TEXT NOT NULL, phase TEXT NOT NULL CHECK(phase IN ('started','exchanging','selecting','connecting')),
+ candidates_encrypted TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL
+);
+
 CREATE TABLE integration_api_tokens (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
@@ -6217,6 +6245,14 @@ CREATE TABLE rt_connector_status (
   UNIQUE(store_id, provider)
 );
 
+CREATE TABLE rt_customer_notice_outbox (
+ id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES rt_stores(id),
+ reservation_id TEXT NOT NULL REFERENCES rt_reservations(id), customer_version INTEGER NOT NULL,
+ line_uid TEXT NOT NULL, message TEXT NOT NULL, retry_key TEXT NOT NULL UNIQUE,
+ sent_at TEXT, lease_until TEXT, lease_token TEXT, created_at TEXT NOT NULL DEFAULT(datetime('now')),
+ UNIQUE(reservation_id,customer_version)
+);
+
 CREATE TABLE rt_email_digests (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -6649,7 +6685,7 @@ CREATE TABLE "rt_reservations" (
   source_updated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT);
+, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT);
 
 CREATE TABLE rt_resource_locks (
   resource_key TEXT PRIMARY KEY,
@@ -6845,6 +6881,17 @@ CREATE TABLE scenario_drafts (
   updated_by         TEXT NOT NULL,
   created_at         TEXT NOT NULL,
   updated_at         TEXT NOT NULL
+);
+
+CREATE TABLE scenario_edit_drafts (
+ line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+ draft_key TEXT NOT NULL,
+ content_json TEXT NOT NULL CHECK(json_valid(content_json)),
+ scenario_id TEXT REFERENCES scenarios(id) ON DELETE SET NULL, step_id TEXT REFERENCES scenario_steps(id) ON DELETE SET NULL,
+ version TEXT NOT NULL CHECK(length(version) = 36),
+ updated_by TEXT NOT NULL, updated_at TEXT NOT NULL,
+ expires_at TEXT NOT NULL,
+ PRIMARY KEY(line_account_id,draft_key)
 );
 
 CREATE TABLE scenario_pinned_action_fires (
@@ -9024,6 +9071,8 @@ CREATE INDEX idx_incoming_webhooks_folder ON incoming_webhooks(line_account_id, 
 
 CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
 
+CREATE INDEX idx_instagram_messages_account_time ON instagram_messages(line_account_id,received_at,id);
+
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);
 
@@ -9610,6 +9659,8 @@ CREATE INDEX idx_rich_menu_versions_group_status
 
 CREATE INDEX idx_rt_approvals_queue ON rt_approval_requests(organization_id, status, created_at DESC);
 
+CREATE UNIQUE INDEX idx_rt_customer_request ON rt_reservations(store_id,line_uid,customer_request_id) WHERE customer_request_id IS NOT NULL;
+
 CREATE INDEX idx_rt_email_digests_store_date
   ON rt_email_digests (store_id, target_date, media_id);
 
@@ -9729,6 +9780,8 @@ CREATE INDEX idx_scenario_actions_lookup
 
 CREATE INDEX idx_scenario_drafts_account_updated
   ON scenario_drafts(line_account_id, updated_at DESC, scenario_id);
+
+CREATE INDEX idx_scenario_edit_drafts_expiry ON scenario_edit_drafts(expires_at);
 
 CREATE INDEX idx_scenario_pinned_action_fires_friend
   ON scenario_pinned_action_fires (friend_id);
@@ -10352,6 +10405,18 @@ CREATE TRIGGER rt_closure_waitlist_update BEFORE UPDATE ON rt_seat_waitlist WHEN
 CREATE TRIGGER rt_closures_overlap_insert BEFORE INSERT ON rt_closures WHEN NEW.archived_at IS NULL AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) cp, json_each(NEW.periods_json) np WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND c.id<>NEW.id AND julianday(json_extract(cp.value,'$.startsAt'))<julianday(json_extract(np.value,'$.endsAt')) AND julianday(json_extract(cp.value,'$.endsAt'))>julianday(json_extract(np.value,'$.startsAt')) AND (json_array_length(c.table_ids_json)=0 OR json_array_length(NEW.table_ids_json)=0 OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) a JOIN json_each(NEW.table_ids_json) b ON a.value=b.value))) BEGIN SELECT RAISE(ABORT,'closure_overlap'); END;
 
 CREATE TRIGGER rt_closures_overlap_update BEFORE UPDATE ON rt_closures WHEN NEW.archived_at IS NULL AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) cp, json_each(NEW.periods_json) np WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND c.id<>NEW.id AND julianday(json_extract(cp.value,'$.startsAt'))<julianday(json_extract(np.value,'$.endsAt')) AND julianday(json_extract(cp.value,'$.endsAt'))>julianday(json_extract(np.value,'$.startsAt')) AND (json_array_length(c.table_ids_json)=0 OR json_array_length(NEW.table_ids_json)=0 OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) a JOIN json_each(NEW.table_ids_json) b ON a.value=b.value))) BEGIN SELECT RAISE(ABORT,'closure_overlap'); END;
+
+CREATE TRIGGER rt_customer_identity_insert BEFORE INSERT ON rt_reservations WHEN NEW.customer_request_id IS NOT NULL AND NEW.status NOT IN ('cancelled','no_show') AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=NEW.store_id AND r.line_uid=NEW.line_uid AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) BEGIN SELECT RAISE(ABORT,'customer_duplicate_booking'); END;
+
+CREATE TRIGGER rt_customer_identity_update BEFORE UPDATE OF starts_at,ends_at ON rt_reservations WHEN NEW.customer_request_id IS NOT NULL AND NEW.status NOT IN ('cancelled','no_show') AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.id<>NEW.id AND r.store_id=NEW.store_id AND r.line_uid=NEW.line_uid AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) BEGIN SELECT RAISE(ABORT,'customer_duplicate_booking'); END;
+
+CREATE TRIGGER rt_customer_line_capacity_insert BEFORE INSERT ON rt_reservations WHEN NEW.customer_request_id IS NOT NULL AND NEW.status NOT IN ('cancelled','no_show') AND EXISTS(SELECT 1 FROM rt_inventory_slots i WHERE i.store_id=NEW.store_id AND julianday(i.starts_at)<julianday(NEW.ends_at) AND julianday(i.starts_at,'+'||i.slot_minutes||' minutes')>julianday(NEW.starts_at) AND i.line_capacity < NEW.guest_count + (SELECT COALESCE(SUM(r.guest_count),0) FROM rt_reservations r WHERE r.id<>NEW.id AND r.store_id=NEW.store_id AND r.source='line' AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(i.starts_at,'+'||i.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(i.starts_at))) BEGIN SELECT RAISE(ABORT,'customer_line_capacity'); END;
+
+CREATE TRIGGER rt_customer_line_capacity_update BEFORE UPDATE OF table_id,starts_at,ends_at,guest_count ON rt_reservations WHEN NEW.customer_request_id IS NOT NULL AND NEW.status NOT IN ('cancelled','no_show') AND (NEW.table_id<>OLD.table_id OR NEW.starts_at<>OLD.starts_at OR NEW.ends_at<>OLD.ends_at OR NEW.guest_count<>OLD.guest_count) AND EXISTS(SELECT 1 FROM rt_inventory_slots i WHERE i.store_id=NEW.store_id AND julianday(i.starts_at)<julianday(NEW.ends_at) AND julianday(i.starts_at,'+'||i.slot_minutes||' minutes')>julianday(NEW.starts_at) AND i.line_capacity < NEW.guest_count + (SELECT COALESCE(SUM(r.guest_count),0) FROM rt_reservations r WHERE r.id<>NEW.id AND r.store_id=NEW.store_id AND r.source='line' AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(i.starts_at,'+'||i.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(i.starts_at))) BEGIN SELECT RAISE(ABORT,'customer_line_capacity'); END;
+
+CREATE TRIGGER rt_customer_table_insert BEFORE INSERT ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND (NEW.status<>'pending' OR NEW.hold_expires_at IS NULL OR julianday(NEW.hold_expires_at)>julianday('now')) AND NEW.table_id IS NOT NULL AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=NEW.store_id AND r.table_id=NEW.table_id AND r.id<>NEW.id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND (NEW.customer_request_id IS NOT NULL OR r.customer_request_id IS NOT NULL) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) BEGIN SELECT RAISE(ABORT,'customer_table_conflict'); END;
+
+CREATE TRIGGER rt_customer_table_update BEFORE UPDATE OF table_id,starts_at,ends_at,status ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND (NEW.status<>'pending' OR NEW.hold_expires_at IS NULL OR julianday(NEW.hold_expires_at)>julianday('now')) AND NEW.table_id IS NOT NULL AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=NEW.store_id AND r.table_id=NEW.table_id AND r.id<>NEW.id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND (NEW.customer_request_id IS NOT NULL OR r.customer_request_id IS NOT NULL) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) BEGIN SELECT RAISE(ABORT,'customer_table_conflict'); END;
 
 CREATE TRIGGER rt_inventory_reservation_delete AFTER DELETE ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE store_id IN (OLD.store_id); END;
 
