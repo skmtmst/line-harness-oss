@@ -31,7 +31,6 @@ import {
   Send,
   SendHorizontal,
   UserCheck,
-  X,
 } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
@@ -51,6 +50,7 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import DateField from '@/components/shared/date-field'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -940,12 +940,17 @@ export default function BroadcastListV8() {
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', null,
       <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度試す</Button>, true)
   ) : visibleBroadcasts.length === 0 ? (
-    filterActive
-      ? stateCard(null, '条件に合う配信はありません', '「予約中のみ」「下書き」や配信日を外すと、すべて出ます',
-        <Button type="button" onClick={clearFilters}><X size={14} aria-hidden="true" />条件を外す</Button>)
-      : stateCard(<Send size={20} aria-hidden="true" />, 'まだ一斉配信はありません', '友だちにまとめてお知らせを送れます',
-        /* 閲覧のみには押せない「配信を作る」を置かずに隠す（2026-10-06 オーナー決定）。 */
-        canEdit ? <Button type="button" variant="primary" onClick={() => openCreate(false)}><Plus size={15} aria-hidden="true" />配信を作る</Button> : null)
+    /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない（2026-10-06 オーナー決定）。 */
+    <EmptyList
+      icon={<Send aria-hidden="true" />}
+      title="まだ一斉配信がありません"
+      description="友だちみんなや絞り込んだ人に、お知らせをまとめて送ります。"
+      create={{ label: '最初の一斉配信を作る', onClick: () => openCreate(false) }}
+      canCreate={canEdit}
+      filtered={filterActive}
+      onClearFilters={clearFilters}
+      filteredDescription="「予約中のみ」「下書き」や配信日を外すと、すべて出ます"
+    />
   ) : (
     <DataTable className={styles.table}>
       {tableHead}

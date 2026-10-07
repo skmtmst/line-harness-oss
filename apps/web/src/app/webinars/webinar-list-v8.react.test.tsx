@@ -157,7 +157,7 @@ test('v8 で何も無いときは eAQ3t の「まだ無い」が出る', async (
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="UyUMw"]')
-  expect(board?.textContent).toContain('まだ、ウェビナーはありません')
+  expect(board?.textContent).toContain('まだウェビナーがありません')
 })
 
 // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。

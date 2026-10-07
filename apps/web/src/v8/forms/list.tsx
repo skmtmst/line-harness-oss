@@ -24,7 +24,6 @@ import {
   MoreHorizontal,
   Percent,
   Plus,
-  SearchX,
   TriangleAlert,
 } from 'lucide-react'
 import { displayFormName, hasStoredDestination, type Folder } from '@line-crm/shared'
@@ -38,6 +37,7 @@ import { runUndoable } from '@/lib/undoable'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
@@ -1200,21 +1200,24 @@ export default function FormsListV8() {
       '担当未割り当てのフォームはありません',
       '担当の決まっていない旧フォームはここに出ます。',
     )
-  } else if (folderTotal === 0 && !filterActive) {
-    listBody = stateCard(
-      <ClipboardList size={18} aria-hidden="true" />,
-      'まだ回答フォームはありません',
-      'アンケートや申し込みを LINE の中で受け付けられます。答えは友だち情報に保存できます。',
-      createButton(false),
-      false,
-      'I3L41O-empty',
-    )
-  } else if (listTotal === 0) {
-    listBody = stateCard(
-      <SearchX size={18} aria-hidden="true" />,
-      '条件に合うフォームはありません',
-      '「公開中」「下書き」「情報欄に保存」や検索を外すと、すべて出ます。',
-      <Button type="button" variant="secondary" onClick={clearFilters}>条件を外す</Button>,
+  } else if (listTotal === 0 || folderTotal === 0) {
+    /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない。 */
+    listBody = (
+      <EmptyList
+        icon={<ClipboardList aria-hidden="true" />}
+        title="まだ回答フォームがありません"
+        description="アンケートや申し込みを LINE の中で受け付け、答えを友だち情報に保存します。"
+        canCreate={canManageFolders}
+        action={
+          <Button type="button" variant="primary" onClick={createDraft} disabled={creating} busy={creating} busyLabel="下書きを作成中">
+            <Plus size={15} aria-hidden="true" />最初のフォームを作る
+          </Button>
+        }
+        filtered={filterActive}
+        onClearFilters={clearFilters}
+        filteredDescription="「公開中」「下書き」「情報欄に保存」や検索を外すと、すべて出ます"
+        data-design-node="I3L41O-empty"
+      />
     )
   } else {
     listBody = (

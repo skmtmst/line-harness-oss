@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -220,19 +221,17 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
       {reorderError ? <p className="text-danger mt-2 text-xs" role="alert">{reorderError}</p> : null}
       {visibilityError ? <p className="text-danger mt-2 text-xs" role="alert">{visibilityError}</p> : null}
 
-      {menus.length === 0 ? (
-        <StateCard
+      {shown.length === 0 ? (
+        /* 修正案 D-2：空の一覧。 */
+        <EmptyList
           icon={<AccountIcon />}
-          title="まだ予約メニューはありません"
-          description="メニューと担当スタッフ・開ける時間を決めると、お客さまがLINEから予約できます。"
-          action={canEdit ? <Button variant="primary" href="/booking/menus/new">予約メニューを作る</Button> : undefined}
-        />
-      ) : shown.length === 0 ? (
-        <StateCard
-          icon={<AccountIcon />}
-          title="条件に合うメニューはありません"
-          description="検索を外すと、すべて出ます"
-          action={<Button onClick={() => { setQuery(''); setPage(1) }}>条件を外す</Button>}
+          title="まだ予約メニューがありません"
+          description="メニューと担当・開ける時間を決めて、お客さまが LINE から予約できるようにします。"
+          create={{ label: '最初の予約メニューを作る', href: '/booking/menus/new' }}
+          canCreate={canEdit}
+          filtered={menus.length > 0}
+          onClearFilters={() => { setQuery(''); setPage(1) }}
+          filteredDescription="検索を外すと、すべて出ます"
         />
       ) : (
         <section className={styles.section}>

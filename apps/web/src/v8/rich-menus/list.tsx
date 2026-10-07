@@ -24,11 +24,9 @@ import {
   ListOrdered,
   MoreHorizontal,
   Plus,
-  Search as SearchIcon,
   Split,
   TriangleAlert,
   Trophy,
-  X,
 } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type RichMenuDeleteImpact, type RichMenuGroupListItem, type RichMenuTapStats } from '@/lib/api'
@@ -47,6 +45,7 @@ import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
@@ -968,27 +967,17 @@ export default function RichMenusListV8() {
       'error',
     )
   ) : groups.length === 0 ? (
-    filterActive ? (
-      stateCard(
-        <SearchIcon size={16} aria-hidden="true" />,
-        '条件に合うメニューはありません',
-        '「公開中」「予約」「下書き」「出し分け」や検索を外すと、すべて出ます。',
-        <Button type="button" variant="secondary" onClick={clearFilters}>
-          <X size={14} aria-hidden="true" />
-          条件を外す
-        </Button>,
-      )
-    ) : (
-      stateCard(
-        <ImageIcon size={16} aria-hidden="true" />,
-        'まだリッチメニューはありません',
-        'トーク画面の下にボタンのメニューを出せます。LINEにあるメニューを取り込むこともできます。',
-        canEdit ? <Button type="button" variant="primary" onClick={goCreate}>
-          <Plus size={15} aria-hidden="true" />
-          メニューを作る
-        </Button> : null,
-      )
-    )
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<ImageIcon aria-hidden="true" />}
+      title="まだリッチメニューがありません"
+      description="トーク画面の下に、ボタンのメニューを出します。"
+      create={{ label: '最初のリッチメニューを作る', onClick: goCreate }}
+      canCreate={canEdit}
+      filtered={filterActive}
+      onClearFilters={clearFilters}
+      filteredDescription="「公開中」「予約」「下書き」「出し分け」や検索を外すと、すべて出ます"
+    />
   ) : (
     <>
       <span className="sr-only" role="status" aria-live="polite">{moveNotice}</span>

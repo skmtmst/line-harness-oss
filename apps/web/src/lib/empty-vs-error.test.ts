@@ -20,7 +20,7 @@ const APP = join(dirname(fileURLToPath(import.meta.url)), '..', 'app');
 /** 一覧の画面と、そこに出る「1件も無い」の文（の一部）。 */
 const PAGES = [
   /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。 */
-  { file: 'reminders/list-v8.tsx', empty: 'まだリマインダはありません' },
+  { file: 'reminders/list-v8.tsx', empty: 'まだリマインダがありません' },
   { file: 'auto-replies/page.tsx', empty: '自動応答は0件です' },
   { file: 'broadcasts/page.tsx', empty: '配信がありません' },
 ];

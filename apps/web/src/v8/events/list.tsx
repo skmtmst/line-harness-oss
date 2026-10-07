@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bookmark, CalendarClock, CalendarX, Eye, Hourglass, MoreHorizontal, Plus, SearchX, TrendingDown, TriangleAlert, Users } from 'lucide-react'
+import { Bookmark, CalendarClock, CalendarX, Eye, Hourglass, MoreHorizontal, Plus, TrendingDown, TriangleAlert, Users } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, eventsApi, fetchApi, type EventListItem, type EventListSummary } from '@/lib/api'
 import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
@@ -21,6 +21,7 @@ import { useStaffRole } from '@/lib/staff-role'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -467,19 +468,18 @@ export default function EventsListV8() {
       <Button onClick={() => void refresh()}>もう一度読み込む</Button>,
       true,
     )
-  } else if (items.length === 0 && !filterActive) {
-    listBody = stateCard(
-      <CalendarClock size={18} aria-hidden="true" />,
-      'イベントがまだありません',
-      '教室・体験会・相談会など、回ごとに定員のあるイベントをここから作ります。',
-      canEdit ? <Button href="/events/new">最初のイベントを作る</Button> : undefined,
-    )
   } else if (items.length === 0) {
-    listBody = stateCard(
-      <SearchX size={18} aria-hidden="true" />,
-      '条件に合うイベントはありません',
-      '検索語や絞り込みを外すと、すべて出ます。',
-      <Button onClick={() => { setQuery(''); setFilter('all'); setFolderFilter('') }}>条件を外す</Button>,
+    /* 修正案 D-2：空の一覧。 */
+    listBody = (
+      <EmptyList
+        icon={<CalendarClock aria-hidden="true" />}
+        title="まだイベントがありません"
+        description="教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受け付けます。"
+        create={{ label: '最初のイベントを作る', href: '/events/new' }}
+        canCreate={canEdit}
+        filtered={filterActive}
+        onClearFilters={() => { setQuery(''); setFilter('all'); setFolderFilter('') }}
+      />
     )
   } else {
     listBody = (
