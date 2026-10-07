@@ -282,14 +282,14 @@ const mediaUploadSessionTargets = new Map()
 
 /** 統括のテンプレートの見本（★V8-B LRc93・X4JcOf・meBRB）。 */
 const HQ_TEMPLATES_HTN = [
-  { id: 'visual-hq-tpl-autumn', name: '秋の新商品のお知らせ', description: '本文・画像 1', template_type: 'template', folder_id: null, revision: 2, updated_at: '2026-09-30T01:12:00.000Z', reference_summary: '', distributed_account_count: 3 },
-  { id: 'visual-hq-tpl-thanks', name: '来店のお礼', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-22T09:40:00.000Z', reference_summary: '', distributed_account_count: 2 },
-  { id: 'visual-hq-tpl-booking', name: '予約の受付', description: '本文・ボタン', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-12T00:00:00.000Z', reference_summary: '回答フォーム「予約」', distributed_account_count: 1 },
-  { id: 'visual-hq-tpl-holiday', name: '定休日のご案内', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-08-30T06:20:00.000Z', reference_summary: '', distributed_account_count: 0 },
-  { id: 'visual-hq-tpl-menu', name: '基本のメニュー', description: null, template_type: 'rich_menu', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
-  { id: 'visual-hq-tpl-form', name: '予約', description: null, template_type: 'form', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
-  { id: 'visual-hq-tpl-tag-vip', name: 'VIP', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
-  { id: 'visual-hq-tpl-tag-new', name: '新規', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
+  { id: 'visual-hq-tpl-autumn', name: '秋の新商品のお知らせ', description: '本文・画像 1', template_type: 'template', folder_id: null, revision: 2, updated_at: '2026-09-30T01:12:00.000Z', reference_summary: '', distributed_account_count: 3, distributed_account_names: ['本店', '渋谷店', 'イベント'], distributed_account_more: 0, content_summary: '本文・画像 1' },
+  { id: 'visual-hq-tpl-thanks', name: '来店のお礼', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-22T09:40:00.000Z', reference_summary: '', distributed_account_count: 2, distributed_account_names: ['本店', '渋谷店'], distributed_account_more: 0, content_summary: '本文' },
+  { id: 'visual-hq-tpl-booking', name: '予約の受付', description: '本文・ボタン', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-12T00:00:00.000Z', reference_summary: '回答フォーム「予約」', distributed_account_count: 1, distributed_account_names: ['本店'], distributed_account_more: 0, content_summary: '本文・ボタン' },
+  { id: 'visual-hq-tpl-holiday', name: '定休日のご案内', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-08-30T06:20:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '本文' },
+  { id: 'visual-hq-tpl-menu', name: '基本のメニュー', description: null, template_type: 'rich_menu', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '6分割・画像あり' },
+  { id: 'visual-hq-tpl-form', name: '予約', description: null, template_type: 'form', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '質問 3' },
+  { id: 'visual-hq-tpl-tag-vip', name: 'VIP', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: 'タグ 1' },
+  { id: 'visual-hq-tpl-tag-new', name: '新規', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: 'タグ 1' },
 ]
 const HQ_TEMPLATE_ACCOUNTS_HTN = [
   { id: 'visual-qa-account-prod', name: '然 -NEN- 本店' },

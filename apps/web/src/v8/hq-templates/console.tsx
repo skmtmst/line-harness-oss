@@ -33,6 +33,7 @@ import { Th } from '@/components/shared/table'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { freshDefinition } from '@/lib/hq-template-authoring'
+import { distributedAccountsLine, templateSubLine } from './list-row'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
 import {
   hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type MessageTemplateDefinition,
@@ -516,13 +517,16 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
                           <FolderDot folder={folder ? { name: folder.name } : null} />
                           <span className={styles.name} title={row.name}>{row.name}</span>
                         </span>
-                        <span className={styles.sub}>{row.description || LABELS[row.template_type]}</span>
+                        <span className={styles.sub} title={templateSubLine(row, LABELS[row.template_type])}>{templateSubLine(row, LABELS[row.template_type])}</span>
                       </td>
                       <td><span className={row.reference_summary ? styles.cell : `${styles.cell} ${styles.cellEmpty}`} title={row.reference_summary}>{row.reference_summary || '—'}</span></td>
                       <td><span className={styles.cell}>{shortDate(row.updated_at)}</span></td>
                       <td className={styles.topCell}>
                         {row.distributed_account_count === undefined ? <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span>
-                          : row.distributed_account_count ? <span className={styles.strong}>{`${row.distributed_account_count} アカウント`}</span>
+                          : row.distributed_account_count ? <>
+                            <span className={styles.strong}>{`${row.distributed_account_count} アカウント`}</span>
+                            {distributedAccountsLine(row) ? <span className={styles.sub} title={distributedAccountsLine(row) ?? undefined}>{distributedAccountsLine(row)}</span> : null}
+                          </>
                           : <span className={styles.strong}>まだ配っていない</span>}
                       </td>
                       <td>
