@@ -34,7 +34,15 @@
 :global([data-theme='v8']) .content { min-width: 0; }
 :global([data-theme='v8']) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
 :global([data-theme='v8']) .folders { width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: 2px; }
+/*
+ * 統括（/hq）の列（絵 JKjsE・LRc93 ほか）：中身の幅 200 に左24・右12の余白と線を足した外寸（content-box）。
+ * border-box のままだと中身が 164 に縮み、右の中身が 36px 左へずれていた（2026-10-08）。
+ * 統括以外の一覧も絵の外寸は 224（中身200＋左右12）で同じずれがあるが、画面ごとの補正が残っているので司令塔の判断で広げる。
+ */
+:global([data-theme='v8']) .folders[data-folder-inset] { box-sizing: content-box; padding-left: var(--tpl-folder-inset-pad-start); }
 :global([data-theme='v8']) .collapsedFolders { display: none; }
+/* 中身の高さで止まる列（統括の設定の中のメニュー・絵 JB8V1・K7HYu・b8xBtZ）。縦の仕切り線も中身まで。 */
+:global([data-theme='v8']) .folders:has(> [data-folder-fit]) { align-self: flex-start; }
 /* 型が組む畳んだ段（folderNav）。作るボタンは列の幅いっぱいにせず中身の幅。選ぶ欄は 1152 の板（Iffil・L7zA7C）の幅。 */
 :global([data-theme='v8']) .collapsedCreate { display: flex; flex-shrink: 0; }
 :global([data-theme='v8']) .collapsedCreate > * { width: auto; }

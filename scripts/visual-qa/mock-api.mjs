@@ -282,14 +282,14 @@ const mediaUploadSessionTargets = new Map()
 
 /** 統括のテンプレートの見本（★V8-B LRc93・X4JcOf・meBRB）。 */
 const HQ_TEMPLATES_HTN = [
-  { id: 'visual-hq-tpl-autumn', name: '秋の新商品のお知らせ', description: '本文・画像 1', template_type: 'template', folder_id: null, revision: 2, updated_at: '2026-09-30T01:12:00.000Z', reference_summary: '', distributed_account_count: 3 },
-  { id: 'visual-hq-tpl-thanks', name: '来店のお礼', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-22T09:40:00.000Z', reference_summary: '', distributed_account_count: 2 },
-  { id: 'visual-hq-tpl-booking', name: '予約の受付', description: '本文・ボタン', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-12T00:00:00.000Z', reference_summary: '回答フォーム「予約」', distributed_account_count: 1 },
-  { id: 'visual-hq-tpl-holiday', name: '定休日のご案内', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-08-30T06:20:00.000Z', reference_summary: '', distributed_account_count: 0 },
-  { id: 'visual-hq-tpl-menu', name: '基本のメニュー', description: null, template_type: 'rich_menu', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
-  { id: 'visual-hq-tpl-form', name: '予約', description: null, template_type: 'form', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
-  { id: 'visual-hq-tpl-tag-vip', name: 'VIP', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
-  { id: 'visual-hq-tpl-tag-new', name: '新規', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
+  { id: 'visual-hq-tpl-autumn', name: '秋の新商品のお知らせ', description: '本文・画像 1', template_type: 'template', folder_id: null, revision: 2, updated_at: '2026-09-30T01:12:00.000Z', reference_summary: '', distributed_account_count: 3, distributed_account_names: ['本店', '渋谷店', 'イベント'], distributed_account_more: 0, content_summary: '本文・画像 1' },
+  { id: 'visual-hq-tpl-thanks', name: '来店のお礼', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-22T09:40:00.000Z', reference_summary: '', distributed_account_count: 2, distributed_account_names: ['本店', '渋谷店'], distributed_account_more: 0, content_summary: '本文' },
+  { id: 'visual-hq-tpl-booking', name: '予約の受付', description: '本文・ボタン', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-12T00:00:00.000Z', reference_summary: '回答フォーム「予約」', distributed_account_count: 1, distributed_account_names: ['本店'], distributed_account_more: 0, content_summary: '本文・ボタン' },
+  { id: 'visual-hq-tpl-holiday', name: '定休日のご案内', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-08-30T06:20:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '本文' },
+  { id: 'visual-hq-tpl-menu', name: '基本のメニュー', description: null, template_type: 'rich_menu', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '6分割・画像あり' },
+  { id: 'visual-hq-tpl-form', name: '予約', description: null, template_type: 'form', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '質問 3' },
+  { id: 'visual-hq-tpl-tag-vip', name: 'VIP', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: 'タグ 1' },
+  { id: 'visual-hq-tpl-tag-new', name: '新規', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: 'タグ 1' },
 ]
 const HQ_TEMPLATE_ACCOUNTS_HTN = [
   { id: 'visual-qa-account-prod', name: '然 -NEN- 本店' },
@@ -316,6 +316,16 @@ const HQ_TEMPLATE_PREFLIGHT_HTN = {
     { accountId: 'visual-qa-account-prod', accountName: '然 -NEN- 本店', items: [{ sourceId: 'hq-authored-message', itemKind: 'template', name: '秋の新商品のお知らせ', expectedRevision: 2, duplicate: true, allowedModes: ['overwrite', 'alias'] }] },
     { accountId: 'visual-qa-account-store', accountName: '然 -NEN- 渋谷店', items: [{ sourceId: 'hq-authored-message', itemKind: 'template', name: '秋の新商品のお知らせ', expectedRevision: 1, duplicate: true, allowedModes: ['overwrite', 'alias'] }] },
     { accountId: 'visual-qa-account-event-2025', accountName: '2025年イベント', items: [{ sourceId: 'hq-authored-message', itemKind: 'template', name: '秋の新商品のお知らせ', expectedRevision: null, duplicate: false, allowedModes: ['create'] }] },
+  ],
+}
+
+/** 統括のテンプレート（★V8-B dEvJM）：配った結果。成功2（新規・同じ名前で別名）・失敗1。 */
+const HQ_TEMPLATE_RESULT_HTN = {
+  runId: 'visual-hq-run-1', status: 'partial',
+  stores: [
+    { accountId: 'visual-qa-account-prod', accountName: '然-NEN-本店', status: 'succeeded', reason: null, counts: { created: 1, overwritten: 0, aliased: 0 }, createdName: '秋の新商品のお知らせ' },
+    { accountId: 'visual-qa-account-store', accountName: '然-NEN-渋谷店', status: 'succeeded', reason: null, counts: { created: 0, overwritten: 0, aliased: 1 }, createdName: '秋の新商品のお知らせ（2）' },
+    { accountId: 'visual-qa-account-event-2025', accountName: '2025年イベント', status: 'failed', reason: 'タグ「秋の新商品」がこのアカウントにありません', counts: { created: 0, overwritten: 0, aliased: 0 }, createdName: null },
   ],
 }
 
@@ -2118,6 +2128,8 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   }
   // 統括のテンプレート（★V8-B meBRB）：配る前の確認。
   if (method === 'POST' && /^\/api\/hq\/templates\/visual-hq-tpl-[^/]+\/preflight$/.test(pathname)) return HQ_TEMPLATE_PREFLIGHT_HTN
+  // 統括のテンプレート（★V8-B dEvJM）：配る。結果の窓に出す成功2・失敗1を返す。
+  if (method === 'POST' && /^\/api\/hq\/templates\/visual-hq-tpl-[^/]+\/distribute$/.test(pathname)) return HQ_TEMPLATE_RESULT_HTN
   // 統括 LINEアカウントを登録（★V8-B v2KMj・qw80E・TvXII）。接続確認は5段すべて通った返事、登録は取り込み中。
   if (method === 'POST' && pathname === '/api/line-accounts/connect/check') return LINE_ACCOUNT_CONNECT_HTN
   if (method === 'POST' && pathname === '/api/line-accounts/connect') {
@@ -3249,6 +3261,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const row = HQ_TEMPLATES_HTN.find((item) => item.id === hqTemplateDetail[1])
     return row ? { success: true, data: { template: row, definition: hqTemplateDefinitionHtn(row) } } : { success: false, error: 'Not found' }
   }
+  if (method === 'GET' && /^\/api\/hq\/templates\/visual-hq-tpl-[^/]+\/distributions\/[^/]+$/.test(pathname)) return { success: true, data: HQ_TEMPLATE_RESULT_HTN }
   if (method === 'DELETE' && pathname === '/api/hq/templates/media') {
     return { success: true, data: { deleted: true } }
   }

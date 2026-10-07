@@ -1,8 +1,10 @@
 import { parseTextOverrides } from './text-overrides.js';
+import type { HqTemplateListDisplay } from '@line-crm/shared';
+import { templateContentSummary } from './list-display.js';
 import { captureDistributionName, targetDistributionVersion } from './distribution-display.js';
 import { parseScenarioDefinition, scenarioSnapshot, inspectScenario, planScenario } from './scenario.js';
 import {
-  beginHqTemplateDistributionRun, getHqTemplate, listHqTemplates, HQ_TEMPLATE_TYPES,
+  beginHqTemplateDistributionRun, getHqTemplate, listHqTemplateDisplaySources, HQ_TEMPLATE_TYPES,
   type HqTemplate, type HqTemplatePreflight, type HqTemplatePreflightResolution,
   type HqTemplateDistributionResult, type HqTemplateStatement, type HqTemplateType,
 } from '@line-crm/db';
@@ -130,8 +132,17 @@ export async function deleteTemplate(db: D1Database, authority: HqTemplateAuthor
   } catch { throw new HqTemplateError('VERSION_CONFLICT', 409); }
   return { id, archived: true };
 }
-export async function listTemplates(db: D1Database, authority: HqTemplateAuthority, type?: HqTemplateType): Promise<HqTemplate[]> {
-  return listHqTemplates(db, authority.tenantId, type);
+export async function listTemplates(db: D1Database, authority: HqTemplateAuthority, type?: HqTemplateType): Promise<(HqTemplate & HqTemplateListDisplay)[]> {
+  const rows = await listHqTemplateDisplaySources(db, authority.tenantId, type);
+  return rows.map(({ definition_json, distributed_account_names_json, display_type: _displayType, ...template }) => {
+    const names = JSON.parse(distributed_account_names_json) as string[];
+    return {
+      ...template,
+      distributed_account_names: names,
+      distributed_account_more: Math.max(0, template.distributed_account_count - names.length),
+      content_summary: templateContentSummary(template.template_type, definition_json, authority.tenantId),
+    };
+  });
 }
 export async function preflightDistribution(db: D1Database, authority: HqTemplateAuthority, id: string, accountIds: string[], bucket?: R2Bucket, textOverrides?: unknown) {
   const accounts = await requireTargetAccounts(db, authority, accountIds);

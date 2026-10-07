@@ -13,7 +13,8 @@
   padding: var(--tpl-htn-step-pad); border-radius: var(--tpl-htn-radius-m);
   background: var(--color-canvas); box-shadow: var(--tpl-htn-ring);
 }
-.step[data-state='current'] { box-shadow: var(--tpl-htn-ring-accent); }
+/* 絵：今の段は 2px の線を外へ 1px はみ出して描く（outline 2・offset -1）。内側の輪だと 1px 小さく見える。 */
+.step[data-state='current'] { box-shadow: none; outline: var(--tpl-htn-line-2) solid var(--color-accent-deep); outline-offset: -1px; }
 .step[data-state='done'] { background: var(--color-success-bg); box-shadow: var(--tpl-htn-ring); }
 .stepMark {
   width: var(--tpl-htn-step-mark); height: var(--tpl-htn-step-mark); flex-shrink: 0;
@@ -149,7 +150,7 @@
 
 /* ⑤ 完了 */
 .doneLine {
-  margin: 0; display: flex; align-items: center; gap: var(--tpl-htn-done-gap);
+  margin: 0; display: flex; align-items: center; gap: var(--tpl-htn-gap-s); /* 絵：印の円 22（線込み）＋間 10。lucide 24 の円は 22 なので間は 8 */
   font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink);
 }
 .doneLine svg { color: var(--color-accent-deep); flex-shrink: 0; }

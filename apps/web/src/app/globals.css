@@ -517,6 +517,8 @@
   /* 読み込み中の輪・帯が 1 周する長さ（動きの点検 18 番。900ms・1.1s・1s とばらばらだった）。 */
   --motion-spin: 1s;
   --press-scale: 0.98;
+  /* 小窓（選ぶ欄・日付の欄）が開くときの縮み。押したときの --press-scale とは別。0.97 を4か所で直書きしていた。 */
+  --popover-enter-scale: 0.97;
   --press-dim: brightness(0.88);
   --press-dim-soft: brightness(0.96);
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -684,7 +686,7 @@
   --tpl-st2-pc-side-w: 340px; --tpl-st2-pc-card-pad: 18px; --tpl-st2-pc-title-lh: 20px; --tpl-st2-pc-label-lh: 20px; --tpl-st2-pc-account-gap: 8px; --tpl-st2-pc-account-pad: 10px 12px; --tpl-st2-pc-fact-pad: 7px 0;
   --tpl-st2-imp-h: 48px; --tpl-st2-imp-pad: 0 20px; --tpl-st2-imp-gap: 12px; --tpl-st2-imp-icon: 16px; --tpl-st2-imp-btn-pad: 6px 12px; --tpl-st2-imp-bg: #fff4e0; --tpl-st2-imp-line: #f0b45a; --tpl-st2-imp-ink: #8a3c00; --tpl-st2-imp-strong: #b45309; --tpl-st2-imp-btn-line: #d9822b;
   /* たまる決めごとを作る・流入と計測の残り（作業役 rsa） */ --tpl-rsa-choice-gap: 8px; --tpl-rsa-side-title-lh: 20px; --tpl-rsa-trial-row-pad: 6px 0; --tpl-rsa-caution-lh: 19px; --tpl-rsa-after-inset: 0 24px; --tpl-rsa-after-note-lh: 18px; --tpl-rsa-mini-pad: 10px 12px; --tpl-rsa-mini-value-size: 18px; --tpl-rsa-mini-value-lh: 26px; --tpl-rsa-orders-pad: 9px 0; --tpl-rsa-kv-row-h: 34.5px; --tpl-rsa-list-indent: 16px; --tpl-rsa-pager-pad: 20px 40px; --tpl-rsa-pager-h: 32px; --tpl-rsa-bleed: 24px; --tpl-rsa-ss-head-gap: 4px; --tpl-rsa-ss-title-lh: 20px; --tpl-rsa-ss-head-pad: 10px 0; --tpl-rsa-ss-head-h: 36.5px; --tpl-rsa-ss-row-pad: 8px 0; --tpl-rsa-ss-row-h: 51.5px; --tpl-rsa-ss-col-domain: 143px; --tpl-rsa-ss-col-state: 100px; --tpl-rsa-ss-col-last: 95px; --tpl-rsa-ss-col-menu: 36px; --tpl-rsa-ss-panel-gap: 10px; --tpl-rsa-ss-code-pad: 12px 14px; --tpl-rsa-ss-code-lh: 15px; --tpl-rsa-ss-domain-pad: 8px 12px; --tpl-rsa-ss-domain-h: 64px; --tpl-rsa-ss-btn-pad: 0 14px; --tpl-rsa-ss-rail-w: 420px; --tpl-rsa-ss-page-head-pad: 9px 16px; --tpl-rsa-ss-page-row-pad: 10px 16px; --tpl-rsa-ss-page-row-h: 36.5px; --tpl-rsa-ss-num-w: 120px; --tpl-rsa-ss-num-narrow-w: 80px; --tpl-rsa-ss-num-pad-end: 12px; --tpl-rsa-ad-provider-pad: 14px; --tpl-rsa-ad-col-media: 100px; --tpl-rsa-ad-col-link: 200px; --tpl-rsa-ad-col-cost: 110px; --tpl-rsa-ad-col-num: 90px; --tpl-rsa-ad-col-import: 80px; --tpl-rsa-ad-row-h: 41.5px; --tpl-rsa-ad-notice-pad: 10px 12px; --tpl-rsa-ad-entry-source: 190px; --tpl-rsa-ad-entry-amount: 71px; --tpl-rsa-ad-entry-who: 75px; --tpl-rsa-qr-pull: -27px; --tpl-rsa-qr-actions-top: 0; --tpl-rsa-line-top: inset 0 1px 0 var(--color-hairline); --tpl-rsa-line-bottom: inset 0 -1px 0 var(--color-hairline);
-  /* 統括のメンバー・アカウントの残り（作業役 hq） */ --tpl-hq-mem-radio-gap: 20px; --tpl-hq-mem-check-pad: 12px; --tpl-hq-mem-check-gap: 6px; --tpl-hq-mem-confirm-row-h: 35.5px; --tpl-hq-mem-confirm-label-w: 200px; --tpl-hq-home-account-h: 240px; --tpl-hq-home-warn-pad-end: 6px;
+  /* 統括のメンバー・アカウントの残り（作業役 hq） */ --tpl-hq-mem-radio-gap: 20px; --tpl-hq-mem-check-pad: 12px; --tpl-hq-mem-check-gap: 6px; --tpl-hq-mem-confirm-row-h: 35.5px; --tpl-hq-mem-confirm-label-w: 200px; --tpl-hq-home-account-h: 240px; --tpl-hq-home-warn-pad-end: 0px; --tpl-hq-home-warn-pull: -10px;
   --tpl-an-tabs-gap: 24px; --tpl-an-tab-pad-bottom: 8px; --tpl-an-tab-line: 2px; --tpl-an-tab-lh: 19px; --tpl-an-ro-margin: 12px 0 13px; --tpl-an-kpi-menu: 24px; --tpl-an-actions-extra: 4px;
   --tpl-an-body-pad: 14px 24px 24px; --tpl-an-split-gap: 16px; --tpl-an-side-gap: 12px; --tpl-an-side-w: 320px; --tpl-an-card-pad: 20px; --tpl-an-card-gap: 14px; --tpl-an-routes-gap: 12px; --tpl-an-removed-gap: 10px; --tpl-an-head-gap: 6px;
   /* ★V8 編集・詳細の画面（リッチメニューの編集・テンプレートの詳細・友だち属性の編集）。 */
@@ -737,7 +739,7 @@
   --tpl-htn-head-pad: 0 7px; --tpl-htn-head-h: 34px; --tpl-htn-preview-card-tail: 34px; --tpl-htn-row-h: 56px; --tpl-htn-cell-pad: 0 7px; --tpl-htn-edge: 16px; --tpl-htn-sub-gap: 2px;
   --tpl-htn-edit-gap: 20px; --tpl-htn-textarea-h: 72px; --tpl-htn-textarea-pad: 8px 10px; --tpl-htn-seg-gap: 2px; --tpl-htn-seg-pad: 3px; --tpl-htn-seg-item-pad: 5px 14px 6px;
   --tpl-htn-image-gap: 10px; --tpl-htn-image-pad: 10px; --tpl-htn-thumb: 64px; --tpl-htn-thumb-bg: #c8a47a; --tpl-htn-preview-w: 360px; --tpl-htn-preview-card-w: 186px; --tpl-htn-preview-image-h: 100px;
-  --tpl-htn-preview-copy-pad: 10px 12px 33px; --tpl-htn-preview-action-pad: 8px 12px; --tpl-htn-line-green: #06c755; --tpl-htn-progress-pad: 18px 16px 12px; --tpl-htn-seg-h: 34px; --tpl-htn-preview-gap: 4px; --tpl-htn-preview-avatar: 28px; --tpl-htn-preview-avatar-gap: 7px; --tpl-htn-rail-pad: 12px; --tpl-htn-list-gap: 14px; --tpl-htn-list-pad: 0 23px 24px 16px; --tpl-htn-top-cell-pad: 10px; --tpl-htn-toolbar-pull: -8px; --tpl-htn-dot-pull: -14px;
+  --tpl-htn-preview-copy-pad: 10px 12px 33px; --tpl-htn-preview-action-pad: 8px 12px; --tpl-htn-line-green: #06c755; --tpl-htn-progress-pad: 18px 16px 12px; --tpl-htn-seg-h: 34px; --tpl-htn-preview-gap: 4px; --tpl-htn-preview-avatar: 28px; --tpl-htn-preview-avatar-gap: 7px; --tpl-htn-rail-pad: 12px; --tpl-htn-list-gap: 14px; --tpl-htn-list-pad: 0 23px 24px 16px; --tpl-htn-list-pad-narrow: 24px; --tpl-htn-top-cell-pad: 10px; --tpl-htn-result-name-w: 200px; --tpl-htn-result-row-pad: 8px 0; --tpl-htn-result-summary-pull: -10px; --tpl-htn-folder-block-gap: 16px; --tpl-htn-dist-progress-h: 8px; --tpl-htn-toolbar-pull: -8px; --tpl-htn-dot-pull: -14px;
   --tpl-an-notes-pad: 12px 14px; --tpl-an-notes-gap: 6px; --tpl-an-notes-radius: 10px; --tpl-an-note-dot-gap: 8px; --tpl-an-route-bar-gap: 4px; --tpl-an-track-h: 6px;
   --tpl-an-tab-gap: 14px; --tpl-an-tab-pad: 14px 24px 24px; --tpl-an-toolbar-gap: 8px; --tpl-an-col-gap: 16px; --tpl-an-thead-pad: 9px 16px; --tpl-an-row-pad: 10px 16px; --tpl-an-row-two-h: 55px; --tpl-an-row-one-h: 37px; --tpl-an-cell-gap: 2px; --tpl-an-num-pad-end: 12px; --tpl-an-col-type: 150px;
   --tpl-an-col-58: 58px; --tpl-an-col-70: 70px; --tpl-an-col-80: 80px; --tpl-an-col-88: 88px; --tpl-an-col-100: 100px; --tpl-an-col-116: 116px;
@@ -843,7 +845,7 @@
   --tpl-ml-approval-pad: 16px; --tpl-ml-approval-gap: 10px; --tpl-ml-approval-radius: 12px; --tpl-ml-approval-row-pad: 10px 12px; --tpl-ml-approval-row-radius: 8px; --tpl-ml-approval-title-size: 14px; --tpl-ml-flush-pull: -14px; --tpl-ml-foot-after-pager: 23px;
   --tpl-ml-pill-pad: 2px 8px; --tpl-ml-pill-gap: 5px; --tpl-ml-pill-lh: 18px; --tpl-ml-ops-gap: 8px;
   --tpl-ml-notice-after: 6px; --tpl-ml-num-pad-end: 8px; --tpl-ml-tab-pad-bottom: 6px; --tpl-ml-ro-before: 8px; --tpl-ml-ro-after: 12px; --tpl-ml-saved-w: 154px; --tpl-ml-search-w: 240px; --tpl-ml-foot-pad: 12px 24px;
-  --tpl-folder-width: 200px; --tpl-folder-pad-block: 16px; --tpl-folder-pad-side: 12px;
+  --tpl-folder-width: 200px; --tpl-folder-pad-block: 16px; --tpl-folder-pad-side: 12px; --tpl-folder-inset-pad-start: 24px;
   /* 統括（/hq）の画面（r4ARpV・JB8V1・b8xBtZ ほか）。 */
   --tpl-hq-nav-gap: 2px; --tpl-hq-nav-label-lh: 16px; --tpl-hq-nav-item-gap: 8px; --tpl-hq-nav-item-pad: 8px 10px; --tpl-hq-nav-item-lh: 19px; --tpl-hq-nav-icon: 14px;
   --tpl-hq-body-gap: 14px; --tpl-hq-body-pad: 16px 24px 24px; --tpl-hq-button-icon: 15px; --tpl-hq-note-pad: 10px 14px;
@@ -859,8 +861,8 @@
   --tpl-hq-dialog-head-pad: 24px 24px 0; --tpl-hq-dialog-title-size: 17px; --tpl-hq-dialog-title-lh: 36px; --tpl-hq-dialog-desc-gap: 2px; --tpl-hq-dialog-content-pad: 14px 24px 0; --tpl-hq-dialog-foot-margin: 14px 24px 24px;
   --tpl-hq-qr-box: 140px; --tpl-hq-qr: 120px; --tpl-hq-lead-lh: 19px; --tpl-hq-code-pad: 14px; --tpl-hq-digit-w: 40px; --tpl-hq-digit-h: 48px;
   --tpl-hq-side-w: 300px; --tpl-hq-thread-pad: 16px; --tpl-hq-bubble-w: 560px; --tpl-hq-bubble-pad: 10px 14px; --tpl-hq-compose-h: 80px; --tpl-hq-compose-pad: 8px 10px; --tpl-hq-side-row-pad: 10px 14px;
-  --tpl-hq-code-box-w: 44px;
-  --tpl-hq-folder-inset: 12px; --tpl-hq-home-pad: 16px 24px 24px 16px; --tpl-hq-home-card-pad: 14px; --tpl-hq-home-value-lh: 24px; --tpl-hq-search-w: 280px;
+  --tpl-hq-lead-pad: 10px 12px;
+  --tpl-hq-home-pad: 16px 24px 24px 16px; --tpl-hq-home-card-pad: 14px; --tpl-hq-home-value-lh: 24px; --tpl-hq-search-w: 280px;
   --tpl-hq-home-account-pad: 18px; --tpl-hq-logo: 40px; --tpl-hq-logo-font: 15px; --tpl-hq-name-lh: 22px; --tpl-hq-stat-lh: 23px; --tpl-hq-col-actions: 260px;
   --tpl-hq-pill-gap: 5px; --tpl-hq-pill-pad: 2px 8px; --tpl-hq-pill-lh: 18px; --tpl-hq-dot: 6px; --tpl-hq-confirm-gap: 6px; --tpl-hq-confirm-label: 64px;
   /* 上の帯（統括・店の共通の外側。絵 V8-B/JKjsE）：帯は右の白い板の端（右の余白 12）までで、中の右の間は 8。 */ --tpl-hq2-topbar-pad-end: 20px;
