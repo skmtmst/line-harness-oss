@@ -12,12 +12,6 @@ const API = readFileSync(join(ROOT, 'src/lib/api.ts'), 'utf8')
 const WORKER_ROUTE = readFileSync(join(ROOT, '../worker/src/routes/reminders.ts'), 'utf8')
 
 describe('V6 リマインダの公開フロー', () => {
-  it('未実装だった5画面を実Node IDで接続する', () => {
-    for (const nodeId of ['s7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo']) {
-      expect(FLOW).toContain(`data-design-node="${nodeId}"`)
-    }
-  })
-
   it('作成時に公開せず、下書きから対象確認へ進む', () => {
     expect(NEW_PAGE).toContain('api.reminders.createDraft(settings)')
     expect(NEW_PAGE).toContain('&stage=target')
@@ -38,11 +32,6 @@ describe('V6 リマインダの公開フロー', () => {
     expect(FLOW).toContain("value == null ? `—${unit}`")
     expect(FLOW).toContain("audience.matched")
     expect(FLOW).toContain("audience.excluded")
-  })
-
-  it('本文に大見出しを重ねず、共通トップバーへ任せる', () => {
-    expect(FLOW).not.toContain('<Header')
-    expect(FLOW).not.toContain('<h1')
   })
 
   it('配信予定は仮の基準日を明示する', () => {

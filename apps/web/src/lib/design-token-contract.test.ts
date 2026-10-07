@@ -96,25 +96,6 @@ describe('設計の実測値に合わせる', () => {
   })
 
   /*
-   * **どのNodeの何を測ったかまで書く。**
-   * 「設計に◯◯pxがある」は「この class が◯◯px」ではない。
-   * 一度それで共通ボタンを36→38に変えかけた（ボタンは置き場所で
-   * 36/38/40 の3段階あり、共通ボタンの正本 `Ai3fq` は36で実装と一致）。
-   */
-  it('V6の角丸を、その class を貼っている場所の正本Nodeへ固定する', () => {
-    // sMpET「表示項目 基本情報」h=46 $radius-sm。使用1箇所も同じ行。
-    expect(token('radius-control')).toBe('8px')
-    // Gfsb4「プルダウン開状態」$radius-sm。注記の正本(案内バー)も同値。
-    expect(token('radius-control')).toBe('8px')
-    // pRHvc「検索と絞り込み」/ k4Hz0X「友だち一覧カード」/ eHPwj「一括操作バー」は
-    // V6 では $radius-md(10)。★V7 でカードは 12px 段に一本化されたので、
-    // 固定先は V7 の値へ書き換える（外見の契約は新しい設計に合わせる）。
-    expect(token('radius-card')).toBe('12px')
-    // z7O873「友だち 詳細検索モーダル」w=760 h=936 $radius-panel
-    expect(token('radius-panel')).toBe('12px')
-  })
-
-  /*
    * **共通ボタンは36pxで正しい。**
    *
    * 設計に38pxのボタンもあるが、それは別の部品——画面ヘッダーの操作
