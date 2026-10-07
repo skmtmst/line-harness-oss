@@ -369,10 +369,17 @@ export default function TagsTab({
   /* 並び替え。絞り込み中は見えている行だけを入れ替え、隠れた行の位置を保つ。失敗は元に戻す。 */
   const applyTagOrder = async (order: string[]) => {
     const previous = items
-    const result = await api.tags.reorder(order)
-    if (!result.success) {
+    /* 返事が失敗でも、通信が例外で落ちても、元の順へ戻して「もう一度」を出す。 */
+    let error: string | null = null
+    try {
+      const result = await api.tags.reorder(order)
+      if (!result.success) error = result.error || '保存に失敗しました'
+    } catch (caught) {
+      error = caught instanceof Error && caught.message ? caught.message : '通信できませんでした'
+    }
+    if (error !== null) {
       setItems(previous)
-      const message = `並び順を保存できませんでした（${result.error}）`
+      const message = `並び順を保存できませんでした（${error}）`
       setActionError(message)
       notifyToast(message, {
         tone: 'error',
