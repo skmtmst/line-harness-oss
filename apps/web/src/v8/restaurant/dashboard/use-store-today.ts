@@ -4,7 +4,7 @@
  * 「今日のお店」（E-1）が読む物をまとめて取る。
  *  - snapshot（店舗・卓・今日の予約の範囲）… 店舗と卓。
  *  - reservationsDay（選んでいる店の今日）… 今日の予約の表と数。30秒ごとに読み直す。
- *  - channels … 予約サイト・グルメ媒体の一覧（名前）。
+ *  - channels＋media-links … 予約サイト・グルメ媒体の一覧（名前と、設定で保存した店舗ページ・管理画面の URL）。
  *  - channel-close-tasks … 他の予約サイトの枠を閉じる知らせ。
  *  - openingHours … 営業時間（説明の行）。
  *  - Google の接続と未返信の口コミ。
@@ -22,7 +22,7 @@ import {
 } from '@/lib/restaurant-test-api'
 import { toYmd } from '../front-desk/slots'
 
-/** 予約サイト・グルメ媒体の1行。リンク（店舗ページ・管理画面）は保存の口ができたら入る（いまは無い）。 */
+/** 予約サイト・グルメ媒体の1行。リンク（店舗ページ・管理画面）は「予約サイト・グルメ媒体」の設定（media-links）で保存したもの。 */
 export type StoreMedium = {
   code: string
   name: string
@@ -55,6 +55,36 @@ export function toMedia(rows: ChannelRow[]): StoreMedium[] {
   return rows
     .filter((row) => row.receiveMethod !== 'manual' && row.receiveMethod !== 'direct')
     .map((row) => ({ code: row.code, name: row.name, storePageUrl: row.storePageUrl ?? null, adminUrl: row.adminUrl ?? null }))
+}
+
+type MediaLinkRow = { code: string; name: string; pageUrl: string | null; loginUrl: string | null }
+
+/**
+ * 受け取りの一覧（channels）に、設定で保存した店舗ページ・管理画面の URL（media-links）を重ねる。
+ * 受け取りの一覧に無いグルメ媒体（予約を受けない）も、URL があれば末尾に足す。
+ */
+export function mergeMediaLinks(media: StoreMedium[], links: MediaLinkRow[]): StoreMedium[] {
+  const byCode = new Map(links.map((link) => [link.code, link]))
+  const merged = media.map((m) => {
+    const link = byCode.get(m.code)
+    return link ? { ...m, name: link.name || m.name, storePageUrl: link.pageUrl ?? m.storePageUrl ?? null, adminUrl: link.loginUrl ?? m.adminUrl ?? null } : m
+  })
+  for (const link of links) {
+    if (media.some((m) => m.code === link.code)) continue
+    if (!link.pageUrl && !link.loginUrl) continue
+    merged.push({ code: link.code, name: link.name, storePageUrl: link.pageUrl, adminUrl: link.loginUrl })
+  }
+  return merged
+}
+
+/** 店の媒体（名前＋保存した URL）。URL の口が読めなくても名前の一覧は出す。 */
+export async function loadStoreMedia(accountId: string, storeId: string): Promise<StoreMedium[]> {
+  const [channels, links] = await Promise.all([
+    fetchApi<{ success: true; data: ChannelRow[] }>(`/api/restaurant-test/channels?account_id=${encodeURIComponent(accountId)}&storeId=${encodeURIComponent(storeId)}`)
+      .then((res) => toMedia(res.data)).catch(() => [] as StoreMedium[]),
+    Promise.resolve().then(() => restaurantTestApi.mediaLinks(accountId, storeId)).then((res) => res.data as MediaLinkRow[]).catch(() => [] as MediaLinkRow[]),
+  ])
+  return mergeMediaLinks(channels, links)
 }
 
 export function useStoreToday(accountId: string | null): StoreToday {
@@ -104,8 +134,8 @@ export function useStoreToday(accountId: string | null): StoreToday {
       restaurantTestApi.reservationsDay(accountId, storeId, day)
         .then((res) => setToday(Array.isArray(res.data?.reservations) ? res.data.reservations : []))
         .catch(() => setToday((current) => current ?? [])),
-      fetchApi<{ success: true; data: ChannelRow[] }>(`/api/restaurant-test/channels?account_id=${encodeURIComponent(accountId)}&storeId=${encodeURIComponent(storeId)}`)
-        .then((res) => setMedia(toMedia(res.data)))
+      loadStoreMedia(accountId, storeId)
+        .then((rows) => setMedia(rows))
         .catch(() => setMedia([])),
       restaurantTestApi.channelCloseTasks(accountId, storeId)
         .then((res) => setCloseTasks(res.data))
