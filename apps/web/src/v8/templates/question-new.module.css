@@ -1,0 +1,248 @@
+/*
+ * ★V8 テンプレート 質問を作る（l87p1J）。外枠は template-edit/frame。
+ * ここは段のカード（枠1・角12・余白20・間14）、選択肢のカード（角12・余白14・間10）、答え方の切り替えだけ。
+ */
+.back {
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-card-gap);
+  padding: var(--tpl-cn-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-card-head-gap);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-cn-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-cn-card-title-lh);
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.row {
+  display: flex;
+  gap: var(--tpl-cn-field-row-gap);
+}
+
+.grow {
+  flex: 1 1 0;
+}
+
+.folder {
+  width: var(--tpl-tg2-folder-w);
+  flex-shrink: 0;
+}
+
+.folder :global(*) {
+  max-width: 100%;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-field-gap);
+  min-width: 0;
+}
+
+.label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--tpl-cn-field-gap);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-cn-label-lh);
+}
+
+.optional {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-tg2-safety-body-size);
+  font-weight: 400;
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.pickLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.smallLabel {
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  height: var(--tpl-cn-control-h);
+  padding: var(--tpl-cn-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--tpl-tg2-input-lh);
+}
+
+.input:focus-visible {
+  outline: var(--tpl-tag-ring) solid var(--color-action);
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-field-row-gap);
+  min-width: 0;
+}
+
+/* 答え方の切り替え（灰の地に選んだ所だけ白）。 */
+.seg {
+  display: inline-flex;
+  gap: var(--tpl-tg2-card-head-gap);
+  padding: var(--tpl-tg2-card-head-gap);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+}
+
+.segButton {
+  padding: var(--tpl-tg2-seg-pad);
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-cn-label-lh);
+  cursor: pointer;
+}
+
+.segButton[aria-checked='true'] {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.choices {
+  display: flex;
+  gap: var(--tpl-cn-field-row-gap);
+}
+
+.choice {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-tg2-swatch-gap);
+  min-width: 0;
+  padding: var(--tpl-tg2-way-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.choiceHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-field-row-gap);
+}
+
+.choiceHead > :last-child {
+  margin-left: auto;
+}
+
+.choiceNo {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+/* 「押されたら」：選ぶ欄の形のボタン（押すと動きを決める窓）。 */
+.pick {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-cn-field-gap);
+  min-width: 0;
+  height: var(--tpl-cn-control-h);
+  padding: var(--tpl-tg2-pick-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-cn-label-lh);
+  cursor: pointer;
+}
+
+.pickText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pickIcon {
+  width: var(--tpl-tg2-rule-icon);
+  height: var(--tpl-tg2-rule-icon);
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+}
+
+/* 届き方の中の吹き出し。 */
+.bubble {
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.bubbleIntro,
+.bubbleText,
+.bubbleChoice {
+  margin: 0;
+  padding: var(--tpl-tg2-bubble-pad);
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: var(--text-label);
+}
+
+.bubbleText {
+  font-weight: 600;
+}
+
+.bubbleChoice {
+  color: var(--color-accent-deep);
+  font-weight: 600;
+  text-align: center;
+}
+
+.bubbleChoice:last-child {
+  border-bottom: 0;
+}

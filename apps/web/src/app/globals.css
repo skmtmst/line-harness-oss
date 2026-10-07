@@ -1036,6 +1036,7 @@
   --tpl-tg2-swatch: 28px; --tpl-tg2-swatch-gap: 10px; --tpl-tg2-swatch-ring: 2px; --tpl-tg2-rule-pad: 0 12px; --tpl-tg2-rule-h: 48px; --tpl-tg2-rule-icon: 14px; --tpl-tg2-icon-btn: 28px; --tpl-tg2-info-band-pad: 10px 14px; --tpl-tg2-info-band-lh: 20px; --tpl-tg2-sample-pad: 10px 14px; --tpl-tg2-sample-count-w: 26px; --tpl-tg2-sample-row-pad-bottom: 9px; --tpl-tg2-dialog-body-gap: 16px; --tpl-tg2-dialog-body-pull-bottom: -8px; --tpl-tg2-dialog-footer-pad: 0 24px 24px;
   --tpl-tg2-step-no: 24px;
   --tpl-tg2-map-pad: 12px 0; --tpl-tg2-menu-w: 170px; --tpl-tg2-menu-image-h: 80px; --tpl-tg2-link-w: 96px; --tpl-tg2-link-icon-w: 28px; --tpl-tg2-link-icon-h: 16px; --tpl-tg2-warn-pad: 10px 12px; --tpl-tg2-check-pad: 9px 0; --tpl-tg2-box-gap: 4px;
+  --tpl-tg2-folder-w: 220px; --tpl-tg2-seg-pad: 6px 12px; --tpl-tg2-pick-pad: 0 10px 0 12px; --tpl-tg2-bubble-pad: 10px 14px;
   --tpl-tg2-info-pad: 14px 24px 0; --tpl-tg2-pill-pad: 2px 8px; --tpl-tg2-pill-gap: 5px; --tpl-tg2-pill-dot: 6px; --tpl-tg2-pill-lh: 18px;
   --tpl-tg2-safety-pad: 16px 24px; --tpl-tg2-safety-gap: 6px; --tpl-tg2-safety-body-size: 11px;
   --tpl-tg2-reason-w: 150px; --tpl-tg2-dialog-pull: -10px; --tpl-tg2-dialog-pull-top: -18px; --tpl-tg2-choice-gap: 10px; --tpl-tg2-usage-lh: 17px; --tpl-tg2-dialog-gap: 14px;

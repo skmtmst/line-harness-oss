@@ -45,3 +45,11 @@
 
 ## 読み込みの状態（`susGP`）
 - 読込中・アカウント未選択・見る権限が無い・読み込めない（もう一度試す）・まだ無い・条件に合うものが無い（条件を外す）を分ける。数の帯は読めるまで「—」。
+
+## 質問を作る・編集（question-new.tsx・絵 l87p1J）
+今の V8（`app/templates/questions/question-v8.tsx`）と同じ口と動き：`api.folders.list('template')`・`api.templates.get/create/update`
+（`question` と `questionStatus`）、使用先がある質問の公開は確認の窓（cuR8I）、離れるときの確認、オーナー・管理者だけが作れる。
+- 入口：`app/templates/questions/new/page.tsx`（`/templates/questions/new`・`?id=`）
+- 見せ方：段「名前とフォルダ」「質問」（前文・質問文・答え方）「選択肢」（横に並ぶカード：ボタンの文字・押されたら・押したときの返信、最大4つ）
+- 「押されたら」は1行の要約（タグ・シナリオは名前。`api.tags.list`・`api.scenarios.list` で読む）。押すと今の質問の部品（QuestionEditor）を窓で開き、タグ・友だち情報・シナリオ・URL・代替テキストなど全部の設定をそこで直す
+- 右の列：この質問を使う場所・届き方（本物のスマホ）
