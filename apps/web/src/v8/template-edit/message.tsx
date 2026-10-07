@@ -57,6 +57,7 @@ import {
 import { TemplateEditFrame } from './frame'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import InsertRow from './insert-row'
+import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
 
 const MESSAGE_TYPES: Array<{ value: string; label: string }> = [
@@ -70,7 +71,7 @@ const snapshot = (draft: TemplateDraft) => JSON.stringify(draft)
 /** 競合の帯（NCbYn）。誰が・いつ・どれを保存したかと、2つの出口。 */
 type Conflict = { name: string; at: string; latest: TemplateDraft | null }
 
-export default function TemplateMessageEditor({ id, visual }: { id: string | null; visual: boolean }) {
+export default function TemplateMessageEditor({ id, visual, example = null }: { id: string | null; visual: boolean; example?: string | null }) {
   const router = useRouter()
   const role = useStaffRole()
   // 役割の確認が済むまでは操作を出す（最後の守りはサーバの 403）。staff と分かったら隠す。
@@ -198,6 +199,40 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
       .catch(() => accept((prev) => ({ ...prev, status: 'failed' })))
     return () => { templateGeneration.current += 1 }
   }, [id, reloadKey])
+
+  /*
+   * 見本から作る（F-5・`?example=<見本の番号>`）：作るときだけ、見本の名前と本文を入れて開く。
+   * 入れるのは1回だけ（入れたあとの入力は上書きしない）。保存はしない（保存は利用者が押す）。
+   * 見本が読めない・見つからないときは白紙のまま、帯で知らせる。
+   */
+  const [exampleNote, setExampleNote] = useState('')
+  const exampleApplied = useRef<string | null>(null)
+  useEffect(() => {
+    if (id || !example || exampleApplied.current === example) return
+    exampleApplied.current = example
+    let cancelled = false
+    let settled = false
+    loadTemplateExamples()
+      .finally(() => { settled = true })
+      .then((items) => {
+        if (cancelled) return
+        const found = items.find((item) => item.id === example)
+        if (!found) {
+          setExampleNote('見本が見つかりませんでした。白紙から作れます。')
+          return
+        }
+        setEditor((prev) => (prev.requestedId === null
+          ? { ...prev, draft: { ...prev.draft, name: found.name, messageType: 'text', messageContent: found.body } }
+          : prev))
+        setExampleNote('')
+      })
+      .catch(() => { if (!cancelled) setExampleNote('見本を読み込めませんでした。白紙から作れます。') })
+    return () => {
+      cancelled = true
+      // 読み終わる前に片付けた（開いた直後の二度目の実行）なら、もう一度読めるように戻す。
+      if (!settled) exampleApplied.current = null
+    }
+  }, [id, example])
 
   /* 差し込みはカーソルの位置へ入れる（今の画面と同じ）。 */
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
@@ -489,6 +524,7 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
         ) : (
           <>
             {error || loadFailed ? <p role="alert" className={styles.error}>{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p> : null}
+            {exampleNote && !id ? <p role="status" className={styles.error}>{exampleNote}</p> : null}
             <Card padding="none" layout="vertical" className={styles.card}>
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>名前とフォルダ</h2>
