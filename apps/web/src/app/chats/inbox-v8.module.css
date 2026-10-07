@@ -23,6 +23,16 @@
   height: var(--tpl-inbox-tool-size);
 }
 
+/* 印は絵（XqSvX）の list-filter・bookmark・settings-2 を 14・墨の薄い字（ink-secondary）。 */
+:global([data-theme='v8']) .tool {
+  color: var(--color-ink-secondary);
+}
+
+:global([data-theme='v8']) .tool svg {
+  width: var(--tpl-inbox-tool-icon);
+  height: var(--tpl-inbox-tool-icon);
+}
+
 /* 札：選んでいない＝白地・薄い枠・墨の字、選んだ＝墨の地・白い字（共通の札 O2fCAt・XGJDa と同じ形）。 */
 :global([data-theme='v8']) .chip {
   gap: var(--tpl-inbox-chip-gap);
