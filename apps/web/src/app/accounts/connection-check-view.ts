@@ -17,11 +17,11 @@ export interface CheckStep {
   state: CheckState
 }
 
-/** 段ごとの言葉。**「確かめていません」と「直してください」を混ぜない。** */
+/** 段ごとの言葉（板 `v2KMj`）。通った／止まった／まだ。 */
 export const CHECK_STATE_LABEL: Record<CheckState, string> = {
-  passed: '通りました',
-  failed: '直してください',
-  skipped: '確かめていません',
+  passed: '通った',
+  failed: '止まった',
+  skipped: 'まだ',
 }
 
 /** 接続確認の返事。`api.lineAccounts.verifyConnection` の形。 */

@@ -370,6 +370,7 @@ function MembersInner() {
                 </tbody>
               </DataTable>
               </div>
+              <p className="mt-2 text-xs text-ink-faint">役割：統括（請求・メンバーまで全部）／管理者／担当者（担当範囲のアカウントだけ）／閲覧のみ（見るだけ）</p>
               </>
             )}
           </section>

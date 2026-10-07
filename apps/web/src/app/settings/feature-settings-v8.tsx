@@ -267,7 +267,7 @@ export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveIte
         <div className={styles.dialogHead}>
           <p className={styles.dialogTitle}>左のメニューの並びを変える</p>
           <p className={styles.dialogDesc}>
-            上下のボタンで同じ区分の中だけを入れ替えます。「この並びにする」を押すまで左のメニューは変わりません。
+            つまみで動かすか、矢印で1つずつ動かします。区分の中で並べ替えます。「この並びにする」を押すまで左のメニューは変わりません。
           </p>
         </div>
         <div className={styles.dialogBody}>
@@ -304,7 +304,7 @@ export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveIte
         <div className={styles.dialogFoot}>
           <span className={styles.dialogFootLead}>
             <button type="button" onClick={() => setDraft(initialOrder)}>
-              元の並びに戻す
+              元の並びに
             </button>
           </span>
           <Button variant="secondary" onClick={onCancel}>

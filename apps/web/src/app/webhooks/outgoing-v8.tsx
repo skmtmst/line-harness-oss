@@ -645,9 +645,9 @@ function OutgoingV8Inner() {
       return (
         <ListState
           kind="error"
-          title="送り先を読み込めませんでした"
+          title="外部連携を読み込めませんでした"
           description="登録内容は消えていません。通信の状態を確認して、もう一度お試しください。"
-          action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+          action={<Button onClick={() => void load()}>もう一度試す</Button>}
         />
       )
     }

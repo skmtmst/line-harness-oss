@@ -179,7 +179,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
         <div className={styles.left}>
           <section className={styles.card} aria-label="開催回">
             <h3 className={styles.cardTitle}>開催回</h3>
-            <p className={styles.cardNote}>変える回を選ぶます</p>
+            <p className={styles.cardNote}>変える回を選びます</p>
             {slotList.length === 0 ? (
               <p className="text-ink-faint mt-2 text-sm">開催回がありません。編集で開催回を足してから、もう一度開いてください。</p>
             ) : (

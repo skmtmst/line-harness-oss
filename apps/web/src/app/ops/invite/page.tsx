@@ -167,8 +167,11 @@ function OpsInviteV7() {
               </AuthField>
             </>
           ) : null}
-          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="進めています…">{v8 && check?.needsPassword ? '→ パスワードを設定して次へ' : '設定して2要素認証へ進む'}
+          <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="進めています…">{v8 && check?.needsPassword ? 'パスワードを設定して次へ' : '設定して2要素認証へ進む'}
           </Button>
+          <p className="text-center text-caption text-ink-faint">
+            この画面は運営メンバーだけが開けます。操作はすべて記録されます。
+          </p>
           <p className="text-center text-caption text-ink-faint">
             招待の有効期限は24時間です。期限が切れたときは、招待した運営メンバーに送り直しを依頼してください
           </p>
