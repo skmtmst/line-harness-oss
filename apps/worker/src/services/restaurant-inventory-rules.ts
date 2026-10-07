@@ -97,6 +97,7 @@ export async function reconcileRestaurantInventory(env:Env['Bindings'],storeId:s
  if(queue)await db.prepare('DELETE FROM rt_inventory_rule_queue WHERE store_id=? AND generation=?').bind(storeId,queue.generation).run();
  await dispatchRestaurantInventoryNotices(env,storeId);
  await dispatchDirectBookingNotices(env,storeId);
+ await dispatchClosureNotices(env,storeId);
 }
 
 /** 取り込みを拒否した重複予約も、画面のタスクと担当LINEへ知らせる。顧客本文は残さない。 */
@@ -142,4 +143,29 @@ export async function processRestaurantInventoryRuleQueue(env:Env['Bindings']) {
  await dispatchRestaurantInventoryNotices(env);
  const pending=(await db.prepare(`SELECT DISTINCT t.store_id FROM rt_reservation_close_outbox o JOIN rt_reservation_close_tasks t ON t.id=o.task_id WHERE o.sent_at IS NULL AND t.status='close' LIMIT 100`).all<{store_id:string}>()).results;
  for(const s of pending)await dispatchDirectBookingNotices(env,s.store_id);
+ const closures=await db.prepare("SELECT DISTINCT store_id FROM rt_closure_close_tasks WHERE status IN ('close','reopen')").all<{store_id:string}>();
+ for(const s of closures.results)await dispatchClosureNotices(env,s.store_id);
+}
+
+/** 自動の媒体作業通知。顧客への1対1連絡は既存チャットから担当者が送る。 */
+async function dispatchClosureNotices(env:Env['Bindings'],storeId:string) {
+ const db=dbFor(env,storeId);
+ const tasks=(await db.prepare(`SELECT t.*,s.timezone,s.name,s.line_account_id FROM rt_closure_close_tasks t JOIN rt_stores s ON s.id=t.store_id WHERE t.store_id=? AND t.status IN ('close','reopen')`).bind(storeId)
+ .all<{id:string;generation:number;channel:string;kind:string;start_date:string;end_date:string;all_day:number;start_time:string|null;end_time:string|null;status:string;timezone:string;name:string;line_account_id:string|null}>()).results;
+ for(const task of tasks){
+  const members=await restaurantResponsibleMembers(db,storeId,task.start_date);
+  for(const member of members)await db.prepare('INSERT OR IGNORE INTO rt_closure_close_outbox(id,task_id,generation,membership_id,retry_key) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),task.id,task.generation,member.id,crypto.randomUUID()).run();
+ }
+ const rows=(await db.prepare(`SELECT o.id,o.retry_key,t.channel,t.kind,t.start_date,t.end_date,t.all_day,t.start_time,t.end_time,t.status,s.name,s.line_account_id,m.line_uid
+ FROM rt_closure_close_outbox o JOIN rt_closure_close_tasks t ON t.id=o.task_id JOIN rt_stores s ON s.id=t.store_id JOIN rt_memberships m ON m.id=o.membership_id
+ LEFT JOIN rt_inventory_rules r ON r.store_id=t.store_id WHERE t.store_id=? AND o.generation=t.generation AND t.status IN ('close','reopen') AND o.sent_at IS NULL
+ AND m.status='active' AND COALESCE(r.notify,1)=1 AND (o.lease_until IS NULL OR datetime(o.lease_until)<=datetime('now')) LIMIT 100`).bind(storeId)
+ .all<{id:string;retry_key:string;channel:string;kind:string;start_date:string;end_date:string;all_day:number;start_time:string|null;end_time:string|null;status:string;name:string;line_account_id:string|null;line_uid:string|null}>()).results;
+ for(const r of rows){if(!r.line_account_id||!r.line_uid)continue;const token=crypto.randomUUID();
+  const lease=await db.prepare(`UPDATE rt_closure_close_outbox SET lease_until=datetime('now','+5 minutes'),lease_token=? WHERE id=? AND sent_at IS NULL AND (lease_until IS NULL OR datetime(lease_until)<=datetime('now'))`).bind(token,r.id).run();
+  if(!lease.meta.changes)continue;
+  const kind=({temporary_closed:'臨時休業',private_event:'貸切',maintenance:'設備点検',other:'その他'} as Record<string,string>)[r.kind];
+  const dates=r.start_date===r.end_date?r.start_date:r.start_date+'〜'+r.end_date,time=r.all_day?'終日':r.start_time+'〜'+r.end_time;
+  try {if(await sendAutomaticBookingLine(env,{accountId:r.line_account_id,to:r.line_uid,text:`${r.name} ${dates} ${time}（${kind}）: ${r.channel}の受付を${r.status==='reopen'?'もう開けてよい状態です。':'閉じてください。'}`,retryKey:r.retry_key,featureId:'restaurant_test'}))await db.prepare("UPDATE rt_closure_close_outbox SET sent_at=datetime('now') WHERE id=? AND lease_token=?").bind(r.id,token).run();}catch{/* 同じキーで次回再試行 */}
+ }
 }

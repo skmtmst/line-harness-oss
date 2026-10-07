@@ -532,7 +532,8 @@
     "594_restaurant_walk_in.sql",
     "595_restaurant_media_links.sql",
     "596_visit_stamps.sql",
-    "597_hq_broadcast_runs.sql"
+    "597_hq_broadcast_runs.sql",
+    "598_restaurant_closures.sql"
   ],
-  "migrationCount": 533
+  "migrationCount": 534
 }

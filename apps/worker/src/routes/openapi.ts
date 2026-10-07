@@ -1,3 +1,4 @@
+import { restaurantClosurePaths } from './restaurant-closures-openapi.js';
 import { stampPaths,hqBroadcastPaths } from './proposal-e-openapi.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
@@ -354,6 +355,7 @@ const spec = {
     },
   },
   paths: {
+    ...restaurantClosurePaths,
     ...stampPaths,
     ...hqBroadcastPaths,
 

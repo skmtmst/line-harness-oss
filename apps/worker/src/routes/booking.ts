@@ -1,3 +1,4 @@
+import { openSeatTables, closuresForRange, closureAffectsTable } from '../services/restaurant-closures.js';
 import { processVisitStampQueue } from '../services/visit-stamps.js';
 // Booking feature HTTP routes.
 //
@@ -3847,13 +3848,16 @@ booking.post('/api/liff/booking/seat-waitlist',async(c)=>{
  if(starts<=Date.now()+60*60_000)return c.json({error:'registration_closed'},409);
  const count=body.guest_count;if(!Number.isInteger(count)||!count||count<1||count>100)return c.json({error:'invalid_party'},400);
  const end=new Date(starts+120*60_000).toISOString(),start=new Date(starts).toISOString();
- // 人数に合う卓が存在し、その滞在中に全卓が予約か仮押さえで埋まっている枠だけ。
- const fitting=await c.env.DB.prepare(`SELECT t.id,NOT EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=t.store_id AND r.table_id=t.id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(?) AND julianday(r.ends_at)>julianday(?)) AND NOT EXISTS(SELECT 1 FROM rt_seat_waitlist w WHERE w.store_id=t.store_id AND w.table_id=t.id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND julianday(w.starts_at)<julianday(?) AND julianday(w.ends_at)>julianday(?)) available FROM rt_tables t WHERE t.store_id=? AND t.is_active=1 AND t.min_capacity<=? AND t.max_capacity>=?`).bind(end,start,end,start,store.id,count,count).all<{id:string;available:number}>();
- if(!fitting.results.length)return c.json({error:'invalid_slot'},400);
- if(fitting.results.some(t=>t.available))return c.json({error:'slot_not_full'},409);
+ const fitting=await openSeatTables(c.env.DB,store.id,start,end,count,true);
+ if(!fitting.length){
+  if((await closuresForRange(c.env.DB,store.id,start,end)).length)return c.json({error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);
+  return c.json({error:'invalid_slot'},400);
+ }
+ // 閉じていない卓だけで満席を判定する。一部貸切の空卓を「予約できる」と数えない。
+ if((await openSeatTables(c.env.DB,store.id,start,end,count)).length)return c.json({error:'slot_not_full'},409);
  const friend=await c.env.DB.prepare('SELECT display_name FROM friends WHERE id=? AND line_account_id=?').bind(caller.friendId,caller.accountId).first<{display_name:string|null}>();
  const result=await insertSeatWaitlistEntry(c.env.DB,{storeId:store.id,startsAt:start,endsAt:end,guestCount:count,customerName:friend?.display_name||'LINEのお客さま',customerPhone:null,lineUid:caller.lineUserId});
- return result.ok?c.json({id:result.id},201):c.json({error:result.error},result.error==='already_waiting'||result.error==='registration_closed'||result.error==='waitlist_limit'?409:400);
+ return result.ok?c.json({id:result.id},201):c.json({error:result.error},result.error==='already_waiting'||result.error==='registration_closed'||result.error==='waitlist_limit'||result.error==='closure_conflict'?409:400);
 });
 booking.delete('/api/liff/booking/seat-waitlist/:id',async(c)=>{
  const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
@@ -3875,11 +3879,14 @@ booking.post('/api/liff/booking/seat-waitlist/:id/accept',async(c)=>{
  if(!checked.ok)return c.json({error:checked.error},400);
  const table=await c.env.DB.prepare('SELECT id FROM rt_tables WHERE id=? AND store_id=? AND is_active=1 AND min_capacity<=? AND max_capacity>=?').bind(entry.table_id,entry.store_id,entry.guest_count,entry.guest_count).first();
  if(!table)return c.json({error:'slot_conflict'},409);
+ const closed=await closuresForRange(c.env.DB,entry.store_id,entry.starts_at,entry.ends_at);
+ if(closed.some(r=>closureAffectsTable(r,entry.table_id)))return c.json({error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);
  const reservationId=crypto.randomUUID();
- await c.env.DB.batch([
+ try { await c.env.DB.batch([
  c.env.DB.prepare(`INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,waitlist_entry_id) VALUES(?,?,'line',?,?,?,?,?,?,?,'confirmed',?)`).bind(reservationId,entry.store_id,`waitlist:${id}`,entry.customer_name,caller.lineUserId,entry.guest_count,entry.starts_at,entry.ends_at,entry.table_id,id),
  c.env.DB.prepare(`UPDATE rt_inventory_slots SET reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND julianday(r.starts_at)<julianday(rt_inventory_slots.starts_at,'+'||rt_inventory_slots.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(rt_inventory_slots.starts_at)),0) WHERE store_id=?`).bind(entry.store_id),
  ]);
+ }catch(error){if(String(error).includes('closure_conflict'))return c.json({error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);throw error;}
  return c.json({reservation_id:reservationId,status:'confirmed'},201);
 });
 /**
@@ -7778,6 +7785,18 @@ booking.get('/api/booking/admin/pending-count', async (c) => {
     .bind(accountId)
     .first<{ cnt: number }>();
   return c.json({ count: row?.cnt ?? 0 });
+});
+
+
+/** 本人確認済みのLINE/LIFFで使う席の空き。休業・貸切のメモは公開しない。 */
+booking.get('/api/liff/booking/seat-availability',async c=>{
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+ if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
+ const storeId=c.req.query('store_id')||'',startsAt=c.req.query('starts_at')||'',endsAt=c.req.query('ends_at')||'',guestCount=Number(c.req.query('guest_count'));
+ const store=await c.env.DB.prepare("SELECT id FROM rt_stores WHERE id=? AND line_account_id=? AND status='active'").bind(storeId,caller.accountId).first();
+ if(!store)return c.json({error:'not_found'},404);
+ if(!Number.isFinite(Date.parse(startsAt))||!Number.isFinite(Date.parse(endsAt))||Date.parse(endsAt)<=Date.parse(startsAt)||!Number.isSafeInteger(guestCount)||guestCount<1||guestCount>100)return c.json({error:'invalid_slot'},400);
+ return c.json({success:true,data:{storeId,startsAt,endsAt,guestCount,tables:await openSeatTables(c.env.DB,storeId,startsAt,endsAt,guestCount)}});
 });
 
 export default booking;

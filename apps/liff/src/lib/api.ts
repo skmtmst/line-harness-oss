@@ -352,6 +352,7 @@ export const api = {
   registerWaitlist: (body: { staff_id: string; menu_id: string; starts_at: string }) =>
     post<{ id: string }>('/api/liff/booking/waitlist', body),
   bookingWaitlists:(id?:string)=>get<{waitlist:CustomerBookingWaitlist[]}>(`/api/liff/booking/waitlist${id?'?id='+encodeURIComponent(id):''}`),
+  seatAvailability:(query:{storeId:string;startsAt:string;endsAt:string;guestCount:number})=>get<{success:true;data:import('@line-crm/shared').RestaurantSeatAvailability}>(`/api/liff/booking/seat-availability?${new URLSearchParams({store_id:query.storeId,starts_at:query.startsAt,ends_at:query.endsAt,guest_count:String(query.guestCount)})}`),
   seatWaitlists:(id?:string)=>get<{waitlist:CustomerSeatWaitlist[]}>(`/api/liff/booking/seat-waitlist${id?'?id='+encodeURIComponent(id):''}`),
   registerSeatWaitlist:(body:RegisterSeatWaitlistInput)=>post<{id:string}>('/api/liff/booking/seat-waitlist',body),
   acceptWaitlist:(body:AcceptBookingWaitlistInput,key:string)=>post<CreateBookingResponse>('/api/liff/booking/requests',body,{'Idempotency-Key':key}),
