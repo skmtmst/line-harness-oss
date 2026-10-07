@@ -215,7 +215,10 @@ export default function GenerationPanel({
           * 入れた行だけを強調カラーで目立たせる。丸やタグの印は出さず、
           * 入っていることは地と枠と文字の色で示す。
           */}
-        <Field label="画像に入れるテキスト" note={`1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」`}>
+        <Field
+          label="画像に入れるテキスト"
+          note={`1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」。同じ条件で指定した枚数ぶん作ります（絵柄は毎回少しずつ変わります）`}
+        >
           <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
             {value.textLines.map((line, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -279,7 +282,10 @@ export default function GenerationPanel({
 
         <ColorRoles value={value} onPick={(key, next) => set(key, next)} disabled={disabled} />
 
-        <Field label="人物">
+        <Field
+          label="人物"
+          help="写真に人を入れるかどうか"
+        >
           <fieldset className="grid grid-cols-2 gap-1.5" disabled={disabled}>
             <legend className="sr-only">人物</legend>
             <SegmentOption name={`${uid}-person`} value="without" checked={value.personOption === 'without'} onSelect={() => set('personOption', 'without')} label="入れない" />
@@ -301,7 +307,10 @@ export default function GenerationPanel({
           />
         </Field>
 
-        <Field label="枚数">
+        <Field
+          label="つくる枚数"
+          note="一度に 4 枚まで"
+        >
           <fieldset className="grid grid-cols-4 gap-1.5" disabled={disabled}>
             <legend className="sr-only">枚数</legend>
             {Array.from({ length: maxCount }, (_, i) => i + 1).map((n) => (
@@ -320,6 +329,8 @@ export default function GenerationPanel({
         <UsageBars usage={usage ?? null} />
 
         <LimitState usage={usage ?? null} onReload={onReloadUsage} compact />
+
+        <div className="text-micro text-ink-faint">1040 × 1040 で書き出します</div>
       </div>
     </aside>
   )
