@@ -69,6 +69,8 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
+import HelpTip from '@/components/shared/help-tip'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars'
@@ -945,6 +947,12 @@ function CommonVarsListInner() {
     </div>
   ) : null
 
+  /* 行の名前の前の色の丸（2026-10-07 オーナー：表にフォルダ列を置かない）。 */
+  const folderDotOf = (folderId: string | null | undefined) => {
+    const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
+
   /* 並びは絵どおり：すべて → 作ったフォルダ → 未分類（最後）。 */
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: listFailed ? null : items.length },
@@ -1282,6 +1290,16 @@ function CommonVarsListInner() {
                 const valueText = formatVarValue(item.type, item.value)
                 const pending = item.nextSchedule ?? null
                 const updateTitle = `最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`
+                const nameLink = (
+                  <Link
+                    href={`/contents/vars/edit?id=${item.id}`}
+                    title={item.name}
+                    className={styles.nameLink}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {item.name}
+                  </Link>
+                )
                 return (
                   <Tr
                     interactive
@@ -1311,17 +1329,13 @@ function CommonVarsListInner() {
                     </Td>
                     <NameCell
                       name={
-                        <Link
-                          href={`/contents/vars/edit?id=${item.id}`}
-                          title={item.name}
-                          className={styles.nameLink}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          {item.name}
-                        </Link>
+                        <span className={styles.nameLine}>
+                          {/* 色の丸は左にフォルダの列が出ているときだけ（1152 で列を畳むと、絵 XIzkJ どおり丸なし）。 */}
+                          {narrow ? nameLink : <FolderDotName folder={folderDotOf(item.folderId)}>{nameLink}</FolderDotName>}
+                        </span>
                       }
                       sub={
-                        <span className={styles.keyRow}>
+                        <span className={styles.keyRow} data-dot-indent={narrow ? undefined : ''}>
                           <code title={placeholderText(item.varKey)} className={styles.keyCode}>
                             {placeholderText(item.varKey)}
                           </code>
@@ -1524,6 +1538,9 @@ function CommonVarsListInner() {
       <Dialog
         open={deleteTarget !== null}
         designNode="xxKtW"
+        designWidth={600}
+        designTop={240}
+        designHeaderPadding="24px 24px 0"
         /* 絵 xxKtW：まだ消せないときは赤い題にしない（差し替え・止めるへ導く窓）。消せるときだけ赤。 */
         tone={deleteImpact && !deleteImpact.canDelete ? 'default' : 'destructive'}
         title={deleteTarget
@@ -1531,21 +1548,27 @@ function CommonVarsListInner() {
             ? `「${deleteTarget.name}」はまだ消せません`
             : `「${deleteTarget.name}」を消しますか？`
           : ''}
-        description={deleteTarget
-          ? deleteImpact && !deleteImpact.canDelete
-            ? `${formatNumber(deleteImpact.total)}か所に差し込まれています。消すと、そこが空欄のまま送られます。先に差し込みを外してください。`
-            : 'この共通情報と、登録値・次回予約を削除します。テンプレート・配信・フォルダ・友だちは削除しません。'
-          : ''}
         busy={deleteBusy}
         error={deleteError || undefined}
         onCancel={closeDelete}
         footer={deleteTarget ? (
           /* 絵 xxKtW：キャンセルは真ん中、実行は右端。 */
-          <div className={styles.splitFooter}>
-            <span aria-hidden="true" />
+          <div className={`${styles.splitFooter} ${styles.deleteFooter}`}>
+            {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
+            {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
+              <input
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="理由（必須・記録に残ります）"
+                aria-label="消した理由・止める理由（記録に残ります）"
+                title="消した理由・止める理由（記録に残ります）"
+                className={styles.footerReason}
+              />
+            ) : <span aria-hidden="true" />}
             <Button type="button" onClick={closeDelete} disabled={deleteBusy}>
               キャンセル
             </Button>
+            <span aria-hidden="true" />
             <span className={styles.footerEnd}>
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete && deleteChoice === 'replace' ? (
               <Button
@@ -1588,7 +1611,13 @@ function CommonVarsListInner() {
         ) : undefined}
       >
         {deleteTarget ? (
-          <div className={styles.dialogBody}>
+          <div className={`${styles.dialogBody} ${styles.deleteBody}`}>
+            {/* 絵 xxKtW：説明は窓の横いっぱい（×の列の下まで）。共通の窓の説明は×の左までなので本文側に置く。 */}
+            <p className={styles.deleteLead}>
+              {deleteImpact && !deleteImpact.canDelete
+                ? `${formatNumber(deleteImpact.total)}か所に差し込まれています。消すと、そこが空欄のまま送られます。先に差し込みを外してください。`
+                : 'この共通情報と、登録値・次回予約を削除します。テンプレート・配信・フォルダ・友だちは削除しません。'}
+            </p>
             {deletePhase === 'loading' ? (
               <p className={styles.dialogLead}>使われている場所を確認しています…</p>
             ) : deletePhase === 'error' ? (
@@ -1616,7 +1645,7 @@ function CommonVarsListInner() {
                         {visible.map((usageItem) => (
                           <li key={`${usageItem.kind}-${usageItem.href}`} className={styles.usageItem}>
                             <span className={styles.usageItemName}>
-                              {usageItem.kindLabel}「{usageItem.name}」
+                              {`${usageItem.kindLabel}「${usageItem.name}」`}
                             </span>
                             <a href={usageItem.href} className={styles.usageItemLink}>開いて外す</a>
                           </li>
@@ -1642,7 +1671,12 @@ function CommonVarsListInner() {
 
                 {!deleteImpact.canDelete ? (
                   <div className={styles.choiceGroup} role="radiogroup" aria-label="どうしますか">
-                    <p className={styles.dialogQuestion}>どうしますか</p>
+                    <p className={styles.dialogQuestion}>
+                      どうしますか
+                      <HelpTip label="確認した範囲">
+                        {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
+                      </HelpTip>
+                    </p>
                     <div
                       className={styles.choiceBox}
                       data-active={deleteChoice === 'replace' || undefined}
@@ -1715,10 +1749,9 @@ function CommonVarsListInner() {
                   <p className={styles.dialogHint}>{unavailableText(deleteImpact)}</p>
                 ) : null}
 
+                {deleteImpact.canDelete ? (
                 <label className={styles.dialogField}>
-                  <span className={styles.dialogLabel}>
-                    {deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'}
-                  </span>
+                  <span className={styles.dialogLabel}>消した理由（記録に残ります）</span>
                   <input
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
@@ -1726,6 +1759,7 @@ function CommonVarsListInner() {
                     className={styles.dialogInput}
                   />
                 </label>
+                ) : null}
 
                 {deleteImpact.canDelete ? (
                   <label className={styles.dialogField}>
@@ -1745,9 +1779,9 @@ function CommonVarsListInner() {
                   <p className={styles.dialogHint}>{blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason })}</p>
                 ) : null}
 
-                <p className={styles.dialogHint}>
+                {deleteImpact.canDelete ? <p className={styles.dialogHint}>
                   {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
-                </p>
+                </p> : null}
               </>
             ) : null}
           </div>

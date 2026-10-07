@@ -23,7 +23,7 @@ import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import DefaultValueInput from '@/components/friend-fields/default-value-input'
-import EditFieldPageV8 from '../../edit-field-page-v8'
+import EditFieldPageV8 from '@/v8/tags/field-edit'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { storedDefaultLabels, sameLabels } from '../default-labels'
 

@@ -1056,6 +1056,22 @@
   --tpl-menu-item-h: 34px; --tpl-menu-item-gap: 8px;
   /* フォルダの色の丸（一覧の行の名前の前）。説明の行は丸と間の分 16 を下げて名前にそろえる。 */
   --tpl-folder-dot-size: 8px; --tpl-folder-dot-gap: 8px; --tpl-folder-dot-indent: 16px;
+  /* 友だち属性・テンプレート・共通情報・共通アクション・リッチメニューの残り（作業役 tg2）。 */
+  --tpl-tg2-mark-col-grip: 52px; --tpl-tg2-mark-col-name: 156px; --tpl-tg2-mark-col-count: 116px; --tpl-tg2-mark-col-default: 106px; --tpl-tg2-mark-col-place: 236px; --tpl-tg2-mark-row-h: 52px;
+  --tpl-tg2-search-col-count: 76px; --tpl-tg2-search-col-share: 76px; --tpl-tg2-search-col-usage: 166px; --tpl-tg2-search-col-updated: 126px; --tpl-tg2-search-col-open: 146px; --tpl-tg2-search-row-h: 61px; --tpl-tg2-foot-pad: 12px 24px;
+  --tpl-tg2-field-col-type: 106px; --tpl-tg2-field-col-place: 186px; --tpl-tg2-field-row-h: 58px; --tpl-tg2-key-size: 11px; --tpl-tg2-key-lh: 13px; --tpl-tg2-band-after: 6px;
+  --tpl-tg2-card-head-gap: 2px; --tpl-tg2-input-lh: 21px; --tpl-tg2-select-w: 320px; --tpl-tg2-ways-gap: 10px; --tpl-tg2-way-pad: 14px; --tpl-tg2-aside-gap: 14px; --tpl-tg2-aside-title-lh: 23px; --tpl-tg2-aside-text-lh: 19px;
+  --tpl-tg2-side-gap: 12px; --tpl-tg2-side-pad: 16px; --tpl-tg2-side-title-size: 14px; --tpl-tg2-chip-h: 36px; --tpl-tg2-chip-pad: 0 10px; --tpl-tg2-chip-icon: 13px; --tpl-tg2-chip-lh: 18px;
+  --tpl-tg2-option-gap: 8px; --tpl-tg2-default-w: 280px; --tpl-tg2-place-pad: 8px 0; --tpl-tg2-place-name-w: 110px; --tpl-tg2-key-w: 200px; --tpl-tg2-key-gap: 8px; --tpl-tg2-note-lh: 16px;
+  --tpl-tg2-type-card-h: 98px; --tpl-tg2-type-card-gap: 8px; --tpl-tg2-type-radio: 16px; --tpl-tg2-radio-off: inset 0 0 0 1.5px var(--color-control-border); --tpl-tg2-radio-on: inset 0 0 0 5px var(--color-accent-deep); --tpl-tg2-ring-thin: 1.5px; --tpl-tg2-label-lh: 19px;
+  --tpl-tg2-swatch: 28px; --tpl-tg2-swatch-gap: 10px; --tpl-tg2-swatch-ring: 2px; --tpl-tg2-rule-pad: 0 12px; --tpl-tg2-rule-h: 48px; --tpl-tg2-rule-icon: 14px; --tpl-tg2-icon-btn: 28px; --tpl-tg2-info-band-pad: 10px 14px; --tpl-tg2-info-band-lh: 20px; --tpl-tg2-sample-pad: 10px 14px; --tpl-tg2-sample-count-w: 26px; --tpl-tg2-sample-row-pad-bottom: 9px; --tpl-tg2-dialog-body-gap: 16px; --tpl-tg2-dialog-body-pull-bottom: -8px; --tpl-tg2-dialog-footer-pad: 0 24px 24px;
+  --tpl-tg2-step-no: 24px;
+  --tpl-tg2-map-pad: 12px 0; --tpl-tg2-menu-w: 170px; --tpl-tg2-menu-image-h: 80px; --tpl-tg2-link-w: 96px; --tpl-tg2-link-icon-w: 28px; --tpl-tg2-link-icon-h: 16px; --tpl-tg2-warn-pad: 10px 12px; --tpl-tg2-check-pad: 9px 0; --tpl-tg2-box-gap: 4px;
+  --tpl-tg2-folder-w: 220px; --tpl-tg2-seg-pad: 6px 12px; --tpl-tg2-pick-pad: 0 10px 0 12px; --tpl-tg2-bubble-pad: 10px 14px;
+  --tpl-tg2-image-w: 160px; --tpl-tg2-image-h: 106px; --tpl-tg2-image-icon: 18px; --tpl-tg2-col-label: 220px; --tpl-tg2-col-kind: 160px; --tpl-tg2-stat-pad: 10px 0; --tpl-tg2-slide-w: 170px; --tpl-tg2-slide-peek: 60px; --tpl-tg2-slide-image-h: 110px; --tpl-tg2-slide-radius: 14px; --tpl-tg2-slide-body-pad: 8px 10px; --tpl-tg2-avatar: 34px; --tpl-tg2-swipe-pad: 2px 10px; --tpl-tg2-swipe-size: 10px;
+  --tpl-tg2-info-pad: 14px 24px 0; --tpl-tg2-pill-pad: 2px 8px; --tpl-tg2-pill-gap: 5px; --tpl-tg2-pill-dot: 6px; --tpl-tg2-pill-lh: 18px;
+  --tpl-tg2-safety-pad: 16px 24px; --tpl-tg2-safety-gap: 6px; --tpl-tg2-safety-body-size: 11px;
+  --tpl-tg2-reason-w: 150px; --tpl-tg2-dialog-pull: -10px; --tpl-tg2-dialog-pull-top: -18px; --tpl-tg2-choice-gap: 10px; --tpl-tg2-usage-lh: 17px; --tpl-tg2-dialog-gap: 14px;
   --tpl-preview-pad: 24px; --tpl-preview-narrow-width: 280px;
   --tpl-preview-content-width: 331px; --tpl-preview-narrow-content-width: 231px;
   --tpl-detail-content-gap: 20px;

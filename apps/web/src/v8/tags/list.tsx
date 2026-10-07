@@ -4,17 +4,15 @@
  * ★V8 友だち属性の一覧（Pencil：タグ `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`）。
  *
  * 型（PageFrame・PageHeading）で板の頭・閲覧のみの帯・タブの段を組み、
- * 本文はタブごとに切り替える。タグのタブはこの場所の `tags-tab.tsx`。
- * 友だち情報欄・対応マーク・保存した検索のタブは、入口（app/tags/page.tsx）から
- * `renderTab` で受け取る（src/v8 は古い画面ファイルを import しないため）。
+ * 本文はタブごとに切り替える。どのタブもこの場所に一から書いた
+ * （tags-tab・fields-tab・marks-tab・searches-tab）。
  *
  * 受け付ける URL と指定は今と同じ：`/tags`・`/tags?tab=fields|marks|searches`・
  * 行の詳細は `?tag=<id>`。
  */
-import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Eye, Upload } from 'lucide-react'
+import { Eye, Plus, Upload } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -26,6 +24,9 @@ import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import TagsTab from './tags-tab'
+import MarksTab from './marks-tab'
+import SearchesTab from './searches-tab'
+import FieldsTab from './fields-tab'
 import styles from './list.module.css'
 
 const TABS = [
@@ -35,7 +36,6 @@ const TABS = [
   ['searches', '保存した検索'],
 ] as const
 export type TagsTabKey = (typeof TABS)[number][0]
-export type OtherTabKey = Exclude<TagsTabKey, 'tags'>
 
 /** タブと機能設定キーの対応（v7 `tags-page-v4.tsx` の TAB_FEATURE と同じ）。「タグ」は必須機能。 */
 const TAB_FEATURE: Partial<Record<TagsTabKey, FeatureKey>> = {
@@ -47,13 +47,10 @@ const TAB_FEATURE: Partial<Record<TagsTabKey, FeatureKey>> = {
 export default function TagsList({
   accountId = null,
   fixture,
-  renderTab,
 }: {
   accountId?: string | null
   /** 試験用の固定表示。渡すと読みに行かない。 */
   fixture?: { items: Tag[]; groups: TagGroup[] }
-  /** タグ以外のタブの本文。入口から渡す。 */
-  renderTab?: (tab: OtherTabKey, context: { accountId: string | null; canEdit: boolean }) => ReactNode
 }) {
   usePageTitle('友だち属性')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -86,7 +83,7 @@ export default function TagsList({
   const currentTabBlocked =
     !fixture && !!currentTabFeature && visibility.status === 'ready' && !visibility.enabled(currentTabFeature)
 
-  const boardId = tab !== 'tags' ? undefined : readOnly ? 'fkGUR' : narrow ? 'aPeD8' : 'I1E7Bt'
+  const boardId = tab === 'marks' ? 'vKDj5' : tab === 'searches' ? 'IWnYX' : tab === 'fields' ? 'q5gbcM' : tab !== 'tags' ? undefined : readOnly ? 'fkGUR' : narrow ? 'aPeD8' : 'I1E7Bt'
 
   /* 見出しの右はタブごとの作る口。閲覧のみには押せない作る口を置かない（2026-10-06 オーナー決定）。 */
   const actions = currentTabBlocked ? null : tab === 'tags' ? (
@@ -97,9 +94,11 @@ export default function TagsList({
       </Button>
     ) : null
   ) : tab === 'marks' ? (
-    canEdit ? <Button href="/tags/marks/new" variant="primary">＋ マークを作る</Button> : null
+    canEdit ? (
+      <Button href="/tags/marks/new" variant="primary"><Plus size={15} aria-hidden="true" />マークを作る</Button>
+    ) : null
   ) : tab === 'searches' ? (
-    <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button>
+    <Button href="/friends" variant="primary"><Plus size={15} aria-hidden="true" />友だち一覧で条件を作る</Button>
   ) : null
 
   return (
@@ -143,8 +142,12 @@ export default function TagsList({
           csvOpen={csvOpen}
           onCsvClose={() => setCsvOpen(false)}
         />
+      ) : tab === 'marks' ? (
+        <MarksTab accountId={accountId} canEdit={canEdit} />
+      ) : tab === 'searches' ? (
+        <SearchesTab accountId={accountId} canEdit={canEdit} />
       ) : (
-        <div className={styles.otherTab}>{renderTab?.(tab, { accountId, canEdit })}</div>
+        <FieldsTab accountId={accountId} canEdit={canEdit} narrow={narrow} />
       )}
     </PageFrame>
   )

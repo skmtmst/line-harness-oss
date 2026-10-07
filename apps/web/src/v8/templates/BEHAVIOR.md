@@ -45,3 +45,19 @@
 
 ## 読み込みの状態（`susGP`）
 - 読込中・アカウント未選択・見る権限が無い・読み込めない（もう一度試す）・まだ無い・条件に合うものが無い（条件を外す）を分ける。数の帯は読めるまで「—」。
+
+## 質問を作る・編集（question-new.tsx・絵 l87p1J）
+今の V8（`app/templates/questions/question-v8.tsx`）と同じ口と動き：`api.folders.list('template')`・`api.templates.get/create/update`
+（`question` と `questionStatus`）、使用先がある質問の公開は確認の窓（cuR8I）、離れるときの確認、オーナー・管理者だけが作れる。
+- 入口：`app/templates/questions/new/page.tsx`（`/templates/questions/new`・`?id=`）
+- 見せ方：段「名前とフォルダ」「質問」（前文・質問文・答え方）「選択肢」（横に並ぶカード：ボタンの文字・押されたら・押したときの返信、最大4つ）
+- 「押されたら」は1行の要約（タグ・シナリオは名前。`api.tags.list`・`api.scenarios.list` で読む）。押すと今の質問の部品（QuestionEditor）を窓で開き、タグ・友だち情報・シナリオ・URL・代替テキストなど全部の設定をそこで直す
+- 右の列：この質問を使う場所・届き方（本物のスマホ）
+
+## カルーセルを作る・編集（carousel.tsx・絵 J60utH）
+今の V8（`app/templates/carousel/carousel-v8.tsx`）と同じ口と動き：読み込み（壊れた中身は知らせて上書き保存）、保存（`saveCarousel`：
+作成だけ済んだあとのやり直しは作り直さない）、公開（使用先があれば確認の窓 cuR8I・409 は止める）、押せる回数、離れる確認。組み立てと保存は carousel-core の写し。
+- 受け付ける URL：`/templates/carousel`・`?id=`・`?visual=1`（見本の3枚で開く。撮影用。見本は絵の3枚にした）
+- 見せ方：段「カード」は札（タイトルの（）書きを外した短い名前）で選び、つまんで並べ替え（Alt＋← → でも）。段「カード N の中身」は画像の枠（押すと登録メディア。「URL で入れる」で URL も入れられる）・タイトル・本文・ボタンの行（文字・押したら・中身）
+- 「動きを実行する」の中身は1行の要約。押すと今の部品（InlineActionList）を窓で開いて決める
+- 絵に無い「押せる回数」は段のいちばん下に残した

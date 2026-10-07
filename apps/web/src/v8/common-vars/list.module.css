@@ -250,6 +250,14 @@
   padding-block: var(--tpl-cv-row-pad-block);
 }
 
+/* 名前の行（色の丸＋名前）は名前の行の高さに収める（丸で行が伸びないように）。 */
+.nameLine {
+  display: flex;
+  height: var(--tpl-cv-name-lh);
+  align-items: center;
+  min-width: 0;
+}
+
 .nameLink {
   display: block;
   max-width: 100%;
@@ -272,6 +280,10 @@
   align-items: center;
   gap: var(--tpl-cv-key-gap);
   min-width: 0;
+}
+
+.keyRow[data-dot-indent] {
+  padding-inline-start: var(--tpl-folder-dot-indent);
 }
 
 .keyCode {
@@ -523,6 +535,52 @@
   padding: var(--tpl-cv-dialog-actions-pad);
 }
 
+/* 削除の窓（xxKtW）：理由・キャンセル・空き・実行の4列。本文と下の帯の間は絵の 14。 */
+.deleteFooter {
+  grid-template-columns: 1fr auto 1fr auto;
+  padding-top: 0;
+}
+
+.deleteBody {
+  gap: var(--tpl-tg2-dialog-gap);
+  margin-top: var(--tpl-tg2-dialog-pull-top);
+  margin-bottom: var(--tpl-tg2-dialog-pull);
+}
+
+.deleteBody .usageItem,
+.deleteBody .usageItemLink {
+  line-height: var(--tpl-tg2-usage-lh);
+}
+
+.deleteBody .usageItemLink {
+  height: auto;
+  min-height: 0;
+}
+
+.deleteBody .choiceGroup {
+  gap: var(--tpl-tg2-choice-gap);
+}
+
+.deleteLead {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-cv-dialog-lh);
+}
+
+/* 削除の窓の左の空き：理由の欄（絵に無いが必須）。 */
+.footerReason {
+  justify-self: start;
+  width: var(--tpl-tg2-reason-w);
+  height: var(--tpl-cv-control-h);
+  padding: var(--tpl-cv-input-pad);
+  border: 1px solid var(--color-control-border, var(--color-hairline));
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+}
+
 .footerEnd {
   display: flex;
   justify-content: flex-end;
@@ -545,6 +603,9 @@
 }
 
 .dialogQuestion {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cv-fix-gap);
   margin: 0;
   color: var(--color-ink);
   font-size: var(--text-label);

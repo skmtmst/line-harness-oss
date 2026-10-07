@@ -4088,7 +4088,7 @@ export const REMINDER_PUBLISH = {
  */
 export const FRIEND_FIELDS = [
   {
-    id: 'field-birthday', folderId: null, name: '誕生日', fieldKey: 'birthday',
+    id: 'field-birthday', folderId: 'friend-field-folder-purchase', name: '誕生日', fieldKey: 'birthday',
     type: 'date', options: null, defaultValue: null, source: 'manual',
     ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: true,
     displayOrder: 1, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
@@ -4127,7 +4127,7 @@ export const FRIEND_ATTRIBUTE_FIELDS = [
     createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
   },
   {
-    id: 'field-prefecture', folderId: null, name: 'お住まい', fieldKey: 'prefecture',
+    id: 'field-prefecture', folderId: 'friend-field-folder-contact', name: 'お住まい', fieldKey: 'prefecture',
     type: 'select', options: ['北海道', '東京都', '大阪府', '福岡県'], defaultValue: null, source: 'form',
     ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
     displayOrder: 2, usageCount: 164, formUsageCount: 2,
@@ -4135,7 +4135,7 @@ export const FRIEND_ATTRIBUTE_FIELDS = [
     createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-19T00:00:00.000Z',
   },
   {
-    id: 'field-birthday', folderId: null, name: '生年月日', fieldKey: 'birthday',
+    id: 'field-birthday', folderId: 'friend-field-folder-purchase', name: '生年月日', fieldKey: 'birthday',
     type: 'date', options: null, defaultValue: null, source: 'form',
     ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
     displayOrder: 3, usageCount: 141, formUsageCount: 1,
@@ -4151,7 +4151,7 @@ export const FRIEND_ATTRIBUTE_FIELDS = [
     createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-17T00:00:00.000Z',
   },
   {
-    id: 'field-phone', folderId: null, name: '電話番号', fieldKey: 'phone_number',
+    id: 'field-phone', folderId: 'friend-field-folder-pets', name: '電話番号', fieldKey: 'phone_number',
     type: 'text', options: null, defaultValue: null, source: 'manual',
     ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
     displayOrder: 5, usageCount: 78, formUsageCount: 1,
@@ -4161,7 +4161,10 @@ export const FRIEND_ATTRIBUTE_FIELDS = [
 ]
 
 export const FRIEND_FIELD_FOLDERS = [
-  { id: 'friend-field-folder-pets', kind: 'friend_field', name: 'ペットプロフィール', displayOrder: 1 },
+  // 板 q5gbcM：ペット・連絡先・購入（名前の前の色の丸もこの色）。
+  { id: 'friend-field-folder-pets', kind: 'friend_field', name: 'ペット', color: '#2f6fde', displayOrder: 1 },
+  { id: 'friend-field-folder-contact', kind: 'friend_field', name: '連絡先', color: '#1f9d55', displayOrder: 2 },
+  { id: 'friend-field-folder-purchase', kind: 'friend_field', name: '購入', color: '#e07b24', displayOrder: 3 },
 ]
 
 /**
@@ -4195,6 +4198,26 @@ export const FRIEND_FIELD_MIGRATION_PREVIEW = {
   runId: 'field-migration-run-birthday-1',
   previewToken: 'visual-qa-field-migration-preview-token',
   previewExpiresAt: '2026-09-07T15:15:00.000Z',
+}
+
+/**
+ * 板 GobMd：「愛犬のお名前」（1行テキスト）を「1つ選ぶ」へ変えるときの見本。
+ * 種類だけの事前確認（移行先なし）なので確認番号は出ない。値は選ぶ候補に足して移す。
+ */
+export const FRIEND_FIELD_MIGRATION_PREVIEW_DOG = {
+  source: {
+    ...FRIEND_ATTRIBUTE_FIELDS.find((field) => field.id === 'field-dog-name'),
+    status: 'active', version: 2, canInsertText: true,
+  },
+  summary: { total: 69, convertible: 0, review: 69, invalid: 0 },
+  rows: [
+    ...Array.from({ length: 41 }, (_, index) => ({ friendId: `friend-dog-pochi-${index + 1}`, sourceValue: 'ポチ', convertedValue: 'ポチ（選ぶ候補に足す）', status: 'review', reason: '選ぶ候補に足します' })),
+    ...Array.from({ length: 28 }, (_, index) => ({ friendId: `friend-dog-coco-${index + 1}`, sourceValue: 'ココ', convertedValue: 'ココ（選ぶ候補に足す）', status: 'review', reason: '選ぶ候補に足します' })),
+  ],
+  usageTargets: [],
+  runId: null,
+  previewToken: null,
+  previewExpiresAt: null,
 }
 
 /**
