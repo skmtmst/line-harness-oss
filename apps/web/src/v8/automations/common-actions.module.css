@@ -92,6 +92,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.subIndent {
+  padding-left: var(--tpl-folder-dot-indent);
+}
+
 .name:hover {
   text-decoration: underline;
 }

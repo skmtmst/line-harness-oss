@@ -19,6 +19,13 @@ function toLocalInput(iso: string): string {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
 }
 
+/** 「10/2（金）」の形（取消の確認の1行目）。 */
+function monthDayWeek(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${date.getMonth() + 1}/${date.getDate()}（${'日月火水木金土'[date.getDay()]}）`
+}
+
 export type ReservationPatch = Record<string, unknown>
 
 /** 閲覧のみ：選ぶ部品は置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */
@@ -71,12 +78,12 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   ]
   const courseOptions = [
     { value: '', label: '席のみ' },
-    ...courses.filter((course) => course.status === 'active' || course.id === reservation.course_id).map((course) => ({ value: course.id, label: course.name })),
+    ...courses.filter((course) => course.status === 'active' || course.id === reservation.course_id).map((course) => ({ value: course.id, label: `${course.name} ${course.price.toLocaleString()}円` })),
   ]
   return (
     <RsDialog
       open
-      title={hold ? `押さえ（${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}）` : `${reservation.customer_name}さんの予約`}
+      title={hold ? `押さえ（${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}）` : `${reservation.customer_name}さんの予約${canWrite ? 'を変更' : ''}`}
       width={600}
       top={120}
       busy={busy}
@@ -114,8 +121,10 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             <DialogField label="人数" htmlFor="rs-edit-guests">
               <TextField id="rs-edit-guests" type="number" min={1} max={100} required readOnly={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
             </DialogField>
-            <DialogField label="アレルギー・特記事項" htmlFor="rs-edit-allergy">
-              <TextField id="rs-edit-allergy" readOnly={!canWrite} value={draft.allergyNote} onChange={(event) => setDraft({ ...draft, allergyNote: event.target.value })} />
+            <DialogField label="卓" kind="select">
+              {canWrite ? (
+                <Select aria-label="卓" size="full" value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={tableOptions} />
+              ) : <ReadOnlyChoice label="卓" value={draft.tableId} options={tableOptions} />}
             </DialogField>
           </div>
           <div className={styles.pair}>
@@ -126,19 +135,14 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
               <TextField id="rs-edit-end" type="datetime-local" required readOnly={!canWrite} value={draft.endsAt} onChange={(event) => setDraft({ ...draft, endsAt: event.target.value })} />
             </DialogField>
           </div>
-          <div className={styles.pair}>
-            <DialogField label="卓" kind="select">
-              {canWrite ? (
-                <Select aria-label="卓" size="full" value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={tableOptions} />
-              ) : <ReadOnlyChoice label="卓" value={draft.tableId} options={tableOptions} />}
-            </DialogField>
-            <DialogField label="コース" kind="select">
-              {canWrite ? (
-                <Select aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} />
-              ) : <ReadOnlyChoice label="コース" value={draft.courseId} options={courseOptions} />}
-            </DialogField>
-          </div>
-          <DialogNote>予約媒体から受けた予約は、予約媒体へは書き戻しません（検証環境は受信専用）。卓を変えると、同じ時間に重なる予約がないかを確かめてから保存します。</DialogNote>
+          <DialogField label="コース" kind="select">
+            {canWrite ? (
+              <Select aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} />
+            ) : <ReadOnlyChoice label="コース" value={draft.courseId} options={courseOptions} />}
+          </DialogField>
+          <DialogField label="アレルギー・特記事項" htmlFor="rs-edit-allergy">
+            <TextField id="rs-edit-allergy" readOnly={!canWrite} value={draft.allergyNote} onChange={(event) => setDraft({ ...draft, allergyNote: event.target.value })} />
+          </DialogField>
         </>
       )}
     </RsDialog>
@@ -157,7 +161,7 @@ export function CancelReservationDialog({ reservation, busy, onClose, onConfirm 
       open={Boolean(reservation)}
       title={hold ? 'この押さえを解除しますか？' : 'この予約を取り消しますか？'}
       width={480}
-      top={240}
+      top={305}
       busy={busy}
       onCancel={onClose}
       actions={(
@@ -167,8 +171,8 @@ export function CancelReservationDialog({ reservation, busy, onClose, onConfirm 
         </>
       )}
     >
-      {reservation ? <p className={styles.dialogStrong}>{hold ? `押さえ ${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}` : `${reservation.customer_name}・${reservation.guest_count}名・${hm(reservation.starts_at)}`}</p> : null}
-      <DialogNote>台帳には取消として残ります。時間帯の在庫は人数分だけ戻ります。</DialogNote>
+      {reservation ? <p className={styles.dialogStrong}>{hold ? `押さえ ${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}` : `${monthDayWeek(reservation.starts_at)} ${hm(reservation.starts_at)} ${reservation.customer_name}さん ${reservation.guest_count}名`}</p> : null}
+      <DialogNote>{hold ? '押さえを解除すると、その時間の卓は空きに戻ります。台帳には履歴が残ります。' : '台帳には取消として残ります。時間帯の在庫は人数分だけ戻ります。取り消した予約は「復活」で戻せます。'}</DialogNote>
     </RsDialog>
   )
 }
@@ -184,7 +188,7 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
   return (
     <RsDialog
       open={open}
-      title="受信データを試す"
+      title="媒体受信シミュレーター（外部への書戻しなし）"
       width={560}
       top={160}
       busy={busy}
@@ -196,35 +200,33 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
       }}
       actions={(
         <>
-          <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
+          <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
           <Button type="submit" variant="primary" disabled={busy || !draft.customerName.trim() || !draft.startsAt}>受信として取り込む</Button>
         </>
       )}
     >
-      <div className={styles.pair}>
-        <DialogField label="受信元" kind="select">
-          <Select aria-label="受信元" size="full" value={draft.provider} onChange={(value) => setDraft({ ...draft, provider: value })} options={[
-            { value: 'restaurant_board', label: 'レストランボード' },
-            { value: 'hotpepper', label: 'Hot Pepper' },
-            { value: 'tabelog', label: '食べログ' },
-          ]} />
-        </DialogField>
-        <DialogField label="外部予約ID" htmlFor="rs-trial-id">
-          <TextField id="rs-trial-id" required value={draft.externalId} onChange={(event) => setDraft({ ...draft, externalId: event.target.value })} />
-        </DialogField>
-      </div>
-      <DialogField label="お客様名" htmlFor="rs-trial-name">
-        <TextField id="rs-trial-name" required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
+      <DialogField label="受信元" kind="select">
+        <Select aria-label="受信元" size="full" value={draft.provider} onChange={(value) => setDraft({ ...draft, provider: value })} options={[
+          { value: 'restaurant_board', label: 'レストランボード' },
+          { value: 'hotpepper', label: 'Hot Pepper' },
+          { value: 'tabelog', label: '食べログ' },
+        ]} />
+      </DialogField>
+      <DialogField label="外部予約ID" htmlFor="rs-trial-id">
+        <TextField id="rs-trial-id" required value={draft.externalId} onChange={(event) => setDraft({ ...draft, externalId: event.target.value })} />
       </DialogField>
       <div className={styles.pair}>
+        <DialogField label="お客様名" htmlFor="rs-trial-name">
+          <TextField id="rs-trial-name" required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
+        </DialogField>
         <DialogField label="人数" htmlFor="rs-trial-guests">
           <TextField id="rs-trial-guests" type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
         </DialogField>
-        <DialogField label="開始日時" htmlFor="rs-trial-start">
-          <TextField id="rs-trial-start" type="datetime-local" required value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} />
-        </DialogField>
       </div>
-      <DialogNote>受信専用のデータとして台帳に取り込みます。予約媒体へは書き戻しません。滞在は2時間で入れます。</DialogNote>
+      <DialogField label="開始日時" htmlFor="rs-trial-start">
+        <TextField id="rs-trial-start" type="datetime-local" required value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} />
+      </DialogField>
+      <DialogNote>試した予約は台帳に入ります。予約媒体へは何も送りません。</DialogNote>
     </RsDialog>
   )
 }

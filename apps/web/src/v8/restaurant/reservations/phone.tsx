@@ -23,6 +23,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantTestApi, type RestaurantMenuItem, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
 import { DialogField } from '../booking-kit/parts'
+import StoreTabs from '../store-tabs/store-tabs'
 import type { PhonePreset } from './today'
 import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './format'
 import styles from './reservations.module.css'
@@ -256,6 +257,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
         title="電話の予約を入れる"
         description="電話・店頭で受けた予約を台帳に入れます。空いている卓は自動で選びます。枠だけ押さえることもできます。"
         identity={<button type="button" className={styles.backLink} onClick={onBack}>← 予約台帳へ</button>}
+        tabs={<StoreTabs current="reservations" flush />}
         preview={preview}
         footerActions={(
           <>
