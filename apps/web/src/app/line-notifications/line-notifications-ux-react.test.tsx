@@ -3,9 +3,9 @@
  * V8 サクサク感（お知らせ）：顧客タブの読み込み中は表の形の骨組みが出て
  * 「読み込み中」の文字は無い。
  */
-import React from 'react'
+import React, { act } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   settings: vi.fn(),
@@ -88,25 +88,34 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   cleanup()
   vi.unstubAllGlobals()
 })
+
+/** 偽の時計を 50ms ずつ進めながら、満たすまで（最大2秒ぶん）確かめる。本物の時間は待たない。 */
+async function until(check: () => void) {
+  for (let i = 0; i < 40; i += 1) {
+    try { check(); return } catch { /* もう少し進める */ }
+    await act(async () => { await vi.advanceTimersByTimeAsync(50) })
+  }
+  check()
+}
 
 it('顧客タブの読み込み中は骨組みが出て「読み込み中」の文字は無い', async () => {
   document.documentElement.dataset.theme = 'v8'
   // 顧客の定義だけ返さず、読み込み中のままにする。
   fixture.definitions.mockReturnValue(new Promise(() => {}))
+  // 待ちは偽の時計で進める（本物の時間を待たない）。骨組みの 0.3 秒は読み始めから数えるので、描く前に替える。
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
   const { container } = render(<LineNotificationsPage />)
-  await waitFor(() => {
+  await until(() => {
     expect(container.querySelector('[aria-label="顧客へのお知らせを読み込んでいます"]')).not.toBeNull()
   })
-  await new Promise((resolve) => setTimeout(resolve, 600))
-  await waitFor(
-    () => {
-      expect(container.querySelectorAll('[data-skeleton]').length).toBeGreaterThan(0)
-    },
-    { timeout: 3000 },
-  )
+  await act(async () => { await vi.advanceTimersByTimeAsync(600) })
+  await until(() => {
+    expect(container.querySelectorAll('[data-skeleton]').length).toBeGreaterThan(0)
+  })
   expect(screen.queryByText(/読み込んでいます/)).toBeNull()
   delete document.documentElement.dataset.theme
 })

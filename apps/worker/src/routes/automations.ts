@@ -513,12 +513,13 @@ automations.post(
      * 同じ鍵を使う。鍵が無い呼び出しは「別の操作」と見分けられず、
      * 前の下書きへ戻って上書きする道が残るので、service 側で断る。
      */
-    const body = await c.req.json<{ operationKey?: unknown }>()
-      .catch((): { operationKey?: unknown } => ({}));
+    const body = await c.req.json<{ operationKey?: unknown; folderId?: unknown }>()
+      .catch((): { operationKey?: unknown; folderId?: unknown } => ({}));
     return draftEndpoint(c, () => createAutomationDraftFromTemplate(c.env.DB, {
       templateKey: c.req.param('key'),
       lineAccountId: accountId,
       operationKey: body.operationKey,
+      folderId: body.folderId,
       createdBy: c.get('staff')?.id,
     }), 201);
   },
@@ -546,6 +547,7 @@ automations.put(
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
     type DraftBody = {
+      folderId?: unknown;
       expectedDraftVersionId?: unknown;
       name?: unknown;
       eventType?: unknown;
@@ -561,6 +563,7 @@ automations.put(
         lineAccountId: accountId,
         expectedDraftVersionId: body.expectedDraftVersionId,
         name: body.name,
+        folderId: body.folderId,
         eventType: body.eventType,
         triggerConfig: body.triggerConfig,
         conditions: body.conditions,

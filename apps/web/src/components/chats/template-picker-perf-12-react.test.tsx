@@ -60,11 +60,19 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   cleanup()
 })
 
-// 検索のデバウンス(250ms)を越えるための実時間待ち。
-const debounce = () => act(async () => { await new Promise((r) => setTimeout(r, 350)) })
+/*
+ * 検索のデバウンス(250ms)を越える。偽の時計で進める（本物の時間を待たない）。
+ * デバウンスは打った瞬間から数えるので、打つ前に fakeClock() で替えておき、越えたら本物の時計へ戻す。
+ */
+const fakeClock = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+const debounce = async () => {
+  await act(async () => { await vi.advanceTimersByTimeAsync(350) })
+  vi.useRealTimers()
+}
 
 describe('PERF-12 テンプレート選択の区画取得', () => {
   test('初回は1ページ目を取り、検索語はサーバーへ渡す', async () => {
@@ -85,6 +93,7 @@ describe('PERF-12 テンプレート選択の区画取得', () => {
     expect(fixture.calls[0].folderCounts).toBe(true)
     await waitFor(() => expect(screen.getAllByText('tp-1').length).toBeGreaterThan(0))
 
+    fakeClock()
     await act(async () => {
       const input = screen.getByLabelText('テンプレート名・本文で検索')
       // React が管理する input の値は setter 経由で入れる。
@@ -164,6 +173,7 @@ describe('PERF-12 テンプレート選択の区画取得', () => {
       }) as never
     }
     render(<TemplatePicker open onClose={() => {}} onPick={() => {}} />)
+    fakeClock()
     await act(async () => {
       const input = screen.getByLabelText('テンプレート名・本文で検索')
       const setter = Object.getOwnPropertyDescriptor(globalThis.HTMLInputElement.prototype, 'value')!.set!

@@ -176,13 +176,16 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     expect(buttonByText('古い順'), '並びの字が入れ替わっていません').toBeTruthy()
   })
 
-  it('編集キーの無い運用担当は閲覧のみの帯が出て、作るは押せない', async () => {
+  it('編集キーの無い運用担当は閲覧のみの帯が出て、作る・保存・フォルダ追加のボタンを置かない', async () => {
     role.current = 'staff'
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています')
-    const create = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('配信を作る')) as HTMLButtonElement
-    expect(create.disabled).toBe(true)
+    const buttons = [...host.querySelectorAll('button')]
+    // 押せない形で出すのではなく、置かない（2026-10-06 オーナー決定）
+    expect(buttons.find((b) => b.textContent?.includes('配信を作る')), '閲覧のみに「配信を作る」が出ています').toBeUndefined()
+    expect(buttons.find((b) => b.textContent?.includes('この条件を保存する')), '閲覧のみに「この条件を保存する」が出ています').toBeUndefined()
+    expect(buttons.find((b) => b.textContent?.includes('フォルダを追加')), '閲覧のみに「フォルダを追加」が出ています').toBeUndefined()
   })
 
   it('編集キーを持つ運用担当は作れる', async () => {

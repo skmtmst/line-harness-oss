@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Area } from '@/components/rich-menus/canvas-editor'
-import { isAreaActionConfigured, pruneStaleAreaTags, pruneStaleAreaTemplates, saveAreaDraft, unsetAreaLabels } from './action-drafts'
+// 古い ./action-drafts.ts（中身は下の再書き出しだけ）はどこからも読まれないので 2026-10-07 に消し、元を直接読む。
+import { isAreaActionConfigured, pruneStaleAreaTags, pruneStaleAreaTemplates, saveAreaDraft, unsetAreaLabels } from '@/components/rich-menus/action-drafts'
 
 function textArea(id: string, text = ''): Area {
   return {

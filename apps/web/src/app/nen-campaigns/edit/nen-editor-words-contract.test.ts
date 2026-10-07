@@ -3,7 +3,8 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const EDITOR = fs.readFileSync(path.join(__dirname, 'campaign-editor.tsx'), 'utf8')
+// 編集の入口（page.tsx）は campaign-editor-v8 を出す（古い campaign-editor.tsx は 2026-10-07 に消した）。
+const EDITOR = fs.readFileSync(path.join(__dirname, 'campaign-editor-v8.tsx'), 'utf8')
 const DISPLAY = fs.readFileSync(path.join(__dirname, '..', 'campaign-display.ts'), 'utf8')
 
 describe('V6 NEN配信編集の運用者向け文言契約', () => {
@@ -23,7 +24,7 @@ describe('V6 NEN配信編集の運用者向け文言契約', () => {
      */
     expect(EDITOR).toContain("setting.campaignKey === 'birthday_coupon'")
     expect(EDITOR).toContain('10:00（固定）')
-    expect(EDITOR).toContain('この日時は誕生日配信の実行処理で固定されています。')
+    expect(EDITOR).toContain('誕生日のきっかけ・日時は配信の実行処理で固定されています。')
     expect(EDITOR).toContain('const timing = `${formatCampaignTiming')
     expect(EDITOR).toContain('{timing}')
     expect(DISPLAY).toContain("birthday_coupon: '誕生日の3日前 10:00'")
@@ -36,7 +37,8 @@ describe('V6 NEN配信編集の運用者向け文言契約', () => {
      * 上部バーと二重だった。設計（Pencil）の本文に画面名テキストは無い。
      * 上部バーへ渡す `usePageTitle` に替えたので、名前はここで見張る。
      */
-    expect(EDITOR).toContain("usePageTitle(`${setting?.label ?? 'NEN配信'}を編集する`)")
+    // ★V8 の編集（campaign-editor-v8）は本文の上のパンくずで NEN配信へ戻す（usePageTitle は持たない）。
+    expect(EDITOR).toContain('← NEN配信へ')
     expect(EDITOR).not.toContain('Header title=')
     expect(EDITOR).toContain('href="/nen-campaigns"')
     expect(EDITOR).not.toContain('フォロー配信へ戻る')
@@ -53,7 +55,7 @@ describe('V6 NEN配信編集の運用者向け文言契約', () => {
     expect(EDITOR).not.toContain('吹き出しを追加する')
     expect(EDITOR).not.toContain('<Button>差し替える</Button>')
     expect(EDITOR).toContain('この配信は1通で届きます')
-    expect(EDITOR).toContain('回答フォーム「{formAction.formName}」を開く')
+    expect(EDITOR).toContain('回答フォーム「{formAction.formName}」を開かせる（任意）')
     expect(EDITOR).toContain("{ kind: 'award_mileage', amount: 200, trigger: 'form_submitted' }")
     expect(EDITOR).toContain('afterActions: actions')
     expect(EDITOR).toContain('配信内容を保存する')

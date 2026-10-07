@@ -1427,6 +1427,7 @@ export interface AffiliateClick {
 // -----------------------------------------------------------------------------
 
 export interface IncomingWebhook {
+  folderId?: string | null;
   id: string;
   name: string;
   sourceType: string;
@@ -1452,6 +1453,7 @@ export interface IncomingWebhookCreated extends Omit<IncomingWebhook, 'hasSecret
 // -----------------------------------------------------------------------------
 
 export interface OutgoingWebhook {
+  folderId?: string | null;
   id: string;
   name: string;
   url: string;

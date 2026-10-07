@@ -30,9 +30,10 @@ import {
   Users,
 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, type ListStats, type TagDependencies } from '@/lib/api'
+import { api, ApiError, type ListStats } from '@/lib/api'
 import { useRowLeaving } from '@/lib/use-row-leaving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPageBody } from '@/components/templates'
 import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
@@ -76,6 +77,27 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 const PAGE_SIZES = [10, 20, 50]
 
 /** 連動の文（絵の「本人+10・1.2倍 他1」）。マイル以外の連動は「他N」。0件は「—」。 */
+/**
+ * 窓なしの保管で、5秒たって送る直前に呼ぶ。影響を読み直し、その間に友だちに付いた・
+ * どこかで使われ始めたなら保管せずに失敗を返す（呼び出し側が行を戻して知らせる）。
+ * 保管そのものが断られたときも失敗を返す。
+ */
+export async function archiveIfStillUnused(
+  tagId: string,
+  accountId: string,
+  tagsApi: Pick<typeof api.tags, 'dependencies' | 'archive'> = api.tags,
+): Promise<{ success: boolean; error?: string }> {
+  const res = await tagsApi.dependencies(tagId, accountId)
+  if (!res.success) return { success: false, error: res.error }
+  const impact = res.data
+  const inUse = impact.friendCount > 0 || impact.references.length > 0 || impact.linkedActions.length > 0
+    || impact.pendingRunCount > 0 || impact.blockingReferenceCount > 0 || !impact.canArchive
+  if (inUse) return { success: false, error: 'in_use' }
+  const archived = await tagsApi.archive(tagId, accountId, { expectedVersion: impact.tag.version, impactRevision: impact.revision }, crypto.randomUUID())
+  if (!archived.success) return { success: false, error: archived.error }
+  return { success: true }
+}
+
 export function tagLinkText(tag: Tag): string {
   const main: string[] = []
   if (tag.mileageReward) main.push(`本人+${tag.mileageReward}`)
@@ -234,57 +256,8 @@ export default function TagsTab({
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
   const { leavingId, leave } = useRowLeaving()
-  /*
-   * どこにも使われていないタグ（友だち 0 人・参照 0・つながる操作 0・待ちの実行 0・マイルの設定なし）は、
-   * 名前を打たせる確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
-   * 影響を読めないとき・どれかが残るときは今までどおり窓（影響の一覧と名前の入力）。
-   */
+  // 使っている所が0のタグは窓なしで保管し、5秒は「元に戻す」で取り消せる（動きの点検 17 番・旧い一覧と同じ）。
   const deferredDelete = useDeferredDelete()
-  const requestArchive = async (tag: Tag) => {
-    if (!accountId) {
-      setDeleteTarget(tag)
-      return
-    }
-    let impact: TagDependencies | null = null
-    try {
-      const res = await api.tags.dependencies(tag.id, accountId)
-      if (res.success) impact = res.data
-    } catch {
-      impact = null
-    }
-    const unused = impact !== null
-      && impact.canArchive
-      && impact.friendCount === 0
-      && impact.references.length === 0
-      && impact.linkedActions.length === 0
-      && impact.pendingRunCount === 0
-      && impact.blockingReferenceCount === 0
-      && !impact.mileageImpact.configured
-    if (!impact || !unused) {
-      setDeleteTarget(tag)
-      return
-    }
-    const confirmed = impact
-    const requestAccountId = accountId
-    deferredDelete.schedule({
-      ids: [tag.id],
-      message: `タグ「${tag.name}」を保管しました`,
-      commit: async () => {
-        try {
-          await api.tags.archive(tag.id, requestAccountId, {
-            expectedVersion: confirmed.tag.version,
-            impactRevision: confirmed.revision,
-          }, crypto.randomUUID())
-        } catch (reason) {
-          // もう保管済みなら、着きたかった状態に着いている（窓の扱いと同じ）。
-          if (reason instanceof ApiError && reason.code === 'already_archived') return
-          throw reason
-        }
-      },
-      onCommitted: () => load(),
-      failureMessage: '保管できませんでした。影響を読み直して、もう一度お試しください。',
-    })
-  }
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
@@ -350,6 +323,7 @@ export default function TagsTab({
   useListScrollMemory(status === 'ready')
 
   const filtered = useMemo(() => items.filter((tag) => {
+    // 保管して「元に戻す」を待っている行は出さない。
     if (deferredDelete.isHidden(tag.id)) return false
     if (query && !tag.name.toLowerCase().includes(query.toLowerCase())) return false
     if (folder === UNGROUPED && tag.groupId) return false
@@ -570,10 +544,30 @@ export default function TagsTab({
         dividerBefore: true,
         disabled: readonly,
         disabledReason: readonly ? readonlyReason : undefined,
-        onSelect: () => { void requestArchive(tag) },
+        onSelect: () => requestArchive(tag),
       })
     }
     return list
+  }
+
+  /*
+   * 保管の入口。使っている所が0（友だち0人・どこからも使われていない）と分かっているタグは、
+   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる。送る直前に影響を読み直し、
+   * その間に使われ始めていたら保管せずに行を戻す。それ以外は今までどおり確かめの窓。
+   */
+  const requestArchive = (tag: Tag) => {
+    if (!isUnused(tag) || !accountId) {
+      setDeleteTarget(tag)
+      return
+    }
+    if (activeTagId === tag.id) setActiveTagId(null)
+    deferredDelete.schedule({
+      ids: [tag.id],
+      message: `タグ「${tag.name}」を保管しました`,
+      commit: () => archiveIfStillUnused(tag.id, accountId),
+      onCommitted: () => load(),
+      failureMessage: 'タグを保管できませんでした。使われ始めていないか確かめて、もう一度お試しください。',
+    })
   }
 
   /* 右クリックのメニュー。行の「…」と同じ操作。移し先はそのまま並べる。 */
@@ -756,7 +750,7 @@ export default function TagsTab({
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
-        <tbody>
+        <RovingTbody>
           {visible.map((tag) => {
             const group = groups.find((item) => item.id === tag.groupId)
             const editHref = `/tags/edit?id=${tag.id}`
@@ -860,7 +854,7 @@ export default function TagsTab({
               </Tr>
             )
           })}
-        </tbody>
+        </RovingTbody>
       </DataTable>
 
       {/* 件数とページ送り（絵：左に件数・右にページ送り）。表示件数は道具の段の右端。 */}

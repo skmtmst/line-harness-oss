@@ -1,3 +1,4 @@
+import { readFolderAssignment, FolderAssignmentError } from '@line-crm/db';
 import {
   COMMON_ACTION_MAX_BRANCH_DEPTH,
   COMMON_ACTION_MAX_DEPTH,
@@ -38,6 +39,7 @@ export class CommonActionValidationError extends Error {
 }
 
 export interface CommonActionSummary {
+  folderId: string | null;
   id: string;
   name: string;
   description: string | null;
@@ -55,6 +57,7 @@ export interface CommonActionSummary {
 
 interface CommonActionRow {
   id: string;
+  folder_id: string | null;
   line_account_id: string;
   name: string;
   description: string | null;
@@ -819,7 +822,7 @@ export async function listCommonActions(
   const paginationSql = input.limit === undefined ? '' : ' LIMIT ? OFFSET ?';
   const paginationBinds = input.limit === undefined ? [] : [input.limit, input.offset ?? 0];
   const rows = await db.prepare(
-    `SELECT ca.id, ca.name, ca.description, ca.status, ca.updated_at,
+    `SELECT ca.id, ca.folder_id, ca.name, ca.description, ca.status, ca.updated_at,
             dv.version_number AS draft_version, pv.version_number AS published_version,
             /* 監査 R470: 公開中行は公開版の処理数と版番号をそろえる。
                下書き優先で数えると編集中の数が公開内容に見える。 */
@@ -842,7 +845,7 @@ export async function listCommonActions(
       GROUP BY ca.id
       ORDER BY ca.updated_at DESC, ca.id DESC${paginationSql}`,
   ).bind(input.lineAccountId, ...binds, ...paginationBinds).all<{
-    id: string; name: string; description: string | null; status: CommonActionSummary['status'];
+    id: string; folder_id: string | null; name: string; description: string | null; status: CommonActionSummary['status'];
     updated_at: string; draft_version: number | null; published_version: number | null;
     action_count: number; binding_count: number; old_binding_count: number;
     execution_count_this_month: number; failure_count_this_month: number;
@@ -850,6 +853,7 @@ export async function listCommonActions(
   }>();
   return { items: (rows.results ?? []).map((row) => ({
     id: row.id,
+    folderId: row.folder_id ?? null,
     name: row.name,
     description: row.description,
     status: row.status,
@@ -1107,9 +1111,10 @@ export async function createCommonAction(
   db: D1Database,
   input: {
     lineAccountId: string; name: unknown; description?: unknown; actions: unknown;
-    createdBy?: string | null; clientRequestKey?: unknown;
+    createdBy?: string | null; clientRequestKey?: unknown; folderId?: unknown;
   },
 ): Promise<{ id: string; draftVersionId: string; versionNumber: number }> {
+  const folderId = await commonActionFolder(db, input.lineAccountId, input.folderId);
   // 同じ鍵の再試行は最初の作成へ戻す。鍵なしの従来の作成は今の動きのまま。
   const requestKey = input.clientRequestKey === undefined || input.clientRequestKey === null
     ? null
@@ -1134,9 +1139,9 @@ export async function createCommonAction(
     await db.batch([
       db.prepare(
         `INSERT INTO common_actions
-           (id, line_account_id, name, description, status, client_request_key, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
-      ).bind(id, input.lineAccountId, name, description, requestKey, input.createdBy ?? null, now, now),
+           (id, line_account_id, name, description, status, client_request_key, created_by, created_at, updated_at, folder_id)
+         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
+      ).bind(id, input.lineAccountId, name, description, requestKey, input.createdBy ?? null, now, now, folderId ?? null),
       db.prepare(
         `INSERT INTO common_action_versions
            (id, common_action_id, version_number, status, action_config, created_by, created_at)
@@ -1159,7 +1164,7 @@ export async function createCommonAction(
 
 async function getOwnedAction(db: D1Database, id: string, lineAccountId: string): Promise<CommonActionRow | null> {
   return db.prepare(
-    `SELECT id, line_account_id, name, description, status, current_draft_version_id,
+    `SELECT id, folder_id, line_account_id, name, description, status, current_draft_version_id,
             current_published_version_id, created_at, updated_at
        FROM common_actions WHERE id = ? AND line_account_id = ?`,
   ).bind(id, lineAccountId).first<CommonActionRow>();
@@ -1192,9 +1197,10 @@ export async function updateCommonActionDraft(
   input: {
     id: string; lineAccountId: string; expectedDraftVersionId: unknown;
     expectedDraftRevision: unknown;
-    name: unknown; description?: unknown; actions: unknown;
+    name: unknown; description?: unknown; actions: unknown; folderId?: unknown;
   },
 ): Promise<void> {
+  const folderId = await commonActionFolder(db, input.lineAccountId, input.folderId);
   const owner = await getOwnedAction(db, input.id, input.lineAccountId);
   if (!owner) throw new CommonActionValidationError('not_found', '共通アクションが見つかりません');
   const expected = requiredString(input.expectedDraftVersionId, 'expectedDraftVersionId', '編集中の版');
@@ -1219,7 +1225,8 @@ export async function updateCommonActionDraft(
    */
   const result = await db.batch([
     db.prepare(
-      `UPDATE common_actions SET name = ?, description = ?, updated_at = ?
+      `UPDATE common_actions SET name = ?, description = ?, updated_at = ?,
+            folder_id = CASE WHEN ? THEN ? ELSE folder_id END
         WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?
           AND EXISTS (
             SELECT 1 FROM common_action_versions
@@ -1227,7 +1234,7 @@ export async function updateCommonActionDraft(
                AND draft_revision = ?
           )`,
     ).bind(
-      name, description, now, owner.id, input.lineAccountId, expected,
+      name, description, now, folderId !== undefined ? 1 : 0, folderId ?? null, owner.id, input.lineAccountId, expected,
       expected, owner.id, expectedRevision,
     ),
     db.prepare(
@@ -1371,7 +1378,7 @@ export async function getCommonActionDetail(
   db: D1Database,
   input: { id: string; lineAccountId: string },
 ): Promise<{
-  id: string; name: string; description: string | null; status: CommonActionRow['status'];
+  id: string; folderId: string | null; name: string; description: string | null; status: CommonActionRow['status'];
   currentDraftVersionId: string | null; currentPublishedVersionId: string | null;
   versions: CommonActionVersion[]; bindings: CommonActionBinding[];
 }> {
@@ -1478,6 +1485,7 @@ export async function getCommonActionDetail(
   }));
   return {
     id: owner.id,
+    folderId: owner.folder_id ?? null,
     name: owner.name,
     description: owner.description,
     status: owner.status,
@@ -1601,4 +1609,12 @@ export async function unarchiveCommonAction(
     `UPDATE common_actions SET status = ?, archived_at = NULL, updated_at = ?
       WHERE id = ? AND line_account_id = ? AND status = 'archived'`,
   ).bind(status, now, owner.id, input.lineAccountId).run();
+}
+
+async function commonActionFolder(db: D1Database, accountId: string, value: unknown) {
+  try { return await readFolderAssignment(db, 'common_action', accountId, value); }
+  catch (error) {
+    if (error instanceof FolderAssignmentError) throw new CommonActionValidationError(error.code, error.message, 'folderId');
+    throw error;
+  }
 }

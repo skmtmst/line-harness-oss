@@ -600,6 +600,8 @@ function OperatorEditInner() {
       <Dialog
         open={confirmOpen}
         designNode="sDXNy"
+        // 絵 sDXNy：窓の余白24・題の行36・本文までの間14
+        designHeaderPadding="24px 24px 0"
         title="このお知らせを公開しますか？"
         onCancel={() => { if (!publishing) setConfirmOpen(false) }}
         footer={

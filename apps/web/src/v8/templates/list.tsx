@@ -11,7 +11,6 @@
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { runOptimistic } from '@/lib/undoable'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -78,6 +77,9 @@ import { withViewTransition } from '@/components/shared/view-transition'
 import { Tabs } from '@/components/shared/tabs'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import StaffAssetList from './staff-asset-list'
+import { RovingTbody } from '@/components/shared/row-roving'
+import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import {
   DELETE_UNUSED_DESCRIPTION,
   blockedDeleteDescription,
@@ -251,8 +253,6 @@ export default function TemplatesListV8() {
   const setPageSize = useCallback((next: number) => setUrlView({ size: String(next), page: '1' }), [setUrlView])
   const page = Math.max(1, Number.parseInt(urlView.page, 10) || 1)
   const setPage = useCallback((next: number) => setUrlView({ page: String(next) }), [setUrlView])
-  /* 取り消し待ちの削除（5秒）の行は一覧から外して描く（動きの点検 17 番）。 */
-  const deferredDelete = useDeferredDelete()
 
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
@@ -432,8 +432,9 @@ export default function TemplatesListV8() {
   })), [tabItems])
   const normalizedTemplateQuery = useMemo(() => normalizeTemplateSearchText(templateQuery), [templateQuery])
 
+  // 使われていないテンプレートは窓なしで消し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
+  const deferredDelete = useDeferredDelete()
   const filteredTemplates = useMemo(() => templateSearchIndex.flatMap(({ template: t, normalizedSearchText }) => {
-    if (deferredDelete.isHidden(t.id)) return []
     if (normalizedTemplateQuery && !normalizedSearchText.includes(normalizedTemplateQuery)) return []
     /* フォルダで絞る。`category` の文字列ではなく `folderId` で見る。 */
     if (selectedCategory === 'unfiled' && t.folderId !== null) return []
@@ -446,6 +447,8 @@ export default function TemplatesListV8() {
     if (savedFilter === 'used' && !(t.usageCount > 0)) return []
     if (savedFilter === 'draft-changes' && !(t.hasDraft && t.publishedAt != null)) return []
     if (savedFilter === 'draft-only' && t.publishedAt != null) return []
+    // 消して「元に戻す」を待っている行は出さない。
+    if (deferredDelete.isHidden(t.id)) return []
     return [t]
   }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, chips, savedFilter, deferredDelete])
 
@@ -550,6 +553,9 @@ export default function TemplatesListV8() {
     })
   }
   const selectedCount = selectedIds.size
+  // 選んでいる間は Esc で選択を外す（旧い一覧と同じ）。
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+  useEscapeToClearSelection(selectedCount > 0, clearSelection)
   const selectedTemplates = templates.filter((t) => selectedIds.has(t.id))
   /** まとめて削除は「使っていない」ものだけ。 */
   const removableSelected = selectedTemplates.filter((t) => t.usageCount === 0)
@@ -1092,9 +1098,12 @@ export default function TemplatesListV8() {
         <p className={styles.stateDesc}>
           よく送る文を保存しておくと、一斉配信・自動応答・シナリオから選べます。
         </p>
-        <Button type="button" variant="primary" disabled={!canMutateTemplates} title={!canMutateTemplates ? NO_MANAGE_NOTE : undefined} onClick={openPicker}>
-          <Plus size={15} aria-hidden="true" />テンプレートを作る
-        </Button>
+        {/* 作れない人には押せないボタンを置かない（2026-10-06 オーナー決定） */}
+        {canMutateTemplates ? (
+          <Button type="button" variant="primary" onClick={openPicker}>
+            <Plus size={15} aria-hidden="true" />テンプレートを作る
+          </Button>
+        ) : null}
       </div>
     )
   ) : (
@@ -1135,7 +1144,7 @@ export default function TemplatesListV8() {
                 <Th aria-label="操作" />
               </TableHeadRow>
             </thead>
-            <tbody>
+            <RovingTbody>
               {shownItems.map((t) => {
                 const publish = publishStateOf(t)
                 const kindLabel = t.question ? 'question' : t.messageType
@@ -1230,7 +1239,7 @@ export default function TemplatesListV8() {
                   </Tr>
                 )
               })}
-            </tbody>
+            </RovingTbody>
           </DataTable>
         </div>
       </ContextMenu>

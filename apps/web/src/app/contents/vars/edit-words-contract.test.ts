@@ -11,7 +11,8 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
  */
 describe('共通情報編集の言葉（AYc6O）', () => {
   it('社内メモの説明が板どおり', () => {
-    const source = readFileSync(join(SRC, 'vars/edit/edit-v8.tsx'), 'utf8')
+    // 入口は src/v8/common-vars-edit/edit.tsx（古い edit-v8.tsx はもう描かれない）。
+    const source = readFileSync(join(SRC, '../../v8/common-vars-edit/edit.tsx'), 'utf8')
     expect(source).toContain('メモ（お客さまには出ません）')
     expect(source).not.toContain('お客さまには出せません')
   })
