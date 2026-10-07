@@ -15,6 +15,7 @@ import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { GripVertical, X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 interface FriendDetail {
   id: string
@@ -153,7 +154,11 @@ function ExpandableText({ value, className = '', empty = '未登録' }: {
   empty?: string
 }) {
   const [expanded, setExpanded] = useState(false)
-  if (!value) return <span className="text-ink-faint">{empty}</span>
+  /*
+   * ★V8：空の「未登録」はほかの値と同じ大きさ（13px）・普通の太さで、薄い色にする。
+   * 大きさを付けないと親の 16px を継いで、値より大きく見えていた（オーナー指摘）。
+   */
+  if (!value) return <span className="text-ink-faint v8:text-label v8:font-normal">{empty}</span>
   return (
     <button
       type="button"
@@ -207,6 +212,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     setLocalNotes(undefined)
     setLocalTags(undefined)
   }, [friendId, chatId])
+  const isV8 = useAdminTheme() === 'v8'
   const [showSettings, setShowSettings] = useState(false)
   const [draggedGroupKey, setDraggedGroupKey] = useState<string | null>(null)
   const settingsButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -700,20 +706,31 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
 
   if (!friendId) return null
 
+  const settingsButton = (
+    <Button variant="secondary" className={isV8 ? 'shrink-0 items-center justify-center whitespace-nowrap' : 'mr-14 v7:h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-micro text-ink-faint'} size={isV8 ? 'compact' : undefined} type="button" ref={settingsButtonRef} onClick={() => {
+        if (!showSettings) updateSettingsPanelPos()
+        setShowSettings(!showSettings)
+      }} aria-expanded={showSettings}>
+      表示項目
+    </Button>
+  )
+
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
-      <div className="relative flex min-h-[66px] items-center border-b border-hairline bg-canvas px-4">
+      {/*
+        ★V8（M0393「その人の要点」）：右の列に「顧客情報 ［表示項目］ ×」の頭の段は無い。
+        顔・名前から始まり、「表示項目」は「友だち詳細」の横に並べる（オーナー指摘）。
+        v7 は今までどおり頭の段に置く。
+      */}
+      <div className={isV8 ? 'contents' : 'relative flex min-h-[66px] items-center border-b border-hairline bg-canvas px-4'}>
+        {isV8 ? null : (
         <div className="flex w-full items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold text-ink">顧客情報</h3>
           </div>
-          <Button variant="secondary" className="mr-14 v7:h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-micro text-ink-faint" type="button" ref={settingsButtonRef} onClick={() => {
-              if (!showSettings) updateSettingsPanelPos()
-              setShowSettings(!showSettings)
-            }} aria-expanded={showSettings}>
-            表示項目
-          </Button>
+          {settingsButton}
         </div>
+        )}
         {showSettings && typeof document !== 'undefined' ? createPortal(
           <div
             data-inbox-v6="detail-sections-panel"
@@ -865,13 +882,24 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   ブロック済
                 </span>
               )}
+              {isV8 ? (
+                /* ★V8：「友だち詳細」の横に「表示項目」。同じ高さの副ボタンを2つ並べる。 */
+                <div className="mt-3 flex items-center justify-center gap-2">
+                  <Button variant="secondary" size="compact" className="text-action items-center whitespace-nowrap" href={`/friends/detail?id=${friend.id}`}>
+                    友だち詳細
+                  </Button>
+                  {settingsButton}
+                </div>
+              ) : (
               <Button variant="secondary" className="text-action mt-3 items-center px-3 py-2 text-xs h-auto whitespace-normal" href={`/friends/detail?id=${friend.id}`}>
                 友だち詳細
               </Button>
+              )}
             </div>
             {/* 前払いのみの印（友だち詳細と同じ置き場所・顔の下）。前払いの人だけ出る。 */}
             {accountId && friendId ? (
-              <div className="border-hairline border-b px-5 py-3">
+              /* ★V8：前払いでない人は中身が空。空の帯（上下12＋線）を残さない（オーナー指摘）。 */
+              <div className="border-hairline border-b px-5 py-3 v8:empty:hidden">
                 <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} />
               </div>
             ) : null}
@@ -885,15 +913,15 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               <h4 className="text-ink mb-2 text-xs font-bold">基本情報</h4>
               <div className="flex justify-between items-center gap-2">
                 <span className="text-micro text-ink-faint shrink-0">本名</span>
-                <ExpandableText value={friend.realName} className="text-xs text-ink-secondary" />
+                <ExpandableText value={friend.realName} className="text-xs text-ink-secondary v8:text-label" />
               </div>
               <div className="flex justify-between items-center gap-2">
                 <span className="text-micro text-ink-faint shrink-0">システム表示名</span>
-                <ExpandableText value={friend.systemDisplayName} className="text-xs text-ink-secondary" />
+                <ExpandableText value={friend.systemDisplayName} className="text-xs text-ink-secondary v8:text-label" />
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="shrink-0 text-micro text-ink-faint">登録日</span>
-                <span className="truncate text-xs text-ink-secondary">{formatDate(friend.createdAt)}</span>
+                <span className="truncate text-xs text-ink-secondary v8:text-label">{formatDate(friend.createdAt)}</span>
               </div>
             </div>
 

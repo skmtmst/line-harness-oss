@@ -4033,9 +4033,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               重なりが上部を覆っている画面幅で閉じられなくなる。
               実際そうなっていた。
             */}
-            <Button variant="secondary" className="absolute top-[17px] right-3 z-10 h-8 w-8 items-center justify-center text-ink-faint whitespace-normal" type="button" onClick={() => setShowFriendInfo(false)} aria-label="顧客情報を閉じる">
+            {/*
+              ★V8：右の列として出しているときは閉じる×を置かない。絵（M0393）の閉じる口は
+              会話の頭の「顧客情報を表示（右の列の出し入れ）」の1つだけ。重ねて出す幅では
+              頭が隠れるので、×を板の右上に残す。
+            */}
+            {adminTheme === 'v8' && wideInfoPanel ? null : (
+            <Button variant="secondary" className="absolute top-[17px] right-3 z-10 h-8 w-8 items-center justify-center text-ink-faint whitespace-normal v8:top-3" type="button" onClick={() => setShowFriendInfo(false)} aria-label="顧客情報を閉じる">
               <X aria-hidden="true" className="h-4 w-4" />
             </Button>
+            )}
             {selectedThreadId ? (
               /*
                 メールの相手は友だちに結びついていない。
