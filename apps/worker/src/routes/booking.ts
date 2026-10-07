@@ -15,6 +15,7 @@ import { processVisitStampQueue } from '../services/visit-stamps.js';
 // scheduled_at / decided_at / expires_at) are written from the Worker.
 
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
+import type { BookingHistoryItem, BookingHistoryResponse } from '@line-crm/shared';
 import {
   createBookingCustomer,
   getBookingCustomer,
@@ -1726,6 +1727,7 @@ booking.get('/api/liff/booking/me', async (c) => {
   const upcoming = await c.env.DB
     .prepare(
       `SELECT b.id, b.starts_at, b.status, b.customer_note,
+              b.lock_version, b.menu_id, b.staff_id,
               m.name AS menu_name,
               s.display_name AS staff_name, s.profile_image_url
          FROM bookings b
@@ -1737,11 +1739,11 @@ booking.get('/api/liff/booking/me', async (c) => {
         ORDER BY b.starts_at ASC`,
     )
     .bind(friendId, accountId, new Date().toISOString())
-    .all();
+    .all<BookingHistoryItem>();
 
   const past = await c.env.DB
     .prepare(
-      `SELECT b.id, b.starts_at, b.status,
+      `SELECT b.id, b.starts_at, b.status, b.lock_version, b.menu_id, b.staff_id,
               m.name AS menu_name,
               s.display_name AS staff_name, s.profile_image_url
          FROM bookings b
@@ -1753,9 +1755,9 @@ booking.get('/api/liff/booking/me', async (c) => {
         LIMIT 50`,
     )
     .bind(friendId, accountId, new Date().toISOString())
-    .all();
+    .all<BookingHistoryItem>();
 
-  return c.json({ upcoming: upcoming.results, past: past.results });
+  return c.json({ upcoming: upcoming.results, past: past.results } satisfies BookingHistoryResponse);
 });
 
 // ================================================================
