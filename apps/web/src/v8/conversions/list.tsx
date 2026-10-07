@@ -83,6 +83,7 @@ import {
   type ConversionStopAction,
   type EditForm,
 } from './dialogs'
+import { notifyToast } from '@/components/shared/toast'
 import styles from './list.module.css'
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
@@ -559,18 +560,35 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     }
   }
 
-  /* 受け口の停止・再開。止めても鍵は残る。 */
+  /*
+   * 受け口の停止・再開。止めても鍵は残る。押した瞬間に窓を閉じて札を変え、裏で保存する
+   * （触り心地 5 回目）。成功したら返ってきた版に置き換える。失敗したら元に戻してトーストで知らせる。
+   */
   const toggleIngest = async (target: ConversionDefinitionListItem) => {
     if (ingestBusy || !canEdit) return
+    const before = target.ingest.disabledAt
+    const disable = !before
+    const patch = (id: string, change: Partial<Pick<ConversionDefinitionListItem, 'version'>> & { disabledAt: string | null }) => setDefinitions((current) => current && ({
+      ...current,
+      items: current.items.map((item) => (item.id === id
+        ? { ...item, ...(change.version !== undefined ? { version: change.version } : {}), ingest: { ...item.ingest, disabledAt: change.disabledAt } }
+        : item)),
+    }))
     setIngestBusy('toggle')
     setIngestError('')
+    setDetailTarget(null)
+    patch(target.id, { disabledAt: disable ? new Date().toISOString() : null })
     try {
-      const res = await api.conversions.setIngestDisabled(target.id, { expectedVersion: target.version, disabled: !target.ingest.disabledAt })
+      const res = await api.conversions.setIngestDisabled(target.id, { expectedVersion: target.version, disabled: disable })
       if (!res.success) throw new Error(res.error)
-      setDetailTarget(null)
-      await load()
+      patch(target.id, { disabledAt: res.data.disabledAt, version: res.data.version })
     } catch {
-      setIngestError('受け口を切り替えられませんでした。画面を閉じて読み直してから、もう一度お試しください。')
+      patch(target.id, { disabledAt: before })
+      notifyToast(`「${target.name}」の受け口を${disable ? '止められ' : '再開でき'}ませんでした。元に戻しました。`, {
+        tone: 'error',
+        actionLabel: '読み直す',
+        onAction: () => { void load() },
+      })
     } finally {
       setIngestBusy('')
     }

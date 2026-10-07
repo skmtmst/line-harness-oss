@@ -54,6 +54,7 @@ import {
   ruleEventLabel,
 } from './display'
 import { CreateButton, MileageFrame, useMileageShell } from './frame'
+import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
 
 const EVENT_LABELS: Record<string, string> = {
@@ -387,16 +388,30 @@ export default function EarningRulesTab() {
     }
   }
 
+  /*
+   * 止める・再開する（行の「…」から）。押した瞬間に状態の札を変え、裏で保存する（触り心地 5 回目）。
+   * 公開内容・版は変わらないので、成功しても一覧を読み直さない。失敗したら元に戻してトーストで知らせる。
+   */
   const toggleRule = async (rule: MileageEarningRuleV6) => {
     if (readonly) return
+    const before = rule.published.status
+    const next = before === 'published' ? 'stopped' : 'published'
+    const setStatus = (status: MileageEarningRuleV6['published']['status']) => setRules((current) => current.map((item) => (
+      item.id === rule.id ? { ...item, published: { ...item.published, status } } : item
+    )))
     setSavingId(rule.id)
     setActionError('')
+    setStatus(next)
     try {
-      const res = await api.mileage.updateRule(rule.id, { isActive: rule.published.status !== 'published' })
+      const res = await api.mileage.updateRule(rule.id, { isActive: next === 'published' })
       if (!res.success) throw new Error(res.error)
-      await load()
     } catch {
-      setActionError('たまる決めごとを更新できませんでした。もう一度お試しください。')
+      setStatus(before)
+      notifyToast(`「${rule.draft.name}」を${next === 'published' ? '再開' : '停止'}できませんでした。元に戻しました。`, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void toggleRule({ ...rule, published: { ...rule.published, status: before } }) },
+      })
     } finally {
       setSavingId(null)
     }
