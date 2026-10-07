@@ -5590,6 +5590,11 @@ const server = createServer((req, res) => {
       res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
       return
     }
+    /* 予約メニューの保存は、ほかの人が先に保存した形（409）を返す。板 v5L19Z（メニュー編集の競合）の帯を撮る。 */
+    if (method === 'PUT' && /^\/api\/booking\/admin\/menus\/[^/]+$/.test(url.pathname)) {
+      res.writeHead(409).end(JSON.stringify({ success: false, error: 'version_conflict' }))
+      return
+    }
     // 運営のお知らせ（V8 tQ2MJ・TJUUl）の宛先の見込み。数えるだけで何も変えない。
     if (method === 'POST' && url.pathname === '/api/ops/announcements/preview') {
       res.writeHead(200).end(JSON.stringify({ success: true, data: { tenants: 18, staff: 18, lineLinked: 11, withEmail: 18 } }))
