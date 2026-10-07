@@ -47,8 +47,9 @@ export type ReorderHandleProps = HandleButtonProps & {
   /**
    * 見た目。`icon` は 32×32 の当たりに6点の図柄（Pencil `K65Uhe`、旧 DragHandle）。
    * `inline` は文字の高さのつまみ（旧 ReorderGrip）。図柄は children で差し替える。
+   * `bare` は部品の見た目を足さない（画面の CSS がつまみの形を持っている所だけ）。
    */
-  look?: 'icon' | 'inline'
+  look?: 'icon' | 'inline' | 'bare'
   /**
    * 動かせない時の出し方。V8 の画面は `hide`（つまみを出さない）。
    * `dim` は v7 の画面の見た目を変えないためだけに残す（薄いつまみ）。
@@ -100,7 +101,7 @@ export default function ReorderHandle({
     /* つまみは出さない。幅だけ同じに空け、理由は title と読み上げで言う。 */
     return (
       <span
-        className={[look === 'icon' ? styles.action : 'inline-flex items-center justify-center p-0.5', className].filter(Boolean).join(' ')}
+        className={[look === 'icon' ? styles.action : look === 'inline' ? 'inline-flex items-center justify-center p-0.5' : '', className].filter(Boolean).join(' ')}
         style={look === 'icon' ? { cursor: 'default', background: 'none' } : undefined}
         title={disabledReason ?? undefined}
         data-reorder-disabled=""
@@ -131,7 +132,7 @@ export default function ReorderHandle({
       data-reorder-handle=""
       aria-label={ariaLabel ?? `${label}を並び替え。上下キーで移動`}
       title={title ?? 'ドラッグまたは上下キーで並び替え'}
-      className={[look === 'icon' ? `${styles.action} ${styles.grip}` : INLINE_CLASS, className].filter(Boolean).join(' ')}
+      className={[look === 'icon' ? `${styles.action} ${styles.grip}` : look === 'inline' ? INLINE_CLASS : '', className].filter(Boolean).join(' ')}
     >
       {glyph}
     </button>

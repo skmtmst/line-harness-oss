@@ -301,4 +301,37 @@ describe('V8 クーポン・リサーチを作る', () => {
     expect(assetsCreate).not.toHaveBeenCalled()
     expect(screen.getByRole('alert').textContent).toContain('質問 1 の選択肢を1つ以上入力してください')
   })
+
+  it('リサーチ：質問の並べ替えは、つまみのドラッグ・上下キー・押して出る「上へ／下へ」で同じ結果になる', async () => {
+    const texts = () => screen.getAllByLabelText('質問文').map((el) => (el as HTMLInputElement).value)
+    const results: string[][] = []
+    for (const how of ['drag', 'key', 'menu'] as const) {
+      act(() => root.unmount())
+      root = createRoot(host)
+      await mount('kind=research')
+      // 質問が1つのときは、つまみを出さず理由を言う。
+      expect(screen.queryByRole('button', { name: /問 1 の並びを変える/ })).toBeNull()
+      expect(document.querySelector('[data-reorder-disabled]')?.getAttribute('title')).toBe('質問が1つのときは並び替えできません')
+      fireEvent.click(screen.getByRole('button', { name: /質問を足す/ }))
+      await flush()
+      type(screen.getAllByLabelText('質問文')[0], '一問目')
+      type(screen.getAllByLabelText('質問文')[1], '二問目')
+      const grip = screen.getByRole('button', { name: /問 1 の並びを変える/ })
+      if (how === 'key') fireEvent.keyDown(grip, { key: 'ArrowDown' })
+      if (how === 'menu') {
+        fireEvent.click(grip)
+        fireEvent.click(screen.getByRole('menuitem', { name: /^下へ/ }))
+      }
+      if (how === 'drag') {
+        const target = screen.getByRole('region', { name: '問 2' })
+        fireEvent.dragStart(grip)
+        fireEvent.dragEnter(target)
+        fireEvent.dragOver(target)
+        fireEvent.drop(target)
+      }
+      await flush()
+      results.push(texts())
+    }
+    expect(results).toEqual([['二問目', '一問目'], ['二問目', '一問目'], ['二問目', '一問目']])
+  })
 })

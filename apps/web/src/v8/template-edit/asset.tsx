@@ -21,6 +21,7 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu from '@/components/shared/action-menu'
+import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import Combobox from '@/components/shared/combobox'
 import DateTimeField from '@/components/shared/date-time-field'
 import LinePreview from '@/components/shared/line-preview'
@@ -139,14 +140,20 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
 
   const updateQuestion = (index: number, patch: Partial<ResearchQuestion>) =>
     setQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)))
-  const moveQuestion = (index: number, delta: -1 | 1) =>
-    setQuestions((prev) => {
-      const to = index + delta
-      if (to < 0 || to >= prev.length) return prev
-      const next = [...prev]
-      ;[next[index], next[to]] = [next[to], next[index]]
-      return next
-    })
+  /*
+   * 質問の並べ替え（共通の並び替え）。つまみのドラッグ・上下キー・つまみを押して出る
+   * 「上へ／下へ」は同じ入口を通る（押して出す並べ替えは、ドラッグできない人の代わりの操作）。
+   */
+  const questionOrder = useReorder({
+    items: questions,
+    idOf: (question) => question.key,
+    disabledReason: questions.length < 2 ? '質問が1つのときは並び替えできません' : null,
+    onReorder: ({ ids }) => setQuestions((prev) => {
+      const byKey = new Map(prev.map((q) => [q.key, q]))
+      const next = ids.map((key) => byKey.get(key)).filter((q): q is ResearchQuestion => Boolean(q))
+      return next.length === prev.length ? next : prev
+    }),
+  })
 
   /** 保存値を組み立てる。足りないときは理由を返す（今の画面と同じ決まり）。 */
   const buildPayload = (): { payload: Record<string, unknown> } | { error: string } => {
@@ -495,20 +502,22 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>質問（上から順に出ます）</h2>
               </div>
-              {questions.map((question, index) => (
-                <section key={question.key} className={styles.question} aria-label={`問 ${index + 1}`}>
+              {questionOrder.shown.map((question, index) => (
+                <section key={question.key} className={styles.question} aria-label={`問 ${index + 1}`} {...questionOrder.rowProps(question.key)}>
                   <div className={styles.toggleRow}>
-                    <button
-                      type="button"
+                    <ReorderHandle
+                      look="bare"
                       className={styles.grip}
-                      aria-label={`問 ${index + 1} の並びを変える`}
+                      label={`問 ${index + 1}`}
+                      ariaLabel={`問 ${index + 1} の並びを変える。ドラッグ・上下キー・押して上へ／下へ`}
                       aria-haspopup="menu"
                       aria-expanded={orderMenu === question.key}
-                      disabled={questions.length < 2}
                       onClick={(event) => { orderAnchor.current = event.currentTarget; setOrderMenu(orderMenu === question.key ? null : question.key) }}
+                      {...questionOrder.handle(question.key)}
+                      {...questionOrder.handleProps(question.key)}
                     >
                       <GripVertical size={14} aria-hidden="true" />
-                    </button>
+                    </ReorderHandle>
                     <span className={styles.questionNo}>問 {index + 1}</span>
                     <span className={styles.spacer} />
                     <span className={styles.toggleLabelSmall}>必ず答えてもらう</span>
@@ -612,13 +621,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         anchorRef={orderAnchor}
         ariaLabel="質問の並びを変える"
         onClose={() => setOrderMenu(null)}
-        items={(() => {
-          const index = questions.findIndex((q) => q.key === orderMenu)
-          return [
-            { id: 'up', label: '上へ', disabled: index <= 0, onSelect: () => { moveQuestion(index, -1); setOrderMenu(null) } },
-            { id: 'down', label: '下へ', disabled: index < 0 || index >= questions.length - 1, onSelect: () => { moveQuestion(index, 1); setOrderMenu(null) } },
-          ]
-        })()}
+        items={orderMenu ? questionOrder.menuItems(orderMenu, () => setOrderMenu(null)).map((item) => ({ ...item, id: item.id === 'move-up' ? 'up' : 'down', disabledReason: undefined })) : []}
       />
 
       <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
