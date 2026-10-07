@@ -1332,6 +1332,7 @@ export type ConversionDefinitionUsageKind =
   | 'nen_campaign' | 'mileage_rule' | 'automation' | 'ad_platform'
 
 export type ConversionDefinitionListItem = {
+  folderId?: string | null
   id: string
   name: string
   sourceType: string
@@ -1997,6 +1998,7 @@ export type CommonActionStep = {
 };
 
 export type CommonActionSummary = {
+  folderId?: string | null
   id: string;
   name: string;
   description: string | null;
@@ -2013,6 +2015,7 @@ export type CommonActionSummary = {
 };
 
 export type AutomationListItem = Automation & {
+  folderId?: string | null
   triggerConfig: Record<string, unknown>;
   status: 'draft' | 'active' | 'stopped';
   versionId: string;
@@ -2398,6 +2401,7 @@ export type CommonActionBinding = {
 };
 
 export type CommonActionDetail = {
+  folderId?: string | null
   id: string;
   name: string;
   description: string | null;
@@ -3600,6 +3604,7 @@ export type AutomationDraftAction = {
   onFailure: 'stop'
 }
 export type AutomationDraftDetail = {
+  folderId?: string | null
   id: string
   draftVersionId: string
   name: string
@@ -9589,6 +9594,7 @@ export const api = {
       )
     },
     createDefinition: (data: {
+      folderId?: string | null
       name: string
       sourceType: string
       sourceConfig: Record<string, unknown>
@@ -9640,6 +9646,7 @@ export const api = {
     ),
     /** 成果地点を、履歴を保ったまま編集して次の版にする（N-252）。 */
     reviseDefinition: (id: string, data: {
+      folderId?: string | null
       expectedVersion: number
       name: string
       sourceType: string
@@ -10629,10 +10636,10 @@ export const api = {
      * 同じ鍵を使う。別の新規作成は必ず別の鍵で呼ぶ——同じ鍵だとサーバーは
      * 同じ下書きを返し、鍵が無い呼び出しは Worker が 422 で断る。
      */
-    createDraftFromTemplate: (templateKey: string, accountId: string, operationKey: string) =>
+    createDraftFromTemplate: (templateKey: string, accountId: string, operationKey: string, folderId?: string | null) =>
       fetchApi<ApiResponse<{ id: string; draftVersionId: string }>>(
         `/api/automation-templates/${encodeURIComponent(templateKey)}/drafts?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ operationKey }) },
+        { method: 'POST', body: JSON.stringify({ operationKey, folderId }) },
       ),
     getDraft: (id: string, accountId: string) =>
       fetchApi<ApiResponse<AutomationDraftDetail>>(
@@ -10646,6 +10653,7 @@ export const api = {
         commonActions: Array<{ id: string; name: string }>
       }>>(`/api/automation-draft-resources?account_id=${encodeURIComponent(accountId)}`),
     updateDraft: (id: string, accountId: string, data: {
+      folderId?: string | null
       expectedDraftVersionId: string
       name: string
       eventType: AutomationDraftDetail['eventType']
@@ -10763,6 +10771,7 @@ export const api = {
       ),
     // 監査 R475: 初回保存から再試行まで同じ鍵を送り、二重作成にしない。
     create: (accountId: string, data: {
+      folderId?: string | null;
       name: string;
       description?: string | null;
       actions: CommonActionStep[];
@@ -10773,6 +10782,7 @@ export const api = {
     ),
     // 監査 R473: 保存ごとに進む改訂番号を照合する。古い画面の保存は409で止まる。
     updateDraft: (id: string, accountId: string, data: {
+      folderId?: string | null
       expectedDraftVersionId: string;
       expectedDraftRevision: number;
       name: string;
@@ -12332,13 +12342,13 @@ export const api = {
         fetchApi<ApiResponse<IncomingWebhookDetail>>(
           `/api/webhooks/incoming/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; name: string; sourceType?: string; secret: string }, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret: string }, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhookCreated>>('/api/webhooks/incoming', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
-      update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string }, stepUpToken?: string) =>
+      update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string; folderId?: string | null }, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhook>>(`/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
@@ -12390,7 +12400,7 @@ export const api = {
         fetchApi<ApiResponse<OutgoingWebhook>>(
           `/api/webhooks/outgoing/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }, stepUpToken?: string) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
@@ -12399,7 +12409,7 @@ export const api = {
       update: (
         id: string,
         lineAccountId: string,
-        data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string },
+        data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string; folderId?: string | null },
         stepUpToken?: string,
       ) =>
         fetchApi<ApiResponse<OutgoingWebhook>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {

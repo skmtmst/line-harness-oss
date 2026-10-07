@@ -1,3 +1,4 @@
+import { readFolderAssignment, FolderAssignmentError } from '@line-crm/db';
 import { resolveCommonActionVersion } from './automation-engine.js';
 import { buildSegmentWhere, parseCondition, type SegmentCondition } from './segment-query.js';
 
@@ -42,6 +43,7 @@ interface AutomationTemplateDefinition extends AutomationTemplateSummary {
 
 export interface AutomationDraftDetail {
   id: string;
+  folderId: string | null;
   draftVersionId: string;
   name: string;
   description: string | null;
@@ -595,9 +597,11 @@ export async function createAutomationDraftFromTemplate(
     lineAccountId: string;
     /** 新規作成の操作を識別する鍵。同じ操作の再試行だけが同じ鍵を使う（DETAIL-13）。 */
     operationKey: unknown;
+    folderId?: unknown;
     createdBy?: string | null;
   },
 ): Promise<{ id: string; draftVersionId: string }> {
+  const folderId = await automationFolder(db, input.lineAccountId, input.folderId);
   const source = template(input.templateKey);
   /*
    * 鍵が無い・形が違う呼び出しは「別の操作」と見分けられないので断る。
@@ -621,9 +625,9 @@ export async function createAutomationDraftFromTemplate(
     await db.batch([
       db.prepare(
         `INSERT OR IGNORE INTO automation_definitions
-           (id, line_account_id, name, description, status, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?)`,
-      ).bind(id, input.lineAccountId, source.name, source.description, input.createdBy ?? null, now, now),
+           (id, line_account_id, name, description, status, created_by, created_at, updated_at, folder_id)
+         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+      ).bind(id, input.lineAccountId, source.name, source.description, input.createdBy ?? null, now, now, folderId ?? null),
       db.prepare(
         // まだ版が付いていない下書きのときだけ足す。先に作った側の版を
         // 上書きしないよう、`current_draft_version_id IS NULL` で守る。
@@ -672,6 +676,7 @@ export async function createAutomationDraftFromTemplate(
 
 interface AutomationDraftRow extends AutomationVersionContent {
   id: string;
+  folder_id: string | null;
   name: string;
   description: string | null;
   current_draft_version_id: string;
@@ -695,7 +700,7 @@ async function readAutomationDraftRow(
   input: { id: string; lineAccountId: string },
 ): Promise<AutomationDraftRow> {
   const row = await db.prepare(
-    `SELECT d.id, d.name, d.description, d.status AS definition_status,
+    `SELECT d.id, d.name, d.description, d.folder_id, d.status AS definition_status,
             d.current_draft_version_id, v.created_by,
             v.trigger_type, v.trigger_config, v.condition_config, v.action_config
        FROM automation_definitions d
@@ -724,6 +729,7 @@ export async function getAutomationDraft(
   );
   return {
     id: row.id,
+    folderId: row.folder_id ?? null,
     // 中身の指紋を混ぜた札を返す。画面はこれをそのまま送り返すだけでよい。
     draftVersionId: await automationRevisionToken(row.current_draft_version_id, row),
     name: row.name,
@@ -831,6 +837,7 @@ export async function updateAutomationDraft(
     id: string;
     lineAccountId: string;
     expectedDraftVersionId: unknown;
+    folderId?: unknown;
     name: unknown;
     eventType: unknown;
     triggerConfig: unknown;
@@ -838,6 +845,7 @@ export async function updateAutomationDraft(
     actions: unknown;
   },
 ): Promise<{ draftVersionId: string }> {
+  const folderId = await automationFolder(db, input.lineAccountId, input.folderId);
   const current = await readAutomationDraftRow(db, { id: input.id, lineAccountId: input.lineAccountId });
   const expected = requiredString(input.expectedDraftVersionId, 'expectedDraftVersionId', '編集中の版');
   // 札には中身の指紋が入っているので、この1行で「行が同じか」だけでなく
@@ -1006,7 +1014,8 @@ export async function updateAutomationDraft(
       // ここも当ててはいけない。**無い版を指しにいってしまう。**
       // 新しい版が本当にできたときだけ差し替える。
       `UPDATE automation_definitions
-          SET name = ?, updated_at = ?, current_draft_version_id = ?
+          SET name = ?, updated_at = ?, current_draft_version_id = ?,
+              folder_id = CASE WHEN ? THEN ? ELSE folder_id END
         WHERE id = ? AND line_account_id = ?
           AND status IN ('draft', 'active', 'stopped')
           AND current_draft_version_id = ?
@@ -1014,7 +1023,7 @@ export async function updateAutomationDraft(
             SELECT 1 FROM automation_versions WHERE id = ? AND automation_id = ?
           )`,
     ).bind(
-      name, now, nextVersionId, current.id, input.lineAccountId, expectedVersionId,
+      name, now, nextVersionId, folderId !== undefined ? 1 : 0, folderId ?? null, current.id, input.lineAccountId, expectedVersionId,
       nextVersionId, current.id,
     ),
     /*
@@ -1355,4 +1364,12 @@ export async function duplicateAutomationDefinition(
     id: newId,
     draftVersionId: await automationRevisionToken(nextVersionId, source),
   };
+}
+
+async function automationFolder(db: D1Database, accountId: string, value: unknown) {
+  try { return await readFolderAssignment(db, 'automation', accountId, value); }
+  catch (error) {
+    if (error instanceof FolderAssignmentError) throw new AutomationDraftError(error.code, error.message, 'folderId');
+    throw error;
+  }
 }
