@@ -573,6 +573,7 @@ shared-button-importer v8/automations/runs.tsx
 shared-button-importer v8/automations/templates.tsx
 shared-button-importer v8/automations/common-actions.tsx
 shared-button-importer v8/automations/versions.tsx
+shared-button-importer v8/autosave/browser-draft-notice.tsx
 shared-button-importer v8/automations/branch-editor.tsx
 shared-button-importer v8/automations/common-action-new.tsx
 shared-button-importer v8/nen-campaigns/list.tsx

@@ -52,6 +52,8 @@ vi.mock('@/lib/api', () => {
     fetchApi: vi.fn(async () => ({ success: true, data: {} })),
     eventsApi: { listEvents: vi.fn(async () => ({ items: [] })) },
     api: {
+      // 下書きの自動保存は閲覧のみの人には動かさないため、役割を読む。
+      staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
       reminders: {
         getDraft: vi.fn(async () => ({ success: true, data: draftStore.draft })),
         saveDraft: vi.fn(async (_id: string, settings: Record<string, unknown>) => {
@@ -220,5 +222,47 @@ describe('V8 リマインダを作る②〜⑤', () => {
     expect(buttonByText('一覧へ戻る')?.getAttribute('href')).toBe('/reminders')
     expect(buttonByText('配信予定を見る')?.getAttribute('href')).toBe('/reminders/detail?id=reminder-new&status=planned')
     expect(buttonByText('詳細を見る')?.getAttribute('href')).toBe('/reminders/detail?id=reminder-new')
+  })
+})
+
+describe('V8 リマインダの下書き自動保存（一斉配信と同じ形）', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+  const wait = async (ms: number) => { await act(async () => { await vi.advanceTimersByTimeAsync(ms) }) }
+  const status = () => host.querySelector('[data-autosave-status]')?.textContent ?? null
+  const setName = async (value: string) => {
+    const input = host.querySelector('#v8-reminder-name') as HTMLInputElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    await act(async () => {
+      setter.call(input, value)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+
+  it('基本設定を直して2秒止まると、下書きへ静かに保存し「下書き保存済み・0秒前」を出す（画面は移らない）', async () => {
+    await render('basics')
+    await setName('予約前日のご案内（改）')
+    expect(status()).toBe('下書きはまだ保存していません')
+    await wait(1900)
+    expect(draftStore.saved).toHaveLength(0)
+    await wait(200)
+    for (let i = 0; i < 3; i += 1) await act(async () => {})
+    expect(draftStore.saved).toHaveLength(1)
+    expect((draftStore.saved[0] as { name: string }).name).toBe('予約前日のご案内（改）')
+    expect(status()).toBe('下書き保存済み・0秒前')
+    expect(pushMock).not.toHaveBeenCalled()
+  })
+
+  it('自動保存が 409 なら競合の帯を出し、それ以上は送らない', async () => {
+    draftStore.conflict = true
+    await render('basics')
+    await setName('予約前日のご案内（改）')
+    await wait(2100)
+    for (let i = 0; i < 3; i += 1) await act(async () => {})
+    expect(host.querySelector('[data-page-template="create"]')?.getAttribute('data-design-node')).toBe('k32cn')
+    draftStore.conflict = false
+    await setName('予約前日のご案内（改2）')
+    await wait(5000)
+    expect(draftStore.saved).toHaveLength(0)
   })
 })
