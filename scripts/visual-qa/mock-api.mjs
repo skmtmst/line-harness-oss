@@ -3525,6 +3525,26 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   // 設計と画像で比べるための中身。空の表しか描けないと、
   // 「空の状態」だけを見て一致したと言えてしまう。
   // 受信箱（設計 `xGLVe`）。空で返すと一覧も吹き出しも出ない。
+  // 会話の中を探す（API-9 の会話の検索の口）。吹き出しを NFKC＋小文字で数える。素の値を返す（外側で包む）。
+  const chatSearch = pathname.match(/^\/api\/chats\/([^/]+)\/messages\/search$/)
+  if (chatSearch) {
+    const q = String(query.get('q') ?? '').trim().normalize('NFKC').toLowerCase()
+    const offset = Number(query.get('offset') ?? 0)
+    const limit = Number(query.get('limit') ?? 30)
+    const rows = FRIEND_MESSAGES[decodeURIComponent(chatSearch[1])] ?? []
+    const all = q ? rows.filter((m) => m.messageType === 'text' && String(m.content).normalize('NFKC').toLowerCase().includes(q)) : []
+    const hits = all.slice(offset, offset + limit).map((m) => {
+      const i = rows.indexOf(m)
+      const at = m.lineEventAt ?? m.createdAt
+      return {
+        id: m.id, at, excerpt: m.content,
+        before: i > 0 ? { id: rows[i - 1].id, excerpt: rows[i - 1].content } : null,
+        after: i < rows.length - 1 ? { id: rows[i + 1].id, excerpt: rows[i + 1].content } : null,
+        cursor: { at, id: m.id },
+      }
+    })
+    return { success: true, data: { total: all.length, hits, nextOffset: offset + hits.length < all.length ? offset + hits.length : null } }
+  }
   const chat = pathname.match(/^\/api\/chats\/([^/]+)$/)
   if (chat) {
     // 一覧と同じ行を返す。`{items,total}` のままだと、開いた会話の名前が
@@ -3539,6 +3559,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           friendRealName: friend?.realName ?? null,
           isAttention: friend?.metadata?.__attention === '1',
           messages: FRIEND_MESSAGES[row.friendId] ?? [],
+          hasMoreMessages: false,
+          total: (FRIEND_MESSAGES[row.friendId] ?? []).length,
         },
       }
     }

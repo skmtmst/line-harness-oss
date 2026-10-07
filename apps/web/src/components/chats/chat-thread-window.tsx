@@ -11,7 +11,11 @@
  * - 上へ遡って上端の近くまで来たら古い分を読む（「前のメッセージ」も残す）。
  *   読み足しても、画像が後から読めても、見ている吹き出しは同じ場所に残る。
  * - 読み上げ：吹き出しの並びは feed、1つずつ article。「全 n 件中 m 件目」を
- *   aria-setsize / aria-posinset で伝える（まだ前がある間は全体数が分からないので -1）。
+ *   aria-setsize / aria-posinset で伝える。全体の数は会話詳細の口の total（API-9）。
+ *   読み込んだ分は新しい方から続いているので、m＝（全体 − 読み込んだ数）＋ i ＋ 1。
+ *   total が無い古い応答で、まだ前がある間だけ -1（分からない）にする。
+ * - 会話の中を探す（2026-10-07）：scrollToId と scrollSeq を渡すと、その吹き出しを
+ *   欄の真ん中へ出す（描かれていなければ先にその位置まで送ってから）。
  * - キーボード：吹き出しに移ったら ↑↓・PageUp/PageDown で前後へ、Home/End で端へ。
  *   いちばん上でさらに ↑ を押すと古い分を読む。
  */
@@ -28,10 +32,16 @@ type Props<M extends ThreadMessage> = {
   onLoadOlder: () => void
   renderMessage: (message: M, index: number, list: M[]) => ReactNode
   label?: string
+  /** 会話の全件数（API-9 の total）。読み上げの「全 n 件中 m 件目」に使う */
+  total?: number
+  /** この吹き出しを欄の真ん中へ出す（scrollSeq が変わるたびに） */
+  scrollToId?: string | null
+  scrollSeq?: number
 }
 
 export default function ChatThreadWindow<M extends ThreadMessage>({
   messages, scrollerRef, hasMore, loadingOlder, onLoadOlder, renderMessage, label = 'メッセージ',
+  total, scrollToId = null, scrollSeq = 0,
 }: Props<M>) {
   const contentRef = useRef<HTMLDivElement | null>(null)
   const focusIndexRef = useRef<number | null>(null)
@@ -67,6 +77,33 @@ export default function ChatThreadWindow<M extends ThreadMessage>({
       el.focus({ preventScroll: true })
       el.scrollIntoView({ block: 'nearest' })
     }
+  })
+
+  /*
+   * 探した当たりへ移る。まだ読み込んでいない（親が読み足している途中）なら待つ。
+   * 描かれていなければ覚えた高さでその位置まで送り、描かれたら真ん中へ寄せる。
+   * 動かした後は窓分けの目印（いちばん上に見えている行）が位置を守る。
+   */
+  const scrollTargetRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (scrollToId) scrollTargetRef.current = scrollToId
+  }, [scrollToId, scrollSeq])
+  useEffect(() => {
+    const id = scrollTargetRef.current
+    if (!id) return
+    const index = messages.findIndex((m) => m.id === id)
+    if (index < 0) return
+    const scroller = scrollerRef.current
+    const el = contentRef.current?.querySelector<HTMLElement>(`[${VIRTUAL_ITEM_ATTR}="${CSS.escape(id)}"]`)
+    if (!scroller || !el) {
+      win.scrollToIndex(index, 'start')
+      return
+    }
+    scrollTargetRef.current = null
+    const box = scroller.getBoundingClientRect()
+    const rect = el.getBoundingClientRect()
+    const delta = rect.top - box.top - Math.max(0, (scroller.clientHeight - rect.height) / 2)
+    if (Math.abs(delta) >= 1) scroller.scrollTop += delta
   })
 
   const moveFocus = (from: number, to: number) => {
@@ -106,7 +143,9 @@ export default function ChatThreadWindow<M extends ThreadMessage>({
     moveFocus(index, to)
   }
 
-  const setSize = hasMore ? -1 : messages.length
+  const known = typeof total === 'number' && Number.isFinite(total)
+  const setSize = !hasMore ? messages.length : known ? Math.max(total, messages.length) : -1
+  const before = setSize < 0 ? 0 : setSize - messages.length
   const rows: ReactNode[] = []
   for (let i = win.start; i < win.end; i += 1) {
     const message = messages[i]
@@ -117,7 +156,7 @@ export default function ChatThreadWindow<M extends ThreadMessage>({
         data-message-id={message.id}
         data-index={i}
         role="article"
-        aria-posinset={i + 1}
+        aria-posinset={before + i + 1}
         aria-setsize={setSize}
         /* 吹き出しへは1か所だけ Tab で入る（いちばん新しい吹き出し）。中は矢印で動く。 */
         tabIndex={i === messages.length - 1 ? 0 : -1}

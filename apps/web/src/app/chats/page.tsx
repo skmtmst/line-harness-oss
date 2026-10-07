@@ -36,6 +36,10 @@ import TemplatePicker from '@/components/chats/template-picker'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
 import ChatThreadWindow from '@/components/chats/chat-thread-window'
+import ChatSearchBar from '@/v8/inbox-search/chat-search-bar'
+import searchStyles from '@/v8/inbox-search/chat-search-bar.module.css'
+import { useChatSearch } from '@/v8/inbox-search/use-chat-search'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
@@ -49,7 +53,7 @@ import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
-import { Bookmark, CheckCircle2, Filter, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, SlidersHorizontal, Star, X } from 'lucide-react'
+import { Bookmark, CheckCircle2, Filter, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Search, SlidersHorizontal, Star, X } from 'lucide-react'
 
 type Chat = ChatListItem
 
@@ -126,6 +130,9 @@ function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
 // 300 のままだと API が200件に丸めるのに画面は300件で「続き」を判定し、
 // 201件目以降に「さらに読み込む」が出ず開けなくなる。
 const CHAT_PAGE_SIZE = 200
+/** 会話の中を探す：昔の当たりまで読み足す1回の件数（会話詳細の口の上限）と回数の上限。 */
+const CHAT_SEARCH_FILL_PAGE = 1000
+const CHAT_SEARCH_FILL_MAX_ROUNDS = 20
 
 /** 一覧の末尾から「続きを読む」位置を作る。口の並び（未読が先・新しい順）と同じ3点。 */
 function toListCursor(
@@ -1231,6 +1238,94 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setLoadingOlderMessages(false)
     }
   }, [loadingOlderMessages, selectedChatId, selectedAccountId, chatDetail?.messages])
+
+  /*
+   * 会話の中を探す（V8.pen M0393 段13・枠 v7GV2、2026-10-07 オーナー採用）。V8 の画面だけ。
+   * 🔍 か ⌘F で頭の下に帯を出し、当たった吹き出しへ移る。
+   * 当たりがまだ読み込んでいない昔の吹き出しなら、いま読んでいる最古の1件から
+   * その当たりまでを会話詳細の口で続けて読み足してから移る。読んだ分は新しい方から
+   * 途切れずにつながったまま（定期の取り直し・下に付ける・窓分けの目印をそのまま使える）。
+   * 位置の口（messagesAt）の around は、送った人・引用・シナリオ名を持たない形で、
+   * 間が空いた並びになるので使わない（BEHAVIOR.md）。
+   */
+  const adminTheme = useAdminTheme()
+  const chatSearch = useChatSearch(adminTheme === 'v8' ? chatDetail?.friendId ?? null : null)
+  const [chatSearchFocusSeq, setChatSearchFocusSeq] = useState(0)
+  const [chatSearchFilling, setChatSearchFilling] = useState(false)
+  const [chatSearchTarget, setChatSearchTarget] = useState<{ id: string; seq: number } | null>(null)
+  const chatMessagesRef = useRef<ChatDetailMessage[]>([])
+  chatMessagesRef.current = chatDetail?.messages ?? []
+  const messagesHasMoreRef = useRef(false)
+  messagesHasMoreRef.current = messagesHasMore
+  const searchRevealSeqRef = useRef(0)
+  const openChatSearchBar = chatSearch.openBar
+  const openChatSearch = useCallback(() => {
+    openChatSearchBar()
+    setChatSearchFocusSeq((n) => n + 1)
+  }, [openChatSearchBar])
+  useEffect(() => {
+    if (!chatSearch.open) setChatSearchTarget(null)
+  }, [chatSearch.open])
+  useEffect(() => {
+    const hit = chatSearch.current
+    if (!hit) return
+    const chatId = selectedChatIdRef.current
+    const accountId = detailAccountRef.current
+    if (!chatId) return
+    const seq = ++searchRevealSeqRef.current
+    const stale = () => seq !== searchRevealSeqRef.current
+      || selectedChatIdRef.current !== chatId || detailAccountRef.current !== accountId
+    void (async () => {
+      let list = chatMessagesRef.current
+      // 1回 1,000 件（口の上限）。1万件の会話でも 10 回まで。
+      for (let round = 0; round < CHAT_SEARCH_FILL_MAX_ROUNDS && !list.some((m) => m.id === hit.id); round += 1) {
+        const oldest = list[0]
+        if (!oldest || !messagesHasMoreRef.current) break
+        setChatSearchFilling(true)
+        try {
+          const res = await api.chats.get(chatId, {
+            limit: CHAT_SEARCH_FILL_PAGE,
+            beforeAt: oldest.eventAt ?? oldest.createdAt,
+            beforeId: oldest.id,
+          })
+          if (stale()) return
+          if (!res.success) break
+          const rows = res.data.messages ?? []
+          const seen = new Set(list.map((m) => m.id))
+          list = [...rows.filter((m) => !seen.has(m.id)), ...list]
+          chatMessagesRef.current = list
+          messagesHasMoreRef.current = res.data.hasMoreMessages === true
+          // 上へ足すだけ（loadOlderMessages と同じ）。見ている位置は窓分けが守る。
+          setChatDetail((prev) => {
+            if (!prev || prev.id !== chatId) return prev
+            const had = new Set((prev.messages ?? []).map((m) => m.id))
+            return { ...prev, messages: [...rows.filter((m) => !had.has(m.id)), ...(prev.messages ?? [])] }
+          })
+          setMessagesHasMore(res.data.hasMoreMessages === true)
+        } catch {
+          if (stale()) return
+          break
+        }
+      }
+      if (stale()) return
+      setChatSearchFilling(false)
+      if (list.some((m) => m.id === hit.id)) setChatSearchTarget({ id: hit.id, seq })
+      else setError('当たったメッセージまで読み込めませんでした。もう一度お試しください。')
+    })()
+    return () => { searchRevealSeqRef.current += 1; setChatSearchFilling(false) }
+  }, [chatSearch.current, chatSearch.moveSeq]) // eslint-disable-line react-hooks/exhaustive-deps
+  // ⌘F / Ctrl+F：会話を開いている間は、ブラウザのページ内検索の代わりに会話の中を探す。
+  useEffect(() => {
+    if (adminTheme !== 'v8' || !chatDetail) return
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        openChatSearch()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [adminTheme, chatDetail, openChatSearch])
 
   /*
    * INBOX-12: 開いている会話を静かに取り直す。
@@ -3166,6 +3261,20 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     **同じ場所に同じ1つのボタン**を置く。閉じる口が右パネルの
                     中にしか無いと、閉じたあと戻す口を別の場所で探すことになる。
                   */}
+                  {/* 板 v7GV2：顧客情報の出し入れの左に「会話の中を探す」（V8 だけ）。 */}
+                  {adminTheme === 'v8' && (
+                    <Button
+                      variant="secondary"
+                      className="h-9 w-9 shrink-0 p-0 text-action"
+                      type="button"
+                      data-design-node="bvHXu"
+                      aria-label="会話の中を探す（⌘F）"
+                      aria-expanded={chatSearch.open}
+                      onClick={() => (chatSearch.open ? chatSearch.close() : openChatSearch())}
+                    >
+                      <Search aria-hidden="true" size={14} />
+                    </Button>
+                  )}
                   <Button variant="secondary" className="h-9 w-9 shrink-0 p-0 text-action" type="button" data-inbox-v6="customer-info-toggle" onClick={() => setShowFriendInfo((current) => !current)} aria-expanded={showFriendInfo}>
                     {showFriendInfo
                       ? <PanelRightClose aria-hidden="true" size={14} />
@@ -3182,6 +3291,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 </div>
               </div>
 
+              {chatSearch.open && (
+                <ChatSearchBar search={chatSearch} focusSeq={chatSearchFocusSeq} busy={chatSearchFilling} />
+              )}
+
               {/* Messages — LINE-style chat bubbles */}
               <div className="relative flex min-h-0 flex-1 flex-col">
               {/* 板 `M0393`：会話の地は surface-pearl（LINE青の地は使わない）。 */}
@@ -3190,7 +3303,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 見ている位置は窓分けの側で守るので、ブラウザの自動の位置合わせは切る
                 （二重に直すと飛ぶ）。行の間 8px は行の中に持つので space-y は付けない。
               */}
-              <div ref={messagesScrollRef} data-inbox-thread-scroller="" className="flex-1 overflow-y-auto p-4" style={{ backgroundColor: 'var(--color-surface-pearl)', overflowAnchor: 'none' }}>
+              <div ref={messagesScrollRef} data-inbox-thread-scroller="" className={`flex-1 overflow-y-auto p-4 ${searchStyles.hitScope}`} style={{ backgroundColor: 'var(--color-surface-pearl)', overflowAnchor: 'none' }}>
                 {/*
                   古い履歴の続き。直近100件だけ読んでいる会話で出す。
                   押すと今見えている最古の1件より古い分を上に足す。
@@ -3220,11 +3333,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     loadingOlder={loadingOlderMessages}
                     onLoadOlder={() => { void loadOlderMessages() }}
                     label={`${chatDetail.friendName}さんとのメッセージ`}
+                    total={chatDetail.total}
+                    scrollToId={chatSearchTarget?.id ?? null}
+                    scrollSeq={chatSearchTarget?.seq ?? 0}
                     renderMessage={(msg, idx, list) => {
                     const prevMsg = idx > 0 ? list[idx - 1] : null
                     const isLast = idx === list.length - 1
                     const showDateSep = !prevMsg || !sameYmd(prevMsg.createdAt, msg.createdAt)
                     const isOutgoing = msg.direction === 'outgoing'
+                    const searchHit = chatSearch.hitKind(msg)
 
                     // メッセージ表示の分岐
                     let bubbleContent: React.ReactNode
@@ -3302,6 +3419,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                   ? 'rounded-tl-card rounded-tr-mini rounded-bl-card rounded-br-card bg-accent-soft text-ink'
                                   : 'min-w-64 rounded-tl-mini rounded-tr-card rounded-bl-card rounded-br-card border border-hairline bg-canvas text-ink'
                               }`}
+                              /* 会話の中を探す：枠は v8/inbox-search の CSS が data-search-hit で付ける。 */
+                              data-search-hit={searchHit ?? undefined}
                             >
                               {/* N-025: 引用元の表示。取り消された引用元は本文を出さない。 */}
                               {msg.quoted && (

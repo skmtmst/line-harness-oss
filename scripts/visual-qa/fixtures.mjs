@@ -2528,6 +2528,32 @@ export const INBOX_STATS = {
  * `/api/friends/:id/messages` は別の口で、こちらには出ない。
  */
 export const FRIEND_MESSAGES = {
+  /*
+    会話の中を探す（V8.pen M0393 段13・枠 v7GV2）の見本。絵と同じ4つの吹き出しで、
+    「定期便」が2つに当たる（いま見ている当たり＝太い枠・ほか＝薄い枠）。
+  */
+  'friend-0': [
+    {
+      id: 'msg-k1', friendId: 'friend-0', direction: 'incoming', messageType: 'text',
+      content: '秋の新商品はいつ届きますか？定期便に追加できますか？', createdAt: '2026-08-19T01:12:00.000Z',
+      broadcastId: null, scenarioStepId: null, source: 'line', scenarioName: null, sentByStaffName: null,
+    },
+    {
+      id: 'msg-k2', friendId: 'friend-0', direction: 'outgoing', messageType: 'text',
+      content: 'お問い合わせありがとうございます。秋の新商品は 10月4日から発送します。定期便への追加は、このトークで『追加』と送っていただくだけで大丈夫です。', createdAt: '2026-08-19T01:20:00.000Z',
+      broadcastId: null, scenarioStepId: null, source: 'manual', scenarioName: null, sentByStaffName: 'Kenta',
+    },
+    {
+      id: 'msg-k3', friendId: 'friend-0', direction: 'incoming', messageType: 'text',
+      content: 'ありがとうございます！では追加でお願いします🙏', createdAt: '2026-08-19T01:24:00.000Z',
+      broadcastId: null, scenarioStepId: null, source: 'line', scenarioName: null, sentByStaffName: null,
+    },
+    {
+      id: 'msg-k4', friendId: 'friend-0', direction: 'outgoing', messageType: 'text',
+      content: 'ご注文の追加を受け付けました。10月4日の発送分に入ります。（このメッセージは自動で送っています）', createdAt: '2026-08-19T01:24:30.000Z',
+      broadcastId: null, scenarioStepId: null, source: 'auto_reply', scenarioName: null, sentByStaffName: null,
+    },
+  ],
   'friend-1': [
     {
       id: 'msg-1', friendId: 'friend-1', direction: 'incoming', messageType: 'text',
