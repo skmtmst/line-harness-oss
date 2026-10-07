@@ -1432,6 +1432,7 @@
   --tpl-inbox-chead-pad: 12px 20px;       /* 会話の頭の内側 */
   --tpl-inbox-chead-gap: 8px;             /* 会話の頭の部品の間 */
   --tpl-inbox-chead-face: 28px;           /* 会話の頭の顔 */
+  --tpl-inbox-chead-who-min: 120px;       /* 名前の欄の下限。これより狭いと操作を次の行へ */
   --tpl-inbox-chead-name: 15px;           /* 会話の頭の名前 */
   --tpl-inbox-chead-name-lh: 23px;
   --tpl-inbox-chead-sub-lh: 18px;
@@ -1487,6 +1488,11 @@
   --tpl-inbox-sch-box-pad: 10px 12px;     /* 送るものの箱 */
   --tpl-inbox-sch-chip-h: 28px;           /* すぐ選ぶの札 */
   --tpl-inbox-sch-chip-pad: 0 12px;
+  --tpl-inbox-st-progress: #b45309;       /* 対応中の札の字と点（絵の 5.） */
+  --tpl-inbox-menu-shadow: 0 8px 24px #1d1d1f1f; /* 会話の頭のメニューの影 */
+  --tpl-inbox-menu-dot: 6px;              /* 対応状況の札の中の点 */
+  --tpl-inbox-menu-check: 13px;           /* 選んでいる行の✓ */
+  --tpl-inbox-menu-search-icon: 12px;
 }
 
 /*

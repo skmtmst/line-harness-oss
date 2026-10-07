@@ -43,6 +43,7 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover'
 import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog'
 import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css'
+import ConversationHead from '@/v8/inbox-chat/conversation-head'
 import SegmentedControl from '@/components/shared/segmented'
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
@@ -3171,6 +3172,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               onBack={() => setSelectedThreadId(null)}
               customerInfoOpen={showFriendInfo}
               onOpenCustomerInfo={() => setShowFriendInfo(true)}
+              onCloseCustomerInfo={() => setShowFriendInfo(false)}
               onChanged={() => {
                 void loadEmails()
               }}
@@ -3210,6 +3212,28 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 操作が同じ行にいると 390px で宛先の名前が潰れて、
                 誰への返信か読めなかった。640px 以上では従来どおり1行。
               */}
+              {isV8 ? (
+                /*
+                 * ★V8 会話の頭（XqSvX）：顔28・名前15・補足、右に ☆・担当・対応状況・探す・右の列の出し入れ。
+                 * メールの会話も同じ部品（ConversationHead）を使う。動き（注目・担当・対応・探す・開閉）は同じ処理を呼ぶ。
+                 */
+                <ConversationHead
+                  name={chatDetail.friendName}
+                  pictureUrl={chatDetail.friendPictureUrl}
+                  sub={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・${formatRelative(chatDetail.lastMessageAt)}`}
+                  subTitle={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 ${formatInboxDatetime(chatDetail.lastMessageAt)}`}
+                  onBack={() => setSelectedChatId(null)}
+                  attention={{ on: Boolean(chatDetail.isAttention), saving: attentionSaving, onToggle: () => void handleAttentionUpdate() }}
+                  operator={{
+                    value: chatDetail.operatorId ?? 'unassigned',
+                    operators,
+                    onChange: (next) => { void handleOperatorUpdate(next === 'unassigned' ? null : next) },
+                  }}
+                  status={{ value: chatDetail.status as ChatStatus, onChange: (next) => void handleStatusUpdate(next as Chat['status']) }}
+                  search={{ open: chatSearch.open, onToggle: () => (chatSearch.open ? chatSearch.close() : openChatSearch()) }}
+                  panel={{ open: showFriendInfo, onToggle: () => setShowFriendInfo((current) => !current) }}
+                />
+              ) : (
               <div className="flex min-h-[66px] flex-wrap items-center gap-x-2 gap-y-2 border-b border-hairline bg-canvas px-4 py-3 sm:flex-nowrap">
                 <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
                   <button
@@ -3304,20 +3328,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     **同じ場所に同じ1つのボタン**を置く。閉じる口が右パネルの
                     中にしか無いと、閉じたあと戻す口を別の場所で探すことになる。
                   */}
-                  {/* 板 v7GV2：顧客情報の出し入れの左に「会話の中を探す」（V8 だけ）。 */}
-                  {adminTheme === 'v8' && (
-                    <Button
-                      variant="secondary"
-                      className="h-9 w-9 shrink-0 p-0 text-action"
-                      type="button"
-                      data-design-node="bvHXu"
-                      aria-label="会話の中を探す（⌘F）"
-                      aria-expanded={chatSearch.open}
-                      onClick={() => (chatSearch.open ? chatSearch.close() : openChatSearch())}
-                    >
-                      <Search aria-hidden="true" size={14} />
-                    </Button>
-                  )}
                   <Button variant="secondary" className="h-9 w-9 shrink-0 p-0 text-action" type="button" data-inbox-v6="customer-info-toggle" onClick={() => setShowFriendInfo((current) => !current)} aria-expanded={showFriendInfo}>
                     {showFriendInfo
                       ? <PanelRightClose aria-hidden="true" size={14} />
@@ -3333,6 +3343,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   */}
                 </div>
               </div>
+              )}
 
               {chatSearch.open && (
                 <ChatSearchBar search={chatSearch} focusSeq={chatSearchFocusSeq} busy={chatSearchFilling} />
