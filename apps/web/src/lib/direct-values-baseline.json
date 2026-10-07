@@ -1,9 +1,4 @@
 {
-  "app/auto-replies/quick-create-v8.module.css": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
   "app/contents/contents-permission-behavior.spec.mjs": {
     "color": 1,
     "radius": 0,
@@ -119,11 +114,6 @@
     "radius": 0,
     "shadow": 0
   },
-  "components/layout/shell-frame.module.css": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
   "components/layout/sidebar.module.css": {
     "color": 0,
     "radius": 2,
@@ -140,11 +130,6 @@
     "shadow": 0
   },
   "components/shared/activity-item.module.css": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "components/shared/attention-star.module.css": {
     "color": 0,
     "radius": 1,
     "shadow": 0
@@ -294,19 +279,9 @@
     "radius": 1,
     "shadow": 1
   },
-  "components/shared/route-badge.module.css": {
-    "color": 0,
-    "radius": 1,
-    "shadow": 0
-  },
   "components/shared/save-conflict-bar.module.css": {
     "color": 1,
     "radius": 0,
-    "shadow": 0
-  },
-  "components/shared/scrollable-table.module.css": {
-    "color": 0,
-    "radius": 3,
     "shadow": 0
   },
   "components/shared/section-header.module.css": {

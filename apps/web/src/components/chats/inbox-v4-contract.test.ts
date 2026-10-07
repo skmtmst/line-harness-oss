@@ -9,7 +9,7 @@ const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'u
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const TEMPLATE_PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
 const FRIEND_INFO = readFileSync(join(HERE, 'friend-info-sidebar.tsx'), 'utf8')
-const INBOX_KPIS = readFileSync(join(HERE, 'inbox-kpis.tsx'), 'utf8')
+// 受信箱の指標カード（inbox-kpis.tsx）はどの画面からも描かれないので 2026-10-07 に消した。それを見ていた行も外した。
 const INBOX_DROPDOWN = readFileSync(join(HERE, 'inbox-dropdown.tsx'), 'utf8')
 const EMAIL_THREAD = readFileSync(join(HERE, '..', 'support', 'email-thread.tsx'), 'utf8')
 const WORKER_CHATS = readFileSync(
@@ -240,10 +240,6 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain('<time className="text-micro text-ink-faint">{startedAt}</time>')
   })
 
-  it('狭い画面でも対応状況の見出しを1行で表示する', () => {
-    expect(INBOX_KPIS).toContain('whitespace-nowrap text-micro font-semibold')
-  })
-
   it('顧客情報の操作と情報順をV4へそろえる', () => {
     expect(FRIEND_INFO).toContain('whitespace-nowrap')
     expect(FRIEND_INFO).toContain("{ key: 'names', label: '基本情報' }")
@@ -257,6 +253,5 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain('const activeFriendId = (chatDetail?.id === selectedChatId')
     expect(PAGE).toContain('chatDetail.friendId')
     expect(PAGE).toContain('friendId={activeFriendId}')
-    expect(INBOX_KPIS).toContain('stats?.todayByChannel?.email')
   })
 })

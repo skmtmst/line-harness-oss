@@ -55,9 +55,10 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
 
   it('V8の専用失敗表示も、その場で一覧を読み直せる', () => {
     for (const [target, message, retry] of [
-      ['broadcasts/list-v8.tsx', '一斉配信を読み込めませんでした', 'onClick={() => void loadList((page - 1) * pageSize)}'],
-      ['form-submissions/list-v8.tsx', "loadFailureCopy(loadFailure, '回答フォーム')", 'onClick={() => void loadForms()}'],
-      ['scenarios/list-v8.tsx', 'シナリオを読み込めませんでした', 'onClick={() => void loadScenarios()}'],
+      ['../v8/broadcasts/list.tsx', '一斉配信を読み込めませんでした', 'onClick={() => void loadList((page - 1) * pageSize)}'],
+      // 一斉配信・回答フォーム・シナリオは入口が src/v8 の新しい一覧を出す（古い list-v8.tsx はもう描かれない）。
+      ['../v8/forms/list.tsx', "loadFailureCopy(loadFailure, '回答フォーム')", 'onClick={() => void loadForms()}'],
+      ['../v8/scenarios/list.tsx', 'シナリオを読み込めませんでした', 'onClick={() => void loadScenarios()}'],
       ['reminders/list-v8.tsx', 'リマインダを読み込めませんでした', 'onClick={reminderList.retry}'],
     ]) {
       const source = readFileSync(join(HERE, target), 'utf8')
@@ -66,9 +67,9 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
       // 失敗表示の中で、押したら読み直すボタンにつながっていることを確認する。
       expect(source.slice(failureAt, failureAt + 1200), target).toContain(retry)
     }
-    const forms = readFileSync(join(HERE, 'form-submissions/list-v8.tsx'), 'utf8')
+    const forms = readFileSync(join(HERE, '../v8/forms/list.tsx'), 'utf8')
     // 403 は共通の案内（loadFailureCopy）が retryable=false を返し、読み直しを出さない。
-    expect(forms).toContain('{failure.retryable ? (')
+    expect(forms).toContain('failure.retryable ? (')
     const friends = readFileSync(join(HERE, 'friends/page.tsx'), 'utf8')
     expect(friends).toContain('onRetry={() => void loadFriends()}')
   })
