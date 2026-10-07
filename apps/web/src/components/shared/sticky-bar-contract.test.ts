@@ -146,15 +146,25 @@ describe('下部追従バーの並びを部品で固定する', () => {
 
   /*
    * ★BG-B の帯は 左=残り枚数／中=サイズ／右=ボタン（`WDJak`「中 サイズ確認」）。
-   * 読むだけの一言を操作の手前に置ける口を足した。渡さない画面は3列のまま
-   * なので、ほかの作成・編集画面の見た目は変わらない。
+   * 読むだけの一言を操作の手前に置ける口を足した。渡さない画面は
+   * 左=状態／中央=操作／右端=空きのままなので、ほかの作成・編集画面の
+   * 見た目は変わらない。
+   *
+   * 2026-10-07 の2度目の差し戻し（この見張り自体を直した）: はじめは
+   * 4列（`1fr auto auto 1fr`）にして右端へ空き列を残していた。しかし
+   * 承認済み ★BG-B `qIp42` の帯 `X2oLn` は右の列 `J94Yj` が
+   * `fill_container` ＋ `justifyContent: end` で、**ボタンが帯の右端に付く**。
+   * 4列だと操作が中央寄りになって絵と違ったため、3列目を操作そのものにして
+   * 右そろえへ変えた。空き列へ戻すとこの試験が落ちる。
    */
-  it('操作の手前の一言は、渡した画面だけ列が増える', () => {
+  it('操作の手前の一言を渡した画面は、ボタンを右端に置く', () => {
     expect(BAR).toMatch(/info\?:\s*ReactNode/)
     expect(BAR).toMatch(/info \? </)
-    // 既定は3列のまま。増える列は `withInfo` を付けた画面だけ。
-    expect(CSS).toMatch(/\.withInfo\s*\{[^}]*grid-template-columns:\s*1fr auto auto 1fr/s)
-    expect(CSS).not.toMatch(/\.bar\s*\{[^}]*1fr auto auto 1fr/s)
+    // 列は3つのまま。3列目が操作で、中身を右へ寄せる。
+    expect(CSS).toMatch(/\.withInfo\s*\{[^}]*grid-template-columns:\s*1fr auto 1fr/s)
+    expect(CSS).toMatch(/\.withInfo \.actions\s*\{[^}]*justify-content:\s*flex-end/s)
+    // 右端に空き列を作る4列へ戻していないこと。
+    expect(CSS).not.toMatch(/1fr auto auto 1fr/)
   })
 
   /*
@@ -173,10 +183,12 @@ describe('下部追従バーの並びを部品で固定する', () => {
     expect(BAR).not.toMatch(/lucide-react/)
   })
 
-  it('一言を置いても右端は空ける', () => {
-    // 一言は `actions` の前。右端の空き箱はそのまま残す。
+  it('一言を渡さない画面は、今までどおり右端を空ける', () => {
+    // 一言は `actions` の前（押す前に読ませる）。
     expect(BAR.indexOf('{info ?')).toBeLessThan(BAR.indexOf('styles.actions'))
-    expect(BAR).toMatch(/aria-hidden="true"/)
+    // 右端の空き箱は残す。ただし一言を渡した画面では作らない
+    // （`X2oLn` どおりボタンが右端に付くため。上の試験とひと組）。
+    expect(BAR).toMatch(/info \? null : <div aria-hidden="true"/)
   })
 
   it('1440 で横スクロールさせずに折り返す', () => {

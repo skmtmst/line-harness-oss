@@ -65,8 +65,13 @@ export default function StickyBar({
       </div>
       {info ? <div className={styles.info}>{info}</div> : null}
       <div className={styles.actions}>{actions}</div>
-      {/* 右端は空ける。ここに何か置くと中央が中央でなくなる。 */}
-      <div aria-hidden="true" />
+      {/*
+       * 右端は空ける。ここに何か置くと中央が中央でなくなる。
+       * ただし一言を渡した画面は、承認済み ★BG-B `X2oLn` の右の列
+       * （`J94Yj` は `justifyContent: end`）どおりボタンが右端に付くので、
+       * この空き箱は作らない。
+       */}
+      {info ? null : <div aria-hidden="true" />}
     </div>
   )
 }
