@@ -1,3 +1,5 @@
+import { CHAT_FILE_TYPES } from '@line-crm/shared';
+import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
 import type { LineMessageType, BookingWaitlistSlotSummary,SeatWaitlistSlotSummary,CustomerSeatWaitlist } from '@line-crm/shared';
 import { adminSessionHeaders } from './admin-session'
@@ -11692,6 +11694,40 @@ export const api = {
     delete: (accountId:string,key:string,expectedVersion:string) => fetchApi<ApiResponse<unknown>>(`/api/scenario-drafts/${encodeURIComponent(key)}?${new URLSearchParams({lineAccountId:accountId})}`,{method:'DELETE',body:JSON.stringify({expectedVersion})}),
   },
   chats: {
+    attachments: {
+      createUploadSession: (id: string, input: { filename: string; mimeType: 'video/mp4'; sizeBytes: number }) =>
+        fetchApi<ApiResponse<ChatAttachmentUploadSession>>(`/api/chats/${encodeURIComponent(id)}/attachments/upload-sessions`, {
+          method: 'POST', body: JSON.stringify(input),
+        }),
+      completeUploadSession: (id: string, sessionId: string, etag: string) =>
+        fetchApi<ApiResponse<ChatAttachment>>(`/api/chats/${encodeURIComponent(id)}/attachments/upload-sessions/${encodeURIComponent(sessionId)}/complete`, {
+          method: 'POST', body: JSON.stringify({ etag }),
+        }),
+      upload: async (id: string, file: File): Promise<ApiResponse<ChatAttachment>> => {
+        const path = `/api/chats/${encodeURIComponent(id)}/attachments`;
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        const inferredMime = Object.entries(CHAT_FILE_TYPES).find(([, ext]) => ext === extension)?.[0];
+        const mimeType = !file.type || ['application/octet-stream', 'application/x-zip-compressed'].includes(file.type)
+          ? inferredMime ?? file.type : file.type;
+        if (mimeType !== 'video/mp4') return fetchApi<ApiResponse<ChatAttachment>>(`${path}/upload`, {
+          method: 'POST', body: file,
+          headers: { 'Content-Type': mimeType || 'application/octet-stream', 'X-Filename': encodeURIComponent(file.name) },
+        });
+        const prepared = await fetchApi<ApiResponse<ChatAttachmentUploadSession>>(`${path}/upload-sessions`, {
+          method: 'POST', body: JSON.stringify({ filename: file.name, mimeType: file.type, sizeBytes: file.size }),
+        });
+        if (!prepared.success || !prepared.data) return prepared as unknown as ApiResponse<ChatAttachment>;
+        const response = await fetch(prepared.data.uploadUrl, {
+          method: 'PUT', headers: prepared.data.requiredHeaders, body: file, credentials: 'omit',
+        });
+        if (!response.ok) throw new Error('動画をアップロードできませんでした');
+        const etag = response.headers.get('etag');
+        if (!etag) throw new Error('アップロード結果を確認できませんでした。R2のCORS設定を確認してください');
+        return fetchApi<ApiResponse<ChatAttachment>>(`${path}/upload-sessions/${encodeURIComponent(prepared.data.id)}/complete`, {
+          method: 'POST', body: JSON.stringify({ etag }),
+        });
+      },
+    },
     searchMessages: (friendId:string,q:string,offset=0,limit=30) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationSearchResult>>(`/api/chats/${encodeURIComponent(friendId)}/messages/search?${new URLSearchParams({q,offset:String(offset),limit:String(limit)})}`),
     messagesAt: (friendId:string,params:{cursorAt?:string;cursorId?:string;direction?:'before'|'after'|'around';limit?:number}={}) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationMessagePage>>(`/api/chats/${encodeURIComponent(friendId)}/messages?${new URLSearchParams(Object.entries(params).map(([k,v])=>[k,String(v)]))}`),
     list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
@@ -11760,7 +11796,7 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    send: (id: string, data: { content: string; messageType?: string; revision?: number; quotedMessageId?: string }, idempotencyKey: string) =>
+    send: (id: string, data: ChatSendInput, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ sent: true; messageId: string; sentByStaffName: string; revision: number }>>(`/api/chats/${id}/send`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
@@ -11782,7 +11818,7 @@ export const api = {
       }),
     // N-025: 送信予約。scheduledAt は JST の datetime-local 値でも受け付ける
     // (サーバー側でUTCへ正規化)。取消・変更は送信中以降になると409で拒否される。
-    schedule: (id: string, data: { content: string; scheduledAt: string; quotedMessageId?: string }, idempotencyKey: string) =>
+    schedule: (id: string, data: ChatScheduleInput, idempotencyKey: string) =>
       fetchApi<ApiResponse<ScheduledChatSend & { replayed: boolean }>>(`/api/chats/${id}/schedule`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },

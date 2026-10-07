@@ -1,3 +1,4 @@
+import { chatAttachmentPaths } from './chat-attachments-openapi.js';
 import { api9Paths, api9Schemas } from './api9-openapi.js';
 import { restaurantClosurePaths } from './restaurant-closures-openapi.js';
 import { stampPaths,hqBroadcastPaths } from './proposal-e-openapi.js';
@@ -394,6 +395,7 @@ const spec = {
     },
   },
   paths: {
+    ...chatAttachmentPaths,
     '/api/mileage/reward-folders': {
       get: { tags: ['Mileage'], summary: '使い道のフォルダと件数を読む', parameters: [{ name: 'accountId', in: 'query', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Folders: id, name, displayOrder, count' }, '404': { description: 'Account not found' } } },
       post: { tags: ['Mileage'], summary: '使い道のフォルダを作る（統括・管理者）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'name'], properties: { accountId: { type: 'string' }, name: { type: 'string', minLength: 1, maxLength: 100 } } } } } }, responses: { '201': { description: 'Created folder' }, '403': { description: 'Forbidden' }, '404': { description: 'Account not found' }, '422': { description: 'Invalid name' } } },
@@ -3227,7 +3229,8 @@ const spec = {
               schema: {
                 type: 'object',
                 properties: {
-                  content: { type: 'string' },
+                  messageType: { type: 'string', enum: ['text', 'flex', 'image', 'video', 'file'], default: 'text' },
+                  content: { type: 'string', description: '添付は送信口と同じJSON。ファイルの予約はアップロードから30日以内。' },
                   scheduledAt: { type: 'string', format: 'date-time' },
                   quotedMessageId: { type: 'string' },
                 },
