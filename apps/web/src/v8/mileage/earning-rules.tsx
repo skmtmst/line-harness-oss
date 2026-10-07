@@ -815,7 +815,7 @@ export default function EarningRulesTab() {
               <Tr key={rule.id} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
                   <div className={styles.rowNameLine}>
-                    <FolderDotName folder={folderDotOf(rule)} dot={!narrow}>
+                    <FolderDotName folder={folderDotOf(rule)}>
                       <span className={styles.rowName} title={rule.draft.name}>{rule.draft.name}</span>
                     </FolderDotName>
                   </div>
