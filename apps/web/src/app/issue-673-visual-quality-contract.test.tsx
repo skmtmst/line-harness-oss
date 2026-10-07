@@ -48,6 +48,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   await act(async () => { root.unmount() })
   host.remove()
   vi.clearAllMocks()
@@ -133,6 +134,8 @@ describe('#673 指標カードのスケルトン', () => {
     chatStatsGet.mockImplementation(
       () => new Promise((resolve) => { resolveStats = resolve }) as ReturnType<typeof api.chatStats.get>,
     )
+    // 待ちは偽の時計で進める（本物の時間を待たない）。骨組みの 0.3 秒は描いた瞬間から数えるので、描く前に替える。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await act(async () => { root.render(<InboxKpis />) })
 
     const section = host.querySelector('section[aria-label="受信箱の対応状況"]')
@@ -142,7 +145,7 @@ describe('#673 指標カードのスケルトン', () => {
      * 出る前は本物の場所を不可視で取るので、実数の「—」は見えない。
      * 「要返信」＋4指標＋待ち時間の骨組み。
      */
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(350) })
     expect(host.querySelectorAll('[data-skeleton]').length).toBeGreaterThanOrEqual(5)
 
     const stats = {
@@ -158,7 +161,7 @@ describe('#673 指標カードのスケルトン', () => {
     })
     expect(section?.getAttribute('aria-busy')).toBeNull()
     // ★V7 §3: 出した骨組みは最低 0.4 秒残る。待ってから実数を確かめる。
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(450) })
     expect(host.querySelectorAll('[data-skeleton]').length).toBe(0)
     expect(section?.textContent).toContain('要返信 3件')
     expect(section?.textContent).toContain('5件')

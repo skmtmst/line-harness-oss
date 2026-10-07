@@ -50,11 +50,28 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする60ファイルだけを利用先に数える', () => {
+  /*
+   * 描かれるファイル：入口（app の page.tsx・layout.tsx）から import をたどって届くもの。
+   * もう描かれない古い画面ファイル（入口が src/v8 の新しい画面を出すようになったもの）は、
+   * 切り替えの日まで残っていても利用先に数えない（2026-10-06）。
+   */
+  const rendered = (() => {
+    const seen = new Set<string>()
+    const queue = files.filter((file) => /\/app\/(?:.*\/)?(?:page|layout)\.tsx$/.test(file))
+    while (queue.length > 0) {
+      const file = queue.pop()!
+      if (seen.has(file)) continue
+      seen.add(file)
+      for (const next of importIndex.get(file) ?? []) if (!seen.has(next)) queue.push(next)
+    }
+    return seen
+  })()
+
+  it('共通Paginationを直接importする、描かれるファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
-    expect(directImporters(files, pagination, importIndex).map((file) => relative(SRC, file)).sort()).toEqual([
+    expect(directImporters(files, pagination, importIndex).filter((file) => rendered.has(file)).map((file) => relative(SRC, file)).sort()).toEqual([
       // m15c: 手書きのページ送りを共通 Pagination へ置き換えた10画面を足す。
       'app/accounts/migration.tsx',
       // ★V8 LINEユーザーIDの移行（Z0jHp）。判断一覧は50件ずつのページ送り。
@@ -68,12 +85,9 @@ describe('共通部品の影響範囲', () => {
       'app/affiliates/v8-approvals-tab.tsx',
       'app/affiliates/v8-offers-tab.tsx',
       'app/affiliates/v8-payment-tab.tsx',
-      // ★V8 自動応答一覧（uE9gf）。表の下にページ送りを置く。
-      'app/auto-replies/list-v8.tsx',
       // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
       'app/auto-replies/runs/page.tsx',
-      // ★V8 自動応答の実行結果（nWmLg）。表の下にページ送りを置く。
-      'app/auto-replies/runs/runs-v8.tsx',
+      // ★V8 自動応答の実行結果（app/auto-replies/runs/runs-v8.tsx）は描かれなくなった。入口は src/v8/auto-replies/runs.tsx（下）。
       // ★V8 オートメーション一覧（LWQXd）。表の下にページ送りを置く。
       'app/automations/list-v8.tsx',
       'app/automations/page.tsx',
@@ -90,8 +104,7 @@ describe('共通部品の影響範囲', () => {
       // タブ分割で settings-v8.tsx から移った。
       'app/booking/menus/settings-tabs/menus-tab.tsx',
       'app/booking/menus/settings-tabs/staff-tab.tsx',
-      // #1145(★V8): 一斉配信の一覧。20件ずつのページ送りを共通へ寄せた。
-      'app/broadcasts/list-v8.tsx',
+      // #1145(★V8) の一斉配信の一覧（app/broadcasts/list-v8.tsx）は描かれなくなった。入口は src/v8/broadcasts/list.tsx（下）。
       // ★V8-B 共通アクション（LnGNw）。表の下にページ送りを置く。
       'app/common-actions/common-actions-v8.tsx',
       'app/common-actions/page.tsx',
@@ -126,9 +139,6 @@ describe('共通部品の影響範囲', () => {
       // ★V8-B イベント一覧（Ih3xS）。表の下にページ送りを置く。
       'app/events/events-list-v8.tsx',
       'app/events/page.tsx',
-      // 2026-09-24(★V7 #701): 回答フォーム一覧の自前の「前へ／次へ」を共通へ寄せた。1ページだけのときは出さない。
-      // ★V8 回答フォーム一覧（I3L41O）。表の下にページ送りを置く。
-      'app/form-submissions/list-v8.tsx',
       // #543: 一覧の到達不能な回答表（M2削除）と共に共通Paginationの利用を外した。
       'app/form-submissions/responses/page.tsx',
       'app/hq/account-browser-v8.tsx',
@@ -140,9 +150,7 @@ describe('共通部品の影響範囲', () => {
       // #565: 送信履歴が増えても描画を際限なく重くしないよう、20件ずつのページ送りに寄せた。
       'app/inflow-links/ad-integration.tsx',
       // ★V8-B 流入と計測の詳細（Q5le3）。友だちの表の下にページ送りを置く。
-      // ★V8-B 流入と計測の一覧（xbHxg）。表の下にページ送りを置く。
       'app/inflow-links/detail/page.tsx',
-      'app/inflow-links/inflow-list-v8.tsx',
       'app/inflow-links/page.tsx',
       // #291: 顧客へのお知らせ9種類を、設計どおり1ページ6件に区切る。
       'app/mileage/action-score-tab.tsx',
@@ -192,11 +200,7 @@ describe('共通部品の影響範囲', () => {
       'app/restaurant-test/v8/google.tsx',
       // ★V8-B 予約台帳 一覧（Z3FoM）。表の下にページ送りを置く。
       'app/restaurant-test/v8/reservations.tsx',
-      // ★V8 リッチメニュー一覧（rZEGN）。表の下にページ送りを置く。
-      'app/rich-menus/list-v8.tsx',
       'app/rich-menus/page.tsx',
-      // ★V8 シナリオ一覧（axFrW）。表の下にページ送りを置く。
-      'app/scenarios/list-v8.tsx',
       // 監査 R132: ファイル検査の一覧が先頭50件固定で検索・ページ送りが
       // なかった。サーバが数えた総数でページ送りを出すため共通へ寄せた。
       // ★V8 ファイルの検査（PfA4o）。表の下にページ送りを置く。
@@ -213,12 +217,6 @@ describe('共通部品の影響範囲', () => {
       'app/templates/list-v8.tsx',
       // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
       'app/users/users-v8.tsx',
-      // ★V8-B 外部連携・やり取りの記録（Uv9AA）。表の下にページ送りを置く。
-      'app/webhooks/_components/webhooks-v8-interactions.tsx',
-      // ★V8-B 外部連携・こちらから送る（ZSbFY）。表の下にページ送りを置く。
-      'app/webhooks/_components/webhooks-v8-outgoing.tsx',
-      // ★V8-B 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りがある。
-      'app/webhooks/interactions-v8.tsx',
       // ★V8-B 外部連携の一覧（ZSbFY）。表の下にページ送りがある。
       'app/webhooks/outgoing-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
@@ -229,12 +227,16 @@ describe('共通部品の影響範囲', () => {
       'components/friend-attributes-v2/tag-list-v2.tsx',
       'components/friend-fields/tags-page-v4.tsx',
       'components/friends/friend-list-table.tsx',
-      'components/inbox/inbox-list.tsx',
       'components/line-notifications/notification-run-list.tsx',
       'components/ops/knowledge-list.tsx',
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
+      /*
+       * もう描かれない古い画面ファイル（自動応答・回答フォーム・流入の一覧・リッチメニュー・
+       * シナリオ・外部連携のやり取りと送る・受信一覧の旧部品）は 2026-10-06 に外した。
+       * 代わりは下の src/v8 の新しい画面。
+       */
       // ★V8 友だち属性 タグの一覧（I1E7Bt）。一から書いた画面。表の下にページ送りを置く。
       'v8/tags/tags-tab.tsx',
       // ★V8 テンプレートの一覧（v19Ivv）。新しい置き場（src/v8）に一から書いた。
