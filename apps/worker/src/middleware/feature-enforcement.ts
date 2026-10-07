@@ -146,7 +146,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/nen/pets', 'photo_review'),
   feature('/api/nen/health', 'photo_review'),
   feature('/api/restaurant-test', 'restaurant_test'),
-  exempt('/api/visit-stamps', 'core', '来店スタンプはマイルと独立。店舗・カード・本人の境界は各ルートで検証'),
+  feature('/api/visit-stamps', 'visit_stamps'),
 
   exempt('/api/settings', 'core', '機能を再度オンにするため停止対象外'),
   exempt('/api/auth', 'core', 'ログインとセッション管理'),
@@ -380,6 +380,11 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   /** 本体で行が見つからないときだけ試す予備の照合（新旧の表の同居用）。 */
   fallbackSql?: string;
 }> = [
+  {pattern:/^\/api\/visit-stamps\/entries\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_entries WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/paper-requests\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_paper_requests WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/paper-photos\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_paper_photos WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/visits\/restaurant\/([^/]+)/,sql:'SELECT s.line_account_id AS account_id FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE r.id=?'},
+  {pattern:/^\/api\/visit-stamps\/visits\/booking\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM bookings WHERE id=?'},
   { pattern: /^\/api\/templates\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM templates WHERE id = ?' },
   { pattern: /^\/api\/scenarios\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM scenarios WHERE id = ?' },
   { pattern: /^\/api\/broadcasts\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcasts WHERE id = ?' },

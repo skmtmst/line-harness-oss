@@ -45,3 +45,7 @@ describe('公開画像配信の安全ヘッダ', () => {
     expect(res.headers.get('Content-Disposition')).toContain('attachment');
   });
 });
+
+it('来店スタンプの紙写真は公開画像口から読めず、R2にも触れない',async()=>{
+ get.mockClear();const res=await app().request('/images/private/visit-stamps/shop/friend/paper');expect(res.status).toBe(404);expect(get).not.toHaveBeenCalled();
+});

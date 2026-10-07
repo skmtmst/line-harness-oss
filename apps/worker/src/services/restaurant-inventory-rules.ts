@@ -1,10 +1,11 @@
 import { getRestaurantInventoryRules } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { dbFor } from './db-router.js';
+import { readCloseNotificationSettings } from './restaurant-close-settings.js';
 import { tzDateStr } from './availability.js';
 import { sendAutomaticBookingLine } from './booking-automatic-line.js';
 
-export async function restaurantResponsibleMembers(db:D1Database,storeId:string,date:string) {
+async function defaultResponsibleMembers(db:D1Database,storeId:string,date:string) {
  return (await db.prepare(`SELECT m.id,m.line_uid FROM rt_memberships m JOIN rt_stores st ON st.organization_id=m.organization_id
  WHERE st.id=? AND m.status='active' AND (m.store_id IS NULL OR m.store_id=st.id)
  AND (EXISTS(SELECT 1 FROM staff s JOIN staff_shifts sh ON sh.staff_id=s.id
@@ -15,6 +16,14 @@ export async function restaurantResponsibleMembers(db:D1Database,storeId:string,
  .bind(storeId,date,date).all<{id:string;line_uid:string|null}>()).results;
 }
 
+export async function restaurantResponsibleMembers(db:D1Database,storeId:string,date:string) {
+ const settings=await readCloseNotificationSettings(db,storeId);
+ if(settings.recipientMode==='responsible')return defaultResponsibleMembers(db,storeId,date);
+ return (await db.prepare(`SELECT m.id,m.line_uid FROM rt_memberships m JOIN rt_stores s ON s.organization_id=m.organization_id
+ WHERE s.id=? AND m.status='active' AND (m.store_id IS NULL OR m.store_id=s.id)
+ AND ((?='manager' AND m.role='store_manager') OR (?='selected' AND m.id IN (SELECT value FROM json_each(?)))) ORDER BY m.id`)
+ .bind(storeId,settings.recipientMode,settings.recipientMode,JSON.stringify(settings.membershipIds)).all<{id:string;line_uid:string|null}>()).results;
+}
 async function upsertTask(db:D1Database,input:{storeId:string;slotId:string;channel:string;reason:string;remaining:number;recipientIds:string[]}) {
  const id=crypto.randomUUID();
  await db.prepare(`INSERT INTO rt_channel_close_tasks(id,store_id,slot_id,channel,status,reason,remaining_seats,recipient_ids_json)
@@ -56,13 +65,13 @@ async function reconcileDirectBookingTasks(db:D1Database,storeId:string,timezone
 
 }
 async function dispatchDirectBookingNotices(env:Env['Bindings'],storeId:string) {
- const db=dbFor(env,storeId),rows=(await db.prepare(`SELECT o.id,o.retry_key,t.channel,t.starts_at,t.status,s.line_account_id,s.name,s.timezone,m.line_uid
+ const db=dbFor(env,storeId),rows=(await db.prepare(`SELECT o.id,o.retry_key,t.channel,t.starts_at,t.status,o.membership_id,s.line_account_id,s.name,s.timezone,m.line_uid
    FROM rt_reservation_close_outbox o JOIN rt_reservation_close_tasks t ON t.id=o.task_id JOIN rt_stores s ON s.id=t.store_id
    JOIN rt_memberships m ON m.id=o.membership_id LEFT JOIN rt_inventory_rules r ON r.store_id=t.store_id
    WHERE t.store_id=? AND t.status IN ('close','reopen') AND o.generation=t.generation AND o.sent_at IS NULL AND m.status='active'
-   AND COALESCE(r.notify,1)=1 AND (o.lease_until IS NULL OR datetime(o.lease_until)<=datetime('now')) LIMIT 100`).bind(storeId)
-   .all<{id:string;retry_key:string;channel:string;starts_at:string;status:'close'|'reopen';line_account_id:string|null;name:string;timezone:string;line_uid:string|null}>()).results;
- for(const r of rows){if(!r.line_account_id||!r.line_uid)continue;const token=crypto.randomUUID();
+   AND COALESCE(r.notify,1)=1 AND (t.status<>'reopen' OR COALESCE((SELECT notify_reopen FROM rt_close_notification_settings n WHERE n.store_id=t.store_id),1)=1) AND (o.lease_until IS NULL OR datetime(o.lease_until)<=datetime('now')) LIMIT 100`).bind(storeId)
+   .all<{id:string;retry_key:string;channel:string;starts_at:string;status:'close'|'reopen';membership_id:string;line_account_id:string|null;name:string;timezone:string;line_uid:string|null}>()).results;
+ for(const r of rows){if(!r.line_account_id||!r.line_uid||!(await restaurantResponsibleMembers(db,storeId,tzDateStr(r.timezone,new Date(r.starts_at)))).some(m=>m.id===r.membership_id))continue;const token=crypto.randomUUID();
    const claim=await db.prepare(`UPDATE rt_reservation_close_outbox SET lease_until=datetime('now','+5 minutes'),lease_token=? WHERE id=? AND sent_at IS NULL AND (lease_until IS NULL OR datetime(lease_until)<=datetime('now'))`).bind(token,r.id).run();
    if(!claim.meta.changes)continue;
    try{if(await sendAutomaticBookingLine(env,{accountId:r.line_account_id,to:r.line_uid,text:`${r.name} ${new Intl.DateTimeFormat('ja-JP',{timeZone:r.timezone,month:'numeric',day:'numeric',hour:'numeric',minute:'numeric'}).format(new Date(r.starts_at))} ${r.status==='reopen'?`${r.channel}の受付は、もう開けてよい状態です。`:`に予約が入りました。${r.channel}の受付を閉じてください。`}`,retryKey:r.retry_key,featureId:'restaurant_test'}))
@@ -87,12 +96,14 @@ export async function reconcileRestaurantInventory(env:Env['Bindings'],storeId:s
     AND status NOT IN ('cancelled','no_show') AND datetime(starts_at)<datetime(?,'+'||(SELECT slot_minutes FROM rt_inventory_slots WHERE id=?)||' minutes')
     AND datetime(ends_at)>datetime(?) LIMIT 1`).bind(storeId,slot.starts_at,slot.id,slot.starts_at).first();
   if(direct||slot.remaining>rule.threshold||!rule.notify) {
-   await db.prepare(`UPDATE rt_channel_close_tasks SET status='reopen',updated_at=datetime('now') WHERE slot_id=? AND status<>'reopen' AND reason<>'table_conflict'`).bind(slot.id).run();
+   await db.prepare(`UPDATE rt_channel_close_tasks SET status='reopen',generation=generation+1,updated_at=datetime('now') WHERE slot_id=? AND status<>'reopen' AND reason<>'table_conflict'`).bind(slot.id).run();
    continue;
   }
   const members=await restaurantResponsibleMembers(db,storeId,tzDateStr(store.timezone,new Date(slot.starts_at)));
   for(const m of media.results)await upsertTask(db,{storeId,slotId:slot.id,channel:m.code,reason:slot.remaining<=0?'full':'limited',remaining:slot.remaining,recipientIds:members.map(m=>m.id)});
  }
+ const reopen=(await db.prepare(`SELECT t.id,t.generation,i.starts_at FROM rt_channel_close_tasks t JOIN rt_inventory_slots i ON i.id=t.slot_id WHERE t.store_id=? AND t.status='reopen'`).bind(storeId).all<{id:string;generation:number;starts_at:string}>()).results;
+ for(const t of reopen)for(const m of await restaurantResponsibleMembers(db,storeId,tzDateStr(store.timezone,new Date(t.starts_at))))await db.prepare('INSERT OR IGNORE INTO rt_inventory_notification_outbox(id,task_id,generation,membership_id,retry_key) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),t.id,t.generation,m.id,crypto.randomUUID()).run();
  // 古い回収が新しい予約の変更を消さない。
  if(queue)await db.prepare('DELETE FROM rt_inventory_rule_queue WHERE store_id=? AND generation=?').bind(storeId,queue.generation).run();
  await dispatchRestaurantInventoryNotices(env,storeId);
@@ -114,21 +125,21 @@ export async function recordRestaurantTableConflict(env:Env['Bindings'],storeId:
 
 export async function dispatchRestaurantInventoryNotices(env:Env['Bindings'],storeId?:string) {
  const db=dbFor(env,storeId);
- const rows=await db.prepare(`SELECT o.id,o.retry_key,o.membership_id,t.reason,t.channel,t.remaining_seats,t.store_id,i.starts_at,
- s.line_account_id,s.name,m.line_uid FROM rt_inventory_notification_outbox o JOIN rt_channel_close_tasks t ON t.id=o.task_id
+ const rows=await db.prepare(`SELECT o.id,o.retry_key,o.membership_id,t.status,t.reason,t.channel,t.remaining_seats,t.store_id,i.starts_at,
+ s.line_account_id,s.name,s.timezone,m.line_uid FROM rt_inventory_notification_outbox o JOIN rt_channel_close_tasks t ON t.id=o.task_id
  LEFT JOIN rt_inventory_rules ru ON ru.store_id=t.store_id JOIN rt_inventory_slots i ON i.id=t.slot_id
  JOIN rt_stores s ON s.id=t.store_id JOIN rt_memberships m ON m.id=o.membership_id
  WHERE o.sent_at IS NULL AND (o.lease_until IS NULL OR datetime(o.lease_until)<=datetime('now'))
- AND o.generation=t.generation AND t.status='close' AND COALESCE(ru.notify,1)=1 AND m.status='active'
- AND (? IS NULL OR t.store_id=?) LIMIT 100`).bind(storeId??null,storeId??null).all<{id:string;retry_key:string;membership_id:string;reason:string;channel:string;remaining_seats:number;store_id:string;starts_at:string;line_account_id:string;name:string;line_uid:string|null}>();
+ AND o.generation=t.generation AND t.status IN ('close','reopen') AND COALESCE(ru.notify,1)=1 AND (t.status<>'reopen' OR COALESCE((SELECT notify_reopen FROM rt_close_notification_settings n WHERE n.store_id=t.store_id),1)=1) AND m.status='active'
+ AND (? IS NULL OR t.store_id=?) LIMIT 100`).bind(storeId??null,storeId??null).all<{id:string;retry_key:string;membership_id:string;status:string;reason:string;channel:string;remaining_seats:number;store_id:string;starts_at:string;line_account_id:string;name:string;timezone:string;line_uid:string|null}>();
  for(const row of rows.results) {
-  if(!row.line_uid||!row.line_account_id)continue;
+  if(!row.line_uid||!row.line_account_id||!(await restaurantResponsibleMembers(db,row.store_id,tzDateStr(row.timezone,new Date(row.starts_at)))).some(m=>m.id===row.membership_id))continue;
   const lease=crypto.randomUUID();
   const claim=await db.prepare(`UPDATE rt_inventory_notification_outbox SET lease_until=datetime('now','+5 minutes'),lease_token=?
  WHERE id=? AND sent_at IS NULL AND (lease_until IS NULL OR datetime(lease_until)<=datetime('now'))`).bind(lease,row.id).run();
   if(!claim.meta.changes)continue;
   try {
-   const text=row.reason==='table_conflict'?`${row.name}の同じ卓に予約が重なりました。予約管理で卓の付け替えを確認してください。`:
+   const text=row.status==='reopen'?`${row.name} ${row.starts_at}の席が空きました。${row.channel}の受付は、もう開けてよい状態です。`:row.reason==='table_conflict'?`${row.name}の同じ卓に予約が重なりました。予約管理で卓の付け替えを確認してください。`:
     `${row.name} ${row.starts_at}は${row.reason==='full'?'満席':'残り'+Math.max(0,row.remaining_seats)+'席'}です。${row.channel}の受付を閉じてください。`;
    const sent=await sendAutomaticBookingLine(env,{accountId:row.line_account_id,to:row.line_uid,text,retryKey:row.retry_key,featureId:'restaurant_test'});
    if(sent)await db.prepare("UPDATE rt_inventory_notification_outbox SET sent_at=datetime('now') WHERE id=? AND lease_token=?").bind(row.id,lease).run();
@@ -156,12 +167,12 @@ async function dispatchClosureNotices(env:Env['Bindings'],storeId:string) {
   const members=await restaurantResponsibleMembers(db,storeId,task.start_date);
   for(const member of members)await db.prepare('INSERT OR IGNORE INTO rt_closure_close_outbox(id,task_id,generation,membership_id,retry_key) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),task.id,task.generation,member.id,crypto.randomUUID()).run();
  }
- const rows=(await db.prepare(`SELECT o.id,o.retry_key,t.channel,t.kind,t.start_date,t.end_date,t.all_day,t.start_time,t.end_time,t.status,s.name,s.line_account_id,m.line_uid
+ const rows=(await db.prepare(`SELECT o.id,o.retry_key,t.channel,t.kind,t.start_date,t.end_date,t.all_day,t.start_time,t.end_time,t.status,o.membership_id,s.name,s.line_account_id,m.line_uid
  FROM rt_closure_close_outbox o JOIN rt_closure_close_tasks t ON t.id=o.task_id JOIN rt_stores s ON s.id=t.store_id JOIN rt_memberships m ON m.id=o.membership_id
  LEFT JOIN rt_inventory_rules r ON r.store_id=t.store_id WHERE t.store_id=? AND o.generation=t.generation AND t.status IN ('close','reopen') AND o.sent_at IS NULL
- AND m.status='active' AND COALESCE(r.notify,1)=1 AND (o.lease_until IS NULL OR datetime(o.lease_until)<=datetime('now')) LIMIT 100`).bind(storeId)
- .all<{id:string;retry_key:string;channel:string;kind:string;start_date:string;end_date:string;all_day:number;start_time:string|null;end_time:string|null;status:string;name:string;line_account_id:string|null;line_uid:string|null}>()).results;
- for(const r of rows){if(!r.line_account_id||!r.line_uid)continue;const token=crypto.randomUUID();
+ AND m.status='active' AND COALESCE(r.notify,1)=1 AND (t.status<>'reopen' OR COALESCE((SELECT notify_reopen FROM rt_close_notification_settings n WHERE n.store_id=t.store_id),1)=1) AND (o.lease_until IS NULL OR datetime(o.lease_until)<=datetime('now')) LIMIT 100`).bind(storeId)
+ .all<{id:string;retry_key:string;channel:string;kind:string;start_date:string;end_date:string;all_day:number;start_time:string|null;end_time:string|null;status:string;membership_id:string;name:string;line_account_id:string|null;line_uid:string|null}>()).results;
+ for(const r of rows){if(!r.line_account_id||!r.line_uid||!(await restaurantResponsibleMembers(db,storeId,r.start_date)).some(m=>m.id===r.membership_id))continue;const token=crypto.randomUUID();
   const lease=await db.prepare(`UPDATE rt_closure_close_outbox SET lease_until=datetime('now','+5 minutes'),lease_token=? WHERE id=? AND sent_at IS NULL AND (lease_until IS NULL OR datetime(lease_until)<=datetime('now'))`).bind(token,r.id).run();
   if(!lease.meta.changes)continue;
   const kind=({temporary_closed:'臨時休業',private_event:'貸切',maintenance:'設備点検',other:'その他'} as Record<string,string>)[r.kind];

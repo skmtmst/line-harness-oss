@@ -4015,5 +4015,28 @@
       "by": "lineAccount",
       "column": "line_account_id"
     }
+  },
+  "rt_close_notification_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "visit_stamp_pin_attempts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "visit_stamp_paper_photos": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
   }
 }

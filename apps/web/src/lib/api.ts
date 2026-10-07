@@ -2943,7 +2943,7 @@ export async function refreshCachedList<T>(path: string): Promise<T> {
   return body
 }
 
-async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
+export async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
     credentials: 'include',

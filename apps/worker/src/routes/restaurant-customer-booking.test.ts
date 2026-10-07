@@ -314,3 +314,76 @@ it('停止したアカウントは本人確認と予約へ進めない', async (
   expect((await hold()).status).toBe(404);
   expect(fetch).not.toHaveBeenCalled();
 });
+
+it('電話と200文字の要望を仮押さえ・確定・履歴・台帳用の予約に残す',async()=>{
+  const details={note:'🍽'.repeat(200),customerPhone:'090-1234-5678'};
+  const input={storeId:'store',startsAt:start,guestCount:2,requestId:'request_details',...details};
+  const h=await request('/api/liff/restaurant/holds',input);
+  expect(h.status).toBe(201);
+  const {data}=await read(h);
+  expect(data).toMatchObject({...details,seatType:'table'});
+  expect((await request('/api/liff/restaurant/holds',input)).status).toBe(200);
+  expect((await request('/api/liff/restaurant/holds',{...input,note:'違う'})).status).toBe(409);
+  const confirmed=await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1,note:'窓際を希望',customerPhone:'03-1234-5678'});
+  expect(confirmed.status).toBe(200);
+  expect((await read(confirmed)).data).toMatchObject({status:'confirmed',note:'窓際を希望',customerPhone:'03-1234-5678',seatType:'table'});
+  expect(db.raw.prepare('SELECT note,customer_phone FROM rt_reservations WHERE id=?').get(data.id)).toEqual({note:'窓際を希望',customer_phone:'03-1234-5678'});
+  const history=await (await request('/api/liff/restaurant/reservations?storeId=store')).json() as any;
+  expect(history.data[0]).toMatchObject({note:'窓際を希望',customerPhone:'03-1234-5678',seatType:'table'});
+  expect((await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1,note:'再送で違う内容'})).status).toBe(409);
+});
+it('任意欄の省略で維持し、空欄で消す。201文字・型違い・不正電話は保存しない',async()=>{
+  for (const details of [{note:'あ'.repeat(201)},{note:123},{customerPhone:{}},{customerPhone:'x'.repeat(51)},{customerPhone:'abc'}]) {
+    expect((await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'request_bad',...details})).status).toBe(400);
+  }
+  const {data}=await read(await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'request_optional',note:'希望',customerPhone:'090-1234-5678'}));
+  expect((await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1,note:'あ'.repeat(201)})).status).toBe(400);
+  expect((await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1,customerPhone:4})).status).toBe(400);
+  expect((await read(await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1}))).data).toMatchObject({note:'希望',customerPhone:'090-1234-5678'});
+  await request(`/api/liff/restaurant/reservations/${data.id}/cancel`,{expectedVersion:2});
+  const {data:other}=await read(await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'request_empty',note:'希望',customerPhone:'090-1234-5678'}));
+  expect((await read(await request(`/api/liff/restaurant/reservations/${other.id}/confirm`,{expectedVersion:1,note:' ',customerPhone:null}))).data).toMatchObject({note:null,customerPhone:null});
+});
+it('空きは卓の種類と設定した店だけの遅刻案内を返す',async()=>{
+  db.raw.exec("UPDATE rt_tables SET seat_type='counter' WHERE id='table2'");
+  const path='/api/liff/restaurant/availability?storeId=store&date=2027-10-01&guestCount=2';
+  let data=(await (await request(path)).json() as any).data;
+  expect(data.slots[0].seatTypes.sort()).toEqual(['counter','table']);
+  expect(data).not.toHaveProperty('lateArrivalPolicy');
+  expect(data).not.toHaveProperty('unavailableReason');
+  db.raw.exec("UPDATE rt_opening_hours_settings SET late_cancel_after_minutes=15,late_arrival_message='15分で取り消す場合があります'");
+  data=(await (await request(path)).json() as any).data;
+  expect(data.lateArrivalPolicy).toEqual({cancelAfterMinutes:15,message:'15分で取り消す場合があります'});
+  db.raw.exec("UPDATE rt_tables SET is_active=0 WHERE id='table1'");
+  const {data:h}=await read(await hold());
+  expect((await read(await request(`/api/liff/restaurant/reservations/${h.id}/confirm`,{expectedVersion:1}))).data.seatType).toBe('counter');
+});
+it.each(['temporary_closed','private_event'])('全卓の%sを空きなしの理由として返し、部分閉鎖は店全体の休業にしない',async(kind)=>{
+  db.raw.prepare("INSERT INTO rt_closures(id,store_id,start_date,end_date,all_day,kind,table_ids_json,periods_json,memo) VALUES('closure','store','2027-10-01','2027-10-01',1,?,'[]',?,'内部メモ')").run(kind,JSON.stringify([{startsAt:'2027-09-30T15:00:00Z',endsAt:'2027-10-01T15:00:00Z'}]));
+  const path='/api/liff/restaurant/availability?storeId=store&date=2027-10-01&guestCount=2';
+  let body=await (await request(path)).json() as any;
+  expect(body.data.unavailableReason).toBe(kind);
+  expect(body.data.slots.every((s:any)=>!s.available&&s.unavailableReason===kind&&s.seatTypes.length===0)).toBe(true);
+  expect(JSON.stringify(body)).not.toContain('内部メモ');
+  db.raw.exec(`UPDATE rt_closures SET table_ids_json='["table1"]',version=version+1`);
+  body=await (await request(path)).json() as any;
+  expect(body.data).not.toHaveProperty('unavailableReason');
+  expect(body.data.slots[0]).toMatchObject({available:true,remainingTables:1});
+});
+it('定休と満席を区別し、定休の日でも臨時休業の指定を優先する',async()=>{
+  const path='/api/liff/restaurant/availability?storeId=store&date=2027-10-01&guestCount=2';
+  db.raw.exec('UPDATE rt_tables SET is_active=0');
+  expect((await (await request(path)).json() as any).data.unavailableReason).toBe('full');
+  db.raw.exec('UPDATE rt_tables SET is_active=1');
+  db.raw.prepare('UPDATE rt_opening_hours_settings SET hours_json=?').run(JSON.stringify(Array.from({length:7},(_,weekday)=>({weekday,periods:[]}))));
+  expect((await (await request(path)).json() as any).data).toMatchObject({slots:[],unavailableReason:'regular_closed'});
+  db.raw.prepare("INSERT INTO rt_closures(id,store_id,start_date,end_date,all_day,kind,table_ids_json,periods_json) VALUES('closure','store','2027-10-01','2027-10-01',1,'temporary_closed','[]',?)").run(JSON.stringify([{startsAt:'2027-09-30T15:00:00Z',endsAt:'2027-10-01T15:00:00Z'}]));
+  expect((await (await request(path)).json() as any).data.unavailableReason).toBe('temporary_closed');
+});
+it('営業時間があって受付終了した日は、定休と表示しない',async()=>{
+  const now=vi.spyOn(Date,'now').mockReturnValue(Date.parse('2027-10-01T06:00:00Z'));
+  try {
+    const body=await (await request('/api/liff/restaurant/availability?storeId=store&date=2027-10-01&guestCount=2')).json() as any;
+    expect(body.data).toMatchObject({slots:[],unavailableReason:'full'});
+  } finally {now.mockRestore();}
+});
