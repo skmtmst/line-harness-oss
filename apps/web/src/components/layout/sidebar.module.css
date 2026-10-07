@@ -440,3 +440,38 @@
 [data-theme="v8"] .section + .sectionHeading,
 [data-theme="v8"] .sectionHeading + .sectionHeading { margin-top: 1px; }
 [data-theme="v8"] .navigationSpacer { flex: 1; width: 100%; }
+
+/*
+ * ★V8 触り心地 5 回目：組の開閉で高さを滑らかに変える。項目は包みの中に残し、
+ * 畳んだら高さ 0（行の数 0fr）。見出しと包みの間の 1 段分も畳んだときは打ち消す。
+ * 開くときは最初から見え、閉じるときは縮み終わってから隠れる。
+ * 動きを減らす設定では一瞬で開閉する。
+ */
+[data-theme="v8"] .sectionItems {
+  display: grid;
+  grid-template-rows: 1fr;
+  gap: inherit;
+}
+
+[data-theme="v8"] .sectionItemsInner {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: inherit;
+  overflow: clip;
+}
+
+[data-theme="v8"] .sectionItemsClosed {
+  grid-template-rows: 0fr;
+  margin-top: calc(var(--tpl-ux5-nav-group-gap) * -1);
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] .sectionItems {
+    transition:
+      grid-template-rows var(--motion-base) var(--motion-ease-out),
+      margin-top var(--motion-base) var(--motion-ease-out),
+      visibility var(--motion-base) allow-discrete;
+  }
+}

@@ -1,0 +1,540 @@
+/*
+ * ★V8 休業日・貸切（提案 E-10 UVnvR）と足す窓（nVvXy）。
+ * 寸法は Pencil の書き出し（design/v8/html/UVnvR.html・nVvXy.html）から読み、globals.css の --tpl-e10-*・--tpl-e1-* だけを使う。
+ */
+
+.state {
+  padding: var(--tpl-e10-cal-pad);
+}
+
+/* 上の知らせ（他の予約サイトの枠を閉じる）：段の上下 16 */
+.bandRow {
+  padding: var(--tpl-e10-band-row-pad);
+}
+
+.band {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-l);
+  padding: var(--tpl-e1-band-pad);
+  border-radius: var(--tpl-e1-radius-l);
+  background: var(--color-status-warn-soft);
+}
+
+.bandIcon {
+  flex: 0 0 auto;
+  color: var(--color-ink-secondary);
+}
+
+.bandText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-xxs);
+  min-width: 0;
+}
+
+.bandTitle,
+.bandDetail {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bandTitle {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--tpl-e1-lh-21);
+}
+
+.bandDetail {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+}
+
+/* 本文：左のカレンダー｜右の列（線で区切る） */
+.body {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.calendar {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-l);
+  min-width: 0;
+  padding: var(--tpl-e10-cal-pad);
+}
+
+.monthHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-s);
+  min-width: 0;
+}
+
+.monthStep {
+  width: var(--tpl-e10-step);
+  height: var(--tpl-e10-step);
+}
+
+.monthTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 600;
+  line-height: var(--tpl-e1-lh-24);
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-l);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e10-gap-6);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-lh-18);
+  white-space: nowrap;
+}
+
+.swatch {
+  width: var(--tpl-e10-swatch);
+  height: var(--tpl-e10-swatch);
+  border-radius: var(--tpl-e10-swatch-radius);
+  box-shadow: var(--tpl-e10-ring);
+}
+
+.swatchClosed {
+  background: var(--color-status-danger-soft);
+}
+
+.swatchPrivate {
+  background: var(--color-status-warn-soft);
+}
+
+.swatchHoliday {
+  background: var(--color-track);
+}
+
+/* 月の升：外枠は角丸 12・線は区切りだけ */
+.grid {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--tpl-e1-radius-l);
+  box-shadow: var(--tpl-e10-ring);
+}
+
+.weekHead {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  background: var(--color-table-head);
+}
+
+.weekDay {
+  padding: var(--tpl-e10-cell-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-e1-lh-18);
+}
+
+.week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  box-shadow: var(--tpl-e10-line-top);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-e1-gap-xs);
+  min-width: 0;
+  height: var(--tpl-e10-cell-h);
+  overflow: hidden;
+  padding: var(--tpl-e10-cell-pad);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+.cell + .cell {
+  box-shadow: var(--tpl-e10-line-left);
+}
+
+.cellButton {
+  cursor: pointer;
+}
+
+.cellButton:hover {
+  background: var(--color-track);
+}
+
+.cellButton:focus-visible {
+  outline: none;
+  box-shadow: var(--tpl-e10-focus);
+}
+
+.cellClosed,
+.cellClosed.cellButton:hover {
+  background: var(--color-status-danger-soft);
+}
+
+.cellPrivate,
+.cellPrivate.cellButton:hover {
+  background: var(--color-status-warn-soft);
+}
+
+.date {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-e1-lh-18);
+}
+
+.dateToday {
+  color: var(--color-accent-deep);
+  font-weight: 700;
+}
+
+.dateFaint {
+  color: var(--color-ink-faint);
+}
+
+.mark {
+  padding: var(--tpl-e1-route-pad);
+  border-radius: var(--tpl-e1-radius-chip);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-e10-lh-17);
+  white-space: nowrap;
+}
+
+.markClosed {
+  color: var(--color-status-danger);
+}
+
+.markHoliday {
+  background: var(--color-track);
+}
+
+.cellNote {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-e10-lh-17);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-lh-18);
+}
+
+/* 右の列 */
+.side {
+  display: flex;
+  flex: 0 0 var(--tpl-e10-side-w);
+  flex-direction: column;
+  gap: var(--tpl-e1-side-gap);
+  min-width: 0;
+  padding: var(--tpl-e10-side-pad);
+  border-left: 1px solid var(--color-hairline);
+}
+
+.sideHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e10-gap-6);
+}
+
+.sideTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-e10-side-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-e10-lh-23);
+  white-space: nowrap;
+}
+
+.sideText,
+.sideEmpty {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+}
+
+.sideButton {
+  width: 100%;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-side-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-xs);
+  min-width: 0;
+  padding: var(--tpl-e10-card-pad);
+  border-radius: var(--tpl-e1-radius-l);
+  box-shadow: var(--tpl-e10-ring);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-s);
+  min-width: 0;
+}
+
+.cardDay {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--tpl-e1-lh-21);
+  white-space: nowrap;
+}
+
+.chip {
+  padding: var(--tpl-e1-route-pad);
+  border-radius: var(--tpl-e1-radius-chip);
+  color: var(--color-ink);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-e10-lh-17);
+  white-space: nowrap;
+}
+
+.chipClosed {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
+
+.chipPrivate {
+  background: var(--color-status-warn-soft);
+}
+
+.cardText {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardStatus {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-lh-18);
+}
+
+.cardStatusWarn {
+  color: var(--color-status-danger);
+}
+
+/* 足す窓（nVvXy）：段の間 16・欄の題と中身 6 */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e10-form-gap);
+}
+
+.field {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-e1-field-gap);
+  min-width: 0;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e10-gap-6);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-e1-lh-20);
+}
+
+.optional {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 400;
+  line-height: var(--tpl-e10-lh-17);
+}
+
+.kinds {
+  align-self: flex-start;
+}
+
+.dates {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-e1-gap-l);
+}
+
+/* 日付の欄は共通部品が 40 の高さ（絵は 36）。題との間を詰めて段の高さを絵にそろえる */
+.dates .field {
+  gap: var(--tpl-e1-gap-xxs);
+}
+
+.wave {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-e10-choice-gap);
+}
+
+.times {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-s);
+}
+
+.tablePicks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-e1-gap-s) var(--tpl-e10-choice-gap);
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+}
+
+.overlap {
+  margin: 0;
+  color: var(--color-status-danger);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-e1-lh-20);
+}
+
+/* 重なる予約（琥珀の箱）：上 12・左右 14・段の間 8。1件は白い行 */
+.affected {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-s);
+  padding: var(--tpl-e10-card-pad);
+  border-radius: var(--tpl-e1-radius-l);
+  background: var(--color-status-warn-soft);
+}
+
+.affectedTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-s);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-e1-lh-20);
+}
+
+.affectedRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-m);
+  min-width: 0;
+  padding: var(--tpl-e10-row-pad);
+  border-radius: var(--tpl-e10-row-radius);
+  background: var(--color-canvas);
+}
+
+.affectedTime {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-e1-lh-20);
+  white-space: nowrap;
+}
+
+.affectedName {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route {
+  padding: var(--tpl-e1-route-pad);
+  border-radius: var(--tpl-e1-radius-s);
+  box-shadow: var(--tpl-e10-ring);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-e10-lh-17);
+  white-space: nowrap;
+}
+
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-s);
+}
+
+/* 狭い幅（1152 など・白い板が 1100 未満）では右の列をカレンダーの下へ回す。升が細くなって文字が切れすぎないように。 */
+@container v8-page (max-width: 1099px) {
+  .body {
+    flex-direction: column;
+  }
+
+  .calendar {
+    padding: var(--tpl-e10-cal-pad-narrow);
+  }
+
+  .side {
+    flex-basis: auto;
+    padding: var(--tpl-e10-side-pad-narrow);
+    border-top: 1px solid var(--color-hairline);
+    border-left: 0;
+  }
+}

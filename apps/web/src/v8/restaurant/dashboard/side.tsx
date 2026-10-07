@@ -3,8 +3,8 @@
 /*
  * 「今日のお店」の右の列（E-1 `右の列`）：予約サイト・グルメ媒体・Google の口コミ・Instagram の新着。
  *
- * 媒体のリンク（店舗ページ・管理画面）は保存の口が無い（Codex が作り中）ので、いまは名前の一覧だけ。
- * 口ができて storePageUrl・adminUrl が来たら、その行にリンクが出る。
+ * 媒体のリンク（店舗ページ・管理画面）は「予約サイト・グルメ媒体」の設定（/settings/booking-media）で保存した URL。
+ * 保存してある行だけにリンクが出る。見出しの右の「設定」から、その設定の画面へ。
  * Instagram はまだつなげないので「つなぐ」への案内だけ（SNS 連携の画面へ）。
  */
 import { CornerUpLeft } from 'lucide-react'
@@ -42,6 +42,8 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
         title="予約サイト・グルメ媒体"
         help="この店が予約を受け取っている媒体です。店舗ページ・管理画面のリンクは、媒体の設定で保存すると出ます。"
         helpLabel="予約サイト・グルメ媒体の説明"
+        href="/settings/booking-media"
+        linkLabel="設定へ"
       />
       {media === null ? (
         <p className={styles.sideText}>読み込んでいます。</p>

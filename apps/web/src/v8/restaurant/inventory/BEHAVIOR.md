@@ -4,7 +4,7 @@
 
 ## 入口・受け付ける URL
 - `app/restaurant-test/inventory/page.tsx`：`theme === 'v8'` のときだけ V8。v7 は `RestaurantConsole view="inventory"`。
-- `?tab=channels` で「予約経路の連携」を開く（新しく）。「自動で合わせるルール」タブは口（F-24）が無いので出さない。
+- `?tab=channels` で「予約経路の連携」、`?tab=closures` で「休業日・貸切」を開く。押したタブも URL に残す（`replaceState`）。「自動で合わせるルール」タブは口（F-24）が無いので出さない。
 
 ## 時間帯ごとの在庫（stock.tsx）
 - 読む：`inventoryDay(store, date)`（日付は店舗の時間帯の今日・右上の日付で変えられる）、`openingHours(store)`、`GET /api/restaurant-test/channels`（媒体を閉じる知らせの選び肢）。
@@ -35,3 +35,7 @@
 
 ## 店のタブ（提案 E-1）
 - 板の頭の下に店のタブ（ダッシュボード・予約（今日・今月・一覧）・座席・卓・予約枠・在庫）を出し、同じ店の中の画面を行き来できる（`../store-tabs`）。左メニューの項目は残す。
+
+## 休業日・貸切（提案 E-10 UVnvR・nVvXy）
+- 3つ目のタブ。中身と動きは `../closures/BEHAVIOR.md`。
+- このタブのときだけ、板の頭の説明が「店舗名 ・ 1つの時間帯の総数 N席（稼働中の卓 M）」、右上が［＋臨時休業・貸切を足す］（店舗が2つ以上なら店舗を選ぶ欄も）になり、検証環境の帯を出さない（絵どおり）。

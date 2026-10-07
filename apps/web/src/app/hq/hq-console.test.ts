@@ -79,7 +79,8 @@ describe('統括コンソール', () => {
   it('統括とアカウントのサイドバーを分け、採用フローを作らない', () => {
     expect(sidebar).toContain('HQ_MENU_SECTIONS')
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.label)).toEqual([
-      'アカウント', '友だち属性', 'テンプレート', 'リッチメニュー', '回答フォーム', 'バナー生成',
+      // 提案 E-9（2026-10-07 オーナー採用）：統括の一括配信を末尾に足した。
+      'アカウント', '友だち属性', 'テンプレート', 'リッチメニュー', '回答フォーム', 'バナー生成', '一括配信',
     ])
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.label === '採用フロー管理')).toBe(false)
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.href)).toEqual([
@@ -89,6 +90,7 @@ describe('統括コンソール', () => {
       '/hq/rich-menus',
       '/hq/form-submissions',
       '/hq/banners',
+      '/hq/broadcasts',
     ])
     // 「設定」は左下のアカウントメニュー（メンバー管理）へ移した。★V6 36-1。
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.href === '/hq/settings')).toBe(false)

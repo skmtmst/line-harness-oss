@@ -43,7 +43,9 @@
   flex-direction: column;
   gap: var(--tpl-e1-gap-s);
   padding: var(--tpl-e1-friend-pad);
-  border: var(--tpl-e1-line-2) solid var(--color-accent);
+  /* 絵の枠は内側に半分かかる線（場所を取らない） */
+  outline: var(--tpl-e1-friend-line) solid var(--color-accent);
+  outline-offset: calc(var(--tpl-e1-friend-line) / -2);
   border-radius: var(--tpl-e1-radius-l);
   background: var(--color-accent-soft);
 }
@@ -100,7 +102,7 @@
   color: var(--color-ink);
   font-size: var(--text-body);
   font-weight: 600;
-  line-height: var(--tpl-e1-lh-20);
+  line-height: var(--tpl-e1-lh-21);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -164,14 +166,13 @@
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
-  gap: var(--tpl-e1-gap-xs);
   min-width: 0;
 }
 
 .tableValue {
   color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: var(--tpl-e1-lh-20);
+  font-size: var(--text-body);
+  line-height: var(--tpl-e1-lh-21);
 }
 
 .notifyRow {
@@ -218,7 +219,7 @@
 
 .tableCards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, var(--tpl-e3-walkin-card-w));
   gap: var(--tpl-e1-gap-s);
 }
 

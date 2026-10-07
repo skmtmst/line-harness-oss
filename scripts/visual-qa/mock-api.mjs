@@ -1477,6 +1477,30 @@ const RESTAURANT_CLOSE_TASKS = [
   { id: 'cct-10', storeId: 'store-sby', slotId: 'slot-2000', startsAt: restaurantAt(20, 0), channel: 'tabelog', status: 'reopen', reason: 'limited', remainingSeats: 4, recipientIds: [], createdAt: restaurantAt(16, 10), updatedAt: restaurantAt(17, 20) },
   { id: 'cct-6', storeId: 'store-sby', slotId: 'slot-1800', startsAt: restaurantAt(18, 0), channel: 'hotpepper', status: 'done', reason: 'full', remainingSeats: 0, recipientIds: [], createdAt: restaurantAt(15, 0), updatedAt: restaurantAt(15, 10) },
 ]
+/*
+ * 提案 E-10（臨時休業・貸切 UVnvR・足す窓 nVvXy）：今月の 20日（臨時休業・終日全卓）・24日（貸切・18〜22時・個室A と T1）・月末（貸切・終日）。
+ * サーバ（/api/restaurant-test/closures）と同じ形。月は撮る日の今月にする（カレンダーに出るように）。
+ */
+const RESTAURANT_CLOSURE_MONTH = `${RESTAURANT_TODAY.getFullYear()}-${String(RESTAURANT_TODAY.getMonth() + 1).padStart(2, '0')}`
+const RESTAURANT_CLOSURE_LAST = String(new Date(RESTAURANT_TODAY.getFullYear(), RESTAURANT_TODAY.getMonth() + 1, 0).getDate())
+const restaurantClosure = (id, day, over) => ({
+  id, storeId: 'store-sby', startDate: `${RESTAURANT_CLOSURE_MONTH}-${day}`, endDate: `${RESTAURANT_CLOSURE_MONTH}-${day}`, allDay: true, startTime: null, endTime: null,
+  kind: 'temporary_closed', memo: null, tableIds: [], createdBy: 'mem-2', createdByName: '中川 由美', createdAt: restaurantAt(10, 0, -3), updatedAt: restaurantAt(10, 0, -3), version: 1, ...over,
+})
+const RESTAURANT_CLOSURES = [
+  restaurantClosure('cl-1', '20', { memo: '設備点検のため' }),
+  restaurantClosure('cl-2', '24', { kind: 'private_event', allDay: false, startTime: '18:00', endTime: '22:00', tableIds: ['tbl-8', 'tbl-1'], memo: '会社の宴会（30名）' }),
+  restaurantClosure('cl-3', RESTAURANT_CLOSURE_LAST, { kind: 'private_event', memo: 'ハロウィン貸切' }),
+]
+/* 臨時休業・貸切の窓の preview：この日の予約2件（LINE の友だち1件・ホットペッパー1件）。保存・送信はしない。 */
+const RESTAURANT_CLOSURE_PREVIEW = {
+  reservations: [
+    { id: 'cl-r1', startsAt: restaurantAt(12, 0, 13), endsAt: restaurantAt(14, 0, 13), guestCount: 2, customerName: '山田 花子', source: 'line', tableId: 'tbl-1', friendId: 'friend-1', isLineFriend: true },
+    { id: 'cl-r2', startsAt: restaurantAt(19, 0, 13), endsAt: restaurantAt(21, 0, 13), guestCount: 4, customerName: '佐藤 美咲', source: 'hotpepper', tableId: 'tbl-4', friendId: null, isLineFriend: false },
+  ],
+  waitlistCount: 0,
+  conflicts: [],
+}
 /* 板 hQQlt（予約経路の連携）：媒体ごとの受け取り。サーバ（/api/restaurant-test/channels）と同じ形。 */
 const RESTAURANT_CHANNELS = [
   { id: 'media-hp', code: 'hotpepper', name: 'Hot Pepper グルメ', todayCount: 9, lastReceivedAt: restaurantAt(18, 42), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
@@ -2050,6 +2074,27 @@ const UID_MIGRATION_DONE = {
 }
 
 function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
+  /* 提案 E-4・E-9：媒体リンクの保存・グルメ媒体・予約ページの URL、統括の一括配信の作る・確かめる・外す・送る・止める・やり直す。 */
+  if (method === 'POST' && pathname === '/api/restaurant-test/media') return { code: 'gourmet_new', name: 'グルメ媒体', acceptsReservations: false }
+  if (method === 'PUT' && pathname.startsWith('/api/restaurant-test/media-links/')) {
+    const row = RESTAURANT_MEDIA_LINKS.find((m) => m.code === pathname.split('/').pop()) ?? RESTAURANT_MEDIA_LINKS[0]
+    return { ...row, storeId: 'store-sby', closeOnBooking: !!row.closeOnBooking, version: row.version + 1 }
+  }
+  if (method === 'POST' && pathname === '/api/restaurant-test/reservation-link') return RESTAURANT_RESERVATION_LINK
+  if (method === 'POST' && pathname === '/api/hq/broadcasts') return { ...HQ_RUN_DRAFT, id: 'hq-run-new', version: 1 }
+  if (method === 'POST' && /^\/api\/hq\/broadcasts\/[^/]+\/preflight$/.test(pathname)) return HQ_PREFLIGHT.map((c) => ({ ...c, excluded: false }))
+  if (method === 'PUT' && /^\/api\/hq\/broadcasts\/[^/]+\/exclusions$/.test(pathname)) return { ...HQ_RUN_DRAFT, id: pathname.split('/')[4], version: 3 }
+  if (method === 'POST' && /^\/api\/hq\/broadcasts\/[^/]+\/(send|stop|cancel)$/.test(pathname)) return { ...HQ_RUN_SENT, id: pathname.split('/')[4] }
+  if (method === 'POST' && /^\/api\/hq\/broadcasts\/[^/]+\/targets\/[^/]+\/retry$/.test(pathname)) return HQ_RUN_SENT
+  /* 来店スタンプ（w4SBbv）：保存・押印・承認・取り消し・暗証番号は、本物と同じ形の返事だけ返す（中身は変えない）。 */
+  if (pathname.startsWith('/api/visit-stamps/')) {
+    if (/^\/api\/visit-stamps\/cards(\/[^/]+)?$/.test(pathname)) return { ...VISIT_STAMP_CARD, version: VISIT_STAMP_CARD.version + 1 }
+    if (/\/grants$/.test(pathname) || /\/reverse$/.test(pathname)) return { cardId: 'vs-card-1', friendId: 'vs-f-5', balance: 1, earnedTotal: 12, expiresAt: null }
+    const review = /^\/api\/visit-stamps\/paper-requests\/([^/]+)\/review$/.exec(pathname)
+    if (review) return { id: review[1], status: 'approved' }
+    const pin = /^\/api\/visit-stamps\/pins\/([^/]+)$/.exec(pathname)
+    if (pin) return { staffId: pin[1], accountId: 'visual-qa-account', configured: true }
+  }
   /* 自動応答のかんたんに作る（板 G4GejG）：作った下書き。重なりは ar-quick の口が返す。 */
   if (method === 'POST' && pathname === '/api/auto-replies/drafts') {
     return { autoReplyId: 'ar-quick', versionId: 'arv-quick', versionNumber: 1, status: 'draft', settings: null, lastTestStatus: null, lastTestedAt: null, publishedAt: null }
@@ -2515,7 +2560,98 @@ function nenMetricsBody(data, query) {
   return { ...data, range: nenRangeFor(query) }
 }
 
+/* 提案 E-4 予約サイト・グルメ媒体（aSmph）：店ごとの媒体リンク。口（restaurant-test/media-links）と同じ形。 */
+const RESTAURANT_MEDIA_LINKS = [
+  { code: 'hotpepper', name: 'ホットペッパー', acceptsReservations: 1, pageUrl: 'https://hotpepper.jp/strJ001234567/', loginUrl: 'https://manager.hotpepper.jp/', closeOnBooking: 1, version: 3 },
+  { code: 'tabelog', name: '食べログ', acceptsReservations: 1, pageUrl: 'https://tabelog.com/tokyo/A1301/A130101/13250000/', loginUrl: 'https://owner.tabelog.com/', closeOnBooking: 1, version: 2 },
+  { code: 'gurunavi', name: 'ぐるなび', acceptsReservations: 1, pageUrl: 'https://r.gnavi.co.jp/abc1234/', loginUrl: 'https://pro.gnavi.co.jp/', closeOnBooking: 1, version: 1 },
+  { code: 'retty', name: 'Retty', acceptsReservations: 0, pageUrl: 'https://retty.me/area/PRE13/ARE1/SUB101/100001234567/', loginUrl: null, closeOnBooking: 0, version: 1 },
+  { code: 'ikyu', name: '一休', acceptsReservations: 1, pageUrl: 'https://restaurant.ikyu.com/123456/', loginUrl: 'https://admin.restaurant.ikyu.com/', closeOnBooking: 0, version: 1 },
+  { code: 'google', name: 'Google', acceptsReservations: 1, pageUrl: 'https://g.page/nen-ginza', loginUrl: 'https://business.google.com/', closeOnBooking: 0, version: 1 },
+]
+const RESTAURANT_RESERVATION_LINK = {
+  url: 'https://liff.line.me/2001234567-AbCdEf/booking',
+  html: '<a href="https://liff.line.me/2001234567-AbCdEf/booking" target="_blank" rel="noopener noreferrer">LINE で予約する</a>',
+  available: false,
+}
+/* 提案 E-9 統括の一括配信（p17Qku・xOXuY）：口（/api/hq/broadcasts）と同じ形。店の名前・数は絵のとおり。 */
+const hqCheck = (accountId, accountName, audienceCount, remaining, blockedReasons = [], extra = {}) => ({
+  accountId, accountName, audienceCount, remaining, connected: !blockedReasons.some((r) => r.includes('LINE')), paused: blockedReasons.some((r) => r.includes('停止')),
+  blockedReasons, excluded: blockedReasons.length > 0, broadcastId: null, ...extra,
+})
+const HQ_PREFLIGHT = [
+  hqCheck('hq-ginza', '銀座店', 6120, 18400),
+  hqCheck('hq-shinjuku', '新宿店', 5880, 2100, ['今月の送信枠が足りません']),
+  hqCheck('hq-yokohama', '横浜店', 4300, 9000, ['LINEに接続されていません']),
+  hqCheck('hq-umeda', '梅田店', 3950, 12000, ['店舗または配信が停止中']),
+  ...[['hq-ikebukuro', '池袋店', 4050], ['hq-nagoya', '名古屋店', 460], ['hq-shibuya', '渋谷店', 3900], ['hq-ueno', '上野店', 3600], ['hq-kyoto', '京都店', 3500], ['hq-kobe', '神戸店', 3450], ['hq-sendai', '仙台店', 3500], ['hq-hakata', '博多店', 5500]]
+    .map(([id, name, count]) => hqCheck(id, name, count, 20000)),
+]
+const hqTarget = (check, status, totalCount, successCount, extra = {}) => ({ ...check, status, totalCount, successCount, version: 2, retryableCount: 0, stopped: false, ...extra })
+const HQ_RUN_DRAFT = { id: 'hq-run-draft', title: '1月の限定メニュー「寒ぶりのしゃぶしゃぶ」を始めました', status: 'prepared', version: 2, scheduledAt: '2027-01-15T02:00:00.000Z', targets: HQ_PREFLIGHT.map((c) => hqTarget(c, c.excluded ? 'excluded' : 'prepared', 0, 0)) }
+const HQ_RUN_SENT = {
+  id: 'hq-run-sent', title: '1月の限定メニュー「寒ぶりのしゃぶしゃぶ」を始めました', status: 'scheduled', version: 4, scheduledAt: '2026-01-15T02:00:00.000Z',
+  targets: [
+    hqTarget(hqCheck('hq-ginza', '銀座店', 6120, 18400), 'sent', 6120, 6118, { broadcastId: 'b-ginza' }),
+    hqTarget(hqCheck('hq-ikebukuro', '池袋店', 4050, 20000), 'sent', 4050, 4050, { broadcastId: 'b-ikebukuro' }),
+    hqTarget(hqCheck('hq-nagoya', '名古屋店', 460, 20000), 'failed', 460, 0, { broadcastId: 'b-nagoya', retryableCount: 460 }),
+    hqTarget(hqCheck('hq-shinjuku', '新宿店', 5880, 2100, ['今月の送信枠が足りません']), 'excluded', 0, 0),
+    hqTarget(hqCheck('hq-others', 'ほか 6店', 23450, 120000), 'sent', 23450, 23450, { broadcastId: 'b-others' }),
+  ],
+}
+
+/* 来店スタンプ（提案 E-7 w4SBbv）。カード1枚・紙の申請4件・佐藤 健二さん（vs-f-5）の台帳。日時は UTC（画面は日本時間で出す）。 */
+const VISIT_STAMP_CARD = {
+  id: 'vs-card-1', name: '然 来店スタンプカード', accountIds: ['visual-qa-account'], active: true, version: 3, expectedVersion: 3,
+  settings: {
+    mode: 'amount', amountUnit: 1000, maxPerVisit: 3, firstVisitBonus: 1, expiryMonths: 6, timezone: 'Asia/Tokyo',
+    multipliers: [{ multiplier: 2, weekdays: [2], startMinute: 1020, endMinute: 1140, from: '2025-12-31T15:00:00.000Z', to: '2026-03-31T15:00:00.000Z' }],
+    rankMultipliers: [],
+    rewards: [{ id: 'reward-drink', name: 'ドリンク 1杯', stamps: 5 }, { id: 'reward-dessert', name: 'デザート 1品', stamps: 10 }],
+  },
+}
+const VISIT_STAMP_FRIENDS = {
+  'vs-f-1': { id: 'vs-f-1', displayName: 'みさき', metadata: { name: '鈴木 美咲' } },
+  'vs-f-2': { id: 'vs-f-2', displayName: 'けん', metadata: { name: '小林 健' } },
+  'vs-f-3': { id: 'vs-f-3', displayName: 'めぐ', metadata: { name: '加藤 恵' } },
+  'vs-f-4': { id: 'vs-f-4', displayName: 'つばさ', metadata: { name: '中村 翼' } },
+  'vs-f-5': { id: 'vs-f-5', displayName: 'けんじ', metadata: { name: '佐藤 健二' } },
+}
+const VISIT_STAMP_PAPER = [
+  { id: 'vsp-1', card_id: 'vs-card-1', friend_id: 'vs-f-1', line_account_id: 'visual-qa-account', photo_url: '', stamps: 7, status: 'pending', created_at: '2026-01-12 11:14:00' },
+  { id: 'vsp-2', card_id: 'vs-card-1', friend_id: 'vs-f-2', line_account_id: 'visual-qa-account', photo_url: '', stamps: 4, status: 'pending', created_at: '2026-01-12 04:02:00' },
+  { id: 'vsp-3', card_id: 'vs-card-1', friend_id: 'vs-f-3', line_account_id: 'visual-qa-account', photo_url: '', stamps: 9, status: 'pending', created_at: '2026-01-11 10:45:00' },
+  { id: 'vsp-4', card_id: 'vs-card-1', friend_id: 'vs-f-4', line_account_id: 'visual-qa-account', photo_url: '', stamps: 3, status: 'approved', created_at: '2026-01-10 09:20:00' },
+]
+const vsEntry = (id, kind, delta, actorId, reason, createdAt, originalId = null) => ({ id, cardId: 'vs-card-1', friendId: 'vs-f-5', accountId: 'visual-qa-account', kind, delta, actorId, reason, createdAt, originalId })
+const VISIT_STAMP_ENTRIES = [
+  vsEntry('vse-1', 'visit', 2, 'stf-3', '来店・会計 2,400円', '2026-01-13T09:40:00.000Z'),
+  vsEntry('vse-2', 'redeem', -10, 'stf-3', 'デザート 1品', '2026-01-13T09:10:00.000Z'),
+  vsEntry('vse-3', 'paper', 7, 'stf-1', '紙のカードの写真を確認しました', '2026-01-12T11:30:00.000Z'),
+  vsEntry('vse-4', 'visit', 1, null, '来店（予約の来店）', '2026-01-12T03:05:00.000Z'),
+  vsEntry('vse-5', 'manual', 1, 'stf-1', '押し忘れ', '2026-01-11T10:02:00.000Z'),
+  vsEntry('vse-6', 'reverse', -1, 'stf-1', 'まちがい', '2026-01-11T10:30:00.000Z', 'vse-5'),
+  vsEntry('vse-7', 'visit', 1, null, '来店', '2026-01-08T10:00:00.000Z'),
+]
+function visitStampRead(pathname, query) {
+  if (pathname === '/api/visit-stamps/cards') return { success: true, data: [VISIT_STAMP_CARD] }
+  if (pathname === '/api/visit-stamps/paper-requests') return { success: true, data: VISIT_STAMP_PAPER }
+  if (/^\/api\/visit-stamps\/cards\/[^/]+\/wallet$/.test(pathname)) {
+    const friendId = query.get('friendId') ?? ''
+    const entries = friendId === 'vs-f-5' ? VISIT_STAMP_ENTRIES : []
+    return { success: true, data: { wallet: { cardId: 'vs-card-1', friendId, balance: entries.reduce((n, e) => n + e.delta, 0), earnedTotal: 12, expiresAt: '2026-07-13T09:40:00.000Z' }, entries } }
+  }
+  const friend = /^\/api\/friends\/(vs-f-\d)$/.exec(pathname)
+  if (friend && VISIT_STAMP_FRIENDS[friend[1]]) return { success: true, data: VISIT_STAMP_FRIENDS[friend[1]] }
+  return null
+}
+
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  { const stamps = method === 'GET' ? visitStampRead(pathname, query) : null; if (stamps) return stamps }
+  if (method === 'GET' && pathname === '/api/restaurant-test/media-links') return { success: true, data: RESTAURANT_MEDIA_LINKS }
+  if (method === 'GET' && pathname === '/api/restaurant-test/media') return { success: true, data: RESTAURANT_MEDIA_LINKS.map(({ code, name, acceptsReservations }) => ({ code, name, acceptsReservations })) }
+  if (method === 'GET' && pathname === '/api/hq/broadcasts') return { success: true, data: [HQ_RUN_SENT, HQ_RUN_DRAFT] }
+  if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+$/.test(pathname)) return { success: true, data: pathname.endsWith('/hq-run-sent') ? HQ_RUN_SENT : HQ_RUN_DRAFT }
   /*
     友だちのマイル詳細（V8 R6kIG・手で増やす・減らす M8zhjL）は1人に絞って読む。
     絞ったときだけ絵の数（残高 1,240・確定待ち 120・期限が近い 200）と5行の明細を返す。
@@ -2612,7 +2748,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const storeId = query.get('storeId') || 'store-sby'
     const date = query.get('date') || ''
     const sameDay = (iso) => { const d = new Date(iso); const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${dd}` === date }
-    return { success: true, data: { date, reservations: RESTAURANT_RESERVATIONS.filter((r) => r.store_id === storeId && sameDay(r.starts_at)) } }
+    return { success: true, data: { date, reservations: RESTAURANT_RESERVATIONS.filter((r) => r.store_id === storeId && sameDay(r.starts_at)), closures: RESTAURANT_CLOSURES.filter((c) => c.storeId === storeId && c.startDate <= date && c.endDate >= date) } }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/customers/search') {
     return { success: true, data: [{ name: '山田 花子', phone: '090-1111-2222', lineUid: 'U-demo-3' }] }
@@ -2621,7 +2757,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: { visitCount: 3, visits: [{ id: 'v-1', starts_at: '2026-08-14T10:00:00.000Z', guest_count: 4, table_label: '個室A', course_name: '秋の鹿肉コース', allergy_note: 'えび' }] } }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/inventory/day') {
-    return { success: true, data: RESTAURANT_INVENTORY_DAY }
+    const date = query.get('date') || ''
+    return { success: true, data: RESTAURANT_INVENTORY_DAY, closures: RESTAURANT_CLOSURES.filter((c) => c.startDate <= date && c.endDate >= date) }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/closures') {
+    const month = query.get('month')
+    return { success: true, data: RESTAURANT_CLOSURES.filter((c) => !month || (c.startDate.slice(0, 7) <= month && c.endDate.slice(0, 7) >= month)) }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/opening-hours') {
     return { success: true, data: RESTAURANT_OPENING_HOURS }
@@ -6838,6 +6979,11 @@ const server = createServer((req, res) => {
     // この1本だけ本物と同じPOSTの器で返す。実行・再試行・取り消しは405のまま。
     if (method === 'POST' && url.pathname === '/api/friends/bulk-runs/preview') {
       res.writeHead(200).end(JSON.stringify({ success: true, data: FRIEND_BULK_RUN.preview }))
+      return
+    }
+    /* 臨時休業・貸切の重なる予約（nVvXy）。preview は保存しないので本物と同じ器で返す。足す・変える・消すは405のまま。 */
+    if (method === 'POST' && url.pathname === '/api/restaurant-test/closures/preview') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: RESTAURANT_CLOSURE_PREVIEW }))
       return
     }
     res.writeHead(405).end(

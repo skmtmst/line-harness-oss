@@ -107,7 +107,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(194)  // 2026-10-07 に提案 E の枠を閉じる知らせ（/restaurant-test/close-tasks）と SNS 連携（/settings/sns）を追加。情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。2026-10-01 に ★V8 新部品の見本画面（visual-qa/v8-parts）を追加。2026-10-03 に /scenarios/new の転送画面を追加。2026-10-04 に予約からの売上（/booking/sales）を追加。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(199)  // 2026-10-07 に提案 E-7 の来店スタンプ（/visit-stamps）、提案 E-4 予約サイト・グルメ媒体（/settings/booking-media）と E-9 統括の一括配信（/hq/broadcasts・new・detail）を追加。同日に提案 E の枠を閉じる知らせ（/restaurant-test/close-tasks）と SNS 連携（/settings/sns）を追加。情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。2026-10-01 に ★V8 新部品の見本画面（visual-qa/v8-parts）を追加。2026-10-03 に /scenarios/new の転送画面を追加。2026-10-04 に予約からの売上（/booking/sales）を追加。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {

@@ -105,3 +105,12 @@
   justify-content: flex-end;
   gap: var(--tpl-e1-gap-s);
 }
+
+/* 行の「…」は絵では枠のある 36 角のボタン */
+.more > button {
+  width: var(--tpl-e1-more);
+  height: var(--tpl-e1-more);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}

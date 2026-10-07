@@ -941,7 +941,7 @@ export default function RemindersListV8() {
                     </Td>
                     <NameCell
                       name={<div className={styles.nameRow}>
-                        <FolderDotName folder={folderDotOf(row)} dot={!narrow}>
+                        <FolderDotName folder={folderDotOf(row)}>
                           <Link
                             href={detailHref(row.id)}
                             title={row.name}
@@ -971,7 +971,7 @@ export default function RemindersListV8() {
                           </button>
                         ) : null}
                       </div>}
-                      sub={<span className={narrow ? undefined : styles.dotIndent} title={view.subtitle}>
+                      sub={<span className={styles.dotIndent} title={view.subtitle}>
                         <CalendarClock size={11} aria-hidden="true" className={styles.cellSubIcon} />
                         {view.subtitle}
                       </span>}

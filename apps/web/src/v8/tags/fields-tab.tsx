@@ -39,6 +39,7 @@ import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { notifyToast } from '@/components/shared/toast'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from '@/components/friend-fields/field-list'
 import styles from './list.module.css'
@@ -160,6 +161,10 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
   const pages = Math.max(1, Math.ceil(visible.length / pageSize))
   const currentPage = Math.min(page, pages)
   const pageItems = visible.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（自動応答と同じ動き）。 */
+  const liveOrder = useLiveReorder(pageItems, (field) => field.id, dragId)
+  const bodyRef = useRef<HTMLTableSectionElement>(null)
+  useFlipRows(bodyRef, liveOrder.shown.map((field) => field.id).join(','))
   const activeField = items.find((item) => item.id === activeFieldId) ?? null
   const activeFieldIndex = pageItems.findIndex((item) => item.id === activeFieldId)
   useEffect(() => setPage(1), [query, type, folderFilter, pageSize])
@@ -380,14 +385,18 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
-        <tbody>
-          {pageItems.map((field) => {
+        <tbody ref={bodyRef}>
+          {liveOrder.shown.map((field) => {
             const usage = knownUsageCount(field)
             const key = `{{field.${field.fieldKey}}}`
             return (
               <Tr
                 interactive
                 key={field.id}
+                data-reorder-id={field.id}
+                onDragEnter={() => { if (!field.isInherited) liveOrder.enter(field.id) }}
+                onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                onDrop={dragId ? () => void move(liveOrder.dropTarget(field.id)) : undefined}
                 className={`${styles.row} ${styles.fieldRow}`}
                 leaving={leavingId === field.id}
                 tabIndex={0}
@@ -407,8 +416,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
                       draggable={!field.isInherited}
                       title={field.isInherited ? '共通項目は移行後に並び替えできます' : undefined}
                       onDragStart={() => setDragId(field.id)}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => void move(field.id)}
+                      onDragEnd={() => setDragId(null)}
                     >
                       <ReorderGrip
                         label={field.name}

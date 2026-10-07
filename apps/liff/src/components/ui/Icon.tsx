@@ -201,6 +201,25 @@ const PATHS = {
     <line key="b" x1="22" x2="16" y1="9" y2="15" />,
     <line key="c" x1="16" x2="22" y1="9" y2="15" />,
   ],
+  /** 来店スタンプ：へらす（増減の −） */
+  minus: [<path key="a" d="M5 12h14" />],
+  /** 来店スタンプ：特典（lucide gift と同じ線） */
+  gift: [
+    <rect key="r" x="3" y="8" width="18" height="4" rx="1" />,
+    <path key="a" d="M12 8v13" />,
+    <path key="b" d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" />,
+    <path key="c" d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" />,
+  ],
+  /** 来店スタンプ：店員の操作（lucide lock と同じ線） */
+  lock: [
+    <rect key="r" width="18" height="11" x="3" y="11" rx="2" ry="2" />,
+    <path key="a" d="M7 11V7a5 5 0 0 1 10 0v4" />,
+  ],
+  /** 来店スタンプ：紙のカードを撮る（lucide camera と同じ線） */
+  camera: [
+    <path key="a" d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />,
+    <circle key="c" cx="12" cy="13" r="3" />,
+  ],
 } as const;
 
 export type IconName = keyof typeof PATHS;

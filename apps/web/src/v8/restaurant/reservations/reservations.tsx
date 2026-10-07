@@ -12,7 +12,9 @@ import { Lock, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { restaurantTestApi, type ReservationQuery, type RestaurantReservation } from '@/lib/restaurant-test-api'
+import TextLink from '@/components/shared/text-link'
+import { restaurantTestApi, type ReservationQuery, type RestaurantClosure, type RestaurantReservation } from '@/lib/restaurant-test-api'
+import { KIND_LABEL, dayTitle, scopeText } from '../closures/format'
 import RestaurantShell, { type RestaurantV8Context } from '../booking-kit/shell'
 import { CancelReservationDialog, EditReservationDialog, InboundTrialDialog, type ReservationPatch } from './dialogs'
 import ListView, { PAGE_SIZE } from './list'
@@ -133,6 +135,8 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const tables = useMemo(() => data.tables.filter((t) => !store || t.store_id === store.id), [data.tables, store])
   const menuItems = useMemo(() => data.menuItems.filter((m) => !store || m.store_id === store.id), [data.menuItems, store])
   const [todayRows, setTodayRows] = useState<RestaurantReservation[] | null>(null)
+  /* その日（今日の見方は選んだ日・ほかの見方は今日）の臨時休業・貸切。日の読み出しの口に入っている。 */
+  const [dayClosures, setDayClosures] = useState<{ day: string; closures: RestaurantClosure[] } | null>(null)
   const [openId, setOpenId] = useState('')
   const [detailId, setDetailId] = useState('')
   const [cancelId, setCancelId] = useState('')
@@ -144,12 +148,27 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     setTodayRows(null)
     if (view !== 'today' || !storeId || !accountId) return
     const load = () => restaurantTestApi.reservationsDay(accountId, storeId, toYmd(day))
-      .then((res) => { if (current) setTodayRows(Array.isArray(res.data?.reservations) ? res.data.reservations : []) })
+      .then((res) => {
+        if (!current) return
+        setTodayRows(Array.isArray(res.data?.reservations) ? res.data.reservations : [])
+        setDayClosures({ day: toYmd(day), closures: Array.isArray(res.data?.closures) ? res.data.closures : [] })
+      })
       .catch(() => { if (current) setTodayRows([]) })
     void load()
     const timer = setInterval(() => { void load() }, 30_000)
     return () => { current = false; clearInterval(timer) }
   }, [view, storeId, accountId, day, data.reservations])
+
+  /* 今週・今月・一覧では、今日が休業・貸切かを見る（帯だけ。表はそのまま）。 */
+  useEffect(() => {
+    let current = true
+    if (view === 'today' || !storeId || !accountId) return
+    const today = toYmd(new Date())
+    void restaurantTestApi.reservationsDay(accountId, storeId, today)
+      .then((res) => { if (current) setDayClosures({ day: today, closures: Array.isArray(res.data?.closures) ? res.data.closures : [] }) })
+      .catch(() => { if (current) setDayClosures(null) })
+    return () => { current = false }
+  }, [view, storeId, accountId])
 
   const rows = useMemo(() => {
     const scoped = store ? data.reservations.filter((r) => r.store_id === store.id) : data.reservations
@@ -197,6 +216,14 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   return (
     <>
       {lineWarning ? <p role="alert" className={styles.warnBand}>{lineWarning}</p> : null}
+      {dayClosures && dayClosures.closures.length > 0 ? (
+        <div role="status" className={styles.closureBand} data-closure-day={dayClosures.day}>
+          <p className={styles.closureText}>
+            {`${dayTitle(dayClosures.day)}は${dayClosures.closures.map((c) => `${KIND_LABEL[c.kind]}（${scopeText(c, tables)}）`).join('・')}です。閉じた時間帯は LINE からの予約を受け付けません。入っている予約は取り消していません。`}
+          </p>
+          <TextLink href="/restaurant-test/inventory?tab=closures">休業日・貸切を見る</TextLink>
+        </div>
+      ) : null}
       {view === 'today' ? (
         <TodayView
           rows={rows}

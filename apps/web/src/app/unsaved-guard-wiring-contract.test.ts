@@ -131,7 +131,10 @@ const GUARDED = [
   'v8/restaurant/google/reviews.tsx',
   'v8/restaurant/reservations/phone.tsx',
   'v8/restaurant/store-new/store-new.tsx',
+  'v8/hq-broadcasts/create.tsx',
+  'v8/settings/booking-media/screen.tsx',
   'v8/template-edit/asset.tsx',
+  'v8/visit-stamps/visit-stamps.tsx',
   'v8/template-edit/message.tsx',
   'v8/webinar-edit/edit.tsx',
   'v8/webinar-edit/new.tsx',
@@ -202,6 +205,7 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'v8/restaurant/closures/closure-dialog.tsx': '臨時休業・貸切を足す・変える窓（提案 E-10 nVvXy）。保存の口は窓の中だけで、開くたびに押した日か記録から作り直し、閉じると入力を破棄する。',
   'v8/restaurant/front-desk/phone-drawer.tsx': '電話予約の引き出し（提案 E-2）。保存の口は引き出しの中だけで、開くたびに空から始まり、閉じると入力を破棄する（入力中は題に * が付く）。',
   'app/hq/account-browser-v8.tsx': 'タグ名だけの小さな窓。保存の口は窓内だけにあり、閉じると入力を破棄する。',
   'app/nen-members/photo-policy-history-v8.tsx': '報酬版を追加する小さな窓。親の設定画面から開き、閉じれば保存前の値を破棄する。',

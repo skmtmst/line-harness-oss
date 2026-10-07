@@ -62,6 +62,7 @@ import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import {
   audienceReason,
@@ -509,6 +510,11 @@ export default function RichMenusListV8() {
       `「${ordered.find((g) => g.id === id)?.name ?? 'メニュー'}」を${direction === -1 ? '1つ上' : '1つ下'}へ動かしました`,
     )
   }, [applyOrderedIds, fullOrderedGroups, reorderDisabledReason])
+
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（自動応答と同じ動き）。 */
+  const liveOrder = useLiveReorder(groups, (g) => g.id, dragId)
+  const bodyRef = useRef<HTMLTableSectionElement>(null)
+  useFlipRows(bodyRef, liveOrder.shown.map((g) => g.id).join(','))
 
   const dropOn = useCallback(async (targetId: string) => {
     const dragging = dragId
@@ -997,8 +1003,8 @@ export default function RichMenusListV8() {
         <DataTable>
           {tableCols}
           {tableHead}
-          <tbody>
-            {groups.map((g) => {
+          <tbody ref={bodyRef}>
+            {liveOrder.shown.map((g) => {
               const cells = thumbCells(g)
               const shape = menuShapeText(g)
               const audienceMain = audienceMainText(g, tagNameById)
@@ -1013,6 +1019,10 @@ export default function RichMenusListV8() {
                 <Tr
                   interactive
                   key={g.id}
+                  data-reorder-id={g.id}
+                  onDragEnter={() => liveOrder.enter(g.id)}
+                  onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                  onDrop={dragId ? () => void dropOn(liveOrder.dropTarget(g.id)) : undefined}
                   className={styles.row}
                   leaving={leavingId === g.id}
                   tabIndex={0}
@@ -1030,8 +1040,7 @@ export default function RichMenusListV8() {
                     onClick={(event) => event.stopPropagation()}
                     draggable={reorderDisabledReason === null}
                     onDragStart={() => setDragId(g.id)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => void dropOn(g.id)}
+                    onDragEnd={() => setDragId(null)}
                   >
                     <span className={styles.orderInner}>
                       {/* 閲覧のみ：つまみは隠し、幅だけ空けて順番の数字の位置を保つ */}

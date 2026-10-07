@@ -86,12 +86,22 @@ export function canMarkVisited(r: RestaurantReservation): boolean {
 export type CloseGroupState = 'open' | 'partly' | 'reopen' | 'done'
 
 export type CloseGroup = {
+  /** まとめる鍵。在庫の枠があれば枠、無ければ予約（媒体リンクの知らせ）・臨時休業ごと。 */
   slotId: string
   startsAt: string
   reason: RestaurantChannelCloseTask['reason']
+  /** 残りの席。予約・臨時休業から出た知らせは席数を持たない（null）。 */
   remainingSeats: number | null
   state: CloseGroupState
   items: Array<{ id: string; channel: string; name: string; status: RestaurantChannelCloseTask['status'] }>
+}
+
+/** 知らせをまとめる鍵。枠が無い知らせ（予約・臨時休業から出たもの）は予約・休業と時刻でまとめる。 */
+export function closeGroupKey(task: Pick<RestaurantChannelCloseTask, 'slotId' | 'reservationId' | 'closureId' | 'startsAt'>): string {
+  if (task.slotId) return task.slotId
+  if (task.reservationId) return `reservation:${task.reservationId}:${task.startsAt}`
+  if (task.closureId) return `closure:${task.closureId}:${task.startsAt}`
+  return `at:${task.startsAt}`
 }
 
 /**
@@ -104,10 +114,9 @@ export function groupCloseTasks(tasks: RestaurantChannelCloseTask[], media: Stor
   const orderOf = (code: string) => { const index = media.findIndex((m) => m.code === code); return index < 0 ? media.length : index }
   const groups = new Map<string, CloseGroup>()
   for (const task of [...tasks].sort((a, b) => a.startsAt.localeCompare(b.startsAt) || orderOf(a.channel) - orderOf(b.channel) || a.channel.localeCompare(b.channel))) {
-    /* 臨時休業・貸切の知らせは枠を持たない（slotId が空）。その休みごとに1行にまとめる。 */
-    const key = task.slotId ?? task.closureId ?? task.id
-    const group = groups.get(key) ?? {
-      slotId: key, startsAt: task.startsAt, reason: task.reason, remainingSeats: task.remainingSeats, state: 'open' as CloseGroupState, items: [] as CloseGroup['items'],
+    const key = closeGroupKey(task)
+    const group: CloseGroup = groups.get(key) ?? {
+      slotId: key, startsAt: task.startsAt, reason: task.reason, remainingSeats: task.remainingSeats, state: 'open', items: [],
     }
     group.items.push({ id: task.id, channel: task.channel, name: nameOf(task.channel), status: task.status })
     groups.set(key, group)
@@ -137,6 +146,7 @@ export function slotTitle(iso: string): string {
 export function reasonText(group: Pick<CloseGroup, 'reason' | 'remainingSeats'>): string {
   if (group.reason === 'full') return '満席になりました'
   if (group.reason === 'table_conflict') return '卓が重なる予約が届きました'
-  if (group.reason === 'closure') return '臨時休業・貸切で閉じます'
-  return `残り ${Math.max(0, group.remainingSeats ?? 0)}席になりました`
+  if (group.reason === 'closure') return '臨時休業・貸切で閉じました'
+  if (group.remainingSeats === null) return 'LINE・電話で予約が入りました'
+  return `残り ${Math.max(0, group.remainingSeats)}席になりました`
 }

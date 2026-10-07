@@ -33,6 +33,7 @@ import { STATE_TEXT } from '@/components/shared/not-connected'
 import { notifyToast } from '@/components/shared/toast'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list'
 import styles from './list.module.css'
@@ -141,6 +142,10 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
   const pages = Math.max(1, Math.ceil(visible.length / pageSize))
   const currentPage = Math.min(page, pages)
   const pageItems = visible.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（自動応答と同じ動き）。 */
+  const liveOrder = useLiveReorder(pageItems, (mark) => mark.id, dragId)
+  const bodyRef = useRef<HTMLTableSectionElement>(null)
+  useFlipRows(bodyRef, liveOrder.shown.map((mark) => mark.id).join(','))
   const activeMark = items.find((mark) => mark.id === activeMarkId) ?? null
   const activeMarkIndex = pageItems.findIndex((mark) => mark.id === activeMarkId)
   useEffect(() => setPage(1), [query, usage, pageSize])
@@ -348,14 +353,18 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
-        <tbody>
-          {pageItems.map((mark) => {
+        <tbody ref={bodyRef}>
+          {liveOrder.shown.map((mark) => {
             const editHref = `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`
             const fixed = mark.isInherited || !canEdit
             return (
               <Tr
                 interactive
                 key={mark.id}
+                data-reorder-id={mark.id}
+                onDragEnter={() => { if (!mark.isInherited) liveOrder.enter(mark.id) }}
+                onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                onDrop={dragId ? () => void move(liveOrder.dropTarget(mark.id)) : undefined}
                 className={`${styles.row} ${styles.markRow}`}
                 tabIndex={0}
                 onClick={() => openMarkDetail(mark.id)}
@@ -374,8 +383,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
                       draggable={!mark.isInherited}
                       title={mark.isInherited ? '共有マークは編集後に並び替えできます' : undefined}
                       onDragStart={() => setDragId(mark.id)}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => void move(mark.id)}
+                      onDragEnd={() => setDragId(null)}
                     >
                       <ReorderGrip
                         label={mark.name}
