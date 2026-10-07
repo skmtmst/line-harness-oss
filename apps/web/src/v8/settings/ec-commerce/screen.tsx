@@ -41,6 +41,7 @@ import {
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
+import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
 
 export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'connector'
@@ -157,15 +158,7 @@ function actionServerFilter(status: ActionTab): { status?: 'succeeded' | 'skippe
   return {}
 }
 
-export type OrderDrawerRender = (props: {
-  orderId: string | null
-  accountId: string | null
-  onClose: () => void
-  onRetryAction: (action: EcActionExecution) => Promise<void>
-  retryingId: string | null
-}) => ReactNode
-
-function EventsPanel({ accountId, renderOrderDrawer }: { accountId: string | null; renderOrderDrawer?: OrderDrawerRender }) {
+function EventsPanel({ accountId }: { accountId: string | null }) {
   const [overviewSlot, setOverviewSlot] = useState<AccountBound<OverviewWithLatency | null>>(() => pendingFor(accountId, null))
   const [recordsSlot, setRecordsSlot] = useState<AccountBound<ImportRecords>>(() => pendingFor(accountId, EMPTY_RECORDS))
   const [pageSlot, setPageSlot] = useState<{ accountId: string | null; page: number }>({ accountId, page: 1 })
@@ -511,13 +504,14 @@ function EventsPanel({ accountId, renderOrderDrawer }: { accountId: string | nul
           {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
         </div>
       ) : null}
-      {renderOrderDrawer?.({
-        orderId: detailOrderId,
-        accountId,
-        onClose: () => setDetailSlot({ accountId, orderId: null }),
-        onRetryAction: retry,
-        retryingId,
-      })}
+      {/* ★V8-B nAesv：注文の状況の引き出し（同じ場所の order-drawer.tsx）。 */}
+      <OrderDrawer
+        orderId={detailOrderId}
+        accountId={accountId}
+        onClose={() => setDetailSlot({ accountId, orderId: null })}
+        onRetryAction={retry}
+        retryingId={retryingId}
+      />
     </>
   )
 }
@@ -567,12 +561,10 @@ export default function EcCommerceScreen({
   tab,
   renderSubscriptions,
   renderConnector,
-  renderOrderDrawer,
 }: {
   tab: EcTabKey
   renderSubscriptions?: (accountId: string | null) => ReactNode
   renderConnector?: (accountId: string | null, canEdit: boolean) => ReactNode
-  renderOrderDrawer?: OrderDrawerRender
 }) {
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
@@ -591,7 +583,7 @@ export default function EcCommerceScreen({
       actions={actions}
     >
       <EcTabsV8 accountId={selectedAccountId} active={tab} />
-      {tab === 'events' ? <EventsPanel accountId={selectedAccountId} renderOrderDrawer={renderOrderDrawer} /> : null}
+      {tab === 'events' ? <EventsPanel accountId={selectedAccountId} /> : null}
       {tab === 'subscriptions' ? renderSubscriptions?.(selectedAccountId) : null}
       {tab === 'connector' ? renderConnector?.(selectedAccountId, canEdit) : null}
     </SbSettingsScreen>

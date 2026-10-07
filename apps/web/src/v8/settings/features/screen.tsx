@@ -400,9 +400,22 @@ export default function FeatureSettingsScreen() {
 
   const ready = Boolean(selectedAccountId) && !loading && !loadFailed
 
-  /* ★V8 `ziYCN`：ほかの人が先に保存した。題の下に帯を出し、編集中身は残す。 */
+  /*
+   * ★V8 `ziYCN`：ほかの人が先に保存した。題の下に帯を出し、編集中身は残す。
+   * 保存は下の帯から押すので、そのままだと帯が画面の外に出る。帯が出たら板のいちばん上へ戻して見せる。
+   */
+  const conflictRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!conflicted) return
+    const band = conflictRef.current
+    if (!band) return
+    const scrolled: HTMLElement[] = []
+    for (let node = band.parentElement; node; node = node.parentElement) scrolled.push(node)
+    band.closest<HTMLElement>('[data-page-template]')?.querySelectorAll<HTMLElement>('[data-template-region]').forEach((node) => scrolled.push(node))
+    for (const node of scrolled) if (node.scrollTop > 0) node.scrollTo({ top: 0 })
+  }, [conflicted])
   const conflictBand = conflicted ? (
-    <div className={styles.conflict} role="status" data-design-node="ziYCN">
+    <div ref={conflictRef} className={styles.conflict} role="status" data-design-node="ziYCN">
       <TriangleAlert className={styles.conflictIcon} aria-hidden="true" />
       <div className={styles.conflictText}>
         <p className={styles.conflictTitle}>ほかの人が先に機能設定を保存しました</p>
