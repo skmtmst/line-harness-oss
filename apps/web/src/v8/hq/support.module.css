@@ -139,7 +139,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--color-action);
+  color: var(--color-accent-deep);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
