@@ -148,6 +148,7 @@ beforeEach(() => {
   root = createRoot(host)
 })
 afterEach(() => {
+  vi.useRealTimers()
   act(() => root.unmount())
   host.remove()
   document.documentElement.removeAttribute('data-theme')
@@ -193,12 +194,15 @@ test('v8 では検索とフォルダ・状態の絞り込みをサーバへ渡�
   })
   const input = host.querySelector('input[aria-label="設定名・流入リンクで探す"]') as HTMLInputElement
   expect(input).toBeTruthy()
+  // 待ちは偽の時計で進める（本物の時間を待たない）。検索の待ちは打った瞬間から数えるので、打つ前に替える。
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
     setter.call(input, '店頭')
     input.dispatchEvent(new Event('input', { bubbles: true }))
-    await new Promise((resolve) => setTimeout(resolve, 350))
+    await vi.advanceTimersByTimeAsync(350)
   })
+  vi.useRealTimers()
   await eventually(() => {
     expect(lastListUrl?.searchParams.get('q')).toBe('店頭')
   })

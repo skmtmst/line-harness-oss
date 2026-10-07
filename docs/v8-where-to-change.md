@@ -29,7 +29,7 @@
 | 角丸・影・入力欄の枠 | `app/globals.css` の `--radius-*`・`--shadow-*`・`--color-control-border` | 全画面 |
 | 左メニュー（幅・行の高さ・並び・項目） | `components/layout/sidebar.tsx`・`sidebar.module.css` | 全画面 |
 | 上の帯（パンくず・アカウントの切り替え・通知・自分） | `components/shell/app-top-bar.tsx`・`components/shell/page-chrome.tsx`・`components/layout/breadcrumb.tsx` | 全画面 |
-| 外側の白い板の位置・すき間 | `components/layout/shell-frame.tsx`・`shell-frame.module.css`、`components/app-shell.module.css` | 全画面 |
+| 外側の白い板の位置・すき間 | `components/app-shell.module.css` | 全画面 |
 | 板の頭（題・説明・右上のボタン）の大きさと余白 | `components/templates/page-frame.tsx`（`PageHeading`）と `components/templates/page-templates.module.css` の `.heading` `.title` `.description` | 型を使う全画面 |
 | 一覧の並び（数の帯・道具の段・フォルダの列・表・下） | `components/templates/list-page.tsx` と `page-templates.module.css` の一覧の部分。寸法は `design/v8/LIST-TEMPLATE-SPEC.md` | 一覧の型の画面 |
 | 作る・編集の並び（手順の帯・下の保存の帯） | `components/templates/create-page.tsx`・`page-templates.module.css` の create の部分 | 作る型の画面 |
