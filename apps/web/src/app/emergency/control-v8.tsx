@@ -948,7 +948,8 @@ const EmergencyControlV8 = (
                   value={stopCode}
                   onChange={setStopCode}
                   labelledBy="emergency-stepup-label"
-                  disabled={mutationLocked || running}
+                  busy={running}
+                  disabled={mutationLocked}
                 />
               )}
             </div>

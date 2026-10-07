@@ -85,11 +85,8 @@ async function renderReady() {
   })
 }
 
+/* 6桁目が入った瞬間に送られる（動きの点検・6）。ここでは返事を待つだけ。 */
 async function submit() {
-  await act(async () => {
-    host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await Promise.resolve()
-  })
   await flush()
 }
 
@@ -97,16 +94,19 @@ const submitButton = () =>
   Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('登録する') || b.textContent?.includes('登録しています'))
 
 describe('2要素認証の確認エラー', () => {
-  it('400 が返ってもボタンを戻し、サーバーの文言をそのまま出す', async () => {
+  it('400 が返ってもボタンを戻し、違うコードは人の言葉で出す', async () => {
     await renderReady()
     await submit()
 
     const alert = host.querySelector('[role="alert"]')
-    expect(alert?.textContent).toContain('認証コードが正しくありません')
+    expect(alert?.textContent).toContain('コードが違います。もう一度入れてください')
     // 「確認しています…」のまま固まらず、もう一度押せる。
     const button = submitButton()
     expect(button?.textContent).toContain('登録する')
-    expect(button?.disabled).toBe(false)
+    // 違ったら6桁を消して1マス目から入れ直せる（6桁そろうと、また自動で送る）。
+    const first = host.querySelector('#ops-totp-code') as HTMLInputElement
+    expect(first.disabled).toBe(false)
+    expect(first.value).toBe('')
   })
 
   it('5xx が返ってもボタンを戻し、状態コードから言い換えた案内を出す', async () => {
@@ -119,7 +119,10 @@ describe('2要素認証の確認エラー', () => {
     expect(alert?.textContent).toContain('サーバーでエラーが起きました')
     const button = submitButton()
     expect(button?.textContent).toContain('登録する')
-    expect(button?.disabled).toBe(false)
+    // 違ったら6桁を消して1マス目から入れ直せる（6桁そろうと、また自動で送る）。
+    const first = host.querySelector('#ops-totp-code') as HTMLInputElement
+    expect(first.disabled).toBe(false)
+    expect(first.value).toBe('')
   })
 
   it('200 でも success:false なら従来どおり文言を出す', async () => {
@@ -128,8 +131,8 @@ describe('2要素認証の確認エラー', () => {
     await renderReady()
     await submit()
 
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain('コードの有効期限が切れています')
-    expect(submitButton()?.disabled).toBe(false)
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('コードの時間が切れました')
+    expect((host.querySelector('#ops-totp-code') as HTMLInputElement).disabled).toBe(false)
   })
 
   it('確認が通ると完了の案内へ進む', async () => {

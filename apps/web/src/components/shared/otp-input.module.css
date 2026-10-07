@@ -111,9 +111,11 @@
 [data-theme='v8'] .group[data-state='success'] .slot:nth-child(5) { transition-delay: calc(var(--motion-instant) * 2); }
 [data-theme='v8'] .group[data-state='success'] .slot:nth-child(n + 6) { transition-delay: var(--motion-base); }
 
-/* まちがえた：横に揺れる（300ms）。 */
-[data-theme='v8'] .group[data-state='error'] .slot {
-  animation: otp-v8-shake var(--motion-slow) var(--motion-ease-out);
+/* まちがえた：横に揺れる（300ms）。動きを減らす設定では揺らさない（赤い枠と文で伝わる）。 */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme='v8'] .group[data-state='error'] .slot {
+    animation: otp-v8-shake var(--motion-slow) var(--motion-ease-out);
+  }
 }
 
 @keyframes otp-v8-shake {
@@ -159,4 +161,38 @@
   background-repeat: no-repeat;
 }
 [data-theme='v8'] .slot { font-variant-numeric: normal; }
+
+/*
+ * 確かめている間の輪と、通ったときの ✓。6マスの並びを動かさないよう、まとまりの右の外に置く。
+ */
+.group { position: relative; }
+.spinner,
+.check {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 12px);
+  translate: 0 -50%;
+}
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  border-top-color: var(--color-ink-faint);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .spinner { animation: otp-spin var(--motion-slow) linear infinite; }
+}
+@keyframes otp-spin {
+  to { rotate: 360deg; }
+}
+.check { color: var(--color-success); }
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 }
