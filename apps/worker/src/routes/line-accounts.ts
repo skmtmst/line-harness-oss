@@ -1,3 +1,4 @@
+import { getLineAccountFoldersByAccountIds, getLineAccountTag } from '@line-crm/db';
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
@@ -110,6 +111,7 @@ function serializeLineAccount(row: DbLineAccount) {
     channelId: row.channel_id,
     name: row.name,
     displayName: row.line_display_name || row.name,
+    folderId: row.folder_id ?? null,
     pictureUrl: row.line_picture_url ?? null,
     basicId: row.line_basic_id ?? null,
     isActive: Boolean(row.is_active),
@@ -199,18 +201,27 @@ lineAccounts.get('/api/line-accounts', async (c) => {
   try {
     const db = c.env.DB;
     const visibleScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    const items = await getLineAccountsByIds(
+    let items = await getLineAccountsByIds(
       db,
       visibleScope.allowedAccountIds,
       c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
     );
+    const folderParam=c.req.query('folderId');
+    if(folderParam!==undefined) {
+      const folderId=folderParam==='' || folderParam==='__none__' ? null : folderParam;
+      if(folderId && !await getLineAccountTag(db,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,folderId)) return c.json({success:false,error:'フォルダが見つかりません'},404);
+      items=items.filter(item=>(item.folder_id ?? null)===folderId);
+    }
     const tagsByAccount = await getLineAccountTagsByAccountIds(db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map(item => item.id));
+    const foldersByAccount = await getLineAccountFoldersByAccountIds(db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map(item => item.id));
     const statsByAccount = await getLineAccountListStats(db, items.map((item) => item.id));
     const serializeWithStats = (item: DbLineAccount) => {
       const overview = statsByAccount[item.id];
       return {
         ...serializeLineAccount(item),
         tags: tagsByAccount[item.id] ?? [],
+        folderId: foldersByAccount[item.id]?.id ?? null,
+        folder: foldersByAccount[item.id] ?? null,
         stats: {
           friendCount: overview?.friendCount ?? 0,
           activeScenarios: overview?.activeScenarios ?? 0,

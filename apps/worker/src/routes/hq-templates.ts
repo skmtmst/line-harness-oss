@@ -1,6 +1,7 @@
+import { TEMPLATE_KINDS, type TemplateKindCounts, type TemplateKind } from '@line-crm/shared';
 import { listTemplateFolders, saveTemplateFolder, deleteTemplateFolder, duplicateTemplate } from '../services/hq-templates/folders.js';
 import { listMessageReferences } from '../services/hq-templates/message-card-references.js';
-import { deleteHqImage, uploadHqImage } from '../services/hq-templates/authoring-media.js';
+import { deleteHqImage, uploadHqImage, uploadHqImagemap } from '../services/hq-templates/authoring-media.js';
 import { TemplateHqTemplateError } from '../services/hq-templates/template.js';
 import { Hono, type Context } from 'hono';
 import { HQ_TEMPLATE_TYPES, getStaffById, type HqTemplateType } from '@line-crm/db';
@@ -62,7 +63,9 @@ hqTemplates.use('/api/hq/templates/*', requireRole('owner', 'admin'), async (c, 
 hqTemplates.post('/api/hq/templates/media', async c => {
   const auth = await authority(c);
   try {
-    const data = await uploadHqImage(c.env.IMAGES, auth, c.req.raw, c.env.WORKER_URL || new URL(c.req.url).origin);
+    const data = c.req.query('purpose')==='rich_message'
+      ? await uploadHqImagemap(c.env, auth, c.req.raw, c.env.WORKER_URL || new URL(c.req.url).origin)
+      : await uploadHqImage(c.env.IMAGES, auth, c.req.raw, c.env.WORKER_URL || new URL(c.req.url).origin);
     return c.json({ success: true, data }, 201);
   } catch (error) {
     if (error instanceof TemplateHqTemplateError) throw new HqTemplateError(error.code, 422);
@@ -83,10 +86,19 @@ hqTemplates.delete('/api/hq/templates/media', async c => {
 });
 hqTemplates.get('/api/hq/templates/accounts', async c => c.json({ success: true, data: await listTemplateAccounts(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates/message-references', async c => c.json({ success: true, data: await listMessageReferences(dbFor(c.env), await authority(c)) }));
+hqTemplates.get('/api/hq/templates/kind-counts', async c => {
+  const rows=await listTemplates(dbFor(c.env),await authority(c),'template');
+  const counts=Object.fromEntries(TEMPLATE_KINDS.map(kind=>[kind,rows.filter(row=>row.kind===kind).length])) as TemplateKindCounts;
+  return c.json({success:true,data:counts});
+});
 hqTemplates.get('/api/hq/templates', async c => {
   const type = c.req.query('type');
   if (type && !HQ_TEMPLATE_TYPES.includes(type as HqTemplateType)) throw new HqTemplateError('INVALID_TYPE');
-  return c.json({ success: true, data: await listTemplates(dbFor(c.env), await authority(c), type as HqTemplateType | undefined) });
+  const kind=c.req.query('kind');
+  if(kind && (!TEMPLATE_KINDS.includes(kind as TemplateKind) || (type && type!=='template'))) throw new HqTemplateError('INVALID_KIND');
+  const rows=await listTemplates(dbFor(c.env),await authority(c),kind?'template':type as HqTemplateType | undefined);
+  const counts=Object.fromEntries(TEMPLATE_KINDS.map(k=>[k,rows.filter(row=>row.kind===k).length])) as TemplateKindCounts;
+  return c.json({success:true,data:kind?rows.filter(row=>row.kind===kind):rows,kind_counts:counts});
 });
 hqTemplates.get('/api/hq/templates/folders', async c => c.json({ success:true, data:await listTemplateFolders(dbFor(c.env),await authority(c)) }));
 hqTemplates.post('/api/hq/templates/folders', async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c)) },201));

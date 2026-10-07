@@ -56,3 +56,5 @@ export * from './restaurant-customer-booking.js';
 export * from './instagram.js';
 export * from './auto-reply-unmatched.js';
 export * from './booking-liff.js';
+
+export * from './template-definition.js';

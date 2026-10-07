@@ -44,6 +44,7 @@ import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -222,6 +223,18 @@ export default function AutomationListV8() {
     }
   }, [selectedAccountId])
 
+  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
+  const folderActions = useFolderRowActions({
+    kind: 'automation',
+    folders,
+    accountId: selectedAccountId ?? null,
+    enabled: canEdit,
+    itemLabel: '自動化',
+    countOf: () => null,
+    onChanged: () => loadFolders(),
+    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
+  })
+
   useEffect(() => {
     if (accountLoading) return
     void load()
@@ -369,7 +382,7 @@ export default function AutomationListV8() {
   /* ===== フォルダ ===== */
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: ready ? items.length : null },
-    ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: null, color: folder.color })),
+    ...folders.map((folder, index) => ({ ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: null, color: folder.color })),
     { id: UNFILED, label: '未分類', count: ready ? items.length : null },
   ]
   const folderSelect = (
@@ -586,6 +599,7 @@ export default function AutomationListV8() {
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
+        {folderActions.dialogs}
         {folderDialogOpen ? (
           <FolderAddDialog
             kind="automation"

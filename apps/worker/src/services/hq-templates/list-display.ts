@@ -26,10 +26,27 @@ export function templateContentSummary(type: HqTemplateType, definitionJson: str
       }
       case 'template': {
         const definition = parseMessageTemplateDefinition(JSON.parse(definitionJson));
+        if(definition.asset) {
+          const {kind,payload}=definition.asset;
+          if(kind==='card_message') return `カード ${Array.isArray(payload.cards)?payload.cards.length:0}枚`;
+          if(kind==='rich_message') return `画像・面 ${Array.isArray(payload.tapAreas)?payload.tapAreas.length:0}`;
+          if(kind==='coupon') {
+            const date=String(payload.endsAt??'').match(/^\d{4}-(\d{2})-(\d{2})/);
+            return date ? `期限 ${Number(date[1])}/${date[2]}` : null;
+          }
+          return Array.isArray(payload.questions) ? `質問 ${payload.questions.length}` : null;
+        }
+        if(definition.template.questionJson) {
+          const q=JSON.parse(definition.template.questionJson);
+          return Array.isArray(q.choices)?`選択肢 ${q.choices.length}`:null;
+        }
+        if(definition.template.messageType==='carousel') {
+          const panels=JSON.parse(definition.template.messageContent);
+          return Array.isArray(panels)?`カード ${panels.length}枚`:'カルーセル';
+        }
         const parts: string[] = [];
         if (definition.card || definition.template.messageType === 'text') parts.push('本文');
         else if (definition.template.messageType === 'flex') parts.push('カード');
-        else if (definition.template.messageType === 'carousel') parts.push('カルーセル');
         const media = referencedMedia(definition);
         for (const [kind, label] of [['image', '画像'], ['video', '動画'], ['audio', '音声'], ['file', 'ファイル']] as const) {
           const count = media.filter(item => item.kind === kind).length;

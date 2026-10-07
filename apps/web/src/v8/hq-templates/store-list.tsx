@@ -1,0 +1,420 @@
+'use client'
+
+/*
+ * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
+ * 絵：テンプレート i0Ao0R（V8.pen の行「統括」）・LRc93（V8-B 版）、回答フォーム wZPua、友だち属性 DzdC3、リッチメニュー noVq4。
+ *
+ * 店の一覧（src/v8/templates/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・種類のタブ・フォルダの列・表・ページ送り）・
+ * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「アカウントへ配る」口だけ：
+ *   - 表の「使っている所」の代わりに「配布先」（N アカウント・まだ配っていない）
+ *   - 行の［アカウントへ配る］（行の「…」にも同じ項目）
+ *   - 数の帯は配ったアカウントの数
+ * 読み書き（一覧・分類・複製・削除・配る）は呼ぶ側（console.tsx）が今までどおり持つ。ここは見せ方と押した知らせだけ。
+ */
+import { useMemo, useState, type ReactNode } from 'react'
+import {
+  ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2,
+  MessageSquare, Pencil, Plus, Send, Ticket, Trash2, Unlink, Users,
+} from 'lucide-react'
+import type { HqTemplateFolder, TemplateKind } from '@line-crm/shared'
+import { ListPage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import EmptyList from '@/components/shared/empty-list'
+import FilterChip from '@/components/shared/filter-chip'
+import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListToolbar from '@/components/shared/list-toolbar'
+import Pagination from '@/components/shared/pagination'
+import { RowMenu } from '@/components/shared/row-actions'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import Select from '@/components/shared/select'
+import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { Tabs } from '@/components/shared/tabs'
+import { TextField } from '@/components/shared/text-field'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { formatNumber } from '@/lib/format'
+import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
+import { distributedAccountsLine, templateSubLine } from './list-row'
+import styles from '../templates/list.module.css'
+
+/** 店のテンプレートと同じ6種類（上のタブ）。 */
+export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof MessageSquare }[] = [
+  { kind: 'message', label: 'メッセージ', icon: MessageSquare },
+  { kind: 'carousel', label: 'カルーセル', icon: GalleryHorizontalEnd },
+  { kind: 'rich_message', label: 'リッチメッセージ', icon: ImageIcon },
+  { kind: 'question', label: '質問', icon: HelpCircle },
+  { kind: 'coupon', label: 'クーポン', icon: Ticket },
+  { kind: 'research', label: 'リサーチ', icon: ClipboardList },
+]
+const KIND_LABEL: Record<TemplateKind, string> = Object.fromEntries(KIND_TABS.map((tab) => [tab.kind, tab.label])) as Record<TemplateKind, string>
+
+/** 種類ごとの言葉（店の同じ機能の一覧と同じ）。 */
+const WORDS: Record<TemplateType, { title: string; item: string; create: string; search: string; description: string; column: string }> = {
+  template: { title: 'テンプレート', item: 'テンプレート', create: 'テンプレートを作る', search: '名前・本文・差し込みで探す', column: 'テンプレート', description: 'メッセージのひな形を作り、各 LINE アカウントへ配ります。配ったあとに直すと、配った先へ新しい版として届きます。' },
+  form: { title: '回答フォーム', item: 'フォーム', create: 'フォームを作る', search: 'フォーム名・質問文', column: 'フォーム（質問の数）', description: '回答フォームのひな形を作り、各 LINE アカウントへ配ります。配ったあとに直すと、新しい版として届きます。' },
+  tag: { title: '友だち属性', item: 'タグ', create: 'タグを作る', search: 'タグ名・用途で探す', column: 'タグ', description: '友だち属性（タグ・入力してもらう項目・対応の印）のひな形を作り、各 LINE アカウントへ配ります。配った先で同じ名前・色で使えます。' },
+  rich_menu: { title: 'リッチメニュー', item: 'メニュー', create: 'メニューを作る', search: 'メニュー名・ボタン名', column: 'メニュー（大きさ・ボタン）', description: 'リッチメニューのひな形を作り、各 LINE アカウントへ配ります。配った先では、そのアカウントの条件で出し分けます。' },
+  scenario: { title: 'シナリオ', item: 'シナリオ', create: 'シナリオを作る', search: 'シナリオ名で探す', column: 'シナリオ', description: 'シナリオのひな形を作り、停止中の下書きとして各 LINE アカウントへ配ります。' },
+}
+
+const PAGE_SIZE_OPTIONS = [
+  { value: '10', label: '10件表示' },
+  { value: '20', label: '20件表示' },
+  { value: '50', label: '50件表示' },
+]
+
+/** M月D日（店の一覧と同じ。時刻は title）。 */
+function monthDay(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'long', day: 'numeric' }).format(date)
+}
+
+/** 公開の札（店と同じ3つの色）。統括では「配ったか」で決める：配った＝配布中、まだ＝下書きだけ。 */
+function stateOf(row: HqTemplate): { label: string; tone: 'live' | 'draft' } {
+  return (row.distributed_account_count ?? 0) > 0 ? { label: '配布中', tone: 'live' } : { label: '下書きだけ', tone: 'draft' }
+}
+
+export interface HqStoreListProps {
+  type: TemplateType
+  rows: HqTemplate[]
+  ready: boolean
+  busy: boolean
+  canEdit: boolean
+  /** 配る先になるアカウントの数（数の帯の「全 N アカウントのうち」）。 */
+  accountTotal: number
+  /** 6種類のタブ（テンプレートだけ）。 */
+  kind?: TemplateKind
+  kindCounts?: Partial<Record<TemplateKind, number>> | null
+  onKindChange?: (kind: TemplateKind) => void
+  folders: HqTemplateFolder[]
+  folderLoadFailed: boolean
+  folderFilter: string
+  onFolderFilter: (id: string) => void
+  onAddFolder: (name: string) => Promise<void>
+  onRenameFolder: (folder: HqTemplateFolder, name: string) => Promise<void>
+  onDeleteFolder: (folder: HqTemplateFolder) => Promise<void>
+  onCreate: () => void
+  onEdit: (row: HqTemplate) => void
+  onDistribute: (row: HqTemplate) => void
+  onDuplicate: (row: HqTemplate) => void
+  onRemove: (row: HqTemplate) => void
+  notices?: ReactNode
+  overlays?: ReactNode
+}
+
+export default function HqStoreList(props: HqStoreListProps) {
+  const {
+    type, rows, ready, busy, canEdit, accountTotal, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
+    onAddFolder, onRenameFolder, onDeleteFolder, onCreate, onEdit, onDistribute, onDuplicate, onRemove, notices, overlays,
+  } = props
+  const words = WORDS[type]
+  const [query, setQuery] = useState('')
+  const [undistributedOnly, setUndistributedOnly] = useState(false)
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /* 分類（フォルダ）の窓：足す・名前を変える（統括のひな形の分類は色を持たない）・消す。 */
+  const [folderDialog, setFolderDialog] = useState<{ editing: HqTemplateFolder | null } | null>(null)
+  const [folderName, setFolderName] = useState('')
+  const [deletingFolder, setDeletingFolder] = useState<HqTemplateFolder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
+
+  const folderOf = (id: string | null | undefined) => folders.find((folder) => folder.id === id) ?? null
+  const countIn = (id: string) => rows.filter((row) => (row.folder_id ?? 'none') === id).length
+
+  const filtered = useMemo(() => {
+    const words = query.normalize('NFKC').toLocaleLowerCase('ja-JP').trim()
+    return rows.filter((row) => {
+      if (folderFilter !== 'all' && (row.folder_id ?? 'none') !== folderFilter) return false
+      if (undistributedOnly && (row.distributed_account_count ?? 0) > 0) return false
+      if (!words) return true
+      return [row.name, row.description ?? '', row.content_summary ?? ''].some((text) => text.normalize('NFKC').toLocaleLowerCase('ja-JP').includes(words))
+    })
+  }, [rows, folderFilter, undistributedOnly, query])
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const current = Math.min(page, pageCount)
+  const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
+
+  /* 数の帯：ひな形・配ったアカウント・配ったひな形・まだ配っていない（統括の一覧で数えられるもの）。 */
+  const distributed = rows.filter((row) => (row.distributed_account_count ?? 0) > 0).length
+  const accountNames = new Set(rows.flatMap((row) => row.distributed_account_names ?? []))
+  const namesComplete = rows.every((row) => (row.distributed_account_more ?? 0) === 0)
+  const kpis = [
+    { key: 'templates', title: 'ひな形', icon: FileText, value: ready ? rows.length : null, unit: '件', detail: ready ? `まだ配っていない ${rows.length - distributed}件` : '—' },
+    { key: 'accounts', title: '配ったアカウント', icon: Link2, value: ready && namesComplete ? accountNames.size : null, unit: '件', detail: ready ? (namesComplete ? `全 ${formatNumber(accountTotal)} アカウントのうち` : '数え切れないアカウントがあります') : '—' },
+    { key: 'distributed', title: '配ったひな形', icon: Send, value: ready ? distributed : null, unit: '件', detail: ready ? '1つ以上のアカウントへ配った' : '—' },
+    { key: 'undistributed', title: 'まだ配っていない', icon: Users, value: ready ? rows.length - distributed : null, unit: '件', detail: ready ? '配布先が無いひな形' : '—' },
+  ]
+
+  const tabs = kind && onKindChange ? (
+    <div className={styles.tabsBox}>
+      <Tabs
+        label={`${words.title}の種類`}
+        items={KIND_TABS.map((tab) => ({
+          label: tab.label,
+          count: kindCounts?.[tab.kind],
+          current: kind === tab.kind,
+          onClick: () => { onKindChange(tab.kind); setPage(1) },
+        }))}
+      />
+    </div>
+  ) : undefined
+
+  const createButton = (full: boolean) => !canEdit ? null : (
+    <Button type="button" variant="primary" className={full ? 'v8-folder-create w-full' : undefined} disabled={!ready || busy} onClick={onCreate}>
+      <Plus size={15} aria-hidden="true" />{words.create}
+    </Button>
+  )
+
+  const folderRows: FolderPanelRow[] = [
+    { id: 'all', label: 'すべて', count: ready ? rows.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    ...folders.map((folder) => ({
+      id: folder.id,
+      label: folder.name,
+      count: ready ? countIn(folder.id) : null,
+      colorEditable: false,
+      ...(canEdit ? {
+        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderDialog({ editing: folder }) },
+        onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
+      } : {}),
+    })),
+    { id: 'none', label: '未分類', count: ready ? countIn('none') : null },
+  ]
+  const selectFolder = (id: string) => { onFolderFilter(id); setPage(1) }
+  const folderPanel = folderLoadFailed ? (
+    <p role="alert" className={styles.folderNote}>フォルダを読み込めませんでした。ページを再読み込みしてください。</p>
+  ) : (
+    <FolderPanel
+      activeId={folderFilter}
+      onSelect={selectFolder}
+      onAddFolder={canEdit ? () => { setFolderError(''); setFolderName(''); setFolderDialog({ editing: null }) } : undefined}
+      addFolderLabel="フォルダを追加"
+      rows={folderRows}
+    >
+      <p className={styles.folderNote}>
+        {type === 'template' ? 'フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります' : `フォルダを消しても、中の${words.item}は未分類に残ります`}
+      </p>
+    </FolderPanel>
+  )
+
+  const saveFolder = async () => {
+    const name = folderName.trim()
+    if (!name || folderBusy || !folderDialog) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      if (folderDialog.editing) await onRenameFolder(folderDialog.editing, name)
+      else await onAddFolder(name)
+      setFolderDialog(null)
+    } catch (caught) {
+      setFolderError(japaneseDetailOf(caught) || 'フォルダを保存できませんでした')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+  const removeFolder = async () => {
+    if (!deletingFolder || folderBusy) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      await onDeleteFolder(deletingFolder)
+      setDeletingFolder(null)
+    } catch (caught) {
+      setFolderError(japaneseDetailOf(caught) || 'フォルダを消せませんでした')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const rowMenu = (row: HqTemplate): ActionMenuItem[] => [
+    { id: 'distribute', label: 'アカウントへ配る', icon: <Send size={14} aria-hidden="true" />, onSelect: () => onDistribute(row) },
+    { id: 'edit', label: '編集する', icon: <Pencil size={14} aria-hidden="true" />, onSelect: () => onEdit(row) },
+    { id: 'duplicate', label: '複製する', icon: <Copy size={14} aria-hidden="true" />, onSelect: () => onDuplicate(row) },
+    { id: 'remove', label: '削除する', icon: <Trash2 size={14} aria-hidden="true" />, tone: 'danger', dividerBefore: true, onSelect: () => onRemove(row) },
+  ]
+
+  const toolbar = (
+    <div className={styles.wideTools}>
+      <ListToolbar
+        search={{ placeholder: words.search, label: `${words.title}のひな形を検索`, value: query, onChange: (value) => { setQuery(value); setPage(1) } }}
+        filters={(
+          <div role="group" aria-label="配ったかで絞り込む" className={styles.chipGroup}>
+            <FilterChip selected={undistributedOnly} onChange={() => { setUndistributedOnly((value) => !value); setPage(1) }} title="まだどのアカウントへも配っていないひな形" icon={<Unlink size={13} aria-hidden="true" />}>
+              未配布
+            </FilterChip>
+          </div>
+        )}
+        trailing={(
+          <div className={styles.perPageBox}>
+            <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZE_OPTIONS} />
+          </div>
+        )}
+      />
+    </div>
+  )
+
+  const showKind = type === 'template'
+  const body = !ready ? (
+    <div className={styles.stateCard} role="status">
+      <p className={styles.stateTitle}>{busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。'}</p>
+    </div>
+  ) : filtered.length === 0 ? (
+    <EmptyList
+      icon={<FileText aria-hidden="true" />}
+      title={`まだ${words.item}のひな形がありません`}
+      description="ひな形を作ると、ここから各 LINE アカウントへ配れます。"
+      create={{ label: `最初の${words.item}を作る`, onClick: onCreate }}
+      canCreate={canEdit}
+      filtered={Boolean(query || undistributedOnly || folderFilter !== 'all')}
+      onClearFilters={() => { setQuery(''); setUndistributedOnly(false); onFolderFilter('all'); setPage(1) }}
+      filteredDescription="検索や「未配布」・フォルダを外すと、すべて出ます"
+    />
+  ) : (
+    <div className={`${styles.tableWrap} ${styles.hqTable}`}>
+      <DataTable>
+        <colgroup>
+          <col />
+          {showKind ? <col className={styles.colKind} /> : null}
+          <col className={styles.colPublish} />
+          <col className={styles.colHqDest} />
+          <col className={styles.colUpdated} />
+          <col className={styles.colHqActions} />
+        </colgroup>
+        <thead>
+          <TableHeadRow>
+            <Th className={styles.headCell}>{words.column}</Th>
+            {showKind ? <Th className={styles.headCell}>種類</Th> : null}
+            <Th className={styles.headCell}>状態</Th>
+            <Th className={styles.headCell}>配布先</Th>
+            <Th className={styles.headCell}>更新</Th>
+            <Th aria-label="操作" />
+          </TableHeadRow>
+        </thead>
+        <tbody>
+          {shown.map((row) => {
+            const folder = folderOf(row.folder_id)
+            const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
+            const state = stateOf(row)
+            const destLine = distributedAccountsLine(row)
+            return (
+              <Tr key={row.id} data-row-id={row.id}>
+                <NameCell
+                  name={(
+                    <div className={styles.dotLine}>
+                      <FolderDotName folder={folder ? { name: folder.name, color: null } : null}>
+                        {canEdit ? (
+                          <button type="button" className={`${styles.cellTitle} ${styles.hqNameButton}`} title={row.name} onClick={() => onEdit(row)}>{row.name}</button>
+                        ) : <span className={styles.cellTitle} title={row.name}>{row.name}</span>}
+                      </FolderDotName>
+                    </div>
+                  )}
+                  sub={<span className={`${styles.cellSub} ${styles.dotIndent}`} title={sub}>{sub}</span>}
+                />
+                {showKind ? (
+                  <Td><span className={styles.kindBadge}>{KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? 'メッセージ'}</span></Td>
+                ) : null}
+                <Td>
+                  <span className={styles.publishPill} data-tone={state.tone}>
+                    <span className={styles.publishDot} aria-hidden="true" />
+                    {state.label}
+                  </span>
+                </Td>
+                <Td>
+                  {row.distributed_account_count === undefined ? (
+                    <span className={styles.cellFaint}>—</span>
+                  ) : row.distributed_account_count > 0 ? (
+                    <span className={styles.hqDest}>
+                      <span className={styles.usageLink}>{`${formatNumber(row.distributed_account_count)} アカウント`}</span>
+                      {destLine ? <span className={styles.cellSub} title={destLine}>{destLine}</span> : null}
+                    </span>
+                  ) : (
+                    <span className={styles.usageLink}>まだ配っていない</span>
+                  )}
+                </Td>
+                <Td className={styles.cellPlain} title={row.updated_at}>{monthDay(row.updated_at)}</Td>
+                <Td className={styles.menuCell}>
+                  <div className={`${styles.menuBox} ${styles.hqActions}`}>
+                    {canEdit ? (
+                      <>
+                        <Button type="button" variant="text" disabled={busy} onClick={() => onDistribute(row)} aria-label={`${row.name}をアカウントへ配る`}>
+                          <Send size={14} aria-hidden="true" />アカウントへ配る
+                        </Button>
+                        <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
+                      </>
+                    ) : null}
+                  </div>
+                </Td>
+              </Tr>
+            )
+          })}
+        </tbody>
+      </DataTable>
+    </div>
+  )
+
+  const summary = `${formatNumber(filtered.length)}件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)}件`
+  const pager = !ready || filtered.length === 0 ? null : pageCount > 1 ? (
+    <Pagination page={current} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{summary}</span>} />
+  ) : <p className={styles.pagerSolo}>{summary}</p>
+
+  return (
+    <ListPage
+      boardId={type === 'template' ? 'i0Ao0R' : type === 'form' ? 'wZPua' : type === 'tag' ? 'DzdC3' : type === 'rich_menu' ? 'noVq4' : 'LRc93'}
+      headingSize="regular"
+      title={words.title}
+      description={words.description}
+      tabs={tabs}
+      stats={(
+        <KpiBand data-design="KPIs" className={styles.kpiStrip}>
+          {kpis.map((kpi) => (
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={<span className={styles.kpiDetailWrap}>{kpi.detail}</span>} />
+          ))}
+        </KpiBand>
+      )}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: selectFolder, createAction: createButton(false) ?? undefined }}
+      folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
+      toolbar={toolbar}
+      pagination={pager}
+      overlays={(
+        <>
+          {overlays}
+          <Dialog
+            open={folderDialog !== null}
+            title={folderDialog?.editing ? 'フォルダの名前を変える' : 'フォルダを追加'}
+            description={`${words.item}のひな形を分けてしまう箱です。消しても、中のひな形は未分類に残ります。`}
+            busy={folderBusy}
+            error={folderError || undefined}
+            confirmLabel={folderDialog?.editing ? '保存する' : '追加する'}
+            cancelLabel="やめる"
+            onCancel={() => { if (!folderBusy) setFolderDialog(null) }}
+            onConfirm={() => void saveFolder()}
+          >
+            <TextField aria-label="フォルダの名前" value={folderName} maxLength={100} disabled={folderBusy} placeholder="例: お問い合わせ" onChange={(event) => setFolderName(event.target.value)} />
+          </Dialog>
+          <ConfirmDialog
+            open={deletingFolder !== null}
+            title={`フォルダ「${deletingFolder?.name ?? ''}」を消しますか？`}
+            description={deleteFolderDescription(`${words.item}のひな形`, deletingFolder ? countIn(deletingFolder.id) : null)}
+            confirmLabel="フォルダを消す"
+            cancelLabel="キャンセル"
+            destructive
+            busy={folderBusy}
+            error={folderError || undefined}
+            onCancel={() => { if (!folderBusy) setDeletingFolder(null) }}
+            onConfirm={() => void removeFolder()}
+          />
+        </>
+      )}
+    >
+      {notices}
+      {body}
+    </ListPage>
+  )
+}

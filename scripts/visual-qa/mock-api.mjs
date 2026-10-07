@@ -283,13 +283,20 @@ const mediaUploadSessionTargets = new Map()
 /** 統括のテンプレートの見本（★V8-B LRc93・X4JcOf・meBRB）。 */
 const HQ_TEMPLATES_HTN = [
   { id: 'visual-hq-tpl-autumn', name: '秋の新商品のお知らせ', description: '本文・画像 1', template_type: 'template', folder_id: null, revision: 2, updated_at: '2026-09-30T01:12:00.000Z', reference_summary: '', distributed_account_count: 3, distributed_account_names: ['本店', '渋谷店', 'イベント'], distributed_account_more: 0, content_summary: '本文・画像 1' },
-  { id: 'visual-hq-tpl-thanks', name: '来店のお礼', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-22T09:40:00.000Z', reference_summary: '', distributed_account_count: 2, distributed_account_names: ['本店', '渋谷店'], distributed_account_more: 0, content_summary: '本文' },
-  { id: 'visual-hq-tpl-booking', name: '予約の受付', description: '本文・ボタン', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-12T00:00:00.000Z', reference_summary: '回答フォーム「予約」', distributed_account_count: 1, distributed_account_names: ['本店'], distributed_account_more: 0, content_summary: '本文・ボタン' },
+  { id: 'visual-hq-tpl-thanks', name: '来店のお礼', description: '本文', template_type: 'template', folder_id: 'visual-hq-folder-inquiry', revision: 1, updated_at: '2026-09-22T09:40:00.000Z', reference_summary: '', distributed_account_count: 2, distributed_account_names: ['本店', '渋谷店'], distributed_account_more: 0, content_summary: '本文' },
+  { id: 'visual-hq-tpl-booking', name: '予約の受付', description: '本文・ボタン', template_type: 'template', folder_id: 'visual-hq-folder-booking', revision: 1, updated_at: '2026-09-12T00:00:00.000Z', reference_summary: '回答フォーム「予約」', distributed_account_count: 1, distributed_account_names: ['本店'], distributed_account_more: 0, content_summary: '本文・ボタン' },
+  { id: 'visual-hq-tpl-carousel', name: '定期便 初回のご案内', description: 'カード 3枚', template_type: 'template', kind: 'carousel', folder_id: 'visual-hq-folder-ec', revision: 1, updated_at: '2026-01-13T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: 'カード 3枚' },
+  { id: 'visual-hq-tpl-question', name: '好みのコース', description: '選択肢 4', template_type: 'template', kind: 'question', folder_id: null, revision: 1, updated_at: '2026-01-13T00:00:00.000Z', reference_summary: '', distributed_account_count: 1, distributed_account_names: ['本店'], distributed_account_more: 0, content_summary: '選択肢 4' },
   { id: 'visual-hq-tpl-holiday', name: '定休日のご案内', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-08-30T06:20:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '本文' },
   { id: 'visual-hq-tpl-menu', name: '基本のメニュー', description: null, template_type: 'rich_menu', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '6分割・画像あり' },
   { id: 'visual-hq-tpl-form', name: '予約', description: null, template_type: 'form', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: '質問 3' },
   { id: 'visual-hq-tpl-tag-vip', name: 'VIP', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: 'タグ 1' },
   { id: 'visual-hq-tpl-tag-new', name: '新規', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0, distributed_account_names: [], distributed_account_more: 0, content_summary: 'タグ 1' },
+]
+const HQ_TEMPLATE_FOLDERS_HTN = [
+  { id: 'visual-hq-folder-inquiry', name: 'お問い合わせ', revision: 1 },
+  { id: 'visual-hq-folder-booking', name: '予約', revision: 1 },
+  { id: 'visual-hq-folder-ec', name: 'EC', revision: 1 },
 ]
 const HQ_TEMPLATE_ACCOUNTS_HTN = [
   { id: 'visual-qa-account-prod', name: '然 -NEN- 本店' },
@@ -3251,9 +3258,19 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    */
   if (pathname === '/api/hq/templates' && method === 'GET') {
     const type = query.get('type')
-    return { success: true, data: type ? HQ_TEMPLATES_HTN.filter((row) => row.template_type === type) : HQ_TEMPLATES_HTN }
+    const kind = query.get('kind')
+    /* API-17：テンプレートは店と同じ6種類（?kind=）。種類の無い古い行はメッセージ。 */
+    const rows = (type ? HQ_TEMPLATES_HTN.filter((row) => row.template_type === type) : HQ_TEMPLATES_HTN)
+      .map((row) => (row.template_type === 'template' ? { ...row, kind: row.kind ?? 'message' } : row))
+    return { success: true, data: kind ? rows.filter((row) => row.kind === kind) : rows }
   }
-  if (pathname === '/api/hq/templates/folders' && method === 'GET') return { success: true, data: [] }
+  if (pathname === '/api/hq/templates/kind-counts' && method === 'GET') {
+    const counts = { message: 0, carousel: 0, rich_message: 0, question: 0, coupon: 0, research: 0 }
+    for (const row of HQ_TEMPLATES_HTN) if (row.template_type === 'template') counts[row.kind ?? 'message'] += 1
+    return { success: true, data: counts }
+  }
+  /* 統括のひな形のフォルダ（絵 i0Ao0R：お問い合わせ・予約・EC）。 */
+  if (pathname === '/api/hq/templates/folders' && method === 'GET') return { success: true, data: HQ_TEMPLATE_FOLDERS_HTN }
   if (pathname === '/api/hq/templates/accounts' && method === 'GET') return { success: true, data: HQ_TEMPLATE_ACCOUNTS_HTN }
   if (pathname === '/api/hq/templates/message-references' && method === 'GET') return { success: true, data: [] }
   const hqTemplateDetail = /^\/api\/hq\/templates\/(visual-hq-tpl-[^/]+)$/.exec(pathname)
@@ -3416,6 +3433,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   /* 統括ホーム（絵 `JKjsE`）の左のタグの列。 */
   if (method === 'GET' && pathname === '/api/line-account-tags') return { success: true, data: LINE_ACCOUNT_TAGS }
+  /* 統括のアカウントのフォルダ（API-17・絵 `JKjsE`：渋谷エリア・イベント・テスト・未分類）。所属はタグの先頭1件と同じ。 */
+  if (method === 'GET' && pathname === '/api/line-account-folders') {
+    const live = LINE_ACCOUNTS.filter((account) => !account.archivedAt)
+    const folders = LINE_ACCOUNT_TAGS.map((tag) => ({
+      id: tag.id, kind: 'line_account', name: tag.name, parentId: null, color: tag.color, displayOrder: tag.displayOrder,
+      createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
+      itemCount: LINE_ACCOUNTS.filter((account) => (account.tags ?? [])[0]?.id === tag.id).length,
+    }))
+    return { success: true, data: { folders, total: LINE_ACCOUNTS.length, unclassifiedCount: live.filter((account) => !(account.tags ?? []).length).length } }
+  }
   /* 統括の名前（絵 `JKjsE` の説明・`K7HYu` の欄）。 */
   if (method === 'GET' && pathname === '/api/tenants/me') return { success: true, data: { name: '然 -NEN- 本部' } }
   if (pathname === '/api/line-accounts') {
@@ -3423,7 +3450,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       `webhook` を付ける。無いと接続状態カードが「確認中」のままで、
       設計の「正常」と並べたときに実装の差に見えてしまう。
     */
-    return { success: true, data: LINE_ACCOUNTS }
+    return { success: true, data: LINE_ACCOUNTS.map((account) => {
+      const first = (account.tags ?? [])[0]
+      const tag = first ? LINE_ACCOUNT_TAGS.find((item) => item.id === first.id) : null
+      return { ...account, folderId: tag?.id ?? null, folder: tag ? { id: tag.id, kind: 'line_account', name: tag.name, parentId: null, color: tag.color, displayOrder: tag.displayOrder, createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' } : null }
+    }) }
   }
   if (pathname === '/api/friends/migrations') {
     return { success: true, data: [UID_MIGRATION_DONE, {

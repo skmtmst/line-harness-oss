@@ -191,7 +191,11 @@ export default function MenuPortal({
       closeRef.current()
     }
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') closeRef.current()
+      if (event.key === 'Escape') {
+        // メニューで処理した印。下の詳細パネルなどが同じ Esc で閉じないように。
+        event.preventDefault()
+        closeRef.current()
+      }
     }
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -211,6 +215,8 @@ export default function MenuPortal({
       className="fixed min-w-0"
       data-menu-portal=""
       data-placement={geometry?.placement ?? 'down'}
+      // 開く動きの起点（押した角）を部品の CSS が決めるための印。
+      data-align={align}
       data-has-more={hasMore ? 'true' : 'false'}
       style={{
         top: geometry?.top ?? 0,
