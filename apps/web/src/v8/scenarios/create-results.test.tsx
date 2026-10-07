@@ -68,6 +68,14 @@ const runs = {
 }
 
 const create = vi.fn()
+/* シナリオの下書きの口の見本（キーごとに1行・版は保存ごとに変わる）。 */
+const drafts = new Map<string, { value: unknown; version: string; updatedAt: string }>()
+const draftCalls: string[] = []
+let draftSeq = 0
+const draftRow = (key: string, row: { value: unknown; version: string; updatedAt: string }) => ({
+  key, lineAccountId: 'account-a', content: { value: row.value }, scenarioId: null, stepId: null,
+  version: row.version, updatedBy: 'staff-1', updatedAt: row.updatedAt, expiresAt: '2026-12-01T00:00:00.000Z',
+})
 vi.mock('@/components/scenarios/scenario-reference-data', () => ({
   scenarioReferenceData: {
     scenario: () => Promise.resolve({ success: true, data: scenario }),
@@ -83,6 +91,29 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     api: {
       ...api,
       folders: { ...api.folders, list: () => Promise.resolve({ success: true, data: [] }) },
+      scenarioDrafts: {
+        get: async (_account: string, key: string) => {
+          draftCalls.push(`GET ${key}`)
+          const row = drafts.get(key)
+          if (!row) throw new actual.ApiError(404, 'not_found', 'not_found')
+          return { success: true, data: draftRow(key, row) }
+        },
+        save: async (_account: string, key: string, body: { expectedVersion: string | 0; content: { value: unknown } }) => {
+          draftCalls.push(`PUT ${key}`)
+          const row = drafts.get(key)
+          if ((row?.version ?? 0) !== body.expectedVersion) throw new actual.ApiError(409, 'version_conflict', 'version_conflict')
+          draftSeq += 1
+          const next = { value: body.content.value, version: `00000000-0000-4000-8000-${String(draftSeq).padStart(12, '0')}`, updatedAt: new Date().toISOString() }
+          drafts.set(key, next)
+          return { success: true, data: draftRow(key, next) }
+        },
+        delete: async (_account: string, key: string, version: string) => {
+          draftCalls.push(`DELETE ${key}`)
+          if (drafts.get(key)?.version !== version) throw new actual.ApiError(409, 'version_conflict', 'version_conflict')
+          drafts.delete(key)
+          return { success: true }
+        },
+      },
       scenarios: {
         ...api.scenarios,
         create: (...args: unknown[]) => create(...args),
@@ -140,7 +171,7 @@ describe('作る①（dnzqC）', () => {
   })
 })
 
-describe('作る①：書きかけをこのブラウザに残す（シナリオは下書きの口が無い）', () => {
+describe('作る①：書きかけをシナリオの下書きの口へ残す（本物の行は作らない）', () => {
   function memoryStorage() {
     const map = new Map<string, string>()
     return {
@@ -153,6 +184,8 @@ describe('作る①：書きかけをこのブラウザに残す（シナリオ�
   beforeEach(() => {
     vi.useFakeTimers()
     vi.stubGlobal('localStorage', memoryStorage())
+    drafts.clear()
+    draftCalls.length = 0
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -160,14 +193,15 @@ describe('作る①：書きかけをこのブラウザに残す（シナリオ�
   })
   const settle = async (ms: number) => { await act(async () => { await vi.advanceTimersByTimeAsync(ms) }) }
 
-  test('名前を打って2秒で残し、開き直すと「前の入力を戻す」で戻る。サーバには作らない', async () => {
+  test('名前を打って2秒で下書きの口へ残し、開き直すと「前の入力を戻す」で戻る。本物のシナリオは作らない', async () => {
     const first = render(<ScenarioCreateV8 />)
     await settle(0)
     fireEvent.change(screen.getByRole('textbox', { name: 'シナリオ名' }), { target: { value: '春のフォロー' } })
     fireEvent.click(screen.getByRole('radio', { name: /経過時間で指定/ }))
     await settle(2100)
-    expect(document.body.textContent).toContain('入力をこのブラウザに一時保存済み・0秒前')
+    expect(document.body.textContent).toContain('下書き保存済み・0秒前')
     expect(create).not.toHaveBeenCalled()
+    expect([...drafts.keys()]).toEqual([expect.stringMatching(/^new:/)])
     first.unmount()
 
     render(<ScenarioCreateV8 />)
@@ -180,11 +214,46 @@ describe('作る①：書きかけをこのブラウザに残す（シナリオ�
     expect((screen.getByRole('radio', { name: /経過時間で指定/ }) as HTMLInputElement).checked).toBe(true)
   })
 
-  test('閲覧のみには残さず、戻す帯も出さない', async () => {
+  test('以前このブラウザに残した書きかけは、一度だけ下書きの口へ移して消す', async () => {
+    localStorage.setItem('lh:v8-draft:scenario-create:account-a:new', JSON.stringify({ savedAt: Date.now(), value: { name: '前の入力', folderId: '', mode: 'elapsed' } }))
+    render(<ScenarioCreateV8 />)
+    await settle(0)
+    expect(localStorage.getItem('lh:v8-draft:scenario-create:account-a:new')).toBeNull()
+    expect([...drafts.values()].map((row) => row.value)).toEqual([{ name: '前の入力', folderId: '', mode: 'elapsed' }])
+    expect(screen.getByRole('button', { name: '前の入力を戻す' })).toBeTruthy()
+  })
+
+  test('作ったら下書きを消す', async () => {
+    create.mockResolvedValue({ success: true, data: { id: 'new-1' } })
+    render(<ScenarioCreateV8 />)
+    await settle(0)
+    fireEvent.change(screen.getByRole('textbox', { name: 'シナリオ名' }), { target: { value: '春のフォロー' } })
+    await settle(2100)
+    expect(drafts.size).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: /この方式で保存する/ }))
+    await settle(0)
+    expect(push).toHaveBeenCalledWith('/scenarios/first-step?id=new-1')
+    expect(drafts.size).toBe(0)
+  })
+
+  test('キャンセルで下書きを消して一覧へ戻る', async () => {
+    render(<ScenarioCreateV8 />)
+    await settle(0)
+    fireEvent.change(screen.getByRole('textbox', { name: 'シナリオ名' }), { target: { value: '春のフォロー' } })
+    await settle(2100)
+    expect(drafts.size).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    await settle(0)
+    expect(drafts.size).toBe(0)
+    expect(push).toHaveBeenCalledWith('/scenarios')
+  })
+
+  test('閲覧のみは下書きの口を読みも書きもせず、戻す帯も出さない', async () => {
     localStorage.setItem('lh:v8-draft:scenario-create:account-a:new', JSON.stringify({ savedAt: Date.now(), value: { name: '前の入力', folderId: '', mode: 'elapsed' } }))
     role = 'staff'
     render(<ScenarioCreateV8 />)
     await settle(2100)
+    expect(draftCalls).toEqual([])
     expect(screen.queryByRole('button', { name: '前の入力を戻す' })).toBeNull()
   })
 })

@@ -23,8 +23,14 @@ import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
-import { browserDraftKey, useBrowserDraft } from '@/v8/autosave/use-browser-draft'
-import { BrowserDraftNotice } from '@/v8/autosave/browser-draft-notice'
+import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
+import {
+  forgetNewScenarioDraftKey,
+  newScenarioDraftKey,
+  scenarioDraftKey,
+  useScenarioDraft,
+} from '@/v8/autosave/use-scenario-draft'
 import Stepper from '@/components/shared/stepper'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { TextField } from '@/components/shared/text-field'
@@ -248,7 +254,7 @@ export default function ScenarioCreateV8() {
           setSaving(null)
           return
         }
-        browserDraft.clear()
+        finishDraft()
         router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
         return
       }
@@ -264,7 +270,7 @@ export default function ScenarioCreateV8() {
         return
       }
       scenarioReferenceData.invalidateScenario(id)
-      browserDraft.clear()
+      finishDraft()
       // 3段目へ。手順の帯が3段なので、2段で編集画面へ放り出さない。
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } catch (cause) {
@@ -284,7 +290,7 @@ export default function ScenarioCreateV8() {
       try {
         const createdId = await createNew('absolute_time')
         if (createdId) {
-          browserDraft.clear()
+          finishDraft()
           router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
         }
       } finally {
@@ -294,7 +300,7 @@ export default function ScenarioCreateV8() {
     }
     const saved = await saveDetails()
     if (saved) {
-      browserDraft.clear()
+      finishDraft()
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } else if (!name.trim()) {
       rejectEmptyName()
@@ -302,13 +308,22 @@ export default function ScenarioCreateV8() {
   }
 
   /*
-   * シナリオには下書きの口が無く、名前と方式を決めた瞬間に行ができる（N-055）。
-   * そのため書きかけはこのブラウザにだけ残し、開き直したときに「前の入力を戻す」を出す。
+   * 書きかけはシナリオの下書きの口（本物とは別の行・配信に使わない・30日で消える）へ残す。
+   * 名前と方式を決めるまで本物のシナリオの行は作らない（N-055）。新規のキーは画面が作る UUID。
    */
-  const browserDraft = useBrowserDraft({
-    storageKey: scenarioState === 'ready' && (!id || scenario)
-      ? browserDraftKey(['scenario-create', scenario?.lineAccountId ?? selectedAccountId, id || 'new'])
+  const draftAccountId = scenario?.lineAccountId ?? selectedAccountId
+  const [newDraftKey, setNewDraftKey] = useState<string | null>(null)
+  useEffect(() => {
+    setNewDraftKey(!id && canEdit && selectedAccountId ? newScenarioDraftKey(selectedAccountId) : null)
+  }, [id, canEdit, selectedAccountId])
+  const browserDraft = useScenarioDraft({
+    accountId: draftAccountId,
+    draftKey: scenarioState === 'ready' && (!id || scenario)
+      ? id ? scenarioDraftKey(id, 'info') : newDraftKey
       : null,
+    // 共通（アカウントなし）のシナリオは本物に紐づけられないので、キーだけで置く。
+    scenarioId: id && scenario?.lineAccountId ? id : null,
+    legacyKey: browserDraftKey(['scenario-create', draftAccountId, id || 'new']),
     value: { name, folderId, mode: selectedMode },
     baseline: scenario
       ? {
@@ -319,9 +334,24 @@ export default function ScenarioCreateV8() {
       : { name: '', folderId: '', mode: 'absolute_time' },
     active: canEdit,
   })
+  /** 本物を保存した・キャンセルした。下書きを消し、次の新規は新しいキーで始める。 */
+  const finishDraft = () => {
+    browserDraft.clear()
+    if (!id) forgetNewScenarioDraftKey(selectedAccountId)
+  }
+  const cancel = () => {
+    finishDraft()
+    router.push('/scenarios')
+  }
+  const loadLatestDraft = () => {
+    const latest = browserDraft.loadLatest()
+    if (latest) applyDraft(latest)
+  }
   const restoreBrowserDraft = () => {
     const stored = browserDraft.restore()
-    if (!stored) return
+    if (stored) applyDraft(stored)
+  }
+  function applyDraft(stored: { name: string; folderId: string; mode: string }) {
     setName(stored.name)
     setFolderId(stored.folderId)
     if (stored.mode === 'elapsed' || stored.mode === 'absolute_time') setSelectedMode(stored.mode)
@@ -360,7 +390,7 @@ export default function ScenarioCreateV8() {
       status={saving ? '作成しています' : detailsSaving ? '保存しています' : browserDraft.label ?? undefined}
       footerActions={(
         <>
-          <Button href="/scenarios">キャンセル</Button>
+          <Button type="button" onClick={cancel}>キャンセル</Button>
           {canEdit ? (
             <>
               <Button disabled={locked} onClick={() => void continueAsDraft()}>
@@ -408,6 +438,7 @@ export default function ScenarioCreateV8() {
         ) : null}
         {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
         <BrowserDraftNotice ago={browserDraft.pendingAgo} onRestore={restoreBrowserDraft} onDiscard={browserDraft.clear} />
+        <ScenarioDraftConflictNotice ago={browserDraft.conflictAgo} onLoadLatest={loadLatestDraft} onOverwrite={browserDraft.overwrite} />
       </div>
 
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="シナリオ情報">

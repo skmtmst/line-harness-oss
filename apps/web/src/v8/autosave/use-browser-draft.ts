@@ -11,6 +11,9 @@
  * - localStorage が使えない（シークレット・容量・拒否）ときは黙って何もしない
  *
  * 保存のキーはアカウントと対象（id・新規）で分け、別の行の書きかけを混ぜない。
+ *
+ * シナリオの3画面はサーバーの下書きの口（use-scenario-draft.ts）へ移った。ここに残した
+ * 書きかけは、そちらが一度だけ移して消す（readBrowserDraft・removeBrowserDraft を使う）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AUTOSAVE_DELAY_MS, savedAgoLabel } from './use-draft-autosave'
