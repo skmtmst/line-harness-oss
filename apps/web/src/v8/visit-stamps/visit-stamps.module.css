@@ -452,3 +452,11 @@
     width: 100%;
   }
 }
+
+/* ④ の「すべて見る」で 50件ごとに送る。 */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tpl-e78-row-gap);
+}

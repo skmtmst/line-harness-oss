@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { VisitStampCard, VisitStampRedemption, VisitStampReward, VisitStampWallet } from '@line-crm/shared';
+import type { VisitStampCard, VisitStampPaperRequest, VisitStampRedemption, VisitStampReward, VisitStampWallet } from '@line-crm/shared';
 import { api, visitStampsApi } from '../lib/api.js';
 import { SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
@@ -15,8 +15,9 @@ import Icon from '../components/ui/Icon.js';
 /**
  * ★V8 来店スタンプ（お客さまの LIFF・提案 E-8）。マイルとは別のスタンプカード。
  *  ① スタンプカード（jQRsr）→［店員に見せる］② 特典を店員に見せる（V2HU7）→ 店員が暗証番号を打つ → 使用済み（xe8ga）
- *  ①［紙のカードを移す］→ ③ 紙のカードを移す（h2HKh）→［申請する］→ お店の確認待ち（etLd8）
- * お客さま本人だけでは使用済みにできない（店員の4桁の暗証番号が要る）。使用済み・取消済みの特典はサーバが二度と使わせない。
+ *  ①［紙のカードを移す］→ ③ 紙のカードを移す（h2HKh）→ 写真を預けて［申請する］→ お店の確認待ち（etLd8）
+ *    確認待ちの申請があるあいだは、③ を開くと確認待ちを出す（同じ紙を二重に送らない）。却下されたら理由を ③ に出す。
+ * お客さま本人だけでは使用済みにできない（店員の4桁の暗証番号が要る。店員は暗証番号からサーバが当てる）。使用済み・取消済みの特典はサーバが二度と使わせない。
  * 店舗は /api/liff/config の accountId、本人は LINE の ID トークン（サーバが確かめる）。
  */
 
@@ -24,7 +25,8 @@ type View = 'card' | 'show' | 'used' | 'paper' | 'pending';
 type Entry = { card: VisitStampCard; wallet: VisitStampWallet };
 
 const sorted = (rewards: VisitStampReward[]) => [...rewards].sort((a, b) => a.stamps - b.stamps);
-const total = (card: VisitStampCard) => Math.max(0, ...card.settings.rewards.map((r) => r.stamps));
+/** マスの数。カードの設定（slotCount）を使い、無い古いカードはいちばん大きい特典の個数。 */
+const total = (card: VisitStampCard) => card.settings.slotCount ?? Math.max(0, ...card.settings.rewards.map((r) => r.stamps));
 const requestId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `r-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 /** 「2026年7月13日」（日本時間）。 */
@@ -112,7 +114,9 @@ export default function VisitStamps() {
   const [view, setView] = useState<View>('card');
   const [picked, setPicked] = useState<string>('');
   const [redemption, setRedemption] = useState<(VisitStampRedemption & { shownAt: Date }) | null>(null);
-  const [used, setUsed] = useState<{ at: Date; balance: number } | null>(null);
+  const [used, setUsed] = useState<{ at: Date; balance: number; staffName: string } | null>(null);
+  /* 自分の紙のカードの申請（確認待ち・承認・却下と理由）。 */
+  const [requests, setRequests] = useState<VisitStampPaperRequest[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -133,6 +137,12 @@ export default function VisitStamps() {
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  const loadRequests = useCallback(async () => {
+    if (!accountId || !entry) return;
+    try { setRequests((await visitStampsApi.paperRequests(accountId, entry.card.id)).data); }
+    catch (e) { logFailure('visit-stamps-paper-requests', e); setRequests([]); }
+  }, [accountId, entry]);
+  useEffect(() => { void loadRequests(); }, [loadRequests]);
 
   const info = useMemo(() => (entry ? cardState(entry.card, entry.wallet.balance) : null), [entry]);
   const chosen = info?.usable.find((r) => r.id === picked) ?? info?.best ?? null;
@@ -171,13 +181,13 @@ export default function VisitStamps() {
         redemption={redemption}
         shopName={shopName}
         onBack={() => { setView('card'); offerRequest.current = requestId(); }}
-        onUse={async (staffId, pin) => {
-          await visitStampsApi.useReward(accountId, redemption.id, staffId, pin);
+        onUse={async (pin) => {
+          const result = await visitStampsApi.useReward(accountId, redemption.id, pin);
           offerRequest.current = requestId();
           const fresh = await visitStampsApi.card(accountId, card.id).catch(() => null);
           const balance = fresh?.data.wallet.balance ?? Math.max(0, wallet.balance - redemption.stamps);
           if (fresh) setEntry({ card: fresh.data.card, wallet: fresh.data.wallet });
-          setUsed({ at: new Date(), balance });
+          setUsed({ at: new Date(), balance, staffName: result.data.staffName });
           setView('used');
         }}
       />
@@ -198,6 +208,7 @@ export default function VisitStamps() {
           <InfoRows rows={[
             ['日時', jpDateTime(used.at)],
             ['店舗', shopName || '—'],
+            ['担当', used.staffName || '店員'],
             ['カード', `残り ${used.balance}個${next ? `（次は${next.name}）` : ''}`],
           ]} />
         </div>
@@ -209,7 +220,15 @@ export default function VisitStamps() {
   }
 
   if (view === 'paper' || view === 'pending') {
-    return <PaperCard accountId={accountId} cardId={card.id} sent={view === 'pending'} onSent={() => setView('pending')} onBack={() => setView('card')} />;
+    return (
+      <PaperCard
+        accountId={accountId}
+        cardId={card.id}
+        requests={requests}
+        onSent={() => { setView('pending'); void loadRequests(); }}
+        onBack={() => setView('card')}
+      />
+    );
   }
 
   return (
@@ -277,7 +296,7 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
   redemption: VisitStampRedemption & { shownAt: Date };
   shopName: string;
   onBack: () => void;
-  onUse: (staffId: string, pin: string) => Promise<void>;
+  onUse: (pin: string) => Promise<void>;
 }) {
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
@@ -289,8 +308,8 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
     if (pin.length !== 4) { setError('店員の暗証番号を4桁で入れてください。'); input.current?.focus(); return; }
     setBusy(true); setError('');
     try {
-      // 店員を選ぶ口が LIFF に無い（API は店員の ID を要る）。暗証番号だけで店員を確かめる口が入ったら staffId は不要になる。
-      await onUse('', pin);
+      // 店員は選ばない。暗証番号だけで、サーバがこの店の店員を当てる（当たらない・重なるときは断る）。
+      await onUse(pin);
     } catch (e) {
       logFailure('visit-stamps-use', e);
       setError(reasonOf(e));
@@ -347,11 +366,22 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
   );
 }
 
+/** 申請の新しい順の先頭（確認待ちがあればそれ）。 */
+export function latestRequest(requests: VisitStampPaperRequest[] | null): VisitStampPaperRequest | null {
+  const list = [...(requests ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return list.find((r) => r.status === 'pending') ?? list[0] ?? null;
+}
+
+/** 申請日時（サーバの UTC。タイムゾーンの無い形も UTC として読む）。 */
+function requestDate(value: string): Date {
+  return new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(value) ? value : `${value.replace(' ', 'T')}Z`);
+}
+
 /**
- * ③ 紙のカードを移す。写真と押してある数を送り、お店が確かめてから足す。
- * 写真を預ける口が LIFF にまだ無い（API は HTTPS の写真の URL を要る）。口が入るまでは送れないことをその場で伝える。
+ * ③ 紙のカードを移す。写真を預け（本人だけが読める置き場）、押してある数と一緒に申請する。お店が確かめてから足す。
+ * 確認待ちの申請があるあいだは、確認待ち（etLd8）を出す。却下された申請があれば、その理由を上に出す。
  */
-function PaperCard({ accountId, cardId, sent, onSent, onBack }: { accountId: string; cardId: string; sent: boolean; onSent: () => void; onBack: () => void }) {
+function PaperCard({ accountId, cardId, requests, onSent, onBack }: { accountId: string; cardId: string; requests: VisitStampPaperRequest[] | null; onSent: () => void; onBack: () => void }) {
   const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);
   const [stamps, setStamps] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -359,8 +389,12 @@ function PaperCard({ accountId, cardId, sent, onSent, onBack }: { accountId: str
   const [sentAt, setSentAt] = useState<Date | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => () => { if (photo) URL.revokeObjectURL(photo.url); }, [photo]);
+  const latest = latestRequest(requests);
+  const pending = latest?.status === 'pending' ? latest : null;
 
-  if (sent) {
+  if (sentAt || pending) {
+    const shownStamps = pending ? pending.stamps : stamps;
+    const shownAt = pending ? requestDate(pending.createdAt) : sentAt;
     return (
       <LiffLookScope className="min-h-screen bg-canvas" designNode="etLd8">
         <LiffHeader title="紙のカードを移す" />
@@ -371,7 +405,7 @@ function PaperCard({ accountId, cardId, sent, onSent, onBack }: { accountId: str
             <Badge tone="pending">確認待ち</Badge>
             <p className="w-full text-sm leading-[21px] text-liff-sub">確認できたらカードに足して、LINE でお知らせします。</p>
           </div>
-          <InfoRows rows={[['押印数', `${stamps} 個`], ['申請日', sentAt ? jpDateTime(sentAt) : '—'], ['写真', '1枚']]} />
+          <InfoRows rows={[['押印数', `${shownStamps} 個`], ['申請日', shownAt ? jpDateTime(shownAt) : '—'], ['写真', '1枚']]} />
         </div>
         <BottomBar>
           <Button variant="secondary" className="min-h-12" onClick={onBack}>カードに戻る</Button>
@@ -384,9 +418,10 @@ function PaperCard({ accountId, cardId, sent, onSent, onBack }: { accountId: str
     if (!photo) { setError('紙のカードの写真を撮ってください。'); return; }
     setBusy(true); setError('');
     try {
-      const photoUrl = await uploadPaperPhoto(photo.file);
-      if (!photoUrl) { setError('いまは写真を送れません。お店でスタンプを足してもらってください。'); return; }
-      await visitStampsApi.requestPaper(accountId, cardId, { photoUrl, stamps });
+      const check = paperPhotoProblem(photo.file);
+      if (check) { setError(check); return; }
+      const uploaded = await visitStampsApi.uploadPaperPhoto(accountId, cardId, photo.file);
+      await visitStampsApi.requestPaper(accountId, cardId, { photoUrl: uploaded.data.photoUrl, stamps });
       setSentAt(new Date());
       onSent();
     } catch (e) {
@@ -400,6 +435,11 @@ function PaperCard({ accountId, cardId, sent, onSent, onBack }: { accountId: str
       <LiffHeader title="紙のカードを移す" />
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-36">
         <p className="text-sm leading-[21px] text-liff-sub">お手持ちの紙のスタンプカードを、LINE のカードに移せます。お店が確認してから足します。</p>
+        {latest?.status === 'rejected' ? (
+          <p role="status" className="rounded-(--liff-radius) bg-liff-note px-3 py-2.5 text-[13px] leading-5 text-ink">
+            {`前の申請（${latest.stamps}個）は、お店が確認できませんでした${latest.reason ? `：${latest.reason}` : ''}。写真を撮り直して、もう一度申請できます。`}
+          </p>
+        ) : null}
         <div className="flex flex-col gap-2">
           <h2 className="text-sm leading-[21px] font-semibold text-ink">① 紙のカードの写真</h2>
           <div className="flex h-[190px] w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl bg-liff-off-bg outline outline-liff-line">
@@ -434,10 +474,9 @@ function PaperCard({ accountId, cardId, sent, onSent, onBack }: { accountId: str
   );
 }
 
-/**
- * 紙のカードの写真を預けて HTTPS の URL を受け取る。LIFF から写真を預ける口が API にまだ無い（Codex へ依頼済みの穴）。
- * 口が入ったらここだけ差し替える。いまは null（＝送れない）を返す。
- */
-async function uploadPaperPhoto(_file: File): Promise<string | null> {
-  return null;
+/** 預ける前の確かめ（サーバと同じ境目：JPEG・PNG・WebP、5MB まで）。問題が無ければ空文字。 */
+export function paperPhotoProblem(file: Pick<File, 'type' | 'size'>): string {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return '写真は JPEG・PNG・WebP で撮ってください。';
+  if (file.size > 5 * 1024 * 1024) return '写真が大きすぎます（5MB まで）。もう一度撮ってください。';
+  return '';
 }

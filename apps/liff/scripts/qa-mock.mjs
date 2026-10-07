@@ -391,7 +391,19 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (method === 'POST' && pathname === '/api/liff/visit-stamps/redemptions/vs-redeem-1/use') {
-      json(res, 200, { success: true, data: { id: 'vs-redeem-1', status: 'used' } });
+      // 暗証番号だけで店員を当てる（API-10）。使った店員の名前を返す（xe8ga の「担当」）。
+      json(res, 200, { success: true, data: { id: 'vs-redeem-1', status: 'used', staffId: 'staff-tamura', staffName: '田村' } });
+      return;
+    }
+    // 自分の紙のカードの申請（確認待ち etLd8 は map の api で確認待ちを1件返す）。ふだんは無し。
+    if (method === 'GET' && pathname === '/api/liff/visit-stamps/cards/vs-card-1/paper-requests') {
+      json(res, 200, { success: true, data: [] });
+      return;
+    }
+    // 紙のカードの写真を預ける（multipart）。中身は読み捨て、本人だけが読める URL を返す。
+    if (method === 'POST' && pathname === '/api/liff/visit-stamps/cards/vs-card-1/paper-photos') {
+      for await (const _chunk of req) { /* 読み捨て */ }
+      json(res, 201, { success: true, data: { id: 'vs-photo-1', photoUrl: 'https://qa.example/api/liff/visit-stamps/paper-photos/vs-photo-1', contentType: 'image/jpeg', size: 1024 } });
       return;
     }
     if (method === 'POST' && pathname === '/api/liff/visit-stamps/cards/vs-card-1/paper-requests') {

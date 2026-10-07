@@ -11,23 +11,35 @@ const TZ = 'Asia/Tokyo'
 export function defaultSettings(): VisitStampSettings {
   return {
     mode: 'visit', amountUnit: 1000, maxPerVisit: 5, firstVisitBonus: 0, expiryMonths: 6, timezone: TZ,
+    slotCount: 10, stackingOrder: 'bonus_then_multipliers',
     multipliers: [], rankMultipliers: [],
     rewards: [{ id: 'reward-1', name: 'ドリンク 1杯', stamps: 10 }],
   }
 }
 
-/** マスの数＝いちばん大きい特典の個数（カードの最後のマス）。設定に別の欄は無い。 */
+/** マスの数。カードの設定（slotCount）を使う。無い古いカードは、いちばん大きい特典の個数。 */
 export function slotCount(settings: VisitStampSettings): number {
-  return Math.max(0, ...settings.rewards.map((r) => r.stamps))
+  return settings.slotCount ?? Math.max(0, ...settings.rewards.map((r) => r.stamps))
 }
 
-/** マスの数を変える＝いちばん大きい特典の個数を変える。ほかの特典はそのまま（マスより大きいものは詰める）。 */
+/** マスの数を変える。特典の個数とは別に持つ（マスより大きい特典は、マスの数に詰める）。 */
 export function withSlotCount(settings: VisitStampSettings, count: number): VisitStampSettings {
-  const max = slotCount(settings)
   return {
     ...settings,
-    rewards: settings.rewards.map((r) => (r.stamps === max ? { ...r, stamps: count } : { ...r, stamps: Math.min(r.stamps, count) })),
+    slotCount: count,
+    rewards: settings.rewards.map((r) => (r.stamps > count ? { ...r, stamps: count } : r)),
   }
+}
+
+/** 重ねたときの順番（口の stackingOrder）。 */
+export const STACKING_ORDERS = [
+  { value: 'bonus_then_multipliers', label: '初回ボーナスを足してから倍率' },
+  { value: 'multipliers_then_bonus', label: '倍率のあとで初回ボーナス' },
+] as const
+
+/** 重ねたときの上限。設定が無い古いカードは「1回の上限」がそのまま重ねた後にかかる。 */
+export function stackedCap(settings: VisitStampSettings): number {
+  return settings.maxStackedStamps ?? settings.maxPerVisit
 }
 
 export function sortedRewards(rewards: VisitStampReward[]): VisitStampReward[] {
@@ -66,8 +78,9 @@ function monthDay(iso: string, minusDay = false): string {
   return `${parts.find((p) => p.type === 'month')?.value}/${parts.find((p) => p.type === 'day')?.value}`
 }
 
-/** 倍率の名前。「2倍デー」（曜日か時間があるとき）・「2倍の期間」（期間だけ）・「いつも 2倍」。 */
+/** 倍率の名前。付けた名前があればそれ。無ければ「2倍デー」（曜日か時間）・「2倍の期間」（期間だけ）・「いつも 2倍」。 */
 export function multiplierName(m: VisitStampMultiplier): string {
+  if (m.name?.trim()) return m.name.trim()
   const n = trimNumber(m.multiplier)
   if (m.weekdays?.length || m.startMinute !== undefined) return `${n}倍デー`
   if (m.from || m.to) return `${n}倍の期間`
@@ -86,7 +99,7 @@ export function multiplierDetail(m: VisitStampMultiplier): string {
 
 export function rankDetail(settings: VisitStampSettings): string {
   return settings.rankMultipliers.length
-    ? settings.rankMultipliers.map((r) => `${r.tagName} ${trimNumber(r.multiplier)}倍`).join(' ・ ')
+    ? settings.rankMultipliers.map((r) => `${r.name?.trim() || r.tagName} ${trimNumber(r.multiplier)}倍${r.active === false ? '（止めています）' : ''}`).join(' ・ ')
     : 'タグごとに倍率を決めます'
 }
 
@@ -102,7 +115,7 @@ export function shortDateTime(iso: string): string {
   return `${v('month')}/${v('day')} ${v('hour')}:${v('minute')}`
 }
 
-export type HistoryRow = { id: string; at: string; count: string; why: string; actor: string; reversible: boolean; reversed: boolean }
+export type HistoryRow = { id: string; friendId: string; at: string; count: string; why: string; actor: string; reversible: boolean; reversed: boolean }
 
 /**
  * 記録の行。取り消し（reverse）は元の行にまとめて「+1 個 → 取り消し」と書く（理由と誰が は取り消しのもの）。
@@ -128,7 +141,7 @@ export function historyRows(entries: VisitStampEntry[], name: (id: string) => st
       else if (e.kind === 'paper' && e.actorId) actor = `${actor}（承認）`
       if (reverse) { why = reverse.reason; actor = who(reverse.actorId) }
       return {
-        id: e.id, at: e.createdAt, count, why, actor,
+        id: e.id, friendId: e.friendId, at: e.createdAt, count, why, actor,
         reversed: !!reverse,
         reversible: !reverse && e.delta !== 0 && ['visit', 'manual', 'paper', 'redeem'].includes(e.kind),
       }
@@ -173,5 +186,6 @@ export function settingsProblem(name: string, s: VisitStampSettings): string | n
   if (s.rewards.some((r) => !r.name.trim() || !Number.isInteger(r.stamps) || r.stamps < 1)) return '特典の名前と個数を確かめてください。'
   if (s.mode === 'amount' && (!Number.isInteger(s.amountUnit) || s.amountUnit < 1)) return '何円ごとに 1個 かを入れてください。'
   if (!Number.isInteger(s.maxPerVisit) || s.maxPerVisit < 1) return '1回の上限を 1個 以上にしてください。'
+  if (s.slotCount !== undefined && s.rewards.some((r) => r.stamps > (s.slotCount ?? 0))) return '特典の個数をマスの数以下にしてください。'
   return null
 }

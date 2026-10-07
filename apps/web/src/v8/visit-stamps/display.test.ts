@@ -1,20 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import type { VisitStampEntry } from '@line-crm/shared'
-import {
-  defaultSettings, friendLabel, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rewardNote,
-  settingsProblem, shortDateTime, slotCount, withSlotCount,
-} from './display'
+import { defaultSettings, friendLabel, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rewardNote, settingsProblem, shortDateTime, slotCount, withSlotCount, stackedCap } from './display'
 
 const settings = { ...defaultSettings(), rewards: [{ id: 'a', name: 'ドリンク 1杯', stamps: 5 }, { id: 'b', name: 'デザート 1品', stamps: 10 }] }
 const entry = (id: string, kind: string, delta: number, actorId: string | null, reason: string, createdAt: string, originalId: string | null = null): VisitStampEntry =>
   ({ id, cardId: 'c', friendId: 'f', accountId: 'acc', kind, delta, actorId, reason, createdAt, originalId })
 
 describe('来店スタンプの見せ方', () => {
-  it('マスの数はいちばん大きい特典。変えるとその特典だけが動き、マスより大きい特典は詰める', () => {
+  it('マスの数は特典の個数と別（API-10 の slotCount）。無い古いカードはいちばん大きい特典。マスより大きい特典は詰める', () => {
     expect(slotCount(settings)).toBe(10)
+    expect(slotCount({ ...settings, slotCount: 12 })).toBe(12)
     const next = withSlotCount(settings, 4)
+    expect(next.slotCount).toBe(4)
     expect(next.rewards.map((r) => r.stamps)).toEqual([4, 4])
-    expect(withSlotCount(settings, 12).rewards.map((r) => r.stamps)).toEqual([5, 12])
+    const wider = withSlotCount(settings, 12)
+    expect(wider.slotCount).toBe(12)
+    expect(wider.rewards.map((r) => r.stamps)).toEqual([5, 10])
+    expect(settingsProblem('カード', { ...settings, slotCount: 8 })).toBe('特典の個数をマスの数以下にしてください。')
+    expect(stackedCap(settings)).toBe(settings.maxPerVisit)
+    expect(stackedCap({ ...settings, maxStackedStamps: 8 })).toBe(8)
   })
 
   it('特典の下の1行は、サーバの減らし方どおり（途中の特典は減る数・最後は新しいカード）', () => {
@@ -71,5 +75,10 @@ describe('来店スタンプの見せ方', () => {
     expect(settingsProblem('カード', { ...settings, mode: 'amount', amountUnit: 0 })).toMatch('何円ごと')
     expect(settingsProblem('カード', { ...settings, maxPerVisit: 0 })).toMatch('上限')
     expect(settingsProblem('カード', settings)).toBeNull()
+  })
+
+  it('倍率に付けた名前があればそれを出す。止めたランクは「止めています」', () => {
+    expect(multiplierName({ name: '火曜の2倍デー', multiplier: 2, weekdays: [2] })).toBe('火曜の2倍デー')
+    expect(multiplierName({ multiplier: 2, weekdays: [2] })).toBe('2倍デー')
   })
 })

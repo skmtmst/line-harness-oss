@@ -23,6 +23,7 @@ export type FeatureKey =
   | 'media'
   | 'events'
   | 'booking'
+  | 'visit_stamps'
   | 'automations'
   | 'external_integrations'
   | 'friend_add_routing'
@@ -79,6 +80,7 @@ export const DEFAULT_FEATURES: Record<FeatureKey, boolean> = {
   media: true,
   events: true,
   booking: true,
+  visit_stamps: true,
   automations: true,
   external_integrations: true,
   friend_add_routing: true,

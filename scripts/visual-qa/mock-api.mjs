@@ -1224,7 +1224,7 @@ const FEATURES = {
   friend_add_routing: true, multi_store_hierarchy: false,
   friend_fields: true, support_marks: true, saved_searches: true,
   media: true, common_vars: true, analytics: true, site_tracking: true,
-  webinars: false, events: true, booking: true, affiliates: false, mileage: true,
+  webinars: false, events: true, booking: true, visit_stamps: true, affiliates: false, mileage: true,
   ec_commerce: true, line_notifications: true, nen_campaigns: true,
   restaurant_test: true,
 }
@@ -2622,6 +2622,8 @@ const VISIT_STAMP_CARD = {
   id: 'vs-card-1', name: '然 来店スタンプカード', accountIds: ['visual-qa-account'], active: true, version: 3, expectedVersion: 3,
   settings: {
     mode: 'amount', amountUnit: 1000, maxPerVisit: 3, firstVisitBonus: 1, expiryMonths: 6, timezone: 'Asia/Tokyo',
+    /* API-10：マスの数・重ねる順番・重ねたときの上限は別に持つ。 */
+    slotCount: 10, stackingOrder: 'bonus_then_multipliers', maxStackedStamps: 5,
     multipliers: [{ multiplier: 2, weekdays: [2], startMinute: 1020, endMinute: 1140, from: '2025-12-31T15:00:00.000Z', to: '2026-03-31T15:00:00.000Z' }],
     rankMultipliers: [],
     rewards: [{ id: 'reward-drink', name: 'ドリンク 1杯', stamps: 5 }, { id: 'reward-dessert', name: 'デザート 1品', stamps: 10 }],
@@ -2633,6 +2635,9 @@ const VISIT_STAMP_FRIENDS = {
   'vs-f-3': { id: 'vs-f-3', displayName: 'めぐ', metadata: { name: '加藤 恵' } },
   'vs-f-4': { id: 'vs-f-4', displayName: 'つばさ', metadata: { name: '中村 翼' } },
   'vs-f-5': { id: 'vs-f-5', displayName: 'けんじ', metadata: { name: '佐藤 健二' } },
+  'vs-f-6': { id: 'vs-f-6', displayName: 'さくら', metadata: { name: '高橋 さくら' } },
+  'vs-f-7': { id: 'vs-f-7', displayName: 'あや', metadata: { name: '山本 彩' } },
+  'vs-f-8': { id: 'vs-f-8', displayName: 'ゆき', metadata: { name: '伊藤 由紀' } },
 }
 const VISIT_STAMP_PAPER = [
   { id: 'vsp-1', card_id: 'vs-card-1', friend_id: 'vs-f-1', line_account_id: 'visual-qa-account', photo_url: '', stamps: 7, status: 'pending', created_at: '2026-01-12 11:14:00' },
@@ -2640,22 +2645,29 @@ const VISIT_STAMP_PAPER = [
   { id: 'vsp-3', card_id: 'vs-card-1', friend_id: 'vs-f-3', line_account_id: 'visual-qa-account', photo_url: '', stamps: 9, status: 'pending', created_at: '2026-01-11 10:45:00' },
   { id: 'vsp-4', card_id: 'vs-card-1', friend_id: 'vs-f-4', line_account_id: 'visual-qa-account', photo_url: '', stamps: 3, status: 'approved', created_at: '2026-01-10 09:20:00' },
 ]
-const vsEntry = (id, kind, delta, actorId, reason, createdAt, originalId = null) => ({ id, cardId: 'vs-card-1', friendId: 'vs-f-5', accountId: 'visual-qa-account', kind, delta, actorId, reason, createdAt, originalId })
+const vsEntry = (id, kind, delta, actorId, reason, createdAt, originalId = null, friendId = 'vs-f-5') => ({ id, cardId: 'vs-card-1', friendId, accountId: 'visual-qa-account', kind, delta, actorId, reason, createdAt, originalId })
+/* ④ 店全体の記録（API-10 の entries）。絵のとおり、いろいろな友だちの記録が新しい順に並ぶ。 */
 const VISIT_STAMP_ENTRIES = [
   vsEntry('vse-1', 'visit', 2, 'stf-3', '来店・会計 2,400円', '2026-01-13T09:40:00.000Z'),
-  vsEntry('vse-2', 'redeem', -10, 'stf-3', 'デザート 1品', '2026-01-13T09:10:00.000Z'),
-  vsEntry('vse-3', 'paper', 7, 'stf-1', '紙のカードの写真を確認しました', '2026-01-12T11:30:00.000Z'),
-  vsEntry('vse-4', 'visit', 1, null, '来店（予約の来店）', '2026-01-12T03:05:00.000Z'),
-  vsEntry('vse-5', 'manual', 1, 'stf-1', '押し忘れ', '2026-01-11T10:02:00.000Z'),
-  vsEntry('vse-6', 'reverse', -1, 'stf-1', 'まちがい', '2026-01-11T10:30:00.000Z', 'vse-5'),
+  vsEntry('vse-2', 'redeem', -10, 'stf-3', 'デザート 1品', '2026-01-13T09:10:00.000Z', null, 'vs-f-6'),
+  vsEntry('vse-3', 'paper', 7, 'stf-1', '紙のカードの写真を確認しました', '2026-01-12T11:30:00.000Z', null, 'vs-f-1'),
+  vsEntry('vse-4', 'visit', 1, null, '来店（予約の来店）', '2026-01-12T03:05:00.000Z', null, 'vs-f-7'),
+  vsEntry('vse-5', 'manual', 1, 'stf-1', '押し忘れ', '2026-01-11T10:02:00.000Z', null, 'vs-f-8'),
+  vsEntry('vse-6', 'reverse', -1, 'stf-1', 'まちがい', '2026-01-11T10:30:00.000Z', 'vse-5', 'vs-f-8'),
   vsEntry('vse-7', 'visit', 1, null, '来店', '2026-01-08T10:00:00.000Z'),
 ]
 function visitStampRead(pathname, query) {
   if (pathname === '/api/visit-stamps/cards') return { success: true, data: [VISIT_STAMP_CARD] }
   if (pathname === '/api/visit-stamps/paper-requests') return { success: true, data: VISIT_STAMP_PAPER }
+  if (pathname === '/api/visit-stamps/entries') {
+    const page = Math.max(1, Number(query.get('page') ?? 1)), pageSize = Math.min(200, Math.max(1, Number(query.get('pageSize') ?? 50)))
+    const friendId = query.get('friendId'), kind = query.get('kind')
+    const list = VISIT_STAMP_ENTRIES.filter((e) => (!friendId || e.friendId === friendId) && (!kind || e.kind === kind))
+    return { success: true, data: { items: list.slice((page - 1) * pageSize, page * pageSize), total: list.length, page, pageSize } }
+  }
   if (/^\/api\/visit-stamps\/cards\/[^/]+\/wallet$/.test(pathname)) {
     const friendId = query.get('friendId') ?? ''
-    const entries = friendId === 'vs-f-5' ? VISIT_STAMP_ENTRIES : []
+    const entries = VISIT_STAMP_ENTRIES.filter((e) => e.friendId === friendId)
     return { success: true, data: { wallet: { cardId: 'vs-card-1', friendId, balance: entries.reduce((n, e) => n + e.delta, 0), earnedTotal: 12, expiresAt: '2026-07-13T09:40:00.000Z' }, entries } }
   }
   const friend = /^\/api\/friends\/(vs-f-\d)$/.exec(pathname)
