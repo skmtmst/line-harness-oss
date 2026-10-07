@@ -177,7 +177,11 @@ function cameBackOrReloaded(): boolean {
 }
 
 function scrollerOf(start: HTMLElement | null): HTMLElement {
-  let element = start?.parentElement ?? null
+  /*
+   * 目印が無いときは本文の入れ物から探す。V8 の PC 幅は外枠が画面の高さで止まり、
+   * 送るのは白い板（#main-content）の中なので、ページ全体（document）を見ても位置は 0 のまま。
+   */
+  let element = start?.parentElement ?? (typeof document !== 'undefined' ? document.getElementById('main-content') : null)
   while (element) {
     const style = getComputedStyle(element)
     if (/(auto|scroll)/.test(style.overflowY) && element.scrollHeight > element.clientHeight + 1) return element
