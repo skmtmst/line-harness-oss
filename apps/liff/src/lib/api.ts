@@ -1,4 +1,8 @@
 import type { FormLayout } from '@line-crm/shared';
+import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
+import type { WebinarAudience } from '@line-crm/shared';
+export type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
+export type { WebinarAudience } from '@line-crm/shared';
 import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
 import { getIdToken, getLiffId } from './liff-auth.js';
 import type { LiffLookApiSettings } from './liff-look.js';
@@ -183,6 +187,12 @@ export type CreateEventBookingResponse =
   | { waitlisted: true; slot_id: string };
 
 export interface EventBookingMine {
+  /** 従来の予約行は未指定。待ちの行は source: 'waitlist'。 */
+  source?: 'booking' | 'waitlist';
+  queue_position?: number | null;
+  party_size?: number;
+  slot_id?: string;
+  offer_expires_at?: string | null;
   id: string;
   event_id: string;
   status: string;
@@ -316,6 +326,11 @@ export const api = {
     ),
   myEventBookings: (tab: 'upcoming' | 'past') =>
     get<{ items: EventBookingMine[] }>(`/api/liff/events/me?tab=${tab}`),
+  myEventWaitlist: () => get<{ items: EventWaitlistMine[] }>('/api/liff/events/me/waitlist'),
+  myEventWaitlistEntry: (waitlistId: string) =>
+    get<EventWaitlistMine>(`/api/liff/events/me/waitlist/${encodeURIComponent(waitlistId)}`),
+  cancelMyEventWaitlist: (waitlistId: string) =>
+    post<{ ok: true }>(`/api/liff/events/me/waitlist/${encodeURIComponent(waitlistId)}/cancel`, {}),
   cancelMyEventBooking: (bookingId: string) =>
     post<{ ok: true }>(`/api/liff/events/me/${bookingId}/cancel`, {}),
   /**
@@ -334,6 +349,10 @@ export const api = {
       success: true;
       data: { bookingId: string; status: 'confirmed'; alreadyConfirmed: boolean };
     }>(`/api/liff/events/waitlist/${encodeURIComponent(token)}/accept`, {}),
+  eventWaitlistOffer: (token: string) =>
+    get<{ success: true; data: EventWaitlistOfferDetail }>(
+      `/api/liff/events/waitlist/${encodeURIComponent(token)}`,
+    ),
 
   // ===== 回答フォーム =====
   /**
@@ -412,6 +431,8 @@ export const api = {
 
   // ===== Webinar =====
   webinarState: (slug: string) => get<WebinarState>(`/api/liff/webinars/${slug}`),
+  webinarAudience: (slug: string) =>
+    get<WebinarAudience>(`/api/liff/webinars/${encodeURIComponent(slug)}/audience`),
   webinarHeartbeat: (
     slug: string,
     sessionStartAt: number,
