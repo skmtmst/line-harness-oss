@@ -30,11 +30,15 @@ describe('V8 仕上げ3回目の動き', () => {
     expect(button).toMatch(/busyLabel = '保存中…'/)
   })
 
-  it('⑤ …・プルダウンの開きは200msで統一（色・暦ポップは120msのまま）', () => {
-    for (const file of ['./action-menu.module.css', './select.module.css']) {
+  it('⑤ プルダウンの開きは200msで統一（色・暦ポップは120msのまま）。「…」は提案 F で 120ms', () => {
+    for (const file of ['./select.module.css']) {
       const css = readFileSync(new URL(file, import.meta.url), 'utf8')
       expect(css).toContain('var(--motion-base) var(--motion-ease-out)')
     }
+    // 「…」のメニューは動きの決まり（提案 F・採用）で押した角から 120ms・0.96→1。
+    // 起点と縮みは v8-motion-root-causes.test.tsx が見る。
+    const menu = readFileSync(new URL('./action-menu.module.css', import.meta.url), 'utf8')
+    expect(menu).toContain('animation: action-menu-v8-enter var(--motion-fast) var(--motion-ease-out)')
     // 選ぶ箱は名前＋長さの分離指定（combobox-v8-in・motion-base）。
     const combo = readFileSync(new URL('./combobox.module.css', import.meta.url), 'utf8')
     expect(combo).toMatch(/animation-duration:\s*var\(--motion-base\)/s)

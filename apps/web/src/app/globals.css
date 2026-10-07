@@ -1672,8 +1672,13 @@ html:not([data-theme="v8"]) .v8-only {
   }
 }
 
-/* 上に向かって開くメニューはトリガーの右上を起点にする。 */
-[data-design-part="action-menu"],
+/*
+ * 上に向かって開くメニューはトリガーの右上を起点にする。
+ * 「…」のメニュー（action-menu）は v7 だけ。V8 は部品（action-menu.module.css）が
+ * 押した角から開く動きを持つ。ここは層の外で、当てると部品の指定に必ず勝ってしまう
+ * （V8 で上から沈む旧い動きが走っていた。窓の dialog と同じ直し方）。
+ */
+:root:not([data-theme="v8"]) [data-design-part="action-menu"],
 [data-design-part="notification-panel"],
 aside[aria-label="フォルダ"] .shadow-lg {
   animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
