@@ -1259,6 +1259,9 @@
   --tpl-rt-preview-w: 210px; --tpl-rt-preview-bg: #8fa8cf; --tpl-rt-preview-icon: 22px; --tpl-rt-rich-radius: 14px; --tpl-rt-photo-h: 96px; --tpl-rt-photo-icon: 22px; --tpl-rt-rich-pad: 12px 14px; --tpl-rt-rich-ink: #111111; --tpl-rt-rich-sub: #666666; --tpl-rt-rich-body-lh: 17px; --tpl-rt-rich-action-pad: 10px 0; --tpl-rt-rich-link: #42659a;
   --tpl-rt-photo-a: #c8a27a; --tpl-rt-photo-b: #9fb3c8; --tpl-rt-photo-c: #d9b8a6; --tpl-rt-photo-d: #b9c7a5; --tpl-rt-mini-pad: 18px; --tpl-rt-mini-title-size: 16px;
   --tpl-inbox-summary-pad: 20px; --tpl-inbox-summary-gap: 16px;
+  /* 受信箱の会話の中を探す（M0393 段13・枠 v7GV2）。 */
+  --tpl-inbox-search-pad: 8px 20px; --tpl-inbox-search-gap: 8px; --tpl-inbox-search-field-h: 32px; --tpl-inbox-search-field-pad: 0 10px; --tpl-inbox-search-field-gap: 6px; --tpl-inbox-search-field-line: 1.5px solid var(--color-accent-deep); --tpl-inbox-search-field-line-offset: -1.5px;
+  --tpl-inbox-search-icon: 14px; --tpl-inbox-search-text: 13px; --tpl-inbox-search-text-lh: 20px; --tpl-inbox-search-count: 12px; --tpl-inbox-search-count-lh: 19px; --tpl-inbox-search-btn: 32px; --tpl-inbox-search-btn-icon: 15px; --tpl-inbox-search-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-inbox-search-hit-current: 0 0 0 2px var(--color-warning); --tpl-inbox-search-hit-other: 0 0 0 2px #fdf3e1;
   /* 自動応答の作る・完了・実行結果と共通情報の作る・編集（Z2LIUx・UGrd2・V4LjH・nWmLg・AYc6O・C67dE・piWhz・p82v9）。 */
   --tpl-ar-ed-none: 0; --tpl-ar-ed-narrow-pad: 16px; --tpl-ar-ed-narrow-side-w: 248px; --tpl-ar-ed-holiday-w: 136px; --tpl-ar-ed-chip-x-pull: -7px; --tpl-ar-ed-kw-row-gap: 4px; --tpl-ar-ed-band-mt: 16px; --tpl-ar-ed-band-mb: -8px; --tpl-ar-ed-band-pad: 12px 16px; --tpl-ar-ed-band-note-lh: 19px;
   --tpl-ar-done-body-pad: 48px 0; --tpl-ar-done-w: 560px; --tpl-ar-done-pad: 32px; --tpl-ar-done-icon: 48px; --tpl-ar-done-title-size: 18px; --tpl-ar-done-title-lh: 26px; --tpl-ar-done-note-lh: 22px; --tpl-ar-done-row-h: 16.5px;
