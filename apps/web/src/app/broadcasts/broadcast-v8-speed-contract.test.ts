@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const DIR = dirname(fileURLToPath(import.meta.url))
-const LIST = readFileSync(join(DIR, 'list-v8.tsx'), 'utf8')
+// 一覧の入口は src/v8/broadcasts/list.tsx（古い list-v8.tsx はもう描かれない）。
+const LIST = readFileSync(join(DIR, '../../v8/broadcasts/list.tsx'), 'utf8')
 
 /*
  * 一斉配信V8の速さ。条件を変えるたび3つの口を取り直していた。

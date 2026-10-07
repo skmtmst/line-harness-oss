@@ -50,7 +50,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 const { AccountProvider } = await import('@/contexts/account-context')
-const { default: CampaignEditor } = await import('./campaign-editor')
+// 編集の入口（page.tsx）は campaign-editor-v8 を出す（古い campaign-editor.tsx はどこからも描かれないので 2026-10-07 に消した）。
+const { default: CampaignEditor } = await import('./campaign-editor-v8')
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -210,7 +211,7 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     // 公開されていない候補を押しても動作は足されない。
     await click(draft as HTMLElement)
     await settle()
-    expect(container.textContent).not.toContain('回答フォーム「下書きフォーム」を開く')
+    expect(container.textContent).not.toContain('回答フォーム「下書きフォーム」を開かせる')
 
     // キーボードだけで公開中の候補を選ぶと動作が足される。
     await act(async () => {
@@ -218,7 +219,7 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
       ;(input as HTMLInputElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     })
     await settle()
-    expect(container.textContent).toContain('回答フォーム「公開中のフォーム」を開く')
+    expect(container.textContent).toContain('回答フォーム「公開中のフォーム」を開かせる')
   })
 
   it('使えるフォームなら「つながる先」に名前と公開状態が出て保存できる', async () => {
@@ -229,7 +230,9 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     })
     await mount()
 
-    expect(container.textContent).toContain('口コミ（公開中）')
+    // ★V8 の編集（campaign-editor-v8）は「つながる先」の欄に公開状態を出さない。つないだ名前と、問題の知らせが無いことを見る。
+    expect(container.textContent).toContain('回答フォーム「口コミ」を開かせる')
+    expect(container.textContent).not.toContain('つなぐ回答フォームは公開されていません')
     await click(saveButton())
     await settle()
     expect(updateSettingApi).toHaveBeenCalledTimes(1)

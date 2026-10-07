@@ -26,6 +26,12 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return { ...actual, fetchApi, api: { ...(actual as unknown as { api: object }).api, folders: apiFolders } }
 })
 
+/* 役割はサーバへ聞かず、手元の値（lh_staff_role）で決める。新しい一覧は答えが来るまで手元の値を使う。 */
+vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
+  const actual = await importOriginal()
+  return { ...actual, useStaffRole: () => null }
+})
+
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
@@ -40,7 +46,8 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
-import FormSubmissionsPage from './list-v8'
+/* 新しい一覧（src/v8/forms/list.tsx）を描く。2026-10-06 に `./list-v8` から向け直した。 */
+import FormSubmissionsPage from '@/v8/forms/list'
 import { ApiError } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -186,8 +193,8 @@ describe('R603: フォルダだけ失敗しても一覧と件数を残す', () =
     // 取得済みのフォームは残る。
     expect(host.textContent).toContain('箱フォーム')
     expect(host.textContent).toContain('未分類フォーム')
-    // 件数も残る（全面エラー・0件にしない）。
-    expect(host.textContent).toContain('2件中')
+    // 件数も残る（全面エラー・0件にしない）。1ページに収まるときは「N件」だけ（BEHAVIOR.md）。
+    expect(host.textContent).toMatch(/(^|[^0-9])2件(?!中)/)
     expect(host.textContent).not.toContain('表示できませんでした')
     // フォルダ欄だけ失敗と再試行。
     expect(host.textContent).toContain('フォルダを読み込めませんでした。')
@@ -222,7 +229,7 @@ describe('正常・空は従来どおり', () => {
   it('一覧が出る', async () => {
     await mount()
     expect(host.textContent).toContain('箱フォーム')
-    expect(host.textContent).toContain('2件中')
+    expect(host.textContent).toMatch(/(^|[^0-9])2件(?!中)/)
   })
 
   it('空は作成導線の空状態', async () => {

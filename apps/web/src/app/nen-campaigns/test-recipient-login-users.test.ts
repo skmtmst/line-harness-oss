@@ -6,7 +6,7 @@ import { describe, expect, test } from 'vitest';
 const directory = dirname(fileURLToPath(import.meta.url));
 const page = readFileSync(join(directory, 'page.tsx'), 'utf8');
 const overview = readFileSync(join(directory, 'nen-overview.tsx'), 'utf8');
-const editor = readFileSync(join(directory, 'edit/campaign-editor.tsx'), 'utf8');
+const editor = readFileSync(join(directory, 'edit/campaign-editor-v8.tsx'), 'utf8');
 const api = readFileSync(join(directory, '../../lib/api.ts'), 'utf8');
 
 describe('NEN配信のテスト送信先', () => {

@@ -30,8 +30,7 @@ export const FOLDER_KINDS = [
   // 友だち情報欄の分類。友だち詳細の上に並ぶタブ（飼い主情報・ペット
   // プロフィールなど）がこれ。friend_fields.folder_id が指す先。
   'friend_field',
-  // F-13（自動化と外部連携）。中身の folder_id 列はまだ無いので、
-  // 件数は「数えていない」（#730）で返る。556 で箱の種類だけ足す。
+  // F-13（自動化と外部連携）。所属先はアカウント別に保存する。
   'common_action',
   'webhook',
   'conversion',
@@ -68,7 +67,7 @@ export async function getFolders(
     // the unassigned policy; other existing folder kinds keep their old list.
     const ids = accountId ? scope.allowedAccountIds.filter((id) => id === accountId) : scope.allowedAccountIds;
     const own = ids.length ? `account_id IN (${ids.map(() => "?").join(",")})` : "0";
-    const legacy = scope.canSeeUnassigned ? "account_id IS NULL" : "(account_id IS NULL AND kind NOT IN ('tag', 'webinar', 'template'))";
+    const legacy = scope.canSeeUnassigned ? "account_id IS NULL" : "(account_id IS NULL AND kind NOT IN ('tag', 'webinar', 'template', 'automation', 'common_action', 'webhook', 'conversion'))";
     const result = await db.prepare(`SELECT * FROM folders WHERE (${own} OR ${legacy})${kind ? " AND kind = ?" : ""}
       ORDER BY kind ASC, display_order ASC, name ASC`).bind(...ids, ...(kind ? [kind] : [])).all<Folder>();
     return result.results;
@@ -241,7 +240,7 @@ export async function countFoldersByKind(db: D1Database): Promise<Record<string,
  * - `friend_field`: scope 表（`friend_field_scopes`）基準が正しいことは確定しているが
  *   （#730 調査）、現時点では件数の利用先が無い。利用画面を作る時に接続する。
  *   テナント全体の無条件集計は採らない（他テナント混入のため）（#730 裁定）。
- * - `automation` / `entry_route` / `mileage_rule`: `folder_id` 列を
+ * - `entry_route` / `mileage_rule`: `folder_id` 列を
  *   持つテーブルが存在せず、どの画面からも `kind` 指定で呼ばれていない
  *   （汎用フォルダ機構が未使用の種別）
  * - `form`: `forms.folder_id` はある（migration 395）が、所属先は
@@ -279,6 +278,9 @@ export const FOLDER_ITEM_COUNT_TABLES: Partial<Record<FolderKind, {
   media: { table: 'media', accountColumn: 'line_account_id' },
   common_var: { table: 'common_vars', accountColumn: 'line_account_id', listFilter: 'archived_at IS NULL' },
   rich_menu: { table: 'rich_menu_groups', accountColumn: 'account_id' },
+  automation: { table: 'automation_definitions', accountColumn: 'line_account_id', listFilter: "status <> 'archived'" },
+  common_action: { table: 'common_actions', accountColumn: 'line_account_id', listFilter: "status <> 'archived'" },
+  conversion: { table: 'conversion_points', accountColumn: 'line_account_id' },
 };
 
 export interface FolderItemCountScope {
@@ -305,6 +307,23 @@ export async function getFolderItemCounts(
   kind: FolderKind,
   scope: FolderItemCountScope,
 ): Promise<FolderItemCounts | undefined> {
+  if (kind === 'webhook') {
+    const [incoming, outgoing] = await Promise.all(
+      ['incoming_webhooks', 'outgoing_webhooks'].map(async table => {
+        if (!scope.allowedAccountIds.length) return [] as { folder_id: string | null; item_count: number }[];
+        const rows = await db.prepare(`SELECT folder_id, COUNT(*) AS item_count FROM ${table}
+          WHERE deleted_at IS NULL AND line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})
+          GROUP BY folder_id`).bind(...scope.allowedAccountIds).all<{ folder_id: string | null; item_count: number }>();
+        return rows.results;
+      }),
+    );
+    const counts: FolderItemCounts = { byFolderId: {}, unfiled: 0 };
+    for (const row of [...incoming, ...outgoing]) {
+      if (row.folder_id === null) counts.unfiled += Number(row.item_count);
+      else counts.byFolderId[row.folder_id] = (counts.byFolderId[row.folder_id] ?? 0) + Number(row.item_count);
+    }
+    return counts;
+  }
   if (kind === 'event') {
     // 複数アカウント向けは sentinel ではなく account_ids を読む。EXISTS で重複を数えない。
     const ids = scope.allowedAccountIds;

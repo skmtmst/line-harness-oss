@@ -36,6 +36,7 @@ let root: Root | null = null
 let container: HTMLDivElement | null = null
 
 afterEach(() => {
+  vi.useRealTimers()
   act(() => { root?.unmount() })
   container?.remove()
   root = null
@@ -159,9 +160,11 @@ describe('DeliveryFailuresCard（今日の配信の失敗）', () => {
 
   it('読込中は骨組みを出す', async () => {
     apiMocks.deliveryFailureOrigins.mockReturnValue(new Promise(() => {}))
+    // 待ちは偽の時計で進める（本物の時間を待たない）。骨組みの 0.3 秒は描いた瞬間から数えるので、描く前に替える。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     const el = mount(<DeliveryFailuresCard accountId="acc-1" />)
     /* ★V7 仕上げ §3: 骨組みは 0.3 秒待ってから出る。 */
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(350) })
     expect(el.querySelector('[data-skeleton]')).not.toBeNull()
     expect(el.textContent).not.toContain('読み込めませんでした')
   })

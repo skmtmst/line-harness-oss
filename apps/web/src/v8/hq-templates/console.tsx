@@ -40,6 +40,7 @@ import {
   choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems,
   uploadedKeysIn, type TemplateMedia,
 } from './definition'
+import { FolderDot } from '@/components/shared/folder-dot'
 import MessageForm from './message-form'
 import styles from './console.module.css'
 
@@ -426,7 +427,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
               {folderLoadFailed ? <p role="alert" className={styles.railNote}>分類を読み込めませんでした。ページを再読み込みしてください。</p> : <>
                 {[{ id: 'all', name: 'すべて' }, { id: 'none', name: '未分類' }, ...folders].map((folder) => (
                   <button key={folder.id} type="button" className={styles.folderItem} aria-pressed={folderFilter === folder.id} onClick={() => setFolderFilter(folder.id)}>
-                    {folder.id === 'all' ? null : <span className={styles.folderDot} data-filed={folder.id !== 'none' || undefined} aria-hidden="true" />}
+                    {folder.id === 'all' ? null : <span className={styles.dotSlot} aria-hidden="true"><FolderDot folder={folder.id === 'none' ? null : { name: folder.name }} /></span>}
                     <span>{folder.name}</span>
                   </button>
                 ))}
@@ -481,7 +482,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
                     <tr key={row.id}>
                       <td>
                         <span className={styles.nameLine}>
-                          <span className={styles.folderDot} data-filed={folder ? true : undefined} role="img" aria-label={`フォルダ：${folder?.name ?? '未分類'}`} title={`フォルダ：${folder?.name ?? '未分類'}`} />
+                          <FolderDot folder={folder ? { name: folder.name } : null} />
                           <span className={styles.name} title={row.name}>{row.name}</span>
                         </span>
                         <span className={styles.sub}>{row.description || LABELS[row.template_type]}</span>
