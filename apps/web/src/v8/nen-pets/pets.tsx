@@ -1,0 +1,165 @@
+'use client'
+
+/*
+ * ★V8-B マイペット（Pencil「★V8-B 画面の地図」専用機能の組：
+ * 一覧 `wTIej`・一覧 1152 `t2SMXX`・ペットの情報を直す `eLjeQ`・ごはんの目安 `h7A2F`）。
+ *
+ * 外枠（見出し・CSV・タブ・数の帯）は2つのタブで同じ。型は ListPage。
+ * データの口（pets・feeding・saveFeeding・updatePet・CSV）は今の画面と同じ。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
+import { useEffect, useState } from 'react'
+import { Calculator, Download, Eye, History, MoreHorizontal, PawPrint, Sparkles } from 'lucide-react'
+import { ListPage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import ActionMenu from '@/components/shared/action-menu'
+import IconButton from '@/components/shared/icon-button'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import { Tabs } from '@/components/shared/tabs'
+import { usePageCrumbs } from '@/components/shell/page-chrome'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { nenPetsApi, type NenPetKpis } from '@/lib/nen-pets-api'
+import PetsListV8 from './list'
+import FeedingV8 from './feeding'
+import { EMPTY_QUERY, downloadCsv, petsToCsv, type PetTab, type PetsQuery } from './parts'
+import styles from './pets.module.css'
+
+export type { PetTab } from './parts'
+
+const BOARD: Record<PetTab, string> = { pets: 'wTIej', feeding: 'h7A2F' }
+
+export default function PetsV8({
+  accountId,
+  tab,
+  onChangeTab,
+}: {
+  accountId: string | null
+  tab: PetTab
+  onChangeTab: (next: PetTab) => void
+}) {
+  usePageCrumbs([{ label: 'ホーム', href: '/' }])
+  const role = useStaffRole()
+  /* 役割が読めるまでは閲覧のみとして扱い、押せないボタンを先に出さない。 */
+  const canEdit = role !== null && canManageRole(role)
+  const readonly = role !== null && !canManageRole(role)
+
+  const [kpis, setKpis] = useState<NenPetKpis | null>(null)
+  const [kpisFailed, setKpisFailed] = useState(false)
+  /** 一覧の絞り込み。CSV も同じ条件で書き出す（今の画面と同じ）。 */
+  const [query, setQuery] = useState<PetsQuery>(EMPTY_QUERY)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(false)
+
+  // 数の帯は一覧の取得に付いてくる。ごはんの目安のタブでは1件だけ取って数を読む。
+  useEffect(() => {
+    if (!accountId || tab !== 'feeding') return
+    let active = true
+    setKpisFailed(false)
+    void nenPetsApi.pets(accountId, { pageSize: 1 }).then((res) => {
+      if (!active) return
+      if (res.success) setKpis(res.data.kpis)
+      else setKpisFailed(true)
+    }).catch(() => { if (active) setKpisFailed(true) })
+    return () => { active = false }
+  }, [accountId, tab])
+
+  // アカウントを替えたら、前のアカウントの数を出さない。
+  const [kpiAccount, setKpiAccount] = useState(accountId)
+  if (kpiAccount !== accountId) {
+    setKpiAccount(accountId)
+    setKpis(null)
+    setQuery(EMPTY_QUERY)
+  }
+
+  const exportCsv = async () => {
+    if (!accountId || exporting) return
+    setExporting(true)
+    setExportError(false)
+    try {
+      const res = await nenPetsApi.pets(accountId, { ...query, pageSize: 'all' })
+      if (!res.success) throw new Error(res.error)
+      downloadCsv(petsToCsv(res.data.items), `nen-pets-${new Date().toISOString().slice(0, 10)}.csv`)
+    } catch {
+      setExportError(true)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const tabs = (
+    <div className={styles.tabs}>
+      <Tabs
+        label="マイペットの切り替え"
+        items={[
+          { label: kpis ? `登録ペット ${kpis.total}` : '登録ペット', current: tab === 'pets', onClick: () => onChangeTab('pets') },
+          { label: 'ごはんの目安', current: tab === 'feeding', onClick: () => onChangeTab('feeding') },
+        ]}
+      />
+    </div>
+  )
+
+  const pending = kpis === null
+  const missing = kpisFailed ? '読み込めませんでした' : '読み込んでいます'
+  const menu = (title: string) => <KpiMenu title={title} busy={exporting || !accountId} onExport={() => void exportCsv()} />
+  const stats = accountId ? (
+    <>
+      {readonly ? (
+        <div className={styles.viewerBand} role="status">
+          <Eye size={16} aria-hidden="true" />
+          <span>閲覧のみで見ています。ペットの情報や主食を変える操作は管理者に頼んでください。</span>
+        </div>
+      ) : null}
+      <KpiBand data-design="KPIs" className={styles.band} aria-label="ペットの数の帯">
+        <KpiCard presentation="band" title="登録ペット" icon={<History size={13} aria-hidden="true" />} menu={menu('登録ペット')} value={pending ? null : kpis.total} unit="匹" loading={pending && !kpisFailed} detail={pending ? missing : `犬 ${kpis.dogs}・猫 ${kpis.cats}・その他 ${Math.max(0, kpis.total - kpis.dogs - kpis.cats)}`} />
+        <KpiCard presentation="band" title="今月の新規" icon={<Sparkles size={13} aria-hidden="true" />} menu={menu('今月の新規')} value={pending ? null : kpis.newThisMonth} unit="匹" loading={pending && !kpisFailed} detail="1日から今日まで" />
+        <KpiCard presentation="band" title="目安を出せる" icon={<Calculator size={13} aria-hidden="true" />} menu={menu('目安を出せる')} value={pending ? null : kpis.computable} unit="匹" loading={pending && !kpisFailed} detail="犬・猫で体重と主食がそろっている" />
+        <KpiCard presentation="band" title="体重が古い" icon={<PawPrint size={13} aria-hidden="true" />} menu={menu('体重が古い')} value={pending ? null : kpis.staleWeight} unit="匹" loading={pending && !kpisFailed} detail="90日 更新なし" />
+      </KpiBand>
+    </>
+  ) : undefined
+
+  return (
+    <ListPage
+      boardId={BOARD[tab]}
+      headingSize="regular"
+      title="マイペット"
+      description="お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。"
+      actions={accountId ? (
+        <Button type="button" onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
+          <Download size={15} aria-hidden="true" />CSV で書き出す
+        </Button>
+      ) : null}
+      tabs={tabs}
+      stats={stats}
+    >
+      {exportError ? (
+        <div className={styles.noteRow}>
+          <Notice tone="warn" message="CSVを書き出せませんでした。通信の状態を確認して、もう一度お試しください。" />
+        </div>
+      ) : null}
+      {!accountId ? (
+        <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、ペットを見るLINEアカウントを選びます。" />
+      ) : tab === 'feeding' ? (
+        <FeedingV8 key={accountId} accountId={accountId} canEdit={canEdit} />
+      ) : (
+        <PetsListV8 key={accountId} accountId={accountId} canEdit={canEdit} query={query} onQueryChange={setQuery} onKpis={setKpis} />
+      )}
+    </ListPage>
+  )
+}
+
+/** 数の帯の「…」。この画面で使える操作（いまの絞り込みで CSV を書き出す）。 */
+function KpiMenu({ title, busy, onExport }: { title: string; busy: boolean; onExport: () => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <span className={styles.kpiMenu}>
+      <IconButton className={styles.kpiMenuButton} aria-label={`${title}のメニュー`} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        <MoreHorizontal size={16} aria-hidden="true" />
+      </IconButton>
+      <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel={`${title}のメニュー`} items={[{ id: 'csv', label: 'CSV で書き出す', disabled: busy, onSelect: () => { setOpen(false); onExport() } }]} />
+    </span>
+  )
+}
