@@ -339,39 +339,89 @@
   font-size: var(--text-label);
 }
 
-.confirmActions {
+/* 公開前の確認の窓（板 sDXNy）：要約の帯（題150・値）→ 宛先の行（名前200・役割・札）→ 注記 → 線の下に右寄せのボタン。 */
+.confirmBody {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--tpl-footer-gap);
+  flex-direction: column;
+  gap: var(--tpl-wa-op-dlg-gap);
+  width: 100%;
 }
 
 .confirmSummary {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-hb2-op-head-gap);
-  padding: var(--tpl-hb2-op-band-pad);
+  gap: var(--tpl-wa-op-sum-gap);
+  padding: var(--tpl-wa-op-sum-pad);
   border-radius: var(--radius-control);
-  background: var(--color-canvas-sunken);
+  background: var(--color-surface-pearl);
   font-size: var(--text-label);
+  line-height: var(--tpl-wa-op-sum-lh);
+}
+
+.confirmLine {
+  display: flex;
+  gap: var(--tpl-wa-op-col-gap);
+  margin: 0;
+}
+
+.confirmLabel {
+  flex: 0 0 var(--tpl-wa-op-sum-label-w);
+  color: var(--color-ink-secondary);
+}
+
+.confirmValue {
+  min-width: 0;
+  font-weight: 600;
+}
+
+.confirmList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .confirmRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--tpl-hb2-op-row-pad);
+  gap: var(--tpl-wa-op-col-gap);
+  box-sizing: border-box;
+  height: var(--tpl-wa-op-row-h);
+  padding: var(--tpl-wa-op-row-pad);
+  line-height: var(--tpl-wa-op-row-lh);
   box-shadow: var(--shadow-row-line);
 }
 
 .confirmName {
+  flex: 0 0 var(--tpl-wa-op-name-w);
+  overflow: hidden;
+  font-size: var(--text-label);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.confirmRole {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink-secondary);
   font-size: var(--text-label);
 }
 
 .confirmNote {
   margin: 0;
-  padding-top: var(--tpl-hb2-op-field-gap);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
+  line-height: var(--tpl-wa-op-sum-lh);
+}
+
+.confirmActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-wa-op-col-gap);
+  padding: var(--tpl-wa-op-foot-pad);
+  border-top: 1px solid var(--color-hairline);
 }

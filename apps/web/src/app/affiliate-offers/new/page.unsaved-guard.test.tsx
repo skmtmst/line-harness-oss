@@ -31,6 +31,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     api: {
       tags: { list: async () => ({ success: true, data: [] }) },
       scenarios: { list: async () => ({ success: true, data: [] }) },
+      staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
     },
   }
 })
