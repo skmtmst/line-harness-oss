@@ -385,6 +385,8 @@
 [data-theme='v8'] .footer { display: block; width: 100%; flex-shrink: 0; }
 [data-theme='v8'] .footer:empty { display: none; }
 [data-theme='v8'] .actions { width: 100%; padding: 14px 24px; gap: 8px; align-items: center; border-top: 1px solid var(--color-hairline); }
+/* 下のボタンを中央に置く口（footerAlign="center"）。既定の右寄せは変えない。 */
+[data-theme='v8'] .panel[data-footer-align='center'] .actions { justify-content: center; }
 [data-theme='v8'] .footerLead { flex: 1; font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 13px; line-height: 20px; color: var(--color-ink-faint); }
 [data-theme='v8'] .designButton { min-width: 0; font-family: inherit; line-height: 20px; }
 [data-theme='v8'] .designButton[data-dialog-action='secondary'] { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }

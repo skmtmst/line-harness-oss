@@ -41,6 +41,7 @@
 :global([data-theme='v8']) .dashboardCell { min-width: 0; flex: 1; padding: 18px 24px; }
 :global([data-theme='v8']) .dashboardCell + .dashboardCell { border-left: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .dashboardAside { width: 297px; flex-shrink: 0; border-left: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .dashboardAside[data-aside-size='wide'] { width: var(--tpl-dash-aside-wide); }
 :global([data-theme='v8']) .createContent { padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side); display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; flex: 1; }
 :global([data-theme='v8']) .preview { width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
 :global([data-theme='v8']) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); border-bottom: 1px solid var(--color-hairline); flex-wrap: wrap; }
