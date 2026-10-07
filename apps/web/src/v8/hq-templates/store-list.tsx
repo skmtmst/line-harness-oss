@@ -36,6 +36,7 @@ import Select from '@/components/shared/select'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { formatNumber } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
 import { distributedAccountsLine, templateSubLine } from './list-row'
@@ -213,7 +214,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       else await onAddFolder(name)
       setFolderDialog(null)
     } catch (caught) {
-      setFolderError(caught instanceof Error ? caught.message : 'フォルダを保存できませんでした')
+      setFolderError(japaneseDetailOf(caught) || 'フォルダを保存できませんでした')
     } finally {
       setFolderBusy(false)
     }
@@ -226,7 +227,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       await onDeleteFolder(deletingFolder)
       setDeletingFolder(null)
     } catch (caught) {
-      setFolderError(caught instanceof Error ? caught.message : 'フォルダを消せませんでした')
+      setFolderError(japaneseDetailOf(caught) || 'フォルダを消せませんでした')
     } finally {
       setFolderBusy(false)
     }
