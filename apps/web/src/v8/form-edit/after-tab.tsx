@@ -11,7 +11,7 @@ import ActionEditor from '@/components/forms/action-editor'
 import type { FormRefs } from '@/components/forms/form-refs'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import { TextInput } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Segmented from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
@@ -58,7 +58,7 @@ export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChan
         <h2 id="fe-thanks-title" className={styles.cardTitle}>答え終わったときの画面</h2>
         <div className={styles.field}>
           <label className={styles.fieldLabel} htmlFor="fe-thanks-text">お礼の文</label>
-          <TextInput id="fe-thanks-text" value={options.thanksText ?? ''} placeholder="ご回答ありがとうございました。" onChange={(e) => onChangeOptions({ thanksText: e.target.value })} />
+          <TextField id="fe-thanks-text" value={options.thanksText ?? ''} placeholder="ご回答ありがとうございました。" onChange={(e) => onChangeOptions({ thanksText: e.target.value })} />
         </div>
         <div className={styles.endingRow}>
           <span className={styles.endingLabel}>終わったあと</span>
@@ -75,7 +75,7 @@ export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChan
         {ending === 'url' ? (
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="fe-thanks-url">開くURL</label>
-            <TextInput
+            <TextField
               id="fe-thanks-url"
               type="url"
               value={options.thanksUrl ?? ''}

@@ -50,7 +50,8 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import { Field, TextInput } from '@/components/shared/form-controls'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import {
@@ -637,7 +638,7 @@ export default function AutomationListV8() {
           {testing ? (
             <div className={styles.testBody}>
               <Field label="試す友だちのID">
-                <TextInput
+                <TextField
                   aria-label="試す友だちのID"
                   value={testFriendId}
                   onChange={(event) => setTestFriendId(event.target.value)}
