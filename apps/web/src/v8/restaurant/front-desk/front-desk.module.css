@@ -150,6 +150,12 @@
   white-space: nowrap;
 }
 
+.timeBox {
+  display: flex;
+  align-items: center;
+  min-height: var(--tpl-rest3-e2-times-h);
+}
+
 .timeChips {
   display: flex;
   flex-wrap: wrap;

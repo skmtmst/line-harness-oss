@@ -79,7 +79,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
   it('変更するで今の変更の窓へ移る', async () => {
     const dialog = await openDetail()
     fireEvent.click(within(dialog).getByRole('button', { name: '変更する' }))
-    expect(await screen.findByRole('dialog', { name: '鈴木 真理さんの予約' })).not.toBeNull()
+    expect(await screen.findByRole('dialog', { name: '鈴木 真理さんの予約を変更' })).not.toBeNull()
     expect(screen.queryByRole('dialog', { name: '鈴木 真理さん・4名' })).toBeNull()
   })
 

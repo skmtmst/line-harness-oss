@@ -1,2 +1,240 @@
 .panes { height: calc(100dvh - 110px); margin: -24px; }
 @media (max-width: 767px) { .panes { height: calc(100dvh - 140px); margin: -16px; } }
+
+/*
+ * ★V8 受信箱の左の列の頭（M0393「1. ふだん」XqSvX の「上」）。
+ * 絵は 題の行・札・検索・担当と経路・状態・並び順 を1つの頭（上18・左右16・下14、段の間12）に
+ * まとめ、線は並び順の下の1本だけ。v7 は段ごとに線で区切る作りのままにするので、
+ * ここは v8 のときだけ効かせる。値は globals.css の [data-theme="v8"] の --tpl-inbox-*。
+ */
+:global([data-theme='v8']) .headTop {
+  column-gap: var(--tpl-inbox-head-tools-gap);
+  row-gap: var(--tpl-inbox-head-gap);
+  padding: var(--tpl-inbox-head-pad-top) var(--tpl-inbox-head-pad-x) 0;
+  border-bottom: 0;
+}
+
+:global([data-theme='v8']) .titleRow {
+  gap: var(--tpl-inbox-head-tools-gap);
+}
+
+:global([data-theme='v8']) .tool {
+  width: var(--tpl-inbox-tool-size);
+  height: var(--tpl-inbox-tool-size);
+}
+
+/* 札：選んでいない＝白地・薄い枠・墨の字、選んだ＝墨の地・白い字（共通の札 O2fCAt・XGJDa と同じ形）。 */
+:global([data-theme='v8']) .chip {
+  gap: var(--tpl-inbox-chip-gap);
+  height: var(--tpl-inbox-control-h);
+  padding: var(--tpl-inbox-chip-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--text-caption--line-height);
+}
+
+:global([data-theme='v8']) .chip[aria-pressed='true'] {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-on-accent);
+}
+
+.chipIcon {
+  display: none;
+}
+
+:global([data-theme='v8']) .chipIcon {
+  display: inline-flex;
+  flex: none;
+  width: var(--tpl-inbox-icon-sm);
+  height: var(--tpl-inbox-icon-sm);
+}
+
+/* 件数は共通の札と同じ：小さく・普通の太さ・薄い字。選んだ札では白。 */
+:global([data-theme='v8']) .chipCount {
+  margin-left: var(--tpl-inbox-none);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 500;
+}
+
+:global([data-theme='v8']) .chip[aria-pressed='true'] .chipCount {
+  color: var(--color-on-accent);
+}
+
+:global([data-theme='v8']) .searchBlock {
+  padding: var(--tpl-inbox-head-gap) var(--tpl-inbox-head-pad-x) 0;
+  border-bottom: 0;
+}
+
+:global([data-theme='v8']) .searchInput {
+  height: var(--tpl-inbox-control-h);
+  border-color: var(--color-control-border);
+  font-size: var(--text-label);
+}
+
+:global([data-theme='v8']) .searchInput::placeholder {
+  color: var(--color-ink-faint);
+}
+
+/* 担当者と経路：列の幅に半分ずつ・間8。どちらも同じ選ぶ欄の形（高さ36・枠 control-border・13/500）。 */
+:global([data-theme='v8']) .filterRow {
+  display: flex;
+  gap: var(--tpl-inbox-filter-gap);
+  margin-top: var(--tpl-inbox-head-gap);
+}
+
+:global([data-theme='v8']) .filterCell {
+  display: block;
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  margin: var(--tpl-inbox-none);
+}
+
+:global([data-theme='v8']) .filterCell > * {
+  width: 100%;
+  min-width: 0;
+}
+
+:global([data-theme='v8']) .filterCell button[aria-label='担当者で絞り込む'] {
+  gap: var(--tpl-inbox-chip-gap);
+  height: var(--tpl-inbox-control-h);
+  padding: var(--tpl-inbox-control-pad);
+  border-color: var(--color-control-border);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+
+:global([data-theme='v8']) .filterCell button[aria-label='担当者で絞り込む'] > span:first-child {
+  color: var(--color-ink);
+}
+
+:global([data-theme='v8']) .filterCell button[aria-label='担当者で絞り込む'] svg {
+  width: var(--tpl-inbox-icon-md);
+  height: var(--tpl-inbox-icon-md);
+  color: var(--color-ink-faint);
+}
+
+:global([data-theme='v8']) .statusBlock {
+  padding: var(--tpl-inbox-head-gap) var(--tpl-inbox-head-pad-x) 0;
+  border-bottom: 0;
+}
+
+:global([data-theme='v8']) .statusSeg {
+  gap: var(--tpl-inbox-seg-gap);
+  height: var(--tpl-inbox-auto);
+  padding: var(--tpl-inbox-seg-pad);
+}
+
+:global([data-theme='v8']) .statusItem {
+  padding: var(--tpl-inbox-seg-item-pad);
+  border-radius: var(--tpl-inbox-seg-item-radius);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+}
+
+/* 並び順：状態の切り替えから12あけ、下14で頭の線。 */
+:global([data-theme='v8']) .sortLine {
+  padding: var(--tpl-inbox-head-gap) var(--tpl-inbox-head-pad-x) var(--tpl-inbox-head-pad-bottom);
+  color: var(--color-ink-faint);
+}
+
+:global([data-theme='v8']) .filterCell button[aria-label='担当者で絞り込む'][aria-expanded='true'] {
+  border-color: var(--color-accent);
+}
+
+/*
+ * ★V8：3つの列は白い板の中いっぱい（絵 XqSvX は板の上端から列が始まり、下端まで伸びる）。
+ * v8 の板の中の余白（上20・左右24・下28）を打ち消し、高さは板の内側にそろえる。
+ * 板の高さが画面で決まるのは PC 幅（1024px 以上）だけなので、そこだけ。
+ */
+@media (min-width: 1024px) {
+  :global([data-theme='v8']) .panes {
+    height: var(--tpl-inbox-panes-h);
+    margin: var(--tpl-inbox-panes-bleed);
+  }
+}
+
+/*
+ * ★V8 会話の行（XqSvX「会話 …」）：内側 上下12・左右16、顔34と文の間10、
+ * 名前・内容・札の段の間2、内容は13pxの1行で省略、経路は枠だけの小さな札、
+ * 担当の前の丸い頭文字は置かない。v7 は今までどおり。
+ */
+:global([data-theme='v8']) .row {
+  padding: var(--tpl-inbox-row-pad);
+}
+
+:global([data-theme='v8']) .rowInner {
+  gap: var(--tpl-inbox-row-gap);
+}
+
+:global([data-theme='v8']) .unreadDot {
+  top: 0;
+  right: var(--tpl-inbox-unread-dot-right);
+  width: var(--tpl-inbox-unread-dot);
+  height: var(--tpl-inbox-unread-dot);
+  border-width: var(--tpl-inbox-unread-dot-ring);
+}
+
+:global([data-theme='v8']) .rowLine {
+  margin-top: var(--tpl-inbox-row-line-gap);
+}
+
+:global([data-theme='v8']) .rowPreview {
+  display: block;
+  overflow: hidden;
+  font-size: var(--text-label);
+  line-height: var(--tpl-inbox-row-preview-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-line-clamp: none;
+}
+
+:global([data-theme='v8']) .rowMeta {
+  gap: var(--tpl-inbox-head-tools-gap);
+}
+
+:global([data-theme='v8']) .channelBadge {
+  height: var(--tpl-inbox-auto);
+  min-width: 0;
+  padding: var(--tpl-inbox-badge-pad);
+  border: 0;
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+  border-radius: var(--tpl-inbox-badge-radius);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-inbox-badge-lh);
+}
+
+:global([data-theme='v8']) .rowAssignee {
+  font-size: var(--text-micro);
+  line-height: var(--tpl-inbox-badge-lh);
+}
+
+:global([data-theme='v8']) .rowAssigneeMark {
+  display: none;
+}
+
+:global([data-theme='v8']) .filterCell button[aria-label='担当者で絞り込む'] {
+  gap: 0;
+}
+
+:global([data-theme='v8']) .filterCell button[aria-label='担当者で絞り込む'] > span:last-child {
+  padding-left: var(--tpl-inbox-chip-gap);
+}
+
+/* 一覧の列の幅：PC 幅では 340〜372 の間で、3つの列の幅の 32%（1440 で絵の 372）。 */
+@media (min-width: 1024px) {
+  :global([data-theme='v8']) .listCol {
+    width: clamp(var(--tpl-inbox-list-w-min), var(--tpl-inbox-list-w-ratio), var(--tpl-inbox-list-w));
+  }
+}

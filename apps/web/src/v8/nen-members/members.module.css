@@ -554,6 +554,7 @@
 .rankChip {
   display: inline-flex;
   align-items: center;
+  gap: var(--tpl-rest3-mb-dot-gap);
   height: var(--tpl-mb-chip-h);
   padding: var(--tpl-mb-chip-pad);
   border-radius: var(--radius-pill);
@@ -561,6 +562,13 @@
   color: var(--color-ink-faint);
   font-size: var(--tpl-mb-text-11);
   font-weight: 500;
+}
+.rankDot {
+  flex-shrink: 0;
+  width: var(--tpl-rest3-mb-dot);
+  height: var(--tpl-rest3-mb-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
 }
 .rankChip[data-tone='top'] {
   background: var(--color-ink);
@@ -610,5 +618,60 @@
   }
   .sideCard {
     width: auto;
+  }
+}
+
+/* 会員一覧の表（AOWoJ）：白い板の幅いっぱい、行の内側 24・間 16。狭い板（1010 未満）は最終購入・マイル還元を畳む。 */
+.mTable {
+  margin-inline: calc(-1 * var(--tpl-rsa-bleed));
+  container-type: inline-size;
+}
+
+.mRow {
+  display: grid;
+  grid-template-columns: var(--tpl-rest3-mb-cols);
+  align-items: center;
+  column-gap: var(--tpl-rest3-mb-gap);
+  min-height: var(--tpl-rest3-mb-row-h);
+  padding: var(--tpl-rest3-mb-row-pad);
+  box-shadow: var(--tpl-rsa-line-bottom);
+}
+
+.mHead {
+  min-height: var(--tpl-rest3-mb-head-h);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-mb-text-11);
+  font-weight: 600;
+  line-height: var(--tpl-mb-lh-16);
+  white-space: nowrap;
+}
+
+.mHead > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mOps {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@container (max-width: 1010px) {
+  .mRow {
+    grid-template-columns: var(--tpl-rest3-mb-cols-narrow);
+  }
+
+  .mWide {
+    display: none;
   }
 }

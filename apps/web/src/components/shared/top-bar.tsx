@@ -1,8 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useEffect, type ChangeEvent } from 'react'
+import { Building2, ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import AccountSwitchMenu, { type AccountSwitchMenuHq } from './account-switch-menu'
+import type { MenuPortalRect } from './menu-portal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
 import styles from './top-bar.module.css'
 
@@ -12,6 +14,20 @@ export interface TopBarAccount {
   /** 頭の1文字。アイコンの代わりに出す。無ければ名前の1文字目。 */
   mark?: string
 }
+
+export interface TopBarNotificationsPopover {
+  open: boolean
+  onClose: () => void
+  /** ベル。外を押したかの判定と Esc で焦点を戻す先。 */
+  getAnchor: () => HTMLElement | null
+  /** 小窓の位置の基準：上の帯の右端から 8 内側・帯の下。 */
+  getPositionRect: () => MenuPortalRect | null
+  /** 小窓の id（ベルの aria-controls）。 */
+  id: string
+}
+
+/** 小窓の右端を上の帯の右端から内側へ寄せる幅（絵 mV28V）。 */
+const BELL_POPOVER_EDGE = 8
 
 export interface TopBarProps {
   title: string
@@ -42,6 +58,12 @@ export interface TopBarProps {
    */
   notificationUnreadCount?: number
   /**
+   * ★V8：ベルを押したときの小窓（V8.pen `DIHFx/D2eAyQ`・小窓 `mV28V`）を描く。
+   * 渡すとベルはページを移らずに小窓を開くボタンになる。渡さなければ今までどおり
+   * 通知の一覧（/notifications）へのリンク。中身（取得・既読）は呼ぶ側が持つ。
+   */
+  renderNotifications?: (popover: TopBarNotificationsPopover) => ReactNode
+  /**
    * ★V8 外側の左側（畳むボタンとパンくず）を出すか。
    * 左メニューの無い殻（停止中のワークスペース等）では渡さない。
    * 畳むボタンは投げるだけなので、受け手の無い場所に置くと
@@ -57,6 +79,18 @@ export interface TopBarProps {
    * v7 では描かない。
    */
   crumbs?: { label: string; href?: string }[] | null
+  /**
+   * ★V8 統括の画面（/hq）のとき、切替の札に「統括」と統括名を出す（絵 `V8-B/JKjsE`）。
+   * 渡さなければ店の画面の札（「LINEアカウント」と選んでいるアカウント）。v7 では描かない。
+   */
+  hq?: { name: string; mark: string } | null
+  /** ★V8 パンくずの「ホーム」の行き先。統括の画面は統括のホーム（/hq）。 */
+  homeHref?: string
+  /**
+   * ★V8 店の画面から統括へ戻る口（絵 V8 `DIHFx/Psg7n`）。統括の権限がある人にだけ渡す。
+   * 渡すと切り替えの左に［統括へ］、切り替えを開いた一覧のいちばん上に「統括に戻る」を出す。v7 では描かない。
+   */
+  hqReturn?: AccountSwitchMenuHq | null
   className?: string
 }
 
@@ -79,12 +113,30 @@ export default function TopBar({
   userName,
   onLogout,
   notificationUnreadCount = 0,
+  renderNotifications,
   v8Chrome = false,
   chromeVariant = 'default',
   menuCollapsed = false,
   crumbs,
+  hq = null,
+  homeHref = '/',
+  hqReturn = null,
   className,
 }: TopBarProps) {
+  const [switchOpen, setSwitchOpen] = useState(false)
+  const switchRef = useRef<HTMLButtonElement>(null)
+  const rootRef = useRef<HTMLElement>(null)
+  const bellRef = useRef<HTMLButtonElement>(null)
+  const [bellOpen, setBellOpen] = useState(false)
+  const bellPopoverId = useId()
+  const closeBell = useCallback(() => setBellOpen(false), [])
+  const getBell = useCallback(() => bellRef.current, [])
+  const getBellPosition = useCallback((): MenuPortalRect | null => {
+    const bar = rootRef.current?.getBoundingClientRect()
+    if (!bar) return null
+    const right = bar.right - BELL_POPOVER_EDGE
+    return { top: bar.top, bottom: bar.bottom, left: right, right, width: 0 }
+  }, [])
   const classes = [styles.root, className].filter(Boolean).join(' ')
   const handleAccountChange = (event: ChangeEvent<HTMLSelectElement>) => {
     onAccountChange(event.target.value)
@@ -111,7 +163,7 @@ export default function TopBar({
   }, [])
 
   return (
-    <header className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined}>
+    <header ref={rootRef} className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined}>
       {/*
         ★V8 外側（Pencil `y3gx8R`）：左に畳むボタンとパンくず
         （アカウント › 画面名）。v7 では .v8-only が消す。
@@ -135,7 +187,7 @@ export default function TopBar({
               「ホーム」で最初の画面へ（統括もふだんの画面も同じ殻）。
               v8-only の帯にだけ出すので v7 は変わらない。
             */}
-            <Link href="/" className={styles.crumbHome}>
+            <Link href={homeHref} className={styles.crumbHome}>
               <HomeGridIcon /><span>ホーム</span>
             </Link>
             <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
@@ -179,6 +231,13 @@ export default function TopBar({
             探すのは各一覧の中の欄が受ける。ここには行き先の曖昧な
             全体検索を置かない。
           */}
+          {/* ★V8 店の画面から統括へ（絵 DIHFx/Psg7n）。狭い帯では印だけ。 */}
+          {hqReturn ? (
+            <button type="button" className={`${styles.hqReturn} v8-only`} onClick={hqReturn.onReturn} title="統括のアカウント一覧へ戻る">
+              <Building2 aria-hidden="true" className={styles.hqReturnIcon} />
+              <span className={styles.hqReturnLabel}>統括へ</span>
+            </button>
+          ) : null}
           <label className={styles.accountField}>
           <span>LINEアカウント</span>
           {/*
@@ -188,7 +247,14 @@ export default function TopBar({
             ブラウザの実装のまま使えるほうが確かなため。
           */}
           <span className={styles.accountPill}>
-            <span className={styles.accountMark} aria-hidden="true">{current?.mark ?? current?.label.slice(0, 1) ?? ''}</span>
+            <span className={styles.accountMark} aria-hidden="true">
+              {hq ? (
+                <>
+                  <span className="v7-only">{current?.mark ?? current?.label.slice(0, 1) ?? ''}</span>
+                  <span className="v8-only">{hq.mark}</span>
+                </>
+              ) : (current?.mark ?? current?.label.slice(0, 1) ?? '')}
+            </span>
             {/*
               ★V8 殻合わせ（絵 `V8-B/JKjsE`）：札に役割（統括など）を小さい
               行で添える。v8-only なので v7 の1行札は変わらない。
@@ -199,15 +265,23 @@ export default function TopBar({
                   札の中の小さい字は「LINEアカウント」で固定（絵の指示）。
                   v8-only の行なので v7 の札は変わらない。
                 */}
-                <span className={`${styles.pillRole} v8-only`}>LINEアカウント</span>
-                <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+                <span className={`${styles.pillRole} v8-only`}>{hq ? '統括' : 'LINEアカウント'}</span>
+                {/* ★V8 統括の画面：札は統括にいることを示す（絵 `V8-B/JKjsE`）。v7 は今までどおり。 */}
+                {hq ? (
+                  <>
+                    <span className={`${styles.accountName} v7-only`}>{current?.label ?? '店舗を選択'}</span>
+                    <span className={`${styles.accountName} v8-only`} title={hq.name}>{hq.name}</span>
+                  </>
+                ) : (
+                  <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+                )}
               </span>
             ) : (
               <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
             )}
             {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
             <select
-              className={styles.accountSelect}
+              className={`${styles.accountSelect} v7-only`}
               value={selectedAccountId}
               onChange={handleAccountChange}
               aria-label="LINEアカウント"
@@ -222,24 +296,63 @@ export default function TopBar({
                 <option key={account.id} value={account.id}>{account.label}</option>
               ))}
             </select>
+            {/*
+              ★V8：開くと自前の一覧（統括に戻る・店の一覧）。v7 はブラウザの選ぶ欄のまま。
+              札の上に透明のボタンを敷き、押すと一覧を出す。
+              選ぶ欄より後ろに置く（外の見出しが指すのは選ぶ欄のまま）。
+            */}
+            <button
+              ref={switchRef}
+              type="button"
+              className={`${styles.accountSelect} v8-only`}
+              aria-label="アカウントを切り替える"
+              aria-haspopup="menu"
+              aria-expanded={switchOpen}
+              onClick={(event) => { event.preventDefault(); setSwitchOpen((current) => !current) }}
+            />
           </span>
           </label>
+          <AccountSwitchMenu
+            open={switchOpen}
+            onClose={() => setSwitchOpen(false)}
+            getAnchor={() => switchRef.current}
+            accounts={accounts}
+            selectedAccountId={selectedAccountId}
+            onSelect={onAccountChange}
+            hq={hqReturn}
+          />
           {/*
-            ★V8: 通知。押すと通知の一覧（/notifications）を開く。
+            ★V8: 通知。小窓を渡されたら、押すとページを移らずにベルの下へ小窓を開く
+            （絵 DIHFx/D2eAyQ）。渡されなければ通知の一覧（/notifications）へのリンク。
             未読は赤い丸で右上に出す（100以上は 99+）。
           */}
-          <Link
-            href="/notifications"
-            className={`${styles.iconButton} v8-only`}
-            aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
-          >
-            <BellIcon />
-            {notificationUnreadCount > 0 ? (
-              <span className={styles.bellBadge} aria-hidden="true">
-                {notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}
-              </span>
-            ) : null}
-          </Link>
+          {renderNotifications ? (
+            <>
+              <button
+                ref={bellRef}
+                type="button"
+                className={`${styles.iconButton} v8-only`}
+                aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
+                aria-haspopup="dialog"
+                aria-expanded={bellOpen}
+                aria-controls={bellOpen ? bellPopoverId : undefined}
+                onClick={() => setBellOpen((current) => !current)}
+              >
+                <BellIcon />
+                <BellBadge count={notificationUnreadCount} />
+              </button>
+              {renderNotifications({ open: bellOpen, onClose: closeBell, getAnchor: getBell, getPositionRect: getBellPosition, id: bellPopoverId })}
+            </>
+          ) : (
+            <Link
+              href="/notifications"
+              className={`${styles.iconButton} v8-only`}
+              aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
+            >
+              <BellIcon />
+              <BellBadge count={notificationUnreadCount} />
+            </Link>
+          )}
           <span className={styles.separator} aria-hidden="true" />
         </> : null}
 
@@ -318,6 +431,16 @@ function PanelLeftIcon() {
       <rect width="18" height="18" x="3" y="3" rx="2" />
       <path d="M9 3v18" />
     </svg>
+  )
+}
+
+/* ★V8: ベルの未読の数（赤い丸・100以上は 99+）。 */
+function BellBadge({ count }: { count: number }) {
+  if (count <= 0) return null
+  return (
+    <span className={styles.bellBadge} aria-hidden="true">
+      {count > 99 ? '99+' : count}
+    </span>
   )
 }
 

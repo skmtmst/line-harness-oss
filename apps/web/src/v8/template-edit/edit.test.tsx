@@ -18,6 +18,8 @@ const listFolders = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const search = vi.hoisted(() => ({ value: '' }))
+const loadExamples = vi.hoisted(() => vi.fn())
+vi.mock('@/v8/templates/examples', () => ({ loadTemplateExamples: loadExamples }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -109,6 +111,21 @@ afterEach(() => {
 })
 
 describe('V8 メッセージを作る・編集', () => {
+  it('見本から作る（?example=）：見本の名前と本文を入れて開き、保存はしない', async () => {
+    loadExamples.mockResolvedValue([{ id: 'template-example-booking', name: '予約の受付', body: 'ご予約を受け付けました。' }])
+    await mount('example=template-example-booking')
+    expect((screen.getByLabelText('テンプレート名') as HTMLInputElement).value).toBe('予約の受付')
+    expect((screen.getByLabelText('本文') as HTMLTextAreaElement).value).toBe('ご予約を受け付けました。')
+    expect(templatesApi.create).not.toHaveBeenCalled()
+  })
+
+  it('見本が見つからないときは白紙のまま、理由を出す', async () => {
+    loadExamples.mockResolvedValue([])
+    await mount('example=missing')
+    expect((screen.getByLabelText('テンプレート名') as HTMLInputElement).value).toBe('')
+    expect(screen.getByText('見本が見つかりませんでした。白紙から作れます。')).toBeTruthy()
+  })
+
   it('作る：名前と本文を書いて下書きを保存すると、選んでいるアカウントで作って一覧へ戻る', async () => {
     templatesApi.create.mockResolvedValue({ success: true, data: { id: 'template-new' } })
     await mount()

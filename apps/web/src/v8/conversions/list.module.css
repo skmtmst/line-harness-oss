@@ -400,3 +400,9 @@
 /* 骨組みの棒。 */
 .skeletonName { display: block; width: 75%; height: var(--tpl-cn-skeleton-h); }
 .skeletonNum { display: block; width: 60%; height: var(--tpl-cn-skeleton-h); margin-left: auto; }
+
+/* 名前の前のフォルダの丸の分だけ、状態の札を名前の頭にそろえる。 */
+.pillIndent {
+  display: block;
+  padding-left: var(--tpl-folder-dot-indent);
+}

@@ -201,6 +201,8 @@ describe('共通部品の影響範囲', () => {
       'v8/forms/list.tsx',
       // ★V8 友だち追加時の配信の実行結果（REIxB）：表の下のページ送りに共通 Pagination。
       'v8/friend-add-runs/runs.tsx',
+      // ★V8 LINE通知の送れなかったもの・記録（DrwMm・PZBVb）。src/v8 に一から書いた表の下のページ送り。
+      'v8/settings/line-notifications/runs-tab.tsx',
       // ★V8 回答フォームの編集（m1cWEy ほか）。登録メディアから選ぶ窓の写しにページ送り。
       'v8/form-edit/media-picker.tsx',
       // V8 のリッチメニュー一覧（src/v8 に一から書いた）。

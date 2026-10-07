@@ -275,18 +275,20 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     { id: 'archived', label: 'アーカイブ', count: archivedCount, color: 'var(--color-status-warn)' },
   ]
 
+  const createProject = canManage ? (
+    <Button variant="primary" onClick={() => { setFormError(''); setFormOpen(true) }} className={styles.full}>
+      <Plus aria-hidden="true" className={styles.buttonIcon} />プロジェクトを作る
+    </Button>
+  ) : null
+  const selectView = (id: string) => setView(id as ProjectView)
   const folders = (
     <div className={styles.folderInset}>
       <FolderPanel
-        createAction={canManage ? (
-          <Button variant="primary" onClick={() => { setFormError(''); setFormOpen(true) }} className={styles.full}>
-            <Plus aria-hidden="true" className={styles.buttonIcon} />プロジェクトを作る
-          </Button>
-        ) : null}
+        createAction={createProject}
         heading="見る"
         rows={rows}
         activeId={view}
-        onSelect={(id) => setView(id as ProjectView)}
+        onSelect={selectView}
       />
     </div>
   )
@@ -342,6 +344,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       title="バナー生成"
       description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ渡します。"
       folders={folders}
+      folderNav={{ rows, activeId: view, onSelect: selectView, createAction: createProject, label: '見る' }}
     >
       <div className={styles.body}>
         {head}
@@ -563,18 +566,20 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     { id: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null, color: 'var(--color-status-warn)' },
   ]
 
+  const uploadImage = canManage ? (
+    <Button variant="primary" onClick={() => setUploadOpen(true)} className={styles.full}>
+      <Upload aria-hidden="true" className={styles.buttonIcon} />画像を取り込む
+    </Button>
+  ) : null
+  const selectView = (id: string) => { setView(id as LibraryView); resetPage() }
   const folders = (
     <div className={styles.folderInset}>
       <FolderPanel
-        createAction={canManage ? (
-          <Button variant="primary" onClick={() => setUploadOpen(true)} className={styles.full}>
-            <Upload aria-hidden="true" className={styles.buttonIcon} />画像を取り込む
-          </Button>
-        ) : null}
+        createAction={uploadImage}
         heading="見る"
         rows={rows}
         activeId={view}
-        onSelect={(id) => { setView(id as LibraryView); resetPage() }}
+        onSelect={selectView}
       />
     </div>
   )
@@ -638,6 +643,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       title="バナー生成"
       description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ渡します。"
       folders={folders}
+      folderNav={{ rows, activeId: view, onSelect: selectView, createAction: uploadImage, label: '見る' }}
     >
       <div className={styles.body}>
         {head}

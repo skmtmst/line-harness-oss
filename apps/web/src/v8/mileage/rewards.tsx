@@ -31,6 +31,7 @@ import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import HelpTip from '@/components/shared/help-tip'
 import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
@@ -682,8 +683,11 @@ export default function RewardsTab() {
             return (
               <Tr key={reward.id} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
-                  <span className={styles.rowName} title={reward.name}>{reward.name}</span>
-                  <span className={styles.rowSub}>
+                  {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
+                  <FolderDotName folder={folderOf(reward) === '未分類' ? null : { name: folderOf(reward) }}>
+                    <span className={styles.rowName} title={reward.name}>{reward.name}</span>
+                  </FolderDotName>
+                  <span className={`${styles.rowSub} ${styles.dotIndent}`}>
                     {reach ? `今すぐ交換できる人 ${formatMileageNumber(reach.reachableFriendCount)}` : '今すぐ交換できる人 —'}
                   </span>
                 </Td>
@@ -837,6 +841,7 @@ export default function RewardsTab() {
       }
       stats={stats}
       folders={<>{createButton(true)}{folderPanel}</>}
+      folderNav={narrow ? undefined : { rows: FOLDERS.map((key) => ({ id: key, label: key })), activeId: folder, onSelect: (id) => { setPage(1); setFolder(id as Folder) }, createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
     >

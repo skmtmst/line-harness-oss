@@ -10,7 +10,7 @@
  */
 import { createContext, useContext, type ReactNode } from 'react'
 import { Eye } from 'lucide-react'
-import { ListPage } from '@/components/templates'
+import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import styles from './mileage.module.css'
@@ -93,6 +93,8 @@ export interface MileageFrameProps {
   stats?: ReactNode
   folders?: ReactNode
   collapsedFolders?: ReactNode
+  /** 板が狭く左の列が畳まれたときに型が道具の段へ出す「作る・フォルダ」。 */
+  folderNav?: ListFolderNav
   toolbar?: ReactNode
   pagination?: ReactNode
   overlays?: ReactNode
@@ -100,7 +102,7 @@ export interface MileageFrameProps {
 }
 
 /** 5つのタブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
-export function MileageFrame({ actions, stats, folders, collapsedFolders, toolbar, pagination, overlays, children }: MileageFrameProps) {
+export function MileageFrame({ actions, stats, folders, collapsedFolders, folderNav, toolbar, pagination, overlays, children }: MileageFrameProps) {
   const { tab, readonly, narrow, counts } = useMileageShell()
   const board = tab === 'earning-rules' && narrow
     ? 'ZJIyl'
@@ -130,6 +132,7 @@ export function MileageFrame({ actions, stats, folders, collapsedFolders, toolba
       stats={stats ? <>{readonly ? <ViewerBand /> : null}{stats}</> : readonly ? <ViewerBand /> : undefined}
       folders={folders}
       collapsedFolders={collapsedFolders}
+      folderNav={folderNav}
       toolbar={toolbar}
       pagination={pagination}
       overlays={overlays}

@@ -46,6 +46,7 @@ import Select from '@/components/shared/select'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -1035,6 +1036,8 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                     onClick={() => setPanelId((currentId) => (currentId === point.id ? null : point.id))}
                   >
                     <Td className={styles.colName}>
+                      {/* 名前の前にフォルダの丸（成果地点はまだフォルダの口が無いので未分類の輪）。札は名前の頭にそろえる。 */}
+                      <FolderDotName folder={null}>
                       <button
                         type="button"
                         className={styles.nameButton}
@@ -1045,7 +1048,8 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                       >
                         {point.name}
                       </button>
-                      <StatePill point={point} />
+                      </FolderDotName>
+                      <span className={styles.pillIndent}><StatePill point={point} /></span>
                     </Td>
                     <Td className={styles.colTrigger}>
                       <span className={styles.cellMain} title={sourceTriggerLabel(point)}>{shortTrigger(point)}</span>

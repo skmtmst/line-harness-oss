@@ -84,11 +84,23 @@ describe('進む操作は下の操作の帯に1つだけ', () => {
     expect(confirm).not.toContain('>戻る<');
   });
 
-  it('確定・待ちは下の帯に「LINEに戻る」と「自分のイベントを見る」(★V8 qVdiX)', () => {
+  it('確定・待ちは下の帯に「LINEに戻る」と、待ちなら「キャンセル待ちをやめる」・それ以外は「自分のイベントを見る」(★V8 qVdiX)', () => {
     expect(done).toContain('<BottomBar>');
     expect(done).toContain('LINEに戻る');
     expect(done).toContain('自分のイベントを見る');
-    expect(done.match(/<Button/g)?.length ?? 0).toBe(2);
+    expect(done).toContain('キャンセル待ちをやめる');
+    // 2つ目のボタンはどちらか一方だけ (自分の待ちが見つかったときだけ「やめる」)。
+    expect(done).toMatch(/\{waitEntry \? \([\s\S]*キャンセル待ちをやめる[\s\S]*\) : \([\s\S]*自分のイベントを見る[\s\S]*\)\}/);
+    expect(done.match(/<Button/g)?.length ?? 0).toBe(3);
+  });
+
+  it('キャンセル待ちをやめるは確認窓を通してから取り下げの口を呼ぶ・順番は自分の待ちから出す', () => {
+    expect(done).toMatch(/api\s*\.myEventWaitlist\(\)/);
+    expect(done).toContain("w.status === 'waiting'");
+    expect(done).toContain('<ConfirmDialog');
+    expect(done).toContain('api.cancelMyEventWaitlist(waitEntry.id)');
+    expect(done).toContain('waitEntry?.queue_position != null');
+    expect(confirm).toContain('waitSlot=${encodeURIComponent(res.slot_id)}');
   });
 });
 
@@ -173,8 +185,11 @@ describe('読み込み中・失敗の間は帯や操作を出さない', () => {
 });
 
 describe('案内の帯は1画面に1本', () => {
-  it('確認の帯は info 1つ (承認制の文は同じ帯に足す)', () => {
-    expect(confirm.match(/bg-info-bg/g)?.length ?? 0).toBe(1);
+  it('確認の帯は注意 1つ (承認制の文は同じ帯に足す)・期限があれば日時で出す', () => {
+    // V8 の板 EscPA：注意の帯は --color-liff-note。期限が無いときだけ「自分のイベント」へ案内する。
+    expect(confirm.match(/bg-liff-note/g)?.length ?? 0).toBe(1);
+    expect(confirm).not.toContain('bg-info-bg');
+    expect(confirm).toContain('formatJstDeadline(slot.starts_at, event.cancel_deadline_hours_before)');
     expect(confirm).toContain('キャンセルは期限まで');
     expect(confirm).not.toContain('bg-yellow');
   });

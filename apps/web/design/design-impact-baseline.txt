@@ -60,7 +60,6 @@ shared-button-importer app/auto-replies/page.tsx
 shared-button-importer app/auto-replies/publish/page.tsx
 shared-button-importer app/auto-replies/runs/page.tsx
 shared-button-importer app/automations/automations-v8.tsx
-shared-button-importer app/automations/drafts/draft-v8.tsx
 shared-button-importer app/automations/list-v8.tsx
 shared-button-importer app/automations/new/friend-multi-select.tsx
 shared-button-importer app/automations/new/new-v8.tsx
@@ -674,11 +673,15 @@ shared-button-importer v8/settings/features/screen.tsx
 shared-button-importer v8/settings/manual-links/screen.tsx
 shared-button-importer v8/settings/file-scan/screen.tsx
 shared-button-importer v8/settings/ec-commerce/screen.tsx
+shared-button-importer v8/settings/ec-commerce/connector.tsx
 shared-button-importer v8/settings/ec-commerce/order-drawer.tsx
 shared-button-importer v8/settings/ec-commerce/identity.tsx
 shared-button-importer v8/settings/pools/create.tsx
 shared-button-importer v8/settings/line-notifications/screen.tsx
+shared-button-importer v8/settings/line-notifications/operator-tab.tsx
+shared-button-importer v8/settings/line-notifications/runs-tab.tsx
 shared-button-importer v8/settings/emergency/screen.tsx
+shared-button-importer v8/settings/emergency/history.tsx
 shared-button-importer v8/settings/emergency/health.tsx
 shared-button-importer v8/restaurant-reservations/detail-dialog.tsx
 # ★V8 飲食店 提案 E（今日のお店 hKRRF・電話予約 wEzuG・枠を閉じる知らせ YMVFD・SNS 連携 y3GGTs）。全店の一覧 CHz31 は stores.tsx へ移した。

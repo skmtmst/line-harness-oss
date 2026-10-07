@@ -6,7 +6,7 @@ import '@/app/hq/readonly-v8.css'
 import { useEffect, useState, type FormEvent } from 'react'
 import Button from '@/components/shared/button'
 import { TextField } from '@/components/shared/text-field'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api } from '@/lib/api'
 import './hq-settings-v8.css'
@@ -16,7 +16,10 @@ import './hq-settings-v8.css'
  * 旧「統括設定」の転送先（/hq/members?tab=tenant）はこの画面へ移した。
  */
 export default function HqSettingsPage() {
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/K7HYu`）。
   usePageTitle('統括の情報')
+  // v7 ではパンくずを描かないので、v7 の見た目は変わらない。
+  usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
   const [canEdit, setCanEdit] = useState(false)
 
   useEffect(() => {

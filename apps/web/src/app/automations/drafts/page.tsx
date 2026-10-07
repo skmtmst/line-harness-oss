@@ -7,7 +7,7 @@ import AutomationDraftEditor from '@/components/automations/automation-draft-edi
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import AutomationDraftV8 from './draft-v8'
+import { NewAutomationV8 } from '@/v8/automations/create/create'
 
 /*
   見本から作った下書きの編集面。
@@ -31,10 +31,10 @@ function AutomationDraftPageInner() {
   const theme = useAdminTheme()
 
   /*
-   * ★V8 切替（`J1VA8`）。v8 のときだけ V8 の枝へ。
+   * ★V8 切替（`J1VA8`）。v8 のときだけ src/v8 の画面（ルールを作るの「下書きを仕上げる」の顔）へ。
    * v7 の見た目は1画素も変えない。
    */
-  if (theme === 'v8' && draftId) return <AutomationDraftV8 key={draftId} draftId={draftId} />
+  if (theme === 'v8' && draftId) return <NewAutomationV8 key={draftId} draftId={draftId} chrome="draft" />
 
   if (!draftId) {
     return (

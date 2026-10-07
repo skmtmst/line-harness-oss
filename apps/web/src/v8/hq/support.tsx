@@ -16,7 +16,7 @@ import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-er
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useTenantStatus } from '@/components/tenant-access-context'
 import { api } from '@/lib/api'
 import { readFileAsBase64 } from '@/lib/hq-banners'
@@ -34,7 +34,7 @@ import {
   type HqSupportKind,
   type HqSupportRequest,
 } from '@/lib/hq-support'
-import HqSettingsNavV8 from './settings-nav'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import NoticeLineDialogV8 from './notice-line-dialog'
 import { SUPPORT_STATUS_WORDS, supportTime } from './support-words'
 import styles from './support.module.css'
@@ -42,7 +42,10 @@ import styles from './support.module.css'
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
 export default function HqSupportV8() {
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/b8xBtZ`）。
   usePageTitle('お問い合わせ')
+  const settingsNav = useHqSettingsFolderNav('contact')
+  usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
   const tenantStatus = useTenantStatus()
   const tenantUnavailable = tenantStatus === 'suspended' || tenantStatus === 'archived'
   const uid = useId()
@@ -182,7 +185,7 @@ export default function HqSupportV8() {
       boardId="b8xBtZ"
       title="お問い合わせ"
       description="使い方の質問・不具合・料金の相談を運営へ送れます。返信は登録メールアドレスと、下の「これまでの問い合わせ」に届きます（平日 2 営業日以内）。"
-      folders={<HqSettingsNavV8 active="contact" />}
+      folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}
     >
       <div className={styles.body}>
         {/* 契約者専用LINEの登録案内（2026-09-18 決定：ここからもいつでも開ける。開いた状態が板 D6fh3） */}

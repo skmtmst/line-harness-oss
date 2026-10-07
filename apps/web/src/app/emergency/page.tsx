@@ -1614,13 +1614,12 @@ function EmergencyPageInner() {
             : <EmergencyControlPanel accounts={accounts} />)}{tab === 'history' && <HistoryPanel />}</div>
 }
 
-/* ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/emergency）。更新履歴・緊急コントロールは今の部品を差し込む。 */
+/* ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/emergency）。更新履歴は src/v8 の画面（I2V65v）、緊急コントロールは今の部品を差し込む。 */
 function EmergencyEntry() {
   const theme = useAdminTheme()
   if (theme !== 'v8') return <EmergencyPageInner />
   return (
     <EmergencyScreen
-      renderHistory={() => <HistoryPanel />}
       renderControl={(accounts, controlRef) => <EmergencyControlV8 ref={controlRef} accounts={accounts} />}
     />
   )
