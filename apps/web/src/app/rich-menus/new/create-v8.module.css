@@ -28,9 +28,10 @@
 
 /* 画面名＋手順の段は型に任せる。画面側に見出しの箱・文字の大きさを書かない。 */
 
-/* 板 `r8dGXT` の競合の帯の置き場。帯の見た目は共通部品（save-conflict）が持つ。 */
+/* 板 `r8dGXT` の競合の帯の置き場（頭の説明の下・横いっぱい）。帯の見た目は共通部品（save-conflict）が持つ。 */
 .conflictSlot {
   display: block;
+  margin: var(--tpl-eds-band-mt) 0 var(--tpl-eds-band-mb);
 }
 
 /* 左=白カードの縦積み、右=説明カード＋スマホ。 */
@@ -494,14 +495,16 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border: 1px solid var(--color-hairline);
+  border: 0;
   border-radius: var(--radius-control, 8px);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
   background: var(--color-canvas);
   font-size: 13px;
 }
 
 .orderRowSelf {
-  border-color: var(--color-accent-deep);
+  outline-color: var(--color-accent-deep);
   background: var(--color-accent-soft);
 }
 
@@ -560,6 +563,7 @@
 .checkList {
   display: flex;
   flex-direction: column;
+  gap: var(--tpl-eds-tag-card-gap);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -571,7 +575,8 @@
   align-items: center;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--color-divider);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
 }
 
 .checkIcon {
@@ -604,11 +609,13 @@
   flex: 1;
 }
 
-/* 板 `F4gELj`：1・2行目の「見直す」は箱にせず文字だけの押しボタン。 */
+/* 板 `F4gELj`：1・2行目の「見直す」は枠の無い押しボタン（高さ36・左右14）。 */
 .checkRetry {
   flex: none;
-  padding: 0;
+  height: var(--tpl-eds-ghost-h);
+  padding: var(--tpl-eds-ghost-pad);
   border: 0;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-ink-secondary);
   font-size: 13px;
@@ -628,20 +635,28 @@
   color: var(--color-ink);
   font-size: 13px;
   font-weight: 600;
+  line-height: var(--tpl-eds-name-lh);
 }
 
 .checkNote {
   margin: 0;
   color: var(--color-ink-faint);
   font-size: 11px;
-  line-height: 1.5;
+  line-height: var(--tpl-eds-hint-lh);
 }
 
 .checkAction {
   flex: none;
 }
 
-/* 「終わりを決める」の入力行（トグルの下）。 */
+/* 「終わりを決める」の箱（枠・角10・余白12/14・間8）。上の行は題とトグル。 */
+.endBox { display: flex; flex-direction: column; gap: var(--tpl-eds-head-gap); padding: var(--tpl-eds-end-pad); border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+.endHead { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-eds-head-gap); }
+.endTitle { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; }
+.endDate { flex: none; width: var(--tpl-eds-end-date-w); }
+.endDate > * { width: 100%; }
+.endDate button { height: var(--tpl-eds-ghost-h); min-height: 0; }
+/* 「終わりを決める」の入力行（題の下）。 */
 .endRow {
   display: flex;
   align-items: center;
@@ -734,3 +749,11 @@
   font-size: var(--text-micro);
   line-height: var(--tpl-hb2-op-note-lh);
 }
+
+/* 直すとき（/rich-menus/edit）：下書きを読み込むまでの一行。 */
+.editLoading { margin: 0; padding: var(--tpl-eds-loading-pad); color: var(--color-ink-faint); font-size: var(--text-label); }
+
+/* 作る③④の段（絵：枠1本は内側の線・影なし）。共通のカードは外側の線で2px 高くなるので、この画面の段だけ線を内側へ。 */
+.flatCard { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; box-shadow: none; }
+/* 段の題は 15/700・行の高さ 22（共通の見出しは 23）。 */
+.flatCard h3 { line-height: var(--tpl-eds-card-title-lh); }

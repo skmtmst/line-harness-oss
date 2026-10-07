@@ -133,13 +133,12 @@ describe('V8 リッチメニュー一覧', () => {
     expect(unfiledRow.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
   })
 
-  test('見るだけの人には閲覧のみの帯が出て、メニューを作るは押せない', async () => {
+  // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
+  test('見るだけの人には閲覧のみの帯が出て、メニューを作るは出さない', async () => {
     fixture.role = 'staff'
     const view = render(<RichMenusListV8 />)
     await view.findByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')
-    const create = view.getAllByRole('button', { name: /メニューを作る/ })
-    expect(create.length).toBeGreaterThan(0)
-    for (const button of create) expect((button as HTMLButtonElement).disabled).toBe(true)
+    expect(view.queryAllByRole('button', { name: /メニューを作る/ })).toHaveLength(0)
   })
 
   test('消せないメニューは「まだ消せません」の窓で、理由を短く・取り下げで外れる2つを1行に並べる', async () => {

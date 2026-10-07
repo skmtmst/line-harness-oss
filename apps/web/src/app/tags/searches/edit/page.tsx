@@ -38,7 +38,7 @@ import { savedSearchSummary, type SavedSearchConditionLabels } from '@/component
 import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { formatDateTime } from '@/lib/format'
-import SearchEditorV8 from '@/app/tags/search-editor-v8'
+import SearchEditorV8 from '@/v8/tag-edit/search-edit'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /*

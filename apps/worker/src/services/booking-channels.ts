@@ -1,3 +1,4 @@
+import { getBookingSyncRules } from '@line-crm/db';
 import { activeTenantLineAccountSql, isOperationCapabilityStopped, resolveLineCredential } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { clientForConnection, type StaffCalendarConnection } from './booking-calendar-sync.js';
@@ -103,6 +104,7 @@ export async function bookingAutomaticNotificationAllowed(db: D1Database, accoun
 
 /** 同じ組合せ・同じ版は再通知しない。失敗時は同じ再試行キーで回復する。 */
 export async function notifyBookingConflicts(db: D1Database, accountId: string): Promise<void> {
+  if(!(await getBookingSyncRules(db,accountId)).notifyConflicts)return;
   const conflicts = await listBookingConflicts(db, accountId);
   for (const conflict of conflicts) {
     const recipient = await db.prepare(`SELECT sm.line_user_id,sm.notification_preferences,la.channel_access_token,la.channel_access_token_encrypted

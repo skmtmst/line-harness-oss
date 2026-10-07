@@ -179,10 +179,8 @@ function rowMenuItems(
       id: 'archive',
       label: w.status === 'archived' ? '下書きに戻す' : 'アーカイブする',
       onSelect: () => onArchive(w),
-      disabled: !canEdit,
-      disabledReason: canEdit ? undefined : READONLY_REASON,
     },
-  ]
+  ].filter((item) => canEdit || item.id !== 'archive')
 }
 
 function toContextItems(items: ActionMenuItem[]): ContextMenuItem[] {
@@ -757,9 +755,10 @@ function WebinarList() {
       ]}
     />
   )
+  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
   const createButton = canEdit
     ? <Button variant="primary" href="/webinars/new"><Plus size={15} aria-hidden="true" />ウェビナーを作る</Button>
-    : <Button variant="primary" disabled title={READONLY_REASON}><Plus size={15} aria-hidden="true" />ウェビナーを作る</Button>
+    : null
 
   /* ===== 道具の段 ===== */
   const shownChipCounts = chipCounts && chipCounts.accountId === selectedAccountId ? chipCounts : null
@@ -914,9 +913,7 @@ function WebinarList() {
                     <Td className={styles.colPeriod}><span className={styles.period} title={period}>{period}</span></Td>
                     <Td className={styles.colOps} onClick={(event) => event.stopPropagation()}>
                       <div className={styles.opsBox}>
-                        {canEdit
-                          ? <Button href={`/webinars/edit?id=${w.id}`}>編集</Button>
-                          : <Button disabled title={READONLY_REASON}>編集</Button>}
+                        {canEdit ? <Button href={`/webinars/edit?id=${w.id}`}>編集</Button> : null}
                         <IconButton
                           title={menuLabel}
                           aria-label={menuLabel}
@@ -1003,14 +1000,14 @@ function WebinarList() {
         </KpiBand>
       </>}
       folders={<>
-        {createButton}
+        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
+        {createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         <FolderPanel
           activeId={selectedFolder}
           onSelect={(id) => { setSelectedFolder(id); setPage(1) }}
           onAddFolder={canEdit ? () => { setFolderError(''); closeDetail(); setFolderFormOpen(true) } : undefined}
           addFolderLabel="フォルダを追加"
-          addFolderDisabled={!selectedAccountId || !canEdit}
-          addFolderTitle={canEdit ? undefined : READONLY_REASON}
+          addFolderDisabled={!selectedAccountId}
           rows={folderRows}
         >
           <p className={styles.folderNote}>フォルダを消しても、中のウェビナーは未分類に残ります</p>
@@ -1069,24 +1066,22 @@ function WebinarList() {
           onNext={activeIndex >= 0 && activeIndex < visibleItems.length - 1 ? () => goDetail(1) : undefined}
           footer={active ? (
             <div className={styles.formActions}>
-              {canEdit
-                ? <Button href={`/webinars/edit?id=${active.id}`}>編集する</Button>
-                : <Button disabled title={READONLY_REASON}>編集する</Button>}
-              <Button
+              {canEdit ? <Button href={`/webinars/edit?id=${active.id}`}>編集する</Button> : null}
+              {canEdit ? <Button
                 variant="secondary"
-                disabled={!canEdit}
-                title={canEdit ? undefined : READONLY_REASON}
                 onClick={() => { closeDetail(); openArchive(active) }}
               >
                 {active.status === 'archived' ? '下書きに戻す' : 'アーカイブする'}
-              </Button>
+              </Button> : null}
             </div>
           ) : undefined}
         >
           {active ? (
             <div className={styles.detail}>
               <p className={styles.dialogLabel}>ウェビナー名</p>
-              <InlineEdit value={active.title} label="ウェビナー名" disabled={!canEdit} onSave={(next) => renameWebinar(active, next)} />
+              {canEdit
+                ? <InlineEdit value={active.title} label="ウェビナー名" onSave={(next) => renameWebinar(active, next)} />
+                : <p className={styles.dialogValue}>{active.title}</p>}
               <p className={styles.dialogLabel}>状態</p>
               <p className={styles.dialogValue}><StatusPill webinar={active} /></p>
               <p className={styles.dialogLabel}>申込・視聴</p>

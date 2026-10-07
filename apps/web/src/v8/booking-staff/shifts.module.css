@@ -103,6 +103,15 @@
   line-height: var(--tpl-bks-switch-lh);
 }
 
+/* 閲覧のみ：時刻を文字で見せる（選ぶ部品と同じ幅・高さ）。 */
+.timeText {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-bks-input-h);
+  font-size: var(--text-label);
+  font-variant-numeric: tabular-nums;
+}
+
 .time > button[aria-haspopup] > svg,
 .time > button[aria-label='時刻を消す'] { display: none; }
 
@@ -135,6 +144,14 @@
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
+}
+
+/* 閲覧のみ：曜日は押せない文字で見せる。 */
+.daysText {
+  display: flex;
+  align-items: center;
+  height: var(--tpl-bks-input-h);
+  font-size: var(--text-label);
 }
 
 .daysButton:hover { color: var(--color-action); text-decoration: underline; }

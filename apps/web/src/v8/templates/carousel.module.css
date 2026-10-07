@@ -1,0 +1,306 @@
+/*
+ * ★V8 テンプレート カルーセルを作る（J60utH）だけの部品。段・欄・入力は question-new.module.css と同じ。
+ * 札（角いっぱい・余白6/12）、画像の枠（160×106）、ボタンの行（文字220・押したら160・中身）、案内の帯。
+ */
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-cn-field-gap);
+}
+
+.chip {
+  padding: var(--tpl-tg2-seg-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-cn-main-lh);
+  cursor: grab;
+}
+
+.chip[aria-pressed='true'] {
+  outline: 0;
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+
+.count {
+  margin-left: auto;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.panelRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-cn-field-row-gap);
+}
+
+.imageCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-cn-field-gap);
+  flex-shrink: 0;
+}
+
+.imageBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tpl-tg2-box-gap);
+  width: var(--tpl-tg2-image-w);
+  height: var(--tpl-tg2-image-h);
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-accent-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tg2-safety-body-size);
+  cursor: pointer;
+}
+
+.imageThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imageIcon {
+  width: var(--tpl-tg2-image-icon);
+  height: var(--tpl-tg2-image-icon);
+}
+
+.linkButton {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  line-height: var(--tpl-cn-sub-lh);
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: var(--tpl-tg2-safety-body-size);
+  cursor: pointer;
+}
+
+.textCol {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-tg2-swatch-gap);
+  min-width: 0;
+}
+
+.over {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+.buttonHead,
+.buttonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-tg2-option-gap);
+}
+
+.buttonHead {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.colLabel {
+  width: var(--tpl-tg2-col-label);
+  flex-shrink: 0;
+}
+
+.colKind {
+  width: var(--tpl-tg2-col-kind);
+  flex-shrink: 0;
+}
+
+.colKind :global(*) {
+  max-width: 100%;
+}
+
+.colBody {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-cn-control-h);
+  height: var(--tpl-cn-control-h);
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.icon {
+  width: var(--tpl-tag-ro-icon);
+  height: var(--tpl-tag-ro-icon);
+  flex-shrink: 0;
+}
+
+.info > .icon {
+  margin-top: var(--tpl-tag-sub-gap);
+  color: var(--color-action);
+}
+
+.toolRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-field-row-gap);
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-tg2-swatch-gap);
+  margin: 0;
+  padding: var(--tpl-tg2-info-band-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-tg2-info-band-lh);
+}
+
+/* 右の列の行（行どうしの間は線だけ）。 */
+.stats {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tpl-tg2-option-gap);
+  padding: var(--tpl-tg2-stat-pad);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+
+.stat > strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* 届き方の中：アイコン34・カード幅170（次のカードは端60だけ見せる）・画像110。 */
+.talkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-cn-field-gap);
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-tg2-avatar);
+  height: var(--tpl-tg2-avatar);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+  font-size: var(--text-body);
+  font-weight: 700;
+}
+
+.slides {
+  display: flex;
+  gap: var(--tpl-tg2-option-gap);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.slide {
+  display: flex;
+  flex: 0 0 var(--tpl-tg2-slide-w);
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--tpl-tg2-slide-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.slide[data-peek] {
+  flex-basis: var(--tpl-tg2-slide-peek);
+}
+
+.slideImage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--tpl-tg2-slide-image-h);
+  overflow: hidden;
+  background: var(--color-accent-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tg2-safety-body-size);
+  object-fit: cover;
+  white-space: nowrap;
+}
+
+.slideBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-box-gap);
+  padding: var(--tpl-tg2-slide-body-pad);
+}
+
+.slideTitle {
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.slideText {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tg2-safety-body-size);
+  line-height: var(--tpl-cn-sub-lh);
+}
+
+.slideButton {
+  padding: var(--tpl-tg2-option-gap) 0;
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-action);
+  font-size: var(--tpl-tg2-safety-body-size);
+  font-weight: 600;
+  text-align: center;
+}
+
+.swipe {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+}
+
+.swipe > span {
+  padding: var(--tpl-tg2-swipe-pad);
+  border-radius: var(--radius-pill);
+  background: var(--v8-line-datechip);
+  color: var(--color-ink);
+  font-size: var(--tpl-tg2-swipe-size);
+}

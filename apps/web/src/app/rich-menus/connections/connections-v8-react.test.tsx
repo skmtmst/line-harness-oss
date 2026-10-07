@@ -21,6 +21,8 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('next/navigation', async importOriginal => ({
   ...await importOriginal<typeof import('next/navigation')>(),
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? 'group-1' : null) }),
+  // V8 は src/v8/rich-menus/connections（右上の「…」から移るので useRouter を使う）。
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
 
@@ -56,6 +58,9 @@ describe('切替のつながりV8（wxIQ7）', () => {
     expect(host.textContent).toContain('タブで行き来できるメニューの関係')
     expect(host.textContent).toContain('いまの状態')
     expect(host.textContent).toContain('公開中')
+    // つながりの図：入口のメニューと、行き来の札（タブB ⇄ タブA）。
+    expect(host.textContent).toContain('このメニュー・タブA')
+    expect(host.textContent).toContain('タブB ⇄ タブA')
   })
 
   it('v7はDIUbOのまま', async () => {

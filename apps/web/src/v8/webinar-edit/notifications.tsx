@@ -362,7 +362,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         )}
         <div className={form.field}>
           <label className={form.label} htmlFor="webinar-action-message">視聴完了のメッセージ</label>
-          <TextField id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} disabled={readOnly || saving} onChange={(event) => setTemplateBody(event.target.value)} />
+          <TextField id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} readOnly={readOnly} disabled={saving} onChange={(event) => setTemplateBody(event.target.value)} />
         </div>
         <div className={form.field}>
           <label className={form.labelSmall} htmlFor="webinar-missing-policy">結果が取れないとき</label>

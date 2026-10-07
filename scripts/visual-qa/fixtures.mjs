@@ -2289,7 +2289,9 @@ export const RICH_MENU_GROUPS = [
   },
   {
     ...RICH_MENU_BASE,
-    id: 'rmg-1',
+    /* 編集の見本（RICH_MENU_GROUP_DETAILS の rmg-1 ＝通常メニュー（会員向け）の下書き）と ID を分ける。
+     * 同じ ID だと、作る③の「出す順番」が自分と取り違えて、この行を消していた。 */
+    id: 'rmg-gold',
     name: '会員ランク上位',
     /* 板 `rZEGN` の丸：通常・通常・キャンペーン・未分類（上から）。 */
     folderId: 'rich-menu-folder-normal',
@@ -2346,11 +2348,16 @@ export const RICH_MENU_GROUPS = [
 
 export const RICH_MENU_GROUP_DETAILS = {
   'rmg-1': {
-    ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-1'),
+    ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-gold'),
+    id: 'rmg-1',
     /* 板 `kmTab`・`Z0uO6`（作る②）の頭は `名前：通常メニュー（会員向け）・
      * いまは下書きです`。一覧の `rmg-1`（会員ランク上位）は変えない。 */
     name: '通常メニュー（会員向け）',
     status: 'draft',
+    /* 板 `OxEMM`・`F4gELj`（作る③④）は「すべての友だち」（既定）で出す下書き。 */
+    isDefaultForAll: true,
+    targetingEnabled: false,
+    targetingCondition: null,
     defaultPageId: 'rmg-1-top',
     pages: [
       richMenuPage('rmg-1-top', 0, 'トップ', [
@@ -2390,6 +2397,17 @@ export const RICH_MENU_GROUP_DETAILS = {
       richMenuPage('rmg-draft-tab-b', 2, 'タブB：会員', []),
     ],
   },
+  /* 板 `hKr8f`（公開した・公開の進み）：公開中で「すべての友だち」の既定。 */
+  'rich-menu-target': {
+    ...RICH_MENU_GROUPS.find((group) => group.id === 'rich-menu-target'),
+    status: 'published',
+    defaultPageId: 'rmt-top',
+    pages: [
+      richMenuPage('rmt-top', 0, 'トップ', [
+        richMenuArea('rmt-top-product', '商品を見る', 'rmt-top', 0),
+      ], 'visual-qa/rich-menus/rmg-1-top.png'),
+    ],
+  },
   'rmg-2': {
     ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-2'),
     defaultPageId: 'rmg-2-top',
@@ -2427,7 +2445,7 @@ export const RICH_MENU_TAP_STATS = {
   byArea: [],
   byGroup: [
     { groupId: 'rich-menu-target', taps: 12480 },
-    { groupId: 'rmg-1', taps: 3210 },
+    { groupId: 'rmg-gold', taps: 3210 },
   ],
   total: 15690,
 }
@@ -3561,10 +3579,12 @@ export const SCENARIO_SIMULATION = {
 
 export const SCENARIO_RUNS = {
   summary: { active: 116, paused: 0, completed: 312, delivering: 18 },
-  /* 板 `X4STXS`（配信結果）の参加中の友だちの先頭2人。 */
+  /* 板 `X4STXS`（配信結果）の参加中の友だちの4行（途中・途中・止まっている・読み終えた）。 */
   subscriptions: [
-    { id: 'scenario-sub-1', friendId: 'friend-1', friendName: '中村 彩', status: 'active', currentStepOrder: 2, startedAt: '2026-09-05T01:00:00.000Z', nextDeliveryAt: '2026-09-06T11:00:00.000Z', updatedAt: '2026-09-05T01:00:00.000Z' },
-    { id: 'scenario-sub-2', friendId: 'friend-2', friendName: '木村 亮', status: 'completed', currentStepOrder: 4, startedAt: '2026-08-28T01:00:00.000Z', nextDeliveryAt: null, updatedAt: '2026-09-04T11:00:00.000Z' },
+    { id: 'scenario-sub-1', friendId: 'friend-1', friendName: '高橋 直人', status: 'active', currentStepOrder: 3, startedAt: '2026-09-27T01:00:00.000Z', nextDeliveryAt: '2026-10-04T01:00:00.000Z', updatedAt: '2026-09-30T01:00:00.000Z' },
+    { id: 'scenario-sub-3', friendId: 'friend-3', friendName: '佐藤 美咲', status: 'active', currentStepOrder: 2, startedAt: '2026-09-30T01:00:00.000Z', nextDeliveryAt: '2026-10-02T11:00:00.000Z', updatedAt: '2026-10-01T11:00:00.000Z' },
+    { id: 'scenario-sub-4', friendId: 'friend-4', friendName: '山田 花子', status: 'paused', currentStepOrder: 1, startedAt: '2026-09-29T01:00:00.000Z', nextDeliveryAt: null, updatedAt: '2026-09-30T01:00:00.000Z' },
+    { id: 'scenario-sub-2', friendId: 'friend-2', friendName: 'Kyohei Yamamoto', status: 'completed', currentStepOrder: 4, startedAt: '2026-08-28T01:00:00.000Z', nextDeliveryAt: null, updatedAt: '2026-09-04T11:00:00.000Z' },
   ],
   pagination: { total: 428, limit: 20, cursor: '', nextCursor: null },
   testSends: [{ id: 'scenario-test-1', friendId: 'friend-1', friendName: '高橋 直人', sentAt: '2026-09-07T00:05:00.000Z', messageCount: 4 }],
@@ -4125,7 +4145,7 @@ export const REMINDER_PUBLISH = {
  */
 export const FRIEND_FIELDS = [
   {
-    id: 'field-birthday', folderId: null, name: '誕生日', fieldKey: 'birthday',
+    id: 'field-birthday', folderId: 'friend-field-folder-purchase', name: '誕生日', fieldKey: 'birthday',
     type: 'date', options: null, defaultValue: null, source: 'manual',
     ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: true,
     displayOrder: 1, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
@@ -4164,7 +4184,7 @@ export const FRIEND_ATTRIBUTE_FIELDS = [
     createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
   },
   {
-    id: 'field-prefecture', folderId: null, name: 'お住まい', fieldKey: 'prefecture',
+    id: 'field-prefecture', folderId: 'friend-field-folder-contact', name: 'お住まい', fieldKey: 'prefecture',
     type: 'select', options: ['北海道', '東京都', '大阪府', '福岡県'], defaultValue: null, source: 'form',
     ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
     displayOrder: 2, usageCount: 164, formUsageCount: 2,
@@ -4172,7 +4192,7 @@ export const FRIEND_ATTRIBUTE_FIELDS = [
     createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-19T00:00:00.000Z',
   },
   {
-    id: 'field-birthday', folderId: null, name: '生年月日', fieldKey: 'birthday',
+    id: 'field-birthday', folderId: 'friend-field-folder-purchase', name: '生年月日', fieldKey: 'birthday',
     type: 'date', options: null, defaultValue: null, source: 'form',
     ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
     displayOrder: 3, usageCount: 141, formUsageCount: 1,
@@ -4188,7 +4208,7 @@ export const FRIEND_ATTRIBUTE_FIELDS = [
     createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-17T00:00:00.000Z',
   },
   {
-    id: 'field-phone', folderId: null, name: '電話番号', fieldKey: 'phone_number',
+    id: 'field-phone', folderId: 'friend-field-folder-pets', name: '電話番号', fieldKey: 'phone_number',
     type: 'text', options: null, defaultValue: null, source: 'manual',
     ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
     displayOrder: 5, usageCount: 78, formUsageCount: 1,
@@ -4198,7 +4218,10 @@ export const FRIEND_ATTRIBUTE_FIELDS = [
 ]
 
 export const FRIEND_FIELD_FOLDERS = [
-  { id: 'friend-field-folder-pets', kind: 'friend_field', name: 'ペットプロフィール', displayOrder: 1 },
+  // 板 q5gbcM：ペット・連絡先・購入（名前の前の色の丸もこの色）。
+  { id: 'friend-field-folder-pets', kind: 'friend_field', name: 'ペット', color: '#2f6fde', displayOrder: 1 },
+  { id: 'friend-field-folder-contact', kind: 'friend_field', name: '連絡先', color: '#1f9d55', displayOrder: 2 },
+  { id: 'friend-field-folder-purchase', kind: 'friend_field', name: '購入', color: '#e07b24', displayOrder: 3 },
 ]
 
 /**
@@ -4232,6 +4255,26 @@ export const FRIEND_FIELD_MIGRATION_PREVIEW = {
   runId: 'field-migration-run-birthday-1',
   previewToken: 'visual-qa-field-migration-preview-token',
   previewExpiresAt: '2026-09-07T15:15:00.000Z',
+}
+
+/**
+ * 板 GobMd：「愛犬のお名前」（1行テキスト）を「1つ選ぶ」へ変えるときの見本。
+ * 種類だけの事前確認（移行先なし）なので確認番号は出ない。値は選ぶ候補に足して移す。
+ */
+export const FRIEND_FIELD_MIGRATION_PREVIEW_DOG = {
+  source: {
+    ...FRIEND_ATTRIBUTE_FIELDS.find((field) => field.id === 'field-dog-name'),
+    status: 'active', version: 2, canInsertText: true,
+  },
+  summary: { total: 69, convertible: 0, review: 69, invalid: 0 },
+  rows: [
+    ...Array.from({ length: 41 }, (_, index) => ({ friendId: `friend-dog-pochi-${index + 1}`, sourceValue: 'ポチ', convertedValue: 'ポチ（選ぶ候補に足す）', status: 'review', reason: '選ぶ候補に足します' })),
+    ...Array.from({ length: 28 }, (_, index) => ({ friendId: `friend-dog-coco-${index + 1}`, sourceValue: 'ココ', convertedValue: 'ココ（選ぶ候補に足す）', status: 'review', reason: '選ぶ候補に足します' })),
+  ],
+  usageTargets: [],
+  runId: null,
+  previewToken: null,
+  previewExpiresAt: null,
 }
 
 /**
@@ -4817,13 +4860,28 @@ export const AD_COST_PLATFORMS = [
   #514-8: 本番の口が返す形だけにする。friendName・conversionName・nextRetryAt は
   口が返さない(画面も読まない)。豊富な形を返すとずれを隠す。
 */
+/* 板 `p0kA3`（広告への送信履歴）の5行。数の帯（`FDBsG`）は口の summary（この30日 送った15・待っている2・断られた1）を読む。 */
 export const AD_CONVERSION_LOGS = [
-  { id: 'adlog-1', adPlatformId: 'ad-meta', friendId: 'friend-inflow-1', eventName: '体験申込フォームの送信', clickId: 'fixed-fbclid-1', clickIdType: 'fbclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:32:00.000Z' },
-  { id: 'adlog-2', adPlatformId: 'ad-google', friendId: 'friend-inflow-2', eventName: '初回のご購入', clickId: 'fixed-gclid-1', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:18:00.000Z' },
-  { id: 'adlog-3', adPlatformId: 'ad-meta', friendId: 'friend-inflow-3', eventName: '予約が入った', clickId: 'fixed-fbclid-2', clickIdType: 'fbclid', status: 'pending', errorMessage: null, createdAt: '2026-08-25T10:54:00.000Z' },
-  { id: 'adlog-4', adPlatformId: 'ad-meta', friendId: 'friend-inflow-4', eventName: '体験申込フォームの送信', clickId: 'fixed-fbclid-3', clickIdType: 'fbclid', status: 'failed', errorMessage: '接続設定を確認してください', createdAt: '2026-08-25T09:41:00.000Z' },
-  { id: 'adlog-5', adPlatformId: 'ad-google', friendId: 'friend-inflow-5', eventName: '初回のご購入', clickId: 'fixed-gclid-2', clickIdType: 'gclid', status: 'failed', errorMessage: '広告アカウントをつなぎ直してください', createdAt: '2026-08-25T08:20:00.000Z' },
-  { id: 'adlog-6', adPlatformId: 'ad-meta', friendId: '', eventName: '定期便のお申し込み', clickId: null, clickIdType: null, status: 'skipped', errorMessage: '対応が付いていないため送っていません', createdAt: '2026-08-24T22:05:00.000Z' },
+  { id: 'adlog-1', adPlatformId: 'ad-google', friendId: 'friend-inflow-1', eventName: '初回購入', clickId: 'fixed-gclid-1', clickIdType: 'gclid', status: 'pending', errorMessage: null, createdAt: '2026-10-01T12:14:00.000Z' },
+  { id: 'adlog-2', adPlatformId: 'ad-meta', friendId: 'friend-inflow-2', eventName: '定期便の申し込み', clickId: 'fixed-fbclid-1', clickIdType: 'fbclid', status: 'pending', errorMessage: null, createdAt: '2026-10-01T09:02:00.000Z' },
+  { id: 'adlog-3', adPlatformId: 'ad-google', friendId: 'friend-inflow-3', eventName: '初回購入', clickId: 'fixed-gclid-2', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-09-30T11:40:00.000Z' },
+  { id: 'adlog-4', adPlatformId: 'ad-meta', friendId: 'friend-inflow-4', eventName: '初回購入', clickId: 'fixed-fbclid-2', clickIdType: 'fbclid', status: 'failed', errorMessage: 'クリックの目印の期限（90日）が切れていました', createdAt: '2026-09-29T03:11:00.000Z' },
+  { id: 'adlog-5', adPlatformId: 'ad-google', friendId: 'friend-inflow-5', eventName: '定期便の申し込み', clickId: 'fixed-gclid-3', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-09-28T00:30:00.000Z' },
+]
+export const AD_CONVERSION_LOG_SUMMARY = { sentLast30Days: 15, pendingLast30Days: 2, failedLast30Days: 1 }
+
+/*
+ * 板 `FDBsG`（広告とのつなぎ）の対応表（F-21 `GET /api/ad-platforms/mappings`）。
+ * 口は成果地点ごとに Google・Meta の2行を返す。来店予約は両方「結びつけない」で、
+ * Meta だけ自動の名前（Schedule）があるので選ぶ欄が出る（絵どおり）。
+ */
+export const AD_EVENT_MAPPINGS = [
+  { pointId: 'cp-first', pointName: '初回購入', eventType: 'purchase_first', provider: 'google', mode: 'manual', eventName: 'purchase_first', automaticEventName: 'purchase', googleActionId: null, version: 2 },
+  { pointId: 'cp-first', pointName: '初回購入', eventType: 'purchase_first', provider: 'meta', mode: 'auto', eventName: 'Purchase', automaticEventName: 'Purchase', googleActionId: null, version: 1 },
+  { pointId: 'cp-teiki', pointName: '定期便の申し込み', eventType: 'subscribe_teiki', provider: 'google', mode: 'manual', eventName: 'subscribe_teiki', automaticEventName: 'subscribe', googleActionId: null, version: 1 },
+  { pointId: 'cp-teiki', pointName: '定期便の申し込み', eventType: 'subscribe_teiki', provider: 'meta', mode: 'auto', eventName: 'Subscribe', automaticEventName: 'Subscribe', googleActionId: null, version: 1 },
+  { pointId: 'cp-visit', pointName: '来店予約', eventType: 'store_visit', provider: 'google', mode: 'off', eventName: null, automaticEventName: null, googleActionId: null, version: 1 },
+  { pointId: 'cp-visit', pointName: '来店予約', eventType: 'store_visit', provider: 'meta', mode: 'off', eventName: null, automaticEventName: 'Schedule', googleActionId: null, version: 1 },
 ]
 
 /*
@@ -5737,7 +5795,6 @@ export const AUTOMATION_RUNS = {
   pagination: { total: 4234, limit: 20, offset: 0 },
 }
 
-/** 設計 `WjYAC` と同じ12件。選択後に利用者の実データを選び直す見本。 */
 /*
  * 見本テンプレートの `triggerLabel` は、**きっかけの種類名ではなく説明文**。
  *
@@ -5751,19 +5808,23 @@ export const AUTOMATION_RUNS = {
  * `automationTriggerLabel(row.trigger_type)` で正本から引くので、
  * そちらは正本の値でなければならない。`cross-contracts.test.ts` が見張る。
  */
+/*
+ * 板 `c7dxp`（オートメーション 見本）の12枚。きっかけは本物の口と同じ「〇〇とき」の言い方で返し、
+ * 画面が「とき」を落として出す（絵：「友だちになった」）。
+ */
 export const AUTOMATION_TEMPLATES = [
-  { key: 'welcome', name: 'はじめての人にあいさつする', description: '追加された友だちへ案内を始めます', triggerLabel: '友だちが追加されたとき', actionLabel: 'シナリオ「はじめての方へ」を始める' },
-  { key: 'reservation', name: '「予約」と送られたら予約画面を出す', description: '予約したい人を迷わせません', triggerLabel: 'メッセージに「予約」が入ったとき', actionLabel: 'リッチメニューを切り替える＋回答フォームを送る' },
-  { key: 'inactive', name: '7日 反応がない人に声をかける', description: '対応漏れを見つけます', triggerLabel: '最終接触から7日たったとき', actionLabel: '対応マーク「気にかける」を付ける' },
-  { key: 'first-order', name: 'はじめて買った人にお礼を送る', description: '初回購入のお礼を自動化します', triggerLabel: '注文が確定したとき（はじめての人だけ）', actionLabel: 'テンプレート「はじめてのご注文ありがとうございます」を送る' },
-  { key: 'tag-scenario', name: 'タグが付いたらシナリオを始める', description: '自由に組み替えられる見本です', triggerLabel: 'タグが付いたとき', actionLabel: '選んだシナリオを始める' },
-  { key: 'birthday', name: '誕生月にクーポンを送る', description: '誕生日に合わせて特典を届けます', triggerLabel: '誕生日の◯日前になったとき', actionLabel: 'クーポンを送る＋マイルを付ける' },
-  { key: 'review', name: '口コミを書いてくれた人にマイル', description: '回答後のお礼を自動化します', triggerLabel: '回答フォームが送られたとき', actionLabel: 'マイルを付ける＋タグを付ける' },
-  { key: 'winback', name: '買っていない人を掘り起こす', description: '休眠した友だちへ定期的に案内します', triggerLabel: '90日 買っていない人（毎週 月曜に見る）', actionLabel: '一斉配信「おひさしぶりです」に入れる' },
-  { key: 'block', name: 'ブロックされたら記録する', description: '解除後の対応に備えます', triggerLabel: 'ブロックされたとき', actionLabel: 'タグ「ブロック」を付ける＋外部連携に知らせる' },
-  { key: 'booking', name: '予約前日に確認を送る', description: '来店忘れを減らします', triggerLabel: '予約日の前日になったとき', actionLabel: '確認メッセージを送る' },
-  { key: 'score', name: '関心が高まった人を担当へ知らせる', description: '対応の優先順位を揃えます', triggerLabel: '行動スコアが80になったとき', actionLabel: '担当者タグを付ける＋外部連携に知らせる' },
-  { key: 'cancel', name: '解約相談を受けたら案内する', description: '相談窓口をすぐ案内します', triggerLabel: '「解約」と送られたとき', actionLabel: '相談予約フォームを送る' },
+  { key: 'welcome', name: '友だち追加のあいさつとタグ', description: '追加された友だちへあいさつします', triggerLabel: '友だちになったとき', actionLabel: 'メッセージを送る・タグを付ける' },
+  { key: 'reservation', name: '「予約」と送られたら担当へ', description: '予約したい人を迷わせません', triggerLabel: 'メッセージを受け取ったとき（含まれる言葉）', actionLabel: '担当に知らせる・タグを付ける' },
+  { key: 'vip-scenario', name: 'VIP タグでシナリオ開始', description: '自由に組み替えられる見本です', triggerLabel: 'タグが付いたとき', actionLabel: 'シナリオを始める' },
+  { key: 'survey-tag', name: 'アンケートの回答でタグ', description: '回答で友だちを分けます', triggerLabel: 'フォームに答えたとき', actionLabel: 'タグを付ける' },
+  { key: 'booking', name: '予約のお礼と前日リマインド', description: '来店忘れを減らします', triggerLabel: '予約が確定したとき', actionLabel: 'メッセージを送る' },
+  { key: 'purchase', name: '購入のお礼とフォロー', description: '購入後のお礼を自動化します', triggerLabel: '注文が確定したとき', actionLabel: '共通アクション「購入のお礼」' },
+  { key: 'first-order', name: '初回購入でマイル付与', description: '初回購入のお礼を自動化します', triggerLabel: '注文が確定したとき（初回）', actionLabel: 'マイルを付ける' },
+  { key: 'winback', name: '休眠の人へ声かけ', description: '休眠した友だちへ定期的に案内します', triggerLabel: '決めた時刻・曜日（毎週月曜）', actionLabel: 'メッセージを送る' },
+  { key: 'birthday', name: '誕生月のクーポン', description: '誕生日に合わせて特典を届けます', triggerLabel: '決めた時刻・曜日（毎月1日）', actionLabel: 'クーポンを送る' },
+  { key: 'unblock', name: 'ブロック解除で再あいさつ', description: '解除後にもう一度あいさつします', triggerLabel: '友だちになったとき（再追加）', actionLabel: 'メッセージを送る' },
+  { key: 'shipping', name: '発送のお知らせ', description: '発送を知らせます', triggerLabel: '注文が発送されたとき', actionLabel: 'メッセージを送る' },
+  { key: 'pause', name: '定期便の休止で引き止め', description: '休止した人へ案内します', triggerLabel: '定期便が休止されたとき', actionLabel: 'メッセージを送る・タグを付ける' },
 ]
 
 const caStep = (id, type, params = {}, onFailure = 'stop') => ({ id, type, params, onFailure })
@@ -6737,34 +6798,33 @@ const tagSummary = (...ids) => LINE_ACCOUNT_TAGS.filter((tag) => ids.includes(ta
 /**
  * LINEアカウント一覧。設計 `QT91v` の稼働3・停止1・保管2と親子関係。
  * 統括ホーム（絵 `JKjsE`）のために、タグ・接続状態（`connection`）・権限者の数（`stats.staffCount`）を足した（2026-10-06）。
+ * 2026-10-07：絵 `JKjsE`・`a7lUk`・`V7vn3` の5件にそろえた（本店→渋谷店→TEST→2025年イベント→旧キャンペーンの並び、
+ * 渋谷店の親は本店、2025年イベントは稼働・旧キャンペーンはアーカイブ、LINE ID は @nen-…、旧テストアカウントは外した）。
+ * 名前を使う66枚を前後で測り、下がった板なし（a7lUk 73→89）。
  */
 export const LINE_ACCOUNTS = [
-  lineAccount('visual-qa-account', '2007123456', '然-NEN- TEST', 0, {
-    isDefault: true, role: '検証用。本番の配信には使わない',
+  lineAccount('visual-qa-account', '2007123456', '然-NEN- TEST', 2, {
+    basicId: 'nen-test', isDefault: true, role: '検証用。本番の配信には使わない',
     stats: { friendCount: 231, activeScenarios: 4, messagesThisMonth: 1842, staffCount: 2 },
     tags: tagSummary('tag-test'), connection: { status: 'warn', checkedAt: '2026-09-30T09:00:00.000Z' },
   }),
-  lineAccount('visual-qa-account-prod', '2007111222', '然-NEN- 本店', 1, {
-    parentLineAccountId: 'visual-qa-account', stats: { friendCount: 186, activeScenarios: 3, messagesThisMonth: 1260, staffCount: 4 },
+  lineAccount('visual-qa-account-prod', '2007111222', '然-NEN- 本店', 0, {
+    basicId: 'nen-honten', stats: { friendCount: 1284, activeScenarios: 3, messagesThisMonth: 1820, staffCount: 4 },
     tags: tagSummary('tag-shibuya'), connection: { status: 'ok', checkedAt: '2026-09-30T09:00:00.000Z' },
   }),
-  lineAccount('visual-qa-account-store', '2007333444', '然-NEN- 渋谷店', 2, {
-    parentLineAccountId: 'visual-qa-account', stats: { friendCount: 42, activeScenarios: 1, messagesThisMonth: 286, staffCount: 3 },
+  lineAccount('visual-qa-account-store', '2007333444', '然-NEN- 渋谷店', 1, {
+    basicId: 'nen-shibuya', parentLineAccountId: 'visual-qa-account-prod', stats: { friendCount: 612, activeScenarios: 1, messagesThisMonth: 946, staffCount: 3 },
     webhook: { expectedUrl: 'https://api.example/webhook', actualUrl: 'https://old.example/webhook', active: true, status: 'mismatched', checkedAt: '2026-08-22T00:00:00.000Z' },
     tags: tagSummary('tag-shibuya'), connection: { status: 'ok', checkedAt: '2026-09-30T09:00:00.000Z' },
   }),
-  lineAccount('visual-qa-account-old', '2007555666', '旧キャンペーン', 3, {
-    isActive: false, stats: { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 0 },
+  lineAccount('visual-qa-account-old', '2007555666', '旧キャンペーン', 4, {
+    basicId: 'nen-old', isActive: false, archivedAt: '2026-04-01T00:00:00.000Z', stats: { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 0 },
     webhook: { expectedUrl: 'https://api.example/webhook', actualUrl: null, active: null, status: 'unknown', checkedAt: '2026-08-12T00:00:00.000Z' },
     tags: tagSummary('tag-event'), connection: { status: 'unknown', checkedAt: null },
   }),
-  lineAccount('visual-qa-account-event-2025', '2007777888', '2025年イベント', 4, {
-    isActive: false, archivedAt: '2026-04-01T00:00:00.000Z', stats: { friendCount: 18, activeScenarios: 0, messagesThisMonth: 0, staffCount: 2 },
-    tags: tagSummary('tag-event'), connection: { status: 'unknown', checkedAt: null },
-  }),
-  lineAccount('visual-qa-account-archive', '2007999000', '旧テストアカウント', 5, {
-    isActive: false, archivedAt: '2026-02-01T00:00:00.000Z', stats: { friendCount: 4, activeScenarios: 0, messagesThisMonth: 0, staffCount: 0 },
-    tags: [], connection: { status: 'unknown', checkedAt: null },
+  lineAccount('visual-qa-account-event-2025', '2007777888', '2025年イベント', 3, {
+    basicId: 'nen-event', stats: { friendCount: 18, activeScenarios: 0, messagesThisMonth: 634, staffCount: 2 },
+    tags: tagSummary('tag-event'), connection: { status: 'ok', checkedAt: '2026-09-30T09:00:00.000Z' },
   }),
 ]
 

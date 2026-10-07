@@ -184,7 +184,8 @@ test('v8 のつなぎタブでは Pencil FDBsG に切り替わる', async () => 
     expect(host.querySelector('[data-design-node="FDBsG"]')).toBeTruthy()
   })
   expect(host.textContent).toContain('広告とのつなぎ')
-  expect(host.textContent).toContain('返ししくみ')
+  // 見出しは絵どおり「返すしくみ」（今までの「返ししくみ」は書き違い）。
+  expect(host.textContent).toContain('返すしくみ')
   expect(host.textContent).toContain('送った件数')
   expect(host.textContent).toContain('送信履歴を見る')
 })
@@ -200,17 +201,14 @@ test('v8 の送信履歴では Pencil p0kA3 に切り替わる', async () => {
   expect(host.textContent).toContain('広告への送信履歴')
   expect(host.textContent).toContain('CSVで書き出す')
   expect(host.textContent).toContain('初回購入')
-  expect(host.textContent).toContain('断られました')
-  expect(host.textContent).toContain('全 2 件')
+  // 2026-10-07 src/v8 に作り直した（BEHAVIOR.md）。札は絵の言い方、断られた理由は下の注に出す。
+  // やり直す（F-22 の送り直し）は owner だけ。行を開いて理由を見る段はやめた。
+  expect(host.textContent).toContain('断られた')
+  expect(host.textContent).toContain('2 件中 2 件')
+  expect(host.textContent).toContain('断られた理由：目印の期限が切れていました')
   const retryButton = [...host.querySelectorAll('button')].find((button) =>
     button.textContent?.includes('やり直す'),
   )
-  expect(retryButton).toBeTruthy()
-  await act(async () => {
-    retryButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await Promise.resolve()
-  })
-  await eventually(() => {
-    expect(host.textContent).toContain('目印の期限が切れていました')
-  })
+  // この試験の役割は admin（送り直しは owner だけなので置かない）。
+  expect(retryButton).toBeUndefined()
 })
