@@ -518,7 +518,7 @@ export default function AccountRegisterV8() {
                     const on = form.tagIds.includes(tag.id)
                     return (
                       <button key={tag.id} type="button" className={styles.tagChip} aria-pressed={on} onClick={() => toggleTag(tag.id)}>
-                        {on ? <CircleDot size={12} aria-hidden="true" /> : <Star size={12} aria-hidden="true" />}{tag.name}
+                        {on ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />}{tag.name}
                       </button>
                     )
                   })}
@@ -589,7 +589,7 @@ export default function AccountRegisterV8() {
             <section className={styles.panel} aria-label="登録完了" data-design-node="TvXII">
               <h2 className={styles.panelTitle}>登録が完了しました</h2>
               <p className={styles.doneLine}>
-                <CircleCheck size={18} aria-hidden="true" />
+                <CircleCheck size={24} aria-hidden="true" />
                 {`${(connection.displayName ?? form.name.trim()) || 'LINEアカウント'}${connection.basicId ? `（${connection.basicId}）` : ''}を登録しました`}
               </p>
               <div className={styles.progressBox}>
