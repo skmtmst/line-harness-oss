@@ -72,6 +72,7 @@ import SortSelect from '@/components/ui/sort-select'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -366,6 +367,18 @@ export default function AutoRepliesListV8() {
       // 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
     }
   }, [])
+
+  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
+  const folderActions = useFolderRowActions({
+    kind: 'auto_reply',
+    folders,
+    accountId: null,
+    enabled: canEdit,
+    itemLabel: '自動応答',
+    countOf: (id) => folders.find((f) => f.id === id)?.itemCount ?? null,
+    onChanged: () => loadFolders(),
+    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
+  })
 
   useEffect(() => { load() }, [load])
   useEffect(() => { void loadFolders() }, [loadFolders])
@@ -963,7 +976,7 @@ export default function AutoRepliesListV8() {
   }
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: rules.length, icon: <Inbox size={15} aria-hidden="true" /> },
-    ...folders.map((f) => ({
+    ...folders.map((f, index) => ({ ...folderActions.rowActions(f, index),
       id: f.id,
       label: f.name,
       // フォルダ件数は API(itemCount) をそのまま出す。来ないときは null（出さない）。
@@ -1644,6 +1657,7 @@ export default function AutoRepliesListV8() {
         V7＋V8 の和集合で見えてしまい、どちらの設計とも一致しなくなる。
         KPIs は V7 と同じ節名なので残す。
       */}
+      {folderActions.dialogs}
       {folderDialogOpen && (
         <FolderAddDialog
           kind="auto_reply"

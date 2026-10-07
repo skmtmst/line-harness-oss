@@ -32,6 +32,7 @@ import HelpTip from '@/components/shared/help-tip'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel from '@/components/shared/detail-panel'
@@ -136,6 +137,18 @@ export default function EventsListV8() {
       setFoldersError(true)
     }
   }, [selectedAccountId])
+
+  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
+  const folderActions = useFolderRowActions({
+    kind: 'event',
+    folders,
+    accountId: selectedAccountId ?? null,
+    enabled: canEdit,
+    itemLabel: 'イベント',
+    countOf: (id) => folders.find((f) => f.id === id)?.itemCount ?? null,
+    onChanged: () => loadFolders(),
+    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
+  })
 
   useEffect(() => {
     void loadFolders()
@@ -309,7 +322,7 @@ export default function EventsListV8() {
 
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: loadStatus === 'ready' && !folderFilter ? listTotal : null },
-    ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
+    ...folders.map((folder, index) => ({ ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
     { id: UNFILED, label: '未分類', count: unfiledCount },
   ]
 
@@ -573,6 +586,7 @@ export default function EventsListV8() {
 
   const overlays = (
     <>
+      {folderActions.dialogs}
       {folderDialogOpen && selectedAccountId ? (
         <FolderAddDialog
           kind="event"

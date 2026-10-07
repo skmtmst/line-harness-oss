@@ -65,6 +65,7 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -220,6 +221,18 @@ export default function ScenariosListV8() {
       // 置き場が取れなくても一覧は出す。
     }
   }, [selectedAccountId])
+
+  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
+  const folderActions = useFolderRowActions({
+    kind: 'scenario',
+    folders,
+    accountId: selectedAccountId ?? null,
+    enabled: canEdit,
+    itemLabel: 'シナリオ',
+    countOf: (id) => folders.find((f) => f.id === id)?.itemCount ?? null,
+    onChanged: () => loadFolders(),
+    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
+  })
 
   useEffect(() => {
     void loadFolders()
@@ -671,7 +684,7 @@ export default function ScenariosListV8() {
 
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: overallTotal },
-    ...folders.map((f) => ({
+    ...folders.map((f, index) => ({ ...folderActions.rowActions(f, index),
       id: f.id,
       label: f.name,
       count: f.itemCount ?? null,
@@ -1246,6 +1259,7 @@ export default function ScenariosListV8() {
         </KpiBand>
       </>}
       overlays={<>
+        {folderActions.dialogs}
         {folderDialogOpen && (
           <FolderAddDialog
             kind="scenario"

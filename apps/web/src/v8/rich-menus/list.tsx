@@ -53,6 +53,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -428,6 +429,18 @@ export default function RichMenusListV8() {
     }
   }, [selectedAccount?.id])
 
+  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
+  const folderActions = useFolderRowActions({
+    kind: 'rich_menu',
+    folders,
+    accountId: selectedAccount?.id ?? null,
+    enabled: canEdit,
+    itemLabel: 'リッチメニュー',
+    countOf: (id) => groupFacets?.folderCounts[id] ?? null,
+    onChanged: () => loadFolders(),
+    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
+  })
+
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => { void loadTapStats() }, [loadTapStats])
   useEffect(() => { void loadTags() }, [loadTags])
@@ -765,7 +778,7 @@ export default function RichMenusListV8() {
   }
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal },
-    ...folders.map((f) => ({
+    ...folders.map((f, index) => ({ ...folderActions.rowActions(f, index),
       id: f.id,
       label: f.name,
       count: groupFacets?.folderCounts[f.id] ?? 0,
@@ -1352,6 +1365,7 @@ export default function RichMenusListV8() {
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={listPager}
       overlays={<>
+        {folderActions.dialogs}
         {folderDialogOpen ? (
           <FolderAddDialog
             kind="rich_menu"
