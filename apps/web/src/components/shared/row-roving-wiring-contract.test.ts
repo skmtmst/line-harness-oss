@@ -18,7 +18,7 @@ describe('主な一覧の行は RovingTbody に入っている', () => {
   it.each(LISTS)('%s', (file) => {
     const source = readFileSync(join(SRC, file), 'utf8')
     expect(source).toContain("from '@/components/shared/row-roving'")
-    expect(source).toMatch(/<RovingTbody>[\s\S]*<\/RovingTbody>/)
+    expect(source).toMatch(/<RovingTbody[\s>][\s\S]*<\/RovingTbody>/)
   })
 
   it('並び替えのつまみは ↑↓ を一覧の行移動に渡さない', () => {

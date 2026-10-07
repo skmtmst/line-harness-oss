@@ -9,7 +9,7 @@ import { useBrand } from '@/lib/use-brand'
 import { qrToDataURL } from '@/lib/qr-image'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import OtpInput from '@/components/shared/otp-input'
+import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '../two-factor-error'
 
@@ -27,7 +27,7 @@ export default function TwoFactorSetupPage() {
   const [challenge, setChallenge] = useState('')
   const [setup, setSetup] = useState<SetupData | null>(null)
   const [qr, setQr] = useState('')
-  const [code, setCode] = useState('')
+  const [typedCode, setCode] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -95,8 +95,11 @@ export default function TwoFactorSetupPage() {
     void qrToDataURL(setup.provisioningUri, { width: 200, margin: 1 }).then(setQr)
   }, [setup])
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
+  /* 6桁目が入った瞬間にも送る（entered）。送っている間は二重に送らない。 */
+  const submit = async (event?: FormEvent, entered?: string) => {
+    event?.preventDefault()
+    if (busy) return
+    const code = entered ?? typedCode
     const digits = code.replace(/\D/g, '')
     if (!challenge || digits.length !== 6) return setError('6桁の認証コードを入力してください')
     setBusy(true)
@@ -135,7 +138,7 @@ export default function TwoFactorSetupPage() {
       window.location.assign(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
     } catch (caught) {
       // R506のついで: 通信断の技術文言をそのまま出さない。
-      setError(twoFactorFailureMessage(caught, '登録を完了できませんでした'))
+      setError(otpFailureMessage(twoFactorFailureMessage(caught, '登録を完了できませんでした')))
       setCode('')
     } finally { setBusy(false) }
   }
@@ -183,7 +186,7 @@ export default function TwoFactorSetupPage() {
             <label htmlFor="totp-setup-code" className="block text-xs font-semibold text-ink">認証アプリの6桁の数字</label>
             <div className="mt-2">
               {/* ★V7 共通 認証コード入力（xHzFK）。 */}
-              <OtpInput id="totp-setup-code" value={code} onChange={setCode} label="認証アプリの6桁の数字" invalid={Boolean(error)} disabled={busy} />
+              <OtpInput id="totp-setup-code" value={typedCode} onChange={setCode} onComplete={(entered) => void submit(undefined, entered)} label="認証アプリの6桁の数字" invalid={Boolean(error)} busy={busy} />
             </div>
           </div>
           <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="確認しています…">確認して登録を完了する

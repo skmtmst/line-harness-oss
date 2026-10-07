@@ -153,6 +153,27 @@
   }
 }
 
+/*
+ * ★V8：画面の高さを外枠で止め、送るのは白い板（.main）の中だけにする（動きの点検・4回目）。
+ * これまでは .shell が min-height だけで高さの上限が無く、中身が長いとページ全体が送られて、
+ * 作る・編集の画面の下の帯（sticky）が画面の外へ出ていた。.main が送る入れ物になれば、
+ * 下の帯は常に画面の下に、上の帯と左メニューは動かずに残る。
+ * PC 幅（1024px 以上）だけ。スマホは固定ヘッダーとページ全体の送りのまま。
+ */
+@media (min-width: 1024px) {
+  [data-theme="v8"] .shell {
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  /* 中の絶対配置（読み上げ用の隠し文字など）が板の外へ出てページを伸ばさないよう、板を基準にする。 */
+  [data-theme="v8"] .main {
+    position: relative;
+    min-height: 0;
+    overscroll-behavior: contain;
+  }
+}
+
 /* v8 の帯は 1280px 未満でも出す（畳んだ左メニューと組む）。モバイルの
    固定ヘッダー分の上余白は 1024px から要らない。 */
 @media (min-width: 1024px) and (max-width: 1279.98px) {

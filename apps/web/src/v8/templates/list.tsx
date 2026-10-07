@@ -10,6 +10,8 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
+import { runOptimistic } from '@/lib/undoable'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -223,17 +225,31 @@ export default function TemplatesListV8() {
   const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
   const [failure, setFailure] = useState<TemplatesFailure | null>(null)
-  const [templateQuery, setTemplateQuery] = useState('')
-  const [chips, setChips] = useState<Record<ChipKey, boolean>>({
-    single: false,
-    multiple: false,
-    variables: false,
-    unused: false,
-  })
-  const [savedFilter, setSavedFilter] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  /*
+   * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
+   * テンプレートを開いて「戻る」と同じ一覧に戻る。
+   */
+  const [urlView, setUrlView] = useListUrlState({ q: '', folder: 'all', chips: '', view: '', size: '20', page: '1' })
+  const templateQuery = urlView.q
+  const setTemplateQuery = useCallback((next: string) => setUrlView({ q: next, page: '1' }), [setUrlView])
+  const chips = useMemo<Record<ChipKey, boolean>>(() => {
+    const on = new Set(urlView.chips ? urlView.chips.split(',') : [])
+    return { single: on.has('single'), multiple: on.has('multiple'), variables: on.has('variables'), unused: on.has('unused') }
+  }, [urlView.chips])
+  const setChips = useCallback((update: Record<ChipKey, boolean> | ((current: Record<ChipKey, boolean>) => Record<ChipKey, boolean>)) => {
+    const next = typeof update === 'function' ? update(chips) : update
+    setUrlView({ chips: (Object.keys(next) as ChipKey[]).filter((key) => next[key]).join(','), page: '1' })
+  }, [chips, setUrlView])
+  const savedFilter = urlView.view
+  const setSavedFilter = useCallback((update: string | ((current: string) => string)) => {
+    setUrlView({ view: typeof update === 'function' ? update(savedFilter) : update, page: '1' })
+  }, [savedFilter, setUrlView])
+  const selectedCategory = urlView.folder
+  const setSelectedCategory = useCallback((next: string) => setUrlView({ folder: next, page: '1' }), [setUrlView])
+  const pageSize = [10, 20, 50].includes(Number(urlView.size)) ? Number(urlView.size) : 20
+  const setPageSize = useCallback((next: number) => setUrlView({ size: String(next), page: '1' }), [setUrlView])
+  const page = Math.max(1, Number.parseInt(urlView.page, 10) || 1)
+  const setPage = useCallback((next: number) => setUrlView({ page: String(next) }), [setUrlView])
 
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
@@ -286,7 +302,6 @@ export default function TemplatesListV8() {
     // フォルダはアカウント単位。切り替えたら前のアカウントの帯も選択も残さない。
     setFolders([])
     setUnfiledCount(null)
-    setSelectedCategory('all')
     setFolderDialogOpen(false)
     setEditingFolder(null)
     setDeletingFolder(null)
@@ -299,8 +314,9 @@ export default function TemplatesListV8() {
     setDuplicateTarget(null)
     setOpenMenuId(null)
     setSelectedIds(new Set())
-    setPage(1)
   }, [selectedAccountId])
+  // アカウントを替えたらフォルダとページを戻す（来た瞬間は URL のまま）。
+  useOnAccountSwitch(selectedAccountId, () => setUrlView({ folder: 'all', page: '1' }))
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
@@ -443,11 +459,7 @@ export default function TemplatesListV8() {
       || savedFilter,
   )
   const clearFilters = () => {
-    setTemplateQuery('')
-    setSelectedCategory('all')
-    setChips({ single: false, multiple: false, variables: false, unused: false })
-    setSavedFilter('')
-    setPage(1)
+    setUrlView({ q: '', folder: 'all', chips: '', view: '', page: '1' })
   }
 
   const toggleChip = (key: ChipKey) => {
@@ -466,9 +478,11 @@ export default function TemplatesListV8() {
   const shownItems = filteredTemplates.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   // 絞り込みや件数の変更でページが溢れたら戻す。
+  // 読み終わってから。読み込み中（0件）に詰めると、URL から戻したページが 1 になる。
   useEffect(() => {
-    if (page > pageCount) setPage(pageCount)
-  }, [page, pageCount])
+    if (!loading && page > pageCount) setPage(pageCount)
+  }, [loading, page, pageCount, setPage])
+  useListScrollMemory(!loading)
 
   const view = listView({ loading, failure, total: tabItems.length, matched: filteredTemplates.length })
   const createBlocked = createBlockedReason({ loading, failure })
@@ -648,35 +662,41 @@ export default function TemplatesListV8() {
     setMoveDraft('')
     setMoveError('')
   }
+  /*
+   * 押した瞬間に移した形を見せて窓を閉じ、裏で保存する（動きの点検・7）。
+   * 1件でも失敗したら元に戻して知らせる（「もう一度」で同じ移動をやり直せる）。
+   */
   const runMove = async () => {
     if (!moveIds) return
-    setMoving(true)
+    const ids = moveIds
+    const folderId = moveDraft === '' ? null : moveDraft
+    const previous = templates
+    const idSet = new Set(ids)
+    setTemplates((current) => current.map((t) => (idSet.has(t.id) ? { ...t, folderId } : t)))
+    setMoveIds(null)
+    setPanelMove(false)
+    setSelectedIds(new Set())
     setMoveError('')
-    try {
+    const send = async () => {
       let failed = 0
-      for (const id of moveIds) {
-        const result = await api.templates.update(id, { folderId: moveDraft === '' ? null : moveDraft })
+      for (const id of ids) {
+        const result = await api.templates.update(id, { folderId })
         if (!result.success) failed += 1
       }
-      if (failed > 0) {
-        setMoveError(`${failed}件を移動できませんでした。状態を読み直してからお試しください。`)
-        await Promise.all([load(), loadFolders()])
-        return
-      }
-      setMoveIds(null)
-      setPanelMove(false)
-      setSelectedIds(new Set())
-      notifyToast('フォルダへ移しました', { tone: 'success' })
-      await Promise.all([load(), loadFolders()])
-    } catch (reason) {
-      setMoveError(
-        reason instanceof ApiError && reason.status === 403
-          ? 'テンプレートを移すには権限が要ります。オーナーか管理者に頼んでください。'
-          : 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
-      )
-    } finally {
-      setMoving(false)
+      return failed > 0 ? { success: false as const, error: `${failed}件` } : { success: true as const }
     }
+    runOptimistic({
+      request: send,
+      revert: () => {
+        setTemplates(previous)
+        void Promise.all([load(), loadFolders()])
+      },
+      failureMessage: 'フォルダへ移せませんでした。状態を読み直したので、もう一度お試しください。',
+      onSuccess: () => {
+        notifyToast('フォルダへ移しました', { tone: 'success' })
+        void loadFolders()
+      },
+    })
   }
 
   /* 複製。複製の口は無いので、同じ内容で「下書き」として新しく作る。 */

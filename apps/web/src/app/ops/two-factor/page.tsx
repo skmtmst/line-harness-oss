@@ -11,7 +11,7 @@ import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-ses
 import { api } from '@/lib/api'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { qrToDataURL } from '@/lib/qr-image'
-import OtpInput from '@/components/shared/otp-input'
+import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import OpsTwoFactorV8 from '@/v8/ops/two-factor'
 import { useAdminTheme } from '@/lib/use-admin-theme'
@@ -36,7 +36,7 @@ function OpsTwoFactorV7() {
   const [uri, setUri] = useState('')
   const [manualKey, setManualKey] = useState('')
   const [qr, setQr] = useState('')
-  const [code, setCode] = useState('')
+  const [typedCode, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   // M504：QR を作れなかったとき。読み込み中の骨組みと区別し、表示し直しの口を出す。
@@ -104,8 +104,11 @@ function OpsTwoFactorV7() {
     return () => { cancelled = true }
   }, [uri, qrAttempt])
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
+  /* 6桁目が入った瞬間にも送る（entered）。送っている間は二重に送らない。 */
+  const submit = async (event?: FormEvent, entered?: string) => {
+    event?.preventDefault()
+    if (busy) return
+    const code = entered ?? typedCode
     if (!session || busy) return
     const digits = code.replace(/\D/g, '')
     if (digits.length !== 6) { setError('6桁の数字を入力してください'); return }
@@ -115,12 +118,12 @@ function OpsTwoFactorV7() {
     // そのまま await すると setBusy(false) が走らず「確認しています…」のまま固まる。
     const res = await opsCall(api.staff.confirmTwoFactorSetup(session.id, digits))
     setBusy(false)
-    if (!res.success) { setError(res.error || '認証コードが正しくありません'); return }
+    if (!res.success) { setError(otpFailureMessage(res.error || '認証コードが正しくありません')); return }
     setState('done')
   }
 
   // 6桁が揃うまで登録させない（V8だけ。v7 は押したときの文のまま）。
-  const digits = code.replace(/\D/g, '')
+  const digits = typedCode.replace(/\D/g, '')
   const codeComplete = digits.length === 6
 
   return (
@@ -177,7 +180,7 @@ function OpsTwoFactorV7() {
           </div>
           <div className="w-full">
             <AuthField label="認証コード（6桁）" htmlFor="ops-totp-code">
-              <OtpInput id="ops-totp-code" value={code} onChange={setCode} label="認証コード（6桁）" invalid={Boolean(error)} disabled={busy} />
+              <OtpInput id="ops-totp-code" value={typedCode} onChange={setCode} onComplete={(entered) => void submit(undefined, entered)} label="認証コード（6桁）" invalid={Boolean(error)} busy={busy} />
             </AuthField>
           </div>
           <Button type="submit" variant="primary" disabled={busy || !uri || !codeComplete} className="w-full" busy={busy} busyLabel="確認しています…">登録する

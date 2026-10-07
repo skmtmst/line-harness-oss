@@ -334,19 +334,25 @@ export default function InflowListV8({
     }
   }
 
-  // 行の受付・停止を切り替える（行の「…」から）。終わったら取り直す。
+  /*
+   * 行の受付・停止を切り替える（行の「…」から）。押した瞬間に札を変え、裏で保存する
+   * （動きの点検・7）。失敗したら元に戻して知らせる。終わったら取り直す。
+   */
   const toggleRouteActive = async (entryRouteId: string, nextActive: boolean, name: string) => {
     setOpenMenuRefCode(null)
+    const setActive = (active: boolean) => setRoutes((current) => current.map((route) => (route.id === entryRouteId ? { ...route, isActive: active } : route)))
+    setActive(nextActive)
     try {
       const res = await api.entryRoutes.update(entryRouteId, { isActive: nextActive })
-      if (res.success) {
-        notifyToast(nextActive ? `「${name}」の受付を再開しました` : `「${name}」の受付を停止しました`)
-        void load()
-      } else {
-        notifyToast(res.error || '更新できませんでした')
-      }
+      if (!res.success) throw new Error(res.error || '更新できませんでした')
+      notifyToast(nextActive ? `「${name}」の受付を再開しました` : `「${name}」の受付を停止しました`)
+      void load()
     } catch (cause) {
-      notifyToast(cause instanceof ApiError && cause.status === 403 ? 'この操作を行う権限がありません' : '通信できませんでした')
+      setActive(!nextActive)
+      notifyToast(
+        cause instanceof ApiError && cause.status === 403 ? 'この操作を行う権限がありません' : '受付を切り替えられませんでした。',
+        { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleRouteActive(entryRouteId, nextActive, name) } },
+      )
     }
   }
 

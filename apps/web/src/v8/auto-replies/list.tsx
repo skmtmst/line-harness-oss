@@ -57,6 +57,8 @@ import { formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
 import { runUndoable } from '@/lib/undoable'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { useLiveReorder } from '@/lib/use-live-reorder'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
@@ -387,6 +389,33 @@ export default function AutoRepliesListV8() {
     page,
   })
   const rules = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : items
+  /*
+   * 止まっている自動応答の削除は、どこにも影響しない（もう返信していない）。確かめの窓を出さずに
+   * 一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。動いているものは今までどおり窓。
+   */
+  const deferredDelete = useDeferredDelete()
+  const requestDelete = (r: AutoReply) => {
+    setDeleteError('')
+    if (r.isActive) {
+      setPendingDelete({ item: r, accountId: selectedAccountId })
+      return
+    }
+    const requestAccountId = selectedAccountId
+    if (panelId === r.id) setPanelId(null)
+    setSelectedIds((current) => {
+      if (!current.has(r.id)) return current
+      const next = new Set(current)
+      next.delete(r.id)
+      return next
+    })
+    deferredDelete.schedule({
+      ids: [r.id],
+      message: `自動応答「${displayName(r)}」を削除しました`,
+      commit: () => api.autoReplies.delete(r.id),
+      onCommitted: () => (selectedAccountIdRef.current === requestAccountId ? load() : undefined),
+      failureMessage: '自動応答を削除できませんでした。状態を読み直してからお試しください。',
+    })
+  }
 
   /* ===== 数の帯 ===== */
   const hitsAllKnown = rules.length > 0 && rules.every((r) => r.hits !== undefined)
@@ -405,7 +434,7 @@ export default function AutoRepliesListV8() {
   const ready = visibleLoadState === 'ready'
 
   /* ===== 絞り込み ===== */
-  const afterQuery = rules.filter((r) => autoReplyMatchesQuery(r, query))
+  const afterQuery = rules.filter((r) => !deferredDelete.isHidden(r.id) && autoReplyMatchesQuery(r, query))
   const inFolder = afterQuery.filter((r) => {
     if (folderFilter === UNFILED) return !r.folderId
     if (folderFilter) return r.folderId === folderFilter
@@ -782,6 +811,9 @@ export default function AutoRepliesListV8() {
     applyPriorityUpdates(updates, `${name}を${direction === -1 ? '1つ上' : '1つ下'}へ動かしました`)
   }
 
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
+  const liveOrder = useLiveReorder(shownItems, (r) => r.id, dragId)
+
   const dropOn = (targetId: string) => {
     if (!dragId || dragId === targetId || !canEdit || sortKey !== 'priority') {
       setDragId(null)
@@ -881,10 +913,7 @@ export default function AutoRepliesListV8() {
       icon: <Trash2 size={14} aria-hidden="true" />,
       tone: 'danger',
       dividerBefore: true,
-      onSelect: () => {
-        setDeleteError('')
-        setPendingDelete({ item: r, accountId: selectedAccountId })
-      },
+      onSelect: () => requestDelete(r),
     })
     // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見る項目だけ残す。
     return readonly ? items.filter((item) => VIEW_ONLY_MENU_IDS.has(item.id)) : items
@@ -1135,8 +1164,8 @@ export default function AutoRepliesListV8() {
               {tableHeadCells}
             </TableHeadRow>
           </thead>
-          <RovingTbody>
-            {shownItems.map((r) => {
+          <RovingTbody reorderKey={liveOrder.shown.map((r) => r.id).join(',')}>
+            {liveOrder.shown.map((r) => {
               const name = displayName(r)
               const conflicts = r.conflictAttentionCount ?? 0
               const actions = actionSummary(r)
@@ -1155,6 +1184,10 @@ export default function AutoRepliesListV8() {
               return (
                 <Tr interactive
                   key={r.id}
+                  data-reorder-id={r.id}
+                  onDragEnter={() => liveOrder.enter(r.id)}
+                  onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                  onDrop={dragId ? () => dropOn(liveOrder.dropTarget(r.id)) : undefined}
                   className={styles.rowClick}
                   tabIndex={0}
                   onClick={() => setPanelId(r.id)}
@@ -1178,8 +1211,7 @@ export default function AutoRepliesListV8() {
                     onClick={(event) => event.stopPropagation()}
                     draggable={canEdit && sortKey === 'priority'}
                     onDragStart={() => setDragId(r.id)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => dropOn(r.id)}
+                    onDragEnd={() => setDragId(null)}
                   >
                     {canEdit && <ReorderGrip
                       label={name}
@@ -1364,9 +1396,8 @@ export default function AutoRepliesListV8() {
                   {canEdit && <Button
                     variant="secondary"
                     onClick={() => {
-                      setDeleteError('')
-                      setPendingDelete({ item: panelRow, accountId: selectedAccountId })
                       setPanelId(null)
+                      requestDelete(panelRow)
                     }}
                   >
                     削除する

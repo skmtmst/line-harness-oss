@@ -11,7 +11,8 @@
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（フォルダへ入れる口が無い・
  * 「先月より」の集計が無い・複製の口が無い など）。
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Bookmark, Inbox, LayoutTemplate, MoreHorizontal, Pause, Play, Plus, Send } from 'lucide-react'
@@ -97,14 +98,26 @@ export default function WebhooksOutgoingV8() {
   const { outgoing, outgoingStatus, summary, loadedAccountId, reload } = overview
 
   const [folders, setFolders] = useState<Folder[]>([])
-  const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [chip, setChip] = useState<SavedFilter>('')
-  /* 並びの部品は絵に無い。つなぎ先は名前で探すことが多いので、既定は名前順（送った回数順は「よく使う絞り込み」から）。 */
-  const [sortKey, setSortKey] = useState<SortKey>('name')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  /*
+   * 検索語・フォルダ・絞り込み・並び順・件数・ページは URL に置く（動きの点検 5 番）。
+   * 送り先を開いて「戻る」と同じ一覧に戻る。絞り込みを変えたらページは 1 へ
+   * （同じ書き込みの中で戻す。効果で戻すと、来た瞬間に URL から戻したページまで消える）。
+   * 並びの部品は絵に無い。つなぎ先は名前で探すことが多いので、既定は名前順（送った回数順は「よく使う絞り込み」から）。
+   */
+  const [view, setView] = useListUrlState({ q: '', folder: '', view: '', sort: 'name', size: '20', page: '1' })
+  const query = view.q
+  const folderFilter = view.folder
+  const chip: SavedFilter = (['', 'active', 'paused', 'failed'] as const).includes(view.view as SavedFilter) ? view.view as SavedFilter : ''
+  const sortKey: SortKey = view.sort === 'volume' ? 'volume' : 'name'
+  const pageSize = [10, 20, 50].includes(Number(view.size)) ? Number(view.size) : 20
+  const page = Math.max(1, Number.parseInt(view.page, 10) || 1)
+  const setPage = useCallback((next: number) => setView({ page: String(next) }), [setView])
+  const setQuery = useCallback((next: string) => setView({ q: next, page: '1' }), [setView])
+  const setFolderFilter = useCallback((next: string) => setView({ folder: next, page: '1' }), [setView])
+  const setChip = useCallback((next: SavedFilter) => setView({ view: next, page: '1' }), [setView])
+  const setSortKey = useCallback((next: SortKey) => setView({ sort: next, page: '1' }), [setView])
+  const setPageSize = useCallback((next: number) => setView({ size: String(next), page: '1' }), [setView])
   const [menuId, setMenuId] = useState<string | null>(null)
   /* 右クリックされた行（「設定」と同じ中身を押した位置に出す。右クリックだけの操作は置かない）。 */
   const [ctxId, setCtxId] = useState<string | null>(null)
@@ -161,15 +174,15 @@ export default function WebhooksOutgoingV8() {
       : b.deliverySummary.total - a.deliverySummary.total))
   }, [displayed, query, folderFilter, chip, sortKey])
 
-  useEffect(() => { setPage(1) }, [query, folderFilter, chip, sortKey, pageSize, selectedAccountId])
+  // アカウントを替えたらページは 1 へ（来た瞬間は URL のまま）。
+  useOnAccountSwitch(selectedAccountId, () => setPage(1))
+  useListScrollMemory(ready)
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pageCount)
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const filterActive = Boolean(query || folderFilter || chip)
   const clearFilters = () => {
-    setQuery('')
-    setFolderFilter('')
-    setChip('')
+    setView({ q: '', folder: '', view: '', page: '1' })
   }
 
   /* ===== 動かす・止める（押した瞬間に札を変え、裏で保存する） ===== */

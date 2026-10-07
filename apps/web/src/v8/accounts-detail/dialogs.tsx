@@ -197,14 +197,17 @@ export function ArchiveDialog({ account, onClose, onDone }: {
     onClose()
   }
 
-  const run = async () => {
-    if (!account || !ready) return
+  /* 6桁目が入った瞬間にも送る（entered）。送っている間は二重に送らない。 */
+  const run = async (entered?: string) => {
+    const value = entered ?? secret
+    const valueReady = method === 'none' || (method === 'totp' ? /^\d{6}$/.test(value) : value.length > 0)
+    if (!account || !valueReady || busy) return
     setBusy(true)
     setError('')
     let token: string | undefined
     if (method !== 'none') {
       try {
-        const res = await api.auth.stepUp({ method, value: secret, purpose: 'line_account.archive' })
+        const res = await api.auth.stepUp({ method, value, purpose: 'line_account.archive' })
         if (!res.success) throw new Error(res.error)
         token = res.data.token
       } catch (caught) {
@@ -259,7 +262,7 @@ export function ArchiveDialog({ account, onClose, onDone }: {
         <div className={styles.verify}>
           <p className={styles.sub} id={secretId}>本人確認（認証アプリの6桁）</p>
           <div className={styles.otp}>
-            <OtpInput value={secret} onChange={setSecret} visualLabel="認証コード（6桁）" labelledBy={secretId} invalid={Boolean(error)} disabled={busy} />
+            <OtpInput value={secret} onChange={setSecret} onComplete={(entered) => void run(entered)} visualLabel="認証コード（6桁）" labelledBy={secretId} invalid={Boolean(error)} busy={busy} />
           </div>
         </div>
       ) : method === 'password' ? (

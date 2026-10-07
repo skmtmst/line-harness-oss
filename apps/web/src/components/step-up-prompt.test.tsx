@@ -65,8 +65,8 @@ describe('StepUpPrompt（V-1）', () => {
       />)
     })
     await screen.findByText('認証アプリで本人確認')
-    fireEvent.change(screen.getByLabelText('1桁目'), { target: { value: '123456' } })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '本人確認して実行' })) })
+    // 6桁目が入った瞬間に送られる（動きの点検・6。「本人確認して実行」を押さなくてよい）。
+    await act(async () => { fireEvent.change(screen.getByLabelText('1桁目'), { target: { value: '123456' } }) })
     await waitFor(() => expect(fixture.authStepUp).toHaveBeenCalledWith({
       method: 'totp', value: '123456', purpose: 'staff.permissions.change',
     }))
@@ -135,8 +135,8 @@ describe('StepUpPrompt（V-1）', () => {
       />)
     })
     await screen.findByText('認証アプリで本人確認')
-    fireEvent.change(screen.getByLabelText('1桁目'), { target: { value: '123456' } })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '本人確認して実行' })) })
+    // 6桁目が入った瞬間に送られる（動きの点検・6。「本人確認して実行」を押さなくてよい）。
+    await act(async () => { fireEvent.change(screen.getByLabelText('1桁目'), { target: { value: '123456' } }) })
     await screen.findByText(/入力回数の上限に達しました/)
     await screen.findByText(/約9分待ってからやり直してください/)
     expect(screen.queryByText(/API error/)).toBeNull()

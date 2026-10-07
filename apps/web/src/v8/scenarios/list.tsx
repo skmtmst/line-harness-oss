@@ -11,7 +11,7 @@
  * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
  */
 import { RovingTbody } from '@/components/shared/row-roving'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Link from 'next/link'
@@ -49,6 +49,8 @@ import NoPermissionBoard from '@/v8/no-permission/no-permission'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { runUndoable } from '@/lib/undoable'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { useLiveReorder } from '@/lib/use-live-reorder'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
@@ -319,7 +321,13 @@ export default function ScenariosListV8() {
     folder: folderFilter,
     page: scenarioList.page,
   })
-  const scenarios = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : scenarioList.items
+  /* 取り消し待ちの削除（5秒）の行は一覧から外して描く（動きの点検 17 番）。 */
+  const deferredDelete = useDeferredDelete()
+  const shownRows = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : scenarioList.items
+  const scenarios = useMemo(
+    () => (deferredDelete.hiddenCount === 0 ? shownRows : shownRows.filter((s) => !deferredDelete.isHidden(s.id))),
+    [deferredDelete, shownRows],
+  )
   /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
   useListScrollMemory(scenarioList.loaded)
   const loadScenarios = scenarioList.retry
@@ -393,6 +401,42 @@ export default function ScenariosListV8() {
     } catch {
       throw new Error('シナリオを削除できませんでした')
     }
+  }
+
+  /*
+   * 影響の無い削除だけ、確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる
+   * （動きの点検 17 番）。止まっていて・購読中が 0 人で・このアカウントだけのもので・
+   * ほかのシナリオの終了後の移動先になっていないもの。どれか分からないときは今までどおり窓。
+   */
+  const requestDelete = async (s: ScenarioRow) => {
+    setDeleteError('')
+    const candidate = !s.isActive && s.subscriberCount === 0 && s.lineAccountId !== null
+    let unreferenced = false
+    if (candidate) {
+      try {
+        const res = await api.scenarios.moveReferrers(s.id)
+        unreferenced = res.success && res.data.items.length === 0
+      } catch {
+        unreferenced = false
+      }
+    }
+    if (!unreferenced) {
+      setDeleteTarget(s)
+      return
+    }
+    if (panelId === s.id) setPanelId(null)
+    deferredDelete.schedule({
+      ids: [s.id],
+      message: `シナリオ「${s.name}」を削除しました`,
+      commit: () => api.scenarios.delete(s.id),
+      onCommitted: () => {
+        void loadFolders()
+        void loadOverallTotal()
+        void loadStats()
+        return loadScenarios()
+      },
+      failureMessage: 'シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。',
+    })
   }
 
   /* ===== まとめて「止める／再開」 ===== */
@@ -568,6 +612,9 @@ export default function ScenariosListV8() {
 
   /* ===== 並び替え ===== */
 
+  /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
+  const liveOrder = useLiveReorder(scenarios, (row) => row.id, dragId)
+
   const dropOn = (targetId: string) => {
     const from = dragId
     setDragId(null)
@@ -701,10 +748,7 @@ export default function ScenariosListV8() {
       label: '削除する',
       tone: 'danger',
       dividerBefore: true,
-      onSelect: () => {
-        setDeleteError('')
-        setDeleteTarget(s)
-      },
+      onSelect: () => { void requestDelete(s) },
     },
   ] as ActionMenuItem[]).filter((item) => canEdit || item.id === 'results')
 
@@ -850,8 +894,8 @@ export default function ScenariosListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <RovingTbody>
-              {scenarios.map((s) => {
+            <RovingTbody reorderKey={liveOrder.shown.map((s) => s.id).join(',')}>
+              {liveOrder.shown.map((s) => {
                 const rowFolder = s.folderId ? folders.find((f) => f.id === s.folderId) : undefined
                 const folderName = s.folderId
                   ? rowFolder?.name ?? 'フォルダ'
@@ -869,6 +913,10 @@ export default function ScenariosListV8() {
                   <Tr
                     interactive
                     key={s.id}
+                    data-reorder-id={s.id}
+                    onDragEnter={() => liveOrder.enter(s.id)}
+                    onDragOver={dragId ? (event) => event.preventDefault() : undefined}
+                    onDrop={dragId ? () => dropOn(liveOrder.dropTarget(s.id)) : undefined}
                     className={`${styles.row} ${styles.rowClick}`}
                     tabIndex={0}
                     onClick={() => setPanelId(s.id)}
@@ -892,8 +940,7 @@ export default function ScenariosListV8() {
                       onClick={(event) => event.stopPropagation()}
                       draggable={canEdit}
                       onDragStart={() => setDragId(s.id)}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => dropOn(s.id)}
+                      onDragEnd={() => setDragId(null)}
                       title={canEdit ? '上下に動かして並び替え' : undefined}
                     >
                       {/* 閲覧のみ：つまみは置かない（列の幅は残る） */}
@@ -1239,9 +1286,8 @@ export default function ScenariosListV8() {
                 {canEdit && <Button
                   variant="secondary"
                   onClick={() => {
-                    setDeleteError('')
-                    setDeleteTarget(panelRow)
                     setPanelId(null)
+                    void requestDelete(panelRow)
                   }}
                 >
                   削除する
