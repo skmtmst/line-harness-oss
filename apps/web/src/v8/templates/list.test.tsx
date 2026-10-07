@@ -130,17 +130,19 @@ describe('V8 テンプレートの一覧', () => {
     expect(screen.queryByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeNull()
   })
 
-  it('使っていないものは削除の確認を開き、押すと消す', async () => {
+  it('使っていないものは確かめの窓を出さずに行を外し、5秒たってから消す（取り消せる間は送らない）', async () => {
     await renderList()
-    openMenuAndDelete('秋の新商品（画像）')
-    expect(screen.getByText('「秋の新商品（画像）」を削除する')).toBeTruthy()
-    expect(screen.getByText('削除は元に戻せません。')).toBeTruthy()
-    const dialog = screen.getByRole('dialog')
-    const confirm = [...dialog.querySelectorAll('button')].find((b) => b.textContent === '削除する') as HTMLButtonElement
-    await act(async () => {
-      fireEvent.click(confirm)
-    })
-    expect(removeTemplate).toHaveBeenCalledWith('t-unused')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      openMenuAndDelete('秋の新商品（画像）')
+      expect(screen.queryByText('「秋の新商品（画像）」を削除する')).toBeNull()
+      expect(screen.queryByText('秋の新商品（画像）')).toBeNull()
+      expect(removeTemplate).not.toHaveBeenCalled()
+      await act(async () => { vi.advanceTimersByTime(5100) })
+      expect(removeTemplate).toHaveBeenCalledWith('t-unused')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('使っているものは消させず、使っている所を2行と残りの数で見せる', async () => {

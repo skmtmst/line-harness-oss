@@ -58,6 +58,7 @@ import { formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
 import { runUndoable } from '@/lib/undoable'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import Button from '@/components/shared/button'
@@ -384,6 +385,33 @@ export default function AutoRepliesListV8() {
     page,
   })
   const rules = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : items
+  /*
+   * 止まっている自動応答の削除は、どこにも影響しない（もう返信していない）。確かめの窓を出さずに
+   * 一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。動いているものは今までどおり窓。
+   */
+  const deferredDelete = useDeferredDelete()
+  const requestDelete = (r: AutoReply) => {
+    setDeleteError('')
+    if (r.isActive) {
+      setPendingDelete({ item: r, accountId: selectedAccountId })
+      return
+    }
+    const requestAccountId = selectedAccountId
+    if (panelId === r.id) setPanelId(null)
+    setSelectedIds((current) => {
+      if (!current.has(r.id)) return current
+      const next = new Set(current)
+      next.delete(r.id)
+      return next
+    })
+    deferredDelete.schedule({
+      ids: [r.id],
+      message: `自動応答「${displayName(r)}」を削除しました`,
+      commit: () => api.autoReplies.delete(r.id),
+      onCommitted: () => (selectedAccountIdRef.current === requestAccountId ? load() : undefined),
+      failureMessage: '自動応答を削除できませんでした。状態を読み直してからお試しください。',
+    })
+  }
 
   /* ===== 数の帯 ===== */
   const hitsAllKnown = rules.length > 0 && rules.every((r) => r.hits !== undefined)
@@ -402,7 +430,7 @@ export default function AutoRepliesListV8() {
   const ready = visibleLoadState === 'ready'
 
   /* ===== 絞り込み ===== */
-  const afterQuery = rules.filter((r) => autoReplyMatchesQuery(r, query))
+  const afterQuery = rules.filter((r) => !deferredDelete.isHidden(r.id) && autoReplyMatchesQuery(r, query))
   const inFolder = afterQuery.filter((r) => {
     if (folderFilter === UNFILED) return !r.folderId
     if (folderFilter) return r.folderId === folderFilter
@@ -890,10 +918,7 @@ export default function AutoRepliesListV8() {
       dividerBefore: true,
       disabled: readonly,
       disabledReason: readonly ? NO_MANAGE_NOTE : undefined,
-      onSelect: () => {
-        setDeleteError('')
-        setPendingDelete({ item: r, accountId: selectedAccountId })
-      },
+      onSelect: () => requestDelete(r),
     })
     return items
   }
@@ -1399,9 +1424,8 @@ export default function AutoRepliesListV8() {
                     variant="secondary"
                     disabled={!canEdit}
                     onClick={() => {
-                      setDeleteError('')
-                      setPendingDelete({ item: panelRow, accountId: selectedAccountId })
                       setPanelId(null)
+                      requestDelete(panelRow)
                     }}
                   >
                     削除する

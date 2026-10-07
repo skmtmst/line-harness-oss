@@ -10,6 +10,7 @@
  * （components/friend-fields/tags-page-v4）を使う。見た目だけを型と絵に合わせた。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -29,8 +30,9 @@ import {
   Users,
 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, type ListStats } from '@/lib/api'
+import { api, ApiError, type ListStats, type TagDependencies } from '@/lib/api'
 import { useRowLeaving } from '@/lib/use-row-leaving'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { ListPageBody } from '@/components/templates'
 import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
@@ -205,17 +207,84 @@ export default function TagsTab({
   const [actionError, setActionError] = useState('')
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsFailed, setStatsFailed] = useState(false)
-  const [query, setQuery] = useState('')
-  const [folder, setFolder] = useState('')
-  const [usageFilter, setUsageFilter] = useState('all')
-  const [sourceFilter, setSourceFilter] = useState('all')
-  const [quick, setQuick] = useState<string[]>([])
+  /*
+   * 検索語・フォルダ・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
+   * タグを開いて「戻る」と同じ一覧に戻る。絞り込みを変えたらページは 1 へ
+   * （同じ書き込みの中で戻す。効果で戻すと、来た瞬間に URL から戻したページまで消える）。
+   */
+  const [view, setView] = useListUrlState({ q: '', folder: '', usage: 'all', source: 'all', quick: '', size: '20', page: '1' })
+  const query = view.q
+  const folder = view.folder
+  const usageFilter = view.usage
+  const sourceFilter = view.source
+  const quick = useMemo(() => (view.quick ? view.quick.split(',') : []), [view.quick])
+  const pageSize = PAGE_SIZES.includes(Number(view.size)) ? Number(view.size) : 20
+  const page = Math.max(1, Number.parseInt(view.page, 10) || 1)
+  const setQuery = useCallback((next: string) => setView({ q: next, page: '1' }), [setView])
+  const setFolder = useCallback((next: string) => setView({ folder: next, page: '1' }), [setView])
+  const setUsageFilter = useCallback((next: string) => setView({ usage: next, page: '1' }), [setView])
+  const setSourceFilter = useCallback((next: string) => setView({ source: next, page: '1' }), [setView])
+  const setQuick = useCallback((update: string[] | ((current: string[]) => string[])) => {
+    const next = typeof update === 'function' ? update(quick) : update
+    setView({ quick: next.join(','), page: '1' })
+  }, [quick, setView])
+  const setPageSize = useCallback((next: number) => setView({ size: String(next), page: '1' }), [setView])
+  const setPage = useCallback((next: number) => setView({ page: String(next) }), [setView])
   const [quickOpen, setQuickOpen] = useState(false)
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
   const { leavingId, leave } = useRowLeaving()
+  /*
+   * どこにも使われていないタグ（友だち 0 人・参照 0・つながる操作 0・待ちの実行 0・マイルの設定なし）は、
+   * 名前を打たせる確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
+   * 影響を読めないとき・どれかが残るときは今までどおり窓（影響の一覧と名前の入力）。
+   */
+  const deferredDelete = useDeferredDelete()
+  const requestArchive = async (tag: Tag) => {
+    if (!accountId) {
+      setDeleteTarget(tag)
+      return
+    }
+    let impact: TagDependencies | null = null
+    try {
+      const res = await api.tags.dependencies(tag.id, accountId)
+      if (res.success) impact = res.data
+    } catch {
+      impact = null
+    }
+    const unused = impact !== null
+      && impact.canArchive
+      && impact.friendCount === 0
+      && impact.references.length === 0
+      && impact.linkedActions.length === 0
+      && impact.pendingRunCount === 0
+      && impact.blockingReferenceCount === 0
+      && !impact.mileageImpact.configured
+    if (!impact || !unused) {
+      setDeleteTarget(tag)
+      return
+    }
+    const confirmed = impact
+    const requestAccountId = accountId
+    deferredDelete.schedule({
+      ids: [tag.id],
+      message: `タグ「${tag.name}」を保管しました`,
+      commit: async () => {
+        try {
+          await api.tags.archive(tag.id, requestAccountId, {
+            expectedVersion: confirmed.tag.version,
+            impactRevision: confirmed.revision,
+          }, crypto.randomUUID())
+        } catch (reason) {
+          // もう保管済みなら、着きたかった状態に着いている（窓の扱いと同じ）。
+          if (reason instanceof ApiError && reason.code === 'already_archived') return
+          throw reason
+        }
+      },
+      onCommitted: () => load(),
+      failureMessage: '保管できませんでした。影響を読み直して、もう一度お試しください。',
+    })
+  }
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
@@ -272,13 +341,16 @@ export default function TagsTab({
     if (fixture) return
     setItems([])
     setGroups([])
-    setFolder('')
-    setPage(1)
     setOpenMenuId(null)
     setMenuMoveFor(null)
   }, [fixture, accountId])
 
+  // アカウントを替えたら、前のアカウントのフォルダとページを残さない（来た瞬間は URL のまま）。
+  useOnAccountSwitch(accountId, () => setView({ folder: '', page: '1' }))
+  useListScrollMemory(status === 'ready')
+
   const filtered = useMemo(() => items.filter((tag) => {
+    if (deferredDelete.isHidden(tag.id)) return false
     if (query && !tag.name.toLowerCase().includes(query.toLowerCase())) return false
     if (folder === UNGROUPED && tag.groupId) return false
     if (folder && folder !== UNGROUPED && tag.groupId !== folder) return false
@@ -295,14 +367,13 @@ export default function TagsTab({
       if (key === 'starred' && !tag.isStarred) return false
     }
     return true
-  }), [items, query, folder, usageFilter, sourceFilter, quick])
+  }), [items, query, folder, usageFilter, sourceFilter, quick, deferredDelete])
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pages)
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const activeTag = items.find((tag) => tag.id === activeTagId) ?? null
   const activeTagIndex = visible.findIndex((tag) => tag.id === activeTagId)
   const activeGroup = activeTag ? groups.find((item) => item.id === activeTag.groupId) : undefined
-  useEffect(() => setPage(1), [query, folder, usageFilter, sourceFilter, quick, pageSize])
 
   /** アカウント切替直後の1フレームは「未取得」として扱う（v7 と同じ）。 */
   const staleAccount = !fixture && loadRequestRef.current.accountId !== accountId
@@ -499,7 +570,7 @@ export default function TagsTab({
         dividerBefore: true,
         disabled: readonly,
         disabledReason: readonly ? readonlyReason : undefined,
-        onSelect: () => setDeleteTarget(tag),
+        onSelect: () => { void requestArchive(tag) },
       })
     }
     return list
@@ -553,7 +624,7 @@ export default function TagsTab({
   ]
 
   const filterActive = Boolean(query || folder || usageFilter !== 'all' || sourceFilter !== 'all' || quick.length)
-  const clearFilters = () => { setQuery(''); setFolder(''); setUsageFilter('all'); setSourceFilter('all'); setQuick([]) }
+  const clearFilters = () => { setView({ q: '', folder: '', usage: 'all', source: 'all', quick: '', page: '1' }) }
 
   const createButton = (wide: boolean) => status === 'forbidden' ? null : canEdit ? (
     <Button href="/tags/new" variant="primary" className={wide ? styles.createWide : undefined}><Plus size={15} aria-hidden="true" />タグを作る</Button>
