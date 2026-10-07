@@ -225,17 +225,21 @@ async function scenarioInboxList(browser) {
 
 async function openFirstChat(page, index = 0) {
   const t0 = Date.now()
-  await page.evaluate((i) => {
+  const name = await page.evaluate((i) => {
     const s = document.querySelector('[data-inbox-list-scroller]') ?? document.querySelector('[data-inbox-sort="fixed"]')?.nextElementSibling
     const rows = [...s.querySelectorAll('button')].filter((b) => (b.textContent ?? '').includes('担当：'))
-    rows[i]?.click()
+    const row = rows[i]
+    const label = row?.querySelector('p')?.textContent ?? ''
+    row?.click()
+    return label
   }, index)
-  await page.waitForFunction(() => {
+  // 見出しの名前が切り替わったら、同じ描画で吹き出しも切り替わっている。
+  await page.waitForFunction((n) => {
+    const header = [...document.querySelectorAll('button[title]')].some((b) => b.getAttribute('title') === n && b.hasAttribute('aria-expanded'))
     const el = document.querySelector('[data-inbox-thread-scroller]')
       ?? [...document.querySelectorAll('div.overflow-y-auto')].find((d) => (d.getAttribute('style') ?? '').includes('surface-pearl'))
-    // 窓分け後は見えている吹き出しだけ描くので、印（data-message-id）で待つ。
-    return el && (el.querySelector('[data-message-id]') || (el.textContent && el.textContent.includes('（')))
-  }, null, { timeout: 30000 })
+    return header && el && (el.querySelector('[data-message-id]') || (el.textContent ?? '').includes('（'))
+  }, name, { timeout: 30000 })
   return Date.now() - t0
 }
 
@@ -442,7 +446,7 @@ async function scenarioInboxSwitch(browser) {
   await page.waitForTimeout(1500)
   const heapStart = await heapMB(cdp)
   const times = []
-  for (let i = 1; i <= SWITCHES; i += 1) times.push(await openFirstChat(page, i % 40))
+  for (let i = 1; i <= SWITCHES; i += 1) times.push(await openFirstChat(page, i % 12))
   await page.waitForTimeout(1500)
   r.switchMedianMs = median(times)
   r.switchMaxMs = Math.max(...times)
