@@ -58,3 +58,5 @@ export * from './auto-reply-unmatched.js';
 export * from './booking-liff.js';
 
 export * from './template-definition.js';
+
+export * from './broadcast-definition.js';
