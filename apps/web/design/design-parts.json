@@ -2105,8 +2105,7 @@
       "routes": {
         "active": [
           "/staff/new",
-          "/reminders/new",
-          "/visual-qa/friend-attributes?state=controls"
+          "/reminders/new"
         ],
         "impact": "入力欄を持つ管理画面"
       },
@@ -2226,8 +2225,7 @@
         "active": [
           "/friends",
           "/tags",
-          "/scenarios",
-          "/visual-qa/friend-attributes?state=controls"
+          "/scenarios"
         ],
         "impact": "一覧検索を持つ管理画面"
       },
@@ -2358,8 +2356,7 @@
           "/friends",
           "/staff/new",
           "/tags",
-          "/scenarios",
-          "/visual-qa/friend-attributes?state=controls"
+          "/scenarios"
         ],
         "impact": "選択欄を持つ管理画面"
       },
@@ -3550,9 +3547,7 @@
       "lastCheckedAt": "2026-08-24",
       "note": "開・読込・空・失敗・未読とフィルター操作まで実装した。既存に通知センターAPIとベル入口がないため実画面へはまだ接続しない。",
       "routes": {
-        "implemented": [
-          "/visual-qa/friend-attributes?state=overlays-notification-panel"
-        ],
+        "implemented": [],
         "impact": "通知入口を持つ管理画面"
       },
       "visualVerification": {

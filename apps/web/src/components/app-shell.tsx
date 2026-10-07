@@ -28,8 +28,6 @@ import { useEffect, useState } from 'react'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isFriendAttributesV2 = pathname === '/visual-qa/friend-attributes-v2'
-  const isFriendAttributesV3 = pathname === '/visual-qa/friend-attributes-v3'
   /*
    * LINEアカウントを登録（/accounts/new）。v7 は外枠の無い専用の全画面。
    * ★V8 は絵（xj3zz〜TvXII）どおり、ほかの画面と同じ外枠（左メニュー・上の帯）で出す（2026-10-07 司令塔）。
@@ -56,10 +54,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (process.env.NODE_ENV === 'development' && pathname.startsWith('/visual-qa/')) {
     return (
       <AccountProvider>
-        <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
-          <Sidebar friendAttributesV2Mode={isFriendAttributesV2} preview={isFriendAttributesV2 || isFriendAttributesV3} />
+        <div className={styles.workspace}>
+          <Sidebar />
           <main className={styles.main}>
-            <div data-design-shell="v6-1920" data-design-node="J33xq" className={`${styles.content} ${isFriendAttributesV2 ? 'lg:pt-[32px]' : ''}`}>
+            <div data-design-shell="v6-1920" data-design-node="J33xq" className={styles.content}>
               {children}
             </div>
           </main>
@@ -101,12 +99,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <ImpersonationNotice />
               {/* V-2: いつもと違う端末・場所からのログイン帯。そのログイン中だけ出る。 */}
               <UnfamiliarLoginNotice />
-              <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
+              <div className={styles.workspace}>
                 {/* V8 の先読み（F①）。V8 のときだけ中の聞き耳が働く。 */}
                 <HoverPrefetch />
                 {/* V8 の探す窓（F②）。⌘K・Ctrl+K で開く。帯には置かない。 */}
                 <CommandPalette />
-                <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
+                <Sidebar />
                 <Workspace>
                   {guardedContent}
                 </Workspace>

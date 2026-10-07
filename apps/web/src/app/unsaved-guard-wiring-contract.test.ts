@@ -282,8 +282,6 @@ const EXEMPTIONS: Record<string, string> = {
     '下書き保存式の編集画面。番兵の扱いは別途検討',
   'app/mileage/v8-score-tab.tsx':
     '★V8 の行動スコア一覧（IRPw8）。点数の変更・ルールの公開停止・できごとの除外は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。名前・できごとの検索欄は絞り込みで閉じると戻る',
-  'components/friend-attributes-v2/tag-list-v2.tsx':
-    '分類の変更は選んだ直後に即時保存し、下書きを持たない',
   'components/friend-fields/tags-page-v4.tsx':
     '一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
   'app/tags/tags-tab-v8.tsx':

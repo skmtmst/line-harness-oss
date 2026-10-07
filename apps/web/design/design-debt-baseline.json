@@ -416,14 +416,6 @@
     "arbitrary-value": 2,
     "unresolved-classname": 1
   },
-  "components/friend-attributes-v2/tag-list-v2.tsx": {
-    "arbitrary-value": 51,
-    "unresolved-classname": 6,
-    "direct-th": 3
-  },
-  "components/friend-attributes-v3/friend-attributes-v3-static.tsx": {
-    "unresolved-classname": 3
-  },
   "components/friend-fields/edit-tag-page-v4.tsx": {
     "arbitrary-value": 1
   },
