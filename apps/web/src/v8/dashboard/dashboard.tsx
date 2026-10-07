@@ -43,6 +43,7 @@ import {
   Unavailable,
   Upcoming,
 } from './sections'
+import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
 
 /* 編集パネル（dnd-kit を含む重い部品）は開くまで読まない（v7 の V8 と同じ）。 */
@@ -210,10 +211,12 @@ export default function DashboardV8() {
   const todayCells = d.visibleToday.map((item) => ({ id: item.id, cell: todayCell(item.id) })).filter((entry) => entry.cell !== null)
   const openCell = todayCells.find((entry) => entry.id === openDetail)
 
+  const overviewFailed = !data && !d.loading && d.error !== ''
   /* ── 右の列・段D のカード ──────────────────────── */
   const rightCard = (id: DashboardCardId): ReactNode => {
-    const unavailable = (key: Parameters<typeof d.sectionAvailable>[0]) => data && !d.sectionAvailable(key)
-    if (id === 'send-quota') return <SendQuota delivery={d.sectionAvailable('quota') ? data?.delivery ?? null : null} metric={data?.metrics?.monthlyQuota} section={data?.sections?.quota} onRetry={() => void d.load()} />
+    /* 概要が取れなかった（data なし）ときは骨組みを出し続けず、段ごとに「読み込めませんでした」を出す。 */
+    const unavailable = (key: Parameters<typeof d.sectionAvailable>[0]) => overviewFailed || (data && !d.sectionAvailable(key))
+    if (id === 'send-quota') return <SendQuota overviewFailed={overviewFailed} delivery={d.sectionAvailable('quota') ? data?.delivery ?? null : null} metric={data?.metrics?.monthlyQuota} section={data?.sections?.quota} onRetry={() => void d.load()} />
     if (id === 'operational-alerts') return <OperationalAlerts risk={d.displayedHealthRisk} healthIssues={d.healthIssueCount} oldestWaitMinutes={d.pendingOldest} twoFactor={d.displayedTwoFactor} referenceCount={reference?.operationalAlerts} failed={d.healthFailed} updatedAt={d.supplementLoadedAt} />
     if (id === 'support-mark-status') return <SupportStatus inbox={d.sectionAvailable('inbox') ? (data && reference?.supportInbox ? { ...data.inbox, ...reference.supportInbox } : data?.inbox ?? null) : null} autoOnInbound={d.supportMarkAutoOnInbound} />
     if (id === 'connection-status') return <ConnectionStatus account={d.selectedAccount} canCheck={role !== null && canManageRole(role)} onChecked={refreshAccounts} risk={d.displayedHealthRisk} activeFriends={d.activeFriends} healthFailed={d.healthFailed} />
@@ -321,8 +324,9 @@ export default function DashboardV8() {
     return metric === undefined ? data?.trend ?? [] : metric.value ?? []
   }
   function unavailableTrend(): ReactNode | null {
-    if (!data || d.sectionAvailable('trend')) return null
-    return <><SectionHeader title="友だち数の推移" /><Unavailable section={data.sections?.trend} onRetry={() => void d.load()} /></>
+    if (!data && !overviewFailed) return null
+    if (data && d.sectionAvailable('trend')) return null
+    return <><SectionHeader title="友だち数の推移" /><Unavailable section={data?.sections?.trend} onRetry={() => void d.load()} /></>
   }
 
   const viewer = role !== null && !canManageRole(role)
@@ -344,7 +348,7 @@ export default function DashboardV8() {
       {d.error ? (
         <div className={styles.errorBand} role="alert">
           <span>{d.error}</span>
-          <Button type="button" onClick={() => void d.load()}>もう一度読み込む</Button>
+          <Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>
         </div>
       ) : null}
       {looseFailures.length ? (
@@ -352,7 +356,7 @@ export default function DashboardV8() {
           tone="warn"
           role="status"
           message={`${partialFailureLabels(looseFailures)}を${STATE_TEXT.error}。0件としては表示していません。`}
-          action={<Button type="button" onClick={() => void d.load()}>もう一度読み込む</Button>}
+          action={<Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>}
         />
       ) : null}
     </div>
