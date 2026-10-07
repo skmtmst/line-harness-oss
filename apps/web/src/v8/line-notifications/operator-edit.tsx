@@ -406,12 +406,12 @@ function OperatorEditInner() {
                   />
                 </div>
                 <div className={styles.pair}>
-                  <Field id="operator-event" label="きっかけ" value={eventType} onChange={setEventType} options={[...EVENT_OPTIONS]} disabled={!canWrite} />
-                  <Field id="operator-importance" label="重要度" value={importance} onChange={setImportance} options={IMPORTANCE_OPTIONS} disabled={!canWrite} />
+                  <Field id="operator-event" label="きっかけ" value={eventType} onChange={setEventType} options={[...EVENT_OPTIONS]} readOnly={!canWrite} />
+                  <Field id="operator-importance" label="重要度" value={importance} onChange={setImportance} options={IMPORTANCE_OPTIONS} readOnly={!canWrite} />
                 </div>
                 <div className={styles.pair}>
-                  <Field id="operator-threshold" label="どれくらいたまったら" value={threshold} onChange={setThreshold} options={THRESHOLD_OPTIONS} disabled={!canWrite} />
-                  <Field id="operator-dedupe" label="同じ知らせを重ねない" value={dedupeMinutes} onChange={setDedupeMinutes} options={DEDUPE_OPTIONS} disabled={!canWrite} />
+                  <Field id="operator-threshold" label="どれくらいたまったら" value={threshold} onChange={setThreshold} options={THRESHOLD_OPTIONS} readOnly={!canWrite} />
+                  <Field id="operator-dedupe" label="同じ知らせを重ねない" value={dedupeMinutes} onChange={setDedupeMinutes} options={DEDUPE_OPTIONS} readOnly={!canWrite} />
                 </div>
               </section>
 
@@ -421,12 +421,12 @@ function OperatorEditInner() {
                   <p className={styles.cardNote}>LINEログイン済みの人にだけ届きます。お客様の連絡先は宛先に入りません。</p>
                 </div>
                 <div className={styles.pair}>
-                  <Field id="operator-recipient-kind" label="送り先" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'チーム' }]} disabled={!canWrite} />
+                  <Field id="operator-recipient-kind" label="送り先" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'チーム' }]} readOnly={!canWrite} />
                   <Field
                     id="operator-recipient-team"
                     label="チーム"
                     value={teamId}
-                    disabled={!canWrite}
+                    readOnly={!canWrite}
                     onChange={(value) => {
                       setTeamId(value)
                       const team = teams.find(item => item.id === value)
@@ -454,20 +454,22 @@ function OperatorEditInner() {
                       </div>
                     ) : (
                       <ul className={styles.staffList}>
-                        {items.map((recipient) => (
+                        {/* 閲覧のみ：選ぶチェックは置かず、受け取る人の名前だけを並べる（2026-10-06 オーナー決定）。 */}
+                        {(canWrite ? items : items.filter((recipient) => recipientIds.includes(recipient.id))).map((recipient) => (
                           <li key={recipient.id} className={styles.staffRow}>
-                            <Checkbox
-                              checked={recipientIds.includes(recipient.id)}
-                              disabled={!canWrite}
-                              onCheckedChange={(checked) => {
-                                setTeamId('')
-                                setRecipientIds((current) => checked
-                                  ? [...current, recipient.id]
-                                  : current.filter((id) => id !== recipient.id))
-                              }}
-                            >
-                              {recipient.name}
-                            </Checkbox>
+                            {canWrite ? (
+                              <Checkbox
+                                checked={recipientIds.includes(recipient.id)}
+                                onCheckedChange={(checked) => {
+                                  setTeamId('')
+                                  setRecipientIds((current) => checked
+                                    ? [...current, recipient.id]
+                                    : current.filter((id) => id !== recipient.id))
+                                }}
+                              >
+                                {recipient.name}
+                              </Checkbox>
+                            ) : <span>{recipient.name}</span>}
                             <span className={styles.staffSpacer} />
                             <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
                               {recipient.channels.line ? 'LINE' : 'LINE 未ログイン'}
@@ -512,19 +514,25 @@ function OperatorEditInner() {
                     </div>
                   ) : null}
                 </div>
-                <Checkbox checked={onlyAvailable} onCheckedChange={setOnlyAvailable} disabled={!canWrite}>
-                  手が空いている人だけに送る（対応中の人には送りません）
-                </Checkbox>
-                <Checkbox checked={emailFallback} onCheckedChange={setEmailFallback} disabled={!canWrite}>
-                  だれも受け取れないときはメールでも送る（LINE未ログインの人がいるとき）
-                </Checkbox>
+                {canWrite ? <>
+                  <Checkbox checked={onlyAvailable} onCheckedChange={setOnlyAvailable}>
+                    手が空いている人だけに送る（対応中の人には送りません）
+                  </Checkbox>
+                  <Checkbox checked={emailFallback} onCheckedChange={setEmailFallback}>
+                    だれも受け取れないときはメールでも送る（LINE未ログインの人がいるとき）
+                  </Checkbox>
+                </> : <>
+                  {/* 閲覧のみ：チェックは置かず、いまの設定を文字で見せる。 */}
+                  <p className={styles.cardNote}>{`手が空いている人だけに送る：${onlyAvailable ? 'する' : 'しない'}`}</p>
+                  <p className={styles.cardNote}>{`だれも受け取れないときはメールでも送る：${emailFallback ? 'する' : 'しない'}`}</p>
+                </>}
               </section>
 
               <section className={styles.card} aria-labelledby="operator-when-send-heading">
                 <div className={styles.cardHead}>
                   <h2 id="operator-when-send-heading" className={styles.cardTitle}>いつ送るか・重ならないか</h2>
                 </div>
-                <Field id="operator-schedule" label="送る時間" value={schedule} onChange={setSchedule} options={SCHEDULE_OPTIONS} disabled={!canWrite} />
+                <Field id="operator-schedule" label="送る時間" value={schedule} onChange={setSchedule} options={SCHEDULE_OPTIONS} readOnly={!canWrite} />
                 <p className={styles.cardNote}>営業時間外のものは翌朝 10:00 にまとめて送ります。</p>
               </section>
 
@@ -642,18 +650,22 @@ function OperatorEditInner() {
 }
 
 /** 題（12px・太字）＋選ぶ欄。2つ並べるときは .pair に入れる。 */
-function Field({ id, label, value, onChange, options, disabled }: {
+/** 選ぶ欄。閲覧のみ（readOnly）は選ぶ部品を置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */
+function Field({ id, label, value, onChange, options, readOnly = false }: {
   id: string
   label: string
   value: string
   onChange: (value: string) => void
   options: { value: string; label: string }[]
-  disabled?: boolean
+  readOnly?: boolean
 }) {
+  const shown = options.find((option) => option.value === value)?.label ?? value
   return (
     <div className={styles.field}>
       <label htmlFor={id} className={styles.fieldLabel}>{label}</label>
-      <Select aria-label={label} id={id} size="full" value={value} onChange={onChange} options={options} disabled={disabled} />
+      {readOnly
+        ? <input id={id} aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} className={styles.input} />
+        : <Select aria-label={label} id={id} size="full" value={value} onChange={onChange} options={options} />}
     </div>
   )
 }

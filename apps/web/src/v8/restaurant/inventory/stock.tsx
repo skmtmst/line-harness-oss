@@ -477,38 +477,43 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               return (
                 <div key={weekday} className={styles.dayRow}>
                   <div className={styles.dayHead}>
-                    <Toggle
-                      checked={open}
-                      label={`${name}曜日に予約を受ける`}
-                      onChange={canEdit ? (next) => setDay(weekday, next ? [{ opensAt: '17:00', closesAt: '22:00' }] : []) : undefined}
-                    />
+                    {/* 閲覧のみ：つまみ・時刻を選ぶ部品は置かず、いまの時間を文字で見せる（2026-10-06 オーナー決定）。 */}
+                    {canEdit ? (
+                      <Toggle
+                        checked={open}
+                        label={`${name}曜日に予約を受ける`}
+                        onChange={(next) => setDay(weekday, next ? [{ opensAt: '17:00', closesAt: '22:00' }] : [])}
+                      />
+                    ) : null}
                     <span className={styles.dayName}>{name}</span>
                   </div>
                   {open ? (
                     <div className={styles.dayPeriods}>
                       {day.periods.map((period, index) => (
                         <div key={index} className={styles.period}>
-                          <span className={styles.timeInput}>
-                            <Select
-                              aria-label={`${name}曜日 ${index + 1}つ目の開始`}
-                              size="full"
-                              disabled={!canEdit}
-                              value={period.opensAt}
-                              options={timeOptions(period.opensAt)}
-                              onChange={(value) => setDay(weekday, day.periods.map((p, i) => (i === index ? { ...p, opensAt: value } : p)))}
-                            />
-                          </span>
-                          <span className={styles.tilde}>〜</span>
-                          <span className={styles.timeInput}>
-                            <Select
-                              aria-label={`${name}曜日 ${index + 1}つ目の終了`}
-                              size="full"
-                              disabled={!canEdit}
-                              value={period.closesAt}
-                              options={timeOptions(period.closesAt)}
-                              onChange={(value) => setDay(weekday, day.periods.map((p, i) => (i === index ? { ...p, closesAt: value } : p)))}
-                            />
-                          </span>
+                          {canEdit ? <>
+                            <span className={styles.timeInput}>
+                              <Select
+                                aria-label={`${name}曜日 ${index + 1}つ目の開始`}
+                                size="full"
+                                value={period.opensAt}
+                                options={timeOptions(period.opensAt)}
+                                onChange={(value) => setDay(weekday, day.periods.map((p, i) => (i === index ? { ...p, opensAt: value } : p)))}
+                              />
+                            </span>
+                            <span className={styles.tilde}>〜</span>
+                            <span className={styles.timeInput}>
+                              <Select
+                                aria-label={`${name}曜日 ${index + 1}つ目の終了`}
+                                size="full"
+                                value={period.closesAt}
+                                options={timeOptions(period.closesAt)}
+                                onChange={(value) => setDay(weekday, day.periods.map((p, i) => (i === index ? { ...p, closesAt: value } : p)))}
+                              />
+                            </span>
+                          </> : (
+                            <span aria-label={`${name}曜日 ${index + 1}つ目の時間帯`}>{`${period.opensAt}〜${period.closesAt}`}</span>
+                          )}
                           {canEdit ? (
                             <IconButton aria-label={`${name}曜日の${index + 1}つ目の時間帯を外す`} className={styles.iconButton} onClick={() => setDay(weekday, day.periods.filter((_, i) => i !== index))}>
                               <Trash2 size={16} aria-hidden="true" />

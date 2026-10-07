@@ -21,6 +21,12 @@ function toLocalInput(iso: string): string {
 
 export type ReservationPatch = Record<string, unknown>
 
+/** 閲覧のみ：選ぶ部品は置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */
+function ReadOnlyChoice({ label, value, options }: { label: string; value: string; options: Array<{ value: string; label: string }> }) {
+  const shown = options.find((option) => option.value === value)?.label ?? value
+  return <TextField aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} />
+}
+
 export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore }: {
   reservation: RestaurantReservation | null
   tables: RestaurantTable[]
@@ -59,6 +65,14 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     courseId: draft.courseId || null,
     allergyNote: draft.allergyNote || null,
   })
+  const tableOptions = [
+    { value: '', label: '未配席' },
+    ...tables.filter((table) => table.is_active || table.id === reservation.table_id).map((table) => ({ value: table.id, label: `${table.code}・${table.label}（${table.min_capacity}〜${table.max_capacity}名）` })),
+  ]
+  const courseOptions = [
+    { value: '', label: '席のみ' },
+    ...courses.filter((course) => course.status === 'active' || course.id === reservation.course_id).map((course) => ({ value: course.id, label: course.name })),
+  ]
   return (
     <RsDialog
       open
@@ -90,40 +104,38 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
         <>
           <div className={styles.pair}>
             <DialogField label="お客様名" htmlFor="rs-edit-name">
-              <TextField id="rs-edit-name" required disabled={!canWrite} value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
+              <TextField id="rs-edit-name" required readOnly={!canWrite} value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
             </DialogField>
             <DialogField label="電話番号" htmlFor="rs-edit-phone">
-              <TextField id="rs-edit-phone" disabled={!canWrite} value={draft.customerPhone} onChange={(event) => setDraft({ ...draft, customerPhone: event.target.value })} />
+              <TextField id="rs-edit-phone" readOnly={!canWrite} value={draft.customerPhone} onChange={(event) => setDraft({ ...draft, customerPhone: event.target.value })} />
             </DialogField>
           </div>
           <div className={styles.pair}>
             <DialogField label="人数" htmlFor="rs-edit-guests">
-              <TextField id="rs-edit-guests" type="number" min={1} max={100} required disabled={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+              <TextField id="rs-edit-guests" type="number" min={1} max={100} required readOnly={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
             </DialogField>
             <DialogField label="アレルギー・特記事項" htmlFor="rs-edit-allergy">
-              <TextField id="rs-edit-allergy" disabled={!canWrite} value={draft.allergyNote} onChange={(event) => setDraft({ ...draft, allergyNote: event.target.value })} />
+              <TextField id="rs-edit-allergy" readOnly={!canWrite} value={draft.allergyNote} onChange={(event) => setDraft({ ...draft, allergyNote: event.target.value })} />
             </DialogField>
           </div>
           <div className={styles.pair}>
             <DialogField label="開始日時" htmlFor="rs-edit-start">
-              <TextField id="rs-edit-start" type="datetime-local" required disabled={!canWrite} value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} />
+              <TextField id="rs-edit-start" type="datetime-local" required readOnly={!canWrite} value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} />
             </DialogField>
             <DialogField label="終了日時" htmlFor="rs-edit-end">
-              <TextField id="rs-edit-end" type="datetime-local" required disabled={!canWrite} value={draft.endsAt} onChange={(event) => setDraft({ ...draft, endsAt: event.target.value })} />
+              <TextField id="rs-edit-end" type="datetime-local" required readOnly={!canWrite} value={draft.endsAt} onChange={(event) => setDraft({ ...draft, endsAt: event.target.value })} />
             </DialogField>
           </div>
           <div className={styles.pair}>
             <DialogField label="卓" kind="select">
-              <Select aria-label="卓" size="full" disabled={!canWrite} value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={[
-                { value: '', label: '未配席' },
-                ...tables.filter((table) => table.is_active || table.id === reservation.table_id).map((table) => ({ value: table.id, label: `${table.code}・${table.label}（${table.min_capacity}〜${table.max_capacity}名）` })),
-              ]} />
+              {canWrite ? (
+                <Select aria-label="卓" size="full" value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={tableOptions} />
+              ) : <ReadOnlyChoice label="卓" value={draft.tableId} options={tableOptions} />}
             </DialogField>
             <DialogField label="コース" kind="select">
-              <Select aria-label="コース" size="full" disabled={!canWrite} value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={[
-                { value: '', label: '席のみ' },
-                ...courses.filter((course) => course.status === 'active' || course.id === reservation.course_id).map((course) => ({ value: course.id, label: course.name })),
-              ]} />
+              {canWrite ? (
+                <Select aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} />
+              ) : <ReadOnlyChoice label="コース" value={draft.courseId} options={courseOptions} />}
             </DialogField>
           </div>
           <DialogNote>予約媒体から受けた予約は、予約媒体へは書き戻しません（検証環境は受信専用）。卓を変えると、同じ時間に重なる予約がないかを確かめてから保存します。</DialogNote>

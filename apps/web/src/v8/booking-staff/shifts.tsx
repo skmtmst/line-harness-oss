@@ -954,8 +954,10 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   }
 
   const staffLabel = (item: BookingStaff) => `${item.name}${item.role ? `（${item.role}）` : ''}`
-  const timeBox = (label: string, value: string, onChange: (v: string) => void) => (
-    <TimeField aria-label={label} value={value} onChange={onChange} className={styles.time} />
+  // 閲覧のみ：時刻を選ぶ部品は置かず、いまの時刻を文字で見せる（2026-10-06 オーナー決定）。
+  const timeBox = (label: string, value: string, onChange: (v: string) => void) => (canEdit
+    ? <TimeField aria-label={label} value={value} onChange={onChange} className={styles.time} />
+    : <span aria-label={label} className={`${styles.time} ${styles.timeText}`}>{value || '—'}</span>
   )
 
   return (
@@ -985,8 +987,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
           )}
           {canEdit ? null : <p className={layout.warnBand} role="status">閲覧のみです。勤務を変えるには、管理者に「自分の勤務」の権限を頼んでください。</p>}
 
-          {/* 閲覧のみのときは入力をまとめて止める（API も 403 で断る）。押せないボタンは置かない。 */}
-          <fieldset disabled={!canEdit} className={styles.fieldset}>
+          {/* 閲覧のみのときは選ぶ部品・押す口を置かず、いまの値を文字で見せる（API も 403 で断る。2026-10-06 オーナー決定）。 */}
+          <fieldset className={styles.fieldset}>
             {/* いつもの勤務時間 */}
             <section className={layout.card} aria-labelledby="bks-week" data-design="Week">
               <div className={layout.cardHead}>
@@ -999,7 +1001,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                 return (
                   <div className={styles.dayRow} key={day.weekday} data-on={row.active || undefined}>
                     <span className={styles.dayName}>{day.short}</span>
-                    <Toggle label={`${day.label}は出勤する`} checked={row.active} onChange={(checked) => updateDraft(day.weekday, { active: checked })} />
+                    {canEdit ? <Toggle label={`${day.label}は出勤する`} checked={row.active} onChange={(checked) => updateDraft(day.weekday, { active: checked })} /> : null}
                     {row.active ? (
                       <>
                         <span className={styles.dayState}>出る</span>
@@ -1030,6 +1032,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               {breakGroups.length === 0 ? <p className={layout.cardNote}>休憩はありません。</p> : breakGroups.map((group) => (
                 <div key={group.key} className={styles.breakRow}>
                   <span className={styles.daysPick}>
+                    {canEdit ? <>
                     <button
                       type="button"
                       className={styles.daysButton}
@@ -1055,6 +1058,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                         ))}
                       </span>
                     ) : null}
+                    </> : <span className={styles.daysText}>{weekdaySetLabel(group.weekdays)}</span>}
                   </span>
                   {timeBox('休憩の始まり', group.start, (v) => updateBreakGroup(group.key, { start: v }))}
                   <span className={styles.tilde}>〜</span>
@@ -1096,6 +1100,12 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                       <span className={styles.exDate}>{shortDay(row.date)}</span>
                       {row.kind === 'exception' ? (
                         <span className={styles.pill} data-tone="off"><span className={styles.pillDot} aria-hidden="true" />{exceptionBadge(row.item)}</span>
+                      ) : !canEdit ? (
+                        // 閲覧のみ：押して直す口は置かず、時間だけを見せる。
+                        <span className={styles.pill} data-tone={row.kind === 'shift' ? 'on' : 'break'}>
+                          <span className={styles.pillDot} aria-hidden="true" />
+                          {row.kind === 'shift' ? `${row.item.start_time}〜${row.item.end_time}` : `休憩 ${row.item.start}〜${row.item.end}`}
+                        </span>
                       ) : (
                         <button
                           type="button"
@@ -1172,8 +1182,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               {shiftError ? <p className={layout.fieldError} role="alert">{shiftError}</p> : null}
             </section>
 
-            {/* 何週分かのシフトを作る */}
-            <section className={layout.card} aria-labelledby="bks-gen">
+            {/* 何週分かのシフトを作る（作るための欄だけなので、閲覧のみには出さない） */}
+            {canEdit ? <section className={layout.card} aria-labelledby="bks-gen">
               <div className={layout.cardHead}><h2 id="bks-gen" className={layout.cardTitle}>何週分かのシフトを作る</h2></div>
               <p className={layout.cardNote}>いつもの勤務時間から、日ごとのシフトをまとめて作ります。作ったあと1日ずつ直せます。</p>
               <div className={styles.genRow}>
@@ -1193,7 +1203,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               </div>
               {genError ? <p className={layout.fieldError} role="alert">{genError}</p> : null}
               {generatedCount !== null && !genError ? <p className={styles.savedNote} role="status">{generatedCount}日分作りました。</p> : null}
-            </section>
+            </section> : null}
 
             {/* Google カレンダー */}
             <section className={layout.card} aria-labelledby="bks-cal">
@@ -1214,6 +1224,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                       setCalendarInput(event.target.value)
                     }}
                     placeholder="例: example@example.invalid"
+                    readOnly={!canEdit}
                     className={layout.input}
                   />
                 </div>

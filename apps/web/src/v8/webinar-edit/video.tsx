@@ -318,13 +318,13 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
           <div className={form.pair}>
             <div className={form.field}>
               <label className={form.label} htmlFor="webinar-period-start">公開の開始</label>
-              <input id="webinar-period-start" type="datetime-local" className={styles.dateInput} value={startsAt} disabled={readOnly} onChange={(event) => setStartsAt(event.target.value)} />
+              <input id="webinar-period-start" type="datetime-local" className={styles.dateInput} value={startsAt} readOnly={readOnly} onChange={(event) => setStartsAt(event.target.value)} />
             </div>
             <div className={form.field}>
               <label className={form.label} htmlFor="webinar-period-end">公開の終了<span className={form.optional}>任意</span></label>
               {noEnd
-                ? <TextField id="webinar-period-end" value="なし（いつでも）" readOnly disabled={readOnly} onFocus={() => { if (!readOnly) setNoEnd(false) }} />
-                : <input id="webinar-period-end" type="datetime-local" className={styles.dateInput} value={endsAt} disabled={readOnly} onChange={(event) => setEndsAt(event.target.value)} />}
+                ? <TextField id="webinar-period-end" value="なし（いつでも）" readOnly onFocus={() => { if (!readOnly) setNoEnd(false) }} />
+                : <input id="webinar-period-end" type="datetime-local" className={styles.dateInput} value={endsAt} readOnly={readOnly} onChange={(event) => setEndsAt(event.target.value)} />}
               {!readOnly && !noEnd ? <Checkbox checked={noEnd} onCheckedChange={setNoEnd}>終わりを決めない（いつでも見られる）</Checkbox> : null}
             </div>
           </div>

@@ -72,6 +72,7 @@ export function BasicForm({
             id={`${idPrefix}-title`}
             value={values.title}
             disabled={disabled}
+            readOnly={readOnly}
             placeholder="NEN活用スタートセミナー"
             invalid={Boolean(fieldErrors.title)}
             onChange={(event) => onChange({ title: event.target.value })}
@@ -89,6 +90,7 @@ export function BasicForm({
               id={`${idPrefix}-slug`}
               value={values.slug}
               disabled={disabled}
+              readOnly={readOnly}
               placeholder="nen-start"
               inputMode="url"
               invalid={Boolean(fieldErrors.slug)}
@@ -113,6 +115,7 @@ export function BasicForm({
             id={`${idPrefix}-description`}
             value={values.description}
             disabled={disabled}
+            readOnly={readOnly}
             placeholder="15分で NEN の使い方がわかる無料セミナーです"
             onChange={(event) => onChange({ description: event.target.value })}
           />
@@ -124,10 +127,15 @@ export function BasicForm({
           <h2 id={`${idPrefix}-kind`} className={styles.cardTitle}>開催形式</h2>
           <p className={styles.cardNote}>あとから動画の段でも変えられます</p>
         </div>
-        <RadioCardGroup legend="開催形式" className={styles.radioPair}>
-          <RadioCard name={`${idPrefix}-delivery`} value="on_demand" checked={values.deliveryKind === 'on_demand'} disabled={disabled} onChange={() => onChange({ deliveryKind: 'on_demand' })} title="オンデマンド配信" note="録画動画をいつでも視聴" icon={<Play size={16} />} />
-          <RadioCard name={`${idPrefix}-delivery`} value="scheduled" checked={values.deliveryKind === 'scheduled'} disabled={disabled} onChange={() => onChange({ deliveryKind: 'scheduled' })} title="日時指定配信" note="指定日時に公開開始" icon={<CalendarDays size={16} />} />
-        </RadioCardGroup>
+        {/* 閲覧のみ：選ぶ部品は置かず、選んでいる形式を文字で見せる（2026-10-06 オーナー決定）。 */}
+        {readOnly ? (
+          <ReadValue label="開催形式">{values.deliveryKind === 'scheduled' ? '日時指定配信' : values.deliveryKind === 'on_demand' ? 'オンデマンド配信' : '外部の動画'}</ReadValue>
+        ) : (
+          <RadioCardGroup legend="開催形式" className={styles.radioPair}>
+            <RadioCard name={`${idPrefix}-delivery`} value="on_demand" checked={values.deliveryKind === 'on_demand'} disabled={disabled} onChange={() => onChange({ deliveryKind: 'on_demand' })} title="オンデマンド配信" note="録画動画をいつでも視聴" icon={<Play size={16} />} />
+            <RadioCard name={`${idPrefix}-delivery`} value="scheduled" checked={values.deliveryKind === 'scheduled'} disabled={disabled} onChange={() => onChange({ deliveryKind: 'scheduled' })} title="日時指定配信" note="指定日時に公開開始" icon={<CalendarDays size={16} />} />
+          </RadioCardGroup>
+        )}
         {values.deliveryKind === 'external' ? <p className={styles.help}>今は外部の動画を使っています。別の形式を選ぶまでそのままです。</p> : null}
       </section>
 

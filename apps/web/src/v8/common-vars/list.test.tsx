@@ -2,7 +2,7 @@
 /*
  * V8 共通情報の一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
  * 行が出る・札で絞れる・行の「…」から止める窓と削除の窓が開く（板 Hhl9M・xxKtW）・
- * 閲覧のみでは帯が出て作れない・空のまま使われている帯の「直す」で絞れる。
+ * 閲覧のみでは帯が出て作るボタンを出さない・空のまま使われている帯の「直す」で絞れる。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -198,13 +198,14 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     expect(document.body.textContent).toContain('消さずに止める')
   })
 
-  it('閲覧のみ（staff）では帯が出て、作るボタンは押せない', async () => {
+  // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
+  it('閲覧のみ（staff）では帯が出て、作るボタンと行の「…」は出さない', async () => {
     staffRole.value = 'staff'
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
-    const create = [...host.querySelectorAll('button')].filter((b) => b.textContent?.includes('共通情報を作る'))
-    expect(create.length).toBeGreaterThan(0)
-    for (const button of create) expect(button.disabled).toBe(true)
+    const create = [...host.querySelectorAll('button, a')].filter((b) => b.textContent?.includes('共通情報を作る'))
+    expect(create).toHaveLength(0)
+    expect(host.querySelector('button[aria-label^="共通情報「"][aria-label$="」の操作"]')).toBeNull()
   })
 })

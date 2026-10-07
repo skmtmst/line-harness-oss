@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
+import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import Toggle from '@/components/shared/toggle'
 import Disclosure from '@/components/shared/disclosure'
@@ -48,7 +49,12 @@ function isUnknownTimeZone(zone: string): boolean {
   }
 }
 
-function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty, humanize }: {
+/** 閲覧のみ：選ぶ部品・つまみの代わりに、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */
+function ReadOnlyText({ label, value, spaced = false }: { label: string; value: string; spaced?: boolean }) {
+  return <TextField aria-label={label} value={value} readOnly aria-readonly="true" title={value} className={spaced ? 'mt-1' : undefined} />
+}
+
+function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty, humanize, readOnly = false }: {
   label: string
   unit: string
   min: number
@@ -57,6 +63,8 @@ function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty,
   onChange: (value: number) => void
   trackEmpty?: (empty: boolean) => void
   humanize?: (value: number) => string | null
+  /** 閲覧のみ：数は見せるが変えられない。 */
+  readOnly?: boolean
 }) {
   const [text, setText] = useState<string | null>(null)
   const trackEmptyRef = useRef(trackEmpty)
@@ -86,6 +94,7 @@ function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty,
           min={min}
           max={max}
           value={shown ?? ''}
+          readOnly={readOnly}
           onChange={(event) => {
             const raw = event.target.value
             if (!trackEmpty) {
@@ -241,7 +250,8 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
 
   return (
     <div className={styles.tabStack} data-design="Rules">
-      <fieldset disabled={!canEdit} className="contents">
+      {/* 閲覧のみ：選ぶ部品・つまみは置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */}
+      <div className="contents">
         <section className={styles.section}>
           <div className={styles.sectionHead}>
             <h2 className={styles.sectionTitle}>いつまで予約を受けるか</h2>
@@ -257,24 +267,30 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
               <HelpTip label="受付の締め切りの説明">「直前まで」は開始の直前まで受け付けます。</HelpTip>
             </span>
             <span className={styles.ruleHead}>キャンセルの期限</span>
-            <Select size="full"
-              aria-label="先の予約が取れる範囲"
-              value={String(draft.bookingWindowDays)}
-              onChange={(value) => set('bookingWindowDays', Number(value))}
-              options={windowOptions}
-            />
-            <Select size="full"
-              aria-label="受付の締め切り"
-              value={String(draft.cutoffMinutesBefore)}
-              onChange={(value) => set('cutoffMinutesBefore', Number(value))}
-              options={cutoffOptions}
-            />
-            <Select size="full"
-              aria-label="キャンセルの期限"
-              value={String(draft.cancelDeadlineMinutesBefore)}
-              onChange={(value) => set('cancelDeadlineMinutesBefore', Number(value))}
-              options={cancelOptions}
-            />
+            {canEdit ? <>
+              <Select size="full"
+                aria-label="先の予約が取れる範囲"
+                value={String(draft.bookingWindowDays)}
+                onChange={(value) => set('bookingWindowDays', Number(value))}
+                options={windowOptions}
+              />
+              <Select size="full"
+                aria-label="受付の締め切り"
+                value={String(draft.cutoffMinutesBefore)}
+                onChange={(value) => set('cutoffMinutesBefore', Number(value))}
+                options={cutoffOptions}
+              />
+              <Select size="full"
+                aria-label="キャンセルの期限"
+                value={String(draft.cancelDeadlineMinutesBefore)}
+                onChange={(value) => set('cancelDeadlineMinutesBefore', Number(value))}
+                options={cancelOptions}
+              />
+            </> : <>
+              <ReadOnlyText label="先の予約が取れる範囲" value={`${draft.bookingWindowDays} 日先まで`} />
+              <ReadOnlyText label="受付の締め切り" value={beforeLabel(draft.cutoffMinutesBefore)} />
+              <ReadOnlyText label="キャンセルの期限" value={beforeLabel(draft.cancelDeadlineMinutesBefore)} />
+            </>}
           </div>
         </section>
 
@@ -284,33 +300,39 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
           </div>
           <div className={styles.ruleLine}>
             <span className={styles.ruleLineLabel}>お店が承認してから確定する</span>
-            <Toggle
-              label="お店が承認してから確定する"
-              checked={draft.approvalMode === 'manual'}
-              onChange={(next) => set('approvalMode', next ? 'manual' : 'automatic')}
-            />
+            {canEdit ? (
+              <Toggle
+                label="お店が承認してから確定する"
+                checked={draft.approvalMode === 'manual'}
+                onChange={(next) => set('approvalMode', next ? 'manual' : 'automatic')}
+              />
+            ) : <span className="text-sm text-ink-secondary">{draft.approvalMode === 'manual' ? 'オン' : 'オフ'}</span>}
           </div>
           <div className={styles.ruleLine}>
             <span className={styles.ruleLineLabel}>{`同じ人の予約は同時に ${draft.maxActiveBookingsPerFriend}件 まで`}</span>
-            <span className={styles.ruleLineSelect}>
-              <Select
-                aria-label="同じ人が同時に持てる予約の数"
-                value={String(draft.maxActiveBookingsPerFriend)}
-                onChange={(value) => set('maxActiveBookingsPerFriend', Number(value))}
-                options={maxOptions}
-              />
-            </span>
+            {canEdit ? (
+              <span className={styles.ruleLineSelect}>
+                <Select
+                  aria-label="同じ人が同時に持てる予約の数"
+                  value={String(draft.maxActiveBookingsPerFriend)}
+                  onChange={(value) => set('maxActiveBookingsPerFriend', Number(value))}
+                  options={maxOptions}
+                />
+              </span>
+            ) : null}
           </div>
           <div className={styles.ruleLine}>
             <span className={styles.ruleLineLabel}>
               「指名なし」を出す
               <HelpTip label="「指名なし」の説明">オンにすると、受付中のスタッフ全員が「指名なし」での予約の対象になります。</HelpTip>
             </span>
-            <Toggle
-              label="「指名なし」を出す"
-              checked={noAssign ?? initialNoAssign}
-              onChange={(next) => setNoAssign(next)}
-            />
+            {canEdit ? (
+              <Toggle
+                label="「指名なし」を出す"
+                checked={noAssign ?? initialNoAssign}
+                onChange={(next) => setNoAssign(next)}
+              />
+            ) : <span className="text-sm text-ink-secondary">{(noAssign ?? initialNoAssign) ? 'オン' : 'オフ'}</span>}
           </div>
         </section>
 
@@ -341,45 +363,51 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
             <label className={styles.fieldLabel}>
               前日のお知らせを送る時刻
               <span className="mt-1 flex items-center gap-2">
-                <TimeField
-                  aria-label="前日のお知らせを送る時刻"
-                  value={draft.reminderDayBeforeTime ?? ''}
-                  onChange={(value) => set('reminderDayBeforeTime', value || null)}
-                />
+                {canEdit ? (
+                  <TimeField
+                    aria-label="前日のお知らせを送る時刻"
+                    value={draft.reminderDayBeforeTime ?? ''}
+                    onChange={(value) => set('reminderDayBeforeTime', value || null)}
+                  />
+                ) : <ReadOnlyText label="前日のお知らせを送る時刻" value={draft.reminderDayBeforeTime || '未設定'} />}
                 <span className="text-ink-faint whitespace-nowrap text-xs">空欄は24時間前</span>
               </span>
             </label>
-            <RuleNumberFieldV8 label="当日のお知らせ" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={(value) => formatHoursBeforeHint(value) || null} />
-            <RuleNumberFieldV8 label="予約枠の間隔" unit="分" min={5} max={60} value={draft.slotGranularityMinutes} onChange={(value) => set('slotGranularityMinutes', value as BookingSettings['slotGranularityMinutes'])} />
-            <RuleNumberFieldV8 label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} humanize={formatMinutesLengthHint} />
+            <RuleNumberFieldV8 readOnly={!canEdit} label="当日のお知らせ" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={(value) => formatHoursBeforeHint(value) || null} />
+            <RuleNumberFieldV8 readOnly={!canEdit} label="予約枠の間隔" unit="分" min={5} max={60} value={draft.slotGranularityMinutes} onChange={(value) => set('slotGranularityMinutes', value as BookingSettings['slotGranularityMinutes'])} />
+            <RuleNumberFieldV8 readOnly={!canEdit} label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} humanize={formatMinutesLengthHint} />
             <label className={styles.fieldLabel}>
               タイムゾーン
-              <Select size="full"
-                aria-label="タイムゾーン"
-                value={draft.timeZone}
-                onChange={(value) => set('timeZone', value)}
-                className="mt-1"
-                options={(TIME_ZONE_CHOICES.includes(draft.timeZone)
-                  ? TIME_ZONE_CHOICES
-                  : [draft.timeZone, ...TIME_ZONE_CHOICES]
-                ).map((zone) => ({ value: zone, label: zone }))}
-              />
+              {canEdit ? (
+                <Select size="full"
+                  aria-label="タイムゾーン"
+                  value={draft.timeZone}
+                  onChange={(value) => set('timeZone', value)}
+                  className="mt-1"
+                  options={(TIME_ZONE_CHOICES.includes(draft.timeZone)
+                    ? TIME_ZONE_CHOICES
+                    : [draft.timeZone, ...TIME_ZONE_CHOICES]
+                  ).map((zone) => ({ value: zone, label: zone }))}
+                />
+              ) : <ReadOnlyText label="タイムゾーン" value={draft.timeZone} spaced />}
               {isUnknownTimeZone(draft.timeZone) ? (
                 <span className="text-danger mt-1 block text-xs">一覧にないタイムゾーンです。綴りを確認してください（よく使う値: Asia/Tokyo）。</span>
               ) : null}
             </label>
             <label className={styles.fieldLabel}>
               日時を選ぶ画面の最初の形
-              <Select size="full"
-                aria-label="日時を選ぶ画面の最初の形"
-                value={draft.liffDateView ?? 'list'}
-                onChange={(value) => set('liffDateView', value as 'list' | 'calendar')}
-                className="mt-1"
-                options={[
-                  { value: 'list', label: '週で見る（日付の横ならび）' },
-                  { value: 'calendar', label: 'カレンダー' },
-                ]}
-              />
+              {canEdit ? (
+                <Select size="full"
+                  aria-label="日時を選ぶ画面の最初の形"
+                  value={draft.liffDateView ?? 'list'}
+                  onChange={(value) => set('liffDateView', value as 'list' | 'calendar')}
+                  className="mt-1"
+                  options={[
+                    { value: 'list', label: '週で見る（日付の横ならび）' },
+                    { value: 'calendar', label: 'カレンダー' },
+                  ]}
+                />
+              ) : <ReadOnlyText label="日時を選ぶ画面の最初の形" value={draft.liffDateView === 'calendar' ? 'カレンダー' : '週で見る（日付の横ならび）'} spaced />}
             </label>
           </div>
         </Disclosure>
@@ -392,7 +420,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
             ) : null}
           </p>
         ) : null}
-      </fieldset>
+      </div>
     </div>
   )
 }
