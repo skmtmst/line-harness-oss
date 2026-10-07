@@ -278,7 +278,6 @@ export function useScenarioDraft<T>({
     } catch {
       return false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [valueJson])
 
   const autosave = useDraftAutosave({
