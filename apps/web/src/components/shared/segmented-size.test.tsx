@@ -68,3 +68,62 @@ describe('切替器の小型（d8X09）', () => {
     expect(CSS).toMatch(/\.item\s*\{[^}]*font-size:\s*var\(--text-label\)/s)
   })
 })
+
+/*
+ * 切替器のパネル内（★BG-B `SLgY5` つくる枚数の4択）。
+ * 器 余白3・r8・横いっぱい／項目 5/12・文 12/17・選択中 700／つまみ r6・上下 3。
+ * 板の文字左端 1057・1100・1146・1192 に合う寸法なので、数字を変えると
+ * ±4px の照合が外れる（docs/v8-design-rules.md §1 の2・§3）。
+ */
+describe('切替器のパネル内（★BG-B SLgY5）', () => {
+  const COUNTS = [
+    { value: '1', label: '1枚' },
+    { value: '2', label: '2枚' },
+    { value: '3', label: '3枚' },
+    { value: '4', label: '4枚' },
+  ]
+
+  it('size="panel" で data-size が付く', () => {
+    const { container } = render(
+      <SegmentedControl aria-label="枚数" options={COUNTS} value="1" onChange={() => {}} size="panel" />,
+    )
+    expect(container.firstElementChild!.getAttribute('data-size')).toBe('panel')
+  })
+
+  it('パネル内は v8 だけで 器 余白3・r8・横いっぱい／項目 5/12・文 12/17／選択中 700／つまみ r6・上下3', () => {
+    expect(CSS).toMatch(/\[data-theme='v8'\]\s*\.root\[data-size='panel'\]\s*\{[^}]*display:\s*flex/s)
+    expect(CSS).toMatch(/\[data-theme='v8'\]\s*\.root\[data-size='panel'\]\s*\{[^}]*padding:\s*3px/s)
+    expect(CSS).toMatch(
+      /\[data-theme='v8'\]\s*\.root\[data-size='panel'\]\s*\{[^}]*border-radius:\s*var\(--radius-segment\)/s,
+    )
+    expect(CSS).toMatch(
+      /\[data-theme='v8'\]\s*\.root\[data-size='panel'\]\s*\.item\s*\{[^}]*padding:\s*5px 12px/s,
+    )
+    expect(CSS).toMatch(
+      /\[data-theme='v8'\]\s*\.root\[data-size='panel'\]\s*\.item\s*\{[^}]*font-size:\s*var\(--text-caption\)/s,
+    )
+    expect(CSS).toMatch(
+      /\[data-theme='v8'\]\s*\.root\[data-size='panel'\]\s*\.item\s*\{[^}]*line-height:\s*17px/s,
+    )
+    expect(CSS).toMatch(
+      /\[data-theme='v8'\]\s*\.root\[data-size='panel'\]\s*\.selected\s*\{[^}]*font-weight:\s*700/s,
+    )
+    expect(CSS).toMatch(
+      /\[data-theme='v8'\]\s*\.root\[data-size='panel'\]\s*\.thumb\s*\{[^}]*border-radius:\s*var\(--radius-mini\)/s,
+    )
+    expect(CSS).toMatch(/\[data-theme='v8'\]\s*\.root\[data-size='panel'\]\s*\.thumb\s*\{[^}]*top:\s*3px/s)
+  })
+
+  it('disabled で項目すべてを押せなくし、薄く見せる', () => {
+    const onChange = vi.fn()
+    const { container } = render(
+      <SegmentedControl aria-label="枚数" options={COUNTS} value="1" onChange={onChange} size="panel" disabled />,
+    )
+    const buttons = [...container.querySelectorAll('button')]
+    expect(buttons).toHaveLength(4)
+    expect(buttons.every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
+    fireEvent.click(buttons[2])
+    expect(onChange).not.toHaveBeenCalled()
+    expect(CSS).toMatch(/\.root:has\(\.item:disabled\)\s*\{[^}]*opacity:\s*0\.5/s)
+  })
+})

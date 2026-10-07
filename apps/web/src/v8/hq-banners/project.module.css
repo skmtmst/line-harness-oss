@@ -11,7 +11,6 @@
 .hint { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); white-space: nowrap; }
 .warnText { color: var(--color-status-warn-deep); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); }
 .icon { width: var(--tpl-hb-button-icon); height: var(--tpl-hb-button-icon); }
-.full { width: 100%; }
 .hiddenInput { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .headActions { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
 .menuBox { position: relative; display: inline-flex; }
@@ -87,12 +86,13 @@
 .starOn { fill: var(--color-status-warn); color: var(--color-status-warn); }
 .starOff { color: var(--color-ink-faint); }
 
+/*
+ * 生成パネルは中身だけを持つ（2026-10-07）。承認済み ★BG-B `qIp42` では
+ * 生成するボタン・条件をクリア・大きさの札は下部追従バー `X2oLn` にあるので、
+ * パネルの中の全幅ボタン（`.full`）と下の行（`.panelFoot` / `.linkButton`）は
+ * 置き場所ごと消した。見た目は共通の帯と札の部品が持つ。
+ */
 .panel { display: flex; flex-direction: column; gap: var(--tpl-hb-dialog-gap); width: var(--tpl-hb-panel-w); flex-shrink: 0; }
-.panelFoot { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
-.panelFoot > :first-child { flex: 1; min-width: 0; }
-
-.linkButton { padding: 0; border: 0; background: transparent; color: var(--color-action); font: inherit; font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-hb-small-lh); white-space: nowrap; cursor: pointer; }
-.linkButton:disabled { color: var(--color-ink-faint); cursor: default; }
 
 @media (max-width: 1151px) {
   .split { flex-direction: column; }

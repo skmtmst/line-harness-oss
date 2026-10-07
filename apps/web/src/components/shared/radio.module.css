@@ -14,4 +14,10 @@
 [data-theme='v8'] .input:not(:checked):focus-visible { box-shadow: none; }
 [data-theme='v8'] .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: auto; }
 [data-theme='v8'] .input { gap: 0; border-radius: 999px; }
+/*
+ * 小さい字（★BG-B `z14gEG` 人物2択）。文 12/17。
+ * 丸 18・間隔 8・選択中の 5px は行内ラジオと同じまま。
+ * 板がこの2択のラベルを 12px で描くため（docs/v8-design-rules.md §1 の2）。
+ */
+[data-theme='v8'] .root[data-size='small'] .label { font-size: var(--text-caption); line-height: 17px; }
 }
