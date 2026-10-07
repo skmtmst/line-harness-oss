@@ -669,6 +669,13 @@
   --tpl-nt-body-pad: 16px 24px 24px; --tpl-nt-body-gap: 16px; --tpl-nt-tab-gap: 20px; --tpl-nt-tab-pad: 8px; --tpl-nt-tab-lh: 19px; --tpl-nt-button-icon: 16px; --tpl-nt-box-radius: 12px;
   --tpl-nt-row-pad: 14px 20px; --tpl-nt-row-gap: 12px; --tpl-nt-icon: 32px; --tpl-nt-icon-glyph: 16px; --tpl-nt-text-gap: 2px; --tpl-nt-dot-gap: 6px; --tpl-nt-dot: 8px;
   --tpl-nt-title-lh: 19px; --tpl-nt-small-lh: 16px; --tpl-nt-go-lh: 17px; --tpl-nt-unread-bg: #f7faff; --tpl-nt-error-bg: #fdecea; --tpl-nt-focus-ring: 2px; --tpl-nt-focus-offset: -2px; --tpl-nt-row-line: inset 0 1px 0 var(--color-hairline);
+  /* 上の帯のベルの小窓（V8.pen DIHFx の D2eAyQ・小窓 mV28V）。 */
+  --bell-w: 380px; --bell-shadow: 0 12px 32px #1d1d1f24; --bell-lh: 1.5; --bell-title-size: 15px;
+  --bell-head-pad: 14px 16px 10px; --bell-head-gap: 8px; --bell-seg-pad: 0 16px 10px;
+  --bell-row-pad: 10px 16px; --bell-row-gap: 10px; --bell-icon: 28px; --bell-icon-radius: 8px; --bell-icon-glyph: 15px; --bell-text-gap: 2px; --bell-meta-gap: 8px;
+  --bell-dot: 8px; --bell-dot-color: #2f6fde; --bell-unread-bg: #f7faff; --bell-foot-pad: 10px 16px; --bell-settings: 32px; --bell-state-pad: 20px 16px; --bell-focus-ring: 2px; --bell-focus-offset: -2px;
+  /* 切り替え（3つ）の詰めた形（ベルの小窓の分類）：項目 4/12・文 12/18。 */
+  --seg-compact-pad: 4px 12px; --seg-compact-lh: 18px;
   /* 分析（ws9wt・eEhYU・L4Uov）：二段の切り替え・数の帯・棒・右の列。 */
   --tpl-an-nav-gap: 8px; --tpl-an-group-gap: 2px; --tpl-an-group-pad: 2px; --tpl-an-group-item-pad: 5px 12px; --tpl-an-seg-radius: 8px; --tpl-an-seg-item-radius: 6px; --tpl-an-seg-lh: 17px; --tpl-an-seg-thumb-shadow: 0 1px 2px #1d1d1f14;
   /* 設定・ログインユーザー・EC連携・プール・運営・分析の残り（作業役 st2） */ --tpl-st2-setnav-child-pad: 5px 10px; --tpl-st2-ticket-subject-lh: 17px; --tpl-st2-ticket-meta-lh: 16px; --tpl-st2-stop-gap: 14px; --tpl-st2-stop-note-pad: 10px 12px; --tpl-st2-stop-note-lh: 17px; --tpl-st2-member-row-gap: 14px; --tpl-st2-stop-side: 24px;

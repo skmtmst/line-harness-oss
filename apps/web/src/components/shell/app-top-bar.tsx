@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '@/components/shared/top-bar'
+import BellNotifications from './bell-notifications'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { usePageChrome } from './page-chrome'
@@ -89,7 +90,8 @@ export default function AppTopBar() {
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      if (!selectedAccountId) return
+      // 店を選んでいない（統括で店を選ぶ前など）ときは数を出さない。前の店の数を残さない。
+      if (!selectedAccountId) { setNotificationUnread(0); return }
       if (document.documentElement.dataset.theme !== 'v8') return
       try {
         const { api } = await import('@/lib/api')
@@ -230,6 +232,9 @@ export default function AppTopBar() {
       userName={staffName}
       onLogout={logout}
       notificationUnreadCount={notificationUnread}
+      renderNotifications={isV8 ? (popover) => (
+        <BellNotifications popover={popover} accountId={selectedAccountId || null} onUnreadChange={setNotificationUnread} />
+      ) : undefined}
       v8Chrome
       chromeVariant="shell"
       crumbs={crumbs}
