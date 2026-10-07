@@ -565,13 +565,27 @@ export const FRIEND_ADD_RUNS = {
       friend: { id: 'visual-friend-add-4', displayName: '山田 太郎' }, friendKind: 'first_time',
       attribution: { status: 'unavailable', routeId: null, routeName: null, reason: null },
       rule: { id: 'rule-fallback', name: '経路が分からなかった人', versionId: 'rule-fallback-v1', versionNumber: 1 },
+      /* 絵 REIxB の4行目・N43uVX：案内は届いたが、シナリオを始めるところで止まった。 */
+      scenario: { id: 'scenario-common', name: '共通のあいさつ', enrollmentId: null, started: false },
+      actions: { total: 2, failed: 1 }, deliveryCount: 1, status: 'failed', errorCode: 'action_failed',
+    },
+    /* 絵 REIxB の5行目：以前からの友だち（再追加）→ 案内なし・タグだけ。 */
+    {
+      id: 'friend-add-run-5', receivedAt: '2026-09-07T01:02:00.000Z', processedAt: null,
+      friend: { id: 'visual-friend-add-5', displayName: '坂本 真人' }, friendKind: 'returning',
+      attribution: { status: 'captured', routeId: 'route-instagram', routeName: 'Instagram プロフィール', reason: 'instagram-profile' },
+      rule: { id: 'rule-shop', name: '店頭QRの初回案内', versionId: 'rule-shop-v1', versionNumber: 1 },
       scenario: null,
-      actions: { total: 1, failed: 1 }, deliveryCount: 0, status: 'failed', errorCode: 'delivery_failed',
+      actions: { total: 1, failed: 0 }, deliveryCount: 0, status: 'suppressed', errorCode: null,
     },
   ],
   total: 214,
-  nextCursor: null,
+  nextCursor: 'friend-add-run-cursor-2',
   summary: {
+    /* 絵 REIxB の数の帯（直近28日 214人・送った案内 1,842通）。 */
+    recentFriends: 214,
+    recentEvents: 226,
+    lastDeliveryAt: '2026-09-07T01:32:00.800Z',
     totalRuns: 214,
     cumulativeDeliveries: 1842,
     scenarioStarts: 198,
@@ -1039,9 +1053,9 @@ export const FORM_DETAIL = {
   ],
   /* 編集画面（m1cWEy・ijxur・XXFT4・tpRRT・J1pdB・Z9wXm・ITBAB）の絵の中身。
    * 1ページ目：店のロゴ・見出し・本文・ラジオ・5段階。2ページ目：見出し・予約を入れる・自由に書く。 */
-  contentRevision: 7,
+  contentRevision: 4,
   publishedVersionId: 'form-1-version-3',
-  publishedContentRevision: 6,
+  publishedContentRevision: 3,
   layout: {
     version: 2,
     header: [],
@@ -1084,6 +1098,29 @@ export const FORM_DETAIL = {
     tags: [{ id: 'tag-visit-survey-answered', name: '来店アンケート回答済み' }],
     mileage: [{ id: 'mileage-visit-survey', label: '回答で50マイル', amount: 50 }],
     reminders: [{ id: 'reminder-next-visit', name: '次回来店の希望日をお知らせ' }],
+  },
+}
+
+/**
+ * 公開中の版（Z9wXm「変わること」の比べ元）。編集画面は `?view=published` で読む。
+ * 下書きとの違いは絵の3行に合わせる：目的の質問を足した・きっかけの質問を消した・答え終わったあとの言葉を変えた。
+ */
+export const FORM_DETAIL_PUBLISHED = {
+  id: FORM_DETAIL.id,
+  name: FORM_DETAIL.name,
+  description: FORM_DETAIL.description,
+  fields: FORM_DETAIL.fields,
+  isActive: true,
+  layout: {
+    ...FORM_DETAIL.layout,
+    sections: FORM_DETAIL.layout.sections.map((section) => section.id !== 'form-section-visit' ? section : {
+      ...section,
+      blocks: section.blocks.map((block) => block.id !== 'form-purpose' ? block : {
+        id: 'form-trigger', kind: 'input', type: 'radio', name: 'visit_trigger', label: 'ご来店のきっかけ', required: false,
+        choices: [{ id: 'trigger-1', label: '紹介' }, { id: 'trigger-2', label: 'SNS' }],
+      }),
+    }),
+    options: { ...FORM_DETAIL.layout.options, thanksText: 'ご回答ありがとうございました！' },
   },
 }
 
@@ -8419,6 +8456,42 @@ export const FRIEND_ADD_RUN_DETAIL = {
   ],
   status: 'completed',
   errorCode: null,
+}
+
+/** 実行の詳細（失敗あり）。絵 N43uVX：案内は届き、タグは付いたが、シナリオを始めるところで止まった。 */
+export const FRIEND_ADD_RUN_DETAIL_FAILED = {
+  id: 'friend-add-run-4', receivedAt: '2026-09-07T01:14:01.000Z', processedAt: '2026-09-07T01:14:02.000Z',
+  friend: { id: 'visual-friend-add-4', displayName: '山田 太郎', redacted: false }, friendKind: 'first_time',
+  attribution: { status: 'unavailable', routeId: null, routeName: null, reason: null },
+  rule: {
+    id: 'rule-fallback', name: '経路が分からなかった人', versionId: 'rule-fallback-v1', versionNumber: 1,
+    definition: {
+      routeIds: [], scenarioId: 'scenario-common', messageType: 'text', messageText: 'ご登録ありがとうございます', timing: 'immediate',
+      actions: [
+        { type: 'add_tag', label: 'タグ「経路が分からない」を付ける', targetId: 'tag-unknown-route' },
+        { type: 'start_scenario', label: 'シナリオ「共通のあいさつ」を始める', targetId: 'scenario-common' },
+      ],
+      friendCondition: '', activeFrom: null, activeUntil: null,
+    },
+  },
+  configuredActions: [
+    { type: 'add_tag', label: 'タグ「経路が分からない」を付ける', targetId: 'tag-unknown-route' },
+    { type: 'start_scenario', label: 'シナリオ「共通のあいさつ」を始める', targetId: 'scenario-common' },
+  ],
+  actionRuns: [
+    {
+      id: 'friend-add-action-run-4a', stableId: 'rule-fallback-v1:0', type: 'tag', status: 'completed',
+      attemptCount: 1, nextRetryAt: null, errorCode: null,
+      startedAt: '2026-09-07T01:14:02.000Z', completedAt: '2026-09-07T01:14:02.000Z', updatedAt: '2026-09-07T01:14:02.000Z',
+    },
+    {
+      id: 'friend-add-action-run-4b', stableId: 'rule-fallback-v1:1', type: 'scenario', status: 'failed',
+      attemptCount: 1, nextRetryAt: null, errorCode: 'action_failed',
+      startedAt: '2026-09-07T01:14:02.000Z', completedAt: null, updatedAt: '2026-09-07T01:14:02.000Z',
+    },
+  ],
+  status: 'failed',
+  errorCode: 'action_failed',
 }
 
 /** 緊急停止の送信経路の台帳。本物は `GET /api/operations/send-paths` の形。 */

@@ -104,7 +104,7 @@ import {
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
   NEN_PHOTO_REWARD_POLICY_VERSIONS,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
-  FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS,
+  FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_DETAIL_PUBLISHED, FORM_SUBMISSIONS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_TAGS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_DETAIL_STOPPED, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   ACCOUNT_HEALTH_LOGS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
@@ -120,7 +120,7 @@ import {
   HQ_BANNER_PRESETS, HQ_BANNER_USAGE, HQ_BANNER_STATS, HQ_BANNER_PROJECTS, HQ_BANNER_IMAGES,
   HQ_BANNER_ARCHIVED_PROJECTS, HQ_BANNER_IMAGE_COUNTS,
   NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST, NEN_FEEDING_PRODUCTS, NEN_HEALTH_SUMMARY_KOMUGI,
-  FRIEND_ADD_RUN_DETAIL, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
+  FRIEND_ADD_RUN_DETAIL, FRIEND_ADD_RUN_DETAIL_FAILED, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
 } from './fixtures.mjs'
 
 /* リッチメニューの公開の進み（K-1）。default は今までの見本（割り当てで失敗）。 */
@@ -3641,6 +3641,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* V8「集まった回答」の絵のフォーム（v0SbYR・MKQyJ）。form-1 とは別の ID。 */
   if (pathname === `/api/forms/${FORM_VISIT_DETAIL.id}`) return { success: true, data: FORM_VISIT_DETAIL }
   if (pathname === `/api/forms/${FORM_VISIT_DETAIL.id}/submissions`) return { success: true, data: FORM_VISIT_SUBMISSIONS }
+  /* 公開中の版（実口は account_id が無いと公開中の版を返す。編集画面は `?view=published` を付けて読む）。 */
+  if (pathname === `/api/forms/${FORM_DETAIL.id}` && query.get('view') === 'published') return { success: true, data: FORM_DETAIL_PUBLISHED }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
@@ -3920,8 +3922,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
      * 本物は `actionRuns` まで含めた1件（`friend-add-rules.ts`）。
      * 未知IDは本物と同じく失敗にする。
      */
-    if (friendAddRunDetail[1] !== FRIEND_ADD_RUN_DETAIL.id) return { success: false, error: '実行結果が見つかりません' }
-    return { success: true, data: FRIEND_ADD_RUN_DETAIL }
+    const found = [FRIEND_ADD_RUN_DETAIL, FRIEND_ADD_RUN_DETAIL_FAILED].find((item) => item.id === friendAddRunDetail[1])
+    if (!found) return { success: false, error: '実行結果が見つかりません' }
+    return { success: true, data: found }
   }
   if (pathname === '/api/scenarios') {
     const requestedPage = Number.parseInt(query.get('page') ?? '', 10)

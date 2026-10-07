@@ -1615,11 +1615,11 @@ export default function FormsListV8() {
       <Dialog
         open={deleteTarget !== null}
         designNode="GVizd"
-        /* 絵は幅 640・上から 222。共通の窓が受け取れるようになったら（designWidth・designTop）渡す。 */
+        /* 絵は幅 640・上から 220。 */
+        designWidth={640}
+        designTop={220}
         title={deleteTarget ? `「${displayFormName(deleteTarget.name)}」をどうしますか` : 'フォームをどうしますか'}
-        description={deleteImpact?.form.isActive
-          ? '配っている URL を開いた人には「受付を終了しました」と出ます。'
-          : undefined}
+        designHeaderPadding="var(--tpl-fm2-dialog-head-pad)"
         busy={deleting || deleteImpactLoading}
         onCancel={closeDelete}
         footer={(
@@ -1653,9 +1653,15 @@ export default function FormsListV8() {
           </div>
         )}
       >
+        {/* 絵は頭（題と×）・説明・2枚のカード・注意の帯・ボタンを 14 ずつで並べる。共通の窓の中身の余白（上下24）を詰める。 */}
+        <div className={styles.archiveBody}>
+        {deleteImpact?.form.isActive ? (
+          <p className={styles.archiveLead}>配っている URL を開いた人には「受付を終了しました」と出ます。</p>
+        ) : null}
         {deleteImpactLoading ? (
           <p className={styles.dialogNote}>公開状態・回答数・利用中の場所を確認しています。</p>
         ) : deleteImpact ? (
+          <>
           <div className={styles.impactOptions}>
             <div className={styles.impactOption} data-tone="recommended">
               <p className={styles.impactOptionTitle}>アーカイブする（おすすめ）</p>
@@ -1663,7 +1669,7 @@ export default function FormsListV8() {
                 {`一覧から隠します。集まった回答 ${formatNumber(deleteImpact.submissionCount)}件 と友だち情報に保存した答えは残ります。`}
               </p>
             </div>
-            <div className={styles.impactOption}>
+            <div className={styles.impactOption} data-disabled={deleteImpact.canDelete ? undefined : ''}>
               <p className={styles.impactOptionTitle} data-tone="danger">削除する</p>
               <p className={styles.impactOptionDesc}>
                 {deleteImpact.canDelete
@@ -1671,20 +1677,23 @@ export default function FormsListV8() {
                   : '回答や利用先があるので削除できません。削除できるのは、未公開・回答なし・利用先なしのフォームだけです。'}
               </p>
             </div>
+          </div>
             {deleteImpact.references.length > 0 ? (
-              <p className={styles.impactWarn}>
+              <p className={styles.impactWarn} title={deleteImpact.answerUrl ? `開けなくなる公開URL：${deleteImpact.answerUrl}` : undefined}>
                 <TriangleAlert size={16} aria-hidden="true" />
                 <span>{`${deleteImpact.references.map(referenceLabel).join('と')}がこのフォームを開きます。`}</span>
               </p>
             ) : null}
-            {deleteImpact.answerUrl ? (
+            {/* 利用先の注意があるときは、その札の title に URL を入れる（絵の窓に URL の行は無い）。 */}
+            {deleteImpact.answerUrl && deleteImpact.references.length === 0 ? (
               <p className={styles.dialogNote}>
                 開けなくなる公開URL：<span className={styles.breakAll}>{deleteImpact.answerUrl}</span>
               </p>
             ) : null}
-          </div>
+          </>
         ) : null}
         {deleteError ? <p className={styles.alertText} role="alert">{deleteError}</p> : null}
+        </div>
       </Dialog>
 
       {/* 名前を変更。回答データやURLは変わらない。 */}

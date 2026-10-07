@@ -28,6 +28,11 @@ export type WizardChrome = {
   identity: ReactNode
   steps: ReactNode
   footerActions: ReactNode
+  /**
+   * 下の帯の「下書きを保存」を差し替えた帯を作る（競合のときに「比べてから保存」にする。絵 pvimJ）。
+   * キャンセル・次へはそのまま。閲覧のみでは差し替えた物も出さない。
+   */
+  footerWithDraft?: (draft: ReactNode) => ReactNode
   status?: ReactNode
 }
 
