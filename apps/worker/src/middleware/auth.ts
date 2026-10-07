@@ -264,6 +264,10 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   // route 側の requirePermission が最終判定を握る。
   ['/api/access', 'access.user.view'],
   ['/api/audit', 'access.audit.view'],
+  // 在庫ルールと媒体受付の操作は、予約枠・在庫画面に帰属する。
+  // 設定変更は route 側でも owner/admin に絞る。
+  ['/api/restaurant-test/inventory-rules', '/restaurant-test/inventory'],
+  ['/api/restaurant-test/channel-close-tasks', '/restaurant-test/inventory'],
 ];
 
 /**
@@ -419,6 +423,9 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/customers/search'],
   ['GET', '/api/restaurant-test/customers/history'],
   ['GET', '/api/restaurant-test/inventory/day'],
+  // 既存の在庫閲覧と同じく担当者も確認できる。ルールの保存は管理者以上。
+  ['GET', '/api/restaurant-test/inventory-rules'],
+  ['GET', '/api/restaurant-test/channel-close-tasks'],
   // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
   ['GET', '/api/restaurant-test/google/connection'],
   ['GET', '/api/restaurant-test/google/reviews'],
@@ -447,6 +454,7 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
   ['PATCH', /^\/api\/restaurant-test\/reservations\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/channel-close-tasks\/[^/]+\/done$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
   ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],
