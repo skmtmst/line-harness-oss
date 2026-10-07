@@ -1,0 +1,267 @@
+/*
+ * ★V8 EC連携 つなぎ先（iLJmw）。数字は書かない（globals.css の [data-theme="v8"] の --tpl-rest3-ec-*）。
+ * 上の段は「つなぎ先の情報」と右の「取り込みのようす」。狭い板では縦に積む。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rest3-ec-gap);
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tpl-rest3-ec-side-w);
+  align-items: start;
+  gap: var(--tpl-rest3-ec-col-gap);
+}
+
+@container (max-width: 760px) {
+  .top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rest3-ec-card-gap);
+  min-width: 0;
+  padding: var(--tpl-rest3-ec-card-pad);
+  border-radius: var(--tpl-rest3-ec-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-ec-title);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-ec-title-lh);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rest3-ec-field-gap);
+  min-width: 0;
+}
+
+.keyField {
+  gap: var(--tpl-rest3-ec-key-gap);
+  margin-top: var(--tpl-rest3-ec-key-top);
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-ec-small);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-ec-label-lh);
+}
+
+.keyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-rest3-ec-row-gap);
+  min-width: 0;
+  min-height: var(--tpl-rest3-ec-key-h);
+  padding: var(--tpl-rest3-ec-key-pad);
+  border-radius: var(--tpl-rest3-ec-band-radius);
+  outline: 1px solid var(--color-control-border, var(--color-hairline));
+  outline-offset: -1px;
+}
+
+.keyMask {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-ec-small);
+  line-height: var(--tpl-rest3-ec-label-lh);
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.note,
+.desc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-rest3-ec-xs);
+  line-height: var(--tpl-rest3-ec-note-lh);
+}
+
+.desc {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rest3-ec-small);
+  line-height: var(--tpl-rest3-ec-desc-lh);
+}
+
+.minis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-rest3-ec-mini-gap);
+}
+
+.mini {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rest3-ec-mini-inner-gap);
+  min-width: 0;
+  padding: var(--tpl-rest3-ec-mini-pad);
+  border-radius: var(--tpl-rest3-ec-mini-radius);
+  background: var(--color-canvas-sunken);
+}
+
+.miniLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rest3-ec-xs);
+  line-height: var(--tpl-rest3-ec-note-lh);
+}
+
+.miniValue {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-ec-mini-num);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-ec-mini-num-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.miniWarn {
+  color: var(--color-danger);
+}
+
+.cardWide {
+  gap: var(--tpl-rest3-ec-card-gap);
+}
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-rest3-ec-row-gap);
+  min-width: 0;
+  margin-top: var(--tpl-rest3-ec-wide-extra);
+}
+
+.statusText {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rest3-ec-body);
+  line-height: var(--tpl-rest3-ec-body-lh);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-rest3-ec-dot-gap);
+  padding: var(--tpl-rest3-ec-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--tpl-rest3-ec-small);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-ec-note-lh);
+  white-space: nowrap;
+}
+
+.status[data-tone='good'] { background: var(--color-accent-soft); color: var(--color-success); }
+.status[data-tone='muted'] { background: var(--color-shell); color: var(--color-ink-secondary); }
+
+.dot {
+  width: var(--tpl-rest3-ec-dot);
+  height: var(--tpl-rest3-ec-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.band {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rest3-ec-band-gap);
+  min-height: var(--tpl-rest3-ec-band-h);
+  margin-top: var(--tpl-rest3-ec-wide-extra);
+  padding: var(--tpl-rest3-ec-band-pad);
+  border-radius: var(--tpl-rest3-ec-band-radius);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rest3-ec-body);
+  line-height: var(--tpl-rest3-ec-body-lh);
+}
+
+.bandWarn {
+  background: var(--color-status-warn-soft);
+}
+
+.bandTitle {
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.bandText {
+  min-width: 0;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-rest3-ec-check-gap-y) var(--tpl-rest3-ec-check-gap);
+}
+
+.rules {
+  display: flex;
+  flex-direction: column;
+}
+
+.rule {
+  display: flex;
+  align-items: center;
+  min-height: var(--tpl-rest3-ec-rule-h);
+}
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-rest3-ec-row-gap);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-rest3-ec-link-gap);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rest3-ec-small);
+  line-height: var(--tpl-rest3-ec-label-lh);
+}
+
+.links a {
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+.saveBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rest3-ec-row-gap);
+  margin-left: auto;
+}
+
+.noticeGood,
+.noticeBad {
+  margin: 0;
+  padding: var(--tpl-rest3-ec-band-pad);
+  border-radius: var(--tpl-rest3-ec-band-radius);
+  font-size: var(--tpl-rest3-ec-body);
+  line-height: var(--tpl-rest3-ec-body-lh);
+}
+
+.noticeGood { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.noticeBad { background: var(--color-status-danger-soft); color: var(--color-danger); }

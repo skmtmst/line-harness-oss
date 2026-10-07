@@ -43,7 +43,6 @@ import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import EcCommerceScreen from '@/v8/settings/ec-commerce/screen'
-import ConnectorPanel from './connector-panel'
 
 const ACTION_STATUS: Record<EcActionExecutionStatus, { label: string; tone: string }> = {
   pending: { label: '処理中', tone: styles.statusWarn },
@@ -578,7 +577,7 @@ function EcCommercePageInner() {
   )
 }
 
-/* ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/ec-commerce）。定期便・つなぎ先・注文の状況は今の部品を差し込む。 */
+/* ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/ec-commerce）。定期便・注文の状況は今の部品を差し込む。つなぎ先は src/v8 の画面（iLJmw）。 */
 function EcCommercePageV8() {
   usePageTitle('EC連携')
   const tab = useMergedTab(EC_TABS, 'tab', 'events') as typeof EC_TABS[number]['key']
@@ -586,7 +585,6 @@ function EcCommercePageV8() {
     <EcCommerceScreen
       tab={tab}
       renderSubscriptions={(accountId) => <SubscriptionsPanel accountId={accountId} />}
-      renderConnector={(accountId, canEdit) => <ConnectorPanel accountId={accountId} canEdit={canEdit} />}
     />
   )
 }
