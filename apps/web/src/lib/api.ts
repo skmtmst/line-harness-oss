@@ -4146,6 +4146,12 @@ export type RichMenuAreaResponse = {
   trackedLinkId: string | null
 }
 
+/** シナリオ停止時の入力。理由は任意・200字まで。 */
+export type ScenarioStopInput = { reason?: string }
+export type ScenarioUpdateInput = Partial<Omit<Scenario,
+  'id' | 'createdAt' | 'updatedAt' | 'stoppedReason' | 'stoppedBy' | 'stoppedAt'
+>> & ScenarioStopInput
+
 /** シナリオの開始のきっかけ（128）。1本に複数持てる。 */
 export type ScenarioTriggerItem = {
   id: string
@@ -8109,15 +8115,21 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ ids }),
       }),
-    create: (data: Omit<Scenario, 'id' | 'createdAt' | 'updatedAt'>) =>
+    create: (data: Omit<Scenario, 'id' | 'createdAt' | 'updatedAt' | 'stoppedReason' | 'stoppedBy' | 'stoppedAt'>) =>
       fetchApi<ApiResponse<Scenario>>('/api/scenarios', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<Omit<Scenario, 'id' | 'createdAt' | 'updatedAt'>>) =>
+    update: (id: string, data: ScenarioUpdateInput) =>
       fetchApi<ApiResponse<Scenario>>(`/api/scenarios/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
+      }),
+    /** 配信を一時停止する。理由を省略しても止められる。 */
+    stop: (id: string, data: ScenarioStopInput = {}) =>
+      fetchApi<ApiResponse<Scenario>>(`/api/scenarios/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...data, isActive: false }),
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE' }),

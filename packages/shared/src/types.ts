@@ -805,6 +805,12 @@ export interface Scenario {
   lineAccountId: string | null;
   /** 有効/無効フラグ */
   isActive: boolean;
+  /** 最後の停止理由（200字まで）。停止記録が無い・理由未入力なら null。 */
+  stoppedReason?: string | null;
+  /** 最後に止めた担当者ID。停止記録が無いなら null。 */
+  stoppedBy?: string | null;
+  /** 最後に止めた日時（日本時間）。再開しても停止記録を残す。 */
+  stoppedAt?: string | null;
   /** 配信モード (作成後の変更不可)。レスポンスでは常にセット、Create リクエストでは省略可 (default: 'relative') */
   deliveryMode?: DeliveryMode;
   /**

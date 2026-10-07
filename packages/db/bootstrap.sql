@@ -6574,7 +6574,8 @@ CREATE TABLE scenarios (
   delivery_mode   TEXT NOT NULL DEFAULT 'relative' CHECK (delivery_mode IN ('relative', 'elapsed', 'absolute_time')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), current_published_version_id TEXT);
+, line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), current_published_version_id TEXT, stopped_reason TEXT
+  CHECK (stopped_reason IS NULL OR length(stopped_reason) <= 200), stopped_by TEXT, stopped_at TEXT);
 
 CREATE TABLE scheduled_chat_sends (
   id TEXT PRIMARY KEY,

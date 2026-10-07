@@ -205,6 +205,9 @@ const spec = {
           triggerType: { type: 'string', enum: ['friend_add', 'tag_added', 'manual'] },
           triggerTagId: { type: 'string', nullable: true },
           isActive: { type: 'boolean' },
+          stoppedReason: { type: 'string', nullable: true, maxLength: 200, readOnly: true, description: '最後の停止理由。未入力・記録なしはnull。再開しても保持する' },
+          stoppedBy: { type: 'string', nullable: true, readOnly: true, description: '最後に止めた担当者ID' },
+          stoppedAt: { type: 'string', nullable: true, readOnly: true, description: '最後に止めた日時（日本時間）' },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
         },
@@ -3697,7 +3700,15 @@ const spec = {
         summary: 'シナリオ詳細取得 (ステップ含む)',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: {
-          '200': { description: 'Scenario with steps' },
+          '200': { description: '最後の停止記録とステップを含むシナリオ', content: { 'application/json': { schema: {
+            type: 'object', properties: {
+              success: { type: 'boolean' },
+              data: { allOf: [
+                { $ref: '#/components/schemas/Scenario' },
+                { type: 'object', properties: { steps: { type: 'array', items: { $ref: '#/components/schemas/ScenarioStep' } } } },
+              ] },
+            },
+          } } } },
           '403': { description: 'Scenario view permission required' },
           '404': { description: 'Not found in account scope' },
         },
@@ -3706,7 +3717,28 @@ const spec = {
         tags: ['Scenarios'],
         summary: 'シナリオ更新',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'Updated' } },
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', properties: {
+            name: { type: 'string' }, description: { type: 'string', nullable: true },
+            triggerType: { type: 'string', enum: ['friend_add', 'tag_added', 'form_answer', 'booking_confirmed', 'manual'] },
+            triggerTagId: { type: 'string', nullable: true },
+            isActive: { type: 'boolean', description: 'falseで停止、trueで再開。再開しても最後の停止記録は残る' },
+            reason: { type: 'string', maxLength: 200, description: 'isActive:falseのときだけ指定できる任意の理由。省略・空白のみはnullで記録。すでに停止中なら記録を上書きしない' },
+            deliveryMode: { type: 'string', enum: ['relative', 'elapsed', 'absolute_time'] },
+            allowConcurrent: { type: 'boolean' }, folderId: { type: 'string', nullable: true },
+            audienceCondition: { type: 'object', nullable: true },
+            onCompleteMode: { type: 'string', enum: ['pause', 'resume_previous', 'move'] },
+            onCompleteScenarioId: { type: 'string', nullable: true },
+          },
+        } } } },
+        responses: {
+          '200': { description: '更新後のシナリオと最後の停止記録', content: { 'application/json': { schema: {
+            type: 'object', properties: { success: { type: 'boolean' }, data: { $ref: '#/components/schemas/Scenario' } },
+          } } } },
+          '400': { description: '入力不正（理由が200字超・文字列でない・停止以外で指定など）' },
+          '403': { description: 'シナリオ編集権限が必要' },
+          '404': { description: '担当範囲内にシナリオが見つからない' },
+        },
       },
       delete: {
         tags: ['Scenarios'],
