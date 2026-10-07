@@ -10,6 +10,11 @@
   border-bottom: 1px solid var(--color-hairline);
 }
 
+/* 絵 QqER7・v5L19Z の頭の説明は 17 の行（設定の頭と同じ 1.6 だと 19 になり、下が全部 2 ずれる）。 */
+.head > p:last-child {
+  line-height: var(--tpl-bm-17);
+}
+
 /* ===== 競合の帯（頭の下・左右の列をまたぐ） ===== */
 
 .conflictRow {
@@ -377,6 +382,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--tpl-bm-8);
+  /* 全体のボタンの最低の高さ（32）を受けない。絵 QqER7 の行は 20。 */
+  min-height: var(--tpl-bm-20);
   padding: 0;
   border: 0;
   background: transparent;
