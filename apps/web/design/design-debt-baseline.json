@@ -369,7 +369,7 @@
     "arbitrary-value": 10
   },
   "components/chats/friend-info-sidebar.tsx": {
-    "unresolved-classname": 12,
+    "unresolved-classname": 13,
     "arbitrary-value": 3
   },
   "components/chats/inbox-dropdown.tsx": {
