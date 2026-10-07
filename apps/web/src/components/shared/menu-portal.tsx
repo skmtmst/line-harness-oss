@@ -191,7 +191,11 @@ export default function MenuPortal({
       closeRef.current()
     }
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') closeRef.current()
+      if (event.key === 'Escape') {
+        // メニューで処理した印。下の詳細パネルなどが同じ Esc で閉じないように。
+        event.preventDefault()
+        closeRef.current()
+      }
     }
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)

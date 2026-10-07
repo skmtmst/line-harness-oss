@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom'
 import { MENU_SECTIONS } from '@/lib/menu'
 import { useV8Leave } from './overlay-utils'
 import styles from './command-palette.module.css'
+import { isImeComposing } from './ime'
 
 export type PaletteItem = {
   href: string
@@ -128,6 +129,8 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (leaving) return
+          // 変換中の Enter（確定）で行き先へ飛ばない・上下で行を動かさない。
+          if (isImeComposing(event)) return
           if (event.key === 'Escape') setOpen(false)
           else if (event.key === 'ArrowDown') {
             event.preventDefault()

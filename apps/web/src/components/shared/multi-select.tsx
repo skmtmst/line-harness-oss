@@ -8,6 +8,7 @@ import { OptionMatch } from './combobox'
 import type { ComboboxOption } from './combobox'
 import MenuPortal from './menu-portal'
 import styles from './multi-select.module.css'
+import { isImeComposing } from './ime'
 
 export type MultiSelectOption = ComboboxOption
 
@@ -127,6 +128,8 @@ export default function MultiSelect({
   }
 
   const onInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    // 変換中のキー（確定の Enter・候補の上下・Esc）は日本語入力のもの。候補を選ばない。
+    if (isImeComposing(event)) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       if (!open) {
