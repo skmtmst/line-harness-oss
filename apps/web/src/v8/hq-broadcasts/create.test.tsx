@@ -197,7 +197,8 @@ describe('一括配信の詳細（xOXuY ⑤ 送った結果）', () => {
     render(<HqBroadcastDetail />)
     await screen.findByText('アカウントごとの送った結果')
     expect(screen.getByText('送れた')).toBeTruthy()
-    expect(screen.getAllByText('失敗')).toHaveLength(2)
+    /* 表の中（店ごと）：見出しの「失敗」と名古屋店の札の2つ。上の数の帯の「失敗」は数えない。 */
+    expect(within(document.querySelector('[data-design="hq-broadcast-result"]') as HTMLElement).getAllByText('失敗')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: /失敗した店にやり直す/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'やり直す' }))
     await waitFor(() => expect(hq.retry).toHaveBeenCalledWith('run-9', 'a3', 5))
