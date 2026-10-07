@@ -120,7 +120,6 @@ describe('共通部品の影響範囲', () => {
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
       'app/inflow-links/_components/ref-orders.tsx',
       // ★V8-B 広告への送信履歴（p0kA3）。表の下にページ送りを置く。
-      'app/inflow-links/ad-integration-v8.tsx',
       // #565: 送信履歴が増えても描画を際限なく重くしないよう、20件ずつのページ送りに寄せた。
       'app/inflow-links/ad-integration.tsx',
       // ★V8-B 流入と計測の詳細（Q5le3）。友だちの表の下にページ送りを置く。
@@ -160,9 +159,6 @@ describe('共通部品の影響範囲', () => {
       'app/staff/page.tsx',
       // 友だち属性V8の4タブ（タグ・情報欄・対応マーク・保存した検索）。
       // 表の下にページ送りがあり、1ページごとの件数を選べる。
-      'app/tags/fields-tab-v8.tsx',
-      'app/tags/marks-v8.tsx',
-      'app/tags/searches-v8.tsx',
       // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
       'app/users/users-v8.tsx',
       'app/webhooks/webhook-interactions.tsx',
