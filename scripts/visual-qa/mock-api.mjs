@@ -5119,6 +5119,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // `jobs` が入っていないと `overview.jobs.pending` で落ちる。
     return { success: true, data: { activeCampaigns: 6, jobs: { total: 2640, pending: 148, sent: 2486, failed: 6 }, columns: 24, pets: 864, coupons: 28 } }
   }
+  /*
+   * やり取りの中身（F-18：伏せ字にした本文）。板 `DA0Ag` の中身の箱。
+   * 予約台帳（wi-2）だけ絵の本文を返し、ほかは「残っていない」。
+   */
+  const interactionPayload = /^\/api\/webhooks\/interactions\/([^/]+)\/payload$/.exec(pathname)
+  if (interactionPayload) {
+    const id = decodeURIComponent(interactionPayload[1])
+    return id === 'wi-2'
+      ? { success: true, data: { id, available: true, body: { event: 'booking_created', booking_id: 'bk_8f2…', menu: 'カウンセリング 30分', friend: 'Masato S.（伏せ字）' } } }
+      : { success: true, data: { id, available: false, body: null } }
+  }
   if (pathname === '/api/webhooks/interactions') {
     /*
       やり取りの記録。**`summary` が丸ごと要る。**
