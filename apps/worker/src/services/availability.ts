@@ -297,6 +297,9 @@ export interface GetAvailabilityParams {
    * 変更が「自分自身と競合」で通らなくなる。
    */
   excludeBookingId?: string;
+  excludeWaitlistId?: string;
+  /** 本人確認済みの案内は通常の受付締切を越えて確定できる。 */
+  waitlistOffer?: boolean;
 }
 
 export interface CalendarSyncState {
@@ -762,12 +765,11 @@ async function loadAvailabilityData(
   const bookings = await db
     .prepare(
       `SELECT staff_id, menu_id, starts_at, block_ends_at
-         FROM bookings
+         FROM booking_slot_allocations
         WHERE line_account_id = ?
-          AND status IN ('requested','confirmed')
           AND julianday(starts_at) < julianday(?)
           AND julianday(block_ends_at) > julianday(?)
-          AND (? IS NULL OR id != ?)`,
+          AND (? IS NULL OR id != ?) AND (? IS NULL OR COALESCE(waitlist_id,'') != ?)`,
     )
     .bind(
       params.lineAccountId,
@@ -775,6 +777,8 @@ async function loadAvailabilityData(
       rangeStart.toISOString(),
       params.excludeBookingId ?? null,
       params.excludeBookingId ?? null,
+      params.excludeWaitlistId ?? null,
+      params.excludeWaitlistId ?? null,
     )
     .all<{ staff_id: string; menu_id: string; starts_at: string; block_ends_at: string }>();
 
@@ -783,25 +787,11 @@ async function loadAvailabilityData(
   const resourceBookings = requiredResources.length === 0
     ? { results: [] as Array<{ resource_id: string; quantity: number; starts_at: string; block_ends_at: string }> }
     : await db.prepare(
-      `SELECT brc.resource_id, brc.quantity, b.starts_at, b.block_ends_at
-         FROM booking_resource_consumptions brc
-         INNER JOIN bookings b ON b.id = brc.booking_id
-         INNER JOIN booking_menu_resources current_requirement
-           ON current_requirement.resource_id = brc.resource_id
-          AND current_requirement.menu_id = ?
-        WHERE brc.line_account_id = ?
-          AND b.status IN ('requested', 'confirmed')
-          AND julianday(b.starts_at) < julianday(?)
-          AND julianday(b.block_ends_at) > julianday(?)
-          AND (? IS NULL OR b.id != ?)`,
-    ).bind(
-      params.menuId,
-      params.lineAccountId,
-      rangeEnd.toISOString(),
-      rangeStart.toISOString(),
-      params.excludeBookingId ?? null,
-      params.excludeBookingId ?? null,
-    ).all<{ resource_id: string; quantity: number; starts_at: string; block_ends_at: string }>();
+      `SELECT a.resource_id,a.quantity,a.starts_at,a.block_ends_at FROM booking_slot_resources a
+        JOIN booking_menu_resources mr ON mr.resource_id=a.resource_id AND mr.menu_id=?
+        WHERE a.line_account_id=? AND julianday(a.starts_at)<julianday(?) AND julianday(a.block_ends_at)>julianday(?)
+        AND (? IS NULL OR a.id<>?) AND (? IS NULL OR COALESCE(a.waitlist_id,'')<>?)`,
+    ).bind(params.menuId,params.lineAccountId,rangeEnd.toISOString(),rangeStart.toISOString(),params.excludeBookingId??null,params.excludeBookingId??null,params.excludeWaitlistId??null,params.excludeWaitlistId??null).all<{ resource_id: string; quantity: number; starts_at: string; block_ends_at: string }>();
 
   const menuForCalc = {
     duration_minutes: menu.override_duration ?? menu.duration_minutes,
@@ -815,7 +805,7 @@ async function loadAvailabilityData(
   // 手編集で壊れた店舗値は無視し、メニュー値だけを見る（従来どおり）。
   const storeCutoffMinutes = intInRange(settingsRow?.cutoff_minutes_before, 0, 43_200);
   const menuCutoffMinutes = menu.cutoff_hours_before == null ? null : menu.cutoff_hours_before * 60;
-  const cutoffMinutes = Math.max(
+  const cutoffMinutes = params.waitlistOffer ? 0 : Math.max(
     params.minLeadTimeMinutes,
     params.applyStoreRules
       ? (menuCutoffMinutes ?? storeCutoffMinutes ?? 0)
@@ -1391,6 +1381,7 @@ export interface ExplainSlotParams {
   minLeadTimeMinutes: number;
   /** R92: お客さま向けの説明では店舗共通ルールを既定値として使う。 */
   applyStoreRules?: boolean;
+  waitlistOffer?: boolean;
   googleCredentials?: GoogleServiceAccountCredentials;
 }
 
@@ -1439,6 +1430,7 @@ export async function explainBookingSlot(
     now: params.now,
     minLeadTimeMinutes: params.minLeadTimeMinutes,
     applyStoreRules: params.applyStoreRules,
+    waitlistOffer:params.waitlistOffer,
     googleCredentials: params.googleCredentials,
   });
   const d0 = loaded.kind === 'ok' ? loaded.data : null;

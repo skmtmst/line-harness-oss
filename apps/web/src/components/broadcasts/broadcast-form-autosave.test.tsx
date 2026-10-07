@@ -120,17 +120,23 @@ function clickButton(label: string) {
 }
 
 async function waitForDebounce() {
-  // 自動保存の間合いは2秒。余裕を持って2.6秒待つ。
+  // 自動保存の間合いは2秒。余裕を持って2.6秒ぶん、偽の時計で進める（本物の時間を待たない）。
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 2600))
+    await vi.advanceTimersByTimeAsync(2600)
   })
   await flush()
 }
 
 describe('一斉配信の下書き自動保存（★V7 sTJsh §5）', () => {
+  beforeEach(() => {
+    // 自動保存の2秒は入力した瞬間から数えるので、描く前から偽の時計にする。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+  })
+
   afterEach(() => {
     unmount()
     vi.clearAllMocks()
+    vi.useRealTimers()
   })
 
   it('通せる形で入力が2秒止まると下書きへ保存し、続きは同じ下書きを更新する', async () => {

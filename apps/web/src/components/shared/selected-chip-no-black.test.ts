@@ -7,6 +7,11 @@ import { describe, expect, it } from 'vitest'
  * 黒をなくす（#4・オーナー「黒がいや」）：選んだ札6か所は白＋緑
  * （地 accent-soft・枠と字 accent-deep）でそろえる。黒（ink地）の
  * 札に戻さないための歯止め。6か所のどれかが外れたら落ちる。
+ *
+ * 2026-10-07：一斉配信の一覧（broadcasts/list-v8.module.css）と友だち追加の編集
+ * （friend-add-settings/editor-v8.module.css）の2か所は、入口が src/v8 に替わり描かれなくなった
+ * ので見張りを外した。src/v8 の新しい画面は選んだ札を共通の札（下の XGJDa の墨地）と同じ形で描く
+ * （絵が正本）ので、白＋緑には付け替えられない。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
 const APP = join(HERE, '..', '..', 'app')
@@ -24,18 +29,6 @@ function expectWhiteGreen(rule: string, file: string) {
 }
 
 describe('選んだ札6か所は白＋緑（黒をなくす #4）', () => {
-  it('一斉配信の札', () => {
-    const css = readFileSync(join(APP, 'broadcasts', 'list-v8.module.css'), 'utf8')
-    const rule = selectedRule(css, /\.chip\[data-selected='true'\] \{[^}]*\}/s, 'broadcasts')
-    expect(rule).toMatch(/border-color:\s*var\(--color-accent-deep\)/)
-    expectWhiteGreen(rule, 'broadcasts')
-  })
-
-  it('友だち追加の札', () => {
-    const css = readFileSync(join(APP, 'friend-add-settings', 'editor-v8.module.css'), 'utf8')
-    expectWhiteGreen(selectedRule(css, /\.chipActive \{[^}]*border-color:[^}]*\}/s, 'friend-add'), 'friend-add')
-  })
-
   it('リマインダの札', () => {
     const css = readFileSync(join(APP, 'reminders', 'wizard-v8.module.css'), 'utf8')
     expectWhiteGreen(selectedRule(css, /\.filterChipOn \{[^}]*\}/s, 'reminders'), 'reminders')

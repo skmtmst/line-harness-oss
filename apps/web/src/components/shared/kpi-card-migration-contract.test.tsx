@@ -49,8 +49,7 @@ describe('KpiCardへの一本化契約', () => {
       expect(source, `${file} に旧カードの影が残っている`).not.toContain('shadow-[')
       expect(source, `${file} に旧カードの任意角丸が残っている`).not.toContain('rounded-[')
     }
-
-    expect(readSource('components/dashboard/kpi-card.tsx')).toContain("from '@/components/shared/kpi-card'")
+    // 旧 import の互換層（components/dashboard/kpi-card.tsx）は使う所が無くなったので 2026-10-07 に消した。
   })
 
   it('旧SummaryCardの入口が残っていない', () => {
