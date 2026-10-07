@@ -217,7 +217,7 @@ export function LiffPhoneStaffStep({
               <span className={`${styles.phoneThumb} ${styles.phoneAvatar}`} aria-hidden="true">{person.display_name.slice(0, 1)}</span>
               <span className={styles.phoneCardBody}>
                 <span className={styles.phoneCardName}>{person.display_name}</span>
-                <span className={styles.phoneCardDesc}>{person.role ?? 'スタッフ'}・指名料なし</span>
+                <span className={styles.phoneCardDesc}>{`${person.role ?? 'スタッフ'}・指名料なし`}</span>
               </span>
             </div>
           ))

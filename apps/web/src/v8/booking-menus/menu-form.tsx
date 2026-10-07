@@ -184,6 +184,8 @@ export default function MenuFormV8() {
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
 
   const generationRef = useRef(0)
+  /* 409 の帯。保存は下の帯から押すので、出たら帯まで戻して見せる（押した場所のままだと気づかない）。 */
+  const conflictRef = useRef<HTMLDivElement | null>(null)
   /** 読み込み直後の入力の形。これと違ったら「直しかけ」とみなす（破棄確認用）。 */
   const baselineRef = useRef('')
 
@@ -558,6 +560,10 @@ export default function MenuFormV8() {
     }
   }
 
+  useEffect(() => {
+    if (conflict) conflictRef.current?.scrollIntoView?.({ block: 'center' })
+  }, [conflict])
+
   /** 409のとき：最新の版と直した人を読み、帯に出す。 */
   async function openConflict(menuId: string) {
     try {
@@ -761,7 +767,7 @@ export default function MenuFormV8() {
       </header>
 
       {conflict && (
-        <div className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">
+        <div ref={conflictRef} className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">
           <div className={styles.conflictBand} role="alert">
             <TriangleAlert size={18} className={styles.conflictIcon} aria-hidden="true" />
             <div className={styles.conflictText}>
