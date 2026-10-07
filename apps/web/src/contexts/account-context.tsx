@@ -51,6 +51,17 @@ export interface AccountWithStats {
   connection?: {
     status: 'ok' | 'warn' | 'unknown'
     checkedAt: string | null
+    /** トークンの期限が切れている（要確認の理由のひとつ）。 */
+    tokenExpired?: boolean
+    /** 最新の確認のうち引っかかったもの（要確認の理由）。古い worker では無い。 */
+    issues?: Array<{
+      kind: 'bot_info' | 'webhook_endpoint' | 'webhook_test' | 'token_refresh'
+      result: 'mismatched' | 'unconfigured' | 'failed'
+      expectedUrl: string | null
+      registeredUrl: string | null
+      webhookActive: boolean | null
+      httpStatus: number | null
+    }>
   }
 }
 

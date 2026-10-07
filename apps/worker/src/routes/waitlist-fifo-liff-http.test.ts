@@ -18,11 +18,15 @@ function waitSeat() { test.raw.prepare(`INSERT INTO rt_seat_waitlist(id,store_id
 describe('F-6 本人確認付きの案内確定', () => {
   it('人の案内は通常の予約口で確定し、再送で増えない', async () => { waitPerson(); await promoteBookingWaitlist(test.db, { lineAccountId: 'a', staffId: 's', startsAt: slot }); const input = { menu_id: 'm', staff_id: 's', starts_at: slot, waitlist_id: 'human' }; const result = await request('/api/liff/booking/requests', 'POST', input); expect(result.status, await result.clone().text()).toBe(201); expect(test.raw.prepare("SELECT status FROM booking_waitlist WHERE id='human'").get()).toMatchObject({ status: 'converted' }); const again = await request('/api/liff/booking/requests', 'POST', input); expect(again.status).toBe(201); expect(test.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toMatchObject({ n: 1 }); });
   it('開始まで2時間を切った案内は10分押さえ、通常の受付締切を越えて確定できる',async()=>{
+    // 夜に回すと90分後が営業時間の外になり案内が出ない（落ちる）。時計だけを明日の日本時間12時に止める。
+    vi.useFakeTimers({toFake:['Date'],now:new Date(Math.ceil(Date.now()/86400000)*86400000+3*3600000)});
+    try{
     slot=new Date(Math.ceil((Date.now()+90*60000)/900000)*900000).toISOString();waitPerson();
     await promoteBookingWaitlist(test.db,{lineAccountId:'a',staffId:'s',startsAt:slot});
     expect(test.raw.prepare("SELECT hold_minutes FROM booking_waitlist WHERE id='human'").get()).toMatchObject({hold_minutes:10});
     const result=await request('/api/liff/booking/requests','POST',{menu_id:'m',staff_id:'s',starts_at:slot,waitlist_id:'human'});
     expect(result.status,await result.clone().text()).toBe(201);
+    }finally{vi.useRealTimers();}
   });
   it('別の人は人の案内を使えない', async () => { waitPerson(); await promoteBookingWaitlist(test.db, { lineAccountId: 'a', staffId: 's', startsAt: slot }); user = 'test-user-1'; const result = await request('/api/liff/booking/requests', 'POST', { menu_id: 'm', staff_id: 's', starts_at: slot, waitlist_id: 'human' }); expect(result.status).toBe(409); expect(test.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toMatchObject({ n: 0 }); });
   it('期限切れの人の案内を拒否する', async () => { waitPerson(); await promoteBookingWaitlist(test.db, { lineAccountId: 'a', staffId: 's', startsAt: slot }); test.raw.prepare("UPDATE booking_waitlist SET hold_expires_at=? WHERE id='human'").run(new Date(Date.now() - 1000).toISOString()); expect((await request('/api/liff/booking/requests', 'POST', { menu_id: 'm', staff_id: 's', starts_at: slot, waitlist_id: 'human' })).status).toBe(409); });
