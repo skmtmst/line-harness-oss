@@ -682,6 +682,14 @@
 .stackSection { gap: var(--tpl-section-gap); }
 .stackCompact { gap: var(--tpl-compact-gap); }
 
+/* 右の列の「LINEでの見え方を見る」は狭い板（kmTab・白い板 1100 未満）だけ。そのときスマホの見本は畳む。 */
+.railPhoneButton { display: none; width: 100%; }
+.railPhoneButton > * { width: 100%; }
+@container v8-page (max-width: 1099px) {
+  .railPhoneButton { display: flex; }
+  .railPhone { display: none; }
+}
+
 /* 手順②（板 Z0uO6・kmTab）：外の箱に札の箱・題・画像・面の一覧を入れる。 */
 .buttonsSection {
   display: flex;

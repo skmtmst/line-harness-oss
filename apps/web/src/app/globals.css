@@ -678,6 +678,7 @@
   --tpl-an-legend-gap: 16px; --tpl-an-swatch: 10px; --tpl-an-swatch-gap: 6px; --tpl-an-day-pad: 0 3px; --tpl-an-bar-up-h: 110px; --tpl-an-bar-down-h: 36px; --tpl-an-bar-radius: 3px; --tpl-an-mark: 8px; --tpl-an-mark-gap: 4px; --tpl-an-mark-radius: 4px;
   --tpl-r2-op-sum-gap: 6px; --tpl-r2-op-key-w: 150px; --tpl-r2-op-name-w: 200px; --tpl-r2-op-confirm-row-h: 36px;
   --tpl-r2-ch-band-bg: #e6f4ea; --tpl-r2-ch-band-ink: #1f7a3a; --tpl-r2-ch-row-h: 54px; --tpl-r2-ch-col-60: 60px; --tpl-r2-ch-col-100: 100px; --tpl-r2-ch-col-110: 110px; --tpl-r2-ch-col-120: 120px; --tpl-r2-ch-col-200: 200px;
+  --tpl-r2-rail-compact-pad: 16px; --tpl-r2-rail-compact-content-width: 247px;
   /* 統括 LINEアカウントを登録（xj3zz・JYfda・GwKE2・v2KMj・TvXII・qw80E）と統括のテンプレート（LRc93・X4JcOf・meBRB）。 */
   --tpl-htn-body-pad: 16px 24px 24px; --tpl-htn-gap: 16px; --tpl-htn-gap-s: 8px; --tpl-htn-gap-xs: 6px; --tpl-htn-steps-pad: 4px 0 8px; --tpl-htn-step-pad: 8px 12px; --tpl-htn-step-mark: 22px;
   --tpl-htn-radius-m: 10px; --tpl-htn-radius-l: 12px; --tpl-htn-radius-pill: 999px; --tpl-htn-line-2: 2px; --tpl-htn-soft-bg: #fafafc;

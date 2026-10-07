@@ -1460,7 +1460,7 @@ export default function RichMenuCreateV8() {
         step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
       } title={<>リッチメニューを作る</>} description={<>{headNote}</>} identity={<Link href="/rich-menus" className={styles.backLink}>
           ← リッチメニューへ
-        </Link>} steps={<Stepper label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />}  preview={renderRail()} previewToggle={<Button type="button" onClick={() => setPreviewOpen(true)}>見え方を確認</Button>} footerActions={
+        </Link>} steps={<Stepper label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />}  preview={renderRail()} previewCompactWhenNarrow footerActions={
           <>
             <Button href="/rich-menus">キャンセル</Button>
             {step === 'publish' ? (
@@ -1621,8 +1621,8 @@ export default function RichMenuCreateV8() {
         ) : null}
       </ConfirmDialog>
 
-      <Dialog open={previewOpen} title="見え方を確認" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
-        {renderRail()}
+      <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
+        {renderLinePreview()}
       </Dialog>
       <Dialog open={imageGuideOpen} title="画像の作り方" cancelLabel="閉じる" onCancel={() => setImageGuideOpen(false)}>
         <div className="space-y-3 text-sm">
@@ -2232,9 +2232,31 @@ export default function RichMenuCreateV8() {
   }
 
   /* ======== 右の列 ======== */
+  /* LINEでの見え方（スマホの見本）。広い板は右の列に、狭い板（kmTab）は右の列のボタンから窓で開く。 */
+  function renderLinePreview() {
+    return (
+      <LinePreview accountName={selectedAccount?.name} note="メニューの見え方の見本です。">
+        <MenuPreview
+          size={group?.size ?? size}
+          imageUrl={previewImageUrl}
+          areas={previewAreas}
+          pages={previewPages}
+          activePageId={previewPage?.id ?? activePage?.id ?? null}
+          chatBarText={chatBarText}
+        />
+      </LinePreview>
+    )
+  }
+
   function renderRail() {
     return (
       <>
+        {/* 絵 kmTab（1152）：右の列のいちばん上に「LINEでの見え方を見る」。広い板では出さない。 */}
+        <div className={styles.railPhoneButton}>
+          <Button type="button" onClick={() => setPreviewOpen(true)}>
+            <Smartphone size={15} aria-hidden="true" />LINEでの見え方を見る
+          </Button>
+        </div>
         {step === 'shape' ? (
           <CreateSummaryCard
             title="公開前に見ておくところ"
@@ -2337,17 +2359,8 @@ export default function RichMenuCreateV8() {
           />
         ) : null}
 
-        <div className={`flex w-full min-w-0 flex-col ${styles.stackSection}`}>
-          <LinePreview accountName={selectedAccount?.name} note="メニューの見え方の見本です。">
-            <MenuPreview
-              size={group?.size ?? size}
-              imageUrl={previewImageUrl}
-              areas={previewAreas}
-              pages={previewPages}
-              activePageId={previewPage?.id ?? activePage?.id ?? null}
-              chatBarText={chatBarText}
-            />
-          </LinePreview>
+        <div className={`flex w-full min-w-0 flex-col ${styles.stackSection} ${styles.railPhone}`}>
+          {renderLinePreview()}
         </div>
       </>
     )

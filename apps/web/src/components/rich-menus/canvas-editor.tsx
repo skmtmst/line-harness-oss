@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { RICH_MENU_DIMENSIONS, type RichMenuAreaIntent } from '@line-crm/shared'
+import {
+  CalendarClock, ClipboardList, Copy, FileText, Link2, MessageCircle, MousePointerClick, Phone, Repeat, Zap,
+  type LucideIcon,
+} from 'lucide-react'
 import Notice from '@/components/shared/notice'
 import { intentLabelOf } from '@/components/rich-menus/area-properties'
 import styles from './canvas-v8.module.css'
@@ -83,6 +87,16 @@ export function areaDisplayName(area: Area, index: number): string {
   return area.label?.trim() || `${index + 1}番目のボタン`
 }
 
+/** 面の名前の上に置く印（動きの種類ごと）。動きが決まっていない面は「押す」の印。 */
+const INTENT_ICON: Record<RichMenuAreaIntent, LucideIcon> = {
+  url: Link2, tel: Phone, text: MessageCircle, template: FileText, form: ClipboardList,
+  switch: Repeat, postback: Zap, datetime: CalendarClock, clipboard: Copy,
+}
+function AreaIcon({ intent }: { intent?: RichMenuAreaIntent | null }) {
+  const Icon = intent ? INTENT_ICON[intent] ?? MousePointerClick : MousePointerClick
+  return <Icon size={20} aria-hidden="true" className={styles.areaIcon} />
+}
+
 function isOverlapping(a: Area, others: Area[]): boolean {
   return others.some((b) => {
     if (b.id === a.id) return false
@@ -124,7 +138,8 @@ export function CanvasEditor({
     if (!viewport) return
     const fit = () => {
       const width = viewport.getBoundingClientRect().width
-      if (width > 0) setScale(Math.min(width, 600) / dims.width)
+      // 絵（Z0uO6・kmTab）：画像は左右に 22 ずつ空けて、幅は 600 まで（1152 の板で 480）。
+      if (width > 0) setScale(Math.min(width - 44, 600) / dims.width)
     }
     fit()
     const observer = new ResizeObserver(fit)
@@ -445,6 +460,13 @@ export function CanvasEditor({
                   boxSizing: 'border-box',
                 }}
               >
+                {/* 絵 Z0uO6・kmTab：面の真ん中に面の名前。押す場所がどの面かを画像の上で分かるようにする。 */}
+                {appearance === 'v8' && !preview ? (
+                  <>
+                    <AreaIcon intent={area.intent} />
+                    <span className={styles.areaName}>{areaDisplayName(area, index)}</span>
+                  </>
+                ) : null}
                 {!preview && selected && showTools &&
                   ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'].map((h) => (
                     <div
