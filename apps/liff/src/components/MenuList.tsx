@@ -64,7 +64,7 @@ export default function MenuList({
       <h2 className="text-xl font-bold text-ink">メニューを選んでください</h2>
       {categories.length > 1 && (
         <div
-          className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5"
+          className="-mx-4 flex gap-1.5 overflow-x-auto px-4"
           role="group"
           aria-label="種類でしぼる"
         >
@@ -106,12 +106,12 @@ export default function MenuList({
                   aria-hidden="true"
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-bold text-ink" title={m.name}>
+                  <span className="block truncate text-[15px] leading-[22px] font-bold text-ink" title={m.name}>
                     {m.name}
                   </span>
                   {/* 説明が無いメニューも行を取っておく (板 IruGD の「シャンプーのみ」。カードの高さをそろえる)。 */}
                   <span
-                    className="mt-[3px] block truncate text-[11.5px] text-liff-sub"
+                    className="mt-[3px] block truncate text-[11.5px] leading-[17px] text-liff-sub"
                     title={m.description ?? undefined}
                     aria-hidden={m.description ? undefined : true}
                   >
