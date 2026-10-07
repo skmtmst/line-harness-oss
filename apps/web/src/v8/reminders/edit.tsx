@@ -42,6 +42,8 @@ import { ApiError, api, type EventListItem } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { formatNumber } from '@/lib/format'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
@@ -177,6 +179,8 @@ type StageFrame = {
   identity: ReactNode
   steps: ReactNode
   description: ReactNode
+  /** 下の帯の左の文（下書きの自動保存の状態）。 */
+  status?: ReactNode
 }
 
 export default function ReminderEditV8({ reminderId, stage }: { reminderId: string; stage: string | null }) {
@@ -347,33 +351,85 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     },
   })
 
-  /** 下書きを保存する。409 は読み直しの帯へ出す。 */
-  async function saveSettings(next: ReminderDraftSettings): Promise<boolean> {
-    setBusy(true)
-    setError('')
-    setConflict(false)
+  /*
+   * 自動保存と手の保存が重なると、同じ版を2回送って競合に見える。
+   * 送っている途中の保存を待ち、最新の版（draftRef）で送る。
+   */
+  const saveInFlight = useRef<Promise<unknown> | null>(null)
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+  const basicsRef = useRef(basics)
+  basicsRef.current = basics
+
+  /**
+   * 下書きを保存する。409 は読み直しの帯へ出す。
+   * silent は自動保存：押せない印・赤い帯は出さない。保存中に打ち足した入力は
+   * 応答で上書きせず、そのまま残す（次の自動保存で追って送る）。
+   */
+  async function saveSettings(next: ReminderDraftSettings, { silent = false }: { silent?: boolean } = {}): Promise<boolean> {
+    if (!silent) {
+      setBusy(true)
+      setError('')
+      setConflict(false)
+    }
+    while (saveInFlight.current) await saveInFlight.current.catch(() => undefined)
+    const base = draftRef.current
+    const sentSettings = settingsRef.current
+    const sentBasics = basicsRef.current
+    const request = api.reminders.saveDraft(
+      reminderId,
+      next,
+      // 開いたときの版 ID と版の時刻を送り、別の画面の先勝ちを止める。
+      base ? { expectedVersionId: base.versionId, expectedUpdatedAt: base.updatedAt } : {},
+    )
+    saveInFlight.current = request
     try {
-      const response = await api.reminders.saveDraft(
-        reminderId,
-        next,
-        // 開いたときの版 ID と版の時刻を送り、別の画面の先勝ちを止める。
-        draft ? { expectedVersionId: draft.versionId, expectedUpdatedAt: draft.updatedAt } : {},
-      )
+      const response = await request
       if (!response.success) throw new Error(response.error)
+      draftRef.current = response.data
       setDraft(response.data)
-      setSettings(response.data.settings)
-      setBasics(basicsFromDraft(response.data.settings))
+      setConflict(false)
+      const untouched = settingsRef.current === sentSettings && basicsRef.current === sentBasics
+      if (!silent || untouched) {
+        setSettings(response.data.settings)
+        setBasics(basicsFromDraft(response.data.settings))
+      }
       return true
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(true)
-      } else {
+      } else if (!silent) {
         setError('保存できませんでした。')
       }
       return false
     } finally {
-      setBusy(false)
+      if (saveInFlight.current === request) saveInFlight.current = null
+      if (!silent) setBusy(false)
     }
+  }
+
+  /*
+   * 入力を持つ段（基本・対象・通知）は、入力が止まって2秒で下書きへ静かに保存する
+   * （一斉配信と同じ）。下書きなので有効中の配信は変わらない。閲覧のみの人には動かさない。
+   */
+  const role = useStaffRole()
+  const autosave = useDraftAutosave({
+    fingerprint: JSON.stringify(v8stage === 'basics' ? basics : settings),
+    dirty,
+    active: role === null || canManageRole(role),
+    enabled: !loading && !conflict && draft !== null && settings !== null
+      && (v8stage !== 'basics' || Boolean(basics?.name.trim())),
+    paused: leaveTarget !== null || busy,
+    save: async () => {
+      const current = settingsRef.current
+      if (!current) return false
+      const currentBasics = basicsRef.current
+      return saveSettings(v8stage === 'basics' && currentBasics ? basicsToDraft(current, currentBasics) : current, { silent: true })
+    },
+  })
+  /** 手で「下書きを保存」したとき。保存できたら帯を「保存済み」にする。 */
+  async function saveDraftByHand(next: ReminderDraftSettings) {
+    if (await saveSettings(next)) autosave.markSaved()
   }
 
   async function sendTest() {
@@ -469,6 +525,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         {conflictBand}
       </>
     ),
+    status: autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined,
   }
 
   const stageError = (error || (!testConfirm && testIssue && v8stage === 'confirm'))
@@ -489,7 +546,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
             const saved = await saveSettings(basicsToDraft(subjectSettings, value))
             if (saved) go('target')
           }}
-          onSaveDraft={async (value) => { await saveSettings(basicsToDraft(subjectSettings, value)) }}
+          onSaveDraft={async (value) => { await saveDraftByHand(basicsToDraft(subjectSettings, value)) }}
           onCancel={() => router.push('/reminders')}
         />
       ) : null}
@@ -510,7 +567,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
             const saved = await saveSettings(subjectSettings)
             if (saved) go(null)
           }}
-          onSaveDraft={async () => { await saveSettings(subjectSettings) }}
+          onSaveDraft={async () => { await saveDraftByHand(subjectSettings) }}
           onCancel={() => router.push('/reminders')}
         />
       ) : null}
@@ -527,7 +584,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
             const saved = await saveSettings(subjectSettings)
             if (saved) go('preview')
           }}
-          onSaveDraft={async () => { await saveSettings(subjectSettings) }}
+          onSaveDraft={async () => { await saveDraftByHand(subjectSettings) }}
           onCancel={() => router.push('/reminders')}
         />
       ) : null}
@@ -542,7 +599,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
           previewFailed={previewState === 'error'}
           onRetryPreview={retryPreview}
           onNext={() => go('confirm')}
-          onSaveDraft={async () => { await saveSettings(subjectSettings) }}
+          onSaveDraft={async () => { await saveDraftByHand(subjectSettings) }}
           busy={busy}
           onCancel={() => router.push('/reminders')}
         />
@@ -569,7 +626,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
           busy={busy}
           publishReady={Boolean(validation?.valid) && subjectDraft.lastTestStatus === 'succeeded'}
           onPublish={() => void publishDraft()}
-          onSaveDraft={async () => { await saveSettings(subjectSettings) }}
+          onSaveDraft={async () => { await saveDraftByHand(subjectSettings) }}
           onCancel={() => router.push('/reminders')}
         />
       ) : null}
