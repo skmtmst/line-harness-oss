@@ -674,7 +674,6 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
       setEditLoad(caught instanceof ApiError && caught.status === 404 ? 'missing' : 'error')
     }
     // hydrate は state の setter だけを使う。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editGroupId])
 
   useEffect(() => {

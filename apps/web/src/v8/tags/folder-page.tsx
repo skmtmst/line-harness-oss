@@ -116,7 +116,6 @@ function TagFolderPage() {
         setLoadState(status === 403 ? 'forbidden' : 'error')
       })
   }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(loadFolder, [editId, selectedAccountId])
 
   const save = async () => {
