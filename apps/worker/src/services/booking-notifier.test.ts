@@ -1,8 +1,9 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   formatStartsAtForStore,
   notificationTiming,
   renderNotificationText,
+  sendBookingNotification,
 } from './booking-notifier.js';
 
 const ctx = {
@@ -12,6 +13,22 @@ const ctx = {
   daysUntil: 1,
   hoursUntil: 2,
 };
+
+test('スタッフ変更の自動LINE通知はmanualを付けず変更後の担当と時刻を送る', async () => {
+  const fetchMock = vi.fn(async () => new Response('', { status: 200 }));
+  vi.stubGlobal('fetch', fetchMock);
+  try {
+    await sendBookingNotification({ channelAccessToken: 'test-token', toLineUserId: 'Utest', kind: 'changed', ctx: { ...ctx, staffName: '中川' } });
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(new Headers(init.headers).has('X-Line-Harness-Source')).toBe(false);
+    const body = JSON.parse(init.body as string);
+    expect(body.to).toBe('Utest');
+    expect(body.messages[0].text).toContain('担当: 中川');
+    expect(body.messages[0].text).toContain(ctx.startsAt);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
 
 describe('renderNotificationText', () => {
   test('受付', () => {
