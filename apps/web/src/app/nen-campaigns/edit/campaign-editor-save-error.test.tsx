@@ -46,7 +46,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 const { AccountProvider } = await import('@/contexts/account-context')
-const { default: CampaignEditor } = await import('./campaign-editor')
+// 編集の入口（page.tsx）は campaign-editor-v8 を出す（古い campaign-editor.tsx はどこからも描かれないので 2026-10-07 に消した）。
+const { default: CampaignEditor } = await import('./campaign-editor-v8')
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 

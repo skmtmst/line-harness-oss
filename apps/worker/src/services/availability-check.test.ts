@@ -79,7 +79,7 @@ function stubDB(data: StubData): D1Database {
           if (sql.includes('booking_availability_exceptions')) {
             return { results: data.exceptions ?? [] };
           }
-          if (sql.includes('booking_resource_consumptions')) {
+          if (sql.includes('booking_slot_resources')) {
             return { results: data.resourceBookings ?? [] };
           }
           if (sql.includes('booking_menu_resources')) {
@@ -106,7 +106,7 @@ function stubDB(data: StubData): D1Database {
           if (sql.includes('FROM staff_breaks')) {
             return { results: data.breaks ?? [] };
           }
-          if (sql.includes('FROM bookings')) {
+          if (sql.includes('FROM booking_slot_allocations')) {
             return { results: data.bookings ?? [] };
           }
           return { results: [] };

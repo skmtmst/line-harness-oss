@@ -14,10 +14,17 @@ const GRID_PAGES = [
 /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る（幅は CSS の `.split` で付ける）。 */
 const V8_FOLDER_PAGES = [
   'reminders/list-v8.tsx',
-  'scenarios/list-v8.tsx',
-  'form-submissions/list-v8.tsx',
   'webinars/list-v8.tsx',
   'templates/list-v8.tsx',
+]
+/*
+ * シナリオ・回答フォームの入口は src/v8 の新しい一覧（2026-10-06〜。古い list-v8.tsx はもう描かれない）。
+ * 新しい一覧はフォルダの列を型（ListPage の folders）に渡し、幅は型の CSS（--tpl-folder-width）が持つ。
+ */
+const SRC_V8 = resolve(import.meta.dirname, '../../v8')
+const NEW_V8_FOLDER_PAGES = [
+  'scenarios/list.tsx',
+  'forms/list.tsx',
 ]
 
 describe('オーナー指示 #582 のフォルダ欄', () => {
@@ -39,6 +46,14 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
     expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
     expect(css).toMatch(/grid-template-columns:\s*200px minmax\(0, 1fr\)/)
     expect(css).toMatch(/@container[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s)
+  })
+
+  it.each(NEW_V8_FOLDER_PAGES)('src/v8/%s は共通の FolderPanel と追加操作を型のフォルダの列へ渡す', (relativePath) => {
+    const page = readFileSync(resolve(SRC_V8, relativePath), 'utf8')
+    expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
+    expect(page).toMatch(/<ListPage[\s\S]*?folders=\{/)
+    const templateCss = readFileSync(resolve(import.meta.dirname, '../templates/page-templates.module.css'), 'utf8')
+    expect(templateCss).toMatch(/\.folders \{ width: var\(--tpl-folder-width\)/)
   })
 
   it('テンプレートも同じ幅と欄内追加操作を使う', () => {
