@@ -1479,6 +1479,10 @@
   --tpl-inbox-tp-band-pad: 10px 20px;     /* 続けて送る順の帯 */
   --tpl-inbox-tp-foot-pad: 12px 20px;     /* 窓の下 */
   --tpl-inbox-tp-head-pad: 16px 20px;     /* 窓の頭 */
+  --tpl-inbox-tp-side-indent: 22px;       /* 子のフォルダの字下げ */
+  --tpl-inbox-tp-body-max: calc(100dvh - 200px); /* 低い画面で窓が切れない */
+  --tpl-inbox-tp-card-on: 1.5px solid var(--color-accent-deep); /* 選んだカードの枠 */
+  --tpl-inbox-tp-card-on-offset: -0.75px;
   --tpl-inbox-sch-w: 420px;               /* 予約して送るの窓の幅 */
   --tpl-inbox-sch-box-pad: 10px 12px;     /* 送るものの箱 */
   --tpl-inbox-sch-chip-h: 28px;           /* すぐ選ぶの札 */
