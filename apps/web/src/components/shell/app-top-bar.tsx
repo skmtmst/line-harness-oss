@@ -15,7 +15,7 @@ import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
  * 共通トップバーを、いまの画面の値へつなぐ層。
  *
  * 見た目は `shared/top-bar.tsx`（Pencil `cBSCb`）が持つ。ここは値を集めるだけ。
- * 分けているのは、部品を1つの画面にも縛らないため（`v6-common-rules.md` §5-2）。
+ * 分けているのは、部品を1つの画面にも縛らないため（`docs/v8-design-rules.md` §5）。
  */
 
 /** ルート → メニューのラベル。長いほうから当てるので、`/tags/new` は「友だち属性」になる。 */

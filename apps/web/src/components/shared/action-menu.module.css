@@ -196,6 +196,11 @@
   gap: var(--tpl-menu-item-gap);
 }
 
+/* ★V8：区切りは線1本だけで、上下の余白を足さない（項目の間 2 の並びのまま。SkY9V で「実行結果を見る」→「編集する」が 39＝36＋線と間 3）。 */
+[data-theme="v8"] .divider {
+  margin: var(--tpl-menu-divider-margin);
+}
+
 /*
  * ★V8 仕上げ（M10）：開くときに少し下から（opacity＋translateY 4px→0、
  * 200ms ease-out）。全画面の規定（globals の lh-surface-in は上から）に

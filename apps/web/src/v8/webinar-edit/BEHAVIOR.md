@@ -1,0 +1,49 @@
+# ウェビナーの作る・編集・参加者・分析・コメント演出（V8）の動き
+
+入口：
+- 編集 `app/webinars/edit/page.tsx`（V8 のときだけ `src/v8/webinar-edit/edit.tsx`、それ以外は今の編集のまま）
+- 作る `app/webinars/new/page.tsx`（V8 のときだけ `src/v8/webinar-edit/new.tsx`、それ以外は `app/webinars/new/new-v8.tsx`）
+
+絵：①基本設定（作る）`j7PP04`・②動画 `VWNaA`（オンデマンド）/`LPOe7`（日時指定・開催回）・③CTA・フォーム `Q0Jrk`（同時編集の帯 `pvimJ`）・
+④通知 `E7iAYs`・⑤確認 `XCUNf`・参加者 `uNsEy`・分析 `z2dgw`・コメント演出 `Omqd4`。
+
+## 受け付ける URL と指定（今の編集と同じ）
+- `/webinars/edit?id=<ウェビナー>&pane=<段>`。`pane` は `basic`・`video`・`cta`・`notifications`・`review`・`participants`・`analytics`・`comments`。
+  - 今の編集にあった `actions`（視聴後アクション）は ④通知の「視聴後にすること」へ、`preview`（公開プレビュー）は ⑤確認へまとめた。古い URL で来たらその段を開く。
+- 段を移ると `?id=…&pane=…` を履歴に積む（戻る・再読込で同じ段に戻る）。同じウェビナーの中の移動は「離れる前の確かめ」を出さない。
+- `id` が無い・404・読み込み失敗（403/429/そのほか）は今の編集と同じ出し分け（TargetMissing）。
+- 作る：`/webinars/new`。作ったら `/webinars/edit?id=<新しいID>&pane=video`（動画の設定へ）か `/webinars`（下書きを保存）。
+
+## 呼ぶ口（今の編集と同じ）
+- 読み込み：`webinarApi.get` と `webinarApi.editor` を一緒に。集計 `webinarApi.analytics` は参加者・分析・コメント演出を開いたときだけ（タブの「参加者 124」に使う）。
+- ①基本設定：`saveEditor`（案内文・開催形式。版つき）→ `update`（名前・URL・フォルダ）の順。フォルダ `webinarApi.folders`。テスト送信 `testNotifications`。
+- ②動画：公開期間・配信枠は `update`（最新の版を `editor` で読んでから `expectedVersion`）。開催回の定員 `webinarSession`／`setSessionCapacity`。
+  動画の準備 `videoAsset`／`advanceVideoAsset`。動画の差し替え `api.media.list(kind=video)` → `update({ videoMediaId, durationSeconds })`。
+  「結果が取れないとき」は選んだらすぐ `saveEditor`。
+- ③CTA：`ctas`／`saveCtas`、申込フォームの候補 `/api/forms?account_id=`、申込フォームの保存 `saveEditor({ registrationFormId, expectedUpdatedAt })`。
+  409（版の食い違い）は同時編集の帯（pvimJ）：「違いを比べる」（最新の editor と ctas を読み直して並べる）・「最新を読み込んで続ける」。
+- ④通知：`notifications`／`saveNotifications`、視聴後の動き `actions`／`saveActions`、本文・取れないとき `saveEditor({ actionTemplateBody, missingResultPolicy })`、テスト `testNotifications`。
+- ⑤確認：`publishValidation`、ページのテスト `testPublicPage`、通知のテスト `testNotifications`、公開 `publish` → `/webinars/published?id=`。
+- 参加者：`participants`（50件ずつ・`nextCursor` で続き・分類で絞り込み）、CSV `participantsCsvUrl`。
+- 分析：CSV の権限を `participants(limit 1)` で確かめてから CSV の口を出す。視聴者コメント `userComments`。
+- コメント演出：`comments`／`saveComments`（秒の順に並べて保存・200件まで・JSON の貼り付け）。
+
+## 保存と離れる前の確かめ（今の編集と同じ）
+- 一度開いた段は隠すだけ（入力は消えない）。各段は「保存」と「保存していない変更があるか」を親へ登録する。
+- 下の帯は1本：キャンセル・下書きを保存・次の段へ（未保存なら「保存して〇〇へ」）。⑤確認は「この版を公開」。
+- 保存していない変更があるまま一覧・左メニュー・戻るで出ようとすると確かめる（`useUnsavedGuard`）。
+
+## 閲覧のみ（staff）
+- 変える操作（下書きを保存・次へ以外の保存・テスト送信・足す・消す・「…」・差し替える・この版を公開・コメントの保存）は置かずに隠す（2026-10-06 オーナー決定）。
+- 選ぶ欄・時刻の欄・スイッチは、押せない形にせず値の文字（ReadValue・「送る／送らない」）で見せる。入力欄は読み取りだけ。
+- 役割は `useStaffRole`（サーバー）。確かめが済むまでは今までどおり出す。最後の守りはサーバーの 403。
+
+## 今の編集と違うところ（見せ方だけ）
+- 参加者の視聴の分類は絵の言葉（視聴完了・途中で離れた・入場のみ・見ていない・見逃し案内の対象）。数の帯の申込は「今月 +N」。
+- 参加者の表に顔の丸は出さない（絵どおり）。行の右端は「チャットを見る →」（ほかに行の操作が無いので「…」は置かない）。名前から友だちの詳細へ。
+- 分析の線のグラフの文字（0:00・終わりの時刻・申し込みボタンを出した時刻）は線と同じ場所に描く。回別・日別・フォームの数と視聴者コメントは下に畳んで残す。
+- コメント演出の行は、その場で直せる欄（秒数は 分:秒、マイナスは開始前）。行の右端はごみ箱で消す。
+- ④通知の右の見え方は、通知の題を押すとその本文に切り替わる（既定は前日のご案内）。送った数の内訳（予定・取消・合計・対象）は題の「？」へ。
+- ⑤確認の「通知のテストを送る」はその場で送る（今の編集は ④通知へ移るだけだった）。
+- ②動画の準備の段は、準備の途中・失敗のときだけ出す（済んでいれば出さない）。段を進める操作は「差し替える」の窓の中。
+- 「視聴完了とみなす」は「90%以上見たら視聴完了（変えられません）」（今の編集は視聴できる人の条件の名前を出していた）。

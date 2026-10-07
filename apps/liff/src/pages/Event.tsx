@@ -137,6 +137,8 @@ export default function Event() {
   const ends = slots.map((s) => s.ends_at).sort();
   const span = starts.length > 0 ? formatJstEventSpan(starts[0], ends[ends.length - 1]) : null;
 
+  /** 枠がすべて同じ日か。同じ日なら枠には時刻だけを出す。 */
+  const oneDay = new Set(slots.map((s) => utcToJstMd(s.starts_at))).size <= 1;
   const caps = slots.map((s) => s.capacity).filter((c): c is number => c != null);
   const rems = slots.map((s) => s.remaining).filter((r): r is number => r != null);
   const seats =
@@ -158,7 +160,8 @@ export default function Event() {
   return (
     <LiffLookScope className="min-h-screen bg-ground" designNode="gVjiC">
       <LiffHeader title="イベント" />
-      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-28">
+      {/* 板 gVjiC：中身は余白 16・まとまりの間は 14。 */}
+      <div className="mx-auto w-full max-w-md space-y-3.5 px-4 pt-4 pb-28">
         {isHttpsUrl(event.image_url) ? (
           <img
             src={event.image_url}
@@ -167,14 +170,14 @@ export default function Event() {
           />
         ) : (
           <div
-            className="flex h-48 w-full items-center justify-center rounded-xl bg-state-mark text-ink-faint"
+            className="flex h-40 w-full items-center justify-center rounded-xl bg-state-mark text-ink-faint"
             aria-hidden="true"
           >
             <Icon name="image" className="h-8 w-8" />
           </div>
         )}
+        <h2 className="text-xl font-bold text-ink">{event.name}</h2>
         <div className="space-y-2">
-          <h2 className="text-xl font-bold text-ink">{event.name}</h2>
           {span && (
             <p className="flex items-start gap-2 text-[13px] text-ink">
               <Icon name="calendar" className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" />
@@ -208,14 +211,14 @@ export default function Event() {
         </div>
         {event.description && (
           <p
-            className={`text-xs leading-6 whitespace-pre-wrap text-liff-sub ${event.description_centered === 1 ? 'text-center' : ''}`}
+            className={`text-xs leading-[18px] whitespace-pre-wrap text-liff-sub ${event.description_centered === 1 ? 'text-center' : ''}`}
           >
             {event.description}
           </p>
         )}
 
         <div>
-          <h3 className="mb-2 text-sm font-bold text-ink">時間を選ぶ</h3>
+          <h3 className="mb-3.5 text-sm font-bold text-ink">時間を選ぶ</h3>
           {slots.length === 0 ? (
             <p className="text-sm text-ink-secondary">現在予約可能な枠はありません。</p>
           ) : (
@@ -252,8 +255,10 @@ export default function Event() {
                       <span
                         className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-(--liff-on-primary)' : 'text-ink'}`}
                       >
-                        {utcToJstMd(s.starts_at)}({utcToJstWeekday(s.starts_at)}) {utcToJstHm(s.starts_at)}〜
-                        {utcToJstHm(s.ends_at)}
+                        {/* 日付は上の行にあるので、枠が1日だけのときは時刻だけ (板 gVjiC)。 */}
+                        {oneDay
+                          ? `${utcToJstHm(s.starts_at)}〜${utcToJstHm(s.ends_at)}`
+                          : `${utcToJstMd(s.starts_at)}(${utcToJstWeekday(s.starts_at)}) ${utcToJstHm(s.starts_at)}〜${utcToJstHm(s.ends_at)}`}
                       </span>
                       <span
                         className={`shrink-0 text-xs font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-(--liff-on-primary)' : full && !disabled ? 'text-liff-wait-ink' : 'text-ink-secondary'}`}
@@ -294,7 +299,7 @@ export default function Event() {
             ? '予約上限に達しています'
             : selectedSlot
               ? selectedFull && waitlistOpen
-                ? 'キャンセル待ちに入る'
+                ? 'キャンセル待ちで申し込む'
                 : 'この時間で申し込む'
               : allFull
                 ? '満席です'

@@ -162,9 +162,8 @@ test('v8 では新しい一覧（FM94M）が出て、v7 は出ない', async () 
   window.localStorage.setItem('lh_staff_role', 'admin')
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
-  expect(host?.querySelector('[data-design-node~="FM94M"]')).not.toBeNull()
-  // 一覧（1152）の板 `XIzkJ` も同じ面に付く（数に入る印）。
-  expect(host?.querySelector('[data-design-node~="FM94M"][data-design-node~="XIzkJ"]')).not.toBeNull()
+  // 2026-10-06 入口は新しい一覧（src/v8/common-vars）。板の印は幅で FM94M（広い）か XIzkJ（1152）のどちらか。
+  expect(host?.querySelector('[data-design-node~="FM94M"],[data-design-node~="XIzkJ"]')).not.toBeNull()
   expect(host?.querySelector('[data-design-node="WuKzU"]')).toBeNull()
   expect(host?.textContent).toContain('差し込んでいる所')
   expect(host?.textContent).toContain('問い合わせ先')
@@ -192,7 +191,8 @@ test('止める窓は予約中の配信の帯を出す（Hhl9M）', async () => 
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const trigger = Array.from(host?.querySelectorAll('button') ?? [])
-    .find((button) => button.getAttribute('aria-label') === '会社名のその他操作')
+    // 新しい一覧（src/v8/common-vars）の行の右端の「…」。
+    .find((button) => button.getAttribute('aria-label') === '共通情報「会社名」の操作')
   expect(trigger).toBeTruthy()
   await act(async () => { trigger!.click() })
   const stopItem = Array.from(document.body.querySelectorAll('[role="menuitem"],[role="menuitemradio"]'))

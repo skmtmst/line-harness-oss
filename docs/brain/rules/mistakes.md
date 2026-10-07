@@ -69,7 +69,7 @@
 ## 2026-09-03
 - やらかし: 担当ごとの worktree(lh-work/lh-*)を作っただけで依存を入れず、Slack フック(pnpm exec tsx)・テスト・型検査が全ノードで落ちていた
 - 原因: worktree は node_modules を共有しない
-- 再発防止: worktree を作ったら必ず `pnpm install --frozen-lockfile` を回してから起動する(docs/v6-orchestration-nodeterm.md §6 に追記)
+- 再発防止: worktree を作ったら必ず `pnpm install --frozen-lockfile` を回してから起動する(当時の NodeTerm の運用文書に追記。その文書は 2026-10-07 に外した)
 
 ## 2026-09-03
 - やらかし: Codex を自動承認(workspace-write)にしたら、worktree の git 管理領域(本体の .git/worktrees/ 配下)に書けず fetch/merge が失敗した
@@ -107,9 +107,9 @@
 - 再発防止: 画像を数えるときは `*-v6/` に限定し、旧世代は除外する
 
 ## 2026-09-02
-- やらかし: 台帳(v6-32-feature-requirements-progress.md)が 8/27 で止まり「共通枠のみ 25/32」と実態より低く表示され、そのまま判断材料に使われかけた
+- やらかし: 手書きの V6 進捗台帳が 8/27 で止まり「共通枠のみ 25/32」と実態より低く表示され、そのまま判断材料に使われかけた
 - 原因: 手書きの台帳と機械生成の台帳が 2 本あった
-- 再発防止: 実装の進捗は機械生成の docs/design-qa/v6-progress-ledger.md だけを見る。手書き台帳の実装列は廃止した
+- 再発防止: 実装の進捗は機械生成の台帳だけを見る。手書き台帳の実装列は廃止した（2026-10-07 から見た目の進捗は ★V8 の照合 PASSED.tsv・SWITCH-READINESS.md）
 
 ## 2026-08-30(#692 で判明)
 - やらかし: 撮影ハーネスが別の画面を撮って「撮影 OK」と言い、古いモックが動いたまま撮って直した返事が反映されない絵ができた

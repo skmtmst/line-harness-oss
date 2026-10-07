@@ -58,7 +58,8 @@ describe('V8 仕上げ3回目の動き', () => {
   it('①④ 表の行は上から順に少しずつ（200ms・40msずらし・4行目以降同時）', () => {
     const css = read('../../app/globals.css')
     expect(css).toMatch(/\[data-theme="v8"\] tbody > tr \{\s*animation:\s*v8-content-in var\(--motion-base\)/s)
-    expect(css).toMatch(/tbody > tr:nth-child\(2\) \{\s*animation-delay:\s*40ms/s)
-    expect(css).toMatch(/tbody > tr:nth-child\(n \+ 4\) \{\s*animation-delay:\s*120ms/s)
+    expect(css).toMatch(/--motion-stagger:\s*40ms;/)
+    expect(css).toMatch(/tbody > tr:nth-child\(2\) \{\s*animation-delay:\s*var\(--motion-stagger\)/s)
+    expect(css).toMatch(/tbody > tr:nth-child\(n \+ 4\) \{\s*animation-delay:\s*calc\(var\(--motion-stagger\) \* 3\)/s)
   })
 })

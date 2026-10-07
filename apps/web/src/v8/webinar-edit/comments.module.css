@@ -1,0 +1,143 @@
+/* ★V8 ウェビナーのコメント演出（Omqd4）。 */
+
+/* 中身：上16・横24・下24、左のカードと右の見え方の間16。 */
+.body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-wc-cm-gap);
+  min-width: 0;
+  padding: var(--tpl-wc-an-pad);
+}
+
+.card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-wc-an-gap);
+  min-width: 0;
+  padding: var(--tpl-wc-an-card-pad);
+  border-radius: var(--tpl-wc-card-radius);
+  box-shadow: var(--tpl-an-ring);
+}
+.cardHead { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+.cardHeadText { display: flex; flex: 1; flex-direction: column; gap: var(--tpl-wc-cm-head-gap); min-width: 0; }
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-an-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-an-card-title-lh);
+}
+.cardDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.state { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
+
+/* 表の見出し：淡い地・角8・内側 10/16・欄の間12・字 11/600。 */
+.headRow {
+  display: flex;
+  gap: var(--tpl-wc-an-row-gap);
+  padding: var(--tpl-wc-cm-head-pad);
+  border-radius: var(--tpl-wc-an-chart-radius);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-row-sub-lh);
+}
+.colSec { width: var(--tpl-wc-cm-col-sec); flex-shrink: 0; }
+.colName { width: var(--tpl-wc-cm-col-name); flex-shrink: 0; }
+.colBody { width: var(--tpl-wc-cm-col-body); flex-shrink: 0; }
+
+/* 行：内側 10/16・欄の間12・下に1pxの線。欄はその場で直せる（地も枠も無い入力欄）。 */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wc-an-row-gap);
+  padding: var(--tpl-wc-cm-head-pad);
+  box-shadow: var(--shadow-row-line);
+}
+.cell {
+  flex-shrink: 0;
+  height: var(--tpl-wc-control-h);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--tpl-wc-cm-cell-radius);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.cell:hover:not(:disabled) { box-shadow: var(--tpl-wc-cm-cell-hover); }
+.cell:focus-visible { outline: var(--tpl-wc-tab-line) solid var(--color-status-info); outline-offset: var(--tpl-wc-tab-line); }
+.cellSec { width: var(--tpl-wc-cm-col-sec); font-weight: 700; font-variant-numeric: tabular-nums; }
+.cellName { width: var(--tpl-wc-cm-col-name); }
+.cellBody { width: var(--tpl-wc-cm-col-body); }
+.remove { flex-shrink: 0; }
+
+.links { display: flex; gap: var(--tpl-wc-cm-gap); }
+.link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-text-sm-lh);
+  cursor: pointer;
+}
+.link:hover { text-decoration: underline; }
+.link:disabled { cursor: not-allowed; opacity: 0.5; }
+.import { display: flex; flex-direction: column; gap: var(--tpl-toolbar-gap); }
+
+/* 右：視聴画面での見え方（幅340・内側16・間10）。黒い画面は高さ180・下に寄せた2行。 */
+.side {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--tpl-wc-an-card-gap);
+  width: var(--tpl-wc-cm-side-w);
+  padding: var(--tpl-wc-cm-side-pad);
+  border-radius: var(--tpl-wc-card-radius);
+  box-shadow: var(--tpl-an-ring);
+}
+.sideTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-wc-cm-side-title-lh);
+}
+.screen {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--tpl-wc-cm-screen-gap);
+  height: var(--tpl-wc-cm-screen-h);
+  padding: var(--tpl-wc-cm-screen-pad);
+  border-radius: var(--tpl-wc-an-chart-radius);
+  background: var(--color-ink);
+}
+.screenLine {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-canvas);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.screenLine[data-dim] { opacity: 0.7; }
+.sideNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}

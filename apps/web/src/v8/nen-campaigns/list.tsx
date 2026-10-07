@@ -1,0 +1,982 @@
+'use client'
+
+/*
+ * ★V8-B NEN配信の一覧（Pencil「★V8-B 画面の地図」専用機能の組）。
+ * 自動配信 `MuhWR`・コラム `Jxmqh`・送った履歴 `Tj7n4`・誕生日クーポンの決めごと（引き出し）`oqSJP`。
+ *
+ * 取得・保存は今の入口（app/nen-campaigns/page.tsx）が持ったまま。ここは見せ方だけ。
+ * 外側（見出し・タブ・数の帯・案内・道具の段）は4つのタブで同じ形にし、
+ * 表は「見出し 36・行 56」の同じ物差しで並べる（タブを替えても表の頭が動かない）。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
+import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import {
+  Bookmark,
+  CalendarDays,
+  CircleHelp,
+  Columns2,
+  Download,
+  Eye,
+  History,
+  MoreHorizontal,
+  PenLine,
+  Undo2,
+} from 'lucide-react'
+import type {
+  NenCampaignSetting,
+  NenColumn,
+  NenColumnMetrics,
+  NenDeliveryDetail,
+  NenDeliveryList,
+  NenFlowMetrics,
+} from '@/lib/api'
+import { ListPage } from '@/components/templates'
+import Button from '@/components/shared/button'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Drawer from '@/components/shared/drawer'
+import FilterChip from '@/components/shared/filter-chip'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import ListToolbar from '@/components/shared/list-toolbar'
+import Notice from '@/components/shared/notice'
+import Pagination from '@/components/shared/pagination'
+import Radio from '@/components/shared/radio'
+import Select from '@/components/shared/select'
+import Toggle from '@/components/shared/toggle'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { Tabs } from '@/components/shared/tabs'
+import { TextArea, TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { csvCell } from '@/lib/presentation'
+import { formatNumber } from '@/lib/format'
+import {
+  canRetryDelivery,
+  deliveryTriggerLabel,
+  formatCampaignAudience,
+  formatCampaignTiming,
+  isPastScheduledAt,
+  jstDateTime,
+  jstMonthDay,
+  num,
+  publishedAtIso,
+  skippedNoRetryNote,
+  statusLabel,
+  type ColumnDeliveryPlan,
+  type FriendOption,
+  type NenCoupon,
+  type NenKpis,
+  type NenTab,
+} from './display'
+import styles from './list.module.css'
+
+export type { NenTab } from './display'
+
+/** 入口（page.tsx）から受け取るもの。今の画面（v7）に渡しているものと同じ形。 */
+export type NenCampaignsListProps = {
+  tab: NenTab
+  topAction?: ReactNode
+  onTabChange: (tab: NenTab) => void
+  settings: NenCampaignSetting[]
+  columns: NenColumn[]
+  columnsTotal: number | null
+  kpis: NenKpis | null
+  flowMetrics: NenFlowMetrics | null
+  columnMetrics: NenColumnMetrics | null
+  deliveryList: NenDeliveryList | null
+  deliveryDetail: NenDeliveryDetail | null
+  friends: FriendOption[]
+  testFriendId: string
+  onTestFriendChange: (id: string) => void
+  accountId: string | null
+  loading: boolean
+  tabError?: string
+  onRetryTab?: () => void
+  kpisFailed?: boolean
+  notice: { tone: 'success' | 'error'; text: string } | null
+  saving: string | null
+  testing: string | null
+  previewCampaignKey: string | null
+  onPreviewCampaign: (key: string | null) => void
+  onToggleSetting: (setting: NenCampaignSetting) => void
+  onTestSend: (setting: NenCampaignSetting) => void
+  coupon: NenCoupon
+  couponOpen: boolean
+  onCouponOpenChange: (open: boolean) => void
+  onCouponChange: (coupon: NenCoupon) => void
+  onSaveCoupon: () => void
+  savingCoupon: boolean
+  selectedColumnId: string | null
+  onSelectColumn: (id: string | null) => void
+  audienceCount: number | null
+  plan: ColumnDeliveryPlan
+  onPlanChange: (plan: ColumnDeliveryPlan) => void
+  introDraft: string
+  onIntroChange: (text: string) => void
+  onSaveIntro: (column: NenColumn) => void
+  savingColumnId: string | null
+  onDeliverColumn: (column: NenColumn, scheduledAt?: string) => void
+  onDuplicateColumn: (column: NenColumn) => void
+  duplicatingColumnId?: string | null
+  onTestColumn: (column: NenColumn) => void
+  onShowDelivery: (id: string) => void
+  onRetryDelivery: (id: string, version: number, reason: string) => void
+  onChangeDeliveryView: (status?: string, cursor?: string, q?: string) => void
+}
+
+const BOARD: Record<NenTab, string> = { auto: 'MuhWR', paused: 'MuhWR', columns: 'Jxmqh', history: 'Tj7n4' }
+const PAGE_SIZES = [10, 20, 50]
+const NO_MANAGE_NOTE = '閲覧のみのため変えられません。変える操作は管理者に頼んでください。'
+
+/* 自動配信の CSV（一覧に出ている決めごとをそのまま出す）。 */
+function autoSettingsToCsv(settings: NenCampaignSetting[], sentByKey: Map<string, number>): string {
+  const header = ['配信名', 'きっかけ', '対象', '状態', '今月送信（通）']
+  const lines = settings.map((setting) => [
+    setting.label,
+    formatCampaignTiming(setting),
+    formatCampaignAudience(setting),
+    setting.isEnabled ? '動いている' : '止めている',
+    String(sentByKey.get(setting.campaignKey) ?? 0),
+  ].map(csvCell).join(','))
+  return `﻿${[header.join(','), ...lines].join('\n')}`
+}
+
+function downloadCsv(text: string, name: string) {
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** 件数の文（「7件中 1〜7件」）。 */
+function rangeText(total: number, page: number, size: number): string {
+  if (total === 0) return '0件'
+  return `${formatNumber(total)}件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)}件`
+}
+
+/** 状態の札（点＋文字）。tone は 動いている＝ok・予約中＝info・止めている／送っていない＝off。 */
+function Pill({ tone, children }: { tone: 'ok' | 'info' | 'off' | 'danger'; children: ReactNode }) {
+  return (
+    <span className={styles.pill} data-tone={tone}>
+      <span className={styles.pillDot} aria-hidden="true" />
+      {children}
+    </span>
+  )
+}
+
+/** 行の右端の「…」。押すと行の操作のメニュー（右クリックだけにしない）。 */
+function RowMenu({ subject, items }: { subject: string; items: ActionMenuItem[] }) {
+  const [open, setOpen] = useState(false)
+  const anchorRef = useRef<HTMLButtonElement | null>(null)
+  if (items.length === 0) return <span className={styles.menuSpace} aria-hidden="true" />
+  return (
+    <span className={styles.menuBox}>
+      <button
+        ref={anchorRef}
+        type="button"
+        className={styles.menuButton}
+        aria-label={`「${subject}」の操作`}
+        title={`「${subject}」の操作`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <MoreHorizontal size={16} aria-hidden="true" />
+      </button>
+      <ActionMenu open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} ariaLabel={`「${subject}」の操作`} items={items} />
+    </span>
+  )
+}
+
+/** 表の下の件数とページ送り。2ページ以上は共通のページ送り（件数の文つき）、1ページでも件数は出す。 */
+function Pager({ total, page, size, onPage }: { total: number; page: number; size: number; onPage: (page: number) => void }) {
+  const pageCount = Math.max(1, Math.ceil(total / size))
+  return (
+    <div className={styles.pagerRow}>
+      {pageCount > 1 ? (
+        <Pagination page={page} pageCount={pageCount} onPageChange={onPage} summary={rangeText(total, page, size)} />
+      ) : (
+        <div className={styles.pager}>
+          <span className={styles.pagerCount}>{rangeText(total, page, size)}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function NenCampaignsList(props: NenCampaignsListProps) {
+  const { tab, settings, columns, kpis, loading } = props
+  const staffRole = useStaffRole()
+  const canEdit = staffRole === null || canManageRole(staffRole)
+
+  // コラムは自分のタブを持つので、自動配信の表には出さない。
+  const autoSettings = useMemo(() => settings.filter((setting) => setting.category !== 'column'), [settings])
+  const enabledCount = autoSettings.filter((setting) => setting.isEnabled).length
+  const pausedCount = autoSettings.length - enabledCount
+  const publishedCount = columns.filter((column) => column.publishedAt != null).length
+  const columnTotal = props.columnsTotal ?? columns.length
+  const sentByKey = useMemo(
+    () => new Map((props.flowMetrics?.flows ?? []).map((flow) => [flow.campaignKey, flow.sent])),
+    [props.flowMetrics],
+  )
+  const tabError = props.tabError ?? ''
+
+  const exportCsv = () => downloadCsv(autoSettingsToCsv(autoSettings, sentByKey), `nen-auto-${new Date().toISOString().slice(0, 10)}.csv`)
+
+  const actions = tab === 'columns'
+    ? (canEdit ? <Button href="/nen-campaigns/columns/new"><PenLine size={15} aria-hidden="true" />コラムを書く</Button> : null)
+    : <Button type="button" onClick={exportCsv} disabled={autoSettings.length === 0}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+
+  // 取れていないタブの件数に 0 を出さない。
+  const countLabel = (base: string, count: number) => (tabError || (loading && settings.length === 0) ? base : `${base} ${count}`)
+  const tabs = (
+    <div className={styles.tabs}>
+      <Tabs
+        label="NEN配信の種類"
+        items={[
+          { label: countLabel('自動配信', autoSettings.length), current: tab === 'auto', onClick: () => props.onTabChange('auto') },
+          { label: countLabel('コラム', columnTotal), current: tab === 'columns', onClick: () => props.onTabChange('columns') },
+          { label: countLabel('停止中', pausedCount), current: tab === 'paused', onClick: () => props.onTabChange('paused') },
+          { label: '送った履歴', current: tab === 'history', onClick: () => props.onTabChange('history') },
+        ]}
+      />
+    </div>
+  )
+
+  const kpiPending = loading && kpis === null
+  const kpiMissing = props.kpisFailed ? '読み込めませんでした' : kpiPending ? '読み込んでいます' : '—'
+  const sentDiff = kpis?.sentThisMonth != null && kpis.sentLastMonth != null ? kpis.sentThisMonth - kpis.sentLastMonth : null
+  const openDetail = tab === 'history' ? '配信ごとの開封の集計から' : tab === 'columns' ? 'コラムを開いた割合' : '自動配信は開封を取れません（コラムだけ）'
+  const stats = (
+    <>
+      {!canEdit ? (
+        <div className={styles.viewerBand} role="status">
+          <Eye size={16} aria-hidden="true" />
+          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+        </div>
+      ) : null}
+      <KpiBand data-design="KPIs" className={styles.band}>
+        <KpiCard presentation="band" title="自動配信" icon={<History size={13} aria-hidden="true" />} help="注文・発送・誕生日などのきっかけで送る配信の数です。" value={settings.length === 0 && loading ? null : autoSettings.length} unit="件" detail={settings.length === 0 && loading ? kpiMissing : `動いている ${enabledCount}・止めている ${pausedCount}`} />
+        <KpiCard presentation="band" title="今月送った" icon={<CircleHelp size={13} aria-hidden="true" />} help="今月（日本時間の月初から）送った通数です。" value={kpis?.sentThisMonth ?? null} unit={kpis?.sentThisMonth == null ? '' : '通'} detail={sentDiff == null ? kpiMissing : `先月より ${sentDiff >= 0 ? '+' : ''}${formatNumber(sentDiff)}`} />
+        <KpiCard presentation="band" title={tab === 'history' ? '取得不可' : '開封（コラムを開いた割合）'} icon={<CircleHelp size={13} aria-hidden="true" />} help={tab === 'history' ? '配信ごとの開封は LINE から取れません。数はコラムの記事を開いた割合です。' : 'コラムの記事を開いた割合です。自動配信は LINE から一人ずつの開封を取れません。'} value={kpis?.openRate ?? null} unit={kpis?.openRate == null ? '' : '%'} detail={kpis ? openDetail : kpiMissing} />
+        <KpiCard presentation="band" title="コラム" icon={<Undo2 size={13} aria-hidden="true" />} help="外部サイトの記事へつなぐコラムの本数です。" value={columns.length === 0 && loading ? null : columnTotal} unit="本" detail={columns.length === 0 && loading ? kpiMissing : `公開中 ${publishedCount}・下書き ${columns.length - publishedCount}`} />
+      </KpiBand>
+    </>
+  )
+
+  return (
+    <ListPage
+      boardId={BOARD[tab]}
+      headingSize="regular"
+      title="NEN配信"
+      description="ネットショップの注文や誕生日に合わせて、決まったメッセージやコラムを自動で送ります。"
+      actions={actions}
+      tabs={tabs}
+      stats={stats}
+      overlays={(
+        <CouponDrawer
+          open={props.couponOpen}
+          coupon={props.coupon}
+          saving={props.savingCoupon}
+          canEdit={canEdit}
+          onClose={() => props.onCouponOpenChange(false)}
+          onChange={props.onCouponChange}
+          onSave={props.onSaveCoupon}
+        />
+      )}
+    >
+      {props.notice ? (
+        <div className={styles.noticeRow}>
+          <Notice tone={props.notice.tone === 'success' ? 'success' : 'danger'} message={props.notice.text} />
+        </div>
+      ) : null}
+      {tab === 'columns' ? (
+        <ColumnsTab {...props} canEdit={canEdit} />
+      ) : tab === 'history' ? (
+        <HistoryTab {...props} canEdit={canEdit} />
+      ) : (
+        <AutoTab {...props} canEdit={canEdit} autoSettings={autoSettings} sentByKey={sentByKey} pausedOnly={tab === 'paused'} />
+      )}
+    </ListPage>
+  )
+}
+
+/* ───────────── 自動配信・停止中（MuhWR） ───────────── */
+
+type AutoFilter = '' | 'follow_up' | 'birthday' | 'off'
+
+function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings: NenCampaignSetting[]; sentByKey: Map<string, number>; pausedOnly: boolean }) {
+  const { autoSettings, sentByKey, pausedOnly, canEdit, kpis } = props
+  const tabError = props.tabError ?? ''
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<AutoFilter>('')
+  const [saved, setSaved] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [savedOpen, setSavedOpen] = useState(false)
+  const savedRef = useRef<HTMLSpanElement | null>(null)
+
+  const followUpCount = autoSettings.filter((s) => s.category === 'follow_up').length
+  const birthdayCount = autoSettings.filter((s) => s.category === 'birthday').length
+  const offCount = autoSettings.filter((s) => !s.isEnabled).length
+  const visible = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase()
+    return autoSettings
+      .filter((setting) => {
+        if (pausedOnly && setting.isEnabled) return false
+        if (filter === 'follow_up' && setting.category !== 'follow_up') return false
+        if (filter === 'birthday' && setting.category !== 'birthday') return false
+        if (filter === 'off' && setting.isEnabled) return false
+        if (saved && setting.category !== saved) return false
+        if (q && !`${setting.label} ${formatCampaignTiming(setting)}`.toLocaleLowerCase().includes(q)) return false
+        return true
+      })
+      // 今月多く送った順（絵の並び）。同じ数は名前順。
+      .sort((a, b) => (sentByKey.get(b.campaignKey) ?? 0) - (sentByKey.get(a.campaignKey) ?? 0) || a.label.localeCompare(b.label, 'ja'))
+  }, [autoSettings, pausedOnly, filter, saved, query, sentByKey])
+  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize))
+  const safePage = Math.min(page, pageCount)
+  const rows = visible.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const filtering = query !== '' || filter !== '' || saved !== ''
+  const pick = (next: AutoFilter) => (selected: boolean) => { setFilter(selected ? next : ''); setPage(1) }
+  const monthLabel = kpis?.monthLabel ?? ''
+
+  const savedOptions: Array<{ value: string; label: string }> = [
+    { value: 'transactional', label: '注文・発送' },
+    { value: 'follow_up', label: '注文のあと' },
+    { value: 'birthday', label: 'ペットの誕生日' },
+  ]
+
+  const menuFor = (setting: NenCampaignSetting): ActionMenuItem[] => {
+    const items: ActionMenuItem[] = []
+    if (canEdit) items.push({ id: 'edit', label: '編集', external: true, onSelect: () => { window.location.href = `/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}` } })
+    items.push({ id: 'preview', label: '中身を見る', onSelect: () => props.onPreviewCampaign(setting.campaignKey) })
+    if (canEdit) {
+      items.push({ id: 'test', label: 'テスト送信', disabled: props.testing !== null, onSelect: () => props.onTestSend(setting) })
+      if (setting.campaignKey === 'birthday_coupon') items.push({ id: 'coupon', label: 'クーポンの決めごと', onSelect: () => props.onCouponOpenChange(true) })
+      items.push(setting.isEnabled
+        ? { id: 'stop', label: '止める', disabled: props.saving === setting.campaignKey, onSelect: () => props.onToggleSetting(setting) }
+        : { id: 'start', label: '動かす', disabled: props.saving === setting.campaignKey, onSelect: () => props.onToggleSetting(setting) })
+    } else if (setting.campaignKey === 'birthday_coupon') {
+      items.push({ id: 'coupon', label: 'クーポンの決めごと', onSelect: () => props.onCouponOpenChange(true) })
+    }
+    items.push({ id: 'history', label: '送った履歴を見る', onSelect: () => props.onTabChange('history') })
+    return items
+  }
+
+  return (
+    <>
+      <div className={styles.noteRow}>
+        <Notice tone="info" message="自動配信は、注文・発送・誕生日などのきっかけで送ります。止めると、そのあとのきっかけでは送りません。" />
+      </div>
+      <div className={styles.toolsRow}>
+        <ListToolbar
+          search={{ placeholder: '配信名で探す', width: 240, value: query, onChange: (value) => { setQuery(value); setPage(1) } }}
+          filters={pausedOnly ? undefined : (
+            <div role="group" aria-label="きっかけで絞り込む" className={styles.chips}>
+              <FilterChip selected={filter === 'follow_up'} onChange={pick('follow_up')} icon={<Columns2 size={13} aria-hidden="true" />} title="注文のあとに送る配信だけ出します">{`注文のあと ${followUpCount}`}</FilterChip>
+              <FilterChip selected={filter === 'birthday'} onChange={pick('birthday')} icon={<CalendarDays size={13} aria-hidden="true" />} title="ペットの誕生日に送る配信だけ出します">{`誕生日 ${birthdayCount}`}</FilterChip>
+              <FilterChip selected={filter === 'off'} onChange={pick('off')} icon={<CalendarDays size={13} aria-hidden="true" />} title="止めている配信だけ出します">{`止めている ${offCount}`}</FilterChip>
+            </div>
+          )}
+          trailing={(
+            <>
+              <span ref={savedRef} className={styles.savedBox}>
+                <Button type="button" aria-haspopup="menu" aria-expanded={savedOpen} onClick={() => setSavedOpen((current) => !current)}>
+                  <Bookmark size={15} aria-hidden="true" />{saved ? savedOptions.find((option) => option.value === saved)?.label : 'よく使う絞り込み'}
+                </Button>
+                <ActionMenu
+                  open={savedOpen}
+                  onClose={() => setSavedOpen(false)}
+                  anchorRef={savedRef}
+                  ariaLabel="よく使う絞り込み"
+                  items={[
+                    ...savedOptions.map((option) => ({ id: option.value, label: option.label, onSelect: () => { setSaved(option.value); setPage(1); setSavedOpen(false) } })),
+                    ...(saved ? [{ id: 'clear', label: '絞り込みを外す', onSelect: () => { setSaved(''); setPage(1); setSavedOpen(false) } }] : []),
+                  ]}
+                />
+              </span>
+              <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} />
+            </>
+          )}
+        />
+      </div>
+
+      {props.loading && autoSettings.length === 0 && !tabError ? (
+        <ListState kind="loading" title="自動配信を読み込んでいます" />
+      ) : tabError ? (
+        <ListState kind="error" title="自動配信を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={props.onRetryTab} />
+      ) : rows.length === 0 ? (
+        filtering ? (
+          <ListState kind="empty" title="条件に合う配信はありません" description="検索や絞り込みを外すと、すべて出ます。" action={<Button onClick={() => { setQuery(''); setFilter(''); setSaved(''); setPage(1) }}>条件を外す</Button>} />
+        ) : (
+          <ListState kind="empty" emptyPreset="readonly" title={pausedOnly ? '止めている配信はありません' : '自動配信はまだありません'} description={pausedOnly ? 'すべての自動配信が動いています。' : '決めごとができると、ここに並びます。'} />
+        )
+      ) : (
+        <>
+          <DataTable className={styles.table}>
+            <thead>
+              <TableHeadRow className={styles.headRow} data-table-layout="columns">
+                <Th className={styles.colName}>配信</Th>
+                <Th className={styles.colTrigger}>きっかけ</Th>
+                <Th className={styles.colTarget}>対象</Th>
+                <Th className={styles.colSent}>{monthLabel ? `${monthLabel} 送信` : '今月 送信'}</Th>
+                <Th className={styles.colOrders}>注文</Th>
+                <Th className={styles.colState}>状態</Th>
+                <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
+              </TableHeadRow>
+            </thead>
+            <tbody>
+              {rows.map((setting) => {
+                const sent = sentByKey.get(setting.campaignKey)
+                const timing = formatCampaignTiming(setting)
+                const audience = formatCampaignAudience(setting)
+                return (
+                  <Tr key={setting.campaignKey} className={styles.row} data-table-layout="columns">
+                    <Td className={styles.colName}>
+                      {canEdit ? (
+                        <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} title={setting.label}>{setting.label}</Link>
+                      ) : (
+                        <button type="button" className={styles.name} title={setting.label} onClick={() => props.onPreviewCampaign(setting.campaignKey)}>{setting.label}</button>
+                      )}
+                    </Td>
+                    <Td className={styles.colTrigger}><span className={styles.cell} title={timing}>{timing}</span></Td>
+                    <Td className={styles.colTarget}><span className={styles.cell} title={audience}>{audience}</span></Td>
+                    <Td className={styles.colSent}><span className={styles.num}>{sent == null ? '—' : formatNumber(sent)}</span></Td>
+                    <Td className={styles.colOrders}><span className={styles.num} title="配信からの注文は配信ごとに取れていません">—</span></Td>
+                    <Td className={styles.colState}>{props.saving === setting.campaignKey ? <Pill tone="off">切り替え中</Pill> : setting.isEnabled ? <Pill tone="ok">動いている</Pill> : <Pill tone="off">止めている</Pill>}</Td>
+                    <Td className={styles.colMenu}><RowMenu subject={setting.label} items={menuFor(setting)} /></Td>
+                  </Tr>
+                )
+              })}
+            </tbody>
+          </DataTable>
+          <Pager total={visible.length} page={safePage} size={pageSize} onPage={setPage} />
+          <p className={styles.hint}>{canEdit ? '行の「…」から 編集・テスト送信・止める・送った履歴を見る。' : '行の「…」から 中身・送った履歴を見る。'}</p>
+        </>
+      )}
+      <CampaignPreviewDrawer {...props} canEdit={canEdit} />
+    </>
+  )
+}
+
+/** 配信の中身（行の「…」→ 中身を見る）。お客様ごとの情報は見本に置き換える。 */
+function CampaignPreviewDrawer(props: NenCampaignsListProps & { canEdit: boolean }) {
+  const setting = props.previewCampaignKey ? props.settings.find((item) => item.campaignKey === props.previewCampaignKey) ?? null : null
+  return (
+    <Drawer
+      open={setting !== null}
+      title={setting ? `${setting.label}の中身` : '配信の中身'}
+      description="お客様ごとの情報は見本に置き換えています。"
+      onClose={() => props.onPreviewCampaign(null)}
+      footer={setting && props.canEdit ? (
+        <div className={styles.drawerFoot}>
+          <TestRecipientPicker friends={props.friends} value={props.testFriendId} onChange={props.onTestFriendChange} accountId={props.accountId} />
+          <Button type="button" variant="primary" disabled={!props.testFriendId || props.testing === setting.campaignKey} busy={props.testing === setting.campaignKey} busyLabel="送信中…" onClick={() => props.onTestSend(setting)}>自分にテストを送る</Button>
+        </div>
+      ) : undefined}
+    >
+      {setting ? (
+        <div className={styles.drawerBody}>
+          <p className={styles.muted}>{formatCampaignTiming(setting)}に、{formatCampaignAudience(setting)}へ届きます。</p>
+          <div className={styles.sample}>
+            <span className={styles.sampleLabel}>届く見本</span>
+            <strong className={styles.sampleTitle}>{setting.title}</strong>
+            <span className={styles.sampleText}>{setting.bodyText}</span>
+            {setting.buttonLabel ? <span className={styles.sampleText}>▶ {setting.buttonLabel}</span> : null}
+          </div>
+          <p className={styles.muted}>テスト送信は「設定 › アカウント › テスト送信先」に登録した、友だち追加中の人にだけ送ります。</p>
+        </div>
+      ) : null}
+    </Drawer>
+  )
+}
+
+/** テスト送信先。登録した人だけを候補にし、いなければ登録先へ案内する。 */
+function TestRecipientPicker({ friends, value, onChange, accountId }: { friends: FriendOption[]; value: string; onChange: (id: string) => void; accountId: string | null }) {
+  if (friends.length === 0) {
+    return (
+      <span className={styles.muted}>
+        テスト送信先が未登録です
+        {accountId ? <> <Link className={styles.link} href={`/accounts/detail?id=${encodeURIComponent(accountId)}`}>テスト送信先を登録する</Link></> : null}
+      </span>
+    )
+  }
+  return <Select aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))} />
+}
+
+/* ───────────── 誕生日クーポンの決めごと（oqSJP） ───────────── */
+
+function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave }: {
+  open: boolean
+  coupon: NenCoupon
+  saving: boolean
+  canEdit: boolean
+  onClose: () => void
+  onChange: (coupon: NenCoupon) => void
+  onSave: () => void
+}) {
+  const prefix = coupon.codePrefix || 'NENBDAY'
+  const leapLabel = coupon.leapYearPolicy === 'mar1' ? '3月1日に送る' : coupon.leapYearPolicy === 'skip' ? 'その年は送らない' : '2月28日に送る'
+  // 閲覧のみの人には、押せない入力欄を置かずに値だけ見せる。
+  if (!canEdit) {
+    return (
+      <Drawer
+        open={open}
+        title="誕生日クーポンの決めごと"
+        description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
+        onClose={onClose}
+        details={[
+          { label: 'クーポンを付ける', value: coupon.isEnabled ? '付ける' : '付けない' },
+          { label: '特典の名前', value: coupon.benefitLabel || '—' },
+          { label: '割引額', value: `${formatNumber(coupon.discountAmount || 0)}円` },
+          { label: '使える日数', value: `${coupon.validityDays || 0}日` },
+          { label: 'コードの頭の文字', value: prefix },
+          { label: '2月29日生まれの子への平年の扱い', value: leapLabel },
+        ]}
+      />
+    )
+  }
+  return (
+    <Drawer
+      open={open}
+      title="誕生日クーポンの決めごと"
+      description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
+      busy={saving}
+      onClose={onClose}
+      footer={(
+        <div className={styles.drawerFoot}>
+          <Button type="button" disabled={saving} onClick={onClose}>キャンセル</Button>
+          <Button type="button" variant="primary" disabled={saving} busy={saving} busyLabel="保存中…" onClick={onSave}>設定を保存する</Button>
+        </div>
+      )}
+    >
+      <div className={styles.couponForm}>
+        <div className={styles.couponSwitch}>
+          <Toggle checked={coupon.isEnabled} label="クーポンを付ける" onChange={(next) => onChange({ ...coupon, isEnabled: next })} />
+          <div className={styles.couponSwitchText}>
+            <strong>クーポンを付ける</strong>
+            <span>切ると、誕生日のメッセージだけが届きます</span>
+          </div>
+        </div>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>特典の名前</span>
+          <TextField value={coupon.benefitLabel} maxLength={40} onChange={(event) => onChange({ ...coupon, benefitLabel: event.target.value })} />
+        </label>
+        <div className={styles.fieldPair}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>割引額（円）</span>
+            <TextField type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>使える日数</span>
+            <TextField type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
+          </label>
+        </div>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>コードの頭の文字（10文字まで・大文字）</span>
+          <TextField value={coupon.codePrefix} maxLength={10} title="半角大文字・数字・- で3〜10文字" onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />
+        </label>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>2月29日生まれの子への平年の扱い</span>
+          <Select
+            aria-label="2月29日生まれの子への平年の扱い"
+            size="full"
+            value={coupon.leapYearPolicy}
+            onChange={(value) => onChange({ ...coupon, leapYearPolicy: value === 'mar1' || value === 'skip' ? value : 'feb28' })}
+            options={[{ value: 'feb28', label: '2月28日に送る' }, { value: 'mar1', label: '3月1日に送る' }, { value: 'skip', label: 'その年は送らない' }]}
+          />
+        </div>
+        <div className={styles.sample}>
+          <span className={styles.sampleLabel}>届く見本</span>
+          <strong className={styles.sampleTitle}>{`${coupon.benefitLabel || 'お誕生日クーポン'} ${formatNumber(coupon.discountAmount || 0)}円引き`}</strong>
+          <span className={styles.sampleCode}>{`コード ${prefix}-1234・使える日数 ${coupon.validityDays || 0}日`}</span>
+        </div>
+        <p className={styles.muted}>クーポンが使われた記録は「コンバージョン」で確認できます。</p>
+      </div>
+    </Drawer>
+  )
+}
+
+/* ───────────── コラム（Jxmqh） ───────────── */
+
+type ColumnFilter = '' | 'published' | 'draft' | 'category'
+
+function columnBadge(column: NenColumn, sent: number | null) {
+  if (column.deliveryStatus === 'sent') return <Pill tone="ok">{sent == null ? '送信済み' : `送信済み ${formatNumber(sent)}`}</Pill>
+  if (column.deliveryStatus === 'scheduled') return <Pill tone="info">予約中</Pill>
+  if (column.deliveryStatus === 'queued') return <Pill tone="info">配信待ち</Pill>
+  return <Pill tone="off">送っていない</Pill>
+}
+
+function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
+  const { columns, columnMetrics, canEdit } = props
+  const tabError = props.tabError ?? ''
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<ColumnFilter>('')
+  const [category, setCategory] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [savedOpen, setSavedOpen] = useState(false)
+  const savedRef = useRef<HTMLSpanElement | null>(null)
+
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const column of columns) {
+      const key = column.category?.trim() || '分類なし'
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])
+  }, [columns])
+  const topCategory = categories[0] ?? null
+  const publishedCount = columns.filter((c) => c.publishedAt != null).length
+  const metricById = useMemo(() => new Map((columnMetrics?.columns ?? []).map((row) => [row.id, row])), [columnMetrics])
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase()
+    return columns.filter((column) => {
+      if (filter === 'published' && column.publishedAt == null) return false
+      if (filter === 'draft' && column.publishedAt != null) return false
+      const cat = column.category?.trim() || '分類なし'
+      if (filter === 'category' && topCategory && cat !== topCategory[0]) return false
+      if (category && cat !== category) return false
+      if (q && !`${column.title} ${column.excerpt} ${column.category ?? ''}`.toLocaleLowerCase().includes(q)) return false
+      return true
+    })
+  }, [columns, filter, category, topCategory, query])
+  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize))
+  const safePage = Math.min(page, pageCount)
+  const rows = visible.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const filtering = query !== '' || filter !== '' || category !== ''
+  const pick = (next: ColumnFilter) => (selected: boolean) => { setFilter(selected ? next : ''); setPage(1) }
+
+  const menuFor = (column: NenColumn): ActionMenuItem[] => canEdit ? [
+    { id: 'reserve', label: 'この内容で予約する', onSelect: () => props.onSelectColumn(column.id) },
+    { id: 'duplicate', label: '複製', disabled: props.duplicatingColumnId === column.id, onSelect: () => props.onDuplicateColumn(column) },
+    { id: 'test', label: 'テスト送信', disabled: props.testing !== null, onSelect: () => props.onTestColumn(column) },
+  ] : [
+    { id: 'open', label: '中身を見る', onSelect: () => props.onSelectColumn(column.id) },
+  ]
+
+  return (
+    <div className={styles.inset}>
+      <div className={styles.noteRow}>
+        <Notice tone="info" message="コラムは外部サイトの記事へつなぐカードです。書いたあと、一覧の「この内容で予約する」で LINE に配信します。" />
+      </div>
+      <div className={styles.toolsRow}>
+        <ListToolbar
+          search={{ placeholder: 'コラムを探す', width: 240, value: query, onChange: (value) => { setQuery(value); setPage(1) } }}
+          filters={(
+            <div role="group" aria-label="コラムを絞り込む" className={styles.chips}>
+              <FilterChip selected={filter === 'published'} onChange={pick('published')} icon={<Columns2 size={13} aria-hidden="true" />} title="公開中のコラムだけ出します">{`公開中 ${publishedCount}`}</FilterChip>
+              <FilterChip selected={filter === 'draft'} onChange={pick('draft')} icon={<CalendarDays size={13} aria-hidden="true" />} title="下書きのコラムだけ出します">{`下書き ${columns.length - publishedCount}`}</FilterChip>
+              {topCategory ? (
+                <FilterChip selected={filter === 'category'} onChange={pick('category')} icon={<CalendarDays size={13} aria-hidden="true" />} title={`分類「${topCategory[0]}」のコラムだけ出します`}>{`${topCategory[0]} ${topCategory[1]}`}</FilterChip>
+              ) : null}
+            </div>
+          )}
+          trailing={(
+            <>
+              <span ref={savedRef} className={styles.savedBox}>
+                <Button type="button" aria-haspopup="menu" aria-expanded={savedOpen} onClick={() => setSavedOpen((current) => !current)}>
+                  <Bookmark size={15} aria-hidden="true" />{category || 'よく使う絞り込み'}
+                </Button>
+                <ActionMenu
+                  open={savedOpen}
+                  onClose={() => setSavedOpen(false)}
+                  anchorRef={savedRef}
+                  ariaLabel="よく使う絞り込み"
+                  items={[
+                    ...categories.map(([name, count]) => ({ id: name, label: `${name} ${count}`, onSelect: () => { setCategory(name); setPage(1); setSavedOpen(false) } })),
+                    ...(category ? [{ id: 'clear', label: '絞り込みを外す', onSelect: () => { setCategory(''); setPage(1); setSavedOpen(false) } }] : []),
+                  ]}
+                />
+              </span>
+              <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} />
+            </>
+          )}
+        />
+      </div>
+
+      {props.loading && columns.length === 0 && !tabError ? (
+        <ListState kind="loading" title="コラムを読み込んでいます" />
+      ) : tabError ? (
+        <ListState kind="error" title="コラムを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={props.onRetryTab} />
+      ) : rows.length === 0 ? (
+        filtering ? (
+          <ListState kind="empty" title="条件に合うコラムはありません" description="検索や絞り込みを外すと、すべて出ます。" action={<Button onClick={() => { setQuery(''); setFilter(''); setCategory(''); setPage(1) }}>条件を外す</Button>} />
+        ) : (
+          <ListState kind="empty" emptyPreset="readonly" title="コラムはまだありません" description={canEdit ? '右上の「コラムを書く」から下書きを作ると、ここに並びます。' : 'コラムが書かれると、ここに並びます。'} />
+        )
+      ) : (
+        <>
+          <DataTable className={styles.table}>
+            <thead>
+              <TableHeadRow className={styles.headRow} data-table-layout="columns">
+                <Th className={styles.colName}>コラム</Th>
+                <Th className={styles.colCategory}>分類</Th>
+                <Th className={styles.colDate}>公開日</Th>
+                <Th className={styles.colLine}>LINE 配信</Th>
+                <Th className={styles.colViews}>閲覧</Th>
+                <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
+              </TableHeadRow>
+            </thead>
+            <tbody>
+              {rows.map((column) => {
+                const metric = metricById.get(column.id)
+                const views = metric?.articleOpened.value
+                const draft = column.publishedAt == null
+                return (
+                  <Tr key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id}>
+                    <Td className={styles.colName}>
+                      <span className={styles.nameStack}>
+                        <button type="button" className={styles.name} title={column.title} onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>
+                        {draft ? <span className={styles.sub}>下書き</span> : null}
+                      </span>
+                    </Td>
+                    <Td className={styles.colCategory}><span className={styles.cell}>{column.category?.trim() || '分類なし'}</span></Td>
+                    <Td className={styles.colDate}><span className={styles.cell}>{column.publishedAt ? jstMonthDay(column.publishedAt) : column.deliveryAt ? `${jstMonthDay(column.deliveryAt)} 予定` : '—'}</span></Td>
+                    <Td className={styles.colLine}>{columnBadge(column, metric?.sent ?? null)}</Td>
+                    <Td className={styles.colViews}><span className={styles.num}>{views == null ? '—' : formatNumber(views)}</span></Td>
+                    <Td className={styles.colMenu}><RowMenu subject={column.title} items={menuFor(column)} /></Td>
+                  </Tr>
+                )
+              })}
+            </tbody>
+          </DataTable>
+          <Pager total={visible.length} page={safePage} size={pageSize} onPage={setPage} />
+          {props.columnsTotal != null && props.columnsTotal > columns.length ? (
+            <div className={styles.noteRow}>
+              <Notice tone="warn" message={`コラムは${formatNumber(props.columnsTotal)}本ありますが、${columns.length}本までしか読み込んでいません。探すときは検索を使ってください。`} />
+            </div>
+          ) : null}
+          <p className={styles.hint}>{canEdit ? '行の「…」から この内容で予約する・複製・テスト送信。' : '行の「…」から 中身を見る。'}</p>
+        </>
+      )}
+      <SelectedColumn {...props} />
+    </div>
+  )
+}
+
+/** 選んだコラム（表の下）。LINE に届く紹介文と、送る相手・時刻を決める。予約は確認の窓を挟む。 */
+function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
+  const { columns, selectedColumnId, plan, audienceCount, introDraft, canEdit } = props
+  const selected = columns.find((column) => column.id === selectedColumnId) ?? null
+  const [confirm, setConfirm] = useState<{ column: NenColumn; scheduledAt?: string } | null>(null)
+  if (!selected) return null
+  const scheduledIso = plan.when === 'schedule' ? publishedAtIso(plan.scheduledAt) : null
+  const schedulePast = plan.when === 'schedule' && isPastScheduledAt(plan.scheduledAt)
+  const scheduleInvalid = plan.when === 'schedule' && (!scheduledIso || schedulePast)
+  const columnEnabled = props.settings.some((setting) => setting.campaignKey === 'column' && setting.isEnabled)
+  const audience = `${selected.targetMode === 'tag' ? 'タグで絞り込み' : '友だち 全員'}（${num(audienceCount)}人）`
+
+  return (
+    <section className={styles.selectPanel} aria-label={`選んだコラム：${selected.title}`}>
+      <h2 className={styles.selectTitle}>{`選んだコラム：${selected.title}`}</h2>
+      <p className={styles.muted}>LINE に届くカードと、送る相手・時刻を決めます。</p>
+      <div className={styles.selectGrid}>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>LINE に出る紹介文</span>
+          <TextArea aria-label="LINE に出る紹介文" value={introDraft} rows={3} maxLength={1500} readOnly={!canEdit} onChange={(event) => props.onIntroChange(event.target.value)} />
+          {canEdit ? (
+            <span className={styles.buttonRow}>
+              <Button type="button" disabled={introDraft === selected.introText || props.savingColumnId === selected.id || !introDraft.trim()} busy={props.savingColumnId === selected.id} busyLabel="保存中…" onClick={() => props.onSaveIntro(selected)}>紹介文を保存する</Button>
+              <Button type="button" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)}>{props.duplicatingColumnId === selected.id ? '複製しています' : '同じ形で書く'}</Button>
+              <span className={styles.muted}>{`${introDraft.length}／1500文字`}</span>
+            </span>
+          ) : null}
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>だれに</span>
+          <span className={styles.cell}>{audience}</span>
+          <span className={styles.muted}>送る相手はコラムを作るときに決めます。友だち解除・ブロックの人には送られません。</span>
+          {canEdit ? (
+            <>
+              <span className={styles.fieldLabel}>いつ</span>
+              <span className={styles.radioRow} role="radiogroup" aria-label="いつ送るか">
+                <Radio name="nen-deliver-when-v8" checked={plan.when === 'now'} onChange={() => props.onPlanChange({ ...plan, when: 'now' })}>今すぐ</Radio>
+                <Radio name="nen-deliver-when-v8" checked={plan.when === 'schedule'} onChange={() => props.onPlanChange({ ...plan, when: 'schedule' })}>日時を予約</Radio>
+              </span>
+              {plan.when === 'schedule' ? (
+                <>
+                  <span className={styles.fieldLabel}>送る日時</span>
+                  <DateTimeField aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(value) => props.onPlanChange({ ...plan, scheduledAt: value })} />
+                  {schedulePast ? <span className={styles.error} role="alert">予約日時が過去になっています。いまより先の日時を選んでください。</span> : null}
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      </div>
+      {!columnEnabled ? <p className={styles.muted}>コラムの配信が停止中のため、いまは送れません。</p> : null}
+      {canEdit ? (
+        <div className={styles.selectFoot}>
+          <TestRecipientPicker friends={props.friends} value={props.testFriendId} onChange={props.onTestFriendChange} accountId={props.accountId} />
+          <Button type="button" disabled={!props.testFriendId || props.testing !== null} busy={props.testing === selected.id} busyLabel="送信中…" onClick={() => props.onTestColumn(selected)}>自分にテストを送る</Button>
+          <Button type="button" variant="primary" disabled={!columnEnabled || scheduleInvalid} onClick={() => setConfirm({ column: selected, scheduledAt: scheduledIso ?? undefined })}>配信を予約する</Button>
+        </div>
+      ) : null}
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.scheduledAt ? `「${confirm.column.title}」を配信予約しますか？` : `「${confirm?.column.title ?? ''}」を今すぐ配信しますか？`}
+        description={confirm?.scheduledAt
+          ? `${jstDateTime(confirm.scheduledAt)}（日本時間）に、${audienceCount == null ? '対象' : `約${num(audienceCount)}人`}の友だちへ送ります。`
+          : `すぐに配信待ちに入り、${audienceCount == null ? '対象' : `約${num(audienceCount)}人`}の友だちへ送られます。`}
+        confirmLabel={confirm?.scheduledAt ? '予約する' : '送る'}
+        onConfirm={() => { if (confirm) props.onDeliverColumn(confirm.column, confirm.scheduledAt); setConfirm(null) }}
+        onCancel={() => setConfirm(null)}
+      />
+    </section>
+  )
+}
+
+/* ───────────── 送った履歴（Tj7n4） ───────────── */
+
+type HistoryFilter = 'all' | 'sent' | 'pending' | 'failed' | 'skipped'
+
+function historyStatus(filter: HistoryFilter): string | undefined {
+  if (filter === 'all') return undefined
+  if (filter === 'pending') return 'pending,processing'
+  return filter
+}
+
+function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
+  const { deliveryList, deliveryDetail, canEdit } = props
+  const tabError = props.tabError ?? ''
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<HistoryFilter>('all')
+  const [reasons, setReasons] = useState<Record<string, string>>({})
+  const [retryFocusId, setRetryFocusId] = useState<string | null>(null)
+  const shown = deliveryList?.deliveries ?? []
+  const summary = deliveryList?.summary
+  const cursor = Number(deliveryList?.pagination.cursor ?? 0)
+  const limit = deliveryList?.pagination.limit ?? 20
+  const total = deliveryList?.pagination.total ?? 0
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const changeQuery = (value: string) => {
+    setQuery(value)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    // 履歴の検索はサーバ全体へ効く。打つたびに呼ばず、手が止まってから1回。
+    searchTimer.current = setTimeout(() => props.onChangeDeliveryView(historyStatus(filter), undefined, value.trim()), 400)
+  }
+  const chip = (value: HistoryFilter, label: string) => (
+    <FilterChip key={value} selected={filter === value} onChange={(selected) => { const next = selected ? value : 'all'; setFilter(next); props.onChangeDeliveryView(historyStatus(next), undefined, query.trim()) }}>{label}</FilterChip>
+  )
+  const page = Math.floor(cursor / limit) + 1
+  const pageCount = Math.max(1, Math.ceil(total / limit))
+
+  return (
+    <div className={styles.inset}>
+      <div className={styles.noteRow}>
+        <Notice tone="info" message="いつ・だれに・何を送ったかの記録です。届かなかったものも、ここで理由が分かります。" />
+      </div>
+      <div className={styles.toolsRow}>
+        <ListToolbar
+          search={{ placeholder: '友だち・配信の名前で探す', width: 240, value: query, onChange: changeQuery }}
+          filters={(
+            <div role="group" aria-label="送った結果で絞り込む" className={styles.chips}>
+              {chip('sent', `送りました ${summary ? formatNumber(summary.sent) : '—'}`)}
+              {chip('pending', `これから ${summary ? formatNumber(summary.pending + summary.processing) : '—'}`)}
+              {chip('failed', `届きませんでした ${summary ? formatNumber(summary.failed) : '—'}`)}
+              {chip('skipped', `送りませんでした ${summary ? formatNumber(summary.skipped) : '—'}`)}
+            </div>
+          )}
+          trailing={<span className={styles.muted}>送った日が新しい順</span>}
+        />
+      </div>
+
+      {props.loading && !deliveryList && !tabError ? (
+        <ListState kind="loading" title="送った履歴を読み込んでいます" />
+      ) : tabError ? (
+        <ListState kind="error" title="送った履歴を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={props.onRetryTab} />
+      ) : shown.length === 0 ? (
+        filter !== 'all' || query ? (
+          <ListState kind="empty" emptyPreset="readonly" title="条件に合う履歴はありません" description="検索語や絞り込みを変えてください。" action={<Button onClick={() => { setQuery(''); setFilter('all'); props.onChangeDeliveryView(undefined, undefined, '') }}>検索と絞り込みを解除</Button>} />
+        ) : (
+          <ListState kind="empty" emptyPreset="readonly" title="送った履歴はまだありません" description="配信が予約されると、送信前からここに記録が並びます。" />
+        )
+      ) : (
+        <>
+          <DataTable className={styles.table}>
+            <thead>
+              <TableHeadRow className={styles.headRow} data-table-layout="columns">
+                <Th className={styles.colWhen}>いつ・だれに</Th>
+                <Th className={styles.colName}>配信</Th>
+                <Th className={styles.colResult}>状態</Th>
+                <Th className={styles.colCause}>きっかけ</Th>
+                <Th className={styles.colViews}>開封</Th>
+                <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
+              </TableHeadRow>
+            </thead>
+            <tbody>
+              {shown.map((delivery) => {
+                const open = deliveryDetail?.id === delivery.id
+                const retryable = canEdit && canRetryDelivery(delivery)
+                const items: ActionMenuItem[] = [
+                  { id: 'detail', label: open ? '中身を閉じる' : '中身を見る', onSelect: () => { setRetryFocusId(null); props.onShowDelivery(delivery.id) } },
+                  ...(retryable ? [{ id: 'retry', label: '再送待ちへ戻す', onSelect: () => { setRetryFocusId(delivery.id); if (!open) props.onShowDelivery(delivery.id) } }] : []),
+                ]
+                const who = `${delivery.friendName || '名前未取得'}・${delivery.lineAccountName}`
+                const tone = delivery.status === 'sent' ? 'ok' : delivery.status === 'failed' ? 'danger' : delivery.status === 'pending' || delivery.status === 'processing' ? 'info' : 'off'
+                return (
+                  <Fragment key={delivery.id}>
+                    <Tr className={styles.row} data-table-layout="columns">
+                      <Td className={styles.colWhen}>
+                        <span className={styles.nameStack}>
+                          <span className={styles.cellStrong}>{jstDateTime(delivery.sentAt || delivery.scheduledAt)}</span>
+                          <span className={styles.sub} title={who}>{who}</span>
+                        </span>
+                      </Td>
+                      <Td className={styles.colName}><span className={styles.cell} title={delivery.label}>{delivery.label}</span></Td>
+                      <Td className={styles.colResult}>
+                        <span className={styles.nameStack}>
+                          <Pill tone={tone}>{statusLabel[delivery.status] ?? '状態を確認できません'}</Pill>
+                          {delivery.unmetReason ? <span className={styles.subDanger} title={delivery.unmetReason}>{delivery.unmetReason}</span> : null}
+                        </span>
+                      </Td>
+                      <Td className={styles.colCause}><span className={styles.cell}>{deliveryTriggerLabel(delivery.campaignKey)}</span></Td>
+                      <Td className={styles.colViews}><span className={styles.num} title={delivery.reaction.reason}>取得不可</span></Td>
+                      <Td className={styles.colMenu}><RowMenu subject={delivery.label} items={items} /></Td>
+                    </Tr>
+                    {open && deliveryDetail ? (
+                      <tr className={styles.detailRow}>
+                        <td colSpan={6}>
+                          <div className={styles.detailBox}>
+                            <span className={styles.muted}>{deliveryDetail.trigger}</span>
+                            <strong className={styles.sampleTitle}>{deliveryDetail.content.title || deliveryDetail.label}</strong>
+                            <span className={styles.sampleText}>{deliveryDetail.content.bodyText || deliveryDetail.content.reason}</span>
+                            {deliveryDetail.content.buttonLabel ? <span className={styles.sampleText}>▶ {deliveryDetail.content.buttonLabel}</span> : null}
+                            {retryable ? (
+                              <label className={styles.field}>
+                                <span className={styles.fieldLabel}>再送する理由（500文字まで）</span>
+                                <TextArea value={reasons[delivery.id] ?? ''} rows={3} maxLength={500} autoFocus={retryFocusId === delivery.id} onChange={(event) => setReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} />
+                                <span className={styles.buttonRow}>
+                                  <Button type="button" variant="primary" disabled={!(reasons[delivery.id] ?? '').trim()} onClick={() => props.onRetryDelivery(delivery.id, delivery.version, reasons[delivery.id] ?? '')}>再送待ちへ戻す</Button>
+                                </span>
+                              </label>
+                            ) : delivery.status === 'skipped' ? (
+                              <span className={styles.muted}>{skippedNoRetryNote[delivery.unmetReasonCode ?? ''] ?? 'この記録は再送できません。'}</span>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </DataTable>
+          <Pager total={total} page={page} size={limit} onPage={(next) => props.onChangeDeliveryView(historyStatus(filter), String(Math.max(0, (next - 1) * limit)), query.trim())} />
+          <p className={styles.hint}>{canEdit ? '行の「…」から 中身を見る・再送待ちへ戻す。' : '行の「…」から 中身を見る。'}</p>
+        </>
+      )}
+    </div>
+  )
+}

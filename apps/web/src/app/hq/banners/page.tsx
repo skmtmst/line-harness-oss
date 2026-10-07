@@ -8,6 +8,8 @@ import '@/app/hq/readonly-v8.css'
 import { api } from '@/lib/api'
 import type { BannerPreset, BannerStats, BannerUsage } from '@/lib/hq-banners'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import HqBannersListV8 from '@/v8/hq-banners/list'
 import { BannerKpis, BannerNote, BannerTabs, type BannerTab } from '@/components/hq/banners/banner-shell'
 import type { BannerChrome } from '@/components/hq/banners/banner-side-nav-v8'
 import LibrarySection from '@/components/hq/banners/library-section'
@@ -18,9 +20,12 @@ import './hq-banners-v8.css'
  * バナー生成。板 B9ZAr（一覧）・W5Wxr（ライブラリ）（V8 のみ）。
  *
  * 左に操作と「見る」案内、右に数値カード帯 → 案内帯 → タブ → 中身。
- * タブの切り替えは `?tab=` で、履歴を積まない（`docs/v6-common-rules.md` §2-2）。
+ * タブの切り替えは `?tab=` で、履歴を積まない（`docs/v8-design-rules.md` §5）。
  */
 export default function HqBannersPage() {
+  // V8 は src/v8/hq-banners に一から書いた画面（B9ZAr・W5Wxr）。v7 は今の画面のまま。
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <HqBannersListV8 />
   return (
     <Suspense fallback={null}>
       <BannersInner />

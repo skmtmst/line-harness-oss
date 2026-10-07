@@ -409,7 +409,7 @@ export function shortDateTime(iso: string, now = new Date()): string {
 
 /**
  * 「3分前」「昨日 21:40」「9月5日（金）」。プロジェクトカードの「更新」に使う。
- * `docs/v6-common-rules.md` §2-7: 分の生表示は日で丸める。
+ * `docs/v8-design-rules.md` §5: 分の生表示は日で丸める。
  */
 export function relativeUpdated(iso: string, now = new Date()): string {
   const date = parseJstDateTime(iso)

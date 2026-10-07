@@ -39,6 +39,7 @@ import styles from './friend-detail-v8.module.css'
 import { loadFailureKind } from './load-failure-kind'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import FriendDetailV8 from '@/v8/friend-detail/detail'
 
 /**
  * 友だち詳細。
@@ -2281,6 +2282,9 @@ function FriendDetailInner() {
 }
 
 export default function FriendDetailPage() {
+  // ★V8 は src/v8/friend-detail に一から書いた画面。v7 はこのファイルのまま。
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <FriendDetailV8 />
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
       <FriendDetailInner />

@@ -1,0 +1,409 @@
+/*
+ * ★V8-B NEN配信の一覧（MuhWR・Jxmqh・Tj7n4・oqSJP）。
+ * 枠・見出し・タブの段・数の帯の並びは型（ListPage）が持つ。ここは板の中の寸法だけ。
+ * 数字は app/globals.css の [data-theme="v8"] の --tpl-nc-* に置く。
+ */
+
+/* タブ（絵：高さ28・文字の下10・文字 13/18）。 */
+.tabs {
+  min-width: 0;
+  margin-bottom: var(--tpl-nc-tab-pull);
+}
+:global([data-theme='v8']) .tabs [role='tab'] {
+  box-sizing: border-box;
+  height: var(--tpl-nc-tab-h);
+  min-height: 0;
+  align-items: flex-start;
+  padding-bottom: 0;
+  line-height: var(--tpl-tabs-text-lh);
+}
+
+/* 数の帯（絵：タブの直下・高さ115。上の線は場所を取らない内側の影。下の線は型の段が持つ）。 */
+:global([data-theme='v8']) .band[data-kpi-presentation='band'] {
+  border-block-width: 0;
+  box-shadow: var(--tpl-nc-band-top-line);
+}
+
+/* 閲覧のみの帯（数の帯の上）。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: var(--tpl-nc-viewer-margin);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* コラム・送った履歴の板は、案内から下が左右にもう一段（24）入る。 */
+.inset {
+  padding-inline: var(--tpl-nc-inset);
+}
+
+.noticeRow,
+.noteRow {
+  padding: var(--tpl-nc-note-pad);
+}
+/* 道具の段の余白（上下14・左右24）は部品（ListToolbar の V8 の帯）が持つ。 */
+.toolsRow {
+  min-width: 0;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.savedBox {
+  display: inline-flex;
+}
+
+/* 表（見出し 36・行 56・欄の間 16・左右 24）。行の線は内側の影（行ごとに 1px 増やさない）。 */
+.table {
+  border: 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nc-col-gap);
+  box-sizing: border-box;
+  height: var(--tpl-nc-head-h);
+  padding: var(--tpl-nc-head-pad);
+  background: var(--color-table-head);
+  box-shadow: var(--shadow-row-line);
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  gap: var(--tpl-nc-col-gap);
+  box-sizing: border-box;
+  height: var(--tpl-nc-row-h);
+  padding: var(--tpl-nc-row-pad);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+  flex-shrink: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: normal;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  white-space: nowrap;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+  flex: 1 1 0;
+  min-width: 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > :is(th.colSent, th.colOrders, th.colViews),
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > :is(td.colSent, td.colOrders, td.colViews) {
+  padding-right: var(--tpl-nc-num-pad-end);
+  text-align: right;
+}
+.colTrigger { width: var(--tpl-nc-col-trigger); min-width: 0; }
+.colTarget { width: var(--tpl-nc-col-target); min-width: 0; }
+.colSent { width: var(--tpl-nc-col-sent); }
+.colOrders { width: var(--tpl-nc-col-orders); }
+.colState { width: var(--tpl-nc-col-state); min-width: 0; }
+.colMenu { width: var(--tpl-nc-menu-size); }
+.colCategory { width: var(--tpl-nc-col-category); min-width: 0; }
+.colDate { width: var(--tpl-nc-col-date); min-width: 0; }
+.colLine { width: var(--tpl-nc-col-line); min-width: 0; }
+.colViews { width: var(--tpl-nc-col-sent); }
+.colWhen { width: var(--tpl-nc-col-when); min-width: 0; }
+.colResult { width: var(--tpl-nc-col-result); min-width: 0; }
+.colCause { width: var(--tpl-nc-col-cause); min-width: 0; }
+
+.name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  min-height: 0;
+  height: auto;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.name:hover {
+  text-decoration: underline;
+}
+.nameStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nc-sub-gap);
+  min-width: 0;
+}
+.cell,
+.cellStrong {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cellStrong {
+  font-weight: 600;
+}
+.sub,
+.subDanger {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subDanger {
+  color: var(--color-status-danger);
+}
+.num {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+/* 状態の札（点＋文字 12/600）。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-nc-pill-gap);
+  padding: var(--tpl-nc-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-nc-pill-lh);
+  white-space: nowrap;
+}
+.pillDot {
+  width: var(--tpl-nc-pill-dot);
+  height: var(--tpl-nc-pill-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  flex-shrink: 0;
+}
+.pill[data-tone='ok'] { background: var(--color-success-bg); color: var(--color-success); }
+.pill[data-tone='info'] { background: var(--color-status-info-soft); color: var(--color-action); }
+.pill[data-tone='off'] { background: var(--color-track); color: var(--color-ink-secondary); }
+.pill[data-tone='danger'] { background: var(--color-status-danger-soft); color: var(--color-status-danger); }
+
+/* 行の右端の「…」（36 の四角）。メニューの目印で行を伸ばさない。 */
+.menuBox {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.menuSpace {
+  display: block;
+  width: var(--tpl-nc-menu-size);
+  height: var(--tpl-nc-menu-size);
+}
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-nc-menu-size);
+  height: var(--tpl-nc-menu-size);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+.menuButton:hover {
+  background: var(--color-table-head);
+}
+
+/* 表の下（件数とページ送り・ヒント）。 */
+.pagerRow {
+  padding: var(--tpl-nc-pager-pad);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nc-pager-gap);
+  box-sizing: border-box;
+  min-height: var(--tpl-nc-pager-h);
+  padding: var(--tpl-nc-pager-inner-pad);
+}
+.pagerCount {
+  flex: 1 1 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-nc-pager-lh);
+}
+.hint {
+  margin: 0;
+  padding: var(--tpl-nc-hint-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+.muted {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-nc-text-lh);
+}
+.link {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+.error {
+  color: var(--color-status-danger);
+  font-size: var(--text-caption);
+}
+
+/* 送った履歴の行の中身（行の「…」→ 中身を見る）。 */
+.detailRow > td {
+  padding: var(--tpl-nc-detail-pad);
+  box-shadow: var(--shadow-row-line);
+}
+.detailBox,
+.sample {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nc-sample-gap);
+  padding: var(--tpl-nc-sample-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+}
+.sampleLabel {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+.sampleTitle {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.sampleText,
+.sampleCode {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  white-space: pre-wrap;
+}
+
+/* 引き出し（中身・クーポンの決めごと）。絵 oqSJP の幅は 520（共通の引き出しは 660）。 */
+:global([data-theme='v8'] [data-design-part='drawer']):has(.couponForm) {
+  width: min(var(--tpl-nc-drawer-w), 100%);
+}
+/* 絵 oqSJP の引き出しは頭・中・足に線を引かず、全体を余白24・間16で並べる。 */
+:global([data-theme='v8'] [data-design-part='drawer']):has(.couponForm) > :global(header) {
+  padding: var(--tpl-nc-drawer-head-pad);
+  border-bottom: 0;
+}
+:global([data-theme='v8'] [data-design-part='drawer']):has(.couponForm) > :global(div) {
+  padding: var(--tpl-nc-drawer-body-pad);
+}
+:global([data-theme='v8'] [data-design-part='drawer']):has(.couponForm) > :global(footer) {
+  padding: var(--tpl-nc-drawer-foot-pad);
+  border-top: 0;
+}
+.drawerBody,
+.couponForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nc-form-gap);
+}
+.drawerFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-toolbar-gap);
+}
+.couponSwitch {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nc-switch-gap);
+  padding: var(--tpl-nc-switch-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+}
+.couponSwitchText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.couponSwitchText > strong {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.couponSwitchText > span {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nc-field-gap);
+  min-width: 0;
+}
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-nc-text-lh);
+}
+.fieldPair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--tpl-nc-pair-gap);
+}
+
+/* 選んだコラム（表の下）。 */
+.selectPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nc-field-gap);
+  padding: var(--tpl-nc-select-pad);
+}
+.selectTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.selectGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--tpl-nc-pair-gap);
+}
+.buttonRow,
+.selectFoot,
+.radioRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.selectFoot {
+  justify-content: flex-end;
+}

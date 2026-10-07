@@ -28,9 +28,9 @@ describe('リッチメニューの残り板', () => {
   })
 
   it('編集の競合は帯・比べる・読み直しを出す（r8dGXT）', () => {
-    expect(CREATE).toContain('data-design-node="r8dGXT"')
+    // 帯は共通部品（save-conflict）に寄せた（2026-10-07）。ボタンの文言は共通部品が持つ。
+    expect(CREATE).toMatch(/<SaveConflictBand[\s\S]{0,400}designNode="r8dGXT"/)
     expect(CREATE).toContain('ほかの人がこのメニューを更新しました')
-    expect(CREATE).toContain('違いを比べる')
     expect(CREATE).toContain('最新を読み込んで続ける')
   })
 

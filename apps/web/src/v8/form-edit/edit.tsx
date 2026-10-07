@@ -12,7 +12,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, Copy, FlaskConical, Smartphone, TriangleAlert, Upload } from 'lucide-react'
+import { ArrowLeft, Copy, FlaskConical, Smartphone, Upload } from 'lucide-react'
 import {
   emptyLayout,
   formThemeContrastError,
@@ -28,6 +28,7 @@ import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { Tabs } from '@/components/shared/tabs'
@@ -123,12 +124,23 @@ function FormEditInner() {
   const [testToken, setTestToken] = useState<string | null>(null)
   const [testBusy, setTestBusy] = useState(false)
   const [testError, setTestError] = useState('')
-  /** ほかの人が先に保存していたとき（409）。入力は捨てない。 */
-  const [conflict, setConflict] = useState<{ updatedAt: string } | null>(null)
   const [showPublish, setShowPublish] = useState(false)
-  const [compareTarget, setCompareTarget] = useState<ConflictSide | null>(null)
-  const [compareBusy, setCompareBusy] = useState(false)
-  const [compareError, setCompareError] = useState('')
+  /*
+   * ほかの人が先に保存していたとき（409）。入力は捨てない。
+   * 帯・比べる窓・読み直しは共通の save-conflict（動きの点検 16 番）。
+   */
+  const saveConflict = useSaveConflict<ConflictSide>({
+    // 「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
+    fetchLatest: async () => {
+      if (!id || !selectedAccountId) return null
+      const res = await api.forms.get(id, selectedAccountId)
+      if (!res.success) return null
+      return { name: res.data.name, description: res.data.description ?? '', layout: res.data.layout ?? emptyLayout() }
+    },
+    reload: () => reloadAfterConflict(),
+  })
+  const conflict = saveConflict.conflict
+  const clearConflict = saveConflict.clear
   const [previewOpen, setPreviewOpen] = useState(false)
   /** 最初の読み込みで ?page= を当てたか（読み直しでページを戻さない）。 */
   const pageFromUrl = useRef(false)
@@ -173,7 +185,7 @@ function FormEditInner() {
     setContentRevision(res.data.contentRevision ?? null)
     setPublishedVersionId(res.data.publishedVersionId ?? null)
     setPublishedContentRevision(res.data.publishedContentRevision ?? null)
-    setConflict(null)
+    clearConflict()
     if (!pageFromUrl.current) {
       pageFromUrl.current = true
       const index = readPage(params.get('page'), nextLayout.sections.length)
@@ -183,7 +195,7 @@ function FormEditInner() {
     savedSnapshot.current = JSON.stringify(loaded)
     setFormLoaded(true)
     return true
-  }, [id, selectedAccountId, params])
+  }, [id, selectedAccountId, params, clearConflict])
 
   const reloadAfterConflict = async () => {
     setError('')
@@ -193,25 +205,6 @@ function FormEditInner() {
       setNotice('最新の内容を読み込みました')
     } catch {
       setError('読み込みに失敗しました。もう一度読み込んでください。')
-    }
-  }
-
-  // 「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
-  const openCompare = async () => {
-    if (!id || !selectedAccountId || compareBusy) return
-    setCompareBusy(true)
-    setCompareError('')
-    try {
-      const res = await api.forms.get(id, selectedAccountId)
-      if (!res.success) {
-        setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
-        return
-      }
-      setCompareTarget({ name: res.data.name, description: res.data.description ?? '', layout: res.data.layout ?? emptyLayout() })
-    } catch {
-      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
-    } finally {
-      setCompareBusy(false)
     }
   }
 
@@ -552,7 +545,7 @@ function FormEditInner() {
         return false
       }
       setContentRevision(res.data.contentRevision)
-      setConflict(null)
+      clearConflict()
       if (publishAfter) {
         const published = await api.forms.publish(id, selectedAccountId, res.data.contentRevision)
         if (!published.success) {
@@ -588,7 +581,7 @@ function FormEditInner() {
       if (e instanceof ApiError && e.status === 409) {
         const data = e.data as { updatedAt?: unknown } | null
         const updatedAt = typeof data?.updatedAt === 'string' ? data.updatedAt : ''
-        setConflict({ updatedAt })
+        saveConflict.mark(updatedAt)
         setError(conflictMessage(updatedAt))
         return false
       }
@@ -719,7 +712,7 @@ function FormEditInner() {
         下書きを保存
       </Button>
       {conflict ? (
-        <Button variant="primary" onClick={() => void openCompare()} disabled={compareBusy || saving}>
+        <Button variant="primary" onClick={() => void saveConflict.compare()} disabled={saveConflict.compareBusy || saving}>
           比べてから保存
         </Button>
       ) : (
@@ -734,15 +727,13 @@ function FormEditInner() {
   /* 競合の帯（J1pdB）。左右の列の上に横いっぱいで出す。型の「狭い板の切り替え」の置き場を借りる。 */
   const conflictBand = conflict ? (
     <div className={styles.bandSlot} data-fe-band>
-      <div className={styles.conflictBand} role="alert" data-design-node="J1pdB">
-        <TriangleAlert size={18} aria-hidden="true" className={styles.conflictIcon} />
-        <span className={styles.conflictText}>
-          <span className={styles.conflictTitle}>{conflictTitle(conflict.updatedAt, name)}</span>
-          <span className={styles.conflictDesc}>あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。</span>
-        </span>
-        <Button onClick={() => void openCompare()} disabled={compareBusy} busy={compareBusy} busyLabel="比べています…">違いを比べる</Button>
-        <Button variant="primary" onClick={() => void reloadAfterConflict()}>最新を読み込んで続ける</Button>
-      </div>
+      <SaveConflictBand
+        designNode="J1pdB"
+        title={conflictTitle(conflict.updatedAt, name)}
+        compareBusy={saveConflict.compareBusy}
+        onCompare={() => void saveConflict.compare()}
+        onReload={() => void saveConflict.reloadLatest()}
+      />
     </div>
   ) : undefined
 
@@ -873,40 +864,16 @@ function FormEditInner() {
         </div>
       </Dialog>
 
-      <Dialog
-        open={compareTarget !== null || compareError !== ''}
-        title="最新の保存と比べる"
-        description="あなたの下書きと、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
-        confirmLabel="最新を読み込んで続ける"
-        busy={compareBusy}
-        error={compareError || undefined}
-        onConfirm={() => {
-          setCompareTarget(null)
-          setCompareError('')
-          void reloadAfterConflict()
-        }}
-        onCancel={() => {
-          setCompareTarget(null)
-          setCompareError('')
-        }}
-      >
-        {compareTarget && (() => {
-          const { lines, omitted } = describeConflictDiff({ name, description, layout }, compareTarget)
-          return lines.length === 0 ? (
-            <p className={styles.changeLine}>違いは見つかりませんでした。そのまま読み込めます。</p>
-          ) : (
-            <div className={styles.changes}>
-              {lines.map((line, index) => (
-                <p key={index} className={styles.changeLine} data-kind={line.kind}>
-                  {line.kind === 'remove' ? '－ ' : line.kind === 'add' ? '＋ ' : '・ '}
-                  {line.text}
-                </p>
-              ))}
-              {omitted > 0 ? <p className={styles.changeLine}>ほか{omitted}件の違いがあります</p> : null}
-            </div>
-          )
-        })()}
-      </Dialog>
+      <SaveConflictCompareDialog
+        open={saveConflict.compareOpen}
+        busy={saveConflict.compareBusy}
+        error={saveConflict.compareError}
+        {...(saveConflict.latest
+          ? describeConflictDiff({ name, description, layout }, saveConflict.latest)
+          : { lines: null, omitted: 0 })}
+        onReload={() => void saveConflict.reloadLatest()}
+        onCancel={saveConflict.closeCompare}
+      />
 
       <Dialog open={previewOpen} title="LINEでの見え方" description="お客さまのスマホに出る形です。" onCancel={() => setPreviewOpen(false)}>
         <div className={styles.phoneDialog}>{phone}</div>

@@ -137,8 +137,10 @@ describe('globals.css の動き規定（★V7 `z97zZN` §1・§3）', () => {
   it('初回表示は下から 8px・200ms ease-out・40ms ずつ', () => {
     expect(GLOBALS_CODE).toMatch(/@keyframes v7-rise[\s\S]*?translateY\(8px\)/)
     expect(GLOBALS_CODE).toMatch(/\.v7-stagger > \*\s*\{[^}]*var\(--motion-base\)[^}]*var\(--motion-ease-out\)/)
-    expect(GLOBALS_CODE).toMatch(/nth-child\(2\)\s*\{[^}]*40ms/)
-    expect(GLOBALS_CODE).toMatch(/nth-child\(n \+ 4\)\s*\{[^}]*120ms/)
+    // 40ms のずらし幅は変数（--motion-stagger）に置いた（動きの点検 18 番）。
+    expect(GLOBALS_CODE).toMatch(/--motion-stagger:\s*40ms;/)
+    expect(GLOBALS_CODE).toMatch(/nth-child\(2\)\s*\{[^}]*var\(--motion-stagger\)/)
+    expect(GLOBALS_CODE).toMatch(/nth-child\(n \+ 4\)\s*\{[^}]*calc\(var\(--motion-stagger\) \* 3\)/)
   })
 
   it('読み直しの線は上に 2px、薄めは 0.55', () => {

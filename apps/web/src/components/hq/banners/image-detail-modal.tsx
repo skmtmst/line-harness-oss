@@ -23,7 +23,7 @@ import {
 /**
  * 画像の詳細とアカウントへ渡す。Pencil 35-3-A `k0JKm`（幅1160）。
  *
- * 全面1枚のオーバーレイに中央そろえで置く（`docs/v6-common-rules.md` §1-7）。
+ * 全面1枚のオーバーレイに中央そろえで置く（`docs/v8-design-rules.md` §5）。
  * 幅は `min(1160px, 100%)`。1920 や 1160 を固定で書かない。
  */
 export default function ImageDetailModal({

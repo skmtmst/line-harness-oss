@@ -1,0 +1,235 @@
+/*
+ * ★V8 統括のバナー生成（B9ZAr・W5Wxr）。頭・左の列の枠は型（ListPage）。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-hb-*`。
+ */
+.folderInset { margin-left: var(--tpl-hb-folder-inset); min-width: 0; }
+.full { width: 100%; }
+.buttonIcon { width: var(--tpl-hb-button-icon); height: var(--tpl-hb-button-icon); }
+.spacer { flex: 1; }
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb-body-gap);
+  padding: var(--tpl-hb-body-pad);
+  min-width: 0;
+}
+
+/* 数のカード4枚（間12） */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tpl-hb-kpi-gap);
+}
+
+.tabs { margin-bottom: var(--tpl-hb-tabs-pull); }
+
+/* 道具の段（探す欄・用途の札・並び） */
+.tools { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); min-width: 0; }
+.projectSearch { width: var(--tpl-hb-project-search-w); flex-shrink: 0; }
+.librarySearch { width: var(--tpl-hb-library-search-w); flex-shrink: 0; }
+.projectSort { width: var(--tpl-hb-project-sort-w); flex-shrink: 0; }
+.projectSort :global(*) { max-width: 100%; }
+.toolLabel { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); white-space: nowrap; }
+.chips { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
+.sortStatic {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-hb-control-h);
+  width: var(--tpl-hb-library-sort-w);
+  padding: var(--tpl-hb-control-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -0.5px;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-hb-label-lh);
+  white-space: nowrap;
+}
+
+/* プロジェクトのカード（3列・横の間12・縦の間14） */
+.projectGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--tpl-hb-kpi-gap);
+  row-gap: var(--tpl-hb-body-gap);
+  align-items: start;
+}
+
+.projectCard {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--tpl-hb-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+  background: var(--color-canvas);
+}
+
+.mosaic {
+  display: flex;
+  gap: var(--tpl-hb-mosaic-gap);
+  height: var(--tpl-hb-mosaic-h);
+  padding: 0;
+  border: 0;
+  background: var(--color-canvas);
+  cursor: pointer;
+}
+
+.thumb {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-shell-gray);
+}
+
+.thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+.cardBody { display: flex; flex-direction: column; padding: var(--tpl-hb-card-pad); }
+.cardTitleRow { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); height: var(--tpl-hb-title-lh); }
+
+.cardTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--tpl-hb-title-lh);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cardTitle:hover { text-decoration: underline; }
+
+.star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tpl-hb-star);
+  height: var(--tpl-hb-star);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: transparent;
+  cursor: pointer;
+}
+
+.star:disabled { opacity: 0.5; }
+.star svg, .starStatic { width: var(--tpl-hb-star-glyph); height: var(--tpl-hb-star-glyph); }
+.starOn { fill: var(--color-status-warn); color: var(--color-status-warn); }
+.starOff { color: var(--color-ink-faint); }
+
+.cardDesc {
+  margin: var(--tpl-hb-desc-gap) 0 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hb-small-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardMeta { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); margin-top: var(--tpl-hb-meta-gap); min-height: var(--tpl-hb-small-lh); }
+.metaText { min-width: 0; overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); text-overflow: ellipsis; white-space: nowrap; }
+.cardMeta .metaText { flex: 1; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--tpl-hb-pill-gap);
+  padding: var(--tpl-hb-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-hb-pill-lh);
+  white-space: nowrap;
+}
+
+.pillInfo { background: var(--color-status-info-soft); color: var(--color-status-info); }
+.pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.pillIdle { background: var(--color-shell-gray); color: var(--color-ink-secondary); }
+.dot { width: var(--tpl-hb-dot); height: var(--tpl-hb-dot); border-radius: var(--radius-pill); background: currentColor; }
+
+/* 画像のます（4列・横の間12・縦の間14） */
+.imageGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: var(--tpl-hb-kpi-gap);
+  row-gap: var(--tpl-hb-body-gap);
+}
+
+.tile { display: flex; flex-direction: column; min-width: 0; }
+
+.tileImage {
+  display: flex;
+  height: var(--tpl-hb-tile-h);
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--tpl-hb-tile-radius);
+  background: var(--color-shell-gray);
+  cursor: pointer;
+}
+
+.tileImage .thumb { border-radius: var(--tpl-hb-tile-radius); }
+.tileMeta { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); height: var(--tpl-hb-star); margin-top: var(--tpl-hb-tile-gap); }
+
+.tileProject {
+  margin: var(--tpl-hb-desc-gap-small) 0 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hb-small-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pager { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
+.range { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); white-space: nowrap; }
+
+/* 数のカード（余白 16・20、間 8、題の行・数の行・補足の3段） */
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb-stat-gap);
+  min-width: 0;
+  padding: var(--tpl-hb-stat-pad);
+  border-radius: var(--tpl-hb-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+  background: var(--color-canvas);
+}
+
+.statHead { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); margin: 0; min-width: 0; }
+.statIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tpl-hb-star);
+  height: var(--tpl-hb-star);
+  border-radius: var(--tpl-hb-stat-icon-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+  color: var(--color-ink-secondary);
+}
+
+.statIcon svg { width: var(--tpl-hb-stat-glyph); height: var(--tpl-hb-stat-glyph); }
+.statTitle { min-width: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-hb-stat-lh); text-overflow: ellipsis; white-space: nowrap; }
+.statValue { display: flex; align-items: flex-end; gap: var(--tpl-hb-stat-unit-gap); margin: 0; }
+.statNumber { color: var(--color-ink); font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: var(--text-metric); font-weight: 600; letter-spacing: var(--tpl-hb-stat-tracking); line-height: var(--tpl-hb-stat-number-lh); font-variant-numeric: tabular-nums; }
+.statUnit { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-hb-stat-lh); }
+.statDetail { margin: 0; overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-stat-lh); text-overflow: ellipsis; white-space: nowrap; }

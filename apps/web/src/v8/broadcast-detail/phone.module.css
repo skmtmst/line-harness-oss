@@ -1,0 +1,232 @@
+/*
+ * ★V8 右の欄の「本物のスマホ」（絵「スマホ 配信の中身」：外枠 330×690・余白10・角丸52、
+ * 画面の角丸42、上の帯44・トークの頭44・トークの余白10・間8、吹き出し幅200）。
+ * 値は app/globals.css の `--tpl-bd-ph-*`。
+ */
+.phone {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: var(--tpl-bd-ph-w);
+  height: var(--tpl-bd-ph-h);
+  margin: 0 auto;
+  padding: var(--tpl-bd-ph-pad);
+  border-radius: var(--tpl-bd-ph-radius);
+  background: var(--tpl-bd-ph-body);
+  box-shadow: var(--tpl-bd-ph-ring), var(--tpl-bd-ph-shadow);
+}
+
+.screen {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--tpl-bd-ph-screen-radius);
+  background: var(--tpl-bd-ph-talk);
+}
+
+.statusBar {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  box-sizing: border-box;
+  height: var(--tpl-bd-ph-bar-h);
+  padding: var(--tpl-bd-ph-bar-pad);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.clock {
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  font-size: var(--tpl-bd-ph-clock-size);
+  font-weight: 600;
+  line-height: var(--tpl-bd-ph-clock-lh);
+}
+
+.island {
+  position: absolute;
+  top: var(--tpl-bd-ph-island-top);
+  left: var(--tpl-bd-ph-island-left);
+  width: var(--tpl-bd-ph-island-w);
+  height: var(--tpl-bd-ph-island-h);
+  border-radius: var(--radius-pill);
+  background: var(--color-ink);
+}
+
+.statusIcons {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bd-ph-icons-gap);
+}
+
+.talkHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bd-ph-head-gap);
+  box-sizing: border-box;
+  height: var(--tpl-bd-ph-bar-h);
+  padding: var(--tpl-bd-ph-head-pad);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.talkHead svg {
+  flex-shrink: 0;
+}
+
+.talkName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--tpl-bd-ph-name-size);
+  font-weight: 700;
+  line-height: var(--tpl-bd-ph-name-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.talk {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-bd-ph-talk-gap);
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--tpl-bd-ph-talk-pad);
+}
+
+.dateRow {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+}
+
+.dateChip {
+  padding: var(--tpl-bd-ph-chip-pad);
+  border-radius: var(--radius-pill);
+  background: var(--tpl-bd-ph-chip);
+  color: var(--color-canvas);
+  font-size: var(--tpl-bd-ph-chip-size);
+  line-height: var(--tpl-bd-ph-chip-lh);
+  white-space: nowrap;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-bd-ph-row-gap);
+  min-width: 0;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tpl-bd-ph-avatar);
+  height: var(--tpl-bd-ph-avatar);
+  border-radius: var(--radius-pill);
+  background: var(--tpl-bd-green);
+  color: var(--color-canvas);
+  font-size: var(--tpl-bd-ph-avatar-size);
+  font-weight: 700;
+}
+
+.sender {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bd-ph-sender-gap);
+  min-width: 0;
+}
+
+.senderName {
+  overflow: hidden;
+  color: var(--tpl-bd-ph-sub);
+  font-size: var(--tpl-bd-ph-sender-size);
+  line-height: var(--tpl-bd-ph-sender-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bodyRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-bd-ph-body-gap);
+}
+
+.bubble {
+  box-sizing: border-box;
+  width: var(--tpl-bd-ph-bubble-w);
+  margin: 0;
+  padding: var(--tpl-bd-ph-bubble-pad);
+  border-radius: var(--tpl-bd-ph-bubble-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--tpl-bd-ph-bubble-size);
+  line-height: var(--tpl-bd-ph-bubble-lh);
+  white-space: pre-wrap;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.photo {
+  display: block;
+  flex-shrink: 0;
+  width: var(--tpl-bd-ph-bubble-w);
+  height: var(--tpl-bd-ph-bubble-w);
+  border-radius: var(--tpl-bd-ph-bubble-radius);
+  background: var(--color-canvas);
+  object-fit: cover;
+}
+
+.photoEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tpl-bd-ph-body-gap);
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bd-ph-bubble-size);
+}
+
+.rich {
+  width: var(--tpl-bd-ph-bubble-w);
+  font-size: var(--tpl-bd-row-size);
+}
+
+.time {
+  flex-shrink: 0;
+  color: var(--tpl-bd-ph-time-color);
+  font-size: var(--tpl-bd-ph-time-size);
+  line-height: var(--tpl-bd-ph-time-lh);
+}
+
+.menuBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tpl-bd-stat-gap);
+  height: var(--tpl-bd-ph-menu-h);
+  background: var(--color-canvas);
+  color: var(--tpl-bd-ph-menu-ink);
+  font-size: var(--tpl-bd-ph-menu-size);
+  font-weight: 600;
+  line-height: var(--tpl-bd-ph-menu-lh);
+}
+
+.homeBar {
+  display: flex;
+  justify-content: center;
+  height: var(--tpl-bd-ph-home-h);
+  background: var(--color-canvas);
+}
+
+.homeLine {
+  width: var(--tpl-bd-ph-home-line-w);
+  height: var(--tpl-bd-ph-home-line-h);
+  border-radius: var(--tpl-bd-ph-home-line-radius);
+  background: var(--tpl-bd-ph-home);
+}

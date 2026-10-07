@@ -1,0 +1,635 @@
+/*
+ * ★V8-B マイペット（wTIej・t2SMXX・eLjeQ・h7A2F）。
+ * 枠・見出し・タブの段・数の帯の並びは型（ListPage）が持つ。ここは板の中の寸法だけ。
+ * 数字は app/globals.css の [data-theme="v8"] の --tpl-nph-* に置く。
+ */
+
+/* タブ（絵：高さ28・文字の下10）。 */
+.tabs {
+  min-width: 0;
+  margin-bottom: var(--tpl-nph-tab-pull);
+}
+:global([data-theme='v8']) .tabs [role='tab'] {
+  box-sizing: border-box;
+  height: var(--tpl-nph-tab-h);
+  min-height: 0;
+  align-items: flex-start;
+  padding-bottom: 0;
+  line-height: var(--tpl-tabs-text-lh);
+}
+
+/* 数の帯（タブの直下。上の線は場所を取らない内側の影。下の線は型の段が持つ）。 */
+:global([data-theme='v8']) .band[data-kpi-presentation='band'] {
+  border-block-width: 0;
+  box-shadow: var(--tpl-nph-band-top-line);
+}
+.kpiMenu {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-nph-kpi-menu);
+}
+/* 数の帯の「…」は枠なしの小さな印（絵の 16 の印）。 */
+:global([data-theme='v8']) .kpiMenu > .kpiMenuButton {
+  width: var(--tpl-nph-kpi-menu);
+  height: var(--tpl-nph-kpi-menu);
+  min-height: 0;
+  flex-basis: var(--tpl-nph-kpi-menu);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+:global([data-theme='v8']) .kpiMenu > .kpiMenuButton:not(:focus-visible) {
+  outline-color: transparent;
+}
+
+/* 閲覧のみの帯（数の帯の上）。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: var(--tpl-nph-viewer-margin);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+.noteRow {
+  padding: var(--tpl-nph-note-pad);
+}
+
+/* 道具の段（上下14・左右24・間8）。1152 では探す欄だけで1段目。 */
+.toolsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+  padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side);
+}
+.searchBox {
+  display: block;
+  width: var(--tpl-nph-search-w);
+  min-width: 0;
+}
+.toolsBreak {
+  display: none;
+}
+.toolsTail {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  margin-left: auto;
+}
+
+/* 表（見出し 36・行 56・欄の間 16・左右 24）。行の線は内側の影（行ごとに 1px 増やさない）。 */
+.table {
+  border: 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nph-col-gap);
+  box-sizing: border-box;
+  height: var(--tpl-nph-head-h);
+  padding: var(--tpl-nph-head-pad);
+  background: var(--color-table-head);
+  box-shadow: var(--shadow-row-line);
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  gap: var(--tpl-nph-col-gap);
+  box-sizing: border-box;
+  height: var(--tpl-nph-row-h);
+  padding: var(--tpl-nph-row-pad);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+  flex-shrink: 0;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: normal;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  white-space: nowrap;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colProduct,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colProduct {
+  flex: 1 1 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colWeight,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colWeight {
+  padding-right: var(--tpl-nph-num-pad-end);
+  text-align: right;
+}
+.colPet { width: var(--tpl-nph-col-pet); }
+.colOwner { width: var(--tpl-nph-col-owner); }
+.colAge { width: var(--tpl-nph-col-age); }
+.colWeight { width: var(--tpl-nph-col-weight); }
+.colFeed { width: var(--tpl-nph-col-feed); }
+.colNeutered { width: var(--tpl-nph-col-neutered); }
+.colActivity { width: var(--tpl-nph-col-activity); }
+.colUpdated { width: var(--tpl-nph-col-updated); }
+.colMenu { width: var(--tpl-nph-menu-size); }
+
+.petCell {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nph-face-gap);
+  min-width: 0;
+}
+.face {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-nph-face);
+  height: var(--tpl-nph-face);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  object-fit: cover;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-sub-gap);
+  min-width: 0;
+}
+.nameText,
+.cellStrong,
+.cell {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nameText,
+.cellStrong {
+  font-weight: 600;
+}
+.sub {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.num {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: normal;
+  white-space: nowrap;
+}
+.narrowOnly {
+  display: none;
+}
+
+/* 1152（白い板が 1100 未満）：年齢・避妊去勢・運動量を隠し、年齢は種類の後ろへ。道具は探す欄だけで1段。 */
+@container v8-page (max-width: 1099px) {
+  :global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > :is(th.colAge, th.colNeutered, th.colActivity),
+  :global([data-theme='v8']) .table .row[data-table-layout='columns'] > :is(td.colAge, td.colNeutered, td.colActivity) {
+    display: none;
+  }
+  .colFeed { width: var(--tpl-nph-col-feed-narrow); }
+  /* 狭い列の補足（種類・年齢、目安の注記）は絵どおり2行に折る。行は中身なりに伸びる（最低 56）。 */
+  :global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+    height: auto;
+    min-height: var(--tpl-nph-row-h);
+  }
+  :is(.colPet, .colFeed) .sub {
+    white-space: normal;
+  }
+  .wideOnly { display: none; }
+  .narrowOnly { display: inline; }
+  .toolsRow {
+    row-gap: 0;
+  }
+  .toolsBreak {
+    display: block;
+    flex-basis: 100%;
+    height: var(--tpl-toolbar-gap);
+  }
+}
+
+/* 状態の札（点＋文字）。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-nph-pill-gap);
+  padding: var(--tpl-nph-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-nph-pill-lh);
+  white-space: nowrap;
+}
+.pillDot {
+  width: var(--tpl-nph-pill-dot);
+  height: var(--tpl-nph-pill-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  flex-shrink: 0;
+}
+.pill[data-tone='ok'] { background: var(--color-success-bg); color: var(--color-success); }
+.pill[data-tone='warn'] { background: var(--color-status-warn-soft); color: var(--color-warning); }
+.pill[data-tone='off'] { background: var(--color-track); color: var(--color-ink-secondary); }
+
+/* 行の右端の「…」（36 の四角）。メニューの目印で行を伸ばさない。 */
+.menuBox {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.menuSpace {
+  display: block;
+  width: var(--tpl-nph-menu-size);
+  height: var(--tpl-nph-menu-size);
+}
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-nph-menu-size);
+  height: var(--tpl-nph-menu-size);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+.menuButton:hover {
+  background: var(--color-table-head);
+}
+
+/* 表の下（件数・ヒント）。 */
+.pagerRow {
+  padding: var(--tpl-nph-pager-pad);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--tpl-nph-pager-h);
+  padding: var(--tpl-nph-pager-inner-pad);
+}
+.pagerCount {
+  flex: 1 1 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-nph-pager-lh);
+}
+.hint {
+  margin: 0;
+  padding: var(--tpl-nph-hint-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+/* ペットの情報を直す（eLjeQ・窓の中身。段の間 14）。 */
+.editor {
+  display: flex;
+  align-self: stretch;
+  flex-direction: column;
+  gap: var(--tpl-nph-editor-gap);
+  margin-block: var(--tpl-nph-editor-pull);
+}
+.editorPet {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nph-editor-pet-gap);
+  padding: var(--tpl-nph-editor-pet-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+}
+.editorFace {
+  composes: face;
+  width: var(--tpl-nph-editor-face);
+  height: var(--tpl-nph-editor-face);
+}
+.editorGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-field-gap);
+  min-width: 0;
+}
+.groupLabel {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+}
+.fieldLabel {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-nph-label-lh);
+}
+.radioRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-nph-radio-gap);
+}
+.editorPair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--tpl-nph-pair-gap);
+}
+.editorField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-field-gap);
+  min-width: 0;
+}
+.editorHint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-nph-hint-lh);
+}
+
+/* ごはんの目安（h7A2F）。中身の余白 上16・左右24・下24、カードの間 12、右のカード 380。 */
+.feeding {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-card-gap);
+  padding: var(--tpl-nph-feeding-pad);
+}
+.feedingGrid {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-nph-card-gap);
+}
+.feedingMain {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-nph-card-gap);
+  min-width: 0;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-card-inner-gap);
+  min-width: 0;
+  padding: var(--tpl-nph-card-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+.formulaCard {
+  flex: 0 0 var(--tpl-nph-formula-w);
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-card-head-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-nph-card-title-lh);
+}
+.cardDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-nph-card-desc-lh);
+}
+
+/* 商品の表（見出し 36・行 56・左右 16）。 */
+.productTable {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+}
+.productHead,
+.productRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nph-col-gap);
+  box-sizing: border-box;
+  padding: var(--tpl-nph-product-pad);
+  box-shadow: var(--shadow-row-line);
+}
+.productHead {
+  height: var(--tpl-nph-product-head-h);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.productRow {
+  height: var(--tpl-nph-product-row-h);
+}
+.productRow:last-child {
+  box-shadow: none;
+}
+.productName {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.productKcal {
+  flex-shrink: 0;
+  width: var(--tpl-nph-product-kcal);
+  padding-right: var(--tpl-nph-num-pad-end);
+  text-align: right;
+}
+.productDefault {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  width: var(--tpl-nph-product-default);
+}
+.productTable[data-kind='nen'] .productDefault {
+  width: var(--tpl-nph-product-default-nen);
+}
+.productTable[data-kind='nen'] .productKcal {
+  width: var(--tpl-nph-product-kcal-nen);
+}
+.productTrash {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  width: var(--tpl-nph-menu-size);
+}
+.productNameButton {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-caption);
+  line-height: normal;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+.productNameButton:hover {
+  text-decoration: underline;
+}
+.kcalInput {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-nph-field-gap);
+}
+.addLink {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-nph-add-lh);
+  cursor: pointer;
+}
+.addLink:disabled {
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+}
+.treat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-field-gap);
+}
+.treatRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-nph-pair-gap);
+}
+.treatInput {
+  display: block;
+  width: var(--tpl-nph-treat-w);
+}
+.treatNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+.treatLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-nph-label-lh);
+}
+
+/* 今日の目安の計算（右のカード）。 */
+.formulaList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-card-inner-gap);
+  margin: 0;
+}
+.formulaRow {
+  display: flex;
+  gap: var(--tpl-nph-formula-gap);
+}
+.formulaLabel {
+  flex: 0 0 var(--tpl-nph-formula-label-w);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+.formulaValue {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+}
+.factorTable {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+.factorHead,
+.factorRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nph-col-gap);
+  padding: var(--tpl-nph-factor-pad);
+  box-shadow: var(--shadow-row-line);
+}
+.factorRow:last-child {
+  box-shadow: none;
+}
+.factorHead {
+  padding: var(--tpl-nph-factor-head-pad);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: normal;
+}
+.factorRow {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+.factorLabel {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+}
+.factorNum {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: var(--tpl-nph-factor-num-w);
+  padding-right: var(--tpl-nph-num-pad-end);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.formulaNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+/* 下の帯（保存・キャンセル）。中央・画面の下に追従は部品が持つ。 */
+.stickyBar {
+  margin-top: var(--tpl-nph-bar-pull);
+}

@@ -1,0 +1,210 @@
+/*
+ * ★V8 マニュアルの正本表（cIdA2）。外側（型・中のメニュー・戻るリンク）は sb-frame。
+ * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-sb-*）。
+ */
+
+/* 運営だけの帯：薄い琥珀・角丸 12・余白 12/16・印 16＋間 10・文字 12。 */
+.note {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-band-gap);
+  margin: 0;
+  padding: var(--tpl-sb-note-pad);
+  border-radius: var(--tpl-sb-card-radius);
+  background: var(--color-status-warn-soft);
+  color: var(--color-ink);
+  font-size: var(--tpl-sb-note-text);
+}
+
+.noteIcon {
+  flex-shrink: 0;
+  width: var(--tpl-sb-band-icon);
+  height: var(--tpl-sb-band-icon);
+  color: var(--color-status-warn-deep);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+.search {
+  width: var(--tpl-sb-search-w-wide);
+  flex-shrink: 0;
+}
+
+/* 札（高さ 36・丸・余白 0/10・文字 12/500）。選んだ札は墨の地に白い字。 */
+.chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-sb-chip-gap);
+  height: var(--tpl-sb-ctl-h);
+  padding: var(--tpl-sb-chip-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--tpl-sb-chip-text);
+  font-weight: 500;
+  line-height: var(--tpl-sb-chip-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  outline-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+
+.chip:focus-visible {
+  outline: var(--tpl-sb-focus-ring);
+}
+
+.spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.schedule {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-sb-row-sub);
+  white-space: nowrap;
+}
+
+.btnIcon {
+  width: var(--tpl-sb-icon-m);
+  height: var(--tpl-sb-icon-m);
+  flex-shrink: 0;
+}
+
+.danger {
+  margin: 0;
+  padding: var(--tpl-sb-band-pad);
+  border-radius: var(--tpl-sb-band-radius);
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--tpl-sb-band-text);
+}
+
+/* 表：枠 1・角丸 12・余白 4/12。行は 6 列（70・150・残り・130・90・76、間 12）。 */
+.table {
+  padding: var(--tpl-sb-tbl-pad);
+  border-radius: var(--tpl-sb-card-radius);
+  outline: 1px solid var(--color-hairline);
+}
+
+.row {
+  display: grid;
+  grid-template-columns:
+    var(--tpl-sb-ml-col-id) var(--tpl-sb-ml-col-name) minmax(0, 1fr)
+    var(--tpl-sb-ml-col-checked) var(--tpl-sb-ml-col-status) var(--tpl-sb-ml-col-action);
+  align-items: center;
+  column-gap: var(--tpl-sb-tbl-gap);
+  padding: var(--tpl-sb-tbl-row-pad);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-size: var(--tpl-sb-tbl-head);
+}
+
+.row:last-child {
+  box-shadow: none;
+}
+
+.headRow {
+  color: var(--color-ink-secondary);
+  font-weight: 600;
+}
+
+.headRow:last-child {
+  box-shadow: var(--shadow-row-line);
+}
+
+.row[data-broken] {
+  background: var(--color-status-danger-soft);
+}
+
+.cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.url {
+  color: var(--color-ink-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.urlEmpty {
+  color: var(--color-ink-secondary);
+}
+
+.editInput {
+  width: 100%;
+  max-width: var(--tpl-sb-ml-edit-w);
+  height: var(--tpl-sb-ctl-h);
+  padding: var(--tpl-sb-ctl-pad);
+  border: 0;
+  border-radius: var(--tpl-sb-ctl-radius);
+  outline: 1px solid var(--color-control-border);
+  font-size: var(--tpl-sb-tbl-head);
+}
+
+/* 状態の札（11/700・丸・余白 2/8）。 */
+.status {
+  display: inline-flex;
+  padding: var(--tpl-sb-pill-pad-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--tpl-sb-row-sub);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status[data-status='ok'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.status[data-status='broken'],
+.status[data-status='unset'] {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-pill-gap);
+  white-space: nowrap;
+}
+
+.footDanger,
+.foot {
+  margin: 0;
+  font-size: var(--tpl-sb-note-text);
+}
+
+.footDanger {
+  color: var(--color-danger);
+}
+
+.foot {
+  color: var(--color-ink-faint);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

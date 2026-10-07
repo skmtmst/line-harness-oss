@@ -141,6 +141,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/nen-members/photos/publications/order',
   'GET /api/notifications/teams',
   'PATCH /api/hq/templates/folders/{id}',
+  'POST /api/ad-platforms/logs/{id}/retry',
   'POST /api/ad-platforms/{id}/connect',
   'POST /api/events/admin/application-preview',
   'POST /api/hq/templates/folders',

@@ -232,7 +232,16 @@ async function copyText(text: string): Promise<boolean> {
   return false;
 }
 
-function CopyButton({ url, urlRef }: { url: string; urlRef: RefObject<HTMLInputElement | null> }) {
+function CopyButton({
+  url,
+  urlRef,
+  compact = false,
+}: {
+  url: string;
+  urlRef: RefObject<HTMLInputElement | null>;
+  /** 箱の中の1行 (S3uBl) では小さな四角のボタンにする。 */
+  compact?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const [manualCopy, setManualCopy] = useState(false);
 
@@ -260,9 +269,13 @@ function CopyButton({ url, urlRef }: { url: string; urlRef: RefObject<HTMLInputE
       <button
         type="button"
         onClick={handleCopy}
-        className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink"
+        className={
+          compact
+            ? 'shrink-0 rounded-lg border border-hairline bg-canvas px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-ink'
+            : 'inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink'
+        }
       >
-        <Icon name="copy" className="h-3.5 w-3.5" />
+        {!compact && <Icon name="copy" className="h-3.5 w-3.5" />}
         {copied ? 'コピー済み' : 'コピー'}
       </button>
       {manualCopy && (
@@ -316,48 +329,32 @@ function mileageSourceLabel(source: string): string {
 }
 
 /**
- * 貯まったマイル (白地に緑の数のカード。オーナー「黒がいや」)。
- * 使えるマイル・確定待ち・内訳4つ・合算の注記を出す。
+ * 貯まったマイル (★V8 S3uBl：深い緑の箱。オーナー「黒がいや」のため黒ではなく深い緑)。
+ * 使えるマイルを大きく、その下に「これまでに得た」「使った」の2つの箱。
+ * 確定待ちは紹介の箱の中へ移した (ReferralCard)。合算の注記はそのまま。
  */
 function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
   const { mileage, insights } = wallet;
   return (
-    <section aria-label="貯まったマイル" className="rounded-2xl border border-hairline bg-canvas p-[18px] text-ink">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs text-ink-secondary">使えるマイル</p>
-        {mileage.pending > 0 && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-liff-soft px-2.5 py-1 text-xs font-bold whitespace-nowrap text-liff-primary">
-            確定待ち {mileage.pending.toLocaleString()}
-            <HelpTip label="確定待ちの説明" align="right">条件の確定を待っているマイルです。</HelpTip>
-          </span>
-        )}
-      </div>
-      <p className="mt-3 text-4xl font-bold tracking-tight tabular-nums text-liff-primary">
-        {mileage.available.toLocaleString()}
-        <span className="ml-1 text-[13px] text-ink-secondary">マイル</span>
+    <section aria-label="貯まったマイル" className="flex flex-col gap-3 rounded-2xl bg-liff-deep p-[18px] text-white">
+      <p className="text-xs text-liff-deep-sub">使えるマイル</p>
+      <p className="flex items-end gap-1">
+        <span className="liff-num text-4xl font-bold tabular-nums">{mileage.available.toLocaleString()}</span>
+        <span className="text-[13px] text-liff-deep-sub">マイル</span>
       </p>
-
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-liff-soft p-3">
-          <p className="text-[11px] text-ink-secondary">これまでに得た</p>
-          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{mileage.lifetimeEarned.toLocaleString()}</p>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1 rounded-xl bg-white/10 p-3">
+          <p className="text-[11px] text-liff-deep-sub">これまでに得た</p>
+          <p className="liff-num text-xl font-bold tabular-nums">{mileage.lifetimeEarned.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl bg-liff-soft p-3">
-          <p className="text-[11px] text-ink-secondary">紹介で得た</p>
-          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{insights.referralMiles.toLocaleString()}</p>
-        </div>
-        <div className="rounded-xl bg-liff-soft p-3">
-          <p className="text-[11px] text-ink-secondary">使った</p>
-          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{mileage.spent.toLocaleString()}</p>
-        </div>
-        <div className="rounded-xl bg-liff-soft p-3">
-          <p className="text-[11px] text-ink-secondary">良質な紹介</p>
-          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{insights.qualityReferralCount.toLocaleString()}人</p>
+        <div className="flex flex-col gap-1 rounded-xl bg-white/10 p-3">
+          <p className="text-[11px] text-liff-deep-sub">使った</p>
+          <p className="liff-num text-xl font-bold tabular-nums">{mileage.spent.toLocaleString()}</p>
         </div>
       </div>
 
       {insights.accountCount > 1 && (
-        <p className="mt-3 text-xs leading-relaxed text-ink-secondary">
+        <p className="text-xs leading-relaxed text-liff-deep-sub">
           {insights.accountCount}個のLINE公式アカウントで貯めたマイルを合算しています
         </p>
       )}
@@ -476,10 +473,10 @@ function MileageOpportunities({ items }: { items: MileageOpportunity[] }) {
 function MileageHistory({ wallet }: { wallet: MileageWalletData }) {
   const { history } = wallet;
   return (
-    <section aria-label="マイル履歴" className="space-y-3">
+    <section aria-label="マイルの履歴" className="space-y-3">
       <div className="px-1">
         <h2 className="flex items-center gap-1 text-sm font-bold text-ink">
-          マイル履歴
+          マイルの履歴
           <HelpTip label="マイル履歴の説明">行動後、定期集計で反映されます。確定待ちは条件の確定待ち、取消は取り消されたものです。</HelpTip>
         </h2>
         <p className="mt-0.5 text-xs text-ink-faint">行動のあと、決まった時間にまとめて反映されます</p>
@@ -518,7 +515,7 @@ function MileageHistory({ wallet }: { wallet: MileageWalletData }) {
   );
 }
 
-/** 紹介の成果 (6-b の上)。3つの数と、追加マイルの対象の注記。 */
+/** 紹介の成果の3つの数 (開いた・友だち追加・成果になった)。紹介の箱の中に置く。 */
 function ReferralSummary({ links }: { links: AffiliateLinkData[] }) {
   const totals = links.reduce(
     (sum, link) => ({
@@ -528,29 +525,148 @@ function ReferralSummary({ links }: { links: AffiliateLinkData[] }) {
     }),
     { clicks: 0, friendAdds: 0, approved: 0 },
   );
+  const cells = [
+    { value: totals.clicks, label: '開いた' },
+    { value: totals.friendAdds, label: '友だち追加' },
+    { value: totals.approved, label: '成果になった' },
+  ];
+  return (
+    <div aria-label="紹介の成果" role="group" className="grid grid-cols-3 gap-1 py-2">
+      {cells.map((c) => (
+        <div key={c.label} className="flex flex-col items-center gap-0.5">
+          <p className="text-lg font-bold text-ink tabular-nums">{c.value.toLocaleString()}</p>
+          <p className="text-[11px] whitespace-nowrap text-ink-secondary">{c.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 箱の中の1行のリンク (★V8 S3uBl)。「名前（URL）」とコピー。 */
+function CompactLinkRow({ link }: { link: AffiliateLinkData }) {
+  const urlRef = useRef<HTMLInputElement>(null);
+  const name = link.offerName ?? link.label ?? 'リンク';
+  const shortUrl = link.url.replace(/^https?:\/\//, '');
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-hairline px-2.5 py-2">
+      <p className="min-w-0 flex-1 truncate text-xs text-ink" title={`${name}（${link.url}）`}>
+        {name}（{shortUrl}）
+      </p>
+      <CopyButton url={link.url} urlRef={urlRef} compact />
+    </div>
+  );
+}
+
+/** まだ参加していない案件の1行。「名前・リンクを発行する」と参加のボタン。 */
+function CompactOfferRow({
+  offer,
+  onEnrolled,
+}: {
+  offer: OfferData;
+  onEnrolled: (link: AffiliateLinkData) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const enrollCalledRef = useRef(false);
+
+  async function handleEnroll() {
+    if (busy || enrollCalledRef.current) return;
+    enrollCalledRef.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      onEnrolled(await postEnrollOffer(offer.id));
+    } catch (e) {
+      logFailure('affiliate-enroll', e);
+      const message = e instanceof Error ? e.message : '';
+      setError(message.includes('上限に達したため終了') ? message : SUBMIT_FAILED_MESSAGE);
+    } finally {
+      setBusy(false);
+      enrollCalledRef.current = false;
+    }
+  }
 
   return (
-    <section aria-label="紹介の成果" className="space-y-3">
-      <div className="px-1">
-        <h2 className="text-sm font-bold text-ink">紹介の成果</h2>
-        <p className="mt-0.5 text-xs text-ink-faint">
-          紹介した友だちが予約・視聴・購入へ進むと、追加マイルの対象になります
+    <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-hairline px-2.5 py-2">
+      <p className="min-w-0 flex-1 truncate text-xs text-ink" title={offer.name}>
+        {offer.name}・リンクを発行する
+      </p>
+      <button
+        type="button"
+        onClick={() => void handleEnroll()}
+        disabled={busy || offer.halted}
+        className="shrink-0 rounded-lg border border-hairline bg-canvas px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-ink disabled:opacity-50"
+      >
+        {busy ? '発行中…' : '発行する'}
+      </button>
+      {error && <p className="w-full text-xs font-bold text-danger">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * お友だちを紹介する (★V8 S3uBl の白い箱)。
+ * 説明は最初の案件の説明。主ボタンで紹介のリンクを LINE で送る (送れない端末はコピー)。
+ * その下に成果の3つの数・確定待ち・リンクの行。
+ */
+function ReferralCard({
+  links,
+  offers,
+  pendingMiles,
+  onEnrolled,
+}: {
+  links: AffiliateLinkData[];
+  offers: OfferData[];
+  pendingMiles: number;
+  onEnrolled: (link: AffiliateLinkData) => void;
+}) {
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  const lead = offers.find((o) => o.enrolled && o.description) ?? offers.find((o) => o.description);
+  // 案件のリンクを先に、案件に結びつかないリンクを後に。
+  const ordered = [...links.filter((l) => l.offerId), ...links.filter((l) => !l.offerId)];
+  const main = ordered[0];
+  const available = offers.filter((o) => !o.enrolled);
+
+  async function share() {
+    if (!main) return;
+    setShareNote(null);
+    try {
+      if (liff.isApiAvailable('shareTargetPicker')) {
+        await liff.shareTargetPicker([{ type: 'text', text: main.url }]);
+        return;
+      }
+    } catch (e) {
+      logFailure('affiliate-share', e);
+    }
+    // 送る画面を開けない端末では、リンクをコピーして知らせる。
+    const ok = await copyText(main.url);
+    setShareNote(ok ? 'リンクをコピーしました。トークに貼って送ってください。' : main.url);
+  }
+
+  return (
+    <section aria-label="お友だちを紹介する" className="flex flex-col gap-2 rounded-(--liff-radius-lg) border border-liff-line p-3.5">
+      <h2 className="text-sm font-bold text-ink">お友だちを紹介する</h2>
+      {lead?.description && (
+        <p className="text-xs leading-[18px] text-liff-sub">{lead.description}</p>
+      )}
+      {main && (
+        <Button variant="primary" onClick={() => void share()}>
+          紹介のリンクを送る
+        </Button>
+      )}
+      {shareNote && <p className="text-xs break-all text-ink-secondary">{shareNote}</p>}
+      <ReferralSummary links={links} />
+      {pendingMiles > 0 && (
+        <p className="text-xs font-semibold text-liff-wait-ink">
+          確定待ち {pendingMiles.toLocaleString()} マイル（成果の確認後に入ります）
         </p>
-      </div>
-      <Card className="grid grid-cols-3 gap-2 p-3">
-        <div className="rounded-lg bg-ground px-2 py-3 text-center">
-          <p className="text-lg font-bold text-ink tabular-nums">{totals.clicks.toLocaleString()}</p>
-          <p className="mt-0.5 text-xs whitespace-nowrap text-ink-faint">開いた</p>
-        </div>
-        <div className="rounded-lg bg-ground px-2 py-3 text-center">
-          <p className="text-lg font-bold text-ink tabular-nums">{totals.friendAdds.toLocaleString()}</p>
-          <p className="mt-0.5 text-xs whitespace-nowrap text-ink-faint">友だち追加</p>
-        </div>
-        <div className="rounded-lg bg-ground px-2 py-3 text-center">
-          <p className="text-lg font-bold text-ink tabular-nums">{totals.approved.toLocaleString()}</p>
-          <p className="mt-0.5 text-xs whitespace-nowrap text-ink-faint">成果になった</p>
-        </div>
-      </Card>
+      )}
+      {ordered.map((l) => (
+        <CompactLinkRow key={l.refCode} link={l} />
+      ))}
+      {available.map((o) => (
+        <CompactOfferRow key={o.id} offer={o} onEnrolled={onEnrolled} />
+      ))}
     </section>
   );
 }
@@ -827,7 +943,7 @@ export default function Affiliate() {
 
   if (state.phase === 'not_registered') {
     return (
-      <div className="min-h-screen bg-ground" data-design-node="S3uBl">
+      <div className="min-h-screen bg-canvas" data-design-node="S3uBl">
         <LiffHeader title="マイル・紹介" />
         <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-3 pb-12">
           {wallet && <MileageSummaryCard wallet={wallet} />}
@@ -896,19 +1012,25 @@ export default function Affiliate() {
     });
   }
 
-  // 並びは S3uBl のとおり「貯まった → 増やす → 紹介の成果」。
+  // 並びは ★V8 S3uBl のとおり「貯まった → お友だちを紹介する → マイルの履歴」。
+  // その下に、増やす取り組み・案件ごとのリンクの管理 (SNSごとの発行・数)。
   return (
-    <div className="min-h-screen bg-ground" data-design-node="S3uBl">
+    <div className="min-h-screen bg-canvas" data-design-node="S3uBl">
       <LiffHeader title="マイル・紹介" />
-      <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-3 pb-12">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-3.5 p-4 pb-12">
 
         {wallet && <MileageSummaryCard wallet={wallet} />}
 
-        {wallet && <MileageOpportunities items={wallet.opportunities} />}
+        <ReferralCard
+          links={links}
+          offers={offers}
+          pendingMiles={wallet?.mileage.pending ?? 0}
+          onEnrolled={handleOfferEnrolled}
+        />
 
         {wallet && <MileageHistory wallet={wallet} />}
 
-        <ReferralSummary links={links} />
+        {wallet && <MileageOpportunities items={wallet.opportunities} />}
 
         {enrolledOffers.length > 0 && (
           <section aria-label="参加中の案件" className="space-y-3">

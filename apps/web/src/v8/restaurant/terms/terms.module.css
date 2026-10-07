@@ -1,0 +1,71 @@
+/*
+ * ★V8 利用規約（VdKOK）。値は globals.css の `--tpl-rt-*`。
+ * 本文の枠：上下20・左右24・段の間10・角12。目次：幅260・余白16・段の間10・地 #fafafc。
+ */
+.body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-rt-half-gap);
+  padding: var(--tpl-rt-body-pad);
+  min-width: 0;
+}
+
+.document {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: var(--tpl-rt-terms-card-pad);
+  border-radius: var(--tpl-rt-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.toc {
+  position: sticky;
+  top: var(--tpl-rt-stat-pad);
+  display: flex;
+  flex: 0 0 var(--tpl-rt-toc-w);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-rt-card-gap);
+  padding: var(--tpl-rt-stat-pad);
+  border-radius: var(--tpl-rt-card-radius);
+  background: var(--color-table-head);
+}
+
+.tocTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.tocList {
+  align-self: stretch;
+  max-height: var(--tpl-rt-toc-h);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.tocLink {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rt-toc-lh);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.tocLink:hover {
+  text-decoration: underline;
+}
+
+.icon15 {
+  width: var(--tpl-rt-icon-15);
+  height: var(--tpl-rt-icon-15);
+  flex-shrink: 0;
+}

@@ -24,7 +24,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import MileageV8 from './mileage-v8'
+import MileageV8 from '@/v8/mileage/mileage'
 import {
   api,
   type MileageAdjustmentApprovalRequest,

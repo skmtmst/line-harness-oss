@@ -3,7 +3,7 @@
  * R623/R624 の結合再現（Toast + runUndoable/runOptimistic）。
  * fake timers + stub commit で、実APIを叩かずに画面と保存の一致を見る。
  */
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ToastHost, { clearToastsForTest, notifyToast, undoLatestToast } from '@/components/shared/toast'
 import { runOptimistic, runUndoable } from './undoable'
@@ -18,6 +18,15 @@ afterEach(() => {
   clearToastsForTest()
   vi.useRealTimers()
 })
+
+/*
+ * 知らせは置き場所の読み上げの入れ物（role=status「知らせ」）の中にあり、
+ * 1件ずつは role を持たない（動きの点検 14 番）。文で1件の箱を探す。
+ */
+function toastBox(text: string): HTMLElement | null {
+  const node = within(screen.getByRole('status', { name: '知らせ' })).queryByText(text)
+  return node ? (node.closest('[data-toast]') as HTMLElement) : null
+}
 
 function undoButton(container: HTMLElement): HTMLButtonElement {
   const found = [...container.querySelectorAll('button')].find((el) => el.textContent === '元に戻す')
@@ -35,7 +44,7 @@ describe('R623 通知のhoverと送信期限は一つの期限', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000)
     })
-    const status = container.querySelector('[role="status"]')!
+    const status = toastBox('外しました')!
     act(() => {
       fireEvent.pointerEnter(status)
     })
@@ -44,7 +53,7 @@ describe('R623 通知のhoverと送信期限は一つの期限', () => {
       await vi.advanceTimersByTimeAsync(6000)
     })
     expect(commit).not.toHaveBeenCalled()
-    expect(container.querySelector('[role="status"]')).not.toBeNull()
+    expect(toastBox('外しました')).not.toBeNull()
     // 離したら残り3秒で送る
     act(() => {
       fireEvent.pointerLeave(status)
@@ -70,7 +79,7 @@ describe('R623 通知のhoverと送信期限は一つの期限', () => {
       await vi.advanceTimersByTimeAsync(2000)
     })
     act(() => {
-      fireEvent.pointerEnter(container.querySelector('[role="status"]')!)
+      fireEvent.pointerEnter(toastBox('外しました')!)
     })
     await act(async () => {
       await vi.advanceTimersByTimeAsync(6000)
@@ -100,7 +109,7 @@ describe('R623 通知のhoverと送信期限は一つの期限', () => {
     // 知らせは消え、遅れて届いた取り消しは画面だけ戻さない
     expect(undoLatestToast()).toBe(false)
     expect(undo).not.toHaveBeenCalled()
-    expect(container.querySelector('[role="status"]')).toBeNull()
+    expect(toastBox('外しました')).toBeNull()
   })
 })
 
@@ -116,7 +125,7 @@ describe('R623b 消えた通知の未取消の保存は残り時間で必ず一�
       await vi.advanceTimersByTimeAsync(2000)
     })
     act(() => {
-      fireEvent.pointerEnter(container.querySelector('[role="status"]')!)
+      fireEvent.pointerEnter(toastBox('外しました')!)
     })
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000)
@@ -148,7 +157,7 @@ describe('R623b 消えた通知の未取消の保存は残り時間で必ず一�
       await vi.advanceTimersByTimeAsync(2000)
     })
     act(() => {
-      fireEvent.pointerEnter(container.querySelector('[role="status"]')!)
+      fireEvent.pointerEnter(toastBox('外しました')!)
     })
     // 止まったまま4件目が来て押し出される（残り3秒）
     act(() => {
@@ -179,7 +188,7 @@ describe('R623b 消えた通知の未取消の保存は残り時間で必ず一�
       await vi.advanceTimersByTimeAsync(2000)
     })
     act(() => {
-      fireEvent.focusIn(container.querySelector('[role="status"]')!)
+      fireEvent.focusIn(toastBox('外しました')!)
     })
     // 元の期限（5秒）を過ぎても止まったまま
     await act(async () => {
@@ -211,8 +220,8 @@ describe('R623b 消えた通知の未取消の保存は残り時間で必ず一�
       await vi.advanceTimersByTimeAsync(1000)
     })
     act(() => {
-      fireEvent.pointerEnter(container.querySelector('[role="status"]')!)
-      fireEvent.focusIn(container.querySelector('[role="status"]')!)
+      fireEvent.pointerEnter(toastBox('外しました')!)
+      fireEvent.focusIn(toastBox('外しました')!)
     })
     // 元の期限を過ぎても止まったまま
     await act(async () => {
@@ -221,7 +230,7 @@ describe('R623b 消えた通知の未取消の保存は残り時間で必ず一�
     expect(commit).not.toHaveBeenCalled()
     // マウスだけ離してもfocusが残っていれば止まったまま
     act(() => {
-      fireEvent.pointerLeave(container.querySelector('[role="status"]')!)
+      fireEvent.pointerLeave(toastBox('外しました')!)
     })
     await act(async () => {
       await vi.advanceTimersByTimeAsync(6000)
@@ -229,7 +238,7 @@ describe('R623b 消えた通知の未取消の保存は残り時間で必ず一�
     expect(commit).not.toHaveBeenCalled()
     // 両方離したら残り4秒で送る
     act(() => {
-      fireEvent.focusOut(container.querySelector('[role="status"]')!)
+      fireEvent.focusOut(toastBox('外しました')!)
     })
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3999)

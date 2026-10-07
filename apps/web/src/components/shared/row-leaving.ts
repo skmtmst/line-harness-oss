@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import { motionMs } from './overlay-utils'
 
 /**
  * 行を消すときの合図（★V8 仕上げ3回目 ④）。
@@ -24,7 +25,7 @@ export function useRowLeaving() {
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (!reduce) {
       await new Promise<void>((resolve) => {
-        setTimeout(resolve, 150)
+        setTimeout(resolve, motionMs('--motion-exit', 150))
       })
     }
     try {

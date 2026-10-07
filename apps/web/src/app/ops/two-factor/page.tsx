@@ -13,6 +13,8 @@ import { logoutAndGoToLogin } from '@/lib/logout'
 import { qrToDataURL } from '@/lib/qr-image'
 import OtpInput from '@/components/shared/otp-input'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import OpsTwoFactorV8 from '@/v8/ops/two-factor'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
  * 運営コンソールの 2要素認証の設定（★V6 37-10-B `NAJKx`）。
@@ -24,6 +26,11 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null }
 
 export default function OpsTwoFactorPage() {
+  // ★V8 は src/v8/ops/two-factor.tsx。v7 は下のまま。
+  return useAdminTheme() === 'v8' ? <OpsTwoFactorV8 /> : <OpsTwoFactorV7 />
+}
+
+function OpsTwoFactorV7() {
   const [session, setSession] = useState<Session | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'done' | 'denied'>('loading')
   const [uri, setUri] = useState('')

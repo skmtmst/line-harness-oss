@@ -83,19 +83,22 @@
     scale var(--motion-snap) var(--motion-spring);
 }
 
-/* ★A の押した感じ（M10）：ボタンの共通部品と同じ（0.97・濃く・80ms／ばね戻り）。 */
+/*
+ * 押した感じ（動きの点検 6 番）：乗せたときの薄い地より少し暗く、ごく少し縮む
+ * （--press-scale・--motion-fast／離すとばね戻り）。絵のボタンは白地なので弱い暗さ。
+ */
 [data-theme='v8'] .button:active:not(:disabled) {
-  filter: brightness(0.95);
+  filter: var(--press-dim-soft);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   [data-theme='v8'] .button:active:not(:disabled) {
-    scale: 0.97;
+    scale: var(--press-scale);
     transition:
-      background-color var(--motion-instant) var(--motion-ease-out),
-      color var(--motion-instant) var(--motion-ease-out),
-      filter var(--motion-instant) var(--motion-ease-out),
-      scale var(--motion-instant) var(--motion-ease-out);
+      background-color var(--motion-fast) var(--motion-ease-out),
+      color var(--motion-fast) var(--motion-ease-out),
+      filter var(--motion-fast) var(--motion-ease-out),
+      scale var(--motion-fast) var(--motion-ease-out);
   }
 }
 
