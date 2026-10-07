@@ -169,14 +169,15 @@ test('v8 では新しい一覧（FM94M）が出て、v7 は出ない', async () 
   expect(host?.textContent).toContain('問い合わせ先')
 })
 
-test('staff では閲覧のみの帯が出て、作る操作が押せない', async () => {
+// 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
+test('staff では閲覧のみの帯が出て、作る操作は出さない', async () => {
   window.localStorage.setItem('lh_staff_role', 'staff')
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   expect(host?.textContent).toContain('閲覧のみで見ています')
-  const createButton = Array.from(host?.querySelectorAll('button') ?? [])
-    .find((button) => button.textContent?.includes('共通情報を作る'))
-  expect(createButton?.hasAttribute('disabled')).toBe(true)
+  const createButtons = Array.from(host?.querySelectorAll('button, a') ?? [])
+    .filter((element) => element.textContent?.includes('共通情報を作る'))
+  expect(createButtons).toHaveLength(0)
 })
 
 test('v7 では従来の一覧が出て、新しい一覧は出ない', async () => {

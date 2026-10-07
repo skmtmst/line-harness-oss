@@ -137,7 +137,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
           <h2 className={styles.sectionTitle}>開ける時間</h2>
           <p className={styles.sectionDesc}>曜日ごとに受付の時間と休けいを決めます</p>
         </div>
-        <fieldset disabled={!canEdit} className="contents">
+        <div className="contents">
           {DAYS.map(({ weekday, label }) => {
             const day = draft.find((entry) => entry.weekday === weekday)
             const intervals = day?.intervals ?? []
@@ -145,6 +145,26 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             const closedText = settings.businessHoursConfigured
               ? '休み（定休日）・お客さまの画面に出ません'
               : '未設定（現在は担当者の勤務時間どおり）'
+            // 閲覧のみ：つまみ・時刻の欄・足す／消す口は置かず、いまの時間を文字で見せる（2026-10-06 オーナー決定）。
+            if (!canEdit) {
+              return (
+                <div key={weekday} className={styles.dayRow}>
+                  <div className={styles.dayName}>
+                    <span className={styles.dayLabel}>{label.replace('曜日', '')}</span>
+                  </div>
+                  <div className={styles.dayBody}>
+                    {intervals.length === 0 ? (
+                      <span className={styles.dayOff}>{closedText}</span>
+                    ) : intervals.map((interval, index) => (
+                      <p key={index} className={styles.intervalLine}>
+                        {interval.start}〜{interval.end}
+                        <span className={styles.sameTimeLabel}>同時 {interval.capacity ?? 1}</span>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )
+            }
             return (
               <div key={weekday} className={styles.dayRow}>
                 <div className={styles.dayName}>
@@ -207,7 +227,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
               </div>
             )
           })}
-        </fieldset>
+        </div>
         {saveError ? <p className="text-danger mt-3 text-sm" role="alert">{saveError}</p> : null}
 
         {/* 絵 yRPxl：設備と空きの確かめは、開ける時間の白い板の中の入れ子の箱（枠・角12・内側16）。 */}

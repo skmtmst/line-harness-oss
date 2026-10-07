@@ -731,3 +731,32 @@ a.railStep:hover .railLabel {
 .cancelKeep {
   margin-left: var(--tpl-sc2-cancel-keep-gap);
 }
+
+/*
+ * 予約を取り消す窓（BeNtj）の頭：題は 16/700 の1行（幅432）、説明は題の12下・行21。
+ * 共通の窓は右上の×が頭の行で幅を取り、題が2行に折れていた。×は消さず（閉じ方は×・UI-25）、
+ * この窓だけ右上の角（窓の余白の中・24角）へ浮かせて題の幅を空ける。共通部品は変えない（下のボタンの段を持つ窓だけに効かせる）。
+ */
+:global([data-theme='v8'] [data-design-part='dialog']):has(.cancelButtons) {
+  position: relative;
+}
+:global([data-theme='v8'] [data-design-part='dialog']):has(.cancelButtons) :global([aria-label='閉じる']) {
+  position: absolute;
+  top: var(--tpl-wb-bc-close-inset);
+  right: var(--tpl-wb-bc-close-inset);
+  width: var(--tpl-wb-bc-close-size);
+  height: var(--tpl-wb-bc-close-size);
+  min-width: 0;
+  min-height: 0;
+}
+:global([data-theme='v8'] [data-design-part='dialog']):has(.cancelButtons) h2 {
+  font-size: var(--text-lead);
+  font-weight: var(--tpl-wb-bc-title-weight);
+  line-height: var(--tpl-wb-bc-title-lh);
+}
+:global([data-theme='v8'] [data-design-part='dialog']):has(.cancelButtons) h2 + p {
+  margin-top: var(--tpl-wb-bc-desc-after-title);
+  line-height: var(--tpl-wb-bc-desc-lh);
+  /* 絵は字の途中で折る（全体の言葉のまとまりで折ると3行になる）。 */
+  word-break: normal;
+}

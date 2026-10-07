@@ -35,6 +35,12 @@ import {
 } from './publish-plan-draft'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import dynamic from 'next/dynamic'
+/*
+ * ★V8 の作るウィザード（直すとき）と詳細は、V8 のときだけ読み込む（v7 の編集画面と試験に V8 の部品を持ち込まない）。
+ */
+const RichMenuCreateV8 = dynamic(() => import('../new/create-v8'), { ssr: false })
+const RichMenuDetailV8 = dynamic(() => import('@/v8/rich-menu-edit/detail'), { ssr: false })
 import { PublishHistorySection } from './publish-history'
 import { PublishProgressSection } from './publish-progress-section'
 import { PrepublishCheckSection } from './prepublish-check-section'
@@ -256,7 +262,15 @@ function RichMenuEditPageInner() {
   const router = useRouter()
   const groupId = searchParams.get('id') ?? ''
   const editorStep = searchParams.get('step')
+  const theme = useAdminTheme()
   usePageTitle(editorStep === 'targeting' ? '誰に出すか' : editorStep === 'publish' ? '公開のしかた' : 'メニューを作る')
+  /*
+   * ★V8：手順の指定（?step=）があれば、作ると同じウィザード（作る①〜④・競合 r8dGXT）で直す。
+   * 指定が無ければメニューの詳細（公開した・公開の進み hKr8f）。下書きは詳細からウィザードへ送る。
+   */
+  if (theme === 'v8' && groupId) {
+    return editorStep ? <RichMenuCreateV8 editGroupId={groupId} /> : <RichMenuDetailV8 groupId={groupId} />
+  }
 
   if (!groupId) {
     /*

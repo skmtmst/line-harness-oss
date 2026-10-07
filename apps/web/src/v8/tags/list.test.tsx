@@ -73,10 +73,12 @@ afterEach(async () => {
 const fixture = { items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }
 
 describe('V8 友だち属性 タグの一覧', () => {
-  it('絵の列（★・タグ・フォルダ・人数・付け方・連動・使っている所・操作）と4つのタブを出す', async () => {
+  it('絵の列（★・タグ・人数・付け方・連動・使っている所・操作）と4つのタブを出し、名前の前にフォルダの色の丸', async () => {
     await render(<TagsList fixture={fixture} />)
     const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())
-    expect(heads).toEqual(['一覧に出す', 'タグ', 'フォルダ', '人数', '付け方', '連動', '使っている所', '操作'])
+    // 左にフォルダの列があるので表にフォルダ列は置かない（2026-10-07 オーナー）。
+    expect(heads).toEqual(['一覧に出す', 'タグ', '人数', '付け方', '連動', '使っている所', '操作'])
+    expect(container.querySelectorAll('tbody [data-folder-dot]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     for (const label of ['タグ', '友だち情報欄', '対応マーク', '保存した検索']) {
       expect(screen.getAllByRole('tab', { name: label }).length).toBeGreaterThan(0)
     }
@@ -85,10 +87,14 @@ describe('V8 友だち属性 タグの一覧', () => {
     expect(screen.getAllByText('1月13日（火）登録').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
   })
 
-  it('1152 の板 ID は aPeD8、閲覧のみは fkGUR で帯を出し、作る・CSV を押せない', async () => {
+  // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
+  it('1152 の板 ID は aPeD8、閲覧のみは fkGUR で帯を出し、作る・CSV・行の「…」を出さない', async () => {
     narrow.value = true
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelector('[data-design-node="aPeD8"]')).not.toBeNull()
+    // 1152 はフォルダの列を畳むので、表にフォルダ列を出して丸は付けない（絵 aPeD8）。
+    expect([...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())).toContain('フォルダ')
+    expect(container.querySelectorAll('tbody [data-folder-dot]').length).toBe(0)
     await act(async () => root.unmount())
     root = createRoot(container)
     role.value = 'staff'
@@ -96,10 +102,10 @@ describe('V8 友だち属性 タグの一覧', () => {
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelector('[data-design-node="fkGUR"]')).not.toBeNull()
     expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'CSVで一括登録する' }) as HTMLButtonElement).disabled).toBe(true)
-    for (const button of screen.getAllByRole('button', { name: 'タグを作る' })) {
-      expect((button as HTMLButtonElement).disabled).toBe(true)
-    }
+    expect(screen.queryByRole('button', { name: 'CSVで一括登録する' })).toBeNull()
+    expect(screen.queryAllByRole('button', { name: 'タグを作る' })).toHaveLength(0)
+    expect(screen.queryAllByRole('link', { name: 'タグを作る' })).toHaveLength(0)
+    expect(screen.queryAllByRole('button', { name: /^タグ「.+」の操作$/ })).toHaveLength(0)
   })
 
   it('「よく使う絞り込み」で ★のみ表示 に絞れる', async () => {
@@ -113,9 +119,10 @@ describe('V8 友だち属性 タグの一覧', () => {
   })
 
   it('タブを押すとそのタブの本文に切り替わる', async () => {
-    await render(<TagsList fixture={fixture} renderTab={(tab) => <p>本文:{tab}</p>} />)
+    await render(<TagsList fixture={fixture} />)
     await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '対応マーク' })) })
-    expect(screen.getByText('本文:marks')).toBeTruthy()
+    expect(container.querySelector('[data-design-node="vKDj5"]')).not.toBeNull()
+    expect(screen.getByText('対応マークを読み込めませんでした')).toBeTruthy()
   })
 
   it('連動は絵の書き方（本人+10・1.2倍 他1）', () => {

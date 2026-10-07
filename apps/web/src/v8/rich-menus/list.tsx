@@ -430,7 +430,7 @@ export default function RichMenusListV8() {
    * 絞り込みが無いときだけ。ページに収まりきらないときは全件を取り直してから計算する。
    */
   const reorderDisabledReason = !canEdit
-    ? NO_MANAGE_NOTE
+    ? '閲覧のみ'
     : sortKey !== 'priority'
       ? '並びを「出す順番」にすると動かせます'
       : query.trim() !== '' || savedFilter !== '' || folderFilter !== ''
@@ -714,8 +714,6 @@ export default function RichMenusListV8() {
       items.push({
         id: 'apply',
         label: '表示先を変える',
-        disabled: !canEdit,
-        disabledReason: !canEdit ? NO_MANAGE_NOTE : undefined,
         onSelect: () => setApplyTo(g),
       })
     }
@@ -727,8 +725,6 @@ export default function RichMenusListV8() {
     items.push({
       id: 'duplicate',
       label: '複製する',
-      disabled: !canEdit,
-      disabledReason: !canEdit ? NO_MANAGE_NOTE : undefined,
       onSelect: () => {
         setDuplicateError(null)
         setDuplicateTarget(g)
@@ -739,11 +735,10 @@ export default function RichMenusListV8() {
       label: g.status === 'published' ? '取り下げ・削除する' : '削除する',
       tone: 'danger',
       dividerBefore: true,
-      disabled: !canEdit,
-      disabledReason: !canEdit ? NO_MANAGE_NOTE : undefined,
       onSelect: () => handleDelete(g),
     })
-    return items
+    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見る項目だけ残す。
+    return canEdit ? items : items.filter((item) => item.id === 'edit' || item.id === 'connections')
   }
 
   /* ===== フォルダ ===== */
@@ -769,23 +764,21 @@ export default function RichMenusListV8() {
   ]
 
   const goCreate = () => router.push('/rich-menus/new')
-  const createButton = (
+  const createButton = canEdit ? (
     <Button
       type="button"
       variant="primary"
       className={narrow ? undefined : styles.createWide}
-      disabled={!canEdit}
-      title={!canEdit ? NO_MANAGE_NOTE : undefined}
       onClick={goCreate}
     >
       <Plus size={15} aria-hidden="true" />
       メニューを作る
     </Button>
-  )
+  ) : null
 
   const folderPanel = (
     <FolderPanel
-      createAction={createButton}
+      createAction={createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
       activeId={folderFilter}
       onSelect={(id) => {
         setFolderFilter(id)
@@ -793,8 +786,6 @@ export default function RichMenusListV8() {
       }}
       onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
       addFolderLabel="フォルダを追加"
-      addFolderDisabled={!canEdit}
-      addFolderTitle={!canEdit ? NO_MANAGE_NOTE : undefined}
       rows={folderRows}
     >
       <p className={styles.folderNote}>フォルダを消しても、中のメニューは未分類に残ります</p>
@@ -992,10 +983,10 @@ export default function RichMenusListV8() {
         <ImageIcon size={16} aria-hidden="true" />,
         'まだリッチメニューはありません',
         'トーク画面の下にボタンのメニューを出せます。LINEにあるメニューを取り込むこともできます。',
-        <Button type="button" variant="primary" disabled={!canEdit} title={!canEdit ? NO_MANAGE_NOTE : undefined} onClick={goCreate}>
+        canEdit ? <Button type="button" variant="primary" onClick={goCreate}>
           <Plus size={15} aria-hidden="true" />
           メニューを作る
-        </Button>,
+        </Button> : null,
       )
     )
   ) : (
@@ -1042,14 +1033,16 @@ export default function RichMenusListV8() {
                     onDrop={() => void dropOn(g.id)}
                   >
                     <span className={styles.orderInner}>
-                      <ReorderGrip
+                      {/* 閲覧のみ：つまみは隠し、幅だけ空けて順番の数字の位置を保つ */}
+                      {!canEdit && <span className={styles.gripSpace} aria-hidden="true">⠿</span>}
+                      {canEdit && <ReorderGrip
                         label={g.name}
                         disabled={reorderDisabledReason !== null}
                         disabledReason={reorderDisabledReason ?? undefined}
                         onMove={(direction) => void keyboardMove(g.id, direction)}
                       >
                         <span aria-hidden>⠿</span>
-                      </ReorderGrip>
+                      </ReorderGrip>}
                       <span className={styles.orderNumber}>{g.targetingPriority + 1}</span>
                     </span>
                   </Td>
