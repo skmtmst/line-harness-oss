@@ -18,7 +18,7 @@
 .root { display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap-outer); min-width: 0; }
 .loading { color: var(--color-ink-faint); font-size: var(--tpl-fe-body-size); }
 
-.backLink { display: inline-flex; align-items: center; gap: var(--tpl-fe-icon-gap); }
+.backLink { display: inline-flex; align-items: center; gap: var(--tpl-fe-icon-gap); font-size: var(--text-label); text-decoration: none; }
 
 
 /* ---------- 段（カード） ---------- */

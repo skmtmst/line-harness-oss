@@ -12,7 +12,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, Copy, FlaskConical, Smartphone, Upload } from 'lucide-react'
+import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react'
 import {
   emptyLayout,
   formThemeContrastError,
@@ -743,8 +743,7 @@ function FormEditInner() {
       title={name || 'フォーム名未設定'}
       identity={(
         <Link href="/form-submissions" className={styles.backLink}>
-          <ArrowLeft size={14} aria-hidden="true" />
-          回答フォームへ
+          ← 回答フォームへ
         </Link>
       )}
       steps={(
