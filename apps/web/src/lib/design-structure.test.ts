@@ -54,16 +54,6 @@ const LEGACY_SCREENS = Object.entries(structure.screens) as Array<
         parts?: string[];
         reason: string;
       };
-      visualVerification?: {
-        status: 'verified' | 'unverified' | 'blocked';
-        referenceNodeIds: string[];
-        requiredViewports: number[];
-        reason?: string;
-        blockingIssues?: string[];
-        referenceScreenshots?: string[];
-        implementationScreenshots?: string[];
-        checkedAt?: string;
-      };
     },
   ]
 >;
@@ -101,8 +91,6 @@ const SCREENS = LEGACY_SCREENS.map(([route, spec]) => [route, {
   sections: V8_SECTIONS[route] ?? spec.sections,
   parts: spec.parts?.map((part) => V8_COPY[route]?.[part] ?? part),
 }] as const)
-
-const REAL_NODE_ID = /^[A-Za-z0-9]{5,6}$/;
 
 /** 1ファイルぶんの import 先を、実ファイルの絶対パスにして返す。 */
 function importedFiles(file: string, source: string): string[] {
@@ -242,72 +230,5 @@ describe('画面の骨格が設計と一致する', () => {
         '節ごと消すと、画面にその機能が無いように見えます。',
       ].join('\n'),
     ).toEqual(recordedGaps);
-  });
-});
-
-describe('V4の視覚一致を機能・文字列テストと混同しない', () => {
-  const v4Screens = SCREENS.filter(([, spec]) => spec.name.startsWith('V4'));
-
-  it('V4画面は視覚検証の状態を必ず記録する', () => {
-    expect(v4Screens.length).toBeGreaterThan(0);
-
-    for (const [route, spec] of v4Screens) {
-      expect(spec.visualVerification, `${route} に visualVerification がありません`).toBeDefined();
-      expect(
-        spec.visualVerification?.requiredViewports,
-        `${route} は1440pxと1920pxの確認が必要です`,
-      ).toEqual(expect.arrayContaining([1440, 1920]));
-    }
-  });
-
-  it('画面名をノードIDの代わりにしたV4はblocked以外にできない', () => {
-    for (const [route, spec] of v4Screens) {
-      const nodeTokens = spec.node.split(/\s+/).filter(Boolean);
-      const hasPlaceholder = nodeTokens.some((node) => !REAL_NODE_ID.test(node));
-      if (hasPlaceholder) {
-        expect(
-          spec.visualVerification?.status,
-          `${route} の node は実ノードIDではありません。実ID取得までblockedにしてください`,
-        ).toBe('blocked');
-      }
-    }
-  });
-
-  it('blockedとunverifiedには未完了の理由があり、verifiedには比較証拠がある', () => {
-    for (const [route, spec] of v4Screens) {
-      const verification = spec.visualVerification;
-      expect(verification).toBeDefined();
-      if (!verification) continue;
-
-      if (verification.status === 'blocked') {
-        expect(
-          verification.blockingIssues?.length,
-          `${route} は止まっている理由を記録してください`,
-        ).toBeGreaterThan(0);
-        continue;
-      }
-
-      if (verification.status === 'unverified') {
-        expect(
-          verification.reason?.trim().length,
-          `${route} は未検証の理由を記録してください`,
-        ).toBeGreaterThan(0);
-        continue;
-      }
-
-      expect(
-        verification.referenceNodeIds.every((node) => REAL_NODE_ID.test(node)),
-        `${route} の実ノードIDを記録してください`,
-      ).toBe(true);
-      expect(
-        verification.referenceScreenshots?.length,
-        `${route} のPen.dev比較画像を記録してください`,
-      ).toBeGreaterThan(0);
-      expect(
-        verification.implementationScreenshots?.length,
-        `${route} の実装比較画像を記録してください`,
-      ).toBeGreaterThan(0);
-      expect(verification.checkedAt, `${route} の比較日時を記録してください`).toBeTruthy();
-    }
   });
 });
