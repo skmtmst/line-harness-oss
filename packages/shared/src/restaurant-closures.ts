@@ -3,22 +3,25 @@ export type RestaurantClosureKind = 'temporary_closed' | 'private_event' | 'main
 export interface RestaurantClosureInput {
   storeId: string; startDate: string; endDate: string; allDay: boolean;
   startTime?: string | null; endTime?: string | null; kind: RestaurantClosureKind;
-  memo?: string | null; tableIds?: string[];
+  memo?: string | null; tableIds?: string[]; notifyMedia?: boolean;
 }
 export interface RestaurantClosure extends RestaurantClosureInput {
-  id: string; startTime: string | null; endTime: string | null; memo: string | null;
+  id: string; notifyMedia: boolean; name: string; startTime: string | null; endTime: string | null; memo: string | null;
   tableIds: string[]; createdBy: string | null; createdByName: string | null;
   createdAt: string; updatedAt: string; version: number;
 }
 export interface RestaurantClosureReservation {
   id: string; startsAt: string; endsAt: string; guestCount: number; customerName: string;
-  source: string; tableId: string | null; friendId: string | null; isLineFriend: boolean;
+  customerPhone: string | null; contacted: boolean; source: string; tableId: string | null; friendId: string | null; isLineFriend: boolean;
 }
 export interface RestaurantClosurePreview {
-  reservations: RestaurantClosureReservation[]; waitlistCount: number; conflicts: RestaurantClosure[];
+  contactedCount: number; reservations: RestaurantClosureReservation[]; waitlistCount: number; conflicts: RestaurantClosure[];
 }
 export interface RestaurantClosureSaveResult extends RestaurantClosurePreview { closure: RestaurantClosure; }
 export interface RestaurantSeatAvailability {
   storeId: string; startsAt: string; endsAt: string; guestCount: number;
   tables: Array<{ id: string; label: string; minCapacity: number; maxCapacity: number }>;
 }
+
+export type RestaurantClosurePreviewInput = RestaurantClosureInput & { excludeId?: string };
+export interface RestaurantCloseNotificationSettings { storeId: string; notifyReopen: boolean; recipientMode: "responsible" | "manager" | "selected"; membershipIds: string[]; version: number; }

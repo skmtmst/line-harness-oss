@@ -46,6 +46,7 @@ function isCoveredRoute(method: string, path: string): boolean {
   if (path.startsWith('/api/restaurant-test') && ![
     '/api/restaurant-test/closures', '/api/restaurant-test/closures/preview', '/api/restaurant-test/closures/:id',
     '/api/restaurant-test/availability', '/api/restaurant-test/google/hours/from-closure',
+    '/api/restaurant-test/closures/:id/contact-status', '/api/restaurant-test/close-notification-settings',
   ].includes(path)) return false;
   if (path.startsWith('/api/internal')) return false;
   if (path.startsWith('/admin/update')) return false;
@@ -131,6 +132,16 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/liff/visit-stamps/cards/{id}/paper-requests',
+  'GET /api/liff/visit-stamps/paper-photos/{id}',
+  'GET /api/restaurant-test/close-notification-settings',
+  'GET /api/restaurant-test/closures/{id}/contact-status',
+  'GET /api/visit-stamps/entries',
+  'GET /api/visit-stamps/paper-photos/{id}',
+  'PATCH /api/hq/broadcasts/{id}',
+  'POST /api/liff/visit-stamps/cards/{id}/paper-photos',
+  'PUT /api/restaurant-test/close-notification-settings',
+
   'GET /api/scenario-drafts/{key}',
   'PUT /api/scenario-drafts/{key}',
   'DELETE /api/scenario-drafts/{key}',

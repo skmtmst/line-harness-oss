@@ -1,3 +1,4 @@
+import { normalizeStoreInterpolations } from '@line-crm/shared';
 import {
   getFriendFieldMap,
   getCommonVarMap,
@@ -30,7 +31,7 @@ export async function resolveInterpolationExtra(
   content: string,
 ): Promise<InterpolationExtra> {
   const needsFields = FIELD_PATTERN.test(content);
-  const needsVars = VAR_PATTERN.test(content);
+  const needsVars = VAR_PATTERN.test(normalizeStoreInterpolations(content));
   if (!needsFields && !needsVars) return {};
 
   const account = needsVars
@@ -176,7 +177,7 @@ export function substituteCommonVars(
   content: string,
   vars: Record<string, string>,
 ): string {
-  return content.replace(
+  return normalizeStoreInterpolations(content).replace(
     /\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g,
     (_match, key: string) => vars[key],
   );

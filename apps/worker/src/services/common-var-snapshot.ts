@@ -1,3 +1,4 @@
+import { normalizeStoreInterpolations } from '@line-crm/shared';
 import {
   resolveCommonVarValuesAt,
   type CommonVarResolutionEntry,
@@ -26,7 +27,7 @@ export class BroadcastCommonVarResolutionError extends Error {
 
 export function commonVarKeysInContent(content: string): string[] {
   return [...new Set(
-    [...content.matchAll(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g)].map((match) => match[1]),
+    [...normalizeStoreInterpolations(content).matchAll(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g)].map((match) => match[1]),
   )];
 }
 

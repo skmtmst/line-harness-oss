@@ -6205,6 +6205,12 @@ CREATE TABLE rt_channel_close_tasks (
  UNIQUE(slot_id,channel)
 );
 
+CREATE TABLE rt_close_notification_settings (
+ store_id TEXT PRIMARY KEY REFERENCES rt_stores(id), notify_reopen INTEGER NOT NULL DEFAULT 1 CHECK(notify_reopen IN (0,1)),
+ recipient_mode TEXT NOT NULL DEFAULT 'responsible' CHECK(recipient_mode IN ('responsible','manager','selected')),
+ membership_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(membership_ids_json)), version INTEGER NOT NULL DEFAULT 1
+);
+
 CREATE TABLE rt_closure_close_outbox (
  id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES rt_closure_close_tasks(id), generation INTEGER NOT NULL,
  membership_id TEXT NOT NULL REFERENCES rt_memberships(id), retry_key TEXT NOT NULL, sent_at TEXT, lease_until TEXT, lease_token TEXT,
@@ -6229,7 +6235,7 @@ CREATE TABLE rt_closures (
  memo TEXT, table_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(table_ids_json) AND json_type(table_ids_json)='array'),
  periods_json TEXT NOT NULL CHECK(json_valid(periods_json) AND json_type(periods_json)='array' AND json_array_length(periods_json)>0),
  created_by TEXT, created_by_name TEXT, version INTEGER NOT NULL DEFAULT 1 CHECK(version>0),
- created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), archived_at TEXT,
+ created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), archived_at TEXT, notify_media INTEGER NOT NULL DEFAULT 1 CHECK(notify_media IN (0,1)),
  CHECK((all_day=1 AND start_time IS NULL AND end_time IS NULL) OR (all_day=0 AND start_time IS NOT NULL AND end_time>start_time))
 );
 
@@ -7665,11 +7671,21 @@ CREATE TABLE visit_stamp_entries (
  UNIQUE(card_id,friend_id,idempotency_key)
 );
 
+CREATE TABLE visit_stamp_paper_photos (
+ id TEXT PRIMARY KEY, card_id TEXT NOT NULL REFERENCES visit_stamp_cards(id), friend_id TEXT NOT NULL REFERENCES friends(id),
+ line_account_id TEXT NOT NULL REFERENCES line_accounts(id), object_key TEXT NOT NULL UNIQUE, content_type TEXT NOT NULL,
+ size INTEGER NOT NULL CHECK(size BETWEEN 1 AND 5242880), created_at TEXT NOT NULL DEFAULT(datetime('now'))
+);
+
 CREATE TABLE visit_stamp_paper_requests (
  id TEXT PRIMARY KEY, card_id TEXT NOT NULL REFERENCES visit_stamp_cards(id), friend_id TEXT NOT NULL REFERENCES friends(id),
  line_account_id TEXT NOT NULL REFERENCES line_accounts(id), photo_url TEXT NOT NULL, stamps INTEGER NOT NULL CHECK(stamps BETWEEN 1 AND 10000),
  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')), reason TEXT, reviewed_by TEXT, reviewed_at TEXT,
  created_at TEXT NOT NULL DEFAULT(datetime('now'))
+, submitted_friend_id TEXT REFERENCES friends(id));
+
+CREATE TABLE visit_stamp_pin_attempts (
+ line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id), attempts INTEGER NOT NULL DEFAULT 0, locked_until TEXT
 );
 
 CREATE TABLE visit_stamp_redemptions (
@@ -10394,9 +10410,9 @@ CREATE TRIGGER rt_closure_reservation_insert BEFORE INSERT ON rt_reservations WH
 
 CREATE TRIGGER rt_closure_reservation_update BEFORE UPDATE ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND (NEW.store_id<>OLD.store_id OR NEW.table_id IS NOT OLD.table_id OR julianday(NEW.starts_at)<>julianday(OLD.starts_at) OR julianday(NEW.ends_at)<>julianday(OLD.ends_at) OR OLD.status IN ('cancelled','no_show') OR (OLD.status='pending' AND OLD.hold_expires_at IS NOT NULL AND NEW.status<>'pending')) AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) p WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND julianday(json_extract(p.value,'$.startsAt'))<julianday(NEW.ends_at) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at) AND (json_array_length(c.table_ids_json)=0 OR NEW.table_id IS NULL OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) t WHERE t.value=NEW.table_id))) BEGIN SELECT RAISE(ABORT,'closure_conflict'); END;
 
-CREATE TRIGGER rt_closure_tasks_insert AFTER INSERT ON rt_closures WHEN NEW.archived_at IS NULL BEGIN INSERT INTO rt_closure_close_tasks(id,store_id,closure_id,closure_version,channel,kind,start_date,end_date,all_day,start_time,end_time,table_ids_json,starts_at,ends_at,status) SELECT lower(hex(randomblob(16))),NEW.store_id,NEW.id,NEW.version,m.code,NEW.kind,NEW.start_date,NEW.end_date,NEW.all_day,NEW.start_time,NEW.end_time,NEW.table_ids_json, json_extract(NEW.periods_json,'$[0].startsAt'),json_extract(NEW.periods_json,'$[#-1].endsAt'),'close' FROM rt_store_media_links l JOIN rt_media m ON m.id=l.media_id WHERE l.store_id=NEW.store_id AND l.close_on_booking=1 AND m.accepts_reservations=1; INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(NEW.store_id,'closure_saved') ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
+CREATE TRIGGER rt_closure_tasks_insert AFTER INSERT ON rt_closures WHEN NEW.archived_at IS NULL BEGIN INSERT INTO rt_closure_close_tasks(id,store_id,closure_id,closure_version,channel,kind,start_date,end_date,all_day,start_time,end_time,table_ids_json,starts_at,ends_at,status) SELECT lower(hex(randomblob(16))),NEW.store_id,NEW.id,NEW.version,m.code,NEW.kind,NEW.start_date,NEW.end_date,NEW.all_day,NEW.start_time,NEW.end_time,NEW.table_ids_json, json_extract(NEW.periods_json,'$[0].startsAt'),json_extract(NEW.periods_json,'$[#-1].endsAt'),'close' FROM rt_store_media_links l JOIN rt_media m ON m.id=l.media_id WHERE NEW.notify_media=1 AND l.store_id=NEW.store_id AND l.close_on_booking=1 AND m.accepts_reservations=1; INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(NEW.store_id,'closure_saved') ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
 
-CREATE TRIGGER rt_closure_tasks_update AFTER UPDATE ON rt_closures BEGIN UPDATE rt_closure_close_tasks SET status='reopen',generation=generation+1,updated_at=datetime('now') WHERE closure_id=NEW.id AND status<>'reopen'; INSERT INTO rt_closure_close_tasks(id,store_id,closure_id,closure_version,channel,kind,start_date,end_date,all_day,start_time,end_time,table_ids_json,starts_at,ends_at,status) SELECT lower(hex(randomblob(16))),NEW.store_id,NEW.id,NEW.version,m.code,NEW.kind,NEW.start_date,NEW.end_date,NEW.all_day,NEW.start_time,NEW.end_time,NEW.table_ids_json, json_extract(NEW.periods_json,'$[0].startsAt'),json_extract(NEW.periods_json,'$[#-1].endsAt'),'close' FROM rt_store_media_links l JOIN rt_media m ON m.id=l.media_id WHERE NEW.archived_at IS NULL AND l.store_id=NEW.store_id AND l.close_on_booking=1 AND m.accepts_reservations=1; INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(NEW.store_id,'closure_changed') ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
+CREATE TRIGGER rt_closure_tasks_update AFTER UPDATE ON rt_closures BEGIN UPDATE rt_closure_close_tasks SET status='reopen',generation=generation+1,updated_at=datetime('now') WHERE closure_id=NEW.id AND status<>'reopen'; INSERT INTO rt_closure_close_tasks(id,store_id,closure_id,closure_version,channel,kind,start_date,end_date,all_day,start_time,end_time,table_ids_json,starts_at,ends_at,status) SELECT lower(hex(randomblob(16))),NEW.store_id,NEW.id,NEW.version,m.code,NEW.kind,NEW.start_date,NEW.end_date,NEW.all_day,NEW.start_time,NEW.end_time,NEW.table_ids_json, json_extract(NEW.periods_json,'$[0].startsAt'),json_extract(NEW.periods_json,'$[#-1].endsAt'),'close' FROM rt_store_media_links l JOIN rt_media m ON m.id=l.media_id WHERE NEW.notify_media=1 AND NEW.archived_at IS NULL AND l.store_id=NEW.store_id AND l.close_on_booking=1 AND m.accepts_reservations=1; INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(NEW.store_id,'closure_changed') ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
 
 CREATE TRIGGER rt_closure_waitlist_insert BEFORE INSERT ON rt_seat_waitlist WHEN NEW.status IN ('waiting','invited') AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) p WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND julianday(json_extract(p.value,'$.startsAt'))<julianday(COALESCE(NEW.ends_at,datetime(NEW.starts_at,'+120 minutes'))) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at)) AND NOT EXISTS( SELECT 1 FROM rt_tables t WHERE t.store_id=NEW.store_id AND t.is_active=1 AND t.min_capacity<=NEW.guest_count AND t.max_capacity>=NEW.guest_count AND (NEW.status='waiting' OR t.id=NEW.table_id) AND NOT EXISTS(SELECT 1 FROM rt_closures c,json_each(c.periods_json) p WHERE c.store_id=t.store_id AND c.archived_at IS NULL AND (json_array_length(c.table_ids_json)=0 OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) ct WHERE ct.value=t.id)) AND julianday(json_extract(p.value,'$.startsAt'))<julianday(COALESCE(NEW.ends_at,datetime(NEW.starts_at,'+120 minutes'))) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at))) BEGIN SELECT RAISE(ABORT,'closure_conflict'); END;
 

@@ -57,3 +57,38 @@ describe('統括の一括配信',()=>{
   await expect(hqBroadcastAuthority(f.db,{...staff,tenantId:'other'})).rejects.toMatchObject({status:403});
  });
 });
+
+it('下書き本文と対象店を同じIDで変更し、古い版・送信後の変更は子配信を変えない',async()=>{
+ const run=await prepareHqBroadcast(f.db,tenant,'owner',input);
+ const changed={...input,title:'新しい下書き',messageContent:'変更本文',accountIds:['shop1']};
+ const updated=await prepareHqBroadcast(f.db,tenant,'owner',changed,{run,expectedVersion:1});expect(updated.id).toBe(run.id);expect(updated.version).toBe(2);
+ const {readHqBroadcastResult}=await import('./hq-broadcasts.js');expect((await readHqBroadcastResult(f.db,updated)).input).toEqual(changed);
+ await expect(prepareHqBroadcast(f.db,tenant,'owner',input,{run,expectedVersion:1})).rejects.toMatchObject({status:409});
+ expect(f.raw.prepare('SELECT line_account_id FROM hq_broadcast_targets').all()).toEqual([{line_account_id:'shop1'}]);
+ await dispatchHqBroadcast(f.db,updated,'owner',2);
+ await expect(prepareHqBroadcast(f.db,tenant,'owner',input,{run:await getHqBroadcastRun(f.db,tenant,run.id),expectedVersion:3})).rejects.toMatchObject({status:409});
+ expect(f.raw.prepare('SELECT message_content FROM broadcasts').get()).toEqual({message_content:'変更本文'});
+});
+it('クーポンとリッチ素材を店側と同じ吹き出しで予約し、実送信の形式に変換できる',async()=>{
+ const bubbles=[{id:'coupon',type:'coupon',content:{assetId:'coupon-1',assetName:'飲み物券',startsAt:'2026-01-01T00:00',endsAt:'2027-01-01T00:00',description:'1杯無料'}},
+ {id:'rich',type:'rich_message',content:{assetId:'rich-1',assetName:'お知らせ',baseUrl:'https://example.test/map',baseSize:{width:1040,height:520},tapAreas:[{x:0,y:0,width:100,height:100,actionType:'uri',uri:'https://example.test/book'}]}}];
+ const b={...input,accountIds:['shop1'],messageBubblesJson:JSON.stringify(bubbles)};const run=await prepareHqBroadcast(f.db,tenant,'owner',b);await dispatchHqBroadcast(f.db,run,'owner',1);
+ const child=f.raw.prepare('SELECT message_type,message_content,message_bubbles_json FROM broadcasts').get() as any;
+ const {parseBroadcastMessageParts,buildMessages}=await import('./broadcast-message-set.js');
+ expect(buildMessages(parseBroadcastMessageParts({messageType:child.message_type,messageContent:child.message_content,messageBubblesJson:child.message_bubbles_json})).map(m=>m.type)).toEqual(['flex','imagemap']);
+});
+it('人数0・LINE応答なし・失敗の分類を返し、生のエラー本文を返さない',async()=>{
+ const {readHqBroadcastResult}=await import('./hq-broadcasts.js');const run=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+ await dispatchHqBroadcast(f.db,run,'owner',1);const child=(f.raw.prepare('SELECT id FROM broadcasts').get() as any).id;
+ f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,attempt_no,error_code) VALUES(?,'friend-shop1','unknown',1,'secret_external_error')").run(child);
+ const result=await readHqBroadcastResult(f.db,await getHqBroadcastRun(f.db,tenant,run.id));expect(result.targets[0].failureReasons).toEqual([{code:'delivery_unknown',label:'LINEの応答なし（届いたか確認が必要）',count:1,retryable:false}]);
+ f.raw.exec('DELETE FROM broadcast_send_claims;DELETE FROM friends;');const preflight=await preflightHqBroadcast(f.db,run);expect(preflight[0].blockedReasons).toContain('友だちが0人です');
+});
+it('店の電話番号と予約ページは決定した共通キーで調べ、空なら送信を止める',async()=>{
+ const b={...input,accountIds:['shop1'],messageContent:'{店の電話番号} / {予約ページ}'};const r=await prepareHqBroadcast(f.db,tenant,'owner',b);
+ const check=await preflightHqBroadcast(f.db,r);expect(check[0].blockedReasons).toContain('店舗の共通情報を確認してください');
+ await expect(dispatchHqBroadcast(f.db,r,'owner',1)).rejects.toMatchObject({status:409});expect(f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get()).toEqual({n:0});
+ f.raw.exec("INSERT INTO common_vars(id,var_key,name,value,line_account_id) VALUES('phone','store_phone','電話','03-1234-5678','shop1'),('url','reservation_url','予約','https://example.test/book','shop1')");
+ expect((await preflightHqBroadcast(f.db,r))[0].blockedReasons).toEqual([]);
+ f.raw.exec("UPDATE common_vars SET value=' ' WHERE var_key='store_phone'");expect((await preflightHqBroadcast(f.db,r))[0].blockedReasons).toContain('店舗の共通情報を確認してください');
+});
