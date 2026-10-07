@@ -136,7 +136,6 @@ export default function Booking() {
           <Done
             menuName={menu.name}
             slot={slot}
-            durationMinutes={staff.duration_minutes}
             status={doneStatus}
           />
         )}
