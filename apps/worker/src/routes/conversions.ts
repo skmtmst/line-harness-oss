@@ -485,6 +485,7 @@ conversions.post('/api/conversions/definitions', conversionPermission('edit'), a
     }
     const data = await createConversionDefinition(c.env.DB, {
       ...definition,
+      folderId: body.folderId,
       usages: usages.filter((usage): usage is NonNullable<typeof usage> => usage !== null),
       staffId: c.get('staff')!.id,
       // N-268: 下書きで保存すると公開まで計測しない。
@@ -606,6 +607,7 @@ conversions.post('/api/conversions/definitions/:id/revise', conversionPermission
       scope: scope.value,
       expectedVersion,
       name: definition.name,
+      folderId: body.folderId,
       sourceType: definition.sourceType,
       sourceConfig: definition.sourceConfig,
       measureMethod: definition.measureMethod,
