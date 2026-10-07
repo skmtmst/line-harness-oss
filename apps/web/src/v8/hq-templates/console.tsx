@@ -14,8 +14,10 @@
  * が今の編集部品を `DefinitionEditor` として渡す（src/v8 から @/app を読まないため）。
  */
 import { useEffect, useRef, useState, type ComponentType } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAccount } from '@/contexts/account-context'
 import { ArrowLeft, Check, Plus, RotateCw, Search, Send } from 'lucide-react'
-import type { HqTemplateFolder, TemplateKind } from '@line-crm/shared'
+import { templateKind, type HqTemplateFolder, type TemplateKind } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
@@ -31,7 +33,7 @@ import { formatNumber } from '@/lib/format'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
 import {
-  hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type MessageTemplateDefinition,
+  hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition,
   type Preflight, type TemplateDefinition, type TemplateDetail, type TemplateInput, type TemplateType,
 } from '@/lib/hq-templates-api'
 import {
@@ -39,14 +41,18 @@ import {
   uploadedKeysIn, type TemplateMedia,
 } from './definition'
 import MessageForm from './message-form'
+import TemplateMessageEditor from '@/v8/template-edit/message'
+import TemplateAssetEditor from '@/v8/template-edit/asset'
+import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/host'
 import HqStoreList from './store-list'
+import HqTemplateDetail from './detail'
 import styles from './console.module.css'
 
 const PAGE_TITLES: Record<TemplateType, string> = { tag: '友だち属性', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
 const EDIT_TITLES: Record<TemplateType, string> = { tag: 'タグのひな形', template: 'メッセージのひな形', rich_menu: 'リッチメニューのひな形', form: '回答フォームのひな形', scenario: 'シナリオのひな形' }
 const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る' }
 
-type Stage = 'list' | 'edit' | 'accounts' | 'duplicates' | 'result'
+type Stage = 'list' | 'detail' | 'edit' | 'accounts' | 'duplicates' | 'result'
 const errorText = (error: unknown) => error instanceof Error ? error.message : '処理できませんでした。時間をおいて再確認してください。'
 
 
@@ -70,6 +76,8 @@ export interface DefinitionEditorProps {
 export default function HqTemplatesV8({ type, DefinitionEditor }: { type: TemplateType; DefinitionEditor?: ComponentType<DefinitionEditorProps> }) {
   const staffRole = useStaffRole()
   const canEdit = staffRole === null || canManageRole(staffRole)
+  const router = useRouter()
+  const { setSelectedAccountId } = useAccount()
   const [stage, setStage] = useState<Stage>('list')
   const [folders, setFolders] = useState<HqTemplateFolder[]>([])
   const [folderLoadFailed, setFolderLoadFailed] = useState(false)
@@ -423,6 +431,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
         }}
         onCreate={startCreate}
         onEdit={(row) => open(row.id, 'edit')}
+        onOpen={type === 'template' ? (row) => open(row.id, 'detail') : undefined}
         onDistribute={(row) => open(row.id, 'accounts')}
         onDuplicate={duplicateRow}
         onRemove={(row) => setRemove(row)}
@@ -449,7 +458,65 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     )
   }
 
-  /* ───── 作る・編集（X4JcOf） ───── */
+  /* ───── 詳細（pQ4fH）：店のテンプレートの詳細と同じ形に「配った先」と［アカウントへ配る］ ───── */
+  if (stage === 'detail' && detail) {
+    const listRow = [...(kindRows ?? []), ...templates].find((item) => item.id === detail.template.id) as HqTemplateListItem | undefined
+    return (
+      <HqTemplateDetail
+        detail={detail}
+        row={listRow}
+        accounts={accounts}
+        folderName={folders.find((folder) => folder.id === detail.template.folder_id)?.name ?? '未分類'}
+        canEdit={canEdit}
+        busy={busy}
+        notices={notices}
+        onBack={toList}
+        onEdit={() => setStage('edit')}
+        onDistribute={() => { setSelected([]); setTextOverrides({}); setSearch(''); setPreflight(null); setChoices({}); setBulkMode(''); setStage('accounts') }}
+        onDuplicate={() => void perform(async () => {
+          const requestId = crypto.randomUUID()
+          await hqTemplatesApi.duplicate(detail.template.id, `${detail.template.name}のコピー`, detail.template.revision, requestId)
+          setTemplates(await hqTemplatesApi.list(type)); await reloadKind()
+          setMessage('ひな形を複製しました。')
+        })}
+        onEnterAccount={(accountId) => { setSelectedAccountId(accountId); router.push('/templates') }}
+      />
+    )
+  }
+
+  /*
+   * ───── 作る・編集：店のテンプレートの作る画面を使い、下の帯の主ボタンを［保存して配る］にする（B-29・B-36）─────
+   * 絵：メッセージ HfK0O・クーポン C3qMCz・リサーチ Fkv3w。保存した中身は統括のひな形（同じ形の payload）にして、
+   * ［保存して配る］は保存のあと「アカウントへ配る」（meBRB）へ進む。
+   * 前回の保存が結果不明のときは、入力を固定した今の画面（下）で再確認する。
+   */
+  const editKind: TemplateKind = detail && 'template' in detail.definition ? templateKind(detail.definition) : kind
+  const sharedEditor = type === 'template' && !createUncertain && (editKind === 'message' || ((editKind === 'coupon' || editKind === 'research') && !detail))
+  if (stage === 'edit' && sharedEditor) {
+    const current = ('template' in definition ? definition : freshDefinition('template')) as MessageTemplateDefinition
+    const host: TemplateEditHost = {
+      backHref: '/hq/templates',
+      description: '保存して配ると、選んだアカウントのテンプレートに新しい版として届きます',
+      folders: folders.map((folder) => ({ value: folder.id, label: folder.name })),
+      folder: folderId ?? '',
+      onFolderChange: (value) => setFolderId(value || null),
+      busy,
+      notice: notices,
+      onSave: (content, distribute) => {
+        const next = hostDefinition(current, content)
+        setName(content.name); setDefinition(next)
+        void save(distribute, next, content.name, description)
+      },
+      onCancel: toList,
+      initialMessage: detail && editKind === 'message' ? { name, messageType: current.template.messageType, messageContent: current.template.messageContent } : undefined,
+      readOnly: !canEdit,
+    }
+    return editKind === 'message'
+      ? <TemplateMessageEditor key={`${detail?.template.id ?? 'new'}-${formKey}`} id={null} visual={false} host={host} />
+      : <TemplateAssetEditor key={`${editKind}-${formKey}`} kind={editKind as 'coupon' | 'research'} host={host} />
+  }
+
+  /* ───── 作る・編集（X4JcOf：前回の保存の再確認・カード型・カルーセル・質問・リッチメッセージ） ───── */
   if (stage === 'edit') {
     const uncertainNotice = createUncertain ? <Notice tone="warn" message="前回の保存結果がまだ確定していません。重複を防ぐため入力を固定しています。同じ依頼を再確認し、保存済みならその結果を読み込みます。" /> : null
     const footer = createUncertain
@@ -722,4 +789,15 @@ function resultSentence(store: DistributionResult['stores'][number]): string {
 
 function accountName(accounts: HqAccount[], id: string): string {
   return accounts.find((account) => account.id === id)?.name ?? id
+}
+
+/** 店の作る画面が組み立てた中身を、統括のひな形（メッセージ）の形にする。カード型の部品（card）は本文で書き直したので外す。 */
+export function hostDefinition(current: MessageTemplateDefinition, content: TemplateHostContent): MessageTemplateDefinition {
+  const base = { ...current, template: { ...current.template, name: content.name } }
+  const { card: _card, asset: _asset, ...rest } = base
+  void _card; void _asset
+  if (content.kind === 'message') {
+    return { ...rest, template: { ...rest.template, messageType: content.messageType as MessageTemplateDefinition['template']['messageType'], messageContent: content.messageContent, questionJson: null } }
+  }
+  return { ...rest, asset: { kind: content.kind, payload: content.payload as never }, template: { ...rest.template, messageType: 'text', messageContent: '', questionJson: null } }
 }

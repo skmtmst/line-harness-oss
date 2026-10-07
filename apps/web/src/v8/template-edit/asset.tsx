@@ -34,6 +34,7 @@ import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
 import { TemplateEditFrame } from './frame'
+import type { TemplateEditHost } from './host'
 import MediaPickerDialog from './media-picker'
 import styles from './edit.module.css'
 
@@ -72,11 +73,15 @@ export function couponPeriodLine(startsAt: string, endsAt: string, once: boolean
   return `${period}・${once ? '1人1回' : '何回でも'}`
 }
 
-export default function TemplateAssetEditor({ kind, visual = false }: { kind: AssetKind; visual?: boolean }) {
+/**
+ * `host` を渡すと、統括のテンプレートの入口から同じ画面を使う（host.ts）。保存は呼ぶ側、主ボタンは［保存して配る］、
+ * 店のアカウントに結びつく欄（登録メディア・行うこと・答えてもらう人）は出さない。
+ */
+export default function TemplateAssetEditor({ kind, visual = false, host }: { kind: AssetKind; visual?: boolean; host?: TemplateEditHost }) {
   const meta = META[kind]
   const router = useRouter()
   const role = useStaffRole()
-  const canMutate = role === null || canManageRole(role)
+  const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
   const { selectedAccountId, accounts } = useAccount()
   usePageTitle(meta.heading)
   const actionOptions = useActionOptions()
@@ -122,7 +127,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
   /* フォルダはアカウントの置き場一覧から選ぶ（保存値はフォルダ名のまま。今と同じ）。 */
   useEffect(() => {
     setFolders([])
-    if (!selectedAccountId) return
+    if (!selectedAccountId || host) return
     let cancelled = false
     void api.folders.list('template', selectedAccountId)
       .then((res) => { if (!cancelled && res.success) setFolders(res.data) })
@@ -209,6 +214,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
   }
 
   const save = async (): Promise<boolean> => {
+    if (host) return false
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
     if (!name.trim()) { setError(`${meta.title}名を入力してください。`); return false }
     const built = buildPayload()
@@ -237,10 +243,22 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
     }
   }
 
+  /* 統括の入口：中身を組み立てて呼ぶ側へ渡す（保存・配る・失敗の知らせは呼ぶ側）。 */
+  const hostSave = (distribute: boolean) => {
+    if (!host) return
+    if (!name.trim()) { setError(`${meta.title}名を入力してください。`); return }
+    const built = buildPayload()
+    if ('error' in built) { setError(built.error); return }
+    setError('')
+    setClean(snapshot)
+    host.onSave({ kind, name: name.trim(), payload: built.payload }, distribute)
+  }
   const onSaveDraft = async () => {
+    if (host) { hostSave(false); return }
     if (await save()) notifyToast('下書きを保存しました')
   }
   const onPublish = async () => {
+    if (host) { hostSave(true); return }
     setPublishing(true)
     try {
       if (await save()) {
@@ -252,9 +270,9 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
     }
   }
 
-  const sendName = accounts.find((account) => account.id === selectedAccountId)?.name ?? '公式アカウント'
+  const sendName = host ? '公式アカウント' : accounts.find((account) => account.id === selectedAccountId)?.name ?? '公式アカウント'
   const blocked = saved ? '保存しました。一覧へ戻ってください。' : null
-  const busy = saving || publishing
+  const busy = saving || publishing || Boolean(host?.busy)
   const imageSet = /^https?:\/\//.test(imageUrl.trim())
 
   const sideCard = kind === 'coupon' ? (
@@ -337,9 +355,9 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
           <Select
             id={`te-${kind}-folder`}
             aria-label="フォルダ"
-            value={folder}
-            onChange={setFolder}
-            options={[{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.name, label: f.name }))]}
+            value={host ? host.folder : folder}
+            onChange={host ? host.onFolderChange : setFolder}
+            options={host ? [{ value: '', label: '未分類' }, ...host.folders] : [{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.name, label: f.name }))]}
           />
         </div>
       </div>
@@ -352,6 +370,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         boardId={meta.board}
         title={meta.heading}
         description={meta.lead}
+        backHref={host?.backHref}
         side={(
           <>
             <div className={styles.previewToggle}>
@@ -364,17 +383,18 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         )}
         footerActions={(
           <>
-            <Button href="/templates">キャンセル</Button>
+            {host ? <Button type="button" onClick={host.onCancel}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={saving && !publishing} busyLabel="保存中…">
               下書きを保存
             </Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={publishing} busyLabel="保存中…">
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
               <Send size={15} aria-hidden="true" />
-              保存して公開
+              {host ? host.primaryLabel ?? '保存して配る' : '保存して公開'}
             </Button>
           </>
         )}
       >
+        {host?.notice}
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
         {saved ? <p role="status" className={styles.readonly}>保存しました。一覧へ戻ると、{meta.title}の一覧に出ています。</p> : null}
         {nameCard}
@@ -468,12 +488,14 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               )}
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>使われたときに行うこと</h2>
-              </div>
-              <InlineActionRowsV8 actions={couponUseActions} onChange={setCouponUseActions} {...actionOptions} />
-            </Card>
+            {host ? null : (
+              <Card padding="none" layout="vertical" className={styles.card}>
+                <div className={styles.cardHead}>
+                  <h2 className={styles.cardTitle}>使われたときに行うこと</h2>
+                </div>
+                <InlineActionRowsV8 actions={couponUseActions} onChange={setCouponUseActions} {...actionOptions} />
+              </Card>
+            )}
           </>
         ) : (
           <>
@@ -592,6 +614,8 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               </div>
             </Card>
 
+            {host ? null : (
+            <>
             <Card padding="none" layout="vertical" className={styles.card}>
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>答え終わったときに行うこと</h2>
@@ -612,6 +636,8 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                 options={actionOptions.tags.map((tag) => ({ value: tag.id, label: tag.name }))}
               />
             </Card>
+            </>
+            )}
           </>
         )}
       </TemplateEditFrame>
@@ -636,7 +662,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         onCancel={() => setImageOpen(false)}
       >
         <div className={styles.imageDialog}>
-          <Button type="button" onClick={() => setPickerOpen(true)}>登録メディアから選ぶ</Button>
+          {host ? null : <Button type="button" onClick={() => setPickerOpen(true)}>登録メディアから選ぶ</Button>}
           {pickedMedia ? <p className={styles.hint}>選択中：{pickedMedia.filename}</p> : null}
           <TextField
             value={imageUrl}

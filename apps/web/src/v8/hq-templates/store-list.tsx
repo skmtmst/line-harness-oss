@@ -101,6 +101,8 @@ export interface HqStoreListProps {
   onDeleteFolder: (folder: HqTemplateFolder) => Promise<void>
   onCreate: () => void
   onEdit: (row: HqTemplate) => void
+  /** 名前を押したとき（詳細 pQ4fH）。無ければ編集を開く。 */
+  onOpen?: (row: HqTemplate) => void
   onDistribute: (row: HqTemplate) => void
   onDuplicate: (row: HqTemplate) => void
   onRemove: (row: HqTemplate) => void
@@ -111,7 +113,7 @@ export interface HqStoreListProps {
 export default function HqStoreList(props: HqStoreListProps) {
   const {
     type, rows, ready, busy, canEdit, accountTotal, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
-    onAddFolder, onRenameFolder, onDeleteFolder, onCreate, onEdit, onDistribute, onDuplicate, onRemove, notices, overlays,
+    onAddFolder, onRenameFolder, onDeleteFolder, onCreate, onEdit, onOpen, onDistribute, onDuplicate, onRemove, notices, overlays,
   } = props
   const words = WORDS[type]
   const [query, setQuery] = useState('')
@@ -310,7 +312,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                     <div className={styles.dotLine}>
                       <FolderDotName folder={folder ? { name: folder.name, color: null } : null}>
                         {canEdit ? (
-                          <button type="button" className={`${styles.cellTitle} ${styles.hqNameButton}`} title={row.name} onClick={() => onEdit(row)}>{row.name}</button>
+                          <button type="button" className={`${styles.cellTitle} ${styles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
                         ) : <span className={styles.cellTitle} title={row.name}>{row.name}</span>}
                       </FolderDotName>
                     </div>
