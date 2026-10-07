@@ -221,7 +221,11 @@
 .colResultWide { width: var(--tpl-fx4-bc-col-result-wide); }
 /* 丸の下の2行目は名前の頭にそろえる（絵の「説明の行」の左 16）。 */
 /* 丸＋名前の行は箱（flex）で包む。文字の行の高さを足さない（足すと行が5〜7高くなる）。 */
-.titleLine { display: flex; min-width: 0; }
+.titleLine { display: flex; align-items: center; min-width: 0; }
+/* 統括から来た配信の札と鍵（l3RQH）。札は細い枠・角丸 6、鍵は薄い色。 */
+.hqMark { display: inline-flex; flex: 0 0 auto; align-items: center; gap: var(--tpl-e49-gap-s); margin-inline-start: var(--tpl-e49-gap-s); }
+.hqChip { padding: var(--tpl-e49-insert-pad); border: 1px solid var(--color-hairline); border-radius: var(--tpl-e49-radius-chip); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-e49-lh-18); white-space: nowrap; }
+.hqLock { flex: 0 0 auto; color: var(--color-ink-faint); }
 .dotIndent { padding-inline-start: var(--tpl-folder-dot-indent); }
 .colMenu { width: var(--tpl-bc-col-menu); text-align: right; }
 
