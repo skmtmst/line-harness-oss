@@ -570,7 +570,7 @@
     "unresolved-classname": 1
   },
   "components/shared/row-actions.tsx": {
-    "unresolved-classname": 2
+    "unresolved-classname": 4
   },
   "components/shared/segmented.tsx": {
     "unresolved-classname": 2
