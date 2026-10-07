@@ -240,7 +240,8 @@ describe('V8 シナリオの通し：作る→1通目→詳細', () => {
     expect(timeMode, '時刻指定の選択が見つかりません').toBeTruthy()
     fireEvent.click(timeMode)
 
-    fireEvent.click(screen.getByRole('button', { name: 'この方式で作る' }))
+    // ★V8 作る①（src/v8/scenarios/create.tsx・dnzqC）の主ボタンは絵どおり「この方式で保存する」。
+    fireEvent.click(screen.getByRole('button', { name: 'この方式で保存する' }))
     await waitFor(() => expect(createScenario).toHaveBeenCalledTimes(1))
     await screen.findByText('シナリオを作りました')
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/scenarios/first-step?id=sc-new'))
