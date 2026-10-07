@@ -3,6 +3,7 @@
 import { useRef, useState, type ButtonHTMLAttributes, type ReactNode, type RefObject } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
+import ReorderHandle from './reorder-handle'
 import styles from './row-actions.module.css'
 
 type Base = { className?: string } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'>
@@ -36,20 +37,12 @@ function IconButton({
  * 並び替えハンドル。Pencil V5 の `K65Uhe`。★V5 で75回。
  *
  * **行の先頭に置く。** 右の操作列に混ぜない。
+ *
+ * 中身は共通の並び替え部品（./reorder-handle）の `icon` の見た目。
+ * 新しい画面は ReorderHandle と useReorder を直接使う（ドラッグ・上下キー・「…」を1つにする）。
  */
 export function DragHandle({ label = '並び替える', ...rest }: Base & { label?: string }) {
-  return (
-    <IconButton label={label} grip {...rest}>
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-        <circle cx="9" cy="6" r="1.6" />
-        <circle cx="15" cy="6" r="1.6" />
-        <circle cx="9" cy="12" r="1.6" />
-        <circle cx="15" cy="12" r="1.6" />
-        <circle cx="9" cy="18" r="1.6" />
-        <circle cx="15" cy="18" r="1.6" />
-      </svg>
-    </IconButton>
-  )
+  return <ReorderHandle look="icon" label={label} ariaLabel={label} title={label} {...rest} />
 }
 
 /**
