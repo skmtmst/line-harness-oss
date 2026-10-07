@@ -16028,11 +16028,12 @@ export const webinarApi = {
       method: 'PUT',
       body: JSON.stringify({ comments: comments.map(({ atSeconds, authorName, body }) => ({ atSeconds, authorName, body })) }),
     }),
-  ctas: (id: string) => fetchApi<{ data: WebinarCtaCard[] }>(`/api/webinars/${id}/ctas`),
-  saveCtas: (id: string, ctas: WebinarCtaCard[]) =>
-    fetchApi<{ data: { count: number } }>(`/api/webinars/${id}/ctas`, {
+  ctas: (id: string) => fetchApi<{ data: WebinarCtaCard[]; version: number; updatedBy: string | null; updatedAt: string | null }>(`/api/webinars/${id}/ctas`),
+  saveCtas: (id: string, ctas: WebinarCtaCard[], expectedVersion?: number) =>
+    fetchApi<{ data: { count: number; version: number } }>(`/api/webinars/${id}/ctas`, {
       method: 'PUT',
       body: JSON.stringify({
+        ...(expectedVersion === undefined ? {} : { expectedVersion }),
         ctas: ctas.map(({ atSeconds, kind, title, body, buttonLabel, autoOpen, formId, url }) => ({
           atSeconds, kind, title, body, buttonLabel, autoOpen, formId, url,
         })),

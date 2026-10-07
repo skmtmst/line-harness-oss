@@ -523,7 +523,8 @@
     "583_restaurant_inventory_rules.sql",
     "590_scenario_stop_reason.sql",
     "591_friend_field_time.sql",
-    "592_mileage_reward_folders.sql"
+    "592_mileage_reward_folders.sql",
+    "593_webinar_cta_version.sql"
   ],
-  "migrationCount": 524
+  "migrationCount": 525
 }

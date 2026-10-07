@@ -7614,7 +7614,7 @@ CREATE TABLE webinars (
   tag_on_cta_click TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL, cta_version INTEGER NOT NULL DEFAULT 0, cta_updated_by TEXT, cta_updated_at TEXT, cta_write_token TEXT);
 
 CREATE INDEX idx_account_handovers_from ON account_handovers (from_account_id);
 
