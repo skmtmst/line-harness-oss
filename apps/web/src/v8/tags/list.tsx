@@ -14,7 +14,7 @@
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Eye, Upload } from 'lucide-react'
+import { Eye, Plus, Upload } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -26,6 +26,7 @@ import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import TagsTab from './tags-tab'
+import MarksTab from './marks-tab'
 import styles from './list.module.css'
 
 const TABS = [
@@ -86,7 +87,7 @@ export default function TagsList({
   const currentTabBlocked =
     !fixture && !!currentTabFeature && visibility.status === 'ready' && !visibility.enabled(currentTabFeature)
 
-  const boardId = tab !== 'tags' ? undefined : readOnly ? 'fkGUR' : narrow ? 'aPeD8' : 'I1E7Bt'
+  const boardId = tab === 'marks' ? 'vKDj5' : tab !== 'tags' ? undefined : readOnly ? 'fkGUR' : narrow ? 'aPeD8' : 'I1E7Bt'
 
   /* 見出しの右はタブごとの作る口。 */
   const actions = currentTabBlocked ? null : tab === 'tags' ? (
@@ -95,11 +96,10 @@ export default function TagsList({
       CSVで一括登録する
     </Button>
   ) : tab === 'marks' ? (
+    /* 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー）。 */
     canEdit ? (
-      <Button href="/tags/marks/new" variant="primary">＋ マークを作る</Button>
-    ) : (
-      <Button type="button" variant="primary" disabled>＋ マークを作る</Button>
-    )
+      <Button href="/tags/marks/new" variant="primary"><Plus size={15} aria-hidden="true" />マークを作る</Button>
+    ) : null
   ) : tab === 'searches' ? (
     <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button>
   ) : null
@@ -145,6 +145,8 @@ export default function TagsList({
           csvOpen={csvOpen}
           onCsvClose={() => setCsvOpen(false)}
         />
+      ) : tab === 'marks' ? (
+        <MarksTab accountId={accountId} canEdit={canEdit} />
       ) : (
         <div className={styles.otherTab}>{renderTab?.(tab, { accountId, canEdit })}</div>
       )}

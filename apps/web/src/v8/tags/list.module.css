@@ -517,3 +517,74 @@
     display: none;
   }
 }
+
+/* ★V8 対応マークのタブ（vKDj5）：案内の帯の段（上14・左右24）。帯そのものは閲覧のみの帯と同じ形。 */
+.infoRow {
+  padding: var(--tpl-tg2-info-pad);
+  flex-shrink: 0;
+}
+
+/* 行は高さ52（中の「…」28＋上下12）。字の行の高さで行が伸びないように高さで決める。 */
+.markRow > td {
+  height: var(--tpl-tg2-mark-row-h);
+  padding-block: 0;
+  line-height: var(--tpl-tag-cell-lh);
+  vertical-align: middle;
+}
+
+.markColGrip { width: var(--tpl-tg2-mark-col-grip); }
+.markColName { width: var(--tpl-tg2-mark-col-name); }
+.markColCount { width: var(--tpl-tg2-mark-col-count); }
+.markColDefault { width: var(--tpl-tg2-mark-col-default); }
+.markColAuto { width: auto; }
+.markColPlace { width: var(--tpl-tg2-mark-col-place); }
+
+.gripSpace {
+  display: inline-block;
+  width: var(--tpl-tag-grip);
+}
+
+/* マークの札（地は印の色を薄く、点と字は印の色）。 */
+.markPill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-tg2-pill-gap);
+  max-width: 100%;
+  padding: var(--tpl-tg2-pill-pad);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--mark-color, var(--color-ink-secondary)) 10%, var(--color-canvas));
+  color: var(--mark-color, var(--color-ink-secondary));
+  font-size: var(--tpl-tag-cell-size);
+  font-weight: 600;
+  line-height: var(--tpl-tg2-pill-lh);
+  white-space: nowrap;
+}
+
+.markPillDot {
+  width: var(--tpl-tg2-pill-dot);
+  height: var(--tpl-tg2-pill-dot);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+/* 表の下の安全確認の段（左右24・上下16・間6）。 */
+.safetyNote {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-safety-gap);
+  padding: var(--tpl-tg2-safety-pad);
+}
+
+.safetyNoteTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.safetyNoteBody {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tg2-safety-body-size);
+}
