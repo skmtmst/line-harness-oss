@@ -103,6 +103,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   const [folderFilter, setFolderFilter] = useState<string>('all')
   const [folderName, setFolderName] = useState('')
   const [folderFormOpen, setFolderFormOpen] = useState(false)
+  const [folderEditId, setFolderEditId] = useState<string | null>(null)
   const [textOverrides, setTextOverrides] = useState<Record<string, string>>({})
   const [overrideOpen, setOverrideOpen] = useState<string | null>(null)
   const duplicateAttempts = useRef(new Map<string, string>())
@@ -441,39 +442,48 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
             onSelect={selectType}
           >
             <p className={styles.railNote}>配るときは、行の「アカウントへ配る」から。種類ごとに一覧を切り替えます。</p>
+          </FolderPanel>
+          {/* 絵（LRc93・2026-10-07 足した「分類」）：種類と同じ形の行（すべて＝受信箱・未分類＝開いたフォルダ）と「分類を追加」。 */}
+          {folderLoadFailed ? <p role="alert" className={styles.railNote}>分類を読み込めませんでした。ページを再読み込みしてください。</p> : (
             <div className={styles.folderBlock} aria-label="分類（フォルダ）">
-              <span className={styles.folderHead}>分類</span>
-              {folderLoadFailed ? <p role="alert" className={styles.railNote}>分類を読み込めませんでした。ページを再読み込みしてください。</p> : <>
-                {[{ id: 'all', name: 'すべて' }, { id: 'none', name: '未分類' }, ...folders].map((folder) => (
-                  <button key={folder.id} type="button" className={styles.folderItem} aria-pressed={folderFilter === folder.id} onClick={() => setFolderFilter(folder.id)}>
-                    {folder.id === 'all' ? null : <span className={styles.dotSlot} aria-hidden="true"><FolderDot folder={folder.id === 'none' ? null : { name: folder.name }} /></span>}
-                    <span>{folder.name}</span>
-                  </button>
-                ))}
-                {canEdit ? (folderFormOpen ? (
+              <FolderPanel
+                heading="分類"
+                rows={[
+                  { id: 'all', label: 'すべて', count: null, icon: <Inbox size={15} /> },
+                  { id: 'none', label: '未分類', count: null },
+                  ...folders.map((folder) => ({
+                    id: folder.id, label: folder.name, count: null,
+                    ...(canEdit ? {
+                      onEdit: () => { setFolderEditId(folder.id); setFolderName(folder.name); setFolderFormOpen(true) },
+                      onDelete: () => void perform(async () => {
+                        await hqTemplatesApi.folders.remove(folder.id, folder.revision)
+                        await reloadFolders(); setTemplates(await hqTemplatesApi.list(type)); setFolderFilter('all')
+                        setMessage('分類を外しました。ひな形は未分類に残ります。')
+                      }),
+                      deleteNote: '分類を外しても、中のひな形は未分類に残ります。',
+                    } : {}),
+                  })),
+                ]}
+                activeId={folderFilter}
+                onSelect={setFolderFilter}
+                onAddFolder={canEdit && !folderFormOpen ? () => { setFolderEditId(null); setFolderName(''); setFolderFormOpen(true) } : undefined}
+                addFolderLabel="分類を追加"
+              >
+                {canEdit && folderFormOpen ? (
                   <span className={styles.folderForm}>
                     <input aria-label="分類の名前" className={styles.input} value={folderName} maxLength={100} disabled={busy} onChange={(event) => setFolderName(event.target.value)} />
                     <Button size="compact" disabled={busy || !folderName.trim()} onClick={() => void perform(async () => {
-                      const target = folders.find((folder) => folder.id === folderFilter)
+                      const target = folders.find((folder) => folder.id === folderEditId)
                       if (target) await hqTemplatesApi.folders.update(target.id, folderName.trim(), target.revision)
                       else await hqTemplatesApi.folders.create(folderName.trim())
-                      await reloadFolders(); setFolderName(''); setFolderFormOpen(false)
-                    })}>{folders.some((folder) => folder.id === folderFilter) ? '名前を変える' : '分類を追加'}</Button>
+                      await reloadFolders(); setFolderName(''); setFolderEditId(null); setFolderFormOpen(false)
+                    })}>{folderEditId ? '名前を変える' : '追加する'}</Button>
+                    <Button size="compact" variant="text" disabled={busy} onClick={() => { setFolderName(''); setFolderEditId(null); setFolderFormOpen(false) }}>やめる</Button>
                   </span>
-                ) : (
-                  <span className={styles.folderTools}>
-                    <Button size="compact" variant="text" onClick={() => setFolderFormOpen(true)}>{folders.some((folder) => folder.id === folderFilter) ? '名前を変える' : '分類を追加'}</Button>
-                    {folders.some((folder) => folder.id === folderFilter) ? <Button size="compact" variant="text" disabled={busy} onClick={() => void perform(async () => {
-                      const target = folders.find((folder) => folder.id === folderFilter)!
-                      await hqTemplatesApi.folders.remove(target.id, target.revision)
-                      await reloadFolders(); setTemplates(await hqTemplatesApi.list(type)); setFolderFilter('all')
-                      setMessage('分類を外しました。ひな形は未分類に残ります。')
-                    })}>分類を外す</Button> : null}
-                  </span>
-                )) : null}
-              </>}
+                ) : null}
+              </FolderPanel>
             </div>
-          </FolderPanel>
+          )}
           </div>
         )}
         toolbar={(
@@ -506,10 +516,10 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
                         </span>
                         <span className={styles.sub}>{row.description || LABELS[row.template_type]}</span>
                       </td>
-                      <td><span className={styles.cell} title={row.reference_summary}>{row.reference_summary || '—'}</span></td>
+                      <td><span className={row.reference_summary ? styles.cell : `${styles.cell} ${styles.cellEmpty}`} title={row.reference_summary}>{row.reference_summary || '—'}</span></td>
                       <td><span className={styles.cell}>{shortDate(row.updated_at)}</span></td>
                       <td className={styles.topCell}>
-                        {row.distributed_account_count === undefined ? <span className={styles.cell}>—</span>
+                        {row.distributed_account_count === undefined ? <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span>
                           : row.distributed_account_count ? <span className={styles.strong}>{`${row.distributed_account_count} アカウント`}</span>
                           : <span className={styles.strong}>まだ配っていない</span>}
                       </td>
@@ -709,11 +719,11 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
                       {on ? <span className={styles.cellLine}>
                         <span className={styles.cell}>{`${summary}（${textOverrides[account.id] !== undefined || store?.textOverride !== undefined ? '個別の本文' : '一括と同じ'}）`}</span>
                         {textMessage && stage === 'accounts' ? <Button size="compact" variant="text" disabled={busy} onClick={() => setOverrideOpen(overrideOpen === account.id ? null : account.id)}>本文を変える</Button> : null}
-                      </span> : <span className={styles.cell}>—</span>}
+                      </span> : <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span>}
                     </td>
-                    <td><span className={styles.cell}>{on ? storeVersion(account.id) : '—'}</span></td>
+                    <td><span className={on ? styles.cell : `${styles.cell} ${styles.cellEmpty}`}>{on ? storeVersion(account.id) : '—'}</span></td>
                     <td>
-                      {!on ? <span className={styles.cell}>—</span> : !store ? <span className={styles.cell}>確認のあとで選ぶ</span>
+                      {!on ? <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span> : !store ? <span className={styles.cell}>確認のあとで選ぶ</span>
                         : allowed.length === 0 ? <span className={styles.modePick}><Select aria-label={`${account.name}の配布方法`} size="full" disabled value="create" onChange={() => undefined} options={[{ value: 'create', label: MODE_LABELS.create }]} /></span>
                         : <span className={styles.modePick}><Select
                           aria-label={`${account.name}の配布方法`}
