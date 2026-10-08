@@ -32,7 +32,12 @@ export async function runExpirer(
   params: RunExpirerParams,
 ): Promise<{ expired: number; idempotencyPurged: number }> {
   const cutoff = new Date(params.now.getTime() - REQUEST_TTL_HOURS * 3600_000).toISOString();
-  const stale = await db
+  // 停止中の行を消費枠に数えず、IDで次のページへ進む。
+  const stale: StaleRow[] = [];
+  const eligibleAccounts = new Map<string, boolean>();
+  let cursor = '';
+  while (stale.length < 200) {
+    const page = await db
     .prepare(
       `SELECT b.id, b.line_account_id, b.friend_id, b.starts_at,
               m.name AS menu_name,
@@ -48,14 +53,31 @@ export async function runExpirer(
          INNER JOIN friends f ON f.id = b.friend_id
           LEFT JOIN booking_settings bs ON bs.line_account_id = b.line_account_id
         WHERE b.status = 'requested'
-          AND b.requested_at < ?
+          AND b.requested_at < ? AND b.id > ?
+        ORDER BY b.id
         LIMIT 200`,
     )
-    .bind(cutoff)
+    .bind(cutoff, cursor)
     .all<StaleRow>();
+    for (const row of page.results) {
+      let eligible = eligibleAccounts.get(row.line_account_id);
+      if (eligible === undefined) {
+        eligible = !row.line_account_id || (
+          await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'booking expirer' })
+          && !await isOperationCapabilityStopped(db, row.line_account_id, 'reminder_dispatch')
+        );
+        eligibleAccounts.set(row.line_account_id, eligible);
+      }
+      if (eligible) stale.push(row);
+      if (stale.length === 200) break;
+    }
+    const next = page.results.at(-1)?.id;
+    if (page.results.length < 200 || !next || next <= cursor) break;
+    cursor = next;
+  }
 
   let expired = 0;
-  for (const row of stale.results) {
+  for (const row of stale) {
     // 機能オフ中は期限切れにせずrequestedのまま残す。再オンで再開する。
     if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'booking expirer' })) {
       continue;
