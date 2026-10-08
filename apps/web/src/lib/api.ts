@@ -5711,7 +5711,7 @@ export type FriendAddRuleOptions = {
   routes: Array<{ id: string; name: string; kind: string }>
   scenarios: Array<{ id: string; name: string }>
   tags: Array<{ id: string; name: string }>
-  folders: Array<{ id: string; name: string }>
+  folders: import('@line-crm/shared').FriendAddRuleFolder[]
 }
 export type FriendAddRuleListData = {
   items: FriendAddRule[]
@@ -11149,15 +11149,19 @@ export const api = {
       fetchApi<ApiResponse<FriendAddRuleConflictData>>(
         `/api/friend-add-rules/conflicts?account_id=${encodeURIComponent(accountId)}&kind=${kind}`,
       ),
-    createFolder: (accountId: string, name: string, idempotencyKey: string) =>
-      fetchApi<ApiResponse<{ id: string; name: string; createdAt: string | null }>>(
+    createFolder: (accountId: string, name: string, idempotencyKey: string, color?: string | null) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').FriendAddRuleFolder>>(
         '/api/friend-add-rules/folders',
         {
           method: 'POST',
           headers: { 'Idempotency-Key': idempotencyKey },
-          body: JSON.stringify({ accountId, name }),
+          body: JSON.stringify({ accountId, name, color }),
         },
       ),
+    updateFolder: (accountId: string, id: string, input: { name?: string; color?: string | null }) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').FriendAddRuleFolder>>(`/api/friend-add-rules/folders/${encodeURIComponent(id)}`, {
+        method: 'PATCH', body: JSON.stringify({ accountId, ...input }),
+      }),
     runs: (accountId: string, params?: {
       period?: 'all' | 'last28days' | 'today' | 'this_month' | 'last_month'
       from?: string

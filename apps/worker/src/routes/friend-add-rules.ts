@@ -41,7 +41,7 @@ import {
   parseFriendAddConditionAst,
   retryFailedFriendAddActions,
 } from '../services/friend-add-routing.js';
-import { toJstParts } from '@line-crm/shared';
+import { isFolderSelectColor, toJstParts } from '@line-crm/shared';
 
 const friendAddRules = new Hono<Env>();
 const KINDS = new Set<FriendAddRuleKind>(['first_time', 'returning']);
@@ -198,9 +198,9 @@ async function loadOptions(db: D1Database, accountId: string) {
         ORDER BY name ASC`,
     ).bind(accountId).all<{ id: string; name: string }>(),
     db.prepare(
-      `SELECT id, name FROM friend_add_rule_folders
+      `SELECT id, name, color FROM friend_add_rule_folders
         WHERE line_account_id = ? ORDER BY name ASC, id ASC`,
-    ).bind(accountId).all<{ id: string; name: string }>(),
+    ).bind(accountId).all<{ id: string; name: string; color: string | null }>(),
   ]);
   return {
     routes: routeRows.results ?? [],
@@ -1029,10 +1029,11 @@ friendAddRules.post('/api/friend-add-runs/:id/retry', requireRole('owner', 'admi
 });
 
 friendAddRules.post('/api/friend-add-rules/folders', requireRole('owner', 'admin'), async (c) => {
-  const body = await c.req.json<{ accountId?: string; name?: string }>();
+  const body = await c.req.json<{ accountId?: string; name?: string; color?: string | null }>();
   const accountId = accountIdFrom(c, body);
   const name = body.name?.trim() ?? '';
   const idempotencyKey = c.req.header('Idempotency-Key');
+  if (body.color !== undefined && !isFolderSelectColor(body.color)) return c.json({ success: false, error: 'フォルダの色を確認してください' }, 422);
   if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
   if (!name || name.length > 60) return c.json({ success: false, error: 'フォルダ名は1〜60文字で入力してください' }, 400);
   if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) {
@@ -1041,26 +1042,26 @@ friendAddRules.post('/api/friend-add-rules/folders', requireRole('owner', 'admin
   try {
     if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
     const replay = await c.env.DB.prepare(
-      `SELECT id, name, created_at FROM friend_add_rule_folders
+      `SELECT id, name, color, created_at FROM friend_add_rule_folders
         WHERE line_account_id = ? AND create_idempotency_key = ? LIMIT 1`,
-    ).bind(accountId, idempotencyKey).first<{ id: string; name: string; created_at: string }>();
+    ).bind(accountId, idempotencyKey).first<{ id: string; name: string; color: string | null; created_at: string }>();
     if (replay) {
-      return c.json({ success: true, data: { id: replay.id, name: replay.name, createdAt: replay.created_at } });
+      return c.json({ success: true, data: { id: replay.id, name: replay.name, color: replay.color, createdAt: replay.created_at } });
     }
     const id = crypto.randomUUID();
     await c.env.DB.prepare(
       `INSERT INTO friend_add_rule_folders
-        (id, line_account_id, name, create_idempotency_key, created_by_staff_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'),
+        (id, line_account_id, name, color, create_idempotency_key, created_by_staff_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'),
                strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))`,
-    ).bind(id, accountId, name, idempotencyKey, c.get('staff').id).run();
+    ).bind(id, accountId, name, body.color ?? null, idempotencyKey, c.get('staff').id).run();
     const created = await c.env.DB.prepare(
-      `SELECT id, name, created_at FROM friend_add_rule_folders
+      `SELECT id, name, color, created_at FROM friend_add_rule_folders
         WHERE id = ? AND line_account_id = ?`,
-    ).bind(id, accountId).first<{ id: string; name: string; created_at: string }>();
+    ).bind(id, accountId).first<{ id: string; name: string; color: string | null; created_at: string }>();
     return c.json({
       success: true,
-      data: { id, name, createdAt: created?.created_at ?? null },
+      data: { id, name, color: created?.color ?? null, createdAt: created?.created_at ?? null },
     }, 201);
   } catch (error) {
     if (error instanceof Error && /unique/i.test(error.message)) {
@@ -1068,6 +1069,31 @@ friendAddRules.post('/api/friend-add-rules/folders', requireRole('owner', 'admin
     }
     console.error('POST /api/friend-add-rules/folders error:', error);
     return c.json({ success: false, error: 'フォルダを作成できませんでした' }, 500);
+  }
+});
+
+// フォルダ名は設定側にも保存されるため、同じトランザクションで置き換える。
+friendAddRules.patch('/api/friend-add-rules/folders/:id', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ accountId?: string; name?: string; color?: string | null }>();
+  const accountId = accountIdFrom(c, body);
+  if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
+  if (body.color !== undefined && !isFolderSelectColor(body.color)) return c.json({ success: false, error: 'フォルダの色を確認してください' }, 422);
+  if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 60)) return c.json({ success: false, error: 'フォルダ名は1〜60文字で入力してください' }, 400);
+  try {
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    const id = c.req.param('id');
+    const folder = await c.env.DB.prepare('SELECT id, name, color FROM friend_add_rule_folders WHERE id=? AND line_account_id=?').bind(id, accountId).first<{ id: string; name: string; color: string | null }>();
+    if (!folder) return c.json({ success: false, error: 'フォルダが見つかりません' }, 404);
+    const name = body.name === undefined ? folder.name : body.name.trim();
+    await c.env.DB.batch([
+      c.env.DB.prepare("UPDATE friend_add_rules SET folder_name=?,lock_version=lock_version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE line_account_id=? AND folder_name=(SELECT name FROM friend_add_rule_folders WHERE id=? AND line_account_id=?) AND folder_name<>?").bind(name, accountId, id, accountId, name),
+      c.env.DB.prepare("UPDATE friend_add_rule_folders SET name=?,color=CASE WHEN ? THEN ? ELSE color END,updated_at=strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE id=? AND line_account_id=?").bind(name, body.color !== undefined ? 1 : 0, body.color ?? null, id, accountId),
+    ]);
+    const updated = await c.env.DB.prepare('SELECT id,name,color FROM friend_add_rule_folders WHERE id=? AND line_account_id=?').bind(id, accountId).first();
+    return c.json({ success: true, data: updated });
+  } catch (error) {
+    if (error instanceof Error && /unique/i.test(error.message)) return c.json({ success: false, error: '同じ名前のフォルダがあります' }, 409);
+    return c.json({ success: false, error: 'フォルダを変更できませんでした' }, 500);
   }
 });
 

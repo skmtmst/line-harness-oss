@@ -170,8 +170,8 @@ export const hqTemplatesApi = {
   list: (type?: TemplateType) => request<HqTemplateListItem[]>(type ? `?type=${type}` : ''),
   folders: {
     list: () => request<import('@line-crm/shared').HqTemplateFolder[]>('/folders'),
-    create: (name: string) => request<import('@line-crm/shared').HqTemplateFolder>('/folders', 'POST', { name }),
-    update: (id: string, name: string, expectedRevision: number) => request<import('@line-crm/shared').HqTemplateFolder>(`/folders/${encodeURIComponent(id)}`, 'PATCH', { name, expectedRevision }),
+    create: (name: string, color?: string | null) => request<import('@line-crm/shared').HqTemplateFolder>('/folders', 'POST', { name, color }),
+    update: (id: string, name: string, expectedRevision: number, color?: string | null) => request<import('@line-crm/shared').HqTemplateFolder>(`/folders/${encodeURIComponent(id)}`, 'PATCH', { name, expectedRevision, color }),
     remove: (id: string, expectedRevision: number) => request<{ id: string }>(`/folders/${encodeURIComponent(id)}`, 'DELETE', { expectedRevision }),
   },
   duplicate: (id: string, name: string, expectedRevision: number, requestId: string) => request<TemplateDetail>(`${idPath(id)}/duplicate`, 'POST', { name, expectedRevision, requestId }),

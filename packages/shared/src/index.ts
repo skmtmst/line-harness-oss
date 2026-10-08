@@ -60,3 +60,5 @@ export * from './booking-liff.js';
 export * from './template-definition.js';
 
 export * from './broadcast-definition.js';
+
+export * from './folder-colors';
