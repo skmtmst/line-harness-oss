@@ -2,6 +2,7 @@
 
 import { createPortal } from 'react-dom'
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { isImeComposing } from './ime'
 
 export type MenuPortalAlign = 'start' | 'end'
 export type MenuPortalPlacement = 'down' | 'up'
@@ -34,6 +35,11 @@ export type MenuPortalProps = {
    * class は `[data-has-more='true']` のときに浮きの影と重ねる）。
    */
   className?: string
+  /**
+   * Esc で閉じずに別のことをするとき（フォルダを選ぶ欄の「名前を入れる」板から一覧へ戻る）。
+   * 渡さなければ Esc は onClose。
+   */
+  onEscape?: () => void
   children: ReactNode
 }
 
@@ -91,6 +97,7 @@ export default function MenuPortal({
   onClose,
   getPositionRect,
   className,
+  onEscape,
   children,
 }: MenuPortalProps) {
   const [mounted, setMounted] = useState(false)
@@ -99,6 +106,8 @@ export default function MenuPortal({
   const panelRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
+  const escapeRef = useRef(onEscape)
+  escapeRef.current = onEscape
   const anchorRef = useRef(getAnchor)
   anchorRef.current = getAnchor
   const positionRef = useRef(getPositionRect)
@@ -209,9 +218,12 @@ export default function MenuPortal({
     }
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // 日本語の変換をやめる Esc は入力欄のもの。メニューは閉じない。
+        if (isImeComposing(event)) return
         // メニューで処理した印。下の詳細パネルなどが同じ Esc で閉じないように。
         event.preventDefault()
-        closeRef.current()
+        if (escapeRef.current) escapeRef.current()
+        else closeRef.current()
       }
     }
     document.addEventListener('pointerdown', onPointerDown)

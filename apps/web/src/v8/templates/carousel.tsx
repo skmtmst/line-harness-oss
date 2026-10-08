@@ -31,6 +31,7 @@ import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
@@ -428,7 +429,19 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                 </label>
                 <div className={`${styles.field} ${styles.folder}`}>
                   <span className={styles.pickLabel}>フォルダ</span>
-                  <Select size="full" aria-label="フォルダ" value={host ? host.folder : folderId ?? ''} onChange={host ? host.onFolderChange : (value) => setFolderId(value || null)} options={[{ value: '', label: '未分類' }, ...(host ? host.folders : folders.map((folder) => ({ value: folder.id, label: folder.name })))]} />
+                  <FolderSelect
+                    size="full"
+                    aria-label="フォルダ"
+                    value={host ? host.folder : folderId ?? ''}
+                    onChange={host ? host.onFolderChange : (value) => setFolderId(value || null)}
+                    folders={host ? host.folders : folders.map(folderById)}
+                    colors={!host}
+                    onCreate={host
+                      ? hostFolderCreate(host)
+                      : canMutate && folderAccountId
+                        ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: folderAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
+                        : undefined}
+                  />
                 </div>
               </div>
             </section>
