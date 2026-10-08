@@ -56,10 +56,10 @@ describe('統括 バナー生成', () => {
     expect(panel).toContain('4つの役割で指定します')
   })
 
-  it('生成は「条件を登録 → 1枚ずつ run」を繰り返し、失敗したら止めて理由を出す', () => {
+  it('生成条件を登録し、保存済みの生成状態を読み直す。失敗は理由を出す', () => {
     expect(projectPage).toContain('api.hqBanners.projects.createGeneration(')
-    expect(projectPage).toContain('api.hqBanners.generations.run(current.id, { gravity: crop })')
-    expect(projectPage).toContain('if (res.data.finished) break')
+    expect(projectPage).toContain('api.hqBanners.generations.get(current.id)')
+    expect(projectPage).toContain("if (!['queued', 'running'].includes(current.status)) break")
     expect(projectPage).toContain('setGenerationError(caught instanceof Error')
     expect(projectPage).toContain('api.hqBanners.generations.cancel(running.id)')
     // 画面を離れて戻ったとき、途中の生成があれば続きから動かす
@@ -76,8 +76,8 @@ describe('統括 バナー生成', () => {
 
   it('V8（iMnph）は外枠に板IDを付け、切り替えに件数を出す', () => {
     expect(projectPage).toContain("'iMnph'")
-    expect(projectPage).toContain('画像を押すと詳細・アカウントへ渡す')
-    for (const label of ['すべて', 'お気に入り', 'アカウントへ渡し済み']) {
+    expect(projectPage).toContain('画像を押すと詳細')
+    for (const label of ['すべて', 'お気に入り', '配布済み']) {
       expect(projectPage).toContain(label)
     }
   })

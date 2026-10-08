@@ -1,7 +1,7 @@
 // 統括2周目の撮影条件。共有対応表を変えず、現在の押し口で各状態を撮る。
 // node scripts/visual-qa/hq2-measure-map.mjs <正本の対応表> > .measure/hq2-map.json
 import fs from 'node:fs'
-import { HQ_BANNER_PROJECTS, HQ_BANNER_IMAGES, LINE_ACCOUNTS } from './fixtures.mjs'
+import { HQ_BANNER_PROJECTS, HQ_BANNER_IMAGES, HQ_BANNER_USAGE, LINE_ACCOUNTS } from './fixtures.mjs'
 
 const map = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
 for (const id of ['B24oNg', 'I0w2e', 'UcBQ5', 'iMnph', 'rI5uh', 'zOpMG', 'p03ImY']) {
@@ -34,7 +34,8 @@ const freshImages = projectImages.slice(0, 2).map((image, index) => ({ ...image,
 map.boards.p03ImY.state.api = [
   { match: 'GET /api/hq/banners/projects/banner-project-qa-1$', body: { success: true, data: { project: HQ_BANNER_PROJECTS[0], images: [...freshImages, ...projectImages], generations: [] } } },
   { match: 'POST /api/hq/banners/projects/banner-project-qa-1/generations', body: { success: true, data: running } },
-  { match: 'POST /api/hq/banners/generations/', delayMs: 30000, body: { success: true, data: { generation: running, finished: false } } },
+  { match: 'GET /api/hq/banners/generations/banner-generation-qa-running$', delayMs: 30000, body: { success: true, data: running } },
+  { match: 'GET /api/hq/banners/usage$', body: { success: true, data: HQ_BANNER_USAGE } },
 ]
 map.boards.p03ImY.state.click = [...filled, '4', 'press:Control+Home', '生成する（4枚）', '画像を生成']
 const [testAccount, main, shibuya, archived, event] = LINE_ACCOUNTS
