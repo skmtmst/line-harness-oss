@@ -620,3 +620,11 @@
   pointer-events: none;
 }
 .bulkBody { display: flex; flex-direction: column; width: 100%; }
+
+/* フォルダを足す窓の注記（一覧・案件の addFolderNote）。作成の手直しで消えたのを戻す。 */
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-row-name-lh);
+}

@@ -359,7 +359,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       const field = document.querySelector<HTMLElement>(fieldError.step === 'basic'
         ? '#fa-name'
         : fieldError.step === 'routes'
-          ? '[data-friend-add-routes] input[type="checkbox"]'
+          ? '[data-friend-add-routes] input[type=checkbox]'
           : '#fa-scenario, #fa-returning-scenario')
       field?.focus()
       field?.scrollIntoView({ block: 'center' })

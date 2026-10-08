@@ -49,7 +49,7 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
       void api.result(detail.template.id, run).then((next) => {
         if (next.runId !== run) throw new Error('配布番号が一致しません。結果を再確認してください。')
         if (alive.current) setResult(next)
-      }).catch((cause) => { if (alive.current) setError(cause instanceof Error ? cause.message : '配布結果を確認できません。') })
+      }).catch((cause) => { if (alive.current) setError((cause instanceof Error && cause.message && !/^API error: /.test(cause.message) ? cause.message : '配布結果を確認できません。')) })
         .finally(() => { lock.current = false; if (alive.current) setBusy(false) })
     }
     return () => { alive.current = false }
@@ -58,7 +58,7 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
   const perform = async (action: () => Promise<void>) => {
     if (lock.current) return
     lock.current = true; setBusy(true); setError('')
-    try { await action() } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : '処理できませんでした。もう一度確認してください。') }
+    try { await action() } catch (cause) { if (alive.current) setError((cause instanceof Error && cause.message && !/^API error: /.test(cause.message) ? cause.message : '処理できませんでした。もう一度確認してください。')) }
     finally { lock.current = false; if (alive.current) setBusy(false) }
   }
   const refresh = (run = pendingRun) => perform(async () => {

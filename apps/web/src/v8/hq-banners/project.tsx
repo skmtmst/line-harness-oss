@@ -12,6 +12,7 @@
  * 色2つ・参照画像1枚」の古い形で、2026-10-06 のオーナーの決定（切り替えと切り抜きを置かない・出力サイズの小箱・
  * 色4つ・参照画像3枚・強調）と食い違うため、決定どおりの今のパネルを残した。参照画像を選ぶ窓（承認済み ★BG-C）も同じ。
  */
+import ExportSizeChip from '@/components/hq/banners/export-size-chip'
 import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Send, Sparkles, Star, Upload, X } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -674,7 +675,7 @@ function ProjectInner() {
             </> : undefined }}
             info={<span className={styles.generationInfo}>
               <span>{`今日の残り ${usage?.today.remaining ?? '—'}枚`}</span>
-              <span>{exportSizeText(presets, input.presetKey).replace(' で書き出します', '') || '寸法 —'}</span>
+              {exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span>寸法 —</span>}
             </span>}
             actions={
               running ? (

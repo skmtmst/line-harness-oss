@@ -261,3 +261,18 @@
 
 /* 共通の日付欄の高さとの差は、次の段との間で吸収する。 */
 .datePair { margin-bottom: calc(-1 * var(--tpl-toolbar-gap)); }
+
+/* 申込の見え方（application-preview）の押せない入力欄。作成の手直しで消えたのを戻す。 */
+.input {
+  width: 100%;
+  min-width: 0;
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-kw-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
