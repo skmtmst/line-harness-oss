@@ -9,10 +9,9 @@
  * 聞く項目・保存の口・送る形・失敗の扱いは今の作る画面（app/mileage/earning-rules/new/v8-earning-rule-new.tsx）と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Check, ChevronLeft, Hourglass, RefreshCw, Share2, TriangleAlert, User, Zap } from 'lucide-react'
+import { ArrowLeftRight, Check, Hourglass, RefreshCw, Share2, TriangleAlert, User, Zap } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -25,6 +24,9 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import DateField from '@/components/shared/date-field'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import { focusMileageField } from '../form-validation'
 import Disclosure from '@/components/shared/disclosure'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -90,6 +92,7 @@ export default function EarningRuleCreateV8() {
   const [tags, setTags] = useState<Tag[]>([])
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [touched, setTouched] = useState(false)
   /** BnrQp：保存が 409 で返ったとき。口が返した「だれが・いつ」を持つ。 */
   const [conflict, setConflict] = useState<{ who: string | null; at: string | null } | null>(null)
   const [trialBusy, setTrialBusy] = useState(false)
@@ -127,17 +130,28 @@ export default function EarningRuleCreateV8() {
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
+  const fieldErrors: Record<string, string> = {}
+  if (!name.trim()) fieldErrors['er-name'] = 'ルール名を入力してください'
+  if (!validAmount) fieldErrors['er-amount'] = '付与マイルは1以上の整数で入力してください'
+  if (validFrom && validUntil && validFrom > validUntil) fieldErrors['er-until'] = '終了日は開始日より後にしてください'
+  if (expiryDays !== null && (!Number.isInteger(expiryDays) || expiryDays < 1 || expiryDays > 3650)) {
+    fieldErrors['er-expiry'] = '有効期限は1〜3650日で入力してください'
+  }
+  const errorOf = (id: string) => touched ? fieldErrors[id] : undefined
   const validate = () => {
-    if (!name.trim()) return 'ルール名を入力してください'
-    if (!validAmount) return '付与マイルは1以上の整数で入力してください'
-    if (!selectedAccountId) return 'LINEアカウントを選択してください'
-    if (expiryDays !== null && (!Number.isInteger(expiryDays) || expiryDays < 1 || expiryDays > 3650)) {
-      return '有効期限は1〜3650日で入力してください'
+    setTouched(true)
+    const first = Object.keys(fieldErrors)[0]
+    if (first) {
+      setSaveError('')
+      setTrialError('')
+      focusMileageField(first)
+      return false
     }
-    if (validFrom && validUntil && validFrom > validUntil) {
-      return '終了日は開始日より後にしてください'
+    if (!selectedAccountId) {
+      setSaveError('LINEアカウントを選択してください')
+      return false
     }
-    return null
+    return true
   }
 
   const draftBody = () => ({
@@ -155,11 +169,7 @@ export default function EarningRuleCreateV8() {
   })
 
   const save = async (continueAfter: boolean) => {
-    const problem = validate()
-    if (problem) {
-      setSaveError(problem)
-      return
-    }
+    if (!validate()) return
     setSaving(true)
     setSaveError('')
     setConflict(null)
@@ -220,11 +230,7 @@ export default function EarningRuleCreateV8() {
 
   const runTrial = async () => {
     if (!selectedAccountId || trialBusy) return
-    const problem = validate()
-    if (problem) {
-      setTrialError(problem)
-      return
-    }
+    if (!validate()) return
     setTrialBusy(true)
     setTrialError('')
     try {
@@ -238,8 +244,6 @@ export default function EarningRuleCreateV8() {
       setTrialBusy(false)
     }
   }
-
-  const back = <Link href={LIST_HREF} className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />マイルへ</Link>
 
   const conflictTitle = conflict?.who
     ? `${conflict.who}さんが${conflict.at ? ` ${conflict.at} に` : ''}この決めごとを保存しました`
@@ -305,8 +309,7 @@ export default function EarningRuleCreateV8() {
       boardId={conflict ? 'BnrQp' : 'ctLwT'}
       title="たまる決めごとを作る"
       description="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
-      identity={back}
-      previewToggle={conflictBand}
+      notice={conflictBand}
       preview={preview}
       footerActions={(
         <>
@@ -315,7 +318,7 @@ export default function EarningRuleCreateV8() {
             保存して続けて作る
           </Button>
           <Button variant="primary" onClick={() => void save(false)} disabled={saving} busy={saving} busyLabel="保存しています">
-            <Check size={15} aria-hidden="true" />保存して動かす
+            <Check size={15} aria-hidden="true" />{conflict ? '比べてから保存' : '保存して動かす'}
           </Button>
         </>
       )}
@@ -327,17 +330,9 @@ export default function EarningRuleCreateV8() {
           <h2 className={styles.cardTitle} id="er-new-rule">どのルールか</h2>
           <p className={styles.cardNote}>きっかけになる行動を選びます</p>
         </div>
-        <label className={styles.field}>
-          <span className={styles.label}>名前</span>
-          <input
-            type="text"
-            aria-label="名前"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="例：リンクをクリック"
-            className={styles.input}
-          />
-        </label>
+        <Field label="名前" htmlFor="er-name" error={errorOf('er-name')}>
+          <TextField id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" />
+        </Field>
         <div className={styles.fieldRow}>
           <div className={styles.field}>
             <span className={styles.labelRow}>
@@ -382,17 +377,11 @@ export default function EarningRuleCreateV8() {
           <h2 className={styles.cardTitle} id="er-new-amount">何マイル付けるか</h2>
         </div>
         <div className={styles.fieldRow}>
-          <label className={styles.field}>
-            <span className={styles.label}>マイル</span>
-            <input
-              type="number"
-              min={1}
-              aria-label="マイル"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className={styles.input}
-            />
-          </label>
+          <div className={styles.field}>
+            <Field label="マイル" htmlFor="er-amount" error={errorOf('er-amount')}>
+              <TextField id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </Field>
+          </div>
           <div className={styles.field}>
             <span className={styles.pickLabel}>付け方</span>
             <Select
@@ -465,19 +454,19 @@ export default function EarningRuleCreateV8() {
               <span className={styles.label}>終了日</span>
               <span className={styles.optional}>任意</span>
             </span>
-            <DateField value={validUntil} onChange={setValidUntil} aria-label="終了日" placeholder="なし" />
+            <DateField id="er-until" value={validUntil} onChange={setValidUntil} aria-label="終了日" placeholder="なし" invalid={Boolean(errorOf('er-until'))} aria-describedby={errorOf('er-until') ? 'er-until-error' : undefined} />
+            {errorOf('er-until') ? <p id="er-until-error" className={styles.error} role="alert">{errorOf('er-until')}</p> : null}
           </div>
         </div>
         {/* 絵には無いが、倍率・期限・取り消し・通知・すぐ動かすの欄は落とさない（段の最後に畳んで置く）。 */}
         <Disclosure title="詳しい設定（倍率・通知・取り消し・公開）" size="compact">
           <div className={styles.detailsBody}>
-            <label className={styles.field}>
-              <span className={styles.label}>付いたマイルの有効期限</span>
+            <Field label="付いたマイルの有効期限" htmlFor="er-expiry" error={errorOf('er-expiry')}>
               <span className={styles.inlineRow}>
-                <input type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" className={styles.input} />
+                <TextField id="er-expiry" type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
                 <span className={styles.cardNote}>日後（空欄なら期限なし）</span>
               </span>
-            </label>
+            </Field>
             <Checkbox checked={ignoreMultiplier} onCheckedChange={setIgnoreMultiplier} description="誰でも同じ額にしたいときに選びます。">
               会員ランクの倍率をかけない
             </Checkbox>
