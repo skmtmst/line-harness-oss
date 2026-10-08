@@ -3,17 +3,6 @@
  * 枠・見出し・左右の分け・下の帯は作る型（CreatePage）が持つ。ここは段（カード）の中身だけ。
  * 寸法は globals.css の --tpl-ml-*。
  */
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-ml-back-gap);
-  width: fit-content;
-  color: var(--color-action);
-  font-size: var(--text-label);
-  text-decoration: none;
-}
-.backLink:hover { text-decoration: underline; }
-
 /* 段（白・薄い枠・角丸12・中20・間14）。 */
 .card {
   display: flex;

@@ -19,6 +19,7 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test, expect } from '@playwright/test'
+import { captureClockFor, QA_TIMEZONE } from './qa-clock.mjs'
 import { ROUTES, TAG_STATES, WIDTHS } from './routes.mjs'
 
 /** 撮るあいだだけ当てる規則（開発表示を消す）。 */
@@ -59,6 +60,7 @@ const MAX_DIFF_PIXELS = 0
 const DEFAULT_CAPTURE_HEIGHT = 1080
 
 test.describe.configure({ mode: 'parallel' })
+test.use({ timezoneId: QA_TIMEZONE })
 
 /**
  * 認証後の店舗選択は毎回消される仕組みなので、消さない印を先に置く。
@@ -97,7 +99,7 @@ for (const width of WIDTHS) {
     test(`${width}px ${route.name}（${route.path}）`, async ({ page }) => {
       await page.setViewportSize({ width, height: DEFAULT_CAPTURE_HEIGHT })
 
-      await signIn(page, route.clock)
+      await signIn(page, captureClockFor(route.path ?? route.route, route.clock))
       await page.goto(`${BASE}${route.path}`, { waitUntil: 'networkidle' })
 
       // 1・2. そのページに居て、描けているか
@@ -149,6 +151,29 @@ for (const width of WIDTHS) {
  * 変わる）。画面のコードは本物のまま通る。
  */
 const TAGS_PATH = '/tags'
+
+// 統括は店の一覧を再利用する。板の幅と広いPCでタブ・操作の右端を見張る。
+for (const width of [1152, 1440, 1920]) {
+  for (const [tab, column] of [['fields', '項目名'], ['marks', 'マーク']]) {
+    test(`hqtabs ${tab} ${width}px 横幅と操作`, async ({ page }) => {
+      await page.setViewportSize({ width, height: DEFAULT_CAPTURE_HEIGHT })
+      await signIn(page)
+      await page.addInitScript(() => localStorage.setItem('lh-admin-theme', 'v8'))
+      await page.goto(`${BASE}/hq/friend-attributes?tab=${tab}`, { waitUntil: 'networkidle' })
+      await expectLanded(page, '/hq/friend-attributes')
+      await expect(page.getByRole('columnheader', { name: column, exact: true })).toBeVisible()
+      await expect(page.getByRole('tab', { name: tab === 'fields' ? '友だち情報欄' : '対応マーク', exact: true })).toHaveAttribute('aria-selected', 'true')
+      const distribute = page.getByRole('button', { name: /を配る$/ }).first()
+      await expect(distribute).toBeVisible()
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      expect(overflow).toBe(0)
+      const actionBounds = await page.getByRole('button', { name: /を配る$|の操作$/ }).evaluateAll((buttons) => buttons.map((button) => ({ right: button.getBoundingClientRect().right, limit: window.innerWidth })))
+      expect(actionBounds.length).toBeGreaterThan(0)
+      for (const action of actionBounds) expect(action.right).toBeLessThanOrEqual(action.limit)
+      await page.screenshot({ path: `test-results/hqtabs/browser-${tab}-${width}.png`, fullPage: true, animations: 'disabled', style: 'nextjs-portal { display: none !important; }' })
+    })
+  }
+}
 
 for (const width of WIDTHS) {
   for (const state of TAG_STATES) {

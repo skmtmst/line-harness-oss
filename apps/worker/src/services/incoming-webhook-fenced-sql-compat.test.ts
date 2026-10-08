@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { Miniflare } from 'miniflare';
-import { incomingWebhookFencedDb } from './incoming-webhook-fenced-db.js';
+import { classifySingleStatement, incomingWebhookFencedDb } from './incoming-webhook-fenced-db.js';
 
 let mf: Miniflare;
 let db: Awaited<ReturnType<Miniflare['getD1Database']>>;
@@ -139,4 +139,12 @@ it.each(readCases)('LFで実際に始まる第2文は改行種別によらず拒
     ]) expect(() => f.prepare(sql)[api]()).toThrow('unsupported_sql');
   }
   expect((await db.prepare('SELECT * FROM effects').all()).results).toEqual([{ id: 'original', value: 'safe' }]);
+});
+
+it('列車3: WITH は受信の柵では拒否のまま、工程記録の DB だけ書き込みとして扱う', () => {
+  const sql = "WITH q AS (SELECT 1) UPDATE effects SET value='x'";
+  expect(() => classifySingleStatement(sql)).toThrow('unsupported_sql');
+  expect(classifySingleStatement(sql, { withAsMutation: true })).toEqual({ readOnly: false, sql });
+  expect(classifySingleStatement('WITH q AS (SELECT 1) SELECT * FROM q', { withAsMutation: true }).readOnly).toBe(false);
+  expect(() => classifySingleStatement('PRAGMA user_version', { withAsMutation: true })).toThrow('unsupported_sql');
 });

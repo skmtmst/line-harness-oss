@@ -5,13 +5,14 @@
  * （src/v8 は @/app を import できない）。決まり（受付期間・上限・数える期間）の欄は
  * offer-terms.tsx（同じく写し）を使う。動きは写し元と同じ。
  */
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
 import { api, type AffiliateOffer } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
+import { Field } from '@/components/shared/form-controls'
+import { TextField, TextArea } from '@/components/shared/text-field'
 import {
   EMPTY_TERMS,
   OfferTermsFields,
@@ -54,6 +55,16 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
   const [isActive, setIsActive] = useState(initial?.isActive ?? true)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'name' | 'rewardAmount' | 'rewardMiles' | keyof OfferTermsFieldValues, string>>>({})
+  const formRef = useRef<HTMLDivElement>(null)
+  const showFieldError = useCallback((key: keyof typeof fieldErrors, message: string) => {
+    setFieldErrors({ [key]: message })
+    requestAnimationFrame(() => {
+      const el = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')
+      el?.focus()
+      el?.scrollIntoView?.({ block: 'center' })
+    })
+  }, [])
 
   // 決まりの欄（#823）。編集では今の版で埋める。読み込めるまでは
   // 差分に含めない（読み込めないまま保存して上限を消さないため）。
@@ -126,8 +137,9 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
   const handleSubmit = useCallback(async () => {
     if (submitting) return
     setFormError(null)
+    setFieldErrors({})
     if (!name.trim()) {
-      setFormError('案件名は必須です')
+      showFieldError('name', '案件名は必須です')
       return
     }
     const reward =
@@ -135,18 +147,18 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
         ? undefined
         : Number(rewardAmount)
     if (reward !== undefined && (!Number.isInteger(reward) || reward < 0)) {
-      setFormError('報酬額は0以上の整数で入力してください')
+      showFieldError('rewardAmount', '報酬額は0以上の整数で入力してください')
       return
     }
     const miles = rewardMiles.trim() === '' ? undefined : Number(rewardMiles)
     if (miles !== undefined && (!Number.isInteger(miles) || miles < 0)) {
-      setFormError('付与マイルは0以上の整数で入力してください')
+      showFieldError('rewardMiles', '付与マイルは0以上の整数で入力してください')
       return
     }
-    // 決まりの欄（#823）。壊れた値は欄の下ではなく箱の誤りで見せる。
+    // 決まりの誤りは、その欄だけに出す。
     const parsed = parseOfferTermsInput(terms)
     if (parsed.error) {
-      setFormError(parsed.error)
+      showFieldError(parsed.field ?? 'windowDays', parsed.error)
       return
     }
     // 編集では変えた決まりだけ送る。変えていない保存で版を増やさない。
@@ -219,7 +231,7 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
     } finally {
       setSubmitting(false)
     }
-  }, [submitting, name, description, rewardAmount, rewardMiles, terms, termsLoaded, termsBase, lineAccountId, tagId, scenarioId, isActive, isEdit, initial, onSaved, onClose])
+  }, [submitting, name, description, rewardAmount, rewardMiles, terms, termsLoaded, termsBase, lineAccountId, tagId, scenarioId, isActive, isEdit, initial, onSaved, onClose, showFieldError])
 
   return (
     <Dialog
@@ -232,61 +244,19 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
       onConfirm={() => { void handleSubmit() }}
       onCancel={onClose}
     >
-      <div className="space-y-4">
-        <div>
-          <label htmlFor={nameId} className="text-ink-secondary mb-1 block text-xs font-medium">
-            案件名 <span className="text-danger">*</span>
-          </label>
-          <input
-            id={nameId}
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="例: 無料体験申込"
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
-          />
-        </div>
-
-        <div>
-          <label htmlFor={descriptionId} className="text-ink-secondary mb-1 block text-xs font-medium">説明</label>
-          <textarea
-            id={descriptionId}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={2}
-            placeholder="案件の説明（任意）"
-            className="border-hairline rounded-control bg-canvas text-ink w-full resize-none border px-3 py-2 text-sm focus:outline-none"
-          />
-        </div>
-
-        <div>
-          <label htmlFor={rewardAmountId} className="text-ink-secondary mb-1 block text-xs font-medium">報酬額（円）</label>
-          <input
-            id={rewardAmountId}
-            type="number"
-            min="0"
-            step="1"
-            value={rewardAmount}
-            onChange={(e) => setRewardAmount(e.target.value)}
-            placeholder="例: 3000"
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
-          />
-        </div>
-
-        <div>
-          <label htmlFor={rewardMilesId} className="text-ink-secondary mb-1 block text-xs font-medium">成果承認時の付与マイル</label>
-          <input
-            id={rewardMilesId}
-            type="number"
-            min="0"
-            step="1"
-            value={rewardMiles}
-            onChange={(e) => setRewardMiles(e.target.value)}
-            placeholder="例: 500"
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
-          />
-          <p className="text-ink-faint mt-1 text-micro">承認された紹介1件ごとに紹介者へ付与します</p>
-        </div>
+      <div className="space-y-4" ref={formRef} onInput={() => setFieldErrors({})}>
+        <Field label="案件名" htmlFor={nameId} error={fieldErrors.name} required>
+          <TextField id={nameId} value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 無料体験申込" />
+        </Field>
+        <Field label="説明" htmlFor={descriptionId}>
+          <TextArea id={descriptionId} value={description} onChange={(event) => setDescription(event.target.value)} rows={2} placeholder="案件の説明（任意）" />
+        </Field>
+        <Field label="報酬額（円）" htmlFor={rewardAmountId} error={fieldErrors.rewardAmount}>
+          <TextField id={rewardAmountId} type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="例: 3000" />
+        </Field>
+        <Field label="成果承認時の付与マイル" htmlFor={rewardMilesId} error={fieldErrors.rewardMiles} note="承認された紹介1件ごとに紹介者へ付与します">
+          <TextField id={rewardMilesId} type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="例: 500" />
+        </Field>
 
         {isEdit && termsFailed ? (
           <p className="text-ink-secondary text-xs" role="status">
@@ -294,7 +264,7 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
             <button type="button" className="font-semibold underline" onClick={() => setTermsAttempt((n) => n + 1)}>読み直す</button>
           </p>
         ) : null}
-        <OfferTermsFields values={terms} onChange={setTerms} disabled={isEdit && !termsLoaded} />
+        <OfferTermsFields errors={fieldErrors} values={terms} onChange={setTerms} disabled={isEdit && !termsLoaded} />
 
         <div>
           <label className="text-ink-secondary mb-1 block text-xs font-medium">誘導 LINE アカウント</label>

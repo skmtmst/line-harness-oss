@@ -16,6 +16,7 @@ import type { LineAccount } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import { createPageErrorMessage, createPageReturnHref } from '@/components/shared/create-page'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { api } from '@/lib/api'
@@ -48,6 +49,14 @@ export default function PoolCreateV8() {
   const [accountsError, setAccountsError] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [inputError, setInputError] = useState<{ target: string; message: string } | null>(null)
+
+  useEffect(() => {
+    if (!inputError) return
+    const control = document.getElementById(inputError.target)
+    control?.focus()
+    control?.scrollIntoView?.({ block: 'center' })
+  }, [inputError])
 
   const guard = useUnsavedGuard({
     dirty: name !== '' || slug !== '' || (accounts.length > 0 && accountIds.join(',') !== accounts[0].id),
@@ -86,10 +95,10 @@ export default function PoolCreateV8() {
     setPickerOpen(false)
   }
 
-  const validate = (): string | null => {
-    if (!name.trim()) return '名前を入力してください'
-    if (!slugValid) return 'URLに使う名前は、半角英小文字・数字・ハイフンで2〜32文字にしてください'
-    if (accountIds.length === 0) return '受け入れ先のアカウントを選んでください'
+  const validate = (): { target: string; message: string } | null => {
+    if (!name.trim()) return { target: 'pl-name', message: '名前を入力してください' }
+    if (!slugValid) return { target: 'pl-slug', message: 'URLに使う名前は、半角英小文字・数字・ハイフンで2〜32文字にしてください' }
+    if (accountIds.length === 0) return { target: 'pl-add-account', message: '受け入れ先のアカウントを選んでください' }
     return null
   }
 
@@ -97,7 +106,9 @@ export default function PoolCreateV8() {
     event?.preventDefault()
     if (saving) return
     const problem = validate()
-    if (problem) { setError(problem); return }
+    setError('')
+    if (problem) { setInputError(problem); return }
+    setInputError(null)
     setSaving(true)
     setError('')
     try {
@@ -119,6 +130,7 @@ export default function PoolCreateV8() {
       layout="narrow-nav"
       title={TITLE}
       description={DESCRIPTION}
+      savePlacement="content"
       saveActions={(
         <>
           <Button href={LIST_HREF}>キャンセル</Button>
@@ -133,14 +145,12 @@ export default function PoolCreateV8() {
           {error ? <p role="alert" className={styles.error}>{error}</p> : null}
           <section className={styles.card} aria-labelledby="pool-create-what">
             <h2 id="pool-create-what" className={styles.cardTitle}>1. どのプールか</h2>
-            <label className={styles.field} htmlFor="pl-name">
-              <span className={styles.label}>プール名</span>
-              <TextField id="pl-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 渋谷エリア" maxLength={100} />
-            </label>
-            <label className={styles.field} htmlFor="pl-slug">
-              <span className={styles.label}>URLに使う名前（あとから変えられません）</span>
-              <TextField id="pl-slug" value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="shibuya" maxLength={32} />
-            </label>
+            <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined}>
+              <TextField id="pl-name" value={name} onChange={(event) => { setName(event.target.value); if (inputError?.target === 'pl-name') setInputError(null) }} placeholder="例: 渋谷エリア" maxLength={100} />
+            </Field>
+            <Field label="URLに使う名前（あとから変えられません）" htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
+              <TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} />
+            </Field>
             <p className={styles.hint}>
               {slugValid
                 ? `保存すると、このURLが発行されます：${publicUrl}`
@@ -177,9 +187,10 @@ export default function PoolCreateV8() {
               </div>
             ) : (
               <span className={styles.addRow}>
-                <Button type="button" onClick={() => setPickerOpen(true)} disabled={addableAccounts.length === 0}>＋ アカウントを足す</Button>
+                <Button id="pl-add-account" type="button" onClick={() => { setInputError(null); setPickerOpen(true) }} disabled={addableAccounts.length === 0}>＋ アカウントを足す</Button>
               </span>
             )}
+            {inputError?.target === 'pl-add-account' ? <p className={styles.error} role="alert">{inputError.message}</p> : null}
             {accountsError ? (
               <p role="alert" className={styles.error}>
                 {accountsError}{' '}

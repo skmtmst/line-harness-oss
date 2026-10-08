@@ -4,6 +4,8 @@ import { api, type AdPlatform } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
+import { focusField } from './focus-field'
 
 type ConfigField = {key: string; label: string; secret?: boolean}
 export const AD_CONNECTION_FIELDS: Record<string, ConfigField[]> = {
@@ -15,6 +17,7 @@ export const AD_CONNECTION_FIELDS: Record<string, ConfigField[]> = {
 export default function AdConnectionDialog({provider,platform,accountId,onClose,onSaved}:{provider:{key:string;label:string};platform?:AdPlatform;accountId:string;onClose:()=>void;onSaved:()=>Promise<void>}) {
  const [values,setValues]=useState<Record<string,string>>(()=>Object.fromEntries(AD_CONNECTION_FIELDS[provider.key].map(f=>[f.key,f.secret?'':String(platform?.config[f.key]??'')]))), [busy,setBusy]=useState(false),[error,setError]=useState('')
  const persisted=useRef(platform)
+ const [fieldErrors,setFieldErrors]=useState<Record<string,string>>({})
  const current=useRef(true)
  // 付くたびに true へ戻す（開発時の StrictMode の付ける→外す→付けるで false が残らないように）。
  useEffect(()=>{current.current=true;return()=>{current.current=false}},[])
@@ -22,7 +25,10 @@ export default function AdConnectionDialog({provider,platform,accountId,onClose,
   if(busy)return
   const fields=AD_CONNECTION_FIELDS[provider.key]
   const existing=persisted.current
-  if(fields.some(f=>!values[f.key]?.trim() && !(f.secret && existing?.secretKeys?.includes(f.key)))) {setError('接続に必要な項目を入力してください');return}
+  setError('')
+  const missing=fields.filter(f=>!values[f.key]?.trim() && !(f.secret && existing?.secretKeys?.includes(f.key)))
+  setFieldErrors(Object.fromEntries(missing.map(f=>[f.key,`${f.label}を入力してください`])))
+  if(missing.length){focusField(`ad-connect-${missing[0].key}`);return}
   setBusy(true);setError('')
   try {
    const config={...existing?.config,...Object.fromEntries(fields.filter(f=>values[f.key]?.trim()).map(f=>[f.key,values[f.key].trim()]))}
@@ -39,7 +45,7 @@ export default function AdConnectionDialog({provider,platform,accountId,onClose,
  }
  return <Dialog open busy={busy} title={`${provider.label}をつなぐ`} onCancel={()=>{if(!busy)onClose()}} footer={<><Button disabled={busy} onClick={onClose}>閉じる</Button><Button variant="primary" disabled={busy} onClick={()=>void connect()}>{busy?'確認しています…':'接続を確認してつなぐ'}</Button></>}>
   <p className="mb-4 text-sm">広告側の費用を読み取って接続を確認します。鍵の値は再表示しません。</p>
-  <div className="space-y-3">{AD_CONNECTION_FIELDS[provider.key].map(field=><label key={field.key} className="block text-sm"><span>{field.label}</span><TextField aria-label={field.label} type={field.secret?'password':'text'} value={values[field.key]??''} autoComplete={field.secret?'new-password':undefined} placeholder={field.secret&&platform?.secretKeys?.includes(field.key)?'保存済み（空欄なら保持）':''} onChange={e=>setValues(v=>({...v,[field.key]:e.target.value}))}/></label>)}</div>
+  <div className="space-y-3">{AD_CONNECTION_FIELDS[provider.key].map(field=><Field key={field.key} label={field.label} htmlFor={`ad-connect-${field.key}`} error={fieldErrors[field.key]}><TextField aria-label={field.label} type={field.secret?'password':'text'} value={values[field.key]??''} autoComplete={field.secret?'new-password':undefined} placeholder={field.secret&&platform?.secretKeys?.includes(field.key)?'保存済み（空欄なら保持）':''} onChange={e=>{setValues(v=>({...v,[field.key]:e.target.value}));setFieldErrors(v=>({...v,[field.key]:''}))}}/></Field>)}</div>
   {error&&<p role="alert" className="mt-3 text-sm text-status-danger">{error}</p>}
  </Dialog>
 }

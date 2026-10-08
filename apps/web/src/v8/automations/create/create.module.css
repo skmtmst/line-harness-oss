@@ -3,11 +3,7 @@
  * 枠・頭・右の列の外枠・下の帯は型（CreatePage）が持つ。ここは段（カード）と右の列の中身だけ。
  */
 
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  font-size: var(--text-label);
-}
+.inputError { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
 
 .viewerBand {
   margin: 0;

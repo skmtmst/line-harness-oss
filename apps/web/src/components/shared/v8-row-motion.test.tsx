@@ -14,9 +14,10 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { cleanup } from '@testing-library/react'
+import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { settleRowEntrance } from './row-entrance-settle'
+import { DataTable, Tr, Td } from './table'
 
 const WEB = process.cwd()
 const globals = readFileSync(join(WEB, 'src/app/globals.css'), 'utf8')
@@ -31,6 +32,24 @@ function rules(css: string) {
 afterEach(() => cleanup())
 
 describe('④ 表の行の登場と退場', () => {
+  it('実際の Tr の退場開始で登場の指定が外れる（登場完了前の削除も含む）', () => {
+    const selectors = rules(globals).filter((rule) => /animation:\s*v8-content-in.*both/.test(rule.body))
+    const screen = (leaving: boolean) => <DataTable><tbody><Tr leaving={leaving}><Td>行</Td></Tr></tbody></DataTable>
+    document.documentElement.dataset.theme = 'v8'
+    const view = render(screen(false))
+    try {
+      const row = view.container.querySelector('tr')!
+      expect(selectors.some((rule) => row.matches(rule.selector))).toBe(true)
+      view.rerender(screen(true))
+      expect(row.dataset.leaving).toBe('true')
+      expect(selectors.some((rule) => row.matches(rule.selector))).toBe(false)
+      view.rerender(screen(false))
+      expect(selectors.some((rule) => row.matches(rule.selector))).toBe(true)
+    } finally {
+      delete document.documentElement.dataset.theme
+    }
+  })
+
   it('登場の動きは消える行に当てない・済みの tbody に当てない・動きを減らす設定では当てない', () => {
     const block = globals.match(/@media \(prefers-reduced-motion: no-preference\) \{\s*\[data-theme="v8"\] tbody[\s\S]*?\n\}/)
     expect(block, '行の登場の規定が no-preference の中に無い').not.toBeNull()

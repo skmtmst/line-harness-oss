@@ -17,6 +17,7 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import Checkbox from '@/components/shared/checkbox'
+import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -580,8 +581,25 @@ function SettlementEditor({
   const [notify, setNotify] = useState(affiliate.notifyOnConversion ?? false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'email' | 'hold', string>>>({})
+  const emailRef = useRef<HTMLInputElement>(null)
+  const holdRef = useRef<HTMLInputElement>(null)
 
   const save = async () => {
+    if (saving) return
+    setError(null)
+    const errors: typeof fieldErrors = {}
+    if (email.trim() && emailRef.current?.validity.typeMismatch) errors.email = 'メールアドレスを確認してください'
+    if (holdDays.trim() && (!Number.isInteger(Number(holdDays)) || Number(holdDays) < 0 || Number(holdDays) > 365)) errors.hold = '保留期間は0日から365日の整数で入力してください'
+    setFieldErrors(errors)
+    if (errors.email || errors.hold) {
+      requestAnimationFrame(() => {
+        const el = errors.email ? emailRef.current : holdRef.current
+        el?.focus()
+        el?.scrollIntoView?.({ block: 'center' })
+      })
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -616,18 +634,15 @@ function SettlementEditor({
           { value: 'rate', label: '売上に対する割合' },
         ]} />
         {rewardMode === 'rate' ? <TextField aria-label="報酬の割合（%）" type="number" min={0} max={100} step="0.1" value={rate} onChange={(e) => setRate(e.target.value)} /> : null}
-        <label className={styles.field}>
-          <span>連絡先</span>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="partner@example.com" className={styles.input} />
-        </label>
-        <label className={styles.field}>
-          <span>確定までの保留（日）</span>
-          <input type="number" min={0} max={365} value={holdDays} onChange={(e) => setHoldDays(e.target.value)} placeholder="なし" className={styles.input} />
-        </label>
-        <label className={styles.field}>
-          <span>支払いサイクル</span>
-          <input type="text" value={payoutCycle} onChange={(e) => setPayoutCycle(e.target.value)} placeholder="例: 月末締め翌月末払い" maxLength={100} className={styles.input} />
-        </label>
+        <Field label="連絡先" htmlFor="af-settlement-email" error={fieldErrors.email}>
+          <TextField id="af-settlement-email" ref={emailRef} type="email" value={email} onChange={(event) => { setEmail(event.target.value); setFieldErrors((old) => ({ ...old, email: undefined })) }} placeholder="partner@example.com" />
+        </Field>
+        <Field label="確定までの保留（日）" htmlFor="af-settlement-hold" error={fieldErrors.hold}>
+          <TextField id="af-settlement-hold" ref={holdRef} type="number" min={0} max={365} value={holdDays} onChange={(event) => { setHoldDays(event.target.value); setFieldErrors((old) => ({ ...old, hold: undefined })) }} placeholder="なし" />
+        </Field>
+        <Field label="支払いサイクル" htmlFor="af-settlement-cycle">
+          <TextField id="af-settlement-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例: 月末締め翌月末払い" maxLength={100} />
+        </Field>
       </div>
       <Checkbox checked={notify} onCheckedChange={setNotify}>成果が出たときに本人へ知らせる</Checkbox>
       <p className={styles.note}>保留日数と支払いサイクルは取り決めの記録です。報酬の計算そのものには使いません。</p>
