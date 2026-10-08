@@ -210,14 +210,32 @@ export function publishRowState(row: UsageRow): string {
 
 /** 版の差（行ごと）。消えた行は「－」、増えた行は「＋」。同じ行は出さない。 */
 export function lineChanges(before: string, after: string): Array<{ kind: 'removed' | 'added'; text: string }> {
-  const beforeLines = before.split('\n').map((line) => line.trimEnd()).filter((line) => line !== '')
-  const afterLines = after.split('\n').map((line) => line.trimEnd()).filter((line) => line !== '')
-  const afterSet = new Set(afterLines)
-  const beforeSet = new Set(beforeLines)
-  return [
-    ...beforeLines.filter((line) => !afterSet.has(line)).map((text) => ({ kind: 'removed' as const, text })),
-    ...afterLines.filter((line) => !beforeSet.has(line)).map((text) => ({ kind: 'added' as const, text })),
+  if (before === after) return []
+  const left = before.split('\n')
+  const right = after.split('\n')
+  // 最長共通部分列で、順番・同じ行の数・空行・空白を保存値のまま比べる。
+  // 共通の前後を省いてから行単位で照合する。大きな差は全変更として示す。
+  let start = 0
+  while (start < left.length && start < right.length && left[start] === right[start]) start += 1
+  let endLeft = left.length, endRight = right.length
+  while (endLeft > start && endRight > start && left[endLeft - 1] === right[endRight - 1]) { endLeft -= 1; endRight -= 1 }
+  const oldLines = left.slice(start, endLeft), newLines = right.slice(start, endRight)
+  if (oldLines.length * newLines.length > 1_000_000) return [
+    ...oldLines.map(text => ({ kind: 'removed' as const, text })),
+    ...newLines.map(text => ({ kind: 'added' as const, text })),
   ]
+  const lengths = Array.from({ length: oldLines.length + 1 }, () => new Uint32Array(newLines.length + 1))
+  for (let i = oldLines.length - 1; i >= 0; i -= 1) for (let j = newLines.length - 1; j >= 0; j -= 1) {
+    lengths[i][j] = oldLines[i] === newLines[j] ? lengths[i + 1][j + 1] + 1 : Math.max(lengths[i + 1][j], lengths[i][j + 1])
+  }
+  const removed: Array<{ kind: 'removed'; text: string }> = [], added: Array<{ kind: 'added'; text: string }> = []
+  let i = 0, j = 0
+  while (i < oldLines.length || j < newLines.length) {
+    if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) { i += 1; j += 1 }
+    else if (i < oldLines.length && (j === newLines.length || lengths[i + 1][j] >= lengths[i][j + 1])) removed.push({ kind: 'removed', text: oldLines[i++] })
+    else added.push({ kind: 'added', text: newLines[j++] })
+  }
+  return [...removed, ...added]
 }
 
 /** 「8月21日 18:02」（日本時間）。年が違うときは年も出す。 */

@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(async () => ({ success: true, data: mocks.rows })),
   foldersList: vi.fn(async () => ({ success: true, data: [] })),
   counts: vi.fn(async () => ({ success: true, data: {} })),
-  create: vi.fn(async () => ({ success: true, data: { id: 't-new' } })),
+  create: vi.fn(async (_payload: Record<string, unknown>) => ({ success: true, data: { id: 't-new' } })),
   get: vi.fn(async () => ({ success: true, data: detailRow(null) })),
   versions: vi.fn(async () => ({ success: true, data: [] })),
   publish: vi.fn(async () => ({ success: true, data: { publishedVersion: 1 } })),
@@ -170,6 +170,7 @@ describe('V8 テンプレートの通し', () => {
   })
 
   it('作る画面で保存して公開すると知らせが出て一覧へ戻る', async () => {
+    mocks.get.mockImplementation(async () => ({ success: true, data: { ...detailRow(null), ...mocks.create.mock.calls.at(-1)?.[0] } }))
     mocks.query = ''
     await mount(<TemplateEditPage />)
     const nameInput = document.getElementById('te-name') as HTMLInputElement

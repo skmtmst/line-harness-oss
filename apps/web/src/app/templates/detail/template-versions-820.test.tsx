@@ -9,6 +9,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const templateGet = vi.hoisted(() => vi.fn())
 const templateVersions = vi.hoisted(() => vi.fn())
+const templateUpdate = vi.hoisted(() => vi.fn())
+const templateCreate = vi.hoisted(() => vi.fn())
 const templateRevert = vi.hoisted(() => vi.fn())
 const searchParams = vi.hoisted(() => ({ value: new URLSearchParams() }))
 
@@ -39,7 +41,7 @@ vi.mock('@/lib/api', () => ({
   api: { folders: { list: async () => ({ success: true, data: [] }) }, staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
     templates: {
       list: async () => ({ success: true, data: [] }),
-      get: templateGet,
+      get: templateGet, create: templateCreate, update: templateUpdate,
       delete: vi.fn(() => Promise.resolve({ success: true, data: null })),
       versions: templateVersions,
       revert: templateRevert,
@@ -186,3 +188,41 @@ describe('版の履歴', () => {
 })
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }) }))
+
+test('WEB-101: 同じ部品のままBを開き、遅れたAの詳細・履歴を捨てる', async () => {
+ let finish!: (v: unknown) => void; stubAll()
+ templateGet.mockImplementation((id: string) => id === 'a' ? new Promise(r => { finish = r }) : Promise.resolve({ success: true, data: { id, name: 'Bの本文', messageType: 'text', messageContent: 'B', usedBy: USED_BY } }))
+ searchParams.value = new URLSearchParams('id=a')
+ const view = render(<TemplateDetailPage />)
+ searchParams.value = new URLSearchParams('id=b'); view.rerender(<TemplateDetailPage />)
+ await act(async () => { await Promise.resolve(); await Promise.resolve() })
+ await act(async () => finish({ success: true, data: { id: 'a', name: 'Aの本文', messageType: 'text', messageContent: 'A', usedBy: USED_BY } }))
+ expect(screen.queryByText('Aの本文')).toBeNull()
+})
+test('WEB-100: 公開済み質問を複製しても選択肢と動きを保つ', async () => {
+ const question = { text: '続けますか', choices: [{ key: 'yes', label: 'はい', behavior: 'none', addTagIds: ['tag'] }] }
+ stubAll(USED_BY, [{ ...VERSIONS[0], question }] as typeof VERSIONS)
+ templateCreate.mockResolvedValue({ success: true, data: { id: 'copy' } })
+ render(<TemplateDetailPage />)
+ await act(async () => { await Promise.resolve(); await Promise.resolve() })
+ fireEvent.click(screen.getByRole('button', { name: '複製する' }))
+ await act(async () => { await Promise.resolve() })
+ expect(templateCreate).toHaveBeenCalledWith(expect.objectContaining({ question, questionStatus: 'draft' }))
+})
+
+test('WEB-107: 複製後の後処理が失敗しても同じ下書きにボタンを結び直す', async () => {
+ const content = JSON.stringify([{ text: '案内', actions: [{ type: 'postback', label: '押す', data: 'ctpl=tpl-1&c=0&a=0' }, { type: 'postback', label: '別', data: 'question=other' }] }])
+ stubAll(USED_BY, [{ ...VERSIONS[0], messageType: 'carousel', messageContent: content }])
+ templateCreate.mockReset().mockResolvedValue({ success: true, data: { id: 'copy' } })
+ templateUpdate.mockRejectedValueOnce(new Error('通信失敗')).mockResolvedValue({ success: true, data: { id: 'copy' } })
+ render(<TemplateDetailPage />)
+ await act(async () => { await Promise.resolve(); await Promise.resolve() })
+ fireEvent.click(screen.getByRole('button', { name: '複製する' }))
+ await act(async () => { await Promise.resolve(); await Promise.resolve() })
+ expect(templateUpdate).toHaveBeenCalled()
+ fireEvent.click(screen.getByRole('button', { name: '複製する' }))
+ await act(async () => { await Promise.resolve(); await Promise.resolve() })
+ expect(templateCreate).toHaveBeenCalledTimes(1)
+ const updated = JSON.parse(templateUpdate.mock.calls[0][1].messageContent)
+ expect(updated[0].actions.map((a: { data: string }) => a.data)).toEqual(['ctpl=copy&c=0&a=0', 'question=other'])
+})

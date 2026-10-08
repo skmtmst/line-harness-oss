@@ -276,14 +276,12 @@ export default function TemplatesListV8() {
   useEffect(() => {
     if (!pickerOpen || examplesRequested.current) return
     examplesRequested.current = true
-    let cancelled = false
     loadTemplateExamples()
-      .then((items) => { if (!cancelled) setExamples(items) })
+      .then((items) => { setExamples(items) })
       .catch(() => {
         examplesRequested.current = false
-        if (!cancelled) setExamples([])
+        setExamples([])
       })
-    return () => { cancelled = true }
   }, [pickerOpen])
   const [savedMenuOpen, setSavedMenuOpen] = useState(false)
   const savedAnchorRef = useRef<HTMLElement | null>(null)
@@ -439,7 +437,7 @@ export default function TemplatesListV8() {
 
   /* ===== 絞り込み ===== */
   const tabItems = useMemo(
-    () => templates.filter((t) => activeSection === 'rich_video' ? isRichVideoTemplate(t) : activeSection === 'question' ? Boolean(t.question) : !t.question && !isRichVideoTemplate(t)),
+    () => templates.filter((t) => activeSection === 'card_message' ? t.messageType === 'carousel' : activeSection === 'rich_video' ? isRichVideoTemplate(t) : activeSection === 'question' ? Boolean(t.question) : !t.question && t.messageType !== 'carousel' && !isRichVideoTemplate(t)),
     [templates, activeSection],
   )
 
@@ -586,6 +584,7 @@ export default function TemplatesListV8() {
   const editHref = (t: Template) =>
     t.question
       ? `/templates/questions/new?id=${encodeURIComponent(t.id)}`
+      : t.messageType === 'carousel' ? `/templates/carousel?id=${encodeURIComponent(t.id)}`
       : `/templates/edit?id=${encodeURIComponent(t.id)}${isRichVideoTemplate(t) ? '&kind=rich_video' : ''}`
   const detailHref = (t: Template) => `/templates/detail?id=${encodeURIComponent(t.id)}`
 
@@ -1290,7 +1289,7 @@ export default function TemplatesListV8() {
     <p className={styles.pagerSolo}>{pagerSummary}</p>
   )
 
-  const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'
+  const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video' || activeSection === 'card_message'
   const switchSection = (next: Section) => {
     setActiveSection(next)
     setPage(1)
@@ -1310,8 +1309,8 @@ export default function TemplatesListV8() {
       <Tabs
         label="テンプレートの種類"
         items={[
-          { label: 'メッセージ', count: loading ? undefined : templates.filter((t) => !t.question && !isRichVideoTemplate(t)).length, current: activeSection === 'message', onClick: () => switchSection('message') },
-          { label: 'カルーセル', count: assetCounts.card_message, current: activeSection === 'card_message', onClick: () => switchSection('card_message') },
+          { label: 'メッセージ', count: loading ? undefined : templates.filter((t) => !t.question && t.messageType !== 'carousel' && !isRichVideoTemplate(t)).length, current: activeSection === 'message', onClick: () => switchSection('message') },
+          { label: 'カルーセル', count: loading ? undefined : assetCounts.card_message === undefined ? undefined : assetCounts.card_message + templates.filter((t) => t.messageType === 'carousel').length, current: activeSection === 'card_message', onClick: () => switchSection('card_message') },
           { label: 'リッチメッセージ', count: assetCounts.rich_message, current: activeSection === 'rich_message', onClick: () => switchSection('rich_message') },
           { label: '質問', count: loading ? undefined : templates.filter((t) => Boolean(t.question)).length, current: activeSection === 'question', onClick: () => switchSection('question') },
           { label: 'クーポン', count: assetCounts.coupon, current: activeSection === 'coupon', onClick: () => switchSection('coupon') },
@@ -1798,6 +1797,7 @@ export default function TemplatesListV8() {
       overlays={overlays}
     >
       {listBody}
+      {activeSection === 'card_message' && (assetCounts.card_message ?? 0) > 0 ? <section aria-label="以前に作ったカルーセル"><h2 className={styles.panelLabel}>以前に作ったカルーセル</h2>{canMutateTemplates ? <BroadcastAssetManager kind="card_message" onChanged={() => void loadAssetCounts()} /> : <StaffAssetList kind="card_message" />}</section> : null}
     </ListPage>
   )
 }

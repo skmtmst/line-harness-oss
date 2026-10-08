@@ -73,7 +73,14 @@ type Conflict = { name: string; at: string; latest: TemplateDraft | null }
  * `host` を渡すと、統括のテンプレートの入口から同じ画面を使う（host.ts）。保存は呼ぶ側、主ボタンは［保存して配る］、
  * 読み込み・自動保存・公開・店の差し込み候補（友だち情報・共通情報）は使わない。
  */
-export default function TemplateMessageEditor({ id, visual, example = null, host }: { id: string | null; visual: boolean; example?: string | null; host?: TemplateEditHost }) {
+type MessageProps = { id: string | null; visual: boolean; example?: string | null; host?: TemplateEditHost }
+export default function TemplateMessageEditor(props: MessageProps) {
+  const { selectedAccountId } = useAccount()
+  return <TemplateMessageInner key={props.host ? 'hq' : `${selectedAccountId}:${props.id}`} {...props} />
+}
+function TemplateMessageInner({ id, visual, example = null, host }: MessageProps) {
+  const active = useRef(true)
+  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
   const router = useRouter()
   const role = useStaffRole()
   // 役割の確認が済むまでは操作を出す（最後の守りはサーバの 403）。staff と分かったら隠す。
@@ -98,7 +105,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const [compareOpen, setCompareOpen] = useState(false)
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
-  const [publishCheck, setPublishCheck] = useState<{ id: string; entries: ReturnType<typeof templateUsageEntries> } | null>(null)
+  const [publishCheck, setPublishCheck] = useState<{ id: string; entries: ReturnType<typeof templateUsageEntries>; version: number; revision: number } | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   /*
@@ -301,6 +308,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     inFlightRef.current = request
     try {
       const res = await request
+      if (!active.current) return null
       if (!res.ok) {
         if (res.conflict && target.templateId) await raiseConflict(target.templateId)
         else if (!silent) setError(res.error)
@@ -332,28 +340,19 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
 
   const leave = () => {
     disarm()
-    router.push('/templates')
+    if (active.current) router.push('/templates')
   }
 
-  const publishNow = async (templateId: string): Promise<boolean> => {
-    const got = await api.templates.get(templateId)
-    if (!got.success || !isTemplateDetailData(got.data)) {
-      setError('いまの状態を読み込めませんでした。もう一度お試しください。')
-      return false
-    }
+  const publishNow = async (templateId: string, version: number, revision: number): Promise<boolean> => {
     try {
-      const res = await api.templates.publish(templateId, {
-        expectedVersion: got.data.publishedVersion ?? 0,
-        expectedDraftRevision: got.data.draftRevision ?? 0,
-      })
-      if (!res.success) {
-        setError(res.error || '公開できませんでした。もう一度お試しください。')
-        return false
-      }
+      if (!active.current) return false
+      const res = await api.templates.publish(templateId, { expectedVersion: version, expectedDraftRevision: revision })
+      if (!active.current) return false
+      if (!res.success) { setError(res.error || '公開できませんでした。下書きは保存済みです。もう一度お試しください。'); return false }
       return true
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) await raiseConflict(templateId)
-      else setError('公開できませんでした。もう一度お試しください。')
+      else setError('公開できませんでした。下書きは保存済みです。もう一度お試しください。')
       return false
     }
   }
@@ -378,27 +377,38 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     }
   }
 
+  const pendingPublication = useRef<{ id: string; snapshot: string; accountId: string | null } | null>(null)
   /* 保存して公開：使っている場所があれば、どこへ届くかを見せてから（cuR8I）。 */
   const onPublish = async () => {
     if (host) { hostSave(true); return }
-    const savedId = await saveNow()
+    const sentSnapshot = snapshot(editor.draft)
+    const pending = pendingPublication.current
+    const savedId = pending && pending.snapshot === sentSnapshot && pending.accountId === selectedAccountId ? pending.id : await saveNow()
     if (!savedId) return
+    pendingPublication.current = { id: savedId, snapshot: sentSnapshot, accountId: selectedAccountId }
     setPublishing(true)
     try {
       const detail = await api.templates.get(savedId)
+      if (!active.current) return
       if (!detail.success || !isTemplateDetailData(detail.data)) {
         setError('いまの状態を読み込めませんでした。一覧の詳細から公開してください。')
         return
       }
-      const entries = detail.data.usedBy ? templateUsageEntries(detail.data.usedBy) : []
-      if (entries.length > 0) {
-        setPublishCheck({ id: savedId, entries })
+      if (snapshot(draftFromDetail(detail.data)) !== sentSnapshot) {
+        await raiseConflict(savedId)
         return
       }
-      if (await publishNow(savedId)) {
+      const entries = detail.data.usedBy ? templateUsageEntries(detail.data.usedBy) : []
+      if (entries.length > 0) {
+        setPublishCheck({ id: savedId, entries, version: detail.data.publishedVersion ?? 0, revision: detail.data.draftRevision ?? 0 })
+        return
+      }
+      if (await publishNow(savedId, detail.data.publishedVersion ?? 0, detail.data.draftRevision ?? 0)) {
         notifyToast('公開しました')
         leave()
       }
+    } catch {
+      setError('下書きは保存済みですが、公開前の状態を読み込めませんでした。もう一度お試しください。')
     } finally {
       setPublishing(false)
     }
@@ -694,7 +704,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
           setPublishing(true)
           setError('')
           try {
-            if (await publishNow(publishCheck.id)) {
+            if (await publishNow(publishCheck.id, publishCheck.version, publishCheck.revision)) {
               setPublishCheck(null)
               notifyToast('公開しました')
               leave()

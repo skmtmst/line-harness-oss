@@ -303,7 +303,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const openImage = () => (host ? fileInput.current?.click() : setPickerOpen(true))
   const onSaveDraft = async () => {
     if (host) { hostSave(false); return }
-    if (await save()) notifyToast('下書きを保存しました')
+    if (await save()) { notifyToast('下書きを保存しました'); disarm(); router.push('/templates') }
   }
   const onPublish = async () => {
     if (host) { hostSave(true); return }

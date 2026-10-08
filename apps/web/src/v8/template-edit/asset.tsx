@@ -291,7 +291,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   }
   const onSaveDraft = async () => {
     if (host) { hostSave(false); return }
-    if (await save()) notifyToast('下書きを保存しました')
+    if (await save()) { notifyToast('下書きを保存しました'); disarm(); router.push('/templates') }
   }
   const onPublish = async () => {
     if (host) { hostSave(true); return }

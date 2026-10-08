@@ -10,7 +10,7 @@
  * 「押されたら」は今の質問の部品（QuestionEditor）を窓で開いて決める（タグ・友だち情報・シナリオ・URL などの全部の設定が残る）。
  * 受け付ける URL：`/templates/questions/new`・`?id=<テンプレート>`（直す）。
  */
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useFieldValidation } from '@/lib/use-field-validation'
 import { TextField } from '@/components/shared/text-field'
@@ -78,6 +78,8 @@ export function choiceActionText(choice: QuestionChoice, tags: Array<Pick<Tag, '
 }
 
 function QuestionNew({ host }: { host?: TemplateEditHost }) {
+  const active = useRef(true)
+  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
   const router = useRouter()
   const params = useSearchParams()
   /* 統括の入口（host）では店のテンプレートを読まない（新しく作るだけ）。 */
@@ -165,6 +167,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const dirty = snapshotOf({ name, category, folderId, question }) !== savedSnapshot
   const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
 
+  const savedQuestion = useRef<{ id: string; snapshot: string; version: number; revision: number } | null>(null)
   const save = async (questionStatus: 'draft' | 'published'): Promise<boolean> => {
     if (host) {
       if (!name.trim()) { reject('q-template-name', 'テンプレート名を入力してください。'); return false }
@@ -192,17 +195,44 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       folderId,
     }
     try {
-      const result = id ? await api.templates.update(id, payload) : await api.templates.create(payload)
-      if (!result.success) { setError(result.error || '保存できませんでした。'); return false }
+      const sentSnapshot = snapshotOf({ name, category, folderId, question })
+      let saved = savedQuestion.current
+      if (!saved || saved.snapshot !== sentSnapshot) {
+        const targetId = id || saved?.id
+        const result = targetId ? await api.templates.update(targetId, { ...payload, questionStatus: 'draft' }) : await api.templates.create({ ...payload, questionStatus: 'draft' })
+        if (!active.current) return false
+        if (!result.success) { setError(result.error || '保存できませんでした。'); return false }
+        saved = { id: result.data.id, snapshot: sentSnapshot, version: 0, revision: 0 }
+        savedQuestion.current = saved
+        setSavedSnapshot(sentSnapshot)
+        const detail = await api.templates.get(saved.id)
+        if (!active.current) return false
+        if (!detail.success) throw new Error('保存後の状態を読み込めませんでした。')
+        saved.version = detail.data.publishedVersion ?? 0
+        saved.revision = detail.data.draftRevision ?? 0
+      }
+      if (questionStatus === 'published') {
+        // 読み直しが失敗した場合は、同じIDの版を確かめてから再開する。
+        if (!saved.revision) {
+          const detail = await api.templates.get(saved.id)
+          if (!active.current) return false
+          if (!detail.success) throw new Error('保存後の状態を読み込めませんでした。')
+          saved.version = detail.data.publishedVersion ?? 0; saved.revision = detail.data.draftRevision ?? 0
+        }
+        const published = await api.templates.publish(saved.id, { expectedVersion: saved.version, expectedDraftRevision: saved.revision })
+        if (!active.current) return false
+        if (!published.success) throw new Error(published.error || '公開できませんでした。')
+      }
       return true
     } catch (caught) {
-      setError(describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' }))
+      if (!active.current) return false
+      setError((savedQuestion.current ? '下書きは保存済みです。' : '') + describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' }))
       return false
     } finally {
       setSaving(false)
     }
   }
-  const leaveToList = () => { disarm(); router.push('/templates') }
+  const leaveToList = () => { if (!active.current) return; disarm(); router.push('/templates') }
   const onSaveDraft = async () => { if (await save('draft')) leaveToList() }
   /* 使われている質問を公開すると利用先へ新しい内容が届くので、使用先があれば確認の窓を挟む（cuR8I）。 */
   const onPublish = async () => {
@@ -393,7 +423,13 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
 export default function QuestionNewV8({ host }: { host?: TemplateEditHost } = {}) {
   return (
     <Suspense fallback={<ListState kind="loading" title="質問テンプレートを準備しています" />}>
-      <QuestionNew host={host} />
+      <BoundQuestion host={host} />
     </Suspense>
   )
+}
+
+function BoundQuestion({ host }: { host?: TemplateEditHost }) {
+  const params = useSearchParams()
+  const { selectedAccountId } = useAccount()
+  return <QuestionNew key={host ? 'hq' : `${selectedAccountId}:${params.get('id')}`} host={host} />
 }

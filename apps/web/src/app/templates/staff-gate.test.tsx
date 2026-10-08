@@ -49,7 +49,7 @@ vi.mock('@/lib/api', () => ({
     },
     broadcastMessageAssets: {
       list: assetList,
-      counts: () => Promise.resolve({ success: true, data: { card_message: 0, rich_message: 0, coupon: 0, research: 0 } }),
+      counts: () => Promise.resolve({ success: true, data: { card_message: 1, rich_message: 0, coupon: 0, research: 0 } }),
     },
     folders: {
       list: () => Promise.resolve({ success: true, data: FOLDERS }),
