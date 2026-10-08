@@ -26,3 +26,11 @@ export interface ReminderScheduleMetrics { scheduledNext24Hours: number }
 
 /** Explicit creation state; omit for legacy active creation, false for a draft. */
 export interface WebhookCreateState { isActive?: boolean }
+
+export interface EcIdentityDuplicateSignal {
+  /** Opaque key for an external customer inside this tenant/account; does not reveal the customer ID. */
+  duplicateGroupKey: string | null;
+  duplicateCandidateCount: number;
+  /** Pending pairs > 1, matching summary.duplicateSuspicions (customers, not pairs). */
+  isDuplicateSuspicion: boolean;
+}

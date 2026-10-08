@@ -1,4 +1,4 @@
-import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState } from '@line-crm/shared'
+import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal } from '@line-crm/shared'
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
 import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
@@ -4833,7 +4833,7 @@ export type EcIdentityCandidateOperationsList = {
     impact: IdentityCandidateImpactMetric[]
     detectedAt: string
     reviewedAt: string | null
-  }>
+  } & EcIdentityDuplicateSignal>
   total: number
   summary: EcIdentityCandidateSummary
 }
