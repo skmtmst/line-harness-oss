@@ -2123,6 +2123,23 @@ const UID_MIGRATION_DONE = {
 }
 
 function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
+  /*
+   * B-6 受信箱の添付（API-15・M0393「7. 添付」）：画像以外の準備（アップロード）は保存しないで同じ形を返す。
+   * B-26 右の欄でその場で直す：対応状況・担当・メモの更新は、送った値を当てた会話を返す（保存はしない）。
+   */
+  if (method === 'POST' && /^\/api\/chats\/[^/]+\/attachments\/upload$/.test(pathname)) {
+    return {
+      id: '9b2f6c1e-3a4d-4e5f-8a7b-1c2d3e4f5a6b', key: 'private/chat-attachments/9b2f6c1e-3a4d-4e5f-8a7b-1c2d3e4f5a6b',
+      url: 'https://example.com/api/chat-attachments/9b2f6c1e-3a4d-4e5f-8a7b-1c2d3e4f5a6b',
+      filename: '定期便のご案内.pdf', mimeType: 'application/pdf', size: 482133, kind: 'file',
+      expiresAt: '2026-11-07T03:00:00.000Z',
+    }
+  }
+  if (method === 'PUT' && /^\/api\/chats\/[^/]+$/.test(pathname)) {
+    const id = pathname.split('/').pop()
+    const chat = CHATS.find((row) => row.id === id || row.friendId === id) ?? CHATS[0]
+    return { id: chat.friendId ?? chat.id, friendId: chat.friendId ?? chat.id, operatorId: chat.operatorId ?? null, status: chat.status, notes: chat.notes ?? null, revision: (chat.revision ?? 0) + 1 }
+  }
   /* 提案 E-4・E-9：媒体リンクの保存・グルメ媒体・予約ページの URL、統括の一括配信の作る・確かめる・外す・送る・止める・やり直す。 */
   if (method === 'POST' && pathname === '/api/restaurant-test/media') return { code: 'gourmet_new', name: 'グルメ媒体', acceptsReservations: false }
   if (method === 'PUT' && pathname.startsWith('/api/restaurant-test/media-links/')) {
@@ -6132,7 +6149,8 @@ const server = createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible',
+    // X-Filename は本物の口（ADMIN_REQUEST_HEADERS）と同じ。受信箱の添付（B-6）が送る。
+    'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible, X-Filename',
   )
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
   res.setHeader('Access-Control-Expose-Headers', 'ETag')

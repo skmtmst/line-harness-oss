@@ -1,6 +1,8 @@
 'use client'
 
 import { notifyToast } from '@/components/shared/toast'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { ApiError } from '@/lib/api'
 
 /*
  * ★V7 sTJsh §1・§4「押したらすぐ反映」「確認の代わりに元に戻す」。
@@ -127,4 +129,76 @@ export function runOptimistic(options: {
         onAction: options.retry,
       })
     })
+}
+
+/** 失敗の理由（口が返した日本語）。機械の文（API error: 500 など）・空は出さない。 */
+const failureReason = (error: unknown): string => japaneseDetailOf(error)
+
+/**
+ * ★V8 受信箱の右の欄でその場で直す（A-2 採用・B-26）。
+ *
+ * 呼び出し側が画面を先に変えてから呼ぶ。裏で `request` を送り、
+ * - 通ったら白い知らせ「〇〇にしました ［元に戻す］」（5秒。乗せている間・押している間は止まる）。
+ *   ［元に戻す］は画面を戻して `undoRequest` を送る。それも失敗したら、戻した画面をまた直して知らせる。
+ * - 失敗したら画面を戻し、理由と［もう一度試す］の知らせを出す。
+ * 知らせは提案 F の共通の知らせ（積み重ね・消えた隙間を詰める）。
+ * 返り値は知らせを消す関数（メモのように続けて保存するとき、前の知らせを片づける）。
+ */
+export function runOptimisticWithUndo(options: {
+  request: Commit
+  revert: () => void
+  /** 成功の知らせ（例「対応状況を対応中にしました」）。 */
+  successMessage: string
+  /** 失敗の知らせの頭（例「対応状況を変えられませんでした。」）。後ろに理由が付く。 */
+  failureMessage: string
+  retry: () => void
+  /** 元に戻すときに送る。省略すると［元に戻す］を出さない。 */
+  undoRequest?: Commit
+  /** 元に戻したあと、もう一度戻す（元に戻すが失敗したときの画面の当て直し）。 */
+  reapply?: () => void
+  onSuccess?: (res: unknown) => void
+  onFailure?: (error: unknown) => void
+  /** 成功の文を保存の結果で変えるとき（メモの同時編集など）。渡すと successMessage より勝つ。 */
+  successMessageOf?: () => string
+}): { dismiss: () => void } {
+  let dismissCurrent: () => void = () => {}
+  const handle = { dismiss: () => dismissCurrent() }
+  const fail = (error: unknown) => {
+    options.revert()
+    options.onFailure?.(error)
+    const reason = failureReason(error)
+    dismissCurrent = notifyToast(`${options.failureMessage}${reason ? reason : '通信を確かめて、もう一度お試しください。'}`, {
+      tone: 'error',
+      actionLabel: 'もう一度試す',
+      onAction: options.retry,
+    })
+  }
+  void Promise.resolve()
+    .then(() => options.request())
+    .then((res) => {
+      if (res && res.success === false) throw new ApiError(400, res.error ?? '')
+      options.onSuccess?.(res)
+      const undoRequest = options.undoRequest
+      const message = options.successMessageOf?.() ?? options.successMessage
+      // 文が空なら知らせない（v7 の画面は今までどおり静かに終わる）。
+      if (!message) return
+      dismissCurrent = notifyToast(message, undoRequest ? {
+        actionLabel: '元に戻す',
+        onAction: () => {
+          options.revert()
+          void Promise.resolve()
+            .then(() => undoRequest())
+            .then((undoRes) => {
+              if (undoRes && undoRes.success === false) throw new ApiError(400, undoRes.error ?? '')
+            })
+            .catch((error: unknown) => {
+              options.reapply?.()
+              const reason = failureReason(error)
+              notifyToast(`元に戻せませんでした。${reason || '通信を確かめて、もう一度お試しください。'}`, { tone: 'error' })
+            })
+        },
+      } : undefined)
+    })
+    .catch(fail)
+  return handle
 }

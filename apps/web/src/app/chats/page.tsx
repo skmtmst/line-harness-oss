@@ -23,7 +23,8 @@ import { withRequestTimeout } from '@/lib/request-timeout'
 import { INBOX_INFO_PANEL_MIN_WIDTH } from './inbox-layout'
 import styles from './inbox-v8.module.css'
 import Select from '@/components/shared/select'
-import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
+import SearchField from '@/components/shared/search-field'
+import { OperatorDropdown, StatusDropdown, buildOperatorRows, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import { unreadLookup } from '@/components/chats/assignee-unread'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
 import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
@@ -45,6 +46,20 @@ import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog'
 import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css'
 import ConversationHead from '@/v8/inbox-chat/conversation-head'
 import { formatInboxListTime } from '@/v8/inbox-chat/list-time'
+import AttachMenu from '@/v8/inbox-chat/attach-menu'
+import AttachmentChip, { type PendingAttachmentView } from '@/v8/inbox-chat/attachment-chip'
+import AttachmentMessage from '@/v8/inbox-chat/attachment-message'
+import {
+  ATTACH_NOTE,
+  ATTACH_NOTE_TITLE,
+  attachmentPreviewLabel,
+  attachmentSendInput,
+  checkAttachment,
+  describeUploadFailure,
+  scheduledContentLabel,
+  type AttachSlot,
+} from '@/v8/inbox-chat/attachments'
+import type { ChatAttachment } from '@line-crm/shared'
 import SegmentedControl from '@/components/shared/segmented'
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
@@ -257,16 +272,6 @@ function formatInboxDatetime(iso: string | null): string {
  * オフセットは常に +09:00。
  */
 const INBOX_TIME_ZONE = 'Asia/Tokyo'
-
-/*
- * ★V8 書く欄の「添付」（オーナー指摘：画像だけでなくファイル・動画も送る）。
- * 選ぶ窓では画像・動画・ファイルを選べるようにする。ただし受信箱の送信口（POST /api/chats/:id/send）は
- * いま 文字・Flex・画像 だけを受ける。動画・ファイルは選んだときに理由を出して止める（送ったつもりにさせない）。
- */
-const ATTACH_ACCEPT_V8 = 'image/jpeg,image/png,video/mp4,application/pdf,.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv'
-/* 案内は絵（XqSvX「画像の注」）の短さに。動画・ファイルがまだ送れないことは title と選んだときの文で伝える。 */
-const ATTACH_NOTE_V8 = 'JPEG / PNG・1枚 1MB まで'
-const ATTACH_NOTE_V8_TITLE = '画像は JPEG / PNG・1枚 1MB まで。動画・ファイルはまだ受信箱から送れません'
 
 function formatJstScheduledAt(iso: string): string {
   const d = new Date(iso)
@@ -657,19 +662,62 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
-  /**
-   * ★V8「添付」で選んだもの。画像は今までの画像の準備へ渡す。動画・ファイルは
-   * 受信箱の送信口がまだ受けないので、理由を出して止める（画像の扱いは変えない）。
+  /*
+   * ★V8 B-6（M0393「7. 添付」I7Skn）：クリップ・ドラッグで選んだもの。
+   * 画像は今までの画像の準備へ渡す（1MB・送り方も同じ）。動画・ファイルは受信箱の添付の口
+   * （API-15）へ先にアップロードし、書く欄の上の札で 準備中・済み・失敗（理由＋もう一度試す）を見せる。
+   * 画像と同じく「アカウント＋会話」ごとに預かり、切り替えても前の会話の結果を今の欄へ書かない。
    */
-  const handlePickAttachment = async (file: File) => {
-    if (file.type.startsWith('image/')) return handlePickImage(file)
-    const ownerKey = draftKeyOf(selectedAccountId, selectedChatId)
-    const message = file.type.startsWith('video/')
-      ? '動画はまだ受信箱から送れません。画像（JPEG / PNG・1MB まで）を選んでください'
-      : 'ファイルはまだ受信箱から送れません。画像（JPEG / PNG・1MB まで）を選んでください'
-    imageErrorDraftsRef.current.set(ownerKey, message)
-    if (draftOwnerKeyRef.current === ownerKey) setImageError(message)
+  type PendingAttachment = PendingAttachmentView & { file: File; job: number; attachment?: ChatAttachment }
+  const attachDraftsRef = useRef(new Map<string, PendingAttachment>())
+  const attachJobRef = useRef(0)
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null)
+  const pendingAttachmentRef = useRef(pendingAttachment)
+  pendingAttachmentRef.current = pendingAttachment
+  const putAttachment = (ownerKey: string, value: PendingAttachment | null) => {
+    if (value) attachDraftsRef.current.set(ownerKey, value)
+    else attachDraftsRef.current.delete(ownerKey)
+    if (draftOwnerKeyRef.current === ownerKey) setPendingAttachment(value)
   }
+  const uploadAttachment = async (ownerKey: string, chatId: string, file: File, kind: 'video' | 'file') => {
+    attachJobRef.current += 1
+    const job = attachJobRef.current
+    const base = { kind, name: file.name, size: file.size, file, job }
+    putAttachment(ownerKey, { ...base, status: 'uploading' })
+    try {
+      const res = await api.chats.attachments.upload(chatId, file)
+      if (attachDraftsRef.current.get(ownerKey)?.job !== job) return
+      if (!res.success) throw new ApiError(400, res.error ?? '')
+      putAttachment(ownerKey, { ...base, status: 'ready', attachment: res.data })
+    } catch (uploadError) {
+      if (attachDraftsRef.current.get(ownerKey)?.job !== job) return
+      putAttachment(ownerKey, { ...base, status: 'failed', error: describeUploadFailure(uploadError) })
+    }
+  }
+  const handlePickAttachment = async (file: File, slot?: AttachSlot) => {
+    const ownerKey = draftKeyOf(selectedAccountId, selectedChatId)
+    const check = checkAttachment(file, slot)
+    if (!check.ok) {
+      // 大きすぎる・送れない形式はその場で理由を出す（アップロードしない）。
+      imageErrorDraftsRef.current.set(ownerKey, check.reason)
+      if (draftOwnerKeyRef.current === ownerKey) setImageError(check.reason)
+      return
+    }
+    if (check.kind === 'image') return handlePickImage(file)
+    if (!selectedChatId) return
+    imageErrorDraftsRef.current.delete(ownerKey)
+    if (draftOwnerKeyRef.current === ownerKey) setImageError('')
+    await uploadAttachment(ownerKey, selectedChatId, file, check.kind)
+  }
+  const retryAttachment = () => {
+    const current = pendingAttachmentRef.current
+    if (!current || !selectedChatId) return
+    void uploadAttachment(draftKeyOf(selectedAccountId, selectedChatId), selectedChatId, current.file, current.kind)
+  }
+  const clearPendingAttachment = () => {
+    putAttachment(draftKeyOf(selectedAccountId, selectedChatId), null)
+  }
+  const [dropOver, setDropOver] = useState(false)
 
   /** 添付を外す。読み込み中の結果が遅れて届いても復活しないよう世代を進める。 */
   const clearPendingImage = () => {
@@ -1673,6 +1721,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     else imageErrorDraftsRef.current.delete(prevKey)
     setImageError(imageErrorDraftsRef.current.get(nextKey) ?? '')
     setImagePreviewOpen(false)
+    // B-6：動画・ファイルの添付は預かりの表に常に書いているので、開いた会話の分を戻すだけ。
+    setPendingAttachment(attachDraftsRef.current.get(nextKey) ?? null)
   }, [selectedAccountId, selectedChatId])
 
   // Surface deep-linked chats in the sidebar even when the current account
@@ -1864,7 +1914,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   const handleSendMessage = async () => {
     if (!selectedChatId || sending || sendLockRef.current) return
-    if (!messageContent.trim() && !pendingImage) return
+    // B-6：動画・ファイルは準備が済んだものだけ送る。準備中・失敗のまま送らない（本文も止める）。
+    const sendingAttachment = pendingAttachment
+    if (sendingAttachment && sendingAttachment.status !== 'ready') {
+      setError(sendingAttachment.status === 'uploading'
+        ? `「${sendingAttachment.name}」の準備が終わってから送れます。`
+        : `「${sendingAttachment.name}」を準備できていません。もう一度試すか、外してから送ってください。`)
+      return
+    }
+    if (!messageContent.trim() && !pendingImage && !sendingAttachment) return
     // INBOX-29: 上限を超えた本文は送らない(下書きは消さない)。
     if (messageContent.length > MESSAGE_MAX_LENGTH) {
       setError(`メッセージは${formatNumber(MESSAGE_MAX_LENGTH)}文字までです。`)
@@ -1985,6 +2043,46 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             lastMessageContent: '[画像]',
             lastMessageDirection: 'outgoing' as const,
             lastMessageType: 'image' as const,
+          } : c))
+        })
+      }
+      // --- B-6 動画・ファイル（準備済みの添付を1通で送る。ファイルはリンクの文で届く） ---
+      if (sendingAttachment?.attachment && (sendingAttachment.kind === 'video' || sendingAttachment.kind === 'file')) {
+        const input = attachmentSendInput(sendingAttachment.attachment)
+        const signature = JSON.stringify({ chatId: sendingChatId, ...input, quotedMessageId: useCombined ? null : quotedMessage?.id ?? null })
+        const sendResult = await api.chats.send(sendingChatId,
+          { ...input, revision: currentRevision, quotedMessageId: useCombined ? undefined : quotedMessage?.id },
+          sendKeysRef.current.get(signature),
+        )
+        if (sendResult.success) currentRevision = sendResult.data.revision
+        sendKeysRef.current.clear(signature)
+        const sentKey = draftKeyOf(sendingAccountId, sendingChatId)
+        if (attachDraftsRef.current.get(sentKey)?.job === sendingAttachment.job) putAttachment(sentKey, null)
+        const savedContent = sendingAttachment.kind === 'file'
+          ? JSON.stringify({ attachmentId: sendingAttachment.attachment.id, ...sendingAttachment.attachment })
+          : input.content
+        const attachmentMessage = buildOutgoingMessage({
+          messageType: sendingAttachment.kind,
+          content: savedContent,
+          sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
+          sentAt: now,
+        })
+        setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
+          ...prev,
+          lastMessageAt: now,
+          status: 'in_progress',
+          revision: sendResult.success ? sendResult.data.revision : prev.revision,
+          messages: [...(prev.messages ?? []), attachmentMessage],
+        } : prev)
+        setChats((prev) => {
+          if (!prev.some((c) => c.id === sendingChatId)) return prev
+          return refreshChatListAfterSend(prev, statusFilterRef.current, (c) => (c.id === sendingChatId ? {
+            ...c,
+            lastMessageAt: now,
+            status: 'in_progress' as const,
+            lastMessageContent: attachmentPreviewLabel(sendingAttachment.kind),
+            lastMessageDirection: 'outgoing' as const,
+            lastMessageType: sendingAttachment.kind,
           } : c))
         })
       }
@@ -2128,7 +2226,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const handleScheduleSend = async () => {
     if (!selectedChatId || scheduling || scheduleLockRef.current) return
     const content = messageContent.trim()
-    if (!content) return
+    /*
+     * B-6（API-15）：予約でも画像・動画・ファイルを使える。添付は1通ずつ、本文は最後に予約する
+     * （同じ日時なので届く順は 添付 → 本文）。準備中・失敗の添付は予約しない。
+     */
+    const schedulingImage = pendingImage && pendingImage.mode === 'line-image' ? pendingImage : null
+    const schedulingAttachment = pendingAttachment
+    if (schedulingAttachment && schedulingAttachment.status !== 'ready') {
+      setError(schedulingAttachment.status === 'uploading'
+        ? `「${schedulingAttachment.name}」の準備が終わってから予約できます。`
+        : `「${schedulingAttachment.name}」を準備できていません。もう一度試すか、外してから予約してください。`)
+      return
+    }
+    if (!content && (!isV8 || (!schedulingImage && !schedulingAttachment))) return
     // INBOX-29: 上限を超えた本文は予約もさせない。
     if (messageContent.length > MESSAGE_MAX_LENGTH) {
       setError(`メッセージは${formatNumber(MESSAGE_MAX_LENGTH)}文字までです。`)
@@ -2138,7 +2248,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setError('予約する日時を選んでください')
       return
     }
-    if (pendingImage) {
+    // v7 は今までどおり（画像つきは予約しない）。V8 だけ添付の予約を使う。
+    if (!isV8 && pendingImage) {
       setError('画像つきの予約送信にはまだ対応していません')
       return
     }
@@ -2147,37 +2258,80 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setScheduling(true)
     scheduleLockRef.current = true
     try {
-      /*
-       * 同じ送信版には同じ操作キーを使い回す(#965)。通信中の二度押しや
-       * 失敗後の再試行で毎回新しいキーを生やすと、処理待ちの予約行が
-       * 二重に登録される。成功した版は消して、次の予約を別操作にする。
-       */
-      const signature = JSON.stringify({
-        kind: 'schedule',
-        chatId: schedulingChatId,
-        content,
-        scheduledAt: scheduleInput,
-        quotedMessageId: quotedMessage?.id ?? null,
-      })
-      const res = await api.chats.schedule(schedulingChatId, {
-        content,
-        // 入力欄は日本時間の約束(INBOX-21)。オフセットを付けて送り、
-        // サーバー側の時間帯に左右されない同じ瞬間を保存する。
-        scheduledAt: jstDatetimeLocalToIso(scheduleInput),
-        quotedMessageId: quotedMessage?.id,
-      }, sendKeysRef.current.get(signature))
-      if (res.success) {
+      const scheduledAt = jstDatetimeLocalToIso(scheduleInput)
+      const items: Array<{ messageType?: 'image' | 'video' | 'file'; content: string; done: () => void }> = []
+      if (schedulingImage) {
+        items.push({
+          messageType: 'image',
+          content: JSON.stringify({ originalContentUrl: schedulingImage.originalContentUrl, previewImageUrl: schedulingImage.previewImageUrl }),
+          done: () => {
+            dropSentDraft(schedulingChatId, schedulingAccountId, { image: schedulingImage })
+            if (selectedChatIdRef.current === schedulingChatId && detailAccountRef.current === schedulingAccountId && pendingImageRef.current === schedulingImage) {
+              setPendingImage(null)
+              setPendingImageMeta(null)
+            }
+          },
+        })
+      }
+      if (schedulingAttachment?.attachment) {
+        const input = attachmentSendInput(schedulingAttachment.attachment)
+        items.push({
+          messageType: input.messageType as 'video' | 'file',
+          content: input.content,
+          done: () => {
+            const key = draftKeyOf(schedulingAccountId, schedulingChatId)
+            if (attachDraftsRef.current.get(key)?.job === schedulingAttachment.job) putAttachment(key, null)
+          },
+        })
+      }
+      if (content) {
+        items.push({
+          content,
+          done: () => {
+            dropSentDraft(schedulingChatId, schedulingAccountId, { content })
+            if (selectedChatIdRef.current === schedulingChatId && detailAccountRef.current === schedulingAccountId) {
+              setMessageContent((prev) => (prev.trim() === content ? '' : prev))
+            }
+          },
+        })
+      }
+      let allScheduled = true
+      for (const item of items) {
+        /*
+         * 同じ送信版には同じ操作キーを使い回す(#965)。通信中の二度押しや
+         * 失敗後の再試行で毎回新しいキーを生やすと、処理待ちの予約行が
+         * 二重に登録される。成功した版は消して、次の予約を別操作にする。
+         */
+        const signature = JSON.stringify({
+          kind: 'schedule',
+          chatId: schedulingChatId,
+          messageType: item.messageType ?? 'text',
+          content: item.content,
+          scheduledAt: scheduleInput,
+          quotedMessageId: quotedMessage?.id ?? null,
+        })
+        const res = await api.chats.schedule(schedulingChatId, {
+          content: item.content,
+          ...(item.messageType ? { messageType: item.messageType } : {}),
+          // 入力欄は日本時間の約束(INBOX-21)。オフセットを付けて送り、
+          // サーバー側の時間帯に左右されない同じ瞬間を保存する。
+          scheduledAt,
+          quotedMessageId: quotedMessage?.id,
+        }, sendKeysRef.current.get(signature))
+        if (!res.success) {
+          allScheduled = false
+          break
+        }
         sendKeysRef.current.clear(signature)
         // 予約した版だけを消す。切替先の下書きや開いたパネルは触らない(#962 F06)。
-        dropSentDraft(schedulingChatId, schedulingAccountId, { content })
-        if (selectedChatIdRef.current === schedulingChatId && detailAccountRef.current === schedulingAccountId) {
-          setMessageContent((prev) => (prev.trim() === content ? '' : prev))
-          setQuotedMessage((prev) => (prev === quotedMessage ? null : prev))
-          setScheduleInput((prev) => (prev === scheduleInput ? '' : prev))
-          setShowSchedulePanel(false)
-        }
-        await loadScheduledSends(schedulingChatId)
+        item.done()
       }
+      if (allScheduled && selectedChatIdRef.current === schedulingChatId && detailAccountRef.current === schedulingAccountId) {
+        setQuotedMessage((prev) => (prev === quotedMessage ? null : prev))
+        setScheduleInput((prev) => (prev === scheduleInput ? '' : prev))
+        setShowSchedulePanel(false)
+      }
+      await loadScheduledSends(schedulingChatId)
     } catch (scheduleError) {
       // 別の会話・アカウントへ切り替えたあとの古い失敗は、
       // 新しい画面へ出さない(A02-04)。
@@ -2798,6 +2952,17 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       </section>
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
           <div className={`border-b border-hairline p-4 ${styles.searchBlock}`}>
+            {isV8 ? (
+              /* ★V8：共通の検索欄（自作の入力欄をやめる）。 */
+              <SearchField
+                value={nameQuery}
+                onChange={(value) => { setNameQuery(clampSearchQuery(value)); dropSavedViewParam() }}
+                onClear={() => { setNameQuery(''); dropSavedViewParam() }}
+                maxLength={SEARCH_QUERY_MAX_LENGTH}
+                placeholder="名前・メールアドレス・内容で検索"
+                aria-label="名前・メールアドレス・内容で検索"
+              />
+            ) : (
             <div className="relative">
               <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-faint" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
               <input
@@ -2810,6 +2975,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               className={`w-full rounded-control border border-hairline bg-canvas py-2 pr-3 pl-9 text-xs text-ink outline-none focus:border-accent-deep focus:ring-2 focus:ring-accent-deep/15 ${styles.searchInput}`}
               />
             </div>
+            )}
             {/*
               #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
               プルダウンが自分で名乗るため、外の字は置かない。
@@ -2822,7 +2988,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   ——一覧はページ送りされるので、2ページ目の未読が落ちる。
                   0件の担当者も選択肢に残す（契約上、0件は配列に載らないので実値0として描く）。
                 */}
-                <OperatorDropdown
+{isV8 ? (
+                  /* ★V8：共通の選ぶ欄（選んだ行は ✓ だけ）。担当者ごとの未読数は名前の後ろの（）に添える（未取得は「—」）。 */
+                  <Select
+                    aria-label="担当者で絞り込む"
+                    label="担当者"
+                    size="full"
+                    value={assigneeFilter}
+                    onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
+                    options={buildOperatorRows(operators, true).map((row) => {
+                      if (row.id === 'all') return { value: row.id, label: row.name }
+                      const unread = assigneeUnreadStatus === 'error' ? null : unreadLookup(assigneeUnread)(row.id)
+                      return { value: row.id, label: `${row.name}（${unread === null ? '—' : unread}）` }
+                    })}
+                  />
+                ) : (
+                                <OperatorDropdown
                   value={assigneeFilter}
                   operators={operators}
                   onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
@@ -2831,6 +3012,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   unreadOf={unreadLookup(assigneeUnread)}
                   unreadUnavailable={assigneeUnreadStatus === 'error'}
                 />
+                )}
               </span>
             </label>
             <div className={`ml-2 inline-block w-[calc(50%-4px)] min-w-0 align-bottom ${styles.filterCell}`}>
@@ -3292,7 +3474,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 <ConversationHead
                   name={chatDetail.friendName}
                   pictureUrl={chatDetail.friendPictureUrl}
-                  sub={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・${formatRelative(chatDetail.lastMessageAt)}`}
+                  sub={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・${formatInboxListTime(chatDetail.lastMessageAt)}`}
                   subTitle={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 ${formatInboxDatetime(chatDetail.lastMessageAt)}`}
                   onBack={() => setSelectedChatId(null)}
                   attention={{ on: Boolean(chatDetail.isAttention), saving: attentionSaving, onToggle: () => void handleAttentionUpdate() }}
@@ -3485,6 +3667,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       bubbleContent = <ChatImageMessage content={msg.content} />
                     } else if (msg.messageType === 'sticker') {
                       bubbleContent = <StickerMessageImage content={msg.content} />
+                    } else if (isV8 && (msg.messageType === 'video' || msg.messageType === 'file') && msg.direction === 'outgoing') {
+                      // B-6：送った動画・ファイルは JSON のまま出さず、再生できる枠・名前と期限の札にする。
+                      bubbleContent = <AttachmentMessage messageType={msg.messageType} content={msg.content} />
                     } else {
                       bubbleContent = <span>{msg.content}</span>
                     }
@@ -3727,7 +3912,28 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 すべて出しっぱなしで、入力欄が縦に伸びてトークが読めなかった。
                 よく使うものだけ出し、設定は畳む。
               */}
-              <div data-inbox-v4="composer" className={`sticky bottom-0 z-10 border-t border-hairline bg-canvas px-4 py-3 relative ${isV8 ? chatStyles.composer : ''}`}>
+              <div
+                data-inbox-v4="composer"
+                className={`sticky bottom-0 z-10 border-t border-hairline bg-canvas px-4 py-3 relative ${isV8 ? chatStyles.composer : ''}`}
+                data-drop-over={isV8 && dropOver ? '' : undefined}
+                /* ★V8 B-6：ファイルを書く欄へ落としてもクリップと同じ（形式から 画像・動画／ファイル を決める）。 */
+                onDragOver={isV8 ? (event) => {
+                  if (!Array.from(event.dataTransfer.types).includes('Files')) return
+                  event.preventDefault()
+                  event.dataTransfer.dropEffect = 'copy'
+                  if (!dropOver) setDropOver(true)
+                } : undefined}
+                onDragLeave={isV8 ? (event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropOver(false)
+                } : undefined}
+                onDrop={isV8 ? (event) => {
+                  if (!Array.from(event.dataTransfer.types).includes('Files')) return
+                  event.preventDefault()
+                  setDropOver(false)
+                  const file = event.dataTransfer.files?.[0]
+                  if (file) void handlePickAttachment(file)
+                } : undefined}
+              >
                 {/* INBOX-12: 定期更新が連続失敗で止まったときの理由と再試行 */}
                 {chatPollStalled && (
                   <p className="text-danger mb-2 text-xs">
@@ -3777,12 +3983,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <NotebookPen aria-hidden="true" size={14} />
                       内部メモ
                     </Button>
-                    {isV8 ? (
-                      <Button variant="secondary" size="compact" className={chatStyles.tool} type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading} title="画像・動画・ファイルを添付" aria-label="添付するものを選ぶ">
-                        <Paperclip aria-hidden="true" size={14} />
-                        添付
-                      </Button>
-                    ) : (
+                    {/* ★V8 B-6：［添付］の道具はやめ、入力欄の左下のクリップから選ぶ（M0393「7. 添付」）。v7 は今までの［画像］。 */}
+                    {isV8 ? null : (
                     <Button variant="secondary" className="h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading} title="画像を選ぶ" aria-label="画像を選ぶ">
                       <ImageIcon aria-hidden="true" size={14} />
                       画像
@@ -4050,6 +4252,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 )}
 
+                {/* ★V8 B-6：動画・ファイルの札（名前・大きさ・×）。準備中・失敗（理由＋もう一度試す）もここで見せる。 */}
+                {isV8 && pendingAttachment ? (
+                  <div className={chatStyles.attachChips}>
+                    <AttachmentChip
+                      item={pendingAttachment}
+                      busy={sending || scheduling}
+                      onRemove={clearPendingAttachment}
+                      onRetry={retryAttachment}
+                    />
+                  </div>
+                ) : null}
+
                 <div className={isV8 ? chatStyles.inputBox : 'rounded-card border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15'}>
                   {/* 中段 */}
                   {/*
@@ -4094,17 +4308,31 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     にしていて、入力欄が縦に伸びてトークが読めなかった。
                     アイコンを押すとファイルを選ぶ窓が開く。
                   */}
+                  {isV8 ? (
+                    /* ★V8 B-6：左下のクリップ（32角）＋「画像・動画・ファイルを添付」。選べない・大きすぎるはここに理由。 */
+                    <span className={chatStyles.attachLead}>
+                      <AttachMenu disabled={!selectedChatId} onPick={(file, slot) => void handlePickAttachment(file, slot)} />
+                      <span
+                        className={chatStyles.attachNote}
+                        data-error={imageError ? '' : undefined}
+                        role={imageError ? 'alert' : undefined}
+                        title={imageError || ATTACH_NOTE_TITLE}
+                      >
+                        {imageError ? imageError : imageUploading ? '画像を読み込み中…' : ATTACH_NOTE}
+                      </span>
+                    </span>
+                  ) : (
                   <span className="flex min-w-0 items-center gap-2">
                     <input
                       ref={imageInputRef}
                       type="file"
-                      accept={isV8 ? ATTACH_ACCEPT_V8 : 'image/jpeg,image/png'}
+                      accept="image/jpeg,image/png"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0]
                         // 同じ画像をもう一度選べるように値を戻す。
                         e.target.value = ''
-                        if (file) void (isV8 ? handlePickAttachment(file) : handlePickImage(file))
+                        if (file) void handlePickImage(file)
                       }}
                     />
                     {/*
@@ -4115,15 +4343,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     */}
                     <span
                       className={`min-w-0 truncate text-xs ${imageError ? 'text-danger' : 'text-ink-faint'}`}
-                      title={imageError || (isV8 ? ATTACH_NOTE_V8_TITLE : 'JPEG / PNG・1枚 1MB まで')}
+                      title={imageError || 'JPEG / PNG・1枚 1MB まで'}
                     >
                       {imageError
                         ? imageError
                         : imageUploading
                           ? '画像を読み込み中…'
-                          : isV8 ? ATTACH_NOTE_V8 : 'JPEG / PNG・1枚 1MB まで'}
+                          : 'JPEG / PNG・1枚 1MB まで'}
                     </span>
                   </span>
+                  )}
                   <span className="ml-auto flex shrink-0 items-center gap-2">
                     <Button
                       size={isV8 ? 'compact' : 'field'}
@@ -4136,7 +4365,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       {isV8 ? <Clock3 aria-hidden="true" size={15} /> : null}
                       予約{scheduledSends.length > 0 ? `(${scheduledSends.length})` : ''}
                     </Button>
-                    <Button variant="primary" size={isV8 ? 'compact' : undefined} className={isV8 ? chatStyles.send : 'shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto'} onClick={handleSendMessage} disabled={sending || messageOverLimit || (!messageContent.trim() && !pendingImage)}>
+                    <Button variant="primary" size={isV8 ? 'compact' : undefined} className={isV8 ? chatStyles.send : 'shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto'} onClick={handleSendMessage} disabled={sending || messageOverLimit || (isV8 && pendingAttachment !== null && pendingAttachment.status !== 'ready') || (!messageContent.trim() && !pendingImage && !(isV8 && pendingAttachment?.status === 'ready'))}>
                       {isV8 && !sending ? <Send aria-hidden="true" size={15} /> : null}
                       {sending ? '送っています…' : '送信'}
                     </Button>
@@ -4148,6 +4377,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       onClose={() => setShowSchedulePanel(false)}
                       content={messageContent}
                       hasImage={Boolean(pendingImage)}
+                      attachmentLabel={pendingAttachment?.status === 'ready' ? `${pendingAttachment.kind === 'video' ? '動画' : 'ファイル'}「${pendingAttachment.name}」` : undefined}
                       value={scheduleInput}
                       onChange={setScheduleInput}
                       onConfirm={() => void handleScheduleSend()}
@@ -4156,7 +4386,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       rows={scheduledSends.map((row) => ({
                         id: row.id,
                         label: `${formatJstScheduledAt(row.scheduledAt)}${row.status === 'sending' ? '（送信中）' : ''}`,
-                        content: row.content,
+                        content: scheduledContentLabel(row.messageType, row.content),
                         editable: row.status === 'scheduled',
                         defaultValue: isoToJstDatetimeLocal(row.scheduledAt),
                       }))}
@@ -4277,7 +4507,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               aria-modal={wideInfoPanel ? undefined : true}
               aria-label="顧客情報"
               tabIndex={-1}
-              className={`h-full max-w-full shrink-0 overflow-hidden bg-canvas focus:outline-none ${wideInfoPanel ? 'relative z-auto w-[260px] border-l border-hairline' : 'fixed inset-y-0 right-0 z-[70] w-[340px] shadow-overlay'}`}
+              className={`h-full max-w-full shrink-0 overflow-hidden bg-canvas focus:outline-none ${wideInfoPanel ? `relative z-auto w-[260px] ${isV8 ? '' : 'border-l border-hairline'}` : 'fixed inset-y-0 right-0 z-[70] w-[340px] shadow-overlay'}`}
             >
             {/*
               重なりの中にも閉じるボタンを置く。上部のボタンだけだと、
