@@ -164,7 +164,6 @@ export function typeLabel(type: string): string {
  */
 const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
   rich_message: 'リッチメッセージには未対応です。いまは写真かFlexで作れます',
-  rich_video: 'リッチビデオには未対応です。いまは動画で送れます',
   card_message: 'カードタイプには未対応です。いまはカルーセルで作れます',
   coupon: 'クーポンには未対応です',
   research: 'リサーチには未対応です',
@@ -248,7 +247,7 @@ function emptyBubble(type: BroadcastBubbleType = 'text'): BroadcastBubble {
     : type === 'video' ? { originalContentUrl: '', previewImageUrl: '' }
     : type === 'carousel' ? { templateId: '', templateName: '', columnsJson: '' }
     : KIND_FIELD_TYPES.has(type) ? { state: emptyMessageKindState() }
-    : type === 'rich_video' ? { originalContentUrl: '', previewImageUrl: '', actionUrl: '' }
+    : type === 'rich_video' ? {}
     : { assetId: '', assetName: '' }
   return { id: crypto.randomUUID(), type, content }
 }
@@ -435,7 +434,8 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
           })}
         />
       )}
-      {['image','video','rich_video'].includes(bubble.type) && <MediaUpload bubble={bubble} onChange={(content) => onChange({ ...bubble, content })} />}
+      {bubble.type === 'rich_video' ? <p>{bubble.content.templateName ? `テンプレート：${String(bubble.content.templateName)}` : '「テンプレートから選ぶ」からリッチビデオを選択してください。'}</p> : null}
+      {['image','video'].includes(bubble.type) && <MediaUpload bubble={bubble} onChange={(content) => onChange({ ...bubble, content })} />}
       {isContentTemplateType(bubble.type) && <div>
         <label className="mb-1 block text-xs font-medium text-ink-secondary">コンテンツで作成したテンプレートから選択</label>
         <Combobox
@@ -574,8 +574,8 @@ function MessageButtonsSection({ buttons, error, onChange }: {
 function bubblesError(bubbles: BroadcastBubble[]): string {
   for (const [index, bubble] of bubbles.entries()) {
     if (bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) return `吹き出し${index + 1}のテキストを入力してください`
-    if (['image','video','rich_video'].includes(bubble.type) && !bubble.content.originalContentUrl) return `吹き出し${index + 1}のファイルをアップロードしてください`
-    if (bubble.type === 'video' || bubble.type === 'rich_video') {
+    if (['image','video'].includes(bubble.type) && !bubble.content.originalContentUrl) return `吹き出し${index + 1}のファイルをアップロードしてください`
+    if (bubble.type === 'video') {
       const problem = videoPreviewProblem(bubble.content.previewImageUrl)
       if (problem) return `吹き出し${index + 1}：${problem}`
     }
@@ -617,7 +617,7 @@ function bubblesError(bubbles: BroadcastBubble[]): string {
      * ここで止める。保存の検査と Worker の解析が同じ変換を見るので、
      * 画面では通るのに送信で断られる形にならない（監査 R144）。
      */
-    if (isContentTemplateType(bubble.type)) {
+    if (bubble.type === 'rich_video' || isContentTemplateType(bubble.type)) {
       const problem = assetBubbleError(bubble)
       if (problem) return `吹き出し${index + 1}の${problem}`
     }
@@ -1099,7 +1099,7 @@ export default function BroadcastForm({
         : []
       if (templateResult.success) {
         setMessageTemplates(sendable
-          .filter((template) => ['text', 'image', 'flex'].includes(template.messageType))
+          .filter((template) => ['text', 'image', 'flex', 'imagemap'].includes(template.messageType))
           .map((template) => ({
             id: template.id,
             name: template.name,
@@ -2475,7 +2475,7 @@ export default function BroadcastForm({
                 <button key={template.id} type="button" onClick={() => setSelectedTemplate(template)} className="broadcast-template-row">
                   <span className="min-w-0 flex-1">
                     <strong className="break-words">{template.name}</strong>
-                    <small>{typeLabel(template.messageType)}</small>
+                    <small>{template.messageType === 'imagemap' ? (/"video"\s*:/.test(template.messageContent) ? 'リッチビデオ' : 'リッチメッセージ') : typeLabel(template.messageType)}</small>
                   </span>
                   <span aria-hidden>›</span>
                 </button>
