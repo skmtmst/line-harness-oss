@@ -228,3 +228,20 @@
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { order: 2; }
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .description { flex-basis: 100%; order: 3; }
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 1; }
+
+/* 詳細の説明とタブの間を詰める板（回答フォーム）。指定した詳細だけに効く。 */
+:global([data-theme='v8']) [data-page-template='detail'] .heading[data-bottom-spacing='compact'] {
+  padding-bottom: calc(var(--tpl-detail-head-pad-bottom) - var(--tpl-head-gap));
+}
+
+/* 回答などの本文と補助欄を組む口。既存の詳細には使わない限り効かない。 */
+.detailColumns { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-ev-fr-rail-w); align-items: start; gap: var(--tpl-ev-fr-col-gap); margin-right: var(--tpl-ev-bk-pull-side); }
+.detailColumnMain { display: flex; flex-direction: column; gap: var(--tpl-wh-check-gap); min-width: 0; }
+.detailColumnAside { min-width: 0; min-height: 100%; padding-left: var(--tpl-ev-fr-rail-pad); border-left: 1px solid var(--color-hairline); }
+.detailColumnToggle { display: none; }
+@container v8-page (max-width: 1099px) {
+  .detailColumns { grid-template-columns: minmax(0, 1fr); margin-right: 0; gap: var(--tpl-body-pad); }
+  .detailColumnToggle { display: block; }
+  .detailColumnAside { display: none; min-height: 0; padding-left: 0; border-left: 0; }
+  .detailColumnAside[data-expanded] { display: block; }
+}

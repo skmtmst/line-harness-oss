@@ -15,13 +15,14 @@ export function TableHeadRow({
   children,
   className,
   density,
+  presentation,
   ...rowProps
-}: TableHeadRowProps & { density?: 'standard' | 'comfortable' }) {
+}: TableHeadRowProps & { density?: 'standard' | 'comfortable'; presentation?: 'embedded' }) {
   const classes = [styles.headRow, density === 'comfortable' && styles.headComfortable, className]
     .filter(Boolean)
     .join(' ')
   return (
-    <tr className={classes} {...rowProps}>
+    <tr className={classes} data-presentation={presentation} {...rowProps}>
       {children}
     </tr>
   )
@@ -37,6 +38,8 @@ export type ThProps = Omit<
   align?: 'left' | 'right' | 'center'
   className?: string
   scope?: Scope
+  /** 短い列では1行で省略し、titleで全文を読める。 */
+  truncate?: boolean
   /**
    * 定義・分母・単位・言葉の意味。見出しのすぐ右の「？」へ入れる
    * （★V7・§2-1b）。表の下の注はここへ移し、2回書かない。
@@ -57,6 +60,7 @@ export function Th({
   help,
   helpLabel,
   helpHref,
+  truncate,
   ...cellProps
 }: ThProps) {
   const classes = [
@@ -73,7 +77,7 @@ export function Th({
 
   return (
     <th className={classes} scope={scope} {...cellProps}>
-      {children}
+      {truncate ? <span className={styles.truncated} title={typeof children === 'string' ? children : undefined}>{children}</span> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
           {help}

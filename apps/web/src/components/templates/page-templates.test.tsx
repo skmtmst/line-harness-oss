@@ -1,10 +1,29 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CreatePage, ListPage, SettingsPage } from './index'
+import { CreatePage, DetailColumns, ListPage, SettingsPage } from './index'
+import { useState } from 'react'
 
 afterEach(cleanup)
 describe('V8 の型へ渡す操作', () => {
+  it('畳んだ詳細欄を開閉でき、検索欄の入力を保持する', () => {
+    function Example() {
+      const [expanded, setExpanded] = useState(false)
+      return <DetailColumns asideLabel="回答の詳細・絞り込み" aside={<input aria-label="回答を探す" />} expanded={expanded} onExpandedChange={setExpanded}>回答表</DetailColumns>
+    }
+    render(<Example />)
+    const toggle = screen.getByRole('button', { name: '回答の詳細・絞り込み' })
+    const aside = screen.getByRole('complementary', { name: '回答の詳細・絞り込み' })
+    expect(toggle.getAttribute('aria-controls')).toBe(aside.id)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(aside.hasAttribute('data-expanded')).toBe(true)
+    fireEvent.change(screen.getByRole('textbox', { name: '回答を探す' }), { target: { value: 'ココ' } })
+    fireEvent.click(toggle)
+    fireEvent.click(toggle)
+    expect((screen.getByRole('textbox', { name: '回答を探す' }) as HTMLInputElement).value).toBe('ココ')
+  })
   it('設定の変更があるときだけ保存口を出し、渡された処理を実行する', () => {
     const save = vi.fn()
     const { rerender } = render(<SettingsPage title="設定" navigation={<a href="#delivery">配信</a>}><section id="delivery">配信設定</section></SettingsPage>)
