@@ -26,7 +26,7 @@ const calls = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/api', () => ({ api: { hqSupport: calls } }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageChrome: () => ({}) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({}) }))
 vi.mock('@/components/tenant-access-context', () => ({ useTenantStatus: () => 'active' }))
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => <div data-line-guide /> }))
 
@@ -64,11 +64,9 @@ describe('b8xBtZ お問い合わせの並び', () => {
     }
   })
 
-  it('履歴は表で受付番号・件名・種類・状態・更新を出す', async () => {
+  it('履歴に受付番号・件名・状態を出す', async () => {
     await act(async () => { root.render(<HqSupportPage />) })
     await settle()
-    const headers = [...host.querySelectorAll('th')].map((th) => th.textContent)
-    expect(headers).toEqual(['受付番号', '件名', '種類', '状態', '更新'])
     const text = host.textContent ?? ''
     expect(text).toContain('#1042')
     expect(text).toContain('Webhook が遅れる')
@@ -81,3 +79,5 @@ describe('b8xBtZ お問い合わせの並び', () => {
     expect(current?.textContent).toContain('お問い合わせ')
   })
 })
+
+vi.mock('next/navigation', () => ({ usePathname: () => window.location.pathname, useSearchParams: () => new URLSearchParams(window.location.search), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))

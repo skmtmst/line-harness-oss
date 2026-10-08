@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import TemplateConsole from './template-console'
@@ -24,7 +25,7 @@ const calls = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/hq-templates-api', () => ({
   TEMPLATE_TYPES: ['tag', 'template', 'rich_menu', 'form'],
-  hqTemplatesApi: calls,
+  hqTemplatesApi: { listStats: async () => ({ thisMonthSentCount: 0, outdatedTemplateCount: 0 }), listByKind: () => calls.list('template'), kindCounts: async () => ({}), versions: async () => [], receivedVersions: async () => [], messageReferences: async () => [], folders: { list: async () => [] }, ...calls },
 }))
 vi.mock('./template-definition-editor', () => {
   const freshDefinition = (type: TemplateType): TemplateDefinition => type === 'rich_menu'
@@ -53,8 +54,8 @@ vi.mock('./template-definition-editor', () => {
     referenceCount: () => 0,
   }
 })
-vi.mock('next/navigation', () => ({ usePathname: () => '/hq/templates', useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(window.location.search),  usePathname: () => '/hq/templates', useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 
 const tagRow = { id: 'tag-1', name: '来店タグ', description: null, template_type: 'tag', revision: 1, updated_at: '2026-09-12T00:00:00Z' }
 const templateRow = { id: 'tpl-1', name: 'お礼テンプレート', description: null, template_type: 'template', revision: 1, updated_at: '2026-09-12T00:00:00Z' }
@@ -82,8 +83,8 @@ afterEach(cleanup)
 
 async function openMenuEdit() {
   render(<TemplateConsole type="rich_menu" />)
-  fireEvent.click(await screen.findByLabelText('アカウントメニューの操作'))
-  fireEvent.click(screen.getByRole('button', { name: 'アカウントメニューを編集' }))
+  fireEvent.click(await screen.findByLabelText('メニュー「アカウントメニュー」の操作'))
+  fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
   await screen.findByTestId('reference-probe')
 }
 
@@ -102,8 +103,8 @@ describe('R119 参照候補の目録', () => {
     calls.list.mockImplementation(async (type?: string) => (type ? [formRow] : [tagRow, templateRow, formRow, menuRow]))
     calls.get.mockResolvedValue(structuredClone(formDetail))
     render(<TemplateConsole type="form" />)
-    fireEvent.click(await screen.findByLabelText('アンケートフォームの操作'))
-    fireEvent.click(screen.getByRole('button', { name: 'アンケートフォームを編集' }))
+    fireEvent.click(await screen.findByLabelText('フォーム「アンケートフォーム」の操作'))
+    fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
     await screen.findByTestId('reference-probe')
     expect(screen.getByTestId('form-tag-tag-1').textContent).toBe('来店タグ')
   })
@@ -122,3 +123,9 @@ describe('R119 参照候補の目録', () => {
     expect(screen.queryByText('参照先の候補を読み込めませんでした。タグ・テンプレート・回答フォームは選べません。')).toBeNull()
   })
 })
+
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], selectedAccountId: null, selectedAccount: null, setSelectedAccountId: vi.fn(), loading: false }) }))
+
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+
+vi.mock('@/v8/form-edit/edit', () => ({ default: ({ host }: { host: { refs: { tags: { id: string; name: string }[] }; notice: React.ReactNode } }) => <div data-testid="reference-probe">{host.notice}{host.refs.tags.map(t => <span key={t.id} data-testid={`form-tag-${t.id}`}>{t.name}</span>)}</div> }))

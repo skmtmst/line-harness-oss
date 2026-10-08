@@ -20,7 +20,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/hq/banners',
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},  usePageTitle: vi.fn(), usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
 vi.mock('@/components/hq/banners/projects-section', () => ({ default: () => null }))
 vi.mock('@/components/hq/banners/library-section', () => ({ default: () => null }))
 vi.mock('@/lib/api', () => ({
@@ -67,3 +67,5 @@ describe('hq/banners の形違い応答', () => {
     expect(await screen.findByText('アーカイブ 1')).toBeTruthy()
   })
 })
+
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
