@@ -4,7 +4,7 @@
  * ★V8 統括のテンプレートの詳細（絵 V8.pen pQ4fH・B-36）。
  *
  * 店のテンプレートの詳細（src/v8/template-detail）と同じ枠（DetailFrame）・同じ CSS・同じ並び（本文・配った先・版の履歴・
- * 右の列の操作・このテンプレートについて・届き方）で組む。違いは「使っている所」の代わりの「配った先」と、帯の［アカウントへ配る］。
+ * 右の列の操作・このテンプレートについて・届き方）で組む。違いは「使っている所」の代わりの「配った先」と、帯の［配る］。
  * 配った先ごとの版（版3（いまの版）／新しい版を未配布）・版の履歴（比べる・この版に戻す）・今月送った数は API-18。
  * 読み書き（読み込み・複製・配る・版を比べる・戻す）は呼ぶ側（console.tsx）。ここは見せ方と押した知らせだけ。
  */
@@ -219,7 +219,7 @@ export default function HqTemplateDetail({
               <p className={styles.draftNote}>
                 {distributedCount > 0
                   ? `配ると、配った ${distributedCount} アカウントのテンプレートが新しい版になります（各アカウントで使っている所はそのアカウントの決まりで切り替わります）`
-                  : '「アカウントへ配る」で、選んだアカウントのテンプレートに届きます'}
+                  : '「配る」で、選んだアカウントのテンプレートに届きます'}
               </p>
             </div>
             {unsentChanges && inUse && current && inUse.version !== current.version ? (
@@ -228,9 +228,9 @@ export default function HqTemplateDetail({
                 比べる
               </Button>
             ) : null}
-            <Button variant="primary" onClick={onDistribute} disabled={busy}>
+            <Button variant="primary" onClick={onDistribute} disabled={busy} aria-label={`${detail.template.name}を配る`}>
               <Send size={14} aria-hidden="true" />
-              アカウントへ配る
+              配る
             </Button>
           </div>
         ) : null}
