@@ -134,6 +134,13 @@ async function get<T>(path: string): Promise<T> {
  * 包みで返すと確かめた口だけがこれを通す。包みが無い・success が true でない応答は
  * 契約違反として投げる（黙って undefined を画面へ渡さない）。
  */
+function responseShapeError(body: unknown, path: string): Error {
+  const err = new Error(`API 応答の形が違います: ${path}`) as Error & { status: number; body: unknown };
+  err.status = 0;
+  err.body = body;
+  return err;
+}
+
 export function unwrapSuccessData<T>(body: unknown, path: string): T {
   if (
     body !== null
@@ -143,14 +150,38 @@ export function unwrapSuccessData<T>(body: unknown, path: string): T {
   ) {
     return (body as { data: T }).data;
   }
-  const err = new Error(`API 応答の形が違います: ${path}`) as Error & { status: number; body: unknown };
-  err.status = 0;
-  err.body = body;
-  throw err;
+  throw responseShapeError(body, path);
 }
 
 async function getData<T>(path: string): Promise<T> {
   return unwrapSuccessData<T>(await get<unknown>(path), path);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** フォームだけの境界。描画に必要な配列が無い応答を画面へ渡さない。 */
+async function getPublicForm(path: string): Promise<PublicForm> {
+  const data = await getData<unknown>(path);
+  if (!isRecord(data) || typeof data.id !== 'string' || typeof data.name !== 'string'
+    || typeof data.isActive !== 'boolean' || !isRecord(data.layout)
+    || !Array.isArray(data.layout.header) || !data.layout.header.every(isRecord)
+    || !Array.isArray(data.layout.sections) || data.layout.sections.length === 0
+    || !data.layout.sections.every((section) => isRecord(section)
+      && Array.isArray(section.blocks) && section.blocks.every(isRecord))) {
+    throw responseShapeError(data, path);
+  }
+  return data as unknown as PublicForm;
+}
+
+async function getLatestFormAnswer(path: string): Promise<{ answers: Record<string, unknown>; createdAt: string } | null> {
+  const data = await getData<unknown>(path);
+  if (data === null) return null;
+  if (!isRecord(data) || !isRecord(data.answers) || typeof data.createdAt !== 'string') {
+    throw responseShapeError(data, path);
+  }
+  return { answers: data.answers, createdAt: data.createdAt };
 }
 
 async function remove<T>(path:string):Promise<T>{
@@ -471,15 +502,13 @@ export const api = {
    */
   // Worker（routes/forms.ts）は `{ success: true, data: PublicForm }` で返す。
   getForm: (id: string, testToken?: string) =>
-    getData<PublicForm>(`/api/forms/${id}${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`),
+    getPublicForm(`/api/forms/${id}${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`),
   /**
    * 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る。
    * Worker は `{ success: true, data: { answers, createdAt } | null }` で返す。
    */
   getMyLatestFormAnswer: (id: string) =>
-    getData<{ answers: Record<string, unknown>; createdAt: string } | null>(
-      `/api/forms/${id}/my-latest`,
-    ),
+    getLatestFormAnswer(`/api/forms/${id}/my-latest`),
   /**
    * フォーム回答の送信。Idempotency-Key は呼び出し側が1回答ぶん安定した
    * UUID を作って必ず渡す(連打・再送の二重回答を防ぐ。イベント予約と同じ)。

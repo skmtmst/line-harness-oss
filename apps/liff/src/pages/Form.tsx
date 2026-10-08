@@ -231,11 +231,14 @@ export default function Form() {
     let cancelled = false;
     void (async () => {
       setLoading(true);
+      setForm(null);
+      setError(null);
       try {
         const data = await api.getForm(id, testToken ?? undefined);
         if (cancelled) return;
+        const defaults = initialAnswers(data.layout);
         setForm(data);
-        setAnswers(initialAnswers(data.layout));
+        setAnswers(defaults);
         // タブの題は上の帯（LiffHeader）が pageTitle・フォーム名から付ける。
 
         // 前回の回答を出す設定のときだけ、サーバが中身を返す。
