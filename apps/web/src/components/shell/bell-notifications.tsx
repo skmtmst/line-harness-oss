@@ -154,7 +154,6 @@ export default function BellNotifications({
       onSelect={select}
       onMarkAllRead={markAllRead}
       onViewAll={() => { onClose(); router.push('/notifications') }}
-      onOpenSettings={() => { onClose(); router.push('/line-notifications?tab=operator') }}
     />
   )
 }
