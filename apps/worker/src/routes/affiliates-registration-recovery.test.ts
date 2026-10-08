@@ -374,3 +374,29 @@ describe('PUT /api/affiliates/:id — 途中保存後の再開は全項目を保
     expect(row.commission_rate).toBe(10);
   });
 });
+
+describe('WEB208 reward mode roundtrip', () => {
+  test.each(['none', 'fixed', 'rate'])('saves %s on both create paths and edit; replay keeps original mode', async (rewardMode) => {
+    const { app, env } = makeApp(db, OWNER);
+    for (const code of [undefined, 'explicitcode']) {
+      const body = { name: '方式', code, lineAccountId: ACCOUNT_A, rewardMode, commissionRate: 10, operationId: `mode-${rewardMode}-${code ?? 'random'}` };
+      const res = await app.request('/api/affiliates', { method: 'POST', body: JSON.stringify(body) }, env);
+      expect(res.status).toBe(201);
+      const created = await res.json() as { data: { id: string; rewardMode: string } };
+      expect(created.data.rewardMode).toBe(rewardMode);
+      expect(sqlite.prepare('SELECT reward_mode FROM affiliates WHERE id = ?').get(created.data.id)).toEqual({ reward_mode: rewardMode });
+      const replay = await app.request('/api/affiliates', { method: 'POST', body: JSON.stringify({ ...body, rewardMode: 'fixed' }) }, env);
+      expect((await replay.json() as typeof created).data.rewardMode).toBe(rewardMode);
+      const updated = await app.request(`/api/affiliates/${created.data.id}`, { method: 'PUT', body: JSON.stringify({ rewardMode: 'none' }) }, env);
+      expect(updated.status).toBe(200);
+      expect((await updated.json() as typeof created).data.rewardMode).toBe('none');
+    }
+  });
+  test('rejects unsupported modes on create and edit', async () => {
+    const { app, env } = makeApp(db, OWNER);
+    for (const [path, method] of [['/api/affiliates', 'POST'], ['/api/affiliates/missing', 'PUT']]) {
+      const res = await app.request(path, { method, body: JSON.stringify({ name: '方式', lineAccountId: ACCOUNT_A, rewardMode: 'invalid' }) }, env);
+      expect(res.status).toBe(400);
+    }
+  });
+});

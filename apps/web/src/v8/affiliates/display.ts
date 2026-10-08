@@ -15,6 +15,7 @@ export interface AffiliateItem {
   name: string
   code: string
   commissionRate: number
+  rewardMode?: 'none' | 'fixed' | 'rate'
   isActive: boolean
   createdAt: string
   friendId: string | null
@@ -217,8 +218,10 @@ export function calculateAffiliateReward({
 }
 
 /** 報酬の約束の一行。登録の値から言えることだけ書く。 */
-export function planText(row: { commissionRate: number; isActive: boolean; rewardAmount?: number }): string {
+export function planText(row: { rewardMode?: 'none' | 'fixed' | 'rate'; commissionRate: number; isActive: boolean; rewardAmount?: number }): string {
   if (!row.isActive) return '止めている'
+  if (row.rewardMode === 'none') return '報酬なし（計測のみ）'
+  if (row.rewardMode === 'fixed') return '1件ごと（案件の額）'
   if (row.commissionRate > 0) return `売上の ${row.commissionRate}%`
   if ((row.rewardAmount ?? 0) > 0) return '1件ごと（案件の額）'
   return '報酬なし（計測のみ）'

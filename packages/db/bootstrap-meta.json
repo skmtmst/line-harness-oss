@@ -553,7 +553,7 @@
     "608_line_account_folders.sql",
     "609_hq_broadcast_authoring.sql",
     "610_booking_reminder_request_snapshot.sql",
-    "612_hq_friend_attribute_templates.sql"
+    "616_affiliate_reward_mode.sql"
   ],
   "migrationCount": 554
 }

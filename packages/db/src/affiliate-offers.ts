@@ -420,6 +420,7 @@ async function readApprovalFreezeInputs(
     : '';
   const row = await db.prepare(
     `SELECT a.commission_rate AS commission_rate,
+            a.reward_mode AS reward_mode,
             ce.value_snapshot AS value_snapshot,
             cp.value AS point_value,
             ${versionRewardSelect},
@@ -438,6 +439,7 @@ async function readApprovalFreezeInputs(
         AND COALESCE(ce.approval_status, 'pending') = 'approved'`,
   ).bind(eventId).first<{
     commission_rate: number | null;
+    reward_mode: 'none' | 'fixed' | 'rate' | null;
     value_snapshot: number | null;
     point_value: number | null;
     version_reward: number | null;
@@ -449,6 +451,9 @@ async function readApprovalFreezeInputs(
   // 固定額・マイルの出どころ。判断の版があればその値。判断が無い行は
   // 記録時刻の版で旧額を保つ。版管理下で記録時刻の版が無いときは凍結
   // しない（null で返し、呼び出し側は承認自体を拒む。F-23 ケース6）。
+  if (row.reward_mode === 'none') {
+    return { formula: 'fixed', commissionRate: null, baseAmount: null, fixedReward: 0, amountMinor: 0, rewardMiles: 0 };
+  }
   let fixedSource: number;
   let milesSource: number;
   if (hasVersionTables
@@ -472,7 +477,7 @@ async function readApprovalFreezeInputs(
     }
   }
   const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
-  const formula: 'rate' | 'fixed' = rate > 0 ? 'rate' : 'fixed';
+  const formula: 'rate' | 'fixed' = row.reward_mode === 'rate' || (row.reward_mode == null && rate > 0) ? 'rate' : 'fixed';
   const baseAmount = formula === 'rate' ? Number(row.value_snapshot ?? row.point_value ?? 0) : null;
   const fixedReward = formula === 'fixed' ? Math.round(fixedSource) : null;
   return {
