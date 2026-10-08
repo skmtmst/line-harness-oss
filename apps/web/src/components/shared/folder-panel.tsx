@@ -6,6 +6,7 @@ import Button from './button'
 import HelpTip from './help-tip'
 import { ArrowDown, ArrowUp, Ellipsis, FolderOpen, FolderPlus, Inbox, Palette, Pencil, Trash2 } from 'lucide-react'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import { RowMenu } from './row-actions'
 import styles from './folder-panel.module.css'
 
 /** テンプレート一覧を正とする、全画面共通のフォルダ欄幅。 */
@@ -48,6 +49,8 @@ export interface FolderPanelRow {
   icon?: ReactNode
   /** フォルダ全体の選択など、行の右に置く操作。 */
   trailing?: ReactNode
+  /** 行ごとの追加操作。今の操作の前に置き、その後に区切りを入れる。 */
+  leadingActions?: ActionMenuItem[]
   /**
    * 直せる行だけ渡す。「すべて」「未分類」は直せない。
    *
@@ -120,7 +123,9 @@ function folderMenuItems(
       onSelect: () => runAction(row.onDelete),
     })
   }
-  return items
+  const leading = row.leadingActions ?? []
+  return [...leading.map((item) => ({ ...item, onSelect: () => runAction(item.onSelect) })),
+    ...items.map((item, index) => index === 0 && leading.length ? { ...item, dividerBefore: true } : item)]
 }
 
 export default function FolderPanel({
@@ -129,6 +134,7 @@ export default function FolderPanel({
   onSelect,
   total,
   heading = 'フォルダ',
+  showHeading = true,
   headingHelp,
   onAddFolder,
   addFolderLabel = 'フォルダを追加する',
@@ -154,6 +160,8 @@ export default function FolderPanel({
   total?: string
   /** 予約管理の「メニュー」など、分類の呼び名が異なる画面で使う。 */
   heading?: string
+  /** 小窓で区画の見出しを外側に置くときだけ省く。 */
+  showHeading?: boolean
   headingHelp?: ReactNode
   /** 一覧の下に置く追加操作。道具列へ重複して置かない。 */
   onAddFolder?: () => void
@@ -176,14 +184,14 @@ export default function FolderPanel({
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
     <aside aria-label="フォルダ" className={`${styles.panel} v7:bg-canvas v7:rounded-card v7:border-hairline v7:h-fit overflow-visible v7:border`}>
       {createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder} v8-only`} aria-hidden="true" /> : null}
-      <div className={`${styles.heading} v7:border-hairline flex items-center justify-between v7:border-b v7:px-4 v7:py-3`}>
+      {showHeading ? <div className={`${styles.heading} v7:border-hairline flex items-center justify-between v7:border-b v7:px-4 v7:py-3`}>
         {headingHelp ? <p className="v7:text-ink v7:text-sm font-semibold">{heading}<HelpTip label={`${heading}の説明`}>{headingHelp}</HelpTip></p>
           : <p className="v7:text-ink v7:text-sm font-semibold">{heading}</p>}
         {total === undefined ? null : <span className="text-ink-faint v7:text-xs v7:tabular-nums">{total}</span>}
-      </div>
+      </div> : null}
       <nav className={`${styles.rows} v7:p-2`}>
         {rows.map((row) => {
-          const hasActions = Boolean(row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
+          const hasActions = Boolean(row.leadingActions?.length || row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
           const isActive = activeId === row.id
           const kind = row.kind ?? (row.label === 'すべて' ? 'all' : row.label === '未分類' ? 'unfiled' : 'folder')
 
@@ -297,4 +305,10 @@ export default function FolderPanel({
       )}
     </aside>
   )
+}
+
+/** フォルダ列を畳んだときも、追加操作を同じメニューへ残す。 */
+export function CollapsedFolderActions({ row }: { row: FolderPanelRow }) {
+  const v8 = useAdminTheme() === 'v8'
+  return <RowMenu label={`フォルダ「${row.label}」の操作`} items={folderMenuItems(row, (action) => action?.(), v8)} />
 }

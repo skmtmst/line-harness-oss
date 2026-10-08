@@ -119,6 +119,8 @@ export function MileageFrame({ actions, stats, folders, collapsedFolders, folder
       tabs={
         <div className={styles.tabsBox}>
         <Tabs
+          /* 件数が読み込まれるとタブの幅が変わるので、下線の位置も測り直す。 */
+          key={MILEAGE_TABS.map((item) => counts[item.key] ?? '').join('|')}
           label="マイルのタブ"
           items={MILEAGE_TABS.map((item) => ({
             /* 絵は「たまる決めごと 6」で1つの文字。数を別の札に分けない。 */

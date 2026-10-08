@@ -3,10 +3,9 @@
 /*
  * ★V8 友だち追加時の配信 作る 完了（有効にした）（Pencil `e0FD1J`）。
  * 有効にしたあとに出る面。読み直しはしない——有効にしたときの設定名・順番・知らせのつながりをそのまま出す。
- * 頭（戻る・題・手順の輪・説明）は型の PageHeading、真ん中に完了のカードを1枚。
+ * 頭（題・手順の輪・説明）は型の PageHeading、真ん中に完了のカードを1枚。
  */
 import { Steps } from '@/components/templates/steps'
-import Link from 'next/link'
 import { Activity, Check, Link2, List } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
@@ -27,7 +26,6 @@ export default function FriendAddDoneV8({ ruleId, ruleName, routeNames, priority
     <PageFrame kind="create" boardId="e0FD1J">
       <PageHeading
         title="初回案内を作る"
-        identity={<Link href="/friend-add-settings" className={styles.backLink}>← 友だち追加時の配信へ</Link>}
         steps={<Steps label="初回案内の作る手順" steps={PUBLISH_STEPS.map((label, index) => ({ label, state: 'done' as const, onSelect: ruleId ? () => router.push(editStepHref(ruleId, index)) : undefined }))} />}
         description={`名前：${ruleName}`}
       />

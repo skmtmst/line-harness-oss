@@ -465,7 +465,7 @@ export default function BalancesTab() {
                 }}
               >
                 <Td className={styles.colName}>
-                  <span className={styles.rowNameInk} title={member.displayName}>{member.displayName}</span>
+                  <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>
                   <span className={styles.rowSub} title={member.lineAccount.name}>{member.lineAccount.name}</span>
                 </Td>
                 <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>

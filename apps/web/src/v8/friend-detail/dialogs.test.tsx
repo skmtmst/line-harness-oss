@@ -16,6 +16,8 @@ const chatGet = vi.hoisted(() => vi.fn())
 const chatUpdate = vi.hoisted(() => vi.fn())
 const scenarioList = vi.hoisted(() => vi.fn())
 const scenarioEnroll = vi.hoisted(() => vi.fn())
+const saved = vi.hoisted(() => vi.fn())
+const conflictNotice = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -39,13 +41,13 @@ import { useScenarioPicker, useSupportEditor } from './dialogs'
 let root: Root
 let host: HTMLDivElement
 
-function Support({ id }: { id: string }) {
-  const editor = useSupportEditor(id, () => {}, () => {})
+function Support({ id, account = 'account-a' }: { id: string; account?: string }) {
+  const editor = useSupportEditor(id, saved, conflictNotice, account)
   return <><button type="button" onClick={() => void editor.openEditor()}>開く</button>{editor.dialog}</>
 }
 
-function Picker({ id }: { id: string }) {
-  const picker = useScenarioPicker(id, id, 'account-a', () => {})
+function Picker({ id, account = 'account-a' }: { id: string; account?: string }) {
+  const picker = useScenarioPicker(id, id, account, saved)
   return <><button type="button" onClick={() => void picker.openPicker()}>選ぶ</button>{picker.dialog}</>
 }
 
@@ -56,6 +58,8 @@ const button = (name: string) => [...document.querySelectorAll('button')].find((
 const chat = (friendId: string, status: string, revision: number) => ({ success: true, data: { id: `chat-${friendId}`, friendId, status, operatorId: null, revision } })
 
 beforeEach(() => {
+  saved.mockReset()
+  conflictNotice.mockReset()
   chatGet.mockReset()
   chatUpdate.mockReset()
   scenarioList.mockReset()
@@ -122,3 +126,72 @@ describe('シナリオの窓も開いた友だちに固定する（WEB125）', (
     expect(scenarioEnroll).not.toHaveBeenCalled()
   })
 })
+
+it('WEB-125: 同じ友だちIDでもアカウントを切り替えると古い窓を閉じる', async () => {
+    chatGet.mockResolvedValue(chat('friend-a', 'in_progress', 3))
+    await act(async () => root.render(<Support id="friend-a" />))
+    await act(async () => { button('開く')!.click() }); await settle()
+    await act(async () => root.render(<Support id="friend-a" account="account-b" />)); await settle()
+    expect(document.querySelector('[data-support-editor]')).toBeNull()
+    expect(chatUpdate).not.toHaveBeenCalled()
+  })
+it('WEB-125: 保存中にアカウントを切り替えると旧成功の通知を捨てる', async () => {
+    chatGet.mockResolvedValue(chat('friend-a', 'in_progress', 3))
+    let release!: (value: unknown) => void
+    chatUpdate.mockReturnValue(new Promise((resolve) => { release = resolve }))
+    await act(async () => root.render(<Support id="friend-a" />))
+    await act(async () => { button('開く')!.click() }); await settle()
+    await act(async () => { button('保存する')!.click() })
+    await act(async () => root.render(<Support id="friend-a" account="account-b" />)); await settle()
+    await act(async () => release({ success: true, data: {} })); await settle()
+    expect(saved).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-support-editor]')).toBeNull()
+  })
+it('WEB-125: 同じ人の競合では窓の入力を残して改訂値だけ読み直せる', async () => {
+  const { ApiError } = await import('@/lib/api')
+  chatGet.mockResolvedValueOnce(chat('friend-a', 'on_hold', 3)).mockResolvedValue(chat('friend-a', 'resolved', 4))
+  chatUpdate.mockRejectedValueOnce(new ApiError(409, 'conflict')).mockResolvedValue({ success: true, data: {} })
+  await act(async () => root.render(<Support id="friend-a" />))
+  await act(async () => { button('開く')!.click() }); await settle()
+  await act(async () => { button('保存する')!.click() }); await settle()
+  expect(document.querySelector('[data-support-editor]')).not.toBeNull()
+  await act(async () => { button('保存する')!.click() }); await settle()
+  expect(chatUpdate).toHaveBeenLastCalledWith('friend-a', { status: 'on_hold', operatorId: null, revision: 4 })
+})
+
+it.each(['success', 'failure', 'throw'])('WEB-125: Aの保存の%sでBの窓・読込待ちを変えない', async (outcome) => {
+  let resolveSave!: (value: unknown) => void
+  let rejectSave!: (reason: unknown) => void
+  let resolveB!: (value: unknown) => void
+  chatGet.mockImplementation((id: string) => id === 'friend-a'
+    ? Promise.resolve(chat(id, 'on_hold', 3))
+    : new Promise((resolve) => { resolveB = resolve }))
+  chatUpdate.mockReturnValueOnce(new Promise((resolve, reject) => { resolveSave = resolve; rejectSave = reject }))
+  await act(async () => root.render(<Support id="friend-a" />))
+  await act(async () => button('開く')!.click()); await settle()
+  await act(async () => button('保存する')!.click())
+  await act(async () => root.render(<Support id="friend-b" />))
+  await act(async () => button('開く')!.click()); await settle()
+  await act(async () => {
+    if (outcome === 'throw') rejectSave(new Error('Aの保存失敗'))
+    else resolveSave(outcome === 'success' ? { success: true, data: {} } : { success: false, error: 'Aの保存失敗' })
+  }); await settle()
+  expect(document.querySelector('[data-support-editor]')).not.toBeNull()
+  expect(button('処理中…')!.disabled).toBe(true)
+  expect(document.body.textContent).not.toContain('Aの保存失敗')
+  expect(saved).not.toHaveBeenCalled()
+  await act(async () => resolveB(chat('friend-b', 'in_progress', 8))); await settle()
+  expect(button('保存する')!.disabled).toBe(false)
+  await act(async () => button('保存する')!.click()); await settle()
+  expect(chatUpdate).toHaveBeenLastCalledWith('friend-b', { status: 'in_progress', operatorId: null, revision: 8 })
+})
+
+it('WEB-125: シナリオの窓も同じIDのアカウント切り替えで捨てる', async () => {
+  scenarioList.mockResolvedValue({ success: true, data: [{ id: 'sc-1', name: 'フォロー', isActive: true }] })
+  await act(async () => root.render(<Picker id="friend-a" />))
+  await act(async () => button('選ぶ')!.click()); await settle()
+  expect(document.querySelector('[data-scenario-picker]')).not.toBeNull()
+  await act(async () => root.render(<Picker id="friend-a" account="account-b" />)); await settle()
+  expect(document.querySelector('[data-scenario-picker]')).toBeNull()
+  expect(scenarioEnroll).not.toHaveBeenCalled()
+ })

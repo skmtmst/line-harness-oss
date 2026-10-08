@@ -14,6 +14,9 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import { focusField } from './focus-field'
 import type {
   EntryRoute,
   CreateEntryRouteInput,
@@ -116,6 +119,17 @@ export default function EditRouteModal({
   const [submitting, setSubmitting] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  const validateFields = () => {
+    const errors: Record<string, string> = {}
+    if (!form.name.trim()) errors['route-name'] = '流入元の名前を入力してください'
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(form.refCode)) errors['route-ref'] = '半角英数字・_・ハイフンで1〜64文字にしてください'
+    setFieldErrors(errors)
+    setError('')
+    if (Object.keys(errors).length) { focusField(Object.keys(errors)[0]); return false }
+    return true
+  }
 
   const validateBeforeSave = () => {
     const nothingDelivers =
@@ -130,6 +144,7 @@ export default function EditRouteModal({
   }
 
   const doSave = async () => {
+    if (!validateFields()) return
     setSubmitting(true)
     setError('')
     try {
@@ -153,6 +168,7 @@ export default function EditRouteModal({
   }
 
   const onSubmit = async () => {
+    if (!validateFields()) return
     // If validation produced a warning, only the explicit "それでも保存"
     // button (which calls doSave directly) may bypass it. The main save
     // button must not be a second-click escape hatch.
@@ -161,7 +177,7 @@ export default function EditRouteModal({
   }
 
   // R270: 作成と同じくフォルダは任意。空欄は未分類のまま保存する。
-  const saveDisabled = submitting || !form.name.trim() || !form.refCode.trim()
+  const saveDisabled = submitting
   return (
     <Dialog
       open
@@ -185,14 +201,13 @@ export default function EditRouteModal({
     >
       <div className="space-y-3">
         <Field label="フォルダ（任意）">
-          <input
+          <TextField
             list={genreLocked ? undefined : 'referral-genre-options'}
             value={form.genre ?? ''}
             // R270: 空欄は未分類として null で送る。空文字のまま送ると
             // 口が400ではじくため、ここで null に寄せる。
             onChange={(e) => setForm({ ...form, genre: e.target.value.trim() ? e.target.value : null })}
             readOnly={genreLocked}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
             placeholder="例: SNS（空欄なら未分類）"
             maxLength={80}
           />
@@ -206,24 +221,22 @@ export default function EditRouteModal({
           </p>
         </Field>
 
-        <Field label="流入元の名前">
-          <input
+        <Field label="流入元の名前" htmlFor="route-name" error={fieldErrors['route-name']}>
+          <TextField
             value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+            onChange={(e) => { setForm({ ...form, name: e.target.value }); setFieldErrors((old) => ({ ...old, 'route-name': '' })) }}
             placeholder="例: Instagram プロフィール"
             maxLength={120}
           />
         </Field>
 
-        <Field label="URLに出る識別子">
-          <input
+        <Field label="URLに出る識別子" htmlFor="route-ref" error={fieldErrors['route-ref']}>
+          <TextField
             value={form.refCode}
-            onChange={(e) => setForm({ ...form, refCode: e.target.value })}
+            onChange={(e) => { setForm({ ...form, refCode: e.target.value }); setFieldErrors((old) => ({ ...old, 'route-ref': '' })) }}
             // R271: 作成済みの識別子は口も変更を拒否する。保存時にはじめて
             // 拒否せず、欄自体を読み取り専用にして理由を近くに出す。
             disabled={refCodeLocked || !isNew}
-            className="border-hairline rounded-control bg-canvas text-ink disabled:bg-canvas-sunken disabled:text-ink-faint w-full border px-3 py-2 font-mono text-sm"
             placeholder="例: youtube"
           />
           {refCodeLocked && (
@@ -322,14 +335,5 @@ export default function EditRouteModal({
         )}
       </div>
     </Dialog>
-  )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="text-ink-secondary mb-1 block text-xs font-medium">{label}</label>
-      {children}
-    </div>
   )
 }

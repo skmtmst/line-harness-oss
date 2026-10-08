@@ -11,7 +11,7 @@
  * - サーバとブラウザの最初の描画が同じなので hydration が壊れない
  */
 import { act } from 'react'
-import { hydrateRoot } from 'react-dom/client'
+import { hydrateRoot, type Root } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -21,6 +21,7 @@ vi.mock('@/components/friend-fields/tags-page-v4', () => ({ default: () => <p da
 
 import TagsPage from '@/app/tags/page'
 import { useAdminTheme } from './use-admin-theme'
+import { ADMIN_THEME_CHANGED_EVENT } from './events'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -61,29 +62,37 @@ describe('テーマの初期値は環境の既定（layout.tsx と同じ）', ()
     document.documentElement.dataset.theme = 'v8'
     seen.length = 0
     const errors: unknown[] = []
+    let root!: Root
     await act(async () => {
-      hydrateRoot(container, <Probe />, { onRecoverableError: (e) => errors.push(e) })
+      root = hydrateRoot(container, <Probe />, { onRecoverableError: (e) => errors.push(e) })
     })
     expect(errors).toEqual([])
     expect(seen.length).toBeGreaterThan(0)
     expect(seen.every((t) => t === 'v8')).toBe(true)
     expect(container.querySelector('[data-theme-probe]')?.getAttribute('data-theme-probe')).toBe('v8')
+    await act(async () => { root.unmount() })
   })
 
   it('検証環境は V8 固定：<html> に古い v7 が残っていても v8', async () => {
     vi.stubEnv('NEXT_PUBLIC_ADMIN_THEME', 'v8')
     document.documentElement.dataset.theme = 'v7'
-    let last = ''
+    const seen: string[] = []
     function Probe() {
-      last = useAdminTheme()
+      seen.push(useAdminTheme())
       return null
     }
     const container = document.createElement('div')
     document.body.appendChild(container)
+    let root!: Root
     await act(async () => {
-      hydrateRoot(container, <Probe />)
+      root = hydrateRoot(container, <Probe />)
     })
-    expect(last).toBe('v8')
+    await act(async () => {
+      window.dispatchEvent(new Event(ADMIN_THEME_CHANGED_EVENT))
+    })
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.every((theme) => theme === 'v8')).toBe(true)
+    await act(async () => { root.unmount() })
   })
 
   it('本番：このブラウザで v8 を選んでいれば（<html> が v8）、描き込み前に v8 へ揃える', async () => {
@@ -95,9 +104,11 @@ describe('テーマの初期値は環境の既定（layout.tsx と同じ）', ()
     }
     const container = document.createElement('div')
     document.body.appendChild(container)
+    let root!: Root
     await act(async () => {
-      hydrateRoot(container, <Probe />)
+      root = hydrateRoot(container, <Probe />)
     })
     expect(last).toBe('v8')
+    await act(async () => { root.unmount() })
   })
 })

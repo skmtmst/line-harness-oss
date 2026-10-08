@@ -17,13 +17,18 @@
  *   node scripts/visual-qa/mock-api.mjs            # 既定 8788番
  *   PORT=9000 node scripts/visual-qa/mock-api.mjs
  */
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+// Web と同じ QR 生成器を使う。画像の口を JSON で返すと小窓が壊れる。
+const QRCode = createRequire(new URL('../../apps/web/package.json', import.meta.url))('qrcode')
 
-/** このファイル自身の指紋。動いている中身が古くないかを言うために持つ。 */
-const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
+import { QA_CLOCK, storeAt, storeYmd } from './qa-clock.mjs'
+import { mockFingerprint } from './mock-fingerprint.mjs'
+/** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
+const FINGERPRINT = mockFingerprint()
 import { readArrayGetPaths } from './api-shapes.mjs'
 import { LARGE_ENABLED, largeBody } from './large-mode.mjs'
 import { BILLING_INVOICES, BILLING_SUMMARY } from './billing-fixture.mjs'
@@ -279,6 +284,18 @@ let commonVarFolders = COMMON_VAR_FOLDERS.map((folder) => ({ ...folder }))
 // 機能15専用。版追加の撮影では、差し替え用セッションの確定が本番口と同じ
 // `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
 const mediaUploadSessionTargets = new Map()
+
+/** 統括の友だち情報欄・対応マーク（#1657）の返事。店の使用先集計は混ぜない。 */
+const HQ_ATTRIBUTE_ROWS = [
+  ...FRIEND_ATTRIBUTE_FIELDS.map((field) => ({
+    template: { id: `visual-hq-attr-${field.id}`, name: field.name, description: null, template_type: 'friend_field', folder_id: field.folderId ? ({ 'friend-field-folder-pets': 'visual-hq-folder-inquiry', 'friend-field-folder-contact': 'visual-hq-folder-booking', 'friend-field-folder-purchase': 'visual-hq-folder-ec' }[field.folderId] ?? null) : null, revision: 1, updated_at: field.updatedAt, friend_count: field.usageCount, distributed_account_count: 1, distributed_account_names: ['本店'], distributed_account_more: 0, outdated_account_count: 0, current_version: 1 },
+    definition: { schemaVersion: 1, field: { name: field.name, fieldKey: field.fieldKey, type: field.type, options: field.options, defaultValue: field.defaultValue, source: field.source, isPersonal: field.isPersonal, isStarred: field.isStarred, ecIsMaster: field.ecIsMaster, ecFieldPath: field.ecFieldPath, displayOrder: field.displayOrder, folderId: field.folderId }, folders: field.folderId ? FRIEND_FIELD_FOLDERS.filter((folder) => folder.id === field.folderId).map(({id, name, color}) => ({id, name, color, parentId: null})) : [] },
+  })),
+  ...SUPPORT_MARKS.map((mark) => ({
+    template: { id: `visual-hq-attr-${mark.id}`, name: mark.name, description: null, template_type: 'mark', folder_id: null, revision: 1, updated_at: '2026-10-08T00:00:00.000Z', friend_count: mark.friendCount, distributed_account_count: 1, distributed_account_names: ['本店'], distributed_account_more: 0, outdated_account_count: 0, current_version: 1 },
+    definition: { schemaVersion: 1, mark: { name: mark.name, color: mark.color, isDefault: mark.isDefault, autoOnInbound: mark.autoOnInbound, displayOrder: mark.displayOrder } },
+  })),
+]
 
 /** 統括のテンプレートの見本（★V8-B LRc93・X4JcOf・meBRB）。 */
 const HQ_TEMPLATES_HTN = [
@@ -1304,15 +1321,9 @@ const EC_CONNECTOR = {
  * 飲食店向けテスト（`/restaurant-test/*`）のスナップショット。
  * `restaurantTestApi.snapshot` が一度に返す形（`apps/worker` の restaurant-test）を
  * そのまま写す。板 CHz31 の並び（渋谷・表参道・中目黒の3店舗）に寄せた固定データ。
- * 日時は撮るたびに変わる絵にならないよう「今日」を基準に組み立てる。
+ * 日時は店舗の timezone と qa-clock の固定時計から組み立てる。
  */
-const RESTAURANT_TODAY = new Date()
-const restaurantAt = (hour, minute = 0, dayOffset = 0) => {
-  const d = new Date(RESTAURANT_TODAY)
-  d.setDate(d.getDate() + dayOffset)
-  d.setHours(hour, minute, 0, 0)
-  return d.toISOString()
-}
+const restaurantAt = (hour, minute = 0, dayOffset = 0) => storeAt(hour, minute, dayOffset, RESTAURANT_STORES[0].timezone)
 const RESTAURANT_STORES = [
   { id: 'store-sby', organization_id: 'org-nen', name: '然 渋谷店', code: 'SBY-01', area: '渋谷', capacity: 80, timezone: 'Asia/Tokyo', status: 'active', line_status: 'connected', google_status: 'connected', line_account_id: 'visual-qa-account', line_account_name: '然 渋谷店', friend_count: 1280 },
   { id: 'store-omt', organization_id: 'org-nen', name: '然 表参道店', code: 'OMT-02', area: '表参道', capacity: 64, timezone: 'Asia/Tokyo', status: 'active', line_status: 'connected', google_status: 'warning', line_account_id: 'visual-qa-account-2', line_account_name: '然 表参道店', friend_count: 842 },
@@ -1523,8 +1534,9 @@ const RESTAURANT_CLOSE_TASKS = [
  * 提案 E-10（臨時休業・貸切 UVnvR・足す窓 nVvXy）：今月の 20日（臨時休業・終日全卓）・24日（貸切・18〜22時・個室A と T1）・月末（貸切・終日）。
  * サーバ（/api/restaurant-test/closures）と同じ形。月は撮る日の今月にする（カレンダーに出るように）。
  */
-const RESTAURANT_CLOSURE_MONTH = `${RESTAURANT_TODAY.getFullYear()}-${String(RESTAURANT_TODAY.getMonth() + 1).padStart(2, '0')}`
-const RESTAURANT_CLOSURE_LAST = String(new Date(RESTAURANT_TODAY.getFullYear(), RESTAURANT_TODAY.getMonth() + 1, 0).getDate())
+const RESTAURANT_CLOSURE_MONTH = storeYmd(QA_CLOCK, RESTAURANT_STORES[0].timezone).slice(0, 7)
+const [closureYear, closureMonth] = RESTAURANT_CLOSURE_MONTH.split('-').map(Number)
+const RESTAURANT_CLOSURE_LAST = String(new Date(Date.UTC(closureYear, closureMonth, 0)).getUTCDate())
 const restaurantClosure = (id, day, over) => ({
   id, storeId: 'store-sby', startDate: `${RESTAURANT_CLOSURE_MONTH}-${day}`, endDate: `${RESTAURANT_CLOSURE_MONTH}-${day}`, allDay: true, startTime: null, endTime: null,
   kind: 'temporary_closed', memo: null, tableIds: [], createdBy: 'mem-2', createdByName: '中川 由美', createdAt: restaurantAt(10, 0, -3), updatedAt: restaurantAt(10, 0, -3), version: 1, ...over,
@@ -2004,13 +2016,13 @@ const SHAPES = {
     items: [
       {
         id: 'report-weekly-friends', lineAccountId: 'visual-qa-account', name: '毎週の友だちの増減', sections: ['friends', 'reactions', 'routes'], savedAnalysisIds: ['saved-1'],
-        cadence: 'weekly', weekday: 1, monthDay: null, sendTime: '9:00', timeZone: 'Asia/Tokyo', periodDays: 7,
+        cadence: 'weekly', weekday: 1, monthDay: null, sendTime: '09:00', timeZone: 'Asia/Tokyo', periodDays: 7,
         recipients: [{ kind: 'staff', staffId: 'staff-owner' }], channels: ['email'], alertRules: [],
         status: 'active', isOneTime: false, nextRunAt: '2026-10-06T09:00:00+09:00', createdBy: 'staff-owner', createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-01T09:00:00+09:00',
       },
       {
         id: 'report-monthly-outcomes', lineAccountId: 'visual-qa-account', name: '月末の成果まとめ', sections: ['routes'], savedAnalysisIds: [],
-        cadence: 'monthly', weekday: null, monthDay: 1, sendTime: '9:00', timeZone: 'Asia/Tokyo', periodDays: 30,
+        cadence: 'monthly', weekday: null, monthDay: 1, sendTime: '09:00', timeZone: 'Asia/Tokyo', periodDays: 30,
         recipients: [{ kind: 'staff', staffId: 'staff-owner' }], channels: ['email', 'line'], alertRules: [],
         status: 'paused', isOneTime: false, nextRunAt: '2026-11-01T09:00:00+09:00', createdBy: 'staff-owner', createdAt: '2026-08-01T09:00:00+09:00', updatedAt: '2026-09-15T09:00:00+09:00',
       },
@@ -2696,6 +2708,9 @@ const VISIT_STAMP_CARD = {
   id: 'vs-card-1', name: '然 来店スタンプカード', accountIds: ['visual-qa-account'], active: true, version: 3, expectedVersion: 3,
   settings: {
     mode: 'amount', amountUnit: 1000, maxPerVisit: 3, firstVisitBonus: 1, expiryMonths: 6, timezone: 'Asia/Tokyo',
+    expiryBasis: 'last_visit', expiryReminder: 'week_before', completion: 'next_card', nextCardId: 'vs-card-gold',
+    backgroundColor: '#7b4a2e', receiptBonus: 1, stampInterval: { mode: 'same_day' },
+    instructions: '1回のご来店で1個たまります。10個で デザート1品プレゼント。',
     /* API-10：マスの数・重ねる順番・重ねたときの上限は別に持つ。 */
     slotCount: 10, stackingOrder: 'bonus_then_multipliers', maxStackedStamps: 5,
     multipliers: [{ multiplier: 2, weekdays: [2], startMinute: 1020, endMinute: 1140, from: '2025-12-31T15:00:00.000Z', to: '2026-03-31T15:00:00.000Z' }],
@@ -2731,7 +2746,7 @@ const VISIT_STAMP_ENTRIES = [
   vsEntry('vse-7', 'visit', 1, null, '来店', '2026-01-08T10:00:00.000Z'),
 ]
 function visitStampRead(pathname, query) {
-  if (pathname === '/api/visit-stamps/cards') return { success: true, data: [VISIT_STAMP_CARD] }
+  if (pathname === '/api/visit-stamps/cards') return { success: true, data: [VISIT_STAMP_CARD, { ...VISIT_STAMP_CARD, id: 'vs-card-gold', name: 'ゴールドカード', settings: { ...VISIT_STAMP_CARD.settings, completion: 'repeat', nextCardId: null } }] }
   if (pathname === '/api/visit-stamps/paper-requests') return { success: true, data: VISIT_STAMP_PAPER }
   if (pathname === '/api/visit-stamps/entries') {
     const page = Math.max(1, Number(query.get('page') ?? 1)), pageSize = Math.min(200, Math.max(1, Number(query.get('pageSize') ?? 50)))
@@ -2856,7 +2871,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/reservations/day') {
     const storeId = query.get('storeId') || 'store-sby'
     const date = query.get('date') || ''
-    const sameDay = (iso) => { const d = new Date(iso); const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${dd}` === date }
+    const timezone = RESTAURANT_STORES.find((store) => store.id === storeId)?.timezone ?? RESTAURANT_STORES[0].timezone
+    const sameDay = (iso) => storeYmd(iso, timezone) === date
     return { success: true, data: { date, reservations: RESTAURANT_RESERVATIONS.filter((r) => r.store_id === storeId && sameDay(r.starts_at)), closures: RESTAURANT_CLOSURES.filter((c) => c.storeId === storeId && c.startDate <= date && c.endDate >= date) } }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/customers/search') {
@@ -3318,6 +3334,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/hq/templates' && method === 'GET') {
     const type = query.get('type')
     const kind = query.get('kind')
+    if (type === 'friend_field' || type === 'mark') {
+      const rows = HQ_ATTRIBUTE_ROWS.filter((item) => item.template.template_type === type).map((item) => item.template)
+      return { success: true, data: rows, stats: { totalTemplates: rows.length, distributedAccountCount: 1, undistributedTemplateCount: 0, thisMonthSentCount: null, outdatedTemplateCount: 0 } }
+    }
     /* API-17：テンプレートは店と同じ6種類（?kind=）。種類の無い古い行はメッセージ。 */
     const rows = (type ? HQ_TEMPLATES_HTN.filter((row) => row.template_type === type) : HQ_TEMPLATES_HTN)
       .map((row) => (row.template_type === 'template' ? { ...row, kind: row.kind ?? 'message' } : row))
@@ -3358,6 +3378,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/hq/templates/folders' && method === 'GET') return { success: true, data: HQ_TEMPLATE_FOLDERS_HTN }
   if (pathname === '/api/hq/templates/accounts' && method === 'GET') return { success: true, data: HQ_TEMPLATE_ACCOUNTS_HTN }
   if (pathname === '/api/hq/templates/message-references' && method === 'GET') return { success: true, data: [] }
+  const attribute = HQ_ATTRIBUTE_ROWS.find((item) => pathname === `/api/hq/templates/${item.template.id}`)
+  if (attribute && method === 'GET') return { success: true, data: attribute }
+  if (/^\/api\/hq\/templates\/visual-hq-attr-[^/]+\/received-versions$/.test(pathname)) return { success: true, data: [] }
   const hqTemplateDetail = /^\/api\/hq\/templates\/(visual-hq-tpl-[^/]+)$/.exec(pathname)
   if (hqTemplateDetail && method === 'GET') {
     const row = HQ_TEMPLATES_HTN.find((item) => item.id === hqTemplateDetail[1])
@@ -4219,7 +4242,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/reminders') {
-    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status'].some((key) => query.has(key))
+    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status', 'sort'].some((key) => query.has(key))
     if (!usesListContract) return { success: true, data: REMINDERS }
     const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
@@ -4237,11 +4260,26 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       if (status === 'active' && (reminder.lifecycleStatus === 'draft' || reminder.lifecycleStatus === 'stopped' || !reminder.isActive)) return false
       if (status === 'stopped' && reminder.lifecycleStatus !== 'stopped' && reminder.isActive) return false
       return true
-    }).sort((left, right) => (
-      (left.displayOrder ?? 0) - (right.displayOrder ?? 0)
-      || right.createdAt.localeCompare(left.createdAt)
-      || left.id.localeCompare(right.id)
-    ))
+    }).sort((left, right) => {
+      const sort = query.get('sort') ?? 'order'
+      const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0
+      if (sort === 'next') return Number(left.nextScheduledAt == null) - Number(right.nextScheduledAt == null)
+        || compare(left.nextScheduledAt ?? '', right.nextScheduledAt ?? '') || compare(left.id, right.id)
+      if (sort === 'name') return compare(left.name.toLowerCase(), right.name.toLowerCase()) || compare(left.id, right.id)
+      if (sort === 'created' || sort === 'updated') {
+        const key = sort === 'created' ? 'createdAt' : 'updatedAt'
+        return compare(right[key], left[key]) || compare(left.id, right.id)
+      }
+      return (left.displayOrder ?? 0) - (right.displayOrder ?? 0)
+        || compare(right.createdAt, left.createdAt) || compare(left.id, right.id)
+    })
+    const sorts = {
+      order: [{ field: 'displayOrder', direction: 'asc' }, { field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'asc' }],
+      next: [{ field: 'nextScheduledAt', direction: 'asc' }, { field: 'id', direction: 'asc' }],
+      created: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'asc' }],
+      updated: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }],
+      name: [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }],
+    }
     const offset = (page - 1) * limit
     return {
       success: true,
@@ -4249,11 +4287,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         items: filtered.slice(offset, offset + limit),
         total: filtered.length,
         limit,
-        sort: [
-          { field: 'displayOrder', direction: 'asc' },
-          { field: 'createdAt', direction: 'desc' },
-          { field: 'id', direction: 'asc' },
-        ],
+        sort: sorts[query.get('sort') ?? 'order'],
       },
     }
   }
@@ -6192,6 +6226,12 @@ const server = createServer((req, res) => {
     return
   }
 
+  if (method === 'GET' && url.pathname === '/api/reminders' && url.searchParams.has('sort')
+    && !['order', 'next', 'created', 'updated', 'name'].includes(url.searchParams.get('sort'))) {
+    res.writeHead(400).end(JSON.stringify({ success: false, error: 'invalid_sort' }))
+    return
+  }
+
   // シナリオの下書きの口（API-9）。撮る板は書きかけの無い状態なので、読むと 404。
   // 保存・消すは本物と同じく版（UUID）で照合する（作る①・1通目・通の編集の自動保存）。
   const scenarioDraftPath = /^\/api\/scenario-drafts\/([^/]+)$/.exec(url.pathname)
@@ -6345,6 +6385,18 @@ const server = createServer((req, res) => {
     res.setHeader('Content-Type', 'image/png')
     res.setHeader('Cache-Control', 'no-store')
     res.writeHead(200).end(png)
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/qr') {
+    const data = url.searchParams.get('data') || 'https://nen.musubo.jp/r/summer-ig'
+    const width = Number(url.searchParams.get('size')?.split('x')[0]) || 320
+    QRCode.toBuffer(data, { type: 'png', width: Math.max(64, Math.min(width, 1024)), margin: 2 }, (error, png) => {
+      if (error) { res.writeHead(400).end(); return }
+      res.setHeader('Content-Type', 'image/png')
+      res.setHeader('Cache-Control', 'no-store')
+      res.writeHead(200).end(png)
+    })
     return
   }
 

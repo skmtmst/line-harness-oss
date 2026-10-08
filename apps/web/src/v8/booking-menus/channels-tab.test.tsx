@@ -71,10 +71,18 @@ describe('予約経路の連携（ZyDd6）', () => {
 
 describe('予約経路の世代と閲覧のみ（WEB058/059）', () => {
   it('WEB059：閲覧のみには「重なりを解消する」を置かず、重なりの知らせは出す', async () => {
-    api.conflicts.mockResolvedValue({ success: true, data: { conflicts: [{ id: 'c1' }, { id: 'c2' }] } })
+    api.conflicts.mockResolvedValue({ success: true, data: { conflicts: [
+      { staffId: 's1', startsAt: '2026-10-03T04:00:00Z', reason: '同じ担当の予約時間が重なっています。' },
+      { staffId: 's2', startsAt: '2026-10-03T04:00:00Z' },
+    ] } })
     render(<ChannelsTabV8 accountId="account-a" canEdit={false} staff={staff} />)
     await screen.findByText(/予約が 2 件重なっています/)
     expect(screen.queryByRole('button', { name: '重なりを解消する' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '重なりを見る' }))
+    expect(screen.getByText('同じ担当の予約時間が重なっています。')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '移して知らせる' })).toBeNull()
+    expect(screen.queryByRole('switch')).toBeNull()
+    expect(api.reassign).not.toHaveBeenCalled()
   })
 
   it('WEB058：B に切り替えたあとに A の応答が届いても、B の一覧のまま', async () => {

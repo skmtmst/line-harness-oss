@@ -2,18 +2,6 @@
  * ★V8 変更の確認（hmr2P・窓 qUdNh）。枠・頭・右の列・下の帯は型（CreatePage）が持つ。
  * ここはカード（枠1・角12・余白18）と表・入力・右の列の中身だけ。
  */
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-compact-gap);
-  color: var(--tpl-identity-color);
-  font-size: var(--text-label);
-  font-weight: var(--tpl-identity-weight);
-  line-height: var(--tpl-identity-lh);
-}
-.backLink:hover {
-  text-decoration: underline;
-}
 .card {
   display: flex;
   flex-direction: column;
@@ -30,7 +18,7 @@
 .cardHead {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-compact-gap);
+  gap: var(--tpl-scn-sub-gap);
 }
 .cardTitle {
   margin: 0;
@@ -46,7 +34,7 @@
   line-height: var(--tpl-row-sub-lh);
 }
 
-/* 開催回の表（見出し40・行40）。 */
+/* 開催回の表（見出し36・行40）。 */
 .table {
   display: flex;
   flex-direction: column;
@@ -63,6 +51,7 @@
   min-height: var(--tpl-ev-row-h);
 }
 .headRow {
+  min-height: var(--tpl-chip-h);
   background: var(--color-surface-pearl);
   box-shadow: var(--shadow-row-line);
   color: var(--color-ink-secondary);
@@ -154,19 +143,6 @@
   font-size: var(--text-caption);
   font-weight: 600;
   line-height: var(--tpl-wh-cell-lh);
-}
-.input {
-  width: 100%;
-  min-width: 0;
-  height: var(--tpl-chip-h);
-  padding: var(--tpl-kw-input-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-body);
 }
 .radioRow {
   display: flex;
@@ -336,6 +312,7 @@
 .confirmRow dd {
   margin: 0;
   color: var(--color-ink);
+  font-weight: 700;
 }
 .confirmSample {
   margin: 0;
@@ -347,3 +324,7 @@
   font-size: var(--text-caption);
   line-height: var(--tpl-wh-cell-lh);
 }
+
+/* 日時の共通欄は40。絵の36の欄との差は、次の段との間だけで吸収する。 */
+.datePair { margin-bottom: calc(-1 * var(--tpl-wh-ops-gap)); }
+.fieldError { margin: 0; color: var(--color-danger); font-size: var(--text-caption); line-height: var(--tpl-row-sub-lh); }

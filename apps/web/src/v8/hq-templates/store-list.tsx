@@ -124,6 +124,9 @@ export interface HqStoreListProps {
   onEdit: (row: HqTemplate) => void
   /** 名前を押したとき（詳細 pQ4fH）。無ければ編集を開く。 */
   onOpen?: (row: HqTemplate) => void
+  onDistributeFolder?: (id: string, name: string) => void
+  /** 全種類を数える。種類タブや検索でフォルダの配布範囲を狭めない。 */
+  folderContents?: HqTemplate[] | null
   onDistribute: (row: HqTemplate) => void
   onDuplicate: (row: HqTemplate) => void
   onRemove: (row: HqTemplate) => void
@@ -134,12 +137,12 @@ export interface HqStoreListProps {
 export default function HqStoreList(props: HqStoreListProps) {
   const {
     type, rows, ready, busy, canEdit, accountTotal, stats, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
-    onAddFolder, onRenameFolder, onDeleteFolder, onCreate, onEdit, onOpen, onDistribute, onDuplicate, onRemove, notices, overlays,
+    onAddFolder, onRenameFolder, onDeleteFolder, onCreate, onEdit, onOpen, onDistribute, onDistributeFolder, folderContents, onDuplicate, onRemove, notices, overlays,
   } = props
   const words = WORDS[type]
   const [query, setQuery] = useState('')
   const [undistributedOnly, setUndistributedOnly] = useState(false)
-  /* 友だち属性（DzdC3）だけ：上のタブ（タグ・友だち情報欄・対応マーク・保存した検索）と、使用状態・付け方の絞り込み。 */
+  /* タグ（DzdC3）だけ：上のタブ（タグ・友だち情報欄・対応マーク・保存した検索）と、使用状態・付け方の絞り込み。 */
   const attribute = useAttributeTab('/hq/friend-attributes')
   const [tagUsage, setTagUsage] = useState<TagUsageFilter>('all')
   const [tagMethod, setTagMethod] = useState('all')
@@ -192,7 +195,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   ]
 
   /*
-   * 友だち属性（DzdC3）の数の帯：未使用・付けている友だち・（今月付けた回数の代わりに）新しい版を未配布・整理の候補。
+   * タグ（DzdC3）の数の帯：未使用・付けている友だち・（今月付けた回数の代わりに）新しい版を未配布・整理の候補。
    * 今月付けた回数は統括の一覧の受け口に無いので出さない（見た目だけ置かない）。
    */
   const tagKpis = [
@@ -223,6 +226,14 @@ export default function HqStoreList(props: HqStoreListProps) {
     </Button>
   )
 
+  const leadingActions = (id: string, name: string): ActionMenuItem[] | undefined => {
+    const contents = folderContents === undefined ? rows : folderContents
+    const count = contents?.filter((row) => id === 'none' ? !row.folder_id : row.folder_id === id).length ?? 0
+    return canEdit && ready && !busy && type !== 'scenario' && onDistributeFolder && count > 0 ? [{
+      id: `${id}-distribute`, label: 'このフォルダを配る', icon: <Send size={14} aria-hidden="true" />, emphasis: true,
+      onSelect: () => onDistributeFolder(id, name),
+    }] : undefined
+  }
   const folderRows: FolderPanelRow[] = [
     { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? rows.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
     ...folders.map((folder) => ({
@@ -232,12 +243,13 @@ export default function HqStoreList(props: HqStoreListProps) {
       color: folder.color,
       count: ready ? countIn(folder.id) : null,
       colorEditable: false,
+      leadingActions: leadingActions(folder.id, folder.name),
       ...(canEdit ? {
         onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderDialog({ editing: folder }) },
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
-    { kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null },
+    { kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null, leadingActions: leadingActions('none', '未分類') },
   ]
   const selectFolder = (id: string) => { onFolderFilter(id); setPage(1) }
   const folderPanel = folderLoadFailed ? (

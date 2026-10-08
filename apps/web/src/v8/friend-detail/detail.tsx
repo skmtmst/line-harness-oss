@@ -84,6 +84,7 @@ function FriendDetailV8Inner() {
     friendId,
     (notice) => { setSupportAlert(''); setSupportNotice(notice); void data.loadFriend() },
     (message) => { setSupportNotice(''); setSupportAlert(message); void data.loadFriend() },
+    selectedAccountId,
   )
   const scenario = useScenarioPicker(friendId, friend?.displayName ?? '', selectedAccountId, (notice) => {
     setScenarioNotice(notice)

@@ -4,7 +4,7 @@
  * 表と下の箱は自動応答の実行結果（nWmLg）と同じ寸法なので、その変数を使う。
  */
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); font-weight: 600; text-decoration: none; }
-.headActions { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); position: relative; top: var(--tpl-ar-run-actions-lift); }
+.headActions { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); }
 
 /* 数の帯：この絵は 余白14/16・段の間2。 */
 .kpis {
