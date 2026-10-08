@@ -64,6 +64,14 @@ describe('統括のテンプレートを作る（店の作る画面＋保存し�
     // 一覧の段では、パンくずは「ホーム」だけ
     expect(chrome.crumbs?.some((item) => item.onSelect)).toBe(false)
   })
+  it('作る画面から一覧へは、下の帯の［キャンセル］でも戻る', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    expect(await screen.findByText('保存して配ると、選んだアカウントのテンプレートに新しい版として届きます')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    await waitFor(() => expect(screen.queryByText('保存して配ると、選んだアカウントのテンプレートに新しい版として届きます')).toBeNull())
+    expect((await screen.findAllByRole('button', { name: /テンプレートを作る/ })).length).toBeGreaterThan(0)
+  })
   it('メッセージは店の作る画面で作り、［保存して配る］で統括のひな形を作ってアカウントへ配るへ進む', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
