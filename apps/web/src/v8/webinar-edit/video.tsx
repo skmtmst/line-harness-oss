@@ -17,6 +17,7 @@ import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import type { MediaItem } from '@line-crm/shared'
 import {
   api,
@@ -316,13 +317,13 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
           <div className={form.pair}>
             <div className={form.field}>
               <label className={form.label} htmlFor="webinar-period-start">公開の開始</label>
-              <input id="webinar-period-start" type="datetime-local" className={styles.dateInput} value={startsAt} readOnly={readOnly} onChange={(event) => setStartsAt(event.target.value)} />
+              <DateTimeField id="webinar-period-start" value={startsAt} readOnly={readOnly} onChange={setStartsAt} />
             </div>
             <div className={form.field}>
               <label className={form.label} htmlFor="webinar-period-end">公開の終了<span className={form.optional}>任意</span></label>
               {noEnd
                 ? <TextField id="webinar-period-end" value="なし（いつでも）" readOnly onFocus={() => { if (!readOnly) setNoEnd(false) }} />
-                : <input id="webinar-period-end" type="datetime-local" className={styles.dateInput} value={endsAt} readOnly={readOnly} onChange={(event) => setEndsAt(event.target.value)} />}
+                : <DateTimeField id="webinar-period-end" value={endsAt} readOnly={readOnly} onChange={setEndsAt} />}
               {!readOnly && !noEnd ? <Checkbox checked={noEnd} onCheckedChange={setNoEnd}>終わりを決めない（いつでも見られる）</Checkbox> : null}
             </div>
           </div>
@@ -514,7 +515,7 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
             <label className={form.field}><span className={form.labelSmall}>終わり</span><input type="date" className={styles.dateInput} value={to} onChange={(event) => setTo(event.target.value)} /></label>
           </div>
         ) : null}
-        <label className={form.field}><span className={form.labelSmall}>時刻</span><input type="time" className={styles.dateInput} value={time} onChange={(event) => setTime(event.target.value)} /></label>
+        <div className={form.field}><span className={form.labelSmall} id="webinar-schedule-time-label">時刻</span><TimeField aria-labelledby="webinar-schedule-time-label" value={time} onChange={setTime} /></div>
       </div>
     </Dialog>
   )
