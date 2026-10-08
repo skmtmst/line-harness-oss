@@ -23,7 +23,8 @@ import { withRequestTimeout } from '@/lib/request-timeout'
 import { INBOX_INFO_PANEL_MIN_WIDTH } from './inbox-layout'
 import styles from './inbox-v8.module.css'
 import Select from '@/components/shared/select'
-import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
+import SearchField from '@/components/shared/search-field'
+import { OperatorDropdown, StatusDropdown, buildOperatorRows, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import { unreadLookup } from '@/components/chats/assignee-unread'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
 import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
@@ -2951,6 +2952,17 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       </section>
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
           <div className={`border-b border-hairline p-4 ${styles.searchBlock}`}>
+            {isV8 ? (
+              /* ★V8：共通の検索欄（自作の入力欄をやめる）。 */
+              <SearchField
+                value={nameQuery}
+                onChange={(value) => { setNameQuery(clampSearchQuery(value)); dropSavedViewParam() }}
+                onClear={() => { setNameQuery(''); dropSavedViewParam() }}
+                maxLength={SEARCH_QUERY_MAX_LENGTH}
+                placeholder="名前・メールアドレス・内容で検索"
+                aria-label="名前・メールアドレス・内容で検索"
+              />
+            ) : (
             <div className="relative">
               <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-faint" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
               <input
@@ -2963,6 +2975,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               className={`w-full rounded-control border border-hairline bg-canvas py-2 pr-3 pl-9 text-xs text-ink outline-none focus:border-accent-deep focus:ring-2 focus:ring-accent-deep/15 ${styles.searchInput}`}
               />
             </div>
+            )}
             {/*
               #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
               プルダウンが自分で名乗るため、外の字は置かない。
@@ -2975,7 +2988,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   ——一覧はページ送りされるので、2ページ目の未読が落ちる。
                   0件の担当者も選択肢に残す（契約上、0件は配列に載らないので実値0として描く）。
                 */}
-                <OperatorDropdown
+{isV8 ? (
+                  /* ★V8：共通の選ぶ欄（選んだ行は ✓ だけ）。担当者ごとの未読数は名前の後ろの（）に添える（未取得は「—」）。 */
+                  <Select
+                    aria-label="担当者で絞り込む"
+                    label="担当者"
+                    size="full"
+                    value={assigneeFilter}
+                    onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
+                    options={buildOperatorRows(operators, true).map((row) => {
+                      if (row.id === 'all') return { value: row.id, label: row.name }
+                      const unread = assigneeUnreadStatus === 'error' ? null : unreadLookup(assigneeUnread)(row.id)
+                      return { value: row.id, label: `${row.name}（${unread === null ? '—' : unread}）` }
+                    })}
+                  />
+                ) : (
+                                <OperatorDropdown
                   value={assigneeFilter}
                   operators={operators}
                   onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
@@ -2984,6 +3012,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   unreadOf={unreadLookup(assigneeUnread)}
                   unreadUnavailable={assigneeUnreadStatus === 'error'}
                 />
+                )}
               </span>
             </label>
             <div className={`ml-2 inline-block w-[calc(50%-4px)] min-w-0 align-bottom ${styles.filterCell}`}>
@@ -3445,7 +3474,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 <ConversationHead
                   name={chatDetail.friendName}
                   pictureUrl={chatDetail.friendPictureUrl}
-                  sub={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・${formatRelative(chatDetail.lastMessageAt)}`}
+                  sub={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・${formatInboxListTime(chatDetail.lastMessageAt)}`}
                   subTitle={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 ${formatInboxDatetime(chatDetail.lastMessageAt)}`}
                   onBack={() => setSelectedChatId(null)}
                   attention={{ on: Boolean(chatDetail.isAttention), saving: attentionSaving, onToggle: () => void handleAttentionUpdate() }}
@@ -4478,7 +4507,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               aria-modal={wideInfoPanel ? undefined : true}
               aria-label="顧客情報"
               tabIndex={-1}
-              className={`h-full max-w-full shrink-0 overflow-hidden bg-canvas focus:outline-none ${wideInfoPanel ? 'relative z-auto w-[260px] border-l border-hairline' : 'fixed inset-y-0 right-0 z-[70] w-[340px] shadow-overlay'}`}
+              className={`h-full max-w-full shrink-0 overflow-hidden bg-canvas focus:outline-none ${wideInfoPanel ? `relative z-auto w-[260px] ${isV8 ? '' : 'border-l border-hairline'}` : 'fixed inset-y-0 right-0 z-[70] w-[340px] shadow-overlay'}`}
             >
             {/*
               重なりの中にも閉じるボタンを置く。上部のボタンだけだと、

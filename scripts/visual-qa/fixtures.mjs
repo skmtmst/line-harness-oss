@@ -2629,6 +2629,26 @@ export const FRIEND_MILEAGE = {
  * 会話を開くたびに「もう一度試す」だけの画面になっていた。
  */
 export const FRIEND_DETAILS = {
+  /*
+   * 受信箱で最初に開く会話（Kyohei Yamamoto・chat-0）の右の欄（★V8 M0393 XqSvX「その人の要点」）。
+   * 無いと右の欄が「名前なし・友だち追加日は未登録・ブロック済」になり、絵と並べられない。
+   */
+  'friend-0': {
+    id: 'friend-0',
+    displayName: 'Kyohei Yamamoto',
+    systemDisplayName: 'Kyohei Yamamoto',
+    realName: '山本 恭平',
+    pictureUrl: null,
+    isFollowing: true,
+    createdAt: '2025-08-13T15:00:00.000Z',
+    metadata: {},
+    tags: [
+      { id: 'friend-tag-teiki-proposal', name: '定期便の提案', color: '#8B938D', createdAt: '2025-08-14T00:00:00.000Z' },
+      { id: 'friend-tag-uncontracted', name: '未契約', color: '#8B938D', createdAt: '2025-08-14T00:00:00.000Z' },
+    ],
+    formSubmissions: [],
+    formSubmissionTotal: 0,
+  },
   'friend-1': {
     id: 'friend-1',
     displayName: 'Kenta Kawano (Obama)',
