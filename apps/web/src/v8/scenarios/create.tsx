@@ -194,7 +194,7 @@ export default function ScenarioCreateV8() {
   /** 名前が空のまま押したら、欄の下にも理由を出して欄へ移す（R172）。止めたとき真。 */
   const rejectEmptyName = (): boolean => {
     if (name.trim()) return false
-    setError('シナリオ名を入力してください')
+    // 上の帯には出さない：欄を赤くして欄の下に理由を出し、欄へ移す（2026-10-08 オーナー「重複している」）。
     setNameError('シナリオ名を入力してください')
     const input = nameWrapRef.current?.querySelector('input')
     if (input) {
