@@ -60,3 +60,47 @@ describe('マイルの友だち詳細を友だちIDで取る（V6R-CX-e）', () 
     expect(other.items.map((item) => item.id)).toEqual(['h3']);
   });
 });
+
+
+describe('WEB074 type filtering before pagination', () => {
+  it('finds spending past 101 grants and reports the filtered total across pages', async () => {
+    friend('me', '本人');
+    for (let i = 0; i < 101; i++) grant(`g-${i}`, 'me', null, 10);
+    for (const [id, type] of [['s1','spend'], ['s2','spend'], ['r1','reversal']] as const) {
+      grant(id, 'me', null, -1);
+      fixture.raw.prepare("UPDATE mileage_ledger SET entry_type=?,occurred_at='2026-08-01' WHERE id=?").run(type,id);
+    }
+    const opts = { accountId: 'acc', entryTypes: ['spend', 'reversal'] as const };
+    const first = await getMileageAdminHistory(fixture.db, { ...opts, entryTypes: [...opts.entryTypes], limit: 2 });
+    const next = await getMileageAdminHistory(fixture.db, { ...opts, entryTypes: [...opts.entryTypes], limit: 2, offset: 2 });
+    expect(first.items).toHaveLength(2);
+    expect(next.items).toHaveLength(1);
+    expect(first.pagination.total).toBe(3);
+    expect(next.pagination.total).toBe(3);
+    expect([...first.items,...next.items].every(row => row.entryType !== 'grant')).toBe(true);
+  });
+});
+
+
+describe('WEB075 paginated personal ledger and full personal metrics', () => {
+  it('counts all 105 grants beyond the page and searches reasons for the selected friend only', async () => {
+    friend('me','同名'); friend('other','同名');
+    const thisMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0,7) + '-01T00:00:00Z';
+    for (let i=0;i<105;i++) {
+      grant(`me-${i}`,'me',null,2);
+      fixture.raw.prepare('UPDATE mileage_ledger SET occurred_at=?,reason=?,status=? WHERE id=?')
+        .run(thisMonth,'本人の購入',i === 0 ? 'pending' : 'available',`me-${i}`);
+    }
+    grant('other-grant','other',null,999);
+    grant('used','me',null,-3);
+    fixture.raw.prepare("UPDATE mileage_ledger SET entry_type='spend',reason='交換' WHERE id='used'").run();
+    const opts = { accountId: 'acc', friendId: 'me', visibleAccountIds: ['acc'], limit: 2 };
+    const result = await getMileageAdminHistory(fixture.db, { ...opts, kind: 'earned', search: '本人の購入', offset: 100 });
+    expect(result.items).toHaveLength(2);
+    expect(result.pagination.total).toBe(105);
+    expect(result.friendSummary).toMatchObject({ scope: 'visible_accounts', counts: { all: 106, earned: 105, spent: 1, voided: 0 }, pendingCount: 1, earnedThisMonth: 210, earnedCountThisMonth: 105 });
+    const spent = await getMileageAdminHistory(fixture.db, { ...opts, kind: 'spent' });
+    expect(spent.items.map(row=>row.id)).toEqual(['used']);
+    expect(spent.friendSummary).toEqual(result.friendSummary);
+  });
+});

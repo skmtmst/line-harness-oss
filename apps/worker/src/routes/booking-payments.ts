@@ -198,6 +198,22 @@ async function startBookingPayment(
     idempotencyKey,
     holdUntil,
   });
+  if (record.booking_id !== booking.id) {
+    return { ok: false, error: 'この支払いの記録は別の予約に使われています', status: 409 };
+  }
+  if (record.status === 'pending') {
+    const provider = providerFor(env, record.provider);
+    const checkoutUrl = record.provider_payment_id && provider?.getCheckoutUrl
+      ? await provider.getCheckoutUrl({
+        providerPaymentId: record.provider_payment_id,
+        idempotencyKey: record.idempotency_key,
+      })
+      : null;
+    if (!checkoutUrl) {
+      return { ok: false, error: '元の支払い画面を取得できません。担当者にお問い合わせください', status: 409 };
+    }
+    return { ok: true, created: false, paymentId: record.id, checkoutUrl };
+  }
   if (record.status !== 'unpaid') {
     return { ok: true, created: false, paymentId: record.id, checkoutUrl: null };
   }

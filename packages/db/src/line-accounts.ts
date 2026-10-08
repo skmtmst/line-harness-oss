@@ -362,7 +362,9 @@ export async function getLineAccountConnectionChecksByIdempotencyKey(
 
 /**
  * Saves one complete check run and advances the account revision in one D1 batch.
- * The INSERTs only select a row after the guarded UPDATE succeeded.
+ * Each INSERT requires the preceding statement to have written one row: first
+ * the guarded UPDATE, then the preceding check INSERT. A rejected UPDATE therefore
+ * keeps changes() at zero throughout the batch, even if another run owns nextRevision.
  */
 export async function saveLineAccountConnectionChecks(
   db: D1Database,
@@ -375,6 +377,7 @@ export async function saveLineAccountConnectionChecks(
           SET revision = revision + 1, updated_at = ?
         WHERE id = ? AND revision = ? AND archived_at IS NULL`,
     ).bind(input.checkedAt, input.lineAccountId, input.expectedRevision),
+    db.prepare(`SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'LINE_ACCOUNT_REVISION_CONFLICT' END)`),
     ...input.checks.map((check) => db.prepare(
       `INSERT INTO line_account_connection_checks (
          id, line_account_id, check_kind, result, expected_url, registered_url,
@@ -382,7 +385,7 @@ export async function saveLineAccountConnectionChecks(
          idempotency_key, account_revision
        )
        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-        WHERE EXISTS (
+        WHERE changes() = 1 AND EXISTS (
           SELECT 1 FROM line_accounts
            WHERE id = ? AND revision = ? AND archived_at IS NULL
         )`,
@@ -404,7 +407,12 @@ export async function saveLineAccountConnectionChecks(
       nextRevision,
     )),
   ];
-  const results = await db.batch(statements);
+  let results: D1Result[];
+  try { results = await db.batch(statements); }
+  catch (error) {
+    if (error instanceof Error && /malformed JSON/i.test(error.message)) throw new LineAccountRevisionConflictError();
+    throw error;
+  }
   if (Number(results[0]?.meta?.changes ?? 0) !== 1) {
     throw new LineAccountRevisionConflictError();
   }

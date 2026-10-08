@@ -1039,7 +1039,7 @@ export function validateAnswer(
       if (typeof min === "number" && selected.length < min) {
         return `${block.label} は${min}つ以上選んでください`;
       }
-      if (typeof max === "number" && selected.length > max) {
+      if (typeof max === "number" && max > 0 && selected.length > max) {
         return `${block.label} は${max}つまで選べます`;
       }
     }
@@ -1096,7 +1096,7 @@ export function validateAnswers(
   layout: FormLayout,
   answers: Record<string, unknown>,
 ): string | null {
-  for (const block of collectInputs(layout)) {
+  for (const block of collectReachableInputs(layout, answers)) {
     // 出していない欄は、答えが無くても責めない
     if (block.hidden) continue;
     const error = validateAnswer(block, answers[block.name]);
@@ -1135,6 +1135,18 @@ export function nextSectionIndex(
     }
   }
   return currentIndex + 1;
+}
+
+/** 回答の分岐で実際に通る欄。共通ヘッダはどの経路でも含める。 */
+export function collectReachableInputs(layout: FormLayout, answers: Record<string, unknown>): FormInputBlock[] {
+  const sections: FormLayout['sections'] = [];
+  const visited = new Set<number>();
+  for (let index = 0; index < layout.sections.length && !visited.has(index);) {
+    visited.add(index);
+    sections.push(layout.sections[index]!);
+    index = nextSectionIndex(layout, index, answers);
+  }
+  return collectInputs({ ...layout, sections });
 }
 
 // ---------------------------------------------------------------------------

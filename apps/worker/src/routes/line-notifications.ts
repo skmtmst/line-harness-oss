@@ -577,7 +577,7 @@ lineNotifications.get(
     const today = jstDateString(0);
     const tomorrow = nextDateString(today);
     const windowStart = jstDateString(-29);
-    const rows = await c.env.DB.prepare(
+    const [rows, failures] = await Promise.all([c.env.DB.prepare(
       `SELECT i.source_event_type AS event_type,
          SUM(CASE WHEN d.accepted_at >= ? AND d.accepted_at < ? THEN 1 ELSE 0 END) AS today_count,
          SUM(CASE WHEN d.accepted_at >= ? AND d.accepted_at < ? THEN 1 ELSE 0 END) AS last_30d_count
@@ -590,7 +590,15 @@ lineNotifications.get(
       GROUP BY i.source_event_type
       ORDER BY last_30d_count DESC, event_type ASC`,
     ).bind(today, tomorrow, windowStart, tomorrow, lineAccountId)
-      .all<{ event_type: string; today_count: number; last_30d_count: number }>();
+      .all<{ event_type: string; today_count: number; last_30d_count: number }>(),
+      c.env.DB.prepare(`SELECT COUNT(*) AS total,
+        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+        SUM(CASE WHEN status = 'retry_wait' THEN 1 ELSE 0 END) AS retry_waiting
+        FROM notification_deliveries
+        WHERE line_account_id = ? AND audience_type = 'customer'
+          AND execution_mode != 'test' AND status IN ('failed', 'retry_wait')`)
+        .bind(lineAccountId).first<{ total: number; failed: number; retry_waiting: number }>(),
+    ]);
     const byEventType = rows.results.map((row) => ({
       eventType: row.event_type,
       today: Number(row.today_count ?? 0),
@@ -599,6 +607,8 @@ lineNotifications.get(
     return c.json({
       success: true,
       data: {
+        failures: { scope: 'all_time_unresolved' as const, total: Number(failures?.total ?? 0),
+          failed: Number(failures?.failed ?? 0), retryWaiting: Number(failures?.retry_waiting ?? 0) },
         sentToday: byEventType.reduce((sum, item) => sum + item.today, 0),
         sentLast30d: byEventType.reduce((sum, item) => sum + item.last30d, 0),
         byEventType,

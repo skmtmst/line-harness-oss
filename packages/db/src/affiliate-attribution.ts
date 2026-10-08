@@ -140,6 +140,8 @@ function asValidWindowDays(v: unknown): number | null {
 }
 
 interface TouchRow {
+  touch_id: string;
+  touched_julian: number;
   ref_code: string;
   touched_at: string;
   affiliate_id: string;
@@ -151,11 +153,15 @@ interface TouchRow {
   aff_account: string | null;
 }
 
+const TOUCH_PAGE_SIZE = 100;
+const EXPLANATION_CANDIDATE_LIMIT = 20;
+
 async function loadTouches(
   db: D1Database,
   friendId: string,
   now: string,
   full: boolean,
+  cursor: { touchedJulian: number; touchId: string } | null,
 ): Promise<TouchRow[]> {
   // full では案件・所属も見る。列が無い古いスキーマ（最小構成の単体試験など）
   // では従来の列だけに戻す。
@@ -164,7 +170,8 @@ async function loadTouches(
   const affAccountSelect = full ? 'a.line_account_id AS aff_account' : 'NULL AS aff_account';
   const touches = await db
     .prepare(
-      `SELECT rt.ref_code AS ref_code, rt.created_at AS touched_at,
+      `SELECT rt.id AS touch_id, julianday(rt.created_at) AS touched_julian,
+              rt.ref_code AS ref_code, rt.created_at AS touched_at,
               al.affiliate_id AS affiliate_id, ${offerSelect},
               al.is_active AS link_active, ${linkAccountSelect},
               a.is_active AS aff_active, a.friend_id AS aff_friend_id,
@@ -174,12 +181,37 @@ async function loadTouches(
          JOIN affiliates a ON a.id = al.affiliate_id
         WHERE rt.friend_id = ?
           AND julianday(rt.created_at) <= julianday(?)
-        ORDER BY julianday(rt.created_at) DESC
-        LIMIT 20`,
+          AND (? IS NULL OR julianday(rt.created_at) < ?
+            OR (julianday(rt.created_at) = ? AND rt.id < ?))
+        ORDER BY julianday(rt.created_at) DESC, rt.id DESC
+        LIMIT ${TOUCH_PAGE_SIZE}`,
     )
-    .bind(friendId, now)
+    .bind(friendId, now, cursor?.touchedJulian ?? null, cursor?.touchedJulian ?? null,
+      cursor?.touchedJulian ?? null, cursor?.touchId ?? null)
     .all<TouchRow>();
   return touches.results;
+}
+
+async function* iterateTouches(db: D1Database, friendId: string, now: string): AsyncGenerator<TouchRow> {
+  let full = true;
+  let cursor: { touchedJulian: number; touchId: string } | null = null;
+  for (;;) {
+    let touches: TouchRow[];
+    try {
+      touches = await loadTouches(db, friendId, now, full, cursor);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!full || !/no such (column|table)/i.test(msg)) throw err;
+      // 古い最小スキーマでも、先頭ページだけで探索を打ち切らない。
+      full = false;
+      touches = await loadTouches(db, friendId, now, full, cursor);
+    }
+    if (touches.length === 0) return;
+    yield* touches;
+    if (touches.length < TOUCH_PAGE_SIZE) return;
+    const last = touches[touches.length - 1]!;
+    cursor = { touchedJulian: last.touched_julian, touchId: last.touch_id };
+  }
 }
 
 /**
@@ -195,23 +227,20 @@ export async function explainAffiliateAttribution(
   const now = at ?? jstNow();
   const pointWindow = asValidWindowDays(opts?.windowDays);
   const lineAccountId = opts?.lineAccountId ?? null;
-  // 決まりの列が無い古いスキーマ（最小構成の単体試験など）では、
-  // 案件の期間・上限・受付を見ずに従来の付け方に落とす。
-  let touches: TouchRow[];
-  try {
-    touches = await loadTouches(db, friendId, now, true);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (!/no such (column|table)/i.test(msg)) throw err;
-    touches = await loadTouches(db, friendId, now, false);
-  }
   const candidates: AttributionCandidate[] = [];
+  // 説明に載せる候補の数と、勝者を探す範囲は別にする。最新の候補を
+  // 20件まで残し、もっと古い候補が勝った時もその1件は必ず含める。
+  const addCandidate = (candidate: AttributionCandidate) => {
+    if (candidates.length < EXPLANATION_CANDIDATE_LIMIT) candidates.push(candidate);
+    else if (candidate.chosen) candidates[EXPLANATION_CANDIDATE_LIMIT - 1] = candidate;
+  };
   let decision: AttributionExplanation['decision'] = null;
   let reason: AttributionReason = 'no_touch';
   // 案件の無い汎用リンクは、従来の 90 日を legacy として使う。
   let usedWindow = ATTRIBUTION_WINDOW_DAYS;
   const versionCache = new Map<string, Awaited<ReturnType<typeof getCurrentOfferVersion>>>();
-  for (const touch of touches) {
+  // 不適格な紹介が何件続いても、適格な最新候補か末尾まで探索する。
+  for await (const touch of iterateTouches(db, friendId, now)) {
     let version = null;
     if (touch.offer_id) {
       if (!versionCache.has(touch.offer_id)) {
@@ -236,20 +265,20 @@ export async function explainAffiliateAttribution(
     if (lineAccountId !== null
       && ((touch.link_account !== null && touch.link_account !== lineAccountId)
         || (touch.aff_account !== null && touch.aff_account !== lineAccountId))) {
-      candidates.push(skip('other_account'));
+      addCandidate(skip('other_account'));
       continue;
     }
     if (touch.link_active !== 1) {
-      candidates.push(skip('inactive_link'));
+      addCandidate(skip('inactive_link'));
       continue;
     }
     if (touch.aff_active !== 1) {
-      candidates.push(skip('inactive_affiliate'));
+      addCandidate(skip('inactive_affiliate'));
       continue;
     }
     // 自分の紹介には付けない。
     if (touch.aff_friend_id !== null && touch.aff_friend_id === friendId) {
-      candidates.push(skip('self_referral'));
+      addCandidate(skip('self_referral'));
       continue;
     }
     const inWindow = await db
@@ -257,7 +286,7 @@ export async function explainAffiliateAttribution(
       .bind(touch.touched_at, now, windowDays)
       .first<{ ok: number }>();
     if (!inWindow) {
-      candidates.push(skip('out_of_window'));
+      addCandidate(skip('out_of_window'));
       continue;
     }
     if (version) {
@@ -268,7 +297,7 @@ export async function explainAffiliateAttribution(
           .bind(now, version.reception_from)
           .first<{ ok: number }>();
         if (!open) {
-          candidates.push(skip('reception_closed'));
+          addCandidate(skip('reception_closed'));
           continue;
         }
       }
@@ -278,7 +307,7 @@ export async function explainAffiliateAttribution(
           .bind(now, version.reception_to)
           .first<{ ok: number }>();
         if (!open) {
-          candidates.push(skip('reception_closed'));
+          addCandidate(skip('reception_closed'));
           continue;
         }
       }
@@ -289,11 +318,11 @@ export async function explainAffiliateAttribution(
           db, touch.offer_id!, { affiliateId: touch.affiliate_id, at: now },
         );
         if (status.totalRemaining !== null && status.totalRemaining <= 0) {
-          candidates.push(skip('capped_total'));
+          addCandidate(skip('capped_total'));
           continue;
         }
         if (status.monthlyRemaining !== null && status.monthlyRemaining <= 0) {
-          candidates.push(skip('capped_monthly'));
+          addCandidate(skip('capped_monthly'));
           continue;
         }
       }
@@ -307,7 +336,7 @@ export async function explainAffiliateAttribution(
     };
     reason = 'matched_last_touch';
     usedWindow = windowDays;
-    candidates.push({ ...base, chosen: true, skipReason: null });
+    addCandidate({ ...base, chosen: true, skipReason: null });
     break;
   }
   if (!decision && candidates.length > 0) {

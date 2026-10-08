@@ -184,3 +184,41 @@ describe('予約メニュー編集の版管理 HTTP', () => {
     await expect(menuRow()).resolves.toMatchObject({ price_mode: 'free', base_price: 0, version: 2 });
   });
 });
+
+
+describe('WEB052 atomic reorder', () => {
+  async function reorder(changes: unknown[]) {
+    const { app, env } = appFor();
+    return app.request('/api/booking/admin/menus/order?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ changes }),
+    }, env);
+  }
+  test('stale second row or foreign row changes neither row nor history', async () => {
+    await db.prepare("INSERT INTO menus (id,line_account_id,name,duration_minutes,buffer_after_minutes,base_price) VALUES ('menu-c','account-a','C',60,0,1000)").run();
+    for (const id of ['menu-c', 'menu-b']) {
+      expect((await reorder([{ id: 'menu-a', expectedVersion: 1, sortOrder: 8 }, { id, expectedVersion: 2, sortOrder: 0 }])).status).toBe(409);
+      expect(await menuRow()).toMatchObject({ version: 1 });
+      expect(await db.prepare("SELECT sort_order FROM menus WHERE id='menu-a'").first()).toEqual({ sort_order: 0 });
+    }
+    expect((await reorder([{ id: 'menu-a', expectedVersion: 1, sortOrder: 8 }, { id: 'menu-c', expectedVersion: 1, sortOrder: 0 }])).status).toBe(200);
+    expect(await menuRow()).toMatchObject({ version: 2 });
+    expect(await db.prepare("SELECT sort_order FROM menu_versions WHERE menu_id='menu-a' AND version_number=2").first()).toEqual({ sort_order: 8 });
+  });
+  test('duplicate IDs and missing revisions are rejected', async () => {
+    expect((await reorder([{ id: 'menu-a', sortOrder: 8 }])).status).toBe(400);
+    expect((await reorder([{ id: 'menu-a', expectedVersion: 1, sortOrder: 8 }, { id: 'menu-a', expectedVersion: 1, sortOrder: 0 }])).status).toBe(400);
+  });
+  test('history persistence failure rolls back both menu changes in real D1', async () => {
+    await db.prepare("INSERT INTO menus (id,line_account_id,name,duration_minutes,buffer_after_minutes,base_price) VALUES ('menu-c','account-a','C',60,0,1000)").run();
+    await db.prepare(`CREATE TRIGGER audit3_fail_history BEFORE INSERT ON menu_versions
+      WHEN NEW.menu_id = 'menu-c' BEGIN SELECT RAISE(ABORT, 'history unavailable'); END`).run();
+    try {
+      expect((await reorder([{ id: 'menu-a', expectedVersion: 1, sortOrder: 8 }, { id: 'menu-c', expectedVersion: 1, sortOrder: 4 }])).status).toBe(500);
+      const rows = await db.prepare("SELECT id,sort_order,version FROM menus WHERE id IN ('menu-a','menu-c') ORDER BY id").all();
+      expect(rows.results).toEqual([{ id: 'menu-a', sort_order: 0, version: 1 }, { id: 'menu-c', sort_order: 0, version: 1 }]);
+      expect(await db.prepare('SELECT COUNT(*) AS count FROM menu_versions').first()).toEqual({ count: 0 });
+    } finally {
+      await db.prepare('DROP TRIGGER audit3_fail_history').run();
+    }
+  });
+});

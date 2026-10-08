@@ -60,3 +60,6 @@ export * from './booking-liff.js';
 export * from './template-definition.js';
 
 export * from './broadcast-definition.js';
+
+export * from "./tab-counts";
+export * from "./audit3-api";

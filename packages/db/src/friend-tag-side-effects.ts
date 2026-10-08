@@ -193,6 +193,7 @@ export async function claimFriendTagSideEffectRun(
   friendId: string,
   tagId: string,
   stepKey: FriendTagSideEffectStep,
+  assignedAt: string,
 ): Promise<FriendTagSideEffectClaim> {
   const now = jstNow();
   const from = FRIEND_TAG_SIDE_EFFECT_RETRYABLE_FROM[stepKey];
@@ -203,7 +204,7 @@ export async function claimFriendTagSideEffectRun(
               attempt_count = attempt_count + 1,
               last_attempt_at = ?,
               updated_at = ?
-        WHERE friend_id = ? AND tag_id = ? AND step_key = ?
+        WHERE friend_id = ? AND tag_id = ? AND step_key = ? AND assigned_at = ?
           AND status IN (${from.map(() => '?').join(', ')})
           AND attempt_count < ?`,
     )
@@ -213,6 +214,7 @@ export async function claimFriendTagSideEffectRun(
       friendId,
       tagId,
       stepKey,
+      assignedAt,
       ...from,
       FRIEND_TAG_SIDE_EFFECT_MAX_ATTEMPTS,
     )
@@ -267,15 +269,16 @@ export async function markFriendTagSideEffectCompleted(
   friendId: string,
   tagId: string,
   stepKey: FriendTagSideEffectStep,
+  assignedAt: string,
 ): Promise<void> {
   const now = jstNow();
   await db
     .prepare(
       `UPDATE friend_tag_side_effect_runs
           SET status = 'completed', last_error = NULL, updated_at = ?
-        WHERE friend_id = ? AND tag_id = ? AND step_key = ?`,
+        WHERE friend_id = ? AND tag_id = ? AND step_key = ? AND assigned_at = ?`,
     )
-    .bind(now, friendId, tagId, stepKey)
+    .bind(now, friendId, tagId, stepKey, assignedAt)
     .run();
 }
 
@@ -291,15 +294,16 @@ export async function markFriendTagSideEffectFailed(
   tagId: string,
   stepKey: FriendTagSideEffectStep,
   error: unknown,
+  assignedAt: string,
 ): Promise<void> {
   const now = jstNow();
   await db
     .prepare(
       `UPDATE friend_tag_side_effect_runs
           SET status = 'failed', last_error = ?, updated_at = ?
-        WHERE friend_id = ? AND tag_id = ? AND step_key = ?`,
+        WHERE friend_id = ? AND tag_id = ? AND step_key = ? AND assigned_at = ?`,
     )
-    .bind(describeError(error), now, friendId, tagId, stepKey)
+    .bind(describeError(error), now, friendId, tagId, stepKey, assignedAt)
     .run();
 }
 

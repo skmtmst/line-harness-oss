@@ -1,3 +1,4 @@
+import { bannerGenerationOperationId, bannerGenerationRequestMatches } from '../services/banner-generation-retry.js';
 import { Hono, type Context } from 'hono';
 import {
   bannerReferencesFromRow,
@@ -286,7 +287,7 @@ function sizeToDimensions(apiSize: string): { width: number | null; height: numb
 }
 
 function safeFilenameBase(name: string): string {
-  const cleaned = name.replace(/[\\/:*?"<>| -]/g, '').trim();
+  const cleaned = name.replace(/[\\/:*?"<>|\0-]/g, '').trim();
   return (cleaned || 'banner').slice(0, 40);
 }
 
@@ -452,6 +453,25 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
     const tenantId = tenantOf(c);
     const project = await getBannerProject(c.env.DB, c.req.param('id'), tenantId);
     if (!project) return c.json({ success: false, error: 'プロジェクトが見つかりません' }, 404);
+    const key = c.req.header('Idempotency-Key');
+    if (key !== undefined && (!key.trim() || key.length > 200 || /[^\x21-\x7e]/.test(key))) {
+      return c.json({ success: false, error: 'Idempotency-Key is invalid' }, 400);
+    }
+    const validation = validateBannerRequest(await readJson(c));
+    if (!validation.ok || !validation.value) {
+      return c.json({ success: false, error: validation.error }, 400);
+    }
+    const v = validation.value;
+    const operationId = key ? await bannerGenerationOperationId(tenantId, project.id, key) : undefined;
+    if (operationId) {
+      const previous = await getBannerGeneration(c.env.DB, operationId, tenantId);
+      if (previous) {
+        if (!bannerGenerationRequestMatches(previous, v)) {
+          return c.json({ success: false, code: 'idempotency_conflict', error: '同じ操作キーで生成条件が変わっています' }, 409);
+        }
+        return c.json({ success: true, data: serializeGeneration(previous) }, 201);
+      }
+    }
     if (project.archived_at) {
       return c.json({ success: false, error: 'アーカイブ済みのプロジェクトでは生成できません。復元してからお試しください' }, 409);
     }
@@ -459,11 +479,6 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
       return c.json({ success: false, error: '画像生成の接続設定がまだありません。運営にお問い合わせください' }, 503);
     }
 
-    const validation = validateBannerRequest(await readJson(c));
-    if (!validation.ok || !validation.value) {
-      return c.json({ success: false, error: validation.error }, 400);
-    }
-    const v = validation.value;
     const usage = await usageSnapshot(c, tenantId);
     const refused = refusal(usage, v.count);
     if (refused) {
@@ -497,6 +512,7 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
       freePrompt: v.freePrompt,
     });
     const generation = await createBannerGeneration(c.env.DB, {
+      operationId,
       tenantId,
       projectId: project.id,
       mode: v.mode,
@@ -521,6 +537,10 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
       references: v.references,
       createdBy: c.get('staff')?.id ?? null,
     });
+    // Concurrent requests share the primary key; the winner's choices remain authoritative.
+    if (operationId && !bannerGenerationRequestMatches(generation, v)) {
+      return c.json({ success: false, code: 'idempotency_conflict', error: '同じ操作キーで生成条件が変わっています' }, 409);
+    }
     await touchBannerProject(c.env.DB, project.id);
     return c.json({ success: true, data: serializeGeneration(generation) }, 201);
   } catch (err) {
