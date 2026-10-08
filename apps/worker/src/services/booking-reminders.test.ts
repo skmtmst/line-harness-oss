@@ -36,6 +36,10 @@ function stubDB(due: DueRow[]) {
           return { success: true, meta: { changes: 1 } };
         },
         async first() {
+          if (sql.includes('RETURNING retry_key')) {
+            updates.push({ sql, bound });
+            return { retry_key: bound[1], recipient_line_user_id: bound[2], messages_json: bound[3] };
+          }
           return null;
         },
       };

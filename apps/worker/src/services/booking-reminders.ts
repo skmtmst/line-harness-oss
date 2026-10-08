@@ -3,7 +3,8 @@
 // the notification text renderer needs in one query.
 
 import type { BookingNotificationSender, NotificationKind } from './booking-notifier.js';
-import { formatStartsAtForStore, notificationTiming } from './booking-notifier.js';
+import { formatStartsAtForStore, notificationTiming, renderNotificationText } from './booking-notifier.js';
+import type { Message } from '@line-crm/line-sdk';
 import { REMINDER_MAX_RETRY } from './booking-types.js';
 import {
   activeTenantLineAccountSql,
@@ -19,6 +20,9 @@ interface DueRow {
   line_account_id: string;
   kind: 'day_before' | 'hours_before';
   retry_count: number;
+  retry_key: string | null;
+  recipient_line_user_id: string | null;
+  messages_json: string | null;
   starts_at: string;
   menu_name: string;
   staff_name: string;
@@ -27,6 +31,12 @@ interface DueRow {
   line_user_id: string;
   /** 店舗のタイムゾーン。文面の日時と「本日/明日」の判定に使う。 */
   timezone: string | null;
+}
+
+interface ReminderRequestSnapshot {
+  retry_key: string;
+  recipient_line_user_id: string;
+  messages_json: string;
 }
 
 export interface ProcessRemindersParams {
@@ -69,6 +79,7 @@ export async function processDueReminders(
   const due = await db
     .prepare(
       `SELECT r.id, r.booking_id, r.kind, r.retry_count,
+              r.retry_key, r.recipient_line_user_id, r.messages_json,
               b.line_account_id, b.starts_at,
               m.name AS menu_name,
               s.display_name AS staff_name,
@@ -116,6 +127,7 @@ export async function processDueReminders(
     // LIMIT 100 で ORDER BY が無く、滞留行が正常なリマインダを押し出す)。
     const priorRetry = row.retry_count;
     const attemptedRetry = priorRetry + 1;
+    let claimed = false;
     try {
       // 送信の準備 (資格情報の復号) は fence の前に済ませる。fence と外部
       // 送信の間に待つ処理を挟まない (V6 の verifyClaimedRunBeforeSend と
@@ -125,6 +137,18 @@ export async function processDueReminders(
         row.channel_access_token,
         { lineAccountId: row.line_account_id, field: 'channel_access_token' },
       );
+      // NULL の旧行も従来の日時・文面で組み立て、初回の送信権と一緒に保存。
+      // 再送では本文を再描画しない。ctx は既存の sender の契約として残す。
+      const timeZone = row.timezone ?? 'Asia/Tokyo';
+      const ctx = {
+        menuName: row.menu_name,
+        staffName: row.staff_name,
+        startsAt: formatStartsAtForStore(row.starts_at, timeZone),
+        ...notificationTiming(row.starts_at, timeZone, params.now),
+      };
+      const messagesJson = row.messages_json ?? JSON.stringify([
+        { type: 'text', text: renderNotificationText(kind, ctx) },
+      ]);
       // 取消と送信の直列化 (原子的)。上の SELECT の b.status='confirmed' は
       // 読み出し時にしか効かず、100件ループの全区間で取消を素通りさせる。
       // 送る直前に1文で「まだ未送信」と「予約がまだ confirmed」と
@@ -137,7 +161,10 @@ export async function processDueReminders(
       const claim = await db
         .prepare(
           `UPDATE booking_reminders
-              SET retry_count = retry_count + 1, sent_at = ?
+              SET retry_count = retry_count + 1, sent_at = ?,
+                  retry_key = COALESCE(retry_key, ?),
+                  recipient_line_user_id = COALESCE(recipient_line_user_id, ?),
+                  messages_json = COALESCE(messages_json, ?)
             WHERE id = ? AND retry_count = ? AND status IN ('pending','failed')
               AND (sent_at IS NULL OR sent_at < ?)
               AND EXISTS (
@@ -148,11 +175,15 @@ export async function processDueReminders(
                          WHEN 'day_before'
                          THEN json_extract(b.notification_policy_snapshot, '$.day_before')
                          ELSE json_extract(b.notification_policy_snapshot, '$.hours_before')
-                       END IS NOT 0)`,
+                       END IS NOT 0)
+            RETURNING retry_key, recipient_line_user_id, messages_json`,
         )
-        .bind(params.now.toISOString(), row.id, priorRetry, claimCutoffIso(params.now))
-        .run();
-      if ((claim.meta?.changes ?? 0) === 0) continue;
+        .bind(params.now.toISOString(), row.retry_key ?? crypto.randomUUID(),
+          row.recipient_line_user_id ?? row.line_user_id, messagesJson,
+          row.id, priorRetry, claimCutoffIso(params.now))
+        .first<ReminderRequestSnapshot>();
+      if (!claim) continue;
+      claimed = true;
 
       // claim と送信の間に緊急停止へ切り替わった分は、握った retry_count を
       // 差し戻して pending のまま残す (#1050)。停止を失敗として数えない。
@@ -161,53 +192,52 @@ export async function processDueReminders(
         await db
           .prepare(
             `UPDATE booking_reminders SET retry_count = retry_count - 1, sent_at = NULL
-              WHERE id = ? AND retry_count = ? AND status IN ('pending','failed')`,
+              WHERE id = ? AND retry_count = ? AND sent_at = ? AND status IN ('pending','failed')`,
           )
-          .bind(row.id, attemptedRetry)
+          .bind(row.id, attemptedRetry, params.now.toISOString())
           .run();
         continue;
       }
 
-      // 文面の日時は店舗の時間帯で書き (R332)、「本日/明日」と残り時間は
-      // 送信時点の実測から組み立てる (R333)。予約の瞬間 (starts_at) や
-      // 通知予定自体は変えない。
-      const timeZone = row.timezone ?? 'Asia/Tokyo';
-      const timing = notificationTiming(row.starts_at, timeZone, params.now);
+      // RETURNING で実際に保存した要求を使う。停止で貸出を戻した直後に
+      // 古い SELECT を持つ別 cron が claim しても、保存ずみの値を変えない。
       await params.sender({
         channelAccessToken: accessToken,
-        toLineUserId: row.line_user_id,
+        toLineUserId: claim.recipient_line_user_id,
         kind,
-        ctx: {
-          menuName: row.menu_name,
-          staffName: row.staff_name,
-          startsAt: formatStartsAtForStore(row.starts_at, timeZone),
-          ...timing,
-        },
-        // R323 と同じ考え方: 同じ貸出の再送は安定キーで行い、
-        // LINE 側の到達ずみ再送は冪等に吸収する。
-        retryKey: `booking-reminder:${row.id}:${attemptedRetry}`,
+        ctx,
+        messages: JSON.parse(claim.messages_json) as Message[],
+        retryKey: claim.retry_key,
       });
       // R331: 書込時も「まだ未送信」を確かめる。貸出中に取消・方針OFFで
       // 行が止まっていたら 0 件になり、取消ずみを復活させない。
+      // 期限切れで別 cron に引き継いだ試行の結果も上書きしない。
       const completed = await db
         .prepare(
           `UPDATE booking_reminders SET status='sent', sent_at = ?
-            WHERE id = ? AND status IN ('pending','failed')`,
+            WHERE id = ? AND status IN ('pending','failed')
+              AND retry_count = ? AND sent_at = ?`,
         )
-        .bind(params.now.toISOString(), row.id)
+        .bind(params.now.toISOString(), row.id, attemptedRetry, params.now.toISOString())
         .run();
       if ((completed.meta?.changes ?? 0) > 0) sent++;
     } catch (e) {
       // fence で握れていれば DB 上も同じ値まで進んでいる (二重に数えない)。
       // R331: ここでも取消ずみの行は触らない。貸出印は消して次回に備える。
+      // claim 前の失敗は読み出した回数・貸出期限、claim 後は自分の貸出を
+      // 照合する。古い応答で新しい試行の回数や結果を巻き戻さない。
       const newStatus = attemptedRetry >= REMINDER_MAX_RETRY ? 'failed_permanent' : 'failed';
       const recorded = await db
         .prepare(
           `UPDATE booking_reminders
               SET status = ?, retry_count = ?, last_error = ?, sent_at = NULL
-            WHERE id = ? AND status IN ('pending','failed')`,
+            WHERE id = ? AND status IN ('pending','failed')
+              AND retry_count = ?
+              AND ${claimed ? 'sent_at = ?' : '(sent_at IS NULL OR sent_at < ?)'}`,
         )
-        .bind(newStatus, attemptedRetry, e instanceof Error ? e.message : String(e), row.id)
+        .bind(newStatus, attemptedRetry, e instanceof Error ? e.message : String(e), row.id,
+          claimed ? attemptedRetry : priorRetry,
+          claimed ? params.now.toISOString() : claimCutoffIso(params.now))
         .run();
       if ((recorded.meta?.changes ?? 0) > 0) failed++;
     }
