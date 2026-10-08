@@ -421,9 +421,9 @@ describe('V8 自動応答の通し：作って有効にする', () => {
     await waitFor(() => expect(testDraft).toHaveBeenCalledTimes(1))
     await screen.findByText('このルールが返します。')
     fireEvent.click(screen.getByRole('button', { name: /^次へ：/ }))
-    // 「次へ」の直読みと画面遷移後の読み直しで2回走ることがある。
-    await waitFor(() => expect(validateDraft).toHaveBeenCalled())
+    // 取得は遷移先のeffectに一本化し、同じ版を一度だけ確かめる。
     await goStep(navState.replaces[navState.replaces.length - 1])
+    await waitFor(() => expect(validateDraft).toHaveBeenCalledTimes(1))
 
     // 手順5：有効にする→知らせと完了・一覧への戻り口。
     const enableButton = screen.getByRole('button', { name: '有効にする' })

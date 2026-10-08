@@ -84,7 +84,7 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { movePriorityUpdates } from './order'
+import { compareEvaluationOrder, movePriorityUpdates } from './order'
 import {
   LOAD_STATE_WORDS,
   NO_WRITE_PERMISSION,
@@ -473,7 +473,7 @@ export default function AutoRepliesListV8() {
         return b.createdAt.localeCompare(a.createdAt)
       default:
         // 評価順は「実際に見る順」。一覧の並びと動く順を合わせる。
-        return a.priority - b.priority || a.createdAt.localeCompare(b.createdAt)
+        return compareEvaluationOrder(a, b)
     }
   }), [inChips, sortKey])
 
@@ -849,7 +849,11 @@ export default function AutoRepliesListV8() {
     while (current !== targetIndex) {
       const step = movePriorityUpdates(working, dragId, direction as -1 | 1)
       if (!step) return
-      for (const u of step) finalUpdates.set(u.id, u.priority)
+      for (const u of step) {
+        finalUpdates.set(u.id, u.priority)
+        const position = working.findIndex(rule => rule.id === u.id)
+        working[position] = { ...working[position], priority: u.priority }
+      }
       const [moved] = working.splice(current, 1)
       working.splice(current + direction, 0, moved)
       current += direction

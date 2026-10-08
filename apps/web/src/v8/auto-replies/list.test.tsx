@@ -16,6 +16,7 @@ const listReplies = vi.hoisted(() => vi.fn())
 const listTemplates = vi.hoisted(() => vi.fn())
 const summary = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
+const updateRule = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -23,7 +24,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      autoReplies: { ...actual.api.autoReplies, list: listReplies, summary },
+      autoReplies: { ...actual.api.autoReplies, list: listReplies, summary, update: updateRule },
       templates: { ...actual.api.templates, list: listTemplates },
       folders: { ...actual.api.folders, list: listFolders },
     },
@@ -159,4 +160,25 @@ describe('V8 自動応答一覧（src/v8）の動き', () => {
       restore()
     }
   })
+})
+
+it('WEB083: 4番目を先頭へドラッグして保存後もD,A,B,Cになる', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  const restore = stubWideViewport()
+  let stored = ['A', 'B', 'C', 'D'].map((id, priority) => ({ ...ruleA, id, name: id, priority, lineAccountId: 'account-a' }))
+  listReplies.mockImplementation(async () => ({ success: true, data: stored }))
+  updateRule.mockImplementation(async (id: string, patch: { priority: number }) => {
+    stored = stored.map(r => r.id === id ? { ...r, ...patch } : r)
+    return { success: true }
+  })
+  try {
+    act(() => { root.render(<AutoRepliesListV8 />) }); await flush()
+    const from = host.querySelector<HTMLElement>('[data-reorder-id="D"] [data-reorder-handle]')!
+    const to = host.querySelector<HTMLElement>('[data-reorder-id="A"]')!
+    expect(from).toBeTruthy()
+    act(() => { fireEvent.dragStart(from) }); act(() => { fireEvent.drop(to) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(5100) }); await flush()
+    expect([...stored].sort((a,b) => a.priority - b.priority).map(r => r.id)).toEqual(['D', 'A', 'B', 'C'])
+    expect(new Set(stored.map(r => r.priority)).size).toBe(4)
+  } finally { restore(); vi.useRealTimers() }
 })

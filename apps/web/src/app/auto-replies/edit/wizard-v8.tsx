@@ -314,6 +314,7 @@ export const STARTER_TEMPLATES: Array<{
     apply: (form) => ({
       ...form,
       ruleName: '予約変更の受付',
+      respondToAll: false, timeMode: 'always', activeFrom: '', activeUntil: '',
       actions: [{key:newActionKey(),actionType:'notify_staff',config:{notificationRuleId:'',notificationRuleVersion:0,message:'予約変更のお問い合わせがありました。受信箱を確認してください。'},onFailure:'continue'}, {key:newActionKey(),actionType:'tag',config:{op:'add',tagIds:[]},onFailure:'continue'}],
       keywordRules: [
         { keyword: '予約変更', matchType: 'contains', minLength: '', caseSensitive: true },
@@ -331,6 +332,7 @@ export const STARTER_TEMPLATES: Array<{
     apply: (form) => ({
       ...form,
       ruleName: 'よくある質問への回答',
+      respondToAll: false, timeMode: 'always', activeFrom: '', activeUntil: '',
       actions: [{key:newActionKey(),actionType:'tag',config:{op:'add',tagIds:[]},onFailure:'continue'}],
       keywordRules: [
         { keyword: '営業時間', matchType: 'contains', minLength: '', caseSensitive: true },
@@ -431,6 +433,8 @@ function AutoReplyWizardV8Inner() {
 
   const initialId = params.get('id')
   const [autoReplyId, setAutoReplyId] = useState<string | null>(initialId)
+  const ruleIdRef = useRef(autoReplyId)
+  ruleIdRef.current = autoReplyId
   const step = readStep(params.get('step'))
   const [published, setPublished] = useState<{ name: string } | null>(null)
   const stage: WizardStep | 'done' = published ? 'done' : step
@@ -443,6 +447,7 @@ function AutoReplyWizardV8Inner() {
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
   const [versionNumber, setVersionNumber] = useState<number | null>(null)
+  const savedVersionRef = useRef<number | null>(null)
   const [isActive, setIsActive] = useState(false)
   const [lifecycleStatus, setLifecycleStatus] = useState('draft')
   const [matchedLast28Days, setMatchedLast28Days] = useState<number | null>(null)
@@ -450,6 +455,8 @@ function AutoReplyWizardV8Inner() {
   const [matchedAccountId, setMatchedAccountId] = useState<string | null>(null)
 
   const [form, setForm] = useState<WizardForm>(EMPTY_FORM)
+  const formFingerprintRef = useRef(JSON.stringify(form))
+  formFingerprintRef.current = JSON.stringify(form)
   /** 最後に読み込み・保存した形。差分が dirty。 */
   const savedSnapshotRef = useRef(JSON.stringify(EMPTY_FORM))
   // 編集の競合（`UGrd2`：409）。入力は捨てず、比べる・読み込むを選んでもらう。
@@ -563,6 +570,7 @@ function AutoReplyWizardV8Inner() {
         const nextForm = formFromSettings(version.settings)
         setForm(nextForm)
         savedSnapshotRef.current = JSON.stringify(nextForm)
+        savedVersionRef.current = version.versionNumber
         setVersionNumber(version.versionNumber)
         setWasPublished(version.status === 'published')
         setMatchedLast28Days(version.matchedLast28Days ?? null)
@@ -686,15 +694,17 @@ function AutoReplyWizardV8Inner() {
 
   /* ===== 手順5で読むもの（公開前チェック） ===== */
   const loadValidation = useCallback(async (ruleId: string) => {
+    const subject = assessmentSubjectRef.current
     setConfirmState('loading')
     try {
       const res = await api.autoReplies.validateDraft(ruleId)
+      if (subject !== assessmentSubjectRef.current) return
       if (!res.success || !res.data) throw new Error('validate failed')
       setValidation(res.data)
       setConflicts(res.data.conflicts ?? [])
       setConfirmState('ready')
     } catch {
-      setConfirmState('error')
+      if (subject === assessmentSubjectRef.current) setConfirmState('error')
     }
   }, [])
 
@@ -704,19 +714,6 @@ function AutoReplyWizardV8Inner() {
    * サーバーの下書きに無いので、未保存のまま飛んだときは保存してから読む
    * ——goNext と同じ約束を直接遷移にも持たせる。
    */
-  useEffect(() => {
-    if (loadState !== 'ready' || !autoReplyId) return
-    if (step !== 'priority' && step !== 'confirm') return
-    if (stepDataRequested.current.has(`${step}:${autoReplyId}`)) return
-    stepDataRequested.current.add(`${step}:${autoReplyId}`)
-    const accountId = matchedAccountId ?? selectedAccountId ?? null
-    if (step === 'priority') {
-      void loadPriorityData(autoReplyId, accountId)
-    } else {
-      void loadValidation(autoReplyId)
-      void loadOrder(autoReplyId, accountId).catch(() => setPriorityState('error'))
-    }
-  }, [loadState, autoReplyId, step, matchedAccountId, selectedAccountId, loadPriorityData, loadValidation, loadOrder])
 
   /* ===== 保存 ===== */
   const buildInput = useCallback((): AutoReplyDraftInput | InputIssue => {
@@ -836,12 +833,14 @@ function AutoReplyWizardV8Inner() {
           expectedVersion: versionNumber,
         })
         if (!res.success) throw new Error(res.error || 'save failed')
+        savedVersionRef.current = res.data.versionNumber
         setVersionNumber(res.data.versionNumber)
       } else {
         const res = await api.autoReplies.createDraft(body, createKeyRef.current)
         if (!res.success) throw new Error(res.error || 'create failed')
         savedId = res.data.autoReplyId
         setAutoReplyId(res.data.autoReplyId)
+        savedVersionRef.current = res.data.versionNumber
         setVersionNumber(res.data.versionNumber)
         setMatchedAccountId(res.data.settings.lineAccountId || null)
         setLifecycleStatus('draft')
@@ -875,6 +874,35 @@ function AutoReplyWizardV8Inner() {
   }, [buildInput, autoReplyId, versionNumber, form, step, router, showInputIssue])
 
   // `UGrd2`「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
+  const inputFingerprint = JSON.stringify(form)
+  const assessmentSubjectRef = useRef('')
+  assessmentSubjectRef.current = `${autoReplyId}:${versionNumber}:${inputFingerprint}`
+  useEffect(() => {
+    setValidation(null); setDryRun(null); setAcknowledged(new Set())
+    setConfirmState('idle')
+  }, [inputFingerprint])
+  useEffect(() => {
+    if (loadState !== 'ready' || !autoReplyId || (step !== 'priority' && step !== 'confirm')) return
+    const key = `${step}:${assessmentSubjectRef.current}`
+    if (stepDataRequested.current.has(key)) return
+    stepDataRequested.current.add(key)
+    const subject = assessmentSubjectRef.current
+    void (async () => {
+      let ruleId = autoReplyId
+      let accountId = matchedAccountId ?? selectedAccountId ?? null
+      if (dirty) {
+        const saved = await saveDraftNow()
+        if (!saved) { stepDataRequested.current.delete(key); return }
+        ruleId = saved.id; accountId = saved.accountId
+        // 保存で版が上がったあとのeffectに一本化する。
+        return
+      }
+      if (subject !== assessmentSubjectRef.current) return
+      if (step === 'priority') await loadPriorityData(ruleId, accountId)
+      else { await loadValidation(ruleId); await loadOrder(ruleId, accountId).catch(() => setPriorityState('error')) }
+    })()
+  }, [loadState, autoReplyId, step, versionNumber, inputFingerprint, dirty, matchedAccountId, selectedAccountId, saveDraftNow, loadPriorityData, loadValidation, loadOrder])
+
   const reloadAfterConflict = useCallback(async () => {
     setSaveConflict(false)
     setCompareTarget(null)
@@ -934,20 +962,12 @@ function AutoReplyWizardV8Inner() {
       // 確かめる対象はサーバーの下書き。未保存のままでは確かめられないので、
       // 変更があればここで必ず保存する。
       let ruleId = autoReplyId
-      let accountId = matchedAccountId ?? selectedAccountId ?? null
       if (dirty || !autoReplyId) {
         const saved = await saveDraftNow()
         if (!saved) return
         ruleId = saved.id
-        accountId = saved.accountId
       }
       if (!ruleId) return
-      if (next === 'priority') {
-        void loadPriorityData(ruleId, accountId)
-      } else {
-        void loadValidation(ruleId)
-        void loadOrder(ruleId, accountId).catch(() => setPriorityState('error'))
-      }
       goToStep(next, ruleId ?? undefined)
     } else {
       goToStep(next)
@@ -1023,6 +1043,7 @@ function AutoReplyWizardV8Inner() {
   /* ===== 手順4：試しに送る ===== */
   const runTest = useCallback(async () => {
     if (!autoReplyId || !selectedFriendId || !testMessage.trim()) return
+    const testedInput = formFingerprintRef.current
     setInputIssue(null)
     setSaving(true)
     setError('')
@@ -1035,10 +1056,12 @@ function AutoReplyWizardV8Inner() {
         ruleId = saved.id
       }
       if (!ruleId) return
+      const testedVersion = savedVersionRef.current
       const res = await api.autoReplies.testDraft(ruleId, {
         friendId: selectedFriendId,
         incomingText: testMessage.trim(),
       })
+      if (ruleIdRef.current !== ruleId || savedVersionRef.current !== testedVersion || formFingerprintRef.current !== testedInput) return
       if (!res.success) throw new Error(res.error || 'test failed')
       if (res.data.staleTest) {
         setDryRun(null)
@@ -1059,7 +1082,7 @@ function AutoReplyWizardV8Inner() {
     () => publishGates(validation, dryRun, acknowledged),
     [validation, dryRun, acknowledged],
   )
-  const publishReady = canPublish(gates)
+  const publishReady = !dirty && canPublish(gates)
 
   const publish = useCallback(async () => {
     if (!autoReplyId || !publishReady || saving) return
