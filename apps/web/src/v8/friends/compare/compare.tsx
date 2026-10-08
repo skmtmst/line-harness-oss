@@ -24,6 +24,7 @@ import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import ListState from '@/components/shared/list-state'
 import { IdentityStateBlock } from '@/components/identity/identity-state'
 import { useIdentityReview } from '@/components/identity/identity-review'
 import { canSubmitDecision } from '@/components/identity/identity-view'
@@ -132,6 +133,12 @@ function CompareInner() {
           onRetry={review.reload}
         />
 
+        {review.state === 'ready' && review.selectedId && !detail ? <ListState
+          kind={review.detailState === 'forbidden' ? 'forbidden' : review.detailState === 'error' ? 'error' : 'loading'}
+          title={review.detailState === 'error' ? '候補の詳細を読み込めませんでした' : undefined}
+          description={review.detailFailure?.description}
+          onRetry={review.detailState === 'error' ? review.reloadDetail : undefined}
+        /> : null}
         {review.state === 'ready' && detail ? (
           <>
             <p className={styles.band}>
