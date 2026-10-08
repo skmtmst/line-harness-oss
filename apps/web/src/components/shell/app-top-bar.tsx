@@ -11,7 +11,6 @@ import { usePageChrome } from './page-chrome'
 import { HQ_MENU_SECTIONS, MENU_SECTIONS, isHqShellPath } from '@/lib/menu'
 import { brandInitial } from '@/components/layout/brand-initial'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import { useBrand } from '@/lib/use-brand'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useManualHref } from '@/lib/use-manual-href'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
@@ -221,14 +220,12 @@ export default function AppTopBar() {
 
   /*
    * ★V8 店の画面から統括へ戻る口（絵 V8 `DIHFx/Psg7n`・オーナー 2026-10-07）。
-   * 統括の権限がある人（オーナー・管理者）にだけ、切り替えの一覧のいちばん上に「統括に戻る」を出す。
+   * 統括へ戻るのは左下の自分のメニューだけ（切り替えの一覧には置かない・オーナー 2026-10-08）。
    * 帯の［統括へ］ボタンはやめ、左下の自分のメニューへまとめた（オーナー 2026-10-07）。
    * 店だけの担当には出さない。
    */
-  const brand = useBrand()
-  const hqReturn = isV8 && canReturnToHq
-    ? { companyName: brand.name ?? '統括', accountCount: accounts.length, onReturn: returnToHq }
-    : null
+  // 2026-10-08 オーナー「左下から統括に戻れるので右上はアカウント切り替えだけでいい」：切り替えの一覧には出さない。
+  const hqReturn = null
 
   /*
    * ★V8：帯の探す欄は V8 の外側から外した（オーナー決定 2026-10-01）。
