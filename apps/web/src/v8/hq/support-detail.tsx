@@ -11,7 +11,10 @@
  */
 import { ImagePlus, Paperclip, Send, X } from 'lucide-react'
 import Link from 'next/link'
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import type { StaffMember } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -49,7 +52,24 @@ function sentNotice(hasEmail: boolean): string {
     : '続きを送りました。運営に届きました。返信はこの画面のやり取りに届きます。'
 }
 
+/*
+ * WEB212：同じ画面のまま別の問い合わせ（?id=）へ移ったら、画面を作り直す。
+ * 初めに1回だけ URL を読むと、前の問い合わせ・入力が残り、前の id へ送ってしまう。
+ */
 export default function HqSupportDetailV8() {
+  return (
+    <Suspense fallback={null}>
+      <HqSupportDetailByQuery />
+    </Suspense>
+  )
+}
+
+function HqSupportDetailByQuery() {
+  const queryId = useSearchParams().get('id')
+  return <HqSupportDetailInner key={queryId ?? ''} queryId={queryId} />
+}
+
+function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   const settingsNav = useHqSettingsFolderNav('contact')
   const uid = useId()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -70,8 +90,14 @@ export default function HqSupportDetailV8() {
   const [notice, setNotice] = useState('')
 
   useEffect(() => {
-    setId(new URLSearchParams(window.location.search).get('id'))
-  }, [])
+    setId(queryId)
+  }, [queryId])
+
+  /* WEB212：続きの本文・添付を書きかけのまま離れるときは確かめる（新しい問い合わせと同じ）。 */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: body.trim() !== '' || attachments.length > 0,
+    busy: sending,
+  })
 
   const idMissing = id === null
   const hasSenderEmail = (me?.email ?? '').trim().length > 0
@@ -275,6 +301,7 @@ export default function HqSupportDetailV8() {
           </section>
         </aside>
       </div>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="書きかけの続き" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </ListPage>
   )
 }

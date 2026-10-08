@@ -87,6 +87,14 @@ function StaticBox({ label, value }: { label: string; value: string }) {
   return <span className={styles.staticBox} role="note" aria-label={`${label}：${value}`}>{value}</span>
 }
 
+/** 版（updatedAt）を除いた中身。直しかけの判定に使う（WEB230）。 */
+export function withoutVersion<T extends object | null>(value: T): Omit<NonNullable<T>, 'updatedAt'> | null {
+  if (!value) return null
+  const { updatedAt: _updatedAt, ...rest } = value as T & { updatedAt?: unknown }
+  void _updatedAt
+  return rest as Omit<NonNullable<T>, 'updatedAt'>
+}
+
 export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const [setting, setSetting] = useState<NenCampaignSetting | null>(null)
   const [draft, setDraft] = useState<Partial<NenCampaignSetting>>({})
@@ -162,7 +170,11 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   }, [selectedAccountId])
 
   const merged = { ...setting, ...draft } as NenCampaignSetting
-  const dirty = setting !== null && JSON.stringify(draft) !== JSON.stringify(setting)
+  /*
+   * WEB230：保存できると setting の版（updatedAt）だけが新しくなり、入力（draft）は前の版のまま。
+   * 版の違いで「直しかけ」と言わない。比べるのは直せる中身だけ。
+   */
+  const dirty = setting !== null && JSON.stringify(withoutVersion(draft)) !== JSON.stringify(withoutVersion(setting))
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
   const actions = merged.afterActions ?? []
   const formAction = actions.find((action) => action.kind === 'open_form')

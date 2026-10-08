@@ -193,6 +193,9 @@ function thumbCells(g: RichMenuGroupListItem): { rows: number; cols: number } {
   return { rows: 2, cols: 3 }
 }
 
+/** WEB222：並べ替えのために全件を読むときの安全弁（200件×50ページ）。 */
+const REORDER_MAX_PAGES = 50
+
 export default function RichMenusListV8() {
   usePageTitle('リッチメニュー')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -463,20 +466,37 @@ export default function RichMenusListV8() {
           ? '順番を保存しています'
           : null
 
+  /*
+   * WEB222：並べ替えの口は全部の ID を求める。200件の1ページ目だけで計算せず、
+   * 全件そろうまで続きを読む。読めなかった・そろわなかったときは null（呼び出し側が失敗を出す）。
+   */
   const fullOrderedGroups = useCallback(async (): Promise<RichMenuGroupListItem[] | null> => {
     if (!selectedAccount?.id) return null
     if (groups.length === groupTotal) return orderTargetingGroups(groups)
-    const res = await api.richMenuGroups.listPage(selectedAccount.id, {
-      page: 1,
-      limit: 200,
-      query: '',
-      folderId: '',
-      filter: '',
-      sort: 'priority',
-    })
-    if (!res.success) return null
-    if (activeAccountRef.current !== selectedAccount.id) return null
-    return orderTargetingGroups(res.data.items)
+    const accountId = selectedAccount.id
+    try {
+      const all: RichMenuGroupListItem[] = []
+      let total = Infinity
+      for (let page = 1; page <= REORDER_MAX_PAGES && all.length < total; page += 1) {
+        const res = await api.richMenuGroups.listPage(accountId, {
+          page,
+          limit: 200,
+          query: '',
+          folderId: '',
+          filter: '',
+          sort: 'priority',
+        })
+        if (!res.success) return null
+        if (activeAccountRef.current !== accountId) return null
+        all.push(...res.data.items.filter((item) => !all.some((known) => known.id === item.id)))
+        total = res.data.total ?? all.length
+        if (res.data.items.length === 0) break
+      }
+      if (all.length < total) return null
+      return orderTargetingGroups(all)
+    } catch {
+      return null
+    }
   }, [groups, groupTotal, selectedAccount?.id])
 
   /* 押した瞬間に並べ、裏で保存する。失敗したら元に戻し「もう一度」でやり直せる。 */

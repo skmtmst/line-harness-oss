@@ -128,8 +128,12 @@ function MembersInner() {
     try {
       if (dialog.member) {
         const res = await api.staff.update(dialog.member.id, {
-          /* 役割は変えたときだけ送る（担当者のまま保存しても管理者へ上がらない）。 */
-          ...(value.role !== dialog.member.role ? { role: value.role } : {}),
+          /*
+           * 役割は変えたときだけ送る（担当者のまま保存しても管理者へ上がらない）。
+           * WEB216：統括（owner）は窓の中では「管理者」として出る。役割を触らずに範囲だけ
+           * 保存したとき、owner→admin の変更（と本人確認）を混ぜない。
+           */
+          ...(value.role !== (dialog.member.role === 'owner' ? 'admin' : dialog.member.role) ? { role: value.role } : {}),
           isActive: value.isActive,
           assignedLineAccountId: value.assignedLineAccountId,
           accountScope: value.accountScope,

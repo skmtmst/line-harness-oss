@@ -54,7 +54,7 @@ export function customerNotificationKpis(input: {
       label: '送れなかった',
       value: value(input.failed),
       unit: '通',
-      note: '確認と別の連絡が必要',
+      note: input.failed === null ? '件数は失敗の一覧で確かめます' : '確認と別の連絡が必要',
       href: '/line-notifications?tab=failures',
     },
   ]

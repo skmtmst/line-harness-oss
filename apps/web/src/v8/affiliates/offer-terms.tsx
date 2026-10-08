@@ -126,9 +126,12 @@ export function parseOfferTermsInput(values: OfferTermsFieldValues): {
 export function OfferTermsFields({
   values,
   onChange,
+  disabled = false,
 }: {
   values: OfferTermsFieldValues
   onChange: (next: OfferTermsFieldValues) => void
+  /** WEB207：今の決まりを読み込めるまでは触らせない（読めないまま直した値は送られない）。 */
+  disabled?: boolean
 }) {
   // R286: 読み上げの項目名。「？」は項目名の外に置き、名前を短く保つ。
   const fieldId = useId()
@@ -154,6 +157,7 @@ export function OfferTermsFields({
           step="1"
           value={values.windowDays}
           onChange={(e) => onChange({ ...values, windowDays: e.target.value })}
+          disabled={disabled}
           placeholder="例: 30（空は今のまま）"
           className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
         />
@@ -173,6 +177,7 @@ export function OfferTermsFields({
           step="1"
           value={values.capTotal}
           onChange={(e) => onChange({ ...values, capTotal: e.target.value })}
+          disabled={disabled}
           placeholder="例: 200（空は上限なし）"
           className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
         />
@@ -192,6 +197,7 @@ export function OfferTermsFields({
           step="1"
           value={values.capMonthly}
           onChange={(e) => onChange({ ...values, capMonthly: e.target.value })}
+          disabled={disabled}
           placeholder="例: 10（空は上限なし）"
           className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
         />
@@ -205,6 +211,7 @@ export function OfferTermsFields({
             type="date"
             value={values.receptionFrom}
             onChange={(e) => onChange({ ...values, receptionFrom: e.target.value })}
+          disabled={disabled}
             className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
           />
         </div>
@@ -215,6 +222,7 @@ export function OfferTermsFields({
             type="date"
             value={values.receptionTo}
             onChange={(e) => onChange({ ...values, receptionTo: e.target.value })}
+          disabled={disabled}
             className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
           />
         </div>
