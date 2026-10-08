@@ -48,7 +48,7 @@ function historyBadge(run: UidMigrationRun): { tone: 'ok' | 'muted' | 'danger' |
 
 
 export default function UidMigrationV8({ initialRunId }: { initialRunId: string | null }) {
-  usePageTitle('UID移行')
+  usePageTitle('友だち')
   const m = useUidMigration(initialRunId)
   const [registerOpen, setRegisterOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
