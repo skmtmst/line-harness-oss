@@ -1,4 +1,4 @@
-import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts } from '@line-crm/shared'
+import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts, BannerGenerationCreateOptions } from '@line-crm/shared'
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
 import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
@@ -9074,9 +9074,10 @@ export const api = {
           body: JSON.stringify({}),
         }),
       /** 条件を登録するだけ。画像はまだ作らない。 */
-      createGeneration: (id: string, input: BannerGenerationInput) =>
+      createGeneration: (id: string, input: BannerGenerationInput, options?: BannerGenerationCreateOptions) =>
         fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/projects/${encodeURIComponent(id)}/generations`, {
           method: 'POST',
+          headers: options?.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : undefined,
           body: JSON.stringify(input),
         }),
       /** 手持ちの画像を取り込む。data は base64（data: なし）。 */

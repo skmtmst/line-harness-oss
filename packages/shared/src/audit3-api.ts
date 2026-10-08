@@ -42,3 +42,8 @@ export interface CustomerNotificationFailureCounts {
   failed: number;
   retryWaiting: number;
 }
+
+export interface BannerGenerationCreateOptions {
+  /** Reuse for retries of this creation attempt, including after a lost response. */
+  idempotencyKey?: string;
+}
