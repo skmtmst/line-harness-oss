@@ -22,6 +22,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
+import TagPill from '@/components/shared/tag-pill'
 import Select from '@/components/shared/select'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
@@ -370,9 +371,10 @@ export default function EventsListV8() {
         trailing={(
           <>
             <div className={styles.savedBox}>
-              <Bookmark size={14} aria-hidden="true" className={styles.savedIcon} />
               <Select
                 aria-label="よく使う絞り込み"
+                icon={<Bookmark aria-hidden="true" />}
+                size="full"
                 value={savedValue}
                 options={SAVED_OPTIONS}
                 onChange={(value) => {
@@ -546,7 +548,7 @@ export default function EventsListV8() {
                               : state === 'paused' ? <span className={`${styles.pill} ${styles.pillWarn}`}>一時停止</span>
                                 : <span className={`${styles.pill} ${styles.pillOff}`}>{STATE_LABEL[state]}</span>}
                       {e.visible_tag_id ? (
-                        <span className={styles.audience} title={e.visible_tag_name ?? '消えたタグ'}>{e.visible_tag_name ?? '消えたタグ'}</span>
+                        <TagPill name={e.visible_tag_name ?? '消えたタグ'} size="sm" />
                       ) : null}
                     </span>
                   </Td>

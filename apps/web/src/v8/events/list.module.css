@@ -21,19 +21,6 @@
   width: var(--tpl-ev-ls-saved-w);
 }
 .savedBox :global(*) { max-width: 100%; }
-.savedBox :global(button) {
-  width: 100%;
-  padding-left: calc(var(--tpl-chip-row-gap) * 8);
-}
-.savedIcon {
-  position: absolute;
-  top: 50%;
-  left: var(--tpl-rule-row-gap);
-  z-index: 1;
-  color: var(--color-ink-secondary);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
 .perPageBox { flex-shrink: 0; }
 
 /* 表。 */
@@ -136,14 +123,6 @@
 .pillWarn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
 .pillLow { background: var(--color-status-info-soft); color: var(--color-status-info); }
 .pillOff { background: var(--color-shell); color: var(--color-ink-secondary); }
-.audience {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .menuCell { text-align: right; }
 .menuBox {
   display: flex;
