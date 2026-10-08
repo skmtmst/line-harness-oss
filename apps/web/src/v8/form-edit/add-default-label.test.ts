@@ -14,6 +14,7 @@ const labelOf = (key: string) => {
 describe('足したときの質問文', () => {
   it('メール・住所・日付・時刻・ファイルは名前が入っている', () => {
     expect(labelOf('contact')).toBe('メールアドレス')
+    expect(labelOf('tel')).toBe('電話番号')
     expect(labelOf('address')).toBe('住所')
     expect(labelOf('date')).toBe('日付')
     expect(labelOf('time')).toBe('時刻')
@@ -24,6 +25,8 @@ describe('足したときの質問文', () => {
     const contact = card('contact').make(0)
     const time = card('time').make(0)
     expect(contact.kind === 'input' && contact.limit?.format).toBe('email')
+    const tel = card('tel').make(0)
+    expect(tel.kind === 'input' && tel.limit?.format).toBe('tel')
     expect(time.kind === 'input' && time.limit?.format).toBe('time')
   })
 
