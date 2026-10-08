@@ -33,17 +33,16 @@ describe('V8 ダッシュボードの言葉', () => {
     expect(summarizeFirstSteps({ ...facts, richMenu: null })).toBeNull()
   })
 
-  it('はじめにやることはオーナー・管理者だけ、閉じたら・全部済んだら出さない', () => {
+  it('はじめにやることはオーナー・管理者だけ、全部済んだら出さない（畳んでいても出す）', () => {
     const some = summarizeFirstSteps({ connect: true, greeting: false, richMenu: false, broadcast: false, scenario: false, invite: false })
     const all = summarizeFirstSteps({ connect: true, greeting: true, richMenu: true, broadcast: true, scenario: true, invite: true })
-    expect(shouldShowFirstSteps('owner', some, false)).toBe(true)
-    expect(shouldShowFirstSteps('admin', some, false)).toBe(true)
-    expect(shouldShowFirstSteps('staff', some, false)).toBe(false)
-    expect(shouldShowFirstSteps('viewer', some, false)).toBe(false)
-    expect(shouldShowFirstSteps(null, some, false)).toBe(false)
-    expect(shouldShowFirstSteps('owner', some, true)).toBe(false)
-    expect(shouldShowFirstSteps('owner', all, false)).toBe(false)
-    expect(shouldShowFirstSteps('owner', null, false)).toBe(false)
+    expect(shouldShowFirstSteps('owner', some)).toBe(true)
+    expect(shouldShowFirstSteps('admin', some)).toBe(true)
+    expect(shouldShowFirstSteps('staff', some)).toBe(false)
+    expect(shouldShowFirstSteps('viewer', some)).toBe(false)
+    expect(shouldShowFirstSteps(null, some)).toBe(false)
+    expect(shouldShowFirstSteps('owner', all)).toBe(false)
+    expect(shouldShowFirstSteps('owner', null)).toBe(false)
   })
 
   it('グラフの日付は暦の曜日つき、見出しの脇は期間の両端', () => {
