@@ -136,3 +136,29 @@ describe('createTestD1 の出来上がり', () => {
     }
   })
 })
+
+// 受け取りボーナスの同時作成を、実D1と同じbatchの境界で検証できること。
+describe('createTestD1 のbatch', () => {
+  test('同時batchは割り込まず、SELECT・RETURNINGとchanges()の結果を返す', async () => {
+    const { raw, db } = createTestD1();
+    try {
+      raw.exec('CREATE TABLE batch_probe(id TEXT PRIMARY KEY, n INTEGER)');
+      const write = (id: string) => db.batch([
+        db.prepare('INSERT INTO batch_probe(id,n) VALUES(?,1) RETURNING id').bind(id),
+        db.prepare('SELECT changes() AS n'),
+        db.prepare('SELECT COUNT(*) AS n FROM batch_probe'),
+      ]);
+      const [first, second] = await Promise.all([write('first'), write('second')]);
+      expect(first.map(x => x.results)).toEqual([[{ id: 'first' }], [{ n: 1 }], [{ n: 1 }]]);
+      expect(second.map(x => x.results)).toEqual([[{ id: 'second' }], [{ n: 1 }], [{ n: 2 }]]);
+    } finally { raw.close(); }
+  });
+  test('途中の失敗はbatch全体を戻す', async () => {
+    const { raw, db } = createTestD1();
+    try {
+      raw.exec('CREATE TABLE batch_probe(id TEXT PRIMARY KEY)');
+      await expect(db.batch([db.prepare("INSERT INTO batch_probe VALUES('same')"), db.prepare("INSERT INTO batch_probe VALUES('same')")])).rejects.toThrow();
+      expect(raw.prepare('SELECT COUNT(*) AS n FROM batch_probe').get()).toEqual({ n: 0 });
+    } finally { raw.close(); }
+  });
+});

@@ -7,6 +7,7 @@ const fx = vi.hoisted(() => ({
   role: 'owner' as string | null,
   cards: vi.fn(), save: vi.fn(), create: vi.fn(), paperRequests: vi.fn(), reviewPaper: vi.fn(), wallet: vi.fn(), grant: vi.fn(), reverse: vi.fn(), setPin: vi.fn(),
   friendsList: vi.fn(), friendsGet: vi.fn(), staffList: vi.fn(), entries: vi.fn(), paperPhoto: vi.fn(),
+  uploadImage: vi.fn(),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', accounts: [{ id: 'acc-1', name: '銀座店' }] }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fx.role, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
@@ -20,10 +21,11 @@ vi.mock('@/lib/visit-stamps-api', () => ({
   },
 }))
 vi.mock('@/lib/api', () => ({
-  api: { friends: { list: fx.friendsList, get: fx.friendsGet }, staff: { list: fx.staffList } },
+  api: { friends: { list: fx.friendsList, get: fx.friendsGet }, staff: { list: fx.staffList }, uploads: { image: fx.uploadImage } },
   describeSaveFailure: (e: unknown) => (e instanceof Error ? e.message : '保存できませんでした。'),
 }))
 import VisitStampsV8 from './visit-stamps'
+import { notifyToast } from '@/components/shared/toast'
 
 const card = {
   id: 'card-1', name: '然 来店スタンプカード', accountIds: ['acc-1'], active: true, version: 3, expectedVersion: 3,
@@ -35,6 +37,7 @@ const card = {
 
 beforeEach(() => {
   fx.role = 'owner'
+  fx.uploadImage.mockResolvedValue({ success: true, data: { url: 'https://example.test/images/card.png' } })
   fx.cards.mockResolvedValue({ success: true, data: [card] })
   fx.save.mockResolvedValue({ success: true, data: card })
   fx.paperRequests.mockResolvedValue({ success: true, data: [{ id: 'p1', friend_id: 'f1', photo_url: '', stamps: 7, status: 'pending', created_at: '2026-01-12 11:14:00' }] })
@@ -53,6 +56,46 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
 
 describe('来店スタンプ（管理画面）', () => {
+  it('誤った受け取りボーナスは欄を赤くし、その欄に移動して保存を止める', async () => {
+    render(<VisitStampsV8 />)
+    await screen.findByDisplayValue('然 来店スタンプカード')
+    const input = screen.getByRole('spinbutton', { name: 'カードを受け取った時のボーナス' })
+    fireEvent.change(input, { target: { value: '51' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', '受け取りボーナスは0〜50個です。')
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(input)
+    expect(fx.save).not.toHaveBeenCalled()
+    expect(notifyToast).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { value: '2' } })
+    expect(screen.queryByRole('alert')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    await waitFor(() => expect(fx.save).toHaveBeenCalledOnce())
+  })
+  it('説明・受け取りボーナス・間隔を見本と保存に反映する', async () => {
+    render(<VisitStampsV8 />)
+    await screen.findByDisplayValue('然 来店スタンプカード')
+    fireEvent.change(screen.getByRole('textbox', { name: '使い方の説明' }), { target: { value: 'お店で1個\n特典があります' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'カードを受け取った時のボーナス' }), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('radio', { name: /同じ日は1回/ }))
+    expect(screen.getByLabelText('お客さまの見え方').textContent).toContain('お店で1個')
+    expect(screen.getByLabelText('お客さまの見え方').textContent).toContain('3 / 10')
+    expect(screen.getByLabelText('お客さまの見え方').textContent).toContain('有効期限')
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    await waitFor(() => expect(fx.save).toHaveBeenCalledWith('card-1', expect.objectContaining({ settings: expect.objectContaining({ instructions: 'お店で1個\n特典があります', receiptBonus: 2, stampInterval: { mode: 'same_day' } }) })))
+  })
+  it('画像は既存のアップロードを使い、3MBを越える画像は預けない', async () => {
+    render(<VisitStampsV8 />)
+    await screen.findByDisplayValue('然 来店スタンプカード')
+    const input = screen.getByLabelText('背景画像を選ぶ')
+    fireEvent.change(input, { target: { files: [new File([new Uint8Array(3 * 1024 * 1024 + 1)], 'large.png', { type: 'image/png' })] } })
+    expect(fx.uploadImage).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { files: [new File(['image'], 'card.png', { type: 'image/png' })] } })
+    await screen.findByAltText('背景画像')
+    expect(fx.uploadImage).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    await waitFor(() => expect(fx.save).toHaveBeenCalledWith('card-1', expect.objectContaining({ settings: expect.objectContaining({ backgroundImageUrl: 'https://example.test/images/card.png' }) })))
+  })
   it('カードの名前を変えて［保存する］で版を付けて保存する', async () => {
     render(<VisitStampsV8 />)
     const name = await screen.findByDisplayValue('然 来店スタンプカード')
@@ -94,6 +137,9 @@ describe('来店スタンプ（管理画面）', () => {
     expect(screen.queryByRole('button', { name: /承認/ })).toBeNull()
     expect(screen.queryByRole('button', { name: '却下' })).toBeNull()
     expect(screen.queryByRole('button', { name: '押印を足す' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'ファイルを選ぶ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /色を選ぶ/ })).toBeNull()
+    expect((screen.getByRole('textbox', { name: '使い方の説明' }) as HTMLTextAreaElement).readOnly).toBe(true)
   })
 
   it('④ は店全体の記録（口の entries）。友だちを選ばなくても、誰に・何個・誰がを新しい順に出す', async () => {

@@ -49,6 +49,13 @@ function wrap(raw: Database.Database, sql: string, args: unknown[]) {
     return a as never
   })
   return {
+    // SQLiteのbatchはawaitを挟まず、一つの同期トランザクションで実D1の直列実行を再現する。
+    batchExecute: () => {
+      const statement = raw.prepare(sql)
+      if (statement.reader) return { results: statement.all(...normalized) }
+      const info = statement.run(...normalized)
+      return { meta: { changes: info.changes, last_row_id: Number(info.lastInsertRowid) } }
+    },
     first: async <T = unknown>(): Promise<T | null> => {
       const row = raw.prepare(sql).get(...normalized)
       return (row as T) ?? null
@@ -116,23 +123,7 @@ export function createTestD1(
       try {
         const results = []
         for (const statement of statements) {
-          /*
-           * 実 D1 の batch は SELECT 文でも .results を返す。ここで一律
-           * .run() すると .results が無く、batch 内で SELECT を投げる
-           * 呼び出し側（使用先のまとめ集計など）が黙って壊れる。
-           */
-          const sql = (statement as unknown as { sql?: string }).sql ?? '';
-          if (!isSelect(sql)) {
-            results.push(await statement.run());
-            continue;
-          }
-          try {
-            results.push(await statement.all());
-          } catch {
-            // WITH x AS (...) INSERT ... のように WITH で始まる書き込みもある。
-            // returnsData が無い文に .all() すると実行前に失敗するので .run() へ倒す。
-            results.push(await statement.run());
-          }
+          results.push((statement as unknown as { batchExecute: () => unknown }).batchExecute())
         }
         raw.exec('COMMIT')
         return results
