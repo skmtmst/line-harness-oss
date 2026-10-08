@@ -12,11 +12,16 @@
 }
 .personName {
   max-width: 100%;
+  /* 名前は共通のボタン（高さ32）で出る。絵は名前の行 23 */
+  height: var(--tpl-inbox-chead-name-lh);
+  min-height: 0;
+  padding: 0;
   color: var(--color-ink);
   font-size: var(--tpl-inbox-chead-name);
   font-weight: 600;
   line-height: var(--tpl-inbox-chead-name-lh);
 }
+.personName[aria-expanded='true'] { height: auto; }
 .personSub { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); }
 .blocked { color: var(--color-ink-faint); font-size: var(--text-micro); }
 .personActions { display: flex; align-items: center; justify-content: center; gap: var(--tpl-inbox-composer-gap); margin-top: var(--tpl-inbox-head-tools-gap); }

@@ -12,6 +12,7 @@
  * （口・版・下書き・冪等の鍵の扱いを変えない）。違うのは見せ方と、先に保存された
  * ときの帯（違いを比べる・最新を読み込んで続ける）。BEHAVIOR.md に書き出した。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -39,8 +40,9 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
-import Stepper, { type StepperStep } from '@/components/shared/stepper'
+import type { StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import CheckCard from '@/components/shared/check-card'
@@ -53,6 +55,7 @@ import Select from '@/components/shared/select'
 import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } from '@/components/shared/folder-select'
 import SegmentedControl from '@/components/shared/segmented'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import Toggle from '@/components/shared/toggle'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -193,6 +196,7 @@ export default function FriendAddEditorV8({ ruleId }: { ruleId?: string }) {
 
 function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
@@ -384,7 +388,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       savedSnapshot.current = editorSnapshot(rule, definition)
       setConflict(false)
       setNotice('下書きを保存しました。')
-      if (!ruleId || nextStep) router.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
+      if (!ruleId || nextStep) samePageUrl.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {
@@ -435,7 +439,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const moveToStep = (nextStep: Step) => {
     if (nextStep === step || saving || enabling) return
     if (!hasUnsavedChanges) {
-      router.replace(hrefFor(nextStep))
+      samePageUrl.replace(hrefFor(nextStep))
       return
     }
     void save(nextStep)
@@ -625,7 +629,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       identity={
         <Link href="/friend-add-settings" className={styles.backLink}>← 友だち追加時の配信へ</Link>
       }
-      steps={<Stepper label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
+      steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
       description={<>
         {step === 'basic'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'
@@ -965,22 +969,20 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
           <div className={styles.datePair}>
             <div className={styles.field}>
               <label htmlFor="fa-from" className={styles.label}>有効期間 はじめ</label>
-              <TextField
+              <DateTimeField
                 id="fa-from"
-                type="datetime-local"
                 value={localInputValue(definition.activeFrom)}
                 readOnly={!canEdit}
-                onChange={(event) => setDefinition((current) => ({ ...current, activeFrom: event.target.value || null }))}
+                onChange={(next) => setDefinition((current) => ({ ...current, activeFrom: next || null }))}
               />
             </div>
             <div className={styles.field}>
               <label htmlFor="fa-until" className={styles.label}>有効期間 おわり</label>
-              <TextField
+              <DateTimeField
                 id="fa-until"
-                type="datetime-local"
                 value={localInputValue(definition.activeUntil)}
                 readOnly={!canEdit}
-                onChange={(event) => setDefinition((current) => ({ ...current, activeUntil: event.target.value || null }))}
+                onChange={(next) => setDefinition((current) => ({ ...current, activeUntil: next || null }))}
               />
             </div>
           </div>
@@ -1181,20 +1183,18 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             )}
             {(definition.timeWindows ?? []).map((slot, index) => (
               <div key={index} className={styles.timeRow}>
-                <TextField
-                  type="time"
+                <TimeField
                   aria-label={`時間帯${index + 1}の開始`}
                   value={slot.start}
                   readOnly={!canEdit}
-                  onChange={(event) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: event.target.value }) }))}
+                  onChange={(next) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: next }) }))}
                 />
                 <span aria-hidden="true">〜</span>
-                <TextField
-                  type="time"
+                <TimeField
                   aria-label={`時間帯${index + 1}の終了`}
                   value={slot.end}
                   readOnly={!canEdit}
-                  onChange={(event) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { end: event.target.value }) }))}
+                  onChange={(next) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { end: next }) }))}
                 />
                 {canEdit ? (
                   <Button type="button" variant="text" aria-label={`時間帯${index + 1}を削除`} onClick={() => setDefinition((current) => ({ ...current, timeWindows: removeTimeWindow(current.timeWindows, index) }))}>削除</Button>

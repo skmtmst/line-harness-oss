@@ -22,7 +22,12 @@ interface ChatItem {
   authorName: string;
   body: string;
   mine?: boolean;
+  /** 自分のコメントが送れなかった。 */
+  failed?: boolean;
 }
+
+/** 開始時刻を過ぎた後の自動の読み直しの間隔。 */
+const AUTO_RELOAD_GAP_MS = 3000;
 
 function formatJp(epoch: number): string {
   return new Date(epoch * 1000).toLocaleString('ja-JP', {
@@ -71,8 +76,13 @@ export default function Webinar() {
     [],
   );
 
+  /** 開始待ちの自動の読み直しを最後に送った時刻。 */
+  const lastAutoLoadRef = useRef(0);
+  /** 状態の取得が進行中か。開始待ちの自動の読み直しを重ねない。 */
+  const loadInFlightRef = useRef(false);
   const load = useCallback(async () => {
-    if (!slug) return;
+    if (!slug || loadInFlightRef.current) return;
+    loadInFlightRef.current = true;
     setError(null);
     setLoadFailed(false);
     try {
@@ -90,6 +100,8 @@ export default function Webinar() {
       const status = (err as { status?: number }).status;
       if (status === 403) setError('この配信は友だち追加後にご覧いただけます。');
       else setLoadFailed(true);
+    } finally {
+      loadInFlightRef.current = false;
     }
   }, [slug]);
 
@@ -98,12 +110,17 @@ export default function Webinar() {
   }, [load]);
 
   // 待機画面: 残り秒を数える + 開始時刻到達で自動リロード
+  // 取得中は重ねず、失敗したら止める（読み直しは「もう一度読み込む」から）。
   useEffect(() => {
-    if (!state || state.live) return;
+    if (!state || state.live || loadFailed || error) return;
     if (state.nextSessionAt === null) return;
     const tick = () => {
       const remain = state.nextSessionAt! - Math.floor(Date.now() / 1000);
       if (remain <= 0) {
+        // 開始時刻を過ぎてもまだ始まっていない応答なら、間を空けて聞き直す。
+        const now = Date.now();
+        if (now - lastAutoLoadRef.current < AUTO_RELOAD_GAP_MS) return;
+        lastAutoLoadRef.current = now;
         void load();
         return;
       }
@@ -112,7 +129,7 @@ export default function Webinar() {
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [state, load]);
+  }, [state, load, loadFailed, error]);
 
   // ライブ画面: プレーヤー初期化
   useEffect(() => {
@@ -245,15 +262,19 @@ export default function Webinar() {
     if (!state?.live || !slug) return;
     const text = input.trim();
     if (!text) return;
+    const key = `u-${Date.now()}`;
     setInput('');
     setChat((prev) => [
       ...prev,
-      { key: `u-${Date.now()}`, authorName: 'あなた', body: text, mine: true },
+      { key, authorName: 'あなた', body: text, mine: true },
     ]);
     try {
       await api.webinarComment(slug, state.sessionStartAt, Math.floor(expectedPosition()), text);
     } catch (err) {
-      console.warn('comment post failed:', err);
+      logFailure('webinar-comment', err);
+      // 送れなかったことを行に出し、書いた文は入力欄へ戻す（新しく書き始めていたら上書きしない）。
+      setChat((prev) => prev.map((item) => (item.key === key ? { ...item, failed: true } : item)));
+      setInput((current) => (current === '' ? text : current));
     }
   };
 
@@ -447,6 +468,7 @@ export default function Webinar() {
               <>
                 <span className="text-night-mine">{item.authorName}</span>
                 {`\u3000${item.body}`}
+                {item.failed && <span className="text-night-dim">（送れませんでした）</span>}
               </>
             ) : (
               `${item.authorName}\u3000${item.body}`
@@ -476,7 +498,9 @@ export default function Webinar() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') void sendComment();
+            // 日本語の変換を確定する Enter では送らない（keyCode 229 は変換中の端末向け）。
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return;
+            void sendComment();
           }}
           placeholder="コメントを書く"
           maxLength={500}

@@ -2508,6 +2508,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
     // キーあり送信の照合材料。読み取りだけに使い、予約の書き込みは判定の後。
     let peekScope: FormSubmitClaimScope | null = null;
     let peekHash: string | null = null;
+    let resumeSavedAnswer = false;
     if (idempotencyKey) {
       const hashSource: Record<string, unknown> = { ...submissionData };
       delete hashSource._webhookVerified;
@@ -2526,6 +2527,23 @@ forms.post('/api/forms/:id/submit', async (c) => {
       };
       // 完了済みの再送は判定より先に返す(回答期限後も最初の結果のまま)。
       const peeked = await getFormSubmitClaim(c.env.DB, peekScope);
+      if (peeked && peeked.request_hash !== peekHash) {
+        return c.json({success: false, error: 'Idempotency-Key was already used with a different request', code: 'idempotency_content_mismatch', retryable: false}, 409);
+      }
+      if (peeked && peeked.status !== 'completed' && !formSubmitClaimExpired(peeked)
+        && peeked.request_hash === peekHash && peeked.submission_id) {
+        const saved = await getFormSubmissionById(c.env.DB, peeked.submission_id);
+        if (saved && saved.form_id === formId && saved.friend_id === friendId) {
+          // 同じ保存済み回答の未完工程を補う。新しい回答の枠は取らない。
+          if (saved.form_version_id) {
+            const version = await getFormVersionContent(c.env.DB, saved.form_version_id);
+            if (!version || version.form_id !== formId) throw new Error('saved_form_version_missing');
+            const {id, form_id: _formId, ...snapshot} = version;
+            form = {...form, ...snapshot, current_published_version_id: id};
+          }
+          resumeSavedAnswer = true;
+        }
+      }
       if (peeked
         && peeked.status === 'completed'
         && peeked.request_hash === peekHash
@@ -2558,11 +2576,12 @@ forms.post('/api/forms/:id/submit', async (c) => {
         friendId,
         submitCount: form.submit_count ?? 0,
         answers: submissionData,
+        resumeSavedAnswer,
       });
       if (rejected) {
         return c.json({ success: false, error: rejected }, 400);
       }
-    } else {
+    } else if (!resumeSavedAnswer) {
       const fields = JSON.parse(form.fields || '[]') as Array<{
         name: string;
         label: string;

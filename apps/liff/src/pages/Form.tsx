@@ -20,7 +20,7 @@ import { api, type MenuItem, type PostalCodeCandidate, type PublicForm, type Sta
 import {
   addDays,
   formatWeekday,
-  jstStartsAtIso,
+  slotStartsAtIso,
   formatJstEventAt,
   jstToday,
   utcToJstHm,
@@ -847,27 +847,45 @@ function AddressFields({
   const [candidates, setCandidates] = useState<PostalCodeCandidate[]>([]);
   const [looking, setLooking] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
+  // 調べている間に書いた欄を、届いた応答で古い中身に戻さないため、
+  // いちばん新しい住所を持っておく（応答のときはこれに足す）。
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  // 調べた郵便番号の回。郵便番号を書き換えたら古い応答・候補は使わない。
+  const lookupGenRef = useRef(0);
+  useEffect(
+    () => () => {
+      lookupGenRef.current += 1;
+    },
+    [],
+  );
 
   const patch = (next: AddressDraft) => onChange(name, next);
 
   const applyCandidate = (c: PostalCodeCandidate) => {
+    const latest = draftRef.current;
     patch({
-      ...draft,
-      postalCode: draft.postalCode,
+      ...latest,
       prefecture: c.prefecture,
       city: c.city,
       // 町名は番地欄が空のときだけ入れる。書いた番地は消さない。
-      addressLine1: draft.addressLine1 || c.town,
+      addressLine1: latest.addressLine1 || c.town,
     });
     setCandidates([]);
     setLookupMessage(null);
   };
 
   const lookup = async () => {
+    const searched = draft.postalCode;
+    const gen = ++lookupGenRef.current;
     setLooking(true);
     setLookupMessage(null);
+    // 応答を使ってよいか（この回が最新で、郵便番号も調べた時のまま）。
+    const stillCurrent = () =>
+      gen === lookupGenRef.current && draftRef.current.postalCode === searched;
     try {
-      const res = await api.postalCodeSearch(draft.postalCode);
+      const res = await api.postalCodeSearch(searched);
+      if (!stillCurrent()) return;
       if (!res.success) throw new Error('postal_code_search_failed');
       const data = res.data;
       if (data.status === 'matched' && data.candidates.length === 1) {
@@ -885,10 +903,11 @@ function AddressFields({
           : 'その郵便番号の住所が見つかりません。下の欄へ直接入力してください',
       );
     } catch {
+      if (!stillCurrent()) return;
       setCandidates([]);
       setLookupMessage('住所を調べられませんでした。下の欄へ直接入力してください');
     } finally {
-      setLooking(false);
+      if (gen === lookupGenRef.current) setLooking(false);
     }
   };
 
@@ -901,7 +920,15 @@ function AddressFields({
           value={draft.postalCode}
           placeholder="123-4567"
           aria-label="郵便番号"
-          onChange={(e) => patch({ ...draft, postalCode: e.target.value })}
+          onChange={(e) => {
+            // 郵便番号を書き換えたら、前の番号の候補・調べ中の応答は使わない。
+            if (e.target.value !== draft.postalCode) {
+              lookupGenRef.current += 1;
+              setLooking(false);
+              setCandidates([]);
+            }
+            patch({ ...draft, postalCode: e.target.value });
+          }}
           className={inputClass}
         />
         <button
@@ -996,7 +1023,7 @@ export function BookingSlotPicker({
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staffList, setStaffList] = useState<StaffItem[]>([]);
   const [staffId, setStaffId] = useState<string>(fixedStaffId ?? '');
-  const [byDate, setByDate] = useState<Record<string, Array<{ start: string; open: boolean }>>>({});
+  const [byDate, setByDate] = useState<Record<string, Array<{ start: string; open: boolean; startUtc?: string }>>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -1047,7 +1074,7 @@ export function BookingSlotPicker({
     Promise.all(chunks.map(([from, to]) => api.availability(menuId, activeStaff, from, to)))
       .then((results) => {
         if (cancelled) return;
-        const merged: Record<string, Array<{ start: string; open: boolean }>> = {};
+        const merged: Record<string, Array<{ start: string; open: boolean; startUtc?: string }>> = {};
         for (const r of results) {
           for (const bucket of r.by_staff ?? []) {
             if (bucket.staff_id !== activeStaff) continue;
@@ -1055,7 +1082,9 @@ export function BookingSlotPicker({
               if (s.date < today || s.date > lastDay) continue;
               const open = !((s.remaining ?? 1) <= 0 || s.state === 'full' || s.state === 'closed');
               const list = (merged[s.date] ??= []);
-              if (!list.some((t) => t.start === s.start)) list.push({ start: s.start, open });
+              if (!list.some((t) => t.start === s.start)) {
+                list.push({ start: s.start, open, ...(s.startUtc ? { startUtc: s.startUtc } : {}) });
+              }
               else if (open) list.find((t) => t.start === s.start)!.open = true;
             }
           }
@@ -1167,7 +1196,8 @@ export function BookingSlotPicker({
       {selectedDate && (
         <div className="grid grid-cols-3 gap-2">
           {daySlots.map((t) => {
-            const startsAt = jstStartsAtIso(selectedDate, t.start);
+            // 空き枠が返した開始の瞬間を送る（店が日本時間以外でもずれない）。
+            const startsAt = slotStartsAtIso({ date: selectedDate, start: t.start, startUtc: t.startUtc });
             const active = picked?.startsAt === startsAt;
             return (
               <button
@@ -1286,19 +1316,42 @@ function BlockView({
     'w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3.5 py-3 text-sm text-ink placeholder:text-liff-idle focus:border-liff-primary focus:outline-none';
   /** 直しがある欄は枠を直しの色にする (お店のテーマの error)。 */
   const invalidStyle = error ? { borderColor: errorColor } : undefined;
+  // 欄名・説明・直しの文を入力と結ぶ（読み上げで欄名と直し方が分かるように）。
+  // id はブロックの id から作る（並べ替えても同じ欄を指す）。
+  const fieldId = `lf-${block.id}`;
+  const labelId = `${fieldId}-label`;
+  const descId = block.description ? `${fieldId}-desc` : undefined;
+  const errorId = error ? `${fieldId}-error` : undefined;
+  const describedBy = [descId, errorId].filter(Boolean).join(' ') || undefined;
+  // 1つの入力で答える欄は label の htmlFor で結ぶ。選択肢・★・住所などは群れにして欄名で呼ぶ。
+  const singleControl =
+    block.type === 'text' ||
+    block.type === 'textarea' ||
+    block.type === 'prefecture' ||
+    block.type === 'select' ||
+    (block.type === 'date' && block.dateStyle !== 'ymd');
+  const fieldProps = { id: fieldId, 'aria-describedby': describedBy };
 
   return (
     <div className="flex flex-col gap-2">
       {/* ★V8 (B8rCt)：欄名と必須の札を1行に並べ、選択肢まで 8 空ける。 */}
-      <label className="flex items-center gap-1.5 text-sm font-bold text-ink">
+      <label
+        id={labelId}
+        htmlFor={singleControl ? fieldId : undefined}
+        className="flex items-center gap-1.5 text-sm font-bold text-ink"
+      >
         {block.label}
         {block.required && <RequiredMark />}
       </label>
       {block.description && (
-        <p className="-mt-1 text-xs text-ink-faint">{block.description}</p>
+        <p id={descId} className="-mt-1 text-xs text-ink-faint">{block.description}</p>
       )}
 
-      <div>
+      <div
+        {...(singleControl
+          ? {}
+          : { role: 'group', 'aria-labelledby': labelId, 'aria-describedby': describedBy })}
+      >
         {block.type === 'text' && (
           <input
             type={block.limit?.format === 'email' ? 'email' : block.limit?.format === 'tel' ? 'tel' : 'text'}
@@ -1309,6 +1362,7 @@ function BlockView({
             className={inputClass}
             style={invalidStyle}
             aria-invalid={!!error}
+            {...fieldProps}
           />
         )}
 
@@ -1322,6 +1376,7 @@ function BlockView({
             className={`${inputClass} min-h-22 resize-y`}
             style={invalidStyle}
             aria-invalid={!!error}
+            {...fieldProps}
           />
         )}
 
@@ -1340,6 +1395,7 @@ function BlockView({
               className={inputClass}
               style={invalidStyle}
               aria-invalid={!!error}
+              {...fieldProps}
             />
           ))}
 
@@ -1350,6 +1406,7 @@ function BlockView({
             className={inputClass}
             style={invalidStyle}
             aria-invalid={!!error}
+            {...fieldProps}
           >
             <option value="">都道府県を選択</option>
             {PREFECTURES.map((p) => (
@@ -1369,6 +1426,7 @@ function BlockView({
               className={inputClass}
               style={invalidStyle}
               aria-invalid={!!error}
+              {...fieldProps}
             >
               <option value="">選択してください</option>
               {(block.choices ?? []).map((choice) => (
@@ -1564,7 +1622,7 @@ function BlockView({
       </div>
 
       {error && (
-        <p className="mt-1 flex items-center gap-1 text-xs font-bold" style={{ color: errorColor }}>
+        <p id={errorId} className="mt-1 flex items-center gap-1 text-xs font-bold" style={{ color: errorColor }}>
           <Icon name="info" className="h-3.5 w-3.5 shrink-0" />
           {error}
         </p>

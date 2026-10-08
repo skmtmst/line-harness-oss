@@ -7,6 +7,7 @@
  * 今の画面（app/notifications/page.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -36,6 +37,7 @@ const PAGE_SIZE = 50
 export default function NotificationsV8() {
   usePageTitle('通知')
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const categoryParam = params.get('category')
@@ -60,7 +62,7 @@ export default function NotificationsV8() {
     if (next === 'all') query.delete('category')
     else query.set('category', next)
     const text = query.toString()
-    router.replace(text ? `/notifications?${text}` : '/notifications')
+    samePageUrl.replace(text ? `/notifications?${text}` : '/notifications')
   }
 
   const load = useCallback(async (offset: number, append: boolean) => {

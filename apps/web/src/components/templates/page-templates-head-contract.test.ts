@@ -91,11 +91,11 @@ describe('型の見出し（379板の絵）', () => {
     expect(globals).toMatch(/--text-body--line-height:\s*1\.7/)
   })
 
-  it('作る型の頭は20/24/16・間8・手順は下の行（FU2aU の同行版は inline で残す）', () => {
+  it('作る型の頭は20/24/16・間8・手順は題と説明の下の行（置き場所は1つ・q1xNMz）', () => {
     expect(css).toMatch(/\[data-page-template='create'\] \.heading \{[^}]*padding:\s*var\(--tpl-create-head-pad-top\) var\(--tpl-create-head-pad-side\) var\(--tpl-create-head-pad-bottom\)/s)
     expect(css).toMatch(/\[data-page-template='create'\] \.heading \{[^}]*gap:\s*var\(--tpl-create-head-gap\)/s)
-    expect(css).toMatch(/\[data-page-template='create'\] \.heading(?::not\(\[data-steps-placement='inline'\]\))? > \.steps \{[^}]*flex-basis:\s*100%/s)
-    expect(css).toMatch(/data-steps-placement='inline'/)
+    expect(css).toMatch(/\[data-page-template='create'\] \.heading > \.steps \{[^}]*flex-basis:\s*100%/s)
+    expect(css).not.toMatch(/data-steps-placement/)
     expect(css).not.toMatch(/\[data-page-template='create'\] \.heading \{[^}]*padding-block:\s*16px/s)
   })
 

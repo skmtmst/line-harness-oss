@@ -10,9 +10,9 @@
     "font": 21
   },
   "app/auto-replies/edit/wizard-v8.module.css": {
-    "spacing": 45,
-    "height": 17,
-    "font": 41
+    "spacing": 42,
+    "height": 13,
+    "font": 18
   },
   "app/auto-replies/runs/auto-reply-runs.module.css": {
     "spacing": 10,
@@ -115,9 +115,9 @@
     "font": 2
   },
   "app/emergency/control-v8.module.css": {
-    "spacing": 43,
-    "height": 13,
-    "font": 27
+    "spacing": 22,
+    "height": 5,
+    "font": 10
   },
   "app/events/bookings/bookings-v8.module.css": {
     "spacing": 11,
@@ -285,9 +285,9 @@
     "font": 1
   },
   "app/reminders/list-v8.module.css": {
-    "spacing": 27,
+    "spacing": 25,
     "height": 16,
-    "font": 27
+    "font": 20
   },
   "app/reminders/new/page.module.css": {
     "spacing": 2,
@@ -296,7 +296,7 @@
   },
   "app/reminders/wizard-v8.module.css": {
     "spacing": 60,
-    "height": 23,
+    "height": 22,
     "font": 66
   },
   "app/restaurant-test/v8/google.module.css": {
@@ -335,14 +335,14 @@
     "font": 11
   },
   "app/rich-menus/new/create-v8.module.css": {
-    "spacing": 40,
+    "spacing": 37,
     "height": 15,
-    "font": 37
+    "font": 30
   },
   "app/scenarios/detail/detail-v8.module.css": {
-    "spacing": 61,
+    "spacing": 57,
     "height": 18,
-    "font": 44
+    "font": 42
   },
   "app/scenarios/first-step-v8.module.css": {
     "spacing": 11,
@@ -458,5 +458,970 @@
     "spacing": 22,
     "height": 6,
     "font": 14
+  },
+  "v8/account-new/register.module.css": {
+    "spacing": 21,
+    "height": 3,
+    "font": 0
+  },
+  "v8/accounts-detail/detail.module.css": {
+    "spacing": 12,
+    "height": 1,
+    "font": 0
+  },
+  "v8/accounts-detail/dialogs.module.css": {
+    "spacing": 6,
+    "height": 1,
+    "font": 0
+  },
+  "v8/accounts-detail/handover.module.css": {
+    "spacing": 16,
+    "height": 1,
+    "font": 0
+  },
+  "v8/affiliate-offer-new/create.module.css": {
+    "spacing": 14,
+    "height": 0,
+    "font": 0
+  },
+  "v8/affiliates/affiliate-drawer.module.css": {
+    "spacing": 10,
+    "height": 11,
+    "font": 0
+  },
+  "v8/affiliates/affiliates.module.css": {
+    "spacing": 23,
+    "height": 26,
+    "font": 0
+  },
+  "v8/affiliates/create.module.css": {
+    "spacing": 14,
+    "height": 9,
+    "font": 0
+  },
+  "v8/analytics/analytics.module.css": {
+    "spacing": 23,
+    "height": 10,
+    "font": 0
+  },
+  "v8/analytics/funnel-form.module.css": {
+    "spacing": 1,
+    "height": 0,
+    "font": 0
+  },
+  "v8/auto-replies/list.module.css": {
+    "spacing": 13,
+    "height": 7,
+    "font": 0
+  },
+  "v8/auto-replies/quick-create.module.css": {
+    "spacing": 5,
+    "height": 1,
+    "font": 0
+  },
+  "v8/auto-replies/runs.module.css": {
+    "spacing": 8,
+    "height": 3,
+    "font": 0
+  },
+  "v8/automations/common-action-new.module.css": {
+    "spacing": 7,
+    "height": 2,
+    "font": 0
+  },
+  "v8/automations/common-actions.module.css": {
+    "spacing": 6,
+    "height": 5,
+    "font": 0
+  },
+  "v8/automations/create/create.module.css": {
+    "spacing": 18,
+    "height": 2,
+    "font": 0
+  },
+  "v8/automations/list.module.css": {
+    "spacing": 6,
+    "height": 8,
+    "font": 0
+  },
+  "v8/automations/runs.module.css": {
+    "spacing": 11,
+    "height": 10,
+    "font": 0
+  },
+  "v8/automations/shell.module.css": {
+    "spacing": 1,
+    "height": 1,
+    "font": 0
+  },
+  "v8/automations/templates.module.css": {
+    "spacing": 6,
+    "height": 0,
+    "font": 0
+  },
+  "v8/automations/versions.module.css": {
+    "spacing": 12,
+    "height": 6,
+    "font": 0
+  },
+  "v8/booking-menus/assign.module.css": {
+    "spacing": 5,
+    "height": 2,
+    "font": 0
+  },
+  "v8/booking-menus/channels.module.css": {
+    "spacing": 7,
+    "height": 0,
+    "font": 0
+  },
+  "v8/booking-menus/menu-form.module.css": {
+    "spacing": 12,
+    "height": 0,
+    "font": 0
+  },
+  "v8/booking-menus/settings.module.css": {
+    "spacing": 44,
+    "height": 8,
+    "font": 0
+  },
+  "v8/booking-staff/layout.module.css": {
+    "spacing": 7,
+    "height": 0,
+    "font": 0
+  },
+  "v8/booking-staff/phone.module.css": {
+    "spacing": 4,
+    "height": 1,
+    "font": 0
+  },
+  "v8/booking-staff/shifts.module.css": {
+    "spacing": 10,
+    "height": 3,
+    "font": 0
+  },
+  "v8/booking-staff/staff-new.module.css": {
+    "spacing": 1,
+    "height": 1,
+    "font": 0
+  },
+  "v8/broadcast-detail/detail.module.css": {
+    "spacing": 28,
+    "height": 2,
+    "font": 0
+  },
+  "v8/broadcast-detail/phone.module.css": {
+    "spacing": 3,
+    "height": 2,
+    "font": 0
+  },
+  "v8/broadcast-detail/reserved.module.css": {
+    "spacing": 10,
+    "height": 1,
+    "font": 0
+  },
+  "v8/broadcasts/list.module.css": {
+    "spacing": 8,
+    "height": 2,
+    "font": 0
+  },
+  "v8/broadcasts/quick-send.module.css": {
+    "spacing": 3,
+    "height": 3,
+    "font": 0
+  },
+  "v8/common-vars-edit/edit.module.css": {
+    "spacing": 19,
+    "height": 1,
+    "font": 0
+  },
+  "v8/common-vars-edit/new.module.css": {
+    "spacing": 10,
+    "height": 0,
+    "font": 0
+  },
+  "v8/common-vars/list.module.css": {
+    "spacing": 19,
+    "height": 6,
+    "font": 0
+  },
+  "v8/contents/list.module.css": {
+    "spacing": 7,
+    "height": 4,
+    "font": 0
+  },
+  "v8/conversions/create.module.css": {
+    "spacing": 13,
+    "height": 3,
+    "font": 0
+  },
+  "v8/conversions/list.module.css": {
+    "spacing": 12,
+    "height": 5,
+    "font": 0
+  },
+  "v8/dashboard/dashboard-editor.module.css": {
+    "spacing": 3,
+    "height": 1,
+    "font": 0
+  },
+  "v8/dashboard/dashboard.module.css": {
+    "spacing": 18,
+    "height": 9,
+    "font": 0
+  },
+  "v8/dashboard/first-steps.module.css": {
+    "spacing": 4,
+    "height": 0,
+    "font": 0
+  },
+  "v8/events/bookings.module.css": {
+    "spacing": 8,
+    "height": 1,
+    "font": 0
+  },
+  "v8/events/change-review.module.css": {
+    "spacing": 17,
+    "height": 2,
+    "font": 0
+  },
+  "v8/events/create.module.css": {
+    "spacing": 13,
+    "height": 2,
+    "font": 0
+  },
+  "v8/events/list.module.css": {
+    "spacing": 8,
+    "height": 4,
+    "font": 0
+  },
+  "v8/form-edit/edit.module.css": {
+    "spacing": 29,
+    "height": 7,
+    "font": 0
+  },
+  "v8/form-responses/responses.module.css": {
+    "spacing": 19,
+    "height": 5,
+    "font": 0
+  },
+  "v8/forms/list.module.css": {
+    "spacing": 17,
+    "height": 4,
+    "font": 0
+  },
+  "v8/friend-add-publish/publish.module.css": {
+    "spacing": 12,
+    "height": 0,
+    "font": 0
+  },
+  "v8/friend-add-runs/detail.module.css": {
+    "spacing": 10,
+    "height": 0,
+    "font": 0
+  },
+  "v8/friend-add-runs/runs.module.css": {
+    "spacing": 8,
+    "height": 3,
+    "font": 0
+  },
+  "v8/friend-add/editor.module.css": {
+    "spacing": 18,
+    "height": 2,
+    "font": 0
+  },
+  "v8/friend-add/list.module.css": {
+    "spacing": 9,
+    "height": 2,
+    "font": 0
+  },
+  "v8/friend-detail/detail.module.css": {
+    "spacing": 37,
+    "height": 3,
+    "font": 0
+  },
+  "v8/friends/compare/compare.module.css": {
+    "spacing": 16,
+    "height": 0,
+    "font": 0
+  },
+  "v8/friends/duplicates/list.module.css": {
+    "spacing": 6,
+    "height": 1,
+    "font": 0
+  },
+  "v8/friends/list/list.module.css": {
+    "spacing": 5,
+    "height": 1,
+    "font": 0
+  },
+  "v8/friends/merged/merged.module.css": {
+    "spacing": 10,
+    "height": 1,
+    "font": 0
+  },
+  "v8/friends/merged/person.module.css": {
+    "spacing": 15,
+    "height": 2,
+    "font": 0
+  },
+  "v8/friends/migrations/migrations.module.css": {
+    "spacing": 19,
+    "height": 2,
+    "font": 0
+  },
+  "v8/friends/shared/head.module.css": {
+    "spacing": 5,
+    "height": 0,
+    "font": 0
+  },
+  "v8/hq-banners/dialogs.module.css": {
+    "spacing": 2,
+    "height": 1,
+    "font": 0
+  },
+  "v8/hq-banners/frame.module.css": {
+    "spacing": 3,
+    "height": 0,
+    "font": 0
+  },
+  "v8/hq-banners/image-detail.module.css": {
+    "spacing": 6,
+    "height": 1,
+    "font": 0
+  },
+  "v8/hq-banners/list.module.css": {
+    "spacing": 7,
+    "height": 2,
+    "font": 0
+  },
+  "v8/hq-banners/project.module.css": {
+    "spacing": 2,
+    "height": 3,
+    "font": 0
+  },
+  "v8/hq-broadcasts/create.module.css": {
+    "spacing": 7,
+    "height": 1,
+    "font": 0
+  },
+  "v8/hq-broadcasts/detail.module.css": {
+    "spacing": 5,
+    "height": 1,
+    "font": 0
+  },
+  "v8/hq-templates/console.module.css": {
+    "spacing": 12,
+    "height": 7,
+    "font": 0
+  },
+  "v8/hq/account-dialogs.module.css": {
+    "spacing": 6,
+    "height": 0,
+    "font": 0
+  },
+  "v8/hq/billing.module.css": {
+    "spacing": 11,
+    "height": 0,
+    "font": 0
+  },
+  "v8/hq/home.module.css": {
+    "spacing": 9,
+    "height": 2,
+    "font": 0
+  },
+  "v8/hq/member-dialog.module.css": {
+    "spacing": 7,
+    "height": 0,
+    "font": 0
+  },
+  "v8/hq/members.module.css": {
+    "spacing": 4,
+    "height": 1,
+    "font": 0
+  },
+  "v8/hq/notice-line-dialog.module.css": {
+    "spacing": 6,
+    "height": 0,
+    "font": 0
+  },
+  "v8/hq/settings-nav.module.css": {
+    "spacing": 3,
+    "height": 0,
+    "font": 0
+  },
+  "v8/hq/settings.module.css": {
+    "spacing": 6,
+    "height": 0,
+    "font": 0
+  },
+  "v8/hq/support-detail.module.css": {
+    "spacing": 13,
+    "height": 0,
+    "font": 0
+  },
+  "v8/hq/support.module.css": {
+    "spacing": 8,
+    "height": 2,
+    "font": 0
+  },
+  "v8/inbox-chat/customer-panel.module.css": {
+    "spacing": 7,
+    "height": 2,
+    "font": 0
+  },
+  "v8/inbox-chat/inbox-chat.module.css": {
+    "spacing": 11,
+    "height": 2,
+    "font": 0
+  },
+  "v8/inbox-search/chat-search-bar.module.css": {
+    "spacing": 1,
+    "height": 0,
+    "font": 0
+  },
+  "v8/inflow-links/ad-pages.module.css": {
+    "spacing": 2,
+    "height": 0,
+    "font": 0
+  },
+  "v8/inflow-links/ads.module.css": {
+    "spacing": 12,
+    "height": 0,
+    "font": 0
+  },
+  "v8/inflow-links/detail.module.css": {
+    "spacing": 14,
+    "height": 3,
+    "font": 0
+  },
+  "v8/inflow-links/list.module.css": {
+    "spacing": 4,
+    "height": 4,
+    "font": 0
+  },
+  "v8/inflow-links/new/create.module.css": {
+    "spacing": 9,
+    "height": 0,
+    "font": 0
+  },
+  "v8/inflow-links/qr-dialog.module.css": {
+    "spacing": 3,
+    "height": 0,
+    "font": 0
+  },
+  "v8/inflow-links/site-script.module.css": {
+    "spacing": 12,
+    "height": 0,
+    "font": 0
+  },
+  "v8/line-notifications/operator-edit.module.css": {
+    "spacing": 22,
+    "height": 10,
+    "font": 0
+  },
+  "v8/login/two-factor-ops.module.css": {
+    "spacing": 2,
+    "height": 1,
+    "font": 0
+  },
+  "v8/mileage/earning-rule-new/create.module.css": {
+    "spacing": 11,
+    "height": 2,
+    "font": 0
+  },
+  "v8/mileage/mileage.module.css": {
+    "spacing": 21,
+    "height": 7,
+    "font": 0
+  },
+  "v8/mileage/reward-edit.module.css": {
+    "spacing": 5,
+    "height": 8,
+    "font": 0
+  },
+  "v8/nen-campaigns/form.module.css": {
+    "spacing": 14,
+    "height": 14,
+    "font": 0
+  },
+  "v8/nen-campaigns/list.module.css": {
+    "spacing": 6,
+    "height": 10,
+    "font": 0
+  },
+  "v8/nen-health/health.module.css": {
+    "spacing": 12,
+    "height": 16,
+    "font": 0
+  },
+  "v8/nen-members/members.module.css": {
+    "spacing": 14,
+    "height": 3,
+    "font": 0
+  },
+  "v8/nen-pets/pets.module.css": {
+    "spacing": 13,
+    "height": 17,
+    "font": 0
+  },
+  "v8/nen-posts/review.module.css": {
+    "spacing": 32,
+    "height": 7,
+    "font": 0
+  },
+  "v8/no-permission/no-permission.module.css": {
+    "spacing": 5,
+    "height": 3,
+    "font": 0
+  },
+  "v8/not-found/not-found.module.css": {
+    "spacing": 2,
+    "height": 0,
+    "font": 0
+  },
+  "v8/notifications/list.module.css": {
+    "spacing": 4,
+    "height": 1,
+    "font": 0
+  },
+  "v8/ops/announcements.module.css": {
+    "spacing": 9,
+    "height": 0,
+    "font": 0
+  },
+  "v8/ops/auth.module.css": {
+    "spacing": 7,
+    "height": 3,
+    "font": 0
+  },
+  "v8/ops/dashboard.module.css": {
+    "spacing": 0,
+    "height": 2,
+    "font": 0
+  },
+  "v8/ops/ops-knowledge-v8.module.css": {
+    "spacing": 1,
+    "height": 0,
+    "font": 0
+  },
+  "v8/ops/parts.module.css": {
+    "spacing": 7,
+    "height": 2,
+    "font": 0
+  },
+  "v8/ops/shell.module.css": {
+    "spacing": 4,
+    "height": 0,
+    "font": 0
+  },
+  "v8/ops/support.module.css": {
+    "spacing": 11,
+    "height": 0,
+    "font": 0
+  },
+  "v8/ops/tenant-detail.module.css": {
+    "spacing": 3,
+    "height": 0,
+    "font": 0
+  },
+  "v8/reminders/detail.module.css": {
+    "spacing": 7,
+    "height": 1,
+    "font": 0
+  },
+  "v8/reminders/edit.module.css": {
+    "spacing": 28,
+    "height": 2,
+    "font": 0
+  },
+  "v8/reminders/sheet-dialog.module.css": {
+    "spacing": 3,
+    "height": 0,
+    "font": 0
+  },
+  "v8/restaurant-reservations/detail-dialog.module.css": {
+    "spacing": 2,
+    "height": 0,
+    "font": 0
+  },
+  "v8/restaurant/approvals/approvals.module.css": {
+    "spacing": 14,
+    "height": 13,
+    "font": 0
+  },
+  "v8/restaurant/booking-kit/parts.module.css": {
+    "spacing": 1,
+    "height": 0,
+    "font": 0
+  },
+  "v8/restaurant/booking-kit/shell.module.css": {
+    "spacing": 10,
+    "height": 1,
+    "font": 0
+  },
+  "v8/restaurant/close-tasks/close-tasks.module.css": {
+    "spacing": 1,
+    "height": 1,
+    "font": 0
+  },
+  "v8/restaurant/closures/closures.module.css": {
+    "spacing": 14,
+    "height": 0,
+    "font": 0
+  },
+  "v8/restaurant/common-a/frame.module.css": {
+    "spacing": 1,
+    "height": 3,
+    "font": 0
+  },
+  "v8/restaurant/common-a/parts.module.css": {
+    "spacing": 2,
+    "height": 7,
+    "font": 0
+  },
+  "v8/restaurant/dashboard/dashboard.module.css": {
+    "spacing": 7,
+    "height": 1,
+    "font": 0
+  },
+  "v8/restaurant/dashboard/stores.module.css": {
+    "spacing": 2,
+    "height": 4,
+    "font": 0
+  },
+  "v8/restaurant/front-desk/front-desk.module.css": {
+    "spacing": 4,
+    "height": 0,
+    "font": 0
+  },
+  "v8/restaurant/google/google.module.css": {
+    "spacing": 22,
+    "height": 23,
+    "font": 0
+  },
+  "v8/restaurant/inventory/inventory.module.css": {
+    "spacing": 30,
+    "height": 7,
+    "font": 0
+  },
+  "v8/restaurant/line-followup/line-followup.module.css": {
+    "spacing": 9,
+    "height": 12,
+    "font": 0
+  },
+  "v8/restaurant/menu/menu.module.css": {
+    "spacing": 4,
+    "height": 5,
+    "font": 0
+  },
+  "v8/restaurant/organization/organization.module.css": {
+    "spacing": 13,
+    "height": 11,
+    "font": 0
+  },
+  "v8/restaurant/reservations/reservations.module.css": {
+    "spacing": 32,
+    "height": 19,
+    "font": 0
+  },
+  "v8/restaurant/store-new/store-new.module.css": {
+    "spacing": 18,
+    "height": 10,
+    "font": 0
+  },
+  "v8/restaurant/store-new/terms-body.module.css": {
+    "spacing": 4,
+    "height": 3,
+    "font": 0
+  },
+  "v8/restaurant/store-tabs/store-tabs.module.css": {
+    "spacing": 1,
+    "height": 0,
+    "font": 0
+  },
+  "v8/restaurant/tables/tables.module.css": {
+    "spacing": 13,
+    "height": 2,
+    "font": 0
+  },
+  "v8/restaurant/terms/terms.module.css": {
+    "spacing": 3,
+    "height": 1,
+    "font": 0
+  },
+  "v8/rich-menu-edit/detail.module.css": {
+    "spacing": 14,
+    "height": 1,
+    "font": 0
+  },
+  "v8/rich-menus/blocked-dialog.module.css": {
+    "spacing": 6,
+    "height": 1,
+    "font": 0
+  },
+  "v8/rich-menus/connections.module.css": {
+    "spacing": 5,
+    "height": 0,
+    "font": 0
+  },
+  "v8/rich-menus/list.module.css": {
+    "spacing": 13,
+    "height": 1,
+    "font": 0
+  },
+  "v8/scenario-detail/detail.module.css": {
+    "spacing": 31,
+    "height": 3,
+    "font": 0
+  },
+  "v8/scenario-first-step/first-step.module.css": {
+    "spacing": 5,
+    "height": 3,
+    "font": 0
+  },
+  "v8/scenarios/create.module.css": {
+    "spacing": 5,
+    "height": 0,
+    "font": 0
+  },
+  "v8/scenarios/list.module.css": {
+    "spacing": 16,
+    "height": 8,
+    "font": 0
+  },
+  "v8/scenarios/results.module.css": {
+    "spacing": 7,
+    "height": 2,
+    "font": 0
+  },
+  "v8/settings/accounts/accounts.module.css": {
+    "spacing": 1,
+    "height": 1,
+    "font": 0
+  },
+  "v8/settings/booking-media/screen.module.css": {
+    "spacing": 3,
+    "height": 1,
+    "font": 0
+  },
+  "v8/settings/ec-commerce/connector.module.css": {
+    "spacing": 5,
+    "height": 0,
+    "font": 0
+  },
+  "v8/settings/ec-commerce/identity.module.css": {
+    "spacing": 1,
+    "height": 0,
+    "font": 0
+  },
+  "v8/settings/ec-commerce/order-drawer.module.css": {
+    "spacing": 9,
+    "height": 2,
+    "font": 0
+  },
+  "v8/settings/ec-commerce/screen.module.css": {
+    "spacing": 4,
+    "height": 2,
+    "font": 1
+  },
+  "v8/settings/emergency/history.module.css": {
+    "spacing": 3,
+    "height": 0,
+    "font": 0
+  },
+  "v8/settings/emergency/screen.module.css": {
+    "spacing": 9,
+    "height": 2,
+    "font": 1
+  },
+  "v8/settings/features/screen.module.css": {
+    "spacing": 21,
+    "height": 2,
+    "font": 2
+  },
+  "v8/settings/file-scan/screen.module.css": {
+    "spacing": 3,
+    "height": 1,
+    "font": 0
+  },
+  "v8/settings/getting-started/getting-started.module.css": {
+    "spacing": 6,
+    "height": 0,
+    "font": 0
+  },
+  "v8/settings/line-notifications/screen.module.css": {
+    "spacing": 5,
+    "height": 2,
+    "font": 1
+  },
+  "v8/settings/manual-links/screen.module.css": {
+    "spacing": 3,
+    "height": 1,
+    "font": 0
+  },
+  "v8/settings/pools/create.module.css": {
+    "spacing": 5,
+    "height": 0,
+    "font": 0
+  },
+  "v8/settings/pools/pools.module.css": {
+    "spacing": 9,
+    "height": 1,
+    "font": 0
+  },
+  "v8/settings/sns/sns.module.css": {
+    "spacing": 9,
+    "height": 1,
+    "font": 0
+  },
+  "v8/settings/staff/staff.module.css": {
+    "spacing": 19,
+    "height": 2,
+    "font": 0
+  },
+  "v8/tag-edit/edit.module.css": {
+    "spacing": 16,
+    "height": 3,
+    "font": 0
+  },
+  "v8/tag-edit/search-edit.module.css": {
+    "spacing": 14,
+    "height": 3,
+    "font": 0
+  },
+  "v8/tags/create.module.css": {
+    "spacing": 16,
+    "height": 1,
+    "font": 0
+  },
+  "v8/tags/list.module.css": {
+    "spacing": 25,
+    "height": 2,
+    "font": 0
+  },
+  "v8/template-detail/detail.module.css": {
+    "spacing": 20,
+    "height": 0,
+    "font": 0
+  },
+  "v8/template-edit/edit.module.css": {
+    "spacing": 26,
+    "height": 3,
+    "font": 0
+  },
+  "v8/template-edit/rich.module.css": {
+    "spacing": 4,
+    "height": 2,
+    "font": 0
+  },
+  "v8/templates/carousel.module.css": {
+    "spacing": 8,
+    "height": 3,
+    "font": 0
+  },
+  "v8/templates/list.module.css": {
+    "spacing": 12,
+    "height": 1,
+    "font": 0
+  },
+  "v8/templates/question-new.module.css": {
+    "spacing": 4,
+    "height": 0,
+    "font": 0
+  },
+  "v8/visit-stamps/visit-stamps.module.css": {
+    "spacing": 7,
+    "height": 4,
+    "font": 0
+  },
+  "v8/webhooks/api-tokens.module.css": {
+    "spacing": 10,
+    "height": 1,
+    "font": 0
+  },
+  "v8/webhooks/create.module.css": {
+    "spacing": 7,
+    "height": 0,
+    "font": 0
+  },
+  "v8/webhooks/incoming.module.css": {
+    "spacing": 12,
+    "height": 2,
+    "font": 0
+  },
+  "v8/webhooks/interactions.module.css": {
+    "spacing": 9,
+    "height": 2,
+    "font": 0
+  },
+  "v8/webhooks/outgoing.module.css": {
+    "spacing": 7,
+    "height": 2,
+    "font": 0
+  },
+  "v8/webhooks/samples.module.css": {
+    "spacing": 8,
+    "height": 0,
+    "font": 0
+  },
+  "v8/webhooks/sheets.module.css": {
+    "spacing": 4,
+    "height": 0,
+    "font": 0
+  },
+  "v8/webhooks/shell.module.css": {
+    "spacing": 1,
+    "height": 1,
+    "font": 0
+  },
+  "v8/webinar-edit/analytics.module.css": {
+    "spacing": 12,
+    "height": 1,
+    "font": 0
+  },
+  "v8/webinar-edit/chrome.module.css": {
+    "spacing": 10,
+    "height": 3,
+    "font": 0
+  },
+  "v8/webinar-edit/comments.module.css": {
+    "spacing": 8,
+    "height": 1,
+    "font": 0
+  },
+  "v8/webinar-edit/cta.module.css": {
+    "spacing": 9,
+    "height": 1,
+    "font": 0
+  },
+  "v8/webinar-edit/form.module.css": {
+    "spacing": 7,
+    "height": 1,
+    "font": 0
+  },
+  "v8/webinar-edit/notifications.module.css": {
+    "spacing": 9,
+    "height": 1,
+    "font": 0
+  },
+  "v8/webinar-edit/participants.module.css": {
+    "spacing": 4,
+    "height": 3,
+    "font": 0
+  },
+  "v8/webinar-edit/review.module.css": {
+    "spacing": 6,
+    "height": 0,
+    "font": 0
+  },
+  "v8/webinar-edit/video.module.css": {
+    "spacing": 7,
+    "height": 0,
+    "font": 0
+  },
+  "v8/webinars/list.module.css": {
+    "spacing": 12,
+    "height": 6,
+    "font": 0
   }
 }

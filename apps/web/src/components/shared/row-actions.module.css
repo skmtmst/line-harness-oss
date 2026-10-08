@@ -113,4 +113,59 @@
     height: 44px;
   }
 }
+
+/*
+ * ★V8 行の「…」の左に置く、よく使う1つの操作（統括の一覧の［配る］：i0Ao0R・noVq4・DzdC3・wZPua）。
+ * 絵：幅60・高さ28・角丸8・薄い枠（control-border）・白い地、印13＋文字12の太字、間4。
+ * 文字は短く1語（「配る」）。読み上げ名は呼ぶ側が「〇〇を配る」と渡す。
+ */
+.quickAction {
+  display: inline-flex;
+  width: 60px; /* width: 60 */
+  height: 28px; /* height: 28 */
+  min-height: 0; /* 素のボタンの最小 32（globals）より低い絵の 28 にする */
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control); /* cornerRadius: 8 */
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: none;
+}
+
+.quickAction > svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--color-ink-secondary);
+}
+
+.quickAction:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.quickAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.quickAction:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+/* タッチ端末は指の当たりとして 44px（LAY-18 と同じ）。 */
+@media (pointer: coarse) {
+  .quickAction {
+    height: 44px;
+  }
+}
 }

@@ -252,11 +252,11 @@ describe('カレンダー', () => {
     expect(screen.getByText(/満席・休み/)).toBeTruthy();
   });
 
-  it('過去・期間の外・お休み・満席・空きなしの日は押せない', async () => {
+  it('過去・期間の外・お休み・空きなしの日は押せない（満席の日は待ちの入口のため押せる・監査 L4）', async () => {
     await openCalendar();
     await screen.findByRole('button', { name: '10月16日 空きあり' });
     expect(screen.getByRole('button', { name: '10月14日 過ぎた日' }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByRole('button', { name: '10月18日 満席' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: '10月18日 満席' }).hasAttribute('disabled')).toBe(false);
     expect(screen.getByRole('button', { name: '10月17日 空きなし' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: '10月21日 お休み' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: '10月16日 空きあり' }).hasAttribute('disabled')).toBe(false);
@@ -724,5 +724,112 @@ describe('カレンダーの見た目（設計合わせ）', () => {
     expect(empty.textContent).not.toContain('●');
     // 薄い文字。
     expect(empty.className).toContain('text-liff-off-ink');
+  });
+});
+
+describe('監査 L1：月の読込を途中で替えても、戻れば読み直す', () => {
+  it('10月の読込中に11月へ送り、10月へ戻ると読み直して日が出る', async () => {
+    mockSettings('calendar', 60);
+    let held = true;
+    const real = availability.getMockImplementation()!;
+    availability.mockImplementation(async (menuId, staffId, from, to) => {
+      // 最初の10月の読込だけ返さずに止める（読込中に月を送った状態を作る）。
+      if (held && from.startsWith('2026-10')) {
+        held = false;
+        return new Promise(() => {});
+      }
+      return real(menuId, staffId, from, to);
+    });
+    renderPicker();
+    expect(await screen.findByText('2026年10月')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '次の月' }));
+    expect(await screen.findByRole('button', { name: '11月2日 空きあり' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '前の月' }));
+    // 読み中の印が残っていると、ここで読込中のまま止まる。
+    expect(await screen.findByRole('button', { name: '10月16日 空きあり' })).toBeTruthy();
+    const octCalls = availability.mock.calls.filter(([, , from]) => from.startsWith('2026-10'));
+    expect(octCalls.length).toBe(2);
+  });
+});
+
+describe('監査 L4：満席の日から時刻の「空いたら知らせる」へ進める（予約はできない）', () => {
+  it('週の並びで満席の日を押すと、灰色の時刻と鈴が出て、予約へは進めない', async () => {
+    const { onSelect } = renderPicker();
+    const full = await screen.findByRole('button', { name: '10月18日 満席' });
+    expect(full.hasAttribute('disabled')).toBe(false);
+    fireEvent.click(full);
+    const ten = await screen.findByRole('button', { name: '10:00' });
+    expect(ten.hasAttribute('disabled')).toBe(true);
+    fireEvent.click(ten);
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '10:00に空いたら知らせる' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '時間を選ぶ' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('カレンダーで満席の日を選んで「この日の時間を選ぶ」から鈴へ進める', async () => {
+    await openCalendar();
+    fireEvent.click(await screen.findByRole('button', { name: '10月18日 満席' }));
+    fireEvent.click(screen.getByRole('button', { name: 'この日の時間を選ぶ' }));
+    expect(await screen.findByRole('button', { name: '11:00に空いたら知らせる' })).toBeTruthy();
+  });
+
+  it('満席の日しかない週も「空きがありません」で止めず、日の並びと鈴を出す', async () => {
+    availability.mockImplementation(async (_m: string, _s: string | undefined, from: string, to: string) => ({
+      by_staff: [
+        {
+          staff_id: 's1',
+          display_name: '担当A',
+          slots: MASTER_SLOTS.filter((x) => x.state === 'full' && x.date >= from && x.date <= to),
+        },
+      ],
+      closed_dates: [],
+    }));
+    renderPicker();
+    const full = await screen.findByRole('button', { name: '10月18日 満席' });
+    expect(screen.queryByText('この週は空きがありません')).toBeNull();
+    fireEvent.click(full);
+    expect(await screen.findByRole('button', { name: '10:00に空いたら知らせる' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '← 担当を選び直す' })).toBeTruthy();
+  });
+
+  it('枠の無い週は今までどおり「空きがありません」(ADutg)', async () => {
+    availability.mockImplementation(async () => ({
+      by_staff: [{ staff_id: 's1', display_name: '担当A', slots: [] }],
+      closed_dates: [],
+    }));
+    renderPicker();
+    expect(await screen.findByText('この週は空きがありません')).toBeTruthy();
+  });
+});
+
+describe('監査 L10：選んだ時刻に開始の瞬間と店のタイムゾーンを持たせる', () => {
+  it('時刻を押すと startUtc・timeZone を付けて onSelect へ渡す', async () => {
+    availability.mockImplementation(async (_m: string, _s: string | undefined, from: string, to: string) => ({
+      by_staff: [
+        {
+          staff_id: 's1',
+          display_name: '担当A',
+          slots: [
+            {
+              date: '2026-10-16',
+              start: '13:00',
+              end: '14:00',
+              timeZone: 'Asia/Bangkok',
+              startUtc: '2026-10-16T13:00:00+07:00',
+              endUtc: '2026-10-16T14:00:00+07:00',
+            },
+          ].filter((x) => x.date >= from && x.date <= to),
+        },
+      ],
+      closed_dates: [],
+    }));
+    const { onSelect } = renderPicker();
+    fireEvent.click(await screen.findByRole('button', { name: '13:00' }));
+    expect(onSelect).toHaveBeenCalledWith({
+      date: '2026-10-16',
+      start: '13:00',
+      startUtc: '2026-10-16T13:00:00+07:00',
+      timeZone: 'Asia/Bangkok',
+    });
   });
 });

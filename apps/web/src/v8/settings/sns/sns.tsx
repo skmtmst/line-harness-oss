@@ -8,6 +8,7 @@
  * Instagram：まだつなげない（口が無い）。つなぐとできること4つを出し、［Instagram とつなぐ］は押せる形のまま
  * 「まだ使えません」の案内を出す（「準備中」の言い回しは決まり §5 で使わない）。閲覧のみには［つなぐ］を置かない。動きは BEHAVIOR.md。
  */
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Check, Link2 } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -49,6 +50,7 @@ function stamp(iso: string | null | undefined): string {
 }
 
 function GoogleCard({ data, error, canManage }: { data: GoogleConnectionData | null; error: unknown; canManage: boolean }) {
+  const router = useRouter()
   if (error && !data) return <section className={styles.card}><ListState kind="error" error={error} onRetry={() => window.location.reload()} /></section>
   if (!data) return <section className={styles.card}><ListState kind="loading" /></section>
   const { connection, summary } = data
@@ -64,7 +66,7 @@ function GoogleCard({ data, error, canManage }: { data: GoogleConnectionData | n
         {canManage ? (
           <RowActions
             subjectName="Google ビジネス"
-            menuItems={[{ id: 'settings', label: '接続の設定を開く', external: true, onSelect: () => { window.location.href = '/restaurant-test/google?tab=settings' } }]}
+            menuItems={[{ id: 'settings', label: '接続の設定を開く', external: true, onSelect: () => { router.push('/restaurant-test/google?tab=settings') } }]}
           />
         ) : null}
       </div>

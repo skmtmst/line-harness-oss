@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * チェックボックス。Pencil ★V7 `gvjpx`。
+ * チェックボックス。Pencil ★V8 `dQCCN`・`S9U7v`「チェック/オン・オフ」。
  *
  *   四角   18×18  角丸 $radius-xxs(3)  枠 1.5px $ink-faint  地 $canvas
  *   選択   地・枠 $accent-deep、印 lucide check 14px $on-accent
@@ -10,7 +10,7 @@
  *   無効   全体の不透明度 0.5
  *   文字   14px $ink、四角との間 8、補足 12px $ink-faint（上との間 4）
  *
- * 動き（Pencil ★V7「チェックボックス 動き」`HO3V6`）
+ * 動き（Pencil ★V8 の動きの表 `NF3uI`）
  *   選ぶ   四角の色 motion-fast、印を一筆で描く motion-base（どちらも motion-ease-out）
  *   外す   四角の色 motion-fast、印は motion-fast で薄くなって消える。描き戻さない
  *   動きを減らす設定では globals.css の決まりで一瞬になる

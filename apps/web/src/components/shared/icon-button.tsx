@@ -16,8 +16,11 @@ export default function IconButton({
   'aria-label': string
   /** React 19 の ref（「…」のメニューの位置の基準などに使う）。 */
   ref?: Ref<HTMLButtonElement>
-  /** 'small' は行の中の 24×24（印 12・角丸 6。ダッシュボード編集 mcOqK の上下）。v8 だけで効く。 */
-  size?: 'small'
+  /**
+   * 'small' は行の中の 24×24（印 12・角丸 6。ダッシュボード編集 mcOqK の上下）。
+   * 'row' は行の右端の「…」の 28×28（印 14・押せる所は 36。★V8 i0Ao0R ほか）。どちらも v8 だけで効く。
+   */
+  size?: 'small' | 'row'
 }) {
   return (
     <button

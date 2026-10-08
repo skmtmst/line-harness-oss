@@ -18,6 +18,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { BOARD_URLS } from './v8-board-urls.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -137,6 +138,29 @@ for (const path of [handoverPath, handoverV8BPath]) {
     entry.width = widthOf(entry.kind ?? '', entry.name)
     boards.set(id, entry)
   }
+}
+
+// 3b. 分類の行（「そのほか／通知」のように、1行に分類の画面の場所を全部並べた行）は、
+// いちばん前（/notifications）を代表にすると、LINEアカウント・運用状態・EC連携などの板を
+// 関係ない「通知」の画面と比べてしまう（監査 ROOT-19）。板ごとの正しい場所（開く指定つき）は
+// v8-board-urls.mjs で決める。決まっていない分類の行の板は場所を空にし、撮影は --route を求める。
+const CATEGORY_ROW_MIN_ROUTES = 4
+const unplaced = []
+for (const [id, entry] of boards) {
+  const exact = BOARD_URLS[id]
+  if (exact) {
+    entry.url = exact
+    entry.route = exact.split('?')[0]
+    continue
+  }
+  if ((entry.routes ?? []).length >= CATEGORY_ROW_MIN_ROUTES) {
+    entry.url = null
+    entry.route = null
+    unplaced.push(id)
+  }
+}
+if (unplaced.length > 0) {
+  console.warn(`[build-v8-design-map] 分類の行だけで場所が決まらない板（BOARD_URLS に足す）: ${unplaced.join(', ')}`)
 }
 
 // 4. 仕様が名指しする板ID。対応表に無いものは警告（落とさない）。

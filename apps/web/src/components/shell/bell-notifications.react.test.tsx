@@ -194,15 +194,13 @@ describe('★V8 ベルの小窓', () => {
     expect(fixture.toast).toHaveBeenCalled()
   })
 
-  it('すべて見る・歯車は小窓を閉じて今のページへ', async () => {
+  it('すべて見るは小窓を閉じてお知らせの画面へ。下に押すものは「すべて見る」1つだけ（歯車は置かない）', async () => {
     render(<Harness />)
-    let dialog = await openPopover()
+    const dialog = await openPopover()
+    expect(within(dialog).queryByRole('button', { name: '通知設定' })).toBeNull()
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'すべて見る →' })) })
     expect(fixture.push).toHaveBeenLastCalledWith('/notifications')
     expect(screen.queryByRole('dialog', { name: 'お知らせ' })).toBeNull()
-    dialog = await openPopover()
-    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '通知設定' })) })
-    expect(fixture.push).toHaveBeenLastCalledWith('/line-notifications?tab=operator')
   })
 
   it('店を選んでいないとき（統括）は読まずに案内だけ', async () => {

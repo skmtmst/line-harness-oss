@@ -11,6 +11,8 @@
  * 読み書きは統括の一括配信の口（API-7 の hq-broadcasts）。店の口（承認・テスト送信・分散・配信後のアクション・
  * 除くタグ・詳細条件）は統括の口に無いので出さない（BEHAVIOR.md の「今の口で出せないもの」）。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { Steps } from '@/components/templates/steps'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -48,7 +50,6 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import formStyles from '@/components/broadcasts/broadcast-form-v8.module.css'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -179,6 +180,7 @@ export default function HqBroadcastCreate() {
   usePageTitle(composer === 'carousel' ? 'カルーセルを作る' : composer === 'rich' ? 'リッチメッセージを作る' : '一括配信を作る')
   usePageCrumbs(composer ? [{ label: '一括配信', href: '/hq/broadcasts' }, { label: '一括配信を作る', href: '/hq/broadcasts/new' }] : [{ label: '一括配信', href: '/hq/broadcasts' }])
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const role = useStaffRole()
   const canManage = role === null || canManageRole(role)
@@ -427,10 +429,10 @@ export default function HqBroadcastCreate() {
 
   const changeStep = (next: BroadcastStepKey) => {
     setStep(next)
-    const q = new URLSearchParams(params.toString())
+    const q = new URLSearchParams(window.location.search)
     if (next === 'basic') q.delete('step'); else q.set('step', next)
     if (draftId) q.set('id', draftId)
-    router.replace(`/hq/broadcasts/new${q.size ? `?${q.toString()}` : ''}`, { scroll: false })
+    samePageUrl.replace(`/hq/broadcasts/new${q.size ? `?${q.toString()}` : ''}`)
     if (next === 'confirm' && (!checks || stale)) void check()
   }
 
@@ -526,10 +528,10 @@ export default function HqBroadcastCreate() {
       setRun(current); setRunKey(key); setChecks(list); setSavedAt(new Date().toISOString())
       if (current.id !== draftId) {
         setDraftId(current.id)
-        const q = new URLSearchParams(params.toString())
+        // 今の URL（段の切り替えで書いた step）に id を足す。この関数を呼んだ時点の段（古い値）で書き戻さない。
+        const q = new URLSearchParams(window.location.search)
         q.set('id', current.id)
-        if (step !== 'basic') q.set('step', step)
-        router.replace(`/hq/broadcasts/new?${q.toString()}`, { scroll: false })
+        samePageUrl.replace(`/hq/broadcasts/new?${q.toString()}`)
       }
       return { run: current, checks: list }
     } catch (caught) {
@@ -764,12 +766,13 @@ export default function HqBroadcastCreate() {
   return (
     <>
       <div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
-        <header className={formStyles.header}>
+        <header className={formStyles.header} data-steps-below="">
           <div className={formStyles.heading}>
             <h2>一括配信を作る</h2>
             <p aria-live="polite">{draftLabel}</p>
           </div>
-          <div className={formStyles.stepRail}><BroadcastStepRail steps={steps} currentKey={step} /></div>
+          {/* 手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。 */}
+          <div className={formStyles.stepsBelow}><Steps label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></div>
           <Button aria-expanded={previewOpen} aria-controls="hq-broadcast-line-preview" className={formStyles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button>
         </header>
         {error ? (
@@ -1152,7 +1155,7 @@ export default function HqBroadcastCreate() {
                     </div>
                     <div>
                       <label htmlFor="hq-bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">時刻（日本時間）</label>
-                      <TimeField id="hq-bc-time" value={time} onChange={setTime} aria-label="時刻（日本時間）" />
+                      <TimeField id="hq-bc-time" size="field" value={time} onChange={setTime} aria-label="時刻（日本時間）" />
                     </div>
                   </div>
                 ) : null}

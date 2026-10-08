@@ -267,6 +267,8 @@ export async function touchBannerProject(db: D1Database, id: string): Promise<vo
 export async function createBannerGeneration(
   db: D1Database,
   input: {
+    /** Deterministic operation ID supplied only by the authenticated API. */
+    operationId?: string;
     tenantId: string;
     projectId: string;
     mode: BannerMode;
@@ -294,7 +296,7 @@ export async function createBannerGeneration(
     createdBy?: string | null;
   },
 ): Promise<BannerGeneration> {
-  const id = crypto.randomUUID();
+  const id = input.operationId ?? crypto.randomUUID();
   const references = (input.references ?? []).slice(0, BANNER_MAX_REFERENCE_IMAGES);
   await db
     .prepare(
@@ -304,7 +306,7 @@ export async function createBannerGeneration(
           person_option, custom_prompt, free_prompt, final_prompt,
           engine, model_name, requested_count, done_count, failed_count, units_per_image,
           error_message, reference_image_id, reference_mode, reference_images, created_by, created_at)
-       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
     )
     .bind(
       id,

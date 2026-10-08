@@ -4,10 +4,20 @@ import {
   setFriendFieldReminderScanCursor,
   enrollFriendsInReminderOnce,
 } from '@line-crm/db';
-import { nextAnniversary, isSameJstDay, toJstParts } from '@line-crm/shared';
+import { nextAnniversary, toJstParts } from '@line-crm/shared';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { getReminderTargetCondition } from './reminder-trigger.js';
 import { matchesCondition } from './segment-query.js';
+
+/** 存在する暦日だけを受け取り、今日以降の基準日をそのまま使う。 */
+function futureBaseline(value: string, now: Date): string | null {
+  const matched = /^(\d{4}-\d{2}-\d{2})(?:$|T)/.exec(value.trim());
+  if (!matched) return null;
+  const day = matched[1];
+  const parsed = new Date(`${day}T00:00:00Z`);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== day) return null;
+  return day >= toJstParts(now).date ? day : null;
+}
 
 /**
  * 友だち情報欄の日付を見て、リマインダのゴール日を立てる。
@@ -71,13 +81,11 @@ export async function processFriendFieldReminders(
       const targetCondition = await getReminderTargetCondition(db, reminder.id);
 
       for (const friend of friends) {
-        // 毎年くり返すなら「次に来るその日」、くり返さないなら「その日が今日か」。
+        // 毎年くり返すなら「次に来るその日」、くり返さないなら今日以降の基準日を使う。
         // 2月29日は設定者が選んだ平年の扱い（2/28・3/1・送らない）に従う（419）。
         const targetDate = reminder.repeat_yearly === 1
           ? nextAnniversary(friend.value, now, reminder.leap_year_policy)
-          : isSameJstDay(friend.value, now)
-            ? toJstParts(now).date
-            : null;
+          : futureBaseline(friend.value, now);
         if (!targetDate) {
           skipped++;
           continue;

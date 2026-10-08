@@ -85,6 +85,7 @@ export async function processOperationAlertNotificationOutbox(
        JOIN staff_members sm ON sm.id = o.staff_id
        JOIN line_accounts la ON la.id = o.line_account_id
       WHERE o.status IN ('queued', 'failed', 'sending') AND o.next_attempt_at <= ?
+        AND la.is_active = 1 AND COALESCE(o.last_error, '') != 'account_inactive'
       ORDER BY o.next_attempt_at, o.id LIMIT ?`,
   ).bind(now, Math.max(1, Math.min(limit, 100))).all<OutboxRow>();
   let sent = 0;
@@ -94,7 +95,10 @@ export async function processOperationAlertNotificationOutbox(
       `UPDATE operation_alert_notification_outbox
           SET status = 'sending', attempt_count = attempt_count + 1,
               next_attempt_at = ?, updated_at = ?
-        WHERE id = ? AND status IN ('queued', 'failed', 'sending') AND next_attempt_at <= ?`,
+        WHERE id = ? AND status IN ('queued', 'failed', 'sending') AND next_attempt_at <= ?
+          AND COALESCE(last_error, '') != 'account_inactive'
+          AND EXISTS (SELECT 1 FROM line_accounts la
+            WHERE la.id = operation_alert_notification_outbox.line_account_id AND la.is_active = 1)`,
     ).bind(leaseExpiresAt, now, row.id, now).run();
     if (Number(claimed.meta?.changes ?? 0) !== 1) continue;
     try {

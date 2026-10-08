@@ -1,0 +1,58 @@
+/*
+ * ログインの確認を初めて待つあいだの外枠（auth-pending-shell.tsx）。
+ * 色・余白は共通の変数だけ。幅は左メニュー（layout/sidebar.module.css の .desktop）と
+ * 本文（app-shell.module.css）の決まりをそのまま使う。
+ */
+.brand {
+  display: flex;
+  height: 64px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 16px;
+}
+
+.topBar {
+  display: none;
+  height: 56px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+}
+
+@media (min-width: 1280px) {
+  .topBar {
+    display: block;
+  }
+}
+
+@media (min-width: 1024px) {
+  :global([data-theme='v8']) .topBar {
+    display: block;
+  }
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+/* ★V8 の外枠は、左メニューと上の帯が灰色の地のまま（線も地も持たない）。白いのは本文の板だけ。 */
+:global([data-theme='v8']) .brand {
+  border-bottom: 0;
+}
+
+:global([data-theme='v8']) .topBar {
+  border-bottom: 0;
+  background: transparent;
+}

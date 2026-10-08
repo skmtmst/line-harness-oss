@@ -1,5 +1,7 @@
 # Lステップ・Liny 実機調査 — V4 設計の一次資料
 
+> 履歴。要件として読まない。現行は `docs/lstep-liny-screen-behavior-research-2026-08.md`・`docs/lstep-unverified-assumptions.md`（比較の根拠）と `docs/v6-requirements/v6-33-account-settings-requirements-draft.md`（乗り換えの要件。§23 に CSV の LINE user ID の未確認事項）。
+
 Lステップの管理画面を実際に操作して採取した仕様と、Liny の公開情報、現行実装との差分。
 **V4 の画面仕様を決めるときの参照元**として使った（当時）。
 

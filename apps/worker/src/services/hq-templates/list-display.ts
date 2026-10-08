@@ -1,3 +1,4 @@
+import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attributes.js';
 import type { HqTemplateType } from '@line-crm/db';
 import { parseTagDefinition } from './tag.js';
 import { parseMessageTemplateDefinition, referencedMedia } from './template.js';
@@ -11,6 +12,11 @@ export function templateContentSummary(type: HqTemplateType, definitionJson: str
   try {
     const input = { templateVersionId: 'list', definitionJson };
     switch (type) {
+      case 'friend_field':
+        return `友だち情報欄・${({text:'テキスト',textarea:'複数行',number:'数値',date:'日付',datetime:'日時',time:'時刻',select:'単一選択',multi_select:'複数選択',checkbox:'チェック',url:'URL',tel:'電話番号',email:'メール',image:'画像',pdf:'PDF'} as const)[parseFriendFieldDefinition(JSON.parse(definitionJson)).field.type]}`;
+      case 'mark':
+        parseMarkDefinition(JSON.parse(definitionJson));
+        return '対応マーク 1';
       case 'tag':
         // 現在のひな形は主タグ1件。付属フォルダはタグ数に含めない。
         parseTagDefinition(JSON.parse(definitionJson));

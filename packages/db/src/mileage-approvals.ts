@@ -227,7 +227,7 @@ export async function confirmPendingMileageEntry(
  * 確定待ちの取消と、利用可能分の取消。
  *
  * - pending: 行自体を void にし、同じ額の逆向きの記録(status=void)を足す。
- *   残高には一度も乗っていないので、記録だけを残す。
+ *   利用可能分は動かさず、財布の確定待ちから同じ額を引く。
  * - available: 元の行は更新・削除せず、逆向きの記録(status=available)を足す。
  *   残高を下回る取消は受け付けない。
  * - void: 再送とみなして既存の逆向き行を返す。
@@ -289,54 +289,69 @@ export async function voidMileageLedgerEntry(
   const reversalId = crypto.randomUUID();
 
   if (entry.status === 'pending') {
-    // 確定待ち: 行を void に進め、履歴として逆向き行(これも void)を足す。
-    const marked = await db
-      .prepare(
+    // 台帳・逆向きの履歴・財布を同じ batch で確定する。
+    // 呼び出し固有の印で、同時取消の負け分が財布を動かすのを防ぐ。
+    const attemptId = crypto.randomUUID();
+    const markerSql = `EXISTS (
+      SELECT 1 FROM mileage_ledger
+       WHERE id = ? AND status = 'void'
+         AND json_extract(metadata, '$.voidAttemptId') = ?
+    )`;
+    const statements = [
+      db.prepare(
         `UPDATE mileage_ledger
             SET status = 'void',
                 metadata = json_set(COALESCE(metadata, '{}'),
-                  '$.voidedByStaffId', ?,
-                  '$.voidedByStaffName', ?,
-                  '$.voidReason', ?,
-                  '$.voidedAt', ?)
+                  '$.voidedByStaffId', ?, '$.voidedByStaffName', ?,
+                  '$.voidReason', ?, '$.voidedAt', ?, '$.voidAttemptId', ?)
           WHERE id = ? AND status = 'pending'`,
-      )
-      .bind(input.staffId, input.staffName, reason, now, entry.id)
-      .run();
-    if (marked.meta.changes === 0) {
+      ).bind(input.staffId, input.staffName, reason, now, attemptId, entry.id),
+      db.prepare(
+        `INSERT OR IGNORE INTO mileage_ledger
+           (id, program_id, beneficiary_user_id, beneficiary_friend_id,
+            engagement_event_id, mileage_rule_id, entry_type, status, amount, reason, source,
+            source_event_id, idempotency_key, reverses_entry_id, metadata,
+            occurred_at, created_at)
+         SELECT ?, ?, ?, ?, ?, ?, 'reversal', 'void', ?, ?, 'admin_void',
+                NULL, ?, ?, ?, ?, ? WHERE ${markerSql}`,
+      ).bind(
+        reversalId, entry.program_id, entry.beneficiary_user_id, entry.beneficiary_friend_id,
+        entry.engagement_event_id, entry.mileage_rule_id, -entry.amount, `取消: ${reason}`,
+        idempotencyKey, entry.id, reversalMetadata, now, now, entry.id, attemptId,
+      ),
+    ];
+    if (await dbTableExists(db, 'mileage_wallets')) {
+      statements.push(db.prepare(
+        `UPDATE mileage_wallets
+            SET pending = pending - ?, version = version + 1, updated_at = ?
+          WHERE program_id = ?
+            AND beneficiary_key = (
+              SELECT CASE
+                WHEN COALESCE(?, f.user_id) IS NOT NULL THEN 'user:' || COALESCE(?, f.user_id)
+                ELSE 'friend:' || ? END
+              FROM (SELECT 1) seed LEFT JOIN friends f ON f.id = ?
+            )
+            AND ${markerSql}`,
+      ).bind(entry.amount, now, entry.program_id,
+        entry.beneficiary_user_id, entry.beneficiary_user_id, entry.beneficiary_friend_id,
+        entry.beneficiary_friend_id, entry.id, attemptId));
+    }
+    const results = await db.batch(statements);
+    const reversal = await db.prepare(
+      `SELECT id FROM mileage_ledger WHERE idempotency_key = ?`,
+    ).bind(idempotencyKey).first<{ id: string }>();
+    if (!reversal) {
       throw new MileageV6Error(
         'mileage_entry_invalid_transition',
         '記録の状態が変わりました。読み直してください',
         409,
       );
     }
-    await db
-      .prepare(
-        `INSERT OR IGNORE INTO mileage_ledger
-           (id, program_id, beneficiary_user_id, beneficiary_friend_id,
-            engagement_event_id, mileage_rule_id, entry_type, status, amount, reason, source,
-            source_event_id, idempotency_key, reverses_entry_id, metadata,
-            occurred_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'reversal', 'void', ?, ?, 'admin_void',
-                 NULL, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        reversalId,
-        entry.program_id,
-        entry.beneficiary_user_id,
-        entry.beneficiary_friend_id,
-        entry.engagement_event_id,
-        entry.mileage_rule_id,
-        -entry.amount,
-        `取消: ${reason}`,
-        idempotencyKey,
-        entry.id,
-        reversalMetadata,
-        now,
-        now,
-      )
-      .run();
-    return { entry: { ...entry, status: 'void' }, reversalEntryId: reversalId, replayed: false };
+    return {
+      entry: { ...entry, status: 'void' },
+      reversalEntryId: reversal.id,
+      replayed: Number(results[0].meta.changes ?? 0) === 0,
+    };
   }
 
   if (entry.status === 'available' && entry.amount > 0) {

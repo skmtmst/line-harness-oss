@@ -5,11 +5,13 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import DateField, { formatLabel as formatDateLabel, parseDate } from './date-field'
 import MenuPortal from './menu-portal'
 import Select from './select'
+import TimeFieldV8, { type TimeFieldSize } from './time-field-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import dateStyles from './date-field.module.css'
 import styles from './date-time-field.module.css'
 
 /**
- * 日時の選択・時刻の選択。Pencil ★V7「日付の選択」（V7 文書 `Fw065`）の仲間。
+ * 日時の選択・時刻の選択。Pencil ★V8（V8.pen）「日時の入力（15分きざみ）」。
  *
  * ブラウザ任せの `<input type="datetime-local">` / `<input type="time">` は、
  * 表示が英語の書式になり、画面ごとに見た目も違った。欄の見た目は DateField と
@@ -37,9 +39,11 @@ export default function DateTimeField({
   min,
   max,
   disabled = false,
+  readOnly = false,
   invalid = false,
   required = false,
   placeholder = '日時を選ぶ',
+  minuteStep = 1,
   id,
   name,
   className,
@@ -53,10 +57,14 @@ export default function DateTimeField({
   min?: string
   max?: string
   disabled?: boolean
+  /** 閲覧のみ。値を字で見せるだけ（押せないボタンを置かない決まり）。 */
+  readOnly?: boolean
   invalid?: boolean
   /** お任せ式の検証用。見た目は変えず、読み上げにだけ必須と伝える。 */
   required?: boolean
   placeholder?: string
+  /** ★V8 の時刻の列の分のきざみ（分）。既定は 1。v7 は使わない。 */
+  minuteStep?: number
   id?: string
   name?: string
   className?: string
@@ -64,6 +72,7 @@ export default function DateTimeField({
   'aria-labelledby'?: string
   'aria-describedby'?: string
 }) {
+  const theme = useAdminTheme()
   const autoId = useId()
   const fieldId = id ?? autoId
   const dialogId = `${fieldId}-datetime-dialog`
@@ -123,6 +132,26 @@ export default function DateTimeField({
       event.preventDefault()
       close()
     }
+  }
+
+  if (readOnly) {
+    return (
+      <div className={[dateStyles.root, className].filter(Boolean).join(' ')}>
+        {name ? <input type="hidden" name={name} value={current} /> : null}
+        <input
+          id={fieldId}
+          readOnly
+          className={dateStyles.field}
+          data-readonly=""
+          value={parsed ? formatDateTimeLabel(parsed) : ''}
+          placeholder="—"
+          title={parsed ? formatDateTimeLabel(parsed) : undefined}
+          aria-label={ariaLabel}
+          aria-labelledby={ariaLabelledBy}
+          aria-describedby={ariaDescribedBy}
+        />
+      </div>
+    )
   }
 
   return (
@@ -200,6 +229,22 @@ export default function DateTimeField({
               aria-label="日付"
             />
           </div>
+          {theme === 'v8' ? (
+            // ★V8：時刻の部分は時刻の欄（打つ＋2列から選ぶ・提案 YCOoR）と同じ部品。
+            <div className={styles.timeV8}>
+              <span className={styles.timeV8Label} id={`${fieldId}-time-label`}>時刻</span>
+              <TimeFieldV8
+                aria-labelledby={`${fieldId}-time-label`}
+                size="field"
+                minuteStep={minuteStep}
+                value={`${pad(shownTime.hours)}:${pad(shownTime.minutes)}`}
+                onChange={(next) => {
+                  const time = parseTime(next)
+                  if (time) chooseTime(time.hours, time.minutes)
+                }}
+              />
+            </div>
+          ) : (
           <div className={styles.timeRow}>
             <label className={styles.timeLabel}>
               時
@@ -223,6 +268,7 @@ export default function DateTimeField({
               />
             </label>
           </div>
+          )}
           <div className={styles.footer}>
             <button type="button" className={styles.closeBtn} onClick={close}>閉じる</button>
             <button type="button" className={styles.clearBtn} onClick={() => { emit(''); close() }}>消す</button>
@@ -234,14 +280,64 @@ export default function DateTimeField({
   )
 }
 
+type TimeFieldProps = {
+  value?: string
+  defaultValue?: string
+  onChange?: (value: string) => void
+  /** `type="time"` と同じ秒の刻み（300 で 5分）。V8 では分の列のきざみになる。 */
+  step?: number
+  /** 分のきざみ（分）。`step` より優先。V8 だけが使う（v7 は 1分のまま）。 */
+  minuteStep?: number
+  /** ★V8 の欄の高さ。`field`＝40（日付の欄と並ぶ）、`compact`＝32（表の中の細い欄）。v7 は使わない。 */
+  size?: TimeFieldSize
+  disabled?: boolean
+  /** 閲覧のみ。V8 は値を見せて打てない・時計を出さない。v7 は押せない欄。 */
+  readOnly?: boolean
+  invalid?: boolean
+  /** お任せ式の検証用。見た目は変えず、読み上げにだけ必須と伝える。 */
+  required?: boolean
+  placeholder?: string
+  id?: string
+  name?: string
+  className?: string
+  'aria-label'?: string
+  'aria-labelledby'?: string
+  'aria-describedby'?: string
+}
+
 /**
- * 時刻の選択。`time` の置き換え。欄の見た目は DateField と同じ（高さ40・14px）、
- * 表示は `10:00`。値は `HH:mm`（空は `''`）で受け渡す。
+ * 時刻の選択。`time` の置き換え。値は `HH:mm`（空は `''`・日本時間）で受け渡す。
+ *
+ * - ★V8（`data-theme="v8"`）：数字を打てる欄＋時と分の2列から選ぶ（time-field-v8.tsx・
+ *   Pencil 提案 YCOoR）。分のきざみは `minuteStep`（分）か `step`（秒）
+ * - v7：今までの形（時・分の2つのプルダウン）。切り替えの1週間後に消す
+ */
+export function TimeField(props: TimeFieldProps) {
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    const { step, minuteStep, placeholder, size, ...rest } = props
+    // v7 の置き場所文（「時刻を選ぶ」）は V8 では使わない。絵の空は「-- : --」。
+    void placeholder
+    return <TimeFieldV8 {...rest} size={size} minuteStep={minuteStep ?? stepSecondsToMinutes(step)} />
+  }
+  const { readOnly, disabled, size, ...v7 } = props
+  void size
+  return <TimeFieldV7 {...v7} disabled={disabled || readOnly} />
+}
+
+/** `type="time"` の秒の刻みを分へ。分にならない刻みは 1分。 */
+function stepSecondsToMinutes(step?: number): number {
+  if (!step || step < 60 || step % 60 !== 0) return 1
+  return step / 60
+}
+
+/**
+ * v7 の時刻の選択。欄の見た目は DateField と同じ（高さ40・14px）、表示は `10:00`。
  *
  * `step` は `type="time"` との置き換えやすさのために受け付けるだけ（分の刻みを
  * 狭めない）。保存する値の形は変えない。
  */
-export function TimeField({
+function TimeFieldV7({
   value,
   defaultValue = '',
   onChange,
@@ -256,23 +352,7 @@ export function TimeField({
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledBy,
   'aria-describedby': ariaDescribedBy,
-}: {
-  value?: string
-  defaultValue?: string
-  onChange?: (value: string) => void
-  step?: number
-  disabled?: boolean
-  invalid?: boolean
-  /** お任せ式の検証用。見た目は変えず、読み上げにだけ必須と伝える。 */
-  required?: boolean
-  placeholder?: string
-  id?: string
-  name?: string
-  className?: string
-  'aria-label'?: string
-  'aria-labelledby'?: string
-  'aria-describedby'?: string
-}) {
+}: TimeFieldProps) {
   void step
   const autoId = useId()
   const fieldId = id ?? autoId

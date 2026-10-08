@@ -5,16 +5,16 @@
  * 絵：テンプレート i0Ao0R（V8.pen の行「統括」）・LRc93（V8-B 版）、回答フォーム wZPua、友だち属性 DzdC3、リッチメニュー noVq4。
  *
  * 店の一覧（src/v8/templates/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・種類のタブ・フォルダの列・表・ページ送り）・
- * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「アカウントへ配る」口だけ：
+ * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「配る」口だけ：
  *   - 表の「使っている所」の代わりに「配布先」（N アカウント・まだ配っていない）
- *   - 行の［アカウントへ配る］（行の「…」にも同じ項目）
+ *   - 全種類の行の右端「…」の左に［配る］（共通部品 RowQuickAction。「…」の中にも同じ項目。オーナー 2026-10-08）
  *   - 数の帯は配ったアカウントの数
  * 読み書き（一覧・分類・複製・削除・配る）は呼ぶ側（console.tsx）が今までどおり持つ。ここは見せ方と押した知らせだけ。
  */
 import { useMemo, useState, type ReactNode } from 'react'
 import {
-  ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2,
-  MessageSquare, Pencil, Plus, Send, Ticket, Trash2, Unlink, Users,
+  CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2,
+  MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users,
 } from 'lucide-react'
 import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
@@ -30,7 +30,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Pagination from '@/components/shared/pagination'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Select from '@/components/shared/select'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -40,7 +40,9 @@ import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { formatNumber } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
 import { distributedAccountsLine, templateSubLine } from './list-row'
+import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
 import styles from '../templates/list.module.css'
+import attributeStyles from './attribute-tabs.module.css'
 
 /** 店のテンプレートと同じ6種類（上のタブ）。 */
 export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof MessageSquare }[] = [
@@ -136,6 +138,10 @@ export default function HqStoreList(props: HqStoreListProps) {
   const words = WORDS[type]
   const [query, setQuery] = useState('')
   const [undistributedOnly, setUndistributedOnly] = useState(false)
+  /* 友だち属性（DzdC3）だけ：上のタブ（タグ・友だち情報欄・対応マーク・保存した検索）と、使用状態・付け方の絞り込み。 */
+  const attribute = useAttributeTab('/hq/friend-attributes')
+  const [tagUsage, setTagUsage] = useState<TagUsageFilter>('all')
+  const [tagMethod, setTagMethod] = useState('all')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -154,10 +160,11 @@ export default function HqStoreList(props: HqStoreListProps) {
     return rows.filter((row) => {
       if (folderFilter !== 'all' && (row.folder_id ?? 'none') !== folderFilter) return false
       if (undistributedOnly && (row.distributed_account_count ?? 0) > 0) return false
+      if (type === 'tag' && !matchesTagFilters(row, tagUsage, tagMethod)) return false
       if (!words) return true
       return [row.name, row.description ?? '', row.content_summary ?? ''].some((text) => text.normalize('NFKC').toLocaleLowerCase('ja-JP').includes(words))
     })
-  }, [rows, folderFilter, undistributedOnly, query])
+  }, [rows, folderFilter, undistributedOnly, query, type, tagUsage, tagMethod])
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
@@ -182,6 +189,18 @@ export default function HqStoreList(props: HqStoreListProps) {
       : { key: 'distributed', title: '配ったひな形', icon: Send, value: ready ? distributed : null, unit: '件', detail: ready ? '1つ以上のアカウントへ配った' : '—' },
     { key: 'outdated', title: '新しい版を未配布', icon: Users, value: ready ? outdated : null, unit: '件', detail: ready ? '直したあと配っていない' : '—' },
   ]
+
+  /*
+   * 友だち属性（DzdC3）の数の帯：未使用・付けている友だち・（今月付けた回数の代わりに）新しい版を未配布・整理の候補。
+   * 今月付けた回数は統括の一覧の受け口に無いので出さない（見た目だけ置かない）。
+   */
+  const tagKpis = [
+    { key: 'unused', title: '未使用', icon: CircleDashed, value: ready ? unusedTagCount(rows) : null, unit: '件', detail: ready ? '配った先で付いている友だちが0人' : '—' },
+    { key: 'friends', title: '付けている友だち', icon: Users, value: ready ? sumOrNull(rows.map((row) => row.friend_count)) : null, unit: '人', detail: ready ? '配った先の合計' : '—' },
+    { key: 'outdated', title: '新しい版を未配布', icon: Send, value: ready ? outdated : null, unit: '件', detail: ready ? '直したあと配っていない' : '—' },
+    { key: 'cleanup', title: '整理の候補', icon: Sparkles, value: ready ? cleanupTagCount(rows) : null, unit: '件', detail: ready ? '未使用・名前が重なっている' : '—' },
+  ]
+  const bandKpis = type === 'tag' ? tagKpis : kpis
 
   const tabs = kind && onKindChange ? (
     <div className={styles.tabsBox}>
@@ -264,22 +283,37 @@ export default function HqStoreList(props: HqStoreListProps) {
   }
 
   const rowMenu = (row: HqTemplate): ActionMenuItem[] => [
-    { id: 'distribute', label: 'アカウントへ配る', icon: <Send size={14} aria-hidden="true" />, onSelect: () => onDistribute(row) },
+    { id: 'distribute', label: '配る', icon: <Send size={14} aria-hidden="true" />, onSelect: () => onDistribute(row) },
     { id: 'edit', label: '編集する', icon: <Pencil size={14} aria-hidden="true" />, onSelect: () => onEdit(row) },
     { id: 'duplicate', label: '複製する', icon: <Copy size={14} aria-hidden="true" />, onSelect: () => onDuplicate(row) },
     { id: 'remove', label: '削除する', icon: <Trash2 size={14} aria-hidden="true" />, tone: 'danger', dividerBefore: true, onSelect: () => onRemove(row) },
   ]
 
   const toolbar = (
-    <div className={styles.wideTools}>
+    <div className={type === 'tag' ? `${styles.wideTools} ${attributeStyles.tagTools}` : styles.wideTools}>
       <ListToolbar
         search={{ placeholder: words.search, label: `${words.title}のひな形を検索`, value: query, onChange: (value) => { setQuery(value); setPage(1) } }}
         filters={(
+          <>
+          {type === 'tag' ? (
+            <>
+              <Select aria-label="使用状態で絞り込む" width={145} value={tagUsage} onChange={(value) => { setTagUsage(value as TagUsageFilter); setPage(1) }} options={[
+                { value: 'all', label: '使用状態：すべて' },
+                { value: 'used', label: '使用状態：付いている' },
+                { value: 'unused', label: '使用状態：未使用' },
+              ]} />
+              <Select aria-label="付け方で絞り込む" width={132} value={tagMethod} onChange={(value) => { setTagMethod(value); setPage(1) }} options={[
+                { value: 'all', label: '付け方：すべて' },
+                ...assignmentMethods(rows).map((method) => ({ value: method, label: `付け方：${method}` })),
+              ]} />
+            </>
+          ) : null}
           <div role="group" aria-label="配ったかで絞り込む" className={styles.chipGroup}>
             <FilterChip selected={undistributedOnly} onChange={() => { setUndistributedOnly((value) => !value); setPage(1) }} title="まだどのアカウントへも配っていないひな形" icon={<Unlink size={13} aria-hidden="true" />}>
               未配布
             </FilterChip>
           </div>
+          </>
         )}
         trailing={(
           <div className={styles.perPageBox}>
@@ -292,12 +326,12 @@ export default function HqStoreList(props: HqStoreListProps) {
 
   /*
    * 種類ごとの列（店の同じ機能の一覧と同じ並び）。違いは「配布先」の列だけ。
-   *   テンプレート i0Ao0R：種類・公開・配布先・今月送った数・更新・「…」（［アカウントへ配る］は「…」の中）
-   *   友だち属性 DzdC3：人数・付け方・配布先・「…」（人数は API-18 の配った先で付いている友だちの合計）
-   *   リッチメニュー noVq4：順・誰に出すか・状態・配布先・今月押された・「…」（API-18 の順・誰に出すか・配った先の押された数）
-   *   回答フォーム wZPua：状態・配布先・更新・［アカウントへ配る］と「…」
+   *   テンプレート i0Ao0R：種類・公開・配布先・今月送った数・更新・［配る］・「…」
+   *   友だち属性 DzdC3：人数・付け方・配布先・［配る］・「…」（人数は API-18 の配った先で付いている友だちの合計）
+   *   リッチメニュー noVq4：順・誰に出すか・状態・配布先・今月押された・［配る］・「…」（API-18 の順・誰に出すか・配った先の押された数）
+   *   回答フォーム wZPua：状態・配布先・更新・［配る］・「…」
+   * ［配る］の列は見出しが空の幅60（絵の「列 配る」）、「…」との間は 16。閲覧のみ（配れない人）には列ごと出さない。
    */
-  const rowButton = type === 'form' || type === 'scenario'
   const rankOf = new Map(type === 'rich_menu'
     ? [...rows].sort((a, b) => (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'ja')).map((row, index) => [row.id, index + 1] as const)
     : [])
@@ -359,8 +393,8 @@ export default function HqStoreList(props: HqStoreListProps) {
       description="ひな形を作ると、ここから各 LINE アカウントへ配れます。"
       create={{ label: `最初の${words.item}を作る`, onClick: onCreate }}
       canCreate={canEdit}
-      filtered={Boolean(query || undistributedOnly || folderFilter !== 'all')}
-      onClearFilters={() => { setQuery(''); setUndistributedOnly(false); onFolderFilter('all'); setPage(1) }}
+      filtered={Boolean(query || undistributedOnly || folderFilter !== 'all' || tagUsage !== 'all' || tagMethod !== 'all')}
+      onClearFilters={() => { setQuery(''); setUndistributedOnly(false); setTagUsage('all'); setTagMethod('all'); onFolderFilter('all'); setPage(1) }}
       filteredDescription="検索や「未配布」・フォルダを外すと、すべて出ます"
     />
   ) : (
@@ -370,13 +404,15 @@ export default function HqStoreList(props: HqStoreListProps) {
           {type === 'rich_menu' ? <col className={styles.colSelect} /> : null}
           <col />
           {columns.map((column) => column.col)}
-          <col className={rowButton ? styles.colHqActions : styles.colMenu} />
+          {canEdit ? <col className={styles.colHqDistribute} /> : null}
+          <col className={styles.colMenu} />
         </colgroup>
         <thead>
           <TableHeadRow>
             {type === 'rich_menu' ? <Th className={styles.headCell}>順</Th> : null}
             <Th className={styles.headCell}>{words.column}</Th>
             {columns.map((column) => <Th key={column.key} className={styles.headCell}>{column.head}</Th>)}
+            {canEdit ? <Th aria-label="配る" /> : null}
             <Th aria-label="操作" />
           </TableHeadRow>
         </thead>
@@ -400,17 +436,17 @@ export default function HqStoreList(props: HqStoreListProps) {
                   sub={<span className={`${styles.cellSub} ${styles.dotIndent}`} title={sub}>{sub}</span>}
                 />
                 {columns.map((column) => column.cell(row))}
+                {canEdit ? (
+                  <Td className={`${styles.menuCell} ${styles.hqDistributeCell}`}>
+                    <div className={styles.menuBox}>
+                      <RowQuickAction label="配る" ariaLabel={`${row.name}を配る`} icon={<Send aria-hidden="true" />} disabled={busy} onClick={() => onDistribute(row)} />
+                    </div>
+                  </Td>
+                ) : null}
                 <Td className={styles.menuCell}>
                   <div className={`${styles.menuBox} ${styles.hqActions}`}>
                     {canEdit ? (
-                      <>
-                        {rowButton ? (
-                          <Button type="button" variant="text" disabled={busy} onClick={() => onDistribute(row)} aria-label={`${row.name}をアカウントへ配る`}>
-                            <Send size={14} aria-hidden="true" />アカウントへ配る
-                          </Button>
-                        ) : null}
-                        <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
-                      </>
+                      <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} size="row" open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
                     ) : null}
                   </div>
                 </Td>
@@ -427,16 +463,20 @@ export default function HqStoreList(props: HqStoreListProps) {
     <Pagination page={current} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{summary}</span>} />
   ) : <p className={styles.pagerSolo}>{summary}</p>
 
+  if (type === 'tag' && attribute.tab !== 'tags') {
+    return <OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} />
+  }
+
   return (
     <ListPage
       boardId={type === 'template' ? 'i0Ao0R' : type === 'form' ? 'wZPua' : type === 'tag' ? 'DzdC3' : type === 'rich_menu' ? 'noVq4' : 'LRc93'}
       headingSize="regular"
       title={words.title}
       description={words.description}
-      tabs={tabs}
+      tabs={type === 'tag' ? <AttributeTabs tab={attribute.tab} onSelect={(key) => { attribute.select(key); setPage(1) }} /> : tabs}
       stats={(
         <KpiBand data-design="KPIs" className={styles.kpiStrip}>
-          {kpis.map((kpi) => (
+          {bandKpis.map((kpi) => (
             <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={<span className={styles.kpiDetailWrap}>{kpi.detail}</span>} />
           ))}
         </KpiBand>

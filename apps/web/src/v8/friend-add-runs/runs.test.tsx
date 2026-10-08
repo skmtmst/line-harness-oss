@@ -153,7 +153,9 @@ describe('実行結果の画面（REIxB）', () => {
   it('「失敗だけ見る」で URL の status を failed にする', async () => {
     await render()
     await act(async () => { buttonByText('失敗だけ見る')?.click() })
-    expect(nav.replace).toHaveBeenCalledWith(expect.stringContaining('status=failed'), { scroll: false })
+    // 同じ画面の中の絞り込みはルーターを通さず履歴だけを書き換える（新しい版の後に丸ごと読み直さない）。
+    expect(new URLSearchParams(window.location.search).get('status')).toBe('failed')
+    expect(nav.replace).not.toHaveBeenCalled()
   })
 
   it('「失敗した処理をもう一度」は今のページの失敗だけを順に実行する', async () => {

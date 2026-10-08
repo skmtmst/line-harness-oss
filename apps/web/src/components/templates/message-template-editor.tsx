@@ -11,6 +11,8 @@ import { Field, TextArea } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Select from '@/components/shared/select'
 
+export const LEGACY_MESSAGE_NOTICE = 'この形は新しく作れません。新しく作るときはカルーセル・リッチメッセージを使ってください。'
+
 export const MESSAGE_TEMPLATE_TYPES = [
   { value: 'text', label: 'テキスト' },
   { value: 'flex', label: 'カード型' },
@@ -244,6 +246,7 @@ export function MessageTemplateEditor({
   referenceUnavailableHint,
   disabled = false,
   typeOptions = MESSAGE_TEMPLATE_TYPES,
+  showTypeSelector = true,
   typeNote,
   bodyLabel,
   bodyAriaLabel,
@@ -264,6 +267,8 @@ export function MessageTemplateEditor({
   referenceUnavailableHint?: ReactNode
   disabled?: boolean
   typeOptions?: ReadonlyArray<{ value: string; label: string }>
+  /** 既存の中身の種類を保ったまま編集するときは切り替えを出さない。 */
+  showTypeSelector?: boolean
   typeNote?: ReactNode
   bodyLabel?: string
   bodyAriaLabel?: string
@@ -308,9 +313,9 @@ export function MessageTemplateEditor({
       <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
         {beforeType}
         {editorContent ?? <>
-        <Field label="種類" htmlFor="tp-type" note={typeNote}>
+        {showTypeSelector ? <Field label="種類" htmlFor="tp-type" note={typeNote}>
           <Select id="tp-type" aria-label="メッセージ形式" value={value.messageType} disabled={disabled} onChange={(messageType) => onChange({ ...value, messageType })} options={[...typeOptions]} />
-        </Field>
+        </Field> : null}
         {afterType}
         {/*
           U058: 本文の欄を先に出す。差し込みの操作群を上に置くと、

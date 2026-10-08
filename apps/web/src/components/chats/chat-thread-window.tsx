@@ -37,11 +37,13 @@ type Props<M extends ThreadMessage> = {
   /** この吹き出しを欄の真ん中へ出す（scrollSeq が変わるたびに） */
   scrollToId?: string | null
   scrollSeq?: number
+  /** 吹き出しの行と行の間（CSS の長さ）。省略は 8px（V8 は絵の 12） */
+  rowGap?: string
 }
 
 export default function ChatThreadWindow<M extends ThreadMessage>({
   messages, scrollerRef, hasMore, loadingOlder, onLoadOlder, renderMessage, label = 'メッセージ',
-  total, scrollToId = null, scrollSeq = 0,
+  total, scrollToId = null, scrollSeq = 0, rowGap = '8px',
 }: Props<M>) {
   const contentRef = useRef<HTMLDivElement | null>(null)
   const focusIndexRef = useRef<number | null>(null)
@@ -161,7 +163,7 @@ export default function ChatThreadWindow<M extends ThreadMessage>({
         /* 吹き出しへは1か所だけ Tab で入る（いちばん新しい吹き出し）。中は矢印で動く。 */
         tabIndex={i === messages.length - 1 ? 0 : -1}
         /* 行の間 8px は行の中に持つ（外の余白だと測った高さに入らない）。 */
-        style={{ display: 'flow-root', paddingTop: i === 0 ? 0 : 8 }}
+        style={{ display: 'flow-root', paddingTop: i === 0 ? 0 : rowGap }}
         className="rounded-mini focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
       >
         {renderMessage(message, i, messages)}

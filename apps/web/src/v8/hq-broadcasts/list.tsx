@@ -9,9 +9,10 @@
  *   - 結果の列はアカウントの合計（届いた人数・失敗したアカウント）
  * 1行＝1回の一括配信。行を押すと詳細（送った結果）へ。動きは BEHAVIOR.md。
  */
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, CalendarClock, FilePen, Inbox, List, Plus, Send } from 'lucide-react'
+import { AlertCircle, ArrowUpDown, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send } from 'lucide-react'
 import type { HqBroadcastRun } from '@line-crm/shared'
 import { ListPage, ListPagePagination } from '@/components/templates/list-page'
 import Button from '@/components/shared/button'
@@ -78,6 +79,7 @@ function rateLine(targets: HqBroadcastRun['targets'], reached: number): string |
 type HqFolder = { id: string; name: string; revision: number; item_count: number }
 
 export default function HqBroadcastList() {
+  const router = useRouter()
   usePageTitle('一括配信')
   const role = useStaffRole()
   const canManage = role === null || canManageRole(role)
@@ -87,6 +89,8 @@ export default function HqBroadcastList() {
   const [status, setStatus] = useState<StatusKey>('all')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
+  /* 並び順（絵 U4Eep0 の「新しい順」）。口は作った順の新しい順で返すので、古い順は逆に並べる。 */
+  const [sortKey, setSortKey] = useState<'newest' | 'oldest'>('newest')
   /* 左の列のフォルダ（店の一斉配信と同じ。API-18 の統括のフォルダ）。読めなくても一覧は出す。 */
   const [folders, setFolders] = useState<HqFolder[] | null>(null)
   const [folderFilter, setFolderFilter] = useState('all')
@@ -124,9 +128,10 @@ export default function HqBroadcastList() {
   const inFolder = useCallback((run: HqBroadcastRun) => folderFilter === 'all' || (folderFilter === 'none' ? !run.input?.folderId || !(folders ?? []).some((f) => f.id === run.input.folderId) : run.input?.folderId === folderFilter), [folderFilter, folders])
   const filtered = useMemo(() => {
     const words = query.trim().toLocaleLowerCase()
-    return all.filter((run) => inFolder(run) && (status === 'all' || statusKeyOf(run) === status)
+    const hits = all.filter((run) => inFolder(run) && (status === 'all' || statusKeyOf(run) === status)
       && (!words || [run.title, run.input?.messageContent ?? ''].some((text) => text.toLocaleLowerCase().includes(words))))
-  }, [all, status, query, inFolder])
+    return sortKey === 'oldest' ? [...hits].reverse() : hits
+  }, [all, status, query, inFolder, sortKey])
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
@@ -136,16 +141,25 @@ export default function HqBroadcastList() {
   const sentRuns = all.filter((run) => statusKeyOf(run) === 'sent')
   const delivered = sentRuns.reduce((sum, run) => sum + run.targets.filter((t) => !t.excluded).reduce((s, t) => s + t.successCount, 0), 0)
   const failedStores = all.reduce((sum, run) => sum + run.targets.filter((t) => !t.excluded && (t.status === 'failed' || failedCount(t) > 0)).length, 0)
+  /*
+   * 平均の開封率（絵 U4Eep0 の4つ目）：送った配信の開いた人の合計÷届いた人の合計。開いた数を数えていない
+   * アカウントが1つでもあれば出さない（「—」）。一覧に送った日が無いので「過去28日」ではなく送った配信全体。
+   * 今月の送信枠（絵の2つ目）は統括の口に無いので、代わりにエラーを置く（見た目だけ置かない）。
+   */
+  const sentTargets = all.filter((run) => statusKeyOf(run) === 'sent' || statusKeyOf(run) === 'error').flatMap((run) => run.targets.filter((t) => !t.excluded && t.successCount > 0))
+  const openKnown = sentTargets.length > 0 && sentTargets.every((t) => t.openedCount != null)
+  const openReached = sentTargets.reduce((sum, t) => sum + t.successCount, 0)
+  const openRate = openKnown && openReached > 0 ? Math.round((sentTargets.reduce((sum, t) => sum + (t.openedCount ?? 0), 0) / openReached) * 1000) / 10 : null
   const kpis = [
     { key: 'scheduled', title: '予約中', icon: CalendarClock, value: ready ? counts.scheduled : null, unit: '件', detail: ready ? `下書き ${formatNumber(counts.draft)}件` : '—' },
     { key: 'sent', title: '送った配信', icon: Send, value: ready ? counts.sent : null, unit: '件', detail: ready ? `${formatNumber(delivered)}人に届いた` : '—' },
     { key: 'error', title: 'エラー', icon: AlertCircle, value: ready ? counts.error : null, unit: '件', detail: ready ? `失敗したアカウント ${formatNumber(failedStores)}件` : '—' },
-    { key: 'all', title: '一括配信', icon: Inbox, value: ready ? all.length : null, unit: '件', detail: '各店の一斉配信にも「統括から」で出ます' },
+    { key: 'open', title: '平均の開封率', icon: MailOpen, value: ready ? openRate : null, unit: '%', detail: ready ? (openRate == null ? 'まだ数えていません' : '送った配信の合計') : '—' },
   ]
 
   const createButton = (full: boolean) => canManage ? (
     <Button variant="primary" href={NEW_HREF} className={full ? 'v8-folder-create w-full' : undefined}>
-      <Plus size={15} aria-hidden="true" />一括配信を作る
+      <Plus size={15} aria-hidden="true" />配信を作る
     </Button>
   ) : null
 
@@ -219,6 +233,15 @@ export default function HqBroadcastList() {
             options={[{ value: '10', label: '10件表示' }, { value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }]}
           />
         </div>
+        <button
+          type="button"
+          className={styles.sortButton}
+          aria-label={`並び順：${sortKey === 'newest' ? '新しい順' : '古い順'}（押すと入れ替え）`}
+          onClick={() => { setSortKey((current) => (current === 'newest' ? 'oldest' : 'newest')); setPage(1) }}
+        >
+          <ArrowUpDown size={14} aria-hidden="true" />
+          {sortKey === 'newest' ? '新しい順' : '古い順'}
+        </button>
       </div>
     </div>
   )
@@ -292,8 +315,8 @@ export default function HqBroadcastList() {
                 <Td className={styles.colMenu}>
                   <div className={styles.menuBox}>
                     <RowActions subjectName={run.title} menuItems={[
-                      { id: 'open', label: run.status === 'prepared' ? '確かめて送る' : '送った結果を見る', onSelect: () => { window.location.href = href } },
-                      ...(run.status === 'prepared' && canManage ? [{ id: 'edit', label: '下書きを直す', onSelect: () => { window.location.href = `${NEW_HREF}?id=${encodeURIComponent(run.id)}` } }] : []),
+                      { id: 'open', label: run.status === 'prepared' ? '確かめて送る' : '送った結果を見る', onSelect: () => { router.push(href) } },
+                      ...(run.status === 'prepared' && canManage ? [{ id: 'edit', label: '下書きを直す', onSelect: () => { router.push(`${NEW_HREF}?id=${encodeURIComponent(run.id)}`) } }] : []),
                     ]} />
                   </div>
                 </Td>
