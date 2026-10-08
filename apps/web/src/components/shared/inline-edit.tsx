@@ -45,6 +45,7 @@ export default function InlineEdit({ value, label, onSave, placeholder, maxLengt
   }
 
   const cancel = () => {
+    if (saving) return
     setDraft(value)
     setError('')
     setEditing(false)
@@ -89,9 +90,9 @@ export default function InlineEdit({ value, label, onSave, placeholder, maxLengt
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
           // 変換中の Enter（確定）・Esc（変換をやめる）は入力欄のもの。保存・取り消しにしない。
-          if (isImeComposing(event)) return
-          if (event.key === 'Enter') void save()
-          else if (event.key === 'Escape') cancel()
+          if (event.defaultPrevented || isImeComposing(event)) return
+          if (event.key === 'Enter') { event.preventDefault(); void save() }
+          else if (event.key === 'Escape') { event.preventDefault(); cancel() }
         }}
         onBlur={() => {
           // ぶれたらやめる（勝手に保存しない）。

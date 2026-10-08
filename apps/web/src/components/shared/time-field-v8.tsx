@@ -4,6 +4,7 @@ import { Clock3 } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './time-field-v8.module.css'
+import { isImeComposing } from './ime'
 
 /**
  * 時刻の欄（★V8）。Pencil V8.pen の提案「時刻を選ぶ（打つ＋2列から選ぶ）」YCOoR
@@ -194,7 +195,7 @@ export default function TimeFieldV8({
   }
 
   const onInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (isComposing(event)) return
+    if (isImeComposing(event)) return
     if (event.key === 'ArrowDown' && !open) {
       event.preventDefault()
       openPanel()
@@ -213,7 +214,7 @@ export default function TimeFieldV8({
   }
 
   const onListKeyDown = (column: Column) => (event: KeyboardEvent<HTMLDivElement>) => {
-    if (isComposing(event)) return
+    if (isImeComposing(event)) return
     const list = column === 'hours' ? HOURS : minutes
     const active = column === 'hours' ? activeHour : activeMinute
     const setActive = column === 'hours' ? setActiveHour : setActiveMinute
@@ -514,11 +515,6 @@ function nowInTokyo(): Hm {
   const hours = Number(parts.find((part) => part.type === 'hour')?.value ?? 0)
   const minutes = Number(parts.find((part) => part.type === 'minute')?.value ?? 0)
   return { hours: hours % 24, minutes }
-}
-
-function isComposing(event: KeyboardEvent<HTMLElement>): boolean {
-  // 日本語の変換中（確定の Enter を含む）は何もしない。Safari は keyCode 229 だけ立つ。
-  return event.nativeEvent.isComposing || event.keyCode === 229
 }
 
 function scrollToRow(list: HTMLElement | null, index: number) {
