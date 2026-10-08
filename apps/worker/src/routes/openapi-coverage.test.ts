@@ -1304,6 +1304,7 @@ const ALLOWLIST = new Set<string>([
   'GET /api/friend-add-runs',
   'GET /api/friend-add-runs/{id}',
   'POST /api/friend-add-rules/drafts',
+  'PATCH /api/friend-add-rules/folders/{id}',
   'POST /api/friend-add-rules/folders',
   'POST /api/friend-add-rules/test',
   'POST /api/friend-add-rules/{id}/publish',
