@@ -87,6 +87,7 @@
 .whenSelectTime {
   flex-shrink: 0;
   display: inline-flex;
+  width: var(--tpl-sfs-time-w);
 }
 .whenExample {
   flex: 1 1 0;
