@@ -34,3 +34,11 @@ export interface EcIdentityDuplicateSignal {
   /** Pending pairs > 1, matching summary.duplicateSuspicions (customers, not pairs). */
   isDuplicateSuspicion: boolean;
 }
+
+export interface CustomerNotificationFailureCounts {
+  /** Current unresolved live customer deliveries, all time; not EC processing events or attempts. */
+  scope: 'all_time_unresolved';
+  total: number;
+  failed: number;
+  retryWaiting: number;
+}
