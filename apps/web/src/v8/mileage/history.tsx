@@ -352,7 +352,7 @@ export default function HistoryTab() {
                 }}
               >
                 <Td className={styles.colName}>
-                  <span className={styles.rowNameInk} title={viewName(item)}>{viewName(item)}</span>
+                  <span className={styles.rowName} title={viewName(item)}>{viewName(item)}</span>
                   <span className={styles.rowSub}>
                     {`${formatMileageShortDateTime(item.occurredAt)}${item.lineAccountName ? `・${item.lineAccountName}` : ''}`}
                   </span>

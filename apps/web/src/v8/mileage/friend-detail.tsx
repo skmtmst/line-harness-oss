@@ -11,7 +11,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ChevronLeft, CircleDot, Clock3, MessageCircle, Minus, Plus, Undo2 } from 'lucide-react'
+import { CircleDot, Clock3, MessageCircle, Minus, Plus, Undo2 } from 'lucide-react'
 import { DetailPage } from '@/components/templates'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -361,9 +361,8 @@ function FriendDetailInner() {
     <DetailPage
       boardId="R6kIG"
       title={displayName}
-      identity={<Link href="/mileage?tab=balances" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />マイルへ</Link>}
       description={[joinedAt ? `友だちになった日 ${joinedAt}` : null, `会員ランク ${rankLabel}`, lastActive ? `最後に動いた日 ${lastActive}` : null].filter(Boolean).join('・')}
-      actions={<div className={`${styles.headActions} ${styles.headActionsPulled}`}>
+      actions={<div className={styles.headActions}>
         <Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>
           <MessageCircle size={15} aria-hidden="true" /> トークを開く
         </Button>
@@ -434,17 +433,15 @@ function FriendDetailInner() {
         </div>
 
         {visible.length === 0 ? (
-          <div className={styles.historyEmpty}>
-            <p className={styles.stateTitle}>{displayedHistory.length === 0 ? 'マイルの履歴はありません' : '条件に合う履歴はありません'}</p>
-            <p className={styles.stateDesc}>
-              {displayedHistory.length === 0 ? '付与や使用が記録されると、ここに理由と日時が表示されます。' : '検索や絞り込みを外すと、すべて出ます'}
-            </p>
-            {displayedHistory.length > 0 ? (
+          <ListState kind="empty"
+            title={displayedHistory.length === 0 ? 'マイルの履歴はありません' : '条件に合う履歴はありません'}
+            description={displayedHistory.length === 0 ? '付与や使用が記録されると、ここに理由と日時が表示されます。' : '検索や絞り込みを外すと、すべて出ます'}
+            action={displayedHistory.length > 0 ? (
               <Button type="button" onClick={() => { setSearchInput(''); setSearch(''); setKindFilter('all'); setPeriod('all'); setPage(1) }}>
                 条件を外す
               </Button>
-            ) : null}
-          </div>
+            ) : undefined}
+          />
         ) : (
           <DataTable className={`${styles.table} ${styles.tableDetail}`}>
             <thead>

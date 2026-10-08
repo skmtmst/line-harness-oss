@@ -519,7 +519,6 @@ export default function RewardsTab() {
       rows={FOLDERS.map((key) => ({ id: key, label: key, count: folderCounts.get(key) ?? 0 }))}
       activeId={folder}
       onSelect={(id) => { setPage(1); setFolder(id as Folder) }}
-      addFolderNote="フォルダを消しても、中の経路は未分類に残ります"
     />
   )
 

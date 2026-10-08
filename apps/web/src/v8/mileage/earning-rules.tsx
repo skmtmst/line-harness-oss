@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, TriangleAlert, Wallet } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, Wallet } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -572,7 +572,6 @@ export default function EarningRulesTab() {
       rows={FOLDERS.map((item) => ({ id: item.key, label: item.label, count: folderCounts.get(item.key) ?? 0, color: item.color }))}
       activeId={folder}
       onSelect={(id) => resetPage(() => setFolder(id as FolderKey))}
-      addFolderNote="フォルダを消しても、中の経路は未分類に残ります"
     />
   )
 
@@ -865,12 +864,11 @@ export default function EarningRulesTab() {
   const body = loading ? (
     <ListState kind="loading" title="たまる決めごとを読み込んでいます" />
   ) : loadError ? (
-    <div className={styles.stateCard} role="alert">
-      <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={16} aria-hidden="true" /></span>
-      <p className={styles.stateTitle}>たまる決めごとを読み込めませんでした</p>
-      <p className={styles.stateDesc}>数の帯は「—」にしています。道具はそのまま使えます。</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
-    </div>
+    <ListState kind="error"
+      title="たまる決めごとを読み込めませんでした"
+      description="数の帯は「—」にしています。道具はそのまま使えます。"
+      action={<Button type="button" onClick={() => void load()}>もう一度試す</Button>}
+    />
   ) : visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
