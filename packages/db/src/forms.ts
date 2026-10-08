@@ -1162,9 +1162,9 @@ export async function createFormSubmission(
  * 中で行うため、2件が同時に来ても両方が「空きあり」と読むことはない。
  * 取れたかどうかは `changes` が 1 か 0 かで分かる。
  *
- * 同じ (formId, slotKey, submissionId) を2回確保しようとしても、主キーが
- * 重複するので2回目は素通り(INSERT 0行)になる。冪等な再開でも枠を
- * 二重に消費しない。
+ * 同じ (formId, slotKey, submissionId) の再開は、既に確保した枠を成功として
+ * 返す。確保後に工程の記録が失敗しても、自分の枠で満席判定にならない。
+ * 重複時の更新は日時も変えず、枠を二重に消費しない。
  */
 export async function claimFormCapacitySlot(
   db: D1Database,
@@ -1177,9 +1177,14 @@ export async function claimFormCapacitySlot(
     .prepare(
       `INSERT INTO form_capacity_claims (form_id, slot_key, submission_id, created_at)
        SELECT ?, ?, ?, ?
-        WHERE (SELECT COUNT(*) FROM form_capacity_claims WHERE form_id = ? AND slot_key = ?) < ?`,
+        WHERE EXISTS (
+          SELECT 1 FROM form_capacity_claims
+           WHERE form_id = ? AND slot_key = ? AND submission_id = ?
+        ) OR (SELECT COUNT(*) FROM form_capacity_claims WHERE form_id = ? AND slot_key = ?) < ?
+       ON CONFLICT(form_id, slot_key, submission_id)
+       DO UPDATE SET created_at = form_capacity_claims.created_at`,
     )
-    .bind(formId, slotKey, submissionId, jstNow(), formId, slotKey, limit)
+    .bind(formId, slotKey, submissionId, jstNow(), formId, slotKey, submissionId, formId, slotKey, limit)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
