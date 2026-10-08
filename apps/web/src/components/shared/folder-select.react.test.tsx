@@ -189,6 +189,50 @@ describe('名前を入れる（iBuZH）', () => {
     expect(screen.getByRole('textbox', { name: '新しいフォルダの名前' })).toBeTruthy()
   })
 
+  it('作っている途中で外を押して閉じ、開き直して別のフォルダを選んだら、遅れて届いた完了で上書きしない', async () => {
+    let resolve: (folder: FolderSelectFolder) => void = () => {}
+    const onCreate = vi.fn<FolderSelectCreate>().mockImplementation(() => new Promise((done) => { resolve = done }))
+    const onChange = vi.fn()
+    const button = await openMenu({ onCreate, onChange })
+    const input = await startCreate()
+    await act(async () => { fireEvent.change(input, { target: { value: '新規' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' })) })
+    await act(async () => { fireEvent.pointerDown(document.body) })
+    expect(screen.queryByRole('listbox')).toBeNull()
+    await act(async () => { fireEvent.click(button) })
+    await act(async () => { fireEvent.click(screen.getByRole('option', { name: '予約' }).querySelector('button')!) })
+    expect(onChange).toHaveBeenLastCalledWith('f-2')
+    const other = document.createElement('input')
+    document.body.appendChild(other)
+    other.focus()
+    try {
+      await act(async () => { resolve({ value: 'f-new', label: '新規' }) })
+      expect(onChange).toHaveBeenCalledTimes(1)
+      expect(button.textContent).toContain('予約')
+      expect(document.activeElement).toBe(other)
+      // 作ったフォルダそのものは一覧に残る（選ばないだけ）。
+      await act(async () => { fireEvent.click(button) })
+      expect(screen.getAllByRole('option').map((option) => option.textContent)).toContain('新規')
+    } finally {
+      other.remove()
+    }
+  })
+
+  it('一覧へ戻って作り直した後、前の回の失敗は新しい板に理由を出さない', async () => {
+    let reject: (error: Error) => void = () => {}
+    const onCreate = vi.fn<FolderSelectCreate>().mockImplementationOnce(() => new Promise((_, fail) => { reject = fail }))
+    await openMenu({ onCreate })
+    const input = await startCreate()
+    await act(async () => { fireEvent.change(input, { target: { value: '古い' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' })) })
+    await act(async () => { fireEvent.pointerDown(document.body) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '所属フォルダ' })) })
+    const fresh = await startCreate()
+    await act(async () => { reject(new Error('作れませんでした')) })
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(fresh.value).toBe('')
+  })
+
   it('色を受け取らない受け口（colors={false}）は見本を出さず null を渡す', async () => {
     const onCreate = vi.fn<FolderSelectCreate>().mockResolvedValue({ value: 'h-1', label: '本部' })
     await act(async () => {
