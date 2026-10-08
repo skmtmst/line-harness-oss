@@ -40,16 +40,6 @@
   gap: var(--tpl-e49-gap-s);
 }
 
-/* LINE プレビューの確認（lLyFR の下の1行） */
-.previewCheck {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-e49-gap-l);
-  font-size: var(--text-caption);
-  color: var(--color-ink-secondary);
-}
-
 .checkEmpty {
   display: flex;
   align-items: center;
@@ -253,4 +243,45 @@
   margin: 0;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
+}
+
+/* ③ カルーセル・リッチメッセージ：選んだ中身の1行と［その場で作る］ */
+.composeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-e49-gap-s);
+  margin-top: var(--tpl-e49-gap-s);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+/* ① RqYwI：「テンプレートを選ぶ」「写す配信を選ぶ」の一覧 */
+.pickList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-gap-m);
+  min-width: 0;
+}
+
+.pickHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-e49-gap-s);
+}
+
+.pickCards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-gap-s);
+}
+
+.pickNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e49-lh-18);
 }

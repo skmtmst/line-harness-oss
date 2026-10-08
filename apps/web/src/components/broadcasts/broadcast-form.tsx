@@ -298,7 +298,8 @@ export function MediaUpload({ bubble, onChange, lineAccountId }: { bubble: Broad
   </div>
 }
 
-function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[] }) {
+/** LINE の見え方の吹き出し1つ。統括の一括配信（v8/hq-broadcasts）も使う。 */
+export function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[] }) {
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
   if (bubble.type === 'text') return <div className="max-w-[82%]">

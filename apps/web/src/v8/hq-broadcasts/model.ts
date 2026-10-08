@@ -194,5 +194,5 @@ export function failureLines(run: Pick<HqBroadcastRun, 'targets'>): Array<{ acco
 }
 
 /** 中身の種類（画面）と、配信用素材の種類（口）。種類のタブと吹き出しの組み立ては bubbles.ts。 */
-export type HqKind = 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'carousel' | 'rich' | 'location' | 'question' | 'intro' | 'coupon'
+export type HqKind = 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'carousel' | 'rich' | 'location' | 'question' | 'intro' | 'coupon' | 'flex'
 export const ASSET_KIND = { coupon: 'coupon', rich: 'rich_message' } as const
