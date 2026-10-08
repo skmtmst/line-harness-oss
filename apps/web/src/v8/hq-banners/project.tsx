@@ -171,10 +171,10 @@ function ProjectInner() {
   }, [fromImageId, status])
 
   /**
-   * 1枚ずつ run を繰り返す（1回の呼び出しで1枚）。失敗したらそこで止め、理由を出す。成功分はサーバーに残る。
-   * 切り抜き位置は保存していないので、作り始めたときの値をそのまま使う（戻った続きは中央。R120）。
+   * サーバーの生成状態を読み直す。画面を閉じても、保存済みの条件で定期処理が続きを作る。
+   * 切り抜き位置は最初の生成条件と一緒に保存し、サーバーで続きを作る。
    */
-  const runLoop = useCallback(async (generation: BannerGeneration, crop: BannerCropPosition = 'center') => {
+  const runLoop = useCallback(async (generation: BannerGeneration) => {
     if (loopRef.current === generation.id) return
     loopRef.current = generation.id
     cancelRef.current = false
@@ -184,23 +184,21 @@ function ProjectInner() {
     try {
       let current = generation
       while (!cancelRef.current) {
-        const res = await api.hqBanners.generations.run(current.id, { gravity: crop })
+        const res = await api.hqBanners.generations.get(current.id)
         if (!res.success) throw new Error(res.error)
-        current = res.data.generation
+        current = res.data
         setRunning(current)
-        if (res.data.resized === false) setSizeNotice(true)
-        if (res.data.image) {
-          const image = res.data.image
-          setImages((prev) => (prev.some((i) => i.id === image.id) ? prev : [image, ...prev]))
-        }
-        if (res.data.finished) break
+        const detail = await api.hqBanners.projects.get(generation.projectId)
+        if (detail.success) setImages(detail.data.images)
+        if (!['queued', 'running'].includes(current.status)) break
+        await new Promise((resolve) => setTimeout(resolve, 1500))
       }
       void loadUsage()
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を作れませんでした。もう一度お試しください。')
       void loadUsage()
     } finally {
-      // 先に最新の状態を読み直してから止める（順を逆にすると、古い「生成中」を見た再開がもう一度 run を呼ぶ）。
+      // 先に最新の状態を読み直してから止める（順を逆にすると、古い「生成中」を見た再開がもう一度状態確認を始める）。
       const res = await api.hqBanners.projects.get(generation.projectId).catch(() => null)
       if (res?.success) {
         setProject(res.data.project)
@@ -212,7 +210,7 @@ function ProjectInner() {
     }
   }, [loadUsage])
 
-  // 画面を離れて戻ってきたとき、途中の生成があれば続きから動かす。
+  // 画面を離れて戻ってきたとき、途中の生成があれば状態確認を再開する。
   useEffect(() => {
     if (status !== 'ready' || running) return
     const pending = activeGeneration(generations)
@@ -249,7 +247,7 @@ function ProjectInner() {
       })
       if (!res.success) throw new Error(res.error)
       setGenerations((prev) => [res.data, ...prev])
-      void runLoop(res.data, input.cropPosition)
+      void runLoop(res.data)
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '生成を始められませんでした。')
       void loadUsage()
@@ -530,7 +528,7 @@ function ProjectInner() {
             {running ? (
               <div className={styles.runningBand} role="status" aria-live="polite">
                 <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
-                <span className={styles.runningText}>{`${Math.min(doneSoFar + 1, running.requestedCount)} / ${running.requestedCount} 枚目を作っています。この画面を閉じるとここで止まります（できた枚数は残ります）`}</span>
+                <span className={styles.runningText}>{`${Math.min(doneSoFar + 1, running.requestedCount)} / ${running.requestedCount} 枚目を作っています。閉じても作り続けます`}</span>
               </div>
             ) : null}
             {generationError ? <Notice tone="danger" message={generationError} onClose={() => setGenerationError('')} /> : null}

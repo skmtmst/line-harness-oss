@@ -735,3 +735,40 @@ describe('WEB205 idempotent generation creation', () => {
     expect(openai.generate).not.toHaveBeenCalled();
   });
 });
+
+describe('WEB206 server-owned continuation',()=>{
+ it('finishes every image from the existing cron without any browser run requests',async()=>{
+  const {processDueBannerGenerations}=await import('../services/banner-jobs.js');
+  const project=await createProject();const created=await call('POST',`/api/hq/banners/projects/${project.id}/generations`,{...GENERATE_BODY,count:3,cropPosition:'top'});
+  const g=(await created.json<{data:{id:string}}>()).data;openai.generate.mockResolvedValue({bytes:JPEG,mimeType:'image/jpeg'});
+  for(let n=0;n<4;n++)await processDueBannerGenerations(env());
+  expect(openai.generate).toHaveBeenCalledTimes(3);
+  expect(testDb.raw.prepare('SELECT status,done_count,failed_count,crop_gravity FROM banner_generations WHERE id=?').get(g.id))
+   .toEqual({status:'done',done_count:3,failed_count:0,crop_gravity:'top'});
+  expect(testDb.raw.prepare('SELECT count(*) AS n FROM banner_usage_ledger').get()).toEqual({n:3});
+ });
+ it('recovers the saved raw image after the database save fails, without a second paid generation',async()=>{
+  const {processBannerGeneration,processDueBannerGenerations}=await import('../services/banner-jobs.js');
+  const project=await createProject();const created=await call('POST',`/api/hq/banners/projects/${project.id}/generations`,{...GENERATE_BODY,count:1});
+  const g=(await created.json<{data:{id:string}}>()).data;openai.generate.mockResolvedValue({bytes:JPEG,mimeType:'image/jpeg'});
+  testDb.raw.exec("CREATE TRIGGER break_save BEFORE INSERT ON banner_images BEGIN SELECT RAISE(ABORT,'database interrupted');END");
+  await expect(processBannerGeneration(env(),g.id,DEFAULT_TENANT_ID)).rejects.toThrow();expect(openai.generate).toHaveBeenCalledOnce();
+  expect(testDb.raw.prepare('SELECT count(*) AS n FROM banner_usage_ledger').get()).toEqual({n:0});
+  testDb.raw.exec("DROP TRIGGER break_save;UPDATE workflow_steps SET next_attempt_at=0 WHERE status='failed'");
+  await processDueBannerGenerations(env());expect(openai.generate).toHaveBeenCalledOnce();
+  expect(testDb.raw.prepare('SELECT status,done_count FROM banner_generations').get()).toEqual({status:'done',done_count:1});
+  expect(testDb.raw.prepare('SELECT count(*) AS n FROM banner_usage_ledger').get()).toEqual({n:1});
+ });
+ it('keeps a stop request made during generation and never starts the next image',async()=>{
+  const {processBannerGeneration,processDueBannerGenerations}=await import('../services/banner-jobs.js');
+  const project=await createProject();const created=await call('POST',`/api/hq/banners/projects/${project.id}/generations`,GENERATE_BODY);
+  const g=(await created.json<{data:{id:string}}>()).data;let entered!:()=>void,release!:()=>void;
+  const started=new Promise<void>(resolve=>entered=resolve),wait=new Promise<void>(resolve=>release=resolve);
+  openai.generate.mockImplementation(async()=>{entered();await wait;return {bytes:JPEG,mimeType:'image/jpeg'}});
+  const running=processBannerGeneration(env(),g.id,DEFAULT_TENANT_ID);await started;
+  await processDueBannerGenerations(env());expect(openai.generate).toHaveBeenCalledOnce();
+  expect((await call('POST',`/api/hq/banners/generations/${g.id}/cancel`)).status).toBe(200);release();await running;
+  await processDueBannerGenerations(env());expect(openai.generate).toHaveBeenCalledOnce();
+  expect(testDb.raw.prepare('SELECT status,stop_requested_at FROM banner_generations').get()).toMatchObject({status:'canceled',stop_requested_at:expect.any(String)});
+ });
+});

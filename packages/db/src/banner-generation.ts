@@ -98,6 +98,8 @@ export interface BannerProject {
 }
 
 export interface BannerGeneration {
+  crop_gravity?: 'center' | 'top' | 'bottom';
+  stop_requested_at?: string | null;
   id: string;
   tenant_id: string;
   project_id: string;
@@ -291,6 +293,7 @@ export async function createBannerGeneration(
     modelName: string | null;
     requestedCount: number;
     unitsPerImage: number;
+    cropGravity?: 'center' | 'top' | 'bottom';
     /** 参照画像（最大3枚・画像ごとに使い方）。無ければ空配列。 */
     references?: BannerReference[] | null;
     createdBy?: string | null;
@@ -305,8 +308,8 @@ export async function createBannerGeneration(
           text_lines, emphasis_lines, base_color, main_color, sub_color, accent_color,
           person_option, custom_prompt, free_prompt, final_prompt,
           engine, model_name, requested_count, done_count, failed_count, units_per_image,
-          error_message, reference_image_id, reference_mode, reference_images, created_by, created_at)
-       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
+          error_message, reference_image_id, reference_mode, reference_images, created_by, created_at, crop_gravity)
+       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
     )
     .bind(
       id,
@@ -338,6 +341,7 @@ export async function createBannerGeneration(
       references.length ? JSON.stringify(references) : null,
       input.createdBy ?? null,
       jstNow(),
+      input.cropGravity ?? 'center',
     )
     .run();
   return (await getBannerGeneration(db, id, input.tenantId))!;

@@ -17,6 +17,8 @@ const getProject = vi.hoisted(() => vi.fn())
 const updateProject = vi.hoisted(() => vi.fn())
 const removeImage = vi.hoisted(() => vi.fn())
 const createGeneration = vi.hoisted(() => vi.fn())
+const getGeneration = vi.hoisted(() => vi.fn())
+const runGeneration = vi.hoisted(() => vi.fn())
 const listAccounts = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const roleBox = vi.hoisted(() => ({ role: 'owner' as string | null }))
@@ -33,6 +35,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         usage: vi.fn(async () => ({ success: false })),
         projects: { ...actual.api.hqBanners.projects, get: getProject, update: updateProject, list: vi.fn(async () => ({ success: true, data: [] })), createGeneration },
         images: { ...actual.api.hqBanners.images, remove: removeImage },
+        generations: {...actual.api.hqBanners.generations,get:getGeneration,run:runGeneration},
       },
       lineAccounts: { ...actual.api.lineAccounts, list: listAccounts },
     },
@@ -79,6 +82,7 @@ const image = (n: number, extra: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   roleBox.role = 'owner'
+  getGeneration.mockReset();runGeneration.mockReset()
   presets.mockResolvedValue({ success: true, data: { presets: [PRESET], maxCount: 4, engineReady: true, usage: { month: { used: 40, limit: 150, remaining: 110 }, today: { used: 6, limit: 30, remaining: 24 }, paused: false, pausedReason: null } } })
   getProject.mockResolvedValue({
     success: true,
@@ -188,3 +192,13 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     expect(start.disabled).toBe(true)
   })
 })
+
+it('WEB206: an open screen polls state and displays server continuation without generating an image itself',async()=>{
+ const response=await getProject('p1');response.data.generations=[{...generation,status:'queued',doneCount:0}];
+ getProject.mockResolvedValue(response);getGeneration.mockResolvedValue({success:true,data:{...generation,status:'running',doneCount:0}});
+ vi.useFakeTimers();
+ try{
+  act(()=>root.render(<HqBannerProjectV8/>));await flush();
+  expect(host.textContent).toContain('閉じても作り続けます');expect(getGeneration).toHaveBeenCalled();expect(runGeneration).not.toHaveBeenCalled();
+ }finally{vi.clearAllTimers();vi.useRealTimers()}
+});
