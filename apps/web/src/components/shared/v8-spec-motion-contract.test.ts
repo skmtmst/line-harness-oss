@@ -30,11 +30,12 @@ describe('V8 仕上げ3回目の動き', () => {
     expect(button).toMatch(/busyLabel = '保存中…'/)
   })
 
-  it('⑤ プルダウンの開きは200msで統一（色・暦ポップは120msのまま）。「…」は提案 F で 120ms', () => {
-    for (const file of ['./select.module.css']) {
-      const css = readFileSync(new URL(file, import.meta.url), 'utf8')
-      expect(css).toContain('var(--motion-base) var(--motion-ease-out)')
-    }
+  it('⑤ プルダウンの開いた中身は提案 F で 150ms（StFE7・B-45）。候補つき入力は200ms・色・暦ポップは120msのまま。「…」は 120ms', () => {
+    // 1つ選ぶプルダウンの開いた中身は共通部品 select-menu。150ms・動きを減らす設定では動かさない。
+    const selectMenu = readFileSync(new URL('./select-menu.module.css', import.meta.url), 'utf8')
+    expect(selectMenu).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*\.surface \{\s*animation: select-menu-enter var\(--select-menu-enter\) var\(--motion-ease-out\)/s)
+    const globals = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8')
+    expect(globals).toMatch(/--select-menu-enter:\s*150ms/)
     // 「…」のメニューは動きの決まり（提案 F・採用）で押した角から 120ms・0.96→1。
     // 起点と縮みは v8-motion-root-causes.test.tsx が見る。
     const menu = readFileSync(new URL('./action-menu.module.css', import.meta.url), 'utf8')
