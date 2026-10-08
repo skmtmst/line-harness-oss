@@ -41,12 +41,14 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import {
   api,
+  describeSaveFailure,
   type ScenarioAction,
   type ScenarioActionHook,
   type ScenarioActionType,
   type ScenarioDraftActionV6,
 } from '@/lib/api'
 import Notice from '@/components/shared/notice'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import ConditionBuilder, {
   findConditionDraftIssue as findSharedConditionDraftIssue,
   findInvalidRangeIssue,
@@ -448,7 +450,7 @@ export default function ActionEditor({
       return true
     } catch (saveError) {
       if (at !== scopeRef.current) return false
-      setError(saveError instanceof Error ? saveError.message : 'V6下書きを保存できませんでした')
+      setError(describeSaveFailure(saveError))
       return false
     } finally {
       if (at === scopeRef.current) setDraftSaving(false)
@@ -462,7 +464,7 @@ export default function ActionEditor({
     setPendingCount(pendingRef.current)
     const run = saveQueueRef.current.then(() => { if (at === scopeRef.current) return task() }).catch((caught) => {
       if (at !== scopeRef.current) return
-      setError(caught instanceof Error ? caught.message : '保存できませんでした。')
+      setError(describeSaveFailure(caught))
       retryRef.current = retrySafe ? async () => {
         // 古い操作の写しを再送せず、その後に打ち足した現在の入力を保存する。
         const latest = actionsRef.current
@@ -505,12 +507,12 @@ export default function ActionEditor({
         : Promise.resolve(null),
     ]).then(([, draftResponse]) => {
       if (cancelled) return
-      if (!draftResponse?.success) { setError('下書きを取得できませんでした。もう一度読み込んでください。'); return }
+      if (!draftResponse?.success) { setError('下書きを読み込めませんでした。もう一度読み込んでください。'); return }
       setDraftReady(true)
       const version = draftResponse?.success && draftResponse.data ? draftResponse.data.version : 0
       draftVersionRef.current = version
       setDraftVersion(version)
-    }).catch((caught) => { if (!cancelled) setError(caught instanceof Error ? caught.message : '取得できませんでした。') })
+    }).catch((caught) => { if (!cancelled) setError(japaneseDetailOf(caught) || '下書きを読み込めませんでした。') })
     return () => {
       cancelled = true
     }
@@ -577,7 +579,7 @@ export default function ActionEditor({
           }),
         )
       }
-      } catch { if (!cancelled) setError('候補を取得できませんでした。もう一度お試しください。') }
+      } catch { if (!cancelled) setError('候補を読み込めませんでした。もう一度お試しください。') }
       finally { if (!cancelled) setTargetsLoading(false) }
     })()
     return () => { cancelled = true }
@@ -762,7 +764,7 @@ export default function ActionEditor({
         onClose()
       } catch (restoreError) {
         setError(
-          restoreError instanceof Error ? restoreError.message : '開く前の状態に戻せませんでした',
+          describeSaveFailure(restoreError),
         )
       } finally {
         setCancelling(false)

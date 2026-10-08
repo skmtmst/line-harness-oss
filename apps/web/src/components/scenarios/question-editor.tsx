@@ -288,7 +288,7 @@ export default function QuestionEditor({
           scenarioReferenceData.scenarios(selectedAccountId),
         ])
         if (cancelled) return
-        if (!tagRes.success || !fieldRes.success || !scenarioRes.success) throw new Error('候補を取得できませんでした')
+        if (!tagRes.success || !fieldRes.success || !scenarioRes.success) throw new Error('候補を読み込めませんでした')
         if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
         if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
         if (scenarioRes.success) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
@@ -306,7 +306,7 @@ export default function QuestionEditor({
 
   return (
     <div className="space-y-5">
-      {referenceError && <p role="alert">候補を取得できませんでした。<Button onClick={() => setReferenceRetry(value => value + 1)}>もう一度読み込む</Button></p>}
+      {referenceError && <p role="alert">候補を読み込めませんでした。<Button onClick={() => setReferenceRetry(value => value + 1)}>もう一度読み込む</Button></p>}
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <label htmlFor={`${fieldBase}-intro`} className="text-ink-secondary text-xs font-medium">前文</label>
@@ -769,7 +769,7 @@ function TagPicker({
             size="full"
           />
         ) : (
-          <span className="text-ink-faint text-xs">{status === 'loading' ? '読み込んでいます' : status === 'error' ? '候補を取得できませんでした' : 'タグがまだありません'}</span>
+          <span className="text-ink-faint text-xs">{status === 'loading' ? '読み込んでいます' : status === 'error' ? '候補を読み込めませんでした' : 'タグがまだありません'}</span>
         )}
       </div>
     </div>

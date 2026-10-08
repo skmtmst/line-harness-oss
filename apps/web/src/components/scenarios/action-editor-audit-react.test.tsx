@@ -48,23 +48,27 @@ vi.mock('./scenario-reference-data', () => ({
   },
 }))
 
-vi.mock('@/lib/api', () => ({
-  api: {
-    scenarios: {
-      list: async () => ({ success: true as const, data: [] }),
-      actions: {
-        list: net.list,
-        update: net.update,
+vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    api: {
+      scenarios: {
+        list: async () => ({ success: true as const, data: [] }),
+        actions: {
+          list: net.list,
+          update: net.update,
+        },
+        getDraft: net.draft,
+        saveDraft: net.saveDraft,
       },
-      getDraft: net.draft,
-      saveDraft: net.saveDraft,
+      tags: { list: async () => ({ success: true as const, data: [] }) },
+      friendFields: { list: async () => ({ success: true as const, data: [] }) },
+      supportMarks: { list: async () => ({ success: true as const, data: [] }) },
+      segments: { count: async () => ({ success: true as const, data: { count: 0 } }) },
     },
-    tags: { list: async () => ({ success: true as const, data: [] }) },
-    friendFields: { list: async () => ({ success: true as const, data: [] }) },
-    supportMarks: { list: async () => ({ success: true as const, data: [] }) },
-    segments: { count: async () => ({ success: true as const, data: { count: 0 } }) },
-  },
-}))
+  }
+})
 
 afterEach(() => {
   cleanup()
@@ -164,4 +168,17 @@ it('WEB262: A→B→Aの切替でも最初のAの遅いアクション一覧を�
   expect(screen.getByRole('button', {name:'内容を編集'})).toBeTruthy()
   await act(async () => finish({success:true,data:[]}))
   expect(screen.getByRole('button', {name:'内容を編集'})).toBeTruthy()
+})
+
+it('保存の内部エラーを日本語で知らせ、失敗後も編集の窓を保つ', async () => {
+  setup()
+  const { ApiError } = await import('@/lib/api')
+  net.update.mockRejectedValue(new ApiError(500, 'API error: 500'))
+  const close = vi.fn()
+  await act(async () => render(<ActionEditor scenarioId="sc-1" hook="scenario_completed" title="あと" onClose={close} />))
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '内容を編集' })))
+  await act(async () => fireEvent.click(screen.getByRole('checkbox', { name: '発動2回目以降も実行する' })))
+  expect(screen.getByText(/サーバー側で保存できませんでした/)).toBeTruthy()
+  expect(document.body.textContent).not.toContain('API error: 500')
+  expect(close).not.toHaveBeenCalled()
 })

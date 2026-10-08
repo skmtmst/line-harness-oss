@@ -100,7 +100,7 @@ export default function QuickSendV8({
     void api.broadcasts.approval.candidates(accountId).then((res) => {
       if (!cancelled && res.success) setCandidates(res.data)
     }).catch(() => undefined)
-    void api.broadcasts.approval.config(accountId).then((res) => { if (cancelled) return; if (res.success) setApprovalConfig(res.data); else setError('承認の設定を取得できませんでした。開き直してください。') }).catch(() => { if (!cancelled) setError('承認の設定を取得できませんでした。開き直してください。') })
+    void api.broadcasts.approval.config(accountId).then((res) => { if (cancelled) return; if (res.success) setApprovalConfig(res.data); else setError('承認の設定を読み込めませんでした。開き直してください。') }).catch(() => { if (!cancelled) setError('承認の設定を読み込めませんでした。開き直してください。') })
     return () => { cancelled = true }
   }, [open, accountId])
 

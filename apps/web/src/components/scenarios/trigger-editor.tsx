@@ -162,7 +162,7 @@ export default function TriggerEditor({
     } catch {
       if (!isCurrent()) return false
       setSaved(null)
-      setError('開始条件を取得できませんでした。もう一度お試しください。')
+      setError('開始条件を読み込めませんでした。もう一度お試しください。')
       return false
     } finally {
       if (isCurrent()) setLoading(false)
@@ -181,7 +181,7 @@ export default function TriggerEditor({
     setTags([])
     void scenarioReferenceData.tags(lineAccountId).then((res) => {
       if (!cancelled && res.success) setTags(res.data.map((t) => ({ id: t.id, name: t.name })))
-    }).catch(() => { if (!cancelled) setError('タグを取得できませんでした。') })
+    }).catch(() => { if (!cancelled) setError('タグを読み込めませんでした。') })
     return () => { cancelled = true }
   }, [lineAccountId])
 

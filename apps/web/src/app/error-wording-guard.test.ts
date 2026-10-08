@@ -46,7 +46,6 @@ const KNOWN_FILES: string[] = [
   'app/accounts/new/page.tsx',
   'app/affiliates/affiliate-display.ts',
   'app/affiliates/tabs.tsx',
-  'app/auto-replies/page.tsx',
   'app/booking/menus/new/page.tsx',
   'app/booking/menus/page.tsx',
   'app/emergency/page.tsx',
@@ -55,7 +54,6 @@ const KNOWN_FILES: string[] = [
   'app/events/page.tsx',
   'app/form-submissions/responses/page.tsx',
   'app/form-submissions/responses/response-summary.ts',
-  'app/friend-add-settings/runs/page.tsx',
   'app/friends/detail/page.tsx',
   'app/getting-started/getting-started-view.ts',
   'app/health/page.tsx',
@@ -65,7 +63,6 @@ const KNOWN_FILES: string[] = [
   'app/line-notifications/page.tsx',
   'app/mileage/mileage-history-tab.tsx',
   'app/nen-campaigns/nen-overview.tsx',
-  'app/reminders/detail/page.tsx',
   'app/restaurant-test/google/google-business.tsx',
   'app/restaurant-test/google/google-profile.tsx',
   'app/rich-menus/edit/page.tsx',
@@ -74,7 +71,6 @@ const KNOWN_FILES: string[] = [
   'app/rich-menus/page.tsx',
   'app/scenarios/detail/scenario-detail-client.tsx',
   // 2026-10-04 完全切り替え：v7 page を捨て、V8 の list-v8 にしたので外す。
-  'app/scenarios/results/page.tsx',
   // ★V8 版も同じ持ち越し文言を使う（直すときは page.tsx と一緒に直す）
   'app/settings/feature-settings-v8.tsx',
   'app/staff/page.tsx',
