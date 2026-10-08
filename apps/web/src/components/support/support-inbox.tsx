@@ -5,6 +5,8 @@ import Avatar from '@/components/shared/avatar'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
+import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import ListState from '@/components/shared/list-state'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
@@ -125,6 +127,7 @@ function isUnknownChannel(item: Pick<InboxItem, 'channel'>): boolean {
 }
 
 export default function SupportInbox({ channel = 'email' }: { channel?: Channel }) {
+  const isV8 = useAdminTheme() === 'v8'
   const sendKeysRef = useRef(new IdempotencyKeyStore())
   const [status, setStatus] = useState<'open' | ThreadStatus | 'all'>('open')
   const [query, setQuery] = useState('')
@@ -359,6 +362,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                   </div>
                   <div className="shrink-0 text-right">
                     <p className={`text-micro font-semibold ${isStaleUnresolved(item) ? 'text-status-warn-deep' : 'text-ink-faint'}`}>{elapsed(item.lastIncomingAt)}</p>
+                    {isV8 ? <div className="mt-1"><StatusPill tone={SUPPORT_STATUS_TONES[item.status]}>{statusLabel[item.status]}</StatusPill></div> : (
                     <StatusBadge
                       tone={item.status === 'resolved' ? 'success' : 'neutral'}
                       size="compact"
@@ -366,6 +370,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                     >
                       {statusLabel[item.status]}
                     </StatusBadge>
+                    )}
                   </div>
                 </div>
               </button>

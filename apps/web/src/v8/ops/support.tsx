@@ -1,5 +1,6 @@
 'use client'
 
+import StatusPill from '@/components/shared/status-pill'
 import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -392,7 +393,7 @@ export default function OpsSupportV8() {
                   <button type="button" aria-current={t.id === selectedId ? 'true' : undefined} onClick={() => pick(t.id)} className={`${styles.ticket} ${t.id === selectedId ? styles.ticketSelected : ''}`}>
                     <span className={styles.ticketTop}>
                       <span className={styles.ticketNo}>{t.ticketLabel}</span>
-                      <StatusBadge tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusBadge>
+                      <StatusPill tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusPill>
                     </span>
                     <span className={styles.ticketSubject}>{t.subject}</span>
                     <span className={styles.ticketMeta}>{`${t.tenantName}・優先度 ${t.priorityLabel}`}</span>
@@ -424,7 +425,7 @@ export default function OpsSupportV8() {
                 {readOnly ? null : <Button disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)}><LogIn aria-hidden="true" />代理ログイン</Button>}
               </div>
               <div className={styles.detailMeta}>
-                <StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge>
+                <StatusPill tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusPill>
                 <span>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : 'なし'}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
                 {ticket.subjectAuto ? <StatusBadge tone="neutral">自動で付けた件名</StatusBadge> : null}
               </div>

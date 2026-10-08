@@ -7,9 +7,9 @@
  * 四角い箱を出さず、選んでいる行は ✓ だけ（オーナー指摘：複数選べないのにチェックボックス）。
  * 対応状況は先頭に状態の色の点。LINE の会話もメールの会話も、この同じ部品を使う。
  */
+import { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import Select from '@/components/shared/select'
 import { buildOperatorRows, type OperatorOption } from '@/components/chats/inbox-dropdown'
-import styles from './inbox-chat.module.css'
 
 export type HeadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
 
@@ -64,14 +64,15 @@ export function HeadStatusMenu({
     <Select
       aria-label={ariaLabel}
       width={STATUS_WIDTH}
-      icon={<span className={styles.ctlDot} data-status={value} />}
+      treatment="pill"
+      icon={<StatusDot tone={SUPPORT_STATUS_TONES[value]} />}
       value={value}
       onChange={(next) => onChange(next as HeadStatus)}
       // 開いた中身の行にも状態の色の点（jvb3W「5. 会話の頭のメニュー」）。
       options={STATUS_ORDER.map((status) => ({
         value: status,
         label: HEAD_STATUS_LABEL[status],
-        leading: <span className={styles.ctlDot} data-status={status} />,
+        leading: <StatusDot tone={SUPPORT_STATUS_TONES[status]} />,
       }))}
     />
   )

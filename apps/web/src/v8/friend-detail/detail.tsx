@@ -16,7 +16,7 @@ import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import Notice from '@/components/shared/notice'
-import StatusBadge from '@/components/shared/status-badge'
+import StatusPill from '@/components/shared/status-pill'
 import TargetMissing from '@/components/shared/target-missing'
 import { Tabs } from '@/components/shared/tabs'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
@@ -145,7 +145,7 @@ function FriendDetailV8Inner() {
         <div className={styles.nameBlock}>
           <div className={styles.nameRow}>
             <h2 className={styles.name} title={friend?.displayName}>{friend?.displayName ?? '友だち詳細'}</h2>
-            {status ? <StatusBadge tone={SUPPORT_TONES[status]} size="compact">{SUPPORT_LABELS[status]}</StatusBadge> : friend ? <span className={styles.faint}>やり取りなし</span> : null}
+            {status ? <StatusPill tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusPill> : friend ? <span className={styles.faint}>やり取りなし</span> : null}
           </div>
           <p className={styles.sub} title={subtitle}>{subtitle}</p>
         </div>
