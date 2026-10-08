@@ -131,9 +131,12 @@ export default function FolderPanel({
   addFolderNote,
   children,
   createAction,
+  reserveCreateSpace = false,
 }: {
   /** V8: 作る操作はフォルダ列の先頭に置く。 */
   createAction?: ReactNode
+  /** 閲覧のみで作る操作を隠すときも、フォルダの位置は変えない。V8 のみ。 */
+  reserveCreateSpace?: boolean
   rows: FolderPanelRow[]
   activeId: string
   onSelect: (id: string) => void
@@ -165,7 +168,7 @@ export default function FolderPanel({
   return (
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
     <aside aria-label="フォルダ" className={`${styles.panel} v7:bg-canvas v7:rounded-card v7:border-hairline v7:h-fit overflow-visible v7:border`}>
-      {createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : null}
+      {createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder} v8-only`} aria-hidden="true" /> : null}
       <div className={`${styles.heading} v7:border-hairline flex items-center justify-between v7:border-b v7:px-4 v7:py-3`}>
         <p className="v7:text-ink v7:text-sm font-semibold">{heading}</p>
         {total === undefined ? null : <span className="text-ink-faint v7:text-xs v7:tabular-nums">{total}</span>}

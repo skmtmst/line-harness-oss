@@ -97,6 +97,14 @@ beforeEach(() => {
   document.body.appendChild(host)
   root = createRoot(host)
   role.value = 'owner'
+  const values = new Map<string, string>()
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value) },
+    removeItem: (key: string) => { values.delete(key) },
+  }
+  Object.defineProperty(window, 'localStorage', { value: storage, configurable: true })
+  window.localStorage.setItem('lh_staff_role', 'owner')
   narrow.value = false
   fetchApi.mockReset()
   fetchApi.mockImplementation(async (path: string) => {
@@ -162,6 +170,27 @@ describe('V8 回答フォーム一覧', () => {
     role.value = 'staff'
     await mount()
     expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /フォームを作る/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」のその他の操作' }))
+    await flush()
+    expect(screen.getByRole('menuitem', { name: '集まった回答' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: '編集' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: '削除' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」の詳細を見る' }))
+    await flush()
+    expect(screen.queryByRole('button', { name: 'フォーム名を変更する' })).toBeNull()
+    expect(screen.queryByText('編集する')).toBeNull()
+    expect(screen.queryByRole('button', { name: '複製' })).toBeNull()
+  })
+
+  it('フォームの編集権限がある staff は変更でき、フォルダの管理だけは出さない', async () => {
+    role.value = 'staff'
+    window.localStorage.setItem('lh_staff_role', 'staff')
+    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/form-submissions']))
+    await mount()
+    expect(screen.getAllByRole('button', { name: /フォームを作る/ }).length).toBeGreaterThan(0)
+    expect(screen.queryByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeNull()
     expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
   })
 

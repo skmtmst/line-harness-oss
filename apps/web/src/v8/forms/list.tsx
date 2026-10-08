@@ -28,7 +28,7 @@ import {
 import { displayFormName, hasStoredDestination, type Folder } from '@line-crm/shared'
 import { fetchApi, api, ApiError, type FormDeleteImpact, type ListStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
@@ -205,6 +205,10 @@ export default function FormsListV8() {
   const staffRole = useStaffRole()
   // 役割が読めない（null・空の返事）あいだは手元の値。読めた役割だけで決め直す。
   const canManageFolders = staffRole ? canManageRole(staffRole) : localCanManage
+  // フォームは項目別の編集権限も受ける。サーバの役割と手元の役割が食い違う間は変更口を隠す。
+  const canEditForms = staffRole
+    ? canManageRole(staffRole) || (staffRole === 'staff' && !isOwnerOrAdmin() && canEditFeature('/form-submissions'))
+    : canEditFeature('/form-submissions')
   /* 1152 の板（`GrnO4`）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
@@ -978,7 +982,10 @@ export default function FormsListV8() {
   ]
 
   /* ===== 行の「…」（編集・名前を変更・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除） ===== */
-  const rowMenuItems = (form: Form): ActionMenuItem[] => [
+  const rowMenuItems = (form: Form): ActionMenuItem[] => !canEditForms ? [{
+    id: 'responses', label: '集まった回答', external: true,
+    onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
+  }] : [
     {
       id: 'edit',
       label: '編集',
@@ -1027,7 +1034,7 @@ export default function FormsListV8() {
     updateListState({ page: 1 })
   }
 
-  const createButton = (full: boolean) => (
+  const createButton = (full: boolean) => canEditForms ? (
     <Button
       type="button"
       variant="primary"
@@ -1039,10 +1046,12 @@ export default function FormsListV8() {
     >
       <Plus size={15} aria-hidden="true" />フォームを作る
     </Button>
-  )
+  ) : null
 
   const folderPanel = (
     <FolderPanel
+      createAction={createButton(true)}
+      reserveCreateSpace={!canEditForms}
       activeId={activeFolderId}
       onSelect={selectFolder}
       onAddFolder={canManageFolders ? () => { closeDetail(); setFolderDialogOpen(true) } : undefined}
@@ -1260,7 +1269,7 @@ export default function FormsListV8() {
         icon={<ClipboardList aria-hidden="true" />}
         title="まだ回答フォームがありません"
         description="アンケートや申し込みを LINE の中で受け付け、答えを友だち情報に保存します。"
-        canCreate={canManageFolders}
+        canCreate={canEditForms}
         action={
           <Button type="button" variant="primary" onClick={createDraft} disabled={creating} busy={creating} busyLabel="下書きを作成中">
             <Plus size={15} aria-hidden="true" />最初のフォームを作る
@@ -1435,7 +1444,7 @@ export default function FormsListV8() {
   )
 
   /* 閲覧のみの帯（`JV2oR`）。見出しの下・数の帯の上。 */
-  const viewerBand = !canManageFolders ? (
+  const viewerBand = !canEditForms ? (
     <div className={styles.viewerBand} role="status" data-design-node="JV2oR">
       <Eye size={16} aria-hidden="true" />
       <span>{VIEWER_NOTE}</span>
@@ -1590,21 +1599,21 @@ export default function FormsListV8() {
             <Button type="button" variant="secondary" href={`/form-submissions/responses?id=${encodeURIComponent(active.id)}`}>
               集まった回答
             </Button>
-            <Button type="button" variant="primary" href={`/form-submissions/edit?id=${encodeURIComponent(active.id)}&tab=basic`}>
+            {canEditForms ? <Button type="button" variant="primary" href={`/form-submissions/edit?id=${encodeURIComponent(active.id)}&tab=basic`}>
               編集する
-            </Button>
+            </Button> : null}
           </div>
         ) : undefined}
       >
         {active ? (
           <div>
             <p className={styles.panelLabel}>フォーム名</p>
-            <InlineEdit
+            {canEditForms ? <InlineEdit
               value={active.name}
               label="フォーム名"
               placeholder="名称未設定のフォーム"
               onSave={(next) => renameForm(active, next)}
-            />
+            /> : <p className={styles.panelValue}>{displayFormName(active.name)}</p>}
             <p className={styles.panelLabel}>状態</p>
             <p className={styles.panelValueRow}>
               <span className={styles.statusPill} data-tone={active.isActive ? 'live' : 'draft'}>
@@ -1625,12 +1634,14 @@ export default function FormsListV8() {
               {`${formatNumber(formAnswerCount(active))}件　${answerSubText(active)}`}
             </p>
             <div className={styles.panelButtons}>
+              {canEditForms ? <>
               <Button type="button" variant="secondary" onClick={() => { closeDetail(); openDuplicate(active) }}>複製</Button>
               {active.isActive ? (
                 <Button type="button" variant="secondary" onClick={() => { closeDetail(); void openStop(active) }}>受付を止める</Button>
               ) : null}
               <Button type="button" variant="secondary" onClick={() => { closeDetail(); openMove(active) }}>フォルダへ移す</Button>
               <Button type="button" variant="secondary" onClick={() => { closeDetail(); void openDelete(active) }}>アーカイブ・削除</Button>
+              </> : null}
               <Button type="button" variant="secondary" onClick={() => void copyAnswerUrl(active)}>URLをコピー</Button>
             </div>
           </div>
@@ -1797,11 +1808,11 @@ export default function FormsListV8() {
         title="回答フォーム"
         description="LINEの中で開くアンケート・申し込みフォームです。答えは友だち情報に保存できます。"
         /* 絵に無い機能（管理者確認）は見出しの右に小さく残す。 */
-        actions={(
+        actions={canManageFolders ? (
           <FilterChip selected={reviewMode} onChange={(next) => { setReviewMode(next); setPage(1) }}>
             {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割り当て）'}
           </FilterChip>
-        )}
+        ) : undefined}
         tabs={viewerBand}
         stats={reviewMode ? undefined : (
           /* 数の帯 4つ。管理者確認は別のアカウント群の数なので出さない。 */
@@ -1821,7 +1832,7 @@ export default function FormsListV8() {
           </KpiBand>
         )}
         folderNav={narrow ? undefined : { rows: folderRows, activeId: activeFolderId, onSelect: selectFolder, createAction: createButton(false) }}
-        folders={reviewMode ? undefined : <>{createButton(true)}{folderPanel}</>}
+        folders={reviewMode ? undefined : folderPanel}
         toolbar={(
           <>
             {narrow ? narrowToolbar : wideToolbar}
