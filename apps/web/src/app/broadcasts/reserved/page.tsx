@@ -268,7 +268,8 @@ function ReservedBroadcastContent() {
     )
   }
 
-  if (broadcast.status !== 'scheduled' || !broadcast.scheduledAt) {
+  // WEB317：この画面で取り消した直後は下書きに戻っている。取消の成功を「予約待ちではない」に戻さない。
+  if ((broadcast.status !== 'scheduled' || !broadcast.scheduledAt) && !cancelled) {
     return (
       <ListState
         kind="error"
