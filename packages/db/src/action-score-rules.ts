@@ -787,36 +787,32 @@ export async function postActionScoreManualAdjustment(
   }
 
   const friend = await db.prepare(
-    `SELECT id, COALESCE(score, 0) AS score FROM friends WHERE id = ? AND line_account_id = ?`,
-  ).bind(input.friendId, input.lineAccountId).first<{ id: string; score: number }>();
+    `SELECT id FROM friends WHERE id = ? AND line_account_id = ?`,
+  ).bind(input.friendId, input.lineAccountId).first<{ id: string }>();
   if (!friend) {
     throw new ActionScoreRuleValidationError('friend_not_found', '対象の友だちが見つかりません');
   }
-  const scoreBefore = friend.score;
-  const scoreAfter = scoreBefore + input.scoreChange;
-  if (scoreAfter < bands.min || scoreAfter > bands.max) {
-    throw new ActionScoreRuleValidationError(
-      'score_out_of_range',
-      `点数は${bands.min}〜${bands.max}点の範囲でしか動かせません（現在${scoreBefore}点）`,
-      'amount',
-    );
-  }
-
   const historyId = crypto.randomUUID();
   const occurredAt = input.occurredAt ?? new Date().toISOString();
+  // 加算元・範囲の判定・履歴の写しを同じSQLに置く。事前に読んだ点数で
+  // 絶対値を作ると、同時に保存された別の調整を消してしまう。
   const write = await db.prepare(
     `INSERT OR IGNORE INTO friend_scores
        (id, friend_id, scoring_rule_id, score_change, reason, created_at,
         line_account_id, event_type, source, idempotency_key,
         operation, score_before, score_after, occurred_at,
         executed_by_staff_id, executed_by_staff_name)
-     VALUES (?, ?, NULL, ?, ?, ?, ?, 'manual_adjustment', 'staff', ?,
-             'manual_adjustment', ?, ?, ?, ?, ?)`,
+     SELECT ?, id, NULL, ?, ?, ?, ?, 'manual_adjustment', 'staff', ?,
+            'manual_adjustment', COALESCE(score, 0), COALESCE(score, 0) + ?, ?, ?, ?
+       FROM friends
+      WHERE id = ? AND line_account_id = ?
+        AND COALESCE(score, 0) + ? BETWEEN ? AND ?`,
   ).bind(
-    historyId, input.friendId, input.scoreChange, reason, occurredAt,
+    historyId, input.scoreChange, reason, occurredAt,
     input.lineAccountId, input.idempotencyKey,
-    scoreBefore, scoreAfter, occurredAt,
+    input.scoreChange, occurredAt,
     input.executedByStaffId, input.executedByStaffName,
+    input.friendId, input.lineAccountId, input.scoreChange, bands.min, bands.max,
   ).run();
 
   const row = await db.prepare(
@@ -824,6 +820,20 @@ export async function postActionScoreManualAdjustment(
        FROM friend_scores WHERE line_account_id = ? AND idempotency_key = ?`,
   ).bind(input.lineAccountId, input.idempotencyKey).first<ManualAdjustmentRow>();
   if (!row) {
+    // 他の加減点が先に確定した場合も、保存時の現在点で範囲を守る。
+    const current = await db.prepare(
+      `SELECT COALESCE(score, 0) AS score FROM friends WHERE id = ? AND line_account_id = ?`,
+    ).bind(input.friendId, input.lineAccountId).first<{ score: number }>();
+    if (!current) {
+      throw new ActionScoreRuleValidationError('friend_not_found', '対象の友だちが見つかりません');
+    }
+    if (current.score + input.scoreChange < bands.min || current.score + input.scoreChange > bands.max) {
+      throw new ActionScoreRuleValidationError(
+        'score_out_of_range',
+        `点数は${bands.min}〜${bands.max}点の範囲でしか動かせません（現在${current.score}点）`,
+        'amount',
+      );
+    }
     throw new ActionScoreRuleValidationError('score_write_failed', 'スコア履歴を保存できませんでした');
   }
   // 同時実行で別内容の行が先に入った場合、無視されたこちらを成功とは返さない。
