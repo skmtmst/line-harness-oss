@@ -22,6 +22,17 @@ export function validateStampSettings(s: VisitStampSettings): void {
     || !Array.isArray(s.multipliers)||s.multipliers.length>20 || !Array.isArray(s.rankMultipliers)||s.rankMultipliers.length>20
     || !Array.isArray(s.rewards)||!s.rewards.length||s.rewards.length>20) throw new StampError('スタンプの設定を確認してください');
   if((s.slotCount!==undefined&&(!Number.isSafeInteger(s.slotCount)||s.slotCount<1||s.slotCount>10000))||(s.maxStackedStamps!==undefined&&(!Number.isSafeInteger(s.maxStackedStamps)||s.maxStackedStamps<1||s.maxStackedStamps>10000))||(s.stackingOrder!==undefined&&!['bonus_then_multipliers','multipliers_then_bonus'].includes(s.stackingOrder)))throw new StampError('マスの数・重ねた上限・順序を確認してください');
+  if (s.backgroundColor !== undefined && !/^#[0-9a-f]{6}$/i.test(s.backgroundColor)) throw new StampError('カードの色を確認してください');
+  if (s.backgroundImageUrl != null && (!safeRestaurantHttpsUrl(s.backgroundImageUrl) || s.backgroundImageUrl.length > 2000)) throw new StampError('背景画像を確認してください');
+  if (s.expiryBasis !== undefined && !['last_visit','first_visit','none'].includes(s.expiryBasis)) throw new StampError('期限の起点を確認してください');
+  if (s.expiryBasis && s.expiryBasis !== 'none' && s.expiryMonths === null) throw new StampError('期限の長さを選んでください');
+  if (s.expiryReminder !== undefined && !['none','day_before','three_days_before','week_before','two_weeks_before','month_before'].includes(s.expiryReminder)) throw new StampError('期限のお知らせを確認してください');
+  if (s.completion !== undefined && !['repeat','next_card'].includes(s.completion)) throw new StampError('ゴール後のカードを確認してください');
+  if (s.completion === 'next_card') stampId(s.nextCardId);
+  if (s.instructions !== undefined && (typeof s.instructions !== 'string' || [...s.instructions].length > 500)) throw new StampError('使い方の説明は500字までです');
+  if (s.receiptBonus !== undefined && (!Number.isSafeInteger(s.receiptBonus) || s.receiptBonus < 0 || s.receiptBonus > 50)) throw new StampError('受け取りボーナスは0〜50個です');
+  if (s.stampInterval !== undefined && (!s.stampInterval || !['none','same_day','hours'].includes(s.stampInterval.mode)
+    || (s.stampInterval.mode === 'hours' && (!Number.isInteger(s.stampInterval.hours) || s.stampInterval.hours! < 1 || s.stampInterval.hours! > 23)))) throw new StampError('押印の間隔は1〜23時間です');
   try { new Intl.DateTimeFormat('en',{timeZone:s.timezone}).format(); } catch { throw new StampError('時間帯を確認してください'); }
   const ids=new Set<string>();
   for(const r of s.rewards) {
@@ -52,9 +63,36 @@ export function calculateVisitStamps(s:VisitStampSettings,amount:number,at:strin
   count*=Math.max(1,...s.rankMultipliers.filter(m=>m.active!==false&&tagNames.includes(m.tagName)).map(m=>m.multiplier));
   return Math.min(s.maxStackedStamps??s.maxPerVisit,Math.floor(count+(after?bonus:0)));
 }
-export function stampExpiry(at:string,months:number|null):string|null {
-  if(months===null)return null;const d=new Date(at),day=d.getUTCDate();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+months);
-  const last=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate();d.setUTCDate(Math.min(day,last));return d.toISOString();
+export function stampExpiry(at:string,months:number|null,jst=false):string|null {
+  if(months===null)return null;const offset=jst?9*3600000:0,d=new Date(Date.parse(at)+offset),day=d.getUTCDate();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+months);
+  const last=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate();d.setUTCDate(Math.min(day,last));return new Date(d.getTime()-offset).toISOString();
+}
+/** 最初の押印をSQL内で選び、同時の初回押印でも起点を一つにする。受け取りは来店に数えない。 */
+export function stampExpiryExpression(s:VisitStampSettings,at:string):{sql:string;args:unknown[]} {
+  if(s.expiryBasis==='none'||s.expiryMonths===null)return {sql:'NULL',args:[]};
+  if(s.expiryBasis!=='first_visit')return {sql:'?',args:[stampExpiry(at,s.expiryMonths,s.expiryBasis==='last_visit')]};
+  return {sql:`(SELECT strftime('%Y-%m-%dT%H:%M:%fZ',strftime('%Y-%m-%d',date(anchor,'start of month',?,
+    '+'||(MIN(CAST(strftime('%d',anchor) AS INTEGER),CAST(strftime('%d',date(anchor,'start of month',?,'-1 day')) AS INTEGER))-1)||' days'))
+    ||strftime('T%H:%M:%f',anchor),'-9 hours') FROM (SELECT strftime('%Y-%m-%dT%H:%M:%f',COALESCE((SELECT e.occurred_at FROM visit_stamp_entries e
+    WHERE e.card_id=w.card_id AND e.friend_id=w.friend_id AND e.kind IN ('visit','manual','paper') AND e.delta>0
+    AND e.idempotency_key<>'@receipt-bonus' ORDER BY julianday(e.occurred_at),e.rowid LIMIT 1),?),'+9 hours') AS anchor))`,
+    args:[`+${s.expiryMonths} months`,`+${s.expiryMonths+1} months`,at]};
+}
+export function stampIntervalCondition(s:VisitStampSettings,at:string,exempt=false):{sql:string;args:unknown[]} {
+  const interval=s.stampInterval;
+  if(exempt||!interval||interval.mode==='none')return {sql:'1=1',args:[]};
+  const condition=interval.mode==='same_day'?`date(e.occurred_at,'+9 hours')>=date(?,'+9 hours')`:`julianday(e.occurred_at)>julianday(?)-?/24.0`;
+  return {sql:`NOT EXISTS(SELECT 1 FROM visit_stamp_entries e WHERE e.card_id=w.card_id AND e.friend_id=w.friend_id
+    AND e.kind IN ('visit','manual') AND e.delta>0 AND e.idempotency_key<>'@receipt-bonus'
+    AND NOT EXISTS(SELECT 1 FROM visit_stamp_entries r WHERE r.original_id=e.id AND r.kind='reverse') AND ${condition})`,
+    args:interval.mode==='same_day'?[at]:[at,interval.hours!]};
+}
+function storedStampExpiry(s:VisitStampSettings):{sql:string;args:unknown[]} {
+  if(s.expiryBasis==='none'||s.expiryMonths===null)return {sql:'NULL',args:[]};
+  const expression=stampExpiryExpression({...s,expiryBasis:'first_visit'},'1970-01-01T00:00:00Z');
+  // 最後からの期限だけは台帳のいちばん新しい押印を使う。押印が無い財布には期限を付けない。
+  if(s.expiryBasis==='last_visit')expression.sql=expression.sql.replace('ORDER BY julianday(e.occurred_at),e.rowid','ORDER BY julianday(e.occurred_at) DESC,e.rowid DESC');
+  expression.args[2]=null;return expression;
 }
 type CardRow={id:string;tenant_id:string;name:string;settings_json:string;active:number;version:number};
 export async function stampCard(db:D1Database,id:string,tenantId?:string):Promise<CardRow> {
@@ -72,6 +110,15 @@ export async function saveStampCard(db:D1Database,tenantId:string,input:VisitSta
   validateStampSettings(input.settings);
   for(const a of input.accountIds){stampId(a);if(!await db.prepare('SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND archived_at IS NULL').bind(a,tenantId).first())throw new StampError('指定した店舗は使えません',403);}
   const cardId=id?stampId(id):crypto.randomUUID();if(id)await stampCard(db,id,tenantId);else if(input.expectedVersion!==0)throw new StampError('新しいカードの版は0です');
+  if (input.settings.completion === 'next_card') {
+    const next = await stampCard(db, input.settings.nextCardId!, tenantId);
+    if (next.id === cardId || !next.active) throw new StampError('次のカードには別の有効なカードを選んでください');
+    const allowed = (await readStampCard(db, next)).accountIds;
+    if (input.accountIds.some(a => !allowed.includes(a))) throw new StampError('次のカードは同じ店舗で使えるカードを選んでください');
+    const seen=new Set([cardId]);let cursor:CardRow|undefined=next;
+    while(cursor){if(seen.has(cursor.id))throw new StampError('次のカードが循環しています');seen.add(cursor.id);
+      const s=JSON.parse(cursor.settings_json) as VisitStampSettings;cursor=s.completion==='next_card'&&s.nextCardId?await stampCard(db,s.nextCardId,tenantId):undefined;}
+  }
   const token=crypto.randomUUID();
   const statements=[db.prepare(`INSERT INTO visit_stamp_cards(id,tenant_id,name,settings_json,active,write_token) SELECT ?,?,?,?,?,? WHERE ?=0
     ON CONFLICT(id) DO UPDATE SET name=excluded.name,settings_json=excluded.settings_json,active=excluded.active,write_token=excluded.write_token,version=version+1,updated_at=datetime('now') WHERE tenant_id=? AND version=?`)
@@ -80,6 +127,9 @@ export async function saveStampCard(db:D1Database,tenantId:string,input:VisitSta
   statements.push(db.prepare('DELETE FROM visit_stamp_card_accounts WHERE card_id=? AND changes()=1').bind(cardId));
   for(const a of input.accountIds)statements.push(db.prepare(`INSERT OR IGNORE INTO visit_stamp_card_accounts(card_id,line_account_id)
     SELECT ?,? WHERE EXISTS(SELECT 1 FROM visit_stamp_cards WHERE id=? AND write_token=?)`).bind(cardId,a,cardId,token));
+  if(input.settings.expiryBasis!==undefined){const expiry=storedStampExpiry(input.settings);
+    statements.push(db.prepare(`UPDATE visit_stamp_wallets AS w SET expires_at=${expiry.sql} WHERE w.card_id=?
+      AND EXISTS(SELECT 1 FROM visit_stamp_cards WHERE id=? AND write_token=?)`).bind(...expiry.args,cardId,cardId,token));}
   const result=await db.batch(statements);if(!result[0].meta.changes)throw new StampError('カードが更新されました。読み直してください',409);
   return readStampCard(db,await stampCard(db,cardId,tenantId));
 }
@@ -98,10 +148,28 @@ export async function canonicalStampFriend(db:D1Database,cardId:string,friendId:
     WHERE a.card_id=? AND f.user_id=? ORDER BY f.id LIMIT 1`).bind(cardId,f.user_id).first<{id:string}>();
   return first?.id??friendId;
 }
+/** 財布を初めて作る操作と受け取りボーナスを一つのトランザクションにする。 */
+export function createStampWalletStatements(db:D1Database,cardId:string,friendId:string,accountId:string,bonus:number,guard='1=1',guardArgs:unknown[]=[]) {
+  return [
+    db.prepare(`INSERT OR IGNORE INTO visit_stamp_wallets(card_id,friend_id) SELECT ?,? WHERE ${guard}`).bind(cardId,friendId,...guardArgs),
+    db.prepare(`INSERT INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,occurred_at)
+      SELECT ?,?,?,?,'manual',?,'受け取りボーナス','@receipt-bonus',datetime('now') WHERE changes()=1 AND ?>0`)
+      .bind(crypto.randomUUID(),cardId,friendId,accountId,bonus,bonus),
+  ];
+}
+export async function stampCardLocked(db:D1Database,cardId:string,friendId:string,accountId:string):Promise<boolean> {
+  const canonical=await canonicalStampFriend(db,cardId,friendId);
+  if(await db.prepare('SELECT 1 FROM visit_stamp_wallets WHERE card_id=? AND friend_id=?').bind(cardId,canonical).first())return false;
+  return !!await db.prepare(`SELECT 1 FROM visit_stamp_cards c JOIN visit_stamp_card_accounts a ON a.card_id=c.id
+    WHERE a.line_account_id=? AND c.active=1 AND json_extract(c.settings_json,'$.completion')='next_card'
+    AND json_extract(c.settings_json,'$.nextCardId')=? LIMIT 1`).bind(accountId,cardId).first();
+}
 export async function stampWallet(db:D1Database,cardId:string,friendId:string,accountId:string):Promise<VisitStampWallet> {
   await stampFriend(db,cardId,friendId,accountId);
+  if(await stampCardLocked(db,cardId,friendId,accountId))throw new StampError('前のカードのゴール特典を使うと受け取れます',409);
   friendId=await canonicalStampFriend(db,cardId,friendId);
-  await db.prepare('INSERT OR IGNORE INTO visit_stamp_wallets(card_id,friend_id) VALUES(?,?)').bind(cardId,friendId).run();
+  const settings=JSON.parse((await stampCard(db,cardId)).settings_json) as VisitStampSettings;
+  await db.batch(createStampWalletStatements(db,cardId,friendId,accountId,settings.receiptBonus??0));
   // 期限切れは再読込でも一度だけ。残高はSQLの現在値を使う。
   await db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,occurred_at)
     SELECT ?,card_id,friend_id,?,'expire',-MAX(balance,0),'有効期限切れ','expire:'||expires_at||':'||version,datetime('now')
@@ -118,11 +186,15 @@ export async function grantStamps(db:D1Database,input:{cardId:string;friendId:st
   const c=await stampCard(db,input.cardId);if(!c.active)throw new StampError('カードは停止中です',409);
   if(!Number.isSafeInteger(input.count)||input.count<1||input.count>10000||typeof input.reason!=='string'||!input.reason.trim()||input.reason.length>500)throw new StampError('押印数と理由を確認してください');
   stampId(input.requestId);input.friendId=(await stampWallet(db,input.cardId,input.friendId,input.accountId)).friendId;
-  const at=input.at??new Date().toISOString(),expires=stampExpiry(at,(JSON.parse(c.settings_json) as VisitStampSettings).expiryMonths);
+  const at=input.at??new Date().toISOString(),settings=JSON.parse(c.settings_json) as VisitStampSettings;
+  if(!Number.isFinite(Date.parse(at)))throw new StampError('押印日時を確認してください');
+  const expiry=stampExpiryExpression(settings,at),interval=stampIntervalCondition(settings,at,input.kind==='paper');
   await db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,actor_id,reason,idempotency_key,visit_key,expires_at,occurred_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).bind(crypto.randomUUID(),input.cardId,input.friendId,input.accountId,input.kind,input.count,input.actorId,input.reason.trim(),input.requestId,input.visitKey??null,expires,at).run();
+    SELECT ?,w.card_id,w.friend_id,?,?,?,?,?,?,?,${expiry.sql},? FROM visit_stamp_wallets w WHERE w.card_id=? AND w.friend_id=? AND ${interval.sql}`)
+    .bind(crypto.randomUUID(),input.accountId,input.kind,input.count,input.actorId,input.reason.trim(),input.requestId,input.visitKey??null,...expiry.args,at,input.cardId,input.friendId,...interval.args).run();
   const receipt=await db.prepare('SELECT delta,reason,kind,line_account_id FROM visit_stamp_entries WHERE card_id=? AND friend_id=? AND idempotency_key=?').bind(input.cardId,input.friendId,input.requestId).first<{delta:number;reason:string;kind:string;line_account_id:string}>();
-  if(!receipt||receipt.delta!==input.count||receipt.reason!==input.reason.trim()||receipt.kind!==input.kind||receipt.line_account_id!==input.accountId)throw new StampError('同じ押印の依頼で内容が変わっています',409);
+  if(!receipt)throw new StampError(settings.stampInterval?.mode==='same_day'?'同じ日は1回までです。日本時間の0時以降に押せます':`前の押印から${settings.stampInterval?.hours??0}時間あけてください`,409);
+  if(receipt.delta!==input.count||receipt.reason!==input.reason.trim()||receipt.kind!==input.kind||receipt.line_account_id!==input.accountId)throw new StampError('同じ押印の依頼で内容が変わっています',409);
   return readStampWallet(db,input.cardId,input.friendId);
 }
 export async function stampEntries(db:D1Database,cardId:string,friendId:string):Promise<VisitStampEntry[]> {
@@ -176,25 +248,36 @@ export async function offerStampReward(db:D1Database,cardId:string,friendId:stri
   if(r!.rewardId!==rewardId)throw new StampError('同じ使用依頼の内容が変わっています',409);return r!;
 }
 export async function useStampReward(db:D1Database,id:string,friendId:string,accountId:string,staffId:string|null,pin:string) {
+  const submittedFriendId=friendId;
   const selected=await db.prepare('SELECT card_id FROM visit_stamp_redemptions WHERE id=?').bind(stampId(id)).first<{card_id:string}>();
   if(!selected)throw new StampError('特典が見つかりません',404);
   friendId=(await stampWallet(db,selected.card_id,friendId,accountId)).friendId;
   const r=await db.prepare('SELECT * FROM visit_stamp_redemptions WHERE id=? AND friend_id=? AND line_account_id=?').bind(stampId(id),friendId,accountId).first<{card_id:string;status:string;stamps:number;reward_name:string}>();
   if(!r)throw new StampError('特典が見つかりません',404);if(r.status!=='offered')throw new StampError('この特典はすでに処理済みです',409);
   await readStampWallet(db,r.card_id,friendId);
+  const card=await stampCard(db,r.card_id),settings=JSON.parse(card.settings_json) as VisitStampSettings;
+  const goal=Math.max(...settings.rewards.map(reward=>reward.stamps));
+  const next=settings.completion==='next_card'&&r.stamps>=goal?await stampCard(db,settings.nextCardId!,card.tenant_id):null;
+  let nextFriend:string|null=null;
+  if(next){if(!next.active)throw new StampError('次のカードは停止中です',409);await stampFriend(db,next.id,submittedFriendId,accountId);nextFriend=await canonicalStampFriend(db,next.id,submittedFriendId);}
   if(staffId===null)staffId=(await identifyStampStaff(db,accountId,pin)).id;else await verifyStampPin(db,accountId,staffId,pin);
-  const results=await db.batch([
+  const statements=[
     db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,actor_id,reason,idempotency_key,occurred_at)
       SELECT ?,r.card_id,r.friend_id,r.line_account_id,'redeem',-r.stamps,?,r.reward_name,'redeem:'||r.id,datetime('now') FROM visit_stamp_redemptions r
       JOIN visit_stamp_wallets w ON w.card_id=r.card_id AND w.friend_id=r.friend_id JOIN visit_stamp_cards c ON c.id=r.card_id
-      WHERE r.id=? AND r.status='offered' AND w.balance>=r.stamps AND (w.expires_at IS NULL OR julianday(w.expires_at)>julianday('now')) AND c.active=1`)
-      .bind(crypto.randomUUID(),staffId,id),
+      WHERE r.id=? AND r.status='offered' AND w.balance>=r.stamps AND (w.expires_at IS NULL OR julianday(w.expires_at)>julianday('now')) AND c.active=1 AND c.version=?
+      AND (? IS NULL OR EXISTS(SELECT 1 FROM visit_stamp_cards nc JOIN visit_stamp_card_accounts na ON na.card_id=nc.id
+        WHERE nc.id=? AND nc.active=1 AND nc.version=? AND na.line_account_id=r.line_account_id))`)
+      .bind(crypto.randomUUID(),staffId,id,card.version,next?.id??null,next?.id??null,next?.version??null),
     db.prepare(`UPDATE visit_stamp_redemptions SET status='used',used_by=?,used_at=datetime('now') WHERE id=? AND status='offered'
       AND EXISTS(SELECT 1 FROM visit_stamp_entries WHERE idempotency_key='redeem:'||? AND card_id=? AND friend_id=?)`).bind(staffId,id,id,r.card_id,friendId),
-  ]);
+  ];
+  if(next&&nextFriend)statements.push(...createStampWalletStatements(db,next.id,nextFriend,accountId,(JSON.parse(next.settings_json) as VisitStampSettings).receiptBonus??0,
+    `changes()=1 AND EXISTS(SELECT 1 FROM visit_stamp_cards WHERE id=? AND active=1 AND version=?)`,[next.id,next.version]));
+  const results=await db.batch(statements);
   if(!results[0].meta.changes)throw new StampError('使用済み、期限切れ、またはスタンプ不足です',409);
   const member=await getStaffById(db,staffId);
-  return {id,status:'used' as const,staffId,staffName:member?.name??'店員'};
+  return {id,status:'used' as const,staffId,staffName:member?.name??'店員',...(next?{nextCardId:next.id}:{})};
 }
 export async function applyPaperStamps(db:D1Database,id:string,tenantId:string,actorId:string,approve:boolean,reason:string) {
   if(typeof reason!=='string'||!reason.trim()||reason.length>500)throw new StampError('承認・却下の理由を入力してください');
@@ -202,11 +285,11 @@ export async function applyPaperStamps(db:D1Database,id:string,tenantId:string,a
   if(!r)throw new StampError('申請が見つかりません',404);if(r.status!=='pending')throw new StampError('申請は処理済みです',409);
   await readStampWallet(db,r.card_id,r.friend_id);
   const card=await stampCard(db,r.card_id);if(!card.active)throw new StampError('カードは停止中です',409);
-  const now=new Date().toISOString(),expiry=stampExpiry(now,(JSON.parse(card.settings_json) as VisitStampSettings).expiryMonths);
+  const now=new Date().toISOString(),expiry=stampExpiryExpression(JSON.parse(card.settings_json) as VisitStampSettings,now);
   const sql=[db.prepare(`UPDATE visit_stamp_paper_requests SET status=?,reason=?,reviewed_by=?,reviewed_at=? WHERE id=? AND status='pending'`)
     .bind(approve?'approved':'rejected',reason.trim(),actorId,now,id)];
   if(approve)sql.push(db.prepare(`INSERT INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,actor_id,reason,idempotency_key,expires_at,occurred_at)
-    SELECT ?,card_id,friend_id,line_account_id,'paper',stamps,reviewed_by,reason,'paper:'||id,?,? FROM visit_stamp_paper_requests WHERE id=? AND changes()=1`).bind(crypto.randomUUID(),expiry,now,id));
+    SELECT ?,p.card_id,p.friend_id,p.line_account_id,'paper',p.stamps,p.reviewed_by,p.reason,'paper:'||p.id,${expiry.sql},? FROM visit_stamp_paper_requests p JOIN visit_stamp_wallets w ON w.card_id=p.card_id AND w.friend_id=p.friend_id WHERE p.id=? AND changes()=1`).bind(crypto.randomUUID(),...expiry.args,now,id));
   const result=await db.batch(sql);if(!result[0].meta.changes)throw new StampError('申請は処理済みです',409);return {id,status:approve?'approved':'rejected'};
 }
 export async function requestPaperStamps(db:D1Database,cardId:string,friendId:string,accountId:string,photo:unknown,count:number) {
@@ -231,6 +314,7 @@ export async function reconcileStampVisit(db:D1Database,kind:StampVisitKind,id:s
   const key=kind+':'+id;
   const cards=(await db.prepare(`SELECT c.* FROM visit_stamp_cards c JOIN visit_stamp_card_accounts a ON a.card_id=c.id WHERE a.line_account_id=?`).bind(visit.account_id).all<CardRow>()).results;
   for(const card of cards) {
+    if(visit.visited&&await stampCardLocked(db,card.id,visit.friend_id,visit.account_id))continue;
     const subject=await canonicalStampFriend(db,card.id,visit.friend_id);
     const original=await db.prepare(`SELECT id,delta FROM visit_stamp_entries WHERE card_id=? AND friend_id=? AND visit_key=? AND kind='visit'`).bind(card.id,subject,key).first<{id:string;delta:number}>();
     if(!visit.visited) {
@@ -258,11 +342,11 @@ export async function reconcileStampVisit(db:D1Database,kind:StampVisitKind,id:s
     // SQLで初回かどうかを最後に判定し、別の来店との競合でも初回ボーナスは1度。
     const regular=calculateVisitStamps(s,checkout?.amount??0,visit.occurred_at,false,tags),first=calculateVisitStamps(s,checkout?.amount??0,visit.occurred_at,true,tags);
     if(!first&&!regular)continue;
-    const expiry=stampExpiry(visit.occurred_at,s.expiryMonths);
+    const expiry=stampExpiryExpression(s,visit.occurred_at),interval=stampIntervalCondition(s,visit.occurred_at);
     await db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,visit_key,expires_at,occurred_at)
-      SELECT ?,?,?,?,'visit',CASE WHEN w.visit_count=0 THEN ? ELSE ? END,'来店から自動押印',?,?,?,? FROM visit_stamp_wallets w
+      SELECT ?,?,?,?,'visit',CASE WHEN w.visit_count=0 THEN ? ELSE ? END,'来店から自動押印',?,?,${expiry.sql},? FROM visit_stamp_wallets w
       WHERE w.card_id=? AND w.friend_id=? AND EXISTS(SELECT 1 FROM visit_stamp_cards WHERE id=? AND active=1)
-      AND CASE WHEN w.visit_count=0 THEN ? ELSE ? END>0`).bind(crypto.randomUUID(),card.id,subject,visit.account_id,first,regular,'auto:'+key,key,expiry,visit.occurred_at,card.id,subject,card.id,first,regular).run();
+      AND CASE WHEN w.visit_count=0 THEN ? ELSE ? END>0 AND ${interval.sql}`).bind(crypto.randomUUID(),card.id,subject,visit.account_id,first,regular,'auto:'+key,key,...expiry.args,visit.occurred_at,card.id,subject,card.id,first,regular,...interval.args).run();
   }
 }
 export async function processVisitStampQueue(env:Env['Bindings']) {

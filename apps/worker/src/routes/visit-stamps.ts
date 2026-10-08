@@ -8,7 +8,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { getStaffById } from '@line-crm/db';
 import { StampError, stampId, stampCard, readStampCard, saveStampCard, stampWallet, stampEntries, grantStamps, reverseStampEntry,
-  setStampPin, offerStampReward, useStampReward, requestPaperStamps, applyPaperStamps, getStampVisit, reconcileStampVisit } from '../services/visit-stamps.js';
+  setStampPin, offerStampReward, useStampReward, requestPaperStamps, applyPaperStamps, getStampVisit, reconcileStampVisit, stampCardLocked } from '../services/visit-stamps.js';
 
 export const visitStamps=new Hono<Env>();
 visitStamps.onError((e,c)=>c.json({success:false,error:e instanceof StampError?e.message:'スタンプの処理を確認できません'},e instanceof StampError?e.status:500));
@@ -20,6 +20,14 @@ async function account(c:Context<Env>,id:unknown) {
 }
 async function body(c:Context<Env>):Promise<Record<string,unknown>> {
   const input=await c.req.json().catch(()=>null);if(!input||typeof input!=='object'||Array.isArray(input))throw new StampError('入力を確認してください');return input;
+}
+async function backgroundImage(c:Context<Env>,input:VisitStampCardInput) {
+  const value=input.settings?.backgroundImageUrl;if(!value)return;
+  let url:URL;try{url=new URL(value);}catch{throw new StampError('アップロードした背景画像を選んでください');}
+  const origin=new URL(c.env.WORKER_URL||c.req.url).origin;
+  if(url.origin!==origin||url.search||url.hash||!/^\/images\/[\w-]+\.(jpg|png)$/.test(url.pathname))throw new StampError('アップロードしたJPG・PNGの背景画像を選んでください');
+  const object=await c.env.IMAGES.head(url.pathname.slice('/images/'.length));
+  if(!object||object.size>3*1024*1024||!['image/jpeg','image/png'].includes(object.httpMetadata?.contentType??''))throw new StampError('背景画像はJPG・PNG、3MBまでです');
 }
 visitStamps.use('/api/visit-stamps/*',requireRole('owner','admin','staff'));
 visitStamps.use('/api/visit-stamps/*',async(c,next)=>{tenant(c);if(!['GET','HEAD','OPTIONS'].includes(c.req.method)){if(c.get('staff')?.readOnly)throw new StampError('閲覧のみの権限です',403);}await next();});
@@ -33,11 +41,13 @@ visitStamps.get('/api/visit-stamps/cards',async c=>{
 });
 visitStamps.post('/api/visit-stamps/cards',requireRole('owner','admin'),async c=>{
   const input=await body(c) as unknown as VisitStampCardInput;
+  await backgroundImage(c,input);
   if(!Array.isArray(input.accountIds))throw new StampError('押せる店舗を選んでください');for(const a of input.accountIds)await account(c,a);
   return c.json({success:true,data:await saveStampCard(dbFor(c.env),tenant(c),input)},201);
 });
 visitStamps.put('/api/visit-stamps/cards/:id',requireRole('owner','admin'),async c=>{
   const db=dbFor(c.env),old=await readStampCard(db,await stampCard(db,c.req.param('id'),tenant(c))),input=await body(c) as unknown as VisitStampCardInput;
+  await backgroundImage(c,input);
   if(!Array.isArray(input.accountIds))throw new StampError('押せる店舗を選んでください');for(const a of [...old.accountIds,...input.accountIds])await account(c,a);
   return c.json({success:true,data:await saveStampCard(db,tenant(c),input,c.req.param('id'))});
 });
@@ -96,7 +106,7 @@ async function customer(c:Context<Env>) {
 }
 visitStamps.get('/api/liff/visit-stamps/cards',async c=>{
   const x=await customer(c),rows=(await x.db.prepare('SELECT card_id FROM visit_stamp_card_accounts WHERE line_account_id=?').bind(x.a).all<{card_id:string}>()).results;
-  const data=[];for(const r of rows){const card=await stampCard(x.db,r.card_id,x.tenantId);if(card.active)data.push({card:await readStampCard(x.db,card),wallet:await stampWallet(x.db,r.card_id,x.friendId,x.a)});}
+  const data=[];for(const r of rows){const card=await stampCard(x.db,r.card_id,x.tenantId);if(card.active&&!await stampCardLocked(x.db,card.id,x.friendId,x.a))data.push({card:await readStampCard(x.db,card),wallet:await stampWallet(x.db,r.card_id,x.friendId,x.a)});}
   return c.json({success:true,data});
 });
 visitStamps.get('/api/liff/visit-stamps/cards/:id',async c=>{

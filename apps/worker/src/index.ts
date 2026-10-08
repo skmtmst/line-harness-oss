@@ -9,6 +9,7 @@ import { broadcastMediaDirect } from './routes/broadcast-media-direct.js';
 import { hqBroadcasts } from './routes/hq-broadcasts.js';
 import { visitStamps } from './routes/visit-stamps.js';
 import { processVisitStampQueue } from './services/visit-stamps.js';
+import { processVisitStampReminders } from './services/visit-stamp-reminders.js';
 import { Hono, type Context } from 'hono';
 import { noindexHeaderMiddleware, robotsTxtHandler } from './lib/robots.js';
 import { cors } from 'hono/cors';
@@ -2232,6 +2233,17 @@ async function scheduled(
     }
   } catch (e) {
     console.error('event-waitlist error:', e);
+  }
+
+  try {
+    await observeDispatch('visit stamp expiry reminders', async () => {
+      await processVisitStampReminders(dbFor(env), {
+        now: new Date(event.scheduledTime), proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+        proxyDispatch: request => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+      });
+    });
+  } catch {
+    console.error(JSON.stringify({ event: 'visit_stamp_reminders_pending' }));
   }
 
   // 外部Google Calendarで確定したMeet個別相談。前日・1時間前のLINE通知を
