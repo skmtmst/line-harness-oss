@@ -255,7 +255,8 @@ export function useDashboard() {
       if (selectedAccountIdRef.current !== accountId) return
       const conflict = caught instanceof Error && 'status' in caught && caught.status === 409
       setPreferenceSaveError({
-        message: conflict ? '別の画面で配置が更新されました。再読み込みしてください' : 'ダッシュボードの配置を保存できませんでした',
+        /* 言葉は絵 mcOqK の 4（引き出しの下の帯）。 */
+        message: conflict ? 'ほかの人が配置を変えました。最新の配置を読み込んでから直してください。' : '配置を保存できませんでした。通信を確かめてください。',
         conflict,
       })
     } finally {
@@ -282,7 +283,7 @@ export function useDashboard() {
       closeEditor()
     } catch {
       if (selectedAccountIdRef.current === accountId) {
-        setPreferenceSaveError({ message: 'ダッシュボードの配置を初期状態へ戻せませんでした', conflict: false })
+        setPreferenceSaveError({ message: '配置を初期状態へ戻せませんでした。通信を確かめてください。', conflict: false })
       }
     } finally {
       preferenceSaveInFlight.current = false

@@ -46,10 +46,19 @@ import {
 import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
 
-/* 編集パネル（dnd-kit を含む重い部品）は開くまで読まない（v7 の V8 と同じ）。 */
-const DashboardEditor = dynamic(() => import('@/components/dashboard/dashboard-editor').then((module) => module.default), {
+/* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
+const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
   loading: () => <p className={styles.note}>編集パネルを読み込んでいます</p>,
 })
+
+/**
+ * ダッシュボード編集（自分の並び）を出してよい役割か。隠すのは閲覧のみ（読み取り専用。
+ * `/api/staff/me` の role が 'viewer'＝サーバーが保存を断る人）だけ。書き込みできる
+ * スタッフは押せるので出す（決まりは「押せないボタンを隠す」）。読めるまで（null）は出す。
+ */
+export function canEditDashboardLayout(role: string | null): boolean {
+  return role !== 'viewer'
+}
 
 /** 時間帯のあいさつ（日本時間）。 */
 export function greeting(name: string | null, now = new Date()): string {
@@ -90,6 +99,7 @@ export default function DashboardV8() {
   const { refreshAccounts } = useAccount()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
   const canManage = role === null || canManageRole(role)
+  const canEditLayout = canEditDashboardLayout(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
   const start = useFirstSteps(d.selectedAccountId, role)
   const [openDetail, setOpenDetail] = useState<DashboardCardId | null>(null)
@@ -104,7 +114,7 @@ export default function DashboardV8() {
         items={[
           { id: 'detail', label: openDetail === id ? '内訳を閉じる' : '内訳を見る', onSelect: () => setOpenDetail((current) => (current === id ? null : id)) },
           { id: 'go', label, external: true, onSelect: () => router.push(href) },
-          { id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor },
+          ...(canEditLayout ? [{ id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor }] : []),
         ]}
       />
     )
@@ -375,11 +385,11 @@ export default function DashboardV8() {
           onChange={d.selectPeriod}
           options={PERIODS.map((item) => ({ value: item.key, label: item.label }))}
         />
-        <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />ダッシュボード編集</Button>
+        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />ダッシュボード編集</Button> : null}
         {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={15} aria-hidden="true" />配信を作る</Button> : null}
       </>}
       notice={notice}
-      overlays={d.editorOpen ? <DashboardEditor
+      overlays={d.editorOpen && canEditLayout ? <DashboardEditor
         open={d.editorOpen}
         preferences={d.preferences}
         saving={d.preferenceSaving}

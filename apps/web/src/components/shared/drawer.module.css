@@ -206,6 +206,92 @@
   }
 }
 
+/* 頭に題の行＋タブなどを縦に積む形（toolbar を渡したときだけ）。 */
+.headerStack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--tpl-de-head-gap);
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tpl-de-head-gap);
+}
+
+/* 下の帯（footer）のすぐ上の知らせ。 */
+.band {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--tpl-de-band-gap);
+  padding: var(--tpl-de-band-pad);
+}
+
+/*
+ * 編集の引き出し（width="editor"・ダッシュボード編集 mcOqK）。540・頭 16/20・題 17/600・
+ * 閉じるは枠つき 30・中 12/20・下 14/20。開くのは 200ms（提案 F）。既定と narrow は変えない。
+ */
+[data-theme='v8'] .panel[data-width='editor'] {
+  width: min(var(--tpl-drawer-editor-w), 100%);
+}
+
+[data-theme='v8'] .panel[data-width='editor'] .header {
+  padding: var(--tpl-de-head-pad);
+}
+
+[data-theme='v8'] .panel[data-width='editor'] .title {
+  font-size: var(--tpl-de-title-size);
+  line-height: var(--tpl-de-title-lh);
+}
+
+[data-theme='v8'] .panel[data-width='editor'] .description {
+  margin-top: var(--tpl-de-desc-gap);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-de-desc-lh);
+}
+
+[data-theme='v8'] .panel[data-width='editor'] .close {
+  width: var(--tpl-de-close);
+  height: var(--tpl-de-close);
+  flex-basis: var(--tpl-de-close);
+  border-radius: var(--radius-segment);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+  color: var(--color-ink-secondary);
+}
+
+[data-theme='v8'] .panel[data-width='editor'] .close:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+[data-theme='v8'] .panel[data-width='editor'] .close > svg {
+  width: var(--tpl-de-close-icon);
+  height: var(--tpl-de-close-icon);
+}
+
+[data-theme='v8'] .panel[data-width='editor'] .body {
+  padding: var(--tpl-de-body-pad);
+}
+
+[data-theme='v8'] .panel[data-width='editor'] .footer {
+  padding: var(--tpl-de-foot-pad);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme='v8'] .panel[data-width='editor'] {
+    transition:
+      opacity var(--motion-base) var(--motion-ease-out),
+      transform var(--motion-base) var(--motion-ease-out);
+  }
+
+  [data-theme='v8'] .panel[data-width='editor'][data-closing] {
+    transition-duration: var(--motion-exit);
+  }
+}
+
 /* 幅の口（width="narrow"）。既定の 660 は変えない。 */
 [data-theme='v8'] .panel[data-width='narrow'] {
   width: min(var(--tpl-drawer-narrow-w), 100%);

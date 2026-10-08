@@ -8,6 +8,7 @@ export default function IconButton({
   type = 'button',
   'aria-label': ariaLabel,
   ref,
+  size,
   ...props
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'aria-label'> & {
   children: ReactNode
@@ -15,6 +16,8 @@ export default function IconButton({
   'aria-label': string
   /** React 19 の ref（「…」のメニューの位置の基準などに使う）。 */
   ref?: Ref<HTMLButtonElement>
+  /** 'small' は行の中の 24×24（印 12・角丸 6。ダッシュボード編集 mcOqK の上下）。v8 だけで効く。 */
+  size?: 'small'
 }) {
   return (
     <button
@@ -23,6 +26,7 @@ export default function IconButton({
       className={[styles.button, className].filter(Boolean).join(' ')}
       aria-label={ariaLabel}
       data-design-node="H0V8EK"
+      data-size={size}
       {...props}
     >
       {children}
