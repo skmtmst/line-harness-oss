@@ -847,27 +847,45 @@ function AddressFields({
   const [candidates, setCandidates] = useState<PostalCodeCandidate[]>([]);
   const [looking, setLooking] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
+  // 調べている間に書いた欄を、届いた応答で古い中身に戻さないため、
+  // いちばん新しい住所を持っておく（応答のときはこれに足す）。
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  // 調べた郵便番号の回。郵便番号を書き換えたら古い応答・候補は使わない。
+  const lookupGenRef = useRef(0);
+  useEffect(
+    () => () => {
+      lookupGenRef.current += 1;
+    },
+    [],
+  );
 
   const patch = (next: AddressDraft) => onChange(name, next);
 
   const applyCandidate = (c: PostalCodeCandidate) => {
+    const latest = draftRef.current;
     patch({
-      ...draft,
-      postalCode: draft.postalCode,
+      ...latest,
       prefecture: c.prefecture,
       city: c.city,
       // 町名は番地欄が空のときだけ入れる。書いた番地は消さない。
-      addressLine1: draft.addressLine1 || c.town,
+      addressLine1: latest.addressLine1 || c.town,
     });
     setCandidates([]);
     setLookupMessage(null);
   };
 
   const lookup = async () => {
+    const searched = draft.postalCode;
+    const gen = ++lookupGenRef.current;
     setLooking(true);
     setLookupMessage(null);
+    // 応答を使ってよいか（この回が最新で、郵便番号も調べた時のまま）。
+    const stillCurrent = () =>
+      gen === lookupGenRef.current && draftRef.current.postalCode === searched;
     try {
-      const res = await api.postalCodeSearch(draft.postalCode);
+      const res = await api.postalCodeSearch(searched);
+      if (!stillCurrent()) return;
       if (!res.success) throw new Error('postal_code_search_failed');
       const data = res.data;
       if (data.status === 'matched' && data.candidates.length === 1) {
@@ -885,10 +903,11 @@ function AddressFields({
           : 'その郵便番号の住所が見つかりません。下の欄へ直接入力してください',
       );
     } catch {
+      if (!stillCurrent()) return;
       setCandidates([]);
       setLookupMessage('住所を調べられませんでした。下の欄へ直接入力してください');
     } finally {
-      setLooking(false);
+      if (gen === lookupGenRef.current) setLooking(false);
     }
   };
 
@@ -901,7 +920,15 @@ function AddressFields({
           value={draft.postalCode}
           placeholder="123-4567"
           aria-label="郵便番号"
-          onChange={(e) => patch({ ...draft, postalCode: e.target.value })}
+          onChange={(e) => {
+            // 郵便番号を書き換えたら、前の番号の候補・調べ中の応答は使わない。
+            if (e.target.value !== draft.postalCode) {
+              lookupGenRef.current += 1;
+              setLooking(false);
+              setCandidates([]);
+            }
+            patch({ ...draft, postalCode: e.target.value });
+          }}
           className={inputClass}
         />
         <button
