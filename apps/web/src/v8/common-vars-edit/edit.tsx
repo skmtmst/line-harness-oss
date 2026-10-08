@@ -14,6 +14,8 @@
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useFieldValidation } from '@/lib/use-field-validation'
+import { TextField, TextArea } from '@/components/shared/text-field'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
@@ -164,6 +166,8 @@ function EditCommonVarV8Inner() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const fields = useFieldValidation()
+  const reject = (id: string, message: string) => { setError(''); fields.reject(id, message) }
   const [loadFailure, setLoadFailure] = useState<'missing' | 'error' | null>(null)
   const [foldersError, setFoldersError] = useState(false)
   const [schedulesError, setSchedulesError] = useState(false)
@@ -395,52 +399,53 @@ function EditCommonVarV8Inner() {
     if (!item || saving || !selectedAccountId) return
     const accountAtRequest = selectedAccountId
     if (!name.trim()) {
-      setError('共通情報名を入力してください')
+      reject('cv-name', '共通情報名を入力してください')
       return
     }
     const valueError = commonVarValueError(item.type, value)
     if (valueError) {
-      setError(valueError)
-      setValueFieldError(valueError)
+      reject('cv-value', valueError)
+      setValueFieldError('')
       document.getElementById('cv-value')?.focus()
       return
     }
     if (validFrom && validUntil && validFrom >= validUntil) {
-      setError('有効終了は有効開始より後にしてください')
+      reject('cv-valid-until', '有効終了は有効開始より後にしてください')
       return
     }
     if (expiryBehavior === 'fallback') {
       if (!fallbackValue) {
-        setError('期限切れ時に使う代替値を入力してください')
+        reject('cv-fallback-value', '期限切れ時に使う代替値を入力してください')
         document.getElementById('cv-fallback-value')?.focus()
         return
       }
       const fallbackError = commonVarValueError(item.type, fallbackValue, '代替値')
       if (fallbackError) {
-        setError(fallbackError)
-        setFallbackFieldError(fallbackError)
+        reject('cv-fallback-value', fallbackError)
+        setFallbackFieldError('')
         document.getElementById('cv-fallback-value')?.focus()
         return
       }
     }
     if (isSecretLikeVarValue(value)) {
       const message = '鍵やトークンのような秘密の値は共通情報に保存できません'
-      setError(message)
-      setValueFieldError(message)
+      reject('cv-value', message)
+      setValueFieldError('')
       document.getElementById('cv-value')?.focus()
       return
     }
     if (expiryBehavior === 'fallback' && isSecretLikeVarValue(fallbackValue)) {
       const message = '鍵やトークンのような秘密の値は代替値にも保存できません'
-      setError(message)
-      setFallbackFieldError(message)
+      reject('cv-fallback-value', message)
+      setFallbackFieldError('')
       document.getElementById('cv-fallback-value')?.focus()
       return
     }
     if (!changeReason.trim()) {
       const message = '変える理由を入力してください'
-      setError(message)
+      setError('')
       setReasonFieldError(message)
+      requestAnimationFrame(() => document.getElementById('cv-change-reason')?.scrollIntoView?.({ block: 'center' }))
       document.getElementById('cv-change-reason')?.focus()
       return
     }
@@ -781,6 +786,7 @@ function EditCommonVarV8Inner() {
 
   const previewTalk = (
     <LinePreview
+      title="差し込んだときの見え方"
       caption={schedules.length > 0 && schedules[0] ? `${scheduleStamp(schedules[0].effectiveFrom)} から` : undefined}
       accountName="然 - NEN -"
       note="差し込んだときの見え方です。新しい中身を入れると、ここが変わります。"
@@ -807,15 +813,17 @@ function EditCommonVarV8Inner() {
         <div className={styles.sideFields}>
           <div className={styles.field}>
             <label htmlFor="cv-name" className={styles.fieldLabelStrong}>名前</label>
-            <input
+            <TextField
+              {...fields.attributes('cv-name')}
               id="cv-name"
               type="text"
               maxLength={200}
               value={name}
-              onChange={(e) => { setSaved(false); setName(e.target.value) }}
+              onChange={(e) => { fields.clear('cv-name'); setSaved(false); setName(e.target.value) }}
               className={styles.fieldInput}
               readOnly={!canWrite}
             />
+            {fields.error('cv-name') ? <p id="cv-name-error" role="alert" className={styles.fieldError}>{fields.error('cv-name')}</p> : null}
           </div>
           {canWrite ? (
             <FolderSelect
@@ -863,8 +871,9 @@ function EditCommonVarV8Inner() {
           <div className={styles.field}>
             <label htmlFor="cv-valid-until" className={styles.fieldLabelStrong}>終わり</label>
             {canWrite
-              ? <DateTimeField id="cv-valid-until" value={validUntil} placeholder="指定なし" onChange={(v) => { setSaved(false); setValidUntil(v) }} />
+              ? <DateTimeField {...fields.attributes('cv-valid-until')} invalid={Boolean(fields.error('cv-valid-until'))} id="cv-valid-until" value={validUntil} placeholder="指定なし" onChange={(v) => { setSaved(false); fields.clear('cv-valid-until'); setValidUntil(v) }} />
               : <ReadOnlyValue id="cv-valid-until" value={readOnlyDate(validUntil)} />}
+            {fields.error('cv-valid-until') ? <p id="cv-valid-until-error" role="alert" className={styles.fieldError}>{fields.error('cv-valid-until')}</p> : null}
           </div>
         </div>
         <div className={styles.sideFields}>
@@ -898,7 +907,8 @@ function EditCommonVarV8Inner() {
               ) : (item.type as string) === 'datetime' ? (
                 <DateTimeField id="cv-fallback-value" value={fallbackValue} onChange={(v) => { setSaved(false); setFallbackValue(v) }} />
               ) : (
-                <input
+                <TextField
+                  {...fields.attributes('cv-fallback-value')}
                   id="cv-fallback-value"
                   type={item.type === 'number' ? 'number' : 'text'}
                   value={fallbackValue}
@@ -908,6 +918,7 @@ function EditCommonVarV8Inner() {
                   readOnly={!canWrite}
                 />
               )}
+              {fields.error('cv-fallback-value') ? <p id="cv-fallback-value-error" role="alert" className={styles.fieldError}>{fields.error('cv-fallback-value')}</p> : null}
               {fallbackFieldError ? <p className={styles.fieldError} role="alert">{fallbackFieldError}</p> : null}
             </div>
           )}
@@ -1009,7 +1020,7 @@ function EditCommonVarV8Inner() {
             const actor = entry.actorName ?? (entry.actorId ? '担当者名を確認できません' : '担当者未記録')
             const what = previous
               ? `${changeText(previous.value, entry.value)}・${actor}${entry.changeReason ? `「${entry.changeReason}」` : ''}`
-              : `作成・${actor}`
+              : `作成・${actor}${entry.changeReason ? `「${entry.changeReason}」` : ''}`
             return (
               <li key={entry.id} className={styles.historyItem}>
                 <span className={styles.historyDate}>{historyStamp(entry.createdAt)}</span>
@@ -1169,17 +1180,18 @@ function EditCommonVarV8Inner() {
                 ) : item.type === 'boolean' ? (
                   <Select size="full" aria-label="新しい中身" id="cv-value" value={value} onChange={(next) => { setSaved(false); setValue(next) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
                 ) : (item.type as string) === 'long_text' ? (
-                  <textarea id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className={styles.fieldArea} rows={2} readOnly={!canWrite} />
+                  <TextArea {...fields.attributes('cv-value')} id="cv-value" value={value} onChange={(e) => { setSaved(false); fields.clear('cv-value'); setValue(e.target.value) }} className={styles.fieldArea} rows={2} readOnly={!canWrite} />
                 ) : (item.type as string) === 'date' ? (
                   <DateField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} />
                 ) : (item.type as string) === 'datetime' ? (
                   <DateTimeField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} />
                 ) : (
-                  <input
+                  <TextField
+                    {...fields.attributes('cv-value')}
                     id="cv-value"
                     type={item.type === 'number' ? 'number' : 'text'}
                     value={value}
-                    onChange={(e) => { setSaved(false); setValue(e.target.value) }}
+                    onChange={(e) => { setSaved(false); fields.clear('cv-value'); setValue(e.target.value) }}
                     className={styles.fieldInput}
                     aria-label="新しい中身"
                     readOnly={!canWrite}
@@ -1187,6 +1199,7 @@ function EditCommonVarV8Inner() {
                 )}
               </div>
             </div>
+            {fields.error('cv-value') ? <p id="cv-value-error" role="alert" className={styles.fieldError}>{fields.error('cv-value')}</p> : null}
             {valueFieldError ? <p className={styles.fieldError} role="alert">{valueFieldError}</p> : null}
             <div className={styles.field}>
               <label htmlFor="cv-change-reason" className={styles.fieldLabelStrong}>
@@ -1503,7 +1516,7 @@ function ImpactRows({
   return (
     <>
       {rows.length === 0 ? (
-        <p className={styles.cardNote}>使われている場所がないため、確かめる文はありません。</p>
+        <p className={styles.cardNote}>{impact.total > 0 ? 'すぐ変わる使用先の文はありません。送信済みの文はこれから変わりません。' : '使われている場所がないため、確かめる文はありません。'}</p>
       ) : (
         <div className={styles.impactList}>
           {visible.map((row, index) => (

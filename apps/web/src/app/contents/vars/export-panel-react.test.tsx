@@ -28,6 +28,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       commonVars: {
         ...actual.api.commonVars,
         listExports: api.listExports,
@@ -80,6 +81,7 @@ async function clickButton(label: string) {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/contents/vars')
   vi.clearAllMocks()
   api.listExports.mockResolvedValue({ success: true, data: [] })
   api.createExport.mockResolvedValue({ success: true, data: job() })

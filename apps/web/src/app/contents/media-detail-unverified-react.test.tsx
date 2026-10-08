@@ -34,7 +34,7 @@ const BASE_IMPACT = {
 vi.mock('@/lib/api', () => ({
   ApiError,
   fetchApi: () => Promise.resolve({ success: true, data: {} }),
-  api: {
+  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
     media: {
       deleteImpact: () => Promise.resolve({
         success: true,
@@ -100,6 +100,7 @@ async function renderDialog(item: MediaItem = ITEM) {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/contents')
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   fixture.impact = null
   host = document.createElement('div')

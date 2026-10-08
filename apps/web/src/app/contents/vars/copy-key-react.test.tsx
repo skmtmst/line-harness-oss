@@ -23,6 +23,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       commonVars: {
         ...actual.api.commonVars,
         list: api.varsList,
@@ -38,7 +39,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/',
   useRouter: () => ({
     push: vi.fn(), replace: vi.fn(), refresh: vi.fn(),
     back: vi.fn(), forward: vi.fn(), prefetch: vi.fn(),
@@ -76,6 +77,8 @@ const item: CommonVar = {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  window.history.replaceState(null, '', '/contents/vars')
   vi.clearAllMocks()
   api.varsList.mockResolvedValue({ success: true, data: [item] })
   api.listExports.mockResolvedValue({ success: true, data: [] })
@@ -104,6 +107,7 @@ describe('共通情報の一覧: 差し込みキーのコピー（#665）', () =
     // 表示は省略されるが、コピーされるのは差し込み用の全文。
     expect(writeText).toHaveBeenCalledTimes(1)
     expect(writeText).toHaveBeenCalledWith('{{var.audit_user_name_for_long_key}}')
-    expect(button.textContent).toBe('コピー済み')
+    expect(button.getAttribute('data-state')).toBe('copied')
+    expect(button.title).toBe('コピーしました')
   })
 })

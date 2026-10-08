@@ -33,6 +33,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       commonVars: {
         ...actual.api.commonVars,
         detail: api.detail,
@@ -54,7 +55,7 @@ vi.mock('next/link', () => ({
 }))
 
 const navigation = vi.hoisted(() => ({ query: 'id=var-1' }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/',
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(navigation.query),
 }))
@@ -135,6 +136,7 @@ const baseVar = {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'lh_staff_role' ? 'owner' : null, setItem: vi.fn(), removeItem: vi.fn() })
   vi.clearAllMocks()
   navigation.query = 'id=var-1'
   api.foldersList.mockResolvedValue({ success: true, data: [] })
@@ -160,7 +162,7 @@ describe('共通情報の編集：フォルダ・予定の取得失敗は本体�
 
     // 本体は出る。
     expect((byId('cv-name') as HTMLInputElement).value).toBe('期間案内')
-    expect(document.body.textContent).toContain('はじめて登録')
+    expect(document.body.textContent).toContain('作成・')
     expect(document.body.textContent).toContain('開店前のため')
     // 画面全体の失敗にならない。
     expect(document.body.textContent).not.toContain('共通情報を読み込めませんでした')
@@ -192,7 +194,7 @@ describe('共通情報の編集：フォルダ・予定の取得失敗は本体�
 
     // 本体は出たまま。
     expect((byId('cv-name') as HTMLInputElement).value).toBe('期間案内')
-    expect(document.body.textContent).toContain('はじめて登録')
+    expect(document.body.textContent).toContain('作成・')
     expect(document.body.textContent).toContain('開店前のため')
     expect(document.body.textContent).not.toContain('この共通情報は見つかりません')
     // 予定欄だけ失敗と再試行。
@@ -244,3 +246,6 @@ describe('共通情報の編集：フォルダ・予定の取得失敗は本体�
     expect((byId('cv-name') as HTMLInputElement).value).toBe('期間案内')
   })
 })
+
+// These scenarios exercise owner actions; permission restrictions are covered separately.
+vi.mock('@/lib/staff-capability', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/staff-capability')>(), isOwnerOrAdmin: () => true }))

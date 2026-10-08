@@ -26,7 +26,6 @@ import {
   type CommonVarReplacementCandidate,
   type CommonVarReplacementImpact,
 } from '@/lib/api'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -1853,8 +1852,7 @@ function CommonVarsListV8Inner() {
 }
 
 function CommonVarsListV8Switch() {
-  const theme = useAdminTheme()
-  return theme === 'v8' ? <CommonVarsListV8Inner /> : null
+  return <CommonVarsListV8Inner />
 }
 
 export default function CommonVarsListV8() {

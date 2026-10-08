@@ -92,6 +92,8 @@ function ensureStorage() {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  window.history.replaceState(null, '', '/contents/vars')
   ensureStorage()
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -180,12 +182,6 @@ test('staff では閲覧のみの帯が出て、作る操作は出さない', as
   expect(createButtons).toHaveLength(0)
 })
 
-test('v7 では従来の一覧が出て、新しい一覧は出ない', async () => {
-  document.documentElement.dataset.theme = 'v7'
-  await renderPage()
-  expect(host?.querySelector('[data-design-node="WuKzU"]')).not.toBeNull()
-  expect(host?.querySelector('[data-design-node~="FM94M"]')).toBeNull()
-})
 
 test('止める窓は予約中の配信の帯を出す（Hhl9M）', async () => {
   window.localStorage.setItem('lh_staff_role', 'admin')

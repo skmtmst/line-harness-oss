@@ -1452,6 +1452,11 @@ function CommonVarsListInner() {
       <Dialog
         open={statusTarget !== null && deleteTarget === null && !panelStatus}
         designNode="Hhl9M"
+        designWidth={600}
+        designTop={240}
+        designHeaderPadding="24px 24px 0"
+        designContentPadding="14px 24px 4px"
+        designHeadingGap={22}
         title={statusTarget ? `「${statusTarget.name}」を${statusAction === 'stop' ? '止める' : '再開する'}` : ''}
         description={
           statusAction === 'stop'
@@ -1615,7 +1620,8 @@ function CommonVarsListInner() {
                 {deleteImpact.canDelete ? (
                   <>
                     <p className={styles.dialogLead}>{usageText(deleteImpact)}</p>
-                    {consequenceText(deleteImpact) ? (
+                    {deleteImpact.historicalTotal > 0 ? <p className={styles.dialogLead}>送信済みの文はこれから変わりません。</p> : null}
+                    {deleteImpact.blockingTotal > 0 && consequenceText(deleteImpact) ? (
                       <p className={styles.dialogLead}>{consequenceText(deleteImpact)}</p>
                     ) : null}
                   </>

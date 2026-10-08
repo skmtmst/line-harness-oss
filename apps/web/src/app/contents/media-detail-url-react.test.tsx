@@ -144,10 +144,13 @@ async function waitForText(text: string) {
   expect(host.textContent).toContain(text)
 }
 
-function detailButton(filename = MEDIA_A.filename): HTMLButtonElement {
-  const button = host.querySelector<HTMLButtonElement>(`button[aria-label="${filename}の使用箇所"]`)
-  if (!button) throw new Error('詳細ボタンがありません')
-  return button
+async function openDetail(filename = MEDIA_A.filename) {
+  const trigger = host.querySelector<HTMLButtonElement>(`button[aria-label="${filename}のその他操作"]`)
+  if (!trigger) throw new Error('詳細の操作ボタンがありません')
+  await act(async () => { trigger.click(); await settle() })
+  const item = [...document.querySelectorAll<HTMLElement>('[role=menuitem]')].find(el => el.textContent?.includes('使用箇所を見る'))
+  if (!item) throw new Error('使用箇所を見るがありません')
+  await act(async () => { item.click(); await settle() })
 }
 
 beforeEach(() => {
@@ -180,7 +183,7 @@ describe('登録メディア詳細のURL復元（N-196）', () => {
     await renderPage()
     await waitForText(MEDIA_A.filename)
 
-    await act(async () => { detailButton().click(); await settle() })
+    await openDetail()
     expect(window.location.pathname).toBe('/contents')
     expect(new URLSearchParams(window.location.search).get('id')).toBe('media-a')
     await waitForText('ファイルのこと')

@@ -8,8 +8,8 @@ import { describe, expect, it } from 'vitest'
  * 「中身は未分類に戻ります」と確認の窓（ConfirmDialog）を出す。
  */
 
-const MEDIA = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const VARS = readFileSync(new URL('./vars/page.tsx', import.meta.url), 'utf8')
+const MEDIA = readFileSync(new URL("./../../v8/contents/list.tsx", import.meta.url), 'utf8')
+const VARS = readFileSync(new URL("./../../v8/common-vars/list.tsx", import.meta.url), 'utf8')
 
 describe('R37 フォルダの名前変更・削除の接続', () => {
   it('メディア一覧は FolderPanel の行に名前変更・削除を渡す', () => {
@@ -28,8 +28,8 @@ describe('R37 フォルダの名前変更・削除の接続', () => {
   })
 
   it('共通情報一覧は FolderPanel の行に名前変更・削除を渡す', () => {
-    expect(VARS).toContain('onEdit: canManageFolders ? () => setEditingFolder(folder) : undefined')
-    expect(VARS).toContain('onDelete: canManageFolders')
+    expect(VARS).toContain('onEdit: canWrite ? () => setEditingFolder(folder) : undefined')
+    expect(VARS).toContain('onDelete: canWrite')
     expect(VARS).toContain("deleteNote: '削除しても、入っていた共通情報は未分類として残ります。'")
   })
 
@@ -46,11 +46,11 @@ describe('R37 フォルダの名前変更・削除の接続', () => {
     // 狭い幅では縦パネルが出ないため、選んでいるフォルダの操作口を置く。
     expect(VARS).toContain('フォルダ名を変える')
     expect(VARS).toContain('フォルダを削除する')
-    expect(VARS).toContain('canManageFolders && selectedUserFolder')
+    expect(VARS).toContain('...(selectedUserFolder ? [')
   })
 
   it('権限の無い人には押して失敗する口を見せない', () => {
-    expect(VARS).toContain('canManageFolders')
-    expect(VARS).toContain("response.data.role === 'owner' || response.data.role === 'admin'")
+    expect(VARS).toContain('canWrite')
+    expect(VARS).toContain("canManageRole(staffRole)")
   })
 })
