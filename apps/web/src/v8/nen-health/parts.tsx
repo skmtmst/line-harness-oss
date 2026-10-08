@@ -10,6 +10,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import { formatNumber } from '@/lib/format'
 import type { NenHealthChangeFilter, NenHealthLastFilter, NenHealthRow, NenHealthSort } from '@/lib/nen-pets-api'
+import StatusBadge from '@/components/shared/status-badge'
 import styles from './health.module.css'
 
 export type HealthTabKey = 'logs' | 'concern' | 'items'
@@ -64,10 +65,7 @@ export function changeBadges(row: NenHealthRow): Array<{ key: string; label: str
 /** 状態の札（点＋文字）。 */
 export function Pill({ tone, children, title }: { tone: 'ok' | 'warn' | 'off'; children: ReactNode; title?: string }) {
   return (
-    <span className={styles.pill} data-tone={tone} title={title}>
-      <span className={styles.pillDot} aria-hidden="true" />
-      {children}
-    </span>
+    <StatusBadge tone={tone === 'ok' ? 'success' : tone === 'off' ? 'neutral' : tone === 'warn' ? 'warning' : 'neutral'} title={title}>{children}</StatusBadge>
   )
 }
 

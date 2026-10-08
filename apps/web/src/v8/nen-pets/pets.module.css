@@ -44,20 +44,7 @@
 
 /* 閲覧のみの帯（数の帯の上）。 */
 .viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
   margin: var(--tpl-nph-viewer-margin);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
 }
 
 .noteRow {
@@ -235,27 +222,6 @@
 }
 
 /* 状態の札（点＋文字）。 */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-nph-pill-gap);
-  padding: var(--tpl-nph-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-nph-pill-lh);
-  white-space: nowrap;
-}
-.pillDot {
-  width: var(--tpl-nph-pill-dot);
-  height: var(--tpl-nph-pill-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-  flex-shrink: 0;
-}
-.pill[data-tone='ok'] { background: var(--color-success-bg); color: var(--color-success); }
-.pill[data-tone='warn'] { background: var(--color-status-warn-soft); color: var(--color-warning); }
-.pill[data-tone='off'] { background: var(--color-track); color: var(--color-ink-secondary); }
 
 /* 行の右端の「…」（36 の四角）。メニューの目印で行を伸ばさない。 */
 .menuBox {
@@ -396,16 +362,6 @@
   flex-direction: column;
   gap: var(--tpl-nph-card-gap);
   min-width: 0;
-}
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-nph-card-inner-gap);
-  min-width: 0;
-  padding: var(--tpl-nph-card-pad);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
 }
 .formulaCard {
   flex: 0 0 var(--tpl-nph-formula-w);

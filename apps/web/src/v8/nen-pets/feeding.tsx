@@ -9,12 +9,15 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFieldValidation } from '@/lib/use-field-validation'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -59,6 +62,11 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const fields = useFieldValidation(drafts.flatMap((row) => [
+    ...(!row.name.trim() ? [{ id: `feeding-name-${row.key}`, message: '商品名を入れるか、行を消してください。' }] : []),
+    ...(!Number.isFinite(Number(row.kcal.replace(/[,，]/g, ''))) || Number(row.kcal.replace(/[,，]/g, '')) <= 0
+      ? [{ id: `feeding-kcal-${row.key}`, message: '100gあたりのカロリーを0より大きい数で入れてください。' }] : []),
+  ]))
   const generationRef = useRef(0)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
@@ -115,6 +123,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
     touch()
   }
   const cancel = () => {
+    fields.reset()
     if (data) { setDrafts(fromData(data)); setTreatLimit(String(data.treatLimitPercent ?? 10)) }
     setDirty(false)
     setError('')
@@ -122,10 +131,11 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
 
   const save = async () => {
     if (status !== 'ready') return
-    const blank = drafts.find((row) => !row.name.trim())
-    if (blank) { setError('商品名が空の行があります。名前を入れるか、行を消してください。'); return }
-    const badKcal = drafts.find((row) => !Number.isFinite(Number(row.kcal.replace(/[,，]/g, ''))) || Number(row.kcal.replace(/[,，]/g, '')) <= 0)
-    if (badKcal) { setError(`「${badKcal.name}」の 100g あたりのカロリーを数で入れてください。`); return }
+    setError('')
+    if (!fields.submit()) {
+      setDrafts((current) => current.map((row) => ({ ...row, editing: true })))
+      return
+    }
     const generation = generationRef.current
     setBusy(true)
     setError('')
@@ -156,7 +166,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
   if (status === 'error') return <ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
   if (!data) return <ListState kind="loading" title="主食のカロリー表を読み込んでいます" />
 
-  const tableProps = { drafts, canEdit, onUpdate: update, onDefault: setDefault, onRemove: remove, addDisabled: drafts.length >= MAX_PRODUCTS }
+  const tableProps = { fields, drafts, canEdit, onUpdate: update, onDefault: setDefault, onRemove: remove, addDisabled: drafts.length >= MAX_PRODUCTS }
 
   return (
     <div className={styles.feeding}>
@@ -164,14 +174,14 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
       {error ? <Notice tone="danger" message={error} /> : null}
       <div className={styles.feedingGrid}>
         <div className={styles.feedingMain}>
-          <section className={styles.card} aria-label="主食">
+          <Card layout="vertical" padding="spacious" surface="bordered" spacing="normal" aria-label="主食">
             <div className={styles.cardHead}>
               <h2 className={styles.cardTitle}>主食（お客さまが選ぶ、ふだんのごはん）</h2>
               <p className={styles.cardDesc}>一般的な種類だけ登録します。マイページの「いつもの主食」で選ばれ、1日の目安（g）はこの kcal で割ります</p>
             </div>
             <ProductTable {...tableProps} kind="staple" defaultHead="既定の主食" defaultChip="既定" makeDefault="既定にする" addLabel="主食を追加する" onAdd={() => add('staple')} />
-          </section>
-          <section className={styles.card} aria-label="然の商品">
+          </Card>
+          <Card layout="vertical" padding="spacious" surface="bordered" spacing="normal" aria-label="然の商品">
             <div className={styles.cardHead}>
               <h2 className={styles.cardTitle}>然の商品（おやつ・トッピング）</h2>
               <p className={styles.cardDesc}>然の商品名と 100g あたりのカロリーを登録すると、マイページに「然の鹿肉の目安」が出ます</p>
@@ -190,10 +200,10 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
                 <span className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</span>
               </span>
             </div>
-          </section>
+          </Card>
         </div>
 
-        <section className={`${styles.card} ${styles.formulaCard}`} aria-label="今日の目安の計算">
+        <Card layout="vertical" padding="spacious" surface="bordered" spacing="normal" className={styles.formulaCard} aria-label="今日の目安の計算">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>今日の目安の計算</h2>
             <p className={styles.cardDesc}>体重・年齢・避妊去勢・運動量から、公的な指針の式で計算します</p>
@@ -221,7 +231,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
             ))}
           </div>
           <p className={styles.formulaNote}>犬・猫以外は計算しません</p>
-        </section>
+        </Card>
       </div>
 
       {canEdit ? (
@@ -242,9 +252,10 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
 }
 
 function ProductTable({
-  kind, drafts, canEdit, defaultHead, defaultChip, makeDefault, addLabel, onUpdate, onDefault, onRemove, onAdd, addDisabled,
+  kind, drafts, fields, canEdit, defaultHead, defaultChip, makeDefault, addLabel, onUpdate, onDefault, onRemove, onAdd, addDisabled,
 }: {
   kind: NenFeedingKind
+  fields: ReturnType<typeof useFieldValidation>
   drafts: FeedingDraft[]
   canEdit: boolean
   defaultHead: string
@@ -271,7 +282,7 @@ function ProductTable({
           <div key={row.key} className={styles.productRow} role="row">
             <span className={styles.productName} role="cell">
               {row.editing && canEdit ? (
-                <TextField aria-label="商品名" value={row.name} maxLength={40} placeholder={kind === 'nen' ? '例：然 鹿肉ジャーキー' : '例：ドライフード'} onChange={(event) => onUpdate(row.key, { name: event.target.value })} />
+                <><TextField {...fields.bind(`feeding-name-${row.key}`)} aria-label="商品名" value={row.name} maxLength={40} placeholder={kind === 'nen' ? '例：然 鹿肉ジャーキー' : '例：ドライフード'} onChange={(event) => onUpdate(row.key, { name: event.target.value })} /><FieldError id={`feeding-name-${row.key}-error`}>{fields.error(`feeding-name-${row.key}`)}</FieldError></>
               ) : canEdit ? (
                 <button type="button" className={styles.productNameButton} title={`${row.name}を直す`} onClick={() => onUpdate(row.key, { editing: true })}>{row.name}</button>
               ) : (
@@ -281,7 +292,7 @@ function ProductTable({
             <span className={styles.productKcal} role="cell">
               {row.editing && canEdit ? (
                 <span className={styles.kcalInput}>
-                  <TextField aria-label={`${row.name || '商品'}の100gあたりのカロリー`} inputMode="decimal" value={row.kcal} placeholder="360" onChange={(event) => onUpdate(row.key, { kcal: event.target.value })} />
+                  <TextField {...fields.bind(`feeding-kcal-${row.key}`)} aria-label={`${row.name || '商品'}の100gあたりのカロリー`} inputMode="decimal" value={row.kcal} placeholder="360" onChange={(event) => onUpdate(row.key, { kcal: event.target.value })} /><FieldError id={`feeding-kcal-${row.key}-error`}>{fields.error(`feeding-kcal-${row.key}`)}</FieldError>
                   <span className={styles.sub}>kcal</span>
                 </span>
               ) : (

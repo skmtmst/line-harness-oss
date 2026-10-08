@@ -130,6 +130,14 @@
 .colStool { width: var(--tpl-nph-hcol-stool); }
 .colMenu { width: var(--tpl-nph-menu-size); }
 
+/* 狭い板では、気になる変化と詳細にも出る便・食いつきの列を畳む。 */
+@container v8-page (max-width: 1099px) {
+  :global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colStool,
+  :global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colStool {
+    display: none;
+  }
+}
+
 .petCell {
   display: flex;
   align-items: center;
@@ -218,27 +226,6 @@
 .bar[data-level='4'] { height: var(--tpl-nph-bar-h); }
 
 /* 状態の札（点＋文字）。 */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-nph-pill-gap);
-  padding: var(--tpl-nph-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-nph-pill-lh);
-  white-space: nowrap;
-}
-.pillDot {
-  width: var(--tpl-nph-pill-dot);
-  height: var(--tpl-nph-pill-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-  flex-shrink: 0;
-}
-.pill[data-tone='ok'] { background: var(--color-success-bg); color: var(--color-success); }
-.pill[data-tone='warn'] { background: var(--color-status-warn-soft); color: var(--color-warning); }
-.pill[data-tone='off'] { background: var(--color-track); color: var(--color-ink-secondary); }
 
 /* 行の右端の「…」。 */
 .menuBox {
