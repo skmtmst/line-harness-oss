@@ -32,7 +32,9 @@ const { data } = await api.media.counts(accountId)
 
 ## 統括の吹き出し
 
-既存の統括配信の作成・確認・実行APIへ店と同じ `messageBubbles`（または `messageBubblesJson`、同時指定不可）を送る。画像・動画・スタンプ・カルーセル・Flex・クーポン・リッチ素材を店側と同じ送信組立で扱う。店舗名と `{{liff_id}}` は店舗別に置き換えた本文を子配信へ保存する。必要なLIFF IDがない店舗は予約前に止める。
+既存の呼び出し口は `hqBroadcastsApi.create(input)`（`POST /api/hq/broadcasts`）、`hqBroadcastsApi.preflight(id)`（`POST /api/hq/broadcasts/:id/preflight`）、`hqBroadcastsApi.send(id, expectedVersion, confirmedRecipientCount?)`（`POST /api/hq/broadcasts/:id/send`）。権限・追加認証・送信人数の確認・取り消せない操作の確認は既存どおり必要。
+
+これらへ店と同じ `messageBubbles`（または `messageBubblesJson`、同時指定不可）を送る。画像・動画・スタンプ・カルーセル・Flex・クーポン・リッチ素材を店側と同じ送信組立で扱う。店舗名と `{{liff_id}}` は店舗別に置き換えた本文を子配信へ保存する。必要なLIFF IDがない店舗は予約前に止める。
 
 統括のひな形から読み込む吹き出しは、すべての種類で次の情報を `content` に残す。
 
@@ -44,7 +46,7 @@ content: {
 }
 ```
 
-既存の成功した配布記録から、その店舗・同じ統括版に対応するひな形ID、素材ID、公開URL、postback内のIDを付け替える。別テナント、別店舗、保管済み素材、未配布の版は409で止める。新しい表・マイグレーションは不要。未配布店舗への自動配布は追加していない。
+既存の成功した配布記録から、その店舗・同じ統括版に対応するひな形ID、素材ID、公開URL、postback内のIDを付け替える。別テナント、別店舗、保管済み素材、未配布の版は409で止める。テスト送信（`hqBroadcastsApi.testSend(id, accountId)`）にも同じ店舗用の素材とLIFFを使う。新しい表・マイグレーションは不要。未配布店舗への自動配布は追加していない。
 
 **Claude側の残作業**：現状の画像・テキスト・Flexの読み込みでは元のひな形IDが落ち、カルーセルでは版IDが無い。画面で上記2項目を保持する。インラインで作った吹き出しには統括のIDを付けない。
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { resolveHqBroadcastMaterials } from './hq-broadcast-materials.js';
 import type { HqBroadcastInput } from '@line-crm/shared';
@@ -20,7 +20,7 @@ beforeEach(()=>{
   f.raw.prepare("INSERT INTO media(id,kind,filename,mime_type,size_bytes,r2_key,public_url,line_account_id) VALUES(?,'image','image','image/png',1,?,?,?)").run(account+'-media','media/'+account+'/image','https://example.test/'+account+'/image',account);
  }
 });
-afterEach(()=>f.raw.close());
+afterEach(()=>{f.raw.close();vi.unstubAllGlobals();});
 it('同じ統括版の配布記録で各店舗のID・画像URL・postbackを付け替え、入力を変えない',async()=>{
  for(const account of ['a','b']){
   const result=await resolveHqBroadcastMaterials(f.db,'tenant',account,input);
@@ -59,4 +59,21 @@ it('クーポン・リッチ素材の店舗用IDと画像のベースURLを付�
    if(kind==='rich_message')expect(content.baseUrl).toBe('https://example.test/'+account+'/imagemap');
   }
  }
+});
+
+it('統括のテスト送信も、予約と同じ店舗用の素材・IDを実送信の本文へ使う',async()=>{
+ f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('test-friend','U-a','a');INSERT INTO account_settings(line_account_id,key,value) VALUES('a','test_recipients','[\"test-friend\"]')");
+ f.raw.prepare("INSERT INTO hq_broadcast_runs(id,tenant_id,request_id,actor_id,input_json) VALUES('test-run','tenant','test-request','owner',?)").run(JSON.stringify(input));
+ f.raw.exec("INSERT INTO hq_broadcast_targets(run_id,line_account_id,account_name) VALUES('test-run','a','a')");
+ const bodies: any[]=[];
+ vi.stubGlobal('fetch',vi.fn(async (_url:string,init:RequestInit)=>{
+  bodies.push(JSON.parse(String(init.body)));return new Response('{}',{status:200,headers:{'x-line-request-id':'test-request'}});
+ }));
+ const {testHqBroadcast}=await import('./hq-broadcast-details.js');
+ const {getHqBroadcastRun}=await import('./hq-broadcasts.js');
+ await testHqBroadcast(f.db,await getHqBroadcastRun(f.db,'tenant','test-run'),'owner','a');
+ expect(bodies).toHaveLength(1);expect(bodies[0].to).toBe('U-a');
+ const column=bodies[0].messages[0].template.columns[0];
+ expect(column.thumbnailImageUrl).toBe('https://example.test/a/image');
+ expect(column.actions[0].data).toBe('ctpl=a-template&c=0&a=0');
 });
