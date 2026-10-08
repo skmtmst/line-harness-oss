@@ -5,14 +5,6 @@
 .screen {
   display: contents;
 }
-.screen [data-template-region='body'] {
-  gap: 0;
-}
-.screen [data-template-region='body'] > [data-template-region='content'] {
-  max-width: none;
-  padding: var(--tpl-acd-pad);
-  gap: var(--tpl-acd-gap);
-}
 
 .viewerBand {
   display: flex;
@@ -99,32 +91,7 @@
 }
 
 /* 判断の表。頭は薄い地・行は上に線。 */
-.table {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-  border-radius: var(--tpl-acd-card-radius);
-  box-shadow: var(--tpl-acd-ring);
-}
-.headRow,
-.row {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-acd-row-gap);
-  min-width: 0;
-}
-.headRow {
-  padding: var(--tpl-acd-ho-head-pad);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-acd-label-size);
-  font-weight: 600;
-}
-.row {
-  padding: var(--tpl-acd-ho-row-pad);
-  box-shadow: var(--tpl-acd-line-top);
-}
+
 .colName {
   display: flex;
   flex: 1;
@@ -164,12 +131,6 @@
   font-size: var(--tpl-acd-wide-size);
   font-weight: 500;
 }
-.empty {
-  margin: 0;
-  padding: var(--tpl-acd-ho-row-pad);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-acd-value-size);
-}
 
 /* 保存していない書き換えの帯。 */
 .pendingBand {
@@ -195,12 +156,10 @@
   flex: 1;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--tpl-acd-ho-list-gap);
+
   min-width: 0;
   margin: 0;
-  padding: var(--tpl-acd-ho-box-pad);
-  border-radius: var(--tpl-acd-ho-step-radius);
-  box-shadow: var(--tpl-acd-ring);
+
 }
 .cardTitle {
   margin: 0;
@@ -245,3 +204,5 @@
     flex-basis: auto;
   }
 }
+
+.nameStack { display: flex; flex-direction: column; gap: var(--tpl-acd-ho-name-gap); min-width: 0; }

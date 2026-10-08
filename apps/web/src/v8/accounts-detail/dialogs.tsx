@@ -18,6 +18,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import OtpInput from '@/components/shared/otp-input'
 import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import StepUpPrompt, { isStepUpRequired, stepUpFailureMessage, type StepUpRequest } from '@/components/step-up-prompt'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import { ARCHIVE_BLOCKER_MESSAGES, parseCount, type AccountDetailView } from './view'
@@ -51,13 +52,21 @@ function Frame({ open, node, width, top, title, busy, onCancel, actions, childre
   )
 }
 
-function Field({ label, children, htmlFor }: { label: ReactNode; children: ReactNode; htmlFor?: string }) {
-  return (
-    <div className={styles.field}>
-      <label className={styles.label} htmlFor={htmlFor}>{label}</label>
-      {children}
-    </div>
-  )
+/** 欄の誤りが描画されたら、先頭へ移動する。通信失敗は上の案内へ残す。 */
+function useInvalidFocus(errors: Record<string, string>, ids: Record<string, string>) {
+  const idsRef = useRef(ids)
+  idsRef.current = ids
+  useEffect(() => {
+    const key = Object.keys(errors)[0]
+    if (!key) return
+    // 窓を開いた直後のフォーカス移動より後に、誤りの欄を標的にする。
+    const frame = requestAnimationFrame(() => {
+      const input = document.getElementById(idsRef.current[key])
+      input?.focus()
+      input?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [errors])
 }
 
 function ErrorLine({ message }: { message: string }) {
@@ -75,13 +84,16 @@ export function StopDialog({ account, onClose, onDone }: {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const inputId = useId()
+  useInvalidFocus(fieldErrors, { reason: inputId })
   const stopping = account?.isActive ?? true
 
   const close = () => {
     if (busy) return
     setReason('')
+    setFieldErrors({})
     setError('')
     onClose()
   }
@@ -90,7 +102,8 @@ export function StopDialog({ account, onClose, onDone }: {
     if (!account) return
     const trimmed = reason.trim()
     if (!trimmed) {
-      setError('理由を入れてください。あとから「なぜ止めたか」を追えるようにします。')
+      setFieldErrors({ reason: '理由を入れてください。あとから「なぜ止めたか」を追えるようにします。' })
+      setError('')
       return
     }
     setBusy(true)
@@ -142,13 +155,13 @@ export function StopDialog({ account, onClose, onDone }: {
             ? '止めているあいだ、配信も受信もしません。予約した配信は送られません。'
             : '再開の前にLINEとの接続を確かめます。止めているあいだに予約していた配信は、自動で送り直しません。'}
         </p>
-        <Field label={stopping ? '止める理由（必須）' : '再開する理由（必須）'} htmlFor={inputId}>
+        <Field label={stopping ? '止める理由（必須）' : '再開する理由（必須）'} htmlFor={inputId} error={fieldErrors.reason}>
           <TextField
             id={inputId}
             maxLength={500}
             placeholder={stopping ? '例: 乗り換えの準備のため' : '例: 接続を直したので再開する'}
             value={reason}
-            onChange={(event) => setReason(event.target.value)}
+            onChange={(event) => { setReason(event.target.value); setFieldErrors({}) }}
             disabled={busy}
           />
         </Field>
@@ -371,9 +384,11 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const secretId = useId()
   const tokenId = useId()
+  useInvalidFocus(fieldErrors, { secret: secretId })
 
   const close = () => {
     if (busy) return
@@ -392,7 +407,8 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
       payload.loginChannelSecret = secret.trim()
     }
     if (Object.keys(payload).length === 0) {
-      setError('差し替える値を入れてください。空の欄は今の値のままにします。')
+      setFieldErrors({ secret: '差し替える値を入れてください。空の欄は今の値のままにします。' })
+      setError('')
       return
     }
     setBusy(true)
@@ -436,12 +452,12 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
         </>}
       >
         <p className={styles.sub}>{kind === 'messaging' ? 'Messaging API' : 'LINE Login'}</p>
-        <Field label={kind === 'messaging' ? 'Channel Secret' : 'Login Channel Secret'} htmlFor={secretId}>
-          <TextField id={secretId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={secret} onChange={(event) => setSecret(event.target.value)} disabled={busy} />
+        <Field label={kind === 'messaging' ? 'Channel Secret' : 'Login Channel Secret'} htmlFor={secretId} error={fieldErrors.secret}>
+          <TextField id={secretId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={secret} onChange={(event) => { setSecret(event.target.value); setFieldErrors({}) }} disabled={busy} />
         </Field>
         {kind === 'messaging' ? (
           <Field label="Channel Access Token" htmlFor={tokenId}>
-            <TextField id={tokenId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={token} onChange={(event) => setToken(event.target.value)} disabled={busy} />
+            <TextField id={tokenId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={token} onChange={(event) => { setToken(event.target.value); setFieldErrors({}) }} disabled={busy} />
           </Field>
         ) : null}
         <p className={styles.infoBand}>保存のときに本人確認が出ます。差し替えたあと、接続を確かめます。</p>
@@ -486,8 +502,11 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
   const [iconUrl, setIconUrl] = useState(account.iconUrl ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const ids = { name: useId(), tz: useId(), login: useId(), liff: useId(), og: useId(), ogDesc: useId(), ogImage: useId(), cap: useId(), warn: useId(), icon: useId() }
+
+  useInvalidFocus(fieldErrors, ids)
 
   const close = () => {
     if (!busy) onClose()
@@ -495,17 +514,23 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
 
   const save = async (stepUpToken?: string) => {
     if (!name.trim()) {
-      setError('アカウント名を入れてください。')
+      setFieldErrors({ name: 'アカウント名を入れてください。' })
+      setError('')
       return
     }
     const capacityNext = parseCount(capacity)
     const warnNext = parseCount(warnAt)
     if (Number.isNaN(capacityNext) || Number.isNaN(warnNext)) {
-      setError('友だちの上限と警告を出す人数は、数字で入れてください。')
+      setFieldErrors({
+        ...(Number.isNaN(capacityNext) ? { cap: '友だちの上限は数字で入れてください。' } : {}),
+        ...(Number.isNaN(warnNext) ? { warn: '警告を出す人数は数字で入れてください。' } : {}),
+      })
+      setError('')
       return
     }
     if (capacityNext !== null && warnNext !== null && warnNext > capacityNext) {
-      setError('警告を出す人数は上限以下にしてください。上限を超える値は鳴りません。')
+      setFieldErrors({ warn: '警告を出す人数は上限以下にしてください。上限を超える値は鳴りません。' })
+      setError('')
       return
     }
     const payload: Parameters<typeof api.lineAccounts.update>[1] = {}
@@ -564,8 +589,8 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         </>}
       >
         <div className={styles.pair}>
-          <Field label="アカウント名" htmlFor={ids.name}>
-            <TextField id={ids.name} required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} />
+          <Field label="アカウント名" htmlFor={ids.name} error={fieldErrors.name}>
+            <TextField id={ids.name} required maxLength={100} value={name} onChange={(event) => { setName(event.target.value); setFieldErrors((current) => { const next = { ...current }; delete next.name; return next }) } } disabled={busy} />
           </Field>
           {canEditTimezone ? (
             <div className={styles.narrow}>
@@ -603,11 +628,11 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
           </>
         ) : null}
         <div className={styles.pair}>
-          <Field label="友だちの上限" htmlFor={ids.cap}>
-            <TextField id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} />
+          <Field label="友だちの上限" htmlFor={ids.cap} error={fieldErrors.cap}>
+            <TextField id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => { setCapacity(event.target.value); setFieldErrors((current) => { const next = { ...current }; delete next.cap; return next }) } } disabled={busy} />
           </Field>
-          <Field label="警告を出す人数" htmlFor={ids.warn}>
-            <TextField id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
+          <Field label="警告を出す人数" htmlFor={ids.warn} error={fieldErrors.warn}>
+            <TextField id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => { setWarnAt(event.target.value); setFieldErrors((current) => { const next = { ...current }; delete next.warn; return next }) } } disabled={busy} />
           </Field>
         </div>
         <Field label="アイコンのURL" htmlFor={ids.icon}>

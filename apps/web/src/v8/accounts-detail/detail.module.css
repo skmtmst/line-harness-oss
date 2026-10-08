@@ -7,14 +7,6 @@
 .screen {
   display: contents;
 }
-.screen [data-template-region='body'] {
-  gap: 0;
-}
-.screen [data-template-region='body'] > [data-template-region='content'] {
-  max-width: none;
-  padding: var(--tpl-acd-pad);
-  gap: var(--tpl-acd-stack-gap);
-}
 
 .headActions {
   display: flex;
@@ -65,15 +57,9 @@
 .inner {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-acd-card-gap);
+
   min-width: 0;
-  padding: var(--tpl-acd-card-pad);
-  border-radius: var(--tpl-acd-card-radius);
-  background: var(--color-canvas);
-  box-shadow: var(--tpl-acd-ring);
-}
-.inner {
-  padding: var(--tpl-acd-inner-pad);
+
 }
 
 .cardHead {
