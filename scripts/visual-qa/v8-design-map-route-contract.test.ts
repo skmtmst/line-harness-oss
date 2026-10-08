@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import designMap from './v8-design-map.json'
+// @ts-expect-error 表を作る道具は素のJSで型定義を持たない。
 import { entryOf } from './build-v8-board-to-code.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -52,7 +53,7 @@ describe('板と画面のコードの表（docs/v8-board-to-code.md）', () => {
 
   it('指定つきの URL（?id= など）でも、入口があれば「page.tsx なし」にしない', () => {
     const wrong = rows
-      .filter(([, , , url, entry]) => url !== '—' && entry === '（page.tsx なし）' && entryOf(url) !== null)
+      .filter(([, , , url, entry]) => url !== '—' && entry === '（page.tsx なし）' && (entryOf(url) as string | null) !== null)
       .map(([, id, , url]) => `${id} ${url}`)
     expect(wrong).toEqual([])
   })
