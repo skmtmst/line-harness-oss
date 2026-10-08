@@ -8699,3 +8699,13 @@ export const COMMON_VAR_HOURS_DETAIL = {
 export const COMMON_VAR_HOURS_SCHEDULES = [
   { id: 'common-var-hours-schedule-1', varId: 'common-var-hours', effectiveFrom: '2026-10-01T00:00', value: '平日 10:00〜18:00', appliedAt: null },
 ]
+
+/* 接続確認 wxIQ7：作成手順の下書きと分離した、公開中・戻れない予約タブの実 API 形の見本。 */
+RICH_MENU_GROUP_DETAILS['rmg-connections'] = {
+  ...RICH_MENU_GROUP_DETAILS['rmg-1'],
+  id: 'rmg-connections', name: '会員ランク上位', status: 'published',
+  pages: RICH_MENU_GROUP_DETAILS['rmg-1'].pages.map((page) => ({
+    ...page, lineRichmenuId: `visual-line-${page.id}`,
+    areas: page.id === 'rmg-1-booking' ? [] : page.areas,
+  })),
+}

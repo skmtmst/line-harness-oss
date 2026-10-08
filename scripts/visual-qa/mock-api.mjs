@@ -6378,6 +6378,24 @@ const server = createServer((req, res) => {
     return
   }
 
+  // 管理画面の画像は公開URLではなく、実際の認証付き表示口から読む。
+  const mediaContent = /^\/api\/media\/([^/]+)\/content$/.exec(url.pathname)
+  if (method === 'GET' && mediaContent) {
+    const item = MEDIA_ITEMS.find((media) => media.id === decodeURIComponent(mediaContent[1]))
+    if (!item || url.searchParams.get('accountId') !== item.lineAccountId) {
+      res.writeHead(404).end()
+      return
+    }
+    if (item.kind === 'image' && item.url.startsWith('data:image/svg+xml,')) {
+      res.setHeader('Content-Type', 'image/svg+xml')
+      res.setHeader('Cache-Control', 'no-store')
+      res.writeHead(200).end(decodeURIComponent(item.url.slice('data:image/svg+xml,'.length)))
+      return
+    }
+    res.writeHead(404).end()
+    return
+  }
+
   if (method === 'GET' && (url.pathname.startsWith('/api/rich-menu-images/') || url.pathname === '/images/hq-templates/visual-tenant-1/menu-member.png')) {
     // 6面が見分けられる撮影専用画像。1px画像ではキャンバスが黒く見え、
     // 画像本体を取得できたか判定できないため、実際の比率に近いPNGを返す。
