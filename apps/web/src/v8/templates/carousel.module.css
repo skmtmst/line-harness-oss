@@ -137,6 +137,26 @@
   min-width: 0;
 }
 
+/* 「予約ページを開く」「予約履歴を開く」の中身：入れる欄は無く、開く先の1行だけ。 */
+.fixedBody {
+  display: flex;
+  align-items: center;
+  min-height: var(--tpl-cn-control-h);
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* LIFF の無いアカウント：選べない動きの理由を操作のそばに書く（出す＝使える）。 */
+.liffNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-sub-lh);
+}
+
 .iconButton {
   display: inline-flex;
   align-items: center;
