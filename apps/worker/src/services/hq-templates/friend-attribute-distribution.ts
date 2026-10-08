@@ -30,6 +30,10 @@ async function snapshot(db:D1Database,auth:HqTemplateAuthority,accountId:string)
  const row=await db.prepare(SNAPSHOT_SQL).bind(auth.tenantId,accountId).first<{snapshot:string}>();
  if(!row)throw new HqTemplateError('SNAPSHOT_UNAVAILABLE',500);return row.snapshot;
 }
+async function snapshotDigest(value:string){
+ const {keys:_keys,...definitions}=JSON.parse(value);
+ return digest(JSON.stringify(definitions));
+}
 function state(value:string):State{
  const raw=JSON.parse(value);return {fields:raw.fields.map((v:any)=>v.row),marks:raw.marks.map((v:any)=>v.row),folders:raw.folders.map((v:any)=>v.row),keys:raw.keys};
 }
@@ -48,7 +52,7 @@ function inspect(type:HqFriendAttributeType,definition:HqFriendFieldDefinition|H
   const keyOccupied=s.keys.some(k=>k.field_key===def.field.fieldKey);
   const writable=row&&row.line_account_id!==null&&row.status==='active'&&!row.ec_is_master&&row.type===def.field.type&&row.field_key===def.field.fieldKey;
   items.push({sourceId:'friend_field',itemKind:'friend_field',name:def.field.name,targetId:row?.id??null,expectedRevision:row?`${row.updated_at}:${row.version}`:null,duplicate:!!row||keyOccupied,
-   allowedModes:row?[...(writable?['overwrite' as const]:[]),'alias','skip']:keyOccupied?['alias']:['create'],code:!row&&keyOccupied?'FIELD_KEY_IN_USE':row&&!writable?'FIELD_REQUIRES_ALIAS':null,reason:!row&&keyOccupied?'差し込み名が使われています。別名で追加してください':row&&!writable?'種類・差し込み名・編集権限が異なります。別名で追加するか飛ばしてください':null});
+   allowedModes:row?[...(writable?['overwrite' as const]:[]),'alias','skip']:keyOccupied?['alias']:['create','alias'],code:!row&&keyOccupied?'FIELD_KEY_IN_USE':row&&!writable?'FIELD_REQUIRES_ALIAS':null,reason:!row&&keyOccupied?'差し込み名が使われています。別名で追加してください':row&&!writable?'種類・差し込み名・編集権限が異なります。別名で追加するか飛ばしてください':null});
  }else{
   const def=definition as HqMarkDefinition,matches=s.marks.filter(row=>normalizeScopedTagName(row.name)===normalizeScopedTagName(def.mark.name));
   if(matches.length>1)throw new HqTemplateError('AMBIGUOUS_MARK',409);const row=matches[0];
@@ -63,10 +67,15 @@ export async function preflightFriendAttribute(db:D1Database,auth:HqTemplateAuth
  const type=template.template_type,def=definitionFor(type,definition),version=await db.prepare('SELECT version FROM hq_template_versions WHERE id=? AND tenant_id=? AND template_id=?').bind(template.current_version_id,auth.tenantId,id).first<{version:number}>();
  if(!version)throw new HqTemplateError('VERSION_UNAVAILABLE',409);
  const preflightId=crypto.randomUUID(),expiresAt=new Date(Date.now()+15*60000).toISOString(),statements:D1PreparedStatement[]=[],stores=[];
+ let fieldKeyReserved=false;
  for(const a of accounts){
-  const value=await snapshot(db,auth,a.id),token=`hqts1.${await digest(value)}`,storeId=crypto.randomUUID(),items=inspect(type,def,value);
+  const value=await snapshot(db,auth,a.id),token=`hqts1.${await snapshotDigest(value)}`,storeId=crypto.randomUUID(),items=inspect(type,def,value);
+  const root=items.find(item=>item.itemKind===type)!;
+  const plannedKeyConflict=type==='friend_field'&&root.allowedModes.includes('create')&&fieldKeyReserved;
+  if(plannedKeyConflict){root.duplicate=true;root.allowedModes=['alias'];root.code='FIELD_KEY_RESERVED';root.reason='同じ差し込み名を別の店へ配ります。この店は別名で追加してください';}
+  if(type==='friend_field'&&root.allowedModes.includes('create'))fieldKeyReserved=true;
   statements.push(db.prepare("INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES(?,?,?,?,?,'create',?,?,'ready',?,?)").bind(storeId,auth.tenantId,id,template.current_version_id,a.id,preflightId,token,auth.actorId,expiresAt));
-  for(const item of items)statements.push(db.prepare("INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES(?,?,?,?,?,?,?,?,?,'create',?,?)").bind(storeId,auth.tenantId,id,template.current_version_id,a.id,preflightId,token,item.sourceId,item.itemKind,item.targetId,item.expectedRevision));
+  for(const item of items)statements.push(db.prepare("INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision,alias_name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(storeId,auth.tenantId,id,template.current_version_id,a.id,preflightId,token,item.sourceId,item.itemKind,plannedKeyConflict&&item.itemKind===type?'alias':'create',item.targetId,item.expectedRevision,plannedKeyConflict&&item.itemKind===type?'pending':null));
   stores.push({accountId:a.id,accountName:a.name,items,targetVersion:await targetDistributionVersion(db,auth.tenantId,id,a.id,version.version)});
  }
  await db.batch(statements);return {preflightId,expiresAt,stores};
@@ -150,9 +159,10 @@ export async function distributeFriendAttribute(db:D1Database,auth:HqTemplateAut
   if(p.status==='consumed'){if(r.mode!==s.mode)throw new HqTemplateError('SELECTION_CHANGED',409);continue;}
   // Validate against the original duplicate identity even when snapshot is stale.
   if(s.mode==='skip'&&(!r.target_id||r.item_kind!==type))throw new HqTemplateError('SELECTION_REQUIRED',409);
+  if(!r.target_id&&r.mode==='alias'&&s.mode!=='alias')throw new HqTemplateError('SELECTION_REQUIRED',409);
   if(r.target_id&&s.mode==='create')throw new HqTemplateError('SELECTION_REQUIRED',409);
   if(!r.target_id&&(s.mode==='overwrite'||s.mode==='skip'))throw new HqTemplateError('SELECTION_REQUIRED',409);
-  if(`hqts1.${await digest(snapshots.get(p.id)!)}`===p.snapshot_token){
+  if(`hqts1.${await snapshotDigest(snapshots.get(p.id)!)}`===p.snapshot_token){
    const item=inspect(type,def,snapshots.get(p.id)!).find(i=>i.sourceId===s.sourceId);
    if(!item||!item.allowedModes.includes(s.mode))throw new HqTemplateError('SELECTION_REQUIRED',409);
   }
@@ -167,7 +177,7 @@ export async function distributeFriendAttribute(db:D1Database,auth:HqTemplateAut
   if(await existing())continue;
   const selected=selections.filter(s=>s.accountId===p.target_account_id),value=await snapshot(db,auth,p.target_account_id);
   let status='succeeded',errorCode:string|null=null,commit:ReturnType<typeof plan>|null=null;
-  if(!p.expires_at||p.expires_at<=new Date().toISOString()||`hqts1.${await digest(value)}`!==p.snapshot_token){status='version_conflict';errorCode='VERSION_CONFLICT';}
+  if(!p.expires_at||p.expires_at<=new Date().toISOString()||`hqts1.${await snapshotDigest(value)}`!==p.snapshot_token){status='version_conflict';errorCode='VERSION_CONFLICT';}
   else try{commit=plan(type,def,value,auth,p.target_account_id,selected)}catch(e){status=e instanceof HqTemplateError&&e.code==='VERSION_CONFLICT'?'version_conflict':'failed';errorCode=e instanceof HqTemplateError?e.code:'COMMIT_FAILED';}
   const persist=async(finalStatus:string,finalError:string|null,apply:boolean)=>{
    const statements:HqTemplateStatement[]=[stmt("SELECT json(CASE WHEN EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND tenant_id=? AND status='ready') AND NOT EXISTS(SELECT 1 FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=?) THEN '{}' ELSE 'CONFLICT' END)",[p.id,auth.tenantId,runId,auth.tenantId,p.target_account_id]),stmt("SELECT json(CASE WHEN EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL) THEN '{}' ELSE 'FORBIDDEN' END)",[p.target_account_id,auth.tenantId])];
@@ -191,7 +201,7 @@ export async function distributeFriendAttribute(db:D1Database,auth:HqTemplateAut
    if(await existing())continue;
    // Recheck ownership before writing a failure ledger for this store.
    await requireTargetAccounts(db,auth,[p.target_account_id]);
-   const conflict=!p.expires_at||p.expires_at<=new Date().toISOString()||`hqts1.${await digest(await snapshot(db,auth,p.target_account_id))}`!==p.snapshot_token;
+   const conflict=!p.expires_at||p.expires_at<=new Date().toISOString()||(await snapshot(db,auth,p.target_account_id))!==value;
    try{await persist(conflict?'version_conflict':'failed',conflict?'VERSION_CONFLICT':'COMMIT_FAILED',false)}catch{if(!(await existing()))throw new HqTemplateError('RESULT_UNAVAILABLE',500)}
   }
  }

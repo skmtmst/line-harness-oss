@@ -202,3 +202,12 @@ test('another HQ administrator can read a result but cannot execute the creator 
  const result=await request(`/${template.id}/distributions/${p.preflightId}`);expect(result.status).toBe(200);expect(result.body.data.stores[0].status).toBe('succeeded');
  staff.readOnly=false;expect((await distribute(template.id,p)).status).toBe(404);
 });
+test('multi-store field preflight requires explicit aliases for global key collisions and commits all stores',async()=>{
+ const {template}=await create('friend_field',fieldDefinition),p=await preflight(template.id,['a','b','c']);
+ expect(p.stores.map((s:any)=>s.items[0].allowedModes)).toEqual([['create','alias'],['alias'],['alias']]);
+ const invalid=await distribute(template.id,p,'create');expect(invalid.status).toBe(409);expect(sql.raw.prepare('SELECT count(*) n FROM friend_fields').get()).toEqual({n:0});
+ const resolutions=p.stores.flatMap((s:any)=>s.items.map((i:any)=>({accountId:s.accountId,sourceId:i.sourceId,mode:i.allowedModes[0]})));
+ const r=await request(`/${template.id}/distribute`,'POST',{preflightId:p.preflightId,resolutions});expect(r.status,JSON.stringify(r.body)).toBe(200);expect(r.body.data.stores.map((s:any)=>s.status)).toEqual(['succeeded','succeeded','succeeded']);
+ expect(sql.raw.prepare('SELECT f.field_key,s.line_account_id FROM friend_fields f JOIN friend_field_scopes s ON s.field_id=f.id ORDER BY s.line_account_id').all()).toEqual([{field_key:'pet_name',line_account_id:'a'},{field_key:'pet_name_2',line_account_id:'b'},{field_key:'pet_name_3',line_account_id:'c'}]);
+ expect((await request(`/${template.id}/distribute`,'POST',{preflightId:p.preflightId,resolutions})).body.data).toEqual(r.body.data);expect(sql.raw.pragma('foreign_key_check')).toEqual([]);
+});
