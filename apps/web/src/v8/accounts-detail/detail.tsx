@@ -9,7 +9,7 @@
  * 編集 n9Z2P）は dialogs.tsx。データの口は今の画面（app/accounts/detail）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ArchiveRestore, ArrowLeftRight, Eye, Pause, Pencil, Play, QrCode } from 'lucide-react'
@@ -94,34 +94,47 @@ export default function AccountDetailV8() {
     }
   }, [])
 
+  /*
+   * 読込の世代（WEB132）。同じ画面のまま ?id= が A→B と変わったとき、A の遅い応答で B の画面・
+   * 「送らなかった」一覧・テスト送信先を上書きしない。最後に出した要求の応答だけを使う。
+   */
+  const loadSeq = useRef(0)
+  const recipientsSeq = useRef(0)
+
   const loadRecipients = useCallback(async () => {
     if (!id) return
+    const seq = ++recipientsSeq.current
     try {
       const res = await api.accountSettings.getTestRecipients(id)
+      if (seq !== recipientsSeq.current) return
       setRecipients(res.success && Array.isArray(res.data) ? res.data.map((r) => r.displayName) : 'error')
     } catch {
+      if (seq !== recipientsSeq.current) return
       setRecipients('error')
     }
   }, [id])
 
   const load = useCallback(async () => {
     if (!id) return
+    const seq = ++loadSeq.current
     setMissing(false)
     try {
       const one = await api.lineAccounts.get(id)
+      if (seq !== loadSeq.current) return
       if (!one.success) { setStatus('error'); return }
       const data = one.data as AccountDetailView
       setAccount(data)
       // 止まっているアカウントでは「送らなかった」一覧も読む（X-1）。
       if (!data.isActive && !data.archivedAt) {
         api.lineAccounts.skippedDeliveries(id)
-          .then((res) => { setSkipped(res.success && Array.isArray(res.data) ? res.data : 'error') })
-          .catch(() => { setSkipped('error') /* 一覧が読めなくても詳細は使える。 */ })
+          .then((res) => { if (seq === loadSeq.current) setSkipped(res.success && Array.isArray(res.data) ? res.data : 'error') })
+          .catch(() => { if (seq === loadSeq.current) setSkipped('error') /* 一覧が読めなくても詳細は使える。 */ })
       } else {
         setSkipped(null)
       }
       setStatus('ready')
     } catch (caught) {
+      if (seq !== loadSeq.current) return
       if (caught instanceof ApiError && caught.status === 404) {
         setMissing(true)
         setStatus('ready')
@@ -129,6 +142,27 @@ export default function AccountDetailV8() {
       }
       setStatus('error')
     }
+  }, [id])
+
+  /*
+   * 見るアカウントが変わったら、前のアカウントの表示と開いていた窓を捨てる（WEB132）。
+   * A で開いた差し替え・編集・止めるの窓を B の画面に残さない。
+   */
+  const shownId = useRef(id)
+  useEffect(() => {
+    if (shownId.current === id) return
+    shownId.current = id
+    setAccount(null)
+    setStatus('loading')
+    setMissing(false)
+    setRecipients(null)
+    setSkipped(null)
+    setStopTarget(null)
+    setArchiveTarget(null)
+    setRestoreTarget(null)
+    setEditing(false)
+    setCredentials(null)
+    setRecipientsOpen(false)
   }, [id])
 
   useEffect(() => { void load() }, [load])
@@ -159,7 +193,7 @@ export default function AccountDetailV8() {
       />,
     )
   }
-  if (status === 'loading') return frame(<ListState kind="loading" />)
+  if (status === 'loading' || (account !== null && account.id !== id)) return frame(<ListState kind="loading" />)
   if (missing || (status === 'ready' && !account)) {
     return frame(
       <TargetMissing
