@@ -182,6 +182,7 @@ export default function NewCommonVarV8() {
   const [nameFieldError, setNameFieldError] = useState('')
   const [keyFieldError, setKeyFieldError] = useState('')
   const [periodFieldError, setPeriodFieldError] = useState('')
+  const [warningAsDraft, setWarningAsDraft] = useState(false)
   const [secretWarningFields, setSecretWarningFields] = useState<string[] | null>(null)
   const valueRef = useRef<HTMLInputElement>(null)
   const memoRef = useRef<HTMLTextAreaElement>(null)
@@ -346,6 +347,7 @@ export default function NewCommonVarV8() {
     }
     const sensitiveFields = sensitiveFieldLabels(value, memo)
     if (sensitiveFields.length > 0 && !allowSensitive) {
+      setWarningAsDraft(asDraft)
       setSecretWarningFields(sensitiveFields)
       setError('')
       return
@@ -725,7 +727,7 @@ export default function NewCommonVarV8() {
             >
               入力に戻って修正する
             </Button>
-            <Button type="button" disabled={saving} onClick={() => void save(true)}>
+            <Button type="button" disabled={saving} onClick={() => void save(true, warningAsDraft)}>
               内容を確認して登録する
             </Button>
           </div>
