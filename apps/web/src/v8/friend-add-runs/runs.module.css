@@ -5,8 +5,8 @@
  */
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }
 
-/* 頭の右の3つ：絵は題の行の上端にそろう（型は縦の中央）。間12。 */
-.headActions { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); position: relative; top: var(--tpl-ar-run-actions-lift); }
+/* 頭の右の3つ：縦位置は型に任せる。間12。 */
+.headActions { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); }
 
 /* 数の帯：この絵は 余白14/16・段の間2（帯の部品の値を、この画面の中だけで差し替える）。 */
 .kpis {
