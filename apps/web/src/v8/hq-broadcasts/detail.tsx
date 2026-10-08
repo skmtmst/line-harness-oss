@@ -8,8 +8,13 @@
  * 送った LINE は取り消せない。動きは BEHAVIOR.md。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { Ban, CirclePause, PencilLine, RotateCcw, Send } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Ban, CirclePause, Copy, Download, PencilLine, RotateCcw, Send } from 'lucide-react'
+import Select from '@/components/shared/select'
+import { Tabs } from '@/components/shared/tabs'
+import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
+import { downloadApiFile } from '@/lib/api'
+import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
 import type { HqBroadcastRun } from '@line-crm/shared'
 import { PageFrame } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
@@ -31,6 +36,19 @@ import BroadcastPhone from '../broadcast-detail/phone'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 const n = (value: number) => value.toLocaleString('ja-JP')
+/** 開いた・押した・反応（API-18）。店の計測がまだ取れていない（null）は「—」。 */
+const metric = (value: number | null | undefined) => (value == null ? '—' : n(value))
+/** 送ったアカウントの合計。1つでも取れていなければ「—」（足りない合計を出さない）。 */
+export function sumMetric(values: Array<number | null | undefined>): number | null {
+  if (values.length === 0 || values.some((value) => value == null)) return null
+  return values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+}
+const ACTIVITY_LABEL: Record<string, string> = {
+  target_fixed: '送るアカウントを決めた', draft_updated: '下書きを直した', excluded: 'アカウントを外した', included: 'アカウントを戻した',
+  scheduled: '送信を予約した', cancelled: '取り消した', stopped: '止めた', retry_before_delivery: 'やり直した', retry_failed: '失敗した人にやり直した',
+  test_send: 'テストを送った', approval_request: '承認を頼んだ', approval_approve: '承認した', approval_reject: '差し戻した', approval_cancel: '承認の依頼を取り消した',
+}
+type TabKey = 'overview' | 'recipients' | 'activity'
 
 type Ask = { kind: 'send' | 'stop' | 'cancel' | 'retry-all' } | { kind: 'retry'; target: ResultTarget }
 
@@ -70,9 +88,11 @@ export function ResultCard({ run, canManage, onRetry, onRetryAll }: {
         <thead>
           <TableHeadRow className={styles.headRow}>
             <Th className={styles.colStore}>店</Th>
-            <Th className={styles.colNum}>送った</Th>
-            <Th className={styles.colNum}>成功</Th>
+            <Th className={styles.colNum}>届いた</Th>
             <Th className={styles.colFail}>失敗</Th>
+            <Th className={styles.colMetric}>開いた</Th>
+            <Th className={styles.colMetric}>押した</Th>
+            <Th className={styles.colMetric}>反応</Th>
             <Th className={styles.colState}>状態</Th>
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
@@ -85,9 +105,11 @@ export function ResultCard({ run, canManage, onRetry, onRetryAll }: {
             return (
               <Tr key={t.accountId} className={styles.row}>
                 <Td className={styles.colStore}><span className={styles.store} title={t.accountName}>{t.accountName}</span></Td>
-                <Td className={styles.colNum}><span className={styles.num}>{off ? '—' : n(t.totalCount ?? 0)}</span></Td>
-                <Td className={styles.colNum}><span className={styles.num}>{off ? '—' : n(t.successCount ?? 0)}</span></Td>
+                <Td className={styles.colNum}><span className={styles.num} title={off ? undefined : `送った ${n(t.totalCount ?? 0)}人`}>{off ? '—' : n(t.successCount ?? 0)}</span></Td>
                 <Td className={styles.colFail}><span className={off ? styles.faint : fail > 0 ? styles.numStrong : styles.faint}>{off ? '—' : n(fail)}</span></Td>
+                <Td className={styles.colMetric}><span className={styles.num}>{off ? '—' : metric(t.openedCount)}</span></Td>
+                <Td className={styles.colMetric}><span className={styles.num}>{off ? '—' : metric(t.clickedCount)}</span></Td>
+                <Td className={styles.colMetric}><span className={styles.num}>{off ? '—' : metric(t.reactionCount)}</span></Td>
                 <Td className={styles.colState}><StatusBadge tone={badge.tone} title={t.blockedReasons.join('・') || undefined}>{badge.label}</StatusBadge></Td>
                 <Td className={styles.colMenu}>
                   {canManage && canRetry(run, t) ? (
@@ -164,14 +186,135 @@ function PreparedCard({ run }: { run: HqBroadcastRun }) {
   )
 }
 
+/** 宛先のタブ：アカウントを選び、その店の配信の宛先を50人ずつ（API-18）。 */
+function RecipientsTab({ run }: { run: HqBroadcastRun }) {
+  const sentTo = run.targets.filter((t) => !t.excluded && t.broadcastId)
+  const [accountId, setAccountId] = useState(sentTo[0]?.accountId ?? '')
+  const [rows, setRows] = useState<Array<{ friendId: string; displayName: string | null; state: string; sentAt: string | null; errorCode: string | null }>>([])
+  const [total, setTotal] = useState<number | null>(null)
+  const [next, setNext] = useState<string | null>(null)
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const load = useCallback(async (cursor: number, append: boolean) => {
+    if (!accountId) { setState('ready'); setRows([]); setTotal(0); return }
+    setState('loading')
+    try {
+      const res = (await hqBroadcastsApi.recipients(run.id, accountId, cursor)).data
+      setRows((current) => (append ? [...current, ...res.rows] : res.rows)); setTotal(res.total); setNext(res.nextCursor); setState('ready')
+    } catch {
+      setState('error')
+    }
+  }, [run.id, accountId])
+  useEffect(() => { void load(0, false) }, [load])
+  const stateLabel = (value: string) => (value === 'sent' ? '届いた' : value === 'failed' ? '失敗' : value === 'pending' || value === 'claimed' ? '送る前' : value)
+  if (sentTo.length === 0) return <p className={detailStyles.note}>まだどのアカウントにも送っていません。送ると、ここに宛先が並びます。</p>
+  return (
+    <section className={detailStyles.section} aria-label="宛先">
+      <div className={styles.cardHead}>
+        <div className={styles.cardText}>
+          <h3 className={detailStyles.secTitle}>宛先</h3>
+          <p className={styles.cardSub}>{total == null ? 'アカウントを選ぶと、その店の宛先が出ます' : `${n(total)}人`}</p>
+        </div>
+        <span className={styles.accountPick}>
+          <Select aria-label="宛先を見るアカウント" size="full" value={accountId} onChange={setAccountId} options={sentTo.map((t) => ({ value: t.accountId, label: t.accountName }))} />
+        </span>
+      </div>
+      {state === 'error' ? <ListState kind="error" error={new Error('宛先を読み込めませんでした')} onRetry={() => void load(0, false)} /> : (
+        <DataTable className={styles.table} data-design="hq-broadcast-recipients">
+          <thead>
+            <TableHeadRow className={styles.headRow}>
+              <Th className={styles.colStore}>友だち</Th>
+              <Th className={styles.colState}>状態</Th>
+              <Th className={styles.colState}>送った日時</Th>
+            </TableHeadRow>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <Tr key={row.friendId} className={styles.row}>
+                <Td className={styles.colStore}><span className={styles.store} title={row.displayName ?? undefined}>{row.displayName ?? '名前未登録'}</span></Td>
+                <Td className={styles.colState}><StatusBadge tone={row.state === 'sent' ? 'success' : row.state === 'failed' ? 'danger' : 'neutral'} title={row.errorCode ?? undefined}>{stateLabel(row.state)}</StatusBadge></Td>
+                <Td className={styles.colState}><span className={styles.faint}>{row.sentAt ? jpDateTime(row.sentAt) : '—'}</span></Td>
+              </Tr>
+            ))}
+          </tbody>
+        </DataTable>
+      )}
+      {state === 'loading' ? <ListState kind="loading" /> : null}
+      {next && state === 'ready' ? <div><Button onClick={() => void load(Number(next), true)}>続きを読む</Button></div> : null}
+    </section>
+  )
+}
+
+/** 記録のタブ：誰がいつ何をしたか（API-18 の activity）。 */
+function ActivityTab({ run, names }: { run: HqBroadcastRun; names: Map<string, string> }) {
+  const [rows, setRows] = useState<Array<{ id: string; accountId: string; actorId: string; action: string; createdAt: string }>>([])
+  const [next, setNext] = useState<string | null>(null)
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const load = useCallback(async (cursor: number, append: boolean) => {
+    setState('loading')
+    try {
+      const res = (await hqBroadcastsApi.activity(run.id, cursor)).data
+      setRows((current) => (append ? [...current, ...res.rows] : res.rows)); setNext(res.nextCursor); setState('ready')
+    } catch {
+      setState('error')
+    }
+  }, [run.id])
+  useEffect(() => { void load(0, false) }, [load])
+  const account = (id: string) => run.targets.find((t) => t.accountId === id)?.accountName ?? (id ? '—' : '一括配信')
+  return (
+    <section className={detailStyles.section} aria-label="記録">
+      <h3 className={detailStyles.secTitle}>記録</h3>
+      {state === 'error' ? <ListState kind="error" error={new Error('記録を読み込めませんでした')} onRetry={() => void load(0, false)} /> : rows.length === 0 && state === 'ready' ? (
+        <p className={detailStyles.note}>まだ記録はありません。</p>
+      ) : (
+        <DataTable className={styles.table} data-design="hq-broadcast-activity">
+          <thead>
+            <TableHeadRow className={styles.headRow}>
+              <Th className={styles.colState}>日時</Th>
+              <Th className={styles.colStore}>したこと</Th>
+              <Th className={styles.colState}>アカウント</Th>
+              <Th className={styles.colState}>した人</Th>
+            </TableHeadRow>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <Tr key={row.id} className={styles.row}>
+                <Td className={styles.colState}><span className={styles.faint}>{jpDateTime(row.createdAt)}</span></Td>
+                <Td className={styles.colStore}><span className={styles.store}>{ACTIVITY_LABEL[row.action] ?? '操作'}</span></Td>
+                <Td className={styles.colState}><span className={styles.faint} title={account(row.accountId)}>{account(row.accountId)}</span></Td>
+                <Td className={styles.colState}><span className={styles.faint}>{names.get(row.actorId) ?? '統括の担当者'}</span></Td>
+              </Tr>
+            ))}
+          </tbody>
+        </DataTable>
+      )}
+      {state === 'loading' ? <ListState kind="loading" /> : null}
+      {next && state === 'ready' ? <div><Button onClick={() => void load(Number(next), true)}>続きを読む</Button></div> : null}
+    </section>
+  )
+}
+
 export default function HqBroadcastDetail() {
   usePageTitle('一括配信の詳細')
   usePageCrumbs([{ label: '一括配信', href: '/hq/broadcasts' }])
   const params = useSearchParams()
+  const router = useRouter()
   const id = params.get('id') ?? ''
+  /* タブは ?tab=（店の配信の詳細と同じ。履歴を積まない）。 */
+  const tabParam = params.get('tab')
+  const [tab, setTab] = useState<TabKey>(tabParam === 'recipients' || tabParam === 'activity' ? tabParam : 'overview')
+  const selectTab = (next: TabKey) => {
+    setTab(next)
+    const q = new URLSearchParams(params.toString())
+    if (next === 'overview') q.delete('tab'); else q.set('tab', next)
+    router.replace(`/hq/broadcasts/detail?${q.toString()}`, { scroll: false })
+  }
   const role = useStaffRole()
   const canManage = role === null || canManageRole(role)
   const [run, setRun] = useState<HqBroadcastRun | null>(null)
+  const [testOpen, setTestOpen] = useState(false)
+  const [requestOpen, setRequestOpen] = useState(false)
+  const [confirmCount, setConfirmCount] = useState('')
+  const [exporting, setExporting] = useState(false)
   const [loadError, setLoadError] = useState<unknown>(null)
   const [ask, setAsk] = useState<Ask | null>(null)
   const [busy, setBusy] = useState(false)
@@ -187,6 +330,22 @@ export default function HqBroadcastDetail() {
     }
   }, [id])
   useEffect(() => { void load() }, [load])
+  const approval = useHqApproval(run)
+  const gate = approvalGate(approval.state)
+  const names = new Map(approval.candidates.map((person) => [person.id, person.name]))
+
+  /** CSV（アカウントごと・宛先ごとの送った結果。API-18）。閲覧のみにも出す。 */
+  const exportCsv = async () => {
+    if (!run || exporting) return
+    setExporting(true); setError('')
+    try {
+      await downloadApiFile(hqBroadcastsApi.exportPath(run.id), `一括配信-${run.title}.csv`)
+    } catch (caught) {
+      setError(errorText(caught, 'CSVを書き出せませんでした。もう一度お試しください。'))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   /* 送っている間は 15 秒ごとに読み直す（店ごとの数が増えていく）。 */
   useEffect(() => {
@@ -202,7 +361,7 @@ export default function HqBroadcastDetail() {
       if (ask.kind === 'send') {
         /* 送る直前にもう一度確かめる（下書きのあいだに枠・接続が変わる）。問題が出たら口が 409 で止める。 */
         await hqBroadcastsApi.preflight(run.id)
-        await hqBroadcastsApi.send(run.id, run.version)
+        await (gate === 'single' ? hqBroadcastsApi.send(run.id, run.version, Number(confirmCount)) : hqBroadcastsApi.send(run.id, run.version))
         notifyToast(run.scheduledAt ? '一括配信を予約しました' : '一括配信を送り始めました')
       } else if (ask.kind === 'stop') {
         await hqBroadcastsApi.stop(run.id, run.version)
@@ -259,10 +418,16 @@ export default function HqBroadcastDetail() {
   const delivered = sentTo.reduce((sum, t) => sum + (t.successCount ?? 0), 0)
   const failedPeople = sentTo.reduce((sum, t) => sum + failedCount(t), 0)
   const skipped = run ? run.targets.filter((t) => t.excluded || t.status === 'excluded').length : 0
+  const opened = sumMetric(sentTo.map((t) => t.openedCount))
+  const clicked = sumMetric(sentTo.map((t) => t.clickedCount))
+  const reacted = sumMetric(sentTo.map((t) => t.reactionCount))
+  const rate = (value: number) => (delivered > 0 ? `${((value / delivered) * 100).toFixed(1)}%` : '—')
   const audience = run?.input?.audience?.kind === 'tag' ? `タグ：${run.input.audience.tagName}` : '友だち全員'
   const people = run ? (run.status === 'prepared' ? (totals?.sendPeople ?? 0) : sentTo.reduce((sum, t) => sum + (t.totalCount ?? 0), 0)) : 0
   const bubbles = (() => { try { return run?.input?.messageBubblesJson ? JSON.parse(run.input.messageBubblesJson) : null } catch { return null } })()
-  const messageText = bubbles?.length ? (bubbles[0].type === 'coupon' ? 'クーポン 1通' : 'リッチメッセージ 1通') : 'テキスト 1通'
+  const messageText = Array.isArray(bubbles) && bubbles.length > 1
+    ? `吹き出し ${bubbles.length}通`
+    : bubbles?.length ? (bubbles[0].type === 'coupon' ? 'クーポン 1通' : bubbles[0].type === 'text' ? 'テキスト 1通' : 'リッチメッセージ 1通') : 'テキスト 1通'
   const exampleStore = sentTo[0]?.accountName ?? '店の名前'
   const tone = badge?.tone === 'success' ? 'success' : badge?.tone === 'danger' ? 'danger' : badge?.tone === 'warning' ? 'warning' : 'neutral'
   const stat = (label: string, value: number | null, unit: string, detail: string) => (
@@ -287,6 +452,15 @@ export default function HqBroadcastDetail() {
             </div>
             {run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : null}
           </div>
+          {run ? (
+            <div className={detailStyles.actions}>
+              {/* CSV は見るだけの操作。閲覧のみにも出す。 */}
+              <Button size="field" onClick={() => void exportCsv()} busy={exporting} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
+              {canManage && run.status !== 'prepared' ? (
+                <Button size="field" variant="primary" href={`/hq/broadcasts/new?copy=${encodeURIComponent(run.id)}`}><Copy size={15} aria-hidden="true" />複製して作る</Button>
+              ) : null}
+            </div>
+          ) : null}
           {canManage && run ? (
             <div className={detailStyles.actions}>
               {run.status === 'prepared' || (live && run.status !== 'stopped') ? (
@@ -299,31 +473,68 @@ export default function HqBroadcastDetail() {
                 <Button size="field" href={`/hq/broadcasts/new?id=${encodeURIComponent(run.id)}`}><PencilLine size={15} aria-hidden="true" />下書きを直す</Button>
               ) : null}
               {run.status === 'prepared' ? (
-                <Button size="field" variant="primary" onClick={() => setAsk({ kind: 'send' })} disabled={(totals?.sendStores ?? 0) === 0} title={(totals?.sendStores ?? 0) === 0 ? '送れる店がありません' : undefined}>
-                  <Send size={15} aria-hidden="true" />{`${n(totals?.sendStores ?? 0)}店に送る`}
-                </Button>
+                <Button size="field" onClick={() => setTestOpen(true)}><Send size={15} aria-hidden="true" />テストを送る</Button>
+              ) : null}
+              {run.status === 'prepared' ? (
+                gate === 'needsRequest' ? (
+                  <Button size="field" variant="primary" onClick={() => setRequestOpen(true)}>承認を依頼する</Button>
+                ) : (
+                  <Button size="field" variant="primary" onClick={() => { setConfirmCount(''); setAsk({ kind: 'send' }) }} disabled={(totals?.sendStores ?? 0) === 0 || gate === 'pending'} title={(totals?.sendStores ?? 0) === 0 ? '送れる店がありません' : gate === 'pending' ? '承認を待っています' : undefined}>
+                    <Send size={15} aria-hidden="true" />{`${n(totals?.sendStores ?? 0)}店に送る`}
+                  </Button>
+                )
               ) : null}
             </div>
           ) : null}
         </header>
+        {run ? (
+          <div className={detailStyles.tabs}>
+            <Tabs
+              label="一括配信の詳細"
+              items={[
+                { label: '概要', current: tab === 'overview', onClick: () => selectTab('overview') },
+                { label: `宛先 ${n(sentTo.reduce((sum, t) => sum + (t.totalCount ?? 0), 0))}`, current: tab === 'recipients', onClick: () => selectTab('recipients') },
+                { label: '記録', current: tab === 'activity', onClick: () => selectTab('activity') },
+              ]}
+            />
+          </div>
+        ) : null}
         <div className={detailStyles.split}>
           <div className={detailStyles.main}>
             {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
-            {run && run.status !== 'prepared' ? (
+            {run && tab === 'recipients' ? <RecipientsTab run={run} /> : null}
+            {run && tab === 'activity' ? <ActivityTab run={run} names={names} /> : null}
+            {run && tab === 'overview' && run.status === 'prepared' && canManage ? (
+              <HqApprovalBlock
+                run={run}
+                approval={approval}
+                requestOpen={requestOpen}
+                onRequestClose={() => setRequestOpen(false)}
+                onChanged={() => void load()}
+                scheduledLabel={run.scheduledAt ? jpDateTime(run.scheduledAt) : null}
+                messageSummary={messageText}
+              />
+            ) : null}
+            {tab === 'overview' && run && run.status !== 'prepared' ? (
               <>
                 <h3 className={detailStyles.secTitle}>配信結果</h3>
                 <div className={detailStyles.stats}>
                   {stat('届いた', delivered, '人', `送ったアカウント ${n(sentTo.length)}`)}
-                  {stat('失敗', failedPeople, '人', failedPeople > 0 ? '下の内訳からやり直せます' : '失敗はありません')}
-                  {stat('開いた', null, '', '統括ではまだ数えていません')}
-                  {stat('外した', skipped, 'アカウント', skipped > 0 ? '送らなかったアカウント' : 'なし')}
+                  {stat('開いた', opened, opened == null ? '' : '人', opened == null ? 'まだ数えていません' : `開封 ${rate(opened)}`)}
+                  {stat('押した', clicked, clicked == null ? '' : '人', clicked == null ? 'まだ数えていません' : `クリック ${rate(clicked)}`)}
+                  {stat('反応', reacted, reacted == null ? '' : '人', reacted == null ? 'まだ数えていません' : '送ったあとに返信などがあった人')}
                 </div>
+                <p className={detailStyles.note}>開いた・押したは、各アカウントの配信で数えた人数の合計です。数えていないアカウントがあるときは「—」で出します。反応は、送ったあとにメッセージを受け取った人の数で、送った配信への返信とは限りません。</p>
+                <h3 className={detailStyles.secTitle}>エラー</h3>
+                <p className={detailStyles.note}>{failedPeople > 0 ? `送信に失敗した人が ${n(failedPeople)}人います。下の内訳からやり直せます。` : '送信に失敗した人はいません（0 人）。'}{skipped > 0 ? `送らなかったアカウントが ${n(skipped)}あります。` : ''}</p>
               </>
             ) : null}
-            <section className={detailStyles.section}>
-              <h3 className={detailStyles.secTitle}>アカウント別の内訳</h3>
-              {body}
-            </section>
+            {tab === 'overview' || !run ? (
+              <section className={detailStyles.section}>
+                <h3 className={detailStyles.secTitle}>アカウント別の内訳</h3>
+                {body}
+              </section>
+            ) : null}
           </div>
           <aside className={detailStyles.side} aria-label="配信した設定とメッセージ">
             <h3 className={detailStyles.secTitle}>配信した設定</h3>
@@ -360,9 +571,14 @@ export default function HqBroadcastDetail() {
           destructive={ask.kind === 'cancel' || ask.kind === 'stop'}
           warning={ask.kind === 'send'}
           busy={busy}
-          onConfirm={() => void act()}
+          onConfirm={ask.kind !== 'send' || gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => void act() : undefined}
           onCancel={() => setAsk(null)}
-        />
+        >
+          {ask.kind === 'send' && gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}
+        </ConfirmDialog>
+      ) : null}
+      {run && run.status === 'prepared' ? (
+        <HqTestSendDialog open={testOpen} accounts={run.targets.filter((t) => !t.excluded).map((t) => ({ id: t.accountId, name: t.accountName }))} prepare={async () => run.id} onClose={() => setTestOpen(false)} />
       ) : null}
     </>
   )
