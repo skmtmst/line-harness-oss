@@ -8,7 +8,6 @@
   display: inline-flex;
   align-items: center;
   gap: var(--tpl-sc2-row-gap);
-  margin-top: calc(var(--tpl-sc2-head-pull) * -1);
 }
 
 .backLink {
