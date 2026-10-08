@@ -1060,7 +1060,7 @@
   --tpl-rml-blocker-pad: 9px 0; --tpl-rml-blocker-gap: 8px; --tpl-rml-blocker-lh: 17px; --tpl-rml-dlg-w: 600px; --tpl-rml-dlg-pad: 24px; --tpl-rml-dlg-gap: 14px; --tpl-rml-dlg-top: 240px; --tpl-rml-dlg-title-size: 17px; --tpl-rml-dlg-title-lh: 25px; --tpl-rml-dlg-desc-lh: 22px; --tpl-rml-icon-btn: 28px; --tpl-rml-notice-after: 6px; --tpl-rml-grip-w: 14px; --tpl-rml-row-line: inset 0 -1px 0 var(--color-divider);
   --tpl-rml-ext-max-w: 1584px; --tpl-rml-ext-side-w: 430px; --tpl-rml-ext-thumb-w: 48px; --tpl-rml-ext-col-a: 100px; --tpl-rml-ext-col-b: 110px; --tpl-rml-ext-col-c: 120px; --tpl-rml-ext-area-w: 24px; --tpl-rml-ext-ratio-large: 2500 / 1686; --tpl-rml-ext-ratio-compact: 2500 / 843;
   --tpl-band-gap: 0;
-  --tpl-viewer-create-space-h: 36px; --tpl-viewer-create-space-col-h: 49px; /* 閲覧のみで隠した作るボタンの高さ（場所だけ空ける）。列の上に直接置く画面はボタンの下の間 13 も含める */
+  --tpl-viewer-create-space-h: 36px; --tpl-viewer-create-space-col-h: 49px; --tpl-viewer-folder-add-space: 17px; /* 閲覧のみで隠した作るボタンの高さ（場所だけ空ける）。列の上に直接置く画面はボタンの下の間 13 も含める */
   /* 自動応答の一覧（uE9gf・Q5lOCc・WPrd5）。 */
   --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: 64px; --tpl-ar-narrow-head-h: 34px;
   --tpl-badge-h: 22px; --tpl-badge-dot: 6px;
