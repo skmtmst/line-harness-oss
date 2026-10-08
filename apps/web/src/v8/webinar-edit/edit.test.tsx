@@ -106,7 +106,7 @@ beforeEach(() => {
     if (path.endsWith('/comments')) return json({ data: comments })
     if (path.endsWith('/notifications')) return json({ data: { settings: { webinarId: 'webinar-1', version: 1, registrationEnabled: true, dayBeforeEnabled: true, dayBeforeTime: '19:00', hourBeforeEnabled: false, hourBeforeMinutes: 15, startEnabled: true, missedEnabled: false, missedTime: '10:00', missedWindowDays: 3, completedEnabled: true, updatedAt: '' }, overview: { total: 10, pending: 0, sent: 9, failed: 1, skipped: 0, cancelled: 0, skippedReasons: [], audience: { people: 10, bookings: 10, definition: 'active_registrations' } } } })
     if (path.endsWith('/actions')) return json({ data: [] })
-    if (path.endsWith('/ctas')) return json({ data: [{ atSeconds: 300, kind: 'url', title: '資料', body: null, buttonLabel: '受け取る', autoOpen: false, formId: null, url: 'https://example.com' }] })
+    if (path.endsWith('/ctas')) return json({ version: 1, updatedBy: null, updatedAt: null, data: [{ atSeconds: 300, kind: 'url', title: '資料', body: null, buttonLabel: '受け取る', autoOpen: false, formId: null, url: 'https://example.com' }] })
     if (path.endsWith('/video-asset')) return json({ data: { asset: null } })
     if (path.endsWith('/publish-validation')) return json({ data: { version: 3, checks: [{ key: 'video_ready', label: '動画の準備ができている', status: 'passed', detail: null }], blockers: [], warnings: [] } })
     if (path === '/api/forms') return json({ success: true, data: [] })
