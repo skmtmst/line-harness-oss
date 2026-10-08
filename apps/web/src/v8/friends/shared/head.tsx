@@ -4,7 +4,8 @@
  * ★V8 友だちの段の頭。
  * - FriendsTabs：タブの並び（x6QsVz の「タブの段」・下に細い線）
  * - FriendsSectionHead：管理の画面（重複検出・統合ユーザー・UID移行・CSV）の頭
- *   （ADjK8・hn6Y8・T9gblG・L48eY の「板の頭」：← 友だちへ／題／説明／タブ／タブの説明）
+ *   （ADjK8・hn6Y8・T9gblG・L48eY の「板の頭」：題／説明／タブ／タブの説明。
+ *   板の頭の「← 友だちへ」は 2026-10-08 に無くした。戻るのは上の帯のパンくず）
  */
 import Link from 'next/link'
 import type { ReactNode } from 'react'
@@ -36,7 +37,6 @@ export function FriendsSectionHead({
   current,
   description,
   action,
-  back = { href: '/friends', label: '友だちへ' },
   title = '友だち',
   note,
   tabs = true,
@@ -45,7 +45,6 @@ export function FriendsSectionHead({
   description: ReactNode
   /** タブの行の右端（絵の「表示中をCSVで書き出す」など）。 */
   action?: ReactNode
-  back?: { href: string; label: string }
   title?: ReactNode
   /** タブの下の1行。省くとタブごとの決まった文。null で出さない。 */
   note?: ReactNode | null
@@ -54,7 +53,6 @@ export function FriendsSectionHead({
   const noteText = note === undefined ? FRIENDS_TAB_NOTES[current] : note
   return (
     <header className={styles.head} data-template-region="heading">
-      <Link href={back.href} className={styles.back}>← {back.label}</Link>
       <h2 className={styles.title}>{title}</h2>
       <p className={styles.description}>{description}</p>
       {tabs ? <FriendsTabs current={current} line={false} action={action} /> : null}
