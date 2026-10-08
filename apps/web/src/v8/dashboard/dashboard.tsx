@@ -313,7 +313,7 @@ export default function DashboardV8() {
         aside={asideIds.length > 0 ? (
           variant === 'link'
             ? <>{asideIds.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</>
-            : <div className={styles.asideStack}>{asideIds.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</div>
+            : <div className={styles.asideStack} data-variant={variant}>{asideIds.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</div>
         ) : undefined}
       >
         {main}
