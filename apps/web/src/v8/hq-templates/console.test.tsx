@@ -8,7 +8,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const calls = vi.hoisted(() => Object.fromEntries(['context', 'list', 'listByKind', 'kindCounts', 'accounts', 'get', 'create', 'update', 'remove', 'duplicate', 'preflight', 'distribute', 'result', 'messageReferences', 'folderList', 'deleteImage', 'uploadRichMessageImage'].map((key) => [key, vi.fn()])))
+const calls = vi.hoisted(() => Object.fromEntries(['context', 'list', 'listByKind', 'kindCounts', 'accounts', 'get', 'create', 'update', 'remove', 'duplicate', 'preflight', 'distribute', 'result', 'messageReferences', 'folderList', 'deleteImage', 'uploadRichMessageImage', 'listStats', 'versions', 'receivedVersions', 'compareVersions', 'restoreVersion'].map((key) => [key, vi.fn()])))
 const push = vi.hoisted(() => vi.fn())
 const selectAccount = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag', 'template', 'rich_menu', 'form', 'scenario'], hqTemplatesApi: { ...calls, folders: { list: calls.folderList } } }))
@@ -41,6 +41,9 @@ beforeEach(() => {
   calls.accounts.mockResolvedValue([{ id: 'a-1', name: '然 -NEN- 本店' }, { id: 'a-2', name: '然 -NEN- 渋谷店' }])
   calls.folderList.mockResolvedValue([{ id: 'f-1', name: '予約', revision: 1 }])
   calls.messageReferences.mockResolvedValue([])
+  calls.listStats.mockResolvedValue({ thisMonthSentCount: 0, outdatedTemplateCount: 0 })
+  calls.versions.mockResolvedValue([])
+  calls.receivedVersions.mockResolvedValue([])
   calls.get.mockResolvedValue(detail())
   calls.create.mockImplementation(async (input: { name: string; definition: unknown }) => ({ template: { ...detail().template, id: 't-new', name: input.name }, definition: input.definition }))
 })
@@ -120,6 +123,33 @@ describe('統括のテンプレートの詳細（pQ4fH）', () => {
     expect(push).toHaveBeenCalledWith('/templates')
     fireEvent.click(screen.getAllByRole('button', { name: /アカウントへ配る/ })[0])
     expect(await screen.findByRole('checkbox', { name: /然 -NEN- 渋谷店/ })).toBeTruthy()
+  })
+})
+
+describe('統括のテンプレートの詳細の版（pQ4fH・API-18）', () => {
+  it('配った先ごとの版と版の履歴を出し、前の版を比べる・この版に戻す', async () => {
+    const version = (n: number, draft: boolean, current: boolean) => ({ id: `v${n}`, version: n, created_by: 's', creator_name: n === 2 ? 'Masato' : 'Kenta Kawano', created_at: '2026-08-21T09:02:00Z', is_draft: draft, is_current: current })
+    calls.versions.mockResolvedValue([version(3, true, true), version(2, false, false), version(1, false, false)])
+    calls.receivedVersions.mockResolvedValue([
+      { accountId: 'a-1', accountName: '然 -NEN- 本店', receivedAt: null, targetVersion: { version: 2, latestVersion: 3, status: 'older', label: '版2' } },
+      { accountId: 'a-2', accountName: '然 -NEN- 渋谷店', receivedAt: null, targetVersion: { version: 3, latestVersion: 3, status: 'latest', label: '版3' } },
+    ])
+    calls.compareVersions.mockResolvedValue({ from: { version: version(1, false, false), definition: { schemaVersion: 1, template: { messageContent: '古い本文' } } }, to: { version: version(3, true, true), definition: { schemaVersion: 1, template: { messageContent: '新しい本文' } } }, changed: true })
+    calls.restoreVersion.mockResolvedValue({ ...detail(), template: { ...detail().template, revision: 4 } })
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click(await screen.findByRole('button', { name: '予約前日のご案内' }))
+    expect(await screen.findByText('版3（いまの版）')).toBeTruthy()
+    expect(screen.getByText('新しい版を未配布')).toBeTruthy()
+    expect(screen.getByText('配っていない変更があります')).toBeTruthy()
+    expect(screen.getByText('下書き（まだ配っていない）')).toBeTruthy()
+    expect(screen.getByText('いま使っている版')).toBeTruthy()
+    const history = screen.getByRole('region', { name: '版の履歴' })
+    fireEvent.click(within(history).getByRole('button', { name: '比べる' }))
+    await waitFor(() => expect(calls.compareVersions).toHaveBeenCalledWith('t-1', 1, 3))
+    expect(await screen.findByText('＋ 新しい本文')).toBeTruthy()
+    fireEvent.click(within(history).getByRole('button', { name: /この版に戻す/ }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'この版に戻す' }))
+    await waitFor(() => expect(calls.restoreVersion).toHaveBeenCalledWith('t-1', 1, 3))
   })
 })
 

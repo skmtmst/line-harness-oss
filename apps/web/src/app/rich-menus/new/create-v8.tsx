@@ -115,6 +115,8 @@ import {
   type PublishPlanInput,
 } from '@/app/rich-menus/edit/publish-plan-draft'
 import styles from './create-v8.module.css'
+import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
+import { HQ_RICH_MENU_INTENTS, type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
 
 /* ---------- 手順 ---------- */
 
@@ -416,6 +418,32 @@ function MenuPreview({
   )
 }
 
+/* ---------- 統括のひな形（host）の画面の中の下書き ---------- */
+
+/** 統括のひな形の中身を、作る画面の下書き（Group）にする。サーバーには作らない。 */
+function groupFromSeed(seed: HqRichMenuSeed): Group {
+  return {
+    id: seed.id ?? 'hq-draft',
+    accountId: '',
+    name: seed.name,
+    chatBarText: seed.chatBarText,
+    size: seed.size,
+    defaultPageId: seed.defaultPageId,
+    isDefaultForAll: seed.displayAudience === 'all',
+    status: 'draft',
+    targetingCondition: null,
+    targetingPriority: seed.displayOrder,
+    targetingEnabled: seed.displayAudience === 'store',
+    folderId: seed.folderId,
+    defaultOpen: true,
+    version: 0,
+    pages: seed.pages.map((page, index) => ({
+      id: page.id, orderIndex: index, name: page.name, aliasId: '', lineRichmenuId: null,
+      imageR2Key: page.imageR2Key, imageContentType: null, areas: page.areas,
+    })),
+  }
+}
+
 /* ---------- 本体 ---------- */
 
 /**
@@ -434,8 +462,14 @@ function stepFromParam(key: string | null): StepKey | null {
  * `editGroupId` を渡すと、その下書き（またはいまのメニュー）を読み込んで同じウィザードで直す
  * （/rich-menus/edit の V8）。読み込むまでは手順の中身を出さず、すべての手順へ戻れる。
  */
-export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string } = {}) {
-  usePageTitle('リッチメニューを作る')
+export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: string; host?: RichMenuCreateHost } = {}) {
+  usePageTitle(host ? 'リッチメニュー' : 'リッチメニューを作る')
+  /*
+   * 統括のひな形（host）：手順の間は画面の中に持ち、最後に一度だけ保存する（店はこれまでどおり手順ごとに下書きを保存）。
+   * 統括の画面で持てない欄（登録メディア・計測リンク・トークを開いたとき・出す相手の条件・公開の確かめ）は出さない。
+   */
+  const stepLabel = (key: StepKey) => (host && key === 'publish' ? '配る' : STEP_LABEL[key])
+  const nextLabel = (key: Exclude<StepKey, 'publish'>) => (host && key === 'audience' ? '次へ：配る' : NEXT_LABEL[key])
   const { selectedAccount } = useAccount()
   const publishAttempt = useRef(new ManualPublishAttempt())
   const pageFileInput = useRef<HTMLInputElement>(null)
@@ -450,7 +484,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
     return stepFromParam(new URLSearchParams(window.location.search).get('step')) ?? 'shape'
   })
   /* 直すときは、すでに下書きがあるので全部の手順へ戻れる。 */
-  const [maxStepIndex, setMaxStepIndex] = useState(editGroupId ? STEP_KEYS.length - 1 : 0)
+  const [maxStepIndex, setMaxStepIndex] = useState(editGroupId || host?.initial ? STEP_KEYS.length - 1 : 0)
   /* 直すとき：下書きを読み込めたか（読み込むまで中身を出さない）。 */
   const [editLoad, setEditLoad] = useState<'idle' | 'loading' | 'ready' | 'missing' | 'error'>(editGroupId ? 'loading' : 'idle')
 
@@ -587,7 +621,8 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
   const [baselineSignature, setBaselineSignature] = useState<string | null>(null)
   // 初期署名は1回だけ（最初のレンダーの値）。useState 初期化で一度だけ計算。
   useEffect(() => {
-    if (baselineSignature === null) setBaselineSignature(signatureNow())
+    // 統括で直すとき（host.initial）は、読み込んだ中身で基準を取る（hydrate）。開発時の二度目の実行で上書きしない。
+    if (baselineSignature === null && !host?.initial) setBaselineSignature(signatureNow())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -603,6 +638,17 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
   const load = useCallback(async () => {
     setLoadError(null)
     setLoadFailedKinds([])
+    if (host) {
+      // 統括：候補は統括のひな形（タグ・テンプレート・回答フォーム）とフォルダ。店のメニュー・計測リンクは無い。
+      setFolders(host.folders.map((folder) => ({ id: folder.id, name: folder.name }) as unknown as Folder))
+      setTags(host.references.tags)
+      setTemplates(host.references.templates)
+      setForms(host.references.forms)
+      setTrackedLinks([])
+      setOtherMenus([])
+      setStaffRole(host.canOperate ? 'owner' : 'viewer')
+      return
+    }
     const [folderRes, tagRes, templateRes, formRes, linkRes, menuRes, staffRes] =
       await Promise.allSettled([
         api.folders.list('rich_menu'),
@@ -651,11 +697,23 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
           : `候補の読み込みに失敗しました（${failed.join('・')}）。もう一度読み込んでください。`,
       )
     }
+    // host の候補は開いたときに一度だけ読む（親が描き直しても入力を消さない）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  /* 統括：直すときは保存してある中身を、画面の中の下書きにする（サーバーの下書きは作らない）。 */
+  const hostSeeded = useRef(false)
+  useEffect(() => {
+    if (!host?.initial || hostSeeded.current) return
+    hostSeeded.current = true
+    hydrate(groupFromSeed(host.initial))
+    // 開いたときに一度だけ。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* 直すとき：下書きを読み込み、手順①〜④の入力に入れる。基準の署名も読み込んだ内容で取り直す。 */
   const loadEditGroup = useCallback(async () => {
@@ -776,8 +834,40 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /** 統括：手順①の内容から画面の中の下書きを作る。ファイルを選んでいたら統括の置き場へ上げて最初のページの画像にする。 */
+  async function hostSeedFromShape(): Promise<HqRichMenuSeed | null> {
+    if (!host || !validateBasics()) return null
+    const template = TEMPLATES.find((t) => t.key === templateKey)
+    if (!template) {
+      setError('面の分けかたを選び直してください')
+      return null
+    }
+    let imageR2Key: string | null = null
+    if (pendingFile) {
+      try {
+        imageR2Key = (await host.uploadImage(pendingFile, size)).r2Key
+      } catch (e) {
+        setError(e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) ? e.message : imageUploadErrorText(e))
+        return null
+      }
+    }
+    const shapePages = Array.from({ length: tabCount + 1 }, (_, index) => ({
+      id: `page-${index + 1}`,
+      name: index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`,
+      imageR2Key: index === 0 ? imageR2Key : null,
+      areas: createAreaDrafts(template).map((area, areaIndex) => ({ ...area, id: `p${index + 1}-a${areaIndex + 1}` })),
+    }))
+    return { id: host.initial?.id, name: name.trim(), chatBarText: chatBarText.trim(), folderId: folderId || null, size, displayAudience: audience === 'all' ? 'all' : 'store', displayOrder: targetingPriority, defaultPageId: shapePages[0].id, pages: shapePages }
+  }
+
   /** 手順①の内容で下書きを作る。作れたら true。 */
   async function createDraft(): Promise<boolean> {
+    if (host) {
+      const seed = await hostSeedFromShape()
+      if (!seed) return false
+      hydrate(groupFromSeed(seed))
+      return true
+    }
     if (!accountId) {
       setError('アカウントを選択してください')
       return false
@@ -834,6 +924,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
   /** 作成後の保存（PATCH）。 */
   async function persistDraft(): Promise<void> {
     if (!group) throw new Error('下書きがまだ作られていません')
+    if (host) return
     const condition = audience === 'targeted' ? pruneCondition(targetingCondition) : null
     if (audience === 'targeted' && !condition) {
       throw new Error('出す相手の条件を設定してください。')
@@ -881,8 +972,9 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
           return false
         }
         await persistDraft()
-        await reloadGroup(group.id)
+        if (!host) await reloadGroup(group.id)
       }
+      if (host) return true
       setNotice('下書きを保存しました。')
       notifyToast('下書きを保存しました')
       return true
@@ -1041,6 +1133,16 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
   async function uploadPageImage(pageId: string, file: File) {
     if (!group) return
     setError(null)
+    if (host) {
+      try {
+        const uploaded = await host.uploadImage(file, group.size)
+        updatePage(pageId, { imageR2Key: uploaded.r2Key, imageContentType: file.type })
+        setImageVersion((v) => v + 1)
+      } catch (e) {
+        setError(e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) ? e.message : imageUploadErrorText(e))
+      }
+      return
+    }
     try {
       const res = await api.richMenuGroups.uploadImage(group.id, pageId, file)
       updatePage(pageId, {
@@ -1100,7 +1202,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
     }
     const target = imageTargetPage(which)
     if (!target) return
-    if (target.id.startsWith('tmp-')) {
+    if (target.id.startsWith('tmp-') && !host) {
       setError('新しいページは、先に下書きを保存してから画像を入れてください。')
       return
     }
@@ -1163,7 +1265,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
 
   useEffect(() => {
     if (step !== 'audience' && step !== 'publish') return
-    if (!group) return
+    if (!group || host) return
     const timer = window.setTimeout(() => void reloadTargetPreview(), 250)
     return () => window.clearTimeout(timer)
   }, [step, group, reloadTargetPreview])
@@ -1197,8 +1299,8 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
   }, [group])
 
   useEffect(() => {
-    if (step === 'publish' && group) void loadChecks()
-  }, [step, group, loadChecks])
+    if (step === 'publish' && group && !host) void loadChecks()
+  }, [step, group, loadChecks, host])
 
   // 「終わりを決める」の戻し先候補：公開中のほかのメニュー。
   useEffect(() => {
@@ -1228,8 +1330,8 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
     }
   }, [groupId])
   useEffect(() => {
-    if (groupId) savePublishPlanDraft(groupId, publishPlan)
-  }, [groupId, publishPlan])
+    if (groupId && !host) savePublishPlanDraft(groupId, publishPlan)
+  }, [groupId, publishPlan, host])
 
   async function validateWithLine() {
     if (!group || validating) return
@@ -1407,7 +1509,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
       ? api.media.contentUrl(selectedMedia.id, accountId)
       : pendingFileUrl
     : previewPage?.imageR2Key
-      ? `${api.richMenuGroups.imageUrl(previewPage.imageR2Key)}?v=${imageVersion}`
+      ? host ? host.imageUrl(previewPage.imageR2Key) : `${api.richMenuGroups.imageUrl(previewPage.imageR2Key)}?v=${imageVersion}`
       : null
 
   const previewAreas = !group
@@ -1468,7 +1570,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
     : 0
 
   const pageImageUrl = activePage?.imageR2Key
-    ? `${api.richMenuGroups.imageUrl(activePage.imageR2Key)}?v=${imageVersion}`
+    ? host ? host.imageUrl(activePage.imageR2Key) : `${api.richMenuGroups.imageUrl(activePage.imageR2Key)}?v=${imageVersion}`
     : null
 
   const areaActionSummary = (area: Area): string => {
@@ -1490,19 +1592,52 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
    */
   const stepperSteps = STEP_KEYS.map((key, i) => ({
     key,
-    label: STEP_LABEL[key],
+    label: stepLabel(key),
     state: (i !== stepIndex && i <= maxStepIndex ? 'done' : 'todo') as 'done' | 'todo',
     onSelect: i !== stepIndex && i <= maxStepIndex ? () => goToStep(key) : undefined,
   }))
 
   const headNote =
     step === 'shape'
-      ? 'いまは下書きとして作ります。最後の「公開」で LINE に出します。'
+      ? host ? 'いまは下書きとして作ります。最後の「配る」で選んだアカウントへ届けます。' : 'いまは下書きとして作ります。最後の「公開」で LINE に出します。'
       : `名前：${name || '（未入力）'}・いまは下書きです`
 
   /* ---------- 描画 ---------- */
 
-  const busy = saving || publishing
+  const busy = saving || publishing || Boolean(host?.busy)
+
+  /** 統括：画面の中の下書きを一度に保存する（手順の途中でも同じ）。 */
+  async function hostSave(distribute: boolean) {
+    if (!host || saving) return
+    setError(null)
+    if (!group) {
+      setSaving(true)
+      try {
+        const seed = await hostSeedFromShape()
+        if (!seed) return
+        hydrate(groupFromSeed(seed))
+        host.onSave(seed, distribute)
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+    if (!validateBasics()) return
+    host.onSave(seedNow(), distribute)
+  }
+  function seedNow(): HqRichMenuSeed {
+    return {
+      id: host?.initial?.id,
+      name: name.trim(),
+      chatBarText: chatBarText.trim(),
+      folderId: folderId || null,
+      size: group?.size ?? size,
+      displayAudience: audience === 'all' ? 'all' : 'store',
+      displayOrder: targetingPriority,
+      defaultPageId: group?.defaultPageId ?? pages[0]?.id ?? '',
+      pages: pages.map((page) => ({ id: page.id, name: page.name, imageR2Key: page.imageR2Key, areas: page.areas })),
+    }
+  }
 
   if (editGroupId && editLoad !== 'ready') {
     if (editLoad === 'missing') {
@@ -1516,7 +1651,8 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
 
   return (
     <CreatePage boardId={
-        step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
+        host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
+          : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
       } title={<>リッチメニューを作る</>} description={<>{headNote}{conflict ? (
           /* 板 `r8dGXT`：帯は頭の説明の下に横いっぱい（右の列の上まで）。見た目は共通部品（save-conflict）。比べる窓はこの画面の要約の比べ（VersionCompare）。 */
           <div className={styles.conflictSlot}>
@@ -1529,10 +1665,37 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
               onReload={acceptLatestAndContinue}
             />
           </div>
-        ) : null}</>} identity={<Link href="/rich-menus" className={styles.backLink}>
+        ) : null}</>} identity={host ? (
+          <button type="button" className={styles.backLink} onClick={host.onCancel}>← リッチメニューへ</button>
+        ) : <Link href="/rich-menus" className={styles.backLink}>
           ← リッチメニューへ
         </Link>} steps={<Stepper label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />}  preview={renderRail()} previewCompactWhenNarrow footerActions={
-          <>
+          host ? (
+            <>
+              <Button type="button" onClick={host.onCancel} disabled={busy}>キャンセル</Button>
+              {step === 'publish' ? (
+                <>
+                  <Button type="button" disabled={busy || !host.canOperate} busy={saving || host.busy} busyLabel="保存中…" onClick={() => void hostSave(false)}>
+                    下書きのまま保存
+                  </Button>
+                  <Button type="button" variant="primary" disabled={busy || !host.canOperate || host.selectedCount === 0} title={host.selectedCount === 0 ? '配るアカウントを選んでください' : undefined} busy={saving || host.busy} busyLabel="保存しています…" onClick={() => void hostSave(true)}>
+                    <Send size={14} aria-hidden="true" />
+                    アカウントへ配る
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button type="button" disabled={busy || !host.canOperate} busy={saving} busyLabel="保存中…" onClick={() => void hostSave(false)}>
+                    下書きを保存
+                  </Button>
+                  <Button type="button" variant="primary" disabled={busy} busy={saving} busyLabel="保存中…" onClick={() => void goNext()}>
+                    <ArrowRight size={14} aria-hidden="true" />
+                    {nextLabel(step as Exclude<StepKey, 'publish'>)}
+                  </Button>
+                </>
+              )}
+            </>
+          ) : <>
             <Button href="/rich-menus">キャンセル</Button>
             {step === 'publish' ? (
               done ? (
@@ -1581,6 +1744,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
             )}
           </>
         } status={dirty ? '未保存の変更があります' : undefined} >
+      {host?.notice}
 
 
 
@@ -1637,7 +1801,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
         }}
       />
 
-      <MediaPickerDialog
+      {host ? null : <MediaPickerDialog
         open={mediaPickerOpen}
         accountId={accountId}
         kind="image"
@@ -1651,7 +1815,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
         }
         onClose={() => setMediaPickerOpen(false)}
         onSelect={handlePickedMedia}
-      />
+      />}
 
       <ConfirmDialog
         open={removePageTarget !== null}
@@ -1840,9 +2004,9 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
                     {shapeImageOk === true ? '・大きさは合っています' : shapeImageOk === false ? '・大きさが合いません' : ''}
                   </span>
                   <span className="flex gap-2">
-                    <Button type="button" onClick={() => { setImagePickTarget('default'); setMediaPickerOpen(true) }} disabled={!accountId}>
+                    {host ? null : <Button type="button" onClick={() => { setImagePickTarget('default'); setMediaPickerOpen(true) }} disabled={!accountId}>
                       <ImageIcon size={15} aria-hidden /> 登録メディアから選ぶ
-                    </Button>
+                    </Button>}
                     <Button type="button" onClick={() => { setSelectedMedia(null); resetPendingFile() }}>
                       選ばない
                     </Button>
@@ -1858,7 +2022,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
                 <Button
                   type="button"
                   aria-label="画像ファイルを選ぶ"
-                  disabled={!accountId}
+                  disabled={!accountId && !host}
                   onClick={() => shapeFileInput.current?.click()}
                   className="bg-success-bg text-accent-deep h-30 w-45 shrink-0 rounded-control border border-hairline text-caption font-semibold disabled:opacity-50"
                 >
@@ -1869,10 +2033,10 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
                 </Button>
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <span className="flex flex-wrap gap-2">
-                    <Button type="button" onClick={() => { setImagePickTarget('default'); setMediaPickerOpen(true) }} disabled={!accountId}>
+                    {host ? null : <Button type="button" onClick={() => { setImagePickTarget('default'); setMediaPickerOpen(true) }} disabled={!accountId}>
                       <ImageIcon size={15} aria-hidden /> 登録メディアから選ぶ
-                    </Button>
-                    <Button type="button" onClick={() => shapeFileInput.current?.click()} disabled={!accountId}>
+                    </Button>}
+                    <Button type="button" onClick={() => shapeFileInput.current?.click()} disabled={!accountId && !host}>
                       ファイルを選ぶ
                     </Button>
                   </span>
@@ -1898,7 +2062,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
     if (!activePage) return <div className={styles.stateCard}>ページがありません</div>
     const activeIndex = activePage.areas.findIndex((a) => a.id === selectedAreaId)
     const areaPages = pages
-      .filter((p) => !p.id.startsWith('tmp-'))
+      .filter((p) => host || !p.id.startsWith('tmp-'))
       .map((p) => ({ id: p.id, name: p.name }))
 
     return (
@@ -1934,8 +2098,8 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
             </Button>
             <div>
               <RowMenu appearance="plain" label="ページと画像の操作" open={pageActionsOpen} onOpenChange={setPageActionsOpen} items={[
-                { id: 'media', label: '登録メディアから選ぶ', disabled: busy || activePage.id.startsWith('tmp-'), disabledReason: '先に下書きを保存してください', onSelect: () => { setImagePickTarget('active'); setMediaPickerOpen(true) } },
-                { id: 'file', label: 'ファイルを選ぶ', disabled: busy || activePage.id.startsWith('tmp-'), disabledReason: '先に下書きを保存してください', onSelect: () => pageFileInput.current?.click() },
+                ...(host ? [] : [{ id: 'media', label: '登録メディアから選ぶ', disabled: busy || activePage.id.startsWith('tmp-'), disabledReason: '先に下書きを保存してください', onSelect: () => { setImagePickTarget('active'); setMediaPickerOpen(true) } }]),
+                { id: 'file', label: 'ファイルを選ぶ', disabled: busy || (!host && activePage.id.startsWith('tmp-')), disabledReason: '先に下書きを保存してください', onSelect: () => pageFileInput.current?.click() },
                 { id: 'tools', label: canvasToolsOpen ? '区切りの調整を閉じる' : '区切りを調整する', onSelect: () => setCanvasToolsOpen(!canvasToolsOpen) },
                 { id: 'delete-area', label: '選んだ面を消す', tone: 'danger', disabled: !selectedAreaId, disabledReason: '先に面を選んでください', onSelect: () => { if (selectedAreaId) deleteArea(activePage.id, selectedAreaId) } },
               ]} />
@@ -2006,7 +2170,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
               onUpdate={(patch) => updateArea(activePage.id, selectedArea.id, patch)}
               onDelete={() => deleteArea(activePage.id, selectedArea.id)}
               showManagementDetails={false}
-              allowedIntents={NEW_MENU_INTENTS_WITH_SWITCH}
+              allowedIntents={host ? [...HQ_RICH_MENU_INTENTS] : NEW_MENU_INTENTS_WITH_SWITCH}
             />
           </Card>
         ) : (
@@ -2049,11 +2213,20 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
               }}
               title="条件に当てはまる友だちだけ"
               icon={<CircleHelp aria-hidden="true" />}
-              note="タグ・友だち情報などで絞る"
+              note={host ? '条件は配った先のアカウントで決めます' : 'タグ・友だち情報などで絞る'}
             />
           </RadioCardGroup>
 
-          {audience === 'all' ? (
+          {host ? (
+            <div className={styles.infoBand}>
+              <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
+              <span>
+                {audience === 'all'
+                  ? '配ると、各アカウントで既定のメニューにするかどうかを選べます。'
+                  : '配った先では下書きのまま届きます。どの友だちに出すかは、各アカウントで条件を決めます。'}
+              </span>
+            </div>
+          ) : audience === 'all' ? (
             <div className={styles.infoBand}>
               <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
               <span>
@@ -2079,8 +2252,28 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
           )}
         </Card>
 
-        {/* 出す順番 */}
-        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
+        {/* 出す順番（統括：配った先の出す順番。小さいほど先） */}
+        {host ? (
+          <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
+            <div className={`flex flex-col ${styles.stackCompact}`}>
+              <SectionHeader title="出す順番" />
+              <p className={styles.cardNote}>ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます。配った先の順番として届きます</p>
+            </div>
+            <ol className={styles.orderList}>
+              <li className={`${styles.orderRow} ${styles.orderRowSelf}`}>
+                <span className={styles.orderNum}>{targetingPriority + 1}</span>
+                <span className={styles.orderName}>{`${name || '（名前未入力）'}（このメニュー${audience === 'all' ? '・既定' : ''}）`}</span>
+              </li>
+            </ol>
+            <Field label="順番（1 がいちばん先）" htmlFor="rm-hq-order">
+              <TextInput id="rm-hq-order" inputMode="numeric" value={String(targetingPriority + 1)} onChange={(e) => {
+                const next = Number(e.target.value.replace(/[^0-9]/g, ''))
+                setTargetingPriority(Number.isFinite(next) && next > 0 ? Math.min(next, 999) - 1 : 0)
+              }} />
+            </Field>
+          </Card>
+        ) : null}
+        {host ? null : <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="出す順番" />
             <p className={styles.cardNote}>ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます</p>
@@ -2100,10 +2293,10 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
           {audience === 'targeted' ? (
             <p className={styles.fieldHint}>新しく作るメニューはいちばん下に置きます。前に出したいときは、あとで編集画面の「出す順番」から変えられます。</p>
           ) : null}
-        </Card>
+        </Card>}
 
-        {/* トークを開いたとき */}
-        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
+        {/* トークを開いたとき（統括のひな形は持たない。配った先で決める） */}
+        {host ? null : <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <SectionHeader title="トークを開いたとき" />
           <div className={styles.segRow}>
             <span className={`${styles.segLabel} ${styles.segLabelPlain}`}>メニューを</span>
@@ -2117,13 +2310,24 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
               onChange={(v) => setDefaultOpen(v === 'open')}
             />
           </div>
-        </Card>
+        </Card>}
       </>
     )
   }
 
   /* ======== 手順④：公開 ======== */
   function renderPublish() {
+    if (host) {
+      return (
+        <>
+          {host.distribute}
+          <div className={styles.infoBand}>
+            <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
+            <span>配ると、選んだアカウントにリッチメニューが下書きとして届きます。既定のメニューにするか・LINE に出すかは、各アカウントで決めます。</span>
+          </div>
+        </>
+      )
+    }
     const timingIsScheduled = publishPlan.mode !== 'now'
     if (done) {
       return (
@@ -2306,7 +2510,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
   /* LINEでの見え方（スマホの見本）。広い板は右の列に、狭い板（kmTab）は右の列のボタンから窓で開く。 */
   function renderLinePreview() {
     return (
-      <LinePreview accountName={selectedAccount?.name} note="メニューの見え方の見本です。">
+      <LinePreview accountName={host ? '公式アカウント' : selectedAccount?.name} note="メニューの見え方の見本です。">
         <MenuPreview
           size={group?.size ?? size}
           imageUrl={previewImageUrl}
@@ -2330,7 +2534,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
         </div>
         {step === 'shape' ? (
           <CreateSummaryCard
-            title="公開前に見ておくところ"
+            title={host ? '配る前に見ておくところ' : '公開前に見ておくところ'}
             rows={[
               {
                 key: 'actions',
@@ -2374,7 +2578,7 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
                     {
                       key: selectedArea.id,
                       label: `${String.fromCharCode(65 + activePage.areas.findIndex((a) => a.id === selectedArea.id))} ${areaDisplayName(selectedArea, activePage.areas.findIndex((a) => a.id === selectedArea.id))}`,
-                      value: '—（公開前）',
+                      value: host ? '—（配る前）' : '—（公開前）',
                     },
                   ]
                 : []
@@ -2387,7 +2591,18 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
           </CreateSummaryCard>
         ) : null}
 
-        {step === 'audience' ? (
+        {step === 'audience' && host ? (
+          <CreateSummaryCard
+            title="誰に出すか"
+            rows={[
+              { key: 'audience', label: '出す相手', value: audience === 'all' ? 'すべての友だち（既定）' : '配った先で店が決める' },
+              { key: 'order', label: '出す順番', value: `${targetingPriority + 1}番目` },
+            ]}
+          >
+            <p className={styles.cardNote}>出る人数は、配った先の友だちで決まります。</p>
+          </CreateSummaryCard>
+        ) : null}
+        {step === 'audience' && !host ? (
           <CreateSummaryCard
             title="出る人数"
             rows={[
@@ -2407,7 +2622,10 @@ export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string
           </CreateSummaryCard>
         ) : null}
 
-        {step === 'publish' ? (
+        {step === 'publish' && host ? (
+          <CreateSummaryCard title="配ると" rows={host.distributeSummary} />
+        ) : null}
+        {step === 'publish' && !host ? (
           <CreateSummaryCard
             title="公開すると"
             rows={[

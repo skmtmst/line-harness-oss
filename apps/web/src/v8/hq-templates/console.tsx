@@ -17,7 +17,7 @@ import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { ArrowLeft, Check, Plus, RotateCw, Search, Send } from 'lucide-react'
-import { templateKind, type HqTemplateFolder, type TemplateKind } from '@line-crm/shared'
+import { templateKind, type HqTemplateFolder, type HqTemplateListStats, type HqTemplateReceivedVersion, type HqTemplateVersionDisplay, type TemplateKind } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
@@ -50,8 +50,14 @@ import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/h
 import FormEditV8 from '@/v8/form-edit/edit'
 import type { FormEditHost } from '@/v8/form-edit/host'
 import { hqFormDefinitionToEditor, hqFormEditorToDefinition } from '@/components/forms/hq-form-definition-adapter'
+import Card from '@/components/shared/card'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
+import { HqRichMenuCompatibilityError, hqRichMenuDefinitionFromSeed, hqRichMenuSeedFromDefinition } from '@/lib/hq-rich-menu-create'
+import type { RichMenuDefinition } from '@/lib/hq-templates-api'
+import HqAccountPicker from './account-picker'
 import HqStoreList from './store-list'
-import HqTemplateDetail from './detail'
+import HqTemplateDetail, { inUseVersionOf } from './detail'
 import styles from './console.module.css'
 
 const PAGE_TITLES: Record<TemplateType, string> = { tag: '友だち属性', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
@@ -79,7 +85,12 @@ export interface DefinitionEditorProps {
   onCanonicalCancel?: () => void
 }
 
-export default function HqTemplatesV8({ type, DefinitionEditor }: { type: TemplateType; DefinitionEditor?: ComponentType<DefinitionEditorProps> }) {
+export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }: {
+  type: TemplateType
+  DefinitionEditor?: ComponentType<DefinitionEditorProps>
+  /** 店のリッチメニューの作る画面（入口が渡す。src/v8 は @/app を読まないため）。host 付きで統括のひな形を作る（gobhu〜gQabc）。 */
+  RichMenuCreate?: ComponentType<{ host: RichMenuCreateHost }>
+}) {
   const staffRole = useStaffRole()
   const canEdit = staffRole === null || canManageRole(staffRole)
   const router = useRouter()
@@ -104,6 +115,12 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   const [kind, setKind] = useState<TemplateKind>('message')
   const [kindRows, setKindRows] = useState<HqTemplate[] | null>(null)
   const [kindCounts, setKindCounts] = useState<Partial<Record<TemplateKind, number>> | null>(null)
+  /* 一覧の集計（API-18：今月送った数・新しい版を未配布）。取れなければ null（数の帯は「—」か行から数える）。 */
+  const [listStats, setListStats] = useState<HqTemplateListStats | null>(null)
+  /* 詳細（pQ4fH）の版の履歴と配った先ごとの版（API-18）。null は読み込み中・読めなかった。 */
+  const [versions, setVersions] = useState<HqTemplateVersionDisplay[] | null>(null)
+  const [versionsFailed, setVersionsFailed] = useState(false)
+  const [received, setReceived] = useState<HqTemplateReceivedVersion[] | null>(null)
   const [preflight, setPreflight] = useState<Preflight | null>(null)
   const [choices, setChoices] = useState<Record<string, DistributionMode>>({})
   const [bulkMode, setBulkMode] = useState<'' | DistributionMode>('')
@@ -133,6 +150,10 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   const createSettlement = useRef<{ kind: 'saved'; detail: TemplateDetail } | { kind: 'rejected' } | null>(null)
   const [createUncertain, setCreateUncertain] = useState(false)
   const alive = useRef(true)
+  /** 保存のあと、そのまま配る前の確認をするアカウント（リッチメニューの作る④）。 */
+  const autoCheck = useRef<string[] | null>(null)
+  /** リッチメニューの作る④で選んだ配るアカウント。 */
+  const [menuTargets, setMenuTargets] = useState<string[]>([])
 
   const reconcileSessionUploads = (keep: readonly string[]) => {
     const kept = new Set(keep)
@@ -147,7 +168,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   /* 絵（meBRB の進み具合・dEvJM の窓の後ろ）：配っている間も結果のあとも題は「アカウントへ配る：名前」のまま。 */
   const pageTitle = stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : `アカウントへ配る：${detail?.template.name ?? ''}`
   /* 絵（HfK0O・u5MM7）：店の作る・編集の画面を使うときは、上の帯は「ホーム › テンプレート／回答フォーム」だけ。 */
-  usePageTitle(stage === 'list' || (stage === 'edit' && !createUncertain && (type === 'form' || type === 'template')) ? PAGE_TITLES[type] : stage === 'edit' ? `${PAGE_TITLES[type]} › ${editTitle}` : PAGE_TITLES[type])
+  usePageTitle(stage === 'list' || (stage === 'edit' && !createUncertain && (type === 'form' || type === 'template' || (type === 'rich_menu' && Boolean(RichMenuCreate)))) ? PAGE_TITLES[type] : stage === 'edit' ? `${PAGE_TITLES[type]} › ${editTitle}` : PAGE_TITLES[type])
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   useEffect(() => {
@@ -172,6 +193,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
       }
       setTemplates(rows); setAccounts(stores); setReady(true)
     }).catch((e) => { if (current) setError(errorText(e)) }).finally(() => { if (current) setBusy(false) })
+    void hqTemplatesApi.listStats(type).then((stats) => { if (current) setListStats(stats ?? null) }).catch(() => { if (current) setListStats(null) })
     // R119: 目録だけの失敗で一覧や保存まで止めない。
     void hqTemplatesApi.list().then(
       (rows) => { if (current) { setCatalog(rows); setCatalogFailed(false) } },
@@ -186,6 +208,20 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     void hqTemplatesApi.kindCounts().then((counts) => { if (current) setKindCounts(counts) }).catch(() => undefined)
     return () => { current = false }
   }, [type, kind, stage])
+  /* 詳細・回答フォームの編集を開いたら、版の履歴と配った先ごとの版を読む（API-18）。読めなくても画面は出す。 */
+  const detailId = detail?.template.id ?? null
+  const detailRevision = detail?.template.revision ?? null
+  const loadVersions = (id: string) => {
+    setVersions(null); setVersionsFailed(false)
+    void hqTemplatesApi.versions(id).then((rows) => { if (alive.current) setVersions(rows) }, () => { if (alive.current) setVersionsFailed(true) })
+    void hqTemplatesApi.receivedVersions(id).then((rows) => { if (alive.current) setReceived(rows) }, () => { if (alive.current) setReceived(null) })
+  }
+  useEffect(() => {
+    if (!detailId || (stage !== 'detail' && !(stage === 'edit' && type === 'form'))) return
+    loadVersions(detailId)
+    // 開いたひな形と版が変わったときだけ読み直す。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailId, detailRevision, stage === 'detail' || stage === 'edit'])
   useEffect(() => {
     if (stage !== 'duplicates') return
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -227,14 +263,14 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     loadDetailIntoForm(loaded); setSelected([]); setTextOverrides({}); setSearch(''); setPreflight(null); setChoices({}); setBulkMode(''); setStage(next)
   })
   const startCreate = () => {
-    createAttempt.current = null; sessionUploads.current = []
+    createAttempt.current = null; sessionUploads.current = []; setMenuTargets([])
     setDetail(null); setFolderId(folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setStage('edit'); setError(''); setConflict(false)
   }
-  const save = (distribute: boolean, sourceDefinition = definition, sourceName = name, sourceDescription = description, andAnother = false) => perform(async () => {
+  const save = (distribute: boolean, sourceDefinition = definition, sourceName = name, sourceDescription = description, andAnother = false, options: { folderId?: string | null; preselect?: string[] } = {}) => perform(async () => {
     const preparedDefinition = definitionForName(type, sourceDefinition, sourceName.trim(), sourceDescription.trim())
     const validation = !sourceName.trim() ? 'ひな形の名前を入力してください。' : definitionError(type, preparedDefinition, creationScope.current?.tenantId)
     if (validation) throw new Error(validation)
-    const input = { type, name: sourceName.trim(), description: sourceDescription.trim(), folderId, definition: preparedDefinition } as TemplateInput
+    const input = { type, name: sourceName.trim(), description: sourceDescription.trim(), folderId: options.folderId !== undefined ? options.folderId : folderId, definition: preparedDefinition } as TemplateInput
     let saved: TemplateDetail
     let continueToAccounts = distribute
     if (detail) {
@@ -288,8 +324,14 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     createAttempt.current = null
     setCreateUncertain(false)
     setTemplates((current) => [saved.template, ...current.filter((row) => row.id !== saved.template.id)])
+    refreshStats()
     setMessage('ひな形を保存しました。')
-    if (continueToAccounts) { setSelected([]); setTextOverrides({}); setSearch(''); setStage('accounts') }
+    if (continueToAccounts) {
+      setSelected(options.preselect ?? []); setTextOverrides({}); setSearch('')
+      // リッチメニューの作る④で選んだアカウントは、保存のあとそのまま確かめる（配る前の確認）。
+      autoCheck.current = options.preselect?.length ? options.preselect : null
+      setStage('accounts')
+    }
     // R561: 「保存して続けて作る」は新規作成のときだけ、空の新規入力へ戻る。
     else if (andAnother && isNew) { setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey((current) => current + 1); setStage('edit') }
     else setStage('list')
@@ -304,6 +346,14 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     if (!alive.current) return
     setPendingRun(null); setPreflight(checked); setChoices({}); setBulkMode(''); setSelected(ids); setNow(Date.now()); setStage('duplicates')
   })
+  useEffect(() => {
+    if (stage !== 'accounts' || !autoCheck.current || !detail) return
+    const ids = autoCheck.current
+    autoCheck.current = null
+    checkStores(ids)
+    // 保存して開いた「アカウントへ配る」で一度だけ。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, detail])
   const applyBulk = (mode: '' | DistributionMode) => {
     setBulkMode(mode)
     if (!preflight || busy || !mode) return
@@ -371,7 +421,9 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     if (result && result.status !== 'running') setResultDialogFor(`${result.runId}:${result.status}`)
   }, [result])
   const reloadFolders = async () => setFolders(await hqTemplatesApi.folders.list())
+  const refreshStats = () => { void hqTemplatesApi.listStats(type).then((stats) => { if (alive.current) setListStats(stats ?? null) }).catch(() => undefined) }
   const reloadKind = async () => {
+    refreshStats()
     if (type !== 'template') return
     const [rows, counts] = await Promise.all([hqTemplatesApi.listByKind(kind), hqTemplatesApi.kindCounts().catch(() => null)])
     if (!alive.current) return
@@ -422,6 +474,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
         busy={busy}
         canEdit={canEdit}
         accountTotal={accounts.length}
+        stats={listStats}
         kind={type === 'template' ? kind : undefined}
         kindCounts={kindCounts}
         onKindChange={type === 'template' ? setKind : undefined}
@@ -477,6 +530,19 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
         canEdit={canEdit}
         busy={busy}
         notices={notices}
+        versions={versions}
+        versionsError={versionsFailed}
+        received={received}
+        onReloadVersions={() => loadVersions(detail.template.id)}
+        onCompare={(from, to) => hqTemplatesApi.compareVersions(detail.template.id, from, to)}
+        onRestore={async (version) => {
+          const restored = await hqTemplatesApi.restoreVersion(detail.template.id, version, detail.template.revision)
+          if (!alive.current) return
+          loadDetailIntoForm(restored)
+          setTemplates((current) => current.map((item) => (item.id === restored.template.id ? { ...item, ...restored.template } : item)))
+          void reloadKind()
+          setMessage(`版${version}の内容で新しい版を作りました。配るまで、配った先は今の版のままです。`)
+        }}
         onBack={toList}
         onEdit={() => setStage('edit')}
         onDistribute={() => { setSelected([]); setTextOverrides({}); setSearch(''); setPreflight(null); setChoices({}); setBulkMode(''); setStage('accounts') }}
@@ -543,6 +609,70 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   }
 
   /*
+   * ───── リッチメニュー：店のリッチメニューの作る画面（①〜④）を使い、④を「配る」（配るアカウント）にする（B-36）─────
+   * 絵：① gobhu・② egdGx・③ K0gu1・④ gQabc。手順の間は画面の中に持ち、［下書きを保存］［アカウントへ配る］で一度に保存する。
+   * 自由に置いた面・シナリオの参照など、作る画面の形に戻せない古い中身は今の画面（下）で直す。
+   */
+  const menuSeed = (() => {
+    if (type !== 'rich_menu' || !detail || !('richMenu' in detail.definition)) return undefined
+    const menu = (detail.definition as RichMenuDefinition).richMenu
+    if (menu.pages.some((page) => page.areas.some((area) => area.scenarioId))) return null
+    return hqRichMenuSeedFromDefinition(detail.definition as RichMenuDefinition, detail.template.folder_id ?? null)
+  })()
+  if (stage === 'edit' && type === 'rich_menu' && RichMenuCreate && !createUncertain && menuSeed !== null) {
+    const host: RichMenuCreateHost = {
+      backHref: '/hq/rich-menus',
+      onCancel: toList,
+      canOperate: canEdit,
+      folders: folders.map((folder) => ({ id: folder.id, name: folder.name })),
+      references: { tags: referenceOptions('tag'), templates: referenceOptions('template'), forms: referenceOptions('form') },
+      initial: menuSeed,
+      uploadImage: async (file, menuSize) => {
+        setUploadBusy(true)
+        try {
+          const media = await hqTemplatesApi.uploadImage(file, 'rich_menu', menuSize === 'large' ? { width: 2500, height: 1686 } : { width: 2500, height: 843 })
+          noteSessionUpload(media)
+          return { r2Key: media.r2Key }
+        } finally {
+          if (alive.current) setUploadBusy(false)
+        }
+      },
+      imageUrl: (r2Key) => `${process.env.NEXT_PUBLIC_API_URL ?? ''}/images/${r2Key.split('/').map(encodeURIComponent).join('/')}`,
+      distribute: (
+        <Card padding="spacious" layout="vertical">
+          <HqAccountPicker
+            title="配るアカウント"
+            allowed={accounts}
+            selected={menuTargets}
+            onChange={setMenuTargets}
+            note="配った先で、既定のメニューにするかを決めます。"
+            disabled={busy || !canEdit}
+          />
+        </Card>
+      ),
+      distributeSummary: [
+        { key: 'accounts', label: '配るアカウント', value: menuTargets.length ? `${menuTargets.length} アカウント` : 'まだ選んでいません' },
+        { key: 'state', label: '届き方', value: '下書きとして届く' },
+      ],
+      selectedCount: menuTargets.length,
+      busy,
+      notice: notices,
+      onSave: (seed, distribute) => {
+        let next: RichMenuDefinition
+        try {
+          next = hqRichMenuDefinitionFromSeed(seed)
+        } catch (cause) {
+          setError(cause instanceof HqRichMenuCompatibilityError ? cause.reason : japaneseDetailOf(cause) || 'リッチメニューの中身を保存できる形にできませんでした。ボタンの動きと画像を確かめてください。')
+          return
+        }
+        setDefinition(next); setName(seed.name); setFolderId(seed.folderId)
+        void save(distribute, next, seed.name, description, false, { folderId: seed.folderId, preselect: distribute ? menuTargets : undefined })
+      },
+    }
+    return <RichMenuCreate key={`menu-${detail?.template.id ?? 'new'}-${formKey}`} host={host} />
+  }
+
+  /*
    * ───── 回答フォーム：店の回答フォームの編集画面を使い、右の列に「配った先」、主ボタンを［保存して配る］にする（B-36）─────
    * 絵：中身 u5MM7・答え終わったあと scJcP・受付と見た目 xRPdo・予約ブロック N4T9mO。前回の保存が結果不明のときは下の今の画面で再確認する。
    */
@@ -555,7 +685,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
       // 配った先で直せる参照先だけ（統括のタグのひな形）。友だち情報・テンプレート・リマインダは店ごとの ID なので選ばせない。
       refs: { tags: referenceOptions('tag'), friendFields: [], scenarios: [], reminders: [], templates: [] },
       accountName: '公式アカウント',
-      statusLine: formStatusLine(listRow),
+      statusLine: formStatusLine(listRow, versions),
       distributedLine: formDistributedLine(listRow),
       busy,
       notice: notices,
@@ -847,12 +977,16 @@ function resultSentence(store: DistributionResult['stores'][number]): string {
   return '配りました'
 }
 
-/** 回答フォームの題の下の1行（u5MM7）。配った版との違いは版の口ができてから（API 待ち）。 */
-export function formStatusLine(row: HqTemplateListItem | undefined): string {
+/**
+ * 回答フォームの題の下の1行（u5MM7）。いまの版がまだ配った先に届いていなければ、配った版との違いを出す（API-18 の版の履歴）。
+ */
+export function formStatusLine(row: HqTemplateListItem | undefined, versions?: readonly HqTemplateVersionDisplay[] | null): string {
   if (!row) return '下書き・まだ配っていません（保存して配ると、選んだアカウントへ届きます）'
-  return (row.distributed_account_count ?? 0) > 0
-    ? '下書き（保存して配ると、配った先へ新しい版として届きます）'
-    : '下書き・まだ配っていません（保存して配ると、選んだアカウントへ届きます）'
+  if ((row.distributed_account_count ?? 0) === 0) return '下書き・まだ配っていません（保存して配ると、選んだアカウントへ届きます）'
+  const current = versions?.find((version) => version.is_current)
+  const inUse = inUseVersionOf(versions ?? null)
+  if (current && inUse && current.version !== inUse.version) return `下書き・配った版${inUse.version}と違うところがあります（保存して配ると、配った先へ新しい版として届きます）`
+  return '下書き（保存して配ると、配った先へ新しい版として届きます）'
 }
 
 /** 右の列「配った先」の文（u5MM7）。名前は API-14 の最大3件と、ほかの数。 */
