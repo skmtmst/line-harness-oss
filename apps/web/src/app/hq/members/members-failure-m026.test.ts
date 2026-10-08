@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const SETTINGS = readFileSync(new URL('../settings/page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/hq/members.tsx', import.meta.url), 'utf8')
+const SETTINGS = readFileSync(new URL('../../../v8/hq/settings.tsx', import.meta.url), 'utf8')
 
 /**
  * M026：権限ダイアログ原文・再送と統括名保存に再試行の案内なし。

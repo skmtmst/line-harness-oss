@@ -145,7 +145,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const id = host ? null : params.get('id')
   const visual = params.get('visual') === '1'
   usePageTitle(host ? 'テンプレート' : id ? 'カルーセルを編集' : 'カルーセルを作る')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'テンプレート', href: '/templates' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'テンプレート', href: '/templates' }], !host)
 
   const [hostInitial] = useState(() => hostCarouselInitial(host))
   const [name, setName] = useState(hostInitial ? hostInitial.name : visual ? '夏の定番5点' : '')

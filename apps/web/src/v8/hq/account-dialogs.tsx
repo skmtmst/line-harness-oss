@@ -55,6 +55,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
   onFolderCreated?: () => void
 }) {
   const [name, setName] = useState(account.name)
+  const [nameError, setNameError] = useState('')
   const [parent, setParent] = useState('')
   const initialFolder = (account as { folderId?: string | null }).folderId ?? ''
   const [folders, setFolders] = useState<Folder[]>([])
@@ -73,9 +74,14 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
   const save = async () => {
     if (busy) return
     if (!name.trim()) {
-      setError('名前を入力してください。')
+      setNameError('名前を入力してください。')
+      setError('')
+      const input = document.getElementById('hq-account-settings-name')
+      input?.focus()
+      input?.scrollIntoView?.({ block: 'center' })
       return
     }
+    setNameError('')
     setBusy(true)
     setError('')
     try {
@@ -144,9 +150,12 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
             value={name}
             maxLength={100}
             disabled={busy}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => { setName(event.target.value); setNameError('') }}
+            invalid={Boolean(nameError)}
+            aria-describedby={nameError ? 'hq-account-settings-name-error' : undefined}
             className={styles.full}
           />
+          {nameError ? <p id="hq-account-settings-name-error" className={styles.error} role="alert">{nameError}</p> : null}
         </div>
         <div className={styles.field}>
           <label htmlFor="hq-account-settings-parent" className={styles.label}>親アカウント</label>

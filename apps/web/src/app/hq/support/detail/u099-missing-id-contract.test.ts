@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'),
+  join(dirname(fileURLToPath(import.meta.url)), '../../../../v8/hq/support-detail.tsx'),
   'utf8',
 )
 
@@ -20,7 +20,7 @@ describe('問い合わせ詳細の id なし（#975 U099）', () => {
     expect(PAGE).toContain('idMissing = id === null')
     expect(PAGE).toContain('idMissing ? (')
     expect(PAGE).toContain('開くお問い合わせが指定されていません')
-    // 戻り先は ★V7 TargetMissing の backHref が持つ。
+    // 戻り先は 共通 TargetMissing の backHref が持つ。
     expect(PAGE).toContain('backHref="/hq/support"')
     expect(PAGE).toContain('問い合わせの一覧へ戻る')
   })

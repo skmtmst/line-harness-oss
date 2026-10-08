@@ -82,7 +82,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const id = host ? null : params.get('id')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   usePageTitle(host ? 'テンプレート' : id ? '質問を編集' : '質問を作る')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'テンプレート', href: '/templates' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'テンプレート', href: '/templates' }], !host)
   /* 統括の編集（host.initialContent）：保存してある質問から始める。形が合わなければ空から。 */
   const [hostInitial] = useState(() => {
     const content = host?.initialContent

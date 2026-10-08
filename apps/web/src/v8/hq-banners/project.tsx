@@ -561,7 +561,7 @@ function ProjectInner() {
 
   return (
     <ListPage boardId={boardId} title={project.name} description={description} actions={actions}
-      crumbs={<Breadcrumb items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />}>
+      crumbs={<Breadcrumb appearance="banner" items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />}>
       <div className={styles.body}>
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}
         <div className={styles.split}>
@@ -782,6 +782,7 @@ function ProjectInner() {
 
       <ReferencePickerDialog
         frame={ReferenceFrame}
+        hqLayout
         open={pickerOpen}
         projectId={project.id}
         presets={presets}

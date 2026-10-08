@@ -72,6 +72,9 @@ describe('会社と連絡先の画面の動き',()=>{
     await renderCard();fireEvent.change(field(label),{target:{value:' '}});submit()
     await waitFor(()=>expect(screen.getByRole('alert').textContent).toContain('入力してください'))
     expect(mocks.save).not.toHaveBeenCalled()
+    expect(field(label).getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(field(label))
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
   })
   it('二重保存を防ぎ、通信中に入力を変更させない',async()=>{
     let finish!: (value:unknown)=>void
