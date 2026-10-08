@@ -1,6 +1,6 @@
 'use client'
 
-import type { ComponentProps, ReactNode } from 'react'
+import type { ComponentProps, ReactNode, Ref } from 'react'
 import { useId } from 'react'
 import Dialog from './dialog'
 import Button from './button'
@@ -11,6 +11,8 @@ import styles from './folder-editor-dialog.module.css'
 
 export interface FolderNameColorFieldsProps {
   name: string
+  nameError?: string
+  nameRef?: Ref<HTMLInputElement>
   onNameChange: (name: string) => void
   color: string | null
   onColorChange: (color: string | null) => void
@@ -25,17 +27,18 @@ export interface FolderNameColorFieldsProps {
 }
 
 /** 名前と色は必ず同じ行。画面側から部品の見た目を上書きしない。 */
-export function FolderNameColorFields({ name, onNameChange, color, onColorChange, colors, allowClear, disabled, nameId, nameLabel = 'フォルダ名', placeholder = '例：購入', maxLength = 100, onSubmit }: FolderNameColorFieldsProps) {
+export function FolderNameColorFields({ name, nameError, nameRef, onNameChange, color, onColorChange, colors, allowClear, disabled, nameId, nameLabel = 'フォルダ名', placeholder = '例：購入', maxLength = 100, onSubmit }: FolderNameColorFieldsProps) {
   const generatedId = useId()
   const id = nameId ?? generatedId
   return <div className={styles.row} data-folder-name-color="">
     <div className={styles.name}>
       <label htmlFor={id} className={styles.label}>{nameLabel}</label>
-      <TextField id={id} value={name} onChange={(event) => onNameChange(event.target.value)} autoFocus
+      <TextField ref={nameRef} id={id} invalid={Boolean(nameError)} aria-describedby={nameError ? `${id}-error` : undefined} value={name} onChange={(event) => onNameChange(event.target.value)} autoFocus
         placeholder={placeholder} maxLength={maxLength} disabled={disabled}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !isImeComposing(event) && name.trim() && !disabled) { event.preventDefault(); onSubmit?.() }
         }} />
+      {nameError ? <p id={`${id}-error`} className={styles.nameError} role="alert">{nameError}</p> : null}
     </div>
     <div className={styles.color}>
       <span className={styles.label}>色</span>
@@ -52,7 +55,7 @@ type Props = FolderNameColorFieldsProps & Pick<ComponentProps<typeof Dialog>, 'o
 }
 
 /** IjVpM の低い窓。保存先やエラー処理は画面が持ち、形はここに集約する。 */
-export default function FolderEditorDialog({ name, onNameChange, color, onColorChange, colors, allowClear, disabled, nameId, nameLabel, placeholder, maxLength, children, footer, confirmIcon, confirmTitle, confirmLabel = '追加する', cancelLabel = 'キャンセル', onConfirm, busy, confirmDisabled, ...dialog }: Props) {
+export default function FolderEditorDialog({ name, nameError, nameRef, onNameChange, color, onColorChange, colors, allowClear, disabled, nameId, nameLabel, placeholder, maxLength, children, footer, confirmIcon, confirmTitle, confirmLabel = '追加する', cancelLabel = 'キャンセル', onConfirm, busy, confirmDisabled, ...dialog }: Props) {
   return <Dialog {...dialog} busy={busy} designWidth={560} designHeaderPadding="24px 24px 0"
     footer={<div className={styles.footer}>{footer ?? <>
       <Button type="button" onClick={dialog.onCancel} disabled={busy}>{cancelLabel}</Button>
@@ -61,7 +64,7 @@ export default function FolderEditorDialog({ name, onNameChange, color, onColorC
     </>}</div>}>
     <div className={styles.body}>
       {children}
-      <FolderNameColorFields name={name} onNameChange={onNameChange} color={color} onColorChange={onColorChange}
+      <FolderNameColorFields name={name} nameError={nameError} nameRef={nameRef} onNameChange={onNameChange} color={color} onColorChange={onColorChange}
         colors={colors} allowClear={allowClear} disabled={disabled || busy} nameId={nameId} nameLabel={nameLabel}
         placeholder={placeholder} maxLength={maxLength} onSubmit={confirmDisabled ? undefined : onConfirm} />
     </div>

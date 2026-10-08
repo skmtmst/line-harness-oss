@@ -18,6 +18,8 @@ import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
+import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -135,6 +137,19 @@ export default function FieldEditor({
   const [ecFieldPath, setEcFieldPath] = useState(field?.ecFieldPath ?? '')
   const [folderId, setFolderId] = useState(field?.folderId ?? '')
   const [validationError, setValidationError] = useState('')
+  const [validationTarget, setValidationTarget] = useState('')
+  const validationRefs = useRef<Record<string, HTMLElement | null>>({})
+  const failField = (key: string, message: string) => {
+    setValidationTarget(key)
+    setValidationError(message)
+    const box = validationRefs.current[key]
+    const control = box?.matches('input, textarea, button') ? box : box?.querySelector<HTMLElement>('input, textarea, button')
+    control?.focus()
+    control?.scrollIntoView({ block: 'center' })
+  }
+  const fieldError = (key: string) => validationTarget === key && validationError
+    ? <p className={styles.fieldError} role="alert" id={`ff-error-${key}`}>{validationError}</p> : null
+  useEffect(() => { setValidationError(''); setValidationTarget('') }, [name, fieldKey, options, defaultValue, defaultOptions, ecFieldPath])
 
   const optionList = useMemo(() => options.map((value) => value.trim()).filter(Boolean), [options])
   const nameDuplicates = useMemo(() => findDuplicateNames(siblings, name, field?.id ?? null), [siblings, name, field?.id])
@@ -184,21 +199,21 @@ export default function FieldEditor({
   const submit = () => {
     if (saving) return
     if (mode === 'create' && !siblingsReady) return
-    if (!name.trim()) return setValidationError('項目名を入力してください')
-    if (mode === 'create' && !fieldKey.trim()) return setValidationError('差し込みの名前を入力してください')
-    if (NEEDS_OPTIONS.has(effectiveType) && optionList.length === 0) return setValidationError('選択肢を1つ以上入力してください')
-    if (ecIsMaster && !ecFieldPath.trim()) return setValidationError('EC側の項目名を入力してください')
+    if (!name.trim()) return failField('name', '項目名を入力してください')
+    if (mode === 'create' && !fieldKey.trim()) return failField('key', '差し込みの名前を入力してください')
+    if (NEEDS_OPTIONS.has(effectiveType) && optionList.length === 0) return failField('options', '選択肢を1つ以上入力してください')
+    if (ecIsMaster && !ecFieldPath.trim()) return failField('ec', 'EC側の項目名を入力してください')
     /* 選択肢から外れた既定値は送る前に止める（R139）。 */
     if (effectiveType === 'multi_select') {
       const missing = defaultOptions.filter((item) => !optionList.includes(item))
-      if (missing.length > 0) return setValidationError(`既定値の「${missing[0]}」は選択肢にありません。選択肢か既定値を直してください`)
+      if (missing.length > 0) return failField('default', `既定値の「${missing[0]}」は選択肢にありません。選択肢か既定値を直してください`)
     }
     /* 時刻の既定値は 24 時間の HH:MM（例 09:30）。サーバーと同じ形で送る前に止める。 */
     if (effectiveType === 'time' && defaultValue.trim() && !/^([01]\d|2[0-3]):[0-5]\d$/.test(defaultValue.trim())) {
-      return setValidationError('時刻の既定値は「09:30」のように 24 時間の時:分で入力してください')
+      return failField('default', '時刻の既定値は「09:30」のように 24 時間の時:分で入力してください')
     }
     if (effectiveType === 'select' && defaultValue && !optionList.includes(defaultValue)) {
-      return setValidationError(`既定値の「${defaultValue}」は選択肢にありません。選択肢か既定値を直してください`)
+      return failField('default', `既定値の「${defaultValue}」は選択肢にありません。選択肢か既定値を直してください`)
     }
     setValidationError('')
     onSubmit({
@@ -266,8 +281,10 @@ export default function FieldEditor({
             {optionRows.map((value, index) => (
               <label key={index} className={styles.field}>
                 <span className={styles.label}>選択肢</span>
-                <input
-                  className={styles.input}
+                <TextField
+                  ref={index === 0 ? (element) => { validationRefs.current.options = element } : undefined}
+                  invalid={index === 0 && validationTarget === 'options' && Boolean(validationError)}
+                  aria-describedby={index === 0 && validationTarget === 'options' && validationError ? 'ff-error-options' : undefined}
                   value={value}
                   disabled={!optionsActive}
                   aria-label={`選択肢 ${index + 1}`}
@@ -276,12 +293,13 @@ export default function FieldEditor({
                 />
               </label>
             ))}
+            {fieldError('options')}
             <span>
               <Button type="button" disabled={!optionsActive} onClick={() => setOptions([...optionRows, ''])}>選択肢を足す</Button>
             </span>
           </div>
-          <div className={`${styles.field} ${styles.defaultBox}`}>
-            <span className={styles.label}>既定値（任意）</span>
+          <div className={styles.defaultBox} ref={(element) => { validationRefs.current.default = element }}>
+            <Field label="既定値（任意）" htmlFor="ff-default" error={validationTarget === 'default' ? validationError : undefined}>
             {/* 複数選択は登録済みの選択肢から複数選ぶ。単一選択は一覧から1つ選ぶ（R139）。 */}
             <DefaultValueInput
               mode={FILE_TYPES.has(effectiveType) ? 'file' : effectiveType === 'multi_select' ? 'multi' : effectiveType === 'select' ? 'single' : effectiveType === 'textarea' ? 'longtext' : 'text'}
@@ -295,6 +313,7 @@ export default function FieldEditor({
               disabled={locked}
               inputId="ff-default"
             />
+            </Field>
           </div>
         </section>
 
@@ -306,7 +325,8 @@ export default function FieldEditor({
           {ecIsMaster ? (
             <label className={styles.field}>
               <span className={styles.label}>EC側の項目名</span>
-              <input className={styles.input} value={ecFieldPath} disabled={locked} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" />
+              <TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" />
+              {fieldError('ec')}
             </label>
           ) : null}
         </section>
@@ -358,21 +378,24 @@ export default function FieldEditor({
         </>}
       >
         {notices}
-        {error || validationError ? <Notice tone="danger" message={error || validationError} /> : null}
+        {error ? <Notice tone="danger" message={error} /> : null}
         {locked ? <Notice tone="warn">共通項目はこのアカウントから直接変更できません。新しい項目へ移行してから編集してください。</Notice> : null}
 
         <section className={styles.card} aria-labelledby="ff-basic">
           <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ff-basic">基本</h2></div>
           <label className={styles.field}>
             <span className={styles.label}>項目名</span>
-            <input
-              className={styles.input}
+            <TextField
+              ref={(element) => { validationRefs.current.name = element }}
+              invalid={validationTarget === 'name' && Boolean(validationError)}
+              aria-describedby={validationTarget === 'name' && validationError ? 'ff-error-name' : undefined}
               value={name}
               disabled={locked}
               aria-required="true"
               placeholder="例：愛犬のお名前"
               onChange={(event) => { setName(event.target.value); if (mode === 'create' && !keyTouched) setFieldKey(suggestKey(event.target.value)) }}
             />
+            {fieldError('name')}
             <DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" />
           </label>
           <div className={styles.field}>
@@ -380,8 +403,11 @@ export default function FieldEditor({
             <span className={styles.keyRow}>
               <span className={styles.keyBrace}>{'{{field.'}</span>
               {mode === 'create' ? (
-                <input
-                  className={`${styles.input} ${styles.keyInput}`}
+                <TextField
+                  ref={(element) => { validationRefs.current.key = element }}
+                  invalid={validationTarget === 'key' && Boolean(validationError)}
+                  aria-describedby={validationTarget === 'key' && validationError ? 'ff-error-key' : undefined}
+                  className={styles.keyInput}
                   value={fieldKey}
                   aria-labelledby="ff-key"
                   aria-required="true"
@@ -391,6 +417,7 @@ export default function FieldEditor({
               ) : <span className={`${styles.input} ${styles.keyInput} ${styles.keyFixed}`}>{field?.fieldKey}</span>}
               <span className={styles.keyBrace}>{'}}'}</span>
             </span>
+            {fieldError('key')}
             {keyOwners.length > 0
               ? <p className={styles.fieldError}>{`この差し込みの名前はすでに「${keyOwners[0]}」で使われています。別の名前にしてください。`}</p>
               : <p className={styles.keyNote}>{`メッセージに {{field.${shownKey}}} と書くと、その人の値に置き換わります`}</p>}

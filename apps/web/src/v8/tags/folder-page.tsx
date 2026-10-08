@@ -73,6 +73,8 @@ function TagFolderPage() {
   const editId = params.get('id')
   const scope: 'tag' | 'friend_field' = !editId && params.get('kind') === 'friend_field' ? 'friend_field' : 'tag'
   const [name, setName] = useState('')
+  const [nameError, setNameError] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
   const [color, setColor] = useState(DEFAULT_COLOR)
   const [folderAccountId, setFolderAccountId] = useState<string | null>(selectedAccountId)
   const [saving, setSaving] = useState(false)
@@ -88,6 +90,7 @@ function TagFolderPage() {
     const request = { editId, generation: activeRef.current.generation + 1 }
     activeRef.current = request
     setError('')
+    setNameError('')
     setSaving(false)
     if (!editId) {
       setName('')
@@ -119,7 +122,9 @@ function TagFolderPage() {
   useEffect(loadFolder, [editId, selectedAccountId])
 
   const save = async () => {
-    if (!name.trim() || saving || loadState !== 'ready') return
+    if (saving || loadState !== 'ready') return
+    if (!name.trim()) { setNameError('フォルダ名を入力してください'); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
+    setNameError('')
     const request = { ...activeRef.current }
     setSaving(true)
     setError('')
@@ -167,8 +172,7 @@ function TagFolderPage() {
     loadState === 'loading' ? '読み込んでいます'
       : loadState === 'error' ? '読み込めませんでした'
         : loadState === 'forbidden' ? '操作する権限がありません'
-          : !name.trim() ? 'フォルダ名を入力すると保存できます'
-            : null
+          : null
   const title = editId ? 'フォルダを直す' : scope === 'friend_field' ? '友だち情報欄のフォルダを追加する' : 'フォルダを追加する'
 
   return (
@@ -179,7 +183,7 @@ function TagFolderPage() {
         designNode="IjVpM"
         designTop={300}
         title={title}
-        name={name} onNameChange={setName} color={color} onColorChange={(next) => setColor(next ?? DEFAULT_COLOR)}
+        name={name} nameError={nameError} nameRef={nameRef} onNameChange={(next) => { setName(next); setNameError('') }} color={color} onColorChange={(next) => setColor(next ?? DEFAULT_COLOR)}
         colors={TAG_FOLDER_COLORS} maxLength={60} disabled={loadState !== 'ready'}
         onConfirm={() => void save()}
         busy={saving}

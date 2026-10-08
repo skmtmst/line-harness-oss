@@ -51,7 +51,7 @@ export function Field({
   count,
   children,
 }: {
-  label: string
+  label?: string
   htmlFor?: string
   required?: boolean
   optional?: boolean
@@ -107,7 +107,7 @@ export function Field({
     >
       {/* 「？」は label の外に置く。中に入れるとラベルがボタンを指してしまい、
           入力欄との結びつき（htmlFor・読み上げ）が壊れる。 */}
-      <div className={styles.labelRow}>
+      {label ? <div className={styles.labelRow}>
         <label htmlFor={htmlFor} className={styles.label}>
           {label}
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
@@ -121,7 +121,7 @@ export function Field({
             {helpHref ? <a href={helpHref} className={styles.helpLink}>くわしく</a> : null}
           </HelpTip>
         ) : null}
-      </div>
+      </div> : null}
       {children}
       {shownError ? <p id={errorId} className={styles.error} role="alert">{shownError}</p> : null}
       {showNote ? <p id={noteId} className={styles.note}>{note}</p> : null}
