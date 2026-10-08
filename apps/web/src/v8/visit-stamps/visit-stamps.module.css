@@ -1,4 +1,4 @@
-/* ★V8 来店スタンプ（提案 E-7 w4SBbv）。寸法は globals.css の --tpl-e78-* だけを使う。表・ボタン・選ぶ欄は共通部品が持つ。 */
+/* ★V8 来店スタンプ（G-8a〜a3）。寸法は globals.css の --tpl-e78-* だけを使う。表・ボタン・選ぶ欄は共通部品が持つ。 */
 
 .body {
   display: flex;
@@ -369,6 +369,9 @@
 }
 
 .countText {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: var(--tpl-e78-label-size);
   line-height: var(--tpl-e78-label-lh);
   font-weight: 600;
@@ -454,12 +457,19 @@
   }
 }
 
-/* ④ の「すべて見る」で 50件ごとに送る。 */
-.pager {
+.historyTable .colWhen { width: var(--tpl-stamp-history-date-w); }
+.historyTable .colFriend { width: var(--tpl-stamp-history-friend-w); }
+.historyTable .colCount { width: var(--tpl-stamp-history-count-w); }
+.historyTable .colWhy { width: var(--tpl-stamp-history-reason-w); }
+.historyTable .colActor { width: var(--tpl-stamp-history-actor-w); }
+.historyTable .colMenu { width: var(--tpl-stamp-history-menu-w); }
+
+.historyFooter {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--tpl-e78-row-gap);
+  flex-wrap: wrap;
+  gap: var(--tpl-e78-pair-gap);
+  min-width: 0;
 }
 
 .appearance { display: flex; align-items: center; gap: var(--tpl-stamp-appearance-gap); min-width: 0; }
