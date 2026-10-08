@@ -543,7 +543,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
     )
   }
 
-  /* ───── 詳細（pQ4fH）：店のテンプレートの詳細と同じ形に「配った先」と［アカウントへ配る］ ───── */
+  /* ───── 詳細（pQ4fH）：店のテンプレートの詳細と同じ形に「配った先」と［配る］ ───── */
   if (stage === 'detail' && detail) {
     const listRow = [...(kindRows ?? []), ...templates].find((item) => item.id === detail.template.id) as HqTemplateListItem | undefined
     return (
@@ -637,7 +637,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
 
   /*
    * ───── リッチメニュー：店のリッチメニューの作る画面（①〜④）を使い、④を「配る」（配るアカウント）にする（B-36）─────
-   * 絵：① gobhu・② egdGx・③ K0gu1・④ gQabc。手順の間は画面の中に持ち、［下書きを保存］［アカウントへ配る］で一度に保存する。
+   * 絵：① gobhu・② egdGx・③ K0gu1・④ gQabc。手順の間は画面の中に持ち、［下書きを保存］［保存する］で一度に保存する。
    * 自由に置いた面・シナリオの参照など、作る画面の形に戻せない古い中身は今の画面（下）で直す。
    */
   const menuSeed = (() => {
@@ -753,7 +753,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
       </>
     return (
       <PageFrame kind="wizard" boardId="X4JcOf">
-        <PageHeading title={type === 'template' ? editTitle : editTitle} description="保存したひな形は、一覧の「アカウントへ配る」で各 LINE アカウントへ配ります。" />
+        <PageHeading title={type === 'template' ? editTitle : editTitle} description="保存したひな形は、一覧の「配る」で各 LINE アカウントへ配ります。" />
         <div className={styles.body}>
           {notices}
           {type === 'template' && 'template' in definition ? (

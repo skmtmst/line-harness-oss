@@ -5,9 +5,9 @@
  * 絵：テンプレート i0Ao0R（V8.pen の行「統括」）・LRc93（V8-B 版）、回答フォーム wZPua、友だち属性 DzdC3、リッチメニュー noVq4。
  *
  * 店の一覧（src/v8/templates/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・種類のタブ・フォルダの列・表・ページ送り）・
- * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「アカウントへ配る」口だけ：
+ * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「配る」口だけ：
  *   - 表の「使っている所」の代わりに「配布先」（N アカウント・まだ配っていない）
- *   - 行の［アカウントへ配る］（行の「…」にも同じ項目）
+ *   - 全種類の行の右端「…」の左に［配る］（共通部品 RowQuickAction。「…」の中にも同じ項目。オーナー 2026-10-08）
  *   - 数の帯は配ったアカウントの数
  * 読み書き（一覧・分類・複製・削除・配る）は呼ぶ側（console.tsx）が今までどおり持つ。ここは見せ方と押した知らせだけ。
  */
@@ -30,7 +30,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Pagination from '@/components/shared/pagination'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Select from '@/components/shared/select'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -265,7 +265,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   }
 
   const rowMenu = (row: HqTemplate): ActionMenuItem[] => [
-    { id: 'distribute', label: 'アカウントへ配る', icon: <Send size={14} aria-hidden="true" />, onSelect: () => onDistribute(row) },
+    { id: 'distribute', label: '配る', icon: <Send size={14} aria-hidden="true" />, onSelect: () => onDistribute(row) },
     { id: 'edit', label: '編集する', icon: <Pencil size={14} aria-hidden="true" />, onSelect: () => onEdit(row) },
     { id: 'duplicate', label: '複製する', icon: <Copy size={14} aria-hidden="true" />, onSelect: () => onDuplicate(row) },
     { id: 'remove', label: '削除する', icon: <Trash2 size={14} aria-hidden="true" />, tone: 'danger', dividerBefore: true, onSelect: () => onRemove(row) },
@@ -293,12 +293,12 @@ export default function HqStoreList(props: HqStoreListProps) {
 
   /*
    * 種類ごとの列（店の同じ機能の一覧と同じ並び）。違いは「配布先」の列だけ。
-   *   テンプレート i0Ao0R：種類・公開・配布先・今月送った数・更新・「…」（［アカウントへ配る］は「…」の中）
-   *   友だち属性 DzdC3：人数・付け方・配布先・「…」（人数は API-18 の配った先で付いている友だちの合計）
-   *   リッチメニュー noVq4：順・誰に出すか・状態・配布先・今月押された・「…」（API-18 の順・誰に出すか・配った先の押された数）
-   *   回答フォーム wZPua：状態・配布先・更新・［アカウントへ配る］と「…」
+   *   テンプレート i0Ao0R：種類・公開・配布先・今月送った数・更新・［配る］・「…」
+   *   友だち属性 DzdC3：人数・付け方・配布先・［配る］・「…」（人数は API-18 の配った先で付いている友だちの合計）
+   *   リッチメニュー noVq4：順・誰に出すか・状態・配布先・今月押された・［配る］・「…」（API-18 の順・誰に出すか・配った先の押された数）
+   *   回答フォーム wZPua：状態・配布先・更新・［配る］・「…」
+   * ［配る］の列は見出しが空の幅60（絵の「列 配る」）、「…」との間は 16。閲覧のみ（配れない人）には列ごと出さない。
    */
-  const rowButton = true
   const rankOf = new Map(type === 'rich_menu'
     ? [...rows].sort((a, b) => (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'ja')).map((row, index) => [row.id, index + 1] as const)
     : [])
@@ -375,13 +375,15 @@ export default function HqStoreList(props: HqStoreListProps) {
           {type === 'rich_menu' ? <col className={storeStyles.colSelect} /> : null}
           <col />
           {columns.map((column) => column.col)}
-          <col className={type === 'form' ? hqStyles.colFormActions : rowButton ? hqStyles.colHqActions : storeStyles.colMenu} />
+          {canEdit ? <col className={storeStyles.colHqDistribute} /> : null}
+          <col className={storeStyles.colMenu} />
         </colgroup>
         <thead>
           <TableHeadRow>
             {type === 'rich_menu' ? <Th className={storeStyles.headCell}>順</Th> : null}
             <Th className={storeStyles.headCell}>{words.column}</Th>
             {columns.map((column) => <Th key={column.key} className={storeStyles.headCell}>{column.head}</Th>)}
+            {canEdit ? <Th aria-label="配る" /> : null}
             <Th aria-label="操作" />
           </TableHeadRow>
         </thead>
@@ -405,17 +407,17 @@ export default function HqStoreList(props: HqStoreListProps) {
                   sub={<span className={`${storeStyles.cellSub} ${storeStyles.dotIndent}`} title={sub}>{sub}</span>}
                 />
                 {columns.map((column) => column.cell(row))}
+                {canEdit ? (
+                  <Td className={`${storeStyles.menuCell} ${storeStyles.hqDistributeCell}`}>
+                    <div className={storeStyles.menuBox}>
+                      <RowQuickAction label="配る" ariaLabel={`${row.name}を配る`} icon={<Send aria-hidden="true" />} disabled={busy} onClick={() => onDistribute(row)} />
+                    </div>
+                  </Td>
+                ) : null}
                 <Td className={storeStyles.menuCell}>
                   <div className={`${storeStyles.menuBox} ${storeStyles.hqActions}`}>
                     {canEdit ? (
-                      <>
-                        {rowButton ? (
-                          <Button type="button" size="compact" disabled={busy} onClick={() => onDistribute(row)} aria-label={`${row.name}をアカウントへ配る`}>
-                            <Send size={14} aria-hidden="true" />配る
-                          </Button>
-                        ) : null}
-                        <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
-                      </>
+                      <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
                     ) : null}
                   </div>
                 </Td>
