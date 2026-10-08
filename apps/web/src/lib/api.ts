@@ -1,3 +1,4 @@
+import type { BookingMenuReorderRequest, BookingMenuReorderResponse } from '@line-crm/shared'
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
 import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
@@ -14896,6 +14897,10 @@ export const bookingApi = {
       method: 'POST',
       headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
       body: JSON.stringify(body),
+    }),
+  reorderMenus: (accountId: string, body: BookingMenuReorderRequest) =>
+    fetchApi<BookingMenuReorderResponse>(withAccount('/api/booking/admin/menus/order', accountId), {
+      method: 'PUT', body: JSON.stringify(body),
     }),
   updateMenu: (accountId: string, id: string, expectedVersion: number, body: Partial<BookingMenu>) =>
     fetchApi<{ ok: true; version: number }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {
