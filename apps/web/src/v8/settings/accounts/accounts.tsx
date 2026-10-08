@@ -45,7 +45,6 @@ import {
   parentName,
   webhookLabel,
 } from './view'
-import frame from '../sa-frame.module.css'
 import styles from './accounts.module.css'
 
 const TITLE = 'LINEアカウント'
@@ -177,7 +176,7 @@ export default function AccountsV8() {
   ) : undefined
 
   return (
-    <div className={frame.screen}>
+    <>
       <SettingsPage boardId="V7vn3" title={TITLE} description={DESCRIPTION} actions={headActions} contentLayout="wide" navigation={<SettingsInnerNav inline />}>
         {notice ? (
           <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} onClose={() => setNotice(null)} />
@@ -319,7 +318,7 @@ export default function AccountsV8() {
         onConfirm={() => void runRestore()}
       />
       {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
-    </div>
+    </>
   )
 }
 

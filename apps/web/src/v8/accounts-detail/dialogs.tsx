@@ -16,6 +16,7 @@ import { formatNumber } from '@/lib/format'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
@@ -45,7 +46,8 @@ function Frame({ open, node, width, top, title, busy, onCancel, actions, childre
       designTop={top}
       busy={busy}
       onCancel={onCancel}
-      footer={actions ? <div className={styles.footer}>{actions}</div> : undefined}
+      layout="account-inset"
+      footer={actions}
     >
       <div className={styles.body}>{children}</div>
     </Dialog>
@@ -150,11 +152,11 @@ export function StopDialog({ account, onClose, onDone }: {
           </Button>
         </>}
       >
-        <p className={styles.warnBand}>
+        <Notice tone="warn" presentation="account-note" icon={null}>
           {stopping
             ? '止めているあいだ、配信も受信もしません。予約した配信は送られません。'
             : '再開の前にLINEとの接続を確かめます。止めているあいだに予約していた配信は、自動で送り直しません。'}
-        </p>
+        </Notice>
         <Field label={stopping ? '止める理由（必須）' : '再開する理由（必須）'} htmlFor={inputId} error={fieldErrors.reason}>
           <TextField
             id={inputId}
@@ -260,7 +262,7 @@ export function ArchiveDialog({ account, onClose, onDone }: {
         </Button>
       </>}
     >
-      <p className={styles.infoBand}>一覧から外します。送受信は止まり、友だちと履歴は残ります。</p>
+      <Notice tone="info" presentation="account-note" icon={null}>一覧から外します。送受信は止まり、友だちと履歴は残ります。</Notice>
       <Field label="アーカイブの理由（任意）" htmlFor={reasonId}>
         <TextField
           id={reasonId}
@@ -274,16 +276,14 @@ export function ArchiveDialog({ account, onClose, onDone }: {
       {method === 'totp' ? (
         <div className={styles.verify}>
           <p className={styles.sub} id={secretId}>本人確認（認証アプリの6桁）</p>
-          <div className={styles.otp}>
-            <OtpInput value={secret} onChange={setSecret} onComplete={(entered) => void run(entered)} visualLabel="認証コード（6桁）" labelledBy={secretId} invalid={Boolean(error)} busy={busy} />
-          </div>
+          <OtpInput value={secret} onChange={setSecret} onComplete={(entered) => void run(entered)} visualLabel="認証コード（6桁）" labelledBy={secretId} invalid={Boolean(error)} busy={busy} />
         </div>
       ) : method === 'password' ? (
         <Field label="本人確認（パスワード）" htmlFor={secretId}>
           <TextField id={secretId} type="password" autoComplete="current-password" value={secret} onChange={(event) => setSecret(event.target.value)} disabled={busy} />
         </Field>
       ) : (
-        <p className={styles.infoBand}>本人確認の方法（2段階認証・パスワード）が登録されていません。そのままアーカイブします。</p>
+        <Notice tone="info" presentation="account-note" icon={null}>本人確認の方法（2段階認証・パスワード）が登録されていません。そのままアーカイブします。</Notice>
       )}
       <ErrorLine message={error} />
     </Frame>
@@ -339,7 +339,7 @@ export function RestoreDialog({ account, onClose, onDone }: {
           <Button type="button" variant="primary" onClick={() => void run()} disabled={busy} busy={busy} busyLabel="処理中…">アーカイブから戻す</Button>
         </>}
       >
-        <p className={styles.infoBand}>一覧へ戻します。戻った直後は「止まっている」状態です。送受信を始めるには、接続を確かめてから「送受信を再開する」を使います。</p>
+        <Notice tone="info" presentation="account-note" icon={null}>一覧へ戻します。戻った直後は「止まっている」状態です。送受信を始めるには、接続を確かめてから「送受信を再開する」を使います。</Notice>
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
@@ -460,7 +460,7 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
             <TextField id={tokenId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={token} onChange={(event) => { setToken(event.target.value); setFieldErrors({}) }} disabled={busy} />
           </Field>
         ) : null}
-        <p className={styles.infoBand}>保存のときに本人確認が出ます。差し替えたあと、接続を確かめます。</p>
+        <Notice tone="info" presentation="account-note" icon={null}>保存のときに本人確認が出ます。差し替えたあと、接続を確かめます。</Notice>
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
@@ -611,9 +611,9 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         <div className={styles.field}>
           <div className={styles.labelRow}>
             <label className={styles.label} htmlFor={ids.og}>ブランド設定（OGP）</label>
-            <button type="button" className={styles.more} aria-expanded={showOgMore} onClick={() => setShowOgMore((value) => !value)}>
+            <Button type="button" variant="text" presentation="account-inline" aria-expanded={showOgMore} onClick={() => setShowOgMore((value) => !value)}>
               {showOgMore ? '説明と画像を閉じる' : '説明と画像も変える'}
-            </button>
+            </Button>
           </div>
           <TextField id={ids.og} placeholder="共有したときに出る名前" value={ogSiteName} onChange={(event) => setOgSiteName(event.target.value)} disabled={busy} />
         </div>
@@ -657,7 +657,7 @@ export function TestRecipientsDialog({ accountId, open, onClose }: { accountId: 
       title="テスト送信先"
       onCancel={onClose}
     >
-      <p className={styles.infoBand}>リマインダや配信のテスト送信が届く先です。変更はこのアカウントだけに効きます。</p>
+      <Notice tone="info" presentation="account-note" icon={null}>リマインダや配信のテスト送信が届く先です。変更はこのアカウントだけに効きます。</Notice>
       <div className={styles.fill}><TestRecipientsSetting accountId={accountId} /></div>
     </Frame>
   )

@@ -23,6 +23,7 @@ import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
 import {
@@ -262,10 +263,7 @@ export default function AccountDetailV8() {
         navigation={<SettingsInnerNav inline />}
       >
         {viewer ? (
-          <p className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </p>
+          <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Notice>
         ) : null}
         <div className={styles.columns}>
           <div className={styles.main}>
@@ -277,7 +275,7 @@ export default function AccountDetailV8() {
                 {parentValue ?? (
                   <span className={styles.inline}>
                     読み込めませんでした
-                    <button type="button" className={styles.textButton} onClick={() => void loadAll()}>もう一度読み込む</button>
+                    <Button type="button" variant="text" presentation="account-inline" onClick={() => void loadAll()}>もう一度読み込む</Button>
                   </span>
                 )}
               </Row>
@@ -286,7 +284,7 @@ export default function AccountDetailV8() {
                 <span className={styles.inline}>
                   <span className={styles.truncate} title={recipientValue}>{recipientValue}</span>
                   {canManage ? (
-                    <button type="button" className={styles.textButton} onClick={() => setRecipientsOpen(true)}>変える</button>
+                    <Button type="button" variant="text" presentation="account-inline" onClick={() => setRecipientsOpen(true)}>変える</Button>
                   ) : null}
                 </span>
               </Row>
@@ -351,7 +349,7 @@ export default function AccountDetailV8() {
                   ) : null}
                 </div>
                 {skipped === null ? (
-                  <p className={styles.muted}>読み込んでいます…</p>
+                  <ListState kind="loading" />
                 ) : skipped === 'error' ? (
                   <p className={styles.muted}>送らなかった配信の一覧を読み込めませんでした。詳細のほかの欄はそのまま使えます。</p>
                 ) : skipped.length === 0 ? (

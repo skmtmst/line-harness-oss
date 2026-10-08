@@ -11,8 +11,8 @@
  */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
-  ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CircleCheck, CircleDashed, CircleDot, CircleX,
-  Copy, Download, ExternalLink, Lock, CircleHelp, Plug, QrCode, ShieldCheck, Star, RotateCw, Users, Activity,
+  ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CircleCheck, CircleDashed, CircleX,
+  Copy, Download, ExternalLink, Lock, CircleHelp, Plug, QrCode, ShieldCheck, RotateCw, Users, Activity,
 } from 'lucide-react'
 import { api, type FollowerImportState, type LineAccountConnectData, type LineAccountTag } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
@@ -22,6 +22,8 @@ import { Steps } from '@/components/templates/steps'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import StickyBar from '@/components/shared/sticky-bar'
+import { TagToggle } from '@/components/shared/tag-pill'
 import { DataTable, Tr, Td } from '@/components/shared/table'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
@@ -453,30 +455,30 @@ export default function AccountRegisterV8() {
                 <fieldset className={styles.fieldset}>
                   <legend className={styles.panelTitle}>アカウントの用意方法</legend>
                   <div className={styles.radios}>
-                    <Radio className={styles.radio} name="account-method-v8" value="existing" checked={accountMethod === 'existing'} onChange={() => setAccountMethod('existing')}>既存の公式アカウントを使う</Radio>
-                    <Radio className={styles.radio} name="account-method-v8" value="new" checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')}>新しく公式アカウントを作成</Radio>
+                    <Radio name="account-method-v8" value="existing" checked={accountMethod === 'existing'} onChange={() => setAccountMethod('existing')}>既存の公式アカウントを使う</Radio>
+                    <Radio name="account-method-v8" value="new" checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')}>新しく公式アカウントを作成</Radio>
                   </div>
                 </fieldset>
-                <div className={styles.noteBox}>
+                <Card className={styles.noteBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
                   <p>{accountMethod === 'existing'
                     ? 'LINE公式アカウントを作成してから、同じプロバイダー内に Messaging API と LINE Login のチャネルを用意します。'
                     : 'LINE公式アカウントを作成してから、同じプロバイダー内に Messaging API と LINE Login のチャネルを用意します。新しく作るときは、先に公式アカウントを作ります。'}</p>
                   <p>・Messaging API と LINE Login は同じプロバイダーで作成してください<br />・Webhook の利用は LINE Developers でオンにしてください</p>
-                </div>
+                </Card>
                 <div className={styles.buttonRow}>
                   <Button href="https://manager.line.biz/" target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />LINE公式アカウントを作る</Button>
                   <Button href="https://developers.line.biz/console/" target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />LINE Developersを開く</Button>
                   <Button href={`${MANUAL}#m1`} target="_blank" rel="noreferrer"><BookOpen size={15} aria-hidden="true" />全手順を見る</Button>
                 </div>
               </Card>
-              <aside className={styles.aside} aria-label="この5段でやること">
+              <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" role="complementary" aria-label="この5段でやること">
                 <h2>この5段でやること</h2>
                 <p>① LINE準備：公式アカウントとチャネルを用意</p>
                 <p>② チャネル設定：チャネル ID とシークレット 4項目</p>
                 <p>③ 基本情報：表示名・LINE ID・担当範囲</p>
                 <p>④ 接続確認：5つの確認がすべて通るまで登録しない</p>
                 <p>⑤ 完了：既存の友だちの取り込み</p>
-              </aside>
+              </Card>
             </div>
           )}
 
@@ -507,11 +509,11 @@ export default function AccountRegisterV8() {
                   <Button href={`${MANUAL}#m1`} target="_blank" rel="noreferrer"><CircleHelp size={15} aria-hidden="true" />取得方法を見る</Button>
                 </div>
               </Card>
-              <aside className={styles.aside} aria-label="どこにある？">
+              <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" role="complementary" aria-label="どこにある？">
                 <h2>どこにある？</h2>
                 <p>チャネル ID とシークレットは、LINE Developers → プロバイダー → チャネル → 「チャネル基本設定」にあります。</p>
                 <p>登録済みのチャネル ID を入れると「このチャネルIDは登録済みです」と出て先へ進めません。</p>
-              </aside>
+              </Card>
             </div>
           )}
 
@@ -533,9 +535,7 @@ export default function AccountRegisterV8() {
                   {(tags ?? []).map((tag) => {
                     const on = form.tagIds.includes(tag.id)
                     return (
-                      <button key={tag.id} type="button" className={styles.tagChip} aria-pressed={on} onClick={() => toggleTag(tag.id)}>
-                        {on ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />}{tag.name}
-                      </button>
+                      <TagToggle key={tag.id} name={tag.name} selected={on} onToggle={() => toggleTag(tag.id)} />
                     )
                   })}
                   {tagInputOpen ? (
@@ -548,10 +548,10 @@ export default function AccountRegisterV8() {
                   )}
                 </div>
               </div>
-              <div className={styles.infoBox}>
+              <Card className={styles.infoBox} layout="horizontal" surface="muted" corner="control" contentPadding="var(--tpl-htn-info-pad)" gap="var(--tpl-htn-panel-gap)">
                 <p>LIFF は登録のときに自動で作ります。親アカウントと担当範囲は、登録のあと「設定」と「メンバー」で決めます。</p>
-                <button type="button" className={styles.linkButton} aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>{moreOpen ? '閉じる' : 'いま決める'}</button>
-              </div>
+                <Button type="button" variant="text" presentation="registration-inline" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>{moreOpen ? '閉じる' : 'いま決める'}</Button>
+              </Card>
               {moreOpen && (
                 <div className={styles.moreBox}>
                   <div className={styles.twoCol}>
@@ -568,10 +568,10 @@ export default function AccountRegisterV8() {
               )}
               <div className={styles.field}>
                 <span className={styles.groupLabel}>Callback URL</span>
-                <div className={styles.endpoint}>
+                <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--tpl-htn-endpoint-pad)" gap="var(--tpl-htn-panel-gap)">
                   <span className={styles.endpointValue} title={callbackUrl}>{callbackUrl}</span>
                   <CopyButton value={callbackUrl} />
-                </div>
+                </Card>
               </div>
             </Card>
           )}
@@ -582,22 +582,22 @@ export default function AccountRegisterV8() {
                 <ol className={styles.checkList} aria-label="接続確認項目">
                   {checkRows.map((row) => <CheckRow key={row.key} row={row} />)}
                 </ol>
-                <div className={styles.importBox}>
+                <Card className={styles.importBox} surface="inset" contentPadding="var(--tpl-htn-import-pad)" gap="var(--tpl-htn-panel-gap)">
                   <Toggle checked={form.importFriends} label="既存の友だちの取り込み" onChange={(next) => update('importFriends', next)} />
                   <span className={styles.importText}>
                     <strong>既存の友だちの取り込み</strong>
                     <span>登録のあと、いまの友だちを musubo に取り込みます（数分かかります）</span>
                   </span>
-                </div>
+                </Card>
               </div>
-              <aside className={styles.aside} aria-label="登録内容を確認する">
+              <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" role="complementary" aria-label="登録内容を確認する">
                 <h2>登録内容を確認する</h2>
                 <p>{`表示名：${form.name.trim() || (connection?.displayName ? `${connection.displayName}（LINEから取得）` : 'LINEから取得')}`}</p>
                 <p>{`LINE ID：${form.lineId || '接続確認で取得します'}`}</p>
                 <p>{`親アカウント：${parentName ?? 'なし'}`}</p>
                 <p>{`タグ：${selectedTags.length > 0 ? selectedTags.map((tag) => tag.name).join('・') : 'なし'}`}</p>
                 <p>{`担当：${staffNames.length > 0 ? staffNames.join('・') : 'なし'}`}</p>
-              </aside>
+              </Card>
             </div>
           )}
 
@@ -608,7 +608,7 @@ export default function AccountRegisterV8() {
                 <CircleCheck size={22} aria-hidden="true" />
                 {`${(connection.displayName ?? form.name.trim()) || 'LINEアカウント'}${connection.basicId ? `（${connection.basicId}）` : ''}を登録しました`}
               </p>
-              <div className={styles.progressBox}>
+              <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
                 {connection.followerImport.capability === 'available' && form.importFriends ? <>
                   <div className={styles.progressHead}>
                     <strong>{importingIds ? '既存の友だちを取り込んでいます' : '既存の友だちを取り込みました'}</strong>
@@ -622,12 +622,12 @@ export default function AccountRegisterV8() {
                   <p className={styles.progressNote}>既存の友だちの取り込みはオフになっています。取り込むときはアカウントの詳細から始めてください。</p>
                 ) : null}
                 <p className={styles.progressNote}>LINE の都合で取り込めないアカウントでは、友だちが話しかけた順に登録されます。</p>
-              </div>
+              </Card>
               {connection.remainingActions.length > 0 && (
-                <div className={styles.noteBox}>
+                <Card className={styles.noteBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
                   <p><strong>残りの手作業</strong></p>
                   <ul>{connection.remainingActions.map((item) => <li key={item}>{item}</li>)}</ul>
-                </div>
+                </Card>
               )}
               <p className={styles.groupLabel}>次にすること</p>
               <div className={styles.buttonRow}>
@@ -651,8 +651,7 @@ export default function AccountRegisterV8() {
           <Notice tone="danger" message={error} onClose={() => setError('')} />
         ) : null}
 
-        <div className={styles.footer}>
-          {createdId ? (
+        <StickyBar presentation="account-registration" actions={createdId ? (
             <Button href="/hq" variant="primary"><ArrowLeft size={15} aria-hidden="true" />統括コンソールへ戻る</Button>
           ) : currentStep === 4 ? <>
             <Button type="button" disabled={busy} onClick={() => { setError(''); setCurrentStep(3) }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
@@ -662,8 +661,7 @@ export default function AccountRegisterV8() {
               ? <Button href="/hq">キャンセル</Button>
               : <Button type="button" disabled={busy} onClick={() => { setError(''); setCurrentStep((currentStep - 1) as StepNumber) }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>}
             <Button type="submit" variant="primary" disabled={busy}><ArrowRight size={15} aria-hidden="true" />次へ</Button>
-          </>}
-        </div>
+          </>} />
       </form>
 
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
