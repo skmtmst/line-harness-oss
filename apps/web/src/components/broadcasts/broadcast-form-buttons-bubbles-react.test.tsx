@@ -13,9 +13,11 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 
+const scope = vi.hoisted(() => ({ account: 'acc-1', recent: vi.fn(async () => ({success: true, data: [] as Array<Record<string, string>>})) }))
 const createApi = vi.hoisted(() => vi.fn())
 const updateApi = vi.hoisted(() => vi.fn())
 const getApi = vi.hoisted(() => vi.fn())
+const templatesApi = vi.hoisted(() => vi.fn(async () => ({ success: true, data: [{ id: 't1', name: 'お礼', messageType: 'text', messageContent: '追加する本文', kind: 'message', accountId: 'acc-1', publishedAt: '2026-10-01', publishedVersion: 1 }] })))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -29,16 +31,18 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         create: createApi,
         update: updateApi,
         get: getApi,
-        list: async () => ({ success: true, data: [] }),
+        list: scope.recent,
         preflight: async () => ({ success: true, data: { audienceCount: 10 } }),
         previewCount: async () => ({ success: true, data: { count: 10 } }),
       },
+      staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
+      featureSettings: { visibility: async () => ({ success: true, data: {} }) },
       folders: { list: emptyList },
       scenarios: { list: emptyList },
       commonVars: { list: emptyList },
       friendFields: { list: emptyList },
       broadcastMessageAssets: { list: emptyList, upload: emptyList },
-      templates: { list: emptyList },
+      templates: { list: templatesApi },
       commonActions: { resources: async () => ({ success: true, data: [] }) },
       accountSettings: { getTestRecipients: async () => ({ success: true, data: [] }) },
     },
@@ -56,7 +60,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: scope.account, loading: false }),
 }))
 
 vi.hoisted(() => {
@@ -253,4 +257,40 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       unmount()
     }
   })
+})
+
+it('WEB256: テンプレートを足しても3通目以降の入力を捨てない', async () => {
+  await renderForm()
+  try {
+    for (let i = 0; i < 3; i++) { await act(async () => buttonByText('メッセージを追加する')!.click()); await flush() }
+    await act(async () => textareas().forEach((el, i) => setNativeValue(el, `元の本文${i}`)))
+    const choice = container.querySelector<HTMLInputElement>('input[value="template"]')!
+    await act(async () => choice.click()); await flush()
+    await act(async () => (container.querySelector('.broadcast-template-row') as HTMLButtonElement).click()); await flush()
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.includes('このテンプレートを使用'))!.click()); await flush()
+    expect(textareas().map(t => t.value)).toEqual(['元の本文0', '元の本文1', '元の本文2', '元の本文3', '追加する本文'])
+  } finally { unmount() }
+})
+
+it('WEB257: 最近の配信は切替前の遅い応答で置き換わらない', async () => {
+ let resolve!: (value: {success: boolean; data: Array<Record<string, string>>})=>void
+ scope.account='acc-1'
+ scope.recent.mockImplementationOnce(()=>new Promise(done=>{resolve=done})).mockResolvedValue({success:true,data:[{id:'b',title:'新しい配信',messageType:'text',messageContent:'新',status:'sent'}]})
+ await renderForm()
+ scope.account='acc-2'
+ await act(async()=>root.render(<BroadcastForm tags={[]} onSuccess={()=>{}} onCancel={()=>{}}/>));await flush()
+ expect(container.textContent).toContain('新しい配信')
+ await act(async()=>resolve({success:true,data:[{id:'old',title:'古い配信',messageType:'text',messageContent:'古',status:'sent'}]}))
+ expect(container.textContent).not.toContain('古い配信')
+ unmount();scope.account='acc-1';scope.recent.mockResolvedValue({success:true,data:[]})
+})
+it('WEB259: テンプレートを開いただけでは確認したと表示しない',async()=>{
+ await renderForm()
+ const picker=[...container.querySelectorAll('button')].find(button=>button.textContent?.includes('テンプレートから選ぶ'))!
+ await act(async()=>picker.click());await flush()
+ const template=[...document.querySelectorAll('button')].find(button=>button.textContent?.includes('お礼'))!
+ await act(async()=>template.click());await flush()
+ const dialog=document.querySelector('[role="dialog"]')!
+ expect(dialog.textContent).not.toContain('確認しました')
+ unmount()
 })

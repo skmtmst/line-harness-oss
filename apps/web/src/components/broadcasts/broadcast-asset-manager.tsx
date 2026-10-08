@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type BroadcastAssetKind, type BroadcastMessageAsset } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -45,6 +45,13 @@ function formatAssetBytes(bytes: number): string {
  */
 export default function BroadcastAssetManager({ kind, onChanged }: { kind: BroadcastAssetKind; onChanged?: () => void }) {
   const { selectedAccountId } = useAccount()
+  const scopeKey = `${selectedAccountId ?? ''}:${kind}`
+  const scopeRef = useRef(scopeKey)
+  scopeRef.current = scopeKey
+  const loadGeneration = useRef(0)
+  const editorGeneration = useRef(0)
+  const uploadGeneration = useRef(new Map<string, number>())
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [items, setItems] = useState<BroadcastMessageAsset[]>([])
   const [editing, setEditing] = useState<BroadcastMessageAsset | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -105,12 +112,23 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
   }
 
   const load = useCallback(async () => {
-    const res = await api.broadcastMessageAssets.list({ accountId: selectedAccountId || undefined, kind })
-    if (res.success) setItems(res.data)
-  }, [kind, selectedAccountId])
-  useEffect(() => { void load() }, [load])
+    const generation = ++loadGeneration.current
+    const key = scopeKey
+    setItems([])
+    setLoadState('loading')
+    try {
+      const res = await api.broadcastMessageAssets.list({ accountId: selectedAccountId || undefined, kind })
+      if (scopeRef.current !== key || loadGeneration.current !== generation) return
+      if (!res.success) throw new Error(res.error)
+      setItems(res.data)
+      setLoadState('ready')
+    } catch {
+      if (scopeRef.current === key && loadGeneration.current === generation) setLoadState('error')
+    }
+  }, [kind, selectedAccountId, scopeKey])
+  useEffect(() => { void load(); return () => { loadGeneration.current++ } }, [load])
 
-  const reset = useCallback(() => { setEditing(null); setShowForm(false); setName(''); setImageUrl(''); setImageFile(null); setDescription(''); setActionUrl(''); setCards([newCard()]); setMoreCard(true); setError('') }, [])
+  const reset = useCallback(() => { editorGeneration.current++; setEditing(null); setShowForm(false); setName(''); setImageUrl(''); setImageFile(null); setDescription(''); setActionUrl(''); setCards([newCard()]); setMoreCard(true); setError('') }, [])
   /*
    * 種類・LINEアカウントが切り替わったら、編集中の対象を離す。
    * 離さないと、別種類の一覧の上で前の素材の編集欄が残り、保存が
@@ -118,16 +136,29 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
    */
   useEffect(() => { reset() }, [reset, kind, selectedAccountId])
   const startEdit = (item: BroadcastMessageAsset) => {
+    editorGeneration.current++;
     setEditing(item); setShowForm(true); setName(item.name); setImageUrl(String(item.payload.imageUrl ?? '')); setImageFile(null); setDescription(String(item.payload.description ?? '')); setActionUrl(String(item.payload.actionUrl ?? ''))
-    if (kind === 'card_message' && Array.isArray(item.payload.cards)) setCards(item.payload.cards as CardDraft[])
+    if (kind === 'card_message' && Array.isArray(item.payload.cards)) setCards((item.payload.cards as CardDraft[]).map(card => ({...card, id: card.id || crypto.randomUUID()})))
     if (kind === 'card_message') setMoreCard(item.payload.moreCard !== false)
   }
   const upload = async (file: File, cardIndex?: number) => {
     if (!['image/jpeg','image/png'].includes(file.type) || file.size > 10 * 1024 * 1024) { setError('JPEG・PNG（10MB以下）を選択してください'); return }
-    const res = await api.broadcastMessageAssets.upload(file)
-    if (!res.success) { setError(res.error); return }
-    if (cardIndex === undefined) { setImageUrl(res.data.url); setImageFile({ name: file.name, size: file.size }) }
-    else setCards((current) => current.map((card, index) => index === cardIndex ? { ...card, imageUrl: res.data.url } : card))
+    const cardId = cardIndex === undefined ? null : cards[cardIndex]?.id
+    const key = scopeKey
+    const editor = editorGeneration.current
+    const target = cardId ?? 'main'
+    const generation = (uploadGeneration.current.get(target) ?? 0) + 1
+    uploadGeneration.current.set(target, generation)
+    const current = () => scopeRef.current === key && editorGeneration.current === editor && uploadGeneration.current.get(target) === generation
+    try {
+      const res = await api.broadcastMessageAssets.upload(file)
+      if (!current()) return
+      if (!res.success) { setError(res.error); return }
+      if (cardId === null) { setImageUrl(res.data.url); setImageFile({ name: file.name, size: file.size }) }
+      else setCards((items) => items.map(card => card.id === cardId ? { ...card, imageUrl: res.data.url } : card))
+    } catch {
+      if (current()) setError('画像をアップロードできませんでした。もう一度お試しください。')
+    }
   }
 
   const clearImage = () => { setImageUrl(''); setImageFile(null) }
@@ -196,7 +227,7 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
       {(kind === 'coupon' || kind === 'research') && <><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={kind === 'coupon' ? '特典内容・利用条件' : 'アンケートの説明'} className="w-full rounded-card border p-3 text-sm" rows={3}/><input value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder={kind === 'coupon' ? 'クーポンを開くURL' : '回答フォームURL'} className="w-full rounded-card border px-3 py-2.5 text-sm" /></>}
       {error && <p className="text-sm text-status-danger">{error}</p>}<div className="flex justify-end gap-2"><button onClick={reset} className="rounded-control border px-4 py-2 text-sm">キャンセル</button><Button variant="primary" className="px-5 py-2 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button></div></div>
     </section>}
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.id} className="rounded-card border border-hairline bg-canvas p-5 shadow-card"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="rounded-pill bg-accent-soft px-2 py-1 text-micro font-bold text-success">{meta.title}</span><h3 className="mt-3 truncate font-bold text-ink">{item.name}</h3><p className="mt-1 text-xs text-ink-faint">更新 {formatDateTime(item.updatedAt)}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="rounded-control border border-accent-border px-3 py-2 text-sm font-bold text-success">一斉配信で使う</a><button onClick={() => startEdit(item)} className="min-w-24 flex-1 rounded-control border px-3 py-2 text-sm font-bold">編集</button><button onClick={() => { setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId }) }} className="rounded-control border border-status-danger-border px-3 py-2 text-sm font-bold text-status-danger">削除する</button></div></article>)}{items.length === 0 && <div className="col-span-full rounded-card border border-dashed bg-canvas p-12 text-center text-sm text-ink-faint">まだ{meta.singular}テンプレートがありません。「{meta.singular}を作る」から追加してください。</div>}</div>
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.id} className="rounded-card border border-hairline bg-canvas p-5 shadow-card"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="rounded-pill bg-accent-soft px-2 py-1 text-micro font-bold text-success">{meta.title}</span><h3 className="mt-3 truncate font-bold text-ink">{item.name}</h3><p className="mt-1 text-xs text-ink-faint">更新 {formatDateTime(item.updatedAt)}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="rounded-control border border-accent-border px-3 py-2 text-sm font-bold text-success">一斉配信で使う</a><button onClick={() => startEdit(item)} className="min-w-24 flex-1 rounded-control border px-3 py-2 text-sm font-bold">編集</button><button onClick={() => { setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId }) }} className="rounded-control border border-status-danger-border px-3 py-2 text-sm font-bold text-status-danger">削除する</button></div></article>)}{loadState === 'loading' && <p role="status">テンプレートを読み込んでいます…</p>}{loadState === 'error' && <div role="alert">テンプレートを読み込めませんでした。<Button onClick={() => void load()}>再読み込み</Button></div>}{loadState === 'ready' && items.length === 0 && <div className="col-span-full rounded-card border border-dashed bg-canvas p-12 text-center text-sm text-ink-faint">まだ{meta.singular}テンプレートがありません。「{meta.singular}を作る」から追加してください。</div>}</div>
 
     {/*
       取り消せない操作なので `destructive` を付ける。消したテンプレートは

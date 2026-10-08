@@ -278,18 +278,26 @@ export function videoPreviewProblem(value: unknown): string | null {
 export function MediaUpload({ bubble, onChange, lineAccountId }: { bubble: BroadcastBubble; onChange: (content: Record<string, unknown>) => void; lineAccountId?: string | null }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const latest = useRef({ bubble, onChange, lineAccountId })
+  latest.current = { bubble, onChange, lineAccountId }
+  const uploadSeq = useRef(0)
+  useEffect(() => { setBusy(false); setError(''); return () => { uploadSeq.current++ } }, [bubble.id, bubble.type, lineAccountId])
   const isVideo = bubble.type === 'video' || bubble.type === 'rich_video'
   const upload = async (file: File) => {
     const allowed = isVideo ? ['video/mp4'] : ['image/jpeg', 'image/png']
     const max = isVideo ? 200 * 1024 * 1024 : 10 * 1024 * 1024
     if (!allowed.includes(file.type)) { setError(isVideo ? 'MP4のみ対応しています' : 'JPEG・PNGのみ対応しています'); return }
     if (file.size > max) { setError(mediaTooLargeMessage(isVideo, file.size)); return }
+    const seq = ++uploadSeq.current
+    const subject = { id: bubble.id, type: bubble.type, lineAccountId }
+    const isCurrent = () => uploadSeq.current === seq && latest.current.bubble.id === subject.id && latest.current.bubble.type === subject.type && latest.current.lineAccountId === subject.lineAccountId
     setBusy(true); setError('')
     try {
       const res = await api.broadcastMessageAssets.upload(file, lineAccountId)
+      if (!isCurrent()) return
       if (!res.success) { setError(res.error); return }
-      onChange({ ...bubble.content, originalContentUrl: res.data.url, previewImageUrl: isVideo ? (bubble.content.previewImageUrl ?? '') : res.data.url })
-    } catch { setError('アップロードに失敗しました。通信を確かめて、もう一度お試しください。') } finally { setBusy(false) }
+      latest.current.onChange({ ...latest.current.bubble.content, originalContentUrl: res.data.url, previewImageUrl: isVideo ? (latest.current.bubble.content.previewImageUrl ?? '') : res.data.url })
+    } catch { if (isCurrent()) setError('アップロードに失敗しました。通信を確かめて、もう一度お試しください。') } finally { if (isCurrent()) setBusy(false) }
   }
   return <div className="space-y-3">
     <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-card border-2 border-dashed border-hairline bg-canvas-sunken text-sm text-ink-faint hover:border-accent">
@@ -666,6 +674,8 @@ export default function BroadcastForm({
   // 独立審査(指摘4): テンプレート読み込みの世代照合と選択中アカウントの記録。
   const templateLoadGenerationRef = useRef(createLoadGeneration())
   const selectedAccountIdRef = useRef(selectedAccountId)
+  const accountGenerationRef = useRef(0)
+  if (selectedAccountIdRef.current !== selectedAccountId) accountGenerationRef.current += 1
   selectedAccountIdRef.current = selectedAccountId
   const searchParams = useSearchParams()
   const appliedDuplicateFrom = useRef(false)
@@ -674,7 +684,7 @@ export default function BroadcastForm({
    * 開き直したとき、下書きの中身をフォームへ戻す。
    * `editingDraft` が無い間は下の描画を読み込み表示へ切り替える。
    */
-  const appliedDraftFrom = useRef(false)
+  const appliedDraftFrom = useRef<string | null>(null)
   const [editingDraft, setEditingDraft] = useState<ApiBroadcast | null>(null)
   const [draftError, setDraftError] = useState('')
   const [title, setTitle] = useState(visualQaAugustCampaign ? '8月キャンペーンのお知らせ' : '')
@@ -870,7 +880,10 @@ export default function BroadcastForm({
     const sourceId = searchParams.get('duplicateFrom')?.trim()
     if (!sourceId) return
     appliedDuplicateFrom.current = true
+    const generation = accountGenerationRef.current
+    const requestAccountId = selectedAccountIdRef.current
     void api.broadcasts.get(sourceId).then((res) => {
+      if (selectedAccountIdRef.current !== requestAccountId || generation !== accountGenerationRef.current) return
       if (!res.success || !res.data) {
         setError('元の配信を読み込めませんでした。作り直す配信を選び直してください。')
         return
@@ -880,6 +893,7 @@ export default function BroadcastForm({
       setBubbles(copy.bubbles)
       setDeliveryMethod('duplicate')
     }).catch(() => {
+      if (generation !== accountGenerationRef.current) return
       setError('元の配信を読み込めませんでした。作り直す配信を選び直してください。')
     })
   }, [searchParams])
@@ -894,11 +908,17 @@ export default function BroadcastForm({
    */
   useEffect(() => {
     // アカウントが確定する前に照合すると「別アカウントの下書き」と誤判定する。
-    if (appliedDraftFrom.current || accountLoading) return
+    if (accountLoading) return
     const draftId = searchParams.get('draft')?.trim()
     if (!draftId) return
-    appliedDraftFrom.current = true
+    const restoreKey = `${draftId}:${selectedAccountId}`
+    if (appliedDraftFrom.current === restoreKey) return
+    appliedDraftFrom.current = restoreKey
+    setDraftError('')
+    const generation = accountGenerationRef.current
+    const requestAccountId = selectedAccountIdRef.current
     void api.broadcasts.get(draftId).then((res) => {
+      if (selectedAccountIdRef.current !== requestAccountId || generation !== accountGenerationRef.current) return
       if (!res.success || !res.data) {
         setDraftError('下書きを読み込めませんでした。一覧から開き直してください。')
         return
@@ -933,8 +953,8 @@ export default function BroadcastForm({
       setAfterActionVersionId(draft.afterActionVersionId ?? '')
       setFolderId(draft.folderId ?? '')
       setMeasureOpens(draft.measureOpens ?? true)
-      const spread = Number(draft.draftPayload?.stealthSpreadMinutes ?? 0)
-      if (Number.isFinite(spread) && spread > 0) setSpreadMinutes(String(spread))
+      const spread = Number(draft.draftPayload?.stealthSpreadMinutes ?? 30)
+      if (Number.isFinite(spread) && spread >= 0) setSpreadMinutes(String(spread))
 
       // 吹き出し。形が読めないときだけ、従来の平文本文から1枚作る。
       const savedBubbles = draft.messageBubbles?.filter((bubble): bubble is BroadcastBubble => (
@@ -999,6 +1019,7 @@ export default function BroadcastForm({
       // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★V7 §5 未保存判定）。
       cleanFingerprintRef.current = null
     }).catch(() => {
+      if (generation !== accountGenerationRef.current) return
       setDraftError('下書きを読み込めませんでした。一覧から開き直してください。')
     })
   }, [searchParams, accountLoading, selectedAccountId])
@@ -1018,9 +1039,12 @@ export default function BroadcastForm({
   useEffect(() => {
     // PERF-06: 複製候補は画面に出る3件ぶんだけAPIへ頼む。
     // 以前は一覧を全件取って先頭3件に絞っていた。
+    let cancelled = false
+    setRecentBroadcasts([])
     api.broadcasts.list({ accountId: selectedAccountId || undefined, limit: 3 })
-      .then((res) => { if (res.success) setRecentBroadcasts(res.data.slice(0, 3)) })
+      .then((res) => { if (!cancelled && res.success) setRecentBroadcasts(res.data.slice(0, 3)) })
       .catch(() => undefined)
+    return () => { cancelled = true }
   }, [selectedAccountId])
 
   /*
@@ -1152,6 +1176,9 @@ export default function BroadcastForm({
   }, [selectedAccountId])
 
   useEffect(() => {
+    let cancelled = false
+    setPublishedActions([])
+    setAfterActionVersionId('')
     if (!selectedAccountId) {
       setPublishedActions([])
       setAfterActionVersionId('')
@@ -1159,14 +1186,15 @@ export default function BroadcastForm({
     }
     api.commonActions.resources(selectedAccountId)
       .then((result) => {
-        if (!result.success) return
+        if (cancelled || !result.success) return
         setPublishedActions((result.data.commonActions ?? []).flatMap((action) => (
           action.currentPublishedVersionId
             ? [{ versionId: action.currentPublishedVersionId, name: action.name, version: action.version }]
             : []
         )))
       })
-      .catch(() => setPublishedActions([]))
+      .catch(() => { if (!cancelled) setPublishedActions([]) })
+    return () => { cancelled = true }
   }, [selectedAccountId])
   /*
    * 送る相手を、そのまま送信に使える条件の形で組み立てる。
@@ -1233,8 +1261,8 @@ export default function BroadcastForm({
    * 保存するのは画面を開いている間だけ（下書きへの永続化はしない）。
    */
   const bubbleContentStash = useRef(new Map<string, Map<string, Record<string, unknown>>>())
-  const updateBubble = (index: number, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => {
-    if (i !== index) return item
+  const updateBubble = (targetId: string, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => {
+    if (item.id !== targetId) return item
     if (item.type !== bubble.type) {
       const stash = bubbleContentStash.current.get(item.id) ?? new Map<string, Record<string, unknown>>()
       stash.set(item.type, item.content)
@@ -1269,9 +1297,12 @@ export default function BroadcastForm({
       setError('このテンプレートの内容を読み込めませんでした')
       return
     }
-    setBubbles((items) => items.length === 1 && !String(items[0]?.content.text ?? '').trim()
-      ? [bubble]
-      : [...items.slice(0, 2), bubble])
+    const empty = bubbles.length === 1 && bubbles[0]?.type === 'text' && !String(bubbles[0].content.text ?? '').trim()
+    if (!empty && bubbles.length >= MAX_BUBBLES) {
+      setError(`メッセージは${MAX_BUBBLES}通までです。追加する前に、不要なメッセージを削除してください。`)
+      return
+    }
+    setBubbles((items) => empty ? [bubble] : [...items, bubble])
     setSelectedTemplate(null)
     setShowTemplatePicker(false)
   }
@@ -1786,7 +1817,10 @@ export default function BroadcastForm({
    * テスト送信の前に、実際に登録されている送信先を読み合わせる。
    * 送信先を固定名で描くと、別アカウントでもその人へ届くように誤解される。
    */
+  const testRecipientsGeneration = useRef(0)
+  useEffect(() => { testRecipientsGeneration.current += 1; setTestDialogOpen(false); setTestRecipients([]) }, [selectedAccountId])
   const openTestDialog = async () => {
+    const generation = ++testRecipientsGeneration.current
     const validationError = validate()
     if (validationError) { setError(validationError); return }
     setTestDialogOpen(true)
@@ -1795,11 +1829,12 @@ export default function BroadcastForm({
     try {
       if (!selectedAccountId) throw new Error('account is not selected')
       const res = await api.accountSettings.getTestRecipients(selectedAccountId)
+      if (generation !== testRecipientsGeneration.current) return
       const recipients = res.success && Array.isArray(res.data) ? res.data : []
       setTestRecipients(recipients)
       setTestRecipientState(res.success ? 'ready' : 'error')
     } catch {
-      setTestRecipientState('error')
+      if (generation === testRecipientsGeneration.current) setTestRecipientState('error')
     }
   }
 
@@ -2420,7 +2455,7 @@ export default function BroadcastForm({
                   data-active={selected || undefined}
                   aria-disabled={type === null || Boolean(type && UNSENDABLE_TYPES[type])}
                   title={type === null ? '紹介メッセージは現在利用できません' : UNSENDABLE_TYPES[type]}
-                  onClick={() => { if (type && !UNSENDABLE_TYPES[type]) updateBubble(index, emptyBubble(type)) }}
+                  onClick={() => { if (type && !UNSENDABLE_TYPES[type]) updateBubble(bubble.id, emptyBubble(type)) }}
                 >
                   {label}
                 </button>
@@ -2429,8 +2464,8 @@ export default function BroadcastForm({
           </div>
 
             {bubble.type === 'text' ? (
-              <TextBubbleEditor bubble={bubble} index={index} total={bubbles.length} trackLinks={trackLinks} embedded={currentStep === 'message'} visualReference={visualQaAugustCampaign} onTrackLinksChange={setTrackLinks} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
-            ) : <BubbleEditor bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />}
+              <TextBubbleEditor bubble={bubble} index={index} total={bubbles.length} trackLinks={trackLinks} embedded={currentStep === 'message'} visualReference={visualQaAugustCampaign} onTrackLinksChange={setTrackLinks} onChange={(next) => updateBubble(bubble.id, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
+            ) : <BubbleEditor bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(bubble.id, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />}
           {index === 0 && <MessageButtonsSection
             buttons={messageButtons}
             error={messageButtonsError(messageButtons)}
@@ -2750,9 +2785,9 @@ export default function BroadcastForm({
       onConfirm={selectedTemplate ? () => applyTemplate(selectedTemplate) : undefined}
     >
       <ul className="space-y-2 rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
-        <li className="text-success">✓ このテンプレートの内容を確認しました</li>
-        <li className="text-success">✓ 差し込みの項目がこの配信で使えることを確認しました</li>
-        <li className="text-success">✓ 読み込んだあとに内容を直せることを確認しました</li>
+        <li className="text-success">テンプレートの内容を確認してください</li>
+        <li className="text-success">差し込みの項目がこの配信で使えるか確認してください</li>
+        <li className="text-success">読み込んだあとも内容を直せます</li>
       </ul>
     </ConfirmDialog>
 
@@ -2806,7 +2841,7 @@ export default function BroadcastForm({
       }}
     >
       <ul className="space-y-2 rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
-        <li className="text-success">✓ 対象人数を確認しました</li>
+        <li className={audienceCount === null ? "text-warning" : "text-success"}>{audienceCount === null ? "対象人数をまだ取得できていません" : `対象人数 ${formatNumber(audienceCount)}人を確認してください`}</li>
         <li className={previewConfirmed ? 'text-success' : 'text-warning'}>{previewConfirmed ? '✓' : '!'} メッセージ表示を確認しました</li>
         <li className={scheduledLabel ? 'text-success' : 'text-ink-faint'}>{scheduledLabel ? '✓' : '○'} 配信日時を確認しました</li>
       </ul>
