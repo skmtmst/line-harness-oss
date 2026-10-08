@@ -323,4 +323,11 @@ describe('削除確認 Gy9OK の絵と、押せる形', () => {
     expect(PAGE).toContain('reason instanceof ApiError && reason.status === 403')
     expect(PAGE).toContain('NO_WRITE_PERMISSION.label')
   })
+  it('何が止まり・何が残り・戻せないことを、これまでどおり読ませる', () => {
+    expect(PAGE).toContain('新しく届くメッセージへの自動返信')
+    expect(PAGE).toContain('タグ付けなどの後の処理が止まります')
+    expect(PAGE).toContain('これまでの実行結果は消えません')
+    expect(PAGE).toContain('削除は元に戻せません')
+  })
+
 })

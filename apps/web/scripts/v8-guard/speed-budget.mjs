@@ -162,9 +162,9 @@ async function measurePress(page) {
 }
 
 /* 偽APIの答えをそのまま運ぶ（待ち受けなし方式の差し替え）。 */
-async function stubApi(page, mockFetch) {
+export async function stubApi(page, mockFetch) {
   await page.route('**/api/**', async (route) => {
-    const url = new URL(route.request().url)
+    const url = new URL(route.request().url())
     const path = `${url.pathname}${url.search}`
     const answered = await mockFetch(route.request().method(), path)
     await route.fulfill({
@@ -181,12 +181,13 @@ async function gotoTarget(page, target) {
     .catch(() => page.goto(target, { waitUntil: 'domcontentloaded', timeout: 20000 }))
 }
 
-async function measureScreen(browser, target, name, route) {
+export async function measureScreen(browser, target, name, route) {
   const page = await newPage(browser)
+  try {
   if (target.stub) await stubApi(page, target.mockFetch)
   const start = Date.now()
   await gotoTarget(page, target.url(route))
-  await page.locator('main').first().waitFor({ state: 'visible', timeout: 15000 })
+  await waitForScreenReady(page, route)
   if (SLOW_MS) await page.waitForTimeout(SLOW_MS)
   const showMs = Date.now() - start
   /* 押す前の落ち着いた状態で LCP と JS を読む。長い作業は押した後も足す。 */
@@ -194,7 +195,6 @@ async function measureScreen(browser, target, name, route) {
   const before = await readPageMetrics(page)
   const pressMs = await measurePress(page)
   const after = await readPageMetrics(page)
-  await page.close()
   return {
     name,
     route,
@@ -203,6 +203,9 @@ async function measureScreen(browser, target, name, route) {
     lcpMs,
     jsBytes: before.jsBytes,
     longTaskMs: Math.max(before.longTaskMs, after.longTaskMs),
+  }
+  } finally {
+    await page.close()
   }
 }
 
@@ -215,7 +218,7 @@ function expandFriends(bodyText) {
     return null
   }
   const wrap = json?.data && Array.isArray(json.data.items) ? json.data : json
-  if (!json || !Array.isArray(wrap?.items) || wrap.items.length === 0) return null
+  if (!json || json.success === false || !Array.isArray(wrap?.items) || wrap.items.length === 0) return null
   const first = wrap.items[0]
   const items = Array.from({ length: 2000 }, (_, i) => ({ ...first, id: `stress-${i}` }))
   return json?.data && Array.isArray(json.data.items)
@@ -223,40 +226,69 @@ function expandFriends(bodyText) {
     : JSON.stringify({ ...json, items, total: 2000 })
 }
 
+export async function installStressApi(page, target) {
+  const state = { rows: 0, error: null }
+  // Playwright は最後に登録した route を先に使う。一般APIを先に置く。
+  if (target.stub) await stubApi(page, target.mockFetch)
+  await page.route('**/api/friends*', async (route) => {
+    const url = new URL(route.request().url())
+    if (url.pathname !== '/api/friends') return route.fallback()
+    try {
+      const answered = target.stub
+        ? await target.mockFetch(route.request().method(), `${url.pathname}${url.search}`)
+        : await route.fetch().then(async (res) => ({ status: res.status(), body: await res.text() }))
+      if (answered.status !== 200) throw new Error(`友だちの取得失敗: HTTP ${answered.status}`)
+      const big = expandFriends(answered.body)
+      if (!big) throw new Error('2,000行の元になる友だちを取得できませんでした')
+      state.rows = (JSON.parse(big).data ?? JSON.parse(big)).items.length
+      await route.fulfill({ status: 200, contentType: 'application/json; charset=utf-8', headers: { 'Access-Control-Allow-Origin': '*' }, body: big })
+    } catch (error) {
+      state.error = error
+      await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ success: false, error: error.message }) })
+    }
+  })
+  return state
+}
+
+/** 2,000行を返したという実際の応答を確かめる。予定の行数は結果に書かない。 */
+export function assertStressResponse(state) {
+  if (state.error) throw state.error
+  if (state.rows !== 2000) throw new Error(`2,000行を取得できていません（実際 ${state.rows}行）`)
+  return state.rows
+}
+
+/** ブラウザ内の実データと読み込み状態を確認する。mainだけでは測定を始めない。 */
+export function screenReady({ route, expectedRows = null }) {
+  if (document.documentElement.dataset.theme !== 'v8') return false
+  const main = document.querySelector('main')
+  if (!main || !main.textContent?.trim()) return false
+  const text = main.textContent
+  if (/画面を表示できませんでした|Application error|読み込めませんでした|見る権限がありません/.test(text)
+    || main.querySelector('[data-list-state="error"], [data-list-state="forbidden"]')) return 'error'
+  if (main.querySelector('[aria-busy="true"], [data-list-state="loading"]')) return false
+  if (route === '/friends') {
+    if (!main.querySelector('[data-friend-row]')) return false
+    if (expectedRows !== null && !text.includes(`${expectedRows.toLocaleString('ja-JP')}人中`)) return false
+  }
+  return true
+}
+
+export async function waitForScreenReady(page, route, expectedRows = null) {
+  const handle = await page.waitForFunction(screenReady, { route, expectedRows }, { timeout: 15000 })
+  const state = await handle.jsonValue()
+  if (state !== true) throw new Error(`${route}: データを読み込めないため速度を測れません（${state}）`)
+}
+
 /* 友だち一覧に 2,000 行を返して、スクロール中の長い作業を測る。 */
 async function measureStress(browser, target) {
   const page = await newPage(browser)
-  if (target.stub) {
-    await page.route('**/api/friends*', async (route) => {
-      const url = new URL(route.request().url)
-      const answered = await target.mockFetch(route.request().method(), `${url.pathname}${url.search}`)
-      const big = expandFriends(answered.body)
-      if (!big) {
-        await route.fulfill({ status: answered.status, contentType: 'application/json; charset=utf-8', body: answered.body })
-        return
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json; charset=utf-8',
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        body: big,
-      })
-    })
-    await stubApi(page, target.mockFetch)
-  } else {
-    await page.route('**/api/friends*', async (route) => {
-      const res = await route.fetch()
-      const big = expandFriends(await res.text())
-      if (!big) {
-        await route.continue()
-        return
-      }
-      await route.fulfill({ status: 200, contentType: 'application/json; charset=utf-8', body: big })
-    })
-  }
+  try {
+  const responseState = await installStressApi(page, target)
   const start = Date.now()
   await gotoTarget(page, target.url('/friends'))
-  await page.locator('main').first().waitFor({ state: 'visible', timeout: 15000 })
+  await waitForScreenReady(page, '/friends', 2000)
+  const rows = assertStressResponse(responseState)
+  const renderedRows = await page.locator('[data-friend-row]').count()
   const showMs = Date.now() - start
   /* 一気に下まで 20 回に分けて送る。途中の長い作業が記録される。 */
   await page.evaluate(async () => {
@@ -271,8 +303,10 @@ async function measureStress(browser, target) {
   })
   const lcpMs = await readLcpMs(page)
   const rest = await readPageMetrics(page)
-  await page.close()
-  return { name: 'friends-2000', route: '/friends', showMs, pressMs: null, lcpMs, ...rest, rows: 2000 }
+  return { name: 'friends-2000', route: '/friends', showMs, pressMs: null, lcpMs, ...rest, rows, renderedRows }
+  } finally {
+    await page.close()
+  }
 }
 
 /* 落とすのは悪化だけ。時間は20%、JS は1KB（2026-10-04 司令塔決定①）。 */
@@ -371,12 +405,15 @@ async function main() {
   const budget = JSON.parse(readFileSync(BUDGET_PATH, 'utf-8'))
   const browser = await chromium.launch()
   const measured = []
+  try {
   for (const [name, route] of Object.entries(SPEED_ROUTES)) {
     measured.push(await measureMedian(() => measureScreen(browser, target, name, route)))
   }
   measured.push(await measureMedian(() => measureStress(browser, target)))
-  await browser.close()
   return { budget, updateBaseline, out, measured }
+  } finally {
+    await browser.close()
+  }
 }
 
 export { expandFriends, judge, parseArgs, targetMisses }

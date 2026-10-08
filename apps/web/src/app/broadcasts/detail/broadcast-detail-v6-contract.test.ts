@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8') + fs.readFileSync(path.join(__dirname, '../../../v8/broadcast-detail/detail.tsx'), 'utf8') + fs.readFileSync(path.join(__dirname, '../../../v8/broadcast-detail/detail.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8') + fs.readFileSync(path.join(__dirname, '../../../v8/broadcast-detail/detail.tsx'), 'utf8')
 
 describe('V6 一斉配信詳細の契約', () => {
   it('概要・宛先・記録を押せるタブとして示す', () => {
@@ -87,4 +87,15 @@ describe('V6 一斉配信詳細の、送信前の進み具合', () => {
     // 文面は元配信を種にする（宛先だけ差し替える）。
     expect(PAGE).toContain('duplicateFrom=')
   })
+  it('予約しただけの配信を実行済みと書かない', () => {
+    expect(PAGE).not.toContain("detail={broadcast.scheduledAt ? '予約どおり実行' : '即時配信'}")
+    expect(PAGE).toContain('に送り始めます')
+    expect(PAGE).toContain('まだ送っていません')
+  })
+
+  it('下書きを送信実績にせず、件数つきの進捗は送信中だけに出す', () => {
+    expect(PAGE).toContain("broadcast.status !== 'draft'")
+    expect(PAGE).toMatch(/broadcast\.status === 'sending'\s*\?\s*\(\s*<Progress/)
+  })
+
 })

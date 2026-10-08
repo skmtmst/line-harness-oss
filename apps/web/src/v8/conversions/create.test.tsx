@@ -8,6 +8,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ConversionDefinitionPreview } from '@/lib/api'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -85,6 +86,14 @@ beforeEach(() => {
       if (createStatus === 409) return json({ success: false, error: '同じ名前の成果地点があります' }, 409)
       return json({ success: true, data: { id: 'cp-new' } })
     }
+    if (url.pathname === '/api/conversions/definitions/preview') {
+      return json({ success: true, data: {
+        range: { from: '2026-09-01', to: '2026-09-30', timeZone: 'Asia/Tokyo' },
+        matchedCount: 52, estimatedCount: 52, estimatedValue: 412000,
+        duplicateExcludedCount: 2, cancellationCount: 1, excludedReasons: [],
+        missingValueCount: 0, dailyAverage: 2, deduplicationWindowDays: null,
+      } satisfies ConversionDefinitionPreview })
+    }
     if (url.pathname.endsWith('/api/automations')) {
       return json({ success: true, data: [{ id: 'auto-1', name: '初回注文をSlackへ知らせる', versionId: 'v1' }, { id: 'auto-2', name: '体験申込のフォロー', versionId: 'v2' }] })
     }
@@ -102,6 +111,41 @@ afterEach(() => {
 const nameInput = () => screen.getByLabelText('成果地点の名前') as HTMLInputElement
 
 describe('V8 成果地点を作る', () => {
+  it('名前が空なら欄の下だけで理由を知らせ、名前へ移り、保存しない', async () => {
+    await mount()
+    const scroll = vi.fn()
+    nameInput().scrollIntoView = scroll
+    fireEvent.click(screen.getByRole('button', { name: /保存して数えはじめる/ }))
+    await flush()
+    expect(nameInput().getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(nameInput())
+    expect(scroll).toHaveBeenCalledWith({ block: 'center' })
+    const error = screen.getByRole('alert')
+    expect(error.textContent).toBe('成果地点の名前を入力してください')
+    expect(nameInput().getAttribute('aria-describedby')).toBe(error.id)
+    expect(error.closest('[data-template-region="content"]')).toBeTruthy()
+    expect(screen.getAllByText('成果地点の名前を入力してください')).toHaveLength(1)
+    expect(posted).toHaveLength(0)
+    fireEvent.change(nameInput(), { target: { value: '定期便を始めた' } })
+    await flush()
+    expect(nameInput().getAttribute('aria-invalid')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('詳細設定の期間が正しくなければ、閉じた段を開いて期間の欄へ移る', async () => {
+    await mount()
+    fireEvent.change(nameInput(), { target: { value: '定期便を始めた' } })
+    const days = screen.getByLabelText('友だち追加からの計測期間') as HTMLInputElement
+    fireEvent.change(days, { target: { value: '366' } })
+    fireEvent.click(screen.getByRole('button', { name: /保存して数えはじめる/ }))
+    await flush()
+    expect(days.getAttribute('aria-invalid')).toBe('true')
+    expect(days.closest('details')?.open).toBe(true)
+    expect(document.activeElement).toBe(days)
+    expect(screen.getByRole('alert').textContent).toBe('成果を紐づける日数は1〜365日で入力してください')
+    expect(posted).toHaveLength(0)
+  })
+
   it('?name= で同じ名前の成果地点があると、競合の帯と「比べてから保存」を出す（cXqlS）', async () => {
     query.value = 'name=商品を買った'
     await mount()

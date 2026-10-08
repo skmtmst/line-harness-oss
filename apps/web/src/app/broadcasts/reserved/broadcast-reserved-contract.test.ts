@@ -79,4 +79,9 @@ describe('V6 一斉配信の予約完了', () => {
     expect(PAGE).toContain('api.broadcasts.cancelReservation(broadcast.id)')
     expect(PAGE).not.toContain('api.broadcasts.delete(broadcast.id)')
   })
+  it('送信時に再集計することを明記する', () => {
+    expect(PAGE).toContain('送る前にもう一度、対象の人数を数え直します')
+    expect(PAGE).toContain('除く見込み')
+  })
+
 })

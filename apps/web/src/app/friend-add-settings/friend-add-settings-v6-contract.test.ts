@@ -189,4 +189,11 @@ describe('V6 友だち追加時配信の監査修正(#946)', () => {
     expect(screens).not.toContain('/friend-add-settings/conflicts')
     expect(screens).not.toContain('/friend-add-settings/test')
   })
+  it('初回と再追加を分け、経路不明の扱いを説明する', () => {
+    expect(LIST_PAGE).toContain('はじめて友だち追加した人')
+    expect(LIST_PAGE).toContain('以前からの友だち・ブロック解除した人')
+    expect(LIST_PAGE).toContain('経路が分からなかった人')
+    expect(LIST_PAGE).toContain('いちばん最後に動く・消せない')
+  })
+
 })

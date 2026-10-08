@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest'
 const V8_DETAIL = fs.readFileSync(path.join(__dirname, 'detail-v8.tsx'), 'utf8')
 const V8_DETAIL_PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const V8_DETAIL_CSS = fs.readFileSync(path.join(__dirname, 'detail-v8.module.css'), 'utf8')
+const RESULTS_CURRENT = fs.readFileSync(new URL('../../scenarios/results/results-v8.tsx', import.meta.url), 'utf8')
 const V8_RESULTS = fs.readFileSync(
   path.join(__dirname, '..', 'results', 'results-v8.tsx'),
   'utf8',
@@ -137,4 +138,11 @@ describe('★V8 シナリオの CSS モジュールの契約', () => {
     expect(V8_DETAIL_CSS).not.toContain('[data-theme')
     expect(V8_RESULTS_CSS).not.toContain('[data-theme')
   })
+  it('通ごとの結果と友だちごとの記録を持つ', () => {
+    expect(RESULTS_CURRENT).toContain('通ごとの結果')
+    expect(RESULTS_CURRENT).toContain('友だちごとの記録')
+    expect(RESULTS_CURRENT).toContain('予定を見る')
+    expect(RESULTS_CURRENT).toContain('さらに読み込む')
+  })
+
 })

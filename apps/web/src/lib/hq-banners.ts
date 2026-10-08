@@ -203,7 +203,7 @@ export interface BannerDeliveryResult {
 export interface BannerGenerationInput {
   mode: BannerMode
   presetKey: string
-  /** 切り抜きの位置。run のときに送り、条件の登録ではサーバーが無視する。 */
+  /** 切り抜きの位置。生成条件と一緒に保存し、サーバーの継続処理で使う。 */
   cropPosition: BannerCropPosition
   textLines: string[]
   /**

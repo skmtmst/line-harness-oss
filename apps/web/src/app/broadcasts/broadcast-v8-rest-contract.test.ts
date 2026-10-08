@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
+const DETAIL_CURRENT = readFileSync(new URL('../../v8/broadcast-detail/detail.tsx', import.meta.url), 'utf8')
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FORM = readFileSync(
   join(HERE, '..', '..', 'components', 'broadcasts', 'broadcast-form.tsx'),
@@ -31,4 +32,11 @@ describe('一斉配信の残り2枚（FU2aU・Q28Gb）', () => {
     expect(DETAIL_PAGE).toContain('shownVersionRef')
     expect(DETAIL_PAGE).toContain('setConflict(true)')
   })
+  it('詳細の競合の帯は板 Q28Gb を持ち、読み直しだけ出す', () => {
+    expect(DETAIL_CURRENT).toContain('data-design-node="Q28Gb"')
+    expect(DETAIL_CURRENT).toContain('ほかの人が配信')
+    expect(DETAIL_CURRENT).toContain('この画面では書き換えません')
+    expect(DETAIL_CURRENT).toContain('読み直す')
+  })
+
 })

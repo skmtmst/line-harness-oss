@@ -171,7 +171,7 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).toContain("samePageUrl.replace(")
     // 詳細の戻り先は受け取った条件をそのまま返す
     expect(DETAIL).toContain("for (const key of ['kind', 'status', 'attribution', 'rule_id', 'pages'])")
-    expect(DETAIL).toContain('href={listHref}')
+    expect(DETAIL).toContain("{ label: '実行結果', href: listHref }")
     expect(DETAIL).not.toContain('href="/friend-add-settings/runs"')
   })
 

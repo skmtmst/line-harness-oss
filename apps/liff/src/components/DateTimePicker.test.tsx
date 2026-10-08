@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import DateTimePicker from './DateTimePicker.js';
 import { dayStateLabel } from './DateTimePicker.js';
 import type { MenuItem, StaffItem } from '../lib/api.js';
@@ -728,6 +728,33 @@ describe('カレンダーの見た目（設計合わせ）', () => {
 });
 
 describe('監査 L1：月の読込を途中で替えても、戻れば読み直す', () => {
+  it('週へ切り替えて戻った後、遅い旧応答を混ぜず新しい月の応答を使う', async () => {
+    mockSettings('calendar', 60);
+    const real = availability.getMockImplementation()!;
+    type Response = Awaited<ReturnType<typeof api.availability>>;
+    const pending: Array<(value: Response) => void> = [];
+    availability.mockImplementation(async (menuId, staffId, from, to) => {
+      if (from === '2026-10-15' && to === '2026-10-31') {
+        return new Promise<Response>((resolve) => pending.push(resolve));
+      }
+      return real(menuId, staffId, from, to);
+    });
+    renderPicker();
+    await screen.findByText('2026年10月');
+    expect(pending).toHaveLength(1);
+    fireEvent.click(screen.getByRole('radio', { name: '週で見る' }));
+    await screen.findByRole('button', { name: '10月16日 空きあり' });
+    fireEvent.click(screen.getByRole('radio', { name: 'カレンダー' }));
+    expect(pending).toHaveLength(2);
+    await act(async () => pending[0]({ by_staff: [{ staff_id: 's1', display_name: '担当A', slots: [
+      { date: '2026-10-17', start: '22:00', end: '23:00' },
+    ] }], closed_dates: [] }));
+    expect(screen.queryByRole('button', { name: '10月17日 空きあり' })).toBeNull();
+    await act(async () => pending[1](await real('m1', 's1', '2026-10-15', '2026-10-31')));
+    expect(await screen.findByRole('button', { name: '10月16日 空きあり' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '10月17日 空きあり' })).toBeNull();
+  });
+
   it('10月の読込中に11月へ送り、10月へ戻ると読み直して日が出る', async () => {
     mockSettings('calendar', 60);
     let held = true;

@@ -75,6 +75,8 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel from '@/components/shared/detail-panel'
@@ -1141,12 +1143,13 @@ export default function AutoRepliesListV8() {
     <EmptyList
       data-design-node="G8i4xP"
       icon={<MessageSquare aria-hidden="true" />}
-      title="まだ自動応答がありません"
-      description="届いた言葉に合わせて、決めた返事を自動で送ります。"
-      create={{ label: '最初の自動応答を作る', onClick: () => router.push('/auto-replies/edit') }}
+      title="まだ自動応答のルールはありません"
+      description="よく届く質問や営業時間外の連絡に、自動で返せます。ひな形からも作れます。"
+      create={{ label: 'ルールを作る', onClick: () => router.push('/auto-replies/edit') }}
       canCreate={canEdit}
       filtered={filterActive}
       onClearFilters={clearFilters}
+      filteredTitle="条件に合うルールはありません"
       filteredDescription="「停止中のみ」「時間帯あり」「今月0回」や検索を外すと、すべて出ます"
     />
   ) : (
@@ -1327,19 +1330,19 @@ export default function AutoRepliesListV8() {
                   </Td>
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()} data-design-node={openMenuId === r.id ? 'IIesG' : undefined}>
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
-                      <div className={styles.menuBox}>
                       <ContextMenu
                         label={`自動応答「${name}」の操作`}
                         items={rowContextItems(r)}
                       >
+                        <div className={styles.menuBox}>
                         <RowMenu
                           label={`自動応答「${name}」の操作`}
                           items={rowMenuItems(r)}
                           open={openMenuId === r.id}
                           onOpenChange={(next) => setOpenMenuId(next ? r.id : null)}
                         />
+                        </div>
                       </ContextMenu>
-                      </div>
                     </Td>
                 </Tr>
               )
@@ -1672,7 +1675,7 @@ export default function AutoRepliesListV8() {
       )}
 
       {/* 止める・再開の確認窓（`i8F12`：理由つき）。単体でもまとめてでも同じ形。 */}
-      <ConfirmDialog
+      <Dialog
         open={pendingToggle !== null}
         title={
           pendingToggle === null
@@ -1693,6 +1696,7 @@ export default function AutoRepliesListV8() {
         confirmLabel={pendingToggle?.kind === 'resume' ? '再開する' : '止める'}
         confirmIcon={pendingToggle?.kind === 'stop' ? <Pause size={16} aria-hidden="true" /> : undefined}
         designNode="i8F12"
+        confirmation
         designLayout="stacked"
         designWidth={600}
         designTop={280}
@@ -1707,22 +1711,16 @@ export default function AutoRepliesListV8() {
         onConfirm={toggleTargetStale ? undefined : () => runToggle()}
       >
         {pendingToggle?.kind === 'stop' && (
-          <div>
-            <label htmlFor="auto-reply-stop-reason" className={styles.reasonLabel}>
-              止める理由{' '}
-              <span className="bg-canvas-sunken text-ink-faint rounded-pill inline-flex items-center px-1.5 py-0.5 text-nano font-medium">
-                任意
-              </span>
-            </label>
-            <input
-              id="auto-reply-stop-reason"
-              value={toggleReason}
-              onChange={(event) => setToggleReason(event.target.value)}
-              maxLength={500}
-              placeholder="例：キャンペーンが終わったので"
-              className={styles.reasonInput}
-              style={{ padding: '8px 12px' }}
-            />
+          <div className={styles.reasonField}>
+            <Field label="止める理由" htmlFor="auto-reply-stop-reason" optional>
+              <TextField
+                id="auto-reply-stop-reason"
+                value={toggleReason}
+                onChange={(event) => setToggleReason(event.target.value)}
+                maxLength={500}
+                placeholder="例：キャンペーンが終わったので"
+              />
+            </Field>
           </div>
         )}
         {toggleTargetStale && (
@@ -1730,7 +1728,7 @@ export default function AutoRepliesListV8() {
             アカウントが切り替わりました。操作する自動応答を選び直してください。
           </p>
         )}
-      </ConfirmDialog>
+      </Dialog>
 
       {/*
         削除の確認窓（`u8sKN`）。
@@ -1744,6 +1742,7 @@ export default function AutoRepliesListV8() {
         busy={deleting}
         error={deleteError}
         designNode="u8sKN"
+        confirmation
         designLayout="stacked"
         designWidth={600}
         designTop={280}
@@ -1764,32 +1763,35 @@ export default function AutoRepliesListV8() {
             >
               削除する
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={deleting}
-              onClick={() => {
-                if (deleting) return
-                setDeleteError('')
-                setPendingDelete(null)
-              }}
-            >
-              キャンセル
-            </Button>
-            {pendingDelete?.item.isActive ? (
+            <div className={styles.deleteAlternatives}>
               <Button
                 type="button"
                 variant="secondary"
-                disabled={deleting || deleteTargetStale}
-                onClick={stopInsteadOfDelete}
+                disabled={deleting}
+                onClick={() => {
+                  if (deleting) return
+                  setDeleteError('')
+                  setPendingDelete(null)
+                }}
               >
-                代わりに止める
+                キャンセル
               </Button>
-            ) : null}
+              {pendingDelete?.item.isActive ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={deleting || deleteTargetStale}
+                  onClick={stopInsteadOfDelete}
+                >
+                  <Pause size={16} aria-hidden="true" />
+                  代わりに止める
+                </Button>
+              ) : null}
+            </div>
           </div>
         }
       >
-        <Notice tone="danger" message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />
+        <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />
         {deleteTargetStale && (
           <p className="text-danger text-sm leading-relaxed" role="alert">
             アカウントが切り替わりました。削除する自動応答を選び直してください。

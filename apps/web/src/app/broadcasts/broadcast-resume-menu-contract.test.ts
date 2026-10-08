@@ -32,4 +32,8 @@ describe('一斉配信の一覧の下書き再開（R207）', () => {
     const rowActionsBlock = PAGE.slice(PAGE.indexOf('<RowActions'), PAGE.indexOf('<RowActions') + 1500)
     expect(rowActionsBlock).not.toContain('edit={{')
   })
+  it('下書き・予約に「編集を続ける」がある', () => {
+    expect(PAGE).toContain('編集を続ける')
+  })
+
 })

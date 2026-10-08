@@ -9,6 +9,8 @@ export type ActionMenuItem = {
   id: string
   label: string
   icon?: ReactNode
+  /** 先頭の主な操作を太字で示す。既存の項目の見た目は変えない。 */
+  emphasis?: boolean
   /**
    * 補足（★V7）。渡すと項目が2行・高さ52pxになる。
    * 例：「テンプレートを送る」＋「受信箱で選んで送ります」。
@@ -197,7 +199,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
           >
             {item.icon ? <span className={styles.icon} aria-hidden="true">{item.icon}</span> : null}
             <span className={styles.itemBody}>
-              <span className={styles.label}>{item.label}</span>
+              <span className={styles.label}>{item.emphasis ? <strong>{item.label}</strong> : item.label}</span>
               {item.description ? (
                 <span className={styles.description}>{item.description}</span>
               ) : null}

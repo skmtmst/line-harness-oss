@@ -886,7 +886,7 @@ function FriendAddList() {
           }}
           onCancel={() => setFallbackStop(false)}
         >
-          <Notice tone="warn" message={`直近7日では ${formatNumber(sinkRule?.matchedLast7Days ?? 0)}人 がこの設定で案内を受け取っています。`} />
+          <Notice tone="warn" appearance="soft" message={`直近7日では ${countText(sinkRule?.matchedLast7Days, '人')} がこの設定で案内を受け取っています。`} />
         </ConfirmDialog>
         {/* 通常の設定の一時停止の確かめ。 */}
         <ConfirmDialog

@@ -97,7 +97,7 @@
 /* 下書きの進み（型の共通部品 Steps）。説明の行の下。 */
 .draftSteps {
   min-width: 0;
-  padding-top: 0;
+  padding-top: var(--tpl-bd-draft-steps-top);
 }
 
 /* 進みの帯（送るまでの段階）：丸18・丸と字の間5・線20・間8。 */

@@ -63,4 +63,20 @@ describe('③ 「…」のメニューの開き方', () => {
     expect(portal?.getAttribute('data-placement')).toMatch(/^(down|up)$/)
     anchor.remove()
   })
+
+  it('旧アニメーションの選択子は実 DOM で v7 だけに一致する', () => {
+    const selectors = rules(globals)
+      .filter((rule) => /animation:\s*lh-surface-in/.test(rule.body))
+      .flatMap((rule) => rule.selector.split(','))
+      .filter((selector) => selector.includes('action-menu'))
+    // happy-dom は祖先の属性変更後も選択子の判定をキャッシュするので文書を分ける。
+    for (const theme of ['v7', 'v8']) {
+      const fixture = document.implementation.createHTMLDocument()
+      fixture.documentElement.dataset.theme = theme
+      const menu = fixture.createElement('div')
+      menu.dataset.designPart = 'action-menu'
+      fixture.body.appendChild(menu)
+      expect(selectors.some((selector) => menu.matches(selector))).toBe(theme === 'v7')
+    }
+  })
 })

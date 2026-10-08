@@ -60,6 +60,16 @@
   white-space: nowrap;
 }
 
+/* RaMf3 の発行されるリンク。既定の設定内容の箱の寸法は変えない。 */
+.summary[data-variant='link'] { gap: var(--tpl-side-card-gap); }
+.summaryHead { display: flex; flex-direction: column; gap: var(--tpl-wa-af-side-gap); }
+.summary[data-variant='link'] .summaryTitle { font-size: var(--text-body); line-height: var(--tpl-wa-af-side-title-lh); }
+.summaryDescription { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-wa-af-side-note-lh); }
+.summary[data-variant='link'] .rows { gap: normal; }
+.summary[data-variant='link'] .row { padding: var(--tpl-af-cr-kv-pad); border: 0; }
+.summary[data-variant='link'] .rowLabel { flex-shrink: 0; line-height: var(--tpl-wa-af-note-lh); }
+.summary[data-variant='link'] .rowValue { font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-wa-af-preview-lh); }
+
 /* 箱の外の淡い案内。 */
 .note {
   align-self: stretch;

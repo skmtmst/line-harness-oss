@@ -19,7 +19,7 @@ import type {
   FriendAddEventKind,
   FriendAddEventRoutingStatus,
 } from '@line-crm/shared'
-import { ArrowLeft, Download, FileText, MessageCircle, Pause, Pencil, RotateCcw, TriangleAlert } from 'lucide-react'
+import { Download, FileText, MessageCircle, Pause, Pencil, RotateCcw, TriangleAlert } from 'lucide-react'
 import { DetailPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -419,7 +419,6 @@ function FriendAddRunsInner() {
     boardId: 'REIxB',
     title: '実行結果：友だち追加時の配信',
     description: 'だれが・どの経路から来て・何を送ったか、失敗した処理を見ます。',
-    identity: <Link href="/friend-add-settings" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />友だち追加時の配信へ</Link>,
   }
 
   if (!accountLoading && !loading && !selectedAccountExists) {

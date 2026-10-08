@@ -115,4 +115,9 @@ describe('一覧の帯（設計 6-1 `q76C35`）', () => {
     expect(KPI_VIEW).toContain("import { buildBroadcastKpiCards, countText } from './broadcast-kpi-values'")
     expect(KPI_VIEW).toContain('const cards = buildBroadcastKpiCards(stats)')
   })
+  it('読み込めなかったときに「ありません」と言わない', () => {
+    expect(PAGE).toContain('一斉配信を読み込めませんでした')
+    expect(PAGE).not.toContain('いまは読み込めていません。上の案内をご覧ください。')
+  })
+
 })

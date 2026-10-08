@@ -37,6 +37,8 @@ export type DialogProps = {
   designContentPadding?: string
   /** 題の隣の補足。ほかの窓の題の並びは変えない。 */
   titleHelp?: ReactNode
+  /** 段の帯を使わず、題・手順・本文・操作を1枚に続ける窓（hadfk）。既定の窓は変えない。 */
+  layout?: 'continuous'
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
   /** 操作の左に出す現在の手順など。 */
@@ -50,6 +52,8 @@ export type DialogProps = {
    * tone（題・ボタンの色）とは独立。渡さなければ帯なし。
    */
   descriptionBand?: 'warning' | 'danger'
+  /** 入力の誤りがある欄など、開いた窓のフォーカス先。省けば従来どおり。 */
+  initialFocusId?: string
   busy?: boolean
   /** 実行ボタンを押せない形で出す（確かめのチェックが入るまで、など）。処理中の busy とは別。 */
   confirmDisabled?: boolean
@@ -99,6 +103,7 @@ export default function Dialog({
   designHeaderHeight,
   designContentPadding,
   titleHelp,
+  layout,
   steps,
   footerLead,
   title,
@@ -106,6 +111,7 @@ export default function Dialog({
   tone = 'default',
   descriptionBand,
   busy = false,
+  initialFocusId,
   error,
   confirmLabel = '保存する',
   cancelLabel = 'キャンセル',
@@ -143,7 +149,8 @@ export default function Dialog({
     busy,
     // 主が取消の窓は、開いた直後の標的を主のボタンへ寄せる。Enter を押しても
     // 残る方が動く向きにする（×と背景は従来どおり取消）。
-    primaryAction === 'cancel' ? () => cancelRef.current : undefined,
+    initialFocusId ? () => document.getElementById(initialFocusId)
+      : primaryAction === 'cancel' ? () => cancelRef.current : undefined,
   )
   const confirmationSizeClass = confirmation && compact
     ? tone === 'destructive'
@@ -188,6 +195,7 @@ export default function Dialog({
       data-size={size}
       data-design-layout={designLayout}
       data-confirm-first={confirmFirst || undefined}
+      data-layout={layout}
       data-footer-align={footerAlign}
       data-design-footer-gap={designFooterGap !== undefined || undefined}
       data-design-width={designWidth ? '' : undefined}

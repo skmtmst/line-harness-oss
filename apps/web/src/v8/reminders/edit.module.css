@@ -374,4 +374,4 @@
   word-break: break-word;
 }
 
-.fieldError { margin: 0; color: var(--color-status-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+.fieldError { margin: var(--tpl-field-error-margin); color: var(--color-status-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }

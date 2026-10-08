@@ -123,3 +123,5 @@
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .notice { -webkit-font-smoothing: auto; }
+
+[data-theme='v8'] .notice[data-appearance='soft'] { border-color: transparent; }

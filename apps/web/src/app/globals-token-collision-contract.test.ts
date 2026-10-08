@@ -68,4 +68,15 @@ describe('globals.css の変数の書き直し', () => {
     const sales = fs.readFileSync(path.join(__dirname, 'booking/sales/sales-v8.module.css'), 'utf8')
     expect(sales).toContain('var(--tpl-bks-sales-title-size)')
   })
+
+  it('売上用の題だけを変更してもスタッフ画面の題へ伝わらない', () => {
+    const staff = fs.readFileSync(path.join(__dirname, '../v8/booking-staff/layout.module.css'), 'utf8')
+    const sales = fs.readFileSync(path.join(__dirname, 'booking/sales/sales-v8.module.css'), 'utf8')
+    const staffTitle = staff.match(/\.title\s*\{([^}]+)\}/)![1]
+    const salesTitle = sales.match(/\.title\s*\{([^}]+)\}/)![1]
+    expect(staffTitle).toContain('font-size: var(--tpl-title-size)')
+    expect(staffTitle).not.toContain('--tpl-bks-sales-title-size')
+    expect(salesTitle).toContain('font-size: var(--tpl-bks-sales-title-size)')
+    expect(salesTitle).not.toContain('var(--tpl-bks-title-size)')
+  })
 })

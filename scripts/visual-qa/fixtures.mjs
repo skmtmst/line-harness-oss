@@ -1,3 +1,5 @@
+import { storeAt } from './qa-clock.mjs'
+
 /**
  * 画面確認のための、固定の中身。
  *
@@ -4180,13 +4182,10 @@ export const REMINDER_PREVIEW = {
 /*
  * 板 `ltAaq`（確認）の配信予定の行は `今後7日 124通（重なり 3件はまとめる）`。
  * `T0nis` の表は「今後7日」を実時計で絞るため、行の日時は見本の API を立てた
- * 時刻から数える（明日 18:00 ×2〈重なり〉・明後日 13:00・明後日 18:00 の4行）。
+ * 固定時計から数える（明日 18:00 ×2〈重なり〉・明後日 13:00・明後日 18:00 の4行）。
  */
 function reminderNewPreviewAt(dayOffset, hour) {
-  const at = new Date()
-  at.setDate(at.getDate() + dayOffset)
-  at.setHours(hour, 0, 0, 0)
-  return at.toISOString()
+  return storeAt(hour, 0, dayOffset)
 }
 export const REMINDER_NEW_PREVIEW = {
   ...REMINDER_PREVIEW,
@@ -5004,7 +5003,7 @@ export const LOGIN_AUDIT = [
  * STAFF_MEMBERS とID・メールを一致させる(#530)。違うID・メールの
  * ままでは画面の名寄せが「要確認」になり、EOTS4の撮影が回らない。
  */
-const accessUser = (id, name, roleBundle, status, options = {}) => ({
+export const accessUser = (id, name, roleBundle, status, options = {}) => ({
   id, name, email: options.email ?? `${id}@example.invalid`, jobTitle: options.jobTitle ?? null,
   roleBundle, featureCount: roleBundle === 'administrator' ? null : (options.featureCount ?? 8),
   hasFieldMasks: null,
@@ -5012,8 +5011,8 @@ const accessUser = (id, name, roleBundle, status, options = {}) => ({
     type: 'accounts', assignedLineAccountId: 'visual-qa-account',
     lineAccountIds: ['visual-qa-account'], includesDescendants: false,
   },
-  lastLoginAt: options.lastLoginAt ?? (status === 'active' ? '2026-09-06T23:02:00.000Z' : null),
-  lastActionAt: options.lastActionAt ?? (status === 'active' ? '2026-09-07T00:18:00.000Z' : null),
+  lastLoginAt: options.lastLoginAt !== undefined ? options.lastLoginAt : (status === 'active' ? '2026-09-06T23:02:00.000Z' : null),
+  lastActionAt: options.lastActionAt !== undefined ? options.lastActionAt : (status === 'active' ? '2026-09-07T00:18:00.000Z' : null),
   mfaEnabled: options.mfaEnabled ?? false,
   status, policyVersion: options.policyVersion ?? 1,
   createdAt: options.createdAt ?? '2026-01-10T00:00:00.000Z',
@@ -5713,14 +5712,14 @@ export const AFFILIATE_SETTLEMENT_PREVIEW = {
 
 export const AFFILIATE_SETTLEMENT_CREATED = {
   kind: 'created', settlementId: 'visual-qa-settlement-2026-08',
-  totalAmount: 174000, conversionCount: 36, version: 1,
+  totalAmount: AFFILIATE_SETTLEMENT_PREVIEW.totalAmount, conversionCount: AFFILIATE_SETTLEMENT_PREVIEW.conversionCount, version: 1,
   closedAt: '2026-09-07T02:00:00.000Z',
 }
 
 export const AFFILIATE_PAYOUT_BATCH = {
   id: 'visual-qa-payout-batch-2026-08', lineAccountId: 'visual-qa-account',
   settlementId: AFFILIATE_SETTLEMENT_CREATED.settlementId,
-  totalAmount: 174000, currency: 'JPY', lineCount: 36, state: 'created',
+  totalAmount: AFFILIATE_SETTLEMENT_CREATED.totalAmount, currency: 'JPY', lineCount: AFFILIATE_SETTLEMENT_CREATED.conversionCount, state: 'created',
   bankFormat: 'zengin_csv', fileChecksum: null, version: 1,
   downloadExpiresAt: null, createdAt: '2026-09-07T02:01:00.000Z',
 }
@@ -5728,7 +5727,7 @@ export const AFFILIATE_PAYOUT_BATCH = {
 export const AFFILIATE_STATEMENT = {
   id: 'visual-qa-affiliate-statement-2026-08', lineAccountId: 'visual-qa-account',
   affiliateId: 'af-1', settlementId: AFFILIATE_SETTLEMENT_CREATED.settlementId,
-  totalAmount: 62000, status: 'generated', version: 1,
+  totalAmount: AFFILIATE_SETTLEMENT_PREVIEW.affiliates.find((item) => item.affiliateId === 'af-1').amount, status: 'generated', version: 1,
   expiresAt: '2026-10-07T02:02:00.000Z', createdAt: '2026-09-07T02:02:00.000Z',
 }
 

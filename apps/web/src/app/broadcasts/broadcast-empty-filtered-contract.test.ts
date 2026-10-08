@@ -30,4 +30,14 @@ describe('R173 一斉配信の0件の出し分け', () => {
     expect(PAGE).toContain("setDateTo('')")
     expect(PAGE).toContain("setSavedViewId('')")
   })
+  it('何も絞っていない0件は従来どおり「まだ配信がありません」', () => {
+    expect(PAGE).toContain('title="まだ一斉配信がありません"')
+  })
+
+  it('絞り込み0件では作る口を出さない', () => {
+    // 「絞り込みを変えるか、新しく作成してください。」は作る口への誘導だった。
+    expect(PAGE).not.toContain('条件に該当する配信はありません')
+    expect(PAGE).not.toContain('絞り込みを変えるか、新しく作成してください。')
+  })
+
 })

@@ -23,6 +23,8 @@ export type MenuPortalProps = {
   matchWidth?: boolean | 'min'
   /** 外を押した・Esc で閉じるとき。開くボタンの押下は含まない。 */
   onClose: () => void
+  /** 位置を測り、子が見える状態になってから焦点を移す。開くごとに1回。 */
+  onReady?: () => void
   /**
    * 位置だけ別の箱に合わせるとき（ベルの小窓は上の帯の右端から 8 内側・帯の下）。
    * 外を押したかの判定は getAnchor のまま（開くボタンの押下は外にしない）。
@@ -98,12 +100,16 @@ export default function MenuPortal({
   getPositionRect,
   className,
   onEscape,
+  onReady,
   children,
 }: MenuPortalProps) {
   const [mounted, setMounted] = useState(false)
   const [geometry, setGeometry] = useState<Geometry | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+  const readyRef = useRef(false)
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
   const closeRef = useRef(onClose)
   closeRef.current = onClose
   const escapeRef = useRef(onEscape)
@@ -172,6 +178,14 @@ export default function MenuPortal({
       window.removeEventListener('scroll', measure, true)
     }
   }, [open, mounted, align, gap, matchWidth, children])
+
+  useLayoutEffect(() => {
+    if (!open) { readyRef.current = false; return }
+    // ref が付いた時点では測定中の visibility:hidden。表示後にだけ通知する。
+    if (!mounted || !geometry || readyRef.current) return
+    readyRef.current = true
+    onReadyRef.current?.()
+  }, [open, mounted, geometry])
 
   // 下に続きがある間だけ下端の影を出す。入りきる時は影なし。
   useLayoutEffect(() => {

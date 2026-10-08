@@ -35,4 +35,8 @@ describe('D023 シナリオ配信方式の読み込み失敗', () => {
     expect(page).toContain('isForbiddenOrRateLimited')
     expect(page).toContain("loadFailureCopy(scenarioError, 'シナリオ')")
   })
+  it('画面固有の保存不可文を残す（403・429にも汎用503にも付ける）', () => {
+    expect(page).toContain('配信方式の選択・保存はできません。')
+  })
+
 })

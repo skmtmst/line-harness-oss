@@ -102,10 +102,11 @@ import {
   responseTypeWord,
 } from '@/app/auto-replies/auto-reply-words'
 import { inEvaluationOrder, PRIORITY_MAX, PRIORITY_MIN, type OrderedRule } from '@/app/auto-replies/auto-reply-order'
-import { canPublish, conflictTone, publishGates } from '@/app/auto-replies/publish/publish-flow'
+import { canPublish, publishGates } from '@/app/auto-replies/publish/publish-flow'
 import AutoReplyInsertChips, { insertedLabels } from './insert-chips'
 import styles from './wizard-v8.module.css'
 import InsertTextField from '@/components/shared/insert-text-field'
+import { FieldError } from '@/components/shared/form-controls'
 
 /*
  * ★V8 自動応答の作成・編集・有効化。
@@ -139,6 +140,7 @@ const DONE_DESIGN_NODE = 'V4LjH'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'not-found' | 'published-only'
 type ResponseMode = 'silent' | 'template' | 'inline-text' | 'inline-flex' | 'inline-image'
+type InputIssue = { error: string; field?: string; step?: WizardStep }
 
 function detectMode(d: {
   responseType: string
@@ -480,16 +482,7 @@ function AutoReplyWizardV8Inner() {
   /** 保存が通った直後の「✓保存しました」（共通 Button の done、1.2秒）。 */
   const [saveDone, setSaveDone] = useState(false)
   const [error, setError] = useState('')
-  const [inputError, setInputError] = useState<{ id: string; message: string } | null>(null)
-  useEffect(() => { setInputError(null) }, [form])
-  useEffect(() => {
-    if (!inputError) return
-    const field = document.getElementById(inputError.id)
-    field?.focus()
-    field?.scrollIntoView?.({ block: 'center' })
-  }, [inputError, step])
-  const errorFor = (id: string) => inputError?.id === id ? inputError.message : undefined
-  const errorText = (id: string) => errorFor(id) ? <p id={`${id}-error`} className={styles.fieldError} role="alert">{errorFor(id)}</p> : null
+  const [inputIssue, setInputIssue] = useState<InputIssue | null>(null)
   const [weekdayNotice, setWeekdayNotice] = useState('')
   const [showMoreKinds, setShowMoreKinds] = useState(false)
   const actionOptions = useActionOptions()
@@ -497,7 +490,34 @@ function AutoReplyWizardV8Inner() {
   const createKeyRef = useRef(crypto.randomUUID())
   const publishKeyRef = useRef(crypto.randomUUID())
 
-  const patch = (part: Partial<WizardForm>) => setForm((current) => ({ ...current, ...part }))
+  const patch = (part: Partial<WizardForm>) => {
+    setInputIssue(null)
+    setForm((current) => ({ ...current, ...part }))
+  }
+  useEffect(() => {
+    if (!inputIssue?.field || inputIssue.step !== step || loadState !== 'ready') return
+    const target = document.getElementById(inputIssue.field)
+    const control = target?.matches('input, textarea, button, [contenteditable="true"]')
+      ? target
+      : target?.querySelector<HTMLElement>('input, textarea, button, [tabindex="0"]')
+    control?.focus()
+    control?.scrollIntoView?.({ block: 'center' })
+  }, [inputIssue, step, loadState])
+  const fieldError = (field: string) => inputIssue?.field === field ? inputIssue.error : undefined
+  const showInputIssue = useCallback((issue: InputIssue) => {
+    setError('')
+    if (!issue.field || !issue.step) {
+      setError(issue.error)
+      return
+    }
+    setInputIssue(issue)
+    if (issue.step !== step) {
+      const query = new URLSearchParams()
+      if (autoReplyId) query.set('id', autoReplyId)
+      query.set('step', issue.step)
+      router.replace(`/auto-replies/edit?${query.toString()}`)
+    }
+  }, [autoReplyId, router, step])
   const dirty = JSON.stringify(form) !== savedSnapshotRef.current
 
   useEffect(() => {
@@ -522,6 +542,7 @@ function AutoReplyWizardV8Inner() {
   const load = useCallback(async () => {
     setLoadState('loading')
     setLoadError(null)
+    setInputIssue(null)
     try {
       const [draftRes, liveRes, folderRes] = await Promise.all([
         autoReplyId ? api.autoReplies.getDraft(autoReplyId) : Promise.resolve(null),
@@ -698,43 +719,43 @@ function AutoReplyWizardV8Inner() {
   }, [loadState, autoReplyId, step, matchedAccountId, selectedAccountId, loadPriorityData, loadValidation, loadOrder])
 
   /* ===== 保存 ===== */
-  const buildInput = useCallback((): AutoReplyDraftInput | { error: string } => {
+  const buildInput = useCallback((): AutoReplyDraftInput | InputIssue => {
     const effectiveRules = form.keywordRules.filter((rule) => rule.keyword.trim() !== '')
     const firstKeyword = effectiveRules[0]?.keyword.trim() ?? ''
     if (!form.respondToAll && !firstKeyword) {
-      return { error: '反応する言葉を入れてください' }
+      return { error: '反応する言葉を入れてください', field: 'wiz-keywords', step: 'trigger' }
+    }
+    const mismatchNotice = exactAllMismatchNotice(effectiveRules, form.keywordMatchMode)
+    if (mismatchNotice) return { error: mismatchNotice, field: 'wiz-keywords', step: 'trigger' }
+    const conditionIssue = findConditionDraftIssue(
+      form.friendTarget === 'filtered' ? form.friendConditions : null,
+    )
+    if (conditionIssue) return { error: conditionIssue, field: 'wiz-conditions', step: 'trigger' }
+
+    if (form.mode === 'template' && !form.templateId) {
+      return { error: '返すテンプレートを選んでください', field: 'wiz-template', step: 'response' }
+    }
+    if (form.mode === 'inline-text' && !form.responseContent.trim()) {
+      return { error: '返す内容を入力してください', field: 'wiz-content', step: 'response' }
+    }
+    if (form.mode === 'inline-flex') {
+      if (!form.responseContent.trim()) return { error: 'カードの内容を入力してください', field: 'wiz-flex', step: 'response' }
+      const flexError = validateFlexContent('flex', form.responseContent)
+      if (flexError) return { error: flexError, field: 'wiz-flex', step: 'response' }
+    }
+    if (form.mode === 'inline-image' && !readLineImageContent(form.responseContent)) {
+      return { error: '返信する画像を選んでください', field: 'wiz-image', step: 'response' }
     }
     if (form.cooldownOn) {
       const cooldownValue = Number(form.cooldownMinutes)
       if (!Number.isInteger(cooldownValue) || cooldownValue <= 0 || cooldownValue > 10080) {
-        return { error: '「同じ人へ続けて返さない」の時間は1〜10080の整数（分）で入れてください' }
+        return { error: '「同じ人へ続けて返さない」の時間は1〜10080の整数（分）で入れてください', field: 'wiz-cooldown', step: 'response' }
       }
     }
-    if (form.mode === 'template' && !form.templateId) {
-      return { error: '返すテンプレートを選んでください' }
-    }
-    if (form.mode === 'inline-text' && !form.responseContent.trim()) {
-      return { error: '返す内容を入力してください' }
-    }
-    if (form.mode === 'inline-flex') {
-      if (!form.responseContent.trim()) return { error: 'カードの内容を入力してください' }
-      const flexError = validateFlexContent('flex', form.responseContent)
-      if (flexError) return { error: flexError }
-    }
-    if (form.mode === 'inline-image' && !readLineImageContent(form.responseContent)) {
-      return { error: '返信する画像を選んでください' }
-    }
-    const conditionIssue = findConditionDraftIssue(
-      form.friendTarget === 'filtered' ? form.friendConditions : null,
-    )
-    if (conditionIssue) return { error: conditionIssue }
     const accountId = matchedAccountId ?? selectedAccountId ?? accounts[0]?.id ?? null
     if (!accountId) {
       return { error: 'LINEアカウントを選んでから作ってください' }
     }
-    const mismatchNotice = exactAllMismatchNotice(effectiveRules, form.keywordMatchMode)
-    if (mismatchNotice) return { error: mismatchNotice }
-
     const body: AutoReplyDraftInput = {
       keyword: firstKeyword || form.keywordRules[0]?.keyword.trim() || 'すべてのメッセージ',
       matchType: effectiveRules[0]?.matchType ?? form.matchType,
@@ -797,19 +818,10 @@ function AutoReplyWizardV8Inner() {
   const saveDraftNow = useCallback(async (): Promise<{ id: string; accountId: string | null } | null> => {
     const body = buildInput()
     if ('error' in body) {
-      const id = body.error.includes('言葉') ? 'wiz-keyword-add' : body.error.includes('テンプレート') ? 'wiz-template' : body.error.includes('時間は') ? 'wiz-cooldown' : body.error.includes('カードの内容') || form.mode === 'inline-flex' ? 'wiz-flex' : body.error.includes('返す内容') ? 'wiz-content' : null
-      if (id) {
-        setError('')
-        setInputError({ id, message: body.error })
-        const targetStep = id === 'wiz-keyword-add' ? 'trigger' : 'response'
-        if (step !== targetStep) {
-          const query = new URLSearchParams(params.toString())
-          query.set('step', targetStep)
-          router.replace(`/auto-replies/edit?${query.toString()}`)
-        }
-      } else setError(body.error)
+      showInputIssue(body)
       return null
     }
+    setInputIssue(null)
     setSaving(true)
     setError('')
     setSaveNotice('')
@@ -860,7 +872,7 @@ function AutoReplyWizardV8Inner() {
     } finally {
       setSaving(false)
     }
-  }, [buildInput, autoReplyId, versionNumber, form, step, router])
+  }, [buildInput, autoReplyId, versionNumber, form, step, router, showInputIssue])
 
   // `UGrd2`「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
   const reloadAfterConflict = useCallback(async () => {
@@ -911,6 +923,13 @@ function AutoReplyWizardV8Inner() {
     const nextIndex = STEP_ORDER.indexOf(step) + 1
     if (nextIndex >= STEP_ORDER.length) return
     const next = STEP_ORDER[nextIndex]
+    if (step === 'trigger') {
+      const input = buildInput()
+      if ('error' in input && input.step === 'trigger') {
+        showInputIssue(input)
+        return
+      }
+    }
     if (next === 'priority' || next === 'confirm') {
       // 確かめる対象はサーバーの下書き。未保存のままでは確かめられないので、
       // 変更があればここで必ず保存する。
@@ -933,7 +952,7 @@ function AutoReplyWizardV8Inner() {
     } else {
       goToStep(next)
     }
-  }, [step, dirty, autoReplyId, saveDraftNow, matchedAccountId, selectedAccountId, loadPriorityData, loadValidation, loadOrder, goToStep])
+  }, [step, dirty, autoReplyId, saveDraftNow, matchedAccountId, selectedAccountId, loadPriorityData, loadValidation, loadOrder, goToStep, buildInput, showInputIssue])
 
   /* ===== 手順4：順番 ===== */
   /**
@@ -1004,6 +1023,7 @@ function AutoReplyWizardV8Inner() {
   /* ===== 手順4：試しに送る ===== */
   const runTest = useCallback(async () => {
     if (!autoReplyId || !selectedFriendId || !testMessage.trim()) return
+    setInputIssue(null)
     setSaving(true)
     setError('')
     try {
@@ -1043,6 +1063,7 @@ function AutoReplyWizardV8Inner() {
 
   const publish = useCallback(async () => {
     if (!autoReplyId || !publishReady || saving) return
+    setInputIssue(null)
     setSaving(true)
     setError('')
     try {
@@ -1457,13 +1478,7 @@ function AutoReplyWizardV8Inner() {
           ) : (
             `ルール名：${thisRuleName}・${statusBadge}として作っています`
           )}
-        </>} notice={saveConflict ? <SaveConflictBand
-          title={`ほかの人がルール「${thisRuleName}」を先に保存しました`}
-          designNode="UGrd2"
-          compareBusy={compareBusy}
-          onCompare={() => void openCompare()}
-          onReload={() => void reloadAfterConflict()}
-        /> : undefined} noticeSpacing="band" identity={<Link href="/auto-replies" className={styles.backLink}>
+        </>} identity={<Link href="/auto-replies" className={styles.backLink}>
           <ArrowLeft size={14} aria-hidden="true" />
           自動応答へ
         </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={narrow ? <>
@@ -1522,7 +1537,15 @@ function AutoReplyWizardV8Inner() {
               </Button>
             )}
           </>
-        } status={dirty ? '下書きに未保存の変更があります' : undefined}>
+        } noticeSpacing="band" notice={saveConflict ? (
+          <SaveConflictBand
+            title={`ほかの人がルール「${thisRuleName}」を先に保存しました`}
+            designNode="UGrd2"
+            compareBusy={compareBusy}
+            onCompare={() => void openCompare()}
+            onReload={() => void reloadAfterConflict()}
+          />
+        ) : undefined} status={dirty ? '下書きに未保存の変更があります' : undefined}>
 
 
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
@@ -1663,7 +1686,7 @@ function AutoReplyWizardV8Inner() {
                         ))}
                         <span className={styles.kwSpacer} />
                         <KeywordInput
-                          invalid={Boolean(errorFor('wiz-keyword-add'))}
+                          error={fieldError('wiz-keywords')}
                           onAdd={(word) => {
                             const trimmed = word.trim()
                             if (!trimmed) return
@@ -1677,7 +1700,7 @@ function AutoReplyWizardV8Inner() {
                           }}
                         />
                       </div>
-                      {errorText('wiz-keyword-add')}
+                      {fieldError('wiz-keywords') ? <FieldError id="wiz-keywords-error">{fieldError('wiz-keywords')}</FieldError> : null}
                     </div>
                     <div className={styles.pairRow}>
                     <div className={styles.field}>
@@ -1738,7 +1761,7 @@ function AutoReplyWizardV8Inner() {
                   </>
                 )}
 
-                <div className={styles.field}>
+                <div className={`${styles.field} ${!narrow ? styles.kindField : ''}`}>
                   <div className={styles.labelRow}>
                     <span className={styles.label}>反応するメッセージの種類</span>
                     {/* 1152 の板（Z2LIUx）は札の行に余地が無いので、題の行の右に置く。 */}
@@ -1948,11 +1971,14 @@ function AutoReplyWizardV8Inner() {
                   />
                 </RadioCardGroup>
                 {form.friendTarget === 'filtered' ? (
+                  <div id="wiz-conditions" role="group" aria-label="反応する友だちの条件" aria-describedby={fieldError('wiz-conditions') ? 'wiz-conditions-error' : undefined} data-invalid={!!fieldError('wiz-conditions') || undefined} className={styles.compositeField}>
                   <ConditionBuilder
                     value={form.friendConditions}
                     onChange={(next) => patch({ friendConditions: next })}
                     label="反応する友だちの条件"
                   />
+                  {fieldError('wiz-conditions') ? <FieldError id="wiz-conditions-error">{fieldError('wiz-conditions')}</FieldError> : null}
+                  </div>
                 ) : (
                   <p className={styles.hint}>条件を入れないと、全員に反応します。</p>
                 )}
@@ -1988,11 +2014,11 @@ function AutoReplyWizardV8Inner() {
                 </div>
 
                 {form.mode === 'inline-text' && (
-                  <div className={styles.bodyBox}>
+                  <div className={styles.bodyBox} data-invalid={!!fieldError('wiz-content') || undefined}>
                     <InsertTextField
                       id="wiz-content"
-                      aria-invalid={Boolean(errorFor('wiz-content')) || undefined}
-                      aria-describedby={errorFor('wiz-content') ? 'wiz-content-error' : undefined}
+                      aria-invalid={!!fieldError('wiz-content') || undefined}
+                      aria-describedby={fieldError('wiz-content') ? 'wiz-content-error' : undefined}
                       aria-label="返す文"
                       className={styles.bodyText}
                       value={form.responseContent}
@@ -2000,7 +2026,6 @@ function AutoReplyWizardV8Inner() {
                       placeholder="例：予約の変更を承りました。担当者が確認次第ご連絡します。"
                       maxLength={5000}
                     />
-                    {errorText('wiz-content')}
                     <div className={styles.insertChips}>
                       <span className={styles.insertLabel}>差し込む</span>
                       <AutoReplyInsertChips
@@ -2011,6 +2036,7 @@ function AutoReplyWizardV8Inner() {
                         {formatNumber(form.responseContent.length)} / 5,000
                       </span>
                     </div>
+                    {fieldError('wiz-content') ? <FieldError id="wiz-content-error">{fieldError('wiz-content')}</FieldError> : null}
                   </div>
                 )}
 
@@ -2021,7 +2047,7 @@ function AutoReplyWizardV8Inner() {
                     </label>
                     <Select
                       id="wiz-template"
-                      error={errorFor('wiz-template')}
+                      error={fieldError('wiz-template')}
                       aria-label="テンプレート"
                       value={form.templateId ?? ''}
                       onChange={(v) => patch({ templateId: v || null })}
@@ -2044,17 +2070,18 @@ function AutoReplyWizardV8Inner() {
                     </label>
                     <TextArea
                       id="wiz-flex"
-                      invalid={Boolean(errorFor('wiz-flex'))}
-                      aria-describedby={errorFor('wiz-flex') ? 'wiz-flex-error' : undefined}
+                      invalid={!!fieldError('wiz-flex')}
+                      aria-describedby={fieldError('wiz-flex') ? 'wiz-flex-error' : undefined}
                       value={form.responseContent}
                       onChange={(e) => patch({ responseContent: e.target.value })}
                       placeholder='{"type":"bubble", ...}'
                     />
-                    {errorText('wiz-flex')}
+                    {fieldError('wiz-flex') ? <FieldError id="wiz-flex-error">{fieldError('wiz-flex')}</FieldError> : null}
                   </div>
                 )}
 
                 {form.mode === 'inline-image' && (
+                  <div id="wiz-image" role="group" aria-label="返信する画像" aria-describedby={fieldError('wiz-image') ? 'wiz-image-error' : undefined} data-invalid={!!fieldError('wiz-image') || undefined} className={styles.compositeField}>
                   <ImageUploader
                     mode="line-image"
                     label="返信する画像"
@@ -2072,6 +2099,8 @@ function AutoReplyWizardV8Inner() {
                       })
                     }
                   />
+                  {fieldError('wiz-image') ? <FieldError id="wiz-image-error">{fieldError('wiz-image')}</FieldError> : null}
+                  </div>
                 )}
 
                 {form.mode === 'silent' && (
@@ -2116,10 +2145,11 @@ function AutoReplyWizardV8Inner() {
                       <>
                       <span className={styles.toggleUnit}>
                         <input
+                          id="wiz-cooldown"
+                          aria-invalid={!!fieldError('wiz-cooldown') || undefined}
+                          aria-describedby={fieldError('wiz-cooldown') ? 'wiz-cooldown-error' : undefined}
                           type="number"
                           className={styles.toggleNum}
-                          id="wiz-cooldown"
-                          aria-invalid={Boolean(errorFor('wiz-cooldown')) || undefined}
                           aria-label="あける時間（分）"
                           min={1}
                           max={10080}
@@ -2128,7 +2158,6 @@ function AutoReplyWizardV8Inner() {
                         />{' '}
                         分あける
                       </span>
-                      {errorText('wiz-cooldown')}
                       </>
                     ) : (
                       <span className={styles.toggleNote}>何度でも返す</span>
@@ -2140,6 +2169,7 @@ function AutoReplyWizardV8Inner() {
                     />
                   </div>
                 </div>
+                {fieldError('wiz-cooldown') ? <FieldError id="wiz-cooldown-error">{fieldError('wiz-cooldown')}</FieldError> : null}
                 <div className={styles.toggleRow}>
                   <div className={styles.toggleText}>
                     <p className={styles.toggleTitle}>担当者が対応中のトークには返さない</p>
@@ -2526,7 +2556,7 @@ function SummaryRow({
 }
 
 /** 反応する言葉の追加入力。Enter・カンマ・離れると確定する。 */
-function KeywordInput({ onAdd, invalid }: { onAdd: (word: string) => void; invalid?: boolean }) {
+function KeywordInput({ onAdd, error }: { onAdd: (word: string) => void; error?: string }) {
   const [value, setValue] = useState('')
   const commit = () => {
     if (value.trim()) {
@@ -2535,12 +2565,12 @@ function KeywordInput({ onAdd, invalid }: { onAdd: (word: string) => void; inval
     }
   }
   return (
-    <label className={styles.kwInput}>
+    <label className={styles.kwInput} data-invalid={!!error || undefined}>
       <Search size={14} aria-hidden="true" />
       <input
-        id="wiz-keyword-add"
-        aria-invalid={invalid || undefined}
-        aria-describedby={invalid ? 'wiz-keyword-add-error' : undefined}
+        id="wiz-keywords"
+        aria-invalid={!!error || undefined}
+        aria-describedby={error ? 'wiz-keywords-error' : undefined}
         value={value}
         placeholder="言葉を入れて Enter"
         aria-label="反応する言葉を足す"
