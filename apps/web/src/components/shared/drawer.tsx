@@ -11,7 +11,7 @@ export type DrawerDetail = { label: string; value: ReactNode }
 export type DrawerProps = {
   open: boolean
   title: string
-  description?: string
+  description?: ReactNode
   dirty?: boolean
   busy?: boolean
   error?: string
@@ -26,7 +26,7 @@ export type DrawerProps = {
    * 'editor' は 540 の編集の引き出し（ダッシュボード編集 mcOqK：頭 16/20・閉じるは枠つき 30・
    * 中 12/20・下 14/20・開くのは 200ms）。v8 だけで効く。
    */
-  width?: 'narrow' | 'editor'
+  width?: 'narrow' | 'editor' | 'order'
   /** V8 の板ごとの幅。省くと既定の幅。 */
   designWidth?: number
   /** 頭の題の行の下に置くもの（タブ・説明の1行）。渡したときだけ頭を縦に積む。 */

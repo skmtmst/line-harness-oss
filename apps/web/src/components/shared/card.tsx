@@ -4,6 +4,8 @@ import styles from './card.module.css'
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   children: ReactNode
   layout?: 'block' | 'vertical'
+  /** 設定の箱は16の余白・10の間。 */
+  spacing?: 'settings'
   overflow?: 'visible' | 'hidden'
   padding?: 'none' | 'default' | 'roomy' | 'spacious'
   /** V8 の入力の段・右の箱・一覧の小窓。既定のカードは変えない。 */
@@ -18,6 +20,7 @@ export default function Card({
   overflow = 'visible',
   padding = 'none',
   variant = 'default',
+  spacing,
   ...props
 }: CardProps) {
   const classes = [
@@ -34,7 +37,7 @@ export default function Card({
     .join(' ')
 
   return (
-    <section className={classes} data-design-part="card" {...props}>
+    <section className={classes} data-design-part="card" data-spacing={spacing} {...props}>
       {children}
     </section>
   )

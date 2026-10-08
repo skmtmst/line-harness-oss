@@ -126,3 +126,6 @@
 :root:not([data-theme='v8']) .legacyTextarea {
   resize: none;
 }
+
+[data-theme='v8'] .field[data-field-size='compact'] .label { font-size: var(--tpl-rest3-ec-small); line-height: var(--tpl-rest3-ec-label-lh); }
+[data-theme='v8'] .field[data-field-size='compact'] :is(.note, .error) { margin-top: 0; font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }

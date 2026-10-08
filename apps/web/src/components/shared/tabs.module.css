@@ -199,3 +199,13 @@
   background: var(--color-status-warn-soft);
 }
 }
+
+/* EC等の設定本文に入る詰めたタブ。 */
+[data-theme='v8'] .list[data-size='settings'] .items { gap: var(--tpl-sb-tab-gap); }
+[data-theme='v8'] .list[data-size='settings'] .tab {
+  padding-bottom: var(--tpl-sb-tab-pad-bottom);
+  line-height: var(--tpl-sb-row-name-lh);
+  border-bottom: var(--tpl-sb-tab-line) solid transparent;
+}
+[data-theme='v8'] .list[data-size='settings'] .current { border-bottom-color: var(--color-ink); }
+[data-theme='v8'] .list[data-size='settings'] .items[data-sliding='true'] .current { border-bottom-color: transparent; }

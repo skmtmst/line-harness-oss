@@ -45,6 +45,7 @@ export function FieldError({ id, children }: { id: string; children: ReactNode }
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */
 export function Field({
   label,
+  size,
   htmlFor,
   required,
   optional,
@@ -57,6 +58,7 @@ export function Field({
   children,
 }: {
   label: string
+  size?: 'compact'
   htmlFor?: string
   required?: boolean
   /** 任意の入力欄。既存の OptionalBadge をラベルの横に置く。 */
@@ -107,6 +109,7 @@ export function Field({
     <FieldContext.Provider value={{ controlId: htmlFor, describedBy, invalid: Boolean(shownError), required: Boolean(required) }}>
     <div
       className={styles.field}
+      data-field-size={size}
       data-field-quiet={quiet && error ? '' : undefined}
       onInput={error ? () => { if (!quiet) setQuiet(true) } : undefined}
       onBlur={quiet ? () => setQuiet(false) : undefined}

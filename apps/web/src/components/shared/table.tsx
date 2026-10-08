@@ -1,5 +1,5 @@
 import React from 'react'
-import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes } from 'react'
+import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import shell from './data-table.module.css'
 import { loadFailureCopy } from './api-error-message'
 import HelpTip from './help-tip'
@@ -76,7 +76,7 @@ export function Th({
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
 
   return (
-    <th className={classes} scope={scope} {...cellProps}>
+    <th className={classes} data-align={align} scope={scope} {...cellProps}>
       {truncate ? <span className={styles.truncated} title={typeof children === 'string' ? children : undefined}>{children}</span> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
@@ -97,14 +97,21 @@ export function DataTable({
   children,
   className,
   'data-design': dataDesign,
+  columns,
+  density,
+  label,
 }: {
   children: ReactNode
   className?: string
   'data-design'?: string
+  /** 列の幅を持つ設定一覧。共通の枠・セル・行で描く。 */
+  columns?: string
+  density?: 'compact' | 'records'
+  label?: string
 }) {
   return (
-    <div className={[shell.frame, className].filter(Boolean).join(' ')}>
-      <table className={shell.table} data-design={dataDesign}>{children}</table>
+    <div className={[shell.frame, className].filter(Boolean).join(' ')} data-table-density={density} style={columns ? { '--table-columns': columns } as CSSProperties : undefined}>
+      <table className={shell.table} data-design={dataDesign} aria-label={label}>{children}</table>
     </div>
   )
 }
@@ -164,7 +171,7 @@ export function Td({ children, align = 'left', className, ...cellProps }: TdProp
     align === 'center' && styles.center,
     className,
   ].filter(Boolean).join(' ')
-  return <td className={classes} {...cellProps}>{children}</td>
+  return <td className={classes} data-align={align} {...cellProps}>{children}</td>
 }
 
 /** 名前・副題・注記を同じ列にまとめる先頭セル。 */

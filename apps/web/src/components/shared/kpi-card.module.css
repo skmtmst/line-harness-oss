@@ -309,3 +309,29 @@
  */
 [data-theme='v8'] .skeleton { height: 32px; }
 [data-theme='v8'] .card[data-kpi-presentation='band'] .skeleton { height: var(--tpl-band-number-lh); }
+
+/* 取り込み記録の小さいカードと、設定内の22/26の数。指定時だけ使う。 */
+[data-theme='v8'] .card[data-kpi-density='record'] {
+  gap: var(--tpl-sb-kpi-gap); padding: var(--tpl-sb-kpi-pad);
+}
+[data-theme='v8'] .card[data-kpi-density='record'] .head,
+[data-theme='v8'] .card[data-kpi-density='record'] .label,
+[data-theme='v8'] .card[data-kpi-density='record'] .detail {
+  min-height: 0; font-size: var(--tpl-sb-row-sub); line-height: var(--tpl-sb-row-sub-lh);
+}
+[data-theme='v8'] .card[data-kpi-density='record'] .label { font-weight: 600; }
+[data-theme='v8'] .card[data-kpi-density='record'] .number {
+  font-size: var(--tpl-sb-kpi-num); line-height: var(--tpl-sb-kpi-num-lh);
+}
+[data-theme='v8'] .card[data-kpi-metric-size='small'] .label { font-size: var(--tpl-rest3-op-kpi-title); line-height: var(--tpl-rest3-op-kpi-title-lh); }
+[data-theme='v8'] .card[data-kpi-metric-size='small'] .number { font-size: var(--tpl-rest3-op-kpi-num); line-height: var(--tpl-rest3-op-kpi-num-lh); }
+[data-theme='v8'] .card[data-kpi-metric-size='small'] .unit { line-height: var(--tpl-rest3-op-kpi-title-lh); }
+
+[data-theme='v8'] .card[data-kpi-density='mini'] {
+  padding: var(--tpl-rest3-ec-mini-pad); gap: var(--tpl-rest3-ec-mini-inner-gap);
+  border-radius: var(--tpl-rest3-ec-mini-radius); outline: 0; background: var(--color-surface-pearl);
+}
+[data-theme='v8'] .card[data-kpi-density='mini'] .head { min-height: 0; }
+[data-theme='v8'] .card[data-kpi-density='mini'] .label { color: var(--color-ink-secondary); font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
+[data-theme='v8'] .card[data-kpi-density='mini'] .number { font-family: var(--font-sans); font-size: var(--tpl-rest3-ec-mini-num); line-height: var(--tpl-rest3-ec-mini-num-lh); letter-spacing: 0; }
+[data-theme='v8'] .card[data-kpi-density='mini'] .detail { display: none; }
