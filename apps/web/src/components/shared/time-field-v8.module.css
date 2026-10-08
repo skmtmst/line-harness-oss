@@ -1,0 +1,314 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * 時刻の欄（★V8）。Pencil V8.pen 提案 YCOoR「時刻を選ぶ（打つ＋2列から選ぶ）」。
+ *
+ *   欄   高さ 36・余白 [0,6,0,12]・角丸 10・枠 control-border 1px（開く・打つ間は accent-deep 2px）
+ *        値 14px・500・字間 1px。空の「-- : --」は ink-faint。時計は 28 角・印 16
+ *   板   幅 156・余白 8・角丸 12・枠 hairline・影 0 8 24 / 12%・欄の 4px 下
+ *   列   幅 64・見出し 11px・行 30（間 2）・7 行ぶんの高さで中をスクロール。列の間に縦線
+ *        選んだ値は accent-deep の地・白い 600。キーで動かしている行は canvas-sunken
+ *   下   線のあとに「今の時刻」（緑 12px 600）と「消す」（ink-secondary 12px）
+ *   動き 提案 F：開く 150ms（不透明度＋大きさ 0.97→1）。動きを減らす設定では出さない
+ */
+
+.root {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  /* 幅の狭い欄（表の中・84px など）で詰めるために、自分の幅を測れるようにする。 */
+  container-type: inline-size;
+}
+
+.field {
+  display: flex;
+  width: 100%;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px 0 12px;
+  border-radius: var(--radius-field);
+  background: var(--color-canvas);
+  /* 枠は絵と同じく内側の線（outline・内へ寄せる）。開く・打つ間は緑 2px。 */
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  transition: outline-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.field:focus-within,
+.field[data-open] {
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: -2px;
+}
+
+.field[data-invalid] {
+  outline-color: var(--color-danger);
+}
+
+.field[data-readonly] {
+  background: var(--color-canvas-sunken);
+}
+
+.field[data-readonly]:focus-within {
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+}
+
+.field[data-disabled] {
+  background: var(--color-canvas-sunken);
+  opacity: 0.6;
+}
+
+.input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  /* 焦点は欄の枠（緑 2px）で見せる。輪郭は透明で残す（強制色モードでは見える）。 */
+  outline: 2px solid transparent;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.input::placeholder {
+  color: var(--color-ink-faint);
+  opacity: 1;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
+
+.open {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.open :global(svg) {
+  width: 16px;
+  height: 16px;
+}
+
+.open:hover:not(:disabled),
+.field[data-open] .open {
+  background: var(--color-canvas-sunken);
+}
+
+.open:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.open:disabled {
+  cursor: not-allowed;
+}
+
+/*
+ * 狭い欄（120 未満。予約の受付枠・シフトなどの 84px の欄）：字を 13px・字間なしにし、
+ * 余白と時計を詰めて「09 : 00」と時計を1行に収める（切らない）。
+ */
+@container (max-width: 119px) {
+  .field {
+    gap: 2px;
+    padding: 0 4px 0 8px;
+  }
+
+  .input {
+    font-size: 13px;
+    letter-spacing: 0;
+  }
+
+  .open {
+    width: 24px;
+    height: 24px;
+    flex-basis: 24px;
+  }
+
+  .open :global(svg) {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.note {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.note[data-kind='error'] {
+  color: var(--color-danger);
+}
+
+.panel {
+  display: flex;
+  width: 156px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: var(--v8-popover-shadow);
+  color: var(--color-ink);
+  transform-origin: top left;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .panel {
+    /* 提案 F の「開く 150ms」。物差しでは閉じると同じ値（--motion-exit）。 */
+    animation: time-field-v8-in var(--motion-exit) var(--motion-ease-out);
+  }
+}
+
+@keyframes time-field-v8-in {
+  from {
+    opacity: 0;
+    scale: var(--popover-enter-scale);
+  }
+}
+
+.columns {
+  display: flex;
+  gap: 6px;
+}
+
+.column {
+  display: flex;
+  width: 64px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.columnHead {
+  padding-left: 2px;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.divider {
+  width: 1px;
+  flex: 0 0 1px;
+  background: var(--color-hairline);
+}
+
+.list {
+  display: flex;
+  height: 222px; /* 7 行（30×7＋間 2×6） */
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  border-radius: var(--radius-mini);
+  /* 焦点は下の :focus-visible の線で見せる。輪郭は透明で残す。 */
+  outline: 2px solid transparent;
+}
+
+.list::-webkit-scrollbar {
+  display: none;
+}
+
+.list:focus-visible {
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+}
+
+.option {
+  display: flex;
+  height: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-mini);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+}
+
+.option:hover,
+.list:focus-visible .option[data-active] {
+  background: var(--color-canvas-sunken);
+}
+
+.option[data-selected],
+.option[data-selected]:hover,
+.list:focus-visible .option[data-selected][data-active] {
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-weight: 600;
+}
+
+.list:focus-visible .option[data-selected][data-active] {
+  outline: 2px solid var(--color-action-soft);
+  outline-offset: -2px;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.now,
+.clear {
+  min-height: 0;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.now {
+  color: var(--color-accent-deep);
+  font-weight: 600;
+}
+
+.clear {
+  color: var(--color-ink-secondary);
+}
+
+.now:hover,
+.clear:hover {
+  text-decoration: underline;
+}
+
+.now:focus-visible,
+.clear:focus-visible {
+  border-radius: var(--radius-mini);
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+}
