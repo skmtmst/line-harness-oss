@@ -181,7 +181,7 @@ export default function HqTemplateDetail({
   }
   const shortName = (name: string) => name.replace(/^然\s*-NEN-\s*/, '')
   const enterButton = (accountId: string | null) => accountId
-    ? <button type="button" className={styles.ghostButton} onClick={() => onEnterAccount(accountId)}><LogIn size={14} aria-hidden="true" />このアカウントへ入る</button>
+    ? <button type="button" className={styles.ghostButton} onClick={() => onEnterAccount(accountId)} aria-label="このアカウントへ入る"><LogIn size={14} aria-hidden="true" />入る</button>
     : <span className={styles.ghostSpacer} aria-hidden="true" />
   const creator = (version: HqTemplateVersionDisplay) => `${version.creator_name ?? '—'}・${stamp(version.created_at)}`
   const sortedVersions = [...(versions ?? [])].sort((a, b) => b.version - a.version)
