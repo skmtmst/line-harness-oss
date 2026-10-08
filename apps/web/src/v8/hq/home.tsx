@@ -391,8 +391,8 @@ export default function HqHomeV8() {
     }
     return (
       <div className={styles.cardButtons}>
-        <Button className={styles.grow} onClick={() => login(account.id)}>
-          <LogIn aria-hidden="true" className={styles.buttonIcon} />このアカウントへ入る
+        <Button className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`}>
+          <LogIn aria-hidden="true" className={styles.buttonIcon} />入る
         </Button>
         {canManage ? (
           <Button onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`}>
