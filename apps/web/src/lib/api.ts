@@ -1,4 +1,4 @@
-import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts, BannerGenerationCreateOptions } from '@line-crm/shared'
+import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts, BannerGenerationCreateOptions, RichMenuGroupListOptions } from '@line-crm/shared'
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
 import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
@@ -12904,14 +12904,7 @@ export const api = {
     },
   },
   richMenuGroups: {
-    listPage: (accountId: string, input: {
-      page?: number
-      limit?: number
-      query?: string
-      folderId?: string
-      filter?: string
-      sort?: 'priority' | 'taps' | 'updated' | 'name'
-    } = {}) => {
+    listPage: (accountId: string, input: RichMenuGroupListOptions = {}) => {
       const query = new URLSearchParams({ accountId })
       query.set('page', String(input.page ?? 1))
       query.set('limit', String(input.limit ?? 50))

@@ -47,3 +47,13 @@ export interface BannerGenerationCreateOptions {
   /** Reuse for retries of this creation attempt, including after a lost response. */
   idempotencyKey?: string;
 }
+
+export interface RichMenuGroupListOptions {
+  page?: number;
+  /** Server caps each page at 200. Read total before treating a page as all groups. */
+  limit?: number;
+  query?: string;
+  folderId?: string;
+  filter?: string;
+  sort?: 'priority' | 'taps' | 'updated' | 'name';
+}
