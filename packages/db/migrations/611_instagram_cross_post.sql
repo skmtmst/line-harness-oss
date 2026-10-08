@@ -1,6 +1,6 @@
--- 草稿。番号別承認後に司令塔が適用する。
+-- 2026-10-08、利用者が検証環境 D1 nen-line-stg への適用を承認。本番には適用しない。
 -- Instagram 同時投稿（設計正本：新規デザイン/2026-10-08_Instagram連携_Instagram同時投稿/Instagram同時投稿_v01.pen
--- WYDjI / yzZ6i / qPEh8 / sKbNq。2026-10-07 利用者承認）。
+-- WYDjI / yzZ6i / qPEh8 / sKbNq。新規ファイル v01 は 2026-10-08 利用者承認）。
 -- additive-only 規約により CHECK は後から広げられないため、まだ使わない値も最初から入れておく
 -- （instagram_status の 'pending'（送信中に落ちた）と 'skipped'（画像なしで出せなかった）は第2段以降で使う）。
 ALTER TABLE rt_google_posts ADD COLUMN instagram_enabled INTEGER NOT NULL DEFAULT 0 CHECK(instagram_enabled IN (0,1));
