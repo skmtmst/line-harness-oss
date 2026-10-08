@@ -1295,7 +1295,7 @@
   --tpl-sb-hc-banner-pad: 14px 18px; --tpl-sb-hc-banner-icon: 20px; --tpl-sb-hc-banner-title: 15px; --tpl-sb-hc-banner-title-lh: 22px; --tpl-sb-hc-body-lh: 17px; --tpl-sb-hc-alert-pad: 8px 0; --tpl-sb-hc-row-pad: 12px 16px; --tpl-sb-hc-col-judge: 90px; --tpl-sb-hc-col-time: 110px; --tpl-sb-hc-col-how: 220px;
   --tpl-sb-ln-preview-w: 390px; --tpl-sb-ln-brand-track: 0.22em; --tpl-sb-focus-ring: 2px solid var(--color-accent); --tpl-sb-dot-radius: 50%;
   --tpl-sb-line-top: inset 0 1px 0 var(--color-hairline); --tpl-sb-line-top-soft: inset 0 1px 0 var(--color-divider); --tpl-sb-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-sb-line-bottom-soft: inset 0 -1px 0 var(--color-divider);
-  --tpl-inbox-list-width: 372px; --tpl-inbox-summary-width: 260px;
+  --tpl-inbox-list-width: 372px; --tpl-inbox-summary-width: 320px;
   /* 飲食店向け（担当 a：店舗ダッシュボード CHz31・承認 t8WgD8・組織 bSp4h・LINE来店フォロー xLpnS・Googleビジネス j0Wcg ほか）。 */
   --tpl-rt-body-pad: 16px 24px 24px; --tpl-rt-body-gap: 16px; --tpl-rt-card-radius: 12px; --tpl-rt-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-rt-line-top: inset 0 1px 0 var(--color-hairline);
   --tpl-rt-band-pad: 10px 16px; --tpl-rt-band-gap: 12px; --tpl-rt-band-radius: 10px; --tpl-rt-band-bg: #faf6ec; --tpl-rt-band-line: #e7dcc2; --tpl-rt-band-badge-pad: 3px 10px; --tpl-rt-band-dot: 8px; --tpl-rt-band-dot-color: #c9a24b;

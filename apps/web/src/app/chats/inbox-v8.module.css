@@ -271,3 +271,6 @@
   color: var(--color-ink);
   font-weight: 600;
 }
+
+/* hold：右の友だち情報は320。狭い板では今までどおり重ねて開く。 */
+:global([data-theme='v8']) .infoPanel { width: var(--tpl-inbox-summary-width); }

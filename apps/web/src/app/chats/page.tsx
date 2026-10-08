@@ -4507,7 +4507,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               aria-modal={wideInfoPanel ? undefined : true}
               aria-label="顧客情報"
               tabIndex={-1}
-              className={`h-full max-w-full shrink-0 overflow-hidden bg-canvas focus:outline-none ${wideInfoPanel ? `relative z-auto w-[260px] ${isV8 ? '' : 'border-l border-hairline'}` : 'fixed inset-y-0 right-0 z-[70] w-[340px] shadow-overlay'}`}
+              className={`${styles.infoPanel} h-full max-w-full shrink-0 overflow-hidden bg-canvas focus:outline-none ${wideInfoPanel ? `relative z-auto w-[260px] ${isV8 ? '' : 'border-l border-hairline'}` : 'fixed inset-y-0 right-0 z-[70] w-[340px] shadow-overlay'}`}
             >
             {/*
               重なりの中にも閉じるボタンを置く。上部のボタンだけだと、
