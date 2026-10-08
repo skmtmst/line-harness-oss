@@ -148,6 +148,12 @@
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .card { -webkit-font-smoothing: auto; }
 
+/* 誤りの口を渡した選択欄だけ。フォーカスしても赤い枠を残す。 */
+[data-theme='v8'] .invalid,
+[data-theme='v8'] .invalid:hover { outline-color: var(--color-danger); }
+[data-theme='v8'] .invalid .box,
+[data-theme='v8'] .invalid .box:focus-visible { outline-color: var(--color-danger); }
+
 /* ★V8 J5DH6o（統括の一括配信「送るアカウント」）：高さ 56・左右 12・間 10・角丸 10、題 13/600・補足 11、印は真ん中にそろえる。 */
 [data-theme='v8'] .compact { align-items: center; gap: 10px; min-height: 56px; padding: 0 12px; border-radius: var(--radius-control); }
 [data-theme='v8'] .compact .title { font-size: 13px; font-weight: 600; line-height: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .map {
   display: flex;
   flex-direction: column;
@@ -106,3 +108,5 @@
 
 .tile { width: 100%; }
 .occupancy.stopped { background: var(--color-surface-pearl); opacity: 0.6; }
+
+}

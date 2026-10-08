@@ -16,7 +16,7 @@
  *   4. specs/pages/*.md … 仕様が名指しする板ID（対応表に無いと警告だけ出す）
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BOARD_URLS } from './v8-board-urls.mjs'
 
@@ -27,7 +27,7 @@ const DESIGN_DIR = process.env.V8_DESIGN_DIR ?? '/Users/kentakenta/lh-work/desig
 const args = process.argv.slice(2)
 const outIndex = args.indexOf('--out')
 const OUT = outIndex >= 0 && args[outIndex + 1]
-  ? join(ROOT, args[outIndex + 1])
+  ? resolve(ROOT, args[outIndex + 1])
   : join(HERE, 'v8-design-map.json')
 
 /** 表の1行を `|` で割る。見出しと区切り行は捨てる。 */

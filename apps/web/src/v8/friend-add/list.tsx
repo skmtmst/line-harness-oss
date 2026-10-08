@@ -870,6 +870,9 @@ function FriendAddList() {
         <ConfirmDialog
           open={fallbackStop}
           designNode="cFo2p"
+          designWidth={600}
+          designTop={280}
+          designHeaderPadding="24px 24px 8px"
           titleIcon={false}
           title="「経路が分からなかった人」は止められません"
           description="いちばん最後の受け皿なので、止めると誰にも案内が届かなくなります。届く中身を変えたいときは、この設定を編集してください。止めたいときは、先に別の受け皿を有効にしてください。"
@@ -880,10 +883,7 @@ function FriendAddList() {
           }}
           onCancel={() => setFallbackStop(false)}
         >
-          <p className={styles.warnNote}>
-            <AlertCircle size={14} aria-hidden="true" />
-            <span>直近7日では {formatNumber(sinkRule?.matchedLast7Days ?? 0)}人 がこの設定で案内を受け取っています。</span>
-          </p>
+          <Notice tone="warn" message={`直近7日では ${countText(sinkRule?.matchedLast7Days, '人')} がこの設定で案内を受け取っています。`} />
         </ConfirmDialog>
         {/* 通常の設定の一時停止の確かめ。 */}
         <ConfirmDialog

@@ -6,6 +6,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   layout?: 'block' | 'vertical'
   overflow?: 'visible' | 'hidden'
   padding?: 'none' | 'default' | 'roomy' | 'spacious'
+  /** V8 の入力の段・右の箱・一覧の小窓。既定のカードは変えない。 */
+  variant?: 'default' | 'form' | 'aside' | 'panel'
   gap?: 'tight'
   /** 内側の線で寸法を保つカード。指定した面だけに適用。 */
   surface?: 'inset'
@@ -18,12 +20,14 @@ export default function Card({
   layout = 'block',
   overflow = 'visible',
   padding = 'none',
+  variant = 'default',
   gap,
   surface,
   ...props
 }: CardProps) {
   const classes = [
     styles.card,
+    variant !== 'default' ? styles[variant] : null,
     surface === 'inset' ? styles.inset : null,
     gap === 'tight' ? styles.gapTight : null,
     layout === 'vertical' ? styles.vertical : null,

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared';
+import stampStyles from './VisitStamps.module.css';
 import type { VisitStampCard, VisitStampPaperRequest, VisitStampRedemption, VisitStampReward, VisitStampWallet } from '@line-crm/shared';
 import { api, visitStampsApi } from '../lib/api.js';
 import { SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
@@ -23,6 +25,20 @@ import Icon from '../components/ui/Icon.js';
 
 type View = 'card' | 'show' | 'used' | 'paper' | 'pending';
 type Entry = { card: VisitStampCard; wallet: VisitStampWallet };
+
+/** 使用後にページを開き直しても、受け取った次のカードを表示する。 */
+export function currentStampCard(entries: Entry[], wanted: string | null): Entry | null {
+  let entry = entries.find(x => x.card.id === wanted) ?? entries[0] ?? null;
+  const seen = new Set<string>();
+  while (entry && !seen.has(entry.card.id)) {
+    seen.add(entry.card.id);
+    if (entry.card.settings.completion !== 'next_card') break;
+    const next = entries.find(x => x.card.id === entry!.card.settings.nextCardId);
+    if (!next) break;
+    entry = next;
+  }
+  return entry;
+}
 
 const sorted = (rewards: VisitStampReward[]) => [...rewards].sort((a, b) => a.stamps - b.stamps);
 /** マスの数。カードの設定（slotCount）を使い、無い古いカードはいちばん大きい特典の個数。 */
@@ -69,12 +85,12 @@ function Slots({ card, balance }: { card: VisitStampCard; balance: number }) {
             key={n}
             role="listitem"
             aria-label={done ? `${n}個目 済み` : reward ? `${n}個目 ${reward.name}` : `${n}個目`}
-            className={`flex h-13 w-13 flex-col items-center justify-center rounded-full ${done ? 'bg-liff-primary text-(--liff-on-primary)' : 'bg-canvas text-liff-sub'} ${reward ? 'outline-[1.5px] outline-liff-primary' : 'outline outline-liff-line'}`}
+            className={`${stampStyles.slot} ${done ? stampStyles.done : ''}`}
           >
             {done ? <Icon name="check" className="h-6 w-6" /> : reward ? (
               <>
-                <Icon name="gift" className="h-4 w-4 text-liff-primary" />
-                <span className="text-[9px] leading-[14px] font-semibold text-liff-primary">{`${n}個`}</span>
+                <Icon name="gift" className="h-4 w-4" />
+                <span className="text-[9px] leading-[14px] font-semibold">{`${n}個`}</span>
               </>
             ) : <span className="liff-num text-[13px] leading-5">{n}</span>}
           </span>
@@ -128,7 +144,7 @@ export default function VisitStamps() {
       setAccountId(account); setShopName(config.data.accountName ?? '');
       const list = await visitStampsApi.cards(account);
       const wanted = new URLSearchParams(window.location.search).get('card');
-      const found = list.data.find((x) => x.card.id === wanted) ?? list.data[0] ?? null;
+      const found = currentStampCard(list.data, wanted);
       setEntry(found);
       setState(found ? 'ready' : 'empty');
     } catch (e) {
@@ -184,7 +200,7 @@ export default function VisitStamps() {
         onUse={async (pin) => {
           const result = await visitStampsApi.useReward(accountId, redemption.id, pin);
           offerRequest.current = requestId();
-          const fresh = await visitStampsApi.card(accountId, card.id).catch(() => null);
+          const fresh = await visitStampsApi.card(accountId, result.data.nextCardId ?? card.id).catch(() => null);
           const balance = fresh?.data.wallet.balance ?? Math.max(0, wallet.balance - redemption.stamps);
           if (fresh) setEntry({ card: fresh.data.card, wallet: fresh.data.wallet });
           setUsed({ at: new Date(), balance, staffName: result.data.staffName });
@@ -235,17 +251,21 @@ export default function VisitStamps() {
     <LiffLookScope className="min-h-screen bg-canvas" designNode="jQRsr">
       <LiffHeader title="来店スタンプ" />
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 p-5 pb-44">
-        <section className="flex flex-col gap-3 rounded-2xl bg-liff-off-bg p-4 outline outline-liff-line" aria-label={card.name}>
-          <div className="flex items-center">
-            <h1 className="min-w-0 flex-1 truncate text-sm leading-[21px] font-semibold text-ink">{card.name}</h1>
-            <span className="liff-num text-sm leading-[21px] font-bold text-liff-primary">{`${Math.min(wallet.balance, count)} / ${count}`}</span>
+        <section className={stampStyles.card} aria-label={card.name} style={{ backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR, color: visitStampDarkInk(card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR) ? 'var(--color-ink)' : 'var(--color-canvas)' }}>
+          {card.settings.backgroundImageUrl ? <img className={stampStyles.background} src={card.settings.backgroundImageUrl} alt="" /> : null}
+          <div className={stampStyles.content}>
+          <div className={stampStyles.title} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR } : undefined}>
+            <h1 className="min-w-0 flex-1 truncate text-sm leading-[21px] font-semibold">{card.name}</h1>
+            <span className="liff-num text-sm leading-[21px] font-bold">{`${Math.min(wallet.balance, count)} / ${count}`}</span>
           </div>
           <Slots card={card} balance={wallet.balance} />
-          <p className="text-xs leading-[18px] text-liff-sub">
+          {card.settings.instructions ? <p className={stampStyles.instructions} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR } : undefined}>{card.settings.instructions}</p> : null}
+          <p className={stampStyles.expiry} style={card.settings.backgroundImageUrl ? { backgroundColor: card.settings.backgroundColor ?? VISIT_STAMP_DEFAULT_COLOR } : undefined}>
             {wallet.expiresAt
-              ? `期限：${jpDate(wallet.expiresAt)}${card.settings.expiryMonths ? `（最後の来店から ${card.settings.expiryMonths}か月）` : ''}`
-              : card.settings.expiryMonths ? `期限：最後の来店から ${card.settings.expiryMonths}か月` : '期限はありません'}
+              ? `期限：${jpDate(wallet.expiresAt)}${card.settings.expiryMonths ? `（${card.settings.expiryBasis === 'first_visit' ? '最初' : '最後'}の来店から ${card.settings.expiryMonths}か月）` : ''}`
+              : card.settings.expiryBasis !== 'none' && card.settings.expiryMonths ? `期限：${card.settings.expiryBasis === 'first_visit' ? '最初' : '最後'}の来店から ${card.settings.expiryMonths}か月` : '期限はありません'}
           </p>
+          </div>
         </section>
 
         {info.best ? (

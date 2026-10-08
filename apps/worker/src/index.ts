@@ -9,6 +9,7 @@ import { broadcastMediaDirect } from './routes/broadcast-media-direct.js';
 import { hqBroadcasts } from './routes/hq-broadcasts.js';
 import { visitStamps } from './routes/visit-stamps.js';
 import { processVisitStampQueue } from './services/visit-stamps.js';
+import { processVisitStampReminders } from './services/visit-stamp-reminders.js';
 import { Hono, type Context } from 'hono';
 import { noindexHeaderMiddleware, robotsTxtHandler } from './lib/robots.js';
 import { cors } from 'hono/cors';
@@ -1414,6 +1415,8 @@ async function runFrequentHeavyJobs(
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'durable tracked click continuation',run:async()=>{const {processDueTrackedClicks}=await import('./services/tracked-click-steps.js');await processDueTrackedClicks(env);}},
+    {name:'durable banner generation',run:async()=>{const {processDueBannerGenerations}=await import('./services/banner-jobs.js');await processDueBannerGenerations(env);}},
     {name:'API draft and integration retention',run:async()=>{const now=new Date(event.scheduledTime);await purgeExpiredScenarioDrafts(env.DB,now);await purgeInstagramTransientData(env.DB,now);}},
     {name:'booking waitlist expiry and promotion',run:async()=>{const {processBookingWaitlists}=await import('./services/waitlist-tick.js');await processBookingWaitlists(env);}},
     {
@@ -2233,6 +2236,17 @@ async function scheduled(
     }
   } catch (e) {
     console.error('event-waitlist error:', e);
+  }
+
+  // 来店スタンプの期限通知。配信の見張り（observeDispatch）の対応表には未登録なので、
+  // event-waitlist と同じく直接呼ぶ（対応表への追加は Codex の担当で別に行う）。
+  try {
+    await processVisitStampReminders(dbFor(env), {
+      now: new Date(event.scheduledTime), proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+      proxyDispatch: request => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    });
+  } catch {
+    console.error(JSON.stringify({ event: 'visit_stamp_reminders_pending' }));
   }
 
   // 外部Google Calendarで確定したMeet個別相談。前日・1時間前のLINE通知を

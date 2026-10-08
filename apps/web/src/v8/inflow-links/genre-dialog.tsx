@@ -10,8 +10,10 @@ import { useId, useState } from 'react'
 import type { EntryRouteGenre } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import { focusField } from './focus-field'
 import { isImeComposing } from '@/components/shared/ime'
-import styles from './list.module.css'
 
 export default function GenreDialog({
   genre,
@@ -25,11 +27,15 @@ export default function GenreDialog({
   const [name, setName] = useState(genre?.name ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [nameError, setNameError] = useState('')
   const inputId = useId()
 
   const save = async () => {
     const normalized = name.trim()
-    if (!normalized || submitting) return
+    if (submitting) return
+    setError('')
+    setNameError('')
+    if (!normalized) { setNameError('フォルダ名を入力してください'); focusField(inputId); return }
     setSubmitting(true)
     setError('')
     try {
@@ -44,9 +50,10 @@ export default function GenreDialog({
       onSaved(response.data, genre?.name ?? null)
     } catch (err) {
       setSubmitting(false)
-      setError(err instanceof ApiError && err.status === 409
-        ? '同じ名前のフォルダが既にあります。'
-        : 'フォルダを保存できませんでした。')
+      if (err instanceof ApiError && err.status === 409) {
+        setNameError('同じ名前のフォルダが既にあります。')
+        focusField(inputId)
+      } else setError('フォルダを保存できませんでした。')
     }
   }
 
@@ -56,25 +63,26 @@ export default function GenreDialog({
       title={genre ? 'フォルダ名を変更' : 'フォルダを追加'}
       description="協力会社名や媒体のまとまりなど、流入リンクをまとめる名前を入れてください。消しても、中の経路は未分類に残ります。"
       busy={submitting}
+      initialFocusId={nameError ? inputId : undefined}
       error={error || undefined}
       confirmLabel={genre ? '保存する' : 'フォルダを作る'}
       onCancel={onClose}
       onConfirm={() => void save()}
     >
-      <label className={styles.dialogLabel} htmlFor={inputId}>フォルダ名</label>
-      <input
+      <Field label="フォルダ名" htmlFor={inputId} error={nameError}>
+      <TextField
         id={inputId}
         autoFocus
         value={name}
-        onChange={(event) => setName(event.target.value)}
+        onChange={(event) => { setName(event.target.value); setNameError('') }}
         onKeyDown={(event) => {
           // 変換の確定の Enter で書きかけの名前を保存しない。
           if (event.key === 'Enter' && !isImeComposing(event)) void save()
         }}
         maxLength={80}
         placeholder="例: A店"
-        className={styles.dialogInput}
       />
+      </Field>
     </Dialog>
   )
 }

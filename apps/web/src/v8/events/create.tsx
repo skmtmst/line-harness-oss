@@ -9,10 +9,9 @@
  * 今の作り（3段階のウィザード）と同じ口を使う：イベントを作る → 最初の枠を作る。
  * 公開は作るときに is_published=1 で送る。絵と今の作りの違いは BEHAVIOR.md。
  */
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Globe, User, Users, X } from 'lucide-react'
+import { Globe, User, Users, X } from 'lucide-react'
 import { ApiError, eventsApi, type EventDetail, type EventQuestion } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -25,6 +24,8 @@ import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { TextField } from '@/components/shared/text-field'
+import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import ApplicationPreview from './application-preview'
 import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso, todayJst } from './shared'
@@ -85,7 +86,22 @@ function EventsCreateV8Inner() {
   const [adding, setAdding] = useState<QuestionDraft | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [nameError, setNameError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const focusTarget = useRef<string | null>(null)
+  useEffect(() => {
+    const id = focusTarget.current
+    if (!id) return
+    focusTarget.current = null
+    const field = document.getElementById(id)
+    field?.focus()
+    field?.scrollIntoView({ block: 'center' })
+  }, [fieldErrors])
+  const clearFieldError = (id: string) => setFieldErrors((current) => {
+    if (!current[id]) return current
+    const next = { ...current }
+    delete next[id]
+    return next
+  })
   const createdIdRef = useRef<string | null>(null)
 
   const update = <K extends keyof EventDetail>(key: K, value: EventDetail[K]) => setDraft((current) => ({ ...current, [key]: value }))
@@ -95,29 +111,32 @@ function EventsCreateV8Inner() {
   const dirty = snapshot !== initialRef.current
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
-  const slotError = useMemo(() => {
-    if (!date || !startTime || !endTime) return '日付・開始・終了を入れてください'
-    if (endTime <= startTime) return '終了は開始より後にしてください'
-    const cap = Number(capacity)
-    if (!Number.isInteger(cap) || cap < 1) return '定員は1以上の数で入れてください'
-    return null
-  }, [date, startTime, endTime, capacity])
-
   async function save(publish: boolean) {
     if (saving || !canEdit) return
     if (!selectedAccountId) {
       setError('上のバーでLINE公式アカウントを選んでください')
       return
     }
-    if (!draft.name.trim()) {
-      setNameError('イベント名を入れてください')
-      setError('直す所があります。赤い理由を確かめてください。')
-      return
+    const errors: Record<string, string> = {}
+    if (!draft.name.trim()) errors['ev-new-name'] = 'イベント名を入れてください'
+    if (draft.venue_url) {
+      try {
+        const url = new URL(draft.venue_url)
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('protocol')
+      } catch {
+        errors['ev-new-url'] = 'http または https で始まる URL を入れてください'
+      }
     }
-    if (slotError) {
-      setError(slotError)
-      return
-    }
+    if (!date) errors['ev-new-date'] = '日付を選んでください'
+    if (!startTime) errors['ev-new-start'] = '開始の時刻を入れてください'
+    if (!endTime) errors['ev-new-end'] = '終わりの時刻を入れてください'
+    else if (startTime && endTime <= startTime) errors['ev-new-end'] = '終了は開始より後にしてください'
+    const cap = Number(capacity)
+    if (!Number.isInteger(cap) || cap < 1) errors['ev-new-cap'] = '定員は1以上の数で入れてください'
+    setError(null)
+    focusTarget.current = Object.keys(errors)[0] ?? null
+    setFieldErrors(errors)
+    if (focusTarget.current) return
     setSaving(true)
     setError(null)
     let eventId = createdIdRef.current
@@ -158,7 +177,6 @@ function EventsCreateV8Inner() {
     }
   }
 
-  const back = <Link href="/events" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />イベント予約へ</Link>
   const capNumber = Number(capacity)
   const previewWhen = `${formatDay(date)} ${startTime}〜${draft.venue_name ? `・${draft.venue_name}` : ''}`
 
@@ -200,7 +218,6 @@ function EventsCreateV8Inner() {
         boardId="d4adD4"
         title="イベントを作る"
         description="中身・回と定員・申し込みのきまりを決めます。下書きのあいだは、お客さまには見えません。"
-        identity={back}
         footerActions={<Button href="/events">一覧へ戻る</Button>}
       >
         <Notice tone="info">イベントを作れるのは統括と管理者だけです。必要なときは統括に頼んでください。</Notice>
@@ -213,7 +230,6 @@ function EventsCreateV8Inner() {
       boardId="d4adD4"
       title="イベントを作る"
       description="中身・回と定員・申し込みのきまりを決めます。下書きのあいだは、お客さまには見えません。"
-      identity={back}
       preview={side}
       status={saving ? '保存しています…' : undefined}
       footerActions={(
@@ -230,27 +246,25 @@ function EventsCreateV8Inner() {
         <h2 className={styles.cardTitle} id="ev-new-body">イベントの中身</h2>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="ev-new-name">イベント名</label>
-          <input
+          <TextField
             id="ev-new-name"
-            className={styles.input}
             value={draft.name}
             maxLength={255}
             placeholder="秋のしつけ教室（第1回）"
-            aria-invalid={nameError ? true : undefined}
+            aria-invalid={Boolean(fieldErrors['ev-new-name']) || undefined}
+            aria-describedby={fieldErrors['ev-new-name'] ? 'ev-new-name-error' : undefined}
             required
             onChange={(event) => {
               update('name', event.target.value)
-              if (nameError && event.target.value.trim()) setNameError(null)
+              clearFieldError('ev-new-name')
             }}
-            onBlur={() => setNameError(draft.name.trim() ? null : 'イベント名を入れてください')}
           />
-          {nameError ? <p className={styles.fieldError} role="alert">{nameError}</p> : null}
+          {fieldErrors['ev-new-name'] ? <p id="ev-new-name-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-name']}</p> : null}
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="ev-new-desc">説明</label>
-          <input
+          <TextField
             id="ev-new-desc"
-            className={styles.input}
             value={draft.description ?? ''}
             maxLength={20000}
             placeholder="開催趣旨・注意事項・持ち物など"
@@ -260,9 +274,8 @@ function EventsCreateV8Inner() {
         <div className={styles.pair}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="ev-new-venue">場所</label>
-            <input
+            <TextField
               id="ev-new-venue"
-              className={styles.input}
               value={draft.venue_name ?? ''}
               placeholder="渋谷ベース 3F"
               onChange={(event) => update('venue_name', event.target.value || null)}
@@ -273,14 +286,16 @@ function EventsCreateV8Inner() {
               <label className={styles.label} htmlFor="ev-new-url">オンラインの URL</label>
               <span className={styles.optional}>任意</span>
             </span>
-            <input
+            <TextField
               id="ev-new-url"
               type="url"
-              className={styles.input}
               value={draft.venue_url ?? ''}
               placeholder="https://…（確定した人だけに見せます）"
-              onChange={(event) => update('venue_url', event.target.value || null)}
+              aria-invalid={Boolean(fieldErrors['ev-new-url']) || undefined}
+              aria-describedby={fieldErrors['ev-new-url'] ? 'ev-new-url-error' : undefined}
+              onChange={(event) => { update('venue_url', event.target.value || null); clearFieldError('ev-new-url') }}
             />
+            {fieldErrors['ev-new-url'] ? <p id="ev-new-url-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-url']}</p> : null}
           </div>
         </div>
       </section>
@@ -314,31 +329,35 @@ function EventsCreateV8Inner() {
           <h2 className={styles.cardTitle} id="ev-new-slot">最初の予約枠</h2>
           <p className={styles.cardNote}>あとから回を足せます（中身を見る → 回を足す）</p>
         </div>
-        <div className={styles.pair}>
+        <div className={`${styles.pair} ${styles.datePair}`}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="ev-new-date">日付</label>
-            <input id="ev-new-date" type="date" className={styles.input} value={date} onChange={(event) => setDate(event.target.value)} />
+            <DateField id="ev-new-date" value={date} invalid={Boolean(fieldErrors['ev-new-date'])} aria-describedby={fieldErrors['ev-new-date'] ? 'ev-new-date-error' : undefined} onChange={(value) => { setDate(value); clearFieldError('ev-new-date') }} />
+            {fieldErrors['ev-new-date'] ? <p id="ev-new-date-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-date']}</p> : null}
           </div>
           <div className={styles.field}>
             <span className={styles.label} id="ev-new-time-label">開始</span>
             <div className={styles.timeRow} role="group" aria-labelledby="ev-new-time-label">
-              <TimeField aria-label="開始の時刻" value={startTime} onChange={setStartTime} />
+              <TimeField id="ev-new-start" aria-label="開始の時刻" invalid={Boolean(fieldErrors['ev-new-start'])} aria-describedby={fieldErrors['ev-new-start'] ? 'ev-new-time-error' : undefined} value={startTime} onChange={(value) => { setStartTime(value); clearFieldError('ev-new-start'); clearFieldError('ev-new-end') }} />
               <span className={styles.timeSep} aria-hidden="true">〜</span>
-              <TimeField aria-label="終わりの時刻" value={endTime} onChange={setEndTime} />
+              <TimeField id="ev-new-end" aria-label="終わりの時刻" invalid={Boolean(fieldErrors['ev-new-end'])} aria-describedby={fieldErrors['ev-new-end'] ? 'ev-new-time-error' : undefined} value={endTime} onChange={(value) => { setEndTime(value); clearFieldError('ev-new-end') }} />
             </div>
+            {fieldErrors['ev-new-start'] || fieldErrors['ev-new-end'] ? <p id="ev-new-time-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-start'] || fieldErrors['ev-new-end']}</p> : null}
           </div>
         </div>
         <div className={styles.pair}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="ev-new-cap">定員</label>
-            <input
+            <TextField
               id="ev-new-cap"
               inputMode="numeric"
-              className={styles.input}
               value={capacity}
               placeholder="20 人"
-              onChange={(event) => setCapacity(event.target.value.replace(/[^0-9]/g, ''))}
+              aria-invalid={Boolean(fieldErrors['ev-new-cap']) || undefined}
+              aria-describedby={fieldErrors['ev-new-cap'] ? 'ev-new-cap-error' : undefined}
+              onChange={(event) => { setCapacity(event.target.value.replace(/[^0-9]/g, '')); clearFieldError('ev-new-cap') }}
             />
+            {fieldErrors['ev-new-cap'] ? <p id="ev-new-cap-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-cap']}</p> : null}
           </div>
           <div className={styles.field}>
             <span className={styles.pickLabel}>1人あたりの予約回数</span>
@@ -421,8 +440,7 @@ function EventsCreateV8Inner() {
         )}
         {adding ? (
           <div className={styles.addRow}>
-            <input
-              className={styles.input}
+            <TextField
               aria-label="聞くこと"
               placeholder="例：ペットの名前と年齢"
               value={adding.label}
