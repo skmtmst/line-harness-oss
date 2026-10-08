@@ -84,7 +84,7 @@ const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; s
 ]
 
 export default function OffersTab() {
-  const { readonly, narrow, setCount } = useAffiliateShell()
+  const { readonly, narrow, setCount, accountId } = useAffiliateShell()
   const settlementPeriod = useMemo(() => currentSettlementPeriod(), [])
 
   const [offers, setOffers] = useState<AffiliateOffer[]>([])
@@ -150,7 +150,7 @@ export default function OffersTab() {
   const loadApprovals = useCallback(async () => {
     setApprovalState('loading')
     try {
-      const results = await Promise.all((['pending', 'approved'] as const).map((status) => listAllConversionApprovals(status)))
+      const results = await Promise.all((['pending', 'approved'] as const).map((status) => listAllConversionApprovals(status, 0, { accountId })))
       if (!mounted.current) return
       setApprovals(results.flatMap((result) => result.items))
       setApprovalsTruncated(results.some((result) => result.truncated))
@@ -158,7 +158,7 @@ export default function OffersTab() {
     } catch {
       if (mounted.current) setApprovalState('error')
     }
-  }, [])
+  }, [accountId])
 
   const loadMonthly = useCallback(async () => {
     setMonthlyState('loading')
