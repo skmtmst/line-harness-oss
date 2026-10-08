@@ -230,13 +230,13 @@ export async function listHqTemplateDisplaySources(
       FROM hq_template_distribution_results r
       JOIN templates t ON t.id=r.template_id AND t.tenant_id=r.tenant_id
       JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
-      WHERE r.tenant_id=?1 AND r.status='succeeded'
+      WHERE r.tenant_id=?1 AND r.status='succeeded' AND NOT EXISTS (SELECT 1 FROM hq_template_preflight_resolutions skipped WHERE skipped.preflight_id=r.preflight_id AND skipped.tenant_id=r.tenant_id AND skipped.friend_attribute_mode='skip')
     ), received AS (
       SELECT r.template_id,r.target_account_id,r.template_version_id,
         ROW_NUMBER() OVER (PARTITION BY r.template_id,r.target_account_id ORDER BY r.finished_at DESC,r.started_at DESC,r.rowid DESC) AS position
       FROM hq_template_distribution_results r
       JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
-      WHERE r.tenant_id=?1 AND r.status='succeeded'
+      WHERE r.tenant_id=?1 AND r.status='succeeded' AND NOT EXISTS (SELECT 1 FROM hq_template_preflight_resolutions skipped WHERE skipped.preflight_id=r.preflight_id AND skipped.tenant_id=r.tenant_id AND skipped.friend_attribute_mode='skip')
     ), outdated AS (
       SELECT r.template_id,COUNT(*) AS count FROM received r JOIN templates t ON t.id=r.template_id
       WHERE r.position=1 AND r.template_version_id<>t.current_version_id GROUP BY r.template_id
@@ -250,7 +250,7 @@ export async function listHqTemplateDisplaySources(
         AND p.target_account_id=r.target_account_id AND p.item_kind='template'
         AND p.source_id='template:' || json_extract(v.definition_json,'$.template.id')
       JOIN messages_log m ON m.template_id_at_send=p.target_id AND m.line_account_id=r.target_account_id
-      WHERE r.tenant_id=?1 AND r.status='succeeded' AND m.direction='outgoing'
+      WHERE r.tenant_id=?1 AND r.status='succeeded' AND NOT EXISTS (SELECT 1 FROM hq_template_preflight_resolutions skipped WHERE skipped.preflight_id=r.preflight_id AND skipped.tenant_id=r.tenant_id AND skipped.friend_attribute_mode='skip') AND m.direction='outgoing'
         AND COALESCE(m.delivery_type,'')<>'test' AND substr(m.created_at,1,7)=strftime('%Y-%m','now','+9 hours')
       GROUP BY r.template_id
     ), tag_population AS (
@@ -259,6 +259,25 @@ export async function listHqTemplateDisplaySources(
       JOIN hq_template_preflight_resolutions p ON p.preflight_id=r.preflight_id AND p.tenant_id=r.tenant_id
         AND p.target_account_id=r.target_account_id AND p.item_kind='tag' AND p.source_id='tag'
       JOIN friend_tags ft ON ft.tag_id=p.target_id JOIN friends f ON f.id=ft.friend_id AND f.line_account_id=r.target_account_id
+      WHERE r.tenant_id=?1 AND r.status='succeeded' AND NOT EXISTS (SELECT 1 FROM hq_template_preflight_resolutions skipped WHERE skipped.preflight_id=r.preflight_id AND skipped.tenant_id=r.tenant_id AND skipped.friend_attribute_mode='skip') GROUP BY r.template_id
+    ), field_population AS (
+      SELECT r.template_id,COUNT(DISTINCT f.id) AS count FROM hq_template_distribution_results r
+      JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
+      JOIN hq_template_preflight_resolutions p ON p.preflight_id=r.preflight_id AND p.tenant_id=r.tenant_id
+        AND p.target_account_id=r.target_account_id AND p.item_kind='friend_field' AND p.friend_attribute_mode IS NULL
+      JOIN friend_field_scopes scope ON scope.field_id=p.target_id AND scope.tenant_id=r.tenant_id AND scope.line_account_id=r.target_account_id
+      JOIN friend_field_values value ON value.field_id=p.target_id AND (
+        (value.value IS NOT NULL AND value.value<>'') OR value.media_id IS NOT NULL OR value.value_number IS NOT NULL
+        OR value.value_date IS NOT NULL OR value.value_datetime IS NOT NULL OR (value.value_text IS NOT NULL AND value.value_text<>''))
+      JOIN friends f ON f.id=value.friend_id AND f.line_account_id=r.target_account_id
+      WHERE r.tenant_id=?1 AND r.status='succeeded' GROUP BY r.template_id
+    ), mark_population AS (
+      SELECT r.template_id,COUNT(DISTINCT f.id) AS count FROM hq_template_distribution_results r
+      JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
+      JOIN hq_template_preflight_resolutions p ON p.preflight_id=r.preflight_id AND p.tenant_id=r.tenant_id
+        AND p.target_account_id=r.target_account_id AND p.item_kind='mark' AND p.friend_attribute_mode IS NULL
+      JOIN support_mark_scopes scope ON scope.mark_id=p.target_id AND scope.tenant_id=r.tenant_id AND scope.line_account_id=r.target_account_id
+      JOIN friends f ON f.support_mark_id=p.target_id AND f.line_account_id=r.target_account_id
       WHERE r.tenant_id=?1 AND r.status='succeeded' GROUP BY r.template_id
     ), menu_taps AS (
       SELECT r.template_id,COUNT(DISTINCT tap.id) AS count FROM hq_template_distribution_results r
@@ -266,7 +285,7 @@ export async function listHqTemplateDisplaySources(
       JOIN hq_template_preflight_resolutions p ON p.preflight_id=r.preflight_id AND p.tenant_id=r.tenant_id
         AND p.target_account_id=r.target_account_id AND p.item_kind='rich_menu'
       JOIN rich_menu_area_taps tap ON tap.group_id=p.target_id AND tap.line_account_id=r.target_account_id
-      WHERE r.tenant_id=?1 AND r.status='succeeded' GROUP BY r.template_id
+      WHERE r.tenant_id=?1 AND r.status='succeeded' AND NOT EXISTS (SELECT 1 FROM hq_template_preflight_resolutions skipped WHERE skipped.preflight_id=r.preflight_id AND skipped.tenant_id=r.tenant_id AND skipped.friend_attribute_mode='skip') GROUP BY r.template_id
     ), ranked_accounts AS (
       SELECT *, ROW_NUMBER() OVER (PARTITION BY template_id ORDER BY name,account_id) AS position
       FROM successful_accounts
@@ -280,7 +299,7 @@ export async function listHqTemplateDisplaySources(
       COALESCE(d.account_count,0) AS distributed_account_count,
       COALESCE(d.names_json,'[]') AS distributed_account_names_json,
       CASE WHEN json_type(CASE WHEN json_valid(v.definition_json) THEN v.definition_json ELSE '{}' END,'$.asset')='object' THEN NULL ELSE COALESCE(s.count,0) END AS this_month_sent_count, COALESCE(o.count,0) AS outdated_account_count, v.version AS current_version,
-      CASE WHEN t.display_type='tag' THEN COALESCE(tp.count,0) ELSE NULL END AS friend_count,
+      CASE t.display_type WHEN 'tag' THEN COALESCE(tp.count,0) WHEN 'friend_field' THEN COALESCE(fp.count,0) WHEN 'mark' THEN COALESCE(mp.count,0) ELSE NULL END AS friend_count,
       CASE WHEN t.display_type='rich_menu' THEN COALESCE(mt.count,0) ELSE NULL END AS tap_count
     FROM templates t
     LEFT JOIN hq_template_versions v ON v.id=t.current_version_id
@@ -289,6 +308,8 @@ export async function listHqTemplateDisplaySources(
     LEFT JOIN outdated o ON o.template_id=t.id
     LEFT JOIN sent s ON s.template_id=t.id
     LEFT JOIN tag_population tp ON tp.template_id=t.id
+    LEFT JOIN field_population fp ON fp.template_id=t.id
+    LEFT JOIN mark_population mp ON mp.template_id=t.id
     LEFT JOIN menu_taps mt ON mt.template_id=t.id
     ORDER BY t.updated_at DESC,t.id
   `).bind(tenantId, type ?? null).all<HqTemplateListSource>();

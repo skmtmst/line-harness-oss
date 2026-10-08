@@ -1,4 +1,5 @@
 import type { FriendFieldType } from './types.js';
+import type { HqTemplateListStats } from "./hq-template-distribution-display.js";
 import type { HqTemplateListDisplay } from './hq-template-list.js';
 export type HqFriendAttributeType = 'friend_field' | 'mark';
 export type HqFriendAttributeMode = 'create' | 'overwrite' | 'alias' | 'skip';
@@ -35,3 +36,7 @@ export type HqFriendAttributeDetail = {
   [K in HqFriendAttributeType]: { template: Omit<HqFriendAttributeTemplate, keyof HqTemplateListDisplay> & { template_type: K }; definition: HqFriendAttributeDefinitions[K] }
 }[HqFriendAttributeType];
 export interface HqAttributeKindCounts { tag: number; friend_field: number; support_mark: number }
+
+export interface HqFriendAttributeListStats extends HqTemplateListStats {
+  totalTemplates: number; distributedAccountCount: number; undistributedTemplateCount: number;
+}

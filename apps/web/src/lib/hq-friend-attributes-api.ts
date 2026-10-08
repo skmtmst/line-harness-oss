@@ -1,4 +1,4 @@
-import type { HqFriendAttributeType, HqFriendAttributeMode, HqFriendAttributeInput, HqFriendAttributeDetail, HqFriendAttributeTemplate, HqAttributeKindCounts, HqTemplatePreflightDisplay, HqTemplateResultDisplay, HqTemplateListStats } from '@line-crm/shared';
+import type { HqFriendAttributeType, HqFriendAttributeMode, HqFriendAttributeInput, HqFriendAttributeDetail, HqFriendAttributeTemplate, HqAttributeKindCounts, HqTemplatePreflightDisplay, HqTemplateResultDisplay, HqFriendAttributeListStats } from '@line-crm/shared';
 import { requestHqTemplate, hqTemplatesApi, fetchHqTemplateVersions, compareHqTemplateVersions, fetchHqTemplateReceivedVersions } from './hq-templates-api';
 import { fetchApi } from './api';
 export interface HqAttributePreflightItem {
@@ -20,8 +20,8 @@ const path = (id: string) => `/${encodeURIComponent(id)}`;
 export const hqFriendAttributesApi = {
   list: (type: HqFriendAttributeType) => requestHqTemplate<HqFriendAttributeTemplate[]>(`?type=${type}`),
   kindCounts: () => requestHqTemplate<HqAttributeKindCounts>('/attribute-kind-counts'),
-  listStats: async (type: HqFriendAttributeType): Promise<HqTemplateListStats> => {
-    const result = await fetchApi<{success: true; stats: HqTemplateListStats}>(`/api/hq/templates?type=${type}`);
+  listStats: async (type: HqFriendAttributeType): Promise<HqFriendAttributeListStats> => {
+    const result = await fetchApi<{success: true; stats: HqFriendAttributeListStats}>(`/api/hq/templates?type=${type}`);
     return result.stats;
   },
   get: (id: string) => requestHqTemplate<HqFriendAttributeDetail>(path(id)),

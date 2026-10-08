@@ -149,6 +149,14 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
             return {manual_assignment_allowed:tag.manualAssignmentAllowed!==false,
               assignment_method:tag.manualAssignmentAllowed!==false?'手動・自動':'自動'};
           }
+          if(template.template_type==='friend_field'&&definition_json) {
+            const field=parseFriendFieldDefinition(JSON.parse(definition_json)).field;
+            return {assignment_method:({manual:'手動',form:'フォーム',ec:'EC連携',automation:'自動'} as const)[field.source??'manual'],manual_assignment_allowed:!field.ecIsMaster};
+          }
+          if(template.template_type==='mark'&&definition_json) {
+            const mark=parseMarkDefinition(JSON.parse(definition_json)).mark;
+            return {assignment_method:mark.autoOnInbound?'受信時に自動':'手動',manual_assignment_allowed:true};
+          }
           if(template.template_type==='rich_menu'&&definition_json) {
             const menu=parseRichMenuTemplateDefinition({templateVersionId:'list',definitionJson:definition_json},authority.tenantId).richMenu;
             return {display_order:menu.displayOrder??0,display_audience:menu.displayAudience==='all'?'全員':'配布先で店が決める'};
@@ -378,7 +386,7 @@ export async function templateVersions(db: D1Database, authority: HqTemplateAuth
   await templateDetail(db, authority, id);
   const rows = await db.prepare(`SELECT v.id,v.version,v.created_by,s.name AS creator_name,v.created_at,
       NOT EXISTS(SELECT 1 FROM hq_template_distribution_results r WHERE r.tenant_id=v.tenant_id AND r.template_id=v.template_id
-        AND r.template_version_id=v.id AND r.status='succeeded') AS is_draft,
+        AND r.template_version_id=v.id AND r.status='succeeded' AND NOT EXISTS (SELECT 1 FROM hq_template_preflight_resolutions skipped WHERE skipped.preflight_id=r.preflight_id AND skipped.tenant_id=r.tenant_id AND skipped.friend_attribute_mode='skip')) AS is_draft,
       v.id=t.current_version_id AS is_current
     FROM hq_template_versions v JOIN hq_templates t ON t.id=v.template_id AND t.tenant_id=v.tenant_id
     LEFT JOIN staff_members s ON s.id=v.created_by AND s.tenant_id=v.tenant_id
@@ -413,7 +421,7 @@ export async function templateReceivedVersions(db: D1Database, authority: HqTemp
     .bind(authority.tenantId,id,template.current_version_id).first<{version:number}>();
   const rows=await db.prepare(`WITH ranked AS (
       SELECT r.*, ROW_NUMBER() OVER (PARTITION BY target_account_id ORDER BY finished_at DESC,started_at DESC,rowid DESC) AS position
-      FROM hq_template_distribution_results r WHERE tenant_id=? AND template_id=? AND status='succeeded')
+      FROM hq_template_distribution_results r WHERE tenant_id=? AND template_id=? AND status='succeeded' AND NOT EXISTS (SELECT 1 FROM hq_template_preflight_resolutions skipped WHERE skipped.preflight_id=r.preflight_id AND skipped.tenant_id=r.tenant_id AND skipped.friend_attribute_mode='skip'))
     SELECT a.id,a.name,r.finished_at,v.version FROM ranked r
     JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
     JOIN hq_template_versions v ON v.id=r.template_version_id AND v.tenant_id=r.tenant_id AND v.template_id=r.template_id

@@ -5,7 +5,7 @@ import { listMessageReferences } from '../services/hq-templates/message-card-ref
 import { deleteHqImage, uploadHqImage, uploadHqImagemap } from '../services/hq-templates/authoring-media.js';
 import { TemplateHqTemplateError } from '../services/hq-templates/template.js';
 import { Hono, type Context } from 'hono';
-import { HQ_TEMPLATE_TYPES, getStaffById, type HqTemplateType } from '@line-crm/db';
+import { HQ_TEMPLATE_TYPES, getStaffById, getHqTemplate, type HqTemplateType } from '@line-crm/db';
 import { dbFor } from '../services/db-router.js';
 import type { Env } from '../index.js';
 import { requireHqTemplateAuthority, type HqTemplateAuthority } from '../services/hq-templates/contract.js';
@@ -97,16 +97,26 @@ hqTemplates.get('/api/hq/templates', async c => {
   const type = c.req.query('type');
   if (type && !HQ_TEMPLATE_TYPES.includes(type as HqTemplateType)) throw new HqTemplateError('INVALID_TYPE');
   const kind=c.req.query('kind');
-  if(kind && (kind==='tag' ? (type && type!=='tag') : (!TEMPLATE_KINDS.includes(kind as TemplateKind) || (type && type!=='template')))) throw new HqTemplateError('INVALID_KIND');
-  const rows=await listTemplates(dbFor(c.env),await authority(c),kind==='tag'?'tag':kind?'template':type as HqTemplateType | undefined);
+  const attributeType=kind==='friend_field'?'friend_field':kind==='support_mark'?'mark':null;
+  if(attributeType&&type&&type!==attributeType) throw new HqTemplateError('INVALID_KIND');
+  if(kind&&!attributeType && (kind==='tag' ? (type && type!=='tag') : (!TEMPLATE_KINDS.includes(kind as TemplateKind) || (type && type!=='template')))) throw new HqTemplateError('INVALID_KIND');
+  const rows=await listTemplates(dbFor(c.env),await authority(c),attributeType??(kind==='tag'?'tag':kind?'template':type as HqTemplateType | undefined));
   const counts=Object.fromEntries(TEMPLATE_KINDS.map(k=>[k,rows.filter(row=>row.kind===k).length])) as TemplateKindCounts;
-  return c.json({success:true,data:kind&&kind!=='tag'?rows.filter(row=>row.kind===kind):rows,kind_counts:counts,stats:{thisMonthSentCount:rows.some(r=>r.this_month_sent_count===null)?null:rows.reduce((n,r)=>n+(r.this_month_sent_count??0),0),
+  const selectedType=attributeType??type;
+  const attributeStats=isFriendAttributeType(selectedType??'')?{
+    totalTemplates:rows.length,undistributedTemplateCount:rows.filter(r=>r.distributed_account_count===0).length,
+    distributedAccountCount:Number((await dbFor(c.env).prepare(`SELECT COUNT(DISTINCT r.target_account_id) count FROM hq_template_distribution_results r
+      JOIN hq_templates t ON t.id=r.template_id AND t.tenant_id=r.tenant_id
+      JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
+      WHERE r.tenant_id=? AND t.archived_at IS NULL AND t.friend_attribute_type=? AND r.status='succeeded'
+        AND NOT EXISTS(SELECT 1 FROM hq_template_preflight_resolutions p WHERE p.preflight_id=r.preflight_id AND p.tenant_id=r.tenant_id AND p.friend_attribute_mode='skip')`).bind((await authority(c)).tenantId,selectedType).first<{count:number}>())?.count??0),
+  }:{};
+  return c.json({success:true,data:kind&&kind!=='tag'&&!attributeType?rows.filter(row=>row.kind===kind):rows,kind_counts:counts,stats:{...attributeStats,thisMonthSentCount:rows.some(r=>r.this_month_sent_count===null)?null:rows.reduce((n,r)=>n+(r.this_month_sent_count??0),0),
     outdatedTemplateCount:rows.filter(r=>(r.outdated_account_count??0)>0).length}});
 });
 hqTemplates.get('/api/hq/templates/attribute-kind-counts',async c=>{
- const rows=await listTemplates(dbFor(c.env),await authority(c),'tag');
- return c.json({success:true,data:{tag:rows.length,friend_field:null,support_mark:null},
-   unavailable:{friend_field:'店ごとの所属が未対応',support_mark:'店ごとの所属が未対応'}});
+ const rows=await listTemplates(dbFor(c.env),await authority(c));
+ return c.json({success:true,data:{tag:rows.filter(r=>r.template_type==='tag').length,friend_field:rows.filter(r=>r.template_type==='friend_field').length,support_mark:rows.filter(r=>r.template_type==='mark').length}});
 });
 hqTemplates.get('/api/hq/templates/folders', async c => c.json({ success:true, data:await listTemplateFolders(dbFor(c.env),await authority(c)) }));
 hqTemplates.post('/api/hq/templates/folders', async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c)) },201));
@@ -159,7 +169,8 @@ hqTemplates.post('/api/hq/templates/:id/distribute', async c => {
   c.set('auditRecorded', true); return c.json({ success: true, data });
 });
 hqTemplates.get('/api/hq/templates/:id/distributions/:runId', async c => {
-  const auth=await authority(c),db=dbFor(c.env),{template}=await templateDetail(db,auth,c.req.param('id'));
+  const auth=await authority(c),db=dbFor(c.env),template=await getHqTemplate(db,auth.tenantId,c.req.param('id'));
+  if(!template) throw new HqTemplateError('NOT_FOUND',404);
   const data=isFriendAttributeType(template.template_type)?await friendAttributeResult(db,auth,c.req.param('id'),c.req.param('runId')):await distributionResult(db,auth,c.req.param('id'),c.req.param('runId'),c.env.IMAGES);
   return c.json({success:true,data});
 });

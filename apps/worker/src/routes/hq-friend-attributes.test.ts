@@ -151,3 +151,47 @@ test('setting a default mark affects only its destination, without changing frie
  expect(sql.raw.prepare("SELECT is_default FROM support_marks WHERE id='old-a'").get()).toEqual({is_default:0});expect(sql.raw.prepare("SELECT is_default FROM support_marks WHERE id='old-b'").get()).toEqual({is_default:1});
  expect(sql.raw.prepare("SELECT support_mark_id FROM friends WHERE id='f'").get()).toEqual({support_mark_id:'old-a'});
 });
+test('attribute counts and totals include actual definitions, population, received versions and stale stores',async()=>{
+ const {template}=await create('mark',markDefinition);
+ let counts=await request('/attribute-kind-counts');expect(counts.body.data).toEqual({tag:0,friend_field:0,support_mark:1});expect(counts.body.unavailable).toBeUndefined();
+ expect((await request('?kind=support_mark')).body.data.map((r:any)=>r.id)).toEqual([template.id]);
+ await distribute(template.id,await preflight(template.id,['a','b']));
+ const marks=sql.raw.prepare("SELECT s.line_account_id,m.id FROM support_marks m JOIN support_mark_scopes s ON s.mark_id=m.id WHERE s.tenant_id='t'").all() as any[];
+ for(const m of marks)sql.raw.prepare('INSERT INTO friends(id,line_user_id,line_account_id,support_mark_id) VALUES(?,?,?,?)').run(`f-${m.line_account_id}`,`U${m.line_account_id}`,m.line_account_id,m.id);
+ let list=await request('?type=mark');expect(list.body.data[0]).toMatchObject({friend_count:2,distributed_account_count:2,distributed_account_names:['a','b'],assignment_method:'受信時に自動',current_version:1});
+ expect(list.body.stats).toMatchObject({totalTemplates:1,distributedAccountCount:2,undistributedTemplateCount:0,outdatedTemplateCount:0});
+ expect((await request(`/${template.id}/received-versions`)).body.data.map((r:any)=>r.targetVersion.version)).toEqual([1,1]);
+ await request(`/${template.id}`,'PATCH',{name:'更新',type:'mark',definition:markDefinition,expectedRevision:2});
+ expect((await request('?type=mark')).body.stats.outdatedTemplateCount).toBe(1);
+ await distribute(template.id,await preflight(template.id),'skip');
+ list=await request('?type=mark');expect(list.body.data[0].outdated_account_count).toBe(2);
+ expect((await request(`/${template.id}/received-versions`)).body.data.map((r:any)=>r.targetVersion.version)).toEqual([1,1]);
+ expect((await request(`/${template.id}/versions`)).body.data[0].is_draft).toBe(true);
+ const p=await preflight(template.id);expect(p.stores[0].targetVersion).toMatchObject({version:1,latestVersion:2,status:'older'});
+ // Even successful history from an account that moved tenant contributes nothing.
+ sql.raw.exec("UPDATE line_accounts SET tenant_id='foreign' WHERE id='b'");
+ list=await request('?type=mark');expect(list.body.data[0]).toMatchObject({friend_count:1,distributed_account_count:1,distributed_account_names:['a'],outdated_account_count:1});
+});
+test('skip alone is not a received version, distributed account or populated field',async()=>{
+ const {template}=await create('friend_field',fieldDefinition);
+ sql.raw.exec("INSERT INTO friend_fields(id,name,field_key,type) VALUES('field','ペット名','pet_name','text'); INSERT INTO friend_field_scopes(field_id,tenant_id,line_account_id,created_at) VALUES('field','t','a','now'); INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f','Uf','a'); INSERT INTO friend_field_values(friend_id,field_id,value) VALUES('f','field','dog')");
+ await distribute(template.id,await preflight(template.id),'skip');
+ let list=await request('?type=friend_field');expect(list.body.data[0]).toMatchObject({distributed_account_count:0,friend_count:0});expect(list.body.stats.undistributedTemplateCount).toBe(1);
+ expect((await request(`/${template.id}/received-versions`)).body.data).toEqual([]);
+ await distribute(template.id,await preflight(template.id),'overwrite');
+ list=await request('?kind=friend_field');expect(list.body.data[0]).toMatchObject({friend_count:1,distributed_account_count:1,assignment_method:'手動'});
+ expect((await request('/attribute-kind-counts')).body.data).toEqual({tag:0,friend_field:1,support_mark:0});
+});
+test('overwriting old label-only options retains removed labels as archived choices',async()=>{
+ const definition={schemaVersion:1,field:{name:'種別',fieldKey:'pet_kind',type:'select',options:[{id:'hq-dog',label:'犬'}]},folders:[]};
+ const {template}=await create('friend_field',definition);
+ sql.raw.exec(`INSERT INTO friend_fields(id,name,field_key,type,type_v6,options_json) VALUES('field','種別','pet_kind','select','select','["犬","猫"]'); INSERT INTO friend_field_scopes(field_id,tenant_id,line_account_id,created_at) VALUES('field','t','a','now')`);
+ const r=await distribute(template.id,await preflight(template.id),'overwrite');expect(r.body.data.stores[0].status).toBe('succeeded');
+ const row=sql.raw.prepare("SELECT options_json FROM friend_fields WHERE id='field'").get() as any;
+ expect(JSON.parse(row.options_json)).toEqual(expect.arrayContaining([expect.objectContaining({label:'犬'}),expect.objectContaining({label:'猫',status:'archived'})]));
+});
+test.each(['text','textarea','number','date','datetime','time','select','multi_select','checkbox','url','tel','email','image','pdf'])('field %s uses the existing store storage columns',async type=>{
+ const definition={...fieldDefinition,field:{...fieldDefinition.field,type}};
+ const {template}=await create('friend_field',definition),r=await distribute(template.id,await preflight(template.id));expect(r.body.data.stores[0].status).toBe('succeeded');
+ const row=sql.raw.prepare("SELECT COALESCE(type_v8,type_v6,type) type FROM friend_fields WHERE field_key='pet_name'").get();expect(row).toEqual({type});
+});

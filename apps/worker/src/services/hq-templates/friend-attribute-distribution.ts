@@ -97,7 +97,7 @@ function plan(type:HqFriendAttributeType,definition:HqFriendFieldDefinition|HqMa
    const field=def.field,folderId=field.folderId?ids.get(`folder:${field.folderId}`)??null:null;
    // Stable IDs of existing options survive relabeling and removal (archived).
    const existing=mode==='overwrite'?s.fields.find(r=>r.id===id):undefined;
-   const oldOptions=existing?.options_json?JSON.parse(existing.options_json):[];
+   const oldOptions=(existing?.options_json?JSON.parse(existing.options_json):[]).map((v:any,i:number)=>typeof v==='string'?{id:`legacy_${i+1}`,label:v,color:null,status:'active',displayOrder:i}:v);
    const options=(field.options??[]).map((v,i)=>typeof v==='string'?{id:`option_${i+1}`,label:v}:v);
    const mapping=new Map<string,string>();
    const merged=options.map(o=>{const old=oldOptions.find((p:any)=>typeof p!=='string'&&(p.id===o.id||p.label===o.label));const optionId=old?.id??o.id;mapping.set(o.id,optionId);return {...o,id:optionId}});
