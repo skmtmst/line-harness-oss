@@ -1,10 +1,11 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync as readOriginal } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE_V7 = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE_V7 = readOriginal(join(HERE, 'page.tsx'), 'utf8')
 const PAGE = [
   'page.tsx',
   'use-duplicates-data.ts',

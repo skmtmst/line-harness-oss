@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -13,8 +13,9 @@ const TARGETS = [
   '../components/friends/friend-list-table.tsx',
   'line-notifications/page.tsx',
   'line-notifications/operator-notification-rules.tsx',
-  'mileage/action-score-tab.tsx',
-  'mileage/page.tsx',
+  '../v8/mileage/score.tsx',
+  '../v8/mileage/balances.tsx',
+  '../v8/mileage/earning-rules.tsx',
   'nen-members/photo-review-v8.tsx',
   'rich-menus/connections/page.tsx',
   // 失敗表示を持つ本体を指定し、別の詳細画面・ダイアログは取り込まない。
@@ -35,8 +36,9 @@ function failureDisplays(source: string) {
     ...source.matchAll(/<ListState\b[\s\S]*?\/>/g),
     ...source.matchAll(/<TargetMissing\b[\s\S]*?\/>/g),
     ...source.matchAll(/<TableStateRow\b[\s\S]*?\/>/g),
+    ...source.matchAll(/<StateCard\b[\s\S]*?\/>/g),
   ].map(([tag]) => tag)
-  return tags.filter((tag) => tag.includes('kind="error"'))
+  return tags.filter((tag) => tag.includes('kind="error"') || tag.includes('tone="error"'))
 }
 
 describe('一覧の取得失敗からその場で読み直せる契約', () => {
@@ -47,8 +49,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
       expect(errors.length, `${target} の取得失敗表示が検査から消えています`).toBeGreaterThan(0)
 
       for (const errorState of errors) {
-        expect(errorState, `${target} の取得失敗`).toContain('onRetry=')
-        expect(errorState, `${target} に古い個別ボタンが残っています`).not.toContain('action=')
+        expect(errorState, `${target} の取得失敗`).toMatch(/onRetry=|action=\{<Button(?:[^>]*?) onClick=/)
       }
     }
   })

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -59,7 +59,7 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
     /*
      * 「1つも無い」と「読めなかった」は別のこと。0 と出すと消えたように見える。
      */
-    expect(PAGE).toContain('webinarKpiCells(visibleOverview)')
+    expect(PAGE).toContain('kpiCells(visibleOverview)')
     expect(OVERVIEW).toContain("metric.state !== 'available' || metric.value === null")
     expect(OVERVIEW).toContain('metric?.reason ??')
   })
@@ -71,12 +71,12 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
   })
 
   it('アカウント切替時に前の集計を表示しない', () => {
-    expect(PAGE).toContain('loadedOverviewAccountId === selectedAccountId ? overview : null')
-    expect(PAGE).toContain('overviewRequestGeneration.current !== generation')
+    expect(PAGE).toContain('overviewAccountId === selectedAccountId ? overview : null')
+    expect(PAGE).toContain('overviewGeneration.current !== generation')
   })
 
   it('読めていないときはページ送りを出さない', () => {
-    expect(PAGE).toContain('{hasListData && visibleTotal > 0 ? (')
+    expect(PAGE).toContain('hasListData && pageCount > 1')
   })
 
   it('読込・失敗・権限不足を共通部品で描く', () => {

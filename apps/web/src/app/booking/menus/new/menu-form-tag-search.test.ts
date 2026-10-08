@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -12,7 +12,9 @@ const FORM = readFileSync(join(HERE, 'menu-form-v8.tsx'), 'utf8')
  */
 describe('予約メニュー作成のタグ検索', () => {
   it('タグの絞り込み欄がある', () => {
-    expect(FORM).toContain('aria-label="タグを検索"')
-    expect(FORM).toContain('visibleTagCandidates')
+    expect(FORM).toMatch(/<Combobox\s+aria-label="予約後に付けるタグ"/)
+    expect(FORM).toContain('options={tagCandidates.map')
+    const picker = readFileSync(join(HERE, '../../../../components/shared/combobox.tsx'), 'utf8')
+    expect(picker).toContain('option.label.toLowerCase().includes(loweredQuery)')
   })
 })

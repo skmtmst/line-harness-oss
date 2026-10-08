@@ -10,7 +10,8 @@
  * app/scenarios/mode-v8.tsx は同じ画面の★V8版で、同じ見比べカードを
  * 持つため同じ扱いにする。
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import {readdirSync,  statSync} from 'node:fs'
+import { readUiSource as readFileSync } from '../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
