@@ -1,5 +1,6 @@
 'use client'
 
+import { useId } from 'react'
 import MultiSelect from '@/components/shared/multi-select'
 import Select from '@/components/shared/select'
 import type { Area } from './canvas-editor'
@@ -110,14 +111,16 @@ export function intentOf(area: Area): RichMenuAreaIntent {
 function Field({
   label,
   hint,
+  htmlFor,
   children,
 }: {
   label: string
   hint?: string
+  htmlFor?: string
   children: React.ReactNode
 }) {
   return (
-    <label className="block">
+    <label className="block" htmlFor={htmlFor}>
       <span className="text-ink-secondary text-xs font-medium">{label}</span>
       {hint && <span className="text-ink-faint block text-micro">{hint}</span>}
       <div className="mt-1">{children}</div>
@@ -163,6 +166,7 @@ export function AreaProperties({
   showManagementDetails = true,
   allowedIntents,
 }: Props) {
+  const inputId = useId()
   const data = (area.actionData ?? {}) as Record<string, unknown>
   const intent = intentOf(area)
   const selectedTagIds = area.tagIds ?? []
@@ -199,8 +203,9 @@ export function AreaProperties({
         ) : null}
       </div>
 
-      <Field label="ボタン名" hint="管理用の呼び名。友だちには表示されません。">
+      <Field label="ボタン名" htmlFor={`${inputId}-name`} hint="管理用の呼び名。友だちには表示されません。">
         <input
+          id={`${inputId}-name`}
           value={area.label ?? ''}
           onChange={(e) => onUpdate({ label: e.target.value })}
           maxLength={60}
@@ -291,8 +296,9 @@ export function AreaProperties({
               飛び先は、選んだ計測リンクの設定が使われます。変えるときは「計測リンク」の画面で編集してください。
             </p>
           ) : (
-            <Field label="URL">
+            <Field label="URL" htmlFor={`${inputId}-url`}>
               <input
+                id={`${inputId}-url`}
                 type="url"
                 value={(data.uri as string) ?? ''}
                 onChange={(e) => onUpdate({ actionData: { ...data, uri: e.target.value } })}
@@ -324,8 +330,9 @@ export function AreaProperties({
       )}
 
       {intent === 'text' && (
-        <Field label="送るテキスト" hint="押した人が、この言葉を送ったことになります。">
+        <Field label="送るテキスト" htmlFor={`${inputId}-text`} hint="押した人が、この言葉を送ったことになります。">
           <input
+            id={`${inputId}-text`}
             value={(data.text as string) ?? ''}
             onChange={(e) => onUpdate({ actionData: { ...data, text: e.target.value } })}
             maxLength={300}
