@@ -26,6 +26,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
 import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
+import ReferenceFrame from './reference-frame'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
@@ -573,6 +574,7 @@ function ProjectInner() {
           {canManage ? (
             <div ref={panelRef} className={styles.panel}>
               <GenerationPanel
+                v8Layout
                 presets={presets}
                 maxCount={maxCount}
                 value={input}
@@ -709,6 +711,7 @@ function ProjectInner() {
       ) : null}
 
       <ReferencePickerDialog
+        frame={ReferenceFrame}
         open={pickerOpen}
         projectId={project.id}
         presets={presets}

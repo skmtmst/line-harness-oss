@@ -333,7 +333,7 @@ export default function AutomationListV8() {
               total={`${items.length}件`}
               activeId=""
               onSelect={() => undefined}
-              rows={[{ id: '', label: 'すべて', count: items.length }]}
+              rows={[{ kind: 'all' as const, id: '', label: 'すべて', count: items.length }]}
             />
           </div>
 

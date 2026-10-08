@@ -7,7 +7,7 @@
  *
  * - 開いた中身は StFE7 の形（shared/select-menu）。各行の前にフォルダの色の点。
  *   一番下に区切りの線と「＋ 新しいフォルダを作る」（緑・600）。
- * - 押すと同じ板が「新しいフォルダ」に替わる：名前の欄（自動で焦点）・色の見本・［やめる］［作って選ぶ］。
+ * - 押すと同じ板が「新しいフォルダ」に替わる：名前の欄（自動で焦点）・横の色ボタン・［やめる］［作って選ぶ］。
  *   Enter で作る（日本語の変換中は作らない）。Esc・［やめる］で一覧へ戻る。
  * - 作ると、その画面のフォルダの受け口（onCreate）で作り、一覧に足して、そのフォルダを選んで閉じる。
  *   作っている間は押せない。失敗したら板の中に理由と［もう一度試す］。入れた名前は残す。
@@ -22,6 +22,9 @@ import Select, { type SelectCreateContext, type SelectProps } from './select'
 import { isImeComposing } from './ime'
 import { japaneseDetailOf } from './api-error-message'
 import styles from './folder-select.module.css'
+import FolderColorButton from './folder-color-button'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
+export { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 
 /** 選べるフォルダ1つ。value は画面が保存に使う値（多くは id。名前で持つ画面は名前）。 */
 export interface FolderSelectFolder {
@@ -30,16 +33,6 @@ export interface FolderSelectFolder {
   /** フォルダの色（#RRGGBB）。無いフォルダは灰の点。 */
   color?: string | null
 }
-
-/** 絵（iBuZH）の色の見本6つ。左から青・緑・橙・赤・紫・灰。 */
-export const FOLDER_SELECT_COLORS: ReadonlyArray<{ value: string; name: string }> = [
-  { value: '#3b82f6', name: '青' },
-  { value: '#16a34a', name: '緑' },
-  { value: '#f97316', name: '橙' },
-  { value: '#ef4444', name: '赤' },
-  { value: '#8b5cf6', name: '紫' },
-  { value: '#64748b', name: '灰' },
-]
 
 export type FolderSelectCreate = (name: string, color: string | null) => Promise<FolderSelectFolder>
 
@@ -57,7 +50,7 @@ export interface FolderSelectProps extends Pick<SelectProps, 'aria-label' | 'lab
    * 渡さないと「＋ 新しいフォルダを作る」を出さない（閲覧のみ・権限なし）。
    */
   onCreate?: FolderSelectCreate
-  /** 受け口が色を受け取らない種類（統括のひな形・統括の一斉配信）は false。色の見本を出さない。 */
+  /** false のときは色のボタンを出さず、作成時に null を渡す。 */
   colors?: boolean
 }
 
@@ -113,16 +106,16 @@ export const folderById = (folder: { id: string; name: string; color?: string | 
 export const folderByName = (folder: { name: string; color?: string | null }): FolderSelectFolder => ({ value: folder.name, label: folder.name, color: folder.color ?? null })
 
 /**
- * 別の入口（統括のひな形など）が渡す口からその場で作る。色は受け取らない（colors={false} と組む）。
+ * 別の入口（統括のひな形など）が渡す口から名前と色で作る。
  * 口が無い・閲覧のみなら作らせない。
  */
 export function hostFolderCreate(host: {
-  createFolder?: (name: string) => Promise<FolderSelectFolder>
+  createFolder?: FolderSelectCreate
   readOnly?: boolean
 }): FolderSelectCreate | undefined {
   const create = host.createFolder
   if (!create || host.readOnly) return undefined
-  return (name) => create(name)
+  return (name, color) => create(name, color)
 }
 
 export default function FolderSelect({
@@ -180,7 +173,7 @@ function FolderCreatePanel({
   onCreate: FolderSelectCreate
 }) {
   const [name, setName] = useState('')
-  const [color, setColor] = useState(FOLDER_SELECT_COLORS[0].value)
+  const [color, setColor] = useState<string>(FOLDER_SELECT_COLORS[0].value)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -225,47 +218,33 @@ function FolderCreatePanel({
       }}
     >
       <div className={styles.heading} aria-hidden="true">新しいフォルダ</div>
-      <input
-        ref={inputRef}
-        type="text"
-        className={styles.field}
-        value={name}
-        maxLength={100}
-        placeholder="フォルダ名"
-        aria-label="新しいフォルダの名前"
-        aria-invalid={error ? true : undefined}
-        // 作っている間は直せない（焦点は残す。disabled にすると焦点が外れて板が閉じる）。
-        readOnly={busy}
-        onChange={(event) => {
-          setName(event.target.value)
-          if (error) setError('')
-        }}
-        onKeyDown={(event) => {
-          // 変換を確定する Enter で書きかけの名前を作らない。
-          if (event.key !== 'Enter' || isImeComposing(event)) return
-          event.preventDefault()
-          void submit()
-        }}
-      />
-      {colors ? (
-        <div className={styles.swatches} role="radiogroup" aria-label="フォルダの色">
-          {FOLDER_SELECT_COLORS.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              role="radio"
-              aria-checked={color === item.value}
-              aria-label={item.name}
-              title={item.name}
-              disabled={busy}
-              className={styles.swatch}
-              data-selected={color === item.value || undefined}
-              style={{ backgroundColor: item.value }}
-              onClick={() => setColor(item.value)}
-            />
-          ))}
-        </div>
-      ) : null}
+      <div className={styles.nameRow}>
+        <input
+          ref={inputRef}
+          type="text"
+          className={styles.field}
+          value={name}
+          maxLength={100}
+          placeholder="フォルダ名"
+          aria-label="新しいフォルダの名前"
+          aria-invalid={error ? true : undefined}
+          // 作っている間は直せない（焦点は残す。disabled にすると焦点が外れて板が閉じる）。
+          readOnly={busy}
+          onChange={(event) => {
+            setName(event.target.value)
+            if (error) setError('')
+          }}
+          onKeyDown={(event) => {
+            // 変換を確定する Enter で書きかけの名前を作らない。
+            if (event.key !== 'Enter' || isImeComposing(event)) return
+            event.preventDefault()
+            void submit()
+          }}
+        />
+        {colors ? (
+          <FolderColorButton compact value={color} onChange={(next) => setColor(next ?? FOLDER_SELECT_COLORS[0].value)} disabled={busy} />
+        ) : null}
+      </div>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.actions}>
         <button type="button" className={styles.cancel} disabled={busy} onClick={context.back}>やめる</button>

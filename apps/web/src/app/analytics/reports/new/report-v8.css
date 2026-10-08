@@ -39,10 +39,11 @@
 
 .report-v8-title {
   margin: 0;
-  line-height: normal;
-  font-size: var(--tpl-an-rp-title-size);
-  font-weight: var(--tpl-an-rp-bold);
+  line-height: var(--tpl-title-lh);
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
   color: var(--color-ink);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .report-v8-lead {

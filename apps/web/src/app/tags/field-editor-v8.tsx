@@ -140,7 +140,7 @@ export default function FieldEditorV8({
   onSubmit: (values: FieldEditorValues, requestKey: string) => void
 }) {
   usePageTitle(mode === 'create' ? '友だち情報欄を追加' : '友だち情報欄を編集')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }])
 
   /* R139・R182: 編集では保存済みの既定値を選択肢名へ戻して持つ（IDのまま見せない）。 */
   const stored = field ? storedDefaultLabels(field) : { single: '', multi: [] }

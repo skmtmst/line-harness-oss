@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useContext, useEffect, useId, useState, type ReactNode } from 'react'
+import React, { useContext, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
@@ -27,6 +27,8 @@ export type DrawerProps = {
    * 中 12/20・下 14/20・開くのは 200ms）。v8 だけで効く。
    */
   width?: 'narrow' | 'editor'
+  /** V8 の板ごとの幅。省くと既定の幅。 */
+  designWidth?: number
   /** 頭の題の行の下に置くもの（タブ・説明の1行）。渡したときだけ頭を縦に積む。 */
   toolbar?: ReactNode
   /** 下の帯（footer）のすぐ上に置く知らせ（保存の失敗など）。中身の帯は呼び出し側の Notice。 */
@@ -47,6 +49,7 @@ export default function Drawer({
   footer,
   modal = true,
   width,
+  designWidth,
   toolbar,
   band,
 }: DrawerProps) {
@@ -80,6 +83,8 @@ export default function Drawer({
       aria-busy={busy || undefined}
       data-dirty={dirty || undefined}
       data-width={width}
+      data-design-width={designWidth ? '' : undefined}
+      style={designWidth ? { '--drawer-design-width': `${designWidth}px` } as CSSProperties : undefined}
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-design-part="drawer"

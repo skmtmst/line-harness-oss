@@ -130,3 +130,12 @@ it('統括の版履歴・比較・復元・受取版と件数を認証済みtran
  request.mockResolvedValue({success:true,stats:{thisMonthSentCount:12,outdatedTemplateCount:2}});
  expect(await hqTemplatesApi.listStats()).toEqual({thisMonthSentCount:12,outdatedTemplateCount:2});
 });
+
+it('ひな形フォルダは色を保存・更新・一覧から読み返す',async()=>{
+ const folder={id:'f',name:'分類',color:'#8b5cf6',revision:1};request.mockResolvedValue({success:true,data:folder});
+ expect(await hqTemplatesApi.folders.create('分類','#8b5cf6')).toEqual(folder);
+ expect(request).toHaveBeenLastCalledWith('/api/hq/templates/folders',{method:'POST',body:JSON.stringify({name:'分類',color:'#8b5cf6'})});
+ await hqTemplatesApi.folders.update('f','改名',1,null);
+ expect(request).toHaveBeenLastCalledWith('/api/hq/templates/folders/f',{method:'PATCH',body:JSON.stringify({name:'改名',expectedRevision:1,color:null})});
+ request.mockResolvedValue({success:true,data:[folder]});expect(await hqTemplatesApi.folders.list()).toEqual([folder]);
+});

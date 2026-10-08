@@ -60,10 +60,11 @@ describe('globals.css の変数の書き直し', () => {
     expect(findTokenCollisions('[data-theme="v8"] { --a: 22px; } [data-theme="v7"] { --a: 20px; }')).toHaveLength(0)
   })
 
-  it('予約スタッフの題は絵の 22px、予約からの売上は別の名前の 20px', () => {
+  it('予約スタッフの題と予約からの売上の題は別の名前で、どちらもページの題の値（22px）を読む', () => {
     const css = fs.readFileSync(GLOBALS, 'utf8')
-    expect(css).toMatch(/--tpl-bks-title-size:\s*22px/)
-    expect(css).toMatch(/--tpl-bks-sales-title-size:\s*20px/)
+    expect(css).toMatch(/--tpl-title-size:\s*22px/)
+    expect(css).toMatch(/--tpl-bks-title-size:\s*var\(--tpl-title-size\)/)
+    expect(css).toMatch(/--tpl-bks-sales-title-size:\s*var\(--tpl-title-size\)/)
     const sales = fs.readFileSync(path.join(__dirname, 'booking/sales/sales-v8.module.css'), 'utf8')
     expect(sales).toContain('var(--tpl-bks-sales-title-size)')
   })

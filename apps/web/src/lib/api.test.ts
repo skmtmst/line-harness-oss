@@ -891,6 +891,16 @@ describe('api.friendAddRules V6 data contract', () => {
     ])
   })
 
+  it('友だち追加のフォルダは色と冪等キーを送り、色の更新口も使える', async () => {
+    const spy = vi.fn(async () => new Response(JSON.stringify({ success: true, data: { id: 'f', name: '店頭', color: '#16a34a' } }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', spy)
+    const created = await api.friendAddRules.createFolder('account-1', '店頭', 'folder-key-00000001', '#16a34a')
+    expect(created.success && created.data.color).toBe('#16a34a')
+    expect(spy.mock.calls[0]).toEqual(['https://worker.example.com/api/friend-add-rules/folders', expect.objectContaining({ method: 'POST', body: JSON.stringify({ accountId: 'account-1', name: '店頭', color: '#16a34a' }), headers: expect.objectContaining({ 'Idempotency-Key': 'folder-key-00000001' }) })])
+    await api.friendAddRules.updateFolder('account-1', 'f/1', { color: null })
+    expect(spy.mock.calls[1]).toEqual(['https://worker.example.com/api/friend-add-rules/folders/f%2F1', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ accountId: 'account-1', color: null }) })])
+  })
+
   it('フォルダ作成と公開に操作識別キーを付け、停止はルールと版から決定する', async () => {
     const spy = vi.fn(async () => new Response(
       JSON.stringify({ success: true, data: {} }),

@@ -284,7 +284,7 @@ export default function TemplateDetailV8() {
 
   const editHref = template.question
     ? `/templates/questions/new?id=${encodeURIComponent(id)}`
-    : `/templates/edit?id=${encodeURIComponent(id)}`
+    : `/templates/edit?id=${encodeURIComponent(id)}${template.messageType === 'imagemap' && /"video"\s*:/.test(draftContent) ? '&kind=rich_video' : ''}`
   const folderLabel = folderName ?? (template.folderId ? template.category : '未分類')
   const insertions = insertionNames(draftContent)
   const visibleUsages = showAllUsages ? usageRows : usageRows.slice(0, USAGE_VISIBLE)

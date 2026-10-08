@@ -84,9 +84,9 @@ const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; s
 /* 色は行の名前の前の丸と左のフォルダの列で同じものを使う（絵 v9JWQ）。止めているは色の無い輪。 */
 const GROUPS: Array<{ key: GroupKey; label: string; color?: string; match: (row: AffiliateListRow) => boolean }> = [
   { key: 'all', label: 'すべて', match: () => true },
-  { key: 'rate', label: '売上の割合で払う', color: FOLDER_COLORS[0], match: (row) => row.isActive && row.commissionRate > 0 },
-  { key: 'fixed', label: '1件ごとに払う', color: FOLDER_COLORS[1], match: (row) => row.isActive && row.commissionRate <= 0 && row.rewardAmount > 0 },
-  { key: 'none', label: '報酬なし（計測のみ）', color: FOLDER_COLORS[2], match: (row) => row.isActive && row.commissionRate <= 0 && row.rewardAmount <= 0 },
+  { key: 'rate', label: '売上の割合で払う', color: FOLDER_COLORS[0], match: (row) => row.isActive && (row.rewardMode === 'rate' || (!row.rewardMode && row.commissionRate > 0)) },
+  { key: 'fixed', label: '1件ごとに払う', color: FOLDER_COLORS[1], match: (row) => row.isActive && (row.rewardMode === 'fixed' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount > 0)) },
+  { key: 'none', label: '報酬なし（計測のみ）', color: FOLDER_COLORS[2], match: (row) => row.isActive && (row.rewardMode === 'none' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount <= 0)) },
   { key: 'stopped', label: '止めている', match: (row) => !row.isActive },
 ]
 
@@ -416,7 +416,7 @@ export default function AffiliatorsTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={GROUPS.map((item) => ({ id: item.key, label: item.label, count: ready ? groupCount(item.key) : null, color: item.color }))}
+      rows={GROUPS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: ready ? groupCount(item.key) : null, color: item.color }))}
       activeId={group}
       onSelect={(id) => resetPage(() => { setSaved(''); setGroup(id as GroupKey) })}
       addFolderNote={<p className={styles.stateDesc}>報酬の決め方で分けた見え方です</p>}

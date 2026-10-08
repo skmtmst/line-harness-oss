@@ -447,7 +447,7 @@ export function CanvasEditor({
                   width: area.boundsWidth * scale,
                   height: area.boundsHeight * scale,
                   border: appearance === 'v8'
-                    ? `${selected ? 3 : 1}px solid ${overlap ? 'var(--color-danger)' : selected ? 'var(--color-accent-deep)' : 'color-mix(in srgb, var(--color-canvas) 67%, transparent)'}`
+                    ? `${selected ? 3 : 1}px solid ${overlap ? 'var(--color-danger)' : selected ? 'var(--color-accent-deep)' : !imageUrl ? 'var(--color-hairline)' : 'color-mix(in srgb, var(--color-canvas) 67%, transparent)'}`
                     : `2px solid ${borderColor}`,
                   background: preview
                     ? 'transparent'

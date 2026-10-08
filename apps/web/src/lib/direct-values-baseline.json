@@ -190,7 +190,7 @@
     "shadow": 0
   },
   "components/shared/folder-add-dialog.tsx": {
-    "color": 8,
+    "color": 16,
     "radius": 0,
     "shadow": 0
   },

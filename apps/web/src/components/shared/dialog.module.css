@@ -365,6 +365,7 @@
 [data-theme='v8'] .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
 [data-theme='v8'] .close svg { width: 16px; height: 16px; }
 [data-theme='v8'] .content { width: 100%; padding: 24px; }
+[data-theme='v8'] .panel[data-design-content-padding] > .content { padding: var(--dialog-design-content-padding); }
 [data-theme='v8'] .footer { display: block; width: 100%; flex-shrink: 0; }
 [data-theme='v8'] .footer:empty { display: none; }
 [data-theme='v8'] .actions { width: 100%; padding: 14px 24px; gap: 8px; align-items: center; border-top: 1px solid var(--color-hairline); }

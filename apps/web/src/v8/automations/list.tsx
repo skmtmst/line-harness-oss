@@ -381,9 +381,9 @@ export default function AutomationListV8() {
 
   /* ===== フォルダ ===== */
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: ready ? items.length : null },
-    ...folders.map((folder, index) => ({ ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: null, color: folder.color })),
-    { id: UNFILED, label: '未分類', count: ready ? items.length : null },
+    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? items.length : null },
+    ...folders.map((folder, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: null, color: folder.color })),
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: ready ? items.length : null },
   ]
   const folderSelect = (
     <Select

@@ -1,0 +1,358 @@
+{
+  "boards": {
+    "DFl3Q": {
+      "doc": "V8-B",
+      "name": "予約管理 予約が重なった知らせ（人）V8",
+      "width": 1440,
+      "url": "/booking/menus?tab=channels",
+      "state": {
+        "api": {
+          "match": "GET /api/booking/admin/conflicts",
+          "body": {
+            "success": true,
+            "data": {
+              "conflicts": [
+                {
+                  "staffId": "bs-ch-3",
+                  "staffName": "佐野 直人",
+                  "bookingId": "visual-conflict-1",
+                  "otherBookingId": "visual-conflict-2",
+                  "startsAt": "2026-10-03T04:00:00Z",
+                  "endsAt": "2026-10-03T05:00:00Z",
+                  "otherStartsAt": "2026-10-03T04:00:00Z",
+                  "otherEndsAt": "2026-10-03T04:45:00Z",
+                  "version": 1,
+                  "otherVersion": 1,
+                  "reasonCode": "same_staff_time_overlap",
+                  "reason": "同じ担当の予約時間が重なっています。",
+                  "calendarConnected": false,
+                  "guidance": "担当のGoogleカレンダーをつなぎ、外の予約もカレンダーへ書き出すと、次から重なりを防げます。",
+                  "bookings": [
+                    {
+                      "bookingId": "visual-conflict-1",
+                      "customerName": "山田 花子",
+                      "menuName": "トリミング",
+                      "staffId": "bs-ch-3",
+                      "staffName": "佐野 直人",
+                      "startsAt": "2026-10-03T04:00:00Z",
+                      "endsAt": "2026-10-03T05:00:00Z",
+                      "source": "liff",
+                      "sourceLabel": "LINE（musubo）",
+                      "version": 1
+                    },
+                    {
+                      "bookingId": "visual-conflict-2",
+                      "customerName": "鈴木 健",
+                      "menuName": "シャンプー",
+                      "staffId": "bs-ch-3",
+                      "staffName": "佐野 直人",
+                      "startsAt": "2026-10-03T04:00:00Z",
+                      "endsAt": "2026-10-03T04:45:00Z",
+                      "source": "import",
+                      "sourceLabel": "外部取り込み",
+                      "version": 1
+                    }
+                  ]
+                }
+              ],
+              "notifyConflicts": true
+            }
+          }
+        },
+        "click": [
+          "重なりを解消する"
+        ]
+      }
+    },
+    "QqER7": {
+      "doc": "V8",
+      "name": "予約設定 メニューを作る V8",
+      "kind": "画面",
+      "route": "/booking/menus/new",
+      "routes": [
+        "/booking/menus/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/QqER7.png",
+      "url": "/booking/menus/new",
+      "state": {
+        "api": {
+          "match": "GET /api/booking/admin/menus$",
+          "body": {
+            "menus": [
+              {
+                "id": "bm-2",
+                "name": "トリミング（中型犬）",
+                "category_label": "トリミング",
+                "description": "シャンプー・カット・爪切り",
+                "duration_minutes": 150,
+                "buffer_after_minutes": 15,
+                "base_price": 12600,
+                "price_mode": "fixed",
+                "version": 1,
+                "sort_order": 2,
+                "is_active": 1,
+                "auto_tag_id": null,
+                "concurrent_capacity": 1,
+                "booking_window_days": 60,
+                "cutoff_hours_before": 24,
+                "cancel_deadline_hours_before": null,
+                "assigned_staff": [
+                  {
+                    "id": "bs-1",
+                    "display_name": "佐々木"
+                  },
+                  {
+                    "id": "bs-3",
+                    "display_name": "高田"
+                  }
+                ],
+                "booking_count_30_days": 0,
+                "effectiveBookingRules": {
+                  "bookingWindowDays": 60,
+                  "cutoffMinutesBefore": 1440,
+                  "cancelDeadlineMinutesBefore": 1440,
+                  "source": {
+                    "bookingWindowDays": "menu",
+                    "cutoffMinutesBefore": "menu",
+                    "cancelDeadlineMinutesBefore": "store"
+                  }
+                }
+              },
+              {
+                "id": "bm-3",
+                "name": "シャンプーのみ",
+                "category_label": "トリミング",
+                "description": null,
+                "duration_minutes": 60,
+                "buffer_after_minutes": 10,
+                "base_price": 4200,
+                "price_mode": "fixed",
+                "version": 1,
+                "sort_order": 3,
+                "is_active": 1,
+                "auto_tag_id": null,
+                "concurrent_capacity": 2,
+                "booking_window_days": 60,
+                "cutoff_hours_before": 12,
+                "cancel_deadline_hours_before": null,
+                "assigned_staff": [
+                  {
+                    "id": "bs-1",
+                    "display_name": "佐々木"
+                  },
+                  {
+                    "id": "bs-3",
+                    "display_name": "高田"
+                  }
+                ],
+                "booking_count_30_days": 1,
+                "effectiveBookingRules": {
+                  "bookingWindowDays": 60,
+                  "cutoffMinutesBefore": 720,
+                  "cancelDeadlineMinutesBefore": 1440,
+                  "source": {
+                    "bookingWindowDays": "menu",
+                    "cutoffMinutesBefore": "menu",
+                    "cancelDeadlineMinutesBefore": "store"
+                  }
+                }
+              },
+              {
+                "id": "bm-4",
+                "name": "爪切り",
+                "category_label": "お手入れ",
+                "description": null,
+                "duration_minutes": 15,
+                "buffer_after_minutes": 5,
+                "base_price": 1200,
+                "price_mode": "fixed",
+                "version": 1,
+                "sort_order": 6,
+                "is_active": 1,
+                "auto_tag_id": null,
+                "concurrent_capacity": 2,
+                "booking_window_days": 30,
+                "cutoff_hours_before": 2,
+                "cancel_deadline_hours_before": null,
+                "assigned_staff": [
+                  {
+                    "id": "bs-1",
+                    "display_name": "佐々木"
+                  },
+                  {
+                    "id": "bs-3",
+                    "display_name": "高田"
+                  }
+                ],
+                "booking_count_30_days": 0,
+                "effectiveBookingRules": {
+                  "bookingWindowDays": 30,
+                  "cutoffMinutesBefore": 120,
+                  "cancelDeadlineMinutesBefore": 1440,
+                  "source": {
+                    "bookingWindowDays": "menu",
+                    "cutoffMinutesBefore": "menu",
+                    "cancelDeadlineMinutesBefore": "store"
+                  }
+                }
+              },
+              {
+                "id": "bm-5",
+                "name": "初回相談",
+                "category_label": "相談",
+                "description": "はじめての方向け",
+                "duration_minutes": 30,
+                "buffer_after_minutes": 0,
+                "base_price": 0,
+                "price_mode": "free",
+                "version": 1,
+                "sort_order": 4,
+                "is_active": 1,
+                "auto_tag_id": null,
+                "concurrent_capacity": 1,
+                "booking_window_days": 60,
+                "cutoff_hours_before": 12,
+                "cancel_deadline_hours_before": null,
+                "assigned_staff": [
+                  {
+                    "id": "bs-1",
+                    "display_name": "佐々木"
+                  },
+                  {
+                    "id": "bs-3",
+                    "display_name": "高田"
+                  }
+                ],
+                "booking_count_30_days": 0,
+                "effectiveBookingRules": {
+                  "bookingWindowDays": 60,
+                  "cutoffMinutesBefore": 720,
+                  "cancelDeadlineMinutesBefore": 1440,
+                  "source": {
+                    "bookingWindowDays": "menu",
+                    "cutoffMinutesBefore": "menu",
+                    "cancelDeadlineMinutesBefore": "store"
+                  }
+                }
+              },
+              {
+                "id": "bm-6",
+                "name": "歯みがき教室",
+                "category_label": "お手入れ",
+                "description": null,
+                "duration_minutes": 60,
+                "buffer_after_minutes": 5,
+                "base_price": 2800,
+                "price_mode": "fixed",
+                "version": 1,
+                "sort_order": 5,
+                "is_active": 0,
+                "auto_tag_id": null,
+                "concurrent_capacity": 1,
+                "booking_window_days": 30,
+                "cutoff_hours_before": 6,
+                "cancel_deadline_hours_before": null,
+                "assigned_staff": [],
+                "booking_count_30_days": 0,
+                "effectiveBookingRules": {
+                  "bookingWindowDays": 30,
+                  "cutoffMinutesBefore": 360,
+                  "cancelDeadlineMinutesBefore": 1440,
+                  "source": {
+                    "bookingWindowDays": "menu",
+                    "cutoffMinutesBefore": "menu",
+                    "cancelDeadlineMinutesBefore": "store"
+                  }
+                }
+              },
+              {
+                "id": "bm-7",
+                "name": "足裏ケア",
+                "category_label": "お手入れ",
+                "description": null,
+                "duration_minutes": 20,
+                "buffer_after_minutes": 5,
+                "base_price": 1800,
+                "price_mode": "fixed",
+                "version": 1,
+                "sort_order": 7,
+                "is_active": 1,
+                "auto_tag_id": null,
+                "concurrent_capacity": 2,
+                "booking_window_days": 30,
+                "cutoff_hours_before": 2,
+                "cancel_deadline_hours_before": null,
+                "assigned_staff": [
+                  {
+                    "id": "bs-1",
+                    "display_name": "佐々木"
+                  },
+                  {
+                    "id": "bs-3",
+                    "display_name": "高田"
+                  }
+                ],
+                "booking_count_30_days": 0,
+                "effectiveBookingRules": {
+                  "bookingWindowDays": 30,
+                  "cutoffMinutesBefore": 120,
+                  "cancelDeadlineMinutesBefore": 1440,
+                  "source": {
+                    "bookingWindowDays": "menu",
+                    "cutoffMinutesBefore": "menu",
+                    "cancelDeadlineMinutesBefore": "store"
+                  }
+                }
+              },
+              {
+                "id": "bm-8",
+                "name": "夏の毛刈り（終了）",
+                "category_label": "季節",
+                "description": null,
+                "duration_minutes": 60,
+                "buffer_after_minutes": 10,
+                "base_price": 6000,
+                "price_mode": "fixed",
+                "version": 1,
+                "sort_order": 8,
+                "is_active": 0,
+                "auto_tag_id": null,
+                "concurrent_capacity": 1,
+                "booking_window_days": null,
+                "cutoff_hours_before": null,
+                "cancel_deadline_hours_before": null,
+                "assigned_staff": [],
+                "booking_count_30_days": 0,
+                "effectiveBookingRules": {
+                  "bookingWindowDays": 60,
+                  "cutoffMinutesBefore": 1440,
+                  "cancelDeadlineMinutesBefore": 1440,
+                  "source": {
+                    "bookingWindowDays": "store",
+                    "cutoffMinutesBefore": "store",
+                    "cancelDeadlineMinutesBefore": "store"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "click": [
+          "fill:メニュー名=トリミング（小型犬）",
+          "fill:例: シャンプー・カット・爪切り=シャンプー・カット・爪切り",
+          "fill:かかる時間（分）=105",
+          "fill:金額（円）=8400",
+          "佐々木",
+          "高田",
+          "fill:後の空き時間（分）=15",
+          "press:Tab",
+          "press:Tab",
+          "press:Tab",
+          "press:Space",
+          "fill:質問文=気になるところ・アレルギーがあれば教えてください"
+        ]
+      }
+    }
+  }
+}

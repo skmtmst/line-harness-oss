@@ -321,9 +321,9 @@ export default function EventsListV8() {
   ) : <span className={styles.createSpace} aria-hidden="true" />
 
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: loadStatus === 'ready' && !folderFilter ? listTotal : null },
-    ...folders.map((folder, index) => ({ ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
-    { id: UNFILED, label: '未分類', count: unfiledCount },
+    { kind: 'all' as const, id: '', label: 'すべて', count: loadStatus === 'ready' && !folderFilter ? listTotal : null },
+    ...folders.map((folder, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
 
   const folderPanel = (

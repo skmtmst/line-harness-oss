@@ -37,6 +37,7 @@ import {
   Trash2,
   TriangleAlert,
   Unlink,
+  Video,
 } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
@@ -95,7 +96,7 @@ import {
 import styles from './list.module.css'
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
-type Section = 'message' | 'question' | BroadcastAssetKind
+type Section = 'message' | 'question' | 'rich_video' | BroadcastAssetKind
 
 /** 絞り込み札。独立に切り替える（1通のみと複数通だけは片方）。 */
 type ChipKey = 'single' | 'multiple' | 'variables' | 'unused'
@@ -161,6 +162,7 @@ const KIND_CARDS: Array<{
   { key: 'message', title: 'メッセージ', icon: MessageSquare, desc: 'テキスト・カード型・画像。差し込みも使える', useFor: 'いちばんよく使う', cannot: 'できない：答えを集める（→ 質問・リサーチ）', href: '/templates/edit' },
   { key: 'card_message', title: 'カルーセル', icon: GalleryHorizontalEnd, desc: '横にめくるカードを最大10枚', useFor: '商品の紹介に', cannot: 'できない：1枚の画像を面に分ける（→ リッチ）', href: '/templates/carousel' },
   { key: 'rich_message', title: 'リッチメッセージ', icon: ImageIcon, desc: '1枚の画像を面に分けて、押すと動く', useFor: 'キャンペーンの告知に', cannot: 'できない：文字だけの本文（→ メッセージ）', href: '/templates/edit?kind=rich_message' },
+  { key: 'rich_video', title: 'リッチビデオ', icon: Video, desc: 'トーク画面で自動で流れる動画。見終わったらボタンで案内', useFor: '新商品・お店の紹介に', cannot: 'できない：画像を面に分ける（→ リッチメッセージ）', href: '/templates/edit?kind=rich_video' },
   { key: 'question', title: '質問', icon: HelpCircle, desc: 'ボタンで答えてもらい、答えでタグなどを付ける', useFor: '好みを聞くときに', cannot: 'できない：何問も続けて聞く（→ リサーチ）', href: '/templates/questions/new' },
   { key: 'coupon', title: 'クーポン', icon: Ticket, desc: '期間・回数・抽選を決めて配る', useFor: '来店・購入のきっかけに', cannot: 'できない：本文を自由に組む（→ メッセージ）', href: '/templates/edit?kind=coupon' },
   { key: 'research', title: 'リサーチ', icon: ClipboardList, desc: 'いくつかの質問にまとめて答えてもらう', useFor: '満足度の調査に', cannot: 'できない：答えですぐタグを付ける（→ 質問）', href: '/templates/edit?kind=research' },
@@ -201,6 +203,11 @@ function publishStateOf(t: Template): { label: string; tone: 'live' | 'changes' 
   if (t.publishedAt == null) return { label: '下書きだけ', tone: 'draft' }
   if (t.hasDraft) return { label: '未公開の変更', tone: 'changes' }
   return { label: '公開中', tone: 'live' }
+}
+
+function isRichVideoTemplate(template: Template): boolean {
+  if (template.messageType !== 'imagemap') return false
+  try { return Boolean(JSON.parse(latestContentOf(template)).video) } catch { return false }
 }
 
 export default function TemplatesListV8() {
@@ -431,7 +438,7 @@ export default function TemplatesListV8() {
 
   /* ===== 絞り込み ===== */
   const tabItems = useMemo(
-    () => templates.filter((t) => (activeSection === 'question' ? Boolean(t.question) : !t.question)),
+    () => templates.filter((t) => activeSection === 'rich_video' ? isRichVideoTemplate(t) : activeSection === 'question' ? Boolean(t.question) : !t.question && !isRichVideoTemplate(t)),
     [templates, activeSection],
   )
 
@@ -578,7 +585,7 @@ export default function TemplatesListV8() {
   const editHref = (t: Template) =>
     t.question
       ? `/templates/questions/new?id=${encodeURIComponent(t.id)}`
-      : `/templates/edit?id=${encodeURIComponent(t.id)}`
+      : `/templates/edit?id=${encodeURIComponent(t.id)}${isRichVideoTemplate(t) ? '&kind=rich_video' : ''}`
   const detailHref = (t: Template) => `/templates/detail?id=${encodeURIComponent(t.id)}`
 
   /** フォルダの並び順を入れ替える（隣と番号を交換）。 */
@@ -867,8 +874,9 @@ export default function TemplatesListV8() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
   const folderRows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? tabItems.length : null },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? tabItems.length : null },
     ...folders.map((folder, index) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
       count: folder.itemCount ?? null,
@@ -880,7 +888,7 @@ export default function TemplatesListV8() {
       onDelete: canMutateTemplates ? () => setDeletingFolder(folder) : undefined,
       deleteNote: '削除しても、中のテンプレートは未分類に残ります。',
     })),
-    { id: 'unfiled', label: '未分類', count: ready ? unfiledCount : null },
+    { kind: 'unfiled' as const, id: 'unfiled', label: '未分類', count: ready ? unfiledCount : null },
   ]
   const folderSelectOptions = [
     { value: 'all', label: 'フォルダ：すべて' },
@@ -1047,7 +1055,7 @@ export default function TemplatesListV8() {
   )
 
   /* ===== 一覧の中身（`susGP`：読込中・読み込めない・空・0件を分ける） ===== */
-  const sectionWord = activeSection === 'question' ? '質問のテンプレート' : 'メッセージのテンプレート'
+  const sectionWord = activeSection === 'rich_video' ? 'リッチビデオのテンプレート' : activeSection === 'question' ? '質問のテンプレート' : 'メッセージのテンプレート'
   const listBody = accountLoading || view === 'loading' ? (
     <div className={styles.skeletonRows} aria-label="読み込み中" data-design-node="susGP">
       {[0, 1, 2, 3].map((i) => (
@@ -1184,7 +1192,7 @@ export default function TemplatesListV8() {
                       sub={<span className={narrow ? styles.cellSub : `${styles.cellSub} ${styles.dotIndent}`} title={excerpt}>{excerpt}</span>}
                     />
                     <Td>
-                      <span className={styles.kindBadge}>{messageTypeText(kindLabel)}</span>
+                      <span className={styles.kindBadge}>{isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}</span>
                     </Td>
                     <Td>
                       <span className={styles.publishPill} data-tone={publish.tone}>
@@ -1284,7 +1292,7 @@ export default function TemplatesListV8() {
     <p className={styles.pagerSolo}>{pagerSummary}</p>
   )
 
-  const isTemplateSection = activeSection === 'message' || activeSection === 'question'
+  const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'
   const switchSection = (next: Section) => {
     setActiveSection(next)
     setPage(1)
@@ -1304,9 +1312,10 @@ export default function TemplatesListV8() {
       <Tabs
         label="テンプレートの種類"
         items={[
-          { label: 'メッセージ', count: loading ? undefined : templates.filter((t) => !t.question).length, current: activeSection === 'message', onClick: () => switchSection('message') },
+          { label: 'メッセージ', count: loading ? undefined : templates.filter((t) => !t.question && !isRichVideoTemplate(t)).length, current: activeSection === 'message', onClick: () => switchSection('message') },
           { label: 'カルーセル', count: assetCounts.card_message, current: activeSection === 'card_message', onClick: () => switchSection('card_message') },
           { label: 'リッチメッセージ', count: assetCounts.rich_message, current: activeSection === 'rich_message', onClick: () => switchSection('rich_message') },
+          { label: 'リッチビデオ', count: loading ? undefined : templates.filter(isRichVideoTemplate).length, current: activeSection === 'rich_video', onClick: () => switchSection('rich_video') },
           { label: '質問', count: loading ? undefined : templates.filter((t) => Boolean(t.question)).length, current: activeSection === 'question', onClick: () => switchSection('question') },
           { label: 'クーポン', count: assetCounts.coupon, current: activeSection === 'coupon', onClick: () => switchSection('coupon') },
           { label: 'リサーチ', count: assetCounts.research, current: activeSection === 'research', onClick: () => switchSection('research') },
@@ -1329,8 +1338,8 @@ export default function TemplatesListV8() {
       <Dialog
         open={pickerOpen}
         title="どの種類を作りますか"
-        designNode="R9XUMr"
-        designWidth={840}
+        designNode="I4jUUW"
+        designWidth={1060}
         designTop={200}
         designHeaderPadding="24px 24px 0"
         designHeaderHeight={48}

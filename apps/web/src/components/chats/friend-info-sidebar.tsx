@@ -1,5 +1,6 @@
 'use client'
 
+import StatusPill, { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import Avatar from '@/components/shared/avatar'
 import { useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
@@ -23,7 +24,6 @@ import { GripVertical, X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
-import chatV8 from '@/v8/inbox-chat/inbox-chat.module.css'
 
 interface FriendDetail {
   id: string
@@ -938,8 +938,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     <Select
                       size="full"
                       aria-label="対応状況を変える"
-                      icon={<span className={chatV8.ctlDot} data-status={effectiveStatus ?? 'unread'} />}
-                      options={STATUS_OPTIONS}
+                      treatment="pill"
+                      icon={<StatusDot tone={SUPPORT_STATUS_TONES[effectiveStatus ?? 'unread']} />}
+                      options={STATUS_OPTIONS.map((option) => ({ ...option, leading: <StatusDot tone={SUPPORT_STATUS_TONES[option.value]} /> }))}
                       value={effectiveStatus ?? 'unread'}
                       onChange={(next) => saveChatStatus(next as NonNullable<ChatStatusInfo['status']>)}
                     />
@@ -967,9 +968,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   </div>
                 ) : chatStatus?.status && statusLabels[chatStatus.status] ? (
                   <div className="mt-1.5">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-pill text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
+                    {isV8 ? <StatusPill tone={SUPPORT_STATUS_TONES[chatStatus.status]}>{statusLabels[chatStatus.status].label}</StatusPill> : (<span className={`inline-flex items-center px-2 py-0.5 rounded-pill text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
                       {statusLabels[chatStatus.status].label}
-                    </span>
+                    </span>)}
                   </div>
                 ) : (
                   <p className="text-xs text-ink-faint mt-1.5">未設定</p>

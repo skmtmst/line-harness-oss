@@ -63,7 +63,7 @@ function FolderEditor() {
 
   // 画面名は共通トップバーだけに置く（`docs/v8-design-rules.md` §5）。
   // 本文に大見出しを戻すと、上部バーと同じ文字が2つ並ぶ。
-  usePageTitle('友だち属性')
+  usePageTitle('タグ')
 
   const close = () => router.push('/tags')
   const dialogRef = useOverlayFocus(!deleteOpen, close, saving)

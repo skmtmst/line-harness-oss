@@ -420,7 +420,7 @@ function OperatorEditInner() {
   return (
     <div data-design-node={editId ? 'hiBO8' : 'gjUz3'} className={styles.board}>
       <div className={styles.head}>
-        <h1 className={styles.headTitle}>{title}</h1>
+        <h1 className={styles.headTitle} title={title}>{title}</h1>
         <p className={styles.headDescription}>{description}</p>
       </div>
 

@@ -1,0 +1,7 @@
+/* 新しい統括の板だけ。店の一覧の寸法は変えない。 */
+.colHqActions { width: var(--tpl-hql-actions-w); }
+.hqNameButton { min-height: 0; }
+.colFormStorage { width: var(--tpl-hql-form-storage-w); }
+.colFormState { width: var(--tpl-hql-form-state-w); }
+.colFormDest { width: var(--tpl-hql-form-dest-w); }
+.colFormActions { width: var(--tpl-hql-form-actions-w); }

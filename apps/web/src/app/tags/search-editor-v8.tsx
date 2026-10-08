@@ -542,7 +542,7 @@ function SearchEditorV8Inner() {
   const [reloadKey, setReloadKey] = useState(0)
 
   usePageTitle('保存した検索を編集')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }, { label: '保存した検索', href: '/tags?tab=searches' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }, { label: '保存した検索', href: '/tags?tab=searches' }])
 
   /*
     ATTR-12: 再計算の連打・条件変更・アカウント切替で、古い計算結果が

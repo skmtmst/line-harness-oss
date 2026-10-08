@@ -188,7 +188,7 @@ export default function MemberDialogV8({
         </div>
       }
     >
-      <form
+      <form noValidate
         className={`${head.head} ${styles.form}`}
         onSubmit={(event) => {
           event.preventDefault()

@@ -4,6 +4,7 @@ import { ChevronDown, Images, Layers, Plus, Scissors, Sparkles, Upload, X } from
 import { useId, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import ColorWell from '@/components/shared/color-well'
+import HelpTip from '@/components/shared/help-tip'
 import LimitState from './limit-state'
 import styles from './generation-panel.module.css'
 import Radio from '@/components/shared/radio'
@@ -69,6 +70,7 @@ export default function GenerationPanel({
   usage,
   onReloadUsage,
   usageHeading,
+  v8Layout = false,
 }: {
   presets: BannerPreset[]
   maxCount: number
@@ -90,6 +92,8 @@ export default function GenerationPanel({
    * 板がそう描いている V8 のプロジェクトの中だけが渡す。v7 の既定は変えない。
    */
   usageHeading?: boolean
+  /** 統括 V8 の板だけの並び。v7 の既定は変えない。 */
+  v8Layout?: boolean
 }) {
   const uid = useId()
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -116,7 +120,7 @@ export default function GenerationPanel({
         押せる大きさに保つための最小高さだった。切替が無い今は題だけの行なので外す。
         板Δ（`S0ay0i`画像を生成 → `RJIyX`出力サイズ）49 に対し、外すと 55 → 46 になる。
       */}
-      <div className="flex flex-wrap items-center gap-2 px-4 py-2">
+      <div className={v8Layout ? 'flex flex-wrap items-center gap-2 px-4 pt-4' : 'flex flex-wrap items-center gap-2 px-4 py-2'}>
         <Sparkles aria-hidden="true" className="h-4.5 w-4.5 text-ink-faint" />
         <h2 className="text-body font-bold text-ink">画像を生成</h2>
       </div>
@@ -253,11 +257,12 @@ export default function GenerationPanel({
           */}
         <Field
           label="画像に入れるテキスト"
-          note={`1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」`}
-          noteSpread
-          footNote="「強調」を押した行は大きく・目立つ色で描きます（1〜2行まで推奨）"
+          note={v8Layout ? `1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで` : `1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」`}
+          noteSpread={!v8Layout}
+          footNote={v8Layout ? undefined : '「強調」を押した行は大きく・目立つ色で描きます（1〜2行まで推奨）'}
+          help={v8Layout ? '「強調」を押した行は大きく・目立つ色で描きます（1〜2行まで推奨）' : undefined}
         >
-          <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
+          <div className={v8Layout ? 'flex flex-col gap-2' : 'flex flex-col gap-2 rounded-control border border-hairline p-3'}>
             {value.textLines.map((line, i) => (
               <div key={i} className="flex items-center gap-2">
                 <span className="w-3 text-micro font-semibold text-ink-faint" aria-hidden="true">{i + 1}</span>
@@ -318,7 +323,7 @@ export default function GenerationPanel({
           </div>
         </Field>
 
-        <ColorRoles value={value} onPick={(key, next) => set(key, next)} disabled={disabled} />
+        <ColorRoles value={value} onPick={(key, next) => set(key, next)} disabled={disabled} v8Layout={v8Layout} />
 
         <Field
           label="人物"
@@ -393,7 +398,7 @@ export default function GenerationPanel({
           />
         </Field>
 
-        <UsageBars usage={usage ?? null} heading={usageHeading} />
+        <UsageBars usage={usage ?? null} heading={v8Layout ? false : usageHeading} v8Layout={v8Layout} />
 
         <LimitState usage={usage ?? null} onReload={onReloadUsage} compact />
 
@@ -413,7 +418,7 @@ export default function GenerationPanel({
  * `heading` を渡すと上に「利用量」を置く（★BG-B `qIp42` の `ta8eS`。棒と同時に出る）。
  * 文字は `ta8eS` 3文字 w=37・h=17 ＝ 12px・太さ600 で、同じパネルの「色の決め方」と同じ見た目。
  */
-function UsageBars({ usage, heading }: { usage: BannerUsage | null; heading?: boolean }) {
+function UsageBars({ usage, heading, v8Layout }: { usage: BannerUsage | null; heading?: boolean; v8Layout?: boolean }) {
   if (!usage) return null
   if (usage.blocked || usage.paused || usage.month.remaining <= 0 || usage.today.remaining <= 0) return null
   const rows = [
@@ -421,17 +426,17 @@ function UsageBars({ usage, heading }: { usage: BannerUsage | null; heading?: bo
     { label: '今日', bucket: usage.today },
   ]
   return (
-    <div data-design-node="iMnph-usage" className="flex flex-col gap-1.5">
+    <div data-design-node="iMnph-usage" className={v8Layout ? 'flex flex-col gap-3 rounded-control bg-canvas-sunken p-3' : 'flex flex-col gap-1.5'}>
       {heading ? <p className="text-caption font-semibold text-ink">利用量</p> : null}
       {rows.map(({ label, bucket }) => {
         const pct = bucket.limit > 0 ? Math.max(0, Math.min(100, (bucket.remaining / bucket.limit) * 100)) : 0
         return (
-          <div key={label} className="flex items-center gap-2">
-            <span className="w-8 shrink-0 text-micro text-ink-secondary">{label}</span>
+          <div key={label} className={v8Layout ? 'flex flex-col gap-1' : 'flex items-center gap-2'}>
+            {v8Layout ? <div className="flex justify-between text-micro text-ink-secondary"><span>{label}</span><span>{`残り ${bucket.remaining} / ${bucket.limit} 枚`}</span></div> : <span className="w-8 shrink-0 text-micro text-ink-secondary">{label}</span>}
             <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-pill bg-hairline">
               <span className="block h-full rounded-pill bg-success" style={{ width: `${pct}%` }} />
             </span>
-            <span className="shrink-0 text-micro text-ink-secondary">残り{bucket.remaining}/{bucket.limit}枚</span>
+            {v8Layout ? null : <span className="shrink-0 text-micro text-ink-secondary">残り{bucket.remaining}/{bucket.limit}枚</span>}
           </div>
         )
       })}
@@ -495,6 +500,7 @@ function Field({
   noteSpread,
   footNote,
   htmlFor,
+  help,
   children,
 }: {
   label: string
@@ -521,6 +527,7 @@ function Field({
    */
   footNote?: string
   htmlFor?: string
+  help?: ReactNode
   children: ReactNode
 }) {
   return (
@@ -532,6 +539,7 @@ function Field({
           <span className="shrink-0 text-caption font-semibold text-ink">{label}</span>
         )}
         {note ? <span className="min-w-0 text-micro text-ink-faint">{note}</span> : null}
+        {help ? <HelpTip label={`${label}の補足`}>{help}</HelpTip> : null}
       </div>
       {children}
       {footNote ? <p className="text-nano text-ink-faint">{footNote}</p> : null}
@@ -615,18 +623,20 @@ export function ColorRoles({
   value,
   onPick,
   disabled,
+  v8Layout = false,
 }: {
   value: BannerGenerationInput
   onPick: (key: BannerColorRoleKey, next: string | null) => void
   disabled?: boolean
+  v8Layout?: boolean
 }) {
   // いま使っている色を「このデザインの色」として見せ、役割どうしで使い回せるようにする。
   const used = Array.from(new Set(COLOR_ROLES.map((role) => value[role.key]).filter((c): c is string => Boolean(c))))
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-1.5">
-        <span className="shrink-0 text-caption font-semibold text-ink">カラー</span>
-        <span className="min-w-0 text-micro text-ink-faint">4つの役割で指定します</span>
+        <span className="shrink-0 text-caption font-semibold text-ink">{v8Layout ? '色' : 'カラー'}</span>
+        {v8Layout ? null : <span className="min-w-0 text-micro text-ink-faint">4つの役割で指定します</span>}
       </div>
       {/*
         4つの役割の並び。縦の間隔は板から逆算する。板の上下のピッチは
@@ -656,9 +666,7 @@ export function ColorRoles({
       {/* 補足（Pencil `pQlYK`）。色の役割の意味を言葉で置いておく。 */}
       <div className="rounded-mini bg-canvas-sunken p-3">
         <p className="text-caption font-semibold text-ink">色の決め方</p>
-        <p className="mt-1 text-micro text-ink-secondary">
-          色をタップすると、好きな色を選べる画面が開きます。画面の中の色をそのまま拾うスポイトも使えます。ベースは背景、メインは主役、サブは差し色、強調は特に目立たせたい文字に使います。
-        </p>
+        <p className="mt-1 text-micro text-ink-secondary">{v8Layout ? 'ベースは背景、メインは見出しの文字、サブは飾り、強調は値段や締切など目立たせたい所に使います。' : '色をタップすると、好きな色を選べる画面が開きます。画面の中の色をそのまま拾うスポイトも使えます。ベースは背景、メインは主役、サブは差し色、強調は特に目立たせたい文字に使います。'}</p>
       </div>
     </div>
   )

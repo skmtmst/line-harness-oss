@@ -1,3 +1,4 @@
+import { friendFieldReminderTargetStatements } from './reminders.js';
 import { jstNow } from './utils.js';
 
 /** 移行前の情報欄を所属させる既定テナント。既存IDと値は変えない。 */
@@ -949,23 +950,14 @@ export async function setFriendFieldValue(
     if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
     value = checked.value;
   }
-  if (value === null || value === '') {
-    await db
-      .prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`)
-      .bind(input.friendId, input.fieldId)
-      .run();
-    return;
-  }
-  await db
-    .prepare(
-      `INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(friend_id, field_id)
-       DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by,
-                     updated_at = excluded.updated_at`,
-    )
-    .bind(input.friendId, input.fieldId, value, input.updatedBy, jstNow())
-    .run();
+  const now = jstNow();
+  const statement = value === null || value === ''
+    ? db.prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`).bind(input.friendId, input.fieldId)
+    : db.prepare(`INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
+        VALUES (?, ?, ?, ?, ?) ON CONFLICT(friend_id, field_id)
+        DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at`)
+        .bind(input.friendId,input.fieldId,value,input.updatedBy,now);
+  await db.batch([statement, ...friendFieldReminderTargetStatements(db, [{ friendId: input.friendId, fieldId: input.fieldId, value }], now)]);
 }
 
 /**
@@ -998,7 +990,8 @@ export async function setFriendFieldValuesBulk(
           )
           .bind(entry.friendId, input.fieldId, entry.value, input.updatedBy, input.now),
   );
-  await db.batch(statements);
+  await db.batch([...statements, ...friendFieldReminderTargetStatements(db,
+    input.entries.map(entry => ({ ...entry, fieldId: input.fieldId })), input.now)]);
   return statements.length;
 }
 
@@ -1032,7 +1025,8 @@ export async function setFriendFieldValuesForFriend(
           )
           .bind(input.friendId, entry.fieldId, entry.value, input.updatedBy, input.now),
   );
-  await db.batch(statements);
+  await db.batch([...statements, ...friendFieldReminderTargetStatements(db,
+    input.entries.map(entry => ({ ...entry, friendId: input.friendId })), input.now)]);
   return statements.length;
 }
 

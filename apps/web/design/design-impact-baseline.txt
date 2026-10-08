@@ -440,6 +440,8 @@ shared-button-importer components/scenarios/trigger-editor.tsx
 shared-button-importer components/session-lost-notice.tsx
 shared-button-importer components/shared/condition-builder.tsx
 shared-button-importer components/shared/create-page.tsx
+shared-button-importer components/shared/folder-editor-dialog.tsx
+shared-button-importer components/templates/detail-columns.tsx
 shared-button-importer components/shared/dialog.tsx
 shared-button-importer components/shared/empty-list.tsx
 shared-button-importer components/shared/file-drop.tsx
@@ -449,6 +451,7 @@ shared-button-importer components/shared/not-connected.tsx
 shared-button-importer components/shared/progress.tsx
 shared-button-importer components/shared/row-actions.tsx
 shared-button-importer components/shared/save-conflict.tsx
+shared-button-importer components/shared/source-picker-dialog.tsx
 shared-button-importer components/shared/target-missing.tsx
 shared-button-importer components/shared/version-history.tsx
 shared-button-importer components/staff/login-audit.tsx
@@ -465,6 +468,7 @@ shared-button-importer lib/unsaved-leave-dialog.tsx
 shared-button-importer app/inflow-links/ad-connection-dialog.tsx
 shared-button-importer app/inflow-links/ad-event-mappings.tsx
 shared-button-importer components/events/event-application-preview.tsx
+shared-button-importer v8/hq/company-contact.tsx
 shared-button-importer v8/tags/create.tsx
 shared-button-importer v8/tags/field-edit.tsx
 shared-button-importer v8/tags/field-editor.tsx
@@ -514,6 +518,7 @@ shared-button-importer v8/webhooks/incoming.tsx
 shared-button-importer v8/webhooks/interactions.tsx
 shared-button-importer v8/webhooks/outgoing.tsx
 shared-button-importer v8/template-edit/asset.tsx
+shared-button-importer v8/template-edit/carousel-image.tsx
 shared-button-importer v8/template-edit/media-picker.tsx
 shared-button-importer v8/template-edit/insert-row.tsx
 shared-button-importer v8/template-edit/message.tsx
@@ -752,9 +757,14 @@ shared-button-importer v8/hq-templates/console.tsx
 shared-button-importer v8/hq-templates/detail.tsx
 shared-button-importer v8/hq-templates/store-list.tsx
 shared-button-importer v8/hq-templates/attribute-tabs.tsx
+shared-button-importer v8/hq-templates/tag-editor.tsx
 shared-button-importer v8/hq-templates/message-form.tsx
 shared-button-importer v8/template-detail/detail.tsx
 shared-button-importer v8/tag-edit/edit.tsx
 shared-button-importer v8/tag-edit/search-edit.tsx
 shared-button-importer v8/rich-menu-edit/detail.tsx
 shared-button-importer v8/affiliate-offer-new/create.tsx
+
+# リッチビデオ編集も共通の保存・キャンセルを使う。
+shared-button-importer v8/template-edit/rich-video.tsx
+shared-button-importer v8/hq-templates/saved-distribution-dialog.tsx

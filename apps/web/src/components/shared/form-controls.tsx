@@ -47,6 +47,7 @@ export function Field({
   label,
   htmlFor,
   required,
+  optional,
   note,
   error,
   help,
@@ -58,6 +59,7 @@ export function Field({
   label: string
   htmlFor?: string
   required?: boolean
+  optional?: boolean
   note?: ReactNode
   error?: ReactNode
   /**
@@ -116,6 +118,7 @@ export function Field({
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
               何も伝わらない。 */}
           {required && <RequiredBadge />}
+          {optional && !required && <OptionalBadge />}
         </label>
         {hasHelp ? (
           <HelpTip label={`${helpLabel ?? label}の説明`}>

@@ -11,6 +11,7 @@ import { PageFrame } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
+import Disclosure from '@/components/shared/disclosure'
 import { TextArea } from '@/components/shared/text-field'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
@@ -155,13 +156,29 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
     }
   }
 
-  const preview = comments.slice(0, 2).reverse()
+  // 開始後の最初のコメントと待機中の最初のコメントを見本にする。
+  // 配列の先頭2件だけだと、待機中のコメントしか出ないことがある。
+  const chronological = [...comments].sort((a, b) => a.atSeconds - b.atSeconds)
+  const firstDuring = chronological.find((comment) => comment.atSeconds >= 0)
+  const firstBefore = chronological.find((comment) => comment.atSeconds < 0)
+  const preview = firstDuring && firstBefore ? [firstDuring, firstBefore] : chronological.slice(0, 2)
+  const previewContent = <>
+    <div className={styles.screen}>
+      {preview.map((comment, index) => (
+        <p key={index} className={styles.screenLine} data-dim={index > 0 || undefined}>{`${comment.authorName}：${comment.body}`}</p>
+      ))}
+    </div>
+    <p className={styles.sideNote}>本物の視聴者コメントは「分析」で見られます</p>
+  </>
   const locked2 = saving || readOnly
 
   return (
     <PageFrame kind="list" boardId="Omqd4">
       <DetailHead {...chrome} current="comments" />
       <div className={styles.body} data-design-node="Omqd4">
+        <div className={styles.previewToggle}>
+          <Disclosure title="視聴画面での見え方" size="compact">{previewContent}</Disclosure>
+        </div>
         <section className={styles.card} aria-labelledby="webinar-comments-title">
           <div className={styles.cardHead}>
             <div className={styles.cardHeadText}>
@@ -219,12 +236,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
         </section>
         <aside className={styles.side} aria-labelledby="webinar-comments-preview">
           <h3 id="webinar-comments-preview" className={styles.sideTitle}>視聴画面での見え方</h3>
-          <div className={styles.screen}>
-            {preview.map((comment, index) => (
-              <p key={index} className={styles.screenLine} data-dim={index > 0 || undefined}>{`${comment.authorName}：${comment.body}`}</p>
-            ))}
-          </div>
-          <p className={styles.sideNote}>本物の視聴者コメントは「分析」で見られます</p>
+          {previewContent}
         </aside>
       </div>
     </PageFrame>

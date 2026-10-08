@@ -166,3 +166,25 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.conflictBooking {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-20);
+  overflow-wrap: anywhere;
+}
+
+.conflictReason {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}
+
+.conflictLabel {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 600;
+}

@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性「友だち情報欄」タブ（Pencil `q5gbcM`）。
+ * ★V8 タグ「友だち情報欄」タブ（Pencil `q5gbcM`）。
  *
  * 動き（読み込み・数の帯・絞り込み・フォルダ・並べ替え・削除の安全確認・移行への入口・
  * 行の詳細パネル・名前のその場の直し・右クリック）は今の V8 タブ（app/tags/fields-tab-v8.tsx）から写した。
@@ -315,8 +315,9 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
   ]
 
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: status === 'ready' ? items.length : null },
+    { kind: 'all' as const, id: '', label: 'すべて', count: status === 'ready' ? items.length : null },
     ...folders.map((f, index) => ({
+      kind: 'folder' as const,
       id: f.id,
       label: f.name,
       count: status === 'ready' ? items.filter((field) => field.folderId === f.id).length : null,
@@ -327,7 +328,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
       onDelete: canEdit ? () => setDeletingFolder(f) : undefined,
       deleteNote: '削除しても、中の項目は未分類に残ります。',
     })),
-    { id: UNFILED, label: '未分類', count: status === 'ready' ? items.filter((field) => !field.folderId).length : null },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: status === 'ready' ? items.filter((field) => !field.folderId).length : null },
   ]
   const folderSelectOptions = [
     { value: '', label: 'フォルダ：すべて' },

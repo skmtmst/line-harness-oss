@@ -58,6 +58,14 @@ afterEach(() => {
 const buttons = () => [...document.querySelectorAll('button')]
 
 describe('統括のひな形の一覧（店と同じ形）', () => {
+  it('フォルダの保存色を左の列と名前の前に表示する', async () => {
+    await render({ folders: [{ id: 'f-1', name: 'お問い合わせ', revision: 1, color: '#8b5cf6' }] })
+    const dot = host.querySelector('[data-folder-dot="filed"]') as HTMLElement
+    expect(dot.style.backgroundColor).toBe('#8b5cf6')
+    expect(dot.getAttribute('aria-label')).toBe('フォルダ：お問い合わせ')
+    expect(host.innerHTML).toContain('#8b5cf6')
+  })
+
   it('配布先の列に配ったアカウントの数、配っていない行は「まだ配っていない」', async () => {
     await render()
     expect(host.textContent).toContain('2 アカウント')
@@ -65,7 +73,7 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.textContent).toContain('まだ配っていない')
   })
 
-  /* 絵：テンプレート i0Ao0R・リッチメニュー noVq4・友だち属性 DzdC3・回答フォーム wZPua。どの種類も行の「…」の左に［配る］。 */
+  /* 絵：テンプレート i0Ao0R・リッチメニュー noVq4・タグ DzdC3・回答フォーム wZPua。どの種類も行の「…」の左に［配る］。 */
   for (const type of ['template', 'tag', 'rich_menu', 'form', 'scenario'] as const) {
     it(`${type} の一覧は、どの行にも「…」の左に［配る］があり、押すとその行を配る`, async () => {
       const h = await render({ type, kind: type === 'template' ? 'message' : undefined })
@@ -86,13 +94,17 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     })
   }
 
-  it('テンプレートは行の「…」の中からも配れる（文字は「配る」）。公開の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
+  it('テンプレートは行の［配る］と「…」の両方から配る。公開の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
     const rows = [
       { ...ROWS[0], outdated_account_count: 1, this_month_sent_count: 1860 },
       { ...ROWS[1], this_month_sent_count: null },
       { ...row('t-3', '予約の受付', 1), outdated_account_count: 0, this_month_sent_count: 0 },
     ]
     const h = await render({ rows, stats: { thisMonthSentCount: 1860, outdatedTemplateCount: 1 } })
+    const distribute = buttons().find((b) => b.getAttribute('aria-label') === '秋の新商品を配る')!
+    await act(async () => { distribute.click() })
+    expect(h.onDistribute).toHaveBeenCalledWith(rows[0])
+    h.onDistribute.mockClear()
     expect(host.textContent).toContain('未公開の変更')
     expect(host.textContent).toContain('下書きだけ')
     expect(host.textContent).toContain('公開中')
@@ -108,7 +120,7 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(h.onDistribute).toHaveBeenCalledWith(rows[0])
   })
 
-  it('友だち属性は人数・付け方、リッチメニューは順・誰に出すか・今月押されたを出す（DzdC3・noVq4）', async () => {
+  it('タグは人数・付け方、リッチメニューは順・誰に出すか・今月押されたを出す（DzdC3・noVq4）', async () => {
     await render({ type: 'tag', kind: undefined, rows: [{ ...ROWS[0], template_type: 'tag', friend_count: 64, assignment_method: '手動・自動' }] })
     expect(host.textContent).toContain('64人')
     expect(host.textContent).toContain('手動・自動')

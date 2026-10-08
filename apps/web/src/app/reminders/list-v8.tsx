@@ -634,14 +634,15 @@ export default function RemindersListV8() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' },
+    { kind: 'all' as const, id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' },
     ...folders.map((folder) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
       count: folder.itemCount ?? null,
       color: folder.color,
     })),
-    { id: UNFILED, label: '未分類', count: unfiledCount, color: 'var(--color-ink-disabled)' },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount, color: 'var(--color-ink-disabled)' },
   ]
 
   const folderSelectOptions = [

@@ -29,6 +29,10 @@ export type DialogProps = {
   designHeaderPadding?: string
   /** ★V8：絵の窓の頭の高さ（px）。渡すと頭の行をこの高さに固定する。渡さなければ中身なり。v7 では効かない。 */
   designHeaderHeight?: number
+  /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
+  designContentPadding?: string
+  /** 題の隣の補足。ほかの窓の題の並びは変えない。 */
+  titleHelp?: ReactNode
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
   /** 操作の左に出す現在の手順など。 */
@@ -85,6 +89,8 @@ export default function Dialog({
   designTop,
   designHeaderPadding,
   designHeaderHeight,
+  designContentPadding,
+  titleHelp,
   steps,
   footerLead,
   title,
@@ -148,8 +154,9 @@ export default function Dialog({
     <div className={styles.titleRow}>
       <span className={styles.titleIcon} aria-hidden="true">{titleIcon}</span>
       {titleNode}
+      {titleHelp}
     </div>
-  ) : titleNode}</>)
+  ) : titleHelp ? <div className={styles.titleRow}>{titleNode}{titleHelp}</div> : titleNode}</>)
   const descriptionNode = description ? <p id={descriptionId} className={styles.description}>{description}</p> : null
   const heading = (
     <>
@@ -174,10 +181,12 @@ export default function Dialog({
       data-design-width={designWidth ? '' : undefined}
       data-design-header-padding={designHeaderPadding ? '' : undefined}
       data-design-header-height={designHeaderHeight ? '' : undefined}
-      style={designWidth || designHeaderPadding || designHeaderHeight ? ({
+      data-design-content-padding={designContentPadding ? '' : undefined}
+      style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding ? ({
         ...(designWidth ? { '--dialog-design-width': `${designWidth}px` } : {}),
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
+        ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),
       } as CSSProperties) : undefined}
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}

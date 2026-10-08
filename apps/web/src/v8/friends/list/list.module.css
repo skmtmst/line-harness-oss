@@ -245,25 +245,6 @@ button.star:hover { background: var(--color-status-warn-soft); color: var(--colo
 
 .supportCell { display: flex; flex-direction: column; gap: var(--tpl-fr-support-gap); min-width: 0; }
 .statusRow { display: flex; align-items: center; gap: var(--tpl-fr-btn-gap); min-width: 0; }
-
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-fr-dot-gap);
-  padding: var(--tpl-fr-status-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-fr-delta-lh);
-  white-space: nowrap;
-}
-
-.dot { width: var(--tpl-fr-dot); height: var(--tpl-fr-dot); border-radius: var(--radius-pill); background: currentColor; flex-shrink: 0; }
-.status_danger { background: var(--color-status-danger-soft); color: var(--color-danger); }
-.status_warn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-.status_info { background: var(--color-action-soft); color: var(--color-action); }
-.status_ok { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-
 .mark {
   overflow: hidden;
   color: var(--color-ink-secondary);

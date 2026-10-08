@@ -762,6 +762,13 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   function hydrate(g: Group) {
     setGroup(g)
+    setSize(g.size)
+    setTabCount(Math.max(0, g.pages.length - 1))
+    const matchedLayout = TEMPLATES.find((layout) => layout.size === g.size && layout.areas.length === g.pages[0]?.areas.length && layout.areas.every((bounds, i) => {
+      const area = g.pages[0].areas[i]
+      return area.boundsX === Math.round(bounds.x) && area.boundsY === Math.round(bounds.y) && area.boundsWidth === Math.round(bounds.w) && area.boundsHeight === Math.round(bounds.h)
+    }))
+    setTemplateKey(matchedLayout?.key ?? V8_LAYOUT_KEYS[g.size][0])
     setPages(g.pages)
     // 保存→読み直しで、いま見ているページを飛ばさない。消えたページだけ既定へ戻す。
     setActivePageId((prev) =>
@@ -770,7 +777,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         : g.pages.find((p) => p.id === g.defaultPageId)?.id ?? g.pages[0]?.id ?? null,
     )
     setSelectedAreaId((prev) =>
-      prev && g.pages.some((p) => p.areas.some((a) => a.id === prev)) ? prev : null,
+      prev && g.pages.some((p) => p.areas.some((a) => a.id === prev)) ? prev : (g.pages.find((p) => p.id === g.defaultPageId) ?? g.pages[0])?.areas[0]?.id ?? null,
     )
     setName(g.name)
     setChatBarText(g.chatBarText)
@@ -819,7 +826,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    * 開けたら手順はどれでも選べる（①で作った後と同じ）。開けなければ理由を出し、新しく作る道は残す。
    */
   const resumeIdRef = useRef<string | null>(
-    typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('id'),
+    host || typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('id'),
   )
   useEffect(() => {
     const id = resumeIdRef.current
@@ -851,7 +858,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     }
     const shapePages = Array.from({ length: tabCount + 1 }, (_, index) => ({
       id: `page-${index + 1}`,
-      name: index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`,
+      name: tabCount === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index)}`,
       imageR2Key: index === 0 ? imageR2Key : null,
       areas: createAreaDrafts(template).map((area, areaIndex) => ({ ...area, id: `p${index + 1}-a${areaIndex + 1}` })),
     }))
@@ -1082,12 +1089,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     const newPage: Page = {
       id: `tmp-${Math.random().toString(36).slice(2, 10)}`,
       orderIndex: nextOrder,
-      name: `タブ ${String.fromCharCode(65 + nextOrder - 1)}`,
+      name: `タブ ${String.fromCharCode(65 + (host ? nextOrder : nextOrder - 1))}`,
       aliasId: '',
       lineRichmenuId: null,
       imageR2Key: null,
       imageContentType: null,
-      areas: [],
+      areas: host ? createAreaDrafts(TEMPLATES.find((layout) => layout.key === templateKey) ?? template).map((area) => ({ ...area, id: crypto.randomUUID() })) : [],
     }
     setPages([...pages, newPage])
     setActivePageId(newPage.id)
@@ -1519,7 +1526,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const previewPages = !group
     ? Array.from({ length: tabCount + 1 }, (_, i) => ({
         id: String(i),
-        name: i === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + i - 1)}`,
+        name: host && tabCount > 0 ? `タブ ${String.fromCharCode(65 + i)}` : i === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + i - 1)}`,
       }))
     : pages.map((p) => ({ id: p.id, name: p.name }))
 
@@ -1651,7 +1658,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     <CreatePage boardId={
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
-      } title={<>リッチメニューを作る</>} description={<>{headNote}{conflict ? (
+      } headingSize="large" title={<>リッチメニューを作る</>} description={<>{headNote}{conflict ? (
           /* 板 `r8dGXT`：帯は頭の説明の下に横いっぱい（右の列の上まで）。見た目は共通部品（save-conflict）。比べる窓はこの画面の要約の比べ（VersionCompare）。 */
           <div className={styles.conflictSlot}>
             <SaveConflictBand
@@ -1674,11 +1681,10 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               {step === 'publish' ? (
                 <>
                   <Button type="button" disabled={busy || !host.canOperate} busy={saving || host.busy} busyLabel="保存中…" onClick={() => void hostSave(false)}>
-                    下書きのまま保存
+                    下書きを保存
                   </Button>
-                  <Button type="button" variant="primary" disabled={busy || !host.canOperate || host.selectedCount === 0} title={host.selectedCount === 0 ? '配るアカウントを選んでください' : undefined} busy={saving || host.busy} busyLabel="保存しています…" aria-label={saving || host.busy || !name.trim() ? undefined : `${name.trim()}を配る`} onClick={() => void hostSave(true)}>
-                    <Send size={14} aria-hidden="true" />
-                    配る
+                  <Button type="button" variant="primary" disabled={busy || !host.canOperate} title="保存したあとに、配るアカウントを選べます" busy={saving || host.busy} busyLabel="保存しています…" onClick={() => void hostSave(true)}>
+                    保存する
                   </Button>
                 </>
               ) : (
@@ -1896,12 +1902,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             <Field label="フォルダ">
               <FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId}
                 folders={folders.map(folderById)} size="full"
-                colors={!host}
+                colors
                 onCreate={!canOperate
                   ? undefined
                   : host
                     ? (host.createFolder
-                      ? folderCreator(async (name) => ({ success: true as const, data: await host.createFolder!(name) }), folderById, (created) => setFolders((current) => [...current, created as Folder]))
+                      ? folderCreator(async (name, color) => ({ success: true as const, data: await host.createFolder!(name, color) }), folderById, (created) => setFolders((current) => [...current, created as Folder]))
                       : undefined)
                     // 一覧の左の列の「フォルダを追加」と同じ口（リッチメニューのフォルダは共有）。
                     : folderCreator((name, color) => api.folders.create({ kind: 'rich_menu', name, color }), folderById, (created) => setFolders((current) => [...current, created]))} />
@@ -1920,7 +1926,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           <RadioCardGroup legend="大きさ" className="grid grid-cols-2 gap-3">
             {SIZE_OPTIONS.map((opt) => <RadioCard key={opt.value} name="rich-menu-size" value={opt.value}
               title={`${opt.label} ${opt.dims}`} note={opt.hint} icon={<opt.icon size={16} aria-hidden="true" />} checked={size === opt.value}
-              disabled={locked} disabledReason="形は下書きを作ったあとは変えられません"
+              disabled={locked}
               onChange={() => {
                 setSize(opt.value)
                 const first = V8_LAYOUT_KEYS[opt.value][0]
@@ -2580,7 +2586,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           />
         ) : null}
 
-        {step === 'buttons' ? (
+        {step === 'buttons' && (!host || selectedArea) ? (
           <CreateSummaryCard
             title="押された回数（今月）"
             rows={

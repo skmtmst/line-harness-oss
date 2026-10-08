@@ -65,6 +65,8 @@ import RowMenu from './row-menu'
 import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
 import { HQ_KIND_LABEL, HQ_KIND_TABS, HQ_NOT_YET, bubbleFromTemplate, carouselColumns, emptyContent, fromApiBubble, hqBubbleProblem, previewBubbleOf, bubbleFromHostContent, hostContentOfBubble, templateContentOfBubble, hqBubbleSummary, newHqBubble, notYetText, toApiBubble, type HqBubble } from './bubbles'
 import HqTemplatePicker from './template-picker'
+import HqBroadcastSourcePicker, { broadcastPickerItem } from './source-picker'
+import { SourcePickerSelection, type SourcePickerItem, type SourcePickerFolder } from '@/components/shared/source-picker-dialog'
 import CarouselV8 from '@/v8/templates/carousel'
 import TemplateRichEditor from '@/v8/template-edit/rich'
 import type { TemplateEditHost } from '@/v8/template-edit/host'
@@ -107,8 +109,6 @@ function errorText(caught: unknown, fallback: string): string {
   // 「API error: 500」のような内部の文は出さない。
   return japaneseDetailOf(caught) || fallback
 }
-
-const TEMPLATE_KIND_NAME: Record<string, string> = { message: 'メッセージ', carousel: 'カルーセル', rich_message: 'リッチメッセージ', question: '質問', coupon: 'クーポン', research: 'リサーチ' }
 
 /** 「9/20」。 */
 function shortDate(iso: string | null | undefined): string {
@@ -205,20 +205,18 @@ export default function HqBroadcastCreate() {
   const [method, setMethod] = useState<Method>('new')
   const [title, setTitle] = useState('')
   const [recent, setRecent] = useState<HqBroadcastRun[]>([])
-  const [templates, setTemplates] = useState<HqTemplateListItem[] | null>(null)
-  const [templateId, setTemplateId] = useState('')
-  const [templateQuery, setTemplateQuery] = useState('')
-  /* ① 「過去の配信を複製」の一覧（送った一括配信）と、選んだ配信。 */
-  const [sentRuns, setSentRuns] = useState<HqBroadcastRun[] | null>(null)
-  const [copiedId, setCopiedId] = useState('')
+  const [basicPicker, setBasicPicker] = useState<'template' | 'duplicate' | null>(null)
+  const basicPickerTrigger = useRef<HTMLButtonElement>(null)
+  const [selectedTemplate, setSelectedTemplate] = useState<{ item: SourcePickerItem; folders: SourcePickerFolder[] } | null>(null)
+  const [copiedRun, setCopiedRun] = useState<HqBroadcastRun | null>(null)
 
   /* ① フォルダ（統括の一括配信のフォルダ）・社内メモ（API-18）。 */
-  const [hqFolders, setHqFolders] = useState<Array<{ id: string; name: string }>>([])
-  /* フォルダを選ぶ欄からその場で作る（dLffh）。一覧の左の列と同じ口。色は持たない。 */
-  const createHqFolder = async (name: string) => {
-    const created = (await hqBroadcastsApi.createFolder(name)).data
-    setHqFolders((current) => [...current, { id: created.id, name: created.name }])
-    return { value: created.id, label: created.name }
+  const [hqFolders, setHqFolders] = useState<Array<{ id: string; name: string; color?: string | null }>>([])
+  /* フォルダを選ぶ欄からその場で作る（dLffh）。一覧の左の列と同じ口。名前と色を保存する。 */
+  const createHqFolder = async (name: string, color: string | null) => {
+    const created = (await hqBroadcastsApi.createFolder(name, color)).data
+    setHqFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }])
+    return { value: created.id, label: created.name, color: created.color }
   }
   const [folderId, setFolderId] = useState('')
   const [internalMemo, setInternalMemo] = useState('')
@@ -301,7 +299,7 @@ export default function HqBroadcastCreate() {
       hqBroadcastsApi.folders().catch(() => null),
     ])
       .then(([accounts, folderList, runs, broadcastFolders]) => {
-        if (current && broadcastFolders) setHqFolders(broadcastFolders.data.map((f) => ({ id: f.id, name: f.name })))
+        if (current && broadcastFolders) setHqFolders(broadcastFolders.data.map((f) => ({ id: f.id, name: f.name, color: f.color })))
         if (!current) return
         if (!accounts.success) throw new Error(accounts.error)
         const list: Store[] = accounts.data
@@ -310,7 +308,7 @@ export default function HqBroadcastCreate() {
         setStores(list)
         if (folderList?.success) setFolders(folderList.data.folders)
         const sent = runs ? runs.data.filter((r) => r.status !== 'prepared') : []
-        setRecent(sent.slice(0, 2)); setSentRuns(sent)
+        setRecent(sent.slice(0, 2))
         if (legacyTags.current.length > 0) {
           const ids = list.filter((s) => s.tags?.some((t) => legacyTags.current.includes(t.id))).map((s) => s.id)
           setAccountIds((prev) => [...new Set([...prev, ...ids])])
@@ -599,18 +597,19 @@ export default function HqBroadcastCreate() {
   }
 
   /** ① 配信方法「テンプレートを選択」・③［テンプレートから選ぶ］：統括のメッセージのひな形を開いている吹き出しに読み込む。 */
-  const applyTemplate = async (id: string) => {
-    if (!id) return
+  const applyTemplate = async (id: string): Promise<string | null> => {
+    if (!id) return 'テンプレートを選んでください'
     try {
       const detail = await hqTemplatesApi.get(id)
-      if (detail.template.template_type !== 'template') return
+      if (detail.template.template_type !== 'template') return 'メッセージのテンプレートを選んでください'
       const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
-      if ('error' in read) { setError(read.error); setErrorStep('basic'); return }
+      if ('error' in read) return read.error
       setBubbles([{ ...read.bubble, body: read.bubble.body.slice(0, BODY_MAX) }]); setOpenBubble(0)
       if (!title.trim()) setTitle((detail.definition as MessageTemplateDefinition).template.name.slice(0, TITLE_MAX))
-      setTemplateId(id); setError(''); setErrorStep(null)
+      setError(''); setErrorStep(null)
+      return null
     } catch (caught) {
-      setError(errorText(caught, 'ひな形を読み込めませんでした。もう一度お試しください。')); setErrorStep('basic')
+      return errorText(caught, 'ひな形を読み込めませんでした。もう一度お試しください。')
     }
   }
   /** ③ カルーセル：統括のカルーセルのひな形を読み、中身（カード）を吹き出しに控える。 */
@@ -641,14 +640,6 @@ export default function HqBroadcastCreate() {
       return errorText(caught, 'テンプレートを読み込めませんでした。もう一度お試しください。')
     }
   }
-  useEffect(() => {
-    if (method !== 'template' || templates) return
-    let current = true
-    void hqTemplatesApi.listByKind().then((list) => { if (current) setTemplates(list) }).catch(() => { if (current) setTemplates([]) })
-    return () => { current = false }
-  }, [method, templates])
-
-  /** ① 最近の配信・「過去の配信を複製」：配信名・中身・送るアカウント・対象を写す（時刻と下書きは写さない）。 */
   /**
    * ① 最近の配信・「過去の配信を複製」・詳細の［複製して作る］：配信名に「（コピー）」を付け、中身（吹き出し）・フォルダ・社内メモを写す。
    * 宛先（送るアカウント・対象）と日時は写さない（RqYwI・オーナー 10-08）。
@@ -656,7 +647,7 @@ export default function HqBroadcastCreate() {
   const duplicate = (source: HqBroadcastRun) => {
     const saved = source.input
     setMethod('duplicate')
-    setCopiedId(source.id)
+    setCopiedRun(source)
     setTitle(`${saved.title}（コピー）`.slice(0, TITLE_MAX))
     setFolderId(saved.folderId ?? '')
     setInternalMemo(saved.internalMemo ?? '')
@@ -714,7 +705,7 @@ export default function HqBroadcastCreate() {
       const definition = hostDefinition(freshDefinition('template') as MessageTemplateDefinition, made.content)
       await hqTemplatesApi.create({ type: 'template', name, definition }, crypto.randomUUID())
       setSaveTplOpen(false)
-      setTemplates(null); setCarousels(null)
+      setCarousels(null)
       notifyToast(`テンプレート「${name}」に保存しました`)
     } catch (caught) {
       setSaveTplError(errorText(caught, 'テンプレートに保存できませんでした。もう一度お試しください。'))
@@ -809,44 +800,13 @@ export default function HqBroadcastCreate() {
                     <RadioCard key={value} name="hq-broadcast-method" value={value} checked={method === value} title={label} note={note} onChange={(next) => setMethod(next as Method)} />
                   ))}
                 </RadioCardGroup>
-                {/* RqYwI（オーナー 10-08）：「テンプレートを選択」「過去の配信を複製」を選んだら、下に選ぶ一覧。選ぶと右の見え方がその中身になる。 */}
-                {method === 'template' ? (
-                  <div className={styles.pickList} data-design-node="RqYwI">
-                    <div className={styles.pickHead}>
-                      <h3>テンプレートを選ぶ</h3>
-                      <SearchField aria-label="テンプレートを名前で探す" placeholder="名前で探す" value={templateQuery} onChange={setTemplateQuery} onClear={() => setTemplateQuery('')} />
-                    </div>
-                    {templates === null ? <ListState kind="loading" /> : templates.length === 0 ? (
-                      <p className={styles.pickNote}>統括のテンプレートがまだありません。統括の「テンプレート」で作れます。</p>
-                    ) : (
-                      <RadioCardGroup legend="テンプレートを選ぶ" className={styles.pickCards}>
-                        {templates.filter((t) => !templateQuery.trim() || t.name.includes(templateQuery.trim())).map((t) => (
-                          <RadioCard key={t.id} name="hq-broadcast-template" value={t.id} checked={templateId === t.id} title={t.name}
-                            note={[TEMPLATE_KIND_NAME[t.kind ?? 'message'] ?? 'メッセージ', t.content_summary, t.updated_at ? `更新 ${shortDate(t.updated_at)}` : ''].filter(Boolean).join('・')}
-                            onChange={() => void applyTemplate(t.id)} />
-                        ))}
-                      </RadioCardGroup>
-                    )}
-                    <p className={styles.pickNote}>選ぶと右の「LINE での見え方」がその中身に変わります。次の「メッセージを作成」で手直しできます。</p>
-                  </div>
-                ) : null}
-                {method === 'duplicate' ? (
-                  <div className={styles.pickList} data-design-node="RqYwI">
-                    <div className={styles.pickHead}><h3>写す配信を選ぶ</h3></div>
-                    {sentRuns === null ? <ListState kind="loading" /> : sentRuns.length === 0 ? (
-                      <p className={styles.pickNote}>送った一括配信はまだありません。</p>
-                    ) : (
-                      <RadioCardGroup legend="写す配信を選ぶ" className={styles.pickCards}>
-                        {sentRuns.map((item) => (
-                          <RadioCard key={item.id} name="hq-broadcast-copy" value={item.id} checked={copiedId === item.id} title={item.title}
-                            note={`${shortDate(item.scheduledAt)} 送信・${formatNumber(runPeople(item))}人・${runKinds(item)}`}
-                            onChange={() => duplicate(item)} />
-                        ))}
-                      </RadioCardGroup>
-                    )}
-                    <p className={styles.pickNote}>選ぶと右の見え方がその配信の中身になります。配信名は「（コピー）」付きで入ります。宛先と日時は写しません。</p>
-                  </div>
-                ) : null}
+                {/* EpTBB：①は選ぶボタン／選んだ1行だけ。窓の仮選択は確定するまで反映しない。 */}
+                {method === 'template' ? selectedTemplate ? (
+                  <SourcePickerSelection buttonRef={basicPickerTrigger} item={selectedTemplate.item} folders={selectedTemplate.folders} onChange={() => setBasicPicker('template')} />
+                ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('template')}>テンプレートを選ぶ</Button> : null}
+                {method === 'duplicate' ? copiedRun ? (
+                  <SourcePickerSelection buttonRef={basicPickerTrigger} item={broadcastPickerItem(copiedRun)} folders={hqFolders} onChange={() => setBasicPicker('duplicate')} />
+                ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('duplicate')}>過去の配信を選ぶ</Button> : null}
                 <label className={formStyles.nameField}>
                   <span className={formStyles.labelRow}><span className="text-ink text-sm font-bold">配信名<RequiredBadge /></span><span className="text-xs text-ink-faint">{title.trim().length} / {TITLE_MAX}文字</span></span>
                   <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} />
@@ -854,7 +814,7 @@ export default function HqBroadcastCreate() {
                 </label>
                 {/* 店の一斉配信と同じフォルダ・社内メモ（統括の一括配信のフォルダ。API-18） */}
                 <div className={formStyles.basicFields}>
-                  <label><span className={formStyles.labelRow}>フォルダ</span><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name }))} onCreate={canManage ? createHqFolder : undefined} colors={false} size="full" /></label>
+                  <label><span className={formStyles.labelRow}>フォルダ</span><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name, color: f.color }))} onCreate={canManage ? createHqFolder : undefined} size="full" /></label>
                   <label><span className={formStyles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません。各アカウントの配信にも同じメモが残ります</HelpTip></span><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} maxLength={10000} className={formStyles.textInput} placeholder="友だちには表示されません" /></label>
                 </div>
                 <div className={formStyles.recentHeader}><h3>最近の配信</h3><Link href="/hq/broadcasts">一括配信の一覧を見る →</Link></div>
@@ -1344,6 +1304,19 @@ export default function HqBroadcastCreate() {
       <HqTestSendDialog open={testOpen} accounts={chosen.filter((s) => !excluded.includes(s.id)).map((s) => ({ id: s.id, name: s.name }))} prepare={prepareForTest} onClose={() => setTestOpen(false)} />
 
       {/* 詳細条件（店の一斉配信と同じ部品。タグ・シナリオは名前で選び、各アカウントの同じ名前に直す） */}
+      {basicPicker ? <HqBroadcastSourcePicker mode={basicPicker}
+        initialId={basicPicker === 'template' ? selectedTemplate?.item.id ?? '' : copiedRun?.id ?? ''}
+        onTemplate={async (item, folders) => {
+          const why = await applyTemplate(item.id)
+          if (!why) setSelectedTemplate({ item, folders })
+          return why
+        }}
+        onBroadcast={duplicate}
+        renderBroadcast={(source) => bubblesFromInput(source.input).map((item) => {
+          const bubble = previewBubbleOf(item, item.body)
+          return bubble ? <BubblePreview key={item.id} bubble={bubble} /> : null
+        })}
+        onClose={() => { setBasicPicker(null); requestAnimationFrame(() => basicPickerTrigger.current?.focus()) }} /> : null}
       <HqTemplatePicker open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={pickTemplate} />
       <Dialog
         open={saveTplOpen}

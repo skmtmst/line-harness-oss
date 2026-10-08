@@ -22,6 +22,11 @@
 - 絞り込み・並び・表示件数・カード／表は URL に残さない（画面の中だけ。v7 と同じ）。
 
 ## 読み込み（API）
+- 統括の情報（`/hq/settings`・板 `K7HYu`）：統括名は従来の `GET/PATCH /api/tenants/me`。会社と連絡先は別の `GET/PATCH /api/tenants/me/company-contact`。表示用の統括名と正式な会社名は混ぜない。
+  - 会社と連絡先はサーバで判定したオーナー・管理者だけが読み取る。通常メンバー・閲覧のみの画面にはカードと読み口を出さない。閲覧のみには保存・住所検索のボタンを出さない。
+  - 保存時に必須6欄・郵便番号7桁・電話番号・メールを検査する。任意の建物名・請求書の宛名は空ならNULL。既存の統括の8欄はNULLのまま。
+  - 読み込んだ `revision` を `expectedRevision` として送る。既存の会社表示設定の版を共用し、ほかの人の先行保存は409。同じ保存の再送では版・監査を増やさない。失敗時に入力を消したり自動で読み直したりしない。
+  - `GET /api/postal-code/search?code=` を再利用。複数候補と既に手入力した住所は、候補を選んだときだけ住所へ入れる。未取得・検索失敗では手入力を保つ。検索中の郵便番号・住所の編集には古い返信を適用しない。
 - ホーム：`GET /api/line-accounts`（タグ・接続状態・数を含む）・`GET /api/line-account-tags`・`GET /api/tenants/me`（説明の統括名）・運営のお知らせ（`PlatformNotices`）。
 - メンバー：`GET /api/staff/me` → 担当範囲が限られる人は一覧を呼ばない（M025）→ `GET /api/staff`・`GET /api/line-accounts`・最終ログイン。
 - 請求：`GET /api/hq/billing/summary`・`GET /api/hq/billing/invoices`（履歴だけの失敗は概要と分ける：R118、502 は決済サービスの案内：M023）。

@@ -138,6 +138,7 @@ beforeEach(() => {
   } catch {
     /* 置き場が無いときはそのまま */
   }
+  window.localStorage.setItem('lh_staff_role', 'owner')
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
   spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => { errors.push(args) })

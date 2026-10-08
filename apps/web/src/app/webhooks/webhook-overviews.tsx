@@ -1202,7 +1202,7 @@ export function IncomingOverview({
             <GuideTerm name="JSON（ジェイソン）">データの書き方の決まりです</GuideTerm>
           </GuideCard>
           <GuideCard title="つながる先">
-            <GuideLink href="/tags">友だち属性</GuideLink>
+            <GuideLink href="/tags">タグ</GuideLink>
             <GuideLink href="/templates">テンプレート</GuideLink>
             <GuideLink href="/automations">オートメーション</GuideLink>
             <GuideLink href="/webhooks?tab=interactions">やり取りの記録</GuideLink>

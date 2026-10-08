@@ -48,7 +48,8 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('webinarApi.folders(selectedAccountId)')
     expect(PAGE).toContain('count: folder.count')
     /* 未分類の絞りはサーバーへ渡す(絞り値は UNFILED 行の id)。 */
-    expect(PAGE).toContain("{ id: UNFILED, label: '未分類', count: unfiledCount }")
+    expect(PAGE).toContain("kind: 'unfiled'")
+    expect(PAGE).toContain("id: UNFILED, label: '未分類', count: unfiledCount }")
     expect(PAGE).not.toContain('const WEBINAR_FOLDERS')
     expect(PAGE).not.toContain('min-h-[640px]')
     expect(PAGE).not.toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')

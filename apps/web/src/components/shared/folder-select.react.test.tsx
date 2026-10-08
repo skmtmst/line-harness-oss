@@ -81,11 +81,13 @@ describe('開いた中身（dLffh）', () => {
 })
 
 describe('名前を入れる（iBuZH）', () => {
-  it('押すと同じ板が「新しいフォルダ」に替わり、名前の欄に焦点・色の見本6つ', async () => {
+  it('押すと同じ板が「新しいフォルダ」に替わり、名前の欄に焦点・横の色ボタンを押すと6色', async () => {
     await openMenu({ onCreate: vi.fn() })
     const input = await startCreate()
     expect(document.activeElement).toBe(input)
     expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：青' })) })
     expect(screen.getAllByRole('radio')).toHaveLength(6)
     expect(screen.getByRole('button', { name: '作って選ぶ' })).toBeTruthy()
   })
@@ -96,7 +98,10 @@ describe('名前を入れる（iBuZH）', () => {
     const button = await openMenu({ onCreate, onChange })
     const input = await startCreate()
     await act(async () => { fireEvent.change(input, { target: { value: ' 新規 ' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：青' })) })
     await act(async () => { fireEvent.click(screen.getByRole('radio', { name: '赤' })) })
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'フォルダの色：赤' }).getAttribute('aria-expanded')).toBe('false')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' })) })
     expect(onCreate).toHaveBeenCalledWith('新規', '#ef4444')
     expect(onChange).toHaveBeenCalledWith('f-new')
@@ -147,6 +152,20 @@ describe('名前を入れる（iBuZH）', () => {
     await act(async () => { fireEvent.keyDown(input, { key: 'Enter', isComposing: true }) })
     expect(onCreate).not.toHaveBeenCalled()
     expect(screen.getByRole('textbox', { name: '新しいフォルダの名前' })).toBeTruthy()
+  })
+
+  it('色の小窓は矢印キーで選べ、Esc は小窓だけを閉じて色ボタンへ戻る', async () => {
+    await openMenu({ onCreate: vi.fn() })
+    const input = await startCreate()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：青' })) })
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: '青' }))
+    await act(async () => { fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' }) })
+    expect(screen.getByRole('radio', { name: '緑' }).getAttribute('aria-checked')).toBe('true')
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: '緑' }))
+    await act(async () => { fireEvent.keyDown(document.activeElement!, { key: 'Escape' }) })
+    expect(screen.queryByRole('radiogroup')).toBeNull()
+    expect(screen.getByRole('textbox', { name: '新しいフォルダの名前' })).toBe(input)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'フォルダの色：緑' }))
   })
 
   it('名前が空なら作れない', async () => {

@@ -6363,6 +6363,9 @@ export const BOOKING_CONFLICT_ALTERNATIVES = BOOKING_PROXY_CREATE.conflict.body.
 export const BOOKING_ADMIN_DETAIL = {
   booking: {
     id: 'bk-1', startsAt: '2026-09-03T00:00:00.000Z', endsAt: '2026-09-03T01:45:00.000Z', status: 'confirmed',
+    staffId: 'bs-1', menuId: 'bm-1', lockVersion: 1,
+    notificationPolicy: { send_line_confirmation: true, day_before: true, hours_before: true },
+    auditLogTotal: 0, auditLogs: [],
     customerNote: '顔まわりはふんわり仕上げてください。', internalNote: '皮膚の赤みに注意。', price: 8400,
     requestedAt: '2026-09-02T02:00:00.000Z', decidedAt: '2026-09-02T02:05:00.000Z', source: 'liff',
     createdByStaffId: 'visual-qa-owner', calendarSync: 'synced', menuName: 'トリミング（小型犬）', staffName: '佐々木',
@@ -8244,7 +8247,7 @@ const bannerImage = (n, projectId, generation, { favorite = false, delivered = [
     id: `banner-image-qa-${n}`, projectId, generationId: generation?.id ?? null,
     sequence: n, source: generation ? 'generated' : 'upload', parentImageId: null, isFavorite: favorite,
     createdBy: '高橋 直人', createdAt: created,
-    media: { id: `banner-media-qa-${n}`, filename: `banner-${n}.png`, mimeType: 'image/png', sizeBytes: 184320, width: w, height: h, url: `https://example.invalid/banners/banner-${n}.png` },
+    media: { id: `banner-media-qa-${n}`, filename: `banner-${n}.png`, mimeType: 'image/png', sizeBytes: 184320, width: w, height: h, url: mediaPreview(n % 2 ? '#f3e9dc' : '#e7f7ef') },
     generation,
     deliveredAccountIds: delivered,
   }
