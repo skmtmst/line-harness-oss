@@ -387,9 +387,9 @@ export async function getFormVersionContentsByIds(
               on_submit_message_type, on_submit_message_content,
               on_submit_webhook_url, on_submit_webhook_headers,
               on_submit_webhook_fail_message, save_to_metadata
-         FROM form_versions WHERE id IN (${unique.map(() => '?').join(', ')})`,
+         FROM form_versions WHERE id IN (SELECT value FROM json_each(?))`,
     )
-    .bind(...unique)
+    .bind(JSON.stringify(unique))
     .all<FormVersionContent>();
   for (const row of result.results) versions.set(row.id, row);
   return versions;
@@ -1000,9 +1000,12 @@ export async function getFormSubmissionsByFriend(
   const safeLimit = boundedListLimit(limit, 10);
   const result = await db
     .prepare(
-      `SELECT fs.*, f.name AS form_name, f.fields AS form_fields
+      `SELECT fs.*,
+              CASE WHEN fs.form_version_id IS NULL THEN f.name ELSE COALESCE(fv.name, '回答時のフォーム') END AS form_name,
+              CASE WHEN fs.form_version_id IS NULL THEN f.fields ELSE COALESCE(fv.fields, '[]') END AS form_fields
        FROM form_submissions fs
        JOIN forms f ON f.id = fs.form_id
+       LEFT JOIN form_versions fv ON fv.id = fs.form_version_id AND fv.form_id = fs.form_id
        WHERE fs.friend_id = ? AND fs.is_test = 0
        ORDER BY fs.created_at DESC
        LIMIT ?`,
@@ -1054,9 +1057,12 @@ export async function getFormSubmissionsByFriendCursor(
   }
   const result = await db
     .prepare(
-      `SELECT fs.*, f.name AS form_name, f.fields AS form_fields
+      `SELECT fs.*,
+              CASE WHEN fs.form_version_id IS NULL THEN f.name ELSE COALESCE(fv.name, '回答時のフォーム') END AS form_name,
+              CASE WHEN fs.form_version_id IS NULL THEN f.fields ELSE COALESCE(fv.fields, '[]') END AS form_fields
        FROM form_submissions fs
        JOIN forms f ON f.id = fs.form_id
+       LEFT JOIN form_versions fv ON fv.id = fs.form_version_id AND fv.form_id = fs.form_id
        WHERE fs.friend_id = ? AND fs.is_test = 0${cursorClause}
        ORDER BY fs.created_at DESC, fs.id DESC
        LIMIT ?`,
@@ -1156,9 +1162,8 @@ export async function createFormSubmission(
  * 中で行うため、2件が同時に来ても両方が「空きあり」と読むことはない。
  * 取れたかどうかは `changes` が 1 か 0 かで分かる。
  *
- * 同じ (formId, slotKey, submissionId) を2回確保しようとしても、主キーが
- * 重複するので2回目は素通り(INSERT 0行)になる。冪等な再開でも枠を
- * 二重に消費しない。
+ * 同じ (formId, slotKey, submissionId) の再開は既存の確保を成功として返す。
+ * INSERT OR IGNORE と完全一致の読戻しで、満席でも自分の枠を二重に消費しない。
  */
 export async function claimFormCapacitySlot(
   db: D1Database,
@@ -1169,13 +1174,17 @@ export async function claimFormCapacitySlot(
 ): Promise<boolean> {
   const result = await db
     .prepare(
-      `INSERT INTO form_capacity_claims (form_id, slot_key, submission_id, created_at)
+      `INSERT OR IGNORE INTO form_capacity_claims (form_id, slot_key, submission_id, created_at)
        SELECT ?, ?, ?, ?
         WHERE (SELECT COUNT(*) FROM form_capacity_claims WHERE form_id = ? AND slot_key = ?) < ?`,
     )
     .bind(formId, slotKey, submissionId, jstNow(), formId, slotKey, limit)
     .run();
-  return (result.meta?.changes ?? 0) > 0;
+  if ((result.meta?.changes ?? 0) > 0) return true;
+  const owned = await db.prepare(`SELECT 1 AS owned FROM form_capacity_claims
+    WHERE form_id=? AND slot_key=? AND submission_id=?`)
+    .bind(formId,slotKey,submissionId).first<{ owned: number }>();
+  return Boolean(owned);
 }
 
 /**
@@ -1530,9 +1539,9 @@ export async function getFormSubmitClaimsBySubmissionIds(
   if (unique.length === 0) return claims;
   const result = await db
     .prepare(
-      `SELECT * FROM form_submit_claims WHERE submission_id IN (${unique.map(() => '?').join(', ')})`,
+      `SELECT * FROM form_submit_claims WHERE submission_id IN (SELECT value FROM json_each(?))`,
     )
-    .bind(...unique)
+    .bind(JSON.stringify(unique))
     .all<FormSubmitClaim>();
   for (const row of result.results) {
     if (row.submission_id) claims.set(row.submission_id, row);
