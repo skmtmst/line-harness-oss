@@ -466,39 +466,25 @@ interface TemplatePublishKeyRecord {
  * - 公開版の更新とキー記録は `db.batch` の単一原子操作で行う。
  *   途中障害・並行要求で版だけ進むことはない(独立審査P1)。
  */
-/**
- * 466: 公開が決まった内容を版履歴へ1行足す。前の版は変えない。
- * 公開本文と同じ原子操作へ入れ、履歴保存が落ちたら公開本文も戻す。
- */
+/** 公開本体のUPDATE直後に、不変の版履歴を同じ原子操作へ入れる。 */
 function publishedVersionStatement(
   db: D1Database,
-  row: TemplateRow,
+  id: string,
   versionNumber: number,
   options: { effectiveFrom?: string; createdByStaffId?: string | null },
   now: string,
-  onlyChanged = false,
 ): D1PreparedStatement {
   return db.prepare(
     `INSERT INTO template_versions
        (id, template_id, version_number, message_type, message_content,
         carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
         question_json, question_status, effective_from, created_by_staff_id, created_at)
-     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${onlyChanged ? 'WHERE changes() = 1' : ''}`,
-  ).bind(
-    crypto.randomUUID(),
-    row.id,
-    versionNumber,
-    row.message_type,
-    row.message_content,
-    row.carousel_actions_json,
-    row.carousel_tap_limit_mode,
-    row.carousel_tap_limit_text,
-    row.question_json,
-    row.question_status,
-    options.effectiveFrom ?? now,
-    options.createdByStaffId ?? null,
-    now,
-  );
+     SELECT ?, id, published_version, message_type, message_content,
+            carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
+            question_json, question_status, ?, ?, ?
+       FROM templates WHERE id = ? AND published_version = ? AND changes() = 1`,
+  ).bind(crypto.randomUUID(), options.effectiveFrom ?? now,
+    options.createdByStaffId ?? null, now, id, versionNumber);
 }
 
 export async function publishTemplate(
@@ -618,21 +604,12 @@ export async function publishTemplate(
       current.published_version,
       current.draft_revision ?? 0,
     ),
+    publishedVersionStatement(db, id, nextVersion, options, now),
   ];
-  publishBatch.push(publishedVersionStatement(db, {
-    ...current,
-    message_type: current.draft_message_type!,
-    message_content: current.draft_message_content!,
-    carousel_actions_json: current.draft_carousel_actions_json,
-    carousel_tap_limit_mode: current.draft_carousel_tap_limit_mode ?? 'none',
-    carousel_tap_limit_text: current.draft_carousel_tap_limit_text,
-    question_json: current.draft_question_json,
-    question_status: current.draft_question_status ?? 'draft',
-  }, nextVersion, options, now, true));
   if (options.idempotencyKey) {
     /*
-     * 同じ原子操作の中で、UPDATE が1行に当たったときだけ記録する。
-     * `changes()` は直前文の更新行数。無条件 INSERT にすると、
+     * 同じ原子操作の中で、公開UPDATEと直後の版履歴INSERTが
+     * それぞれ1行に当たったときだけ記録する。無条件 INSERT にすると、
      * 同時負けの側まで記録が残り、再試行の見分けが壊れる。
      */
     publishBatch.push(
@@ -1116,8 +1093,8 @@ export async function getTemplatesWithUsageCount(
       templates = [];
     } else {
       const rows = await db.prepare(
-        `SELECT * FROM templates WHERE id IN (${pageIds.map(() => '?').join(',')})`,
-      ).bind(...pageIds).all<TemplateRow>();
+        `SELECT * FROM templates WHERE id IN (SELECT value FROM json_each(?))`,
+      ).bind(JSON.stringify(pageIds)).all<TemplateRow>();
       const order = new Map(pageIds.map((id, index) => [id, index]));
       templates = (rows.results ?? [])
         .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));

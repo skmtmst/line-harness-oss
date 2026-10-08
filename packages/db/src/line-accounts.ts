@@ -362,7 +362,9 @@ export async function getLineAccountConnectionChecksByIdempotencyKey(
 
 /**
  * Saves one complete check run and advances the account revision in one D1 batch.
- * The INSERTs only select a row after the guarded UPDATE succeeded.
+ * Each INSERT requires the preceding statement to have written one row: first
+ * the guarded UPDATE, then the preceding check INSERT. A rejected UPDATE therefore
+ * keeps changes() at zero throughout the batch, even if another run owns nextRevision.
  */
 export async function saveLineAccountConnectionChecks(
   db: D1Database,
@@ -383,7 +385,7 @@ export async function saveLineAccountConnectionChecks(
          idempotency_key, account_revision
        )
        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-        WHERE EXISTS (
+        WHERE changes() = 1 AND EXISTS (
           SELECT 1 FROM line_accounts
            WHERE id = ? AND revision = ? AND archived_at IS NULL
         )`,
