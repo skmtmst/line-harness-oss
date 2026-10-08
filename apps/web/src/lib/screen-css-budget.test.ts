@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { countScreenCss, BASELINE } from '../../scripts/screen-css-budget.mjs'
+import { countScreenCss, screenFiles, BASELINE } from '../../scripts/screen-css-budget.mjs'
 
 const baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<
   string,
@@ -36,5 +36,11 @@ describe('画面の余白・高さ・文字（型の変数を使う）', () => {
     // 落ちたら: 型の変数（--tpl-*）に寄せるか、意図があるなら
     // node apps/web/scripts/screen-css-budget.mjs で基準を更新してください。
     expect(worse).toEqual({})
+  })
+
+  // 監査 ROOT-23：V8 の画面（src/v8）の CSS も数える。app だけだと V8 へ移した画面が見張りから外れる。
+  it('V8 の画面（src/v8）の CSS も数える', () => {
+    expect(screenFiles().some((file: string) => /[\\/]src[\\/]v8[\\/]/.test(file))).toBe(true)
+    expect(Object.keys(baseline).some((file) => file.startsWith('v8/'))).toBe(true)
   })
 })
