@@ -1,3 +1,7 @@
+// @vitest-environment happy-dom
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import KpiBand from './kpi-band'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -47,10 +51,10 @@ describe('数の帯（Pp3nS）', () => {
   })
 
   it('包み（KpiBand）は帯の印を持ち、並べ方は呼び出し側のまま', () => {
-    const source = read('kpi-band.tsx')
-    expect(source).toContain('data-kpi-strip')
-    expect(source).toContain('data-kpi-presentation="band"')
-    expect(source).toContain('gridClassName')
+    const html = renderToStaticMarkup(<KpiBand gridClassName="custom-grid"><span>数</span></KpiBand>)
+    expect(html).toContain('data-kpi-strip')
+    expect(html).toContain('data-kpi-presentation="band"')
+    expect(html).toContain('custom-grid')
   })
 
   it('帯の指定は層の外にある（ユーティリティ層の gap 等に勝つ）', () => {

@@ -97,13 +97,16 @@ export function DataTable({
   children,
   className,
   'data-design': dataDesign,
+  density,
 }: {
   children: ReactNode
   className?: string
   'data-design'?: string
+  /** 連携画面の3種類の行。指定のない表の見た目は変えない。 */
+  density?: 'reviews' | 'media' | 'sample'
 }) {
   return (
-    <div className={[shell.frame, className].filter(Boolean).join(' ')}>
+    <div className={[shell.frame, className].filter(Boolean).join(' ')} data-density={density}>
       <table className={shell.table} data-design={dataDesign}>{children}</table>
     </div>
   )

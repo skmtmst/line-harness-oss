@@ -199,3 +199,36 @@
 [data-theme='v8'] .bodyCell { padding-inline: var(--tpl-cell-gap-half); }
 [data-theme='v8'] .bodyCell:first-child { padding-left: var(--tpl-row-pad-side); }
 [data-theme='v8'] .bodyCell:last-child { padding-right: var(--tpl-row-pad-side); }
+
+/* 連携画面の行の密度。画面からセルの見た目を上書きさせない。 */
+[data-theme='v8'] .frame[data-density='reviews'] {
+  border-radius: var(--tpl-rt-card-radius); outline: 1px solid var(--color-hairline); outline-offset: -1px;
+}
+[data-theme='v8'] .frame[data-density='reviews'] table { display: block; }
+[data-theme='v8'] .frame[data-density='reviews'] :is(thead, tbody) { display: block; }
+[data-theme='v8'] .frame[data-density='reviews'] tr {
+  display: flex; align-items: center; gap: var(--tpl-rt-col-gap); min-width: 0; height: auto; border: 0;
+}
+[data-theme='v8'] .frame[data-density='reviews'] thead tr { padding: var(--tpl-rt-thead-pad); background: var(--color-table-head); }
+[data-theme='v8'] .frame[data-density='reviews'] tbody tr { padding: var(--tpl-rt-review-row-pad); box-shadow: var(--tpl-rt-line-top); }
+[data-theme='v8'] .frame[data-density='reviews'] :is(th, td) {
+  display: flex; flex-direction: column; gap: var(--tpl-rt-cell-gap); min-width: 0; height: auto; padding: 0; border: 0; box-shadow: none;
+  color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: normal; white-space: nowrap;
+}
+[data-theme='v8'] .frame[data-density='reviews'] th { font-size: var(--text-micro); font-weight: 600; }
+[data-theme='v8'] .frame[data-density='media'] th {
+  height: auto; padding: var(--tpl-e49-head-pad); color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-e49-lh-18);
+}
+[data-theme='v8'] .frame[data-density='media'] td { height: var(--tpl-e49-row-h); padding: var(--tpl-e49-row-pad); }
+[data-theme='v8'] .frame[data-density='media'] :is(th, td):first-child { padding-left: var(--tpl-e49-edge); }
+[data-theme='v8'] .frame[data-density='media'] :is(th, td):last-child { padding-right: var(--tpl-e49-edge); }
+[data-theme='v8'] .frame[data-density='sample'] { overflow: hidden; border: 1px solid var(--color-hairline); border-radius: var(--tpl-e1-radius-l); }
+[data-theme='v8'] .frame[data-density='sample'] thead tr { border-top: 0; }
+[data-theme='v8'] .frame[data-density='sample'] :is(th, td) { height: auto; padding: 0; border: 0; box-shadow: none; }
+[data-theme='v8'] .frame[data-density='sample'] tbody tr { border-bottom: 0; box-shadow: var(--shadow-row-line); }
+[data-theme='v8'] .frame[data-density='sample'] tbody tr:last-child { box-shadow: none; }
+[data-theme='v8'] .frame[data-density='sample'] th { text-align: left; }
+
+[data-theme='v8'] .frame[data-density='sample'] tr :is(th, td):is(:first-child, :last-child) { padding-inline: 0; }
+
+[data-theme='v8'] .frame[data-density='reviews'] tr :is(th, td):is(:first-child, :last-child) { padding-inline: 0; }

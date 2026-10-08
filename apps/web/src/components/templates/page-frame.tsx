@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import HelpTip from '@/components/shared/help-tip'
+import StickyBar from '@/components/shared/sticky-bar'
 import styles from './page-templates.module.css'
 
 export interface PageHeadingProps {
@@ -53,4 +54,9 @@ export function PageFrame({ kind, children, boardId, standalone = false, hasFoot
   kind: string; children: ReactNode; boardId?: string; standalone?: boolean; hasFooter?: boolean
 }) {
   return <div className={styles.frame} data-page-template={kind} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
+}
+
+/** 型が保存帯の置き場所と追従を持つ。画面は操作と状態だけを渡す。 */
+export function PageFooter({ actions, status }: { actions: ReactNode; status?: ReactNode }) {
+  return <div className={styles.footer} data-template-region="footer"><StickyBar actions={actions} status={status} /></div>
 }

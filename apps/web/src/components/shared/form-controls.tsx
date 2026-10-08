@@ -54,9 +54,14 @@ export function Field({
   helpLabel,
   helpHref,
   count,
+  density,
+  grow,
   children,
 }: {
   label: string
+  /** 小さな連携フォームのラベルと間隔。 */
+  density?: 'compact' | 'input'
+  grow?: boolean
   htmlFor?: string
   required?: boolean
   /** 任意の入力欄。既存の OptionalBadge をラベルの横に置く。 */
@@ -107,6 +112,8 @@ export function Field({
     <FieldContext.Provider value={{ controlId: htmlFor, describedBy, invalid: Boolean(shownError), required: Boolean(required) }}>
     <div
       className={styles.field}
+      data-grow={grow || undefined}
+      data-density={density}
       data-field-quiet={quiet && error ? '' : undefined}
       onInput={error ? () => { if (!quiet) setQuiet(true) } : undefined}
       onBlur={quiet ? () => setQuiet(false) : undefined}

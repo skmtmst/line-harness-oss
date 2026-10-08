@@ -308,3 +308,5 @@
   opacity: 0.4;
 }
 }
+
+[data-theme="v8"] .field[data-size="compact"] { height: var(--tpl-rt-control-h); }

@@ -126,3 +126,9 @@
 :root:not([data-theme='v8']) .legacyTextarea {
   resize: none;
 }
+
+[data-theme='v8'] .field[data-density] { display: flex; flex-direction: column; gap: var(--tpl-rt-payload-gap); }
+[data-theme='v8'] .field[data-density] .labelRow { margin: 0; }
+[data-theme='v8'] .field[data-density="compact"] .label { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: normal; }
+[data-theme='v8'] .field[data-density="input"] .label { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-rt-label-lh); }
+[data-theme='v8'] .field[data-grow] { flex: 1 1 0; }

@@ -45,6 +45,7 @@ const ICON_BY_TONE: Record<CanonicalTone, typeof CircleCheck> = {
 
 export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   tone: NoticeTone
+  density?: 'compact'
   /** 本文（1〜2文）。`children` があるときはそちらが勝つ。 */
   message?: string
   children?: ReactNode
@@ -77,6 +78,7 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
  */
 export default function Notice({
   tone,
+  density,
   message,
   children,
   action,
@@ -101,6 +103,7 @@ export default function Notice({
       // 指定がないときだけ、種類から既定（危険＝alert、ほかは note）を決める。
       role={role ?? (canonical === 'danger' ? 'alert' : 'note')}
       data-design-part="notice"
+      data-density={density}
       data-design-node={node}
     >
       {icon === undefined ? (
