@@ -11,7 +11,7 @@ import ActionEditor from './action-editor'
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
 const net = vi.hoisted(() => ({
-  update: vi.fn(), draft: vi.fn(), saveDraft: vi.fn(),
+  list: vi.fn(), update: vi.fn(), draft: vi.fn(), saveDraft: vi.fn(),
   updates: [] as Array<{ scenarioId: string; actionId: string; patch: unknown }>,
 }))
 
@@ -53,7 +53,7 @@ vi.mock('@/lib/api', () => ({
     scenarios: {
       list: async () => ({ success: true as const, data: [] }),
       actions: {
-        list: async () => ({ success: true as const, data: [SEED_ACTION] }),
+        list: net.list,
         update: net.update,
       },
       getDraft: net.draft,
@@ -121,6 +121,7 @@ async function saveCondition() {
 
 const sibling = { id: 'sibling', hook: 'step_sent', stepId: 'other-step', choiceKey: null, type: 'send_text', params: { content: '他の通' }, condition: null, onFailure: 'stop', sortOrder: 0 }
 function setup() {
+  net.list.mockReset().mockResolvedValue({success:true,data:[SEED_ACTION]})
   net.update.mockReset().mockResolvedValue({ success: true, data: {} })
   net.draft.mockReset().mockResolvedValue({ success: true, data: { version: 4, afterActions: [sibling] } })
   net.saveDraft.mockReset().mockResolvedValue({ success: true, data: { version: 5 } })
@@ -147,4 +148,20 @@ it('WEB264: 反映は保存待ちを閉じず、通信失敗を表示する', as
   await act(async () => reject(new Error('通信失敗')))
   expect(screen.getByText(/通信失敗/)).toBeTruthy()
   expect(close).not.toHaveBeenCalled()
+})
+
+it('WEB262: A→B→Aの切替でも最初のAの遅いアクション一覧を捨てる', async () => {
+  setup()
+  let finish!: (value: unknown) => void
+  net.list.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  const props = {hook: 'scenario_completed' as const, title: 'あと', onClose: () => {}}
+  const view = render(<ActionEditor {...props} scenarioId="sc-1" />)
+  await act(async () => {})
+  view.rerender(<ActionEditor {...props} scenarioId="sc-2" />)
+  await act(async () => {})
+  view.rerender(<ActionEditor {...props} scenarioId="sc-1" />)
+  await act(async () => {})
+  expect(screen.getByRole('button', {name:'内容を編集'})).toBeTruthy()
+  await act(async () => finish({success:true,data:[]}))
+  expect(screen.getByRole('button', {name:'内容を編集'})).toBeTruthy()
 })

@@ -87,8 +87,10 @@ export default function TriggerEditor({
 }: TriggerEditorProps) {
   /** 最後にサーバーへ保存されている（されていると分かっている）一覧。 */
   const subject = `${scenarioId}:${lineAccountId}`
-  const subjectRef = useRef(subject)
-  subjectRef.current = subject
+  const subjectRef = useRef({ key: subject, generation: 0 })
+  if (subjectRef.current.key !== subject) {
+    subjectRef.current = { key: subject, generation: subjectRef.current.generation + 1 }
+  }
   const loadGeneration = useRef(0)
   const savingRef = useRef(false)
   const [saved, setSaved] = useState<ScenarioTriggerItem[] | null>(null)

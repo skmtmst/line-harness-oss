@@ -260,3 +260,22 @@ it('WEB268: 保存の通信例外から入力を残して再試行できる', as
   expect(removeTrigger).toHaveBeenCalledTimes(2)
   expect(onClose).toHaveBeenCalledTimes(1)
 })
+
+it('WEB268: A→B→Aに戻っても最初のAの保存完了で今の窓を閉じない', async () => {
+  let finish!: (value: unknown) => void
+  removeTrigger.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  const onClose = vi.fn()
+  const props = {onClose, lineAccountId:'acc-1'}
+  const view = render(<TriggerEditor {...props} scenarioId="sc-1" />)
+  await act(async () => {})
+  fireEvent.click(screen.getAllByText('外す')[0])
+  await act(async () => fireEvent.click(screen.getByText('開始条件を保存する')))
+  expect(removeTrigger).toHaveBeenCalledTimes(1)
+  view.rerender(<TriggerEditor {...props} scenarioId="sc-2" />)
+  await act(async () => {})
+  view.rerender(<TriggerEditor {...props} scenarioId="sc-1" />)
+  await act(async () => {})
+  await act(async () => finish({success:true,data:null}))
+  expect(onClose).not.toHaveBeenCalled()
+  expect(screen.getByText('友だち追加時')).toBeTruthy()
+})

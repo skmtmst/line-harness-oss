@@ -328,8 +328,11 @@ export default function ActionEditor({
   const [draftReady, setDraftReady] = useState(false)
   const [reload, setReload] = useState(0)
   const scope = `${scenarioId}:${selectedAccountId}:${hook}:${stepId}:${choiceIndex}`
-  const scopeRef = useRef(scope)
-  scopeRef.current = scope
+  const scopeRef = useRef({ key: scope, generation: 0 })
+  if (scopeRef.current.key !== scope) {
+    scopeRef.current = { key: scope, generation: scopeRef.current.generation + 1 }
+  }
+  const scopeSubject = scopeRef.current
   const [error, setErrorState] = useState('')
   const setError = (message: string) => { errorRef.current = message; setErrorState(message) }
   const [conditionFor, setConditionFor] = useState<string | null>(null)
@@ -377,7 +380,8 @@ export default function ActionEditor({
 
   /* 一覧の取得。表示の作り直しは呼び出し側が決める。 */
   const fetchActions = useCallback(async (): Promise<ScenarioAction[]> => {
-    const at = `${scenarioId}:${selectedAccountId}:${hook}:${stepId}:${choiceIndex}`
+    const at = scopeSubject
+    if (at !== scopeRef.current) return []
     const res = await api.scenarios.actions.list(scenarioId)
     if (scopeRef.current !== at) return []
     if (!res.success) {
@@ -389,12 +393,12 @@ export default function ActionEditor({
           (a.stepId ?? null) === (stepId ?? null) &&
           (a.choiceIndex ?? null) === (choiceIndex ?? null),
       )
-  }, [scenarioId, selectedAccountId, hook, stepId, choiceIndex])
+  }, [scenarioId, selectedAccountId, hook, stepId, choiceIndex, scopeSubject])
 
   /* 初回の読み込みだけ「読み込んでいます」を出す。R244: 保存のたびに
    * 作り直して編集欄を閉じないよう、更新時は黙って入れ替える。 */
   const load = useCallback(async (): Promise<ScenarioAction[]> => {
-    const at = scopeRef.current
+    const at = scopeSubject
     setLoading(true)
     try {
       const next = await fetchActions()
@@ -403,23 +407,24 @@ export default function ActionEditor({
       if (initialRef.current === null) initialRef.current = next
       return next
     } finally { if (scopeRef.current === at) setLoading(false) }
-  }, [fetchActions])
+  }, [fetchActions, scopeSubject])
 
   /* 保存後の読み直し。開いている編集欄・入力焦点を残すため、読み込み中の
    * 表示には切り替えない。 */
   const refresh = useCallback(async (): Promise<ScenarioAction[]> => {
-    const at = scopeRef.current
+    const at = scopeSubject
     const next = await fetchActions()
     if (scopeRef.current === at) setActionsSync(next)
     return next
-  }, [fetchActions])
+  }, [fetchActions, scopeSubject])
 
   const saveDraftSnapshot = async (next: ScenarioAction[]) => {
+    if (scopeSubject !== scopeRef.current) return false
     if (!selectedAccountId) {
       setError('LINE公式アカウントを選んでください')
       return false
     }
-    const at = scopeRef.current
+    const at = scopeSubject
     setDraftSaving(true)
     try {
       const current = await api.scenarios.getDraft(scenarioId, selectedAccountId)
@@ -452,7 +457,7 @@ export default function ActionEditor({
 
   /* 保存は1本の列に並べる。打ち続けても順序が入れ替わらない。 */
   const enqueue = (task: () => Promise<void>, retrySafe = false) => {
-    const at = scopeRef.current
+    const at = scopeSubject
     pendingRef.current += 1
     setPendingCount(pendingRef.current)
     const run = saveQueueRef.current.then(() => { if (at === scopeRef.current) return task() }).catch((caught) => {
@@ -462,6 +467,7 @@ export default function ActionEditor({
         // 古い操作の写しを再送せず、その後に打ち足した現在の入力を保存する。
         const latest = actionsRef.current
         for (const action of latest) {
+          if (at !== scopeRef.current) return
           const response = await api.scenarios.actions.update(scenarioId, action.id, {
             config: action.config, condition: action.condition,
             repeatOnRefire: action.repeatOnRefire, sortOrder: action.sortOrder,
@@ -472,12 +478,21 @@ export default function ActionEditor({
         onChanged?.()
       } : null
     }).finally(() => {
-      pendingRef.current -= 1
-      setPendingCount(pendingRef.current)
+      if (at === scopeRef.current) {
+        pendingRef.current -= 1
+        setPendingCount(pendingRef.current)
+      }
     })
     saveQueueRef.current = run
     return run
   }
+
+  useEffect(() => {
+    pendingRef.current = 0
+    setPendingCount(0)
+    saveQueueRef.current = Promise.resolve()
+    retryRef.current = null
+  }, [scopeSubject])
 
   useEffect(() => {
     let cancelled = false
