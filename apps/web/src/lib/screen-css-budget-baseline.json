@@ -10,9 +10,9 @@
     "font": 21
   },
   "app/auto-replies/edit/wizard-v8.module.css": {
-    "spacing": 45,
-    "height": 17,
-    "font": 41
+    "spacing": 42,
+    "height": 13,
+    "font": 18
   },
   "app/auto-replies/runs/auto-reply-runs.module.css": {
     "spacing": 10,
@@ -115,9 +115,9 @@
     "font": 2
   },
   "app/emergency/control-v8.module.css": {
-    "spacing": 43,
-    "height": 13,
-    "font": 27
+    "spacing": 22,
+    "height": 5,
+    "font": 10
   },
   "app/events/bookings/bookings-v8.module.css": {
     "spacing": 11,
@@ -285,9 +285,9 @@
     "font": 1
   },
   "app/reminders/list-v8.module.css": {
-    "spacing": 27,
+    "spacing": 25,
     "height": 16,
-    "font": 27
+    "font": 20
   },
   "app/reminders/new/page.module.css": {
     "spacing": 2,
@@ -296,7 +296,7 @@
   },
   "app/reminders/wizard-v8.module.css": {
     "spacing": 60,
-    "height": 23,
+    "height": 22,
     "font": 66
   },
   "app/restaurant-test/v8/google.module.css": {
@@ -335,14 +335,14 @@
     "font": 11
   },
   "app/rich-menus/new/create-v8.module.css": {
-    "spacing": 40,
+    "spacing": 37,
     "height": 15,
-    "font": 37
+    "font": 30
   },
   "app/scenarios/detail/detail-v8.module.css": {
-    "spacing": 61,
+    "spacing": 57,
     "height": 18,
-    "font": 44
+    "font": 42
   },
   "app/scenarios/first-step-v8.module.css": {
     "spacing": 11,
@@ -864,9 +864,14 @@
     "height": 2,
     "font": 0
   },
-  "v8/inbox-chat/inbox-chat.module.css": {
-    "spacing": 7,
+  "v8/inbox-chat/customer-panel.module.css": {
+    "spacing": 6,
     "height": 0,
+    "font": 0
+  },
+  "v8/inbox-chat/inbox-chat.module.css": {
+    "spacing": 9,
+    "height": 2,
     "font": 0
   },
   "v8/inbox-search/chat-search-bar.module.css": {
@@ -1300,7 +1305,7 @@
     "font": 0
   },
   "v8/template-edit/edit.module.css": {
-    "spacing": 25,
+    "spacing": 26,
     "height": 3,
     "font": 0
   },
