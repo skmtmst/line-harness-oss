@@ -2,18 +2,6 @@
  * ★V8 イベントを作る（d4adD4）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
  * ここはカード（枠1・角12・余白20・間12）と、右の列のカード（余白16・間8）の中身だけ。
  */
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-compact-gap);
-  color: var(--tpl-identity-color);
-  font-size: var(--text-label);
-  font-weight: var(--tpl-identity-weight);
-  line-height: var(--tpl-identity-lh);
-}
-.backLink:hover {
-  text-decoration: underline;
-}
 .card {
   display: flex;
   flex-direction: column;
@@ -90,19 +78,6 @@
   font-weight: 600;
   line-height: var(--tpl-row-sub-lh);
   white-space: nowrap;
-}
-.input {
-  width: 100%;
-  min-width: 0;
-  height: var(--tpl-chip-h);
-  padding: var(--tpl-kw-input-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-body);
 }
 .timeRow {
   display: flex;
@@ -283,3 +258,6 @@
 .linkRow {
   display: flex;
 }
+
+/* 共通の日付欄の高さとの差は、次の段との間で吸収する。 */
+.datePair { margin-bottom: calc(-1 * var(--tpl-toolbar-gap)); }
