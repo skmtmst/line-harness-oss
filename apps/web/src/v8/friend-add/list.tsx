@@ -11,6 +11,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/friend-add-settings/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -180,6 +181,7 @@ function FriendAddList() {
   usePageTitle('友だち追加時の配信')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   // 閲覧のみ：押せない形にする（隠さない）。
@@ -432,7 +434,7 @@ function FriendAddList() {
     if (deleteBusy) return
     setDeleteTarget(null)
     setDeleteError('')
-    if (requestedDeleteId) router.replace(`/friend-add-settings?kind=${kind}`)
+    if (requestedDeleteId) samePageUrl.replace(`/friend-add-settings?kind=${kind}`)
   }
   const runDelete = async () => {
     if (!selectedAccountId || !deleteTarget || deleteBusy) return
@@ -445,7 +447,7 @@ function FriendAddList() {
         return
       }
       setDeleteTarget(null)
-      if (requestedDeleteId) router.replace(`/friend-add-settings?kind=${kind}`)
+      if (requestedDeleteId) samePageUrl.replace(`/friend-add-settings?kind=${kind}`)
       await load()
     } catch (caught) {
       setDeleteError(describeFriendAddFailure(caught, '設定', 'delete').message)
@@ -823,7 +825,7 @@ function FriendAddList() {
               current: kind === tab,
               onClick: () => {
                 resetCursor()
-                router.replace(`/friend-add-settings?kind=${tab}`)
+                samePageUrl.replace(`/friend-add-settings?kind=${tab}`)
               },
             }))}
           />

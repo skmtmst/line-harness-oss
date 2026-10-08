@@ -83,6 +83,24 @@ beforeEach(() => {
 });
 
 describe('予約の支払いの共通口', () => {
+  it('同じ申込の再試行は最初の決済URLと同じ支払い記録を返す', async () => {
+    seedBooking();
+    await saveBookingPaymentConfig(db, 'account-a', { mode: 'online', provider: 'stripe', holdMinutes: 30 });
+    const request = () => app().request('/api/booking/payments/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookingId: 'booking-a' }),
+    }, env());
+    const first = await request();
+    const initial = await first.json() as { data: { payment: { id: string }; checkoutUrl: string } };
+    expect(first.status).toBe(201);
+    const retry = await request();
+    expect(retry.status).toBe(200);
+    await expect(retry.json()).resolves.toMatchObject({ data: {
+      payment: { id: initial.data.payment.id }, checkoutUrl: initial.data.checkoutUrl,
+    } });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM booking_payments').get()).toEqual({ n: 1 });
+  });
+
   it('何も決めていない店はお支払いなしで鍵も入っていない', async () => {
     seedBooking();
     const response = await app().request(

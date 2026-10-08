@@ -80,6 +80,8 @@
 /* ── 右の列 ── */
 .asideStack { display: flex; flex-direction: column; height: 100%; }
 .asideBlock { display: flex; flex-direction: column; gap: var(--tpl-db-aside-gap); padding: var(--tpl-db-aside-pad); }
+.asideStack[data-variant='trend'] > .asideBlock:last-child { padding-bottom: var(--tpl-db-aside-tail-pad); margin-bottom: var(--tpl-db-aside-tail-pull); }
+.asideStack[data-variant='inbox'] > .asideBlock:last-child { padding-bottom: var(--tpl-db-aside-inbox-tail-pad); }
 .asideBlock + .asideBlock { border-top: 1px solid var(--color-hairline); }
 .kv { display: flex; align-items: center; gap: var(--tpl-db-kv-gap); min-width: 0; color: inherit; text-decoration: none; }
 a.kv:hover .kvKey { text-decoration: underline; }

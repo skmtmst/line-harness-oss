@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { formatDay, formatDateTime, formatNumber, formatRelative } from '@/lib/format'
@@ -128,7 +129,7 @@ export default function OverviewTab({
           <GroupHead title="タグ" action={perms.editSupport ? <Link className={styles.groupLink} href={inbox}>編集</Link> : null} />
           <div className={styles.tags}>
             {friend.tags?.length
-              ? friend.tags.map((tag) => <span key={tag.id} className={styles.tag} title={tag.name}>{tag.name}</span>)
+              ? friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} />)
               : <span className={`${styles.memo} ${styles.faint}`}>タグはありません</span>}
             {perms.editSupport ? <Link className={`${styles.tag} ${styles.tagAdd}`} href={inbox}>＋ 追加</Link> : null}
           </div>

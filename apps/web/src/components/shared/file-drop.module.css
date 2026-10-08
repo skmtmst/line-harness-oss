@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * ファイルを落とす場所・添付ファイルの行。Pencil ★V7 `NQMnx`。
+ * ファイルを落とす場所・添付ファイルの行。Pencil ★V8（V8.pen）「ファイルを落とす欄」。
  *
  * 落とす場所
  *   ふだん  地 $canvas-sunken、縁 1.5px $hairline、角丸 12、高さ 180

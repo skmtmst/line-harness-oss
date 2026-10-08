@@ -54,13 +54,12 @@ describe('友だちのタブと権限', () => {
   })
   afterEach(() => store.clear())
 
-  it('タブは今と同じ行き先（UID移行は V8 の移行画面、CSV は /friends/migrations）', () => {
+  it('タブは絵どおり4つ（UID移行は V8 の移行画面。CSV は友だちを取り込むから行く）', () => {
     expect(FRIENDS_TABS.map((tab) => [tab.label, tab.href])).toEqual([
       ['友だち一覧', '/friends'],
       ['重複検出', '/friends?tab=duplicates'],
       ['統合ユーザー', '/friends?tab=merged'],
       ['UID移行', '/friends/migrations?tab=uid'],
-      ['CSVで書き出す・取り込む', '/friends/migrations'],
     ])
   })
 

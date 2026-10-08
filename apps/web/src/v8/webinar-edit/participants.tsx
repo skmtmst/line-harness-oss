@@ -5,6 +5,7 @@
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
  * 口・権限・失敗の扱いは app/webinars/edit/participants-v8.tsx と同じ（BEHAVIOR.md）。
  */
+import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bookmark, CircleCheck, CircleSlash, Download, History, LogOut, Undo2 } from 'lucide-react'
 import { ListPageBody, ListPagePagination } from '@/components/templates'
@@ -196,7 +197,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             return (
               <Tr key={participant.friendId} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
-                  <a href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</a>
+                  <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</Link>
                   <span className={styles.sub}>{`${joinNote(participant)}${joinKindLabel(participant)}`}</span>
                 </Td>
                 <Td className={styles.colWhen}><span className={styles.main}>{shortDateTime(participant.latestJoinedAt)}</span></Td>

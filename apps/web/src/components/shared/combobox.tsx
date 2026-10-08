@@ -45,7 +45,7 @@ export interface ComboboxProps {
 }
 
 /**
- * 候補つき入力（1つ選ぶ）。Pencil ★V7 `WUVcz`「候補つき入力・複数選択」§1。
+ * 候補つき入力（1つ選ぶ）。Pencil ★V8（V8.pen）「候補から選ぶ」。
  *
  * 形の手本は select.tsx（開閉・枠・誤り）と date-field（欄の 6px 下の
  * 候補・motion-fast の出方）。寸法・色・文字は WUVcz の書き出しから。

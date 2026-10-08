@@ -12,6 +12,7 @@
  * 空のまま使われているときの黄色の帯は表の列の上、行の右端は「…」
  * （編集・止める／再開する・削除する）。右クリックでも同じものが出る。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -215,6 +216,7 @@ function CommonVarsListInner() {
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   /* 1152 の板（`XIzkJ`）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
@@ -257,7 +259,7 @@ function CommonVarsListInner() {
   const folderFilter = params.get('folder') ?? ''
   const setFolderFilter = (id: string) => {
     setPage(1)
-    router.replace(id ? `/contents/vars?folder=${encodeURIComponent(id)}` : '/contents/vars')
+    samePageUrl.replace(id ? `/contents/vars?folder=${encodeURIComponent(id)}` : '/contents/vars')
   }
 
   const [addingFolder, setAddingFolder] = useState(false)

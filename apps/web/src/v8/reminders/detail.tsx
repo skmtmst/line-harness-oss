@@ -6,6 +6,7 @@
  * 枠は型（PageFrame）。頭の中にタブを持つ形（絵の「板の頭」）は型の頭に無いので、ここで組む。
  * 読む口・操作は今の画面（app/reminders/detail/detail-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -204,6 +205,7 @@ export default function ReminderDetailV8Page() {
 
 function ReminderDetailV8() {
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const reminderId = searchParams.get('id') ?? ''
   const tab = tabFromParam(searchParams.get('tab'))
@@ -288,7 +290,7 @@ function ReminderDetailV8() {
     params.set('id', reminderId)
     params.set('tab', next)
     if (next !== 'runs') params.delete('runStatus')
-    router.replace(`/reminders/detail?${params.toString()}`, { scroll: false })
+    samePageUrl.replace(`/reminders/detail?${params.toString()}`)
   }
 
   /* ===== 状態を変える操作 ===== */
@@ -509,7 +511,7 @@ function ReminderDetailV8() {
                 params.set('id', reminderId)
                 params.set('tab', 'runs')
                 params.set('runStatus', 'permanent_failed')
-                router.replace(`/reminders/detail?${params.toString()}`, { scroll: false })
+                samePageUrl.replace(`/reminders/detail?${params.toString()}`)
               }}
               onShowAllRuns={() => selectTab('runs')}
             />
@@ -591,7 +593,7 @@ function ReminderDetailV8() {
         open={confirmPause}
         designNode="RwVo5"
         title={`「${data.reminder.name}」を一時停止する`}
-        description="止めているあいだ、通知は送りません。止めているあいだに送る予定だった通知は、再開しても送りません（過去の日時になるため）"
+        description="止めているあいだ、通知は送りません。止めているあいだに送る予定だった通知は、再開しても送りません（過去の日時になるため）。登録者と送った履歴は残ります。"
         band={pauseImpact.truncated
           ? `送る予定の ${formatNumber(plannedTotal)}通が送られなくなります（今後24時間の分は数え切れませんでした）。`
           : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)}通 が送られなくなります。`}

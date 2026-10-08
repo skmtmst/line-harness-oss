@@ -194,7 +194,7 @@
 
 .nameRow {
   display: flex;
-  height: var(--tpl-row-name-lh);
+  min-height: var(--tpl-row-name-lh);
   align-items: center;
   gap: var(--tpl-tag-name-gap);
   min-width: 0;
@@ -232,6 +232,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.nameLink { color: var(--color-action); } /* 保存した検索の条件名は青い文字（絵 IWnYX）。 */
 
 .name:hover {
   color: var(--color-action);
@@ -523,6 +525,8 @@
 
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
 .viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
+/* 閲覧のみで隠したフォルダを追加の場所（フォルダを消しても…の注が動かない）。 */
+.viewerFolderAddSpace { display: block; height: var(--tpl-viewer-folder-add-space); }
 
 /* ★V8 対応マークのタブ（vKDj5）：案内の帯の段（上14・左右24）。帯そのものは閲覧のみの帯と同じ形。 */
 .infoRow {

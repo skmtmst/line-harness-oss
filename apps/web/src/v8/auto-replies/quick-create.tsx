@@ -18,6 +18,7 @@ import { api, describeSaveFailure } from '@/lib/api'
 import type { AutoReplyConflict, AutoReplyDraftInput } from '@line-crm/shared'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { isImeComposing } from '@/components/shared/ime'
 import styles from './quick-create.module.css'
 
 /* 1欄ぶんの確かめ。文は「何をすれば直るか」を1文で書く。 */
@@ -256,6 +257,8 @@ export default function QuickCreateV8({
               onChange={(event) => setDraft(event.target.value)}
               onBlur={blurKeywords}
               onKeyDown={(event) => {
+                // 日本語の変換中のキー（確定の Enter・変換の取り消し）は入力欄のもの。札にしない。
+                if (isImeComposing(event)) return
                 // 空の欄で Backspace を押すと、最後の札を外す（札の×は指を乗せたとき・選んだときだけ見せる）。
                 if (event.key === 'Backspace' && !draft && keywords.length > 0) {
                   removeKeyword(keywords[keywords.length - 1])

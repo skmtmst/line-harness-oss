@@ -11,7 +11,7 @@ import dateStyles from './date-field.module.css'
 import styles from './date-time-field.module.css'
 
 /**
- * 日時の選択・時刻の選択。Pencil ★V7「日付の選択」（V7 文書 `Fw065`）の仲間。
+ * 日時の選択・時刻の選択。Pencil ★V8（V8.pen）「日時の入力（15分きざみ）」。
  *
  * ブラウザ任せの `<input type="datetime-local">` / `<input type="time">` は、
  * 表示が英語の書式になり、画面ごとに見た目も違った。欄の見た目は DateField と

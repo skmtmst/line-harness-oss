@@ -10,6 +10,7 @@
  * 確認）は v7 の /booking/menus と /booking/staff/shifts と同じ。
  * テーマが v7 のときはこのファイルは読まれず、従来の見た目が出る。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { closedOn, closedRanges, closedSpan } from './lib/closed-ranges'
 import {
   memo,
@@ -19,7 +20,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Check, Smartphone } from 'lucide-react'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -150,7 +151,7 @@ function previewRange(): { from: string; to: string } {
 export default function BookingSettingsV8({ accountId }: { accountId: string | null }) {
   usePageTitle('予約設定')
   usePageCrumbs([{ label: '予約', href: '/booking/bookings' }, { label: '予約設定' }])
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const rawTab = searchParams.get('tab')
   const tab: V8TabKey = V8_TAB_KEYS.has(rawTab ?? '') ? (rawTab as V8TabKey) : 'menus'
@@ -431,14 +432,14 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
       setSwitchTarget(next)
       return
     }
-    router.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
+    samePageUrl.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
   }
   function confirmSwitch() {
     const next = switchTarget
     setSwitchTarget(null)
     if (!next) return
     tabEdit?.onReset()
-    router.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
+    samePageUrl.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
   }
 
   /*
