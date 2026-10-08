@@ -96,6 +96,24 @@ describe('LINEプレビュー共通部品', () => {
     expect(screen.getByText('こんにちは')).toBeTruthy()
   })
 
+  it('リッチメニューはトーク画面のいちばん下（入力の帯の位置）に出し、帯は1本だけ（gobhu）', () => {
+    document.documentElement.dataset.theme = 'v8'
+    const { container } = render(
+      <LinePreview chatBarText="会員メニュー" richMenu={<div data-testid="menu-image">メニューの画像</div>} />,
+    )
+    const screenEl = container.querySelector('[data-line-preview-part="talk"]')!.parentElement!
+    const parts = [...screenEl.children].map((el) => el.getAttribute('data-line-preview-part')).filter(Boolean)
+    /* 上からトーク → メニュー → 帯。メニューはトークの中に入れない（トークがその上で縮む）。 */
+    expect(parts).toEqual(['talk', 'rich-menu', 'menu-bar'])
+    expect(container.querySelector('[data-line-preview-part="talk"] [data-testid="menu-image"]')).toBeNull()
+    expect(container.querySelector('[data-line-preview-part="rich-menu"] [data-testid="menu-image"]')).toBeTruthy()
+    /* 帯は1本だけで、文字はトーク画面の下の文言。 */
+    expect(container.querySelectorAll('[data-line-preview-part="menu-bar"]')).toHaveLength(1)
+    expect(container.querySelector('[data-line-preview-part="menu-bar"]')?.textContent).toBe('会員メニュー')
+    /* リッチメニューの見本は日付の札を出さない（絵 gobhu）。 */
+    expect(screen.queryByText('今日')).toBeNull()
+  })
+
   it('枠の色は生の色値ではなくトークンで読む', () => {
     const tsx = read('line-preview.tsx')
     // トーク背景色のトークンを使い、#16進も素の Tailwind 色も書かない。

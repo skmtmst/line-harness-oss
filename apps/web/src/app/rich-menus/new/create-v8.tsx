@@ -27,7 +27,6 @@ import {
   Send,
   Users,
   Zap,
-  ChevronDown,
   Circle,
   CircleCheck,
   CircleAlert,
@@ -348,8 +347,9 @@ function CheckIcon({ state }: { state: CheckState }) {
 }
 
 /**
- * LINEでの見え方の中身。画像があれば実画像に面の線を重ね、
- * 無ければ面の線だけ出し「画像を選ぶと、ここに出ます」（仕様書・公式照合より）。
+ * LINEでの見え方の中身（スマホの下・入力の帯の位置に出すリッチメニュー）。画像があれば実画像に面の線を重ね、
+ * 無ければ面の線（点線）だけ出し「画像を選ぶと、ここに出ます」（仕様書・公式照合より）。
+ * 下の帯（トーク画面の下の文言 ∨）は LinePreview が1本だけ描く（gobhu）。
  */
 function MenuPreview({
   size,
@@ -357,16 +357,30 @@ function MenuPreview({
   areas,
   pages,
   activePageId,
-  chatBarText,
 }: {
   size: 'large' | 'compact'
   imageUrl: string | null
   areas: Array<{ x: number; y: number; w: number; h: number }> | null
   pages: Array<{ id: string; name: string }>
   activePageId: string | null
-  chatBarText: string
 }) {
   const dims = RICH_MENU_DIMENSIONS[size]
+  const areaBoxes = areas && areas.length > 0 ? (
+    <div className={styles.previewMenuAreas} aria-hidden="true">
+      {areas.map((a, i) => (
+        <span
+          key={i}
+          className={styles.previewMenuAreaBox}
+          style={{
+            left: `${(a.x / dims.width) * 100}%`,
+            top: `${(a.y / dims.height) * 100}%`,
+            width: `${(a.w / dims.width) * 100}%`,
+            height: `${(a.h / dims.height) * 100}%`,
+          }}
+        />
+      ))}
+    </div>
+  ) : null
   return (
     <div>
       {pages.length > 1 ? (
@@ -382,38 +396,21 @@ function MenuPreview({
         <div className={styles.previewMenuImage}>
           {/* eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL */}
           <img src={imageUrl} alt="メニューの画像" />
-          {areas && areas.length > 0 ? (
-            <div className={styles.previewMenuAreas} aria-hidden="true">
-              {areas.map((a, i) => (
-                <span
-                  key={i}
-                  className={styles.previewMenuAreaBox}
-                  style={{
-                    left: `${(a.x / dims.width) * 100}%`,
-                    top: `${(a.y / dims.height) * 100}%`,
-                    width: `${(a.w / dims.width) * 100}%`,
-                    height: `${(a.h / dims.height) * 100}%`,
-                  }}
-                />
-              ))}
-            </div>
-          ) : null}
+          {areaBoxes}
         </div>
       ) : (
         <div
           className={styles.previewMenuEmpty}
+          data-rich-menu-size={size}
           style={{ aspectRatio: `${dims.width} / ${dims.height}` }}
         >
-          <span>
+          {areaBoxes}
+          <span className={styles.previewMenuEmptyText}>
             画像を選ぶと、ここに出ます
             {areas && areas.length > 0 ? `（${areas.length}面）` : ''}
           </span>
         </div>
       )}
-      <div className={styles.previewMenuBar}>
-        {chatBarText || 'メニュー'}
-        <ChevronDown size={11} aria-hidden />
-      </div>
     </div>
   )
 }
@@ -2510,16 +2507,20 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   /* LINEでの見え方（スマホの見本）。広い板は右の列に、狭い板（kmTab）は右の列のボタンから窓で開く。 */
   function renderLinePreview() {
     return (
-      <LinePreview accountName={host ? '公式アカウント' : selectedAccount?.name} note="メニューの見え方の見本です。">
-        <MenuPreview
-          size={group?.size ?? size}
-          imageUrl={previewImageUrl}
-          areas={previewAreas}
-          pages={previewPages}
-          activePageId={previewPage?.id ?? activePage?.id ?? null}
-          chatBarText={chatBarText}
-        />
-      </LinePreview>
+      <LinePreview
+        accountName={host ? '公式アカウント' : selectedAccount?.name}
+        note="メニューの見え方の見本です。"
+        chatBarText={chatBarText}
+        richMenu={(
+          <MenuPreview
+            size={group?.size ?? size}
+            imageUrl={previewImageUrl}
+            areas={previewAreas}
+            pages={previewPages}
+            activePageId={previewPage?.id ?? activePage?.id ?? null}
+          />
+        )}
+      />
     )
   }
 
