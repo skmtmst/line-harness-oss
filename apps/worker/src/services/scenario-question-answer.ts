@@ -16,6 +16,8 @@
  * 繋ぎ直してから実行する。繋ぎ先が無いときだけ live を読む。
  */
 import {
+  validateScenarioActionReferences,
+  ensureWorkflowStep, getWorkflowStep, workflowJson,
   addTagToFriend,
   removeTagFromFriend,
   getFriendFieldById,
@@ -31,6 +33,7 @@ import {
 } from '@line-crm/db'
 import type { LineClient } from '@line-crm/line-sdk'
 import {
+  parseQuestionPostback,
   parseQuestion,
   hasAnsweredBefore,
   DEFAULT_REPEAT_REPLY,
@@ -38,7 +41,9 @@ import {
   type QuestionStepRef,
   type ScenarioQuestionChoice,
 } from './scenario-question.js'
-import { runScenarioActions, runPinnedScenarioActions } from './scenario-actions.js'
+import { acquireWorkflow, type WorkflowExecution } from './workflow-execution.js'
+import { stableWebhookStepId } from './incoming-webhook-receipts.js'
+import { runActionRows, pinnedActionsToRows, runScenarioOp } from './scenario-actions.js'
 
 interface StepRow {
   id: string
@@ -123,68 +128,180 @@ export async function handleQuestionAnswer(
   )
   result.repeat = answered
 
-  await logPostback(db, friend.id, input.choiceIndex, target, input.lineAccountId ?? null)
-
-  // 選択肢の返信文にも {{var.*}} を書ける。消えた共通情報は空文字や
-  // 生の差し込み名のまま送らず、fail-closed で返信を止める。
-  const expandReply = async (text: string): Promise<string | null> => {
+  const accountId = target.scenarioAccountId ?? input.lineAccountId ?? null
+  const subjectId = await stableWebhookStepId(`question:${accountId}:${friend.id}:${target.versionStepId ?? target.logLiveStepId}`,
+    String(repeatScope ?? 'single'))
+  const ref = { scopeId: `line:${accountId ?? 'default'}`, processKind: 'question_answer', subjectId, stepKey: '__run' }
+  const known = await getWorkflowStep(db, ref)
+  if (answered || known) {
+    // A repeated tap never resumes failed effects automatically. Legacy logs need human reconciliation.
+    if (!known) await ensureWorkflowStep(db,ref,{status:'unknown',maxAttempts:50,
+      input:{friendId:friend.id,target,choiceIndex:input.choiceIndex}})
+    result.repeat = true
+    const text = choice.repeatReply?.trim() || DEFAULT_REPEAT_REPLY
     try {
-      const { expandSendCommonVars } = await import('./interpolation-context.js')
-      return await expandSendCommonVars(
-        db, text,
-        { kind: 'scenario', id: target.versionStepId ?? input.stepId },
-        { lineAccountId: target.scenarioAccountId ?? input.lineAccountId ?? null, friendId: friend.id },
-      )
-    } catch (err) {
-      console.error('[scenario-question] common var resolution failed', err)
-      return null
-    }
-  }
-
-  if (answered) {
-    // 2度目。返すだけで、タグもシナリオも動かさない。
-    const text = choice.repeatReply && choice.repeatReply.trim() !== ''
-      ? choice.repeatReply
-      : DEFAULT_REPEAT_REPLY
-    const expanded = await expandReply(text)
-    if (expanded === null) return result
-    result.replyTokenConsumed = await sendReply(lineClient, friend, replyToken, expanded)
+      const {expandSendCommonVars}=await import('./interpolation-context.js')
+      const expanded=await expandSendCommonVars(db,text,{kind:'scenario',id:target.versionStepId ?? input.stepId},
+        {lineAccountId:accountId,friendId:friend.id})
+      result.replyTokenConsumed=await sendReply(lineClient,friend,replyToken,expanded)
+    } catch { /* The accepted first choice and its remaining work stay intact. */ }
     return result
   }
-
-  await applyChoiceSideEffects(db, friend.id, target, choice)
-
+  const execution=await acquireWorkflow(db,{scopeId:ref.scopeId,processKind:ref.processKind,subjectId},
+    {input:{friendId:friend.id,target,choiceIndex:input.choiceIndex},maxAttempts:50})
+  if(!execution) { result.repeat=true;return result }
   try {
-    if (target.pinnedActions) {
-      await runPinnedScenarioActions(db, {
-        actions: target.pinnedActions,
-        hook: 'choice_selected',
-        friendId: friend.id,
-        versionStepId: target.versionStepId,
-        choiceIndex: input.choiceIndex,
-        accountId: target.scenarioAccountId,
-      })
-    } else {
-      await runScenarioActions(db, {
-        scenarioId: target.scenarioId,
-        hook: 'choice_selected',
-        friendId: friend.id,
-        stepId: target.logLiveStepId ?? input.stepId,
-        choiceIndex: input.choiceIndex,
-      })
-    }
-  } catch (err) {
-    console.error('[scenario-question] actions failed', err)
-  }
-
-  if (choice.reply && choice.reply.trim() !== '') {
-    const expanded = await expandReply(choice.reply)
-    if (expanded !== null) {
-      result.replyTokenConsumed = await sendReply(lineClient, friend, replyToken, expanded)
-    }
-  }
-
+    await execution.step('received',()=>logPostback(execution.mutationDb('received'),friend.id,input.choiceIndex,target,accountId))
+    result.replyTokenConsumed=await executeQuestionAnswer(db,execution,lineClient,friend,target,input.choiceIndex,replyToken,false)
+  }catch(error){await execution.fail();throw error}
   return result
+}
+
+/** Run only the unfinished stages, using the originally pinned choice and action plan. */
+export async function executeQuestionAnswer(
+  db:D1Database,execution:WorkflowExecution,lineClient:LineClient,
+  friend:{id:string;line_user_id:string},target:ResolvedAnswerTarget,choiceIndex:number,
+  replyToken:string|undefined,resuming:boolean,
+):Promise<boolean> {
+  const question=parseQuestion(target.questionJson)
+  if(!question || !question.choices[choiceIndex]) { await execution.fail();throw new Error('answer_snapshot_invalid') }
+  const choice=question.choices[choiceIndex]
+  let failed=false,consumed=false
+  const stage=async(key:string,work:(owned:D1Database)=>Promise<unknown>)=>{
+    try { await execution.step(key,()=>work(execution.mutationDb(key)),{maxAttempts:50}) }
+    catch { failed=true }
+  }
+  for(const id of choice.addTagIds ?? []) await stage(`tag:add:${id}`,async owned=>{
+    if(!await isResourceInScenarioAccount(db,'tag',id,target.scenarioAccountId)) throw new Error('answer_resource_unavailable')
+    await addTagToFriend(owned,friend.id,id)
+  })
+  for(const id of choice.removeTagIds ?? []) await stage(`tag:remove:${id}`,async owned=>{
+    if(!await isResourceInScenarioAccount(db,'tag',id,target.scenarioAccountId)) throw new Error('answer_resource_unavailable')
+    await removeTagFromFriend(owned,friend.id,id)
+  })
+  if(choice.field?.fieldId) await stage('field',async owned=>{
+    if(!(await validateScenarioActionReferences(db,target.scenarioAccountId,'friend_field',{fieldId:choice.field!.fieldId})).ok) throw new Error('answer_resource_unavailable')
+    const field=await getFriendFieldById(db,choice.field!.fieldId)
+    if(!field) throw new Error('answer_resource_unavailable')
+    const checked=validateFriendFieldValue(field,choice.field!.value ?? '')
+    if(!checked.ok) throw new Error('answer_value_invalid')
+    await setFriendFieldValue(owned,{friendId:friend.id,fieldId:field.id,value:checked.value,updatedBy:'scenario',field})
+  })
+  if(choice.behavior==='scenario' && choice.scenario) await stage('scenario',async owned=>{
+    if(choice.scenario!.scenarioId && !await isResourceInScenarioAccount(db,'scenario',choice.scenario!.scenarioId,target.scenarioAccountId)) throw new Error('answer_resource_unavailable')
+    await runScenarioOp(owned,friend.id,target.scenarioId,choice.scenario!)
+  })
+  let actions = target.pinnedActions ? pinnedActionsToRows(target.pinnedActions) : null
+  if (!actions) {
+    actions=await execution.step('action_plan',async()=>{
+      const rows=await db.prepare(`SELECT * FROM scenario_actions WHERE scenario_id=? ORDER BY sort_order,id`)
+        .bind(target.scenarioId).all<import('./scenario-actions.js').ScenarioActionRow>()
+      return rows.results
+    })
+  }
+  for(const action of actions.filter(a=>a.hook==='choice_selected' && (a.step_id ?? null)===(target.versionStepId ?? target.logLiveStepId)
+    && (a.choice_index ?? null)===choiceIndex)) await stage(`action:${action.id}`,async owned=>{
+      const references=await validateScenarioActionReferences(db,target.scenarioAccountId,action.action_type,JSON.parse(action.config_json))
+      if(!references.ok)throw new Error('answer_resource_unavailable')
+      const outcome=await runActionRows(owned,[action],friend.id,{fires:target.pinnedActions?'pinned':'live',accountId:target.scenarioAccountId})
+      if(outcome.failed || outcome.skippedIncomplete) throw new Error('answer_action_failed')
+      return outcome
+    })
+  // Persist a reply-attempt receipt BEFORE using the non-repeatable replyToken.
+  // A crash or lost acknowledgement remains uncertain; administrators never send it again on resume.
+  if(choice.reply?.trim() && !resuming) {
+    try {
+      const {expandSendCommonVars}=await import('./interpolation-context.js')
+      const text=await expandSendCommonVars(db,choice.reply,{kind:'scenario',id:target.versionStepId ?? target.logLiveStepId ?? target.scenarioId},
+        {lineAccountId:target.scenarioAccountId,friendId:friend.id})
+      await execution.step('reply_attempt',async()=>({attempted:true}))
+      if(replyToken) { consumed=true;await lineClient.replyMessage(replyToken,[{type:'text',text}]) }
+      else await lineClient.pushMessage(friend.line_user_id,[{type:'text',text}],await stableWebhookStepId(execution.sourceEventId,'reply'))
+      await execution.step('reply_confirmed',async()=>({accepted:true}))
+    }catch { failed=true }
+  }
+  if(failed) await execution.fail();else {try{await execution.complete()}catch(error){await execution.fail();throw error}}
+  return consumed
+}
+
+export async function resumeQuestionAnswer(db:D1Database,input:{
+  scopeId:string;executionId:string;actorId:string;reason:string;lineClient:LineClient;
+  confirmedChoiceIndex?:number;confirmedCompletedSteps?:string[];
+}):Promise<boolean> {
+  if(!input.actorId || !input.reason.trim() || input.reason.length>500)throw new Error('answer_resume_reason_invalid')
+  const ref={scopeId:input.scopeId,processKind:'question_answer',subjectId:input.executionId,stepKey:'__run'}
+  const root=await getWorkflowStep(db,ref)
+  if(!root?.input_json) throw new Error('answer_not_found')
+  const snapshot=JSON.parse(root.input_json) as {friendId:string;target:ResolvedAnswerTarget;choiceIndex:number}
+  const friend=await db.prepare('SELECT id,line_user_id,line_account_id FROM friends WHERE id=?').bind(snapshot.friendId)
+    .first<{id:string;line_user_id:string;line_account_id:string|null}>()
+  if(!friend || `line:${friend.line_account_id ?? 'default'}`!==input.scopeId || (snapshot.target.scenarioAccountId!==null && snapshot.target.scenarioAccountId!==friend.line_account_id))
+    throw new Error('answer_scope_changed')
+  if(root.status==='succeeded') return false
+  if(root.status==='running' && root.lease_expires_at!>Date.now()) throw new Error('answer_busy')
+  if(root.status==='unknown') {
+    if(!Number.isInteger(input.confirmedChoiceIndex) || !Array.isArray(input.confirmedCompletedSteps)) throw new Error('legacy_answer_unknown')
+    const question=parseQuestion(snapshot.target.questionJson)
+    if(!question?.choices[input.confirmedChoiceIndex!]) throw new Error('answer_reconciliation_invalid')
+    snapshot.choiceIndex=input.confirmedChoiceIndex!
+    const choice=question.choices[snapshot.choiceIndex];
+    const valid=new Set<string>([
+      ...(choice.addTagIds ?? []).map(id=>`tag:add:${id}`),...(choice.removeTagIds ?? []).map(id=>`tag:remove:${id}`),
+      ...(choice.field?.fieldId?['field']:[]),...(choice.behavior==='scenario' && choice.scenario?['scenario']:[]),
+      ...(choice.reply?.trim()?['reply_attempt','reply_confirmed']:[]),
+    ]);
+    const actions=snapshot.target.pinnedActions?pinnedActionsToRows(snapshot.target.pinnedActions):
+      (await db.prepare('SELECT * FROM scenario_actions WHERE scenario_id=? ORDER BY sort_order,id').bind(snapshot.target.scenarioId)
+        .all<import('./scenario-actions.js').ScenarioActionRow>()).results;
+    for(const action of actions.filter(a=>a.hook==='choice_selected' && (a.step_id ?? null)===(snapshot.target.versionStepId ?? snapshot.target.logLiveStepId)
+      && (a.choice_index ?? null)===snapshot.choiceIndex))valid.add(`action:${action.id}`);
+    if(input.confirmedCompletedSteps.some(key=>!valid.has(key)))throw new Error('answer_reconciliation_invalid');
+  }
+  const execution=await acquireWorkflow(db,{scopeId:ref.scopeId,processKind:ref.processKind,subjectId:ref.subjectId},
+    {input:snapshot,maxAttempts:50,resume:{expectedUpdatedAt:root.updated_at}});
+  if(!execution)throw new Error('answer_busy');
+  const audit={...ref,stepKey:`resume:${crypto.randomUUID()}`};
+  try {
+  await ensureWorkflowStep(execution.db,audit,{input:{actorId:input.actorId,reason:input.reason,at:new Date().toISOString(),
+    legacyConfirmed:root.status==='unknown',confirmedChoiceIndex:input.confirmedChoiceIndex ?? null,
+    confirmedCompletedSteps:input.confirmedCompletedSteps ?? []}});
+  await execution.db.prepare(`UPDATE workflow_steps SET status='succeeded' WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=?`)
+    .bind(audit.scopeId,audit.processKind,audit.subjectId,audit.stepKey).run();
+  if(root.status==='unknown')for(const key of input.confirmedCompletedSteps!){
+    await ensureWorkflowStep(execution.db,{...ref,stepKey:key});
+    await execution.db.prepare(`UPDATE workflow_steps SET status='succeeded',result_json='null' WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=? AND status='pending'`)
+      .bind(ref.scopeId,ref.processKind,ref.subjectId,key).run();
+  }
+  await execution.db.prepare(`UPDATE workflow_steps SET status='pending',attempt_count=0,next_attempt_at=NULL,error_code=NULL
+    WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key!='__run' AND status IN ('failed','exhausted')`)
+    .bind(ref.scopeId,ref.processKind,ref.subjectId).run()
+  await executeQuestionAnswer(db,execution,input.lineClient,friend,snapshot.target,snapshot.choiceIndex,undefined,true)
+  return true
+  }catch(error){await execution.fail();throw error}
+}
+
+/** Old postbacks carry no effect receipts. Show them as unknown until an administrator reconciles them. */
+export async function registerLegacyQuestionAnswers(db:D1Database,scenarioId:string,canSee:(accountId:string|null)=>Promise<boolean>):Promise<void>{
+  const logs=await db.prepare(`SELECT m.friend_id,m.content,f.line_account_id FROM messages_log m
+    JOIN friends f ON f.id=m.friend_id WHERE m.source='postback' AND m.direction='incoming' AND m.content LIKE 'sq:%'
+      AND (EXISTS(SELECT 1 FROM scenario_steps st WHERE st.id=m.scenario_step_id AND st.scenario_id=?)
+        OR EXISTS(SELECT 1 FROM scenario_versions sv WHERE sv.scenario_id=? AND m.scenario_version_step_id LIKE sv.id || ':%'))
+    ORDER BY m.created_at,m.id LIMIT 100`).bind(scenarioId,scenarioId)
+    .all<{friend_id:string;content:string;line_account_id:string|null}>()
+  for(const log of logs.results){
+    if(!await canSee(log.line_account_id))continue
+    const parsed=parseQuestionPostback(log.content)
+    if(!parsed)continue
+    const target=await resolveAnswerTarget(db,log.friend_id,parsed)
+    if(!target || target.scenarioId!==scenarioId)continue
+    const question=parseQuestion(target.questionJson)
+    if(!question?.choices[parsed.choiceIndex])continue
+    const accountId=target.scenarioAccountId ?? log.line_account_id
+    const subjectId=await stableWebhookStepId(`question:${accountId}:${log.friend_id}:${target.versionStepId ?? target.logLiveStepId}`,
+      String(question.tapMode==='single'?'single':parsed.choiceIndex))
+    await ensureWorkflowStep(db,{scopeId:`line:${accountId ?? 'default'}`,processKind:'question_answer',subjectId,stepKey:'__run'},
+      {status:'unknown',maxAttempts:50,input:{friendId:log.friend_id,target,choiceIndex:parsed.choiceIndex}})
+  }
 }
 
 async function resolveAnswerTarget(
@@ -324,92 +441,7 @@ async function logPostback(
       )
       .run()
   } catch (err) {
-    console.error('[scenario-question] failed to log postback', err)
-  }
-}
-
-/**
- * 選択肢に直接ぶら下がっている操作。
- *
- * アクション設定（scenario_actions）とは別に、選択肢の欄として持っている
- * ぶん。Lステップも同じで、よく使う3つ（タグ追加・タグはずす・友だち情報）
- * だけは選択肢の中に置いてある。
- *
- * タグと遷移先は、シナリオと同じ LINE 公式アカウントのものだけを通す。
- * ID を直接書けば他アカウントのタグを付けられる、という抜けを server 側で
- * 塞ぐ（画面で選べないだけでは足りない）。
- */
-async function applyChoiceSideEffects(
-  db: D1Database,
-  friendId: string,
-  target: ResolvedAnswerTarget,
-  choice: ScenarioQuestionChoice,
-): Promise<void> {
-  const accountId = target.scenarioAccountId
-  for (const tagId of choice.addTagIds ?? []) {
-    try {
-      if (!(await isResourceInScenarioAccount(db, 'tag', tagId, accountId))) {
-        console.warn(`[scenario-question] cross-account tag=${tagId} — skipped`)
-        continue
-      }
-      await addTagToFriend(db, friendId, tagId)
-    } catch (err) {
-      console.error('[scenario-question] add tag failed', err)
-    }
-  }
-  for (const tagId of choice.removeTagIds ?? []) {
-    try {
-      if (!(await isResourceInScenarioAccount(db, 'tag', tagId, accountId))) {
-        console.warn(`[scenario-question] cross-account tag=${tagId} — skipped`)
-        continue
-      }
-      await removeTagFromFriend(db, friendId, tagId)
-    } catch (err) {
-      console.error('[scenario-question] remove tag failed', err)
-    }
-  }
-
-  if (choice.field?.fieldId) {
-    try {
-      // N-042: 選択肢の固定値も項目の型で検証し、合わなければ保存しない。
-      // 項目が無い(削除済み)ときも孤立した行を作らず飛ばす。
-      const target = await getFriendFieldById(db, choice.field.fieldId)
-      if (!target) throw new Error(`field not found: ${choice.field.fieldId}`)
-      const checked = validateFriendFieldValue(target, choice.field.value ?? '')
-      if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`)
-      await setFriendFieldValue(db, {
-        friendId,
-        fieldId: choice.field.fieldId,
-        value: checked.value,
-        updatedBy: 'scenario',
-        field: target,
-      })
-    } catch (err) {
-      console.error('[scenario-question] set field failed', err)
-    }
-  }
-
-  if (choice.behavior === 'scenario' && choice.scenario) {
-    try {
-      if (
-        choice.scenario.scenarioId &&
-        !(await isResourceInScenarioAccount(
-          db,
-          'scenario',
-          choice.scenario.scenarioId,
-          accountId,
-        ))
-      ) {
-        console.warn(
-          `[scenario-question] cross-account scenario=${choice.scenario.scenarioId} — skipped`,
-        )
-        return
-      }
-      const { runScenarioOp } = await import('./scenario-actions.js')
-      await runScenarioOp(db, friendId, target.scenarioId, choice.scenario)
-    } catch (err) {
-      console.error('[scenario-question] scenario op failed', err)
-    }
+    throw err
   }
 }
 

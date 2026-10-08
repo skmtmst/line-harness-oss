@@ -58,6 +58,9 @@ import {
 } from '../services/scenario-v6-contract.js';
 import { listLimit, listPage } from './list-pagination.js';
 
+import { resumeQuestionAnswer, registerLegacyQuestionAnswers } from '../services/scenario-question-answer.js';
+import { LineClient } from '@line-crm/line-sdk';
+import { getWorkflowStep } from '@line-crm/db';
 const scenarios = new Hono<Env>();
 
 function scenarioPermission(
@@ -145,6 +148,44 @@ async function requireVisibleScenario(c: Context<Env>, next: () => Promise<void>
   }
   await next();
 }
+
+scenarios.get('/api/scenarios/:id/question-answers', requireRole('owner','admin'), requireVisibleScenario, async(c)=>{
+  const scenario=await getScenarioById(c.env.DB,c.req.param('id'));
+  await registerLegacyQuestionAnswers(c.env.DB,scenario!.id,accountId=>canAccessAllLineAccounts(c.env.DB,c.get('staff'),[accountId]));
+  const rows=await c.env.DB.prepare(`SELECT scope_id,subject_id,status,error_code,input_json,updated_at FROM workflow_steps
+    WHERE process_kind='question_answer' AND step_key='__run' AND status!='succeeded'
+      AND json_extract(input_json,'$.target.scenarioId')=? ORDER BY updated_at DESC LIMIT 100`)
+    .bind(scenario!.id).all<{scope_id:string;subject_id:string;status:string;error_code:string|null;input_json:string;updated_at:number}>();
+  const visible=[];
+  for(const row of rows.results)if(await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[row.scope_id.slice(5)==='default'?null:row.scope_id.slice(5)]))visible.push(row);
+  return c.json({success:true,data:visible.map(row=>({executionId:row.subject_id,status:row.status,errorCode:row.error_code,
+    friendId:JSON.parse(row.input_json).friendId,updatedAt:new Date(row.updated_at).toISOString()}))});
+});
+scenarios.post('/api/scenarios/:id/question-answers/:executionId/resume',requireRole('owner','admin'),requireVisibleScenario,async(c)=>{
+  if(c.get('staff')?.readOnly) return c.json({success:false,error:'閲覧のみの権限では再開できません'},403);
+  const body=await c.req.json().catch(()=>null);
+  if(!body || typeof body.reason!=='string' || !body.reason.trim() || body.reason.length>500)
+    return c.json({success:false,error:'再開する理由を1〜500文字で入力してください'},400);
+  const scenario=await getScenarioById(c.env.DB,c.req.param('id'));
+  const root=await c.env.DB.prepare(`SELECT * FROM workflow_steps WHERE process_kind='question_answer' AND subject_id=? AND step_key='__run'`)
+    .bind(c.req.param('executionId')).first<import('@line-crm/db').WorkflowStepRow>();
+  const scopeId=root?.scope_id ?? '';
+  const accountId=scopeId.slice(5)==='default'?null:scopeId.slice(5);
+  if(!await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[accountId]))return c.json({success:false,error:'回答が見つかりません'},404);
+  if(!root?.input_json || JSON.parse(root.input_json).target.scenarioId!==scenario!.id)
+    return c.json({success:false,error:'回答が見つかりません'},404);
+
+  try{
+    const resumed=await resumeQuestionAnswer(c.env.DB,{scopeId,executionId:c.req.param('executionId'),actorId:c.get('staff')!.id,
+      reason:body.reason.trim(),lineClient:new LineClient(''),
+      confirmedChoiceIndex:body.confirmedChoiceIndex,confirmedCompletedSteps:body.confirmedCompletedSteps});
+    const latest=await getWorkflowStep(c.env.DB,{scopeId,processKind:'question_answer',subjectId:c.req.param('executionId'),stepKey:'__run'});
+    return c.json({success:true,data:{resumed,status:latest?.status}});
+  }catch(error){
+    const code=error instanceof Error?error.message:'answer_resume_failed';
+    return c.json({success:false,code,error:code==='legacy_answer_unknown'?'古い回答の成功した工程は不明です。確認した工程と最初の選択肢を指定してください':'回答を再開できませんでした'},409);
+  }
+});
 
 /** Convert D1 snake_case Scenario row to shared camelCase shape */
 function serializeScenario(row: DbScenario) {

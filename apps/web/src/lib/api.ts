@@ -1,3 +1,4 @@
+import type {QuestionAnswerRecovery,ResumeQuestionAnswerRequest,ResumeQuestionAnswerResponse} from '@line-crm/shared';
 import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
 import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts, BannerGenerationCreateOptions, RichMenuGroupListOptions } from '@line-crm/shared'
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
@@ -3879,6 +3880,7 @@ export type ListStats = {
     clickRate: number | null
   }
   scenarios: {
+
     total: number
     active: number
     subscribers: number
@@ -8117,6 +8119,11 @@ export const api = {
       ),
   },
   scenarios: {
+    questionAnswers: {
+      list: (scenarioId:string)=>fetchApi<ApiResponse<QuestionAnswerRecovery[]>>(`/api/scenarios/${encodeURIComponent(scenarioId)}/question-answers`),
+      resume: (scenarioId:string,executionId:string,input:ResumeQuestionAnswerRequest)=>fetchApi<ApiResponse<ResumeQuestionAnswerResponse>>(
+        `/api/scenarios/${encodeURIComponent(scenarioId)}/question-answers/${encodeURIComponent(executionId)}/resume`,{method:'POST',body:JSON.stringify(input)}),
+    },
     listPage: (params?: {
       accountId?: string
       page?: number
