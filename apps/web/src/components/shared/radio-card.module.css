@@ -277,6 +277,9 @@
 [data-theme='v8'] .compact .title { font-size: 11px; line-height: 16px; font-weight: 600; }
 [data-theme='v8'] .compact .note { font-size: 10px; line-height: 14px; }
 [data-theme='v8'] .compact.checked .title { color: var(--color-accent-deep); }
+[data-theme='v8'] .compact[data-compact-typography='banner'] .body { gap: var(--tpl-hq-nav-gap); }
+[data-theme='v8'] .compact[data-compact-typography='banner'] .title { font-size: var(--text-caption); line-height: var(--tpl-htn-lh-17); font-weight: 700; }
+[data-theme='v8'] .compact[data-compact-typography='banner'] .note { font-size: var(--text-micro); line-height: var(--tpl-hq-small-lh); }
 
 /*
  * 高さ 90 の箱（height="short"・★V8 E-3 PUWyq の卓のカード）。

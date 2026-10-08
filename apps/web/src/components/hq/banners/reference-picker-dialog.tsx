@@ -1,6 +1,7 @@
 'use client'
 
-import { Check, Upload } from 'lucide-react'
+import styles from './reference-picker-dialog.module.css'
+import { Check, Star, Upload } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react'
 import Button from '@/components/shared/button'
 import Dialog, { type DialogProps } from '@/components/shared/dialog'
@@ -15,7 +16,6 @@ import {
   BANNER_REFERENCE_MODES,
   BANNER_REFERENCE_MODE_LABEL,
   imageMatchesQuery,
-  tileCaption,
   type BannerImage,
   type BannerPreset,
   type BannerProject,
@@ -42,6 +42,7 @@ export default function ReferencePickerDialog({
   onPick,
   onUpload,
   frame: Frame = Dialog,
+  hqLayout = false,
 }: {
   open: boolean
   projectId: string
@@ -55,6 +56,8 @@ export default function ReferencePickerDialog({
   onUpload: (file: File) => void
   /** V8 の板が別の窓枠を描くときの差し替え。選択・検索・送信の動きは共有する。 */
   frame?: ComponentType<DialogProps>
+  /** UcBQ5：検索を次の行に置く4列の板。ほかの選択窓は変えない。 */
+  hqLayout?: boolean
 }) {
   const theme = useAdminTheme()
   const v8 = theme === 'v8'
@@ -226,9 +229,9 @@ export default function ReferencePickerDialog({
         {/* 絞り込み行（`cOgWE`）。チップが左、検索が右。 */}
         <div className="flex flex-wrap items-center gap-2">
           <FilterChip selected={scope === 'all'} onChange={() => setScope('all')}>すべて</FilterChip>
-          <FilterChip selected={scope === 'project'} onChange={() => setScope('project')}>このプロジェクト</FilterChip>
-          <FilterChip selected={scope === 'favorite'} onChange={() => setScope('favorite')}>お気に入り</FilterChip>
-          <span className="flex-1" />
+          <FilterChip selected={scope === 'project'} icon={hqLayout ? <Star size={14} aria-hidden="true" /> : undefined} onChange={() => setScope('project')}>このプロジェクト</FilterChip>
+          <FilterChip selected={scope === 'favorite'} icon={hqLayout ? <Star size={14} aria-hidden="true" /> : undefined} onChange={() => setScope('favorite')}>お気に入り</FilterChip>
+          <span className={hqLayout ? "w-full" : "flex-1"} />
           <div className="w-60 max-w-full">
             <SearchField value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="画像名・プロジェクト名で検索" aria-label="参照画像を検索" />
           </div>
@@ -258,7 +261,7 @@ export default function ReferencePickerDialog({
             role="listbox"
             aria-label="参照にする画像"
             aria-multiselectable="true"
-            className="grid max-h-160 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4"
+            className={hqLayout ? "grid max-h-160 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 md:grid-cols-4" : "grid max-h-160 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4"}
           >
             {visible.map((image) => {
               const index = picks.findIndex((reference) => reference.imageId === image.id)
@@ -272,7 +275,7 @@ export default function ReferencePickerDialog({
                   // 3 枚そろったら、選んでいないタイルは押しても増えないので触れない形にする。
                   disabled={!selectedTile && full}
                   onClick={() => toggle(image)}
-                  className="flex flex-col gap-1.5 text-left disabled:opacity-50"
+                  className={hqLayout ? styles.tile : "flex flex-col gap-1.5 text-left disabled:opacity-50"}
                 >
                   <span
                     className={
@@ -291,8 +294,8 @@ export default function ReferencePickerDialog({
                     ) : null}
                   </span>
                   <>
-                    <span className="truncate text-caption font-semibold text-ink">{referenceName(image)}</span>
-                    <span className="truncate text-nano text-ink-faint tabular-nums">{referenceSize(image, presets)}</span>
+                    <span className={hqLayout ? styles.name : "truncate text-caption font-semibold text-ink"}>{referenceName(image)}</span>
+                    <span className={hqLayout ? styles.size : "truncate text-nano text-ink-faint tabular-nums"}>{referenceSize(image, presets)}</span>
                   </>
                 </button>
               )
