@@ -13,7 +13,7 @@ import FormDesignSettings from './form-design-settings'
  */
 
 const router = vi.hoisted(() => ({ replace: vi.fn() }))
-vi.mock('next/navigation', () => ({ useRouter: () => router }))
+vi.mock('next/navigation', () => ({ usePathname: () => '/', useSearchParams: () => new URLSearchParams(), useRouter: () => router }))
 
 let host: HTMLDivElement
 let root: Root

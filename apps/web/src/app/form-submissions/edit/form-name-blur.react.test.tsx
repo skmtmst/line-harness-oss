@@ -13,7 +13,7 @@ import { emptyLayout } from '@line-crm/shared'
 
 const navigation = vi.hoisted(() => ({
   pathname: '/form-submissions/edit',
-  query: 'id=form-1&tab=basic',
+  query: 'id=form-1&tab=appearance',
   push: vi.fn(),
   replace: vi.fn(),
   back: vi.fn(),
@@ -55,7 +55,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return {
     ...actual,
     fetchApi: vi.fn(async () => ({ success: true, data: [] })),
-    api: {
+    api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       ...actual.api,
       forms: {
         ...actual.api.forms,
@@ -113,8 +113,8 @@ let root: Root
 
 beforeEach(() => {
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-  window.history.replaceState(null, '', '/form-submissions/edit?id=form-1&tab=basic')
-  navigation.query = 'id=form-1&tab=basic'
+  window.history.replaceState(null, '', '/form-submissions/edit?id=form-1&tab=appearance')
+  navigation.query = 'id=form-1&tab=appearance'
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -135,7 +135,7 @@ async function show() {
 }
 
 function nameInput(): HTMLInputElement {
-  const input = host.querySelector<HTMLInputElement>('#fm-name')
+  const input = host.querySelector<HTMLInputElement>('#fe-name')
   if (!input) throw new Error('フォーム名の欄がない')
   return input
 }

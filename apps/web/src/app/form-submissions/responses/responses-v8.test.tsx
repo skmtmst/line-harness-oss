@@ -31,7 +31,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageChrome: () => ({}) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: () => {}, usePageChrome: () => ({}) }))
 
 import FormResponsesPage from './page'
 

@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const source = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const source = readFileSync(new URL("./../../../v8/form-edit/edit.tsx", import.meta.url), 'utf8')
 
 describe('回答フォームの下書きと公開を分ける', () => {
   it('保存と公開を別の操作として表示する', () => {
     expect(source).toContain("onClick={() => void save(false)}")
-    expect(source).toContain('下書きを保存する')
+    expect(source).toContain('下書きを保存')
     expect(source).toContain('この版を公開')
   })
 

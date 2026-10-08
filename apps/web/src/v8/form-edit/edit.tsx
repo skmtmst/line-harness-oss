@@ -115,6 +115,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [ogTitle, setOgTitle] = useState('')
   const [ogDescription, setOgDescription] = useState('')
   const [ogImageUrl, setOgImageUrl] = useState('')
+  const [focusOgImageRequest, setFocusOgImageRequest] = useState(0)
   const [layout, setLayoutState] = useState<FormLayout>(() => host?.initial.layout ?? emptyLayout())
   const [page, setPage] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
@@ -504,7 +505,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* ---------------- 保存・公開 ---------------- */
 
   /** 保存を断る理由（無ければ null）。自動保存の「通せる形か」にも同じものを使う。 */
-  const saveProblem = (publishAfter: boolean): { message: string; name?: boolean } | null => {
+  const saveProblem = (publishAfter: boolean): { message: string; name?: boolean; ogImage?: boolean } | null => {
     if (!host && !selectedAccountId) return { message: 'LINE公式アカウントを選んでください' }
     if (!name.trim()) return { message: 'フォーム名を入力してください', name: true }
     const allBlocks = layout.header.concat(layout.sections.flatMap((s) => s.blocks))
@@ -521,7 +522,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     const layoutError = validateFormLayoutForSave(layout)
     if (layoutError) return { message: layoutError }
     const ogImageError = ogImageUrlError(ogImageUrl)
-    if (ogImageError) return { message: ogImageError }
+    if (ogImageError) return { message: ogImageError, ogImage: true }
     // 文字と背景の差が 4.5:1 未満の組み合わせは保存できない（保存APIも同じ検査をする）。
     const contrastError = formThemeContrastError(normalizeFormTheme(layout.options?.theme))
     if (contrastError) return { message: contrastError }
@@ -553,8 +554,13 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     const problem = saveProblem(publishAfter)
     if (problem) {
       if (silent) return false
-      setError(problem.message)
+      setError(problem.name || problem.ogImage ? '' : problem.message)
       setNameError(problem.name ? problem.message : null)
+      if (problem.name || problem.ogImage) {
+        setEditTab('appearance')
+        if (problem.ogImage) setFocusOgImageRequest((value) => value + 1)
+        requestAnimationFrame(() => { const field = document.getElementById(problem.ogImage ? 'fe-og-image' : 'fe-name'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
+      }
       return false
     }
     if (!silent) setNameError(null)
@@ -881,13 +887,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           </Link>
         )
       )}
-      steps={(
-        <div className={styles.tabs}>
-          {/* 型は説明をタブの下へ置くので、絵どおり題の下・タブの上に出すためここに置く。 */}
-          <p className={styles.status}>{statusLine}</p>
-          <Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, onClick: () => changeTab(t.key) }))} />
-        </div>
-      )}
+      description={statusLine}
+      bottomSpacing="compact"
+      tabsAfterSpacing="form"
+      tabs={<Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, onClick: () => changeTab(t.key) }))} />}
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}
@@ -936,11 +939,13 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             ogTitle={ogTitle}
             ogDescription={ogDescription}
             ogImageUrl={ogImageUrl}
+            focusOgImageRequest={focusOgImageRequest}
             onChangeOptions={patchOptions}
             onChangeName={(next) => {
               setName(next)
               if (next.trim()) setNameError(null)
             }}
+            onBlurName={() => setNameError(name.trim() ? null : 'フォーム名を入力してください')}
             onChangeDescription={setDescription}
             onChangeOgTitle={setOgTitle}
             onChangeOgDescription={setOgDescription}

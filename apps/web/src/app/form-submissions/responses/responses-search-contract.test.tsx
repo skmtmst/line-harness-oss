@@ -21,7 +21,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams('id=form-1'),
 }))
@@ -65,14 +65,14 @@ function mockResponses() {
 }
 
 function input(): HTMLInputElement {
-  const found = host.querySelector('#form-response-filter')
+  const found = host.querySelector('input[type=search]')
   if (!(found instanceof HTMLInputElement)) throw new Error('search input not found')
   return found
 }
 
 function csvButton(): HTMLButtonElement {
   const buttons = [...host.querySelectorAll('button')]
-  const found = buttons.find((button) => button.textContent === 'CSVで書き出す')
+  const found = buttons.find((button) => button.textContent?.replace(/\s/g, '') === 'CSVで書き出す')
   if (!(found instanceof HTMLButtonElement)) throw new Error('csv button not found')
   return found
 }
@@ -178,6 +178,7 @@ describe('MKQyJ 後処理の札（済み・未完）', () => {
       root.render(<FormResponsesPage />)
     })
     await settle(50)
+    await act(async () => { [...host.querySelectorAll('button')].find(b => b.textContent === '1件ずつ見る')!.click() })
     expect(host.textContent).toContain('済み')
     expect(host.textContent).toContain('未完')
     expect(host.textContent).not.toContain('後処理に未完があります')
