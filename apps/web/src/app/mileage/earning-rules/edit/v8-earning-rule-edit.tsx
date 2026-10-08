@@ -232,7 +232,6 @@ function EditInner() {
 
   return (
     <div data-design-node="ctLwT" className={formStyles.page}>
-      <Button variant="secondary" href="/mileage?tab=earning-rules">← マイルへ</Button>
       <div className={formStyles.head}>
         <h1 className={formStyles.title}>たまる決めごとを編集</h1>
         <p className={formStyles.description}>

@@ -43,7 +43,6 @@ export function DetailHead({
     <>
       <header className={styles.head} data-template-region="heading">
         <div className={styles.headText}>
-          <BackLink />
           <h2 className={styles.title} title={title}>{title}</h2>
           <p className={styles.subtitle}>{subtitle}</p>
         </div>

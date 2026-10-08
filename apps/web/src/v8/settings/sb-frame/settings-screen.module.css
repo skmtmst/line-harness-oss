@@ -39,13 +39,6 @@
   margin-inline: var(--tpl-sb-footer-side);
 }
 
-/* 戻るリンク（← 機能設定へ）があるときは、板の頭を縦に積む（戻る・題・説明、間 8）。 */
-:global([data-theme='v8'] [data-page-template='settings']):has(.screen[data-sb-identity]) > [data-template-region='heading'] {
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--tpl-sb-head-gap);
-}
-
 .back {
   font-size: var(--tpl-sb-band-text);
   white-space: nowrap;

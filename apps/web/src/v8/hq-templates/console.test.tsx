@@ -5,7 +5,7 @@
  * 詳細（pQ4fH）は「配った先」（API-14 の配った先のアカウント名）と［アカウントへ配る］。
  */
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls = vi.hoisted(() => Object.fromEntries(['context', 'list', 'listByKind', 'kindCounts', 'accounts', 'get', 'create', 'update', 'remove', 'duplicate', 'preflight', 'distribute', 'result', 'messageReferences', 'folderList', 'deleteImage', 'uploadRichMessageImage', 'listStats', 'versions', 'receivedVersions', 'compareVersions', 'restoreVersion'].map((key) => [key, vi.fn()])))
@@ -19,7 +19,8 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], selectedAccountId: null, selectedAccount: null, setSelectedAccountId: selectAccount, loading: false }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+const chrome = vi.hoisted(() => ({ crumbs: null as Array<{ label: string; href?: string; onSelect?: () => void }> | null }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: (crumbs: typeof chrome.crumbs) => { chrome.crumbs = crumbs } }))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({ useActionOptions: () => ({ tags: [], scenarios: [], templates: [], forms: [], reminders: [], richMenus: [] }) }))
 
 import HqTemplatesV8 from './console'
@@ -50,20 +51,33 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('統括のテンプレートを作る（店の作る画面＋保存して配る）', () => {
-  it('作る画面の「← テンプレートへ」を押すと一覧へ戻る', async () => {
+  it('作る画面から一覧へは、上の帯のパンくず「テンプレート」で戻る（同じ URL のまま段を替える）', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
-    fireEvent.click(await screen.findByRole('button', { name: '← テンプレートへ' }))
-    await waitFor(() => expect(screen.queryByRole('button', { name: '← テンプレートへ' })).toBeNull())
+    expect(await screen.findByText('保存して配ると、選んだアカウントのテンプレートに新しい版として届きます')).toBeTruthy()
+    const crumb = chrome.crumbs?.find((item) => item.label === 'テンプレート')
+    expect(crumb?.href).toBe('/hq/templates')
+    expect(crumb?.onSelect).toBeTypeOf('function')
+    act(() => { crumb!.onSelect!() })
+    await waitFor(() => expect(screen.queryByText('保存して配ると、選んだアカウントのテンプレートに新しい版として届きます')).toBeNull())
+    expect((await screen.findAllByRole('button', { name: /テンプレートを作る/ })).length).toBeGreaterThan(0)
+    // 一覧の段では、パンくずは「ホーム」だけ
+    expect(chrome.crumbs?.some((item) => item.onSelect)).toBe(false)
+  })
+  it('作る画面から一覧へは、下の帯の［キャンセル］でも戻る', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    expect(await screen.findByText('保存して配ると、選んだアカウントのテンプレートに新しい版として届きます')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    await waitFor(() => expect(screen.queryByText('保存して配ると、選んだアカウントのテンプレートに新しい版として届きます')).toBeNull())
     expect((await screen.findAllByRole('button', { name: /テンプレートを作る/ })).length).toBeGreaterThan(0)
   })
   it('メッセージは店の作る画面で作り、［保存して配る］で統括のひな形を作ってアカウントへ配るへ進む', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
     expect(await screen.findByText('保存して配ると、選んだアカウントのテンプレートに新しい版として届きます')).toBeTruthy()
-    // 一覧と同じ URL のまま段を替えるので、戻るはリンクでなくボタン（同じ URL へのリンクは押しても何も起きなかった・10-08）。
-    expect(screen.queryByRole('link', { name: '← テンプレートへ' })).toBeNull()
-    expect(screen.getByRole('button', { name: '← テンプレートへ' })).toBeTruthy()
+    // 板の頭の「← テンプレートへ」は無くした（2026-10-08）。一覧へは上の帯のパンくずで戻る。
+    expect(screen.queryByText('← テンプレートへ')).toBeNull()
     fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '予約前日' } })
     fireEvent.change(screen.getByLabelText('本文'), { target: { value: '{{name}}さん、明日です' } })
     fireEvent.click(screen.getByRole('button', { name: '保存して配る' }))

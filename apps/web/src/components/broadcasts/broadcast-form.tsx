@@ -833,8 +833,11 @@ export default function BroadcastForm({
     schedule: '一斉配信を作成・送信設定',
     confirm: '一斉配信を作成・最終確認',
   }
-  /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（v7 はこれまでの帯）。 */
-  const v8 = useAdminTheme() === 'v8'
+  /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（v7 はこれまでの帯）。
+     ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。v7 は今までどおり。 */
+  const theme = useAdminTheme()
+  const v8 = theme === 'v8'
+  const showHeadBack = !v8
   usePageTitle(
     preflightDialogOpen
       ? '一斉配信の配信前チェック'
@@ -2123,7 +2126,7 @@ export default function BroadcastForm({
   return <div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
     <header className={styles.header} data-steps-below={v8 || undefined}>
       <div className={styles.heading}>
-        <Button variant="secondary" className={styles.textButton} size="compact" onClick={() => guarded(onCancel)}>← 一斉配信一覧</Button>
+        {showHeadBack ? <Button variant="secondary" className={styles.textButton} size="compact" onClick={() => guarded(onCancel)}>← 一斉配信一覧</Button> : null}
         <h2>一斉配信を作る</h2>
         <p aria-live="polite">{draftStatusLabel || '下書き・未保存'}</p>
       </div>

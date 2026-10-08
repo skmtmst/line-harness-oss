@@ -8,6 +8,11 @@ export interface PageHeadingProps {
   headingSize?: 'regular' | 'compact' | 'large'
   description?: ReactNode
   help?: ReactNode
+  /**
+   * @deprecated ★V8 では描かない（オーナー 2026-10-08「全部消す」）。
+   * 板の頭の「← 〇〇へ」は、上の帯のパンくず（usePageCrumbs）と下の帯の［キャンセル］に任せる。
+   * 渡しても型が捨てる（画面ごとに消して回らないための受け口。呼び出し側は追って外す）。
+   */
   identity?: ReactNode
   actions?: ReactNode
   /** 題と説明の下の行に置く、来た道の案内（★BG-B `qIp42` の `HLq5w`・`Y5UR7`）。 */
@@ -20,9 +25,9 @@ export interface PageHeadingProps {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, description, help, identity, actions, crumbs, steps, headingSize }: PageHeadingProps) {
+export function PageHeading({ title, description, help, actions, crumbs, steps, headingSize }: PageHeadingProps) {
+  /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
   return <header className={styles.heading} data-template-region="heading" data-heading-size={headingSize} data-has-steps={!!steps || undefined} data-has-crumbs={!!crumbs || undefined}>
-    {identity ? <div className={styles.identity}>{identity}</div> : null}
     <div className={styles.headingText}>
       <div className={styles.titleRow}><h2 className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</h2>
         {help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}

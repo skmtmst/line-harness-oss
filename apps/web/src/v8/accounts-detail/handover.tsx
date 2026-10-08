@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, Eye, Play, RotateCcw } from 'lucide-react'
+import { Eye, Play, RotateCcw } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, type AccountHandover, type AccountHandoverDecision } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -156,7 +156,10 @@ export default function AccountHandoverV8() {
 
   useEffect(() => { void load() }, [load])
   usePageTitle('乗り換え')
-  usePageCrumbs([{ label: '設定' }, { label: 'LINEアカウント', href: '/accounts' }])
+  /* 板の頭の［アカウントの詳細へ戻る］は 2026-10-08 に無くした。詳細へは上の帯のパンくずで戻る。 */
+  usePageCrumbs(account
+    ? [{ label: '設定' }, { label: 'LINEアカウント', href: '/accounts' }, { label: account.name, href: `/accounts/detail?id=${account.id}` }]
+    : [{ label: '設定' }, { label: 'LINEアカウント', href: '/accounts' }])
 
   const destination = accounts.find((item) => item.id === handover?.toAccountId) ?? null
   const countsAreComplete = handover?.counts ? totalsMatch(handover.counts, handover.counts.sourceTotal) : false
@@ -316,13 +319,9 @@ export default function AccountHandoverV8() {
     }
   }
 
-  const backButton = account ? (
-    <Button href={`/accounts/detail?id=${account.id}`}><ArrowLeft size={14} aria-hidden="true" />アカウントの詳細へ戻る</Button>
-  ) : null
-
   const frame = (title: string, description: string | undefined, children: ReactNode) => (
     <div className={styles.screen}>
-      <SettingsPage boardId="x2dSNv" title={title} description={description} actions={backButton} navigation={<SettingsInnerNav inline />}>
+      <SettingsPage boardId="x2dSNv" title={title} description={description} navigation={<SettingsInnerNav inline />}>
         {children}
       </SettingsPage>
       {stepUpPrompt}

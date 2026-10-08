@@ -15,7 +15,7 @@
  */
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, CircleHelp, Copy, Eye, Mail, MoreHorizontal, Pause, Play, Plus, RefreshCw } from 'lucide-react'
+import { CircleHelp, Copy, Eye, Mail, MoreHorizontal, Pause, Play, Plus, RefreshCw } from 'lucide-react'
 import { api, type MeasurementSite } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
@@ -346,7 +346,6 @@ export default function SiteScriptV8() {
     <div className={styles.board} data-design-node="XjOte">
       <header className={styles.head}>
         <div className={styles.headText}>
-          <Link href="/inflow-links" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />流入と計測へ</Link>
           <h1 className={styles.title}>サイトスクリプト</h1>
           <p className={styles.description}>ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。</p>
         </div>
