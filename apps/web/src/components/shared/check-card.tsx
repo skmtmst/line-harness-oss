@@ -14,6 +14,8 @@ export default function CheckCard({
   title,
   note,
   disabled = false,
+  invalid = false,
+  describedBy,
   size = 'regular',
   className,
 }: {
@@ -24,6 +26,9 @@ export default function CheckCard({
   /** 補足（任意） */
   note?: React.ReactNode
   disabled?: boolean
+  /** 必須の選択が足りないときだけ、共通の誤りの色を出す。 */
+  invalid?: boolean
+  describedBy?: string
   /**
    * 箱の大きさ。既定は高さ 68・余白 14。
    * `'compact'` は高さ 56・左右 12・間 10・角丸 10・題 13/600・補足 11（★V8 統括の一括配信「送るアカウント」J5DH6o）。
@@ -38,6 +43,7 @@ export default function CheckCard({
         styles.card,
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,
+        invalid ? styles.invalid : null,
         size === 'compact' ? styles.compact : null,
         className,
       ].filter(Boolean).join(' ')}
@@ -48,6 +54,8 @@ export default function CheckCard({
           className={styles.box}
           checked={checked}
           disabled={disabled}
+          aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
           onChange={(event) => onChange(event.target.checked)}
         />
         <svg viewBox="0 0 12 12" className={styles.mark} aria-hidden="true">
