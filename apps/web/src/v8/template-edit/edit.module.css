@@ -3,7 +3,7 @@
  * 寸法は globals.css の --tpl-te-*（と作る型の --tpl-*）だけを読む。
  */
 
-/* 戻るリンク（絵は「← テンプレートへ」を1つの文字で描く）。 */
+/* 閲覧のみの板の「一覧へ戻る」の文字リンク。 */
 .back { text-decoration: none; }
 .back:hover { text-decoration: underline; }
 

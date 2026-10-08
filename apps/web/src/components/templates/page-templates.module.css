@@ -69,8 +69,6 @@
 :global([data-theme='v8']) .preview[data-preview-surface='plain'] { background: transparent; }
 :global([data-theme='v8']) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); border-bottom: 1px solid var(--color-hairline); flex-wrap: wrap; }
 :global([data-theme='v8']) [data-page-template='detail'] .heading { padding: var(--tpl-detail-head-pad-top) var(--tpl-detail-head-pad-side) var(--tpl-detail-head-pad-bottom); gap: var(--tpl-detail-head-gap); flex-wrap: wrap; }
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .identity,
-:global([data-theme='v8']) [data-page-template='detail'] .heading > .identity { flex-basis: 100%; }
 /* 作る型の手順は題と説明の下の行。FU2aU の同行版は stepsPlacement="inline" で残す。 */
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { flex-basis: 100%; order: 3; margin-inline: 0; }
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 2; margin-left: auto; }
@@ -206,11 +204,7 @@
   :global([data-theme='v8']) .preview { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
 }
 
-/* ★V8 Pencil の座標どおり（司令塔 2026-10-05）：戻るリンクの行の高さ・頭の行の間・詳細の題と説明 */
-:global([data-theme='v8']) .identity, :global([data-theme='v8']) .identity * { line-height: var(--tpl-identity-lh); }
-:global([data-theme='v8']) .identity { display: flex; align-items: center; }
-/* 戻るリンクは青の太字（絵 K7HWG・A0pDt・loVfW ほか「← 〇〇へ」#0b63ce/600）。 */
-:global([data-theme='v8']) .identity > a { color: var(--tpl-identity-color); font-weight: var(--tpl-identity-weight); }
+/* ★V8 Pencil の座標どおり（司令塔 2026-10-05）：頭の行の間・詳細の題と説明。板の頭の戻る（← 〇〇へ）は 2026-10-08 に無くした。 */
 :global([data-theme='v8']) [data-page-template='create'] .heading { row-gap: var(--tpl-create-head-row-gap); }
 :global([data-theme='v8']) [data-page-template='detail'] .heading { row-gap: var(--tpl-detail-head-row-gap); }
 :global([data-theme='v8']) [data-page-template='detail'] .headingText { gap: var(--tpl-detail-title-gap); }
@@ -228,7 +222,7 @@
 :global([data-theme='v8']) .steps :global([data-part='stepper']) li > button > span:not(:first-child) { font-size: var(--tpl-steps-text-size); line-height: var(--tpl-steps-text-lh); }
 /* ★V8 フォルダの列：上の「作る」ボタンの下からフォルダの題まで18（apLqS フォルダの列：間2＋14＋2） */
 :global([data-theme='v8']) .folders > :global(a) + * , :global([data-theme='v8']) .folders > :global(button) + * { margin-top: 16px; }
-/* ★V8 作る型の頭の並び（A0pDt・K7HWG：戻る → 題 → 手順の帯 → 説明の行 12px）。題の下に説明を出さず、手順の帯の下へ（司令塔 2026-10-06） */
+/* ★V8 作る型の頭の並び（A0pDt・K7HWG：題 → 手順の帯 → 説明の行 12px）。題の下に説明を出さず、手順の帯の下へ（司令塔 2026-10-06） */
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText { display: contents; }
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .titleRow { flex-basis: 100%; order: 1; }
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { order: 2; }

@@ -402,7 +402,6 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         boardId={meta.board}
         title={meta.heading}
         description={meta.lead}
-        backHref={host?.backHref}
         side={(
           <>
             <div className={styles.previewToggle}>

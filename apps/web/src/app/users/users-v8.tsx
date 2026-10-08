@@ -37,11 +37,17 @@ const UID_STATUS = {
 
 export default function UsersV8() {
   usePageTitle('統合ユーザー')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち', href: '/friends' }])
   const u = useMergedUsers()
   const staffRole = useStaffRole()
   const canManage = staffRole === null || canManageRole(staffRole)
   const [openedPersonId, setOpenedPersonId] = useState<string | null>(null)
+  /*
+   * 人の詳細は同じ URL のまま開くので、上の帯のパンくずの「統合ユーザー」で一覧へ戻す
+   * （板の頭の「← 統合ユーザーへ」は 2026-10-08 に無くした）。
+   */
+  usePageCrumbs(openedPersonId
+    ? [{ label: 'ホーム', href: '/' }, { label: '友だち', href: '/friends' }, { label: '統合ユーザー', href: '/users', onSelect: () => setOpenedPersonId(null) }]
+    : [{ label: 'ホーム', href: '/' }, { label: '友だち', href: '/friends' }])
   const [expanded, setExpanded] = useState<string | null>(null)
 
   // 数の帯の「統合ユーザー」は重複検出の集計（uniquePeople）を使う（v7 と同じ API）。

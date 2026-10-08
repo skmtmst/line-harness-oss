@@ -17,7 +17,6 @@ import { Th } from '@/components/shared/table'
  * 読まれず、従来の見た目が出る。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -326,7 +325,6 @@ export default function AssignMatrixV8() {
   return (
     <div className={shell.shell} data-design-node="ooufy">
       <header className={shell.boardHead} data-design="Head">
-        <Link href="/booking/bookings" className={shell.backLink}>← 予約へ</Link>
         <h1 className={shell.headTitle}>担当メニューをまとめて決める</h1>
         <p className={shell.headNote} role="status" aria-live="polite">
           {dirty ? '未保存の変更があります' : 'メニューごとに、予約を受けられるスタッフを決めます'}

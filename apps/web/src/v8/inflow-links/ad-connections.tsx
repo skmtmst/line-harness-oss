@@ -8,9 +8,8 @@
  * 呼ぶ口：送信記録の30日の集計（今と同じ）・対応表 `GET /api/ad-platforms/mappings`（F-21）・
  * 結びつける `PUT /api/ad-platforms/mappings/:pointId`（owner・admin）。BEHAVIOR.md の「広告とのつなぎ」。
  */
-import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Clock, Eye, History, RotateCw, Send, XCircle } from 'lucide-react'
+import { Clock, Eye, History, RotateCw, Send, XCircle } from 'lucide-react'
 import type { AdEventMapping } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -161,7 +160,6 @@ export default function AdConnectionsV8() {
     <div className={adsStyles.board} data-design-node="FDBsG">
       <header className={adsStyles.head}>
         <div className={adsStyles.headText}>
-          <Link href="/inflow-links" className={adsStyles.backLink}><ArrowLeft size={14} aria-hidden="true" />流入と計測へ</Link>
           <h1 className={adsStyles.title}>広告とのつなぎ</h1>
           <p className={adsStyles.description}>LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。</p>
         </div>

@@ -330,7 +330,6 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         boardId="J60utH"
         title={id ? 'カルーセルを編集' : 'カルーセルを作る'}
         description={`横にめくるカード。最大 ${MAX_COLUMNS} 枚`}
-        backHref={host?.backHref}
         side={(
           <>
             <section className={te.sideCard}>

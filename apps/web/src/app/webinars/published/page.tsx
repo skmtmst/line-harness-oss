@@ -14,6 +14,7 @@ import { useAccount } from '@/contexts/account-context'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 type PublishedWebinar = Webinar & {
   publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
@@ -30,6 +31,8 @@ function publicationWindow(webinar: PublishedWebinar): string {
 }
 
 function PublishedWebinarContent() {
+  /* ★V8 は頭の「← ウェビナー一覧」を置かない（オーナー 2026-10-08）。一覧へは上の帯のパンくずと［ウェビナー一覧へ］。 */
+  const showHeadBack = useAdminTheme() !== 'v8'
   usePageTitle('ウェビナー・公開完了')
   const id = useSearchParams().get('id')
   const { accounts, loading: accountsLoading } = useAccount()
@@ -164,7 +167,7 @@ function PublishedWebinarContent() {
 
   return (
     <div data-design-node="TimXl" className="mx-auto max-w-[1600px] space-y-4 px-6 pb-12 pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3"><a href="/webinars" className="text-action text-sm font-semibold">← ウェビナー一覧</a><Button href="/webinars">ウェビナー一覧へ</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3">{showHeadBack ? <a href="/webinars" className="text-action text-sm font-semibold">← ウェビナー一覧</a> : <span />}<Button href="/webinars">ウェビナー一覧へ</Button></div>
       <ol className="grid grid-cols-2 gap-2 py-2 sm:grid-cols-5">{['基本設定', '動画', 'CTA・フォーム', '通知', '確認'].map((label, index) => <li key={label} className="text-ink flex items-center gap-2 px-3 py-2 text-xs font-semibold"><span className="bg-accent-deep text-on-accent flex h-7 w-7 items-center justify-center rounded-pill">✓</span><span><span className="text-accent-deep block text-nano">STEP {index + 1}</span>{label}</span></li>)}</ol>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
         <section className="border-hairline bg-canvas min-h-[720px] rounded-card border p-8 shadow-card">
