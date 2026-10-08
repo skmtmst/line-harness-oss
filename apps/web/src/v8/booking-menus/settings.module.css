@@ -1563,8 +1563,8 @@
 }
 
 .phoneCatNow {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
+  background: var(--color-ink);
+  color: var(--color-canvas);
 }
 
 /* 選ぶカード（メニュー・担当）。 */
@@ -1673,6 +1673,11 @@
 .phoneCardCheck {
   flex-shrink: 0;
   color: var(--v8-liff-primary);
+}
+
+.phoneCardNext {
+  flex-shrink: 0;
+  color: var(--v8-liff-idle);
 }
 
 /* 週の日付の札。両はしに週送りの ‹ › 。 */
