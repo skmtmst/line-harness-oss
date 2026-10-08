@@ -31,6 +31,8 @@ import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import styles from './line-preview.module.css'
 
 export interface LinePreviewProps {
+  /** 狭い選択窓ではスマホを列の内側に収める。省略時は正本の幅のまま。 */
+  fit?: boolean
   /** 枠の中身。各画面の吹き出し・カードをそのまま渡す。 */
   children?: ReactNode
   /**
@@ -65,6 +67,7 @@ const readIsV8 = () => document.documentElement?.getAttribute('data-theme') === 
 const readIsV8OnServer = () => false
 
 export default function LinePreview({
+  fit = false,
   children,
   caption,
   note,
@@ -80,7 +83,7 @@ export default function LinePreview({
    */
   if (v8) {
     return (
-      <section aria-label="LINEでの見え方" className={styles.phoneRoot}>
+      <section aria-label="LINEでの見え方" className={styles.phoneRoot} data-fit={fit || undefined}>
         {/* 絵（JeINq・A0pDt ほか24枚）はすべて「LINEでの見え方」。列の左に寄せ、スマホはその下の真ん中。 */}
         <p className={styles.phoneTitle}>
           <span>LINEでの見え方</span>
