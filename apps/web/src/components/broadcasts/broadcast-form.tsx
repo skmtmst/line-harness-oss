@@ -835,9 +835,9 @@ export default function BroadcastForm({
   }
   /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（v7 はこれまでの帯）。
      ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。v7 は今までどおり。 */
-  const theme = useAdminTheme()
-  const v8 = theme === 'v8'
-  const showHeadBack = !v8
+  /* ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。v7 は今までどおり。手順は V8 だけ題と説明の下（Steps）。 */
+  const showHeadBack = useAdminTheme() !== 'v8'
+  const v8 = !showHeadBack
   usePageTitle(
     preflightDialogOpen
       ? '一斉配信の配信前チェック'
