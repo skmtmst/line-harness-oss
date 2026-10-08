@@ -1056,34 +1056,36 @@ export default function RemindersListV8() {
                     <Button variant="primary" onClick={() => goDetail(detailHref(panelRow.id))}>
                       詳細を見る
                     </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={!canEdit}
-                      onClick={() => goDetail(`/reminders/edit?id=${encodeURIComponent(panelRow.id)}`)}
-                    >
-                      編集する
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={!canEdit}
-                      onClick={() => {
-                        setDuplicateError('')
-                        setDuplicateTarget(panelRow)
-                        setPanelId(null)
-                      }}
-                    >
-                      複製する
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={!canEdit}
-                      onClick={() => {
-                        setPanelId(null)
-                        requestDelete(panelRow)
-                      }}
-                    >
-                      削除する
-                    </Button>
+                    {/* 閲覧のみの人には押せないボタンを置かない（行の「…」と同じ。監査 WEB-015）。 */}
+                    {canEdit ? (
+                      <>
+                        <Button
+                          variant="secondary"
+                          onClick={() => goDetail(`/reminders/edit?id=${encodeURIComponent(panelRow.id)}`)}
+                        >
+                          編集する
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            setDuplicateError('')
+                            setDuplicateTarget(panelRow)
+                            setPanelId(null)
+                          }}
+                        >
+                          複製する
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            setPanelId(null)
+                            requestDelete(panelRow)
+                          }}
+                        >
+                          削除する
+                        </Button>
+                      </>
+                    ) : null}
                   </>
                 }
               >
