@@ -158,12 +158,14 @@ function ConnectDialog({
 
 /** 予約が重なったときの知らせ（DFl3Q）。移す先を選び、移して知らせる。 */
 export function ConflictDialog({
+  canEdit = true,
   accountId,
   conflict,
   staff,
   onClose,
   onDone,
 }: {
+  canEdit?: boolean
   accountId: string
   conflict: BookingConflict
   staff: BookingChannelStaff[]
@@ -177,6 +179,7 @@ export function ConflictDialog({
   const [error, setError] = useState('')
   const targetName = targets.find((t) => t.staffId === targetId)?.displayName ?? ''
   const move = async () => {
+    if (!canEdit || busy) return
     if (!targetId) {
       setError('移す先のスタッフを選んでください。')
       return
@@ -205,7 +208,7 @@ export function ConflictDialog({
         cancelLabel="あとで"
         busy={busy}
         error={error || undefined}
-        onConfirm={() => void move()}
+        onConfirm={canEdit ? () => void move() : undefined}
         onCancel={onClose}
       >
         {conflict.bookings?.length ? (
@@ -218,6 +221,7 @@ export function ConflictDialog({
           </div>
         ) : null}
         {conflict.reason ? <p className={ch.conflictReason}>{conflict.reason}</p> : null}
+        {canEdit ? <>
         <p className={ch.conflictLabel}>①の予約を移す先のスタッフ</p>
         <Select
           aria-label="移す先のスタッフ"
@@ -234,6 +238,7 @@ export function ConflictDialog({
           <Toggle label="移したことを、お客さまに知らせる" checked={notify} disabled={busy} onChange={setNotify} />
           <span className={ch.conflictReason}>移したことを、お客さまに知らせる（LINE の友だちなら LINE、そうでなければ電話の案内を出す）</span>
         </div>
+        </> : null}
         {conflict.guidance ? <NoteBar tone="warn">{conflict.guidance}</NoteBar> : null}
       </Dialog>
     </div>
@@ -347,7 +352,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
         <NoteBar tone="warn">
           予約が {conflicts.length} 件重なっています。
           {/* WEB059：閲覧のみには、付け替え（書き込み）へ進む口を置かない。重なりの知らせは出す。 */}
-          {canEdit ? <Button size="compact" onClick={() => setConflictOpen(true)}>重なりを解消する</Button> : null}
+          <Button size="compact" onClick={() => setConflictOpen(true)}>{canEdit ? '重なりを解消する' : '重なりを見る'}</Button>
         </NoteBar>
       ) : null}
 
@@ -460,8 +465,8 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
       {connectTarget ? (
         <ConnectDialog accountId={accountId} staff={connectTarget} onClose={() => setConnectTarget(null)} onDone={() => { setConnectTarget(null); void load() }} />
       ) : null}
-      {canEdit && conflictOpen && firstConflict ? (
-        <ConflictDialog accountId={accountId} conflict={firstConflict} staff={data.staff} onClose={() => setConflictOpen(false)} onDone={() => { setConflictOpen(false); void load() }} />
+      {conflictOpen && firstConflict ? (
+        <ConflictDialog canEdit={canEdit} accountId={accountId} conflict={firstConflict} staff={data.staff} onClose={() => setConflictOpen(false)} onDone={() => { setConflictOpen(false); void load() }} />
       ) : null}
     </div>
   )
