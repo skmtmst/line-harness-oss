@@ -92,25 +92,9 @@
 }
 
 /*
- * ★V8 仕上げ（M10）：選ぶ欄の候補も少し下から（200ms ease-out）。
- * 開く速さは窓・メニューと同じにする。
+ * ★V8 の開いた中身は共通部品 select-menu（StFE7）が描き、開く動き（150ms）もそちらが持つ。
+ * ここの .listbox・.option・.check は v7 だけ。
  */
-[data-theme='v8'] .listbox {
-  animation: select-v8-enter var(--motion-base) var(--motion-ease-out);
-  transform-origin: top center;
-}
-
-@keyframes select-v8-enter {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 .option {
   display: flex;
@@ -211,9 +195,13 @@
   font-weight: 500;
 }
 
-/* 開いている・誤りの枠色は v8 でもそれぞれの意味の色を保つ。 */
+/*
+ * 開いている・誤りの枠色は v8 でもそれぞれの意味の色を保つ。
+ * ★V8 は中身が離れて浮く（StFE7・ボタンの下 4px）ので、開いても下の角は丸いまま。
+ */
 [data-theme='v8'] .openTrigger {
   border-color: var(--color-accent);
+  border-radius: var(--radius-control);
 }
 
 /*

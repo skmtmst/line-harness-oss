@@ -587,6 +587,26 @@
   --v8-bphone-screen-radius: 34px;   /* 画面の角丸 */
   /* 一覧の日付窓（list-v8.module.css の datePopover）が落とす影 */
   --v8-popover-shadow: 0 8px 24px rgb(15 23 32 / 0.12);
+
+  /*
+   * プルダウンの開いた中身（★V8 共通部品 StFE7「選ぶ欄/開いた」・2026-10-08 B-45）。
+   * components/shared/select-menu だけが読む。画面側で上書きしない。
+   * 行は 7/10 の内側＋文字の行 18 で高さ 32（多い候補の間引きの計算もこの値）。
+   */
+  --select-menu-radius: 12px;
+  --select-menu-pad: 6px;
+  --select-menu-gap: 2px;
+  --select-menu-shadow: 0 8px 24px #1d1d1f1f;
+  --select-menu-heading-pad: 4px 10px 2px;
+  --select-menu-heading-size: 11px;
+  --select-menu-item-pad: 7px 10px;
+  --select-menu-item-radius: 8px;
+  --select-menu-item-gap: 8px;
+  --select-menu-item-size: 13px;
+  --select-menu-item-line: 18px;
+  --select-menu-check: 14px;
+  --select-menu-enter: 150ms;
+  --select-menu-enter-scale: 0.97;
 }
 
 /*
