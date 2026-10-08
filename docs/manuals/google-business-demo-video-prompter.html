@@ -69,11 +69,12 @@
     background:var(--panel);
     border:1px solid var(--line);
     border-radius:10px;
-    padding:clamp(18px,3vw,38px);
+    padding:clamp(18px,3vw,34px);
     display:flex;
     flex-direction:column;
-    gap:clamp(14px,2.4vh,26px);
+    gap:clamp(12px,2vh,20px);
     min-height:0;
+    overflow-y:auto;
   }
   .eyebrow{
     display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;
@@ -88,15 +89,40 @@
   }
   .tag.read{color:var(--muted)}
   .tag.write{color:var(--tally)}
-  .action{
+  .title{
     margin:0;
-    font-size:clamp(24px,4.6vw,46px);
+    font-size:clamp(22px,3.6vw,36px);
     font-weight:600;
-    line-height:1.34;
+    line-height:1.32;
     letter-spacing:-.01em;
     text-wrap:balance;
   }
-  .action code{
+  .rows{display:flex;flex-direction:column;gap:0}
+  .row{
+    display:grid;
+    grid-template-columns:5.6em 1fr;
+    gap:0 clamp(12px,2vw,22px);
+    padding:clamp(11px,1.8vh,16px) 0;
+    border-top:1px solid var(--line);
+    align-items:baseline;
+  }
+  .row:last-child{border-bottom:1px solid var(--line)}
+  .row dt{
+    font-family:var(--mono);
+    font-size:clamp(10px,1.3vw,12px);
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+    padding-top:.35em;
+  }
+  .row dd{
+    margin:0;
+    font-size:clamp(15px,2.1vw,22px);
+    line-height:1.52;
+  }
+  .row.do dd{font-weight:600}
+  .row.caution dt{color:var(--caution)}
+  .row code{
     font-family:var(--mono);
     font-size:.84em;
     font-weight:400;
@@ -106,16 +132,19 @@
     padding:.08em .34em;
     word-break:break-all;
   }
-  .action .hot{color:var(--caution);font-weight:600}
+  .row .hot{color:var(--caution);font-weight:600}
+  @media (max-width:560px){
+    .row{grid-template-columns:1fr;gap:6px}
+    .row dt{padding-top:0}
+  }
   .sub{
     margin:0;
     font-family:var(--en);
-    font-size:clamp(14px,1.9vw,20px);
+    font-size:clamp(13px,1.7vw,18px);
     line-height:1.6;
     color:var(--muted);
     max-width:66ch;
-    border-top:1px solid var(--line);
-    padding-top:clamp(12px,2vh,20px);
+    padding-top:clamp(10px,1.6vh,16px);
     margin-top:auto;
   }
   .sub::before{
@@ -126,7 +155,7 @@
     color:var(--line);
     margin-bottom:8px;
   }
-  .steptrack{height:2px;background:var(--line);border-radius:2px;overflow:hidden}
+  .steptrack{height:2px;background:var(--line);border-radius:2px;overflow:hidden;flex:none}
   .steptrack i{display:block;height:100%;width:0;background:var(--muted)}
 
   .ahead{
@@ -171,17 +200,18 @@
     overflow-y:auto;
   }
   .pre[hidden]{display:none}
-  .card{width:100%;max-width:620px;display:flex;flex-direction:column;gap:22px}
+  .card{width:100%;max-width:660px;display:flex;flex-direction:column;gap:20px}
   .card h1{
-    margin:0;font-size:clamp(22px,3.4vw,32px);line-height:1.3;
+    margin:0;font-size:clamp(20px,3.2vw,30px);line-height:1.3;
     text-wrap:balance;
   }
   .card h1 em{font-style:normal;color:var(--tally)}
-  .pre ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+  .pre ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;
+    counter-reset:pf}
   .pre li{
     display:flex;gap:12px;align-items:flex-start;
-    padding:14px 0;border-top:1px solid var(--line);
-    font-size:clamp(14px,1.8vw,16px);line-height:1.55;
+    padding:13px 0;border-top:1px solid var(--line);
+    font-size:clamp(13px,1.7vw,16px);line-height:1.55;
   }
   .pre li:last-child{border-bottom:1px solid var(--line)}
   .pre li b{
@@ -200,13 +230,16 @@
 <div class="pre" id="pre">
   <div class="card">
     <h1>1本撮り <em>10分10秒</em>。声は要りません。<br>画面に出る順に押すだけです。</h1>
-    <ul>
+    <ol>
       <li><b>済</b><span>本番クライアントの承認済みリダイレクトURIは <code>https://api.musubo.jp/api/restaurant-test/google/oauth/callback</code> の1行だけ（確認済み）</span></li>
-      <li><b>要</b><span>「Googleビジネス」→「設定」が<em>未接続</em>から始まる（接続済みなら先に解除）</span></li>
-      <li><b>要</b><span>ブラウザの表示言語を English にする（同意画面を英語で写すため。管理画面は日本語のまま）</span></li>
-      <li><b>要</b><span>録画範囲に<em class="warn">この台本ページを入れない</em>。スマホで見るか、<code>Cmd+Shift+5</code> で「選択部分を収録」にしてブラウザだけ撮る</span></li>
-      <li><b>要</b><span>クライアントIDは写ってよい。<em class="warn">シークレットとパスワードは絶対に写さない</em></span></li>
-    </ul>
+      <li><b>1</b><span><em>Googleアカウント</em>の表示言語を English にする。<code>myaccount.google.com</code> →「個人情報」→「ウェブ向けの全般設定」→「言語」。ブラウザの言語設定では変わらない</span></li>
+      <li><b>2</b><span>管理画面の「Googleビジネス」→「設定」で、接続済みなら「接続を解除」</span></li>
+      <li><b>3</b><span><code>myaccount.google.com/connections</code> → musubo →<em class="warn">「すべてのアクセス権を削除」</em>。これをしないとGoogleの許可画面に許可の文言が1つも出ず、撮り直しになる</span></li>
+      <li><b>4</b><span>手順6〜9までリハーサルし、許可の文言が読めることを確認したら<em class="warn">必ず「Cancel」</em>。Continueを押すと許可が復活する</span></li>
+      <li><b>5</b><span>口コミが1件以上ある／直す営業時間1か所・追加する写真1枚・投稿の本文を先に決めておく</span></li>
+      <li><b>6</b><span>録画範囲に<em class="warn">この台本ページを入れない</em>。スマホで見るか、<code>Cmd+Shift+5</code> で「選択部分を収録」にしてブラウザだけ撮る</span></li>
+      <li><b>7</b><span>クライアントIDは写ってよい。<em class="warn">シークレットとパスワードは絶対に写さない</em></span></li>
+    </ol>
     <p>録画を始めてから「開始」を押してください。時計は字幕ファイルの秒数と同じです。ずれたら「前」「次」で合わせ直せます。</p>
     <button id="begin">準備できた</button>
   </div>
@@ -227,11 +260,15 @@
 
   <main class="stage">
     <div class="eyebrow">
-      <span class="no">字幕 <span id="cue">1</span></span>
-      <span>台本 <span id="script">0-1</span></span>
+      <span class="no">手順 <span id="cue">1</span></span>
       <span id="tagSlot"></span>
     </div>
-    <p class="action" id="action">—</p>
+    <p class="title" id="title">—</p>
+    <dl class="rows">
+      <div class="row do"><dt>押す</dt><dd id="doIt">—</dd></div>
+      <div class="row"><dt>出るはず</dt><dd id="see">—</dd></div>
+      <div class="row caution"><dt>注意</dt><dd id="warn">—</dd></div>
+    </dl>
     <div class="steptrack"><i id="stepbar"></i></div>
     <p class="sub" id="sub">—</p>
   </main>
@@ -249,71 +286,170 @@
 
 <script>
 const STEPS = [
-  {n:1,a:0,b:15,s:"0-1",t:"`https://musubo.jp/` をログインなしで開く",h:[],
+  {n:1,a:0,b:15,t:"公開サイトのトップ",h:["ログイン済みの窓は使わない"],
+   o:"ログインしていないブラウザの窓で `https://musubo.jp/` を開き、上から下まで一度ゆっくりスクロールする",
+   c:"musuboのトップページ。アドレスバーに `musubo.jp` が読める",
+   w:"管理画面にログイン済みの窓は使わない。審査員は「誰でも見られるページか」を見ている",
    e:"musubo is a LINE-based customer communication tool for small restaurants and shops in Japan. This is our public home page, open without signing in."},
-  {n:2,a:15,b:35,s:"0-2",t:"フッターから `/privacy/` を開き、第6節までスクロール",h:[],
+  {n:2,a:15,b:35,t:"プライバシーポリシー第6節",h:["アドレスバーは隠さない"],
+   o:"画面のいちばん下のフッターから「プライバシーポリシー」を開き、第6節「Googleビジネスプロフィール連携で取り扱うGoogleユーザーデータ」まで下げて3秒止める",
+   c:"アドレスバーが `https://musubo.jp/privacy/`。第6節の見出しと、28日・30暦日・Limited Use の説明",
+   w:"文字が小さければ `Cmd` と `+` で拡大してよい。ただしアドレスバーは隠さない",
    e:"From the footer we open our privacy policy at musubo.jp/privacy. Section 6 describes exactly what Google user data we read and write."},
-  {n:3,a:35,b:55,s:"0-2",t:"`/terms/` を開き、第3節までスクロール",h:[],
+  {n:3,a:35,b:55,t:"利用規約第3節",h:[],
+   o:"同じフッターから「利用規約」を開き、第3節のGoogle連携の説明まで下げて3秒止める",
+   c:"アドレスバーが `https://musubo.jp/terms/`。「当社が自動で送信することはありません」の一文",
+   w:"第3節は見出しの番号で探す。読み上げは不要",
    e:"And our terms of service at musubo.jp/terms. Section 3 describes the Google Business Profile features. The dashboard UI is Japanese only, so these subtitles explain each screen."},
-  {n:4,a:55,b:70,s:"0-3",t:"`admin.musubo.jp` でログイン（パスワード入力中は手元を映さない）",h:["パスワード入力中は手元を映さない"],
+  {n:4,a:55,b:70,t:"管理画面にログイン",h:["手元（キーボード）を映さない","「表示」は押さない"],
+   o:"同じ窓で `admin.musubo.jp` を開き、メールとパスワードを入れてログインする",
+   c:"ログイン画面のあと、管理画面のトップ",
+   w:"パスワードを打つ間は手元（キーボード）を映さない。パスワード欄の「表示」は押さない",
    e:"Now we sign in to our dashboard at admin.musubo.jp. Store staff always sign in here themselves; there is no indirect access to our Business Profile project."},
-  {n:5,a:70,b:82,s:"1",t:"管理画面のトップとアドレスバーのドメインを映す",h:[],
+  {n:5,a:70,b:82,t:"管理画面のトップ",h:["通知・別のタブ・ターミナルを映さない"],
+   o:"管理画面のトップで3秒止め、アドレスバーを一度はっきり映す",
+   c:"`admin.musubo.jp` のドメインと、普段どおりの管理画面",
+   w:"通知・別のタブ・ターミナルを映さない。収録前に閉じておく",
    e:"This is the musubo dashboard. The same screen where the owner handles LINE messages."},
-  {n:6,a:82,b:95,s:"2",t:"左メニュー「Googleビジネス」→「設定」の未接続状態",h:["未接続状態"],
+  {n:6,a:82,b:95,t:"Googleビジネスの設定（未接続）",h:["進めず収録を止める"],
+   o:"左メニューの「Googleビジネス」を開き、「設定」タブを表示する",
+   c:"「Googleアカウントを接続」ボタンがある、まだ何も接続されていない画面",
+   w:"ここで「接続済み」と出たら進めず収録を止める。1-B の手順2と3をやり直す",
    e:'In the left menu we open "Google Business". The Settings tab shows that no Google account is connected yet.'},
-  {n:7,a:95,b:110,s:"3",t:"「Googleアカウントを接続」を押し、`client_id=` が写った状態で2〜3秒静止",h:["2〜3秒静止"],
+  {n:7,a:95,b:110,t:"認可URLを映す",h:["急いで次へ進めない"],
+   o:"「Googleアカウントを接続」を押す。Googleの画面が出たらアドレスバーを1回クリックしてURL全体を出し、2〜3秒そのまま止める",
+   c:"`accounts.google.com` で始まるURLの中に `client_id=` と `scope=` が読める",
+   w:"審査員がここを確認する。急いで次へ進めない。クライアントIDは写ってよい",
    e:'We press "Connect Google account". The address bar now shows Google\'s own OAuth endpoint with our client_id.'},
-  {n:8,a:110,b:120,s:"4",t:"アカウント選択で店舗を管理しているアカウントを選ぶ",h:[],
+  {n:8,a:110,b:120,t:"アカウントを選ぶ",h:["他人のメールアドレスも写る"],
+   o:"店舗のGoogleビジネスプロフィールを管理しているアカウントを選ぶ",
+   c:"アカウントの一覧。1件だけ並ぶのが望ましい",
+   w:"複数のGoogleアカウントにログインしていると他人のメールアドレスも写る。収録前に1つだけにしておく",
    e:"Google asks which account to use. We choose the account that already administers this store's Google Business Profile."},
-  {n:9,a:120,b:135,s:"5",t:"同意画面。アプリ名 `musubo` と3つのスコープが読めるよう静止",h:["読めるよう静止"],
+  {n:9,a:120,b:135,t:"許可の画面（いちばん大事）",h:["チェックボックスは出ない","そこで収録を止める"],
+   o:"Googleの許可画面が出たら、要求している許可の文言が画面に出ている状態で5秒そのまま止める。文言が途中で切れていたら切れないところまでスクロールして見せる",
+   c:"アプリ名 `musubo` と、ビジネス情報の管理を求める文（英語なら `musubo will be able to … your Google business listings.`）",
+   w:"チェックボックスは出ない。必要なのは許可の文言が読めること。青い帯に `musubo already has some access` と出て許可の文言が1つも出ないときは、そこで収録を止める（1-B の手順3の削除ができていない）",
    e:'This is Google\'s consent screen. The app name is "musubo". We request exactly three scopes: Manage your Business Profile, email, and openid.'},
-  {n:10,a:135,b:150,s:"5",t:"チェックは外さずに「Allow」",h:["チェックは外さずに"],
-   e:'We do not send include_granted_scopes. If "Manage your Business Profile" is left unchecked, we refuse to save the connection and ask the owner to connect again with that permission granted. Here we keep it checked and allow.'},
-  {n:11,a:150,b:165,s:"6",t:"接続済み表示と接続したGoogleアカウントのメール",h:[],
+  {n:10,a:135,b:150,t:"許可する",h:["カメラを止めない","戻るボタンは押さない"],
+   o:"「Continue」（日本語表示なら「続行」）を押す",
+   c:"Googleの画面が閉じて、musuboの管理画面に戻る",
+   w:"戻るまで数秒かかる。待っている間もカメラを止めない。ブラウザの戻るボタンは押さない",
+   e:"We allow. We do not send include_granted_scopes, so the stored token carries only the scopes requested on this screen. If the Business Profile permission is not granted, we refuse to save the connection and ask the owner to connect again."},
+  {n:11,a:150,b:165,t:"接続済みの表示",h:["隠さずに映す"],
+   o:"「設定」タブに戻ったところで3秒止める",
+   c:"「接続済み」の表示と、接続したGoogleアカウントのメールアドレス",
+   w:"このメール表示が openid と email を要求している唯一の理由。隠さずに映す",
    e:"Back in the dashboard, the connection is shown together with the connected Google account's email address. This is the only use of openid and userinfo.email: so the owner can confirm which account is linked."},
-  {n:12,a:165,b:180,s:"7",t:"「接続する店舗を選ぶ」で一覧を出し1つ選ぶ（読み取り1）",h:[],g:"READ 1 of 5",
+  {n:12,a:165,b:180,t:"店舗を選ぶ（読み取り1）",h:[],g:"READ 1 of 5",
+   o:"店舗の一覧から1つ選び、「この店舗を接続する」を押す",
+   c:"このGoogleアカウントで管理できる店舗の一覧",
+   w:"一覧が空のときは、選んだGoogleアカウントがその店舗の管理者になっていない。収録を止めてアカウントを確かめる",
    e:"READ 1 of 5: the list of locations this signed-in user already administers, so the owner can choose which store to link."},
-  {n:13,a:180,b:205,s:"8",t:"「プロフィール」タブ（読み取り2）",h:[],g:"READ 2 of 5",
+  {n:13,a:180,b:205,t:"プロフィールを読む（読み取り2）",h:["ここでは何も変えない"],g:"READ 2 of 5",
+   o:"「プロフィール」タブを開き、上から下まで一度スクロールする",
+   c:"店舗名・住所・電話番号・営業時間・写真が、Googleに出ているとおりに並ぶ",
+   w:"ここでは何も変えない。変更するのは手順22から",
    e:"READ 2 of 5: that store's profile details - name, address, phone number, regular and special hours, website URL, description and photos - as currently published on Google."},
-  {n:14,a:205,b:230,s:"9",t:"「口コミ」タブ→「同期する」（読み取り3）",h:[],g:"READ 3 of 5",
+  {n:14,a:205,b:230,t:"口コミを読む（読み取り3）",h:["1件も無いと手順17以降が撮れない"],g:"READ 3 of 5",
+   o:"「口コミ」タブを開き、「同期する」を押して取得が終わるまで待つ",
+   c:"「取得中…」のあと、口コミの一覧（評価・本文・日時・投稿者名）",
+   w:"1件も無いと手順17以降が撮れない。収録前に1件以上あることを確かめておく（1-B の手順5）",
    e:"READ 3 of 5: the store's Google reviews. Text, rating, time, reviewer display name and any existing reply."},
-  {n:15,a:230,b:245,s:"10",t:"「投稿」タブ（読み取り4）",h:[],g:"READ 4 of 5",
+  {n:15,a:230,b:245,t:"投稿を読む（読み取り4）",h:["ここでは作らない"],g:"READ 4 of 5",
+   o:"「投稿」タブを開く",
+   c:"Googleに出ている投稿の一覧。無ければ空の一覧のままでよい",
+   w:"ここでは作らない。作るのは手順27",
    e:"READ 4 of 5: the store's local posts on Google."},
-  {n:16,a:245,b:260,s:"10",t:"「パフォーマンス」タブの直近28日グラフ（読み取り5）",h:[],g:"READ 5 of 5",
+  {n:16,a:245,b:260,t:"指標を読む（読み取り5）",h:[],g:"READ 5 of 5",
+   o:"「パフォーマンス」タブを開き、期間が「直近28日」になっていることを見せる",
+   c:"プロフィール表示・ルート検索・電話ボタンのクリック・サイトへのクリックのグラフ",
+   w:"数字が0でも問題ない。グラフの項目名が読めればよい",
    e:"READ 5 of 5: daily performance metrics - profile impressions, direction requests, call clicks and website clicks - shown as a simple chart."},
-  {n:17,a:260,b:285,s:"11",t:"口コミ1件を開き「AIで下書きを作る」",h:[],
+  {n:17,a:260,b:285,t:"AIで下書きを作る",h:["そのまま送らない"],
+   o:"「口コミ」タブに戻り、1件の「返信を見る」を押して、「AIで下書きを作る」を押す",
+   c:"AIが作った返信の下書きが本文欄に入る",
+   w:"この下書きをそのまま送らないことを次の手順で見せる。ここが審査の要点",
    e:'Now the write operations. We open one review and press "Draft with AI" to generate a suggested reply.'},
-  {n:18,a:285,b:305,s:"11",t:"下書きを手で書き換えて「下書きを保存する」",h:[],
+  {n:18,a:285,b:305,t:"下書きを手で直す",h:["ゆっくり打つ"],
+   o:"下書きの文を1〜2文、手で書き換えて「下書き保存」を押す",
+   c:"下書きを保存した案内。まだGoogleへは送っていない",
+   w:"全部消して書き直してもよい。手で直したことが見えるようにゆっくり打つ",
    e:"The owner edits that draft by hand and saves it as a draft. Nothing has been sent to Google at this point."},
-  {n:19,a:305,b:330,s:"12",t:"「返信内容を確認」。送信本文がそのまま出る確認画面を映す",h:["確認画面を映す"],g:"WRITE 1 of 4",
-   e:'WRITE 1 of 4: we press "Review the reply". This confirmation screen shows the exact text that will be sent to Google.'},
-  {n:20,a:330,b:345,s:"12",t:"「この内容で返信する」（書き込み1）",h:[],
+  {n:19,a:305,b:330,t:"返信の確認画面とチェック",h:["musuboの画面のもの","Googleの許可画面にチェックは出ない"],g:"WRITE 1 of 4",
+   o:"「返信内容を確認」を押す。確認画面で3秒止めたあと、「返信先・内容・個人情報の有無を確認しました」のチェックを入れる",
+   c:"「この返信をGoogleに公開しますか？」の見出し、「まだ送信していません」の表示、送信する本文そのまま",
+   w:"このチェックはmusuboの画面のもの。Googleの許可画面にチェックは出ない。入れないと次のボタンが押せない",
+   e:'WRITE 1 of 4: we press "Review the reply". This confirmation screen shows the exact text that will be sent to Google. The staff member must tick a confirmation box before the send button becomes active.'},
+  {n:20,a:330,b:345,t:"返信を送る（書き込み1）",h:[],
+   o:"「この内容で返信する」を押す",
+   c:"「送信中…」のあと、送信済みの表示に変わる",
+   w:"押すまでは何もGoogleへ行かない。ここが「店舗の人が確認して押したときだけ送る」証拠になる",
    e:"Only after the owner reads it and presses the confirm button is the reply sent. Nothing is ever sent automatically, on a schedule, or in the background."},
-  {n:21,a:345,b:360,s:"12",t:"別タブでGoogle側に返信が反映されたところ",h:[],
+  {n:21,a:345,b:360,t:"Google側で返信を確かめる",h:[],
+   o:"別のタブで店舗のGoogleビジネスプロフィール（またはGoogleマップの店舗ページ）を開き、返信が出ているところを映す",
+   c:"いま送った返信が、Google側の口コミにぶら下がっている",
+   w:"反映に時間がかかることがある。出ないときは手順22へ進み、最後にもう一度見せる",
    e:"In another tab we open the store's Google Business Profile. The reply is now published on Google."},
-  {n:22,a:360,b:385,s:"13",t:"「プロフィール」で営業時間を1か所直し「変更案を確認」",h:["1か所"],g:"WRITE 2 of 4",
+  {n:22,a:360,b:385,t:"営業時間の変更案",h:["直すのは1か所だけ"],g:"WRITE 2 of 4",
+   o:"「プロフィール」タブに戻り「営業時間を変更」を押す。1か所だけ時刻を直して「変更案を確認」を押す",
+   c:"変更する曜日と時刻の入力欄",
+   w:"直すのは1か所だけ。あとで元に戻す作業が増える",
    e:'WRITE 2 of 4: back in the Profile tab we change one field - the business hours - and press "Review the change".'},
-  {n:23,a:385,b:405,s:"13",t:"変更前後が並ぶ確認画面→「Googleに変更を送信」（書き込み2）",h:[],
+  {n:23,a:385,b:405,t:"営業時間を送る（書き込み2）",h:["チェックを入れるまで送信ボタンは押せない"],
+   o:"「現在」と「変更後」が並ぶ確認画面で3秒止め、「店舗・日付・時間を確認しました」にチェックを入れて「Googleに変更を送信」を押す",
+   c:"変更前と変更後の値、「予約への影響」の一行、変更しない項目の説明",
+   w:"チェックを入れるまで送信ボタンは押せない。入れたらすぐ押さず、確認画面の文字を1秒見せてから押す",
    e:'The confirmation screen shows the old value and the new value side by side. We press "Send change to Google".'},
-  {n:24,a:405,b:415,s:"13",t:"「変更履歴」に記録が残るところ",h:[],
+  {n:24,a:405,b:415,t:"変更履歴",h:["記録を消す操作はしない"],
+   o:"送信後に出る「変更履歴を見る」を押す",
+   c:"だれが・いつ・何を送ったかの記録",
+   w:"ここは読み取りだけ。記録を消す操作はしない",
    e:"The change history records who sent what, and when, so the owner can review their own actions."},
-  {n:25,a:415,b:440,s:"14",t:"「写真」で1枚追加し「変更案を確認」",h:[],g:"WRITE 3 of 4",
+  {n:25,a:415,b:440,t:"写真の変更案",h:["営業時間のときと違う","人の顔が写っている写真は避ける"],g:"WRITE 3 of 4",
+   o:"「プロフィールへ戻る」→「プロフィールを編集」を押し、写真を1枚追加して「変更内容を確認」を押す",
+   c:"選んだ写真のファイル名が行に出る",
+   w:"ボタンの名前は営業時間のときと違う（こちらは「変更内容を確認」）。人の顔が写っている写真は避ける",
    e:'WRITE 3 of 4: in the Photos section we add one store photo and press "Review the change".'},
-  {n:26,a:440,b:460,s:"14",t:"「写真を追加（ファイル名）」の行と「他の項目は変更しない」→送信（書き込み3）。Google側への反映は映さない",h:["Google側への反映は映さない"],
+  {n:26,a:440,b:460,t:"写真を送る（書き込み3）",h:["映さなくてよい"],
+   o:"確認画面の「写真を追加（ファイル名）」の行と「店舗名・住所・電話・営業時間は変更しません。」の一文を映し、「店舗・項目・内容を確認しました」にチェックを入れて「Googleに変更を送信」を押す",
+   c:"追加する写真と、変更しない項目の説明",
+   w:"写真はGoogleの審査後に反映されるので、Google側に出ているところは映さなくてよい",
    e:'The confirmation screen lists "add photo" with the file name, and states that no other field will be changed. We confirm. Google reviews new photos on their side before publishing them.'},
-  {n:27,a:460,b:485,s:"15",t:"「投稿」タブ→「投稿を作る」で最新情報を1件書く",h:[],g:"WRITE 4 of 4",
+  {n:27,a:460,b:485,t:"投稿を作る",h:["電話番号や個人名を入れない"],g:"WRITE 4 of 4",
+   o:"「投稿」タブを開き「投稿を作成」を押す。種類は「最新情報」を選び、本文を書く",
+   c:"種類の選択と本文の入力欄",
+   w:"本文に電話番号や個人名を入れない。あとで消す投稿なので短くてよい",
    e:"WRITE 4 of 4: in the Posts tab we create a local post."},
-  {n:28,a:485,b:505,s:"15",t:"「公開前の最終確認」で本文と日時→「この内容で予約する」（書き込み4）",h:[],
+  {n:28,a:485,b:505,t:"投稿を送る（書き込み4）",h:["1秒見せてから押す"],
+   o:"「公開内容を確認」を押し、「公開先・本文・画像・リンク・日時を確認しました」にチェックを入れて「この内容で予約する」を押す",
+   c:"投稿先・種類・公開予定・本文が並ぶ確認画面",
+   w:"ここも確認画面の文字を1秒見せてから押す。審査員は確認画面の中身を読む",
    e:"The final confirmation screen shows the exact body and the publish time that will go to Google. We confirm."},
-  {n:29,a:505,b:520,s:"15",t:"別タブでGoogle側に投稿が反映されたところ",h:[],
+  {n:29,a:505,b:520,t:"Google側で投稿を確かめる",h:[],
+   o:"別のタブで店舗のGoogleページを開き直し、投稿が出ているところを映す",
+   c:"いま予約した投稿がGoogle側に出ている",
+   w:"出ていないときは、手順21のタブで返信が反映されているかだけ見せて次へ進む",
    e:"In another tab, the post is now visible on the store's Google Business Profile."},
-  {n:30,a:520,b:545,s:"16",t:"「設定」→「接続を解除」。削除の説明文も映す",h:["削除の説明文も映す"],
+  {n:30,a:520,b:545,t:"接続を解除する",h:["素早く閉じない"],
+   o:"「設定」タブを開き「接続を解除」を押す。出てきた確認の説明文を3秒かけて全部映してから「接続を解除する」を押す",
+   c:"「Googleアカウントの接続を解除しますか？」と、トークンと取得したデータを削除する説明文",
+   w:"この説明文が、保存したデータを消せることの証拠になる。ダイアログを素早く閉じない",
    e:'Now we disconnect. In the Settings tab we press "Disconnect". The on-screen notice states that the OAuth tokens and all content fetched from Google will be deleted.'},
-  {n:31,a:545,b:565,s:"17",t:"解除後に「口コミ」「プロフィール」が空になっているところ",h:[],
+  {n:31,a:545,b:565,t:"解除後に空になっている",h:[],
+   o:"「口コミ」タブと「プロフィール」タブを開き、Googleから取ったデータが残っていないところを映す",
+   c:"どちらも未接続の案内に戻っている",
+   w:"「設定」タブが「Googleアカウントを接続」に戻っていることも1回映す",
    e:"After disconnecting, the Reviews and Profile tabs no longer hold any Google content. Cached content is also deleted automatically 28 days after it was last fetched, so nothing is kept beyond the 30 calendar day limit."},
-  {n:32,a:565,b:590,s:"18",t:"`https://myaccount.google.com/connections` でmusuboの認可が消えているところ",h:[],
+  {n:32,a:565,b:590,t:"Google側の許可も消える",h:["撮り直さずに"],
+   o:"別のタブで `https://myaccount.google.com/connections` を開き、musuboが一覧に無いところを映す",
+   c:"接続済みのアプリの一覧。musuboの行が無い",
+   w:"残っていたらGoogle側で取り消しが失敗している。撮り直さずに収録後そのまま報告する",
    e:"Finally, in Google account settings under Connections, musubo no longer appears: disconnecting also sends a revoke request to Google."},
-  {n:33,a:590,b:610,s:"—",t:"最後の画面のまま。自動送信しないことを字幕で締める",h:[],
+  {n:33,a:590,b:610,t:"締め",h:["20秒たってから録画を止める"],
+   o:"最後の画面のまま20秒そのまま置く。字幕が最後まで出る時間をとる",
+   c:"直前の画面のまま",
+   w:"20秒たってから録画を止める。すぐ止めると最後の字幕が切れる",
    e:"To summarise: replies, profile changes, photos and posts are sent to Google only when the store's own staff read a confirmation screen and press the confirm button. There is no automatic reply, no scheduled posting and no automatic profile editing. The only background processing is a read-only refresh."}
 ];
 const TOTAL = 610;
@@ -347,15 +483,18 @@ function paint(){
     shown = i;
     $("idx").textContent = st.n;
     $("cue").textContent = st.n;
-    $("script").textContent = st.s;
     $("window").textContent = mmss(st.a) + " – " + mmss(st.b);
-    $("action").innerHTML = markup(st.t, st.h);
+    $("title").textContent = st.t;
+    $("doIt").innerHTML = markup(st.o, st.h);
+    $("see").innerHTML = markup(st.c, st.h);
+    $("warn").innerHTML = markup(st.w, st.h);
     $("sub").textContent = st.e;
     $("tagSlot").innerHTML = st.g
       ? '<span class="tag ' + (st.g.indexOf("READ") === 0 ? "read" : "write") + '">' + st.g + "</span>"
       : "";
     const nx = STEPS[i+1];
-    $("next").textContent = nx ? mmss(nx.a) + "　" + nx.t.replace(/`/g,"") : "撮影終了。録画を止めてください";
+    $("next").textContent = nx ? mmss(nx.a) + "　" + nx.t : "撮影終了。録画を止めてください";
+    document.querySelector(".stage").scrollTop = 0;
   }
 }
 

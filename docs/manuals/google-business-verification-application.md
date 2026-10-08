@@ -69,7 +69,7 @@
 >
 > There is no narrower scope available. The Google Business Profile APIs do not publish a read-only scope, a reviews-only scope or a performance-only scope — `business.manage` is the single scope these APIs accept, so every operation above requires it.
 >
-> Consent handling: the authorisation request asks for exactly three scopes — `business.manage`, `openid` and `email`. We do not send `include_granted_scopes`, so a token we store never carries a scope that was not shown on that consent screen. Google's consent screen also lets the user clear an individual permission; if "Manage your Business Profile" is left unchecked, we refuse the connection instead of storing a token that cannot be used — the callback stores nothing and the dashboard asks the owner to connect again with that permission granted. The same check runs every time we refresh the access token, so a permission the owner removes later in their Google account puts the connection into a "needs re-consent" state in our dashboard rather than failing silently.
+> Consent handling: the authorisation request asks for exactly three scopes — `business.manage`, `openid` and `email`. We do not send `include_granted_scopes`, so a token we store never carries a scope that was not shown on that consent screen. Google's consent screen also lets the user decline an individual permission; if "Manage your Business Profile" is not granted, we refuse the connection instead of storing a token that cannot be used — the callback stores nothing and the dashboard asks the owner to connect again with that permission granted. The same check runs every time we refresh the access token, so a permission the owner removes later in their Google account puts the connection into a "needs re-consent" state in our dashboard rather than failing silently.
 >
 > We do not create or delete locations, do not transfer or change ownership of a location, and do not access any account the user does not already administer. Write operations are additionally restricted to users holding the owner or admin role inside musubo, and are gated by a server-side switch per environment.
 >
@@ -102,7 +102,7 @@
 >
 > より狭いスコープは存在しません。Google Business Profile APIには読み取り専用・口コミ専用・実績専用のスコープが公開されておらず、上記のすべてが `business.manage` だけで受け付けられます。
 >
-> 許可の扱い：認可リクエストで要求するのは `business.manage` と `openid`・`email` の3つだけで、`include_granted_scopes` は送りません。したがって保存するトークンに、その同意画面に出ていないスコープが含まれることはありません。Googleの同意画面では権限ごとにチェックを外せますが、「ビジネス情報の管理」が外れたままの場合は接続を保存せず、画面でその権限を付けたまま接続し直すよう案内します。同じ確認はアクセストークンの更新時にも行うので、後からGoogleアカウント側で権限を取り消した場合も、黙って失敗するのではなく「再連携が必要」という状態として表示します。
+> 許可の扱い：認可リクエストで要求するのは `business.manage` と `openid`・`email` の3つだけで、`include_granted_scopes` は送りません。したがって保存するトークンに、その同意画面に出ていないスコープが含まれることはありません。Googleの同意画面では権限ごとに許可しないことを選べますが、「ビジネス情報の管理」が許可されないままの場合は接続を保存せず、画面でその権限を付けたまま接続し直すよう案内します。同じ確認はアクセストークンの更新時にも行うので、後からGoogleアカウント側で権限を取り消した場合も、黙って失敗するのではなく「再連携が必要」という状態として表示します。
 >
 > 店舗の新規作成・削除、オーナー権限の移転・変更、本人が管理していないアカウントへのアクセスは一切行いません。書き込みはmusubo内のオーナー／管理者の権限を持つ利用者に限られ、さらに環境ごとのサーバー側スイッチで制御しています。
 >
@@ -133,7 +133,8 @@ YouTube Studioへアップロードし、公開設定は**「限定公開（Unli
 **撮影当日に手元で見るのは `docs/manuals/google-business-demo-video-shoot-sheet.md`。** 下の台本を秒数つきの時間割にしてあり、英語字幕は `docs/manuals/google-business-demo-video-subtitles.srt` をYouTubeへそのまま上げられる（33行が下の手順と1対1で対応している）。
 
 - **管理画面の文言は日本語しかない。** 英語化の仕組みは入っていないので、画面は日本語のまま撮り、**英語の字幕（またはYouTubeの字幕ファイル）を必ず付ける**。レビュー担当は英語で読む
-- **ブラウザの表示言語を英語にする**（Googleの**許可画面だけ**は英語で出る。Chromeの設定→言語→Englishを一番上へ）。管理画面は日本語のまま
+- **Googleアカウントの表示言語を English にする**（Googleの**許可画面だけ**が英語で出る。`myaccount.google.com` →「個人情報」→「ウェブ向けの全般設定」→「言語」。ログイン中のGoogleのページはブラウザの言語設定を見ないため、Chromeの言語設定を変えても英語にならない）。管理画面は日本語のまま。撮影後に日本語へ戻す
+- **撮影前に `https://myaccount.google.com/connections` → musubo →「すべてのアクセス権を削除」を実行する**。管理画面側の「接続を解除」はトークンの取り消しだけで、Googleアカウント側の許可の記録は残る。残ったままだと許可画面が「`musubo already has some access`」の青い帯だけになり、**要求する許可の文言が1つも表示されず撮り直しになる**（詳細な手順は `docs/manuals/google-business-demo-video-shoot-sheet.md` の 1-B）
 - **アドレスバーを画面に入れる**。許可画面のURLに `client_id=` が写っている必要がある（**OAuthクライアントIDは動画に写ってよい。シークレットは絶対に写さない**）
 - ターミナル、他のタブ、秘密値が写る画面は閉じる
 - 実在する自分の店舗のGoogleアカウントを使う。返信の投稿と店舗情報の変更まで実演するので、**あとで元に戻せる口コミ・項目**を選ぶ（例：紹介文の末尾に1文足して、撮影後に戻す）
