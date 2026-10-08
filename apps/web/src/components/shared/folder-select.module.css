@@ -1,0 +1,154 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+/*
+ * ★V8 フォルダを選ぶ欄（dLffh・iBuZH）。値は globals.css の [data-theme="v8"] の --select-menu-*。
+ * 板（白い地・角丸・影）は select-menu が持つ。ここは点と「新しいフォルダ」の中身だけ。
+ */
+@layer components {
+
+/* 行の前のフォルダの色の点（8・角丸）。色の無いフォルダ・未分類は灰。 */
+.dot {
+  display: inline-block;
+  flex: none;
+  width: var(--select-menu-dot);
+  height: var(--select-menu-dot);
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-faint);
+}
+
+.panel {
+  display: flex;
+  box-sizing: border-box;
+  /* 板は幅 220（内側 10）。欄がもっと広いときは板の幅いっぱい。 */
+  width: 100%;
+  min-width: calc(var(--select-menu-panel-w) - var(--select-menu-panel-pad) * 2);
+  flex-direction: column;
+  gap: var(--select-menu-panel-gap);
+}
+
+.heading {
+  color: var(--color-ink-faint);
+  font-size: var(--select-menu-heading-size);
+  font-weight: 500;
+  line-height: var(--select-menu-item-line);
+  white-space: nowrap;
+}
+
+.field {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--select-menu-field-h);
+  padding: var(--select-menu-field-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--select-menu-item-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--select-menu-item-size);
+}
+
+.field::placeholder {
+  color: var(--color-ink-faint);
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: -1px;
+}
+
+.field[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.swatches {
+  display: flex;
+  align-items: center;
+  gap: var(--select-menu-swatch-gap);
+}
+
+.swatch {
+  box-sizing: border-box;
+  flex: none;
+  width: var(--select-menu-swatch);
+  height: var(--select-menu-swatch);
+  /* 全体の押せる物の最小の大きさ（base 層）に引き伸ばされない（絵は 18 の丸）。 */
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  scale: none;
+}
+
+.swatch[data-selected='true'] {
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: -1px;
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.swatch:disabled {
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--select-menu-button-size);
+  line-height: var(--select-menu-item-line);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--select-menu-swatch-gap);
+}
+
+.cancel,
+.primary {
+  box-sizing: border-box;
+  display: inline-flex;
+  height: var(--select-menu-button-h);
+  align-items: center;
+  border-radius: var(--select-menu-item-radius);
+  font-family: inherit;
+  font-size: var(--select-menu-button-size);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cancel {
+  padding: var(--select-menu-button-pad);
+  border: 1px solid var(--color-control-border);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-weight: 400;
+}
+
+.cancel:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.primary {
+  padding: var(--select-menu-button-pad-primary);
+  border: 0;
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-weight: 600;
+}
+
+.cancel:focus-visible,
+.primary:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.cancel:disabled,
+.primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+}
