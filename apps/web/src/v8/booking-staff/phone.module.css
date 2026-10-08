@@ -263,7 +263,7 @@
 .day[data-closed='true'] { background: var(--v8-liff-off); }
 
 .dow { color: var(--color-ink-faint); font-size: var(--text-nano); line-height: var(--tpl-bks-ph-dow-lh); }
-.num { color: var(--color-ink); font-size: var(--tpl-bks-ph-num-size); font-weight: 700; line-height: var(--tpl-bks-ph-num-lh); font-variant-numeric: tabular-nums; }
+.num { color: var(--color-ink); font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-bks-ph-num-lh); font-variant-numeric: tabular-nums; }
 .day[data-now='true'] .num { color: var(--v8-liff-primary); }
 .day[data-closed='true'] .num { color: var(--v8-liff-idle); }
 .dayState { font-size: var(--tpl-bks-ph-state-size); line-height: var(--tpl-bks-ph-state-lh); font-weight: 600; }

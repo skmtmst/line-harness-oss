@@ -63,6 +63,7 @@
   min-height: var(--tpl-ev-row-h);
 }
 .headRow {
+  min-height: calc(var(--tpl-ev-row-h) - var(--tpl-compact-gap) - var(--tpl-wh-ops-gap));
   background: var(--color-surface-pearl);
   box-shadow: var(--shadow-row-line);
   color: var(--color-ink-secondary);

@@ -257,11 +257,11 @@ function ChangeReview({ eventId }: { eventId: string }) {
           <div className={styles.pair}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="ev-cr-start">開始日時</label>
-              <DateTimeField id="ev-cr-start" value={activeEdit.startsAt} onChange={(next) => updateActive({ startsAt: next })} />
+              <DateTimeField size="compact" id="ev-cr-start" value={activeEdit.startsAt} onChange={(next) => updateActive({ startsAt: next })} />
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="ev-cr-end">終了日時</label>
-              <DateTimeField id="ev-cr-end" value={activeEdit.endsAt} onChange={(next) => updateActive({ endsAt: next })} />
+              <DateTimeField size="compact" id="ev-cr-end" value={activeEdit.endsAt} onChange={(next) => updateActive({ endsAt: next })} />
             </div>
           </div>
           <div className={styles.pair}>
