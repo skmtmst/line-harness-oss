@@ -1518,6 +1518,19 @@
   --tpl-inbox-line-top: inset 0 1px 0 var(--color-hairline);    /* 上の線 */
   --tpl-inbox-line-right: inset -1px 0 0 var(--color-hairline);  /* 右の線 */
   --tpl-inbox-line-bottom-soft: inset 0 -1px 0 var(--color-divider); /* 行の間の薄い線 */
+  /* B-6 添付（M0393「7. 添付」I7Skn）：左下のクリップ・小窓・書く欄の上の札・会話の中の動画とファイル */
+  --tpl-inbox-attach-btn: 32px;           /* クリップの四角（白地・薄い枠・角丸10） */
+  --tpl-inbox-attach-btn-radius: 10px;
+  --tpl-inbox-attach-icon: 16px;          /* クリップ・小窓の印 */
+  --tpl-inbox-attach-pop-w: 290px;        /* 小窓の幅 */
+  --tpl-inbox-attach-pop-pad: 6px;        /* 小窓の内側 */
+  --tpl-inbox-attach-item-pad: 10px 12px; /* 小窓の1行の内側 */
+  --tpl-inbox-attach-item-gap: 10px;      /* 印と文の間 */
+  --tpl-inbox-attach-chip-pad: 6px 6px 6px 10px; /* 書く欄の上の札の内側 */
+  --tpl-inbox-attach-chip-max: 100%;      /* 札は書く欄の幅まで */
+  --tpl-inbox-sent-video-w: 260px;        /* 会話の中の動画の幅 */
+  --tpl-inbox-sent-file-w: 260px;         /* 会話の中のファイルの札の幅 */
+  --tpl-inbox-info-card-pad: 16px;        /* 右の欄の顧客情報の枠の内側（XqSvX） */
 }
 
 /*
