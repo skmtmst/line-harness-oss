@@ -43,6 +43,7 @@ import { pruneCondition } from '@/lib/segment-condition'
 import { CreatePage } from '@/components/templates'
 import Stepper from '@/components/shared/stepper'
 import Select from '@/components/shared/select'
+import { TimeField } from '@/components/shared/date-time-field'
 import SegmentedControl from '@/components/shared/segmented'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -78,8 +79,8 @@ type ContentMode = 'compose' | 'template'
 const TIME_RE = /^\d{2}:\d{2}$/
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 const pad2 = (n: number) => String(n).padStart(2, '0')
-/** 時刻の候補は30分きざみ。保存済みの半端な時刻（10:15 など）は候補に足して残す。 */
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => `${pad2(Math.floor(i / 2))}:${i % 2 ? '30' : '00'}`)
+/** 時刻の分は30分きざみ。保存済みの半端な時刻（10:15 など）は時刻の欄が分の列に足して残す。 */
+const TIME_MINUTE_STEP = 30
 /** 日数の候補。保存済みの大きい日数は候補に足して残す。 */
 const DAY_OPTIONS = Array.from({ length: 61 }, (_, i) => String(i))
 
@@ -533,9 +534,6 @@ export default function ScenarioFirstStepV8() {
     },
   ]
   const dayOptions = DAY_OPTIONS.includes(String(offsetDays)) ? DAY_OPTIONS : [...DAY_OPTIONS, String(offsetDays)]
-  const timeOptions = !deliveryTime || TIME_OPTIONS.includes(deliveryTime)
-    ? TIME_OPTIONS
-    : [...TIME_OPTIONS, deliveryTime].sort()
 
   return (
     <CreatePage
@@ -642,12 +640,12 @@ export default function ScenarioFirstStepV8() {
             <>
               <span className={styles.whenText}>日後の</span>
               <span className={styles.whenSelectTime}>
-                <Select
+                {/* ★V8 の時刻の欄（打つ＋時と分の2列・提案 YCOoR）。絵 V6xAo・U5rxyH は幅140。 */}
+                <TimeField
                   value={deliveryTime}
                   onChange={setDeliveryTime}
                   aria-label="配信する時刻"
-                  width={100}
-                  options={[...(deliveryTime ? [] : [{ value: '', label: '時刻を選ぶ' }]), ...timeOptions.map((t) => ({ value: t, label: t }))]}
+                  minuteStep={TIME_MINUTE_STEP}
                 />
               </span>
             </>
