@@ -53,9 +53,19 @@ describe('MJoJR メニュー管理', () => {
     openMenu('秋の鹿肉コース')
     fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
     fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '9900' } })
-    fireEvent.change(screen.getByLabelText('新しい価格の開始日時'), { target: { value: '2099-10-10T09:00' } })
+    // 開始日時は共通の日時の欄（打つ・暦と時刻から選ぶ）。来月10日を選ぶと時刻は 10:00 で決まる。
+    const next = new Date()
+    next.setDate(1)
+    next.setMonth(next.getMonth() + 1)
+    const ymd = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-10`
+    fireEvent.click(screen.getByLabelText('新しい価格の開始日時'))
+    const picker = screen.getByRole('dialog', { name: '日時を選ぶ' })
+    fireEvent.click(within(picker).getByRole('button', { name: '日付' }))
+    fireEvent.click(screen.getByRole('button', { name: '次の月' }))
+    fireEvent.click(screen.getAllByRole('button').find((b) => (b.getAttribute('aria-label') ?? '').startsWith(`${next.getFullYear()}年${next.getMonth() + 1}月10日`))!)
+    fireEvent.click(within(screen.getByRole('dialog', { name: '日時を選ぶ' })).getByRole('button', { name: '閉じる' }))
     fireEvent.click(screen.getByRole('button', { name: /保存して申請する/ }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ price: 9900, effectiveAt: new Date('2099-10-10T09:00').toISOString() })))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ price: 9900, effectiveAt: new Date(`${ymd}T10:00`).toISOString() })))
   })
 
   it('停止は確認の窓（MV5Os）を通って保管にする', async () => {

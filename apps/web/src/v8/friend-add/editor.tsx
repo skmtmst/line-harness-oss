@@ -37,7 +37,7 @@ import {
   Workflow,
 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
 import Stepper, { type StepperStep } from '@/components/shared/stepper'
@@ -53,6 +53,7 @@ import Select from '@/components/shared/select'
 import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } from '@/components/shared/folder-select'
 import SegmentedControl from '@/components/shared/segmented'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import Toggle from '@/components/shared/toggle'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -202,6 +203,8 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const requestedStep = searchParams.get('step') as Step | null
   const step: Step = STEPS.some((item) => item.key === requestedStep) ? requestedStep! : 'basic'
   usePageTitle('初回案内を作る')
+  /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
+  usePageCrumbs([{ label: '友だち追加時の配信', href: '/friend-add-settings' }])
   const [rule, setRule] = useState<EditorRule>({
     name: '', folderName: null, priority: 1, friendKind: 'first_time', isFallback: false,
     status: 'draft', matchedLast7Days: null, lastTestStatus: null, version: 0,
@@ -963,22 +966,20 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
           <div className={styles.datePair}>
             <div className={styles.field}>
               <label htmlFor="fa-from" className={styles.label}>有効期間 はじめ</label>
-              <TextField
+              <DateTimeField
                 id="fa-from"
-                type="datetime-local"
                 value={localInputValue(definition.activeFrom)}
                 readOnly={!canEdit}
-                onChange={(event) => setDefinition((current) => ({ ...current, activeFrom: event.target.value || null }))}
+                onChange={(next) => setDefinition((current) => ({ ...current, activeFrom: next || null }))}
               />
             </div>
             <div className={styles.field}>
               <label htmlFor="fa-until" className={styles.label}>有効期間 おわり</label>
-              <TextField
+              <DateTimeField
                 id="fa-until"
-                type="datetime-local"
                 value={localInputValue(definition.activeUntil)}
                 readOnly={!canEdit}
-                onChange={(event) => setDefinition((current) => ({ ...current, activeUntil: event.target.value || null }))}
+                onChange={(next) => setDefinition((current) => ({ ...current, activeUntil: next || null }))}
               />
             </div>
           </div>
@@ -1179,20 +1180,18 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             )}
             {(definition.timeWindows ?? []).map((slot, index) => (
               <div key={index} className={styles.timeRow}>
-                <TextField
-                  type="time"
+                <TimeField
                   aria-label={`時間帯${index + 1}の開始`}
                   value={slot.start}
                   readOnly={!canEdit}
-                  onChange={(event) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: event.target.value }) }))}
+                  onChange={(next) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: next }) }))}
                 />
                 <span aria-hidden="true">〜</span>
-                <TextField
-                  type="time"
+                <TimeField
                   aria-label={`時間帯${index + 1}の終了`}
                   value={slot.end}
                   readOnly={!canEdit}
-                  onChange={(event) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { end: event.target.value }) }))}
+                  onChange={(next) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { end: next }) }))}
                 />
                 {canEdit ? (
                   <Button type="button" variant="text" aria-label={`時間帯${index + 1}を削除`} onClick={() => setDefinition((current) => ({ ...current, timeWindows: removeTimeWindow(current.timeWindows, index) }))}>削除</Button>

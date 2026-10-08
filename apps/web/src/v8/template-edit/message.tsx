@@ -483,8 +483,6 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         boardId={boardId}
         title={title}
         description={description}
-        backHref={host?.backHref}
-        onBack={host?.onCancel}
         band={conflict ? (
           <div className={styles.band} role="alert" data-design-node="NCbYn">
             <CircleAlert size={18} aria-hidden="true" className={styles.bandIcon} />
