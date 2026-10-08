@@ -638,7 +638,7 @@ export async function runFormAction(
       const content = await expandSendCommonVars(
         db, template.message_content,
         { kind: 'form_reply', id: input.formId ?? input.idempotencyPrefix ?? friendId },
-        { friendId },
+        { friendId, messageType: template.message_type },
       );
       if (template.message_type === 'text') {
         if (content) {
