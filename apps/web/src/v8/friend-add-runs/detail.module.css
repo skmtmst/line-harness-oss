@@ -3,8 +3,6 @@
  * 頭の下に線 → 左（余白24/28・間16）と右の欄（380・余白24・間14・左に線）。
  * 値は app/globals.css の --tpl-fm2-rd-*。白い板が 1100px を切ったら右の欄を左の下へ畳む。
  */
-.backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }
-
 .split {
   display: flex;
   flex: 1;
@@ -42,7 +40,8 @@
   flex-direction: column;
   gap: var(--tpl-fm2-rd-card-gap);
   padding: var(--tpl-fm2-rd-card-pad);
-  border: 1px solid var(--color-hairline);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
   border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
@@ -66,11 +65,12 @@
   align-items: center;
   gap: var(--tpl-fm2-rd-step-gap);
   padding: var(--tpl-fm2-rd-step-pad);
-  border: 1px solid var(--color-hairline);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
   border-radius: var(--radius-control);
 }
 
-.step[data-state='ng'] { border-color: transparent; background: var(--color-danger-bg); }
+.step[data-state='ng'] { outline-color: transparent; background: var(--color-danger-bg); }
 .stepIcon { flex-shrink: 0; width: var(--tpl-fm2-rd-step-icon); height: var(--tpl-fm2-rd-step-icon); color: var(--color-accent-deep); }
 .step[data-state='ng'] .stepIcon { color: var(--color-danger); }
 .step[data-state='wait'] .stepIcon { color: var(--color-ink-faint); }
@@ -101,7 +101,8 @@
   flex-direction: column;
   gap: var(--tpl-fm2-rd-box-gap);
   padding: var(--tpl-fm2-rd-box-pad);
-  border: 1px solid var(--color-hairline);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
   border-radius: var(--radius-card);
 }
 

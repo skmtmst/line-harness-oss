@@ -2,7 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import FolderPanel, { type FolderPanelRow } from './folder-panel'
+import FolderPanel, { CollapsedFolderActions, type FolderPanelRow } from './folder-panel'
 
 let host: HTMLDivElement
 let root: Root
@@ -79,4 +79,29 @@ describe('V8 フォルダの列の共通の印（faSbC）', () => {
     const { button } = await render({ id: 'all', kind: 'all', label: 'すべて', count: 1, color: 'red' })
     expect((button.querySelector('.v7-only') as HTMLElement).style.backgroundColor).toBe('red')
   })
+})
+
+describe('フォルダの行ごとに追加する操作', () => {
+  it('追加操作だけの行にもメニューを出し、先頭に置いて今の操作と区切る', async () => {
+    const distribute = vi.fn()
+    await render({ id: 'test', label: 'テスト', count: 1, leadingActions: [{ id: 'send', label: 'このフォルダを配る', emphasis: true, onSelect: distribute }], onEdit: vi.fn() })
+    await act(async () => (host.querySelector('[aria-label="フォルダ「テスト」の操作"]') as HTMLButtonElement).click())
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 100)))
+    const items = [...document.querySelectorAll('[role="menuitem"]')]
+    expect(items[0].textContent).toBe('このフォルダを配る')
+    expect(items[0].querySelector('strong')).not.toBeNull()
+    expect(items[1].parentElement?.querySelector('hr')).not.toBeNull()
+    await act(async () => (items[0] as HTMLButtonElement).click())
+    expect(distribute).toHaveBeenCalledTimes(1)
+  })
+  it('畳んだフォルダにも同じ追加操作のメニューを出す', async () => {
+    const send = vi.fn()
+    await act(async () => root.render(<CollapsedFolderActions row={{ id: 'none', label: '未分類', count: 1,
+      leadingActions: [{ id: 'send', label: 'このフォルダを配る', onSelect: send }] }} />))
+    await act(async () => (host.querySelector('[aria-label="フォルダ「未分類」の操作"]') as HTMLButtonElement).click())
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 100)))
+    await act(async () => (document.querySelector('[role="menuitem"]') as HTMLButtonElement).click())
+    expect(send).toHaveBeenCalledTimes(1)
+  })
+
 })

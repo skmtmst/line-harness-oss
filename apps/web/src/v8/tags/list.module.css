@@ -650,3 +650,6 @@
   flex-basis: 100%;
   margin-bottom: var(--tpl-tg2-band-after);
 }
+
+/* 統括だけ、共通の配る操作の場所を表の列として確保する。 */
+.colDistribute { width: var(--tpl-hq-attribute-distribute-col); text-align: left; }

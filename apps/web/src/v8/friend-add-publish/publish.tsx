@@ -13,7 +13,6 @@
  * 公開したときの数をそのまま出す。`?done=1` は作る⑤（編集画面）から有効にして来たとき。
  */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CircleAlert, CircleCheck, Power, Send, Smartphone } from 'lucide-react'
 import type { FriendAddRoutingValidation } from '@line-crm/shared'
@@ -350,7 +349,6 @@ function FriendAddPublish() {
     <CreatePage
       boardId="U8Xm3X"
       title="初回案内を作る"
-      identity={<Link href="/friend-add-settings" className={styles.backLink}>← 友だち追加時の配信へ</Link>}
       steps={(
         <Steps
           label="初回案内の作る手順"

@@ -23,6 +23,7 @@ import {
   Eye,
   FilePen,
   Inbox,
+  KeyRound,
   Pause,
   Play,
   Plus,
@@ -49,7 +50,12 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Disclosure from '@/components/shared/disclosure'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
+import StatusBadge from '@/components/shared/status-badge'
+import Card from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder'
@@ -84,6 +90,7 @@ import {
   type EditForm,
 } from './dialogs'
 import { notifyToast } from '@/components/shared/toast'
+import { focusConversionField, type ConversionFieldIssue } from './field-issue'
 import styles from './list.module.css'
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
@@ -191,10 +198,9 @@ function usageLines(point: ConversionDefinitionListItem): { main: string; sub: s
 
 function StatePill({ point }: { point: ConversionDefinitionListItem }) {
   return (
-    <span className={styles.pill} data-tone={point.state === 'active' ? 'active' : point.state === 'invalid' || point.state === 'sourceStopped' ? 'warn' : 'neutral'}>
-      <span className={styles.pillDot} aria-hidden="true" />
+    <StatusBadge tone={point.state === 'active' ? 'success' : point.state === 'invalid' || point.state === 'sourceStopped' ? 'warning' : 'neutral'}>
       {STATE_LABELS[point.state] ?? STATE_LABELS.active}
-    </span>
+    </StatusBadge>
   )
 }
 
@@ -293,6 +299,10 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const [editForm, setEditForm] = useState<EditForm | null>(null)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
+  const [editFieldIssue, setEditFieldIssue] = useState<ConversionFieldIssue | null>(null)
+  useEffect(() => {
+    if (editFieldIssue) focusConversionField(editFieldIssue.field)
+  }, [editFieldIssue])
   const [editValueModeNotice, setEditValueModeNotice] = useState<string | null>(null)
   const [publishing, setPublishing] = useState(false)
   const [ingestBusy, setIngestBusy] = useState<'' | 'issue' | 'toggle'>('')
@@ -430,29 +440,35 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       setEditValueModeNotice(null)
     }
     setEditError('')
+    setEditFieldIssue(null)
   }
 
   /* 編集を送る。開いたときの版をそのまま渡し、409 は上書きせずに読み直しを促す。 */
   const submitEdit = async () => {
     if (!editTarget || !editForm || editSaving || !canEdit) return
+    const invalid = (field: string, message: string) => {
+      setEditError('')
+      setEditFieldIssue({ field, message })
+    }
     const name = editForm.name.trim()
-    if (!name) { setEditError('名前を入れてください'); return }
+    if (!name) { invalid('cv-edit-name', '名前を入れてください'); return }
     if (!originInfoOf(editForm.sourceType).valueModes.includes(editForm.valueMode)) {
-      setEditError('この起点には注文の金額が無いため、金額の決め方を選び直してください')
+      invalid('cv-edit-value-mode', 'この起点には注文の金額が無いため、金額の決め方を選び直してください')
       return
     }
-    if (editForm.valueMode === 'fixed' && !editForm.fixedValue.trim()) { setEditError('1件あたりの金額を入れてください'); return }
-    if (editForm.deduplicationMode === 'window' && !editForm.deduplicationWindowDays.trim()) { setEditError('数えない日数を入れてください'); return }
-    if (editForm.sourceType === 'url_reach' && !editForm.targetUrl.trim()) { setEditError('数えてよいページを入れてください'); return }
+    if (editForm.valueMode === 'fixed' && !editForm.fixedValue.trim()) { invalid('cv-edit-value', '1件あたりの金額を入れてください'); return }
+    if (editForm.deduplicationMode === 'window' && !editForm.deduplicationWindowDays.trim()) { invalid('cv-edit-window', '数えない日数を入れてください'); return }
+    if (editForm.sourceType === 'url_reach' && !editForm.targetUrl.trim()) { invalid('cv-edit-url', '数えてよいページを入れてください'); return }
     if (editForm.attributionDays.trim()
       && (!Number.isInteger(Number(editForm.attributionDays))
         || Number(editForm.attributionDays) < 1 || Number(editForm.attributionDays) > 365)) {
-      setEditError('計測期間は1〜365日で入れてください（空欄なら既定の90日です）')
+      invalid('cv-edit-days', '計測期間は1〜365日で入れてください（空欄なら既定の90日です）')
       return
     }
-    if (editForm.exclusionMemo.trim().length > 500) { setEditError('数えない条件のメモは500文字以内で入力してください'); return }
+    if (editForm.exclusionMemo.trim().length > 500) { invalid('cv-edit-memo', '数えない条件のメモは500文字以内で入力してください'); return }
     const exclusionIssue = findConditionDraftIssue(editForm.exclusion)
-    if (exclusionIssue) { setEditError(exclusionIssue); return }
+    if (exclusionIssue) { invalid('cv-edit-exclusion', exclusionIssue); return }
+    setEditFieldIssue(null)
     setEditSaving(true)
     setEditError('')
     try {
@@ -782,7 +798,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
 
   /* ===== 道具の段 ===== */
   /* 1152 の板（BygrU）は札を2つ（動いている・止めている）だけ。ほかの状態は「よく使う絞り込み」から選ぶ。 */
-  const chipList = narrow ? CHIPS.slice(0, 2) : CHIPS
+  const chipList = narrow || (role !== null && !canEdit) ? CHIPS.slice(0, 2) : CHIPS
   const filterChips = (
     <div role="group" aria-label="状態で絞り込む">
       {chipList.map((chip) => {
@@ -811,10 +827,14 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       <Select
         aria-label="よく使う絞り込み"
         value={status === 'all' ? '' : status}
-        onChange={(value) => setStatus((value || 'all') as StatusFilter)}
+        onChange={(value) => {
+          if (value.startsWith('sort:')) setSort(value.slice(5) as PointSort)
+          else setStatus((value || 'all') as StatusFilter)
+        }}
         options={[
           { value: '', label: 'よく使う絞り込み' },
           ...CHIPS.map((chip) => ({ value: chip.value, label: `${chip.label}だけ` })),
+          ...(role !== null && !canEdit ? SORT_OPTIONS.map((option) => ({ value: `sort:${option.value}`, label: `並び：${option.label}` })) : []),
         ]}
       />
     </div>
@@ -846,12 +866,12 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     </div>
   )
   const wideToolbar = (
-    <div className={styles.wideTools}>
+    <div className={`${styles.wideTools} ${role !== null && !canEdit ? styles.viewerTools : ''}`}>
       {notice}
       <ListToolbar
         search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', width: 240, value: query, onChange: setQuery }}
         filters={filterChips}
-        trailing={<>{savedBox}{sortBox}{perPageBox}</>}
+        trailing={<>{savedBox}{canEdit || role === null ? sortBox : null}{perPageBox}</>}
       />
     </div>
   )
@@ -865,11 +885,21 @@ function ConversionList({ accountId }: { accountId: string | null }) {
 
   /* ===== 表の下の小窓（詳細・止める） ===== */
   const detailCard = panelPoint ? (
-    <section className={styles.panel} aria-label="詳細の小窓">
-      <h2 className={styles.panelTitle}>{`詳細の小窓：${panelPoint.name}`}</h2>
+    <Card variant="panel" aria-label="詳細の小窓">
+      <div className={styles.panelHead}>
+        <h2 className={styles.panelTitle}>{`詳細の小窓：${panelPoint.name}`}</h2>
+        <RowMenu className={styles.panelMore} label={`詳細「${panelPoint.name}」のその他の操作`} size="row" items={[
+          ...(canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.ingest.configured && panelPoint.status !== 'stopped' ? [{
+            id: 'toggle-ingest', label: panelPoint.ingest.disabledAt ? '受け口を再開する' : '受け口を止める',
+            disabled: ingestBusy !== '', onSelect: () => void toggleIngest(panelPoint),
+          }] : []),
+          { id: 'events', label: '中身を見る', onSelect: () => setDetailTarget(panelPoint) },
+          { id: 'close', label: '閉じる', onSelect: () => setPanelId(null) },
+        ]} />
+      </div>
       <p className={styles.panelLine}>
         <StatePill point={panelPoint} />
-        <span>{`${sourceTriggerLabel(panelPoint)}・${deduplicationLabel(panelPoint.deduplicationMode, panelPoint.deduplicationWindowDays)}`}</span>
+        <span title={sourceTriggerLabel(panelPoint)}>{`${shortTrigger(panelPoint)}・${rowSub(panelPoint)}`}</span>
       </p>
       <p className={styles.panelText}>{`使われている場所：${usageLabel(panelPoint)}`}</p>
       {panelPoint.measureMethod === 'webhook' ? (
@@ -883,31 +913,26 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       {ingestError ? <p className={styles.errorText} role="alert">{ingestError}</p> : null}
       <div className={styles.panelButtons}>
         {canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.status !== 'stopped' ? (
-          <Button onClick={() => void issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています">鍵を発行する</Button>
-        ) : null}
-        {canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.ingest.configured && panelPoint.status !== 'stopped' ? (
-          <Button onClick={() => void toggleIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'toggle'} busyLabel="切り替えています">
-            {panelPoint.ingest.disabledAt ? '受け口を再開する' : '受け口を止める'}
-          </Button>
+          <Button onClick={() => void issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています"><KeyRound size={15} aria-hidden="true" />鍵を発行する</Button>
         ) : null}
         {canEdit && panelPoint.status !== 'stopped' ? <Button onClick={() => openEdit(panelPoint)}>編集する</Button> : null}
         {canEdit && panelPoint.state === 'draft' ? (
           <Button onClick={() => void publishDraft(panelPoint)} disabled={publishing} busy={publishing} busyLabel="公開しています">公開する</Button>
         ) : null}
-        {canEdit && panelPoint.status !== 'stopped' && panelPoint.state !== 'draft' ? (
-          <Button onClick={() => void openStop(panelPoint, 'stop')}><CirclePause size={15} aria-hidden="true" />止める</Button>
-        ) : null}
-        {canEdit && panelPoint.status !== 'stopped' ? <Button variant="danger" onClick={() => void openStop(panelPoint, 'delete')}>削除する</Button> : null}
-        <Button onClick={() => setDetailTarget(panelPoint)}>中身を見る</Button>
-        <Button variant="text" onClick={() => setPanelId(null)}>閉じる</Button>
       </div>
-    </section>
+      {canEdit && panelPoint.status !== 'stopped' ? (
+        <div className={styles.panelButtons}>
+          {panelPoint.state !== 'draft' ? <Button onClick={() => void openStop(panelPoint, 'stop')}><Pause size={15} aria-hidden="true" />止める</Button> : null}
+          <Button variant="danger" onClick={() => void openStop(panelPoint, 'delete')}>削除する</Button>
+        </div>
+      ) : null}
+    </Card>
   ) : null
 
   const stopCard = stopTarget ? (
-    <section className={styles.panel} aria-label="止めるときの小窓">
-      <h2 className={styles.panelTitle}>{`「${stopTarget.name}」を止める`}</h2>
-      <p className={styles.panelText}>
+    <Card variant="panel" aria-label="止めるときの小窓">
+      <h2 className={styles.panelTitle} title={`対象：${stopTarget.name}`}>止めるときの小窓（3択）</h2>
+      <p className={styles.stopDescription}>
         {stopImpactLoading
           ? '利用先と影響を読み込んでいます。'
           : stopImpact
@@ -916,14 +941,15 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       </p>
       <RadioCardGroup legend="どうしますか？">
         <RadioCard
+          variant="row"
           name="conversion-v8-stop-action"
           value="stop"
           checked={stopAction === 'stop'}
           onChange={() => setStopAction('stop')}
           title="止める（使う所の計測も止まる）"
-          note="これから先は数えません。過去の記録と分析は残します。"
         />
         <RadioCard
+          variant="row"
           name="conversion-v8-stop-action"
           value="replace"
           checked={stopAction === 'replace'}
@@ -931,9 +957,9 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           disabled={!stopImpact?.replacementCandidates.length}
           disabledReason="差し替え先の成果地点がありません"
           title="別の成果地点に差し替えてから止める"
-          note="利用先を別の成果地点へ切り替え、過去の数字を残します。"
         />
         <RadioCard
+          variant="row"
           name="conversion-v8-stop-action"
           value="delete"
           checked={stopAction === 'delete'}
@@ -941,7 +967,6 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           disabled={!stopImpact?.canDelete}
           disabledReason="成果または利用先があるため、物理削除は選べません。"
           title="削除する（使われていないときだけ選べる）"
-          note={stopImpact?.canDelete ? '成果0件・利用先0件のため、この成果地点だけを削除できます。' : '成果または利用先があるため、物理削除は選べません。'}
         />
       </RadioCardGroup>
       {stopAction === 'replace' ? (
@@ -957,17 +982,15 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           />
         </div>
       ) : null}
-      <label className={styles.fieldBox}>
-        <span className={styles.fieldLabel}>理由（必須）</span>
-        <input
+      <Field label="理由（必須）" htmlFor="cv-stop-reason">
+        <TextField
           aria-label="止める理由"
-          className={styles.reasonInput}
           value={stopReason}
           maxLength={500}
           placeholder="計測の仕方を変えるため"
           onChange={(event) => setStopReason(event.target.value)}
         />
-      </label>
+      </Field>
       {stopError ? <p className={styles.errorText} role="alert">{stopError}</p> : null}
       <div className={styles.panelActions}>
         <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
@@ -981,7 +1004,13 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           {stopAction === 'delete' ? '削除する' : '止める'}
         </Button>
       </div>
-    </section>
+      <Disclosure title="操作の影響を確認する" size="compact">
+        <p className={styles.panelText}>対象：{stopTarget.name}</p>
+        <p className={styles.panelText}>止める：これから先は数えません。過去の記録と分析は残します。</p>
+        <p className={styles.panelText}>差し替える：利用先を別の成果地点へ切り替え、過去の数字を残します。</p>
+        <p className={styles.panelText}>削除する：成果0件・利用先0件のときに、この成果地点だけを削除できます。</p>
+      </Disclosure>
+    </Card>
   ) : null
 
   /* ===== 表 ===== */
@@ -990,10 +1019,12 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     listBody = <ListSkeleton />
   } else if (loadFailed) {
     listBody = (
-      <div className={styles.stateBox}>
-        <Notice tone="warn" action={<Button variant="text" onClick={() => void load()}>もう一度試す</Button>}>成果地点を読み込めませんでした</Notice>
-        <p className={styles.stateNote}>数の帯は「—」です。検索や絞り込みはそのまま使えます（条件を変えてから試し直せます）。</p>
-      </div>
+      <ListState
+        kind="error"
+        title="成果地点を読み込めませんでした"
+        description="数の帯は「—」です。検索や絞り込みはそのまま使えます（条件を変えてから試し直せます）。"
+        onRetry={() => void load()}
+      />
     )
   } else if (shown.length === 0) {
     /* 修正案 D-2：空の一覧。 */
@@ -1016,7 +1047,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
             <Notice tone="warn">一覧は先頭5000個までを表示しています。これより後ろの成果地点は検索や絞り込みで範囲を分けて確認してください。</Notice>
           </div>
         ) : null}
-        <div className={`${styles.tableWrap} ${narrow ? styles.tableWrapNarrow : ''}`}>
+        <div className={`${styles.tableWrap} ${narrow ? styles.tableWrapNarrow : role !== null && !canEdit ? styles.tableWrapViewer : ''}`}>
           <DataTable className={styles.table}>
             <TableHead />
             <tbody>
@@ -1036,7 +1067,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                   >
                     <Td className={styles.colName}>
                       {/* 名前の前にフォルダの丸（成果地点はまだフォルダの口が無いので未分類の輪）。札は名前の頭にそろえる。 */}
-                      <FolderDotName folder={null}>
+                      <FolderDotName folder={null} dot={!narrow}>
                       <button
                         type="button"
                         className={styles.nameButton}
@@ -1048,7 +1079,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                         {point.name}
                       </button>
                       </FolderDotName>
-                      <span className={styles.pillIndent}><StatePill point={point} /></span>
+                      <span className={narrow ? undefined : styles.pillIndent}><StatePill point={point} /></span>
                     </Td>
                     <Td className={styles.colTrigger}>
                       <span className={styles.cellMain} title={sourceTriggerLabel(point)}>{shortTrigger(point)}</span>
@@ -1211,11 +1242,24 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           editTarget={editTarget}
           setEditTarget={setEditTarget}
           editForm={editForm}
-          setEditForm={setEditForm}
+          setEditForm={(next) => {
+            const changed = typeof next === 'function' ? next(editForm) : next
+            if (editFieldIssue && editForm && changed) {
+              const fieldKeys: Record<string, keyof EditForm> = {
+                'cv-edit-name': 'name', 'cv-edit-url': 'targetUrl', 'cv-edit-value-mode': 'valueMode',
+                'cv-edit-value': 'fixedValue', 'cv-edit-window': 'deduplicationWindowDays',
+                'cv-edit-days': 'attributionDays', 'cv-edit-memo': 'exclusionMemo', 'cv-edit-exclusion': 'exclusion',
+              }
+              const key = fieldKeys[editFieldIssue.field]
+              if (key && editForm[key] !== changed[key]) setEditFieldIssue(null)
+            }
+            setEditForm(changed)
+          }}
           editValueModeNotice={editValueModeNotice}
           setEditValueModeNotice={setEditValueModeNotice}
           editSaving={editSaving}
           editError={editError}
+          editFieldIssue={editFieldIssue}
           submitEdit={() => void submitEdit()}
         />
       </>}

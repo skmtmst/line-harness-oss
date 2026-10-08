@@ -156,3 +156,30 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     })
   }
 })
+
+describe('フォルダの配布口を出す範囲（G-7）', () => {
+  it('すべてと空フォルダには出さず、未分類と別種類だけ入ったフォルダにも出す', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    const onDistributeFolder = vi.fn()
+    await render({ rows: [ROWS[1]], folderContents: [ROWS[0], ROWS[1]], onDistributeFolder,
+      folders: [{ id: 'f-1', name: '別種類だけ', revision: 1 }, { id: 'f-empty', name: '空', revision: 1 }] })
+    expect(buttons().some((button) => button.getAttribute('aria-label') === 'フォルダ「すべて」の操作')).toBe(false)
+    const unfiled = buttons().find((button) => button.getAttribute('aria-label') === 'フォルダ「未分類」の操作')!
+    expect(unfiled).toBeTruthy()
+    await act(async () => unfiled.click())
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 100)))
+    const entry = document.querySelector('[role="menuitem"]') as HTMLButtonElement
+    expect(entry.textContent).toBe('このフォルダを配る')
+    expect(entry.querySelector('strong')).not.toBeNull()
+    await act(async () => entry.click())
+    expect(onDistributeFolder).toHaveBeenCalledWith('none', '未分類')
+    await act(async () => buttons().find((button) => button.getAttribute('aria-label') === 'フォルダ「空」の操作')!.click())
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 100)))
+    expect([...document.querySelectorAll('[role="menuitem"]')].some((item) => item.textContent === 'このフォルダを配る')).toBe(false)
+    delete document.documentElement.dataset.theme
+  })
+  it('閲覧のみにはフォルダの配布口を出さない', async () => {
+    await render({ canEdit: false, folderContents: ROWS, onDistributeFolder: vi.fn() })
+    expect(buttons().some((button) => button.getAttribute('aria-label')?.endsWith('の操作'))).toBe(false)
+  })
+})

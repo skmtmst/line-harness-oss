@@ -97,19 +97,25 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
     setBusy(true)
     setError('')
     const signature = `${friendId}:${scheduledAt}`
-    const result = await api.chats.schedule(
-      friendId,
-      { content: content.trim(), scheduledAt: `${scheduledAt}:00+09:00` },
-      keysRef.current.get(signature),
-    )
-    setBusy(false)
-    if (!result.success) {
-      setError(result.error || '予約できませんでした')
-      return
+    try {
+      const result = await api.chats.schedule(
+        friendId,
+        { content: content.trim(), scheduledAt: `${scheduledAt}:00+09:00` },
+        keysRef.current.get(signature),
+      )
+      if (!result.success) {
+        setError(result.error || '予約できませんでした')
+        return
+      }
+      keysRef.current.clear(signature)
+      onReserved()
+      onClose()
+    } catch {
+      // 結果が分からない失敗では鍵を残し、同じ予約の再試行を二重に作らない。
+      setError('予約できませんでした。通信状態を確認して、もう一度お試しください。')
+    } finally {
+      setBusy(false)
     }
-    keysRef.current.clear(signature)
-    onReserved()
-    onClose()
   }
 
   return (

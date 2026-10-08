@@ -1040,10 +1040,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.funnelTrack {
+.funnelMeasure {
+  position: relative;
   flex: 1 1 0;
-  height: var(--tpl-an-funnel-num);
   min-width: 0;
+}
+.funnelMeasure .funnelValue {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+}
+.funnelTrack {
+  display: block;
+  height: var(--tpl-an-funnel-num);
+  width: 100%;
   border-radius: var(--tpl-an-flow-track-radius);
   background: var(--color-surface-pearl);
 }
@@ -1128,7 +1138,6 @@
 .field[data-w='measure'] { width: var(--tpl-an-field-measure-w); }
 .field[data-w='axis'] { width: var(--tpl-an-field-axis-w); }
 .field[data-w='period'] { width: var(--tpl-an-field-period-w); }
-.saveSlot :global(p.text-ink-faint) { display: none; }
 .waitBox {
   display: flex;
   flex-direction: column;

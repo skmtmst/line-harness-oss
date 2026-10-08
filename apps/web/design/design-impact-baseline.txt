@@ -758,3 +758,7 @@ shared-button-importer v8/affiliate-offer-new/create.tsx
 # リッチビデオ編集も共通の保存・キャンセルを使う。
 shared-button-importer v8/template-edit/rich-video.tsx
 shared-button-importer v8/hq-templates/saved-distribution-dialog.tsx
+shared-button-importer v8/hq-templates/attribute-distribution.tsx
+shared-button-importer v8/hq-templates/attributes.tsx
+shared-button-importer v8/hq-templates/folder-distribution-dialog.tsx
+shared-button-importer v8/hq-templates/folder-distribution-result.tsx

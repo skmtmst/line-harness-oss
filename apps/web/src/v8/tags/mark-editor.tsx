@@ -41,8 +41,9 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useCanManageSupportMark } from '@/components/friend-fields/support-mark-permissions'
 import SupportMarkRulesPanel from '@/components/friend-fields/support-mark-rules-panel'
 import { EVENT_LABELS, eventLabel, inExecutionOrder } from '@/components/friend-fields/support-mark-rules-view'
-import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
+import { AttributeKindGuide, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list'
+import MarkBasicFields from './mark-basic-fields'
 import styles from './create.module.css'
 
 const COLORS = [
@@ -461,32 +462,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
         {hideForm ? null : (
           <>
-            <section className={styles.card} aria-labelledby="mark-basic">
-              <div className={styles.cardHead}><h2 className={styles.cardTitle} id="mark-basic">基本</h2></div>
-              <label className={styles.field}>
-                <span className={styles.label}>マーク名</span>
-                <Field error={nameError}><TextField ref={nameRef} aria-label="マーク名" value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例：要確認" /></Field>
-                <DuplicateNameNote duplicates={nameDuplicates} kindLabel="対応マーク" />
-              </label>
-              <div className={styles.colorField} role="group" aria-labelledby="mark-color">
-                <span className={styles.labelStrong} id="mark-color">色</span>
-                <span className={styles.colorRow}>
-                  {COLORS.map((item) => (
-                    <button
-                      key={item.value}
-                      type="button"
-                      onClick={() => setColor(item.value)}
-                      aria-label={item.name}
-                      title={item.name}
-                      aria-pressed={color.toLowerCase() === item.value.toLowerCase()}
-                      className={styles.colorSwatch}
-                      style={{ backgroundColor: item.value }}
-                    />
-                  ))}
-                </span>
-                <p className={styles.keyNote}>赤・オレンジ・緑・青・紫・グレー（色と名前の両方で見分ける）</p>
-              </div>
-            </section>
+            <MarkBasicFields name={name} color={color} onName={(value) => { setName(value); setNameError('') }} onColor={setColor} nameDuplicates={nameDuplicates} disabled={saving} error={nameError} nameRef={nameRef} />
 
             <section className={styles.card} aria-labelledby="mark-rules">
               <div className={styles.cardHead}>

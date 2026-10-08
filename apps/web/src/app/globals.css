@@ -552,6 +552,10 @@
  *     器の内側1pxの縁と、白いつまみの薄い影（同上）
  */
 [data-theme="v8"] {
+  /* 面の分け方（案A・JeINq／EFV8l）。タイルと見本の選択色。 */
+  --color-layout-picker-sample: #f1f2f4;
+  --color-layout-picker-sample-selected: #cfe9d8;
+  --color-layout-picker-selected: #e8f5ec;
   /* controls レーン：書き出しHTMLの線・成功・浮く色選びの値。 */
   --color-controls-swatch-line: #1d1d1f1f;
   --shadow-controls-primary: 0 1px 2px #087a3e40, 0 1px 0 #ffffff26;
@@ -661,6 +665,8 @@
   --tpl-hb-card-radius: 12px; --tpl-hb-mosaic-gap: 2px; --tpl-hb-mosaic-h: 120px; --tpl-hb-card-pad: 12px; --tpl-hb-title-lh: 19px; --tpl-hb-star: 24px; --tpl-hb-star-glyph: 16px;
   --tpl-hb-desc-gap: 6px; --tpl-hb-desc-gap-small: 4px; --tpl-hb-meta-gap: 4px; --tpl-hb-pill-gap: 5px; --tpl-hb-pill-pad: 2px 8px; --tpl-hb-pill-lh: 18px; --tpl-hb-dot: 6px;
   --tpl-hb-tile-h: 108px; --tpl-hb-tile-radius: 10px; --tpl-hb-tile-gap: 8px;
+  --tpl-hb-footer-inset: 24px; --tpl-hb-footer-margin: -24px; --tpl-hb-selection-margin: auto;
+  --tpl-hb-selection-outline: 2px solid var(--color-accent-deep); --tpl-hb-selection-inset: -2px; --tpl-hb-selection-outset: 2px;
   --tpl-hb-project-pad: 16px 24px 24px; --tpl-hb-project-gap: 16px; --tpl-hb-gallery-gap: 12px; --tpl-hb-project-tile-h: 120px; --tpl-hb-project-tile-gap: 6px; --tpl-hb-panel-w: 390px; --tpl-hb-band-pad: 10px 14px; --tpl-hb-pending-gap: 6px; --tpl-hb-pending-icon: 20px;
   --tpl-hb-stat-gap: 8px; --tpl-hb-stat-pad: 16px 20px; --tpl-hb-stat-icon-radius: 9px; --tpl-hb-stat-glyph: 14px; --tpl-hb-stat-lh: 18px; --tpl-hb-stat-unit-gap: 3px; --tpl-hb-stat-tracking: -0.5px; --tpl-hb-stat-number-lh: 26px;
   --tpl-hb-dialog-gap: 14px; --tpl-hb-dialog-pad: 24px; --tpl-hb-dialog-radius: 16px; --tpl-hb-dialog-edge: 16px; --tpl-hb-dialog-head-gap: 4px; --tpl-hb-dialog-title-size: 17px; --tpl-hb-dialog-title-lh: 25px; --tpl-hb-close-glyph: 16px; --tpl-hb-actions-pad: 6px; --tpl-hb-actions-pad-confirm: 11px; --tpl-hb-account-list-h: 258px; --tpl-hb-dialog-desc-lh: 18px;
@@ -2564,3 +2570,4 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-bcpick-focus: 2px;
   --tpl-bcpick-mobile-preview: 30dvh;
 }
+[data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }

@@ -3,12 +3,6 @@
  * 枠・頭・手順の輪・右の列・下の帯は型（CreatePage / PageHeading）が持つ。ここは段（カード）の中身だけ。
  */
 
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  font-size: var(--text-label);
-}
-
 .viewerBand {
   margin: 0;
   padding: var(--tpl-ro-band-pad);
