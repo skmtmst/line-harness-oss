@@ -13,7 +13,6 @@
  * （キー・名前・href をここで書き換えない）。API・権限も変えない。
  */
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import React, { useRef, useState } from 'react'
 import Notice from '@/components/shared/notice'
 import { canEditFeature } from '@/lib/staff-capability'
@@ -171,15 +170,14 @@ export function FriendsListHeadV8({
 }
 
 /**
- * 管理画面の「← 友だち一覧 › データ管理 › 今の画面」の段（sdbsQ）。
+ * 管理画面の「データ管理 › 今の画面」の段（sdbsQ）。友だち一覧へは上の帯のパンくずで戻る
+ * （段の頭の「← 友だち一覧」は 2026-10-08 に無くした）。
  * 右に同じ「データ管理 ▾」を置き、隣の管理画面へ直接移れるようにする。
  */
 export function FriendsManageNavV8({ current }: { current: string }) {
   return (
     <div className={styles.manageNav} data-friends-manage-nav="v8">
       <nav aria-label="データ管理の中の現在地" className={styles.manageCrumbs}>
-        <Link href="/friends">← 友だち一覧</Link>
-        <span className={styles.sep} aria-hidden="true">›</span>
         <span className={styles.group}>データ管理</span>
         <span className={styles.sep} aria-hidden="true">›</span>
         <span className={styles.here} aria-current="page">{current}</span>
