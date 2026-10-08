@@ -64,7 +64,7 @@ export function workflowMutationDb(db:D1Database,root:WorkflowStepRef,owner:stri
     }catch(error){await failWorkflowStep(db,ref,claimed.lease_owner!,{delayMs:0});throw error;}
   };
   const wrap=(sql:string,args:unknown[]=[]):D1PreparedStatement=>{
-    const classified=classifySingleStatement(sql),item=db.prepare(classified.sql);
+    const classified=classifySingleStatement(sql,{withAsMutation:true}),item=db.prepare(classified.sql);
     const proxy=new Proxy(item,{get(_target,key){
       if(key==='bind')return(...values:unknown[])=>wrap(classified.sql,values);
       if(key==='run')return async()=>(await execute([{sql:classified.sql,args}]))[0];
@@ -77,8 +77,8 @@ export function workflowMutationDb(db:D1Database,root:WorkflowStepRef,owner:stri
     if(key==='prepare')return wrap;
     if(key==='batch')return(items:D1PreparedStatement[])=>{
       const plan=items.map(item=>{const original=originals.get(item);if(!original)throw new Error('workflow_foreign_statement');return original});
-      if(plan.every(item=>classifySingleStatement(item.sql).readOnly))return Promise.all(plan.map(item=>read(item.sql,item.args,'all')));
-      if(plan.some(item=>classifySingleStatement(item.sql).readOnly))throw new Error('workflow_mixed_batch_unsupported');
+      if(plan.every(item=>classifySingleStatement(item.sql,{withAsMutation:true}).readOnly))return Promise.all(plan.map(item=>read(item.sql,item.args,'all')));
+      if(plan.some(item=>classifySingleStatement(item.sql,{withAsMutation:true}).readOnly))throw new Error('workflow_mixed_batch_unsupported');
       return execute(plan);
     };
     throw new Error(`workflow_database_api_unsupported:${String(key)}`);
