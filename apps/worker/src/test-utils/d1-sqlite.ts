@@ -39,6 +39,10 @@ function rewriteNumbered(sql: string, args: unknown[]): { sql: string; args: unk
   return { sql: rewritten, args: order.map((n) => args[n - 1]) }
 }
 
+/** Public methods stay promises; batch executes native statements without yielding between SQL writes. */
+function promiseMethod<T>(sync:()=>T):(()=>Promise<T>) & {sync:()=>T} {
+  return Object.assign(async()=>sync(),{sync});
+}
 function wrap(raw: Database.Database, sql: string, args: unknown[]) {
   const rewritten = rewriteNumbered(sql, args)
   sql = rewritten.sql
@@ -49,18 +53,22 @@ function wrap(raw: Database.Database, sql: string, args: unknown[]) {
     return a as never
   })
   return {
-    first: <T = unknown>(): T | null => {
+    first: promiseMethod(<T = unknown>(): T | null => {
       const row = raw.prepare(sql).get(...normalized)
       return (row as T) ?? null
-    },
-    all: <T = unknown>(): { results: T[] } => {
+    }),
+    all: promiseMethod(<T = unknown>(): { results: T[]; meta?: { changes:number; last_row_id:number } } => {
       const rows = raw.prepare(sql).all(...normalized)
+      if (/\bRETURNING\b/i.test(sql) && !/^\s*(SELECT|PRAGMA)/i.test(sql)) {
+        const meta=raw.prepare('SELECT changes() AS changes,last_insert_rowid() AS last_row_id').get() as {changes:number;last_row_id:number};
+        return {results:rows as T[],meta};
+      }
       return { results: rows as T[] }
-    },
-    run: () => {
+    }),
+    run: promiseMethod(() => {
       const info = raw.prepare(sql).run(...normalized)
       return { meta: { changes: info.changes, last_row_id: Number(info.lastInsertRowid) } }
-    },
+    }),
   }
 }
 
@@ -124,17 +132,21 @@ export function createTestD1(
            * 呼び出し側（使用先のまとめ集計など）が黙って壊れる。
            */
           const sql = (statement as unknown as { sql?: string }).sql ?? '';
+          const invoke=(method:'run'|'all')=>{
+            const callback=statement[method] as unknown as (()=>unknown) & {sync?:()=>unknown};
+            return callback.sync ? callback.sync() : callback.call(statement);
+          };
           if (!isSelect(sql)) {
-            const result=statement.run();results.push(result instanceof Promise?await result:result);
+            const result=invoke('run');results.push(result && typeof (result as Promise<unknown>).then==='function'?await result:result);
             continue;
           }
           try {
-            const result=statement.all();results.push(result instanceof Promise?await result:result);
+            const result=invoke('all');results.push(result && typeof (result as Promise<unknown>).then==='function'?await result:result);
           } catch (error) {
             if(!String((error as {message?:unknown})?.message).includes('does not return data'))throw error;
             // WITH x AS (...) INSERT ... のように WITH で始まる書き込みもある。
             // returnsData が無い文に .all() すると実行前に失敗するので .run() へ倒す。
-            const result=statement.run();results.push(result instanceof Promise?await result:result);
+            const result=invoke('run');results.push(result && typeof (result as Promise<unknown>).then==='function'?await result:result);
           }
         }
         raw.exec('COMMIT')
