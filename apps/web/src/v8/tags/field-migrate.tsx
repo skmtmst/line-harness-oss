@@ -13,7 +13,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ClipboardCheck, TriangleAlert } from 'lucide-react'
+import { ArrowRight, TriangleAlert } from 'lucide-react'
 import type { FriendField, FriendFieldType } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -137,7 +137,8 @@ function FieldMigrate() {
         if (source) {
           setTargetName(`${source.name}（新）`)
           setTargetKey(`${source.fieldKey}_new`.slice(0, 32))
-          setTargetType(source.type)
+          // 絵（GobMd）は「1つ選ぶ」を選んだ状態。同じ種類への移行は意味が無いので、今と違う種類から始める。
+          setTargetType(source.type === 'select' ? 'text' : 'select')
         }
       })
       .catch((reason) => {
@@ -485,7 +486,7 @@ function FieldMigrate() {
         ) : null}
         {!confirmed ? (
           <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">
-            <ClipboardCheck size={15} aria-hidden="true" />
+            <ArrowRight size={15} aria-hidden="true" />
             {targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
           </Button>
         ) : null}
