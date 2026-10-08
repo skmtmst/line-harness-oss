@@ -7,14 +7,14 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   role: 'owner' as string,
   replace: vi.fn(),
   push: vi.fn(),
   myStaff: [] as Array<Record<string, unknown>>,
-  putBreaks: vi.fn(),
+  putBreaks: vi.fn(), putRules: vi.fn(), putDates: vi.fn(),
 }))
 
 const stableRouter = { replace: (...args: unknown[]) => fixture.replace(...args), push: (...args: unknown[]) => fixture.push(...args) }
@@ -51,9 +51,14 @@ vi.mock('@/lib/api', () => {
       getBreakDates: async () => ({ version: 'd1', breaks: [] }),
       getGoogleCalendar: async () => ({ connection: null, service_account: { configured: true } }),
       putBreaks: (...args: unknown[]) => fixture.putBreaks(...args),
+      putAvailabilityRules: (...args: unknown[]) => fixture.putRules(...args),
+      putBreakDates: (...args: unknown[]) => fixture.putDates(...args),
     },
   }
 })
+
+vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
+vi.mock('@/components/shared/date-field', () => ({ default: (p: { value: string; onChange: (v: string) => void; 'aria-label'?: string }) => <input aria-label={p['aria-label']} value={p.value} onChange={(e) => p.onChange(e.target.value)} /> }))
 
 import StaffShiftsV8, { groupBreaks, shortDay, weekdaySetLabel } from './shifts'
 
@@ -75,6 +80,8 @@ beforeEach(() => {
   fixture.role = 'owner'
   fixture.myStaff = []
   fixture.replace.mockClear()
+  fixture.putRules.mockReset().mockResolvedValue({ ok: true })
+  fixture.putDates.mockReset()
   fixture.putBreaks.mockReset()
   fixture.putBreaks.mockImplementation(async (_a: unknown, _s: unknown, _v: unknown, rows: Array<{ weekday: number; start_time: string; end_time: string }>) => ({
     version: 'v2',
@@ -177,3 +184,29 @@ describe('勤務とシフト（管理者）', () => {
     expect(screen.queryByRole('button', { name: /の休憩を削除/ })).toBeNull()
   })
 })
+
+ test('WEB187：この日だけの休憩の保存失敗では追加欄と日付を残し、再試行できる', async () => {
+   fixture.putDates.mockRejectedValueOnce(new Error('network')).mockResolvedValue({ breaks: [], version: 'd2' })
+   render(<StaffShiftsV8 staffId="bs-1" />)
+   fireEvent.click(await screen.findByRole('button', { name: 'この日を足す' }))
+   fireEvent.click(screen.getByRole('button', { name: '足す種別' }))
+   fireEvent.click(within(await screen.findByRole('option', { name: 'この日だけの休憩' })).getByRole('button'))
+   fireEvent.change(screen.getByLabelText('この日の日付'), { target: { value: '2026-10-12' } })
+   for (const [label, value] of [['この日の始まり', '12:00'], ['この日の終わり', '13:00']]) {
+     const input = screen.getByRole('combobox', { name: label }); fireEvent.change(input, { target: { value } }); fireEvent.blur(input)
+   }
+   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '足す', exact: true })) })
+   await waitFor(() => expect(fixture.putDates).toHaveBeenCalledTimes(1))
+   expect((screen.getByLabelText('この日の日付') as HTMLInputElement).value).toBe('2026-10-12')
+   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '足す', exact: true })) })
+   await waitFor(() => expect(fixture.putDates).toHaveBeenCalledTimes(2))
+ })
+ test('WEB188：勤務時間だけ保存しても、編集中の休憩を取得値で戻さない', async () => {
+   render(<StaffShiftsV8 staffId="bs-1" />)
+   const start = await screen.findByRole('combobox', { name: '休憩の始まり' })
+   fireEvent.change(start, { target: { value: '12:00' } })
+   fireEvent.blur(start)
+   await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: '保存' })[0]) })
+   await waitFor(() => expect(fixture.putRules).toHaveBeenCalledTimes(1))
+   expect((screen.getByRole('combobox', { name: '休憩の始まり' }) as HTMLInputElement).value).toBe('12 : 00')
+ })

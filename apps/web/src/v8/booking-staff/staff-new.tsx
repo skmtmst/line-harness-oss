@@ -11,7 +11,7 @@
  * 未保存の離脱確認、権限が無いときの案内、読み込み失敗の言い分け）は
  * 今までの app/booking/staff/new（v7・staff-new-v8）から写した。BEHAVIOR.md を参照。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, ChevronDown, Smartphone } from 'lucide-react'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
@@ -63,12 +63,19 @@ export default function StaffNewV8() {
    * ここにIDがある間は createStaff を二度と呼ばず、残りの割当だけをやり直す。
    */
   const [createdStaffId, setCreatedStaffId] = useState<string | null>(null)
+  const createdInput = useRef<string | null>(null)
+  const accountRef = useRef(selectedAccountId)
+  const accountGeneration = useRef(0)
+  if (accountRef.current !== selectedAccountId) accountGeneration.current += 1
+  accountRef.current = selectedAccountId
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
   // R310: 控えた登録済みIDは作ったアカウントのもの。切替後は使い回さない。
   useEffect(() => {
     setCreatedStaffId(null)
+    createdInput.current = null
+    setSaving(false)
   }, [selectedAccountId])
 
   /* R578: 担当メニューの取得失敗と本当の0件を言い分ける。失敗しても入力は残る。 */
@@ -192,17 +199,34 @@ export default function StaffNewV8() {
     if (!parsed.ok && parsed.field === 'name') return parsed.error
     return null
   }
-  const [fieldErrors, setFieldErrors] = useState<{ name?: string }>({})
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; menus?: string }>({})
+  const formRef = useRef<HTMLDivElement>(null)
+  const focusInvalid = useRef(false)
+  useEffect(() => {
+    if (!focusInvalid.current) return
+    focusInvalid.current = false
+    const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')
+    field?.focus(); field?.scrollIntoView?.({ block: 'center' })
+  }, [fieldErrors])
+
 
   async function save() {
     if (saving) return
     const validationError = validate()
     if (validationError) {
-      setSaveError(validationError)
+      focusInvalid.current = true
       const nameError = nameFieldError(name)
-      setFieldErrors(nameError !== null ? { name: nameError } : {})
+      const menusError = offered.size === 0 ? '担当メニューを1つ以上選んでください。' : null
+      setSaveError(nameError || menusError ? null : validationError)
+      setFieldErrors({ ...(nameError ? { name: nameError } : {}), ...(menusError ? { menus: menusError } : {}) })
       return
     }
+    const accountId = selectedAccountId!
+    const parsed = parseBookingStaffInput(staffInput(), 'create')
+    if (!parsed.ok) return
+    const inputSnapshot = JSON.stringify(parsed.value)
+    const generation = accountGeneration.current
+    const current = () => accountRef.current === accountId && accountGeneration.current === generation
     setSaving(true)
     setSaveError(null)
     setFieldErrors({})
@@ -210,30 +234,39 @@ export default function StaffNewV8() {
       // R310: 割当だけ失敗して戻ってきた再試行では、スタッフを作り直さない。
       let staffId = createdStaffId
       if (staffId == null) {
-        const parsed = parseBookingStaffInput(staffInput(), 'create')
-        if (!parsed.ok) throw new Error(parsed.error)
-        const res = await bookingApi.createStaff(selectedAccountId!, parsed.value)
+        const res = await bookingApi.createStaff(accountId, parsed.value)
+        if (!current()) return
         staffId = res.id
+        setCreatedStaffId(staffId)
+        createdInput.current = inputSnapshot
+      } else if (createdInput.current !== inputSnapshot) {
+        await bookingApi.updateStaff(accountId, staffId, parsed.value)
+        if (!current()) return
+        createdInput.current = inputSnapshot
       }
       // 担当メニューは staff_menus に入る。作ってから流し込む。
       try {
         await bookingApi.putStaffMenus(
-          selectedAccountId!,
+          accountId,
           staffId,
           menus.map((m) => ({ menu_id: m.id, is_offered: offered.has(m.id), override_duration_minutes: null, override_price: null })),
         )
       } catch {
+        if (!current()) return
         setCreatedStaffId(staffId)
         throw new Error('スタッフは登録できましたが、担当メニューの設定に失敗しました。入力は残っています。「割当をやり直す」を押してください。')
       }
+      if (!current()) return
       setCreatedStaffId(null)
+      createdInput.current = null
       router.push(createPageReturnHref('/booking/menus?tab=staff', staffId))
     } catch (e) {
+      if (!current()) return
       setSaveError(e instanceof Error && e.message && !/^API error: /.test(e.message)
         ? e.message
         : 'スタッフを登録できませんでした。入力は残っています。もう一度お試しください。')
     } finally {
-      setSaving(false)
+      if (current()) setSaving(false)
     }
   }
 
@@ -244,7 +277,7 @@ export default function StaffNewV8() {
 
   if (!canManageStaff) {
     return (
-      <div className={layout.shell} data-design-node="CcA4k">
+      <div ref={formRef} className={layout.shell} data-design-node="CcA4k">
         <div className={styles.denied}>
           <ListState
             kind="error"
@@ -282,7 +315,7 @@ export default function StaffNewV8() {
   const memberLabel = (m: StaffMember) => `${m.name}${m.email ? `（${m.email}）` : ''}`
 
   return (
-    <div className={layout.shell} data-design-node="CcA4k">
+    <div ref={formRef} className={layout.shell} data-design-node="CcA4k">
       <header className={layout.head} data-design="Head">
         <h1 className={layout.title}>予約スタッフを登録</h1>
         <p className={layout.desc}>お客さまが予約するときに指名できる担当者を登録します。</p>
@@ -290,6 +323,7 @@ export default function StaffNewV8() {
 
       <div className={layout.body} data-design="Body">
         <div className={layout.main}>
+          <fieldset disabled={saving} className="contents">
           {/* ① お客さまに見える情報 */}
           <section className={layout.card} aria-labelledby="bs-card-info">
             <div className={layout.cardHead}><h2 id="bs-card-info" className={layout.cardTitle}>お客さまに見える情報</h2></div>
@@ -352,7 +386,7 @@ export default function StaffNewV8() {
             ) : menus.length === 0 ? (
               <p className={layout.cardNote}>まだメニューがありません。先に予約設定の「メニュー」から登録してください。</p>
             ) : (
-              <div className={styles.checkRow}>
+              <div className={styles.checkRow} role="group" aria-label="予約を受けられるメニュー" aria-invalid={!!fieldErrors.menus && offered.size === 0} tabIndex={-1}>
                 {shownMenus.map((m) => (
                   <span key={m.id} className={styles.checkItem} title={`${m.name}（${m.duration_minutes}分・${priceLabel(m)}）`}>
                     <Checkbox checked={offered.has(m.id)} onCheckedChange={() => toggle(m.id)} className={styles.check}>{m.name}</Checkbox>
@@ -366,6 +400,8 @@ export default function StaffNewV8() {
               </div>
             )}
           </section>
+
+          {fieldErrors.menus && offered.size === 0 ? <p className={layout.fieldError} role="alert">{fieldErrors.menus}</p> : null}
 
           {/* ③ 受付と表示 */}
           <section className={layout.card} aria-labelledby="bs-card-accept">
@@ -437,6 +473,7 @@ export default function StaffNewV8() {
               {createdStaffId ? '割当をやり直す' : 'スタッフを登録する'}
             </Button>
           </div>
+          </fieldset>
         </div>
 
         <aside className={layout.side} aria-label="お客さまの予約画面の見え方" data-design="Side">

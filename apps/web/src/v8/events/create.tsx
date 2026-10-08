@@ -86,6 +86,17 @@ function EventsCreateV8Inner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [nameError, setNameError] = useState<string | null>(null)
+  const [slotField, setSlotField] = useState<'date' | 'start' | 'end' | 'capacity' | null>(null)
+  const focusInvalid = useRef(false)
+  const [validationAttempt, setValidationAttempt] = useState(0)
+  useEffect(() => {
+    if (!focusInvalid.current) return
+    focusInvalid.current = false
+    const id = nameError ? 'ev-new-name' : slotField === 'date' ? 'ev-new-date' : slotField === 'capacity' ? 'ev-new-cap' : null
+    const field = id ? document.getElementById(id) : document.querySelector<HTMLElement>(`[aria-label="${slotField === 'start' ? '開始の時刻' : '終わりの時刻'}"]`)
+    field?.focus(); field?.scrollIntoView?.({ block: 'center' })
+  }, [nameError, slotField, validationAttempt])
+
   const createdIdRef = useRef<string | null>(null)
 
   const update = <K extends keyof EventDetail>(key: K, value: EventDetail[K]) => setDraft((current) => ({ ...current, [key]: value }))
@@ -111,13 +122,20 @@ function EventsCreateV8Inner() {
     }
     if (!draft.name.trim()) {
       setNameError('イベント名を入れてください')
-      setError('直す所があります。赤い理由を確かめてください。')
+      focusInvalid.current = true
+      setValidationAttempt((n) => n + 1)
+      setError(null)
       return
     }
     if (slotError) {
-      setError(slotError)
+      focusInvalid.current = true
+      setValidationAttempt((n) => n + 1)
+      setSlotField(!date ? 'date' : !startTime ? 'start' : !endTime || endTime <= startTime ? 'end' : 'capacity')
+      setError(null)
       return
     }
+    setSlotField(null)
+    setNameError(null)
     setSaving(true)
     setError(null)
     let eventId = createdIdRef.current
@@ -317,14 +335,16 @@ function EventsCreateV8Inner() {
         <div className={styles.pair}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="ev-new-date">日付</label>
-            <input id="ev-new-date" type="date" className={styles.input} value={date} onChange={(event) => setDate(event.target.value)} />
+            <input id="ev-new-date" aria-invalid={slotField === 'date' && !!slotError} type="date" className={styles.input} value={date} onChange={(event) => setDate(event.target.value)} />
+            {slotField === 'date' && slotError ? <p className={styles.fieldError} role="alert">{slotError}</p> : null}
           </div>
           <div className={styles.field}>
             <span className={styles.label} id="ev-new-time-label">開始</span>
             <div className={styles.timeRow} role="group" aria-labelledby="ev-new-time-label">
-              <TimeField aria-label="開始の時刻" value={startTime} onChange={setStartTime} />
+              <TimeField invalid={slotField === 'start' && !!slotError} aria-label="開始の時刻" value={startTime} onChange={setStartTime} />
               <span className={styles.timeSep} aria-hidden="true">〜</span>
-              <TimeField aria-label="終わりの時刻" value={endTime} onChange={setEndTime} />
+              <TimeField invalid={slotField === 'end' && !!slotError} aria-label="終わりの時刻" value={endTime} onChange={setEndTime} />
+              {(slotField === 'start' || slotField === 'end') && slotError ? <p className={styles.fieldError} role="alert">{slotError}</p> : null}
             </div>
           </div>
         </div>
@@ -333,12 +353,14 @@ function EventsCreateV8Inner() {
             <label className={styles.label} htmlFor="ev-new-cap">定員</label>
             <input
               id="ev-new-cap"
+              aria-invalid={slotField === 'capacity' && !!slotError}
               inputMode="numeric"
               className={styles.input}
               value={capacity}
               placeholder="20 人"
               onChange={(event) => setCapacity(event.target.value.replace(/[^0-9]/g, ''))}
             />
+            {slotField === 'capacity' && slotError ? <p className={styles.fieldError} role="alert">{slotError}</p> : null}
           </div>
           <div className={styles.field}>
             <span className={styles.pickLabel}>1人あたりの予約回数</span>
