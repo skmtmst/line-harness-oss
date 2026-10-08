@@ -243,6 +243,11 @@
 :global([data-theme='v8']) .settingsContent[data-content-layout='wide'] { padding: var(--tpl-sa-content-pad); gap: var(--tpl-sa-gap); }
 :global([data-theme='v8']) .settingsContent[data-content-layout='account-detail'] { padding: var(--tpl-acd-pad); gap: var(--tpl-acd-stack-gap); }
 :global([data-theme='v8']) .settingsContent[data-content-layout='account-handover'] { padding: var(--tpl-acct-handover-content-pad); gap: var(--tpl-acd-gap); }
+@container v8-page (max-width: 1099px) {
+  /* アカウントの本文を設定メニューの下へ押し出さない。移動先は外側の設定メニューにもある。 */
+  :global([data-theme='v8']) .settings[data-content-layout] > .settingsNav { display: none; }
+  :global([data-theme='v8']) .settingsContent[data-content-layout] { width: 100%; padding-left: var(--tpl-head-pad-side); align-self: stretch; }
+}
 /* ページが畳まれても、窓の中のフォルダは窓の寸法で並べる。 */
 :global([data-theme='v8']) .listBody[data-dialog-layout] .folders { display: flex; }
 :global([data-theme='v8']) .listBody[data-dialog-layout] .collapsedFolders { display: none; }

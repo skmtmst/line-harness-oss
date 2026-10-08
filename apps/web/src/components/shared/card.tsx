@@ -3,13 +3,14 @@ import styles from './card.module.css'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   children: ReactNode
-  layout?: 'block' | 'vertical'
+  layout?: 'block' | 'vertical' | 'horizontal'
   overflow?: 'visible' | 'hidden'
   padding?: 'none' | 'default' | 'roomy' | 'spacious'
   /** 板ごとの余白・間はトークンで渡す。枠の描画はこの部品が持つ。 */
   contentPadding?: string
   gap?: string
   surface?: 'inset' | 'muted'
+  corner?: 'control'
   /** V8 の入力の段・右の箱・一覧の小窓。既定のカードは変えない。 */
   variant?: 'default' | 'form' | 'aside' | 'panel'
 }
@@ -24,6 +25,7 @@ export default function Card({
   contentPadding,
   gap,
   surface,
+  corner,
   style,
   variant = 'default',
   ...props
@@ -31,7 +33,7 @@ export default function Card({
   const classes = [
     styles.card,
     variant !== 'default' ? styles[variant] : null,
-    layout === 'vertical' ? styles.vertical : null,
+    layout === 'vertical' ? styles.vertical : layout === 'horizontal' ? styles.horizontal : null,
     overflow === 'hidden' ? styles.overflowHidden : null,
     padding === 'default' ? styles.paddingDefault : null,
     padding === 'roomy' ? styles.paddingRoomy : null,
@@ -42,7 +44,7 @@ export default function Card({
     .join(' ')
 
   return (
-    <section className={classes} data-design-part="card" data-card-surface={surface}
+    <section className={classes} data-design-part="card" data-card-surface={surface} data-card-corner={corner}
       data-card-spacing={contentPadding || gap ? '' : undefined}
       style={{ ...style, '--card-content-padding': contentPadding, '--card-content-gap': gap } as CSSProperties} {...props}>
       {children}

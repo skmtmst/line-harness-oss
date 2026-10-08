@@ -22,6 +22,8 @@ type CommonProps = {
    * `standard` のままにする。
    */
   size?: 'standard' | 'field' | 'compact'
+  /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
+  presentation?: 'account-inline' | 'registration-inline'
   className?: string
   children: ReactNode
 }
@@ -76,9 +78,9 @@ export default function Button(props: ButtonProps) {
   const classes = [styles.button, styles[variant], styles[size], props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, size: _size, variant: _variant, ...linkProps } = props
+    const { children, className: _className, href, size: _size, variant: _variant, presentation, ...linkProps } = props
     return (
-      <Link href={href} className={classes} {...linkProps}>
+      <Link href={href} className={classes} data-presentation={presentation} {...linkProps}>
         {children}
       </Link>
     )
@@ -94,6 +96,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     className: _className,
     variant: _variant,
     size: _size,
+    presentation,
     href: _href,
     type = 'button',
     busy,
@@ -149,6 +152,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     <button
       type={type}
       className={classes}
+      data-presentation={presentation}
       ref={setRefs}
       disabled={disabled || busyNow}
       aria-busy={busyNow ? true : undefined}

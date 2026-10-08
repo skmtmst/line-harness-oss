@@ -1,5 +1,10 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
+.inlineBar { display: flex; align-items: center; gap: var(--tpl-acd-actions-gap); }
+.inlineBar[data-presentation='account-registration'] {
+  position: sticky; bottom: 0; z-index: 2; justify-content: center;
+  gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn-footer-pad); background: var(--color-canvas); box-shadow: var(--tpl-htn-line-top);
+}
 /*
  * 下部追従バー。Pencil V5 の `Ai3fq`「共通 編集追従バー」と、
  * 作成・編集画面すべての最下段。

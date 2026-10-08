@@ -33,8 +33,8 @@ export type DialogProps = {
   designContentPadding?: string
   /** 題の隣の補足。ほかの窓の題の並びは変えない。 */
   titleHelp?: ReactNode
-  /** 段の帯を使わず、題・手順・本文・操作を1枚に続ける窓（hadfk）。既定の窓は変えない。 */
-  layout?: 'continuous'
+  /** 段の帯を使わず続ける窓（hadfk）、またはアカウントの窓の余白。既定の窓は変えない。 */
+  layout?: 'continuous' | 'account-inset'
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
   /** 操作の左に出す現在の手順など。 */
@@ -217,7 +217,7 @@ export default function Dialog({
       {children ? <div className={styles.content}>{children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.footer}>
-      {footer ?? (onConfirm ? (
+      {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*
          * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま
          * 使う（#976 U077/U083/U084）。ここで赤や緑を自前で持つと、コントラストが

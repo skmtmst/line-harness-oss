@@ -123,3 +123,10 @@
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .notice { -webkit-font-smoothing: auto; }
+
+[data-theme='v8'] .notice[data-presentation='account-note'] {
+  width: 100%; margin: 0; padding: var(--tpl-acd-dlg-band-pad); border: 0;
+  border-radius: var(--tpl-acd-dlg-band-radius); font-size: var(--tpl-acd-dlg-band-size); line-height: var(--tpl-acd-dlg-band-lh);
+}
+[data-theme='v8'] .info[data-presentation='account-note'] { background: var(--color-surface-pearl); }
+[data-theme='v8'] .warn[data-presentation='account-note'] { background: var(--tpl-acd-warn-bg); color: var(--tpl-acd-warn-ink); }
