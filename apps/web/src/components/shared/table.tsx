@@ -5,6 +5,7 @@ import { loadFailureCopy } from './api-error-message'
 import HelpTip from './help-tip'
 import { FailureTitle, RetryLabel } from './retry-label'
 import styles from './table.module.css'
+import presentationStyles from './table-presentation.module.css'
 
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
@@ -97,13 +98,16 @@ export function DataTable({
   children,
   className,
   'data-design': dataDesign,
+  presentation,
 }: {
   children: ReactNode
   className?: string
   'data-design'?: string
+  /** 時間×卓と予約一覧の寸法。指定した表だけに適用する。 */
+  presentation?: 'ledger' | 'calendar'
 }) {
   return (
-    <div className={[shell.frame, className].filter(Boolean).join(' ')}>
+    <div className={[shell.frame, presentation && presentationStyles[presentation], className].filter(Boolean).join(' ')}>
       <table className={shell.table} data-design={dataDesign}>{children}</table>
     </div>
   )

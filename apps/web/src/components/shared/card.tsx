@@ -3,24 +3,31 @@ import styles from './card.module.css'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   children: ReactNode
+  frame?: 'raised' | 'inset'
   layout?: 'block' | 'vertical'
   overflow?: 'visible' | 'hidden'
-  padding?: 'none' | 'default' | 'roomy' | 'spacious'
+  padding?: 'none' | 'compact' | 'default' | 'roomy' | 'spacious'
+  corner?: 'card' | 'segment'
 }
 
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
 export default function Card({
   children,
   className,
+  frame = 'raised',
   layout = 'block',
   overflow = 'visible',
   padding = 'none',
+  corner = 'card',
   ...props
 }: CardProps) {
   const classes = [
     styles.card,
+    corner === 'segment' ? styles.segment : null,
+    frame === 'inset' ? styles.inset : null,
     layout === 'vertical' ? styles.vertical : null,
     overflow === 'hidden' ? styles.overflowHidden : null,
+    padding === 'compact' ? styles.paddingCompact : null,
     padding === 'default' ? styles.paddingDefault : null,
     padding === 'roomy' ? styles.paddingRoomy : null,
     padding === 'spacious' ? styles.paddingSpacious : null,

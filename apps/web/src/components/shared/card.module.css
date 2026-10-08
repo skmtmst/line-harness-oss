@@ -7,6 +7,12 @@
   box-shadow: var(--shadow-card);
 }
 
+/* 枠を内側に引く段の箱。既定のカードの影・寸法は変えない。 */
+.inset { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; box-shadow: none; }
+
+.segment { border-radius: var(--radius-segment); }
+.paddingCompact { padding: 14px; }
+
 .vertical {
   display: flex;
   flex-direction: column;
