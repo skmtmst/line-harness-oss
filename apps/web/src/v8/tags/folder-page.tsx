@@ -6,7 +6,7 @@
  * 読み込み・保存・削除・クエリの切り替え（古い応答を捨てる）は今の画面（app/tags/folders/new/page.tsx）と同じ。
  * 受け付ける URL：`/tags/folders/new`（タグのフォルダを追加）・`?id=<フォルダ>`（直す・削除）・
  * `?kind=friend_field`（友だち情報欄のフォルダを追加。今の「作成する場所」の切り替えの代わり）。
- * 色は名前つきの9色を、名前の横の共通ボタンから選ぶ。
+ * 色は共通部品と同じ名前つきの8色を、名前の横の共通ボタンから選ぶ。
  */
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -20,19 +20,10 @@ import ListState from '@/components/shared/list-state'
 import TagsList from './list'
 import styles from './create.module.css'
 
-/* 絵の9色。保存する値は色コード、読み上げと見出しは名前。既定は緑（基調色）。 */
-export const TAG_FOLDER_COLORS: ReadonlyArray<{ value: string; name: string }> = [
-  { value: '#EF4444', name: '赤' },
-  { value: '#F97316', name: 'オレンジ' },
-  { value: '#F59E0B', name: '黄' },
-  { value: '#06C755', name: '緑' },
-  { value: '#3B82F6', name: '青' },
-  { value: '#06B6D4', name: '水色' },
-  { value: '#7C3AED', name: '紫' },
-  { value: '#EC4899', name: 'ピンク' },
-  { value: '#6B7280', name: 'グレー' },
-]
-const DEFAULT_COLOR = TAG_FOLDER_COLORS[3].value
+import { FOLDER_COLORS, FOLDER_COLOR_NAMES } from '@/components/shared/folder-add-dialog'
+
+export const TAG_FOLDER_COLORS = FOLDER_COLORS.map((value) => ({ value, name: FOLDER_COLOR_NAMES[value] }))
+const DEFAULT_COLOR = FOLDER_COLORS[0]
 
 type RequestKey = { editId: string | null; generation: number }
 const sameRequest = (a: RequestKey, b: RequestKey) => a.editId === b.editId && a.generation === b.generation

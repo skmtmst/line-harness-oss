@@ -151,12 +151,12 @@ function StepTitle({ number, title, note }: { number: number; title: string; not
   )
 }
 
-export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClose, onAdd, referenceState = false, hqV8 = false }: { accountId: string | null; suppliedResources?: CommonActionResources | null; allowedActionTypes?: readonly TagEditorActionLabel[]; onClose: () => void; onAdd: (action: LinkedAction) => void; referenceState?: boolean; hqV8?: boolean }) {
+export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClose, onAdd, selectedAction, referenceState = false, hqV8 = false }: { accountId: string | null; suppliedResources?: CommonActionResources | null; allowedActionTypes?: readonly TagEditorActionLabel[]; onClose: () => void; onAdd: (action: LinkedAction, beforeId?: string) => void; selectedAction?: Pick<LinkedAction, 'id' | 'label'>; referenceState?: boolean; hqV8?: boolean }) {
   const [selected, setSelected] = useState<(typeof ACTION_TYPES)[number]>(referenceState ? ACTION_TYPES[1] : ACTION_TYPES[0])
   const [timing, setTiming] = useState<'immediate' | 'delay'>('immediate')
   const [delay, setDelay] = useState(referenceState ? '24' : '1')
   const [delayUnit, setDelayUnit] = useState<'minutes' | 'hours' | 'days'>(referenceState ? 'hours' : 'minutes')
-  // 共通Selectはvalue/onChange必須のため表示保持用の状態を持つ。元の素のselectも非制御で値はどこからも読まれていなかったので、動きは変えない。
+  // 前へ追加する位置は、呼び出し元が最後に選んだ行に結ぶ。
   const [position, setPosition] = useState('last')
   const [message, setMessage] = useState('ご登録ありがとうございます。')
   const [amount, setAmount] = useState('100')
@@ -192,7 +192,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
     const label = selected[0] === 'テキスト送信' ? message.trim()
       : selected[0] === 'マイル付与' ? `${Math.max(1, Number(amount) || 1)} mile`
         : resourceName ?? selected[0]
-    onAdd({ id: crypto.randomUUID(), type: selected[1], label, timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後`, definition: { id: crypto.randomUUID(), type: definition.actionType, params, onFailure: 'stop' } })
+    onAdd({ id: crypto.randomUUID(), type: selected[1], label, timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後`, definition: { id: crypto.randomUUID(), type: definition.actionType, params, onFailure: 'stop' } }, position === 'before' ? selectedAction?.id : undefined)
   }
 
   return (
@@ -273,7 +273,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
               onChange={setPosition}
               options={[
                 { value: 'last', label: 'いちばん最後に追加' },
-                { value: 'before', label: '選択中のアクションの前' },
+                { value: 'before', label: '選択中のアクションの前', disabled: !selectedAction },
               ]}
               size="full"
             />

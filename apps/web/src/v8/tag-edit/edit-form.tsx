@@ -98,7 +98,7 @@ export function TagEditForm({
   const [groupId, setGroupId] = useState(tag.groupId ?? '')
   const [isStarred, setIsStarred] = useState(tag.isStarred ?? false)
   const hasStoredLink = Boolean((tag.mileageReward ?? 0) || (tag.referralMileageReward ?? 0) || tag.mileageMultiplierBps)
-  const [linked, setLinked] = useState(host?.initialValues.linked ?? (hasStoredLink || initialActions.length > 0))
+  const [linked, setLinked] = useState(host?.initialValues.linked ?? tag.linkedEnabled ?? (hasStoredLink || initialActions.length > 0))
   const [reward, setReward] = useState(String(tag.mileageReward ?? 0))
   const [referralReward, setReferralReward] = useState(String(tag.referralMileageReward ?? 0))
   const [multiplier, setMultiplier] = useState(tag.mileageMultiplierBps == null ? '' : String(tag.mileageMultiplierBps))
@@ -107,6 +107,7 @@ export function TagEditForm({
   const [reapplyMode, setReapplyMode] = useState<'once' | 'every'>(tag.reapplyPolicy === 'every_time' ? 'every' : 'once')
   const [actions, setActions] = useState<LinkedAction[]>(initialActions)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [selectedActionId, setSelectedActionId] = useState<string | null>(null)
   const [retroactiveOpen, setRetroactiveOpen] = useState(retroactiveReference)
   /* 畳んだ段。競合のときは、直した所が見えるように全部開く（xn95q）。 */
   const [actionsOpen, setActionsOpen] = useState(false)
@@ -317,7 +318,7 @@ export function TagEditForm({
                 {linked || host ? (
                   <>
                     {actions.length === 0 ? <p className={styles.emptyBox}>連動の動きはまだありません</p> : actions.map((action, index) => (
-                      <div key={action.id} className={styles.actionRow}>
+                      <div key={action.id} className={styles.actionRow} onFocus={() => setSelectedActionId(action.id)} onClick={() => setSelectedActionId(action.id)}>
                         <span className={styles.actionIndex}>{index + 1}</span>
                         <span className={styles.actionLabel} title={`${action.type}：${action.label}`}>{action.label}</span>
                         {action.timing && action.timing !== 'すぐに' ? <span className={styles.actionTiming}>{action.timing}</span> : null}
@@ -420,7 +421,7 @@ export function TagEditForm({
           ) : null}
         </fieldset>
       </CreatePage>
-      {drawerOpen ? <ActionDrawer hqV8={Boolean(host)} suppliedResources={host ? null : undefined} allowedActionTypes={host?.allowedActionTypes} accountId={host ? null : accountId} onClose={() => setDrawerOpen(false)} onAdd={(action) => { if (host) setLinked(true); setActions((current) => [...current, action]); setDrawerOpen(false) }} /> : null}
+      {drawerOpen ? <ActionDrawer hqV8={Boolean(host)} suppliedResources={host ? null : undefined} allowedActionTypes={host?.allowedActionTypes} accountId={host ? null : accountId} onClose={() => setDrawerOpen(false)} selectedAction={actions.find((action) => action.id === selectedActionId)} onAdd={(action, beforeId) => { if (host) setLinked(true); setActions((current) => { const index = beforeId ? current.findIndex((entry) => entry.id === beforeId) : -1; return index < 0 ? [...current, action] : [...current.slice(0, index), action, ...current.slice(index)] }); setDrawerOpen(false) }} /> : null}
       {retroactiveOpen ? (
         <RetroactiveDialog
           referenceState={retroactiveReference}

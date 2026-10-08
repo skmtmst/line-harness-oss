@@ -51,8 +51,10 @@ export default function TagEditV8() {
   const [groups, setGroups] = useState<TagGroup[]>([])
   // その場でタグのフォルダを作る（dLffh）。左の列の「フォルダを追加」と同じ受け口。
   const createGroup = async (name: string, color: string | null) => {
+    const generation = requestRef.current
     const response = await api.tagGroups.create({ name, color, accountId: selectedAccountId })
     const created = folderCreateResult(response, (group: TagGroup) => ({ value: group.id, label: group.name, color: group.color }))
+    if (targetRef.current !== targetKey || requestRef.current !== generation) throw new Error('編集するタグが変わりました。もう一度選び直してください。')
     if (response.success) setGroups((current) => [...current, response.data])
     return created
   }
@@ -74,9 +76,22 @@ export default function TagEditV8() {
   const [dependencies, setDependencies] = useState<TagDependencies | null>(null)
   const [dependenciesStatus, setDependenciesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
-  const load = useCallback(async () => {
+  const targetKey = `${selectedAccountId ?? ''}:${tagId}`
+  const targetRef = useRef(targetKey)
+  const targetGenerationRef = useRef(0)
+  if (targetRef.current !== targetKey) {
+    targetRef.current = targetKey
+    targetGenerationRef.current += 1
+  }
+  const targetGeneration = targetGenerationRef.current
+  const requestRef = useRef(0)
+  const [editorRevision, setEditorRevision] = useState(0)
+
+  const load = useCallback(async (refresh = false) => {
+    const generation = ++requestRef.current
+    const stillHere = () => targetRef.current === targetKey && requestRef.current === generation
     if (!tagId || !selectedAccountId) { setLoading(false); return }
-    setLoading(true)
+    if (!refresh) { setLoading(true); setTag(null); setDefinition(null); setGroups([]); setDependencies(null); setDependenciesStatus('loading') }
     setError('')
     setTagMissing(false)
     try {
@@ -85,6 +100,7 @@ export default function TagEditV8() {
         api.tags.dependencies(tagId, selectedAccountId),
         api.tagGroups.list(selectedAccountId),
       ])
+      if (!stillHere()) return
       if (folders.success) setGroups(folders.data.filter((group) => group.accountId === selectedAccountId))
       if (dependenciesResult.success) {
         setDependencies(dependenciesResult.data)
@@ -97,21 +113,25 @@ export default function TagEditV8() {
       setDefinition(detail.data)
       setTag({ ...detail.data.tag, friendCount: dependenciesResult.success ? dependenciesResult.data.friendCount : detail.data.tag.friendCount })
     } catch (caught) {
+      if (!stillHere()) return
       if (caught instanceof ApiError && caught.status === 404) setTagMissing(true)
       else setError('読み込みに失敗しました。もう一度読み込んでください。')
       setDependenciesStatus((prev) => (prev === 'ready' ? prev : 'error'))
     } finally {
-      setLoading(false)
+      if (stillHere()) setLoading(false)
     }
-  }, [tagId, selectedAccountId])
+  }, [tagId, selectedAccountId, targetKey])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { setConflictValues(null); setCompareTarget(null); setCompareError(''); setCompareBusy(false); setSaving(false); setDeleting(false); setDeleteOpen(false); void load(); return () => { requestRef.current += 1 } }, [load])
 
   // M956：応答が消えたときの再送用。同じ内容の再送は同じ要求キー、成功したら捨てる。
   const saveKeysRef = useRef(new IdempotencyKeyStore())
 
   const save = async (values: TagEditorValues, applyRetroactive: boolean, previewToken?: string) => {
     if (!tag || !definition || !selectedAccountId || saving) return
+    const savingTarget = targetKey
+    const savingGeneration = requestRef.current
+    const stillHere = () => targetRef.current === savingTarget && requestRef.current === savingGeneration
     setSaving(true)
     setError('')
     try {
@@ -131,18 +151,20 @@ export default function TagEditV8() {
       }
       const { previewToken: _ignored, ...sigPayload } = payload
       void _ignored
-      const sig = JSON.stringify(sigPayload)
+      const sig = JSON.stringify({ target: savingTarget, version: tag.version ?? 1, payload: sigPayload })
       const update = await api.tags.updateDefinition(tag.id, selectedAccountId, tag.version ?? 1, payload, saveKeysRef.current.get(sig))
+      if (!stillHere()) return
       if (!update.success) throw new Error(update.error)
       saveKeysRef.current.clear(sig)
       notifyToast(update.data.replayed ? '保存済みでした。' : update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
       setConflictValues(null)
-      await load()
+      await load(true)
     } catch (reason) {
+      if (!stillHere()) return
       if (reason instanceof ApiError && reason.status === 409) setConflictValues(values)
       else setError(describeSaveFailure(reason))
     } finally {
-      setSaving(false)
+      if (targetRef.current === savingTarget && targetGenerationRef.current === targetGeneration) setSaving(false)
     }
   }
 
@@ -151,36 +173,45 @@ export default function TagEditV8() {
     setCompareError('')
     setConflictValues(null)
     setError('')
+    setEditorRevision((current) => current + 1)
     await load()
   }
 
   const openCompare = async () => {
     if (compareBusy || !tagId || !selectedAccountId) return
+    const generation = requestRef.current
+    const stillHere = () => targetRef.current === targetKey && requestRef.current === generation
     setCompareBusy(true)
     setCompareError('')
     try {
       const detail = await api.tags.definition(tagId, selectedAccountId)
+      if (!stillHere()) return
       if (!detail.success) throw new Error(detail.error)
       setCompareTarget(detail.data)
     } catch {
+      if (!stillHere()) return
       setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
     } finally {
-      setCompareBusy(false)
+      if (stillHere()) setCompareBusy(false)
     }
   }
 
   const remove = async () => {
     if (!tag || deleting) return
+    const generation = requestRef.current
+    const stillHere = () => targetRef.current === targetKey && requestRef.current === generation
     setDeleting(true)
     try {
       const result = await api.tags.delete(tag.id)
+      if (!stillHere()) return
       if (!result.success) throw new Error(result.error)
       router.push('/tags')
     } catch (reason) {
+      if (!stillHere()) return
       setError(reason instanceof Error ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。')
       setDeleteOpen(false)
     } finally {
-      setDeleting(false)
+      if (stillHere()) setDeleting(false)
     }
   }
 
@@ -197,13 +228,13 @@ export default function TagEditV8() {
   }
   // 保管済みのタグは通常の編集を出さない（#710）。
   if (tag.status === 'archived') {
-    return <ArchivedTagEditor tag={tag} accountId={selectedAccountId} onCancel={() => router.push('/tags')} onSaved={(updated) => setTag((current) => (current ? { ...current, ...updated } : current))} />
+    return <ArchivedTagEditor tag={tag} accountId={selectedAccountId} onCancel={() => router.push('/tags')} onSaved={(updated) => { if (targetRef.current === targetKey && targetGenerationRef.current === targetGeneration) setTag((current) => (current ? { ...current, ...updated } : current)) }} />
   }
 
   return (
     <>
       <TagEditForm
-        key={`${tag.id}:${tag.version ?? 1}`}
+        key={`${targetKey}:${editorRevision}`}
         tag={tag}
         groups={groups}
         onCreateGroup={canEdit && selectedAccountId ? createGroup : undefined}

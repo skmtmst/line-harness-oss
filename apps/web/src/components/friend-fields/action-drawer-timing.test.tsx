@@ -39,3 +39,12 @@ describe('連動アクションの実行タイミング', () => {
     expect(screen.getByRole('note').textContent).toContain('待機中にタグが外れた場合は実行されません。')
   })
 })
+
+it('前へ追加するときは選択対象IDを呼び出し元へ返す（WEB276）', () => {
+  const onAdd=vi.fn()
+  render(<ActionDrawer accountId={null} suppliedResources={null} onClose={()=>{}} onAdd={onAdd} selectedAction={{ id:'action-b',label:'二通目' }} />)
+  fireEvent.click(screen.getByRole('button',{ name:'追加する位置' }))
+  fireEvent.click(screen.getByRole('button',{ name:'選択中のアクションの前' }))
+  fireEvent.click(screen.getByRole('button',{ name:'このアクションを追加する' }))
+  expect(onAdd).toHaveBeenCalledWith(expect.any(Object),'action-b')
+})

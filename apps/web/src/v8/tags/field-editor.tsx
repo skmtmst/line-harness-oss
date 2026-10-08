@@ -392,7 +392,6 @@ export default function FieldEditor({
         {error ? <Notice tone="danger" message={error} /> : null}
         {locked && !host ? <Notice tone="warn">共通項目はこのアカウントから直接変更できません。新しい項目へ移行してから編集してください。</Notice> : null}
 
-        <div>
         <section className={styles.card} aria-labelledby="ff-basic">
           <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ff-basic">基本</h2></div>
           <label className={styles.field} data-field="name">
@@ -490,7 +489,6 @@ export default function FieldEditor({
             })}
           </div>
         </section>
-        </div>
       </CreatePage>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject={mode === 'edit' ? '項目への変更' : '入力した項目'} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </>
