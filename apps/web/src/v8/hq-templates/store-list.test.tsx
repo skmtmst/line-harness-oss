@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * 統括のひな形の一覧（店と同じ形＋配る口・B-27〜B-29・B-36）の動き。
- * 6種類のタブで種類を替える・配布先の列・［アカウントへ配る］・閲覧のみには配る／作る口を置かない・フォルダで絞る。
+ * 6種類のタブで種類を替える・配布先の列・全種類の行の［配る］（「…」の左。オーナー 2026-10-08）・閲覧のみには配る／作る口を置かない・フォルダで絞る。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -65,21 +65,34 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.textContent).toContain('まだ配っていない')
   })
 
-  it('回答フォームは行の［アカウントへ配る］でその行を配る（wZPua）', async () => {
-    const h = await render({ type: 'form', kind: undefined })
-    const button = buttons().find((b) => b.getAttribute('aria-label') === '秋の新商品をアカウントへ配る')
-    await act(async () => { button!.click() })
-    expect(h.onDistribute).toHaveBeenCalledWith(ROWS[0])
-  })
+  /* 絵：テンプレート i0Ao0R・リッチメニュー noVq4・友だち属性 DzdC3・回答フォーム wZPua。どの種類も行の「…」の左に［配る］。 */
+  for (const type of ['template', 'tag', 'rich_menu', 'form', 'scenario'] as const) {
+    it(`${type} の一覧は、どの行にも「…」の左に［配る］があり、押すとその行を配る`, async () => {
+      const h = await render({ type, kind: type === 'template' ? 'message' : undefined })
+      for (const r of ROWS) {
+        const button = buttons().find((b) => b.getAttribute('aria-label') === `${r.name}を配る`)
+        expect(button, r.name).toBeTruthy()
+        expect(button!.textContent?.trim()).toBe('配る')
+        /* 同じ行の「…」より前（左）に置く。 */
+        const tr = button!.closest('tr')!
+        const menu = tr.querySelector('[aria-haspopup="menu"]')!
+        expect(button!.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      }
+      await act(async () => { buttons().find((b) => b.getAttribute('aria-label') === '定休日を配る')!.click() })
+      expect(h.onDistribute).toHaveBeenCalledWith(ROWS[1])
+      /* 見出しにも［配る］の列（空の見出し）がある。 */
+      expect(document.querySelector('th[aria-label="配る"]')).not.toBeNull()
+      expect(host.textContent).not.toContain('アカウントへ配る')
+    })
+  }
 
-  it('テンプレートは行の「…」から配る。公開の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
+  it('テンプレートは行の「…」の中からも配れる（文字は「配る」）。公開の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
     const rows = [
       { ...ROWS[0], outdated_account_count: 1, this_month_sent_count: 1860 },
       { ...ROWS[1], this_month_sent_count: null },
       { ...row('t-3', '予約の受付', 1), outdated_account_count: 0, this_month_sent_count: 0 },
     ]
     const h = await render({ rows, stats: { thisMonthSentCount: 1860, outdatedTemplateCount: 1 } })
-    expect(buttons().some((b) => b.getAttribute('aria-label') === '秋の新商品をアカウントへ配る')).toBe(false)
     expect(host.textContent).toContain('未公開の変更')
     expect(host.textContent).toContain('下書きだけ')
     expect(host.textContent).toContain('公開中')
@@ -88,7 +101,7 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.textContent).toContain('新しい版を未配布')
     const menu = buttons().find((b) => b.getAttribute('aria-label') === 'テンプレート「秋の新商品」の操作')
     await act(async () => { menu!.click() })
-    const item = [...document.querySelectorAll('[role="menuitem"], button')].find((el) => el.textContent?.trim() === 'アカウントへ配る')
+    const item = [...document.querySelectorAll('[role="menuitem"], button')].find((el) => el.getAttribute('role') === 'menuitem' && el.textContent?.trim() === '配る')
     await act(async () => { (item as HTMLElement).click() })
     expect(h.onDistribute).toHaveBeenCalledWith(rows[0])
   })
@@ -119,9 +132,13 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.textContent).toContain('定休日')
   })
 
-  it('閲覧のみには作る・配る口を置かない', async () => {
-    await render({ canEdit: false })
-    expect(buttons().some((b) => b.textContent?.includes('テンプレートを作る'))).toBe(false)
-    expect(buttons().some((b) => b.getAttribute('aria-label')?.endsWith('をアカウントへ配る'))).toBe(false)
-  })
+  for (const type of ['template', 'tag', 'rich_menu', 'form'] as const) {
+    it(`閲覧のみには作る・配る口を置かない（${type}）`, async () => {
+      await render({ type, kind: type === 'template' ? 'message' : undefined, canEdit: false })
+      expect(buttons().some((b) => b.textContent?.includes('を作る'))).toBe(false)
+      expect(buttons().some((b) => b.getAttribute('aria-label')?.endsWith('を配る'))).toBe(false)
+      expect(buttons().some((b) => b.textContent?.trim() === '配る')).toBe(false)
+      expect(document.querySelector('th[aria-label="配る"]')).toBeNull()
+    })
+  }
 })
