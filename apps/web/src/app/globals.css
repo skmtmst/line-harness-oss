@@ -607,6 +607,19 @@
   --select-menu-check: 14px;
   --select-menu-enter: 150ms;
   --select-menu-enter-scale: 0.97;
+  /* 同じ板で「新しいフォルダ」の名前を入れる（iBuZH）。内側 10・間 8・欄 32・色の見本 18（間 6）・ボタン 28。 */
+  --select-menu-panel-pad: 10px;
+  --select-menu-panel-gap: 8px;
+  --select-menu-field-h: 32px;
+  --select-menu-field-pad: 0 10px;
+  --select-menu-swatch: 18px;
+  --select-menu-swatch-gap: 6px;
+  --select-menu-button-h: 28px;
+  --select-menu-button-size: 12px;
+  --select-menu-button-pad: 0 10px;
+  --select-menu-button-pad-primary: 0 12px;
+  --select-menu-panel-w: 220px;
+  --select-menu-dot: 8px;
 }
 
 /*

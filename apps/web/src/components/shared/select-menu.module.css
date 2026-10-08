@@ -126,6 +126,31 @@
   opacity: 0.5;
 }
 
+.divider {
+  flex: none;
+  height: 1px;
+  background: var(--color-divider);
+}
+
+/* 一覧の下の「＋ 新しいフォルダを作る」（dLffh）。緑・600。 */
+.action {
+  color: var(--color-accent-deep);
+  font-weight: 600;
+}
+
+.actionIcon {
+  width: var(--select-menu-check);
+  height: var(--select-menu-check);
+}
+
+/* 同じ板の中身を替えたとき（iBuZH「名前を入れる」）。内側 10・間 8。 */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--select-menu-panel-gap);
+  padding: var(--select-menu-panel-pad);
+}
+
 .leading {
   display: inline-flex;
   flex: none;

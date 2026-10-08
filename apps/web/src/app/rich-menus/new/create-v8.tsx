@@ -56,6 +56,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import SegmentedControl from '@/components/shared/segmented'
 import Toggle from '@/components/shared/toggle'
 import DateTimeField from '@/components/shared/date-time-field'
@@ -1893,8 +1894,17 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               }} placeholder="例：通常メニュー（会員向け）" invalid={Boolean(nameError)} />
             </Field>
             <Field label="フォルダ">
-              <Select aria-label="フォルダ" value={folderId} onChange={setFolderId}
-                options={[{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.id, label: f.name }))]} size="full" />
+              <FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId}
+                folders={folders.map(folderById)} size="full"
+                colors={!host}
+                onCreate={!canOperate
+                  ? undefined
+                  : host
+                    ? (host.createFolder
+                      ? folderCreator(async (name) => ({ success: true as const, data: await host.createFolder!(name) }), folderById, (created) => setFolders((current) => [...current, created as Folder]))
+                      : undefined)
+                    // 一覧の左の列の「フォルダを追加」と同じ口（リッチメニューのフォルダは共有）。
+                    : folderCreator((name, color) => api.folders.create({ kind: 'rich_menu', name, color }), folderById, (created) => setFolders((current) => [...current, created]))} />
             </Field>
           </div>
           <Field label="トーク画面の下の文言（14文字まで）" htmlFor="rm-chatbar" error={chatBarTextError}>

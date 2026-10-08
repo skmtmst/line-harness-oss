@@ -20,7 +20,8 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+import FolderSelect, { folderCreateResult } from '@/components/shared/folder-select'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import Toggle from '@/components/shared/toggle'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
@@ -53,6 +54,8 @@ function TagCreate() {
   const router = useRouter()
   const params = useSearchParams()
   const { selectedAccountId } = useAccount()
+  const staffRole = useStaffRole()
+  const canEditFolders = staffRole === null || canManageRole(staffRole)
   const copyId = params.get('copy') ?? ''
   /* 直前に作ったタグの名前。URL に残すので再読み込みでも消えない。 */
   const createdName = params.get('created') ?? ''
@@ -184,7 +187,14 @@ function TagCreate() {
   if (loading) return <ListState kind="loading" title="複製元を読み込んでいます…" />
 
   const back = <Link href="/tags" className={styles.backLink}>← 友だち属性へ</Link>
-  const groupOptions = [{ value: '', label: '未分類' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]
+  const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
+  // その場でタグのフォルダを作る（dLffh）。左の列の「フォルダを追加」と同じ受け口・同じ権限。
+  const createGroup = async (name: string, color: string | null) => {
+    const response = await api.tagGroups.create({ name, color, accountId: selectedAccountId })
+    const created = folderCreateResult(response, (group: TagGroup) => ({ value: group.id, label: group.name, color: group.color }))
+    if (response.success) setGroups((current) => [...current, response.data])
+    return created
+  }
 
   return (
     <>
@@ -226,7 +236,7 @@ function TagCreate() {
           <div className={styles.field}>
             <span className={styles.label} id="tag-new-folder">所属フォルダ</span>
             <span className={styles.selectBox}>
-              <Select size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} options={groupOptions} />
+              <FolderSelect size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} />
             </span>
             {foldersFailed ? (
               <div className={styles.inlineRetry}>
