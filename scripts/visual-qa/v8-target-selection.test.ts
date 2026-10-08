@@ -9,7 +9,7 @@ describe('ROOT-05 query付きの板', () => {
     const { targets, skipped } = selectTargets(map, { onlyBoards: ids })
     expect(skipped).toEqual([])
     expect(targets.map((t: { board: string; route: string }) => [t.board, t.route])).toEqual(
-      ids.sort().map(id => [id, map.boards[id as keyof typeof map.boards].url]))
+      ids.sort().map(id => [id, (map.boards[id as keyof typeof map.boards] as { url?: string }).url]))
   })
   it('存在しない入口と幅なしの板は外す', () => {
     const boards = { absent: { route: '/not-implemented', width: 1440 }, liff: { route: '/tags', width: null } }
