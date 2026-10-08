@@ -318,3 +318,15 @@
 [data-theme='v8'] .row .radio { position: static; width: 18px; height: 18px; margin: 0; }
 [data-theme='v8'] .row:active { filter: none; }
 [data-theme='v8'] .row { -webkit-font-smoothing: auto; }
+
+/* フォームの小さい選択肢（RaMf3・hadfk）。装飾の丸を出さず、印と題を同じ行に置く。 */
+[data-theme='v8'] .form { min-height: 0; padding: 12px 10px; gap: 4px; border-radius: var(--radius-control); }
+[data-theme='v8'] .form:has(.inlineIcon) { padding-inline: 14px; }
+[data-theme='v8'] .form .body { gap: 4px; }
+[data-theme='v8'] .form .title { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 19px; }
+[data-theme='v8'] .form .note { font-size: 11px; line-height: 16px; }
+[data-theme='v8'] .form > .radio { top: 0; right: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+[data-theme='v8'] .form:has(> .radio:focus-visible) { outline: 2px solid var(--color-action); outline-offset: 2px; }
+.inlineIcon { display: inline-flex; color: var(--color-ink-secondary); }
+[data-theme='v8'] .form.checked .inlineIcon { color: var(--color-accent-deep); }
+.inlineIcon svg { width: 14px; height: 14px; }

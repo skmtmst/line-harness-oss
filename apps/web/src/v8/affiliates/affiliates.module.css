@@ -269,47 +269,6 @@
 /* 閲覧のみで隠した作るボタン（＋下の間）の場所だけ空ける。 */
 .viewerCreateSpace { display: block; height: var(--tpl-af-viewer-create-h); }
 
-/* 空・失敗の1枚。 */
-.stateCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--tpl-cell-gap-half);
-  margin: 0 var(--tpl-toolbar-pad-side);
-  padding: var(--tpl-wb-target-pad);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  text-align: center;
-}
-.stateIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-chip-h);
-  height: var(--tpl-chip-h);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-tile);
-  color: var(--color-ink-secondary);
-}
-.stateIconError {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-.stateTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-row-name-lh);
-}
-.stateDesc {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-row-name-lh);
-}
-
 /* タブの段（絵 nJlxX：タブの高さ 28）。共通のタブは変えず、この板の下の余白だけ詰める。 */
 .tabsBox :global([role='tab']) { min-height: 0; padding-bottom: var(--tpl-af-tab-pad-bottom); }
 
@@ -398,9 +357,9 @@
 .bulkTargets {
   display: flex;
   align-items: center;
-  gap: var(--tpl-toolbar-gap);
-  padding: var(--tpl-af-bulk-target-pad);
-  border-radius: var(--radius-control);
+  gap: var(--tpl-af-ops-gap);
+  padding: var(--tpl-af-dr-row-pad);
+  border-radius: var(--radius-segment);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
 }
@@ -414,19 +373,21 @@
   white-space: nowrap;
 }
 .linkButton {
+  min-height: 0;
   padding: 0;
   border: 0;
   background: none;
   color: var(--color-action);
   font-size: var(--text-caption);
   font-weight: 600;
+  line-height: normal;
   cursor: pointer;
 }
 .bulkChoices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--tpl-af-ops-gap);
-  margin-top: var(--tpl-af-bulk-choices-gap);
+  margin-top: var(--tpl-af-cr-card-gap);
 }
 
 /* 期間を締める（usDpO）。対象・合計の行は線で区切る。 */

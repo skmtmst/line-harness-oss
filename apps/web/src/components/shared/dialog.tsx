@@ -33,6 +33,8 @@ export type DialogProps = {
   designContentPadding?: string
   /** 題の隣の補足。ほかの窓の題の並びは変えない。 */
   titleHelp?: ReactNode
+  /** 段の帯を使わず、題・手順・本文・操作を1枚に続ける窓（hadfk）。既定の窓は変えない。 */
+  layout?: 'continuous'
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
   /** 操作の左に出す現在の手順など。 */
@@ -93,6 +95,7 @@ export default function Dialog({
   designHeaderHeight,
   designContentPadding,
   titleHelp,
+  layout,
   steps,
   footerLead,
   title,
@@ -181,6 +184,7 @@ export default function Dialog({
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-size={size}
+      data-layout={layout}
       data-footer-align={footerAlign}
       data-design-width={designWidth ? '' : undefined}
       data-design-header-padding={designHeaderPadding ? '' : undefined}
