@@ -195,3 +195,10 @@ test.each(['text','textarea','number','date','datetime','time','select','multi_s
  const {template}=await create('friend_field',definition),r=await distribute(template.id,await preflight(template.id));expect(r.body.data.stores[0].status).toBe('succeeded');
  const row=sql.raw.prepare("SELECT COALESCE(type_v8,type_v6,type) type FROM friend_fields WHERE field_key='pet_name'").get();expect(row).toEqual({type});
 });
+test('another HQ administrator can read a result but cannot execute the creator preflight',async()=>{
+ const {template}=await create('mark',markDefinition),p=await preflight(template.id);await distribute(template.id,p);
+ sql.raw.exec("INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('admin','Admin','admin','another-fixture','t')");
+ staff={id:'admin',name:'Admin',role:'admin',tenantId:'t',readOnly:true};
+ const result=await request(`/${template.id}/distributions/${p.preflightId}`);expect(result.status).toBe(200);expect(result.body.data.stores[0].status).toBe('succeeded');
+ staff.readOnly=false;expect((await distribute(template.id,p)).status).toBe(404);
+});

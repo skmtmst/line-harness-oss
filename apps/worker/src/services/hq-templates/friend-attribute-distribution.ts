@@ -119,7 +119,7 @@ function plan(type:HqFriendAttributeType,definition:HqFriendFieldDefinition|HqMa
 }
 export async function friendAttributeResult(db:D1Database,auth:HqTemplateAuthority,id:string,runId:string){
  const run=await db.prepare('SELECT status,created_by FROM hq_template_distribution_runs WHERE id=? AND tenant_id=? AND template_id=?').bind(runId,auth.tenantId,id).first<{status:string;created_by:string}>();
- if(!run||run.created_by!==auth.actorId)throw new HqTemplateError('NOT_FOUND',404);
+ if(!run)throw new HqTemplateError('NOT_FOUND',404);
  const preflights=(await db.prepare('SELECT * FROM hq_template_preflights WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id').bind(auth.tenantId,id,runId).all<HqTemplatePreflight>()).results;
  await requireTargetAccounts(db,auth,preflights.map(p=>p.target_account_id));
  const stores=[];
