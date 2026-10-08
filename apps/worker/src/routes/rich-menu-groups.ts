@@ -1,3 +1,4 @@
+import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../services/rich-menu-group-input.js';
 import { Hono, type Context } from 'hono';
 import {
   getRichMenuGroups,
@@ -2279,31 +2280,16 @@ async function buildPublishGroupInput(
   latestGroup: RichMenuGroupWithPages,
   account: { liff_id?: string | null },
 ): Promise<GroupInput> {
-  const trackedLinkUrls = await resolveTrackedLinkUrls(
+  return assembleRichMenuGroupInput(
     c.env.DB,
-    () => resolveTrackedLinkBaseUrl(c.env.DB, c.env.WORKER_URL || new URL(c.req.url).origin),
-    latestGroup,
+    richMenuLiveToSnapshot(latestGroup),
+    account,
+    {
+      fallbackGroupId: latestGroup.id,
+      workerBaseUrl: c.env.WORKER_URL || new URL(c.req.url).origin,
+      liffUrl: c.env.LIFF_URL,
+    },
   );
-  const formBaseUrl = account.liff_id ? `https://liff.line.me/${account.liff_id}` : (c.env.LIFF_URL ?? null);
-  return {
-    id: latestGroup.id,
-    size: latestGroup.size,
-    chatBarText: latestGroup.chat_bar_text,
-    isDefaultForAll: latestGroup.is_default_for_all === 1,
-    defaultOpen: latestGroup.default_open === 1,
-    formBaseUrl,
-    pages: latestGroup.pages.map((p) => ({
-      id: p.id, orderIndex: p.order_index, name: p.name,
-      imageR2Key: p.image_r2_key, imageContentType: p.image_content_type, lineRichMenuId: p.line_richmenu_id,
-      areas: p.areas.map((a) => ({
-        id: a.id,
-        bounds: { x: a.bounds_x, y: a.bounds_y, width: a.bounds_width, height: a.bounds_height },
-        actionType: a.action_type, actionData: a.actionData, intent: a.intent, label: a.label,
-        tagIds: a.tagIds, scoreChange: a.score_change, templateId: a.template_id, formId: a.form_id,
-        trackedLinkUrl: a.tracked_link_id ? (trackedLinkUrls.get(a.tracked_link_id) ?? null) : null,
-      })),
-    })),
-  };
 }
 
 /** K-1「公開の進み」の段の名前。設計 K-1 の4段。 */
