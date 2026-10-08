@@ -73,6 +73,7 @@ import { describeFriendAddFailure } from './failure'
 import { addTimeWindow, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow } from './flow'
 import { resendSuppressionText } from './text'
 import styles from './editor.module.css'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
 type EditorRule = {
@@ -1033,7 +1034,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
   scenarios: FriendAddRuleOptions['scenarios']
   canEdit: boolean
 }) {
-  const messageRef = useRef<HTMLTextAreaElement | null>(null)
+  const messageRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement | null>(null)
   const insertToken = (token: string) => {
     const area = messageRef.current
     if (!area) return
@@ -1082,7 +1083,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
         </div>
         )}
         <div className={styles.bodyBox}>
-          <textarea
+          <InsertTextField
             ref={messageRef}
             aria-label="最初に送るメッセージ"
             className={styles.bodyText}
@@ -1090,7 +1091,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             maxLength={MESSAGE_LIMIT}
             value={definition.messageText}
             readOnly={!canEdit}
-            onChange={(event) => setDefinition((current) => ({ ...current, messageText: event.target.value }))}
+            onValueChange={(next) => setDefinition((current) => ({ ...current, messageText: next }))}
           />
           <div className={styles.insertRow}>
             {/* 閲覧のみ：差し込むボタンは置かない（文字数だけ見せる）。 */}
