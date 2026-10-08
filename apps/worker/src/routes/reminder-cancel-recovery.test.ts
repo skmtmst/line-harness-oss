@@ -1797,8 +1797,9 @@ describe('旧表の恒久失敗を上限で打ち切る (自主検証)', () => {
       ).run();
       breakAccountCredential(dual.raw1, 'account-9');
       const sentTo: string[] = [];
+      let attemptTime=Date.parse('2099-05-31T12:00:00.000Z');
       const run = () => processDueEventReminders(dual.db1, {
-        now: new Date('2099-05-31T12:00:00.000Z'),
+        now: new Date((attemptTime+=60_000)),
         sender: async (p) => {
           sentTo.push(p.toLineUserId);
         },
