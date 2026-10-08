@@ -16,8 +16,7 @@ import {
   CircleDot,
   Bookmark,
   Columns3,
-  ChevronDown,
-  Database,
+  Download,
   Eye,
   Megaphone,
   MessageSquare,
@@ -55,7 +54,6 @@ import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
-import ActionMenu from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -67,7 +65,8 @@ import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import FriendRowMenu from '@/components/friends/friend-row-menu'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
-import { FRIENDS_TABS, hasEditKey } from '../shared/nav'
+import { hasEditKey } from '../shared/nav'
+import { FriendsTabs } from '../shared/head'
 import { emptyMessageOf } from './empty'
 import { csvExportLine } from './csv-export'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
@@ -187,8 +186,6 @@ export default function FriendsListV8() {
   const [columnsReady, setColumnsReady] = useState(false)
   const [columnsOpen, setColumnsOpen] = useState(false)
   const columnsButtonRef = useRef<HTMLButtonElement>(null)
-  const dataMenuRef = useRef<HTMLSpanElement>(null)
-  const [dataMenuOpen, setDataMenuOpen] = useState(false)
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('friends.visibleColumns') ?? 'null') as unknown
@@ -558,29 +555,10 @@ export default function FriendsListV8() {
 
   const headActions = (
     <>
-      <span ref={dataMenuRef} className={styles.dataMenuBox}>
-        <Button type="button" variant="secondary" aria-haspopup="menu" aria-expanded={dataMenuOpen} onClick={() => setDataMenuOpen((current) => !current)}>
-          <Database size={14} aria-hidden="true" />
-          表示中をCSVで書き出す
-          <ChevronDown size={14} aria-hidden="true" />
-        </Button>
-        <ActionMenu
-          open={dataMenuOpen}
-          ariaLabel="友だちのデータの操作"
-          anchorRef={dataMenuRef}
-          onClose={() => setDataMenuOpen(false)}
-          items={[
-            { id: 'csv', label: '表示中をCSVで書き出す', disabled: loadStatus !== 'ready', onSelect: () => { setDataMenuOpen(false); exportCurrentPage() } },
-            ...FRIENDS_TABS.filter((tab) => tab.key !== 'list' && tab.key !== 'csv').map((tab, index) => ({
-              id: tab.key,
-              label: tab.label,
-              external: true,
-              dividerBefore: index === 0,
-              onSelect: () => { setDataMenuOpen(false); router.push(tab.href) },
-            })),
-          ]}
-        />
-      </span>
+      <Button type="button" variant="secondary" onClick={exportCurrentPage} disabled={loadStatus !== 'ready'}>
+        <Download size={14} aria-hidden="true" />
+        表示中をCSVで書き出す
+      </Button>
       {canImport ? (
         <Button variant="primary" href="/friends/migrations">
           <Upload size={14} aria-hidden="true" />
@@ -928,6 +906,7 @@ export default function FriendsListV8() {
               <span>{VIEWER_NOTE}</span>
             </div>
           ) : null}
+          <FriendsTabs current="list" />
         </>
       )}
       stats={statsBand}

@@ -353,5 +353,3 @@ button.star:hover { background: var(--color-status-warn-soft); color: var(--colo
   box-shadow: none;
 }
 :global([data-theme='v8']) .kpiMenu > .kpiMenuButton:not(:focus-visible) { outline-color: transparent; }
-
-.dataMenuBox { display: inline-flex; }
