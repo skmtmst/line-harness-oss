@@ -44,6 +44,7 @@ import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -170,6 +171,7 @@ export default function AutomationListV8() {
   const [onlyActive, setOnlyActive] = useState(false)
   const [onlyStopped, setOnlyStopped] = useState(false)
   const [saved, setSaved] = useState<SavedKey>('')
+  const [sort, setSort] = useState<'updated' | 'runs' | 'name'>('updated')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -266,16 +268,16 @@ export default function AutomationListV8() {
         .includes(query)
     })
     return [...filtered].sort((a, b) => {
-      if (saved === 'name') return a.name.localeCompare(b.name, 'ja')
-      if (saved === 'runs') return b.executionCount30d - a.executionCount30d || a.name.localeCompare(b.name, 'ja')
+      if (sort === 'name') return a.name.localeCompare(b.name, 'ja')
+      if (sort === 'runs') return b.executionCount30d - a.executionCount30d || a.name.localeCompare(b.name, 'ja')
       return b.updatedAt.localeCompare(a.updatedAt)
     })
-  }, [items, search, folderFilter, onlyActive, onlyStopped, saved])
+  }, [items, search, folderFilter, onlyActive, onlyStopped, saved, sort])
 
   const pageCount = Math.max(1, Math.ceil(visible.length / pageSize))
   const current = Math.min(Math.max(1, page), pageCount)
   const paged = visible.slice((current - 1) * pageSize, current * pageSize)
-  useEffect(() => { setPage(1) }, [search, folderFilter, onlyActive, onlyStopped, saved, pageSize, selectedAccountId])
+  useEffect(() => { setPage(1) }, [search, folderFilter, onlyActive, onlyStopped, saved, sort, pageSize, selectedAccountId])
 
   const runRowAction = async (fn: () => Promise<void>, id: string) => {
     if (rowBusyId) return
@@ -418,7 +420,11 @@ export default function AutomationListV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select aria-label="よく使う絞り込み" value={saved} onChange={(value) => setSaved(value as SavedKey)} options={SAVED_OPTIONS} />
+      <Select aria-label="よく使う絞り込み" value={saved} onChange={(value) => {
+        setSaved(value as SavedKey)
+        if (value === 'name' || value === 'runs') setSort(value)
+        else setSort('updated')
+      }} options={SAVED_OPTIONS} />
     </div>
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
@@ -458,7 +464,14 @@ export default function AutomationListV8() {
       <ListToolbar
         search={{ placeholder: 'ルール名・きっかけで探す', label: 'ルールを検索', width: 240, value: search, onChange: setSearch }}
         filters={filterChips}
-        trailing={<>{savedBox}{perPageBox}</>}
+        trailing={<>{savedBox}<Select aria-label="並び順" width={170} value={sort} onChange={(value) => {
+          setSort(value as 'updated' | 'runs' | 'name')
+          if (saved === 'runs' || saved === 'name') setSaved('')
+        }} options={[
+          { value: 'updated', label: '並び：更新が新しい順' },
+          { value: 'runs', label: '並び：動いた回数が多い順' },
+          { value: 'name', label: '並び：名前順' },
+        ]} />{perPageBox}</>}
       />
     </>
   )
@@ -509,7 +522,9 @@ export default function AutomationListV8() {
                 return (
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
-                      <span className={styles.name} title={item.name}>{item.name}</span>
+                      <FolderDotName folder={null}>
+                        <span className={styles.name} title={item.name}>{item.name}</span>
+                      </FolderDotName>
                     </Td>
                     <Td className={styles.colTrigger}><span className={styles.cell} title={trigger}>{trigger}</span></Td>
                     <Td className={styles.colWho}><span className={styles.cell} title={who}>{who}</span></Td>

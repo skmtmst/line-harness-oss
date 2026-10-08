@@ -97,16 +97,16 @@
 .colState { width: var(--tpl-am-col-state); flex-shrink: 0; }
 .colOps { width: var(--tpl-am-col-ops); flex-shrink: 0; }
 
-/* ルール名（緑の 13/600）。広い板は1行、狭い板は2行まで。 */
+/* 短い名前は途中で折らず、全文は title で確かめる。 */
 .name {
-  display: -webkit-box;
+  display: block;
   overflow: hidden;
   color: var(--color-accent-deep);
   font-size: var(--tpl-row-name-size);
   font-weight: 600;
   line-height: normal;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* きっかけ・だれに：12 の文字で2行まで。 */
