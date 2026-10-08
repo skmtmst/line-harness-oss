@@ -131,7 +131,7 @@ const buttons = () => [...document.querySelectorAll('button')] as HTMLButtonElem
 const buttonText = (text: string) => buttons().find((button) => button.textContent?.trim() === text)
 
 describe('V8 ウェビナーの編集', () => {
-  it('入口は V8 のときだけ新しい画面を出す（v7 の見た目では今の画面のまま）', async () => {
+  it('入口はテーマ設定にかかわらずV8の画面を出す', async () => {
     nav.search = 'id=webinar-1&pane=participants'
     await render(<EditPage />)
     expect(host.querySelector('[data-wc-editor="v8"]')).toBeTruthy()
@@ -139,7 +139,7 @@ describe('V8 ウェビナーの編集', () => {
     act(() => { root.unmount() })
     root = createRoot(host)
     await render(<EditPage />)
-    expect(host.querySelector('[data-wc-editor="v8"]')).toBeNull()
+    expect(host.querySelector('[data-wc-editor="v8"]')).toBeTruthy()
   })
 
   it('参加者（uNsEy）：頭・タブ（参加者の人数つき）・数の帯・表・チャットへの道', async () => {

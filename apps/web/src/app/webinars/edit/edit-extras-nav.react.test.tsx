@@ -31,7 +31,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
-  useSearchParams: () => new URLSearchParams('id=w1'),
+  useSearchParams: () => new URLSearchParams('id=w1&pane=participants'),
   usePathname: () => '/webinars/edit',
 }))
 
@@ -39,7 +39,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined,
   usePageTitle: () => {},
 }))
 
@@ -98,6 +98,7 @@ const editorPayload = {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   get.mockImplementation(async () => ({ success: true, data: webinar }))
   editor.mockImplementation(async () => ({ success: true, data: editorPayload }))
   analytics.mockImplementation(() => new Promise(() => {}))
@@ -122,7 +123,7 @@ describe('R94 編集画面の常設導線', () => {
     await act(async () => { root.render(<EditWebinarPage />) })
     await flush()
 
-    const nav = host.querySelector('nav[aria-label="参加者・分析・演出へ移動"]')
+    const nav = host.querySelector('nav[aria-label="設定・参加者・分析・コメント演出"]')
     expect(nav, '常設導線の nav が見つかりません').toBeTruthy()
     expect(nav!.textContent).toContain('参加者')
     expect(nav!.textContent).toContain('分析')
@@ -133,11 +134,11 @@ describe('R94 編集画面の常設導線', () => {
     await act(async () => { root.render(<EditWebinarPage />) })
     await flush()
 
-    const nav = host.querySelector('nav[aria-label="参加者・分析・演出へ移動"]')!
+    const nav = host.querySelector('nav[aria-label="設定・参加者・分析・コメント演出"]')!
     const button = [...nav.querySelectorAll('button')].find((el) => el.textContent === '分析')
     expect(button, '分析の行き先が見つかりません').toBeTruthy()
     await act(async () => { button!.click() })
     await flush()
-    expect(button!.getAttribute('aria-current')).toBe('page')
+    expect([...host.querySelectorAll('nav button')].find((el) => el.textContent === '分析')!.getAttribute('aria-current')).toBe('page')
   })
 })

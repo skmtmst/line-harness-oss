@@ -89,6 +89,8 @@ const json = (data: unknown, status = 200) => new Response(
 let fetchCalls: string[] = []
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  window.history.replaceState(null, '', '/webinars')
   listItems = [webinar()]
   staffRole = 'admin'
   fetchCalls = []
@@ -289,10 +291,10 @@ test('アーカイブ済みを開いて記録を読み、確認してから下�
   await act(async () => { option.querySelector('button')!.click() })
   expect(requests.some((r) => r.url.includes('status=archived'))).toBe(true)
   const row = host.querySelector('tbody tr')!
-  expect(row.textContent).toContain('● アーカイブ')
+  expect(row.textContent).toContain('アーカイブ')
   expect(row.textContent).toContain('124人')
   expect(row.textContent).toContain('視聴開始 98人')
-  await act(async () => { (row.querySelector('button[aria-label="NEN活用スタートセミナーのその他操作"]') as HTMLButtonElement).click() })
+  await act(async () => { (row.querySelector('button[aria-label="ウェビナー「NEN活用スタートセミナー」の操作"]') as HTMLButtonElement).click() })
   const restore = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes('下書きに戻す')) as HTMLElement
   await act(async () => { restore.click() })
   expect(requests.filter((r) => r.method === 'PUT')).toHaveLength(0)

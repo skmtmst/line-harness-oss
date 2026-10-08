@@ -170,8 +170,9 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       setSavedForm(registrationFormId)
       return true
     } catch (cause) {
-      if (isConflict(cause)) { setConflict(true); setLatest(null); return false }
-      if (cause instanceof ApiError && ['form_inactive_or_missing', 'form_account_mismatch'].includes(cause.code ?? '')) loadForms()
+      const candidateRejected = cause instanceof ApiError && ['form_inactive_or_missing', 'form_account_mismatch'].includes(cause.code ?? '')
+      if (candidateRejected) loadForms()
+      else if (isConflict(cause)) { setConflict(true); setLatest(null); return false }
       setRegistrationError(webinarErrorText(cause, '申込フォームを保存できませんでした。入力は残っています。'))
       return false
     }
@@ -243,7 +244,9 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       /* 競合の間は「下書きを保存」を「比べてから保存」に替える（押すと違いを比べる窓。絵 pvimJ）。 */
       footerActions={conflict && chrome.footerWithDraft
         ? chrome.footerWithDraft(<Button disabled={busy} busy={reading} onClick={() => void readLatest()}>比べてから保存</Button>)
-        : chrome.footerActions}
+        : chrome.footerWithDraft ? chrome.footerWithDraft(
+          <Button disabled={busy || ctas === null || forms.state !== 'ready'} busy={saving} onClick={() => void saveCurrent.current()}>下書きを保存</Button>,
+        ) : chrome.footerActions}
       status={chrome.status}
       /* 競合の帯は左右の列の上に横いっぱい（絵 pvimJ）。 */
       notice={conflict ? (

@@ -91,7 +91,10 @@ function NewInner() {
     const problems = { title: titleProblem(values.title), slug: slugProblem(values.slug) }
     if (problems.title || problems.slug) {
       setFieldErrors(problems)
-      setError(problems.title ?? problems.slug ?? null)
+      setError(null)
+      const field = document.getElementById(problems.title ? 'webinar-new-title' : 'webinar-new-slug')
+      field?.focus()
+      field?.scrollIntoView?.({ block: 'center' })
       return
     }
     savingRef.current = true
