@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Users } from 'lucide-react'
+import { AlertCircle, ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Send, Users } from 'lucide-react'
 import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
@@ -22,7 +22,7 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -45,6 +45,8 @@ import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorde
 import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from '@/components/friend-fields/field-list'
 import styles from './list.module.css'
 
+import type { AttributeListHost } from './attribute-host'
+
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 未分類の印。空文字は「すべて」なので別の値にする。 */
@@ -58,7 +60,7 @@ export function fieldTypeWord(type: FriendFieldType): string {
   return FIELD_TYPE_LABELS[type] ?? type
 }
 
-export default function FieldsTab({ accountId, canEdit, narrow = false }: { accountId: string | null; canEdit: boolean; narrow?: boolean }) {
+export default function FieldsTab({ accountId, canEdit, narrow = false, host }: { accountId: string | null; canEdit: boolean; narrow?: boolean; host?: AttributeListHost<FriendField> }) {
   const router = useRouter()
   const [items, setItems] = useState<FriendField[]>([])
   const [summary, setSummary] = useState<FriendFieldListSummary | null>(null)
@@ -85,7 +87,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?field=<id> を残す。 */
   const [activeFieldId, setActiveFieldId] = useDetailPanelUrl('field')
-  const openFieldDetail = (id: string) => withViewTransition(() => setActiveFieldId(id))
+  const openFieldDetail = (id: string) => host ? (canEdit ? host.onEdit(id) : undefined) : withViewTransition(() => setActiveFieldId(id))
 
   /* アカウント切替のあとに届いた古い応答で一覧を上書きしない（ATTR-01）。 */
   const gateRef = useRef(createResponseGate())
@@ -105,6 +107,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
   }, [accountId])
 
   const load = useCallback(async () => {
+    if (host) { host.reload(); return }
     const account = accountId
     const token = gateRef.current.begin()
     if (!account) {
@@ -134,11 +137,13 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
       setStatus(forbidden ? 'forbidden' : 'error')
       setError(forbidden ? '' : '再読み込みしても直らない場合はエラー報告へ。')
     }
-  }, [accountId])
-  useEffect(() => { void load() }, [load])
+  }, [accountId, host])
+  useEffect(() => { if (!host) void load() }, [load, host])
+  useEffect(() => { if (host) { setItems(host.items); setStatus(host.status); setError(host.error ?? ''); setFolders(host.folders ?? []); setFolderError(host.foldersFailed ? 'フォルダを読み込めませんでした。' : '') } }, [host])
 
   /* フォルダは folders 表（kind=friend_field）。件数は一覧の items から数える（同じ母集団）。 */
   const loadFolders = useCallback(async () => {
+    if (host) { host.reload(); return }
     if (!accountId) return
     setFolderError('')
     try {
@@ -148,8 +153,8 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
     } catch {
       setFolderError('フォルダを読み込めませんでした。')
     }
-  }, [accountId])
-  useEffect(() => { void loadFolders() }, [loadFolders])
+  }, [accountId, host])
+  useEffect(() => { if (!host) void loadFolders() }, [loadFolders, host])
 
   const visible = useMemo(() => items.filter((field) => {
     if (query && !field.name.toLocaleLowerCase('ja').includes(query.toLocaleLowerCase('ja'))) return false
@@ -169,9 +174,13 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
   const activeField = items.find((item) => item.id === activeFieldId) ?? null
   const activeFieldIndex = pageItems.findIndex((item) => item.id === activeFieldId)
   useEffect(() => setPage(1), [query, type, folderFilter, pageSize])
+  useEffect(() => {
+    if (host && !host.foldersFailed && folderFilter && folderFilter !== UNFILED && !folders.some((folder) => folder.id === folderFilter)) setFolderFilter('')
+  }, [host, folders, folderFilter])
 
   /* 並び替え：/api/friend-fields/reorder へ「動かせる行だけの新しい順」を1回で渡す。共通項目の位置は保つ。 */
   const applyOrder = async (next: FriendField[]) => {
+    if (host) { await host.onOrder(next.map((item) => item.id)); return }
     if (!accountId) return
     const previous = items
     setItems(next)
@@ -196,7 +205,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
   }
 
   const move = async (targetId: string) => {
-    if (!accountId || !dragId || dragId === targetId) return setDragId(null)
+    if ((!accountId && !host) || !dragId || dragId === targetId) return setDragId(null)
     const order = visible.map((field) => field.id)
     const from = order.indexOf(dragId); const to = order.indexOf(targetId)
     setDragId(null)
@@ -268,8 +277,13 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
     }
   }
 
-  /* 行の「…」と右クリックは同じ中身：編集・移行（種類を変える）・削除。閲覧のみは変える操作を出さない。 */
+  /* 行の「…」と右クリックは同じ中身。統括は配る、店は移行。 */
   const rowMenuItems = (field: FriendField): ActionMenuItem[] => {
+    if (host) return canEdit ? [
+      { id: 'edit', label: '編集', onSelect: () => host.onEdit(field.id) },
+      { id: 'distribute', label: '配る', onSelect: () => host.onDistribute(field.id) },
+      { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => host.onRemove(field.id) },
+    ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openFieldDetail(field.id) }]
     const list: ActionMenuItem[] = [
       { id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/fields/edit?id=${encodeURIComponent(field.id)}`) },
@@ -321,10 +335,10 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
       label: f.name,
       count: status === 'ready' ? items.filter((field) => field.folderId === f.id).length : null,
       color: f.color,
-      onEdit: canEdit ? () => setFolderDialog(f) : undefined,
-      onMoveUp: canEdit && index > 0 ? () => void moveFolderOrder(index, -1) : undefined,
-      onMoveDown: canEdit && index < folders.length - 1 ? () => void moveFolderOrder(index, 1) : undefined,
-      onDelete: canEdit ? () => setDeletingFolder(f) : undefined,
+      onEdit: canEdit ? () => host ? host.onEditFolder?.(f.id) : setFolderDialog(f) : undefined,
+      onMoveUp: !host && canEdit && index > 0 ? () => void moveFolderOrder(index, -1) : undefined,
+      onMoveDown: !host && canEdit && index < folders.length - 1 ? () => void moveFolderOrder(index, 1) : undefined,
+      onDelete: canEdit ? () => host ? host.onRemoveFolder?.(f.id) : setDeletingFolder(f) : undefined,
       deleteNote: '削除しても、中の項目は未分類に残ります。',
     })),
     { id: UNFILED, label: '未分類', count: status === 'ready' ? items.filter((field) => !field.folderId).length : null },
@@ -343,7 +357,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
 
   /* 閲覧のみには作るボタンを置かない（2026-10-06 オーナー）。 */
   const createButton = (wide: boolean) => status === 'forbidden' || !canEdit ? null : (
-    <Button href="/tags/fields/new" variant="primary" className={wide ? styles.createWide : undefined}><Plus size={15} aria-hidden="true" />項目を作る</Button>
+    <Button {...(host ? { onClick: host.onCreate, disabled: host.busy } : { href: '/tags/fields/new' })} variant="primary" className={wide ? styles.createWide : undefined}><Plus size={15} aria-hidden="true" />項目を作る</Button>
   )
 
   const table = status === 'forbidden' ? (
@@ -383,6 +397,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
             <Th className={styles.fieldColType}>入っている人</Th>
             <Th className={styles.fieldColType}>回答フォーム</Th>
             <Th className={styles.fieldColPlace}>出す場所</Th>
+            {host && canEdit ? <Th className={styles.colDistribute}><span className="sr-only">配る</span></Th> : null}
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
@@ -433,9 +448,9 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
                   <ContextMenu label={`項目「${field.name}」の操作`} items={fieldContextItems(field)}>
                     <div className={styles.nameRow}>
                       <FolderDotName folder={folderDotOf(field.folderId)}>
-                        {canEdit ? (
+                        {canEdit && !host ? (
                           <Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className={styles.name} title={field.name} onClick={(event) => event.stopPropagation()}>{field.name}</Link>
-                        ) : <span className={styles.name} title={field.name}>{field.name}</span>}
+                        ) : host && canEdit ? <Link href="#" className={styles.name} title={field.name} onClick={(event) => { event.preventDefault(); event.stopPropagation(); host.onEdit(field.id) }}>{field.name}</Link> : <span className={styles.name} title={field.name}>{field.name}</span>}
                       </FolderDotName>
                     </div>
                     <p className={`${styles.sub} ${styles.fieldKey}`} title={key}>{key}</p>
@@ -448,16 +463,17 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
                     {field.formUsageCount === undefined || field.formUsageCount === 0 ? '—' : `${field.formUsageCount}つ`}
                   </span>
                 </Td>
-                <Td className={styles.fieldColPlace}><span className={styles.cellText} title={destinationLabel(field)}>{destinationLabel(field)}</span></Td>
+                <Td className={styles.fieldColPlace}><span className={styles.cellText} title={host ? undefined : destinationLabel(field)}>{host ? '—' : destinationLabel(field)}</span></Td>
+                {host && canEdit ? <Td className={styles.colDistribute} onClick={(event) => event.stopPropagation()}><RowQuickAction label="配る" ariaLabel={`${field.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(field.id)} /></Td> : null}
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
-                    <RowMenu
+                    {(!host || canEdit) ? <RowMenu
                       className={styles.menuButton}
                       label={`項目「${field.name}」の操作`}
                       items={rowMenuItems(field)}
                       open={openMenuId === field.id}
                       onOpenChange={(next) => setOpenMenuId(next ? field.id : null)}
-                    />
+                    /> : null}
                   </span>
                 </Td>
               </Tr>
@@ -477,7 +493,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
 
       <p className={styles.footNote}>
         {canEdit
-          ? `${visible.length}件。行の「…」に：編集・移行（種類を変える）・削除。並べ替えはつまんで上下（キーボードは上下キー）`
+          ? `${visible.length}件。行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）`
           : `${visible.length}件。`}
       </p>
     </DelayedSkeleton>
@@ -485,7 +501,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
 
   return (
     <>
-      <KpiBand data-design="KPIs" className={styles.kpis}>
+      {host?.kpis ?? <KpiBand data-design="KPIs" className={styles.kpis}>
         {kpis.map((kpi) => (
           <KpiCard
             key={kpi.title}
@@ -497,7 +513,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
             detail={kpi.detail}
           />
         ))}
-      </KpiBand>
+      </KpiBand>}
 
       <ListPageBody
         folders={<>
@@ -505,7 +521,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
           <FolderPanel
             activeId={folderFilter}
             onSelect={setFolderFilter}
-            onAddFolder={canEdit ? () => setFolderDialog('new') : undefined}
+            onAddFolder={canEdit ? () => host ? host.onAddFolder?.() : setFolderDialog('new') : undefined}
             addFolderLabel="フォルダを追加"
             rows={folderRows}
           >
@@ -526,7 +542,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
           {/* 案内の帯は道具の段の上（絵：表の列の上だけにかかる）。 */}
           <p className={`${styles.readonlyBand} ${styles.toolbarBand}`}>
             <Info className={styles.readonlyIcon} aria-hidden="true" />
-            項目の種類を変えると、入っている値が変わることがあります。種類を変えるときは「移行」で事前に確かめてから変えます。
+            {host ? '情報欄のひな形を各アカウントへ配れます。種類と差し込みの名前は作ったあと変えられません。別の種類は新しいひな形を作ってください。' : '項目の種類を変えると、入っている値が変わることがあります。種類を変えるときは「移行」で事前に確かめてから変えます。'}
           </p>
           <span className={narrow ? styles.searchNarrow : styles.search}>
             <SearchField aria-label="項目名で探す" placeholder="項目名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
@@ -561,7 +577,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
 
       {/* 行の詳細パネル。名前はその場で直せる。 */}
       <DetailPanel
-        open={activeField !== null}
+        open={!host && activeField !== null}
         title={activeField?.name ?? ''}
         description={activeField ? `{{field.${activeField.fieldKey}}}・${fieldTypeWord(activeField.type)}` : undefined}
         onClose={() => setActiveFieldId(null)}

@@ -2516,3 +2516,5 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-feat-example-radius: 10px;
   --tpl-feat-example-inner-gap: 2px;
 }
+
+[data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }
