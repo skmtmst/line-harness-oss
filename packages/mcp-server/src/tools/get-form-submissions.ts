@@ -7,12 +7,13 @@ export function registerGetFormSubmissions(server: McpServer): void {
     "get_form_submissions",
     "Get all submissions for a specific form. Returns response data with timestamps and friend IDs.",
     {
+      accountId: z.string().optional().describe("LINE account ID (uses default if omitted)"),
       formId: z.string().describe("The form ID to get submissions for"),
     },
-    async ({ formId }) => {
+    async ({ formId, accountId }) => {
       try {
         const client = getClient();
-        const submissions = await client.forms.getSubmissions(formId);
+        const submissions = await client.forms.getSubmissions(formId, { accountId });
         return {
           content: [
             {

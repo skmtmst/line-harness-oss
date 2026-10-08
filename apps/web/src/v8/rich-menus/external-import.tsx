@@ -98,7 +98,7 @@ export function ExternalImportWorkspace({
                       className={`grid w-full items-center gap-3 text-left ${styles.menuRow} ${active ? 'bg-accent-soft' : 'bg-canvas hover:bg-canvas-sunken'}`}
                     >
                       <span className="bg-canvas-sunken text-ink-faint flex h-10 items-center justify-center rounded-control">▧</span>
-                      <span className="min-w-0"><strong className="text-ink block truncate text-sm">{menu.name || '名前なし'}</strong><span className="text-ink-faint block truncate text-xs">{menu.areasCount}面・切替なし・画像あり</span></span>
+                      <span className="min-w-0"><strong className="text-ink block truncate text-sm">{menu.name || '名前なし'}</strong><span className="text-ink-faint block truncate text-xs">{`${menu.areasCount}面・${switchText(menu)}・画像あり`}</span></span>
                       <span className="text-ink hidden text-sm font-semibold sm:block">—<small className="text-ink-faint block text-micro font-normal">今月</small></span>
                       <span className="text-ink-secondary hidden text-xs sm:block">作成日不明</span>
                       <span className={styles.importTag}>取り込む</span>
@@ -112,7 +112,7 @@ export function ExternalImportWorkspace({
               <h2 className="text-ink mb-3 text-sm font-bold">取り込むと、できるようになること</h2>
               <ul className="space-y-3 text-xs text-ink-secondary">
                 <li>✓ 面ごとのボタンを、この画面から書き換えられます</li>
-                <li>✓ 「誰に出すか」の条件を付けられます（いまは全員に出ています）</li>
+                <li>{`✓ 「誰に出すか」の条件を付けられます${selected ? (selected.isCurrentDefault ? '（いまは全員に出ています）' : '（いまは全員向けの既定ではありません）') : ''}`}</li>
                 <li>✓ 面ごとのタップ数が取れるようになります</li>
               </ul>
               <Notice tone="info" className="mt-4">ⓘ 取り込んでも、お客さまに出ているメニューは変わりません。中身をこちらで持つようになるだけです。</Notice>
@@ -155,6 +155,15 @@ export function ExternalImportWorkspace({
       ) : null}
     </div>
   )
+}
+
+/**
+ * WEB221：一覧の行の「切替」。LINEから読んだ面の動きに切り替えがあれば「切替あり」。
+ * 面の動きが読めていないときは言い切らない。
+ */
+export function switchText(menu: Pick<LineMenu, 'areas'>): string {
+  if (!menu.areas) return '切替は未確認'
+  return menu.areas.some((area) => area.action.type === 'richmenuswitch') ? '切替あり' : '切替なし'
 }
 
 function externalActionText(action: NonNullable<LineMenu['areas']>[number]['action']): string {

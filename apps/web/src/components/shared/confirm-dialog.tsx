@@ -56,6 +56,8 @@ interface ConfirmDialogProps {
    * 数えられていない人数のまま送らせない、といった止め方に使う。
    */
   onConfirm?: () => void
+  /** 実行ボタンを押せない形で出す（WEB228：確かめのチェックが入るまで）。 */
+  confirmDisabled?: boolean
   onCancel: () => void
 }
 
@@ -81,6 +83,7 @@ export default function ConfirmDialog({
   designTop,
   primaryAction = 'confirm',
   onConfirm,
+  confirmDisabled = false,
   onCancel,
 }: ConfirmDialogProps) {
   /*
@@ -105,6 +108,7 @@ export default function ConfirmDialog({
       confirmLabel={confirmLabel}
       cancelLabel={cancelLabel}
       busy={busy}
+      confirmDisabled={confirmDisabled}
       error={error}
       primaryAction={primaryAction}
       titleIcon={shownTitleIcon}

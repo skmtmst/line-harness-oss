@@ -958,7 +958,7 @@ async function handleEvent(
             const introContent = await expandSendCommonVars(
               db, template.message_content,
               { kind: 'notification', id: referralRoute.id },
-              { lineAccountId, friendId: friend.id },
+              { lineAccountId, friendId: friend.id, messageType: template.message_type },
             );
             const message = buildMessage(template.message_type, introContent);
             try {

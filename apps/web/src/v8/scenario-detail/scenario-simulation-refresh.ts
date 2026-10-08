@@ -26,7 +26,8 @@ export function scenarioSimulationKey(
     ScenarioWithSteps,
     'lineAccountId' | 'audienceCondition' | 'allowConcurrent' | 'triggerType' | 'steps'
   > | null,
-  triggerCount: number | null,
+  /** 開始のきっかけの数。WEB229：同じ数のまま中身を変えたときも鍵が変わるよう、版つきの文字も受ける。 */
+  triggerCount: number | string | null,
 ): string {
   if (!scenario) return ''
   return JSON.stringify({

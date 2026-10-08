@@ -153,7 +153,7 @@ export class LineClient {
       body,
       retryKey ? { 'X-Line-Retry-Key': retryKey } : {},
     );
-    return { data, requestId: headers.get('x-line-request-id') };
+    return { data, requestId: headers.get('x-line-accepted-request-id') ?? headers.get('x-line-request-id') };
   }
 
   async broadcast(
@@ -167,7 +167,7 @@ export class LineClient {
       body,
       retryKey ? { 'X-Line-Retry-Key': retryKey } : {},
     );
-    return { data, requestId: headers.get('x-line-request-id') };
+    return { data, requestId: headers.get('x-line-accepted-request-id') ?? headers.get('x-line-request-id') };
   }
 
   async replyMessage(

@@ -750,6 +750,7 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
 }
 
 export interface UpdateFormInput {
+  folderId?: string | null;
   name?: string;
   description?: string | null;
   fields?: string;
@@ -809,7 +810,8 @@ export async function updateForm(
   const result = await db
     .prepare(
       `UPDATE forms
-       SET name = ?,
+       SET folder_id = CASE WHEN ? THEN ? ELSE folder_id END,
+           name = ?,
            description = ?,
            fields = ?,
            layout = ?,
@@ -831,6 +833,8 @@ export async function updateForm(
        WHERE id = ? AND content_revision = ?`,
     )
     .bind(
+      'folderId' in input ? 1 : 0,
+      input.folderId ?? null,
       input.name ?? existing.name,
       'description' in input ? (input.description ?? null) : existing.description,
       input.fields ?? existing.fields,

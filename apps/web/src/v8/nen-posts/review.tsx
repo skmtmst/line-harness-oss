@@ -344,7 +344,10 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       await load()
     } catch (error) {
       if (generation === accountGeneration.current) {
-        setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。'))
+        const message = photoNoticeFor(error, '審査結果を保存できませんでした。')
+        setNotice(message)
+        // WEB225：見送りの窓が開いたままなら、失敗の理由を窓の中に出す（裏の一覧にだけ出さない）。
+        if (nextStatus === 'rejected') setReasonError(message)
         if (error instanceof ApiError && error.status === 409) {
           reviewKeys.current.delete(id)
           await load()
@@ -435,7 +438,10 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       await load()
     } catch (error) {
       if (generation === accountGeneration.current) {
-        setNotice(photoNoticeFor(error, 'まとめて審査できませんでした。'))
+        const message = photoNoticeFor(error, 'まとめて審査できませんでした。')
+        setNotice(message)
+        // WEB225：まとめて見送りの窓の中にも出す。
+        if (decision === 'return') setReasonError(message)
       }
     } finally {
       setBulkReviewing(false)

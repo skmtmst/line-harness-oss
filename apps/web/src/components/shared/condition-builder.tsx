@@ -140,6 +140,9 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
   const [scenarios, setScenarios] = useState<Option[]>([])
   const [count, setCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
+  /* WEB067：候補（タグ・シナリオ・友だち情報・対応マーク）が読めなかったこと。読み直せる。 */
+  const [optionsFailed, setOptionsFailed] = useState(false)
+  const [optionsAttempt, setOptionsAttempt] = useState(0)
 
   const condition: SegmentCondition = value ?? { operator: 'AND', rules: [], groups: [] }
 
@@ -152,8 +155,16 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
       setMarks([])
       return () => { cancelled = true }
     }
+    /*
+     * WEB067：アカウントが変わったら、前のアカウントの候補を消してから読む。
+     * B の読み込みが失敗したときに、A のタグ・シナリオを選べるまま残さない。
+     */
+    setTags([])
+    setFields([])
+    setMarks([])
+    setScenarios([])
+    setOptionsFailed(false)
     if (!selectedAccountId) {
-      setMarks([])
       return () => { cancelled = true }
     }
     void (async () => {
@@ -174,7 +185,9 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
         if (fieldRes.success && Array.isArray(fieldRes.data)) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
         if (markRes.success && Array.isArray(markRes.data)) setMarks(markRes.data.map((m) => ({ id: m.id, name: m.name })))
         if (scenarioRes.success && Array.isArray(scenarioRes.data)) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
+        if (!tagRes.success || !fieldRes.success || !markRes.success || !scenarioRes.success) setOptionsFailed(true)
       } catch {
+        if (!cancelled) setOptionsFailed(true)
         /*
          * 選択肢の読み込みが丸ごと失敗しても、条件の入力行自体は残す。
          * 名前・日付・スコアのような選択肢を使わない条件は組めるままにする。
@@ -186,7 +199,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     }
     // 渡された候補は中身が変わったときだけ入れ直す。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccountId, fieldsEnabled, marksEnabled, options ? JSON.stringify(options) : ''])
+  }, [selectedAccountId, fieldsEnabled, marksEnabled, options ? JSON.stringify(options) : '', optionsAttempt])
 
   /*
    * 該当件数。条件を書きながら人数が見えないと、絞りすぎ・絞り足りないに
@@ -196,26 +209,35 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     // 出さないなら数えない。打つたびに使われない問い合わせが飛ぶ。
     if (!showCount) return
     const usable = pruneCondition(condition)
+    /* WEB065：数え直す間は前の数を出さない（別のアカウント・条件の数を残さない）。 */
+    setCount(null)
     if (!usable) {
-      setCount(null)
+      setCounting(false)
       return
     }
+    /* WEB066：条件・アカウントが変わったら、飛んでいる数え上げの結果は捨てる。 */
+    let cancelled = false
     const timer = setTimeout(() => {
       void (async () => {
         setCounting(true)
         try {
-          const res = await api.segments.count(usable as never)
+          // WEB065：選んでいるアカウントの友だちで数える（統括の候補を渡す画面はアカウントを付けない）。
+          const res = await api.segments.count(usable as never, options ? undefined : (selectedAccountId ?? undefined))
+          if (cancelled) return
           setCount(res.success ? (res.count ?? 0) : null)
         } catch {
-          setCount(null)
+          if (!cancelled) setCount(null)
         } finally {
-          setCounting(false)
+          if (!cancelled) setCounting(false)
         }
       })()
     }, 400)
-    return () => clearTimeout(timer)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(condition), showCount])
+  }, [JSON.stringify(condition), showCount, selectedAccountId])
 
   /*
    * S4-OR: 足したばかりの空のかたまりは下書きとして残す。
@@ -306,6 +328,12 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
 
   return (
     <div className="space-y-4">
+      {optionsFailed ? (
+        <p className="text-ink-secondary text-xs" role="status">
+          タグ・シナリオなどの候補を読み込めませんでした。{' '}
+          <button type="button" className="font-semibold underline" onClick={() => setOptionsAttempt((n) => n + 1)}>読み直す</button>
+        </p>
+      ) : null}
       <div className="border-hairline rounded-card border p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-ink text-sm font-bold">

@@ -32,6 +32,7 @@ import { TimeField } from '@/components/shared/date-time-field'
 import FilterChip from '@/components/shared/filter-chip'
 import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
 import HelpTip from '@/components/shared/help-tip'
+import InsertTextField, { InsertButton, type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -56,7 +57,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import RowMenu from './row-menu'
-import { ASSET_KIND, STORE_INSERTS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
+import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
 import styles from './create.module.css'
 
 type Store = Pick<LineAccount, 'id' | 'name' | 'tags'> & { friendCount: number; folderId: string | null; folder: Folder | null }
@@ -207,7 +208,7 @@ export default function HqBroadcastCreate() {
   const body = active.body
   const setBody = (next: string | ((text: string) => string)) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...item, body: typeof next === 'function' ? next(item.body) : next } : item)))
   const setKind = (next: HqKind) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...item, kind: next, assetId: '' } : item)))
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   /* 統括で使える共有の素材（どの店にも属さないクーポン・リッチメッセージ）。 */
   const [assets, setAssets] = useState<BroadcastMessageAsset[] | null>(null)
   const assetId = active.assetId
@@ -234,6 +235,8 @@ export default function HqBroadcastCreate() {
   const [leaving, setLeaving] = useState(false)
   /* 下書きの依頼番号。作ったとき（または読んだ下書き）のものを、直すときもそのまま使う（口の決まり）。 */
   const requestRef = useRef('')
+  /* WEB011：requestRef を作った中身（key）。中身が同じやり直しは同じ依頼番号を使う。 */
+  const createKeyRef = useRef('')
 
   useEffect(() => {
     let current = true
@@ -453,15 +456,23 @@ export default function HqBroadcastCreate() {
         if (current && current.status === 'prepared' && requestId) {
           current = (await hqBroadcastsApi.update(current.id, { ...input, requestId, expectedVersion: current.version })).data
         } else {
-          requestRef.current = crypto.randomUUID()
+          // WEB011：応答が切れた作成のやり直しは、同じ中身なら同じ依頼番号で送る（別の下書きを作らない）。
+          if (!requestRef.current || createKeyRef.current !== key) {
+            requestRef.current = crypto.randomUUID()
+            createKeyRef.current = key
+          }
           current = (await hqBroadcastsApi.create({ ...input, requestId: requestRef.current })).data
         }
+        // WEB011：作れた・直せた下書きは、確かめ（preflight）の前にすぐ覚える。
+        // 確かめが失敗してやり直したとき、同じ下書きを新しい版で直す（重複も 409 も起こさない）。
+        setRun(current)
       }
       let list = (await hqBroadcastsApi.preflight(current.id)).data
       const blocked = list.filter((p) => p.blockedReasons.length > 0 && !p.excluded).map((p) => p.accountId)
       if (blocked.length > 0) {
         const ids = [...new Set([...list.filter((p) => p.excluded).map((p) => p.accountId), ...blocked])]
         current = (await hqBroadcastsApi.exclude(current.id, ids, current.version)).data
+        setRun(current)
         list = list.map((p) => (ids.includes(p.accountId) ? { ...p, excluded: true } : p))
       }
       setRun(current); setRunKey(key); setChecks(list); setSavedAt(new Date().toISOString())
@@ -580,7 +591,7 @@ export default function HqBroadcastCreate() {
 
   const insert = (label: string) => {
     const el = bodyRef.current
-    const at = el ? el.selectionStart : body.length
+    const at = el?.selectionStart ?? body.length
     setBody((text) => `${text.slice(0, at)}${label}${text.slice(at)}`.slice(0, BODY_MAX))
     requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(at + label.length, at + label.length) })
   }
@@ -884,13 +895,14 @@ export default function HqBroadcastCreate() {
                         </div>
                         {kind === 'text' ? (
                           <section>
-                            <textarea
+                            <InsertTextField
                               ref={bodyRef}
                               aria-label="本文"
                               rows={6}
                               maxLength={BODY_MAX}
                               value={body}
-                              onChange={(event) => setBody(event.target.value)}
+                              onValueChange={setBody}
+                              extraTokens={STORE_INSERT_CHIPS}
                               placeholder="{店名}より：…"
                               className="border-hairline rounded-control w-full resize-none border p-3 text-sm focus:border-accent focus:outline-none"
                             />
@@ -898,7 +910,7 @@ export default function HqBroadcastCreate() {
                               <span className={styles.inserts}>
                                 <span className="text-ink-faint">差し込む：</span>
                                 {STORE_INSERTS.map((item) => (
-                                  <Button key={item.label} size="compact" variant="text" title={item.help} onClick={() => insert(item.label)}>{`＋ ${item.label.slice(1, -1)}`}</Button>
+                                  <InsertButton key={item.label} label={item.label.slice(1, -1)} title={item.help} onClick={() => insert(item.label)} />
                                 ))}
                               </span>
                               <span className="text-ink-faint">{`${formatNumber(body.length)} / ${formatNumber(BODY_MAX)}`}</span>
