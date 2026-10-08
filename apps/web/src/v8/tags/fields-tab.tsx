@@ -533,6 +533,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
           </span>
           <Select
             aria-label="種類で絞り込む"
+            width={119}
             value={type}
             onChange={(value) => setType(value as typeof type)}
             options={[
