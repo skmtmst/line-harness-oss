@@ -164,7 +164,6 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/instagram/connection',
   'POST /api/instagram/oauth/start',
   'GET /api/instagram/oauth/callback',
-  'POST /api/instagram/oauth/connect',
   'POST /api/instagram/refresh',
   'POST /api/instagram/sync',
   'GET /api/instagram/profile',

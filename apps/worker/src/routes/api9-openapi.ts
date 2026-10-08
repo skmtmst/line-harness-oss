@@ -260,22 +260,10 @@ Object.assign(api9Paths, {
   },
   '/api/instagram/oauth/callback': {
     get: operation(
-      'ログイン中の同じ操作者のstateを一度だけ消費し、ページ候補を返す。閲覧のみは禁止',
+      'stateを一度だけ消費し、ビジネスアカウントのページを自動採用して接続を保存。設定>SNS連携へ戻す',
       [],
       undefined,
       { state: string, code: string },
-    ),
-  },
-  '/api/instagram/oauth/connect': {
-    post: operation(
-      '候補のページとInstagramを選び、暗号化したトークンと有効期限を保存',
-      [],
-      {
-        type: 'object',
-        required: ['state', 'pageId', 'expectedVersion'],
-        properties: { state: string, pageId: string, expectedVersion: integer },
-      },
-      { lineAccountId: string },
     ),
   },
   '/api/instagram/refresh': {

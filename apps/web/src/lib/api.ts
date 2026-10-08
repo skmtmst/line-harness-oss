@@ -11672,8 +11672,7 @@ export const api = {
   instagram: {
     connection: (accountId:string)=>fetchApi<ApiResponse<import('@line-crm/shared').InstagramConnectionStatus>>(`/api/instagram/connection?${new URLSearchParams({lineAccountId:accountId})}`),
     start: (accountId:string)=>fetchApi<ApiResponse<{url:string;expiresAt:string}>>(`/api/instagram/oauth/start?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:'{}'}),
-    callback: (state:string,code:string)=>fetchApi<ApiResponse<{state:string;lineAccountId:string;pages:import('@line-crm/shared').InstagramOAuthPage[]}>>(`/api/instagram/oauth/callback?${new URLSearchParams({state,code})}`),
-    connect: (accountId:string,body:{state:string;pageId:string;expectedVersion:number})=>fetchApi<ApiResponse<{connected:true;version:number}>>(`/api/instagram/oauth/connect?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:JSON.stringify(body)}),
+    // 折り返しはブラウザがそのまま踏む（/settings/sns?instagram=... へ戻る）ので、画面から叩く口は持たない。
     refresh: (accountId:string)=>fetchApi<ApiResponse<{expiresAt:string;dataAccessExpiresAt:string|null;version:number}>>(`/api/instagram/refresh?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:'{}'}),
     disconnect: (accountId:string,expectedVersion:number)=>fetchApi<ApiResponse<{disconnected:true}>>(`/api/instagram/connection?${new URLSearchParams({lineAccountId:accountId})}`,{method:'DELETE',body:JSON.stringify({expectedVersion})}),
     profile: (accountId:string)=>fetchApi<ApiResponse<{state:string;value:import('@line-crm/shared').InstagramProfile|null;syncedAt?:string|null}>>(`/api/instagram/profile?${new URLSearchParams({lineAccountId:accountId})}`),

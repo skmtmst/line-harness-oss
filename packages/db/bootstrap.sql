@@ -3871,7 +3871,7 @@ CREATE TABLE instagram_connections (
  expires_at TEXT NOT NULL, data_access_expires_at TEXT, profile_json TEXT, posts_json TEXT,
  refreshed_at TEXT NOT NULL, synced_at TEXT, connected_by TEXT NOT NULL,
  version INTEGER NOT NULL DEFAULT 1
-);
+, scopes TEXT NOT NULL DEFAULT '');
 
 CREATE TABLE instagram_messages (
  id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
@@ -6452,7 +6452,7 @@ CREATE TABLE rt_google_posts (
   checked_at TEXT,
   deleted_at TEXT,
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, instagram_enabled INTEGER NOT NULL DEFAULT 0 CHECK(instagram_enabled IN (0,1)), instagram_caption TEXT, instagram_status TEXT NOT NULL DEFAULT 'none' CHECK(instagram_status IN ('none','pending','published','failed','skipped')), instagram_media_id TEXT, instagram_permalink TEXT, instagram_error TEXT, instagram_published_at TEXT);
 
 CREATE TABLE rt_google_profiles (
   store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,

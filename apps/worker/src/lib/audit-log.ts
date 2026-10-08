@@ -160,6 +160,7 @@ export type AuditAction =
   | 'restaurant.google.review.reply'
   | 'restaurant.google.change.send'
   | 'restaurant.google.post.publish'
+  | 'restaurant.google.post.instagram_retry'
   | 'restaurant.google.post.remove'
   // #818: 広告費の手入力と、管理画面からの取り直し
   | 'ad_cost.manual_entry'

@@ -19,11 +19,12 @@ import {
   instagramGraph,
   instagramPages,
   instagramLongToken,
+  instagramCanPublish,
+  INSTAGRAM_PUBLISH_SCOPE,
   encryptInstagramCredential,
   decryptInstagramCredential,
   verifyInstagramSignature,
   type InstagramConfig,
-  type InstagramPage,
 } from '../services/instagram.js';
 export const instagram = new Hono<Env>();
 instagram.onError((e, c) =>
@@ -49,17 +50,15 @@ type Connection = {
   profile_json: string | null;
   posts_json: string | null;
   synced_at: string | null;
+  /** 同意済みの許可（カンマ区切り）。610 で追加。 */
+  scopes: string;
 };
-type Pending = {
-  userToken: string;
-  expiresAt: string;
-  dataAccessExpiresAt: string | null;
-  pages: InstagramPage[];
-};
+// 同時投稿の許可を持たない古い接続も「認可が切れています」にして、同じ接続ボタンで取り直させる。
 const expired = (r: Connection) =>
   Date.parse(r.expires_at) <= Date.now() ||
   (r.data_access_expires_at != null &&
-    Date.parse(r.data_access_expires_at) <= Date.now());
+    Date.parse(r.data_access_expires_at) <= Date.now()) ||
+  !instagramCanPublish(r.scopes ?? '');
 async function account(c: Context<Env>): Promise<string> {
   const id = c.req.query('lineAccountId');
   if (!id) throw new InstagramError('account_required', 400);
@@ -159,8 +158,9 @@ instagram.post(
       redirect_uri: cfg.redirectUri,
       state,
       response_type: 'code',
+      // instagram_content_publish が無いと同時投稿ができないので、接続のときに一緒に貰う。
       scope:
-        'pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_messages,pages_manage_metadata',
+        'pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_messages,pages_manage_metadata,instagram_content_publish',
     }).toString();
     return c.json({
       success: true,
@@ -171,37 +171,57 @@ instagram.post(
     });
   },
 );
+/**
+ * 認可が終わったあとに戻る画面。利用者が見るのは「設定 › SNS連携」だけなので、
+ * 成否をクエリで伝えてそこへ戻す（restaurant-google.ts の折り返しと同じ形）。
+ */
+function snsReturnUrl(c: Context<Env>, result: 'connected' | 'failed'): string {
+  const base = (c.env.ADMIN_PUBLIC_URL ?? '').replace(/\/+$/, '');
+  const url = new URL(
+    `${base || new URL(c.req.url).origin}${INSTAGRAM_RETURN_PATH}`,
+  );
+  url.searchParams.set('instagram', result);
+  return url.toString();
+}
+const INSTAGRAM_RETURN_PATH = '/settings/sns';
+/**
+ * Instagram にログインするだけで接続が終わる口（2026-10-07 利用者承認）。
+ * Facebook ページを選ばせる画面は出さず、ビジネスアカウントのつながったページを
+ * ここで自動採用して保存し、必ず設定 › SNS連携へ戻す。
+ */
 instagram.get(
   '/api/instagram/oauth/callback',
   requireRole('owner', 'admin'),
   denyReadOnly(),
   async (c) => {
-    const cfg = ready(c),
-      state = c.req.query('state'),
-      code = c.req.query('code');
-    if (!state || !code || code.length > 4096 || state.length > 256)
-      throw new InstagramError('invalid_callback', 400);
-    const hash = await instagramHash(state),
-      row = await c.env.DB.prepare(
+    let hash: string | null = null;
+    try {
+      const cfg = ready(c),
+        state = c.req.query('state'),
+        code = c.req.query('code');
+      if (!state || !code || code.length > 4096 || state.length > 256)
+        throw new InstagramError('invalid_callback', 400);
+      hash = await instagramHash(state);
+      const row = await c.env.DB.prepare(
         "SELECT line_account_id FROM instagram_oauth_states WHERE state_hash=? AND staff_id=? AND phase='started' AND expires_at>?",
       )
         .bind(hash, c.get('staff').id, new Date().toISOString())
         .first<{ line_account_id: string }>();
-    if (
-      !row ||
-      !(await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [
-        row.line_account_id,
-      ]))
-    )
-      throw new InstagramError('invalid_oauth_state', 403);
-    const claimed = await c.env.DB.prepare(
-      "UPDATE instagram_oauth_states SET phase='exchanging' WHERE state_hash=? AND staff_id=? AND phase='started' AND expires_at>?",
-    )
-      .bind(hash, c.get('staff').id, new Date().toISOString())
-      .run();
-    if (!claimed.meta.changes)
-      throw new InstagramError('oauth_state_used', 409);
-    try {
+      if (
+        !row ||
+        !(await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [
+          row.line_account_id,
+        ]))
+      )
+        throw new InstagramError('invalid_oauth_state', 403);
+      const id = row.line_account_id;
+      const claimed = await c.env.DB.prepare(
+        "UPDATE instagram_oauth_states SET phase='exchanging' WHERE state_hash=? AND staff_id=? AND phase='started' AND expires_at>?",
+      )
+        .bind(hash, c.get('staff').id, new Date().toISOString())
+        .run();
+      if (!claimed.meta.changes)
+        throw new InstagramError('oauth_state_used', 409);
       const short = await instagramGraph<{ access_token: string }>(
         cfg,
         'oauth/access_token',
@@ -214,100 +234,15 @@ instagram.get(
         },
       );
       if (!short.access_token) throw new InstagramError('invalid_meta_token');
-      const long = await instagramLongToken(cfg, short.access_token),
-        pages = await instagramPages(cfg, long.token);
-      const pending: Pending = {
-        userToken: long.token,
-        expiresAt: long.expiresAt,
-        dataAccessExpiresAt: long.dataAccessExpiresAt,
-        pages,
-      };
-      const encrypted = await encryptInstagramCredential(
-        JSON.stringify(pending),
-        cfg.encryptionKey,
-      );
-      await c.env.DB.prepare(
-        "UPDATE instagram_oauth_states SET phase='selecting',candidates_encrypted=? WHERE state_hash=? AND phase='exchanging'",
-      )
-        .bind(encrypted, hash)
-        .run();
-      return c.json({
-        success: true,
-        data: {
-          state,
-          lineAccountId: row.line_account_id,
-          pages: pages.map(({ pageId, pageName, instagramId }) => ({
-            pageId,
-            pageName,
-            instagramId,
-          })),
-        },
-      });
-    } catch (e) {
-      await c.env.DB.prepare(
-        'DELETE FROM instagram_oauth_states WHERE state_hash=?',
-      )
-        .bind(hash)
-        .run();
-      throw e;
-    }
-  },
-);
-instagram.post(
-  '/api/instagram/oauth/connect',
-  requireRole('owner', 'admin'),
-  async (c) => {
-    const id = await account(c),
-      cfg = ready(c),
-      b = await c.req
-        .json<{ state: string; pageId: string; expectedVersion: number }>()
-        .catch(() => null);
-    if (
-      !b ||
-      typeof b.state !== 'string' ||
-      typeof b.pageId !== 'string' ||
-      !/^\d+$/.test(b.pageId) ||
-      b.state.length > 256 ||
-      !Number.isSafeInteger(b.expectedVersion) ||
-      b.expectedVersion < 0
-    )
-      throw new InstagramError('invalid_connection', 400);
-    const hash = await instagramHash(b.state),
-      pending = await c.env.DB.prepare(
-        "SELECT candidates_encrypted FROM instagram_oauth_states WHERE state_hash=? AND line_account_id=? AND staff_id=? AND phase='selecting' AND expires_at>?",
-      )
-        .bind(hash, id, c.get('staff').id, new Date().toISOString())
-        .first<{ candidates_encrypted: string }>();
-    if (!pending) throw new InstagramError('invalid_oauth_state', 403);
-    const data = JSON.parse(
-        await decryptInstagramCredential(
-          pending.candidates_encrypted,
-          cfg.encryptionKey,
-        ),
-      ) as Pending,
-      page = data.pages.find((p) => p.pageId === b.pageId);
-    if (!page) throw new InstagramError('page_not_authorized', 403);
-    if (
-      Date.parse(data.expiresAt) <= Date.now() ||
-      (data.dataAccessExpiresAt &&
-        Date.parse(data.dataAccessExpiresAt) <= Date.now())
-    )
-      throw new InstagramError('meta_token_expired', 409);
-    const current = await c.env.DB.prepare(
-      'SELECT version FROM instagram_connections WHERE line_account_id=?',
-    )
-      .bind(id)
-      .first<{ version: number }>();
-    if ((current?.version ?? 0) !== b.expectedVersion)
-      throw new InstagramError('version_conflict', 409);
-    const claimed = await c.env.DB.prepare(
-      "UPDATE instagram_oauth_states SET phase='connecting' WHERE state_hash=? AND phase='selecting' AND expires_at>?",
-    )
-      .bind(hash, new Date().toISOString())
-      .run();
-    if (!claimed.meta.changes)
-      throw new InstagramError('oauth_state_used', 409);
-    try {
+      const long = await instagramLongToken(cfg, short.access_token);
+      // 同時投稿の許可が無い接続は保存しない。画面は未接続のままなので、もう一度ログインすれば取り直せる。
+      if (!long.scopes.includes(INSTAGRAM_PUBLISH_SCOPE))
+        throw new InstagramError('instagram_publish_not_granted', 403);
+      const pages = await instagramPages(cfg, long.token),
+        page = pages[0];
+      // ビジネスアカウント（またはクリエイターアカウント）でなければ投稿の口が無い。
+      if (!page)
+        throw new InstagramError('instagram_business_account_required', 403);
       const profile = await instagramGraph<InstagramProfile>(
         cfg,
         page.instagramId,
@@ -317,25 +252,24 @@ instagram.post(
             'id,username,name,biography,profile_picture_url,followers_count,media_count',
         },
       );
-      // Webhook購読の口も準備する。Metaの審査・テスター権限は接続時にMetaが判定する。
-      await instagramGraph(
-        cfg,
-        `${page.pageId}/subscribed_apps`,
-        page.token,
-        { subscribed_fields: 'messages,messaging_postbacks' },
-        'POST',
-      );
       const pageToken = await encryptInstagramCredential(
           page.token,
           cfg.encryptionKey,
         ),
         userToken = await encryptInstagramCredential(
-          data.userToken,
+          long.token,
           cfg.encryptionKey,
         );
+      // ブラウザの折り返しでは版を預かれないので、保存の直前に今の版を読んで衝突だけ見る。
+      const current = await c.env.DB.prepare(
+        'SELECT version FROM instagram_connections WHERE line_account_id=?',
+      )
+        .bind(id)
+        .first<{ version: number }>();
+      const expectedVersion = current?.version ?? 0;
       const now = new Date().toISOString();
       const result = await c.env.DB.prepare(
-        `INSERT INTO instagram_connections(line_account_id,page_id,instagram_id,page_name,username,page_token_encrypted,user_token_encrypted,expires_at,data_access_expires_at,profile_json,refreshed_at,connected_by) SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM instagram_connections WHERE line_account_id=?) ON CONFLICT(line_account_id) DO UPDATE SET page_id=excluded.page_id,instagram_id=excluded.instagram_id,page_name=excluded.page_name,username=excluded.username,page_token_encrypted=excluded.page_token_encrypted,user_token_encrypted=excluded.user_token_encrypted,expires_at=excluded.expires_at,data_access_expires_at=excluded.data_access_expires_at,profile_json=excluded.profile_json,posts_json=NULL,synced_at=NULL,refreshed_at=excluded.refreshed_at,connected_by=excluded.connected_by,version=version+1 WHERE version=?`,
+        `INSERT INTO instagram_connections(line_account_id,page_id,instagram_id,page_name,username,page_token_encrypted,user_token_encrypted,expires_at,data_access_expires_at,scopes,profile_json,refreshed_at,connected_by) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM instagram_connections WHERE line_account_id=?) ON CONFLICT(line_account_id) DO UPDATE SET page_id=excluded.page_id,instagram_id=excluded.instagram_id,page_name=excluded.page_name,username=excluded.username,page_token_encrypted=excluded.page_token_encrypted,user_token_encrypted=excluded.user_token_encrypted,expires_at=excluded.expires_at,data_access_expires_at=excluded.data_access_expires_at,scopes=excluded.scopes,profile_json=excluded.profile_json,posts_json=NULL,synced_at=NULL,refreshed_at=excluded.refreshed_at,connected_by=excluded.connected_by,version=version+1 WHERE version=?`,
       )
         .bind(
           id,
@@ -345,14 +279,15 @@ instagram.post(
           profile.username ?? null,
           pageToken,
           userToken,
-          data.expiresAt,
-          data.dataAccessExpiresAt,
+          long.expiresAt,
+          long.dataAccessExpiresAt,
+          long.scopes.join(','),
           JSON.stringify(profile),
           now,
           c.get('staff').id,
-          b.expectedVersion,
+          expectedVersion,
           id,
-          b.expectedVersion,
+          expectedVersion,
         )
         .run();
       if (!result.meta.changes)
@@ -362,17 +297,16 @@ instagram.post(
       )
         .bind(hash)
         .run();
-      return c.json({
-        success: true,
-        data: { connected: true, version: (await connection(c, id)).version },
-      });
-    } catch (e) {
-      await c.env.DB.prepare(
-        "UPDATE instagram_oauth_states SET phase='selecting' WHERE state_hash=? AND phase='connecting'",
-      )
-        .bind(hash)
-        .run();
-      throw e;
+      return c.redirect(snsReturnUrl(c, 'connected'));
+    } catch {
+      // 失敗の中身は画面に出さない。使い切りの state は必ず捨てて、やり直せる状態に戻す。
+      if (hash)
+        await c.env.DB.prepare(
+          'DELETE FROM instagram_oauth_states WHERE state_hash=?',
+        )
+          .bind(hash)
+          .run();
+      return c.redirect(snsReturnUrl(c, 'failed'));
     }
   },
 );
@@ -402,13 +336,14 @@ instagram.post(
       ),
       token = await encryptInstagramCredential(page.token, cfg.encryptionKey);
     const saved = await c.env.DB.prepare(
-      'UPDATE instagram_connections SET page_token_encrypted=?,user_token_encrypted=?,expires_at=?,data_access_expires_at=?,refreshed_at=?,version=version+1 WHERE line_account_id=? AND version=?',
+      'UPDATE instagram_connections SET page_token_encrypted=?,user_token_encrypted=?,expires_at=?,data_access_expires_at=?,scopes=?,refreshed_at=?,version=version+1 WHERE line_account_id=? AND version=?',
     )
       .bind(
         token,
         user,
         long.expiresAt,
         long.dataAccessExpiresAt,
+        long.scopes.join(','),
         new Date().toISOString(),
         id,
         r.version,
