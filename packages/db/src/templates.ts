@@ -862,7 +862,6 @@ export async function getTemplateSendCounts(
 ): Promise<Map<string, TemplateSendCounts>> {
   if (templateIds.length === 0) return new Map();
   const month = nowJst.slice(0, 7);
-  const placeholders = templateIds.map(() => '?').join(',');
   const result = await db.prepare(
     `SELECT template_id_at_send AS template_id,
             COUNT(*) AS total_count,
@@ -870,9 +869,9 @@ export async function getTemplateSendCounts(
       FROM messages_log
       WHERE direction = 'outgoing'
         AND COALESCE(delivery_type, '') != 'test'
-        AND template_id_at_send IN (${placeholders})
+        AND template_id_at_send IN (SELECT value FROM json_each(?))
       GROUP BY template_id_at_send`,
-  ).bind(month, ...templateIds).all<{
+  ).bind(month, JSON.stringify(templateIds)).all<{
     template_id: string;
     total_count: number;
     month_count: number;
@@ -1087,8 +1086,8 @@ export async function getTemplatesWithUsageCount(
       templates = [];
     } else {
       const rows = await db.prepare(
-        `SELECT * FROM templates WHERE id IN (${pageIds.map(() => '?').join(',')})`,
-      ).bind(...pageIds).all<TemplateRow>();
+        `SELECT * FROM templates WHERE id IN (SELECT value FROM json_each(?))`,
+      ).bind(JSON.stringify(pageIds)).all<TemplateRow>();
       const order = new Map(pageIds.map((id, index) => [id, index]));
       templates = (rows.results ?? [])
         .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
