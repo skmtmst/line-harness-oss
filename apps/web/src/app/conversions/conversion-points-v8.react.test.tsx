@@ -230,7 +230,8 @@ test('v8 で行を選ぶと詳細の小窓が出て、止める小窓は理由�
   expect(stopButton).toBeTruthy()
   await act(async () => { stopButton!.click() })
   await eventually(() => {
-    expect(host.textContent).toContain('「商品を買った」を止める')
+    expect(host.textContent).toContain('止めるときの小窓（3択）')
+    expect(host.textContent).toContain('対象：商品を買った')
   })
   expect(host.textContent).toContain('理由（必須）')
   // 理由が空のままは止められない（詳細の小窓の「止める」と区別する）

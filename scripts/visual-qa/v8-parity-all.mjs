@@ -46,45 +46,51 @@ const onlyBoards = pick('--boards')?.split(',').map((id) => id.trim()).filter(Bo
 const onlyDoc = pick('--doc') ?? null
 const limit = Number(pick('--limit') ?? 0)
 
-const map = loadMap()
-const boards = Object.entries(map.boards)
+export function selectTargets(map, { onlyBoards = null, onlyDoc = null, root = ROOT } = {}) {
+  const boards = Object.entries(map.boards)
 
-// 対象：場所と幅が決まり、実装の page がある板。お客さまの画面（LIFF・
-// 幅なし）・まだ場所が無い板は「未対象」として数えるだけ。
-const targets = []
-const skipped = []
-for (const [board, entry] of boards) {
-  if (onlyBoards && !onlyBoards.includes(board)) continue
-  if (onlyDoc && entry.doc !== onlyDoc) continue
-  let route = null
-  try {
-    route = resolveTarget(map, board, null, null).route
-  } catch {
-    skipped.push({ board, reason: '場所なし（まだ積み替え前）' })
-    continue
+  // 対象：場所と幅が決まり、実装の page がある板。お客さまの画面（LIFF・
+  // 幅なし）・まだ場所が無い板は「未対象」として数えるだけ。
+  const targets = []
+  const skipped = []
+  for (const [board, entry] of boards) {
+    if (onlyBoards && !onlyBoards.includes(board)) continue
+    if (onlyDoc && entry.doc !== onlyDoc) continue
+    let route = null
+    try {
+      route = resolveTarget(map, board, null, null).route
+    } catch {
+      skipped.push({ board, reason: '場所なし（まだ積み替え前）' })
+      continue
+    }
+    const width = entry.width
+    if (!width) {
+      skipped.push({ board, reason: '幅なし（PC点検の対象外）' })
+      continue
+    }
+    const pathname = new URL(route, 'http://visual-qa.local').pathname
+    const page = join(root, 'apps', 'web', 'src', 'app', pathname === '/' ? 'page.tsx' : `${pathname.replace(/^\//, '')}/page.tsx`)
+    if (!existsSync(page)) {
+      skipped.push({ board, reason: `実装なし（${route}）` })
+      continue
+    }
+    targets.push({ board, entry, route: entry.url ?? route, width })
   }
-  const width = entry.width
-  if (!width) {
-    skipped.push({ board, reason: '幅なし（PC点検の対象外）' })
-    continue
-  }
-  const page = join(ROOT, 'apps', 'web', 'src', 'app', route === '/' ? 'page.tsx' : `${route.replace(/^\//, '')}/page.tsx`)
-  if (!existsSync(page)) {
-    skipped.push({ board, reason: `実装なし（${route}）` })
-    continue
-  }
-  targets.push({ board, entry, route: entry.url ?? route, width })
+  return { targets, skipped }
 }
-const runTargets = limit > 0 ? targets.slice(0, limit) : targets
-console.log(`[v8-parity-all] 対象 ${runTargets.length} 板・対象外 ${skipped.length} 板 → ${OUT}`)
 
-// 見本の写しをまとめて用意する。
-try {
-  execFileSync('node', [join(HERE, 'sync-v8-design-refs.mjs'), '--boards', runTargets.map((t) => t.board).join(',')], {
-    stdio: 'inherit',
-  })
-} catch {
-  console.error('[v8-parity-all] 見本の写しに失敗。続ける（無い板は飛ばす）。')
+async function main() {
+  const { targets, skipped } = selectTargets(loadMap(), { onlyBoards, onlyDoc })
+  const runTargets = limit > 0 ? targets.slice(0, limit) : targets
+  console.log(`[v8-parity-all] 対象 ${runTargets.length} 板・対象外 ${skipped.length} 板 → ${OUT}`)
+
+  // 見本の写しをまとめて用意する。
+  try {
+    execFileSync('node', [join(HERE, 'sync-v8-design-refs.mjs'), '--boards', runTargets.map((t) => t.board).join(',')], {
+      stdio: 'inherit',
+    })
+  } catch {
+    console.error('[v8-parity-all] 見本の写しに失敗。続ける（無い板は飛ばす）。')
 }
 
 const { chromium } = await import('@playwright/test')
@@ -206,3 +212,6 @@ if (skipped.length > 0) {
 mkdirSync(OUT, { recursive: true })
 writeFileSync(join(OUT, 'v8-parity-report.md'), `${lines.join('\n')}\n`)
 console.log(`[v8-parity-all] 一覧 → ${join(OUT, 'v8-parity-report.md')}`)
+
+}
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main()

@@ -556,7 +556,8 @@
     "612_hq_friend_attribute_templates.sql",
     "613_folder_colors.sql",
     "614_tenant_company_contact.sql",
+    "615_workflow_steps.sql",
     "616_affiliate_reward_mode.sql"
   ],
-  "migrationCount": 557
+  "migrationCount": 558
 }

@@ -136,6 +136,7 @@
   font-size: var(--text-caption);
   line-height: var(--tpl-st2-od-text-lh);
   overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .error {

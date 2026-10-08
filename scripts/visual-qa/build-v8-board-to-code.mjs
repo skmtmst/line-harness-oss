@@ -7,8 +7,8 @@
  *   - 分類の行の板（LINEアカウント・プールなど）を /notifications の画面に載せる
  *
  * 作り方
- *   1. 板の並びと画面の URL は、今の文書の行（前に撮影の対応表から写したもの）を残す。
- *      `v8-board-urls.mjs` で場所を決めた板だけ、その URL に置き換える。
+ *   1. 板の並びは今の文書から読む。画面の URL は撮影の対応表を優先し、
+ *      両方とも同じ実URL・タブ指定から作る。--out で保護文書の変更案だけを出せる。
  *   2. 入口・画面のファイルは、その URL の入口 `apps/web/src/app/<URL の道>/page.tsx` が
  *      import する V8 の画面から毎回作り直す（`@/v8/…` を先に、次に `*-v8` のファイル。共通の見出しは除く）。
  *
@@ -16,7 +16,7 @@
  *   node scripts/visual-qa/build-v8-board-to-code.mjs
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join, normalize, relative } from 'node:path'
+import { dirname, join, normalize, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BOARD_URLS } from './v8-board-urls.mjs'
 
@@ -24,7 +24,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
 const SRC = join(ROOT, 'apps', 'web', 'src')
 const APP = join(SRC, 'app')
-const OUT = join(ROOT, 'docs', 'v8-board-to-code.md')
+const DOC = join(ROOT, 'docs', 'v8-board-to-code.md')
+const outAt = process.argv.indexOf('--out')
+const OUT = outAt >= 0 && process.argv[outAt + 1] ? resolve(ROOT, process.argv[outAt + 1]) : DOC
 
 const NO_SPLIT = '（別ファイルなし：page.tsx の中で分けている・または V8 なし）'
 const NO_PAGE = '（page.tsx なし）'
@@ -73,20 +75,25 @@ function cell(text) {
   return String(text).replace(/\|/g, '\\|')
 }
 
-function main() {
-  const map = JSON.parse(readFileSync(join(HERE, 'v8-design-map.json'), 'utf8'))
-  const previous = readFileSync(OUT, 'utf8')
-    .split('\n')
-    .filter((line) => /^\| V8(?:-B)? \|/.test(line))
-    .map((line) => line.slice(1, -1).split(' | ').map((part) => part.trim()))
-  const rows = previous.map(([doc, id, name, urlCell]) => {
+export function buildRows(map, previous) {
+  return previous.map(([doc, id, name, urlCell]) => {
     const kept = urlCell && urlCell !== '—' ? urlCell : null
-    const url = BOARD_URLS[id] ?? kept
+    const entryInMap = map.boards[id]
+    const url = entryInMap ? (entryInMap.url ?? entryInMap.route ?? null) : (BOARD_URLS[id] ?? kept)
     const board = { doc, name: map.boards[id]?.name ?? name }
     const entry = entryOf(url)
     const files = entry ? v8FilesOf(entry) : []
     return { id, board, url, entry, files }
   })
+}
+
+function main() {
+  const map = JSON.parse(readFileSync(join(HERE, 'v8-design-map.json'), 'utf8'))
+  const previous = readFileSync(DOC, 'utf8')
+    .split('\n')
+    .filter((line) => /^\| V8(?:-B)? \|/.test(line))
+    .map((line) => line.slice(1, -1).split(' | ').map((part) => part.trim()))
+  const rows = buildRows(map, previous)
   rows.sort((a, b) => {
     if ((a.url === null) !== (b.url === null)) return a.url === null ? 1 : -1
     return (a.url ?? '').localeCompare(b.url ?? '') || a.board.doc.localeCompare(b.board.doc) || a.id.localeCompare(b.id)
@@ -121,7 +128,7 @@ function main() {
   const head = [
     '# V8 の絵（Pencil の板）と画面のコードの対応表',
     '',
-    '- 作り直し：`node scripts/visual-qa/build-v8-board-to-code.mjs`（手で直さない）。URL は前の撮影の対応表から写したもの（場所を決め直した板は `scripts/visual-qa/v8-board-urls.mjs`）。入口・画面のファイルは、その URL の入口（`page.tsx`、`?` の後ろは外して探す）が読む `@/v8/…` または `*-v8` のファイル。共通の見出し（`readonly-header-v8`）は画面のファイルに数えない。',
+    '- 作り直し：`node scripts/visual-qa/build-v8-board-to-code.mjs`（手で直さない）。URL は `scripts/visual-qa/v8-design-map.json` と同じもの（実URL・タブ指定）。入口・画面のファイルは、その URL の入口（`page.tsx`、`?` の後ろは外して探す）が読む `@/v8/…` または `*-v8` のファイル。共通の見出し（`readonly-header-v8`）は画面のファイルに数えない。',
     '- 「V8 の画面ファイル」が `v8/…` なら `apps/web/src/v8/` の新しい画面、`app/…-v8.tsx` なら今の V8 ファイル（60% 以上合うものはここを直す。`apps/web/src/v8/README.md`）。1つの入口が複数の画面を読むとき（タブごと）は全部並べる。',
     '- 画面の中の見た目は型・部品で決まるので、まず `docs/v8-where-to-change.md` を読む。',
     `- 数：src/v8 を読む板 ${readsV8}・app の V8 ファイルだけを読む板 ${readsApp}・入口が V8 の別ファイルを読まない板（page.tsx の中で分けている・または V8 なし） ${noSplit}・URL なし ${noUrl}。`,

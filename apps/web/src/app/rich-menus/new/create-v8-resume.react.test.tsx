@@ -7,6 +7,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -81,6 +82,38 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     host.remove()
     vi.unstubAllGlobals()
     window.history.replaceState(null, '', '/')
+  })
+
+  it('店でも案Aの形を選ぶと、A・Bに対応する2面の座標を作成APIへ送る', async () => {
+    window.history.replaceState(null, '', '/rich-menus/new')
+    type CreatedInput = { pages: Array<{ areas: Array<{ boundsY: number; boundsHeight: number }> }> }
+    let input: CreatedInput | null = null
+    const original = fetch
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+      const path = new URL(String(url), 'http://localhost').pathname
+      if (path === '/api/rich-menu-groups' && init?.method === 'POST') {
+        input = JSON.parse(String(init.body))
+        return { ok: true, status: 200, json: async () => ({ success: true, data: { id: 'rmg-x', pages: [{ id: 'p-top' }] } }) }
+      }
+      if (path === '/api/rich-menu-groups/rmg-x' && input) {
+        const created: CreatedInput = input
+        return { ok: true, status: 200, json: async () => ({ success: true, data: { ...GROUP, pages: [{ ...GROUP.pages[0], areas: created.pages[0].areas.map((area: object, index: number) => ({ ...area, id: `area-${index}` })) }] } }) }
+      }
+      return original(url as RequestInfo, init)
+    }))
+    await act(async () => { root.render(<RichMenuCreateV8 />) })
+    await settle()
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: '1面（面 A）' })) })
+    await act(async () => { fireEvent.keyDown(screen.getByRole('radio', { name: '1面（面 A）' }), { key: 'ArrowRight' }) })
+    expect((screen.getByRole('radio', { name: '上下2面（面 A・B）' }) as HTMLInputElement).checked).toBe(true)
+    await act(async () => { fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: '店の2面メニュー' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き' })) })
+    await settle()
+    expect(input).not.toBeNull()
+    const created = input as unknown as CreatedInput
+    expect(created.pages[0].areas.map((area) => [area.boundsY, area.boundsHeight])).toEqual([[0, 843], [843, 843]])
+    expect(screen.getAllByRole('button', { name: /^面 [AB]、動きは/ })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: /^面 C、/ })).toBeNull()
   })
 
   it('手順②に下書きのページと面を出し、①だけ済みにする', async () => {

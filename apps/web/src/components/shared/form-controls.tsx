@@ -37,6 +37,11 @@ export function OptionalBadge() {
   return <span className={styles.optional}>任意</span>
 }
 
+/** 複合入力欄の下にも、Field と同じ誤りの文を置く。 */
+export function FieldError({ id, children }: { id: string; children: ReactNode }) {
+  return <p id={id} className={styles.error} role="alert">{children}</p>
+}
+
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */
 export function Field({
   label,
@@ -57,6 +62,7 @@ export function Field({
   required?: boolean
   /** 設定カードの絵で、必須を任意と同じ薄い文字で示す。 */
   requiredAppearance?: 'badge' | 'text'
+  /** 任意の入力欄。既存の OptionalBadge をラベルの横に置く。 */
   optional?: boolean
   note?: ReactNode
   error?: ReactNode

@@ -1379,7 +1379,7 @@
       "routes": [],
       "width": 1440,
       "shot": "lint/V8/shots/KRgTQ.png",
-      "url": "/booking/menus"
+      "url": "/booking/menus?tab=holidays"
     },
     "KdFRI": {
       "doc": "V8-B",
@@ -2585,7 +2585,7 @@
       "routes": [],
       "width": 1152,
       "shot": "lint/V8/shots/VFxWU.png",
-      "url": "/booking/menus"
+      "url": "/booking/menus?tab=hours"
     },
     "VLEaj": {
       "doc": "V8",
@@ -3098,7 +3098,7 @@
       "routes": [],
       "width": 1440,
       "shot": "lint/V8-B/shots/ZyDd6.png",
-      "url": "/booking/menus"
+      "url": "/booking/menus?tab=channels"
     },
     "a1k3d": {
       "doc": "V8",
@@ -5520,7 +5520,7 @@
       "routes": [],
       "width": 1440,
       "shot": "lint/V8/shots/x1OZS6.png",
-      "url": "/booking/menus"
+      "url": "/booking/menus?tab=rules"
     },
     "x2dSNv": {
       "doc": "V8-B",
@@ -5768,7 +5768,7 @@
       "routes": [],
       "width": 1440,
       "shot": "lint/V8/shots/yRPxl.png",
-      "url": "/booking/menus"
+      "url": "/booking/menus?tab=hours"
     },
     "yvOtn": {
       "doc": "V8-B",

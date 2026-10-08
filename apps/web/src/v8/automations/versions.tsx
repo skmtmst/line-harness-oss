@@ -9,7 +9,6 @@
  * 型（DetailPage）に、戻る道・題・説明・右上の操作・4つの数のマス・版の履歴・呼び出し元の表を渡す。
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { BookOpen, GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
 import { api, ApiError, type CommonActionDetail, type CommonActionStep, type CommonActionSummary } from '@/lib/api'
@@ -228,7 +227,6 @@ function VersionsInner() {
     <DetailPage
       boardId="ziSgL"
       headingSize="regular"
-      identity={<Link href="/common-actions" className={styles.back}>← 共通アクション一覧へ戻る</Link>}
       title={`${detail.name}（版と使われている場所）`}
       description="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。"
       actions={<>

@@ -20,7 +20,7 @@ vi.mock('@/lib/api', async (original) => {
     lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [{ id: 'direct', name: '直営店', color: '#2563eb', displayOrder: 0 }] } })) },
   } }
 })
-vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag', 'template', 'rich_menu', 'form', 'scenario'], hqTemplatesApi: { ...calls, folders: { list: calls.folderList } } }))
+vi.mock('@/lib/hq-templates-api', async (original) => ({ ...await original<typeof import('@/lib/hq-templates-api')>(), TEMPLATE_TYPES: ['tag', 'template', 'rich_menu', 'form', 'scenario'], hqTemplatesApi: { ...calls, folders: { list: calls.folderList } } }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(''),
@@ -286,7 +286,7 @@ describe('統括のテンプレートを作る（リッチメッセージ g8d6ai
     const file = new File(['png'], 'summer.png', { type: 'image/png' })
     fireEvent.change(screen.getByLabelText('リッチメッセージの画像のファイル'), { target: { files: [file] } })
     await waitFor(() => expect(calls.uploadRichMessageImage).toHaveBeenCalledWith(file))
-    fireEvent.click(screen.getByRole('button', { name: '1面' }))
+    fireEvent.click(screen.getByRole('radio', { name: '1面（面 A）' }))
     fireEvent.click(screen.getByRole('button', { name: '面 A を押したら' }))
     expect(screen.queryByRole('option', { name: '動きを実行する' })).toBeNull()
     fireEvent.click(within(await screen.findByRole('option', { name: 'URLを開く' })).getByRole('button'))
@@ -428,4 +428,78 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
     expect(await within(dialog).findAllByText('配布状況を確認できません')).toHaveLength(2)
     expect(within(dialog).queryByText('未配布')).toBeNull()
   })
+})
+
+describe('フォルダの「…」からまとめて配る（G-7）', () => {
+  const folderRows = () => [
+    { ...listRow, folder_id: 'f-1' },
+    { ...listRow, id: 't-2', name: '別の種類のひな形', folder_id: 'f-1', kind: 'carousel' },
+  ]
+  const checked = (id: string) => ({ preflightId: `run-${id}`, expiresAt: new Date(Date.now() + 60000).toISOString(), stores: [{ accountId: 'a-1', accountName: '然 -NEN- 本店', items: [{ sourceId: id, name: id, itemKind: 'template', duplicate: false, allowedModes: ['create'] }] }] })
+  const delivered = (id: string) => ({ runId: `run-${id}`, status: 'completed', stores: [{ accountId: 'a-1', status: 'succeeded', counts: { created: 1, overwritten: 0, aliased: 0 } }] })
+  async function selectFolder() {
+    fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'このフォルダを配る' }))
+    return screen.findByRole('dialog', { name: 'フォルダ「予約」の 2 件を配る' })
+  }
+  beforeEach(() => {
+    document.documentElement.dataset.theme = 'v8'
+    calls.list.mockResolvedValue(folderRows())
+    calls.listByKind.mockResolvedValue([folderRows()[0]])
+    calls.get.mockImplementation(async (id: string) => ({ ...detail(), template: folderRows().find((row) => row.id === id) }))
+    calls.preflight.mockImplementation(async (id: string) => checked(id))
+    calls.distribute.mockImplementation(async (id: string) => delivered(id))
+  })
+  afterEach(() => { delete document.documentElement.dataset.theme; window.history.replaceState(null, '', '/hq/templates') })
+  it('全種類のフォルダ内ひな形は全選択で始まり、片方0なら配れない', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    const dialog = await selectFolder()
+    expect((within(dialog).getByRole('checkbox', { name: '別の種類のひな形' }) as HTMLInputElement).checked).toBe(true)
+    expect(within(dialog).getByText('本文')).toBeTruthy()
+    expect(within(dialog).getByText('カルーセル')).toBeTruthy()
+    expect(within(dialog).getByRole('button', { name: '2 件を 0 アカウントへ配る' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '然 -NEN- 本店' }))
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '予約前日のご案内' }))
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '別の種類のひな形' }))
+    expect(within(dialog).getByRole('button', { name: '0 件を 1 アカウントへ配る' }).hasAttribute('disabled')).toBe(true)
+    expect(calls.preflight).not.toHaveBeenCalled()
+  })
+  it('すべての確認が済むまで配らず、順に配った結果を同じ窓へまとめる', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    const dialog = await selectFolder()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '然 -NEN- 本店' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '2 件を 1 アカウントへ配る' }))
+    fireEvent.click(await screen.findByRole('button', { name: '次のひな形を確かめる（1/2）' }))
+    await waitFor(() => expect(calls.preflight).toHaveBeenCalledWith('t-2', ['a-1']))
+    expect(calls.distribute).not.toHaveBeenCalled()
+    fireEvent.click(await screen.findByRole('button', { name: '2 件を 1 アカウントへ配る' }))
+    const result = await screen.findByRole('dialog', { name: '配った結果：フォルダ「予約」' })
+    expect(within(result).getByText('1 アカウントへ配りました。成功 2・失敗 0。成功した所はもう使えます。')).toBeTruthy()
+    expect(calls.distribute.mock.calls.map((call) => call[0])).toEqual(['t-1', 't-2'])
+  })
+  it('再読込後は記録した番号をGETで確認し、配り直さない', async () => {
+    window.sessionStorage.setItem('hq-folder-distribution:tenant-a:owner:template', JSON.stringify([{ templateId: 't-1', accountIds: ['a-1'], runId: 'run-t-1' }]))
+    calls.result.mockResolvedValue(delivered('t-1'))
+    render(<HqTemplatesV8 type="template" />)
+    expect(await screen.findByRole('dialog', { name: '配った結果：フォルダ「配布結果の再確認」' })).toBeTruthy()
+    expect(calls.result).toHaveBeenCalledWith('t-1', 'run-t-1')
+    expect(calls.distribute).not.toHaveBeenCalled()
+  })
+
+  it('失敗したひな形とアカウントだけ再確認し、先に成功した配布は送らない', async () => {
+    calls.distribute.mockImplementationOnce(async () => delivered('t-1')).mockImplementationOnce(async () => ({ ...delivered('t-2'), status: 'failed', stores: [{ ...delivered('t-2').stores[0], status: 'failed', reason: '更新を確認してください' }] }))
+    render(<HqTemplatesV8 type="template" />)
+    const dialog = await selectFolder()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '然 -NEN- 本店' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '2 件を 1 アカウントへ配る' }))
+    fireEvent.click(await screen.findByRole('button', { name: '次のひな形を確かめる（1/2）' }))
+    fireEvent.click(await screen.findByRole('button', { name: '2 件を 1 アカウントへ配る' }))
+    const result = await screen.findByRole('dialog', { name: '配った結果：フォルダ「予約」' })
+    fireEvent.click(within(result).getByRole('button', { name: '失敗した 1 件をやり直す' }))
+    fireEvent.click(await screen.findByRole('button', { name: '1 件を 1 アカウントへ配る' }))
+    await waitFor(() => expect(calls.distribute).toHaveBeenCalledTimes(3))
+    expect(calls.distribute.mock.calls.map((call) => call[0])).toEqual(['t-1', 't-2', 't-2'])
+    expect(calls.preflight.mock.calls.map((call) => [call[0], call[1]])).toEqual([['t-1', ['a-1']], ['t-2', ['a-1']], ['t-2', ['a-1']]])
+  })
+
 })

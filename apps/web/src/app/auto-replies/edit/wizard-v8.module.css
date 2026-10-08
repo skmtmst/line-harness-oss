@@ -99,7 +99,7 @@
   margin: 0;
   color: var(--color-ink-faint);
   font-size: 12px;
-  line-height: 1.6;
+  line-height: var(--tpl-text-sm-lh);
 }
 
 .field {
@@ -182,6 +182,7 @@
   background: transparent;
   color: var(--color-ink-faint);
   cursor: pointer;
+  margin-block: var(--tpl-ar-ed-chip-x-pull);
 }
 .chipRemove:hover {
   color: var(--color-danger);
@@ -272,6 +273,7 @@
   gap: var(--tpl-compact-gap);
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
 }
 .weekdayPreset {
   height: var(--tpl-chip-h);
@@ -282,6 +284,7 @@
   color: var(--color-ink);
   font-size: var(--text-label);
   font-weight: 500;
+  line-height: var(--tpl-chip-label-lh);
   cursor: pointer;
 }
 .weekdayPreset:hover {
@@ -583,8 +586,8 @@
   display: flex; align-items: center; gap: var(--tpl-body-gap); min-height: var(--tpl-ar-done-row-h);
   padding: var(--tpl-side-row-pad) 0; box-shadow: var(--shadow-row-line);
 }
-.doneRow > dt { flex: 1 1 auto; color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
-.doneRow > dd { min-width: 0; margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.doneRow > dt { flex: 1 1 auto; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); white-space: nowrap; }
+.doneRow > dd { min-width: 0; margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .doneActions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--tpl-body-gap); padding-top: var(--tpl-body-gap); }
 
 /* トグルの行（細かい決まり）。 */
@@ -747,6 +750,11 @@
   background: var(--color-canvas); color: var(--color-ink-faint);
 }
 .kwInput input { min-width: 0; flex: 1 1 0; border: 0; outline: 0; background: transparent; font-size: var(--text-label); }
+.kwInput[data-invalid], .bodyBox[data-invalid], .compositeField[data-invalid], .toggleNum[aria-invalid='true'] {
+  outline: 1px solid var(--color-danger);
+  outline-offset: -1px;
+}
+.compositeField { min-width: 0; border-radius: var(--radius-control); }
 .pairRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-rule-row-gap); }
 .kindsRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-body-gap); }
 .kindsNote { margin-left: auto; color: var(--color-ink-faint); font-size: var(--text-micro); }
@@ -756,15 +764,15 @@
 .sourceInline { display: inline-flex; align-items: center; gap: var(--tpl-rule-row-gap); color: var(--color-ink-faint); font-size: var(--text-caption); }
 .moreKinds { height: var(--tpl-chip-h); padding: var(--tpl-chip-pad); border: 0; background: transparent; color: var(--color-action); font-size: var(--text-caption); cursor: pointer; }
 .countRow { display: flex; align-items: baseline; gap: var(--tpl-chip-row-gap); margin: 0; padding: var(--tpl-chip-row-gap) 0; }
-.countNum { color: var(--color-ink-faint); font-size: var(--tpl-count-num-size); font-weight: 700; line-height: var(--tpl-count-num-lh); }
+.countNum { display: block; color: var(--color-ink-faint); font-size: var(--tpl-count-num-size); font-weight: 700; line-height: var(--tpl-count-num-lh); }
 .countUnit { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
-.sideHint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); }
+.sideHint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-rule-note-lh); }
 .sideCard .kvRow > dt { color: var(--color-ink-secondary); }
-.sampleHit { margin: 0; color: var(--color-success); font-size: var(--text-caption); font-weight: 600; }
-.sampleMiss { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); font-weight: 600; }
+.sampleHit { margin: 0; color: var(--color-success); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-text-sm-lh); }
+.sampleMiss { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-text-sm-lh); }
 .stepTrigger .field { gap: var(--tpl-compact-gap); }
 .stepTrigger .pairRow .field { gap: var(--tpl-field-gap-basic); }
-.weekdaySummary { margin-left: auto; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.weekdaySummary { margin-left: auto; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
 .stepTrigger { padding-bottom: var(--tpl-section-pad); }
 
 /* 絵 Guoye「重なりを1件ずつ確かめる」：クリームの地・角12・余白16。 */
@@ -802,6 +810,7 @@
 :global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .labelRow .moreKinds { flex: 1 1 auto; height: auto; padding: var(--tpl-ar-ed-none); text-align: left; }
 :global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .kindsNote { flex: 1 1 0; min-width: 0; margin-left: var(--tpl-body-gap); }
 :global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .weekdayPresets { flex-wrap: wrap; row-gap: var(--tpl-body-gap); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .weekdayRow { row-gap: var(--tpl-body-gap); }
 :global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .weekdaySummary { flex-basis: 100%; margin-left: var(--tpl-ar-ed-none); }
 :global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .inlineSelect > :last-child { width: var(--tpl-ar-ed-holiday-w); }
 :global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .inlineSelect :global(*) { max-width: 100%; }

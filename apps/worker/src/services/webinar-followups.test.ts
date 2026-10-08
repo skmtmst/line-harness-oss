@@ -105,8 +105,8 @@ describe('processWebinarFollowups', () => {
       sql.includes('JOIN friends f ON f.id = c.friend_id AND f.is_following = 1'),
     )).toBe(true);
     expect(updates).toContainEqual(expect.objectContaining({
-      sql: expect.stringContaining("last_error = 'not_following'"),
-      values: ['2026-08-10T20:00:00+09:00', 'followup-1'],
+      sql: expect.stringContaining("last_error='not_following'"),
+      values: ['failed','2026-08-10T20:00:00+09:00', 'followup-1'],
     }));
   });
 });

@@ -10,9 +10,8 @@
  * 最後の「そのほか（任意）」の段にまとめ、欄の説明は「？」へ入れる。
  */
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Check, ChevronLeft, FlaskConical, Plus } from 'lucide-react'
+import { Check, FlaskConical, Plus } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -41,6 +40,7 @@ import { localDateTime, utcDateTime } from '@/lib/presentation'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { LIMIT_FIELD_ERRORS, normalizeDigits, optionalInteger, validateReward, type FormState } from './reward-form'
+import { focusMileageField } from './form-validation'
 import styles from './reward-edit.module.css'
 
 type CommonActionOption = { id: string; label: string }
@@ -212,6 +212,29 @@ function RewardEditorInner() {
   }, [editing, load])
 
   const errors = validateReward(form)
+  const validateInputs = () => {
+    setTouched(true)
+    const fields = [
+      ['reward-name', '使い道の名前を入力してください'],
+      ['reward-miles', '必要マイルは1以上の整数で入力してください'],
+      ['reward-action', '交換後に渡すものを選んでください'],
+      ['reward-stock', LIMIT_FIELD_ERRORS.stockLimit],
+      ['reward-per-friend', LIMIT_FIELD_ERRORS.perFriendLimit],
+      ['reward-ends', '交換終了は交換開始より後にしてください'],
+      ['reward-expires', LIMIT_FIELD_ERRORS.benefitExpiresDays],
+    ]
+    const first = fields.find(([, message]) => errors.includes(message))
+    if (first) {
+      setFailure('')
+      focusMileageField(first[0])
+      return false
+    }
+    if (!selectedAccountId) {
+      setFailure('LINEアカウントを選択してください')
+      return false
+    }
+    return true
+  }
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((now) => ({ ...now, [key]: value }))
     setFailure('')
@@ -244,8 +267,7 @@ function RewardEditorInner() {
   }
 
   const save = async (thenPublish: boolean) => {
-    setTouched(true)
-    if (!selectedAccountId || errors.length > 0) return
+    if (!validateInputs() || !selectedAccountId) return
     setSaving(true)
     setFailure('')
     try {
@@ -273,8 +295,7 @@ function RewardEditorInner() {
   }
 
   const testExchange = async () => {
-    setTouched(true)
-    if (!selectedAccountId || errors.length > 0) return
+    if (!validateInputs() || !selectedAccountId) return
     setTesting(true)
     setFailure('')
     setTestResult(null)
@@ -319,8 +340,7 @@ function RewardEditorInner() {
 
   const published = reward?.status === 'published'
   const requestPublish = () => {
-    setTouched(true)
-    if (!selectedAccountId || errors.length > 0) return
+    if (!validateInputs()) return
     setPublishOpen(true)
   }
   const kindNote = KINDS.find((kind) => kind.value === form.rewardKind)?.note ?? ''
@@ -356,7 +376,6 @@ function RewardEditorInner() {
       boardId="L2Bzp"
       title="使い道を作る"
       description="マイルと交換できる特典を決めます。出すと、お客さまの LINE（マイルの画面）に並びます。"
-      identity={<Link href="/mileage?tab=rewards" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />マイルへ</Link>}
       preview={preview}
       footerActions={<>
         <Button variant="secondary" href="/mileage?tab=rewards">キャンセル</Button>
@@ -397,10 +416,10 @@ function RewardEditorInner() {
         <div className={styles.grid2}>
           <SelectField label="交換後に渡すもの" htmlFor="reward-action"
             help={form.rewardKind === 'coupon' ? 'クーポンは引換コードで渡すので、選ばなくても出せます' : '共通アクションの版を指定します'}
-            error={errorOf('交換後に渡すものを選んでください')}
           >
             <Select
               id="reward-action"
+              error={errorOf('交換後に渡すものを選んでください')}
               aria-label="交換後に渡すもの"
               size="full"
               value={form.commonActionVersionId}
@@ -473,24 +492,24 @@ function RewardEditorInner() {
         <div className={styles.grid2}>
           <div className={styles.field}>
             <label htmlFor="reward-stock" className={styles.label}>出す数<OptionalBadge /></label>
-            <TextField id="reward-stock" inputMode="numeric" title="空欄なら限りなし。0 と書くと品切れ（交換できません）" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="制限なし" />
-            {errorOf(LIMIT_FIELD_ERRORS.stockLimit) ? <p className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.stockLimit}</p> : null}
+            <TextField id="reward-stock" invalid={Boolean(errorOf(LIMIT_FIELD_ERRORS.stockLimit))} aria-describedby={errorOf(LIMIT_FIELD_ERRORS.stockLimit) ? 'reward-stock-error' : undefined} inputMode="numeric" title="空欄なら限りなし。0 と書くと品切れ（交換できません）" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="制限なし" />
+            {errorOf(LIMIT_FIELD_ERRORS.stockLimit) ? <p id="reward-stock-error" className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.stockLimit}</p> : null}
           </div>
           <div className={styles.field}>
             <label htmlFor="reward-per-friend" className={styles.label}>1人あたり<OptionalBadge /></label>
-            <TextField id="reward-per-friend" inputMode="numeric" title="空欄なら何回でも" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="1回まで" />
-            {errorOf(LIMIT_FIELD_ERRORS.perFriendLimit) ? <p className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.perFriendLimit}</p> : null}
+            <TextField id="reward-per-friend" invalid={Boolean(errorOf(LIMIT_FIELD_ERRORS.perFriendLimit))} aria-describedby={errorOf(LIMIT_FIELD_ERRORS.perFriendLimit) ? 'reward-per-friend-error' : undefined} inputMode="numeric" title="空欄なら何回でも" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="1回まで" />
+            {errorOf(LIMIT_FIELD_ERRORS.perFriendLimit) ? <p id="reward-per-friend-error" className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.perFriendLimit}</p> : null}
           </div>
         </div>
         <div className={styles.grid2}>
           <div className={styles.field}>
             <label htmlFor="reward-starts" className={styles.label}>交換開始</label>
             <DateTimeField id="reward-starts" aria-label="交換開始" value={form.startsAt} onChange={(v) => set('startsAt', v)} />
-            {errorOf('交換終了は交換開始より後にしてください') ? <p className={styles.error} role="alert">交換終了は交換開始より後にしてください</p> : null}
           </div>
           <div className={styles.field}>
             <label htmlFor="reward-ends" className={styles.label}>交換終了<OptionalBadge /></label>
-            <DateTimeField id="reward-ends" aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} />
+            <DateTimeField id="reward-ends" aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} invalid={Boolean(errorOf('交換終了は交換開始より後にしてください'))} aria-describedby={errorOf('交換終了は交換開始より後にしてください') ? 'reward-ends-error' : undefined} placeholder="期限なし" />
+            {errorOf('交換終了は交換開始より後にしてください') ? <p id="reward-ends-error" className={styles.error} role="alert">交換終了は交換開始より後にしてください</p> : null}
           </div>
         </div>
       </section>

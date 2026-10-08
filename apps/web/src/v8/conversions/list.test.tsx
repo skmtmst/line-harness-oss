@@ -117,6 +117,46 @@ afterEach(() => {
 })
 
 describe('V8 コンバージョンの一覧', () => {
+  it('一覧の読み込みが失敗しても空とは扱わず、読み直すと成果地点を表示する', async () => {
+    const base = globalThis.fetch
+    let failed = true
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (failed && new URL(String(input)).pathname === '/api/conversions/definitions') {
+        return json({ success: false, error: 'unavailable' }, 503)
+      }
+      return base(input, init)
+    })
+    await mount()
+    expect(screen.getByText('成果地点を読み込めませんでした')).toBeTruthy()
+    expect(screen.queryByText('まだ成果地点がありません')).toBeNull()
+    failed = false
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }))
+    await flush()
+    expect(screen.getByText('商品を買った')).toBeTruthy()
+    expect(screen.queryByText('成果地点を読み込めませんでした')).toBeNull()
+  })
+  it('編集で名前が空なら、その欄で理由を知らせ、欄へ移り、更新しない', async () => {
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: '成果地点「商品を買った」の操作' }))
+    await flush()
+    fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
+    await flush()
+    const input = screen.getByLabelText('成果地点の名前') as HTMLInputElement
+    const scroll = vi.fn()
+    input.scrollIntoView = scroll
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'この内容にする' }))
+    await flush()
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(input)
+    expect(scroll).toHaveBeenCalledWith({ block: 'center' })
+    const error = screen.getByRole('alert')
+    expect(error.textContent).toBe('名前を入れてください')
+    expect(input.getAttribute('aria-describedby')).toBe(error.id)
+    expect(screen.getAllByText('名前を入れてください')).toHaveLength(1)
+    expect(calls.some((call) => call.startsWith('POST '))).toBe(false)
+  })
+
   it('状態の札に口の件数を出し、行に数え方と使われている場所を出す', async () => {
     await mount()
     expect(screen.getByRole('button', { name: /動いている 1/ })).toBeTruthy()
@@ -188,7 +228,8 @@ describe('V8 コンバージョンの一覧', () => {
     await flush()
     const panel = screen.getByRole('region', { name: '詳細の小窓' })
     expect(panel.textContent).toContain('（動いています）')
-    fireEvent.click(screen.getByRole('button', { name: '受け口を止める' }))
+    fireEvent.click(screen.getByRole('button', { name: '詳細「商品を買った」のその他の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '受け口を止める' }))
     await flush()
     expect(calls).toContain('POST /api/conversions/definitions/cp-1/ingest-disable')
     // 返事を待たずに変わっている
