@@ -16,12 +16,13 @@
  *
  * 画面ごとに作り方を書かない。各画面は自分の種類のフォルダの受け口を onCreate に渡すだけ。
  */
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Select, { type SelectCreateContext, type SelectProps } from './select'
 import { isImeComposing } from './ime'
 import { japaneseDetailOf } from './api-error-message'
 import styles from './folder-select.module.css'
+import FolderColorButton from './folder-color-button'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 export { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 
@@ -173,13 +174,6 @@ function FolderCreatePanel({
 }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState<string>(FOLDER_SELECT_COLORS[0].value)
-  const [colorOpen, setColorOpen] = useState(false)
-  const colorButtonRef = useRef<HTMLButtonElement>(null)
-  const paletteRef = useRef<HTMLDivElement>(null)
-  const paletteId = useId()
-  useEffect(() => {
-    if (colorOpen) paletteRef.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus()
-  }, [colorOpen])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -220,8 +214,7 @@ function FolderCreatePanel({
         event.preventDefault()
         event.stopPropagation()
         event.nativeEvent.stopImmediatePropagation()
-        if (colorOpen) { setColorOpen(false); colorButtonRef.current?.focus() }
-        else if (!busyRef.current) context.back()
+        if (!busyRef.current) context.back()
       }}
     >
       <div className={styles.heading} aria-hidden="true">新しいフォルダ</div>
@@ -249,34 +242,7 @@ function FolderCreatePanel({
           }}
         />
         {colors ? (
-          <div className={styles.colorPicker}>
-            <button ref={colorButtonRef} type="button" className={styles.colorButton}
-              aria-label={`フォルダの色：${FOLDER_SELECT_COLORS.find((item) => item.value === color)?.name}`}
-              aria-expanded={colorOpen} aria-controls={paletteId} disabled={busy}
-              onClick={() => setColorOpen((open) => !open)}>
-              <Dot color={color} /><span aria-hidden="true">⌄</span>
-            </button>
-            {colorOpen ? <div ref={paletteRef} id={paletteId} className={styles.swatches} role="radiogroup" aria-label="フォルダの色">
-              {FOLDER_SELECT_COLORS.map((item, index) => (
-                <button key={item.value} type="button" role="radio"
-                  aria-checked={color === item.value} aria-label={item.name} title={item.name}
-                  tabIndex={color === item.value ? 0 : -1} disabled={busy}
-                  className={styles.swatch} data-selected={color === item.value || undefined}
-                  style={{ backgroundColor: item.value }}
-                  onKeyDown={(event) => {
-                    if (isImeComposing(event)) return
-                    const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End']
-                    if (!keys.includes(event.key)) return
-                    event.preventDefault(); event.stopPropagation()
-                    const next = event.key === 'Home' ? 0 : event.key === 'End' ? FOLDER_SELECT_COLORS.length - 1 : (index + (event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1) + FOLDER_SELECT_COLORS.length) % FOLDER_SELECT_COLORS.length
-                    setColor(FOLDER_SELECT_COLORS[next].value)
-                    paletteRef.current?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus()
-                  }}
-                  onClick={() => { setColor(item.value); setColorOpen(false); colorButtonRef.current?.focus() }}
-                />
-              ))}
-            </div> : null}
-          </div>
+          <FolderColorButton compact value={color} onChange={(next) => setColor(next ?? FOLDER_SELECT_COLORS[0].value)} disabled={busy} />
         ) : null}
       </div>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
