@@ -1,4 +1,4 @@
-import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary } from '@line-crm/shared'
+import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics } from '@line-crm/shared'
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
 import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
@@ -3947,7 +3947,7 @@ export type ReminderDeliveryRunsResponse = {
     sentThisMonth: number
     /** 今後7日以内（期限切れの未送分を含む）に送る予定の件数。 */
     scheduledNext7Days: number
-  }
+  } & ReminderScheduleMetrics
   steps: Array<{
     id: string
     stepNumber: number
@@ -11890,9 +11890,11 @@ export const api = {
     /** 実行結果（設計 `GC4St`）。状態・検索・ページ送りは Worker が受ける。 */
     runs: (
       reminderId: string,
-      params?: { status?: ReminderDeliveryRunStatus; search?: string; limit?: number; offset?: number },
+      params?: { status?: ReminderDeliveryRunStatus; search?: string; limit?: number; offset?: number } & ReminderRunReadOptions,
     ) => {
       const query = new URLSearchParams()
+      if (params?.order) query.set('order', params.order)
+      if (params?.executedOnly !== undefined) query.set('executedOnly', String(params.executedOnly))
       if (params?.status) query.set('status', params.status)
       if (params?.search) query.set('search', params.search)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))

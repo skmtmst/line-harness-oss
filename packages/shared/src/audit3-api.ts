@@ -16,3 +16,10 @@ export interface MileageFriendHistorySummary {
   earnedThisMonth: number;
   earnedCountThisMonth: number;
 }
+
+export interface ReminderRunReadOptions {
+  order?: 'scheduled_asc' | 'recent_desc';
+  /** Excludes queued/claimed before pagination; retry_wait remains an executed failed attempt. */
+  executedOnly?: boolean;
+}
+export interface ReminderScheduleMetrics { scheduledNext24Hours: number }
