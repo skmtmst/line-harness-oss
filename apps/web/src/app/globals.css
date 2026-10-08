@@ -769,6 +769,13 @@
   /* 来店スタンプ G-1：追加の設定欄とお客さまのカード。 */
   --tpl-textarea-compact-h: 72px;
   --tpl-stamp-card-min-h: 1074px;
+  --tpl-tab-count-pad: 0 6px;
+  --tpl-stamp-history-date-w: 15%;
+  --tpl-stamp-history-friend-w: 20%;
+  --tpl-stamp-history-count-w: 18%;
+  --tpl-stamp-history-reason-w: 21%;
+  --tpl-stamp-history-actor-w: 17%;
+  --tpl-stamp-history-menu-w: 9%;
   --tpl-stamp-image-w: 96px;
   --tpl-stamp-image-h: 60px;
   --tpl-stamp-slot: 44px;
