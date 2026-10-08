@@ -11,7 +11,7 @@ BEGIN SELECT RAISE(ABORT,'HQ_TYPE_IMMUTABLE'); END;
 
 -- Skip is an additive extension. The legacy mode CHECK and all old kinds stay intact.
 ALTER TABLE hq_template_preflight_resolutions ADD COLUMN friend_attribute_mode TEXT
-  CHECK (friend_attribute_mode IS NULL OR (friend_attribute_mode='skip' AND resolution_mode='overwrite' AND target_id IS NOT NULL));
+  CHECK (friend_attribute_mode IS NULL OR (friend_attribute_mode='skip' AND resolution_mode='overwrite' AND NOT (target_id IS NULL)));
 CREATE TRIGGER hq_attribute_skip_insert BEFORE INSERT ON hq_template_preflight_resolutions
 WHEN NEW.friend_attribute_mode IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM hq_templates t WHERE t.id=NEW.template_id AND t.tenant_id=NEW.tenant_id

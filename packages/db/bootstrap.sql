@@ -3599,7 +3599,7 @@ CREATE TABLE hq_template_preflight_resolutions (
   alias_name TEXT,
   expected_revision TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), friend_attribute_mode TEXT
-  CHECK (friend_attribute_mode IS NULL OR (friend_attribute_mode='skip' AND resolution_mode='overwrite' AND target_id IS NOT NULL)),
+  CHECK (friend_attribute_mode IS NULL OR (friend_attribute_mode='skip' AND resolution_mode='overwrite' AND NOT (target_id IS NULL))),
   PRIMARY KEY (preflight_id, tenant_id, source_id),
   CHECK (resolution_mode != 'overwrite' OR (target_id IS NOT NULL AND expected_revision IS NOT NULL)),
   CHECK (resolution_mode != 'alias' OR alias_name IS NOT NULL),
