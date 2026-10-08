@@ -1483,6 +1483,7 @@
   --tpl-inbox-dot-sm: 7px;                /* 頭の対応状況の丸 */
   --tpl-inbox-chead-pad: 12px 20px;       /* 会話の頭の内側 */
   --tpl-inbox-chead-gap: 8px;             /* 会話の頭の部品の間 */
+  --tpl-inbox-chead-search-right: 24px;   /* 🔍 を浮かせる右端（やりとりの左右の余白にそろえる） */
   --tpl-inbox-chead-face: 28px;           /* 会話の頭の顔 */
   --tpl-inbox-chead-who-min: 120px;       /* 名前の欄の下限。これより狭いと操作を次の行へ */
   --tpl-inbox-chead-name: 15px;           /* 会話の頭の名前 */
@@ -1503,6 +1504,7 @@
   --tpl-inbox-menu-pill-pad: 2px 8px;     /* 対応状況の札の内側 */
   --tpl-inbox-menu-search-h: 32px;        /* 担当者名を検索 */
   --tpl-inbox-thread-pad: 20px 24px;      /* やりとりの内側 */
+  --tpl-inbox-thread-gap: 12px;           /* 吹き出しの行と行・日付と吹き出しの間 */
   --tpl-inbox-bubble-w: 340px;            /* 吹き出しの幅の上限 */
   --tpl-inbox-bubble-pad: 10px 14px;      /* 吹き出しの内側 */
   --tpl-inbox-bubble-radius: 16px;

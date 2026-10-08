@@ -2894,7 +2894,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             {filter.icon ? <filter.icon aria-hidden className={styles.chipIcon} /> : null}
             {filter.label}
             {/* 件数がまだ無い時は「—」を出さない（★V7：意味の無い記号を置かない）。 */}
-            {quickCountsNow ? <span className={`ml-1 tabular-nums ${styles.chipCount}`}>{quickCountsNow[filter.key]}</span> : null}
+            {/* ★V8（eovoG）：札に件数は出さない（要返信＝下の「未対応」と同じ数）。読み上げと検査のため文字は残す。 */}
+            {quickCountsNow ? <span className={`tabular-nums ${isV8 ? 'sr-only' : 'ml-1'} ${styles.chipCount}`}>{quickCountsNow[filter.key]}</span> : null}
           </Button>
         ))}
         <SavedViewDialog
@@ -3256,6 +3257,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <div key={chat.id} className="border-b border-hairline">
                     <button
                       onClick={() => handleSelectChat(chat.id)}
+                      /* 名前は相手の名前だけ、未読と本文は説明に回す（読み上げで名前から入れる）。 */
+                      aria-labelledby={isV8 ? `chat-row-name-${chat.id}` : undefined}
+                      aria-describedby={isV8 ? `${chat.isUnread ? `chat-row-unread-${chat.id} ` : ''}chat-row-preview-${chat.id}` : undefined}
                       className={`w-full px-3 py-3 text-left transition-colors ${
                         isSelected
                           ? 'bg-shell'
@@ -3268,14 +3272,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           {/* ★V7 友だちの顔：画像が読めない時も色つきの頭文字。 */}
                           <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={adminTheme === 'v8' ? 34 : 32} />
                           {chat.isUnread && (
-                            <span className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
+                            <span id={`chat-row-unread-${chat.id}`} className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
                               {/* 板 `M0393`：未対応は名前の太字。行の地は塗らない。 */}
-                              <p className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
+                              <p id={`chat-row-name-${chat.id}`} className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
                             </div>
                             {isV8 ? (
                               /* ★V8（XqSvX）：右上は「2時間前」「昨日」「8月16日」。未読は濃い字・太字。待ち時間の札は置かない。 */
@@ -3289,6 +3293,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           {/* 板 `M0393`：行ごとの状態の札は置かない（赤い点＋太字と上の切り替えで足りる）。 */}
                           <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
                             <p
+                              id={`chat-row-preview-${chat.id}`}
                               className={`line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview} ${
                                 needsAttention ? 'text-ink font-medium' : 'text-ink-faint'
                               }`}
@@ -3644,6 +3649,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     total={chatDetail.total}
                     scrollToId={chatSearchTarget?.id ?? null}
                     scrollSeq={chatSearchTarget?.seq ?? 0}
+                    rowGap={isV8 ? 'var(--tpl-inbox-thread-gap)' : undefined}
                     renderMessage={(msg, idx, list) => {
                     const prevMsg = idx > 0 ? list[idx - 1] : null
                     const isLast = idx === list.length - 1
