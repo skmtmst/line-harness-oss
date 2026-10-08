@@ -13,7 +13,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Archive, Check, Pencil, Plus, Trash2, Zap } from 'lucide-react'
+import { Check, Pause, Pencil, Plus, Trash2, Zap } from 'lucide-react'
 import {
   api,
   ApiError,
@@ -407,7 +407,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       </dl>
       {editing ? (
         <p className={styles.infoNote}>
-          <Archive className={styles.wayIcon} aria-hidden="true" />
+          <Pause className={styles.wayIcon} aria-hidden="true" />
           保管すると、新しく付けられなくなります。いま付いている人は、保管の小窓で選ぶマークへ置き換わり、履歴に残ります。
         </p>
       ) : null}
@@ -429,7 +429,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         preview={aside}
         destructive={editing && selected && !hideForm ? (
           <Button type="button" variant="danger" onClick={() => void openArchive()} disabled={archiveBlockReason !== null} title={archiveBlockReason ?? undefined}>
-            <Archive size={15} aria-hidden="true" />保管する
+            <Pause size={15} aria-hidden="true" />保管する
           </Button>
         ) : undefined}
         footerActions={hideForm ? <Button href="/tags?tab=marks">一覧へ戻る</Button> : <>
