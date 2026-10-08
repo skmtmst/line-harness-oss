@@ -311,3 +311,13 @@
   height: 16px;
   stroke-width: 2.5;
 }
+
+/*
+ * 欄いっぱい（full）で先頭の図柄があるときは、値を図柄のすぐ右に寄せる
+ * （space-between のままだと値が箱の真ん中に浮く。受信箱の右の欄の対応状況・B-26）。
+ * 決まった幅の箱（会話の頭・よく使う絞り込み）は今のまま。
+ */
+[data-theme='v8'] .full .leadingIcon + .value {
+  flex: 1;
+  text-align: left;
+}
