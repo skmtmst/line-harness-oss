@@ -7,7 +7,7 @@ const root = resolve(process.cwd(), 'src')
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
 /*
- * IDEA-04（issue #1022）：友だち属性の分類説明・重複候補・変更前後条件。
+ * IDEA-04（issue #1022）：タグの分類説明・重複候補・変更前後条件。
  *
  * 実施範囲：
  *  - 既存の属性作成／編集で、タグ・情報欄・対応マーク等の違いを説明する
@@ -16,7 +16,7 @@ const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
  *  - 大量対象の影響計算が間に合わないときは「未計算」、推定は確定値にしない
  *  - 属性辞書の独立メニュー・自動統合・新しいタイトルバーは作らない
  */
-describe('IDEA-04（issue #1022）友だち属性の分類説明・重複候補・変更前後条件', () => {
+describe('IDEA-04（issue #1022）タグの分類説明・重複候補・変更前後条件', () => {
   it('分類の使い分け案内は共通部品1つに寄せ、4分類すべてを説明する', () => {
     const guide = read('components/friend-fields/attribute-kind-guide.tsx')
     // 4分類とも「何を持つか」「いつ選ぶか」「作る入口」を持つ。

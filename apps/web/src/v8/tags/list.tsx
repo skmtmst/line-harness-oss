@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性の一覧（Pencil：タグ `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`）。
+ * ★V8 タグの一覧（Pencil：タグ `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`）。
  *
  * 型（PageFrame・PageHeading）で板の頭・閲覧のみの帯・タブの段を組み、
  * 本文はタブごとに切り替える。どのタブもこの場所に一から書いた
@@ -53,7 +53,7 @@ export default function TagsList({
   /** 試験用の固定表示。渡すと読みに行かない。 */
   fixture?: { items: Tag[]; groups: TagGroup[] }
 }) {
-  usePageTitle('友だち属性')
+  usePageTitle('タグ')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   const samePageUrl = useSamePageUrl()
@@ -106,7 +106,7 @@ export default function TagsList({
     <PageFrame kind="list" boardId={boardId}>
       <PageHeading
         headingSize="regular"
-        title="友だち属性"
+        title="タグ"
         description="友だちに付ける印（タグ）・入力してもらう項目・対応の印・保存した条件をまとめて管理します。"
         actions={actions}
       />

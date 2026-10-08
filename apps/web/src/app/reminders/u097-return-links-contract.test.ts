@@ -18,7 +18,7 @@ const INFLOW_DETAIL = read('app/inflow-links/detail/page.tsx')
  * 操作を足す。
  */
 describe('一覧へ戻る操作を置く（#975 U097）', () => {
-  it('友だち属性の移行は、アカウント未選択と対象なしの両方で一覧へ戻れる', () => {
+  it('タグの移行は、アカウント未選択と対象なしの両方で一覧へ戻れる', () => {
     expect(TAGS_MIGRATE).toContain('href="/tags?tab=fields"')
     expect(TAGS_MIGRATE).toContain('友だち情報欄の一覧へ戻る')
     expect(TAGS_MIGRATE).toContain('移行元の項目が見つかりません')

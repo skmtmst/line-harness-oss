@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性の一覧（Pencil「★V8 画面の地図」の友だち属性の行：
+ * ★V8 タグの一覧（Pencil「★V8 画面の地図」のタグの行：
  * タグ `I1E7Bt`・友だち情報欄 `q5gbcM`・対応マーク `vKDj5`・保存した検索 `IWnYX`、
  * 状態の板は `U0aKD`）。
  *
@@ -52,7 +52,7 @@ export default function TagsListV8({
   fixture?: { items: import('@line-crm/shared').Tag[]; groups: import('@line-crm/shared').TagGroup[] }
   accountId?: string | null
 }) {
-  usePageTitle('友だち属性')
+  usePageTitle('タグ')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   const router = useRouter()
@@ -94,7 +94,7 @@ export default function TagsListV8({
       <div data-design="Head">
         <div className={styles.head}>
           <div className={styles.headText}>
-            <h2 className={styles.headTitle}>友だち属性</h2>
+            <h2 className={styles.headTitle}>タグ</h2>
             <p className={styles.headDescription}>
               タグ・友だち情報欄・対応マーク・保存した検索をここで管理します。
             </p>

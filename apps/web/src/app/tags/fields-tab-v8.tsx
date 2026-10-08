@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性「友だち情報欄」タブの一覧（Pencil `q5gbcM`、状態 `U0aKD`）。
+ * ★V8 タグ「友だち情報欄」タブの一覧（Pencil `q5gbcM`、状態 `U0aKD`）。
  *
  * 項目もフォルダを持つので、タグと同じく左にフォルダの列を出す
  * （folders.kind = 'friend_field'。こちらは共通の folders 表なので

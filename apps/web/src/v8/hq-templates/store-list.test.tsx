@@ -73,7 +73,7 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.textContent).toContain('まだ配っていない')
   })
 
-  /* 絵：テンプレート i0Ao0R・リッチメニュー noVq4・友だち属性 DzdC3・回答フォーム wZPua。どの種類も行の「…」の左に［配る］。 */
+  /* 絵：テンプレート i0Ao0R・リッチメニュー noVq4・タグ DzdC3・回答フォーム wZPua。どの種類も行の「…」の左に［配る］。 */
   for (const type of ['template', 'tag', 'rich_menu', 'form', 'scenario'] as const) {
     it(`${type} の一覧は、どの行にも「…」の左に［配る］があり、押すとその行を配る`, async () => {
       const h = await render({ type, kind: type === 'template' ? 'message' : undefined })
@@ -116,7 +116,7 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(h.onDistribute).toHaveBeenCalledWith(rows[0])
   })
 
-  it('友だち属性は人数・付け方、リッチメニューは順・誰に出すか・今月押されたを出す（DzdC3・noVq4）', async () => {
+  it('タグは人数・付け方、リッチメニューは順・誰に出すか・今月押されたを出す（DzdC3・noVq4）', async () => {
     await render({ type: 'tag', kind: undefined, rows: [{ ...ROWS[0], template_type: 'tag', friend_count: 64, assignment_method: '手動・自動' }] })
     expect(host.textContent).toContain('64人')
     expect(host.textContent).toContain('手動・自動')

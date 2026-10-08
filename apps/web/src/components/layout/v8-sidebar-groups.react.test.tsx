@@ -179,7 +179,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(view.queryAllByText('me-hq')).toHaveLength(0)
   })
 
-  it('V2 の友だち属性モードでも、v8 では組を丸ごと隠さない', async () => {
+  it('V2 のタグモードでも、v8 では組を丸ごと隠さない', async () => {
     const view = await renderSidebar({ friendAttributesV2Mode: true })
     // v7 では「自動化・予約・設定」の組が消えるが、v8 では見出しが残る
     for (const label of ['自動化', '予約', '設定']) {

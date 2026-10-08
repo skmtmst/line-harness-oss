@@ -9,6 +9,8 @@ import Breadcrumb from '@/components/layout/breadcrumb'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import SegmentedControl from '@/components/shared/segmented'
+import HelpTip from '@/components/shared/help-tip'
 import Combobox from '@/components/shared/combobox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Drawer from '@/components/shared/drawer'
@@ -220,13 +222,19 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
           </section>
 
           <section className="mt-7 border-t border-hairline pt-6">
-            <h3 className="mb-3 text-sm font-bold text-ink">2. 実行するタイミング</h3>
-            <RadioCardGroup legend="実行するタイミング" className="grid gap-2 sm:grid-cols-2">
-              <RadioCard name="timing" value="immediate" checked={timing === 'immediate'} onChange={() => setTiming('immediate')} title="すぐに実行" />
-              <RadioCard name="timing" value="delay" checked={timing === 'delay'} onChange={() => setTiming('delay')} title="時間をあけて実行" />
-            </RadioCardGroup>
-              <div className={`mt-3 flex items-center gap-2 ${timing === 'immediate' ? 'opacity-55' : ''}`}>
-                <input type="number" min={1} value={delay} onChange={(event) => setDelay(event.target.value)} className={`${inputClass} max-w-28`} />
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink">2. 実行するタイミング
+              <HelpTip label="実行するタイミングの説明">時間をあけて実行すると、その時間が経ってから実行されます。待機中にタグが外れた場合は実行されません。</HelpTip>
+            </h3>
+            <SegmentedControl
+              aria-label="実行するタイミング"
+              size="timing"
+              options={[{ value: 'immediate', label: 'すぐに実行' }, { value: 'delay', label: '時間をあけて実行' }]}
+              value={timing}
+              onChange={setTiming}
+            />
+            {timing === 'delay' ? (
+              <div className="mt-3 flex items-center gap-2">
+                <input aria-label="実行までの待ち時間" type="number" min={1} value={delay} onChange={(event) => setDelay(event.target.value)} className={`${inputClass} max-w-28`} />
                 <Select
                   aria-label="遅延の単位"
                   value={delayUnit}
@@ -238,7 +246,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
                   ]}
                 />
               </div>
-            <p className="mt-2 text-xs leading-5 text-ink-faint">待機を挟むと、その時間が経ってから実行されます。待機中にタグが外れた場合は実行されません。</p>
+            ) : null}
           </section>
 
           <section className="mt-7 border-t border-hairline pt-6">
@@ -513,7 +521,7 @@ export default function TagEditorV4({
   return (
     <div>
       {!embedded && <div className="mb-5">
-        <Breadcrumb items={[{ label: '友だち属性', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
+        <Breadcrumb items={[{ label: 'タグ', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
       </div>}
 
       {error && <Notice className="mb-4" tone="danger" message={error} />}

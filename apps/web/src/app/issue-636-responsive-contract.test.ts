@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
-describe('04-C-横1: 友だち属性のタグ表は1440pxに収まる', () => {
+describe('04-C-横1: タグ表は1440pxに収まる', () => {
   const page = read('../components/friend-fields/tags-page-v4.tsx')
 
   it('表の最小幅を内容実幅（833px）以下の800pxへ下げる', () => {

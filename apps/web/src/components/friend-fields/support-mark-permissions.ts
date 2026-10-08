@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
  * R511: 対応マークの作成・編集を画面で案内してよい役割か。
  *
  * サーバの口（POST・PATCH /api/support-marks）は `requireRole('owner', 'admin')`
- * で、staff は友だち属性の権限キーを持っていても作れない・変えられない。
+ * で、staff はタグの権限キーを持っていても作れない・変えられない。
  * タグの作成と同じ約束。ここは表示の目安で、本当の可否はサーバが決める
  * （`localStorage` の自己申告値は偽装できるため）。
  *

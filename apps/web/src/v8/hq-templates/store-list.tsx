@@ -2,7 +2,7 @@
 
 /*
  * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
- * 絵：テンプレート i0Ao0R（V8.pen の行「統括」）・LRc93（V8-B 版）、回答フォーム wZPua、友だち属性 DzdC3、リッチメニュー noVq4。
+ * 絵：テンプレート i0Ao0R（V8.pen の行「統括」）・LRc93（V8-B 版）、回答フォーム wZPua、タグ DzdC3、リッチメニュー noVq4。
  *
  * 店の一覧（src/v8/templates/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・種類のタブ・フォルダの列・表・ページ送り）・
  * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「配る」口だけ：
@@ -59,7 +59,7 @@ const KIND_LABEL: Record<TemplateKind, string> = Object.fromEntries(KIND_TABS.ma
 const WORDS: Record<TemplateType, { title: string; item: string; create: string; search: string; description: string; column: string }> = {
   template: { title: 'テンプレート', item: 'テンプレート', create: 'テンプレートを作る', search: '名前・本文・差し込みで探す', column: 'テンプレート', description: 'メッセージのひな形を作り、各 LINE アカウントへ配ります。配ったあとに直すと、配った先へ新しい版として届きます。' },
   form: { title: '回答フォーム', item: 'フォーム', create: 'フォームを作る', search: 'フォーム名・質問文', column: 'フォーム（質問の数）', description: '回答フォームのひな形を作り、各 LINE アカウントへ配ります。配ったあとに直すと、新しい版として届きます。' },
-  tag: { title: '友だち属性', item: 'タグ', create: 'タグを作る', search: 'タグ名・用途で探す', column: 'タグ', description: '友だち属性（タグ・入力してもらう項目・対応の印）のひな形を作り、各 LINE アカウントへ配ります。配った先で同じ名前・色で使えます。' },
+  tag: { title: 'タグ', item: 'タグ', create: 'タグを作る', search: 'タグ名・用途で探す', column: 'タグ', description: 'タグ（タグ・入力してもらう項目・対応の印）のひな形を作り、各 LINE アカウントへ配ります。配った先で同じ名前・色で使えます。' },
   rich_menu: { title: 'リッチメニュー', item: 'メニュー', create: 'メニューを作る', search: 'メニュー名・ボタン名', column: 'メニュー（大きさ・ボタン）', description: 'リッチメニューのひな形を作り、各 LINE アカウントへ配ります。配った先では、そのアカウントの条件で出し分けます。' },
   scenario: { title: 'シナリオ', item: 'シナリオ', create: 'シナリオを作る', search: 'シナリオ名で探す', column: 'シナリオ', description: 'シナリオのひな形を作り、停止中の下書きとして各 LINE アカウントへ配ります。' },
 }
@@ -329,7 +329,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   /*
    * 種類ごとの列（店の同じ機能の一覧と同じ並び）。違いは「配布先」の列だけ。
    *   テンプレート i0Ao0R：種類・公開・配布先・今月送った数・更新・［配る］・「…」
-   *   友だち属性 DzdC3：人数・付け方・配布先・［配る］・「…」（人数は API-18 の配った先で付いている友だちの合計）
+   *   タグ DzdC3：人数・付け方・配布先・［配る］・「…」（人数は API-18 の配った先で付いている友だちの合計）
    *   リッチメニュー noVq4：順・誰に出すか・状態・配布先・今月押された・［配る］・「…」（API-18 の順・誰に出すか・配った先の押された数）
    *   回答フォーム wZPua：状態・配布先・更新・［配る］・「…」
    * ［配る］の列は見出しが空の幅60（絵の「列 配る」）、「…」との間は 16。閲覧のみ（配れない人）には列ごと出さない。
