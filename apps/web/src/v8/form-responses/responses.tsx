@@ -16,7 +16,7 @@ import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { DetailPage } from '@/components/templates'
+import { DetailPage, DetailColumns } from '@/components/templates'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -146,6 +146,8 @@ function Responses() {
   /* 絵（v0SbYR）は「まとめて見る」が先頭。 */
   const [view, setView] = useState<'rows' | 'summary'>('summary')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [asideExpanded, setAsideExpanded] = useState(false)
+  const selectAnswer = (id: string | null) => { setSelectedId(id); setAsideExpanded(true) }
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState('')
   const [exporting, setExporting] = useState(false)
@@ -439,6 +441,7 @@ function Responses() {
   return (
     <DetailPage
       boardId={view === 'summary' ? 'v0SbYR' : 'MKQyJ'}
+      tabSpacing="compact"
       identity={<Link href="/form-submissions" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />回答フォームへ</Link>}
       title={`集まった回答：${form.name}`}
       description={headLine}
@@ -453,8 +456,7 @@ function Responses() {
         />
       )}
     >
-      <div className={styles.layout}>
-        <div className={styles.main}>
+      <DetailColumns aside={rail} asideLabel="回答の詳細・絞り込み" expanded={asideExpanded} onExpandedChange={setAsideExpanded}>
           {total === 0 && !query.trim() ? (
             <ListState kind="empty" title="まだ回答がありません" description="フォームが回答されると、ここに1件ずつ並びます。" />
           ) : view === 'summary' ? (
@@ -466,7 +468,7 @@ function Responses() {
                     <p className={styles.alertTitle}>{`後処理が終わっていない回答が ${incompleteItems.length}件あります`}</p>
                     <p className={styles.alertNote}>{`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}</p>
                   </div>
-                  <Button onClick={() => { setSelectedId(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length}件を見る`}</Button>
+                  <Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length}件を見る`}</Button>
                 </div>
               ) : null}
               {summaries.map((fieldSummary) => {
@@ -550,10 +552,10 @@ function Responses() {
               </div>
               <table className={styles.table}>
                 <thead>
-                  <TableHeadRow>
+                  <TableHeadRow presentation="embedded">
                     <Th className={styles.colWhen}>答えた日時</Th>
                     <Th className={styles.colWho}>答えた人</Th>
-                    <Th>{firstKey ? (labels[firstKey] ?? firstKey) : '回答'}</Th>
+                    <Th truncate>{firstKey ? (labels[firstKey] ?? firstKey) : '回答'}</Th>
                     <Th className={styles.colState}>後処理</Th>
                   </TableHeadRow>
                 </thead>
@@ -567,11 +569,11 @@ function Responses() {
                         key={item.id}
                         className={isSelected ? styles.rowSelected : undefined}
                         aria-selected={isSelected}
-                        onClick={() => setSelectedId(item.id)}
+                        onClick={() => selectAnswer(item.id)}
                       >
                         <td className={styles.when}>{shortWhen(item.createdAt)}</td>
                         <td>
-                          <button type="button" className={styles.who} title={item.friendName ?? '不明'} onClick={() => setSelectedId(item.id)}>
+                          <button type="button" className={styles.who} title={item.friendName ?? '不明'} onClick={() => selectAnswer(item.id)}>
                             {item.friendName ?? '不明'}
                           </button>
                         </td>
@@ -594,9 +596,7 @@ function Responses() {
               </div>
             </section>
           )}
-        </div>
-        {rail}
-      </div>
+      </DetailColumns>
     </DetailPage>
   )
 }

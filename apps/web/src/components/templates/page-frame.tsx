@@ -6,6 +6,8 @@ export interface PageHeadingProps {
   title: ReactNode
   /** 題はすべて22/700/32。compact は題の周りの余白・間隔だけを詰める。 */
   headingSize?: 'regular' | 'compact' | 'large'
+  /** 詳細の説明とタブを詰める口。指定しない画面には効かない。 */
+  bottomSpacing?: 'compact'
   description?: ReactNode
   help?: ReactNode
   /**
@@ -32,9 +34,9 @@ export function PageTitle({ children, as: Tag = 'h2', className }: {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, description, help, actions, crumbs, steps, headingSize }: PageHeadingProps) {
+export function PageHeading({ title, description, help, actions, crumbs, steps, headingSize, bottomSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
-  return <header className={styles.heading} data-template-region="heading" data-heading-size={headingSize} data-has-steps={!!steps || undefined} data-has-crumbs={!!crumbs || undefined}>
+  return <header className={styles.heading} data-template-region="heading" data-heading-size={headingSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-has-crumbs={!!crumbs || undefined}>
     <div className={styles.headingText}>
       <div className={styles.titleRow}><h2 className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</h2>
         {help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}

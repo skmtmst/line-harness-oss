@@ -2,6 +2,7 @@ export { DashboardPage, DashboardRow, DashboardColumns, type DashboardPageProps 
 export { ListPage, ListPageBody, ListPagePagination, type ListPageProps, type ListPageBodyProps, type ListFolderNav } from './list-page'
 export { CreatePage, type CreatePageProps } from './create-page'
 export { DetailPage, type DetailPageProps } from './detail-page'
+export { DetailColumns } from './detail-columns'
 export { InboxPage, type InboxPageProps } from './inbox-page'
 export { SettingsPage, type SettingsPageProps } from './settings-page'
 export { AnalyticsPage, type AnalyticsPageProps } from './analytics-page'
