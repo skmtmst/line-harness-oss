@@ -176,12 +176,4 @@ describe('会話の中を探す（V8 M0393 段13・枠 v7GV2）', () => {
     expect(host.querySelector('[data-search-hit]')).toBeNull()
   })
 
-  it('v7 の見た目では🔍も ⌘F も出さない（本番は切り替えまで v7）', async () => {
-    delete document.documentElement.dataset.theme
-    await act(async () => root.render(<ChatsPage />))
-    await eventually(() => expect(host.textContent).toContain('定期便を追加したい'))
-    expect(host.querySelector('[aria-label="会話の中を探す（⌘F）"]')).toBeNull()
-    await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', metaKey: true })) })
-    expect(host.querySelector('[role="search"]')).toBeNull()
-  })
 })

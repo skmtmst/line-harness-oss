@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { ApiError } from '@/lib/api'
 import { loadFailureKind } from './load-failure-kind'
 
@@ -20,12 +20,12 @@ describe('M012 友だち詳細の失敗表示', () => {
   })
 
   it('対応状況の保存失敗は共通の状態別案内へ渡す', () => {
-    expect(PAGE).toContain('setSupportError(describeSaveFailure(err))')
+    expect(PAGE).toContain('setError(describeSaveFailure(err))')
     expect(PAGE).not.toContain('setSupportError(err instanceof ApiError ? err.message')
   })
 
   it('シナリオ登録の失敗は共通の状態別案内へ渡す', () => {
-    expect(PAGE).toContain('setScenarioError(describeSaveFailure(err))')
+    expect(PAGE).toContain('setError(describeSaveFailure(err))')
     expect(PAGE).not.toContain('setScenarioError(err instanceof ApiError ? err.message')
   })
 
@@ -33,6 +33,6 @@ describe('M012 友だち詳細の失敗表示', () => {
     expect(PAGE).toContain('loadFailureKind(err)')
     expect(PAGE).toContain('この友だちを見る権限がありません')
     // 権限不足の面は再試行口なし（押しても直らないため）。
-    expect(PAGE).toContain('if (!loading && loadForbidden) {')
+    expect(PAGE).toContain('if (!data.loading && data.loadForbidden) {')
   })
 })

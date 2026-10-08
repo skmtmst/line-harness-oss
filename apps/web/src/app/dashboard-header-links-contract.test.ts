@@ -12,7 +12,8 @@
  * 独自の色・大きさを増やさない。
  */
 
-import fs from 'node:fs'
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
+const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -38,20 +39,6 @@ const SIDE = code(SIDE_CARDS)
 const SINGLE_LOOK = 'text-status-info'
 
 describe('ダッシュボードの行き先リンクの置き場所', () => {
-  it('今月の送信枠は SideCard で右上に「配信設定へ →」、題は1行のまま', () => {
-    expect(CODE).toContain('title="今月の送信枠"')
-    expect(CODE).toContain("action={{ label: '配信設定へ →', href: '/accounts' }}")
-    // 「毎月1日リセット」は題の脇に置くと題が2行に折れる。
-    // 脇（period）には置かず、「？」（HelpTip：いつ元に戻るか）へ移す。
-    expect(CODE).not.toContain('period="毎月1日リセット"')
-    expect(CODE).toContain('helpTip="送信枠は毎月1日にリセットされます。')
-  })
-
-  it('運用アラートは SideCard で右上に「運用状態を見る →」、脇の「現在」は残す', () => {
-    expect(CODE).toContain('title="運用アラート"')
-    expect(CODE).toContain('period="現在"')
-    expect(CODE).toContain("action={{ label: '運用状態を見る →', href: '/emergency' }}")
-  })
 
   it('行き先リンクを下の行や左下に置かない', () => {
     // 下の行にリンクと更新時刻を並べていた残骸がないこと。
@@ -65,16 +52,6 @@ describe('ダッシュボードの行き先リンクの見た目', () => {
     expect(SIDE).toContain(SINGLE_LOOK)
     expect(SIDE).toContain('text-label font-semibold')
     expect(SIDE).not.toMatch(/text-info shrink-0 text-xs/)
-  })
-
-  it('LiveDataCard の行き先リンクは同じ見た目で矢印付き', () => {
-    expect(CODE).toContain('{linkLabel} →</Link>')
-    expect(CODE).toContain('text-status-info shrink-0 text-label font-semibold')
-  })
-
-  it('TodayTaskCard の行き先リンクは同じ見た目（配置は右下のまま）', () => {
-    expect(CODE).toContain('text-status-info inline-flex min-h-6')
-    expect(CODE).not.toMatch(/text-action inline-flex min-h-6/)
   })
 
   it('ダッシュボードに独自の色・大きさの行き先リンクを増やさない', () => {

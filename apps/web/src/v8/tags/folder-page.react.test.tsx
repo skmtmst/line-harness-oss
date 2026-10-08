@@ -40,3 +40,16 @@ it('編集の読み込みが失敗した間は保存・色変更を止め、再�
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダを保存する' })) })
   expect(api.tagGroups.update).toHaveBeenCalledWith('g-1', { name: '新名', color: '#123456', accountId: 'acc-1' })
 })
+
+it('フォルダ名の未入力は欄で知らせ、そこに戻して作成しない', async () => {
+ const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => undefined)
+ render(<FolderPage />)
+ fireEvent.click(screen.getByRole('button', { name: 'フォルダを作る' }))
+ const input = screen.getByRole('textbox', { name: 'フォルダ名' })
+ expect(input.getAttribute('aria-invalid')).toBe('true')
+ expect(document.activeElement).toBe(input)
+ expect(screen.getAllByText('フォルダ名を入力してください')).toHaveLength(1)
+ expect(api.tagGroups.create).not.toHaveBeenCalled()
+ expect(scroll).toHaveBeenCalledWith({ block: 'center' })
+ scroll.mockRestore()
+})

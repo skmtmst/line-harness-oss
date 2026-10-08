@@ -257,7 +257,7 @@ async function eventually(check: () => void, timeout = 1_500): Promise<void> {
 }
 
 function buttonsByText(text: string): HTMLButtonElement[] {
-  return Array.from(host.querySelectorAll('button')).filter((b) => b.textContent === text)
+  return Array.from(document.body.querySelectorAll('button')).filter((b) => b.textContent === text)
 }
 
 function linksByText(text: string): HTMLAnchorElement[] {
@@ -282,7 +282,7 @@ describe('N-037 staffの情報欄は読み取り専用（403と画面を一致�
     expect(input!.disabled).toBe(false)
     expect(buttonsByText('保存する')).toHaveLength(1)
     expect(linksByText('項目を作る').length).toBeGreaterThan(0)
-    expect(host.textContent).not.toContain('情報欄の値を保存できるのは')
+    expect(document.body.textContent).toContain('保存できるのはオーナー・管理者')
   })
 
   it('staffは値を読めるが、編集欄・保存・項目追加は出ない', async () => {
@@ -291,12 +291,12 @@ describe('N-037 staffの情報欄は読み取り専用（403と画面を一致�
     const input = host.querySelector<HTMLInputElement>('input[type="text"]')
     // 値は読める（読み取り専用として表示される）
     expect(input).toBeTruthy()
-    expect(input!.disabled).toBe(true)
+    expect(input!.readOnly).toBe(true)
     expect(input!.value).toBe('既存の値')
     // 押すと403になる口は出さない
     expect(buttonsByText('保存する')).toHaveLength(0)
     expect(linksByText('項目を作る')).toHaveLength(0)
-    expect(host.textContent).toContain('情報欄の値を保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。')
+    expect(document.body.textContent).toContain('保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。')
   })
 })
 
@@ -314,7 +314,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     await render('info')
     const [text, personal] = inputs()
     // 個人情報でない項目はサーバーも受けないため、入力欄を閉じる
-    expect(text.disabled).toBe(true)
+    expect(text.readOnly).toBe(true)
     expect(text.value).toBe('既存の値')
     // 個人情報の項目は編集できる
     expect(personal.disabled).toBe(false)
@@ -322,7 +322,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     expect(buttonsByText('保存する')).toHaveLength(1)
     // 項目の定義を足す口はオーナー・管理者専用のまま
     expect(linksByText('項目を作る')).toHaveLength(0)
-    expect(host.textContent).toContain('個人情報')
+    expect(document.body.textContent).toContain('個人情報')
   })
 
   it('edit キーを持つ staff が個人情報を変えて保存すると saveForFriend へ届く', async () => {
@@ -349,8 +349,8 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     setRole('staff', ['/tags'], ['attribute.personal_info.view'])
     await render('info')
     const [text, personal] = inputs()
-    expect(text.disabled).toBe(true)
-    expect(personal.disabled).toBe(true)
+    expect(text.readOnly).toBe(true)
+    expect(personal.readOnly).toBe(true)
     // 値は読める
     expect(personal.value).toBe('090-0000-0000')
     expect(buttonsByText('保存する')).toHaveLength(0)
@@ -364,8 +364,8 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     setRole('staff', ['/tags'])
     await render('info')
     expect(inputs()).toHaveLength(1)
-    expect(host.textContent).toContain('個人情報の項目が 1 件あります。')
-    expect(host.textContent).toContain('表示には個人情報の閲覧権限が要ります。')
+    expect(document.body.textContent).toContain('個人情報の項目が 1 件あります。')
+    expect(document.body.textContent).toContain('表示には個人情報の閲覧権限が要ります。')
     expect(buttonsByText('保存する')).toHaveLength(0)
   })
 })
@@ -381,13 +381,13 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
       editButtons[0].click()
     })
     await eventually(() => {
-      expect(host.querySelector('[data-support-editor]')).toBeTruthy()
+      expect(document.querySelector('[role="dialog"]')).toBeTruthy()
       expect(net.calls.some((c) => c.name === 'chats.get' && c.args[0] === 'friend-1')).toBe(true)
       expect(net.calls.some((c) => c.name === 'operators.list')).toBe(true)
     })
 
-    const statusSelect = host.querySelector<HTMLSelectElement>('select[aria-label="対応状況を変える"]')!
-    const operatorSelect = host.querySelector<HTMLSelectElement>('select[aria-label="担当者を変える"]')!
+    const statusSelect = document.querySelector<HTMLSelectElement>('select[aria-label="対応状況を変える"]')!
+    const operatorSelect = document.querySelector<HTMLSelectElement>('select[aria-label="担当者を変える"]')!
     // いまの値（chatDetail）が入っている
     expect(statusSelect.value).toBe('in_progress')
     expect(operatorSelect.value).toBe('op-1')
@@ -406,7 +406,7 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
       expect(call!.args[0]).toBe('friend-1')
       expect(call!.args[1]).toEqual({ status: 'resolved', operatorId: 'op-2', revision: 3 })
     })
-    await eventually(() => expect(host.textContent).toContain('担当・対応状況を更新しました'))
+    await eventually(() => expect(document.body.textContent).toContain('担当・対応状況を更新しました'))
   })
 
   it('「未割り当て」を選ぶと operatorId=null で送る', async () => {
@@ -415,8 +415,8 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
     await act(async () => {
       buttonsByText('編集')[0].click()
     })
-    await eventually(() => expect(host.querySelector('[data-support-editor]')).toBeTruthy())
-    await setSelectValue(host.querySelector<HTMLSelectElement>('select[aria-label="担当者を変える"]')!, '')
+    await eventually(() => expect(document.querySelector('[role="dialog"]')).toBeTruthy())
+    await setSelectValue(document.querySelector<HTMLSelectElement>('select[aria-label="担当者を変える"]')!, '')
     await act(async () => {
       buttonsByText('保存する')[0].click()
     })
@@ -437,7 +437,7 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
     await render('timeline')
     // 「編集」はボタンではなく受信箱へのリンクのまま
     expect(buttonsByText('編集')).toHaveLength(0)
-    expect(linksByText('編集').length).toBeGreaterThan(0)
-    expect(host.querySelector('[data-support-editor]')).toBeNull()
+    expect(linksByText('受信箱で開く').length).toBeGreaterThan(0)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 })

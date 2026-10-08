@@ -109,6 +109,23 @@ afterEach(async () => {
 })
 
 describe('B-26 右の欄でその場で直す', () => {
+  it('タグの追加は開いて選べ、Tキーでも開いて入力欄へ移動する', async () => {
+    await renderPanel()
+    const picker = () => document.getElementById('inbox-panel-tag-picker')!
+    expect(picker().hidden).toBe(true)
+    await act(async () => { button('＋ 追加')!.click() })
+    expect(picker().hidden).toBe(false)
+    expect(document.querySelector('[aria-label="タグを探して付ける"]')).toBeTruthy()
+    await act(async () => { button('＋ 追加')!.click() })
+    expect(picker().hidden).toBe(true)
+    document.activeElement instanceof HTMLElement && document.activeElement.blur()
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true })) })
+    await eventually(() => {
+      expect(picker().hidden).toBe(false)
+      expect(document.activeElement?.getAttribute('aria-label')).toBe('タグを探して付ける')
+    })
+  })
+
   it('対応状況は選んだ瞬間に変え、版を送らずその項目だけ保存し、［元に戻す］で前の状態を送る', async () => {
     mocks.update.mockResolvedValue({ success: true, data: { revision: 4 } })
     await renderPanel()

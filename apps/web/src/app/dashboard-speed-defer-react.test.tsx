@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * V8 速さ対応：起動時は概要・配置だけを先に取り、補足の口は
- * 右の列が見えてから叩く。v7 は今までどおりすぐ叩く。
+ * V8：最初の画面に出る補足を起動時から取り、表示の変化で重ねて取得しない。
  */
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -198,27 +197,14 @@ function calledStaffList(): boolean {
   return net.calls.some((call) => call === 'GET /api/staff')
 }
 
-describe('V8 速さ対応：補足の口は右の列が見えてから', () => {
-  it('起動時は概要・配置だけを取り、補足は右の列が見えるまで待つ', async () => {
+describe('V8：補足を起動時から取得する', () => {
+  it('起動時に補足を取り、右の列の表示が変わっても取得を重ねない', async () => {
     await render()
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)) })
 
     expect(called('/api/dashboard/overview')).toBe(true)
     expect(called('/api/dashboard/preferences')).toBe(true)
-    // 右の列が見える前は、補足の口を叩かない。
-    expect(called('/api/nen-members/photos/review-metrics')).toBe(false)
-    expect(called('/api/booking/admin/requests')).toBe(false)
-    expect(called('/api/booking/admin/requests-summary')).toBe(false)
-    expect(called('/health')).toBe(false)
-    expect(calledStaffList()).toBe(false)
-    expect(called('/api/support-marks')).toBe(false)
-    expect(called('/api/dashboard/upcoming')).toBe(false)
-    expect(called('/api/dashboard/delivery-failure-origins')).toBe(false)
-
-    await revealAside()
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)) })
-
-    // 右の列が見えたら、補足の口を叩く。
+    // 補足は最初から取得する。
     expect(called('/api/nen-members/photos/review-metrics')).toBe(true)
     expect(called('/api/booking/admin/requests')).toBe(true)
     expect(called('/api/booking/admin/requests-summary')).toBe(true)
@@ -227,5 +213,10 @@ describe('V8 速さ対応：補足の口は右の列が見えてから', () => {
     expect(called('/api/support-marks')).toBe(true)
     expect(called('/api/dashboard/upcoming')).toBe(true)
     expect(called('/api/dashboard/delivery-failure-origins')).toBe(true)
+
+    const initialCalls = [...net.calls]
+    await revealAside()
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)) })
+    expect(net.calls).toEqual(initialCalls)
   })
 })

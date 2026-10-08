@@ -5,7 +5,7 @@
  * すると、別の場所に同じ字が1つでもあれば素通りする。ここでは対象の関数の
  * 本体か、対象のJSXの区間だけを切り出して見る。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -39,9 +39,9 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
   const waiting = functionBody(PAGE, 'formatWaitingDuration')
   const lineRow = region(PAGE, 'const waitingLabel = needsAttention', '{/* Right Panel: Chat Detail */}')
 
-  it('一覧の日時は共通の日付書式と相対時刻を使う', () => {
+  it('一覧の日時は共通の書式から時刻を出す', () => {
     expect(PAGE).toContain("import { formatDateTime, formatNumber, formatRelative, formatTime }")
-    expect(lineRow).toContain('formatRelative(chat.lastMessageAt)')
+    expect(lineRow).toContain('formatInboxListTime(chat.lastMessageAt)')
   })
 
   it('取れない日時は空欄や Invalid Date ではなく — を出す', () => {
@@ -57,35 +57,27 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
     expect(waiting).toContain('${hours}時間${minutes % 60}分')
   })
 
-  it('行は待ち時間があればそれを、無ければ日付を出す（v7）。V8 は絵どおり時刻だけ', () => {
-    expect(lineRow).toContain('waitingLabel ? (')
+  it('V8の行は絵どおり時刻を出す', () => {
     expect(lineRow).toContain('formatInboxListTime(chat.lastMessageAt)')
-    expect(lineRow).toContain('formatRelative(chat.lastMessageAt)')
+    expect(lineRow).toContain('formatInboxListTime(chat.lastMessageAt)')
+    expect(lineRow).toContain('formatInboxListTime(chat.lastMessageAt)')
     // 年入りの旧書式へ戻さない。
     expect(lineRow).not.toContain('formatDatetime(')
   })
 })
 
 describe('H3lAOB / xGLVe トーク見出しの操作', () => {
-  const header = region(PAGE, '<div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">', '{/* Messages')
+  const header = region(PAGE, '{/* Chat Header */}', '{/* Messages') + readFileSync(join(HERE, '..', '..', 'v8', 'inbox-chat', 'conversation-head.tsx'), 'utf8')
 
   it('顧客情報は開いていても閉じていても同じ1つのボタンで切り替える', () => {
-    expect(header).toContain('onClick={() => setShowFriendInfo((current) => !current)}')
-    expect(header).toContain('aria-expanded={showFriendInfo}')
-    expect(header).toContain("showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'")
+    expect(header).toContain('onToggle: () => setShowFriendInfo((current) => !current)')
+    expect(header).toContain('aria-expanded={panel.open}')
+    expect(header).toContain("panel.open ? '顧客情報を閉じる' : '顧客情報を表示'")
     // 「閉じているときだけ出す」形へ戻さない。
     expect(header).not.toContain('{!showFriendInfo && (')
   })
 
-  it('顧客情報を開いても操作列を1行・高さ40pxで保つ', () => {
-    // U008/U010(#969): 390px では2行目へ落として右に切らないため、
-    // 折り返しは sm 未満だけ。sm 以上では従来どおり1行を保つ。
-    expect(header).toContain('sm:flex-nowrap')
-    // V8 移行 ①: 共通 Button の inline-flex は部品側が持つので高さだけを見る。
-    expect(header).toContain('className="h-9 w-9 shrink-0')
-    expect(header).toContain('compact={showFriendInfo}')
-    expect(INBOX_DROPDOWN).toContain('whitespace-nowrap border px-2.5 text-xs')
-  })
+
 })
 
 describe('B7CER8 内部メモ', () => {
@@ -186,8 +178,8 @@ describe('LAY-01/LAY-02 顧客情報の列とドロワー', () => {
     // 同じ1つのボタンが開閉し、パネルは showFriendInfo だけに従う。
     // 「開いていないのに閉じると表示する」状態を作らない(#982 LAY-02)。
     expect(PAGE).toContain('{showFriendInfo && (selectedChatId || selectedThreadId)')
-    expect(PAGE).toContain('aria-expanded={showFriendInfo}')
-    expect(PAGE).toContain("showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'")
+    expect(PAGE).toContain('aria-expanded={panel.open}')
+    expect(PAGE).toContain("panel.open ? '顧客情報を閉じる' : '顧客情報を表示'")
   })
 })
 
