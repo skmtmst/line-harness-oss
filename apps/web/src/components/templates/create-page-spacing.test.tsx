@@ -63,8 +63,6 @@ describe('作成の型の余白の口', () => {
  * 寸法を絵と照合してから（V8 移行の報告の一覧）。直したらここから消す。
  */
 const KNOWN_REGION_OVERRIDES = [
-  'src/v8/accounts-detail/detail.module.css',
-  'src/v8/accounts-detail/handover.module.css',
   'src/v8/settings/sa-frame.module.css',
   'src/v8/settings/sb-frame/settings-screen.module.css',
 ]

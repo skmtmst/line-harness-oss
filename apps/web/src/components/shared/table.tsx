@@ -97,14 +97,19 @@ export function DataTable({
   children,
   className,
   'data-design': dataDesign,
+  presentation,
+  label,
 }: {
   children: ReactNode
   className?: string
   'data-design'?: string
+  /** カード内の表の寸法。未指定の一覧は今までの形を保つ。 */
+  presentation?: 'account-list' | 'account-handover' | 'connection-check'
+  label?: string
 }) {
   return (
-    <div className={[shell.frame, className].filter(Boolean).join(' ')}>
-      <table className={shell.table} data-design={dataDesign}>{children}</table>
+    <div className={[shell.frame, className].filter(Boolean).join(' ')} data-table-presentation={presentation}>
+      <table className={shell.table} data-design={dataDesign} data-table-presentation={presentation} aria-label={label}>{children}</table>
     </div>
   )
 }

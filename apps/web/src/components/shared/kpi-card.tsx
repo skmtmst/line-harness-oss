@@ -73,7 +73,7 @@ export type KpiCardProps = {
   /** 対象画面にV6がある場合はv6、配信予定を強調するカードはbroadcastを使う。 */
   variant?: 'v5' | 'v6' | 'broadcast'
   /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
-  presentation?: 'card' | 'band' | 'cell'
+  presentation?: 'card' | 'band' | 'cell' | 'stacked'
   density?: 'compact' | 'comfortable'
   className?: string
   hidden?: boolean
@@ -208,7 +208,7 @@ export default function KpiCard({
       {delta ? <span className={`${styles.delta} v8-only`}>{delta}</span> : null}
       </div>
 
-      <p className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
+      {presentation !== 'stacked' || detail || onRetry || action ? <p className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
         <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
@@ -220,7 +220,7 @@ export default function KpiCard({
             <span>{action.label}</span><ArrowRight size={12} aria-hidden="true" />
           </Link>
         ) : null}
-      </p>
+      </p> : null}
     </div>
   )
 }

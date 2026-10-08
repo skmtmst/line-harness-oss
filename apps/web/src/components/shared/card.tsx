@@ -1,4 +1,4 @@
-import React, { type HTMLAttributes, type ReactNode } from 'react'
+import React, { type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import styles from './card.module.css'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
@@ -6,6 +6,10 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   layout?: 'block' | 'vertical'
   overflow?: 'visible' | 'hidden'
   padding?: 'none' | 'default' | 'roomy' | 'spacious'
+  /** 板ごとの余白・間はトークンで渡す。枠の描画はこの部品が持つ。 */
+  contentPadding?: string
+  gap?: string
+  surface?: 'inset' | 'muted'
 }
 
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
@@ -15,6 +19,10 @@ export default function Card({
   layout = 'block',
   overflow = 'visible',
   padding = 'none',
+  contentPadding,
+  gap,
+  surface,
+  style,
   ...props
 }: CardProps) {
   const classes = [
@@ -30,7 +38,9 @@ export default function Card({
     .join(' ')
 
   return (
-    <section className={classes} data-design-part="card" {...props}>
+    <section className={classes} data-design-part="card" data-card-surface={surface}
+      data-card-spacing={contentPadding || gap ? '' : undefined}
+      style={{ ...style, '--card-content-padding': contentPadding, '--card-content-gap': gap } as CSSProperties} {...props}>
       {children}
     </section>
   )

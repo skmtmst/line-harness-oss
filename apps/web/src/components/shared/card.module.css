@@ -33,6 +33,17 @@
   padding: 20px;
 }
 
+.card[data-card-surface='inset'], .card[data-card-surface='muted'] {
+  border: 0; box-shadow: none;
+}
+.card[data-card-surface='inset'] { box-shadow: inset 0 0 0 1px var(--color-hairline); }
+.card[data-card-surface='muted'] { background: var(--color-surface-pearl); }
+.card[data-card-spacing] {
+  padding: var(--card-content-padding, 0);
+  gap: var(--card-content-gap, 0);
+  min-width: 0;
+}
+
 .header {
   display: flex;
   min-height: 48px;

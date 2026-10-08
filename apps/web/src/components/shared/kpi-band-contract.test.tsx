@@ -49,7 +49,8 @@ describe('数の帯（Pp3nS）', () => {
   it('包み（KpiBand）は帯の印を持ち、並べ方は呼び出し側のまま', () => {
     const source = read('kpi-band.tsx')
     expect(source).toContain('data-kpi-strip')
-    expect(source).toContain('data-kpi-presentation="band"')
+    expect(source).toContain("presentation = 'band'")
+    expect(source).toContain('data-kpi-presentation={presentation}')
     expect(source).toContain('gridClassName')
   })
 
