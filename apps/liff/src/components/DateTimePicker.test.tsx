@@ -726,3 +726,28 @@ describe('カレンダーの見た目（設計合わせ）', () => {
     expect(empty.className).toContain('text-liff-off-ink');
   });
 });
+
+describe('監査 L1：月の読込を途中で替えても、戻れば読み直す', () => {
+  it('10月の読込中に11月へ送り、10月へ戻ると読み直して日が出る', async () => {
+    mockSettings('calendar', 60);
+    let held = true;
+    const real = availability.getMockImplementation()!;
+    availability.mockImplementation(async (menuId, staffId, from, to) => {
+      // 最初の10月の読込だけ返さずに止める（読込中に月を送った状態を作る）。
+      if (held && from.startsWith('2026-10')) {
+        held = false;
+        return new Promise(() => {});
+      }
+      return real(menuId, staffId, from, to);
+    });
+    renderPicker();
+    expect(await screen.findByText('2026年10月')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '次の月' }));
+    expect(await screen.findByRole('button', { name: '11月2日 空きあり' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '前の月' }));
+    // 読み中の印が残っていると、ここで読込中のまま止まる。
+    expect(await screen.findByRole('button', { name: '10月16日 空きあり' })).toBeTruthy();
+    const octCalls = availability.mock.calls.filter(([, , from]) => from.startsWith('2026-10'));
+    expect(octCalls.length).toBe(2);
+  });
+});

@@ -458,7 +458,8 @@ export default function DateTimePicker({
     if (loadedMonths.includes(month) || loadingMonthsRef.current.has(`${calReloadKey}:${month}`)) {
       return;
     }
-    loadingMonthsRef.current.add(`${calReloadKey}:${month}`);
+    const loadingKey = `${calReloadKey}:${month}`;
+    loadingMonthsRef.current.add(loadingKey);
     const from = monthStart(month) < today ? today : monthStart(month);
     const to = monthEnd(month) > windowEnd ? windowEnd : monthEnd(month);
     if (from > to) {
@@ -466,10 +467,12 @@ export default function DateTimePicker({
       return;
     }
     let cancelled = false;
+    let settled = false;
     void Promise.all(
       splitRange(from, to).map(([head, tail]) => api.availability(menu.id, staff.id, head, tail)),
     )
       .then((results) => {
+        settled = true;
         if (cancelled) return;
         const buckets = results.flatMap((r) => (r.by_staff[0] ? [r.by_staff[0]] : []));
         const { byDate: grouped, fullDates, limitedDates, openDates } = groupSlots(buckets);
@@ -485,12 +488,16 @@ export default function DateTimePicker({
         setLoadedMonths((prev) => (prev.includes(month) ? prev : [...prev, month]));
       })
       .catch((e) => {
+        settled = true;
         if (cancelled) return;
         logFailure('availability', e);
         setCalFailed(true);
       });
     return () => {
       cancelled = true;
+      // 読み終わる前に月・見せ方を替えたら「読み中」の印を外す。
+      // 外さないと、その月へ戻っても読み始めず読み込み中のまま残る。
+      if (!settled) loadingMonthsRef.current.delete(loadingKey);
     };
   }, [view, settings, month, menu.id, staff.id, today, windowEnd, loadedMonths, calReloadKey]);
 
