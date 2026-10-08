@@ -42,6 +42,7 @@ import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
+import FolderSelect from '@/components/shared/folder-select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -211,6 +212,12 @@ export default function HqBroadcastCreate() {
 
   /* ① フォルダ（統括の一括配信のフォルダ）・社内メモ（API-18）。 */
   const [hqFolders, setHqFolders] = useState<Array<{ id: string; name: string }>>([])
+  /* フォルダを選ぶ欄からその場で作る（dLffh）。一覧の左の列と同じ口。色は持たない。 */
+  const createHqFolder = async (name: string) => {
+    const created = (await hqBroadcastsApi.createFolder(name)).data
+    setHqFolders((current) => [...current, { id: created.id, name: created.name }])
+    return { value: created.id, label: created.name }
+  }
   const [folderId, setFolderId] = useState('')
   const [internalMemo, setInternalMemo] = useState('')
 
@@ -846,7 +853,7 @@ export default function HqBroadcastCreate() {
                 </label>
                 {/* 店の一斉配信と同じフォルダ・社内メモ（統括の一括配信のフォルダ。API-18） */}
                 <div className={formStyles.basicFields}>
-                  <label><span className={formStyles.labelRow}>フォルダ</span><Select aria-label="フォルダ" value={folderId} onChange={setFolderId} options={[{ value: '', label: '未分類' }, ...hqFolders.map((f) => ({ value: f.id, label: f.name }))]} size="full" /></label>
+                  <label><span className={formStyles.labelRow}>フォルダ</span><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name }))} onCreate={canManage ? createHqFolder : undefined} colors={false} size="full" /></label>
                   <label><span className={formStyles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません。各アカウントの配信にも同じメモが残ります</HelpTip></span><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} maxLength={10000} className={formStyles.textInput} placeholder="友だちには表示されません" /></label>
                 </div>
                 <div className={formStyles.recentHeader}><h3>最近の配信</h3><Link href="/hq/broadcasts">一括配信の一覧を見る →</Link></div>

@@ -27,7 +27,12 @@ export interface TemplateEditHost {
   /** 板の頭の説明（統括：保存して配ると…）。 */
   description: string
   /** フォルダの候補（value は呼ぶ側が保存に使う値。未分類は ''）。 */
-  folders: Array<{ value: string; label: string }>
+  folders: Array<{ value: string; label: string; color?: string | null }>
+  /**
+   * フォルダを選ぶ欄からその場で作る（dLffh）。呼ぶ側の種類のフォルダの受け口。色は受け取らない。
+   * 渡さないと「＋ 新しいフォルダを作る」を出さない。
+   */
+  createFolder?: (name: string) => Promise<{ value: string; label: string }>
   folder: string
   onFolderChange: (value: string) => void
   /** 呼ぶ側の保存・読み込み中。 */

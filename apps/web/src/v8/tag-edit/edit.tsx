@@ -29,6 +29,7 @@ import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderCreateResult, type FolderSelectCreate } from '@/components/shared/folder-select'
 import TargetMissing from '@/components/shared/target-missing'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
@@ -57,6 +58,13 @@ export default function TagEditV8() {
   const [tag, setTag] = useState<Tag | null>(null)
   const [definition, setDefinition] = useState<TagDefinition | null>(null)
   const [groups, setGroups] = useState<TagGroup[]>([])
+  // その場でタグのフォルダを作る（dLffh）。左の列の「フォルダを追加」と同じ受け口。
+  const createGroup = async (name: string, color: string | null) => {
+    const response = await api.tagGroups.create({ name, color, accountId: selectedAccountId })
+    const created = folderCreateResult(response, (group: TagGroup) => ({ value: group.id, label: group.name, color: group.color }))
+    if (response.success) setGroups((current) => [...current, response.data])
+    return created
+  }
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -207,6 +215,7 @@ export default function TagEditV8() {
         key={`${tag.id}:${tag.version ?? 1}`}
         tag={tag}
         groups={groups}
+        onCreateGroup={canEdit && selectedAccountId ? createGroup : undefined}
         dependencies={dependencies}
         accountId={selectedAccountId}
         readOnly={!canEdit}
@@ -250,6 +259,7 @@ export default function TagEditV8() {
 function TagEditForm({
   tag,
   groups,
+  onCreateGroup,
   dependencies,
   accountId,
   readOnly,
@@ -267,6 +277,8 @@ function TagEditForm({
 }: {
   tag: Tag
   groups: TagGroup[]
+  /** その場でフォルダを作る（dLffh）。閲覧のみは渡さない。 */
+  onCreateGroup?: FolderSelectCreate
   dependencies: TagDependencies | null
   accountId: string
   readOnly: boolean
@@ -458,7 +470,7 @@ function TagEditForm({
               <div className={styles.folderBox}>
                 {readOnly
                   ? <span className={styles.roValue}>{groups.find((group) => group.id === groupId)?.name ?? '未分類'}</span>
-                  : <Select aria-label="所属フォルダ" value={groupId} onChange={setGroupId} options={[{ value: '', label: '未分類' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]} size="full" />}
+                  : <FolderSelect aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))} onCreate={onCreateGroup} size="full" />}
               </div>
             </div>
             <div className={styles.switchRow}>

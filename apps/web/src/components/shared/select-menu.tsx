@@ -14,8 +14,8 @@
  *
  * 開く・閉じる・キーボードは呼び出し側（shared/select）が持つ。ここは見た目と並びだけ。
  */
-import { Check } from 'lucide-react'
-import type { CSSProperties, MouseEvent, ReactNode, Ref } from 'react'
+import { Check, Plus } from 'lucide-react'
+import type { CSSProperties, FocusEvent, MouseEvent, ReactNode, Ref } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './select-menu.module.css'
 
@@ -63,6 +63,21 @@ export interface SelectMenuProps {
   /** 上の小さな見出し（例「並び」）。無ければ出さない。 */
   heading?: string
   listRef?: Ref<HTMLUListElement>
+  /** 中身の板（白い地の内側）。焦点が板の中にあるかを呼び出し側が見るため。 */
+  innerRef?: Ref<HTMLDivElement>
+  /**
+   * 一覧の下に区切りの線を引いて置く行（dLffh「＋ 新しいフォルダを作る」。SelectMenuAction）。
+   */
+  footer?: ReactNode
+  /**
+   * 渡すと、同じ板の中身をこれに替える（iBuZH「名前を入れる」）。見出し・一覧・footer は出さない。
+   * 中の入力欄に焦点を移せるよう、押す前の焦点の止めはしない。
+   */
+  panel?: ReactNode
+  /** 板の中から焦点が外へ出たとき（Tab で抜けたなど）。 */
+  onPanelBlur?: (event: FocusEvent<HTMLDivElement>) => void
+  /** Esc で閉じずに別のことをするとき（panel から一覧へ戻る）。 */
+  onEscape?: () => void
   children: ReactNode
 }
 
@@ -75,6 +90,11 @@ export function SelectMenu({
   ariaLabel,
   heading,
   listRef,
+  innerRef,
+  footer,
+  panel,
+  onPanelBlur,
+  onEscape,
   children,
 }: SelectMenuProps) {
   return (
@@ -84,10 +104,27 @@ export function SelectMenu({
       matchWidth="min"
       getAnchor={getAnchor}
       onClose={onClose}
+      onEscape={onEscape}
       className={styles.surface}
     >
-      {/* 欄に焦点を残したまま押せるよう、押す前に焦点を移さない。 */}
-      <div className={styles.inner} onMouseDown={(event: MouseEvent) => event.preventDefault()} data-select-menu="">
+      {panel ? (
+        <div
+          ref={innerRef}
+          id={listboxId}
+          className={styles.panel}
+          data-select-menu=""
+          data-select-menu-panel=""
+          // 入力欄の焦点を板の空き・ボタンを押しても動かさない（押した拍子に閉じない）。
+          onMouseDown={(event: MouseEvent) => {
+            if (!(event.target instanceof HTMLInputElement)) event.preventDefault()
+          }}
+          onBlur={onPanelBlur}
+        >
+          {panel}
+        </div>
+      ) : (
+      /* 欄に焦点を残したまま押せるよう、押す前に焦点を移さない。 */
+      <div ref={innerRef} className={styles.inner} onMouseDown={(event: MouseEvent) => event.preventDefault()} data-select-menu="">
         {heading ? (
           <div className={styles.heading} aria-hidden="true">
             {heading}
@@ -103,7 +140,14 @@ export function SelectMenu({
         >
           {children}
         </ul>
+        {footer ? (
+          <>
+            <div className={styles.divider} aria-hidden="true" />
+            {footer}
+          </>
+        ) : null}
       </div>
+      )}
     </MenuPortal>
   )
 }
@@ -149,6 +193,30 @@ export function SelectMenuOption({
         {selected ? <Check className={styles.check} aria-hidden="true" /> : null}
       </button>
     </li>
+  )
+}
+
+export interface SelectMenuActionProps {
+  label: string
+  active?: boolean
+  onSelect: () => void
+  onHover?: () => void
+}
+
+/** 一覧の下の「＋ 〇〇」（dLffh「新しく作る」）。緑・600。選択肢ではないので listbox の外に置く。 */
+export function SelectMenuAction({ label, active = false, onSelect, onHover }: SelectMenuActionProps) {
+  return (
+    <button
+      type="button"
+      className={`${styles.item} ${styles.action}`}
+      data-active={active || undefined}
+      data-select-menu-action=""
+      onMouseEnter={onHover}
+      onClick={onSelect}
+    >
+      <span className={styles.leading} aria-hidden="true"><Plus className={styles.actionIcon} /></span>
+      <span className={styles.label}>{label}</span>
+    </button>
   )
 }
 

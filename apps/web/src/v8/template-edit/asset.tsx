@@ -27,6 +27,7 @@ import DateTimeField from '@/components/shared/date-time-field'
 import LinePreview from '@/components/shared/line-preview'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
@@ -384,12 +385,18 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         </div>
         <div className={`${styles.field} ${styles.folderField}`}>
           <label htmlFor={`te-${kind}-folder`} className={styles.labelSmall}>フォルダ</label>
-          <Select
+          <FolderSelect
             id={`te-${kind}-folder`}
             aria-label="フォルダ"
             value={host ? host.folder : folder}
             onChange={host ? host.onFolderChange : setFolder}
-            options={host ? [{ value: '', label: '未分類' }, ...host.folders] : [{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.name, label: f.name }))]}
+            folders={host ? host.folders : folders.map(folderByName)}
+            colors={!host}
+            onCreate={host
+              ? hostFolderCreate(host)
+              : canMutate && selectedAccountId
+                ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
+                : undefined}
           />
         </div>
       </div>
