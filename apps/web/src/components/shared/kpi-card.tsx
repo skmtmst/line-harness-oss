@@ -75,6 +75,8 @@ export type KpiCardProps = {
   /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
   presentation?: 'card' | 'band' | 'cell'
   density?: 'compact' | 'comfortable'
+  /** LINE通知の板の数カード。既定のカードの寸法は保つ。 */
+  appearance?: 'notification-customer' | 'notification-operator'
   className?: string
   hidden?: boolean
   id?: string
@@ -119,6 +121,7 @@ export default function KpiCard({
   variant = 'v6',
   presentation = 'card',
   density = 'comfortable',
+  appearance,
   className,
   valueTone = 'default',
   valueText,
@@ -149,6 +152,7 @@ export default function KpiCard({
       className={classes}
       data-kpi-presentation={presentation}
       data-kpi-density={density}
+      data-kpi-appearance={appearance}
       aria-busy={loading || undefined}
       data-design-version={variant}
       {...cardProps}

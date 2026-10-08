@@ -54,9 +54,15 @@ export function Field({
   helpLabel,
   helpHref,
   count,
+  size,
+  fill,
   children,
 }: {
   label: string
+  /** 選ぶ欄の短いラベル（gjUz3・hiBO8）。既定の欄は変えない。 */
+  size?: 'compact'
+  /** 横に並ぶ欄を等分する。 */
+  fill?: boolean
   htmlFor?: string
   required?: boolean
   /** 任意の入力欄。既存の OptionalBadge をラベルの横に置く。 */
@@ -107,6 +113,8 @@ export function Field({
     <FieldContext.Provider value={{ controlId: htmlFor, describedBy, invalid: Boolean(shownError), required: Boolean(required) }}>
     <div
       className={styles.field}
+      data-field-size={size}
+      data-field-fill={fill || undefined}
       data-field-quiet={quiet && error ? '' : undefined}
       onInput={error ? () => { if (!quiet) setQuiet(true) } : undefined}
       onBlur={quiet ? () => setQuiet(false) : undefined}

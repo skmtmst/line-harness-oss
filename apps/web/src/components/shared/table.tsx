@@ -1,5 +1,5 @@
 import React from 'react'
-import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes } from 'react'
+import type { CSSProperties, ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes } from 'react'
 import shell from './data-table.module.css'
 import { loadFailureCopy } from './api-error-message'
 import HelpTip from './help-tip'
@@ -97,14 +97,24 @@ export function DataTable({
   children,
   className,
   'data-design': dataDesign,
+  grid,
+  label,
 }: {
   children: ReactNode
   className?: string
   'data-design'?: string
+  /** 列の寸法が板ごとに決まる設定一覧。セル・線・枠は共通部品が持つ。 */
+  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string }
+  label?: string
 }) {
   return (
-    <div className={[shell.frame, className].filter(Boolean).join(' ')}>
-      <table className={shell.table} data-design={dataDesign}>{children}</table>
+    <div className={[shell.frame, className].filter(Boolean).join(' ')} data-grid-table={grid ? '' : undefined}>
+      <table className={shell.table} data-design={dataDesign} aria-label={label} style={grid ? {
+        '--table-columns': grid.columns,
+        '--table-compact-columns': grid.compactColumns ?? grid.columns,
+        '--table-row-padding': grid.padding,
+        '--table-head-padding': grid.headPadding,
+      } as CSSProperties : undefined}>{children}</table>
     </div>
   )
 }

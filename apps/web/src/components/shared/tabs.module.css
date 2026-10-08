@@ -198,4 +198,6 @@
   color: var(--color-status-warn-deep);
   background: var(--color-status-warn-soft);
 }
+[data-theme='v8'] .list[data-size='notification'] .items { gap: var(--tpl-nt-tab-gap); }
+[data-theme='v8'] .list[data-size='notification'] .tab { min-height: 0; padding-bottom: var(--tpl-nt-tab-pad); line-height: var(--tpl-nt-tab-lh); }
 }
