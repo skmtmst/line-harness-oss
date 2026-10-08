@@ -10,7 +10,7 @@
  * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・保管済み）は今の画面（app/tags/edit-tag-page-v8）と同じ。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, ChevronUp, Copy, GitCompare, Plus, Trash2, TriangleAlert } from 'lucide-react'
@@ -256,7 +256,19 @@ export default function TagEditV8() {
   )
 }
 
-function TagEditForm({
+export interface TagEditHost {
+  initialValues: TagEditorValues
+  title: string
+  saveLabel?: string
+  onSaveDraft?: (values: TagEditorValues) => void
+  description: string
+  notice?: ReactNode
+  preview: (values: TagEditorValues) => ReactNode
+  onSaveAnother: (values: TagEditorValues) => void
+  allowedActionTypes: readonly import('@/components/friend-fields/tag-editor-v4').TagEditorActionLabel[]
+}
+
+export function TagEditForm({
   tag,
   groups,
   onCreateGroup,
@@ -274,7 +286,9 @@ function TagEditForm({
   onCancel,
   onSave,
   onDelete,
+  host,
 }: {
+  host?: TagEditHost
   tag: Tag
   groups: TagGroup[]
   /** その場でフォルダを作る（dLffh）。閲覧のみは渡さない。 */
@@ -298,7 +312,7 @@ function TagEditForm({
   const [groupId, setGroupId] = useState(tag.groupId ?? '')
   const [isStarred, setIsStarred] = useState(tag.isStarred ?? false)
   const hasStoredLink = Boolean((tag.mileageReward ?? 0) || (tag.referralMileageReward ?? 0) || tag.mileageMultiplierBps)
-  const [linked, setLinked] = useState(hasStoredLink || initialActions.length > 0)
+  const [linked, setLinked] = useState(host?.initialValues.linked ?? (hasStoredLink || initialActions.length > 0))
   const [reward, setReward] = useState(String(tag.mileageReward ?? 0))
   const [referralReward, setReferralReward] = useState(String(tag.referralMileageReward ?? 0))
   const [multiplier, setMultiplier] = useState(tag.mileageMultiplierBps == null ? '' : String(tag.mileageMultiplierBps))
@@ -321,12 +335,13 @@ function TagEditForm({
   /* IDEA-04：同名のタグがすでにあるとき、保存する前に知らせる。 */
   const [siblingNames, setSiblingNames] = useState<Array<{ id: string; name: string }>>([])
   useEffect(() => {
+    if (host) return
     let cancelled = false
     void api.tags.list({ accountId })
       .then((res) => { if (!cancelled && res.success) setSiblingNames(res.data.map((item) => ({ id: item.id, name: item.name }))) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [accountId])
+  }, [accountId, host])
   const nameDuplicates = useMemo(() => findDuplicateNames(siblingNames, name, tag.id), [siblingNames, name, tag.id])
 
   const groupName = groups.find((group) => group.id === groupId)?.name ?? '未分類'
@@ -344,14 +359,14 @@ function TagEditForm({
   /* N-047：いま付いている人への反映の人数はサーバーで数える。入力中は少し待ってから数え直す。 */
   const [retroPreview, setRetroPreview] = useState<TagRetroactivePreview | null>(null)
   useEffect(() => {
-    if (retroactiveReference) return
+    if (retroactiveReference || host) return
     const timer = setTimeout(() => {
       void api.tags.retroactivePreview(tag.id, accountId, { self: values.rewardMiles, referrer: values.referralRewardMiles })
         .then((res) => { if (res.success) setRetroPreview(res.data) })
         .catch(() => {})
     }, 400)
     return () => clearTimeout(timer)
-  }, [tag.id, accountId, values.rewardMiles, values.referralRewardMiles, retroactiveReference])
+  }, [tag.id, accountId, values.rewardMiles, values.referralRewardMiles, retroactiveReference, host])
 
   const requestSave = () => {
     if (applyToExisting && (tag.friendCount ?? 0) > 0 && (values.rewardMiles > 0 || values.referralRewardMiles > 0)) {
@@ -430,26 +445,29 @@ function TagEditForm({
   return (
     <div className={styles.page}>
       <CreatePage
-        title={tag.name || 'タグを編集'}
-        identity={<Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />友だち属性へ</Link>}
-        description={(
+        boardId={host ? 'MFgPZ' : 'Qat9s'}
+        footerOutlined={Boolean(host)}
+        notice={host?.notice}
+        title={host?.title ?? (tag.name || 'タグを編集')}
+        identity={host ? undefined : <Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />友だち属性へ</Link>}
+        description={host ? <>{host.description}{readOnly ? <p className={styles.roBand} role="note">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}</> : (
           <>
             {`${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
             {readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}
             {conflictBand}
           </>
         )}
-        preview={side}
-        destructive={readOnly ? undefined : <Button variant="danger" type="button" onClick={onDelete}>タグを削除する</Button>}
+        preview={host ? host.preview(values) : side}
+        destructive={host || readOnly ? undefined : <Button variant="danger" type="button" onClick={onDelete}>タグを削除する</Button>}
         footerActions={(
           <>
             <Button onClick={onCancel}>キャンセル</Button>
             {/* 閲覧のみには押せない操作を置かない（隠す）。 */}
-            {readOnly ? null : <Button href={`/tags/new?copy=${tag.id}`}><Copy size={14} aria-hidden="true" />複製して作る</Button>}
+            {readOnly ? null : host?.onSaveDraft ? <Button disabled={saving || !name.trim()} onClick={() => host.onSaveDraft?.(values)}>下書きを保存</Button> : host ? <Button disabled={saving || !name.trim()} onClick={() => host.onSaveAnother(values)}><Copy size={14} aria-hidden="true" />保存して続けて作る</Button> : <Button href={`/tags/new?copy=${tag.id}`}><Copy size={14} aria-hidden="true" />複製して作る</Button>}
             {readOnly ? null : (
-              <Button variant="primary" onClick={conflict ? onCompare : requestSave} busy={saving}>
+              <Button variant="primary" onClick={conflict ? onCompare : requestSave} busy={saving} disabled={Boolean(host) && !name.trim()}>
                 {conflict ? <GitCompare size={14} aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}
-                {conflict ? '比べてから保存' : 'タグを保存する'}
+                {conflict ? '比べてから保存' : host ? host.saveLabel ?? 'タグを作る' : 'タグを保存する'}
               </Button>
             )}
           </>
@@ -457,7 +475,7 @@ function TagEditForm({
       >
         {error ? <Notice tone="danger" message={error} /> : null}
         {/* 閲覧のみには入力の部品・押す口を置かず、いまの値を文字で見せる（2026-10-06 オーナー決定）。 */}
-        <fieldset className={styles.fieldset}>
+        <fieldset disabled={saving || readOnly} className={styles.fieldset}>
           <section className={styles.card} aria-label="基本">
             <h2 className={styles.cardTitle}>基本</h2>
             <label className={styles.field}>
@@ -498,7 +516,7 @@ function TagEditForm({
                 </div>
                 {actionsOpen ? null : (
                   <div className={styles.summaryRow}>
-                    <span className={styles.summaryText}>{actionsSummary(actions, linked)}</span>
+                    <span className={styles.summaryText}>{host && actions.length === 0 ? 'まだありません。［開く］から連動アクションを足せます' : actionsSummary(actions, linked)}</span>
                     <span className={styles.titleSpacer} />
                     <button type="button" className={styles.openButton} onClick={() => setActionsOpen(true)} aria-expanded={false}>開く<ChevronDown size={14} aria-hidden="true" /></button>
                   </div>
@@ -507,7 +525,7 @@ function TagEditForm({
             </div>
             {actionsOpen ? (
               <>
-                {linked ? (
+                {linked || host ? (
                   <>
                     {actions.length === 0 ? <p className={styles.emptyBox}>連動の動きはまだありません</p> : actions.map((action, index) => (
                       <div key={action.id} className={styles.actionRow}>
@@ -531,7 +549,7 @@ function TagEditForm({
             ) : null}
           </section>
 
-          {linked ? (
+          {linked || host ? (
             <section className={styles.card} aria-label="マイル">
               <div className={styles.cardTitles}>
                 <h2 className={styles.cardTitle}>マイル</h2>
@@ -541,7 +559,7 @@ function TagEditForm({
                 </div>
                 {mileageOpen ? null : (
                   <div className={styles.summaryRow}>
-                    <span className={styles.summaryText}>{mileageSummary(multiplier, Number(reward) || 0, Number(referralReward) || 0)}</span>
+                    <span className={styles.summaryText}>{host && !multiplier && !Number(reward) && !Number(referralReward) ? '変えない（ひな形の既定）' : mileageSummary(multiplier, Number(reward) || 0, Number(referralReward) || 0)}</span>
                     <span className={styles.titleSpacer} />
                     <button type="button" className={styles.openButton} onClick={() => setMileageOpen(true)} aria-expanded={false}>開く<ChevronDown size={14} aria-hidden="true" /></button>
                   </div>
@@ -563,13 +581,14 @@ function TagEditForm({
                         : <div className={styles.selectBox}><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={PRIORITIES} size="full" /></div>}
                     </div>
                   </div>
-                  <div className={styles.switchRow}>
+                  {host ? null : <div className={styles.switchRow}>
                     <div className={styles.switchText}>
                       <span className={styles.label}>今付いている人にもさかのぼって積む（倍率は次の付与から）</span>
                       <span className={styles.hint}>{`オンにすると、すでに付いている ${tag.friendCount ?? 0} 人にも本人・紹介者のマイルをさかのぼって積みます（倍率は次の付与から）。積む前に人数の確認が開きます`}</span>
                     </div>
                     {readOnly ? <span className={styles.linkedState}>{applyToExisting ? 'オン' : 'オフ'}</span> : <Toggle checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" />}
                   </div>
+                  }
                   {applyToExisting ? (
                     <div className={styles.statGrid}>
                       <div className={styles.statBox}><span className={styles.statLabel}>現在の対象者</span><span className={styles.statValue}>{tag.friendCount ?? 0}人</span></div>
@@ -612,7 +631,7 @@ function TagEditForm({
           ) : null}
         </fieldset>
       </CreatePage>
-      {drawerOpen ? <ActionDrawer accountId={accountId} onClose={() => setDrawerOpen(false)} onAdd={(action) => { setActions((current) => [...current, action]); setDrawerOpen(false) }} /> : null}
+      {drawerOpen ? <ActionDrawer hqV8={Boolean(host)} suppliedResources={host ? null : undefined} allowedActionTypes={host?.allowedActionTypes} accountId={host ? null : accountId} onClose={() => setDrawerOpen(false)} onAdd={(action) => { if (host) setLinked(true); setActions((current) => [...current, action]); setDrawerOpen(false) }} /> : null}
       {retroactiveOpen ? (
         <RetroactiveDialog
           referenceState={retroactiveReference}

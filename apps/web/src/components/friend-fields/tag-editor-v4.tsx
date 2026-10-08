@@ -149,7 +149,7 @@ function StepTitle({ number, title, note }: { number: number; title: string; not
   )
 }
 
-export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClose, onAdd, referenceState = false }: { accountId: string | null; suppliedResources?: CommonActionResources | null; allowedActionTypes?: readonly TagEditorActionLabel[]; onClose: () => void; onAdd: (action: LinkedAction) => void; referenceState?: boolean }) {
+export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClose, onAdd, referenceState = false, hqV8 = false }: { accountId: string | null; suppliedResources?: CommonActionResources | null; allowedActionTypes?: readonly TagEditorActionLabel[]; onClose: () => void; onAdd: (action: LinkedAction) => void; referenceState?: boolean; hqV8?: boolean }) {
   const [selected, setSelected] = useState<(typeof ACTION_TYPES)[number]>(referenceState ? ACTION_TYPES[1] : ACTION_TYPES[0])
   const [timing, setTiming] = useState<'immediate' | 'delay'>('immediate')
   const [delay, setDelay] = useState(referenceState ? '24' : '1')
@@ -195,6 +195,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
 
   return (
     <Drawer
+      designWidth={hqV8 ? 640 : undefined}
       open
       title="連動アクションを追加"
       description="タグが付いた直後に実行する処理を選びます。"
@@ -210,16 +211,17 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
     >
           <section>
             <h3 className="mb-3 text-sm font-bold text-ink">1. アクションの種類</h3>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className={hqV8 ? 'grid grid-cols-2 gap-2.5 sm:grid-cols-3' : 'grid grid-cols-2 gap-2 sm:grid-cols-3'}>
               {ACTION_TYPES.map((action) => (
-                <Button variant="secondary" className={(`rounded-control border px-3 py-3 text-left text-sm font-medium ${allowedActionTypes && !allowedActionTypes.includes(action[0]) ? 'cursor-not-allowed border-hairline text-ink-faint opacity-55' : selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`) + ' h-auto whitespace-normal'} key={action[0]} type="button" disabled={Boolean(allowedActionTypes && !allowedActionTypes.includes(action[0]))} onClick={() => setSelected(action)}>
+                <Button variant="secondary" className={(`rounded-control border px-3 ${hqV8 ? 'py-2.5 text-caption' : 'py-3 text-sm'} text-left font-medium ${allowedActionTypes && !allowedActionTypes.includes(action[0]) ? 'cursor-not-allowed border-hairline text-ink-faint opacity-55' : selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`) + ' h-auto whitespace-normal'} key={action[0]} type="button" disabled={Boolean(allowedActionTypes && !allowedActionTypes.includes(action[0]))} onClick={() => setSelected(action)}>
                   {action[0]}
                 </Button>
               ))}
             </div>
+            {hqV8 ? <p className="mt-2 break-normal text-micro text-ink-faint">統括のひな形で使えるのは「テキスト送信」と「マイル付与」です。ほかは配った先の店で足します。</p> : null}
           </section>
 
-          <section className="mt-7 border-t border-hairline pt-6">
+          <section className={hqV8 ? 'mt-3 border-t border-hairline pt-3' : 'mt-7 border-t border-hairline pt-6'}>
             <h3 className="mb-3 text-sm font-bold text-ink">2. 実行するタイミング</h3>
             <RadioCardGroup legend="実行するタイミング" className="grid gap-2 sm:grid-cols-2">
               <RadioCard name="timing" value="immediate" checked={timing === 'immediate'} onChange={() => setTiming('immediate')} title="すぐに実行" />

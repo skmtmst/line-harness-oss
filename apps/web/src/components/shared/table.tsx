@@ -113,7 +113,7 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
   /** ★V7：指を乗せた行に薄い地を敷く。押せる行・選べる行だけに付ける。 */
   interactive?: boolean
   /** ★V7：行の高さ。`comfortable` は64px。未指定は58pxのまま。 */
-  density?: 'standard' | 'comfortable'
+  density?: 'standard' | 'comfortable' | 'template'
   /**
    * ★V8 仕上げ3回目（M10）④：消える行。渡すと 150ms で薄くなってから
    * 画面側が DOM から外す（外す側の合図は画面が持つ。ここは見た目だけ）。
@@ -127,6 +127,7 @@ export function Tr({ children, className, selected, interactive, density, leavin
   const classes = [
     shell.row,
     density === 'comfortable' && shell.rowComfortable,
+    density === 'template' && shell.rowTemplate,
     interactive && shell.rowInteractive,
     selected && shell.rowSelected,
     className,
