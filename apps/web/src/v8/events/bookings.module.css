@@ -307,3 +307,15 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--tpl-rule-row-gap);
 }
+
+/* 狭い板では名前と期限の列を残り幅へ合わせ、行の操作を右端に収める。 */
+@container v8-page (max-width: 1099px) {
+  .mainGrid {
+    grid-template-columns: minmax(0, 1fr) var(--tpl-kw-input-w) var(--tpl-ev-state-w) var(--tpl-ev-num-w) calc(var(--tpl-kw-input-w) + var(--tpl-ev-state-w));
+  }
+  .personSub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

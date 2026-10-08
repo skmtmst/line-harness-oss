@@ -490,9 +490,9 @@ function Bookings({ eventId }: { eventId: string }) {
               <div role="row" key={`${row.source}:${row.id}`} className={`${styles.row} ${styles.mainRow} ${styles.mainGrid}`}>
                 <span role="cell" className={styles.person}>
                   <span className={styles.personName} title={row.displayName ?? '友だちは未取得'}>{row.displayName ?? '友だちは未取得'}</span>
-                  <span className={styles.personSub}>{participationSub(row)}</span>
+                  <span className={styles.personSub} title={participationSub(row)}>{participationSub(row)}</span>
                 </span>
-                <span role="cell" className={styles.cellText}>
+                <span role="cell" className={styles.cellText} title={row.source === 'waitlist' ? `キャンセル待ち ${waitlistRankAll(row.id)} 番` : '申込'}>
                   {row.source === 'waitlist'
                     ? row.status === 'waiting' || row.status === 'offered' || row.status === 'accepted'
                       ? `キャンセル待ち ${waitlistRankAll(row.id)} 番`
@@ -500,7 +500,7 @@ function Bookings({ eventId }: { eventId: string }) {
                     : '申込'}
                 </span>
                 <span role="cell">{chip(row.status)}</span>
-                <span role="cell" className={styles.cellText}>
+                <span role="cell" className={styles.cellText} title={row.offerExpiresAt ? jstShort(row.offerExpiresAt) : undefined}>
                   {row.offerExpiresAt ? jstShort(row.offerExpiresAt) : row.status === 'waiting' ? '案内前' : '—'}
                 </span>
                 <span role="cell" className={styles.rowActions}>
