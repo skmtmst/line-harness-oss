@@ -28,7 +28,7 @@ const CANONICAL: Record<NoticeTone, CanonicalTone> = {
   error: 'danger',
 }
 
-/* 正本は Pencil「★V7 共通部品 その2」uR9s8 の §1。4種とも同じ節点。 */
+/* 正本は Pencil ★V8 `ThDed`「帯/案内」。下の節点の印 uR9s8 は前の版から引き継いだ値で、4種とも同じ。 */
 const NODE_BY_TONE: Record<CanonicalTone, string> = {
   info: 'uR9s8',
   success: 'uR9s8',

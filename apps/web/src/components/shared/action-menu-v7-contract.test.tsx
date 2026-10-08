@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import ActionMenu from './action-menu'
 
 /**
- * ★V7 メニュー（Pencil「★V7 メニュー」`xifuV`）の共通部品の試験。
+ * その他操作メニュー（Pencil ★V8 `hnuY9`）の共通部品の試験。
  *
  * - 項目は高さ36（補足つき52）・アイコン16＋文字14・折り返さない
  * - 区切り線・小さな見出し、危ない操作は danger、別画面へ行く項目は ↗

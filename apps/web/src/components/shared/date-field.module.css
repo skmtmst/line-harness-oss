@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * 日付の選択。Pencil ★V7「日付の選択」（V7 文書 `Fw065`）。
+ * 日付の選択。Pencil ★V8（V8.pen）「日付の入力（カレンダー）」。
  *
  *   欄     高さ 40・余白 [0,12]・角丸 8・枠 $hairline（開いている間は $accent-deep 1.5px）
  *   暦     幅 296・余白 16・角丸 12・影 beautiful-shadows md・欄の 6px 下、左をそろえる
