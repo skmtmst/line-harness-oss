@@ -242,7 +242,7 @@ export default function ConnectorPanel({ accountId, canEdit = true }: { accountI
             {[
               ['NEN配信', data?.impact.nenCampaigns, 'ECの出来事がきっかけ'],
               ['マイル', data?.impact.mileageRules, 'ECの出来事がきっかけ'],
-              ['友だち属性', data?.impact.friendFields, 'ECの出来事がきっかけ'],
+              ['タグ', data?.impact.friendFields, 'ECの出来事がきっかけ'],
               ['コンバージョン', data?.impact.conversions, 'アカウント全体'],
               ['分析', data?.impact.analytics, 'アカウント全体'],
             ].map(([label, value, scope]) => <div className={styles.impactRow} key={String(label)}><span>{label}<small className="mt-0.5 block text-caption font-normal text-ink-faint">{scope}</small></span><strong>{typeof value === 'number' ? `${value}件` : '— 未取得'}</strong></div>)}

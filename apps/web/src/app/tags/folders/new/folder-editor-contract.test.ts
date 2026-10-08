@@ -8,9 +8,9 @@ const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 const FOLDER_EDITOR = 'app/tags/folders/new/page.tsx'
 
 describe('フォルダの作成・編集（設計 byqIW）', () => {
-  it('友だち属性の一覧に、追加・編集で同じモーダルを重ねる', () => {
+  it('タグの一覧に、追加・編集で同じモーダルを重ねる', () => {
     const source = read(FOLDER_EDITOR)
-    expect(source).toContain("usePageTitle('友だち属性')")
+    expect(source).toContain("usePageTitle('タグ')")
     expect(source).not.toContain('<h1')
     expect(source).not.toContain('text-[32px]')
     expect(source).toContain('<TagsPageV4 accountId={selectedAccountId} />')
@@ -111,7 +111,7 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
   })
 })
 
-describe('友だち属性の一覧（設計 hqrOv）', () => {
+describe('タグの一覧（設計 hqrOv）', () => {
   it('指標カード4枚を、取得失敗でも見出しごと残す', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
     // 「タグ数」は一覧の件数（1–20 / N件）と同じ数の重ね書きだったため

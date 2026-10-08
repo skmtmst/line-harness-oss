@@ -12,7 +12,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   '/': 'ダッシュボード',
   '/chats': '受信箱',
   '/friends': '友だち',
-  '/tags': '友だち属性',
+  '/tags': 'タグ',
   '/scenarios': 'シナリオ配信',
   '/broadcasts': '一斉配信',
   '/reminders': 'リマインダ',

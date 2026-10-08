@@ -11,7 +11,7 @@ const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.ts
  * 「収まらないとき折り返す」印と上書きを置く。印と上書きの両方が
  * そろっていないと、片方だけ残った静かな退行になる。
  */
-describe('U029 友だち属性のタブとCSVの重なり', () => {
+describe('U029 タグのタブとCSVの重なり', () => {
   it('タブ行を包む印があり、収まらない幅で折り返す上書きがある', () => {
     expect(PAGE).toContain('data-tabs-row')
     expect(PAGE).toContain('[data-tabs-row] nav:has(> span)')

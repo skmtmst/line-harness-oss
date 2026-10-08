@@ -1,4 +1,4 @@
-# 友だち属性（src/v8/tags）の動き
+# タグ（src/v8/tags）の動き
 
 ## 受け付ける URL と指定
 - `/tags`（タグ）・`/tags?tab=fields`（友だち情報欄）・`/tags?tab=marks`（対応マーク）・`/tags?tab=searches`（保存した検索）

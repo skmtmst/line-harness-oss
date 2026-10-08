@@ -80,7 +80,7 @@ describe('統括コンソール', () => {
     expect(sidebar).toContain('HQ_MENU_SECTIONS')
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.label)).toEqual([
       // 提案 E-9（2026-10-07 オーナー採用）：統括の一括配信を末尾に足した。
-      'アカウント', '友だち属性', 'テンプレート', 'リッチメニュー', '回答フォーム', 'バナー生成', '一括配信',
+      'アカウント', 'タグ', 'テンプレート', 'リッチメニュー', '回答フォーム', 'バナー生成', '一括配信',
     ])
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.label === '採用フロー管理')).toBe(false)
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.href)).toEqual([

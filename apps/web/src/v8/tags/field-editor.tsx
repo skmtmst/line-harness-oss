@@ -118,7 +118,7 @@ export default function FieldEditor({
   onSubmit: (values: FieldEditorValues, requestKey: string) => void
 }) {
   usePageTitle(mode === 'create' ? '項目を作る' : '項目を編集')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags?tab=fields' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags?tab=fields' }])
 
   /* 編集では保存済みの既定値を選択肢名へ戻して持つ（R139・R182）。 */
   const stored = field ? storedDefaultLabels(field) : { single: '', multi: [] }

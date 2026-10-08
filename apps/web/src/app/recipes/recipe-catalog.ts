@@ -13,7 +13,7 @@ import type { Recipe as ApiRecipe } from '@/lib/api'
 export interface RecipeRequirement {
   label: string
   /**
-   * 機能設定の鍵。**`null` は「切れない機能」**（友だち属性など）。
+   * 機能設定の鍵。**`null` は「切れない機能」**（タグなど）。
    * 鍵が無いことと、機能がオフなことを混ぜない。
    */
   feature: FeatureKey | null
@@ -52,7 +52,7 @@ export interface Recipe {
   requirements: ReadonlyArray<RecipeRequirement>
 }
 
-const FRIEND_ATTRIBUTES: RecipeRequirement = { label: '友だち属性', feature: null }
+const FRIEND_ATTRIBUTES: RecipeRequirement = { label: 'タグ', feature: null }
 
 export const RECIPES: ReadonlyArray<Recipe> = [
   {
@@ -143,11 +143,11 @@ export function featureLabel(key: string): string {
   return FEATURE_LABELS[key] ?? key
 }
 
-/** 友だち属性は切れない機能なのでAPIの必要機能配列には入らない。 */
+/** タグは切れない機能なのでAPIの必要機能配列には入らない。 */
 export function apiRecipeRequirements(recipe: ApiRecipe): Array<{ key: string | null; label: string; on: boolean }> {
   const missing = new Set(recipe.missingFeatures)
   return [
-    { key: null, label: '友だち属性', on: true },
+    { key: null, label: 'タグ', on: true },
     ...recipe.requiredFeatures.map((key) => ({ key, label: featureLabel(key), on: !missing.has(key) })),
   ]
 }

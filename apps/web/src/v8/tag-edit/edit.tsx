@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性：タグの編集（一から書いた画面・2026-10-07）。
+ * ★V8 タグ：タグの編集（一から書いた画面・2026-10-07）。
  * Pencil：タグの編集 `Qat9s`、競合 `xn95q`、閲覧のみ `fkGUR`。
  *
  * 型は「作る」（CreatePage）：頭（戻る・タグ名・フォルダと人数）→ 左に「基本」「タグ連動」「マイル」、
@@ -48,7 +48,7 @@ import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary
 import styles from './edit.module.css'
 
 export default function TagEditV8() {
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }])
   const router = useRouter()
   const params = useSearchParams()
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -431,7 +431,7 @@ function TagEditForm({
     <div className={styles.page}>
       <CreatePage
         title={tag.name || 'タグを編集'}
-        identity={<Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />友だち属性へ</Link>}
+        identity={<Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />タグへ</Link>}
         description={(
           <>
             {`${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}

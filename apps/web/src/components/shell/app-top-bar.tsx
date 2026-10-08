@@ -25,7 +25,7 @@ import { canReturnToHqFrom } from '@/lib/hq-return'
  * 分けているのは、部品を1つの画面にも縛らないため（`docs/v8-design-rules.md` §5）。
  */
 
-/** ルート → メニューのラベル。長いほうから当てるので、`/tags/new` は「友だち属性」になる。 */
+/** ルート → メニューのラベル。長いほうから当てるので、`/tags/new` は「タグ」になる。 */
 const MENU_LABELS: Array<[string, string]> = MENU_SECTIONS
   .flatMap((section) => section.items.map((item): [string, string] => [item.href, item.label]))
   .sort((a, b) => b[0].length - a[0].length)

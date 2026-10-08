@@ -14,7 +14,7 @@ const EDIT = readFileSync(join(HERE, 'edit-tag-page-v8.tsx'), 'utf8')
  * 進み具合に数えられない。見た目の部品は既存のものを使い、
  * ここでは板IDの結び付けだけを見る。
  */
-describe('友だち属性の残りの板ID', () => {
+describe('タグの残りの板ID', () => {
   it('状態の4場面に U0aKD が付く', () => {
     // 読み込み場面は共通の骨組み（TagRowsSkeleton）に designNode で渡す。
     // 注釈の `U0aKD` を除き、札の値を4つ数える。

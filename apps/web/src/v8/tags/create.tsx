@@ -50,7 +50,7 @@ export default function TagCreateV8() {
 
 function TagCreate() {
   usePageTitle('タグを作る')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }])
   const router = useRouter()
   const params = useSearchParams()
   const { selectedAccountId } = useAccount()
@@ -186,7 +186,7 @@ function TagCreate() {
 
   if (loading) return <ListState kind="loading" title="複製元を読み込んでいます…" />
 
-  const back = <Link href="/tags" className={styles.backLink}>← 友だち属性へ</Link>
+  const back = <Link href="/tags" className={styles.backLink}>← タグへ</Link>
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
   // その場でタグのフォルダを作る（dLffh）。左の列の「フォルダを追加」と同じ受け口・同じ権限。
   const createGroup = async (name: string, color: string | null) => {

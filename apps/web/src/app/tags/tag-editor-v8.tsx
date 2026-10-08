@@ -139,7 +139,7 @@ export default function TagEditorV8({
   allowedActionTypes?: readonly TagEditorActionLabel[]
 }) {
   usePageTitle(mode === 'create' ? 'タグを作る' : 'タグを編集')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }])
   // 親から渡る保存の知らせは、画面の中の文で出さず Toast（右下・4秒）へ送る。
   useEffect(() => {
     if (notice) notifyToast(notice)

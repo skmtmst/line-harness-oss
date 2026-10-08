@@ -2325,7 +2325,7 @@ export default function BroadcastForm({
             {tagsStatus === 'ready' && tags.length === 0 && (
               <p className="mt-1 text-xs text-ink-faint">
                 タグはまだありません。先に
-                <Link href="/tags" className="font-semibold text-action hover:underline">友だち属性 ＞ タグ</Link>
+                <Link href="/tags" className="font-semibold text-action hover:underline">タグ</Link>
                 で作成してください。
               </p>
             )}

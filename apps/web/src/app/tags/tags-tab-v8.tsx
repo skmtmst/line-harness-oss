@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性「タグ」タブの一覧（Pencil `I1E7Bt`、フォルダ窓 `IjVpM`、
+ * ★V8 タグ「タグ」タブの一覧（Pencil `I1E7Bt`、フォルダ窓 `IjVpM`、
  * 状態の板 `U0aKD`）。
  *
  * 数え方・絞り込み・並べ替え・保管の判断は v7（`tags-page-v4.tsx`）と

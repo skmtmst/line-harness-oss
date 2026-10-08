@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * ★V8 友だち属性 タグの一覧（src/v8/tags）の動きの試験。
+ * ★V8 タグ タグの一覧（src/v8/tags）の動きの試験。
  * 絵（I1E7Bt・aPeD8・fkGUR）の置き場に移した操作が、押せる形で残っているかを見る。
  */
 import React, { act } from 'react'
@@ -72,7 +72,7 @@ afterEach(async () => {
 
 const fixture = { items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }
 
-describe('V8 友だち属性 タグの一覧', () => {
+describe('V8 タグ タグの一覧', () => {
   it('絵の列（★・タグ・人数・付け方・連動・使っている所・操作）と4つのタブを出し、名前の前にフォルダの色の丸', async () => {
     await render(<TagsList fixture={fixture} />)
     const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())

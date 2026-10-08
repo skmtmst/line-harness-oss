@@ -513,7 +513,7 @@ export default function TagEditorV4({
   return (
     <div>
       {!embedded && <div className="mb-5">
-        <Breadcrumb items={[{ label: '友だち属性', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
+        <Breadcrumb items={[{ label: 'タグ', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
       </div>}
 
       {error && <Notice className="mb-4" tone="danger" message={error} />}
