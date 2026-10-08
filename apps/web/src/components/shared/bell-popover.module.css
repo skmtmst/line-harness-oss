@@ -224,9 +224,4 @@
   font-size: var(--text-label);
 }
 
-[data-theme='v8'] .foot .settings {
-  width: var(--bell-settings);
-  height: var(--bell-settings);
-  flex-basis: var(--bell-settings);
-}
 }
