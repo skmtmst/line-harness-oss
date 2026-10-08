@@ -1,3 +1,4 @@
+import { readFileSync as readOriginal } from 'node:fs'
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 import { readFileSync as readNative } from 'node:fs'
@@ -118,7 +119,7 @@ describe('フィルターバー統一（監査6 #668）', () => {
   it.each(TOOLBAR_ORDER.map(([name, path, markers]) => ({ name, path, markers })))(
     '$name は「検索 → 絞り込み → 並び順 → 表示件数」の順',
     ({ path, markers }) => {
-      const source = read(path)
+      const source = path === '../../app/webinars/list-v8.tsx' ? readOriginal(new URL(path, import.meta.url), 'utf8') : read(path)
       let previous = -1
       for (const marker of markers) {
         const index = source.indexOf(marker)

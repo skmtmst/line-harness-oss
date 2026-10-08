@@ -18,7 +18,7 @@ export default function StatusBadge({
 }: Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
   children: ReactNode
   tone?: StatusBadgeTone
-  size?: 'default' | 'compact'
+  size?: 'default' | 'compact' | 'annotation'
   /**
    * 札の意味（例：審査中・保留・期限切れの違い）。札のすぐ右の「？」へ入れる
    * （★V7・§2-1b）。札の列が並ぶ表では、見出しの「？」にまとめるのも可。
@@ -34,7 +34,7 @@ export default function StatusBadge({
    */
   dot?: boolean
 }) {
-  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : null, dot ? null : styles.noDot, className]
+  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : size === 'annotation' ? styles.annotation : null, dot ? null : styles.noDot, className]
     .filter(Boolean)
     .join(' ')
   const hasHelp = help !== undefined && help !== null

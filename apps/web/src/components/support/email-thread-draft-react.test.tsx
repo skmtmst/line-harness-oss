@@ -3,6 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import EmailThread from './email-thread'
+import { fireEvent } from '@testing-library/react'
 
 /**
  * F06: メール会話の下書きは会話ごとに保管する。
@@ -100,6 +101,24 @@ async function render(threadId: string) {
 }
 
 const textarea = () => host.querySelector('textarea')!
+
+it('WEB251: メモ保存中は入力・背景・キャンセルで内容を失わない', async () => {
+  state.set('A', 'unread')
+  net.handler = url => url.endsWith('/notes') ? new Promise(() => {}) : respond(url)
+  await render('A')
+  const toggle = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('内部メモ'))!
+  await act(async () => toggle.click())
+  const memo = document.getElementById('email-internal-memo') as HTMLTextAreaElement
+  await act(async () => fireEvent.change(memo, { target: { value: '保存する内容' } }))
+  const save = [...document.querySelectorAll('button')].find(button => button.textContent === '保存する')!
+  await act(async () => save.click())
+  expect(memo.disabled).toBe(true)
+  const cancel = [...document.querySelectorAll('button')].find(button => button.textContent === 'キャンセル')!
+  expect(cancel.disabled).toBe(true)
+  const overlay = memo.closest('[role="dialog"]')!
+  await act(async () => fireEvent.click(overlay))
+  expect(document.getElementById('email-internal-memo')).toBeTruthy()
+})
 
 async function draft(text: string) {
   const el = textarea()

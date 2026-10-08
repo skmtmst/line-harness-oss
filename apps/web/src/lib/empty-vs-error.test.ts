@@ -10,7 +10,7 @@
  * ここでは**文字列そのものではなく、`error` で分岐しているか**を見る。
  * 文面は変わってよい。「失敗したのに『ありません』と言い切らない」ことだけを守る。
  */
-import { readFileSync } from 'node:fs';
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';

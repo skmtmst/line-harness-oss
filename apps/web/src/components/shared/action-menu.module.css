@@ -238,3 +238,7 @@
   }
 }
 }
+/* 提案F-5: 消える側は拡縮せず80msのフェードだけ。 */
+[data-theme='v8'] .menu[data-closing] { animation: action-menu-v8-leave var(--motion-instant) var(--motion-ease-out) forwards; pointer-events: none; }
+@keyframes action-menu-v8-leave { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { [data-theme='v8'] .menu[data-closing] { animation: none; opacity: 0; } }

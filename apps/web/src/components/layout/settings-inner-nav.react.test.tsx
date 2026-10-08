@@ -8,12 +8,13 @@
  *   - いまの画面が選ばれた形になる
  *   - 見るだけの人には、見られる画面だけ出す（左のメニューと同じ決まり）
  */
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
   pathname: '/settings',
+  accountId: 'account-1',
 }))
 
 const localStorageValues = new Map<string, string>()
@@ -31,7 +32,7 @@ vi.mock('next/link', async () => {
   const React = await import('react')
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement('a', { href, ...props }, children) }
 })
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1' }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
 vi.mock('@/lib/api', () => ({
   api: {
     featureSettings: { visibility: fixture.visibility },
@@ -48,6 +49,7 @@ describe('★V8 設定の中のメニュー', () => {
     clearFeatureVisibilityCache()
     fixture.visibility.mockReset()
     fixture.pathname = '/settings'
+    fixture.accountId = 'account-1'
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { ec_commerce: true, line_notifications: true } },
@@ -57,6 +59,20 @@ describe('★V8 設定の中のメニュー', () => {
   })
 
   afterEach(() => cleanup())
+
+  it('WEB252: 切替先が読込中なら前の機能を出さず、設定保存後に再取得する', async () => {
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(view.queryByText('EC連携')).toBeTruthy())
+    fixture.visibility.mockReturnValue(new Promise(() => {}))
+    fixture.accountId = 'account-2'
+    view.rerender(<SettingsInnerNav />)
+    expect(view.queryByText('EC連携')).toBeNull()
+    await waitFor(() => expect(fixture.visibility.mock.calls.length).toBe(2))
+    fixture.visibility.mockResolvedValue({ success: true, data: { features: { ec_commerce: true } } })
+    act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated', { detail: { accountId: 'account-2' } })))
+    await waitFor(() => expect(fixture.visibility.mock.calls.length).toBe(3))
+    await waitFor(() => expect(view.queryByText('EC連携')).toBeTruthy())
+  })
 
   // 2026-10-06：設定の板（ihjfd ほか 8 枚）の並びへ。見出し「設定」・印つき・プール管理あり・「専用」の小見出しなし。
   it('絵の並びで出す：はじめの設定・LINEアカウント・プール管理・ログインユーザー・機能設定・運用状態・EC連携・LINE通知（SNS 連携は末尾）', async () => {

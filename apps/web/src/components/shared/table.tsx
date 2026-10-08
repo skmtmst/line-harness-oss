@@ -16,15 +16,18 @@ export function TableHeadRow({
   className,
   density,
   presentation,
+  as = 'tr',
   ...rowProps
-}: TableHeadRowProps & { density?: 'standard' | 'comfortable'; presentation?: 'embedded' }) {
+}: TableHeadRowProps & { density?: 'standard' | 'comfortable'; presentation?: 'embedded'; as?: 'tr' | 'div' }) {
   const classes = [styles.headRow, density === 'comfortable' && styles.headComfortable, className]
     .filter(Boolean)
     .join(' ')
   return (
-    <tr className={classes} data-presentation={presentation} {...rowProps}>
+    <React.Fragment>{as === 'div' ? <div role="row" className={classes} data-table-layout="columns" data-presentation={presentation} {...rowProps as HTMLAttributes<HTMLDivElement>}>
       {children}
-    </tr>
+    </div> : <tr className={classes} data-presentation={presentation} {...rowProps}>
+      {children}
+    </tr>}</React.Fragment>
   )
 }
 

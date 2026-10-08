@@ -8,6 +8,7 @@ import type {
   ReactNode,
 } from 'react'
 import styles from './button.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 type CommonProps = {
   /**
@@ -126,6 +127,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   }, [done, busy])
 
   const elementRef = useRef<HTMLButtonElement | null>(null)
+  const v8 = useAdminTheme() === 'v8'
   const idleWidthRef = useRef(0)
   useLayoutEffect(() => {
     const el = elementRef.current
@@ -136,6 +138,20 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     }
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
+    if (!v8) return
+    // いちばん長い結果の文字も最初に測る。成功した瞬間に幅が跳ねない。
+    const sample = el.cloneNode(false) as HTMLButtonElement
+    sample.removeAttribute('id')
+    sample.setAttribute('aria-hidden', 'true')
+    sample.style.cssText = 'position:absolute;visibility:hidden;width:max-content;min-width:0;pointer-events:none'
+    el.parentElement?.appendChild(sample)
+    let widest = idleWidthRef.current
+    for (const label of [busyLabel, doneLabel]) {
+      sample.textContent = label
+      widest = Math.max(widest, sample.offsetWidth + 21)
+    }
+    sample.remove()
+    el.style.width = `${widest}px`
   })
 
   const setRefs = (el: HTMLButtonElement | null) => {

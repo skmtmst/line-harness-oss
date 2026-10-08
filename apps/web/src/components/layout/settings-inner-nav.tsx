@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
+import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
 import { Activity, BellRing, Layers, MessageCircle, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Users, type LucideIcon } from 'lucide-react'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
@@ -99,6 +100,19 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
   const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Record<string, boolean> | null>(null)
+  const [visibilityAccount, setVisibilityAccount] = useState<string | null>(null)
+  const [visibilityVersion, setVisibilityVersion] = useState(0)
+
+  useEffect(() => {
+    const updated = (event: Event) => {
+      const accountId = (event as CustomEvent<{ accountId?: string }>).detail?.accountId
+      if (accountId && accountId !== selectedAccountId) return
+      setVisibilityAccount(null)
+      setVisibilityVersion(value => value + 1)
+    }
+    window.addEventListener(FEATURE_SETTINGS_UPDATED_EVENT, updated)
+    return () => window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, updated)
+  }, [selectedAccountId])
 
   useEffect(() => {
     setStaffRole(localStorage.getItem('lh_staff_role'))
@@ -122,12 +136,13 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
         if (cancelled) return
         const features = response.success ? response.data?.features : undefined
         setVisibility(isBooleanRecord(features) ? features : {})
+        setVisibilityAccount(selectedAccountId)
       })
       .catch(() => {
-        if (!cancelled) setVisibility({})
+        if (!cancelled) { setVisibility({}); setVisibilityAccount(selectedAccountId) }
       })
     return () => { cancelled = true }
-  }, [selectedAccountId])
+  }, [selectedAccountId, visibilityVersion])
 
   /*
    * 見える項目だけを出す（夕41：見るだけの人には、見られる画面だけの
@@ -141,7 +156,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
     if (staffRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
     const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
     if (!featureKey) return true
-    if (!visibility || visibility[featureKey] !== true) return false
+    if (visibilityAccount !== selectedAccountId || !visibility || visibility[featureKey] !== true) return false
     return true
   }
 

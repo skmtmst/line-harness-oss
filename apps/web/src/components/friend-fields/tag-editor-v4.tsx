@@ -1,5 +1,6 @@
 'use client'
 
+import SharedToggle from '@/components/shared/toggle'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowDown, ArrowUp, Coins, Copy, Trash2, X } from 'lucide-react'
@@ -128,18 +129,7 @@ const inputClass =
   'w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink'
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (next: boolean) => void; label: string }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative h-7 w-12 rounded-pill transition-colors ${checked ? 'bg-accent' : 'bg-hairline'}`}
-    >
-      <span className={`absolute top-1 h-5 w-5 rounded-pill bg-canvas shadow-card transition-all ${checked ? 'left-6' : 'left-1'}`} />
-    </button>
-  )
+  return <SharedToggle checked={checked} onChange={onChange} label={label} />
 }
 
 function StepTitle({ number, title, note }: { number: number; title: string; note?: string }) {

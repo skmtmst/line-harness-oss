@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { GripVertical, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
@@ -92,7 +92,7 @@ export default function InlineActionRowsV8({ actions, onChange, ...options }: Pr
         return (
           <div key={action.key} className={styles.item}>
             <div className={styles.row}>
-              <GripVertical size={14} aria-hidden="true" className={styles.grip} />
+              <span className={styles.grip} aria-hidden="true" />
               <span className={styles.num}>{index + 1}</span>
               <span className={styles.title}>{actionRowTitle(action, options)}</span>
               {incomplete ? <span className={styles.incomplete}>未完成</span> : null}

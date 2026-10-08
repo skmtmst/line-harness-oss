@@ -19,8 +19,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => router,
 }))
 
-function Harness({ dirty, onDiscard }: { dirty: boolean; onDiscard?: () => void }) {
-  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, onDiscard })
+function Harness({ dirty, onDiscard, busy }: { dirty: boolean; onDiscard?: () => void; busy?: boolean }) {
+  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, onDiscard, busy })
   return (
     <div>
       <a href="/form-submissions">回答フォーム</a>
@@ -83,6 +83,11 @@ async function clickDialogButton(action: 'confirm' | 'cancel') {
 }
 
 describe('useUnsavedGuard', () => {
+  it('保存中は未保存判定にかかわらず閉じる操作を止める', async () => {
+    await render(<Harness dirty={false} busy />)
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-action="leave-button"]')!.click())
+    expect(router.push).not.toHaveBeenCalled()
+  })
   it('dirty の間、一覧へのリンクを止めて確認を出す（FORM-19a）', async () => {
     await render(<Harness dirty={true} />)
     const event = await click(anchor('回答フォーム'))

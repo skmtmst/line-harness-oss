@@ -25,15 +25,15 @@ describe('KPIの折りたたみ部品（#975 U060）', () => {
 describe('V8の数の帯とメンバー一覧', () => {
   const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8')
 
-  it('ウェビナーは数の帯を狭い幅で2列にする', () => {
-    expect(read('app/webinars/list-v8.tsx')).toContain('aria-label="ウェビナーの数の帯"')
-    expect(read('app/webinars/list-v8.module.css')).toMatch(/@media \(max-width: 640px\)[^}]*\.kpiBand[^}]*repeat\(2, minmax\(0, 1fr\)\)/s)
+  it('ウェビナーは数の帯を狭い幅で1列にする', () => {
+    expect(read('app/webinars/list-v8.tsx')).toContain('<KpiBand>')
+    expect(read('components/shared/kpi-card.module.css')).toMatch(/@media \(max-width: 639px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/)
   })
 
-  it('写真審査は集計4件を狭い板で2列にする', () => {
+  it('写真審査は集計4件を狭い幅で1列にする', () => {
     const page = read('app/nen-members/photo-review-v8.tsx')
-    expect(page.match(/<KpiCellV8\b/g)).toHaveLength(4)
-    expect(read('app/nen-members/photo-review-v8.module.css')).toMatch(/@container \(max-width: 600px\)[^}]*\.kpiBand[^}]*repeat\(2, minmax\(0, 1fr\)\)/s)
+    expect(page.match(/<KpiCard\b/g)).toHaveLength(4)
+    expect(read('components/shared/kpi-card.module.css')).toMatch(/@media \(max-width: 639px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/)
   })
 
   it('LINE通知の数の帯は小さい幅で1列、640px以上で2列にする', () => {

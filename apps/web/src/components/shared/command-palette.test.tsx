@@ -105,3 +105,10 @@ describe('CommandPalette（探す窓・F②）', () => {
     expect(screen.getByRole('dialog')).not.toBeNull()
   })
 })
+
+it('WEB-008/240: 日本語変換中のEscapeはパレットも閉じない', () => {
+  render(<CommandPalette items={items} />)
+  openPalette()
+  fireEvent.keyDown(screen.getByRole('textbox', { name: '機能と友だちを探す' }), { key: 'Escape', isComposing: true })
+  expect(screen.getByRole('dialog')).toBeTruthy()
+})

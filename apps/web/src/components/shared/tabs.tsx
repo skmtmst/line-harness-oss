@@ -97,8 +97,13 @@ export function Tabs({
       ))
     }
     measure()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    if (itemsRef.current) {
+      observer?.observe(itemsRef.current)
+      itemsRef.current.querySelectorAll<HTMLElement>('[role="tab"]').forEach(tab => observer?.observe(tab))
+    }
     window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure) }
   }, [currentKey, items.length])
   const sliding = indicator !== null
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useRef, useState, type RefObject } from 'react'
+import { isImeComposing } from './ime'
 
 export const OverlayDepthContext = createContext(0)
 const activeOverlays = new Map<object, { depth: number; order: number }>()
@@ -32,6 +33,8 @@ export function useOverlayFocus(
   const containerRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
   const initialFocusRef = useRef(initialFocus)
+  const closeDisabledRef = useRef(closeDisabled)
+  closeDisabledRef.current = closeDisabled
 
   useEffect(() => {
     onCloseRef.current = onClose
@@ -63,12 +66,14 @@ export function useOverlayFocus(
       Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
     // 初回フォーカスの予約は cleanup で取消せるようにしておく。
     const initialFocusFrame = requestAnimationFrame(() => {
-      if (isTop()) (initialFocusRef.current?.() ?? focusable()[0])?.focus()
+      if (isTop() && !containerRef.current?.contains(document.activeElement)) {
+        (initialFocusRef.current?.() ?? focusable()[0])?.focus()
+      }
     })
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!isTop()) return
-      if (event.key === 'Escape' && !closeDisabled) {
+      if (!isTop() || event.defaultPrevented || isImeComposing(event)) return
+      if (event.key === 'Escape' && !closeDisabledRef.current) {
         event.preventDefault()
         onCloseRef.current()
         return
@@ -102,7 +107,7 @@ export function useOverlayFocus(
       }
       if (restoreFocus) previous?.focus()
     }
-  }, [closeDisabled, open, depth])
+  }, [open, depth])
 
   return containerRef
 }

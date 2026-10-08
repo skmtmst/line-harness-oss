@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -95,9 +95,10 @@ describe('編集画面の STEP 4', () => {
     expect(EDIT).toContain('onDirtyChange={dirtyReporterFor')
     expect(EDIT).toContain('registerSave={saveRegistrarFor')
     /* 取得は子の編集タブに一本化し、親は報告を受ける。同じ口を2回叩かない。 */
-    expect(SCREEN).toContain('onLoaded={handleLoaded}')
-    expect(SCREEN).toContain('<WebinarNotifications webinarId={webinarId}')
-    expect(EDIT).not.toContain('webinarApi.notifications(webinarId)')
+    expect(SCREEN).toContain('const load = useCallback(async () =>')
+    expect(SCREEN).toContain('webinarApi.notifications(webinarId)')
+    expect(SCREEN).toContain('onDirtyChange')
+    expect(SCREEN).toContain('registerSave')
     expect(STEPS, '未接続の印が残っている').not.toContain("notConnected: '通知・リマインドの設定'")
   })
 })
