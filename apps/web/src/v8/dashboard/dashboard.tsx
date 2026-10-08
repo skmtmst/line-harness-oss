@@ -51,6 +51,15 @@ const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module)
   loading: () => <p className={styles.note}>編集パネルを読み込んでいます</p>,
 })
 
+/**
+ * ダッシュボード編集（自分の並び）を出してよい役割か。隠すのは閲覧のみ（読み取り専用。
+ * `/api/staff/me` の role が 'viewer'＝サーバーが保存を断る人）だけ。書き込みできる
+ * スタッフは押せるので出す（決まりは「押せないボタンを隠す」）。読めるまで（null）は出す。
+ */
+export function canEditDashboardLayout(role: string | null): boolean {
+  return role !== 'viewer'
+}
+
 /** 時間帯のあいさつ（日本時間）。 */
 export function greeting(name: string | null, now = new Date()): string {
   const hour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Asia/Tokyo' }).format(now))
@@ -90,6 +99,7 @@ export default function DashboardV8() {
   const { refreshAccounts } = useAccount()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
   const canManage = role === null || canManageRole(role)
+  const canEditLayout = canEditDashboardLayout(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
   const start = useFirstSteps(d.selectedAccountId, role)
   const [openDetail, setOpenDetail] = useState<DashboardCardId | null>(null)
@@ -104,7 +114,7 @@ export default function DashboardV8() {
         items={[
           { id: 'detail', label: openDetail === id ? '内訳を閉じる' : '内訳を見る', onSelect: () => setOpenDetail((current) => (current === id ? null : id)) },
           { id: 'go', label, external: true, onSelect: () => router.push(href) },
-          ...(canManage ? [{ id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor }] : []),
+          ...(canEditLayout ? [{ id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor }] : []),
         ]}
       />
     )
@@ -375,11 +385,11 @@ export default function DashboardV8() {
           onChange={d.selectPeriod}
           options={PERIODS.map((item) => ({ value: item.key, label: item.label }))}
         />
-        {canManage ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />ダッシュボード編集</Button> : null}
+        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />ダッシュボード編集</Button> : null}
         {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={15} aria-hidden="true" />配信を作る</Button> : null}
       </>}
       notice={notice}
-      overlays={d.editorOpen && canManage ? <DashboardEditor
+      overlays={d.editorOpen && canEditLayout ? <DashboardEditor
         open={d.editorOpen}
         preferences={d.preferences}
         saving={d.preferenceSaving}
