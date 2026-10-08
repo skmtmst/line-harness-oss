@@ -8240,7 +8240,7 @@ const bannerImage = (n, projectId, generation, { favorite = false, delivered = [
     id: `banner-image-qa-${n}`, projectId, generationId: generation?.id ?? null,
     sequence: n, source: generation ? 'generated' : 'upload', parentImageId: null, isFavorite: favorite,
     createdBy: '高橋 直人', createdAt: created,
-    media: { id: `banner-media-qa-${n}`, filename: `banner-${n}.png`, mimeType: 'image/png', sizeBytes: 184320, width: w, height: h, url: `https://example.invalid/banners/banner-${n}.png` },
+    media: { id: `banner-media-qa-${n}`, filename: `banner-${n}.png`, mimeType: 'image/png', sizeBytes: 184320, width: w, height: h, url: mediaPreview(n % 2 ? '#f3e9dc' : '#e7f7ef') },
     generation,
     deliveredAccountIds: delivered,
   }
