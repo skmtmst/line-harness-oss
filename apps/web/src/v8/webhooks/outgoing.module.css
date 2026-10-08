@@ -51,39 +51,6 @@
 .tableWrap {
   min-width: 0;
 }
-.table {
-  border: 0;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
-  gap: var(--tpl-wh-col-gap);
-  height: var(--tpl-wh-head-h);
-  padding: var(--tpl-wh-head-pad);
-}
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
-  gap: var(--tpl-wh-col-gap);
-  height: var(--tpl-wh-row-h);
-  padding: var(--tpl-wh-row-pad);
-  border-bottom: 0;
-  box-shadow: var(--shadow-row-line);
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
-  height: auto;
-  padding: 0;
-  border: 0;
-  box-shadow: none;
-  line-height: normal;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colCount,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colCount {
-  padding-right: var(--tpl-wh-num-pad-end);
-  text-align: right;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
-  flex: 1 1 0;
-  min-width: 0;
-}
 .colWhen { width: var(--tpl-wh-col-when); min-width: 0; }
 .colPayload { width: var(--tpl-wh-col-payload); min-width: 0; }
 .colCount { width: var(--tpl-wh-col-count); }
@@ -91,15 +58,6 @@
 .colOps { width: var(--tpl-wh-col-ops); }
 
 /* 1152 の4列（絵 AsfFB）。列の頭の位置は絵の x に合わせ、列の間は幅で持つ。 */
-:global([data-theme='v8']) .tableNarrow .headRow[data-table-layout='columns'],
-:global([data-theme='v8']) .tableNarrow .row[data-table-layout='columns'] {
-  gap: 0;
-  padding-inline: var(--tpl-af2-wh-narrow-pad);
-}
-:global([data-theme='v8']) .tableNarrow .row[data-table-layout='columns'] { height: var(--tpl-af2-wh-narrow-row-h); }
-:global([data-theme='v8']) .tableNarrow .headRow[data-table-layout='columns'] > th.colName,
-:global([data-theme='v8']) .tableNarrow .row[data-table-layout='columns'] > td.colName { padding-inline-end: var(--tpl-af2-wh-name-end); }
-:global([data-theme='v8']) .tableNarrow .headRow[data-table-layout='columns'] > th.nameHead { padding-inline-start: var(--tpl-folder-dot-indent); }
 .colMonth { width: var(--tpl-af2-wh-col-month); display: flex; flex-direction: column; gap: var(--tpl-row-sub-gap); }
 .colStateNarrow { width: var(--tpl-af2-wh-col-state); display: flex; align-items: center; }
 .colOpsNarrow { width: var(--tpl-af2-wh-col-ops); }
@@ -170,36 +128,6 @@ a.name:hover {
 }
 
 /* ようすの札（点つき）。 */
-.pill {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: var(--tpl-wb-pill-gap);
-  padding: var(--tpl-wb-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-wb-pill-lh);
-  white-space: nowrap;
-}
-.pillDot {
-  width: var(--tpl-badge-dot);
-  height: var(--tpl-badge-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-.pill[data-tone='active'] {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-.pill[data-tone='danger'] {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-.pill[data-tone='neutral'] {
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-}
 
 /* 操作：中身を見る（やり直す）と設定。メニューの目印が行を1段増やさないよう横に並べる。 */
 .opsBox {
@@ -279,18 +207,6 @@ a.name:hover {
   display: flex;
   gap: var(--tpl-toolbar-gap);
 }
-.secretInput {
-  flex: 1;
-  min-width: 0;
-  min-height: var(--tpl-chip-h);
-  padding: var(--tpl-kw-input-pad);
-  border: 1px solid var(--color-control-border);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-family: ui-monospace, monospace;
-  font-size: var(--text-label);
-}
 
 /* 読み込み中の骨（絵 wWrpY：丸と棒4本の行）。 */
 .skeletonRow {
@@ -309,3 +225,5 @@ a.name:hover {
   flex: 1;
   height: var(--tpl-wh-skel-bar);
 }
+
+.colState { align-items: flex-start; }

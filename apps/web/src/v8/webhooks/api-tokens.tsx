@@ -20,6 +20,10 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import EmptyList from '@/components/shared/empty-list'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -101,6 +105,7 @@ export default function WebhooksApiTokensV8() {
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState('')
+  const [scopesError, setScopesError] = useState('')
   const [scopes, setScopes] = useState<string[]>([...SCOPES])
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -184,6 +189,7 @@ export default function WebhooksApiTokensV8() {
     setName('')
     setNameError('')
     setCreateError('')
+    setScopesError('')
     setScopes([...SCOPES])
     setCreateOpen(true)
   }
@@ -191,15 +197,18 @@ export default function WebhooksApiTokensV8() {
   const handleCreate = async (stepUpToken?: string) => {
     setCreateError('')
     setNameError('')
+    setScopesError('')
     const requestAccountId = selectedAccountId
     if (!requestAccountId) return
     const trimmed = name.trim()
     if (!trimmed) {
       setNameError('名前を入力してください')
+      requestAnimationFrame(() => { const field = document.getElementById('wh-token-name'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
     }
     if (scopes.length === 0) {
-      setCreateError('できることを1つ以上選んでください')
+      setScopesError('できることを1つ以上選んでください')
+      requestAnimationFrame(() => { const field = document.getElementById('wh-token-scopes'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
     }
     setCreating(true)
@@ -344,29 +353,26 @@ export default function WebhooksApiTokensV8() {
           onCancel={() => { if (!creating) setCreateOpen(false) }}
         >
           <div className={styles.createBody}>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="wh-token-name">名前</label>
-              <input
+            <Field label="名前" htmlFor="wh-token-name" error={nameError}>
+              <TextField
                 id="wh-token-name"
                 value={name}
                 maxLength={120}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：在庫システム"
-                className={styles.input}
                 aria-invalid={nameError ? true : undefined}
-                aria-describedby={nameError ? 'wh-token-name-error' : undefined}
               />
-              {nameError ? <p id="wh-token-name-error" className={styles.fieldError} role="alert">{nameError}</p> : null}
-            </div>
-            <fieldset className={styles.field}>
+            </Field>
+            <fieldset className={styles.field} id="wh-token-scopes" tabIndex={-1} aria-invalid={Boolean(scopesError) || undefined} aria-describedby={scopesError ? "wh-token-scopes-error" : undefined}>
               <legend className={styles.label}>できること</legend>
               <div className={styles.checkRow}>
                 {SCOPES.map((scope) => (
-                  <Checkbox key={scope} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
+                  <Checkbox key={scope} invalid={Boolean(scopesError)} aria-describedby={scopesError ? "wh-token-scopes-error" : undefined} checked={scopes.includes(scope)} onCheckedChange={() => toggleScope(scope)}>
                     {scopeLabel(scope)}
                   </Checkbox>
                 ))}
               </div>
+              {scopesError ? <p id="wh-token-scopes-error" className={styles.fieldError} role="alert">{scopesError}</p> : null}
             </fieldset>
             <p className={styles.createNote}>発行した鍵は1回だけ表示されます。名前は、どの仕組みに渡した鍵かが分かるように付けます。</p>
           </div>
@@ -519,27 +525,30 @@ export default function WebhooksApiTokensV8() {
                 return true
               }}
             >
-              <div className={styles.table} role="table" aria-label="API 接続の鍵">
-                <div className={styles.headRow} role="row">
-                  <span role="columnheader" className={styles.colName}>名前</span>
-                  <span role="columnheader" className={styles.colScopes}>できること</span>
-                  <span role="columnheader" className={styles.colCreated}>作った日</span>
-                  <span role="columnheader" className={styles.colUsed}>最後に使った</span>
-                  <span role="columnheader" className={styles.colState}>状態</span>
-                  <span role="columnheader" className={styles.colOps}><span className={styles.srOnly}>操作</span></span>
-                </div>
+              <DataTable aria-label="API 接続の鍵" columnLayout={{ headHeight: 'auto', rowHeight: 'var(--tpl-ms-key-row-h)', gap: 'var(--tpl-ms-key-col-gap)', padding: 'var(--tpl-ms-key-row-pad)', headPadding: 'var(--tpl-ms-key-head-row-pad)', headRadius: 'var(--tpl-ms-key-box-radius)', headTextSize: 'var(--text-micro)', bodyTextSize: 'var(--text-caption)' }}>
+                <thead>
+                  <TableHeadRow data-table-layout="columns">
+                  <Th className={styles.colName}>名前</Th>
+                  <Th className={styles.colScopes}>できること</Th>
+                  <Th className={styles.colCreated}>作った日</Th>
+                  <Th className={styles.colUsed}>最後に使った</Th>
+                  <Th className={styles.colState}>状態</Th>
+                  <Th className={styles.colOps}><span className={styles.srOnly}>操作</span></Th>
+                </TableHeadRow>
+                </thead>
+                <tbody>
                 {tokens.map((token) => {
                   const scopeText = token.scopes.map(scopeLabel).join('・')
                   return (
-                    <div key={token.id} className={styles.row} role="row" data-ctx-row={token.id}>
-                      <span role="cell" className={styles.colName} title={token.name}>{token.name}</span>
-                      <span role="cell" className={styles.colScopes} title={scopeText}>{scopeText}</span>
-                      <span role="cell" className={styles.colCreated}>{tokenDate(token.createdAt)}</span>
-                      <span role="cell" className={styles.colUsed}>{tokenUsedAt(token.lastUsedAt)}</span>
-                      <span role="cell" className={styles.colState}>
-                        <span className={styles.pill}><span className={styles.pillDot} aria-hidden="true" />使っている</span>
-                      </span>
-                      <span role="cell" className={styles.colOps}>
+                    <Tr key={token.id} data-table-layout="columns" data-ctx-row={token.id}>
+                      <Td className={styles.colName} title={token.name}>{token.name}</Td>
+                      <Td className={styles.colScopes} title={scopeText}>{scopeText}</Td>
+                      <Td className={styles.colCreated}>{tokenDate(token.createdAt)}</Td>
+                      <Td className={styles.colUsed}>{tokenUsedAt(token.lastUsedAt)}</Td>
+                      <Td className={styles.colState}>
+                        <StatusBadge tone="success">使っている</StatusBadge>
+                      </Td>
+                      <Td className={styles.colOps}>
                         {canManage ? (
                           <span className={styles.menuBox}>
                             <Button
@@ -568,11 +577,12 @@ export default function WebhooksApiTokensV8() {
                             />
                           </span>
                         ) : null}
-                      </span>
-                    </div>
+                      </Td>
+                    </Tr>
                   )
                 })}
-              </div>
+              </tbody>
+              </DataTable>
             </ContextMenu>
             <p className={styles.footNote}>行の「…」から止める。止めても、すでに付けたタグは残ります。</p>
           </>
