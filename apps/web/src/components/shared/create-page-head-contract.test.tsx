@@ -63,10 +63,22 @@ describe('作る型の頭（v8・作成画面の絵）', () => {
     expect(css).toMatch(/\[data-theme="v8"\]\s*\.head p\s*{[^}]*line-height:\s*normal/s)
   })
 
-  it('v8 の戻る行は 13・操作色・「/ 今の題」を畳む', () => {
-    expect(css).toMatch(/\[data-theme="v8"\]\s*\.crumb\s*{[^}]*font-size:\s*13px/s)
-    expect(css).toMatch(/\[data-theme="v8"\]\s*\.crumb a\s*{[^}]*var\(--color-action\)/s)
-    expect(css).toMatch(/\[data-theme="v8"\]\s*\.crumb > span\s*{[^}]*display:\s*none/s)
+  it('v8 では戻る行（← 親へ）を描かない（オーナー 2026-10-08。戻るのは上の帯のパンくずと［キャンセル］）', () => {
+    const previous = process.env.NEXT_PUBLIC_ADMIN_THEME
+    process.env.NEXT_PUBLIC_ADMIN_THEME = 'v8'
+    try {
+      const html = renderToStaticMarkup(
+        <CreatePage title="試しの作成" parent={['一覧', '/items']} onSave={async () => {}}>
+          <p>中身</p>
+        </CreatePage>,
+      )
+      expect(html).not.toContain('data-design="Crumb"')
+      expect(html).toContain('試しの作成')
+    } finally {
+      if (previous === undefined) delete process.env.NEXT_PUBLIC_ADMIN_THEME
+      else process.env.NEXT_PUBLIC_ADMIN_THEME = previous
+    }
+    expect(css).not.toMatch(/\[data-theme="v8"\]\s*\.crumb/)
   })
 
   it('既定（v7）の指定は空・Header 本体は触らない', () => {

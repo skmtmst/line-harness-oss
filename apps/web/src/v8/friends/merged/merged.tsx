@@ -9,13 +9,13 @@
  * 絵の列「配信に使うアカウント」「結び付けた日」は一覧の API に無い。
  * 今の列（状態・最終接触）をその位置に出す（情報を落とさない）。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronUp, Download, RotateCw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -47,17 +47,22 @@ export default function MergedUsersV8() {
   const personFromUrl = searchParams.get('person')
   const [openedPersonId, setOpenedPersonId] = useState<string | null>(personFromUrl)
   useEffect(() => { setOpenedPersonId(personFromUrl) }, [personFromUrl])
+  const close = () => {
+    setOpenedPersonId(null)
+    if (personFromUrl) router.replace('/friends?tab=merged')
+  }
+  /*
+   * 人の詳細は一覧と同じ URL のまま開くことがあるので、上の帯のパンくずの「統合ユーザー」で
+   * 一覧へ戻す（板の頭の「← 統合ユーザーへ」は 2026-10-08 に無くした）。最新の close を呼ぶ。
+   */
+  const closeRef = useRef(close)
+  closeRef.current = close
+  usePageCrumbs(openedPersonId
+    ? [{ label: '友だち', href: '/friends' }, { label: '統合ユーザー', href: '/friends?tab=merged', onSelect: () => closeRef.current() }]
+    : null)
 
   if (openedPersonId) {
-    return (
-      <MergedPersonV8
-        personId={openedPersonId}
-        onClose={() => {
-          setOpenedPersonId(null)
-          if (personFromUrl) router.replace('/friends?tab=merged')
-        }}
-      />
-    )
+    return <MergedPersonV8 personId={openedPersonId} onClose={close} />
   }
   return <MergedUsersList onOpen={setOpenedPersonId} />
 }

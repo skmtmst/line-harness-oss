@@ -2291,12 +2291,9 @@ export default function ScenarioDetailV8({
 
   return (
     <PageFrame kind="detail" boardId={conflict ? 'kz2B6' : scenario.isActive ? 'PMLkX' : 'ARuZ4'} hasFooter>
-      {/* 板の頭：戻る・題＋状態の札＋鉛筆・説明の1行。右に操作（配信結果・下見・まとめてテスト・その他）。 */}
+      {/* 板の頭：題＋状態の札＋鉛筆・説明の1行。右に操作（配信結果・下見・まとめてテスト・その他）。 */}
       <header className={styles.head} data-design="Head">
         <div className={styles.headText}>
-          <Link href="/scenarios" className={styles.back}>
-            ← シナリオ配信へ
-          </Link>
           <div className={styles.titleRow}>
             <h1 className={styles.title} title={scenario.name}>{scenario.name}</h1>
             <StatusChip status={scenario.isActive ? 'running' : 'paused'} />
