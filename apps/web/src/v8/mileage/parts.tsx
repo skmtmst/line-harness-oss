@@ -5,7 +5,8 @@
  * 形は一覧の型と共通部品に任せ、ここは並べ方だけを持つ。
  */
 import type { ReactNode } from 'react'
-import { Bookmark, TriangleAlert } from 'lucide-react'
+import { Bookmark } from 'lucide-react'
+import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
@@ -135,16 +136,7 @@ export function StateCard({
   description?: string
   action?: ReactNode
 }) {
-  return (
-    <div className={styles.stateCard} role={tone === 'error' ? 'alert' : undefined}>
-      {tone === 'error' ? (
-        <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={16} aria-hidden="true" /></span>
-      ) : null}
-      <p className={styles.stateTitle}>{title}</p>
-      {description ? <p className={styles.stateDesc}>{description}</p> : null}
-      {action}
-    </div>
-  )
+  return <ListState kind={tone} title={title} description={description} action={action} />
 }
 
 /** 失敗の1枚の「もう一度試す」。 */

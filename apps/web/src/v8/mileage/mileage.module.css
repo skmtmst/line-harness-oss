@@ -241,47 +241,6 @@
   color: var(--color-action);
 }
 
-/* 空・失敗の1枚。 */
-.stateCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--tpl-cell-gap-half);
-  margin: 0 var(--tpl-toolbar-pad-side);
-  padding: var(--tpl-wb-target-pad);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  text-align: center;
-}
-.stateIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-chip-h);
-  height: var(--tpl-chip-h);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-tile);
-  color: var(--color-ink-secondary);
-}
-.stateIconError {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-.stateTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-row-name-lh);
-}
-.stateDesc {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-row-name-lh);
-}
-
 /* テストの結果。 */
 .testList {
   display: grid;
@@ -850,8 +809,6 @@
   margin-top: var(--tpl-sub-gap);
 }
 
-/* 詳細の型の頭では操作が「マイルへ」の段のぶん下がる。絵は題の列の真ん中なので、その半分だけ上げる。 */
-.headActionsPulled { margin-top: var(--tpl-ml-head-actions-pull); }
 
 /* 閲覧のみで隠した作るボタン（フォルダの列の上）の場所だけ空ける。 */
 .viewerCreateSpace { display: block; height: var(--tpl-ml-viewer-create-h); }
