@@ -52,6 +52,7 @@ let groupStatus = 200
 function stubFetch() {
   vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
     const path = new URL(String(url), 'http://localhost').pathname
+    if (path === '/api/staff/me') return { ok: true, status: 200, json: async () => ({ success: true, data: { role: 'owner' } }) }
     if (path === '/api/rich-menu-groups/rmg-x') {
       return groupStatus === 200
         ? { ok: true, status: 200, json: async () => ({ success: true, data: GROUP }) }
@@ -136,4 +137,61 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     await settle()
     expect(host.textContent).toContain('作りかけの下書きを開けませんでした')
   })
+  it('WEB-286: 作成後の読み直しが失敗しても同じ下書きから再開する', async () => {
+    window.history.replaceState(null, '', '/rich-menus/new')
+    const original = fetch
+    let creates = 0, reads = 0
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+      const path = new URL(String(url), 'http://localhost').pathname
+      if (path === '/api/rich-menu-groups' && init?.method === 'POST') {
+        creates += 1
+        return { ok: true, status: 200, json: async () => ({ success: true, data: { id: 'rmg-x', pages: [{ id: 'p-top' }] } }) }
+      }
+      if (path === '/api/rich-menu-groups/rmg-x') {
+        reads += 1
+        if (reads === 1) return { ok: false, status: 500, json: async () => ({ success: false, error: '通信失敗' }) }
+      }
+      return original(url as RequestInfo, init)
+    }))
+    await act(async () => { root.render(<RichMenuCreateV8 />) })
+    await settle()
+    await act(async () => { fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: '再開' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き' })) })
+    await settle()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き' })) })
+    await settle()
+    expect(creates).toBe(1)
+    expect(host.textContent).toContain('切替タブ（ページ）')
+  })
+
+  it('WEB-287: 保存中に変えた名前を読み直した下書きで消さない', async () => {
+    window.history.replaceState(null, '', '/rich-menus/new?id=rmg-x&step=shape')
+    const original = fetch
+    let finish!: (v: unknown) => void
+    vi.stubGlobal('fetch', vi.fn((url: unknown, init?: RequestInit) => {
+      if (init?.method === 'PATCH') return new Promise(r => { finish = r })
+      return original(url as RequestInfo, init)
+    }))
+    await act(async () => { root.render(<RichMenuCreateV8 />) })
+    await settle()
+    const name = screen.getByLabelText('メニュー名（友だちには見えません）')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await act(async () => { fireEvent.change(name, { target: { value: '保存中の追加入力' } }) })
+    await act(async () => finish({ ok: true, status: 200, json: async () => ({ success: true, data: GROUP }) }))
+    await settle()
+    expect((screen.getByLabelText('メニュー名（友だちには見えません）') as HTMLInputElement).value).toBe('保存中の追加入力')
+  })
+
+  it('WEB-289: 公開前の検査を取得できない間は公開を押せない', async () => {
+    window.history.replaceState(null, '', '/rich-menus/new?id=rmg-x&step=publish')
+    const original = fetch
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+      if (String(url).includes('prepublish-check')) return { ok: false, status: 500, json: async () => ({ success: false, error: '通信失敗' }) }
+      return original(url as RequestInfo, init)
+    }))
+    await act(async () => { root.render(<RichMenuCreateV8 />) })
+    await settle()
+    expect((screen.getByRole('button', { name: '公開する' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
 })

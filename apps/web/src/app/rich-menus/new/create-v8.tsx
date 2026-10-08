@@ -617,6 +617,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     [group, draftSignature, createInputSignature],
   )
 
+  const signatureRef = useRef(signatureNow())
+  signatureRef.current = signatureNow()
   const [baselineSignature, setBaselineSignature] = useState<string | null>(null)
   // 初期署名は1回だけ（最初のレンダーの値）。useState 初期化で一度だけ計算。
   useEffect(() => {
@@ -646,6 +648,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const load = useCallback(async () => {
     const request = ++referenceRequest.current
     setReferencesReady(false)
+    setTags([]); setTemplates([]); setForms([]); setFolders([]); setTrackedLinks([]); setOtherMenus([])
     setLoadError(null)
     setLoadFailedKinds([])
     if (host) {
@@ -715,6 +718,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   useEffect(() => {
     void load()
+    return () => { referenceRequest.current += 1 }
   }, [load])
 
   useEffect(() => {
@@ -841,10 +845,19 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     )
   }
 
-  async function reloadGroup(groupId: string) {
+  async function reloadGroup(groupId: string, sentSignature?: string) {
     const res = await api.richMenuGroups.get(groupId)
     if (!res.success) throw new Error(res.error ?? '取得失敗')
-    hydrate(res.data as Group)
+    const next = res.data as Group
+    if (sentSignature && signatureRef.current !== sentSignature) {
+      // 保存中の追加入力を保ち、保存した版と新しいページIDだけを受け取る。
+      setGroup(next)
+      const sent = JSON.parse(sentSignature) as { pages: Array<{ id: string }> }
+      const ids = new Map(sent.pages.map((page, i) => [page.id, next.pages[i]?.id ?? page.id]))
+      setPages(current => current.map(page => ({ ...page, id: ids.get(page.id) ?? page.id })))
+      sent.pages = sent.pages.map(page => ({ ...page, id: ids.get(page.id) ?? page.id }))
+      setBaselineSignature(JSON.stringify(sent))
+    } else hydrate(next)
   }
 
   /*
@@ -892,6 +905,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   }
 
   /** 手順①の内容で下書きを作る。作れたら true。 */
+  const createdAttempt = useRef<{ id: string; pageId?: string; imageUploaded: boolean } | null>(null)
   async function createDraft(): Promise<boolean> {
     if (host) {
       const seed = await hostSeedFromShape()
@@ -915,36 +929,40 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       setError('出す相手の条件を設定してください。')
       return false
     }
-    const res = await api.richMenuGroups.create({
-      accountId,
-      name: name.trim(),
-      chatBarText: chatBarText.trim(),
-      size,
-      folderId: folderId || null,
-      defaultPageIndex: 0,
-      isDefaultForAll: audience === 'all',
-      targetingEnabled: audience === 'targeted',
-      targetingCondition: condition ? JSON.stringify(condition) : null,
-      targetingPriority,
-      defaultOpen,
-      imageMediaId: selectedMedia?.id,
-      pages: Array.from({ length: tabCount + 1 }, (_, index) => ({
-        name: index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`,
-        orderIndex: index,
-        areas,
-      })),
-    })
-    if (!res.success) throw new Error(res.error ?? '作成失敗')
-    const createdId = res.data.id
+    if (!createdAttempt.current) {
+      const res = await api.richMenuGroups.create({
+        accountId,
+        name: name.trim(),
+        chatBarText: chatBarText.trim(),
+        size,
+        folderId: folderId || null,
+        defaultPageIndex: 0,
+        isDefaultForAll: audience === 'all',
+        targetingEnabled: audience === 'targeted',
+        targetingCondition: condition ? JSON.stringify(condition) : null,
+        targetingPriority,
+        defaultOpen,
+        imageMediaId: selectedMedia?.id,
+        pages: Array.from({ length: tabCount + 1 }, (_, index) => ({
+          name: index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`,
+          orderIndex: index,
+          areas,
+        })),
+      })
+      if (!res.success) throw new Error(res.error ?? '作成失敗')
+      createdAttempt.current = { id: res.data.id, pageId: res.data.pages[0]?.id, imageUploaded: false }
+    }
+    const createdId = createdAttempt.current.id
     // ファイルを直接選んでいたら既定ページへ上げる。
-    if (pendingFile) {
-      const defaultPageId = res.data.pages[0]?.id
+    if (pendingFile && !createdAttempt.current.imageUploaded) {
+      const defaultPageId = createdAttempt.current.pageId
       if (defaultPageId) {
         try {
           await api.richMenuGroups.uploadImage(createdId, defaultPageId, pendingFile)
+          createdAttempt.current.imageUploaded = true
         } catch (e) {
           // 下書き自体はできている。画像だけ失敗として知らせる。
-          setError(imageUploadErrorText(e))
+          throw new Error(imageUploadErrorText(e))
         }
       }
     }
@@ -987,6 +1005,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setSaving(true)
     setError(null)
     setNotice('')
+    const sentSignature = draftSignature()
     try {
       if (!group) {
         const ok = await createDraft()
@@ -1003,7 +1022,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           return false
         }
         await persistDraft()
-        if (!host) await reloadGroup(group.id)
+        if (!host) await reloadGroup(group.id, sentSignature)
       }
       if (host) return true
       setNotice('下書きを保存しました。')
@@ -1304,7 +1323,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   /* ---------- 手順④：公開 ---------- */
 
   const loadChecks = useCallback(async () => {
-    if (!group) return
+    if (!group) return false
     setChecksLoading(true)
     try {
       const res = await api.richMenuGroups.prepublishCheck(group.id)
@@ -1322,8 +1341,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         pages: { state: data.pageCount <= data.maxPages ? 'ok' : 'ng', count: data.pageCount, max: data.maxPages },
       }))
       setChecksError(false)
+      return data.selfCheck.ok && data.pageCount <= data.maxPages && data.deviceConfirmed
     } catch {
       setChecksError(true)
+      setChecks(null)
+      return false
     } finally {
       setChecksLoading(false)
     }
@@ -1464,7 +1486,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       await persistDraft()
       draftSaved = true
       // 保存で内容が変わると実機確認の fingerprint が変わる。保存し直した状態で再確認する。
-      await loadChecks()
+      if (!(await loadChecks())) throw new Error('公開前の確認がそろいませんでした。検査をやり直してください。')
       await reloadGroup(group.id)
       const res = await api.richMenuGroups.publish(group.id, idempotencyKey)
       if (!res.success) throw new Error(res.error ?? 'publish failed')
@@ -1750,8 +1772,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     disabled={
                       busy ||
                       !canOperate ||
-                      (checks !== null && publishPlan.mode === 'now' && !checksAllOk) ||
-                      (checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk)
+                      checksLoading || checksError || checks === null ||
+                      (publishPlan.mode === 'now' && !checksAllOk) ||
+                      (publishPlan.mode !== 'now' && !scheduleGateOk)
                     }
                     busy={publishing || saving}
                     busyLabel={publishPlan.mode === 'now' ? '公開しています…' : '予約しています…'}
