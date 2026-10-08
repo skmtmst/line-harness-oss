@@ -8,6 +8,7 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 import MenuPortal from './menu-portal'
 import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption, SelectMenuSpacer, splitOptionHeads } from './select-menu'
 import styles from './select.module.css'
+import pillStyles from './status-pill.module.css'
 
 export interface SelectOption {
   value: string
@@ -52,9 +53,9 @@ export interface SelectProps {
   width?: number
   /**
    * 見せ方。既定 'box' は枠の箱。'text' は枠なし文字＋上下矢印
-   * （x6QsVz の並び替えどおり）。v8 だけで枠を消す。
+   * （x6QsVz の並び替えどおり）。'pill' は対応状況の丸い札。V8 にだけ適用する。
    */
-  treatment?: 'box' | 'text'
+  treatment?: 'box' | 'text' | 'pill'
   /**
    * 箱の先頭の図柄（v19Ivv のよく使う絞り込みの栞どおり）。
    * 渡さなければ出ない。
@@ -286,7 +287,7 @@ export default function Select({
         ref={triggerRef}
         id={buttonId}
         type="button"
-        className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : ''}`}
+        className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' && v8 ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
         aria-label={ariaLabel}
         aria-controls={listboxId}
         aria-expanded={open}

@@ -3,6 +3,7 @@
 /*
  * 概要タブ（JCDRm・Q5F2QE の 1.）。左に要点 320px、右に数の帯・進行中・同じ人・最近の履歴・行う操作。
  */
+import StatusPill from '@/components/shared/status-pill'
 import { useState } from 'react'
 import Link from 'next/link'
 import {
@@ -27,7 +28,7 @@ import type { FriendDetail } from '@/lib/api'
 import type { FriendDetailState } from './use-friend-detail'
 import type { FriendDetailPermissions } from './permissions'
 import { inboxHrefForFriend, timelineSourceHref, timelineTypeLabel, timelineKey, type FriendTimelineItem } from './timeline'
-import { SUPPORT_LABELS } from './support'
+import { SUPPORT_LABELS, SUPPORT_TONES } from './support'
 import styles from './detail.module.css'
 
 function GroupHead({ title, action }: { title: string; action?: React.ReactNode }) {
@@ -118,7 +119,7 @@ export default function OverviewTab({
             action={perms.editSupport ? <button type="button" className={styles.groupLink} onClick={onEditSupport}>編集</button> : null}
           />
           <dl className={styles.kvList}>
-            <Kv label="状況">{support ? SUPPORT_LABELS[support.status] : <span className={styles.faint}>やり取りなし</span>}</Kv>
+            <Kv label="状況">{support ? <StatusPill tone={SUPPORT_TONES[support.status]}>{SUPPORT_LABELS[support.status]}</StatusPill> : <span className={styles.faint}>やり取りなし</span>}</Kv>
             <Kv label="担当">{support?.operatorName ?? <span className={styles.faint}>未割り当て</span>}</Kv>
             <Kv label="最後のやりとり">{data.historyStatus === 'ready' ? lastContactText(data.historyItems) : '—'}</Kv>
           </dl>
