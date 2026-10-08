@@ -448,6 +448,7 @@ export const ADMIN_REQUEST_HEADERS = [
   'Content-Type',
   'Authorization',
   'X-CSRF-Token',
+  'X-Line-Account-Id',
   'x-admin-api-key',
   'X-Filename',
   'Idempotency-Key',

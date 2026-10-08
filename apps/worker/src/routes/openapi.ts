@@ -1,3 +1,4 @@
+import { tabCountPaths } from './tab-counts-openapi.js';
 import { api18Paths } from './api18-openapi.js';
 import { chatAttachmentPaths } from './chat-attachments-openapi.js';
 import { api17Paths, api17TemplateKind } from './api17-openapi.js';
@@ -397,6 +398,7 @@ const spec = {
     },
   },
   paths: {
+    ...tabCountPaths,
     ...chatAttachmentPaths,
     '/api/mileage/reward-folders': {
       get: { tags: ['Mileage'], summary: '使い道のフォルダと件数を読む', parameters: [{ name: 'accountId', in: 'query', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Folders: id, name, displayOrder, count' }, '404': { description: 'Account not found' } } },

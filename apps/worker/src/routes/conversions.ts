@@ -1,3 +1,5 @@
+import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
+import { conversionApprovalCounts } from '../services/tab-counts.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getConversionPoints,
@@ -1646,6 +1648,18 @@ const APPROVAL_STATUSES = new Set(['pending', 'approved', 'rejected']);
 // 承認待ち(友だち名・案件名含む)を返すので、定義系と同じ
 // `conversionPermission('view')` で縛る(#513 M1)。利用者は
 // /conversions 画面のタブだけなので、affiliates 側の導線は変えない。
+conversions.get('/api/conversions/approvals/counts', conversionPermission('view'), async (c) => {
+  try {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    return c.json({ success: true, data: await conversionApprovalCounts(c.env.DB, {
+      allowedAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned,
+    }) });
+  } catch (err) {
+    console.error('GET /api/conversions/approvals/counts error:', err);
+    return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
+  }
+});
+
 conversions.get('/api/conversions/approvals', conversionPermission('view'), async (c) => {
   try {
     const status = c.req.query('status') ?? 'pending';
@@ -2139,7 +2153,8 @@ async function notifyApprovalOnce(
     const claimed = await markApprovalNotified(db, eventId, state.approvedAt);
     if (!claimed) return;
     try {
-      await notifyAffiliateApproval(db, env, info.affiliateId, info.offerName, info.rewardAmount);
+      await notifyAffiliateApproval(db, env, info.affiliateId, info.offerName, info.rewardAmount,
+        await createBroadcastRetryKey('affiliate-approval', eventId, state.approvedAt));
     } catch (err) {
       // 送信の途中で落ちたら同じ世代の記録だけ戻す。世代が変わって
       // いたら戻さない（新しい世代の未送信を消さない）。
