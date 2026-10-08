@@ -311,16 +311,16 @@ export async function executeFieldMigration(
       statements.push(db.prepare(
         `UPDATE reminders SET trigger_field_id = ?, updated_at = ?
           WHERE line_account_id = ? AND trigger_field_id = ?
-            AND id IN (${reminderIds.map(() => '?').join(', ')})`,
-      ).bind(run.target_field_id, completedAt, run.line_account_id, run.source_field_id, ...reminderIds));
+            AND id IN (SELECT value FROM json_each(?))`,
+      ).bind(run.target_field_id, completedAt, run.line_account_id, run.source_field_id, JSON.stringify(reminderIds)));
     }
     const formIds = promised
       .filter((target) => target.switchable && target.kind === 'form')
       .map((target) => target.id);
     if (formIds.length > 0) {
       const drafts = await db.prepare(
-        `SELECT f.id, f.fields FROM forms f WHERE f.id IN (${formIds.map(() => '?').join(', ')})`,
-      ).bind(...formIds).all<{ id: string; fields: string }>();
+        `SELECT f.id, f.fields FROM forms f WHERE f.id IN (SELECT value FROM json_each(?))`,
+      ).bind(JSON.stringify(formIds)).all<{ id: string; fields: string }>();
       for (const draft of drafts.results) {
         const switched = switchDraftFormFields(draft.fields, run.source_field_id, run.target_field_id);
         if (switched) {

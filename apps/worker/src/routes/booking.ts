@@ -26,6 +26,7 @@ import {
   getBookingAdminSettings,
   saveBookingAdminSettings,
   createBookingPayment,
+  getBookingPaymentByBooking,
   decidePrepayOnly,
   prepayNoticeFor,
   resolveBookingPaymentConfig,
@@ -910,7 +911,31 @@ booking.post('/api/liff/booking/requests', async (c) => {
     now: new Date(),
   });
   if (cached) {
-    return c.json(cached.body as Record<string, unknown>, cached.status as 200 | 201 | 400 | 409 | 422);
+    if (cached.status !== 202) {
+      return c.json(cached.body as Record<string, unknown>, cached.status as 200 | 201 | 400 | 409 | 422);
+    }
+    // 完成応答を書けなかった要求は、先に確保した予約IDを本人の範囲で引く。
+    // INSERT前の同時要求は409で待たせる。保存済みの予約は作り直さず、
+    // 通知・タグ等の副作用もこの再送口から重ねて実行しない。
+    const pendingBookingId = (cached.body as { booking_id?: unknown }).booking_id;
+    if (typeof pendingBookingId === 'string') {
+      const saved = await c.env.DB.prepare(
+        `SELECT id, status FROM bookings WHERE id = ? AND line_account_id = ? AND friend_id = ?`,
+      ).bind(pendingBookingId, accountId, friendId).first<{ id: string; status: string }>();
+      if (saved) {
+        const payment = await getBookingPaymentByBooking(c.env.DB, accountId, saved.id);
+        const prepayNotice = await prepayNoticeFor(
+          c.env.DB, accountId, await decidePrepayOnly(c.env.DB, accountId, friendId),
+        );
+        return c.json({
+          booking_id: saved.id,
+          status: saved.status,
+          ...(payment ? { payment: { id: payment.id, status: payment.status, holdUntil: payment.hold_until } } : {}),
+          ...(prepayNotice ? { prepayNotice } : {}),
+        }, 201);
+      }
+    }
+    return c.json({ error: 'request_in_progress' }, 409);
   }
 
   // 案内を受けた本人・枠・有効期限を確認してから、通常の予約確定処理を使う。
@@ -991,6 +1016,23 @@ booking.post('/api/liff/booking/requests', async (c) => {
   const autoConfirm = adminSettings?.approvalMode === 'automatic';
   const initialStatus = (autoConfirm ? 'confirmed' : 'requested') satisfies BookingStatus;
   const decidedAt = autoConfirm ? nowIso : null;
+  const reserved = await reserveIdempotencyResponse(c.env.DB, {
+    key: idemKey,
+    lineAccountId: accountId,
+    friendId,
+    body: { error: 'request_in_progress', booking_id: bookingId },
+    ttlMinutes: IDEMPOTENCY_TTL_MINUTES,
+    now: new Date(),
+  });
+  if (!reserved) {
+    const raced = await findIdempotencyResponse(c.env.DB, {
+      key: idemKey, lineAccountId: accountId, friendId, now: new Date(),
+    });
+    if (raced && raced.status !== 202) {
+      return c.json(raced.body as Record<string, unknown>, raced.status as 200 | 201 | 400 | 409 | 422);
+    }
+    return c.json({ error: raced ? 'request_in_progress' : 'idempotency_key_conflict' }, 409);
+  }
   // 競合チェックと INSERT を 1 ステートメントで原子化する。
   // INSERT ... SELECT WHERE NOT EXISTS パターンで、同一スタッフの overlap 行がある場合は
   // 0 行 INSERT に落とす。changes=0 を 409 として扱う。
@@ -1063,22 +1105,31 @@ booking.post('/api/liff/booking/requests', async (c) => {
         blockEndsAt: blockEndsAt.toISOString(),
       }),
     );
-  const insertResult = await insertBookingWithResourceSnapshot(c.env.DB, {
-    bookingInsert,
-    bookingId,
-    lineAccountId: accountId,
-    menuId: body.menu_id,
-  });
+  let insertResult: { inserted: boolean; consumptionCount: number };
+  try {
+    insertResult = await insertBookingWithResourceSnapshot(c.env.DB, {
+      bookingInsert, bookingId, lineAccountId: accountId, menuId: body.menu_id,
+    });
+  } catch (error) {
+    // DB応答だけ消えた場合はcommit済みかもしれない。不在を確認できた
+    // ときだけ自分の仮応答を消す。救出の読取も失敗したら確保を残す。
+    try {
+      const saved = await c.env.DB.prepare('SELECT id FROM bookings WHERE id = ? AND line_account_id = ? AND friend_id = ?')
+        .bind(bookingId, accountId, friendId).first();
+      if (!saved) await releaseReservedIdempotencyResponse(c.env.DB, {
+        key: idemKey, lineAccountId: accountId, friendId, bookingId,
+      });
+    } catch { /* 不明な結果はキーを残して二重作成を止める。 */ }
+    throw error;
+  }
   if (!insertResult.inserted) {
     const err = { error: 'slot_conflict' };
-    await saveIdempotencyResponse(c.env.DB, {
+    await completeIdempotencyResponse(c.env.DB, {
       key: idemKey,
       lineAccountId: accountId,
       friendId,
       status: 409,
       body: err,
-      ttlMinutes: IDEMPOTENCY_TTL_MINUTES,
-      now: new Date(),
     });
     return c.json(err, 409);
   }
@@ -1262,14 +1313,12 @@ booking.post('/api/liff/booking/requests', async (c) => {
     ...(bookingPayment ? { payment: bookingPayment } : {}),
     ...(selfPrepayNotice ? { prepayNotice: selfPrepayNotice } : {}),
   };
-  await saveIdempotencyResponse(c.env.DB, {
+  await completeIdempotencyResponse(c.env.DB, {
     key: idemKey,
     lineAccountId: accountId,
     friendId,
     status: 201,
     body: responseBody,
-    ttlMinutes: IDEMPOTENCY_TTL_MINUTES,
-    now: new Date(),
   });
   return c.json(responseBody, 201);
 });

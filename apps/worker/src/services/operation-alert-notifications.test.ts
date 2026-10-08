@@ -327,4 +327,21 @@ describe('operation alert notification outbox', () => {
       "SELECT status, attempt_count FROM operation_alert_notification_outbox WHERE id = 'outbox-stale'",
     ).get()).toEqual({ status: 'sent', attempt_count: 2 });
   });
+  it('W8: 停止した店の通知を同じtickや再オンで送らず、明示再送でだけ再開する', async () => {
+    const testDb = createTestD1(); await seedResolvedFlap(testDb);
+    testDb.raw.exec(`DELETE FROM operation_alert_notification_outbox WHERE channel='email';
+      UPDATE operation_alert_notification_outbox SET status='queued', attempt_count=0, next_attempt_at='2026-09-16T00:00:00.000Z';
+      UPDATE line_accounts SET is_active=0 WHERE id='account-1'`);
+    const env = { DB: testDb.db } as Env['Bindings'];
+    expect(await processOperationAlertNotificationOutbox(env)).toEqual({ sent: 0, failed: 0 });
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare('SELECT status,last_error,attempt_count FROM operation_alert_notification_outbox').get())
+      .toEqual({ status: 'failed', last_error: 'account_inactive', attempt_count: 0 });
+    testDb.raw.exec("UPDATE line_accounts SET is_active=1 WHERE id='account-1'");
+    expect(await processOperationAlertNotificationOutbox(env)).toEqual({ sent: 0, failed: 0 });
+    testDb.raw.exec("UPDATE operation_alert_notification_outbox SET status='queued',last_error=NULL");
+    expect(await processOperationAlertNotificationOutbox(env)).toEqual({ sent: 1, failed: 0 });
+    testDb.raw.close();
+  });
+
 });

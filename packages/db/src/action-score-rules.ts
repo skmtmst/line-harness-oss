@@ -1,4 +1,4 @@
-import { isAccountFeatureEnabled } from './account-settings.js';
+import { isAccountFeatureEnabled, accountFeatureOffExclusionSql } from './account-settings.js';
 
 export type ActionScoreRuleOperation = 'delta' | 'set';
 export type ActionScoreRuleSetStatus = 'draft' | 'published' | 'stopped';
@@ -792,16 +792,6 @@ export async function postActionScoreManualAdjustment(
   if (!friend) {
     throw new ActionScoreRuleValidationError('friend_not_found', '対象の友だちが見つかりません');
   }
-  const scoreBefore = friend.score;
-  const scoreAfter = scoreBefore + input.scoreChange;
-  if (scoreAfter < bands.min || scoreAfter > bands.max) {
-    throw new ActionScoreRuleValidationError(
-      'score_out_of_range',
-      `点数は${bands.min}〜${bands.max}点の範囲でしか動かせません（現在${scoreBefore}点）`,
-      'amount',
-    );
-  }
-
   const historyId = crypto.randomUUID();
   const occurredAt = input.occurredAt ?? new Date().toISOString();
   const write = await db.prepare(
@@ -810,13 +800,15 @@ export async function postActionScoreManualAdjustment(
         line_account_id, event_type, source, idempotency_key,
         operation, score_before, score_after, occurred_at,
         executed_by_staff_id, executed_by_staff_name)
-     VALUES (?, ?, NULL, ?, ?, ?, ?, 'manual_adjustment', 'staff', ?,
-             'manual_adjustment', ?, ?, ?, ?, ?)`,
+     SELECT ?, f.id, NULL, ?, ?, ?, ?, 'manual_adjustment', 'staff', ?,
+             'manual_adjustment', COALESCE(f.score,0), COALESCE(f.score,0)+?, ?, ?, ?
+       FROM friends f WHERE f.id=? AND f.line_account_id=?
+         AND COALESCE(f.score,0)+? BETWEEN ? AND ?`,
   ).bind(
-    historyId, input.friendId, input.scoreChange, reason, occurredAt,
-    input.lineAccountId, input.idempotencyKey,
-    scoreBefore, scoreAfter, occurredAt,
-    input.executedByStaffId, input.executedByStaffName,
+    historyId, input.scoreChange, reason, occurredAt,
+    input.lineAccountId, input.idempotencyKey, input.scoreChange, occurredAt,
+    input.executedByStaffId, input.executedByStaffName, input.friendId, input.lineAccountId,
+    input.scoreChange, bands.min, bands.max,
   ).run();
 
   const row = await db.prepare(
@@ -824,6 +816,13 @@ export async function postActionScoreManualAdjustment(
        FROM friend_scores WHERE line_account_id = ? AND idempotency_key = ?`,
   ).bind(input.lineAccountId, input.idempotencyKey).first<ManualAdjustmentRow>();
   if (!row) {
+    const current = await db.prepare(`SELECT score FROM friends WHERE id=? AND line_account_id=?`)
+      .bind(input.friendId,input.lineAccountId).first<{ score: number }>();
+    if (!current) throw new ActionScoreRuleValidationError('friend_not_found', '対象の友だちが見つかりません');
+    if (current.score + input.scoreChange < bands.min || current.score + input.scoreChange > bands.max) {
+      throw new ActionScoreRuleValidationError('score_out_of_range',
+        `点数は${bands.min}〜${bands.max}点の範囲でしか動かせません（現在${current.score}点）`, 'amount');
+    }
     throw new ActionScoreRuleValidationError('score_write_failed', 'スコア履歴を保存できませんでした');
   }
   // 同時実行で別内容の行が先に入った場合、無視されたこちらを成功とは返さない。
@@ -908,7 +907,7 @@ export async function processActionScoreInactivity(
   const limit = Math.max(1, Math.min(options.limit ?? 200, 500));
   const rows = await db.prepare(
     `WITH latest AS (
-       SELECT f.id AS friend_id, f.line_account_id,
+       SELECT f.id AS friend_id, f.line_account_id, v.rules_json,
               COALESCE(MAX(ee.occurred_at), f.created_at) AS last_activity_at
          FROM friends f
          JOIN action_score_rule_sets s
@@ -920,12 +919,22 @@ export async function processActionScoreInactivity(
            ON COALESCE(ee.actor_friend_id, ee.subject_friend_id) = f.id
         WHERE f.is_following = 1
           AND v.rules_json LIKE '%"eventType":"inactivity_30d"%'
-        GROUP BY f.id, f.line_account_id, f.created_at
+        GROUP BY f.id, f.line_account_id, f.created_at, v.rules_json
      )
      SELECT friend_id, line_account_id, last_activity_at
        FROM latest WHERE datetime(last_activity_at) <= datetime(?)
-      ORDER BY last_activity_at ASC LIMIT ?`,
-  ).bind(cutoff, limit).all<{ friend_id: string; line_account_id: string; last_activity_at: string }>();
+        AND NOT ${accountFeatureOffExclusionSql('latest.line_account_id', 'mileage')}
+        AND EXISTS (SELECT 1 FROM json_each(latest.rules_json) rule
+          WHERE json_extract(rule.value,'$.eventType')='inactivity_30d'
+            AND json_extract(rule.value,'$.enabled')=1
+            AND (json_extract(rule.value,'$.source') IS NULL OR json_extract(rule.value,'$.source')='scheduler')
+            AND (json_extract(rule.value,'$.validFrom') IS NULL OR julianday(json_extract(rule.value,'$.validFrom'))<=julianday(?))
+            AND (json_extract(rule.value,'$.validUntil') IS NULL OR julianday(json_extract(rule.value,'$.validUntil'))>=julianday(?))
+            AND NOT EXISTS (SELECT 1 FROM friend_scores fs WHERE fs.line_account_id=latest.line_account_id
+              AND fs.friend_id=latest.friend_id AND fs.rule_key=json_extract(rule.value,'$.id')
+              AND fs.source='scheduler' AND fs.source_event_id='inactivity:'||latest.friend_id||':'||latest.last_activity_at))
+      ORDER BY datetime(last_activity_at) ASC, friend_id ASC LIMIT ?`,
+  ).bind(cutoff, now.toISOString(), now.toISOString(), limit).all<{ friend_id: string; line_account_id: string; last_activity_at: string }>();
   let applied = 0;
   const transitions: Array<{ lineAccountId: string; friendId: string; applications: ActionScoreApplication[] }> = [];
   for (const row of rows.results ?? []) {

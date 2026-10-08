@@ -468,22 +468,22 @@ interface TemplatePublishKeyRecord {
  */
 /**
  * 466: 公開が決まった内容を版履歴へ1行足す。前の版は変えない。
- * 公開の原子操作のあとに足す。ここで落ちたら公開ごと500にし、
- * 版だけ進んだ公開を残さない（黙って履歴欠けにしない）。
+ * 公開本文と同じ原子操作へ入れ、履歴保存が落ちたら公開本文も戻す。
  */
-async function recordPublishedVersion(
+function publishedVersionStatement(
   db: D1Database,
   row: TemplateRow,
   versionNumber: number,
   options: { effectiveFrom?: string; createdByStaffId?: string | null },
   now: string,
-): Promise<void> {
-  await db.prepare(
+  onlyChanged = false,
+): D1PreparedStatement {
+  return db.prepare(
     `INSERT INTO template_versions
        (id, template_id, version_number, message_type, message_content,
         carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
         question_json, question_status, effective_from, created_by_staff_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${onlyChanged ? 'WHERE changes() = 1' : ''}`,
   ).bind(
     crypto.randomUUID(),
     row.id,
@@ -498,7 +498,7 @@ async function recordPublishedVersion(
     options.effectiveFrom ?? now,
     options.createdByStaffId ?? null,
     now,
-  ).run();
+  );
 }
 
 export async function publishTemplate(
@@ -546,6 +546,13 @@ export async function publishTemplate(
         draft_question_status: null,
         draft_revision: 0,
       };
+      const history = await db.prepare(`SELECT id FROM template_versions WHERE template_id=? AND version_number=?`)
+        .bind(id,Number(prior.published_version)).first();
+      if (!history && Number(prior.published_version) > 0) {
+        // 過去の欠落版の付属設定・利用開始日・操作者は成功キーだけでは
+        // 復元できない。現在の設定から推測せず、人の復旧判断へ返す。
+        throw new Error('TEMPLATE_VERSION_HISTORY_MISSING');
+      }
       return { row: fixed, published: false, replayed: true };
     }
   }
@@ -612,6 +619,16 @@ export async function publishTemplate(
       current.draft_revision ?? 0,
     ),
   ];
+  publishBatch.push(publishedVersionStatement(db, {
+    ...current,
+    message_type: current.draft_message_type!,
+    message_content: current.draft_message_content!,
+    carousel_actions_json: current.draft_carousel_actions_json,
+    carousel_tap_limit_mode: current.draft_carousel_tap_limit_mode ?? 'none',
+    carousel_tap_limit_text: current.draft_carousel_tap_limit_text,
+    question_json: current.draft_question_json,
+    question_status: current.draft_question_status ?? 'draft',
+  }, nextVersion, options, now, true));
   if (options.idempotencyKey) {
     /*
      * 同じ原子操作の中で、UPDATE が1行に当たったときだけ記録する。
@@ -675,8 +692,6 @@ export async function publishTemplate(
   if (!next || Number(next.published_version) !== nextVersion) {
     throw new Error('TEMPLATE_VERSION_CONFLICT');
   }
-  // 466: 公開のたびに版を1行足す。前の版は変えない。
-  await recordPublishedVersion(db, next, nextVersion, options, now);
   return { row: next, published: true, replayed: false };
 }
 
@@ -877,7 +892,6 @@ export async function getTemplateSendCounts(
 ): Promise<Map<string, TemplateSendCounts>> {
   if (templateIds.length === 0) return new Map();
   const month = nowJst.slice(0, 7);
-  const placeholders = templateIds.map(() => '?').join(',');
   const result = await db.prepare(
     `SELECT template_id_at_send AS template_id,
             COUNT(*) AS total_count,
@@ -885,9 +899,9 @@ export async function getTemplateSendCounts(
       FROM messages_log
       WHERE direction = 'outgoing'
         AND COALESCE(delivery_type, '') != 'test'
-        AND template_id_at_send IN (${placeholders})
+        AND template_id_at_send IN (SELECT value FROM json_each(?))
       GROUP BY template_id_at_send`,
-  ).bind(month, ...templateIds).all<{
+  ).bind(month, JSON.stringify(templateIds)).all<{
     template_id: string;
     total_count: number;
     month_count: number;

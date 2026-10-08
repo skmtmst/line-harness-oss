@@ -703,6 +703,9 @@ export async function createFunnelVersion(
   }
   const id = crypto.randomUUID();
   const statements: D1PreparedStatement[] = [
+    db.prepare(`SELECT json(CASE WHEN EXISTS (SELECT 1 FROM funnels
+      WHERE id=? AND line_account_id=? AND status='active') THEN '{}' ELSE 'analytics_funnel_not_active' END)`)
+      .bind(input.funnelId,input.lineAccountId),
     // 版番号は読み取った最大値+1を明示する。間に別の保存が割り込むと
     // UNIQUE(funnel_id, version_number) が衝突し、下のcatchで競合へ変換する。
     db.prepare(
@@ -724,6 +727,7 @@ export async function createFunnelVersion(
   try {
     await db.batch(statements);
   } catch (error) {
+    if (error instanceof Error && /malformed JSON/i.test(error.message)) throw new Error('analytics_funnel_not_active');
     if (error instanceof Error && error.message.includes('UNIQUE')) {
       throw new Error('analytics_funnel_version_conflict');
     }
