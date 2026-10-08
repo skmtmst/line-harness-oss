@@ -26,6 +26,8 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
+import { InsertText } from '@/components/shared/insert-text-field'
+import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
 import TargetMissing from '@/components/shared/target-missing'
 import FlexPreviewComponent from '@/components/flex-preview'
 import {
@@ -360,14 +362,14 @@ export default function TemplateDetailV8() {
           </p>
         </div>
       ) : (
-        <LinePreview accountName="然 - NEN -" note="受け取る人のLINEでの見え方です。{ } の差し込みは、送るときに受け取る人ごとの値に変わります。">
+        <LinePreview title="届き方" accountName="然 - NEN -" note="受け取る人のLINEでの見え方です。{ } の差し込みは、送るときに受け取る人ごとの値に変わります。">
           {template.messageType === 'flex' ? <FlexPreviewComponent content={draftContent} /> : (
             <div className={styles.talkRow}>
               <span className={styles.talkIcon} aria-hidden="true">然</span>
               <div className={styles.talkCol}>
                 <span className={styles.talkName}>然 - NEN -</span>
                 <div className={styles.talkBubbleRow}>
-                  <p className={styles.talkBubble}>{draftContent}</p>
+                  <p className={styles.talkBubble}>{buildTemplatePreview(draftContent, EMPTY_TEMPLATE_REFERENCES).content}</p>
                   <span className={styles.talkTime}>18:00</span>
                 </div>
               </div>
@@ -425,7 +427,7 @@ export default function TemplateDetailV8() {
               </Button>
             ) : null}
           </div>
-          <div className={styles.bodyBox}>{draftContent}</div>
+          <div className={styles.bodyBox}>{template.messageType === 'text' ? <InsertText value={draftContent} /> : draftContent}</div>
         </section>
 
         <section className={styles.card} aria-label="使っている所" ref={usageRef}>

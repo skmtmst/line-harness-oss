@@ -191,7 +191,7 @@ function form(index, overrides = {}) {
 
 async function openHarness(browser, {
   role = 'admin', formsByAccount = {}, fail = false, listDelayMs = {},
-  detail = null, putResults = [], viewport = { width: 1440, height: 1000 },
+  detail = null, putResults = [], viewport = { width: 1440, height: 1000 }, theme = null,
 } = {}) {
   const state = {
     listCalls: [], folderWrites: [], formWrites: [], putBodies: [],
@@ -204,10 +204,12 @@ async function openHarness(browser, {
     ],
   }
   const context = await browser.newContext({ viewport })
-  await context.addInitScript(() => {
+  await context.addInitScript((selectedTheme) => {
     localStorage.setItem('lh_selected_account', 'account-a')
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
-  })
+    // 見た目を選ぶ（設定画面の「画面の見た目」と同じ置き場）。null は環境の既定のまま。
+    if (selectedTheme) localStorage.setItem('lh-admin-theme', selectedTheme)
+  }, theme)
   const page = await context.newPage()
   page.on('pageerror', (error) => console.error('browser page error:', error.message))
   page.on('console', (message) => {
@@ -818,6 +820,81 @@ try {
     }
     const removeBox = await page.getByRole('button', { name: 'この動作を削除' }).boundingBox()
     assert.equal(removeBox.x + removeBox.width <= 390, true, 'R26: 動作の削除が画面に収まる')
+    await context.close()
+  }
+
+  /*
+   * 11. V8 の編集画面（src/v8/form-edit）でも、版の競合で入力を捨てない（監査 WEB-314）。
+   *
+   * 7〜10 は v7 の編集画面（#fm-name・「下書きを保存する」）を見ている。本番の切り替えの
+   * 1週間後まで v7 の試験は残し、V8 の編集画面は同じ動きをここで見る。
+   * V8 の名前・カードの欄は「受付と見た目」のタブ（#fe-name・#fe-og-*）、保存は「下書きを保存」。
+   */
+  async function openV8Editor(page, formName) {
+    await openList(page)
+    await page.getByRole('button', { name: `「${formName}」の詳細を見る`, exact: true }).click()
+    await page.getByRole('link', { name: '編集する', exact: true }).click()
+    await page.getByRole('tab', { name: '受付と見た目' }).or(page.getByRole('button', { name: '受付と見た目', exact: true })).first().click()
+    await page.locator('#fe-name').waitFor({ timeout: 15_000 })
+    await page.waitForFunction(
+      (expected) => document.querySelector('#fe-name')?.value === expected,
+      formName, { timeout: 15_000 },
+    )
+  }
+  {
+    const detail = {
+      ...form(1, { id: 'form-1', name: 'サーバ側の名前' }),
+      contentRevision: 4,
+    }
+    const { context, page, state } = await openHarness(browser, {
+      formsByAccount: { 'account-a': [detail] },
+      detail,
+      putResults: ['conflict'],
+      theme: 'v8',
+    })
+    await openV8Editor(page, 'サーバ側の名前')
+    await page.locator('#fe-name').fill('わたしが直した名前')
+    await page.getByRole('button', { name: '下書きを保存', exact: true }).click()
+
+    await page.getByText(/^ほかの人が.*を保存しました$/).first().waitFor({ timeout: 15_000 })
+    assert.equal(state.putBodies.length >= 1, true, 'V8: 保存を出す')
+    assert.equal(state.putBodies[0].expectedContentRevision, 4, 'V8: 読み込んだ版をそのまま送る')
+    assert.equal(await page.locator('#fe-name').inputValue(), 'わたしが直した名前', 'V8: 409 で入力を捨てない')
+    assert.equal(await page.getByRole('button', { name: '比べてから保存', exact: true }).count(), 1,
+      'V8: 競合のあとは比べてから保存する出口を出す')
+    await context.close()
+  }
+
+  /*
+   * 12. V8 の編集画面で、カード（OGP）の3欄に打った文字が保存の中身まで届く（#725 を V8 でも）。
+   */
+  {
+    const detail = {
+      ...form(1, { id: 'form-1', name: 'ごはんの相談' }),
+      contentRevision: 4,
+    }
+    const { context, page, state } = await openHarness(browser, {
+      formsByAccount: { 'account-a': [detail] },
+      detail,
+      theme: 'v8',
+    })
+    await openV8Editor(page, 'ごはんの相談')
+    // カードの3欄は「リンクの見え方」の窓の中。利用者と同じ順（開く → 打つ → 閉じる → 保存）でたどる。
+    await page.getByRole('button', { name: /^リンクの見え方：/ }).click()
+    const linkDialog = page.getByRole('dialog', { name: 'リンクの見え方' })
+    await linkDialog.waitFor({ timeout: 15_000 })
+    await page.locator('#fe-og-title').fill('ごはんの相談フォーム')
+    await page.locator('#fe-og-desc').fill('3分で終わります')
+    await page.locator('#fe-og-image').fill('https://example.test/ogp.png')
+    await linkDialog.getByRole('button', { name: '閉じる', exact: true }).last().click()
+    await linkDialog.waitFor({ state: 'detached', timeout: 10_000 })
+    await page.getByRole('button', { name: '下書きを保存', exact: true }).click()
+    for (let i = 0; i < 100 && state.putBodies.length === 0; i += 1) await page.waitForTimeout(50)
+    const sent = state.putBodies.at(-1)
+    assert.ok(sent, 'V8: 保存が飛ぶ')
+    assert.equal(sent.ogTitle, 'ごはんの相談フォーム', 'V8: 打った見出しが保存へ乗る')
+    assert.equal(sent.ogDescription, '3分で終わります', 'V8: 打った説明が保存へ乗る')
+    assert.equal(sent.ogImageUrl, 'https://example.test/ogp.png', 'V8: 打った画像URLが保存へ乗る')
     await context.close()
   }
 

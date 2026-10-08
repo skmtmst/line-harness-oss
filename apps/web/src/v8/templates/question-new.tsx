@@ -13,7 +13,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronDown, Plus, Send } from 'lucide-react'
+import { ChevronDown, Plus, Send, Trash2 } from 'lucide-react'
 import type { Folder, Scenario, Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { describeApiFailure, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
@@ -227,7 +227,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
 
   const busy = saving || publishing || Boolean(host?.busy)
   const phone = (
-    <LinePreview note="質問の見え方（山田 太郎さんの場合）" caption="配信日 10:00">
+    <LinePreview title={null} note="質問の見え方（山田 太郎さんの場合）" caption="配信日 10:00">
       <div className={styles.bubble}>
         {question.intro?.trim() ? <p className={styles.bubbleIntro}>{displayText(question.intro)}</p> : null}
         <p className={styles.bubbleText}>{displayText(question.text) || '質問文を入力すると、ここに出ます。'}</p>
@@ -326,7 +326,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               <div key={choice.key ?? index} className={styles.choice}>
                 <div className={styles.choiceHead}>
                   <span className={styles.choiceNo}>{`選択肢 ${index + 1}`}</span>
-                  <Button type="button" variant="text" disabled={question.choices.length <= 1} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を消す`}>消す</Button>
+                  <Button type="button" variant="text" disabled={question.choices.length <= 1} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を消す`}><Trash2 size={14} aria-hidden="true" />消す</Button>
                 </div>
                 <label className={styles.field}>
                   <span className={styles.label}>ボタンの文字（20文字まで）</span>

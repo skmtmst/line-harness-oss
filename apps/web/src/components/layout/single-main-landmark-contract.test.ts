@@ -14,12 +14,22 @@ const ALLOWED = [
   'components/auth/auth-card.tsx',
   'components/ops/ops-shell.tsx',
   'app/global-error.tsx',
+  /* V8 で枠の外に描く画面：運営の外枠・運営のログイン・招待・2要素認証の設定（app-shell が外枠を付けない道）。 */
+  'v8/ops/shell.tsx',
+  'v8/ops/login.tsx',
+  'v8/ops/invite.tsx',
+  'v8/ops/two-factor.tsx',
 ]
-const ALLOWED_DIRS = ['app/login/', 'app/staff/invite/', 'app/staff/email-change/', 'app/visual-qa/']
+const ALLOWED_DIRS = ['app/login/', 'app/staff/invite/', 'app/staff/email-change/', 'app/visual-qa/', 'v8/login/']
+/*
+ * 監査 ROOT-23：V8 の画面は src/v8 に書く。app・components だけを見ると、
+ * V8 の画面が <main> を書いても見張りに掛からない。v8 も同じく見る。
+ */
+const SCAN_DIRS = 'app components v8'
 
 describe('本文の目印は1つだけ', () => {
   it('共通の枠の中で描く画面は <main> を書かない', () => {
-    const files = execSync('grep -rlE "<main[ >]" app components --include=*.tsx || true', { cwd: SRC, encoding: 'utf8' })
+    const files = execSync(`grep -rlE "<main[ >]" ${SCAN_DIRS} --include=*.tsx || true`, { cwd: SRC, encoding: 'utf8' })
       .split('\n')
       .filter(Boolean)
       .filter((f) => !/\.test\.|\.spec\./.test(f))

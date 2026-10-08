@@ -22,6 +22,10 @@
 .heading p { margin-top: var(--space-2); font-size: 12px; color: var(--color-ink-faint); }
 .heading > button { height: auto; padding: 0; font-size: 12px; color: var(--color-action); }
 .stepRail { min-width: 0; flex: 1; }
+/* ★V8 手順（型の共通部品 Steps・Fa8ED / q1xNMz）：題と説明のすぐ下・左寄せ・1行。横いっぱいに広げない。 */
+.header[data-steps-below] { flex-wrap: wrap; row-gap: 0; }
+.header[data-steps-below] > .heading { flex: 1 1 auto; }
+.stepsBelow { order: 3; flex-basis: 100%; min-width: 0; margin-top: var(--space-20); }
 .header :global([data-part='stepper']) { margin: 0; border: 0; border-radius: var(--radius-none); background: transparent; padding: 0; }
 .header :global([data-part='stepper'] li) { flex: 0 1 auto; gap: var(--space-14); }
 .header :global([data-part='stepper'] ol) { gap: var(--space-14); }

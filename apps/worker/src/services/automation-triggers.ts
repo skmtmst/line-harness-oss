@@ -1,3 +1,4 @@
+import { accountFeatureOffExclusionSql } from '@line-crm/db';
 import type { SegmentCondition } from './segment-query.js';
 import { matchesCondition, parseCondition } from './segment-query.js';
 import {
@@ -434,60 +435,66 @@ export async function processScheduledAutomationTriggers(
   const now = new Date(options.now ?? new Date().toISOString());
   if (Number.isNaN(now.getTime())) throw new Error('scheduled_now_invalid');
   const limit = Math.max(1, Math.min(options.limit ?? 100, 500));
-  const candidates = await db.prepare(
-    `SELECT d.id AS automation_id, d.priority, d.line_account_id, v.trigger_type, v.trigger_config, v.condition_config,
-            a.timezone
-       FROM automation_definitions d
-       JOIN automation_versions v
-         ON v.id = d.current_published_version_id
-        AND v.automation_id = d.id AND v.status = 'published'
-       JOIN line_accounts a ON a.id = d.line_account_id AND a.is_active = 1
-      WHERE d.status = 'active' AND v.trigger_type IN ('datetime', 'daily', 'weekly')
-      ORDER BY d.priority DESC, d.created_at ASC
-      LIMIT ?`,
-  ).bind(limit).all<ScheduledCandidate>();
-
   const results: AutomationDispatchItem[] = [];
   let due = 0;
-  for (const candidate of candidates.results ?? []) {
-    if (!SCHEDULE_TRIGGER_TYPES.has(candidate.trigger_type)) continue;
-    // 機能オフ中は起動しない。定義は残るため再オンで再開する。
-    if (candidate.line_account_id && !await featureJobCanRun(db, { accountId: candidate.line_account_id, featureId: 'automations', job: 'automation triggers' })) {
-      continue;
-    }
-    try {
-      const config = parseScheduleConfig(candidate.trigger_config, candidate.trigger_type);
-      const occurrence = dueOccurrence(candidate.trigger_type, config, now, candidate.timezone);
-      if (!occurrence) continue;
-      due += 1;
-      if (results.length + config.friendIds.length > limit) {
+  const pageSize = 100;
+  for (let offset = 0; ; offset += pageSize) {
+    const candidates = await db.prepare(
+      `SELECT d.id AS automation_id, d.priority, d.line_account_id, v.trigger_type, v.trigger_config, v.condition_config,
+              a.timezone
+         FROM automation_definitions d
+         JOIN automation_versions v
+           ON v.id = d.current_published_version_id
+          AND v.automation_id = d.id AND v.status = 'published'
+         JOIN line_accounts a ON a.id = d.line_account_id AND a.is_active = 1
+        WHERE d.status = 'active' AND v.trigger_type IN ('datetime', 'daily', 'weekly')
+          AND NOT ${accountFeatureOffExclusionSql('d.line_account_id', 'automations')}
+        ORDER BY d.priority DESC, d.created_at ASC, d.id ASC
+        LIMIT ? OFFSET ?`,
+    ).bind(pageSize, offset).all<ScheduledCandidate>();
+
+    for (const candidate of candidates.results ?? []) {
+      if (results.length >= limit) break;
+      if (!SCHEDULE_TRIGGER_TYPES.has(candidate.trigger_type)) continue;
+      // 機能オフ中は起動しない。定義は残るため再オンで再開する。
+      if (candidate.line_account_id && !await featureJobCanRun(db, { accountId: candidate.line_account_id, featureId: 'automations', job: 'automation triggers' })) {
+        continue;
+      }
+      try {
+        const config = parseScheduleConfig(candidate.trigger_config, candidate.trigger_type);
+        const occurrence = dueOccurrence(candidate.trigger_type, config, now, candidate.timezone);
+        if (!occurrence) continue;
+        due += 1;
+        if (results.length + config.friendIds.length > limit) {
+          results.push({
+            automationId: candidate.automation_id,
+            runId: null,
+            kind: 'configuration_error',
+            status: 'configuration_error',
+            error: 'scheduled_trigger_capacity_exceeded',
+          });
+          continue;
+        }
+        for (const friendId of config.friendIds) {
+          results.push(await startCandidate(db, candidate, {
+            lineAccountId: candidate.line_account_id,
+            eventType: candidate.trigger_type,
+            sourceEventId: `schedule:${candidate.automation_id}:${occurrence}:${friendId}`,
+            friendId,
+            eventData: { occurrence, timeZone: candidate.timezone },
+          }, { ...options, now: now.toISOString() }));
+        }
+      } catch (error) {
         results.push({
           automationId: candidate.automation_id,
           runId: null,
           kind: 'configuration_error',
           status: 'configuration_error',
-          error: 'scheduled_trigger_capacity_exceeded',
+          error: error instanceof Error ? error.message : String(error),
         });
-        continue;
       }
-      for (const friendId of config.friendIds) {
-        results.push(await startCandidate(db, candidate, {
-          lineAccountId: candidate.line_account_id,
-          eventType: candidate.trigger_type,
-          sourceEventId: `schedule:${candidate.automation_id}:${occurrence}:${friendId}`,
-          friendId,
-          eventData: { occurrence, timeZone: candidate.timezone },
-        }, { ...options, now: now.toISOString() }));
-      }
-    } catch (error) {
-      results.push({
-        automationId: candidate.automation_id,
-        runId: null,
-        kind: 'configuration_error',
-        status: 'configuration_error',
-        error: error instanceof Error ? error.message : String(error),
-      });
     }
+    if (candidates.results.length < pageSize || results.length >= limit) break;
   }
   return { due, results };
 }

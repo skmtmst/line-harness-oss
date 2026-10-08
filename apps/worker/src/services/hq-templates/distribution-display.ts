@@ -6,7 +6,7 @@ export async function targetDistributionVersion(
 ): Promise<HqTemplateTargetVersion> {
   const result = await db.prepare(`SELECT v.version FROM hq_template_distribution_results r
     JOIN hq_template_versions v ON v.id=r.template_version_id AND v.tenant_id=r.tenant_id AND v.template_id=r.template_id
-    WHERE r.tenant_id=? AND r.template_id=? AND r.target_account_id=? AND r.status='succeeded'
+    WHERE r.tenant_id=? AND r.template_id=? AND r.target_account_id=? AND r.status='succeeded' AND NOT EXISTS (SELECT 1 FROM hq_template_preflight_resolutions skipped WHERE skipped.preflight_id=r.preflight_id AND skipped.tenant_id=r.tenant_id AND skipped.friend_attribute_mode='skip')
     ORDER BY r.finished_at DESC,r.started_at DESC,r.rowid DESC LIMIT 1`)
     .bind(tenantId, templateId, accountId).first<{ version: number }>();
   const version = result?.version ?? null;

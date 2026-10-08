@@ -7,9 +7,10 @@
  * 送る前（下書き）・予約中は取り消す（cancel）。下書きは店ごとの確かめを見て、そのまま送れる（send）。
  * 送った LINE は取り消せない。動きは BEHAVIOR.md。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Ban, CirclePause, Copy, Download, PencilLine, RotateCcw, Send } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Ban, Check, CirclePause, Copy, Download, PencilLine, RotateCcw, Send } from 'lucide-react'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
@@ -293,11 +294,64 @@ function ActivityTab({ run, names }: { run: HqBroadcastRun; names: Map<string, s
   )
 }
 
+/**
+ * 送るまでの段（店の配信の詳細と同じ帯・絵 M2tJM）。下書き →（承認待ち）→（予約済み）→ 送信中 → 送信済み。
+ * 承認が絡まない・予約しない一括配信はその段を省く。分かれ道（一部失敗・失敗あり・止めた・取り消した）は札で添える。
+ * 承認の状態は下書きのあいだだけ読める（送ったあとは口に無い）ので、送ったあとは承認の段を出さない。
+ */
+function HqDeliveryRail({ run, approvalPending }: { run: HqBroadcastRun; approvalPending: boolean }) {
+  const live = run.targets.filter((t) => !t.excluded)
+  const scheduled = run.scheduledAt != null
+  const steps: Array<{ key: string; label: string }> = [
+    { key: 'draft', label: '下書き' },
+    ...(approvalPending ? [{ key: 'approval', label: '承認待ち' }] : []),
+    ...(scheduled ? [{ key: 'scheduled', label: '予約済み' }] : []),
+    { key: 'sending', label: '送信中' },
+    { key: 'sent', label: '送信済み' },
+  ]
+  const badge = runBadge(run)
+  const current = run.status === 'prepared' ? (approvalPending ? 'approval' : 'draft')
+    : run.status === 'cancelled' ? 'draft'
+    : live.length > 0 && live.every((t) => t.status === 'sent' || t.status === 'failed') ? 'sent'
+    : live.some((t) => t.status === 'sending' || t.status === 'sent') || run.status === 'stopped' ? 'sending'
+    : scheduled ? 'scheduled' : 'sending'
+  const currentIndex = Math.max(0, steps.findIndex((step) => step.key === current))
+  const branch = ['一部失敗', '失敗あり', '止めた', '取り消した'].includes(badge.label) ? badge : null
+  return (
+    <ol className={detailStyles.rail} aria-label="配信の状態">
+      {steps.map((step, index) => {
+        const state = index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'todo'
+        return (
+          <li key={step.key} className={detailStyles.railItem} data-state={state} data-kind="delivery">
+            {index > 0 ? <span className={detailStyles.railLine} data-done={index <= currentIndex || undefined} aria-hidden="true" /> : null}
+            <span className={detailStyles.railStep}>
+              <span className={detailStyles.railMark} aria-hidden="true">{state === 'done' ? <Check size={11} strokeWidth={3} /> : null}</span>
+              <span className={detailStyles.railLabel} aria-current={state === 'current' ? 'step' : undefined}>{step.label}</span>
+            </span>
+          </li>
+        )
+      })}
+      {branch ? (
+        <li className={detailStyles.railItem}>
+          <span className={detailStyles.railLine} aria-hidden="true" />
+          <span className={detailStyles.badge} data-tone={branch.tone === 'danger' ? 'danger' : branch.tone === 'warning' ? 'warning' : 'neutral'}>{branch.label}</span>
+        </li>
+      ) : null}
+    </ol>
+  )
+}
+
+/** 送り方（店の配信の詳細と同じ言葉）。分けて送る分数が入っていれば、その分数。 */
+export function deliveryWayText(input: Pick<HqBroadcastRun['input'], 'stealthSpreadMinutes'> | null | undefined, sent: boolean): string {
+  const minutes = input?.stealthSpreadMinutes ?? 0
+  if (minutes > 0) return `${minutes}分かけて分けて送る`
+  return sent ? 'すぐに全員へ（分けて送らない）' : 'すぐに全員へ'
+}
+
 export default function HqBroadcastDetail() {
-  usePageTitle('一括配信の詳細')
   usePageCrumbs([{ label: '一括配信', href: '/hq/broadcasts' }])
   const params = useSearchParams()
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const id = params.get('id') ?? ''
   /* タブは ?tab=（店の配信の詳細と同じ。履歴を積まない）。 */
   const tabParam = params.get('tab')
@@ -306,7 +360,7 @@ export default function HqBroadcastDetail() {
     setTab(next)
     const q = new URLSearchParams(params.toString())
     if (next === 'overview') q.delete('tab'); else q.set('tab', next)
-    router.replace(`/hq/broadcasts/detail?${q.toString()}`, { scroll: false })
+    samePageUrl.replace(`/hq/broadcasts/detail?${q.toString()}`)
   }
   const role = useStaffRole()
   const canManage = role === null || canManageRole(role)
@@ -331,6 +385,8 @@ export default function HqBroadcastDetail() {
   }, [id])
   useEffect(() => { void load() }, [load])
   const approval = useHqApproval(run)
+  /* 上の帯は「一括配信 › 配信名」、画面名は配信名だけ（店の配信の詳細と同じ・絵 M2tJM）。 */
+  usePageTitle(run ? run.title : '一括配信の詳細')
   const gate = approvalGate(approval.state)
   const names = new Map(approval.candidates.map((person) => [person.id, person.name]))
 
@@ -451,6 +507,7 @@ export default function HqBroadcastDetail() {
               {badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : null}
             </div>
             {run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : null}
+            {run ? <HqDeliveryRail run={run} approvalPending={approval.state?.approval.status === 'pending'} /> : null}
           </div>
           {run ? (
             <div className={detailStyles.actions}>
@@ -543,6 +600,7 @@ export default function HqBroadcastDetail() {
                 ['送るアカウント', `${n(sentTo.length)}アカウント${skipped ? `（外した ${n(skipped)}）` : ''}`],
                 ['対象', `${audience} ${n(people)}人`],
                 [run?.status === 'prepared' ? '送る日時' : '送った日時', run?.scheduledAt ? jpDateTime(run.scheduledAt) : 'すぐ送る'],
+                ['送り方', deliveryWayText(run?.input, run?.status !== 'prepared')],
                 ['メッセージ', messageText],
               ].map(([label, value]) => (
                 <div key={label} className={detailStyles.row}><dt>{label}</dt><dd title={value}>{value}</dd></div>

@@ -48,6 +48,12 @@ export interface AvailabilityResponse {
       remaining?: number;
       /** 枠の状態（Worker が付ける。'full' は埋まった枠）。 */
       state?: 'available' | 'limited' | 'full' | 'closed';
+      /** 店のタイムゾーン名（date・start はこの zone の暦日・壁時刻）。 */
+      timeZone?: string;
+      /** 開始の瞬間（offset 付き ISO）。予約・待ちの登録はこれを送る。 */
+      startUtc?: string;
+      /** 終了の瞬間（offset 付き ISO）。 */
+      endUtc?: string;
     }>;
   }>;
   /** 休みの日（お店・担当が閉めている日）。カレンダーの「休」の印に使う。 */

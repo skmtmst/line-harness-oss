@@ -120,7 +120,7 @@ export async function issueHandoverCode(
   const existing = await db
     .prepare(
       `SELECT * FROM account_handovers
-        WHERE from_account_id = ? AND status = 'code_issued' AND code_expires_at > ?
+        WHERE from_account_id = ? AND status = 'code_issued' AND julianday(code_expires_at) > julianday(?)
         ORDER BY created_at DESC LIMIT 1`,
     )
     .bind(input.fromAccountId, jstNow())
@@ -160,19 +160,22 @@ export async function linkHandover(
   const handover = await getHandoverByCode(db, input.code);
   if (!handover) return { ok: false, error: 'そのコードはありません' };
   if (handover.status !== 'code_issued') return { ok: false, error: 'そのコードはもう使われています' };
-  if (handover.code_expires_at <= jstNow()) return { ok: false, error: 'そのコードは期限が切れています' };
+  if (!Number.isFinite(Date.parse(handover.code_expires_at)) || Date.parse(handover.code_expires_at) <= Date.parse(jstNow())) return { ok: false, error: 'そのコードは期限が切れています' };
   if (handover.from_account_id === input.toAccountId) {
     return { ok: false, error: '同じアカウントへは引き継げません' };
   }
   const now = jstNow();
-  await db
+  const result = await db
     .prepare(
       `UPDATE account_handovers
           SET to_account_id = ?, provider_match = ?, status = 'linked', linked_at = ?
-        WHERE id = ?`,
+        WHERE id = ? AND status = 'code_issued' AND julianday(code_expires_at) > julianday(?)`,
     )
-    .bind(input.toAccountId, input.providerMatch, now, handover.id)
+    .bind(input.toAccountId, input.providerMatch, now, handover.id, now)
     .run();
+  if (Number(result.meta?.changes ?? 0) !== 1) {
+    return { ok: false, error: 'そのコードは期限切れ、または既に使われています' };
+  }
   return { ok: true, handover: (await getHandoverById(db, handover.id))! };
 }
 

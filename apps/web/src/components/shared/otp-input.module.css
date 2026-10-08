@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * 認証コード入力（6マス）。Pencil ★V7 `xHzFK`、1マスは `ENP7x`。
+ * 認証コード入力（6マス）。Pencil ★V8 `RfHCo`「OTP入力」・`cMbie`「OTP入力/できた」。
  *
  *   1マス  48×56  角丸 $radius-sm(8)  枠 1px $hairline  地 $canvas
  *   数字   22px 太字 $ink

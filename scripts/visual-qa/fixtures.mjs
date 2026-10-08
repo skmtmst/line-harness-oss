@@ -2540,7 +2540,7 @@ export const FRIEND_MESSAGES = {
     },
     {
       id: 'msg-k2', friendId: 'friend-0', direction: 'outgoing', messageType: 'text',
-      content: 'お問い合わせありがとうございます。秋の新商品は 10月4日から発送します。定期便への追加は、このトークで『追加』と送っていただくだけで大丈夫です。', createdAt: '2026-08-19T01:20:00.000Z',
+      content: 'お問い合わせありがとうございます。秋の新商品は\n10月4日から発送します。定期便への追加は、このトークで『追加』と送っていただくだけで大丈夫です。', createdAt: '2026-08-19T01:20:00.000Z',
       broadcastId: null, scenarioStepId: null, source: 'manual', scenarioName: null, sentByStaffName: 'Kenta',
     },
     {
@@ -2635,6 +2635,8 @@ export const FRIEND_DETAILS = {
    */
   'friend-0': {
     id: 'friend-0',
+    // 実口 GET /api/friends/:id と同じく所属アカウントを返す。無いと受信箱が「別アカウントの相手」と判断して会話を開かない(#673)。
+    lineAccountId: 'visual-qa-account',
     displayName: 'Kyohei Yamamoto',
     systemDisplayName: 'Kyohei Yamamoto',
     realName: '山本 恭平',
@@ -2651,6 +2653,8 @@ export const FRIEND_DETAILS = {
   },
   'friend-1': {
     id: 'friend-1',
+    // 実口 GET /api/friends/:id と同じく所属アカウントを返す。無いと受信箱が「別アカウントの相手」と判断して会話を開かない(#673)。
+    lineAccountId: 'visual-qa-account',
     displayName: 'Kenta Kawano (Obama)',
     systemDisplayName: 'Kenta Kawano (Obama)',
     realName: '河野 健太',

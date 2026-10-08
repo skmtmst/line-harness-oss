@@ -1249,6 +1249,7 @@ async function handleEvent(
         const tapResult = await handleRichMenuTap(db, lineClient, friend, tap.areaId, {
           lineAccountId,
           replyToken: postbackReplyToken,
+          sourceEventId: event.webhookEventId,
         });
         if (tapResult.replyTokenConsumed) postbackReplyToken = undefined;
         tapLabel = tapResult.target?.label ?? null;

@@ -33,11 +33,12 @@
 }
 
 /* 数の帯：上の線はタブの線が持つ（二重にしない）。 */
-:global([data-theme='v8']) .kpiBand[data-kpi-strip][data-kpi-presentation='band'] { border-top: 0; }
+:global([data-theme='v8']) .kpiBand[data-kpi-strip][data-kpi-presentation='band'] { border-block-width: 0; }
 
 .delta {
   display: inline-flex;
   align-items: center;
+  gap: var(--tpl-fr-tag-gap);
   padding: var(--tpl-fr-delta-pad);
   border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
@@ -288,6 +289,7 @@ button.star:hover { background: var(--color-status-warn-soft); color: var(--colo
 
 .tag {
   min-width: 0;
+  max-width: var(--tpl-fr-tag-max);
   overflow: hidden;
   padding: var(--tpl-fr-tag-pad);
   border-radius: var(--radius-mini);
@@ -338,3 +340,16 @@ button.star:hover { background: var(--color-status-warn-soft); color: var(--colo
 }
 
 .bulkWrap { display: block; }
+
+/* 数の帯の「…」（絵：題の右端・16px）。 */
+.kpiMenu { display: inline-flex; align-items: center; height: var(--tpl-nph-kpi-menu); }
+:global([data-theme='v8']) .kpiMenu > .kpiMenuButton {
+  width: var(--tpl-nph-kpi-menu);
+  height: var(--tpl-nph-kpi-menu);
+  min-height: 0;
+  flex-basis: var(--tpl-nph-kpi-menu);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+:global([data-theme='v8']) .kpiMenu > .kpiMenuButton:not(:focus-visible) { outline-color: transparent; }

@@ -70,17 +70,23 @@ export class GoogleCalendarClient {
       body: JSON.stringify(body),
     });
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`Google FreeBusy API error ${res.status}: ${text}`);
-    }
-
-    const data = (await res.json()) as {
-      calendars?: Record<string, { busy?: { start: string; end: string }[] }>;
-    };
-
-    const calendarData = data.calendars?.[this.config.calendarId];
-    return calendarData?.busy ?? [];
+    if (!res.ok) throw new GoogleCalendarReadError(res.status);
+    const data = await res.json().catch(() => { throw new GoogleCalendarReadError(502); }) as {
+      calendars?: Record<string, { errors?: unknown; busy?: unknown }>;
+    } | null;
+    const calendar = data?.calendars?.[this.config.calendarId];
+    // HTTP200でもカレンダー単位の失敗がある。未取得を「予定なし」にしない。
+    if (!calendar || (calendar.errors !== undefined
+      && (!Array.isArray(calendar.errors) || calendar.errors.length > 0))
+      || !Array.isArray(calendar.busy)) throw new GoogleCalendarReadError(502);
+    return calendar.busy.map((interval: unknown) => {
+      if (!interval || typeof interval !== 'object') throw new GoogleCalendarReadError(502);
+      const { start, end } = interval as Partial<BusyInterval>;
+      if (typeof start !== 'string' || typeof end !== 'string'
+        || !Number.isFinite(Date.parse(start)) || !Number.isFinite(Date.parse(end))
+        || Date.parse(end) <= Date.parse(start)) throw new GoogleCalendarReadError(502);
+      return { start, end };
+    });
   }
 
   /**

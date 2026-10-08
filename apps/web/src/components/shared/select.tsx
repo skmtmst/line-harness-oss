@@ -108,6 +108,8 @@ export default function Select({
   const [open, setOpen] = useState(defaultOpen)
   // 'create' は「＋ 〇〇」を押した後（同じ板で名前を入れている）。閉じたら一覧へ戻す。
   const [mode, setMode] = useState<'list' | 'create'>('list')
+  // 作る板の回。閉じる・一覧へ戻る・ほかを選ぶ・作り直すで進め、古い回の遅い応答に今の選択を上書きさせない。
+  const createSessionRef = useRef(0)
   const menuRef = useRef<HTMLDivElement>(null)
   const enabledOptions = options.filter((option) => !option.disabled)
   const selectedIndex = Math.max(0, enabledOptions.findIndex((option) => option.value === value))
@@ -184,24 +186,38 @@ export default function Select({
   }, [disabled])
 
   useEffect(() => {
-    if (!open) setMode('list')
+    if (open) return
+    createSessionRef.current += 1
+    setMode('list')
   }, [open])
 
   const hasCreate = Boolean(createAction) && v8
   // キーボードで動く行の数。「＋ 〇〇」は使える候補の後ろの1行。
   const rowCount = enabledOptions.length + (hasCreate ? 1 : 0)
   const createActive = hasCreate && activeIndex === enabledOptions.length
-  const startCreate = () => setMode('create')
+  const startCreate = () => {
+    createSessionRef.current += 1
+    setMode('create')
+  }
   const backToList = () => {
+    createSessionRef.current += 1
     // 焦点を先にボタンへ戻す（入力欄が消えて焦点が迷子になり閉じるのを防ぐ）。
     triggerRef.current?.focus()
     setMode('list')
   }
-  const finishCreate = (next: string) => {
-    onChange(next)
-    triggerRef.current?.focus()
-    setOpen(false)
-  }
+  // 板に渡す受け口は、その回の番号を覚える。回が終わった後に届いた完了は選ばず・焦点も動かさず・閉じない。
+  const createContext = (session: number): SelectCreateContext => ({
+    back: () => {
+      if (session === createSessionRef.current) backToList()
+    },
+    finish: (next: string) => {
+      if (session !== createSessionRef.current) return
+      createSessionRef.current += 1
+      onChange(next)
+      triggerRef.current?.focus()
+      setOpen(false)
+    },
+  })
 
   useEffect(() => {
     setActiveIndex(selectedIndex)
@@ -209,6 +225,7 @@ export default function Select({
 
   const choose = (option: SelectOption) => {
     if (option.disabled) return
+    createSessionRef.current += 1
     onChange(option.value)
     setOpen(false)
   }
@@ -313,7 +330,7 @@ export default function Select({
             if (!next || menuRef.current?.contains(next) || rootRef.current?.contains(next)) return
             setOpen(false)
           }}
-          panel={hasCreate && mode === 'create' && createAction ? createAction.render({ back: backToList, finish: finishCreate }) : undefined}
+          panel={hasCreate && mode === 'create' && createAction ? createAction.render(createContext(createSessionRef.current)) : undefined}
           footer={hasCreate && createAction ? (
             <SelectMenuAction
               label={createAction.label}

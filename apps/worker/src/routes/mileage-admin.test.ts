@@ -544,6 +544,14 @@ describe('mileage admin API', () => {
     expect(dbMocks.getMileageAdminHistory).not.toHaveBeenCalled();
   });
 
+  it('WEB074 forwards multiple types before pagination and rejects invalid types', async () => {
+    dbMocks.getMileageAdminHistory.mockResolvedValue({ items: [], pagination: { total: 4, limit: 2, offset: 2 } });
+    const response = await call('/api/mileage/history?accountId=account-1&entryTypes=spend,reversal&limit=2&offset=2');
+    expect(response.status).toBe(200);
+    expect(dbMocks.getMileageAdminHistory).toHaveBeenCalledWith(env.DB, expect.objectContaining({ entryTypes: ['spend','reversal'], limit: 2, offset: 2 }));
+    expect((await call('/api/mileage/history?accountId=account-1&entryTypes=spend,bogus')).status).toBe(400);
+  });
+
   it('returns filtered mileage history with bounded pagination', async () => {
     dbMocks.getMileageAdminHistory.mockResolvedValue({
       items: [], pagination: { total: 0, limit: 100, offset: 0 },

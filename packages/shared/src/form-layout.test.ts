@@ -758,3 +758,27 @@ describe("文字と背景のコントラスト（P）", () => {
     expect(validateFormForPublish(layout)).toBeNull();
   });
 });
+
+test('チェックボックスの上限0は制限なしとして公開・回答の両方で扱う', () => {
+  const question = input({ name: 'selected', label: '選択', type: 'checkbox', required: true,
+    choices: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], selectionLimit: { min: 1, max: 0 } });
+  const layout = emptyLayout();
+  layout.sections[0]!.blocks = [question];
+  expect(validateFormForPublish(layout)).toBeNull();
+  expect(validateAnswers(layout, { selected: ['A', 'B'] })).toBeNull();
+});
+
+test('分岐で通らなかったセクションの必須欄は要求しない', () => {
+  const layout = emptyLayout();
+  layout.header = [input({ name: 'header', required: true })];
+  layout.sections = [
+    { id: 'first', name: 'First', blocks: [input({ name: 'branch', type: 'radio', required: true,
+      choices: [{ id: 'skip', label: 'skip', jumpToSectionId: 'last' }, { id: 'all', label: 'all' }] })] },
+    { id: 'middle', name: 'Middle', blocks: [input({ name: 'skipped', required: true })] },
+    { id: 'last', name: 'Last', blocks: [input({ name: 'final', required: true })] },
+  ];
+  expect(validateAnswers(layout, { header: 'header', branch: 'skip', final: 'done' })).toBeNull();
+  expect(validateAnswers(layout, { header: 'header', branch: 'all', final: 'done' })).toContain('skipped');
+  expect(validateAnswers(layout, { branch: 'skip', final: 'done' })).toContain('header');
+  expect(validateAnswers(layout, { header: 'header', branch: 'skip' })).toContain('final');
+});

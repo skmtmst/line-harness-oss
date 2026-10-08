@@ -1,3 +1,5 @@
+import { accountFeatureOffExclusionSql } from './account-settings.js';
+
 export const ANALYTICS_REPORT_SECTIONS = [
   'friends', 'reactions', 'routes', 'usage', 'mileage',
 ] as const;
@@ -222,7 +224,8 @@ export async function claimDueAnalyticsReportSchedules(db: D1Database, now: stri
   const rows = await db.prepare(
     `SELECT * FROM analytics_report_schedules
       WHERE status = 'active' AND next_run_at <= ?
-      ORDER BY next_run_at ASC LIMIT ?`,
+        AND NOT ${accountFeatureOffExclusionSql('analytics_report_schedules.line_account_id', 'analytics')}
+      ORDER BY next_run_at ASC, id ASC LIMIT ?`,
   ).bind(now, limit).all<ScheduleRow>();
   return rows.results.map(serialize);
 }

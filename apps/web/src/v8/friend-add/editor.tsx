@@ -12,6 +12,7 @@
  * （口・版・下書き・冪等の鍵の扱いを変えない）。違うのは見せ方と、先に保存された
  * ときの帯（違いを比べる・最新を読み込んで続ける）。BEHAVIOR.md に書き出した。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -39,8 +40,9 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
-import Stepper, { type StepperStep } from '@/components/shared/stepper'
+import type { StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import CheckCard from '@/components/shared/check-card'
@@ -194,6 +196,7 @@ export default function FriendAddEditorV8({ ruleId }: { ruleId?: string }) {
 
 function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
@@ -385,7 +388,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       savedSnapshot.current = editorSnapshot(rule, definition)
       setConflict(false)
       setNotice('下書きを保存しました。')
-      if (!ruleId || nextStep) router.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
+      if (!ruleId || nextStep) samePageUrl.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {
@@ -436,7 +439,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const moveToStep = (nextStep: Step) => {
     if (nextStep === step || saving || enabling) return
     if (!hasUnsavedChanges) {
-      router.replace(hrefFor(nextStep))
+      samePageUrl.replace(hrefFor(nextStep))
       return
     }
     void save(nextStep)
@@ -626,7 +629,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       identity={
         <Link href="/friend-add-settings" className={styles.backLink}>← 友だち追加時の配信へ</Link>
       }
-      steps={<Stepper label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
+      steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
       description={<>
         {step === 'basic'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'

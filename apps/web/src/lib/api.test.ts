@@ -1202,7 +1202,7 @@ describe('機能オフの403契約', () => {
       status: 403,
       code: 'FEATURE_DISABLED',
     })
-    expect(detail).toEqual({ featureId: 'webinars' })
+    expect(detail).toEqual({ featureId: 'webinars', accountId: null })
   })
 
   it('補助データの呼び出しでは suppressFeatureDisabledEvent で案内を出さず、エラー自体は返す(#860)', async () => {
@@ -1880,4 +1880,74 @@ describe('一斉配信動画の直接アップロード',()=>{
 it('休業の409から画面が重なる記録の名前・日付をdataとして取得する',()=>{
  const data={conflicts:[{id:'closure',name:'設備点検',startDate:'2026-11-10',endDate:'2026-11-11'}]};const raw=JSON.stringify({success:false,error:'休業・貸切が重なっています',code:'closure_overlap',data});
  expect(extractApiErrorCode(raw)).toBe('closure_overlap');expect(extractApiErrorData(raw)).toEqual(data);expect(extractApiErrorMessage(raw,409)).toBe('休業・貸切が重なっています');
+});
+
+describe('件数・課金見積りの呼び出し', () => {
+  it('件数は一覧の全件取得をせず、各集計口だけを呼ぶ', async () => {
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ success: true, data: {} })));
+    vi.stubGlobal('fetch', fetchSpy);
+    await api.automations.counts('account/a');
+    await api.media.counts('account/a');
+    await api.conversionApprovals.counts();
+    await api.hqBilling.preview('standard', 'year');
+    expect(fetchSpy.mock.calls.map(args => args[0])).toEqual([
+      'https://worker.example.com/api/automations/counts?account_id=account%2Fa',
+      'https://worker.example.com/api/media/counts?accountId=account%2Fa',
+      'https://worker.example.com/api/conversions/approvals/counts',
+      'https://worker.example.com/api/hq/billing/preview?planKey=standard&interval=year',
+    ]);
+  });
+});
+
+describe('応答の合図は呼出元のアカウントを保持する', () => {
+  function listen(name: string) {
+    const target = new EventTarget();
+    const details: unknown[] = [];
+    target.addEventListener(name, event => details.push((event as CustomEvent).detail));
+    vi.stubGlobal('window', target);
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: vi.fn(), removeItem: vi.fn() });
+    vi.stubGlobal('sessionStorage', { getItem: () => null, setItem: vi.fn(), removeItem: vi.fn() });
+    return details;
+  }
+  function featureOff() {
+    return new Response(JSON.stringify({ code: 'FEATURE_DISABLED', featureId: 'webinars', accountId: 'wrong-response-account' }), { status: 403 });
+  }
+  it('遅れて届いたAの403を、先に切り替えたBの返事として通知しない', async () => {
+    const details = listen('lh-feature-disabled');
+    let finishA!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn((url: string) => url.includes('accountId=a')
+      ? new Promise<Response>(resolve => { finishA = resolve; }) : Promise.resolve(featureOff())));
+    const first = fetchApi('/api/webinars?accountId=a').catch(error => error);
+    await expect(fetchApi('/api/webinars?accountId=b')).rejects.toMatchObject({ status: 403 });
+    finishA(featureOff());
+    await first;
+    expect(details).toEqual([
+      { featureId: 'webinars', accountId: 'b' }, { featureId: 'webinars', accountId: 'a' },
+    ]);
+  });
+  it('本文・ヘッダ・明示オプションから対象を取り、本文や秘密値を合図に載せない', async () => {
+    const details = listen('lh-session-lost');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 401 })));
+    for (const options of [
+      { method: 'POST', body: JSON.stringify({ lineAccountId: 'body-account', secret: 'private-value' }) },
+      { headers: { 'X-Line-Account-Id': 'header-account' } },
+      { accountId: 'explicit-account' },
+      { method: 'POST', body: JSON.stringify({ accountIds: ['a', 'b'] }) },
+    ]) await expect(fetchApi('/api/resource', options)).rejects.toMatchObject({ status: 401 });
+    expect(details).toEqual([
+      { accountId: 'body-account' }, { accountId: 'header-account' }, { accountId: 'explicit-account' },
+      { accountId: null, accountIds: ['a', 'b'] },
+    ]);
+    expect(JSON.stringify(details)).not.toContain('private-value');
+  });
+  it('Blobとファイル保存も同じ機能オフの合図を渡す', async () => {
+    const details = listen('lh-feature-disabled');
+    vi.stubGlobal('fetch', vi.fn(async () => featureOff()));
+    const { fetchApiBlob } = await import('./api');
+    await expect(fetchApiBlob('/api/media/file?account_id=a')).rejects.toMatchObject({ status: 403 });
+    await expect(downloadApiFile('/api/media/export?lineAccountId=b', 'file.csv')).rejects.toMatchObject({ status: 403 });
+    expect(details).toEqual([
+      { featureId: 'webinars', accountId: 'a' }, { featureId: 'webinars', accountId: 'b' },
+    ]);
+  });
 });
