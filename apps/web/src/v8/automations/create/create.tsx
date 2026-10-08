@@ -10,7 +10,6 @@ import {
   api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail,
   type AutomationDraftDetail,
 } from '@/lib/api'
-import Link from 'next/link'
 import {
   ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, FilePen, MessageCircle, Pencil, Play,
   RefreshCw, Tag as TagIcon, Trash2, TriangleAlert, UserPlus, UserRound, Zap,
@@ -26,7 +25,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
-import { RequiredBadge } from '@/components/shared/form-controls'
+import { Field, RequiredBadge } from '@/components/shared/form-controls'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 /*
@@ -804,6 +803,17 @@ export function NewAutomationV8({
   const [preparingTest, setPreparingTest] = useState(false)
   const [testConfirmation, setTestConfirmation] = useState<TestConfirmation | null>(null)
   const [error, setError] = useState('')
+  const [inputError, setInputError] = useState<{ target: string; message: string } | null>(null)
+
+  useEffect(() => {
+    if (!inputError) return
+    const frame = window.requestAnimationFrame(() => {
+      const control = document.getElementById(inputError.target)
+      control?.focus()
+      control?.scrollIntoView?.({ block: 'center' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [inputError])
   const [notice, setNotice] = useState('')
   const [existingAutomations, setExistingAutomations] = useState<Automation[]>([])
   /*
@@ -1051,6 +1061,7 @@ export function NewAutomationV8({
 
     accountSwitchPendingRef.current = true
     setError('')
+    setInputError(null)
     setTestConfirmation(null)
 
     const snapshot = captureFormSnapshot()
@@ -1440,34 +1451,45 @@ export function NewAutomationV8({
   const normalizedTriggerConfig = () =>
     normalizeTriggerConfigFor(draftEventType, triggerConfig, keyword)
 
-  const updateAction = (key: number, patch: Partial<ActionDraft>) =>
+  const updateAction = (key: number, patch: Partial<ActionDraft>) => {
+    setInputError(null)
     setActions((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)))
+  }
+
+  useEffect(() => { setInputError(null) }, [eventType, triggerConfig])
 
   const validate = (): string | null => {
-    if (!name.trim()) return 'ルール名を入力してください'
+    setError('')
+    setInputError(null)
+    const invalid = (target: string, message: string, actionKey?: number) => {
+      if (actionKey !== undefined) setEditingActionKey(actionKey)
+      setInputError({ target, message })
+      return message
+    }
+    if (!name.trim()) return invalid('v8-rule-name', 'ルール名を入力してください')
     /*
      * 古い形で保存された条件を読めなかった下書きは、付け直すまで保存させない。
      * そのまま保存すると、読めなかった条件が黙って消えて全員へ届くルールに
      * 変わってしまう（AUTOMATION-04）。
      */
     if (conditionUnreadable) {
-      return '保存されていた「だれに」の条件を付け直してください（読めない古い形のままでは保存できません）'
+      return invalid('v8-repair-condition', '保存されていた「だれに」の条件を付け直してください（読めない古い形のままでは保存できません）')
     }
     // 時刻・日時のきっかけは対象の友だちが必須（サーバの検証と同じ条件）。
-    if (eventType === 'datetime' && !String(triggerConfig.at ?? '').trim()) return '実行日時を入力してください'
-    if ((eventType === 'daily' || eventType === 'weekly') && !String(triggerConfig.time ?? '').trim()) return '実行時刻を入力してください'
-    if (eventType === 'weekly' && normalizeWeekdays(triggerConfig.weekdays).length === 0) return '曜日を1つ以上選んでください'
+    if (eventType === 'datetime' && !String(triggerConfig.at ?? '').trim()) return invalid('v8-trigger-at', '実行日時を入力してください')
+    if ((eventType === 'daily' || eventType === 'weekly') && !String(triggerConfig.time ?? '').trim()) return invalid('v8-trigger-time', '実行時刻を入力してください')
+    if (eventType === 'weekly' && normalizeWeekdays(triggerConfig.weekdays).length === 0) return invalid('au-weekday-first', '曜日を1つ以上選んでください')
     if ((eventType === 'datetime' || eventType === 'daily' || eventType === 'weekly')
-      && normalizeFriendIds(triggerConfig.friendIds).length === 0) return '対象の友だちを選んでください'
-    if (actions.length === 0) return 'することを1つ以上決めてください'
+      && normalizeFriendIds(triggerConfig.friendIds).length === 0) return invalid('au-friend-search', '対象の友だちを選んでください')
+    if (actions.length === 0) return invalid('v8-add-action', 'することを1つ以上決めてください')
     for (const row of actions) {
-      if (row.type === 'add_tag' && !row.tagId) return '付けるタグを選んでください'
-      if (row.type === 'start_scenario' && !row.scenarioId) return '始めるシナリオを選んでください'
-      if (row.type === 'common_action' && !row.commonActionId) return '使う共通アクションを選んでください'
-      if (row.type === 'send_message' && !row.message.trim()) return '送る文面を入力してください'
+      if (row.type === 'add_tag' && !row.tagId) return invalid(`v8-tag-${row.key}`, '付けるタグを選んでください', row.key)
+      if (row.type === 'start_scenario' && !row.scenarioId) return invalid(`v8-scenario-${row.key}`, '始めるシナリオを選んでください', row.key)
+      if (row.type === 'common_action' && !row.commonActionId) return invalid(`v8-common-action-${row.key}`, '使う共通アクションを選んでください', row.key)
+      if (row.type === 'send_message' && !row.message.trim()) return invalid(`v8-message-${row.key}`, '送る文面を入力してください', row.key)
       if (row.type === 'notify_staff'
         && (!String(row.kept?.notificationRuleId ?? '').trim() || !String(row.kept?.message ?? '').trim())) {
-        return '担当へ知らせる中身が読めません。することを選び直してください'
+        return invalid(`v8-action-${row.key}`, '担当へ知らせる中身が読めません。することを選び直してください', row.key)
       }
     }
     return null
@@ -1677,7 +1699,6 @@ export function NewAutomationV8({
     setConflict(null)
     const invalid = validate()
     if (invalid) {
-      setError(invalid)
       setNotice('')
       return
     }
@@ -2455,7 +2476,6 @@ export function NewAutomationV8({
     <CreatePage
       boardId={conflict ? 'tJqST' : isDraft ? 'J1VA8' : 'M4torY'}
       title={isDraft ? '下書きを仕上げる' : 'ルールを作る'}
-      identity={<Link href={backHref} className={styles.backLink}>{isDraft ? '← 見本へ' : '← オートメーションへ'}</Link>}
       /* 見本の帯（J1VA8）は頭の中、説明のすぐ下（絵では頭の線より上）。 */
       description={isDraft
         ? (
@@ -2488,7 +2508,6 @@ export function NewAutomationV8({
                   onClick={() => {
                     const invalid = validate()
                     if (invalid) {
-                      setError(invalid)
                       setNotice('')
                       return
                     }
@@ -2525,16 +2544,15 @@ export function NewAutomationV8({
           <h2 className={styles.cardTitle}>{isDraft ? '1. どのルールか' : '名前'}</h2>
           <p className={styles.cardDesc}>一覧で見分けるための名前。お客さまには見えません</p>
         </div>
-        <label className={styles.field} htmlFor="v8-rule-name">
-          <span className={styles.label}>{isDraft ? 'ルール名' : '名前'}</span>
+        <Field label={isDraft ? 'ルール名' : '名前'} htmlFor="v8-rule-name" error={inputError?.target === 'v8-rule-name' ? inputError.message : undefined}>
           <TextField
             id="v8-rule-name"
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => { setName(event.target.value); if (inputError?.target === 'v8-rule-name') setInputError(null) }}
             placeholder="例：「予約」と送られたら担当へ知らせる"
             maxLength={120}
           />
-        </label>
+        </Field>
       </Card>
 
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="どんなときに動かしますか">
@@ -2601,24 +2619,27 @@ export function NewAutomationV8({
               {eventType === 'calendar_booked' ? <Select aria-label="予約の種類" value={String(triggerConfig.bookingType ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, bookingType: value })} options={[{ value: '', label: 'すべての予約' }, { value: 'salon', label: 'サロン予約' }, { value: 'event', label: 'イベント予約' }]} size="full" /> : null}
               {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <TextField aria-label="予約メニュー" placeholder="メニューID（空欄ならすべて）" value={String(triggerConfig.menuId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, menuId: e.target.value })} /> : null}
               {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <TextField aria-label="対象イベント" placeholder="イベントID（空欄ならすべて）" value={String(triggerConfig.eventId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, eventId: e.target.value })} /> : null}
-              {eventType === 'datetime' ? <DateTimeField aria-label="実行日時" value={String(triggerConfig.at ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, at: v })} /> : null}
+              {eventType === 'datetime' ? <DateTimeField id="v8-trigger-at" invalid={inputError?.target === 'v8-trigger-at'} aria-describedby={inputError?.target === 'v8-trigger-at' ? 'v8-trigger-error' : undefined} aria-label="実行日時" value={String(triggerConfig.at ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, at: v })} /> : null}
               {eventType === 'weekly' ? (
                 <WeekdaySelect
                   value={triggerConfig.weekdays as ReadonlyArray<number>}
+                  error={inputError?.target === 'au-weekday-first' ? inputError.message : undefined}
                   time={String(triggerConfig.time ?? '')}
                   onChange={(days) => setTriggerConfig({ ...triggerConfig, weekdays: days })}
                 />
               ) : null}
-              {eventType === 'daily' || eventType === 'weekly' ? <TimeField aria-label="実行時刻" step={300} value={String(triggerConfig.time ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, time: v })} /> : null}
+              {eventType === 'daily' || eventType === 'weekly' ? <TimeField id="v8-trigger-time" invalid={inputError?.target === 'v8-trigger-time'} aria-describedby={inputError?.target === 'v8-trigger-time' ? 'v8-trigger-error' : undefined} aria-label="実行時刻" step={300} value={String(triggerConfig.time ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, time: v })} /> : null}
               {eventType === 'datetime' || eventType === 'daily' || eventType === 'weekly' ? (
                 <FriendMultiSelect
                   accountId={selectedAccountId ?? null}
+                  error={inputError?.target === 'au-friend-search' ? inputError.message : undefined}
                   selectedIds={normalizeFriendIds(triggerConfig.friendIds)}
                   names={friendNamesOf(triggerConfig)}
                   onChange={(ids, nextNames) => setTriggerConfig({ ...triggerConfig, friendIds: ids, friendNames: nextNames })}
                 />
               ) : null}
             </div>
+            {inputError?.target === 'v8-trigger-at' || inputError?.target === 'v8-trigger-time' ? <p id="v8-trigger-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
             <p className={styles.cardDesc}>{triggerConfigSummary}。保存後も設定を確認できます。</p>
           </div>
         ) : null}
@@ -2636,7 +2657,7 @@ export function NewAutomationV8({
               以前の条件を外してもよければ、下のボタンから付け直せます。
             </p>
             <div>
-              <Button onClick={() => setConditionUnreadable(false)}>以前の条件を外して付け直す</Button>
+              <Button id="v8-repair-condition" onClick={() => { setConditionUnreadable(false); setInputError(null) }}>以前の条件を外して付け直す</Button>
             </div>
           </div>
         ) : (
@@ -2709,9 +2730,10 @@ export function NewAutomationV8({
             )
           })}
         </ol>
+        {inputError?.target === 'v8-add-action' ? <p className={styles.inputError} role="alert">{inputError.message}</p> : null}
         {canEdit ? (
           <div className={styles.linkRow}>
-            <button type="button" className={styles.linkButton} onClick={() => addAction('add_tag')}>＋ すること を足す</button>
+            <button id="v8-add-action" type="button" className={styles.linkButton} onClick={() => { setInputError(null); addAction('add_tag') }}>＋ すること を足す</button>
             <button type="button" className={styles.linkButton} onClick={() => addAction('common_action')}>共通アクションから選ぶ</button>
           </div>
         ) : null}
@@ -2734,6 +2756,7 @@ export function NewAutomationV8({
               <span className={styles.label}>すること</span>
               <Select
                 id={`v8-action-${editingRow.key}`}
+                error={inputError?.target === `v8-action-${editingRow.key}` ? inputError.message : undefined}
                 aria-label="すること"
                 value={editingRow.type}
                 onChange={(value) => updateAction(editingRow.key, { type: value as ActionType })}
@@ -2746,6 +2769,7 @@ export function NewAutomationV8({
               <ResourcePick
                 title="付けるタグ"
                 id={`v8-tag-${editingRow.key}`}
+                error={inputError?.target === `v8-tag-${editingRow.key}` ? inputError.message : undefined}
                 selectLabel="自動化で付けるタグ"
                 value={editingRow.tagId}
                 onPick={(value) => updateAction(editingRow.key, { tagId: value })}
@@ -2758,6 +2782,7 @@ export function NewAutomationV8({
               <ResourcePick
                 title="始めるシナリオ"
                 id={`v8-scenario-${editingRow.key}`}
+                error={inputError?.target === `v8-scenario-${editingRow.key}` ? inputError.message : undefined}
                 selectLabel="自動化で始めるシナリオ"
                 value={editingRow.scenarioId}
                 onPick={(value) => updateAction(editingRow.key, { scenarioId: value })}
@@ -2770,6 +2795,7 @@ export function NewAutomationV8({
               <ResourcePick
                 title="使う共通アクション"
                 id={`v8-common-action-${editingRow.key}`}
+                error={inputError?.target === `v8-common-action-${editingRow.key}` ? inputError.message : undefined}
                 selectLabel="自動化で使う共通アクション"
                 value={editingRow.commonActionId}
                 onPick={(value) => updateAction(editingRow.key, { commonActionId: value })}
@@ -2786,10 +2812,13 @@ export function NewAutomationV8({
               <label className={styles.field} htmlFor={`v8-message-${editingRow.key}`}>
                 <span className={styles.label}>送る文面</span>
                 <TextArea
+                  invalid={inputError?.target === `v8-message-${editingRow.key}`}
+                  aria-describedby={inputError?.target === `v8-message-${editingRow.key}` ? 'v8-action-error' : undefined}
                   id={`v8-message-${editingRow.key}`}
                   value={editingRow.message}
                   onChange={(event) => updateAction(editingRow.key, { message: event.target.value })}
                 />
+                {inputError?.target === `v8-message-${editingRow.key}` ? <p id="v8-action-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
               </label>
             )}
           </div>
@@ -2902,6 +2931,7 @@ function ResourcePick(props: {
   loading: boolean
   failed: boolean
   failedNote: string
+  error?: string
 }) {
   const { title, id, selectLabel, value, onPick, options, loading, failed, failedNote } = props
   return (
@@ -2909,6 +2939,7 @@ function ResourcePick(props: {
       <label className={styles.label} htmlFor={id}>{title}<RequiredBadge /></label>
       <Select
         id={id}
+        error={props.error}
         value={value}
         disabled={loading || failed}
         onChange={(picked) => onPick(picked)}
