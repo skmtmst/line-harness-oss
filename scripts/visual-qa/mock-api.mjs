@@ -283,6 +283,18 @@ let commonVarFolders = COMMON_VAR_FOLDERS.map((folder) => ({ ...folder }))
 // `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
 const mediaUploadSessionTargets = new Map()
 
+/** 統括の友だち情報欄・対応マーク（#1657）の返事。店の使用先集計は混ぜない。 */
+const HQ_ATTRIBUTE_ROWS = [
+  ...FRIEND_ATTRIBUTE_FIELDS.map((field) => ({
+    template: { id: `visual-hq-attr-${field.id}`, name: field.name, description: null, template_type: 'friend_field', folder_id: field.folderId ? ({ 'friend-field-folder-pets': 'visual-hq-folder-inquiry', 'friend-field-folder-contact': 'visual-hq-folder-booking', 'friend-field-folder-purchase': 'visual-hq-folder-ec' }[field.folderId] ?? null) : null, revision: 1, updated_at: field.updatedAt, friend_count: field.usageCount, distributed_account_count: 1, distributed_account_names: ['本店'], distributed_account_more: 0, outdated_account_count: 0, current_version: 1 },
+    definition: { schemaVersion: 1, field: { name: field.name, fieldKey: field.fieldKey, type: field.type, options: field.options, defaultValue: field.defaultValue, source: field.source, isPersonal: field.isPersonal, isStarred: field.isStarred, ecIsMaster: field.ecIsMaster, ecFieldPath: field.ecFieldPath, displayOrder: field.displayOrder, folderId: field.folderId }, folders: field.folderId ? FRIEND_FIELD_FOLDERS.filter((folder) => folder.id === field.folderId).map(({id, name, color}) => ({id, name, color, parentId: null})) : [] },
+  })),
+  ...SUPPORT_MARKS.map((mark) => ({
+    template: { id: `visual-hq-attr-${mark.id}`, name: mark.name, description: null, template_type: 'mark', folder_id: null, revision: 1, updated_at: '2026-10-08T00:00:00.000Z', friend_count: mark.friendCount, distributed_account_count: 1, distributed_account_names: ['本店'], distributed_account_more: 0, outdated_account_count: 0, current_version: 1 },
+    definition: { schemaVersion: 1, mark: { name: mark.name, color: mark.color, isDefault: mark.isDefault, autoOnInbound: mark.autoOnInbound, displayOrder: mark.displayOrder } },
+  })),
+]
+
 /** 統括のテンプレートの見本（★V8-B LRc93・X4JcOf・meBRB）。 */
 const HQ_TEMPLATES_HTN = [
   /* API-18：今月送った数（this_month_sent_count）・古い版のままの配り先（outdated_account_count）・いまの版（current_version）。 */
@@ -3321,6 +3333,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/hq/templates' && method === 'GET') {
     const type = query.get('type')
     const kind = query.get('kind')
+    if (type === 'friend_field' || type === 'mark') {
+      const rows = HQ_ATTRIBUTE_ROWS.filter((item) => item.template.template_type === type).map((item) => item.template)
+      return { success: true, data: rows, stats: { totalTemplates: rows.length, distributedAccountCount: 1, undistributedTemplateCount: 0, thisMonthSentCount: null, outdatedTemplateCount: 0 } }
+    }
     /* API-17：テンプレートは店と同じ6種類（?kind=）。種類の無い古い行はメッセージ。 */
     const rows = (type ? HQ_TEMPLATES_HTN.filter((row) => row.template_type === type) : HQ_TEMPLATES_HTN)
       .map((row) => (row.template_type === 'template' ? { ...row, kind: row.kind ?? 'message' } : row))
@@ -3361,6 +3377,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/hq/templates/folders' && method === 'GET') return { success: true, data: HQ_TEMPLATE_FOLDERS_HTN }
   if (pathname === '/api/hq/templates/accounts' && method === 'GET') return { success: true, data: HQ_TEMPLATE_ACCOUNTS_HTN }
   if (pathname === '/api/hq/templates/message-references' && method === 'GET') return { success: true, data: [] }
+  const attribute = HQ_ATTRIBUTE_ROWS.find((item) => pathname === `/api/hq/templates/${item.template.id}`)
+  if (attribute && method === 'GET') return { success: true, data: attribute }
+  if (/^\/api\/hq\/templates\/visual-hq-attr-[^/]+\/received-versions$/.test(pathname)) return { success: true, data: [] }
   const hqTemplateDetail = /^\/api\/hq\/templates\/(visual-hq-tpl-[^/]+)$/.exec(pathname)
   if (hqTemplateDetail && method === 'GET') {
     const row = HQ_TEMPLATES_HTN.find((item) => item.id === hqTemplateDetail[1])

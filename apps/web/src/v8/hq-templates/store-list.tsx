@@ -139,7 +139,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   const words = WORDS[type]
   const [query, setQuery] = useState('')
   const [undistributedOnly, setUndistributedOnly] = useState(false)
-  /* 友だち属性（DzdC3）だけ：上のタブ（タグ・友だち情報欄・対応マーク・保存した検索）と、使用状態・付け方の絞り込み。 */
+  /* タグ（DzdC3）だけ：上のタブ（タグ・友だち情報欄・対応マーク・保存した検索）と、使用状態・付け方の絞り込み。 */
   const attribute = useAttributeTab('/hq/friend-attributes')
   const [tagUsage, setTagUsage] = useState<TagUsageFilter>('all')
   const [tagMethod, setTagMethod] = useState('all')
@@ -192,7 +192,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   ]
 
   /*
-   * 友だち属性（DzdC3）の数の帯：未使用・付けている友だち・（今月付けた回数の代わりに）新しい版を未配布・整理の候補。
+   * タグ（DzdC3）の数の帯：未使用・付けている友だち・（今月付けた回数の代わりに）新しい版を未配布・整理の候補。
    * 今月付けた回数は統括の一覧の受け口に無いので出さない（見た目だけ置かない）。
    */
   const tagKpis = [

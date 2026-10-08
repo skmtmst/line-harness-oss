@@ -150,6 +150,29 @@ for (const width of WIDTHS) {
  */
 const TAGS_PATH = '/tags'
 
+// 統括は店の一覧を再利用する。板の幅と広いPCでタブ・操作の右端を見張る。
+for (const width of [1152, 1440, 1920]) {
+  for (const [tab, column] of [['fields', '項目名'], ['marks', 'マーク']]) {
+    test(`hqtabs ${tab} ${width}px 横幅と操作`, async ({ page }) => {
+      await page.setViewportSize({ width, height: DEFAULT_CAPTURE_HEIGHT })
+      await signIn(page)
+      await page.addInitScript(() => localStorage.setItem('lh-admin-theme', 'v8'))
+      await page.goto(`${BASE}/hq/friend-attributes?tab=${tab}`, { waitUntil: 'networkidle' })
+      await expectLanded(page, '/hq/friend-attributes')
+      await expect(page.getByRole('columnheader', { name: column, exact: true })).toBeVisible()
+      await expect(page.getByRole('tab', { name: tab === 'fields' ? '友だち情報欄' : '対応マーク', exact: true })).toHaveAttribute('aria-selected', 'true')
+      const distribute = page.getByRole('button', { name: /を配る$/ }).first()
+      await expect(distribute).toBeVisible()
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      expect(overflow).toBe(0)
+      const actionBounds = await page.getByRole('button', { name: /を配る$|の操作$/ }).evaluateAll((buttons) => buttons.map((button) => ({ right: button.getBoundingClientRect().right, limit: window.innerWidth })))
+      expect(actionBounds.length).toBeGreaterThan(0)
+      for (const action of actionBounds) expect(action.right).toBeLessThanOrEqual(action.limit)
+      await page.screenshot({ path: `test-results/hqtabs/browser-${tab}-${width}.png`, fullPage: true, animations: 'disabled', style: 'nextjs-portal { display: none !important; }' })
+    })
+  }
+}
+
 for (const width of WIDTHS) {
   for (const state of TAG_STATES) {
     test(`${width}px 友だち属性・${state.label}（${state.name}）`, async ({ page }) => {

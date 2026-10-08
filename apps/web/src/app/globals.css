@@ -2565,3 +2565,4 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-bcpick-focus: 2px;
   --tpl-bcpick-mobile-preview: 30dvh;
 }
+[data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }

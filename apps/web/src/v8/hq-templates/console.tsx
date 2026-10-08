@@ -61,6 +61,8 @@ import type { RichMenuDefinition } from '@/lib/hq-templates-api'
 import HqAccountPicker from './account-picker'
 import SavedDistributionDialog from './saved-distribution-dialog'
 import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, useDistributionFolders, ALL_ACCOUNTS } from './distribution-accounts'
+import HqAttributes from './attributes'
+import { useAttributeTab } from './attribute-tabs'
 import HqStoreList from './store-list'
 import HqTagEditorV8 from './tag-editor'
 import HqTemplateDetail, { inUseVersionOf } from './detail'
@@ -93,7 +95,19 @@ export interface DefinitionEditorProps {
   onCanonicalCancel?: () => void
 }
 
-export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }: {
+interface ConsoleProps {
+  type: TemplateType
+  DefinitionEditor?: ComponentType<DefinitionEditorProps>
+  RichMenuCreate?: ComponentType<{ host: RichMenuCreateHost }>
+}
+
+export default function HqTemplatesV8(props: ConsoleProps) {
+  const attribute = useAttributeTab('/hq/friend-attributes')
+  if (props.type === 'tag' && (attribute.tab === 'fields' || attribute.tab === 'marks')) return <HqAttributes key={attribute.tab} type={attribute.tab === 'fields' ? 'friend_field' : 'mark'} tab={attribute.tab} onTab={attribute.select} />
+  return <HqTemplatesBody {...props} />
+}
+
+function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   type: TemplateType
   DefinitionEditor?: ComponentType<DefinitionEditorProps>
   /** 店のリッチメニューの作る画面（入口が渡す。src/v8 は @/app を読まないため）。host 付きで統括のひな形を作る（gobhu〜gQabc）。 */
