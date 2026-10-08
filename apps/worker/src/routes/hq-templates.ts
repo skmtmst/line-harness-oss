@@ -1,3 +1,4 @@
+import { isFriendAttributeType, preflightFriendAttribute, distributeFriendAttribute, friendAttributeResult } from '../services/hq-templates/friend-attribute-distribution.js';
 import { TEMPLATE_KINDS, type TemplateKindCounts, type TemplateKind } from '@line-crm/shared';
 import { listTemplateFolders, saveTemplateFolder, deleteTemplateFolder, duplicateTemplate } from '../services/hq-templates/folders.js';
 import { listMessageReferences } from '../services/hq-templates/message-card-references.js';
@@ -140,12 +141,25 @@ hqTemplates.delete('/api/hq/templates/:id', async c => {
 hqTemplates.post('/api/hq/templates/:id/preflight', async c => {
   const input = await body(c);
   if (!Array.isArray(input.accountIds) || input.accountIds.some(v => typeof v !== 'string')) throw new HqTemplateError('INVALID_ACCOUNTS');
+  const auth=await authority(c),db=dbFor(c.env),{template}=await templateDetail(db,auth,c.req.param('id'));
+  if(isFriendAttributeType(template.template_type)) {
+    if(input.textOverrides!==undefined) throw new HqTemplateError('INVALID_DEFINITION');
+    return c.json({success:true,data:await preflightFriendAttribute(db,auth,c.req.param('id'),input.accountIds as string[])});
+  }
   return c.json({ success: true, data: await preflightDistribution(dbFor(c.env), await authority(c), c.req.param('id'), input.accountIds as string[], c.env.IMAGES, input.textOverrides) });
 });
 hqTemplates.post('/api/hq/templates/:id/distribute', async c => {
   const input = await body(c);
-  if (typeof input.preflightId !== 'string' || !Array.isArray(input.resolutions) || input.resolutions.length > 270 || input.resolutions.some(v => !v || typeof v !== 'object' || typeof v.accountId !== 'string' || typeof v.sourceId !== 'string' || !['create', 'overwrite', 'alias'].includes(v.mode))) throw new HqTemplateError('INVALID_SELECTION');
-  const data = await distributeTemplate(dbFor(c.env), await authority(c), c.req.param('id'), input.preflightId, input.resolutions as DistributionSelection[], c.env.IMAGES, c.env.WORKER_URL || new URL(c.req.url).origin);
+  const auth=await authority(c),db=dbFor(c.env),{template}=await templateDetail(db,auth,c.req.param('id'));
+  const modes=isFriendAttributeType(template.template_type)?['create','overwrite','alias','skip']:['create','overwrite','alias'];
+  if (typeof input.preflightId !== 'string' || !Array.isArray(input.resolutions) || input.resolutions.length > 270 || input.resolutions.some(v => !v || typeof v !== 'object' || typeof v.accountId !== 'string' || typeof v.sourceId !== 'string' || !modes.includes(v.mode))) throw new HqTemplateError('INVALID_SELECTION');
+  const data = isFriendAttributeType(template.template_type)
+    ? await distributeFriendAttribute(db,auth,c.req.param('id'),input.preflightId,input.resolutions as Parameters<typeof distributeFriendAttribute>[4])
+    : await distributeTemplate(dbFor(c.env), await authority(c), c.req.param('id'), input.preflightId, input.resolutions as DistributionSelection[], c.env.IMAGES, c.env.WORKER_URL || new URL(c.req.url).origin);
   c.set('auditRecorded', true); return c.json({ success: true, data });
 });
-hqTemplates.get('/api/hq/templates/:id/distributions/:runId', async c => c.json({ success: true, data: await distributionResult(dbFor(c.env), await authority(c), c.req.param('id'), c.req.param('runId'), c.env.IMAGES) }));
+hqTemplates.get('/api/hq/templates/:id/distributions/:runId', async c => {
+  const auth=await authority(c),db=dbFor(c.env),{template}=await templateDetail(db,auth,c.req.param('id'));
+  const data=isFriendAttributeType(template.template_type)?await friendAttributeResult(db,auth,c.req.param('id'),c.req.param('runId')):await distributionResult(db,auth,c.req.param('id'),c.req.param('runId'),c.env.IMAGES);
+  return c.json({success:true,data});
+});

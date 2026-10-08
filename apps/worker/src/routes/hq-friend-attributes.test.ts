@@ -58,3 +58,96 @@ test('read only and account scoped staff cannot mutate and foreign tenant cannot
  staff.readOnly=false;sql.raw.exec("UPDATE staff_members SET account_scope='accounts' WHERE id='owner'");expect((await request(`/${template.id}`)).status).toBe(403);
  sql.raw.exec("UPDATE staff_members SET account_scope='all',tenant_id='foreign' WHERE id='owner'");staff.tenantId='foreign';expect((await request(`/${template.id}`)).status).toBe(404);
 });
+async function preflight(id:string,accountIds=['a']){
+ const p=await request(`/${id}/preflight`,'POST',{accountIds});expect(p.status,JSON.stringify(p.body)).toBe(200);return p.body.data;
+}
+async function distribute(id:string,p:any,mode?:string){
+ return request(`/${id}/distribute`,'POST',{preflightId:p.preflightId,resolutions:p.stores.flatMap((s:any)=>s.items.map((i:any)=>({accountId:s.accountId,sourceId:i.sourceId,mode:mode && i.itemKind!=='folder'?mode:i.duplicate?'overwrite':'create'})))});
+}
+test('mark distribution creates isolated definitions, handles duplicates and skip without reapplying',async()=>{
+ const {template}=await create('mark',markDefinition),p=await preflight(template.id,['a','b','c']);
+ const r=await distribute(template.id,p);expect(r.status,JSON.stringify(r.body)).toBe(200);expect(r.body.data.stores.map((s:any)=>s.status)).toEqual(['succeeded','succeeded','succeeded']);
+ expect(sql.raw.prepare("SELECT count(*) n FROM support_mark_scopes WHERE tenant_id='t'").get()).toEqual({n:3});
+ const before=sql.raw.prepare("SELECT m.* FROM support_marks m JOIN support_mark_scopes s ON s.mark_id=m.id WHERE s.line_account_id='a'").get();
+ const p2=await preflight(template.id);expect(p2.stores[0].items[0].allowedModes).toEqual(['overwrite','alias','skip']);
+ const skipped=await distribute(template.id,p2,'skip');expect(skipped.body.data.stores[0]).toMatchObject({status:'succeeded',counts:{created:0,overwritten:0,aliased:0,skipped:1}});
+ expect(sql.raw.prepare("SELECT m.* FROM support_marks m JOIN support_mark_scopes s ON s.mark_id=m.id WHERE s.line_account_id='a'").get()).toEqual(before);
+ expect((await distribute(template.id,p2,'skip')).body.data).toEqual(skipped.body.data);
+ expect((await distribute(template.id,p2,'alias')).status).toBe(409);
+ const aliased=await distribute(template.id,await preflight(template.id),'alias');expect(aliased.body.data.stores[0].createdName).toBe('相談中 (2)');
+ expect(sql.raw.pragma('foreign_key_check')).toEqual([]);
+});
+test('field distribution preserves folders, key, type, options, scope and values on overwrite',async()=>{
+ const definition={schemaVersion:1,field:{name:'種別',fieldKey:'pet_kind',type:'select',folderId:'child',options:[{id:'dog',label:'犬',color:'#112233'},{id:'cat',label:'猫'}],defaultValue:'dog',isPersonal:true},folders:[{id:'parent',name:'基本',color:'#123456'},{id:'child',name:'ペット',parentId:'parent'}]};
+ const {template}=await create('friend_field',definition),p=await preflight(template.id),r=await distribute(template.id,p);expect(r.status,JSON.stringify(r.body)).toBe(200);expect(r.body.data.stores[0].status).toBe('succeeded');
+ const row=sql.raw.prepare("SELECT * FROM friend_fields WHERE field_key='pet_kind'").get() as any;expect(row).toMatchObject({type:'select',type_v6:'select',is_personal:1});
+ expect(JSON.parse(row.options_json)[0]).toMatchObject({id:'dog',label:'犬',color:'#112233'});
+ expect(sql.raw.prepare('SELECT tenant_id,line_account_id FROM friend_field_scopes WHERE field_id=?').get(row.id)).toEqual({tenant_id:'t',line_account_id:'a'});
+ sql.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('friend','Ufriend','a')");sql.raw.prepare("INSERT INTO friend_field_values(friend_id,field_id,value) VALUES('friend',?,'dog')").run(row.id);
+ const overwritten=await distribute(template.id,await preflight(template.id),'overwrite');expect(overwritten.body.data.stores[0].status).toBe('succeeded');
+ expect(sql.raw.prepare("SELECT value FROM friend_field_values WHERE friend_id='friend'").get()).toEqual({value:'dog'});expect(sql.raw.prepare('SELECT version FROM friend_fields WHERE id=?').get(row.id)).toEqual({version:2});
+ const skipped=await distribute(template.id,await preflight(template.id),'skip');expect(skipped.body.data.stores[0].counts.skipped).toBe(1);expect(sql.raw.prepare('SELECT version FROM friend_fields WHERE id=?').get(row.id)).toEqual({version:2});
+});
+test.each(['changed','race','expired'])('mark %s destination rejects writes and retains atomic result',async mode=>{
+ const {template}=await create('mark',markDefinition),p=await preflight(template.id);
+ const mutate=()=>sql.raw.exec("INSERT INTO support_marks(id,name,color) VALUES('new','changed','#123456'); INSERT INTO support_mark_scopes(mark_id,tenant_id,line_account_id,created_at) VALUES('new','t','a','now')");
+ if(mode==='changed')mutate();
+ if(mode==='expired')sql.raw.prepare("UPDATE hq_template_preflights SET expires_at='2000' WHERE idempotency_fingerprint=?").run(p.preflightId);
+ if(mode==='race'){
+  const original=sql.db.batch.bind(sql.db);let injected=false;
+  sql.db.batch=async statements=>{if(!injected){injected=true;mutate();}return original(statements)};
+ }
+ const r=await distribute(template.id,p);expect(r.status,JSON.stringify(r.body)).toBe(200);expect(r.body.data.stores[0].status).toBe('version_conflict');
+ expect(sql.raw.prepare("SELECT count(*) n FROM support_marks WHERE name='相談中'").get()).toEqual({n:0});expect(sql.raw.pragma('foreign_key_check')).toEqual([]);
+});
+test('foreign target and account ownership race cannot write; decisions validated before claim',async()=>{
+ const {template}=await create('mark',markDefinition);sql.raw.exec("UPDATE line_accounts SET tenant_id='foreign' WHERE id='b'");
+ expect((await request(`/${template.id}/preflight`,'POST',{accountIds:['b']})).status).toBe(403);
+ const p=await preflight(template.id);expect((await distribute(template.id,p,'skip')).status).toBe(409);
+ expect(sql.raw.prepare('SELECT count(*) n FROM hq_template_distribution_runs').get()).toEqual({n:0});
+ sql.raw.exec("UPDATE line_accounts SET tenant_id='foreign' WHERE id='a'");expect((await distribute(template.id,p)).status).toBe(403);
+});
+test('global field key conflicts offer explicit alias and never touch another store',async()=>{
+ const {template}=await create('friend_field',fieldDefinition);
+ expect((await distribute(template.id,await preflight(template.id))).body.data.stores[0].status).toBe('succeeded');
+ const before=sql.raw.prepare("SELECT * FROM friend_fields WHERE field_key='pet_name'").get();
+ const p=await preflight(template.id,['b']);expect(p.stores[0].items[0]).toMatchObject({allowedModes:['alias'],reason:'FIELD_KEY_IN_USE',targetId:null});
+ expect((await distribute(template.id,p,'overwrite')).status).toBe(409);
+ const alias=await distribute(template.id,p,'alias');expect(alias.body.data.stores[0]).toMatchObject({status:'succeeded',counts:{aliased:1}});
+ const rows=sql.raw.prepare('SELECT f.field_key,s.line_account_id FROM friend_fields f JOIN friend_field_scopes s ON s.field_id=f.id ORDER BY f.field_key').all();expect(rows).toEqual([{field_key:'pet_name',line_account_id:'a'},{field_key:'pet_name_2',line_account_id:'b'}]);
+ expect(sql.raw.prepare("SELECT * FROM friend_fields WHERE field_key='pet_name'").get()).toEqual(before);
+});
+test('field overwrite retains values and original option IDs after changing labels and removing options',async()=>{
+ const initial={schemaVersion:1,field:{name:'種別',fieldKey:'pet_kind',type:'select',options:[{id:'dog',label:'犬'},{id:'cat',label:'猫'}]},folders:[]};
+ const {template}=await create('friend_field',initial);await distribute(template.id,await preflight(template.id));
+ const id=(sql.raw.prepare("SELECT id FROM friend_fields WHERE field_key='pet_kind'").get() as any).id;
+ sql.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f','Uf','a')");sql.raw.prepare("INSERT INTO friend_field_values(friend_id,field_id,value) VALUES('f',?,'cat')").run(id);
+ const definition={...initial,field:{...initial.field,options:[{id:'dog',label:'いぬ'}],defaultValue:'dog'}};
+ expect((await request(`/${template.id}`,'PATCH',{name:'ひな形',type:'friend_field',definition,expectedRevision:2})).status).toBe(200);
+ const r=await distribute(template.id,await preflight(template.id),'overwrite');expect(r.body.data.stores[0].status).toBe('succeeded');
+ const row=sql.raw.prepare('SELECT options_json FROM friend_fields WHERE id=?').get(id) as any;expect(JSON.parse(row.options_json)).toEqual(expect.arrayContaining([expect.objectContaining({id:'dog',label:'いぬ'}),expect.objectContaining({id:'cat',status:'archived'})]));
+ expect(sql.raw.prepare("SELECT value FROM friend_field_values WHERE friend_id='f'").get()).toEqual({value:'cat'});
+});
+test('incompatible field type and inherited definitions cannot be overwritten',async()=>{
+ const {template}=await create('friend_field',fieldDefinition);await distribute(template.id,await preflight(template.id));
+ sql.raw.exec("UPDATE friend_fields SET type_v6='number' WHERE field_key='pet_name'");
+ const p=await preflight(template.id);expect(p.stores[0].items[0].allowedModes).toEqual(['alias','skip']);expect((await distribute(template.id,p,'overwrite')).status).toBe(409);
+});
+test('database failure rolls back definition, scope, folders, audit and success ledger together',async()=>{
+ const definition={...fieldDefinition,field:{...fieldDefinition.field,folderId:'folder'},folders:[{id:'folder',name:'基本'}]};
+ const {template}=await create('friend_field',definition),p=await preflight(template.id);
+ sql.raw.exec("CREATE TRIGGER fail_scope BEFORE INSERT ON friend_field_scopes BEGIN SELECT RAISE(ABORT,'injected'); END");
+ const r=await distribute(template.id,p);expect(r.status).toBe(200);expect(r.body.data.stores[0].status).toBe('failed');
+ expect(sql.raw.prepare("SELECT count(*) n FROM friend_fields").get()).toEqual({n:0});expect(sql.raw.prepare("SELECT count(*) n FROM folders WHERE account_id='a'").get()).toEqual({n:0});
+ expect(sql.raw.prepare("SELECT count(*) n FROM hq_template_distribution_results WHERE status='succeeded'").get()).toEqual({n:0});
+ expect(sql.raw.prepare("SELECT count(*) n FROM audit_events WHERE action='hq_template.distributed' AND result='success'").get()).toEqual({n:0});expect(sql.raw.pragma('foreign_key_check')).toEqual([]);
+});
+test('setting a default mark affects only its destination, without changing friend assignments',async()=>{
+ const {template}=await create('mark',{...markDefinition,mark:{...markDefinition.mark,isDefault:true}});
+ for(const id of ['a','b'])sql.raw.prepare("INSERT INTO support_marks(id,name,is_default) VALUES(?,'既定',1)").run(`old-${id}`);
+ for(const id of ['a','b'])sql.raw.prepare("INSERT INTO support_mark_scopes(mark_id,tenant_id,line_account_id,created_at) VALUES(?,'t',?,'now')").run(`old-${id}`,id);
+ sql.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id,support_mark_id) VALUES('f','Uf','a','old-a')");
+ await distribute(template.id,await preflight(template.id));
+ expect(sql.raw.prepare("SELECT is_default FROM support_marks WHERE id='old-a'").get()).toEqual({is_default:0});expect(sql.raw.prepare("SELECT is_default FROM support_marks WHERE id='old-b'").get()).toEqual({is_default:1});
+ expect(sql.raw.prepare("SELECT support_mark_id FROM friends WHERE id='f'").get()).toEqual({support_mark_id:'old-a'});
+});
