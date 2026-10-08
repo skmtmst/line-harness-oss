@@ -64,6 +64,13 @@ export async function acquireWorkflow(db: D1Database,
         const outer=execution.activeStep;execution.activeStep=key;
         let result:T;
         try{result=await work()}finally{execution.activeStep=outer}
+        // Best-effort helpers may swallow a database error. Their unfinished receipts must keep this parent retryable.
+        const prefixes=[`${key}:`,`line:${key}:`];
+        const unfinished=await db.prepare(`SELECT 1 FROM workflow_steps WHERE scope_id=? AND process_kind=? AND subject_id=?
+          AND status NOT IN ('succeeded','canceled')
+          AND (substr(step_key,1,length(?))=? OR substr(step_key,1,length(?))=?) LIMIT 1`)
+          .bind(root.scopeId,root.processKind,root.subjectId,prefixes[0],prefixes[0],prefixes[1],prefixes[1]).first();
+        if(unfinished)throw new WorkflowDeferred('unfinished_step');
         const domain=domainDbs.get(key);
         if(domain)result=normalizeWorkflowResult(domain,result);
         await renewWorkflowStep(db,root,owner,options.leaseMs);

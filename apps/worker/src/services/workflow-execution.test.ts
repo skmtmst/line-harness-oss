@@ -57,6 +57,18 @@ describe('PKG67 shared workflow recovery',()=>{
   await expect(one.db.prepare('UPDATE effects SET n=n+1 RETURNING n').first()).rejects.toThrow();
   expect(await two.db.prepare('UPDATE effects SET n=n+1 RETURNING n').first()).toEqual({n:1});
  });
+ it('keeps a swallowed write failure retryable instead of completing its parent stage',async()=>{
+  item.raw.exec("CREATE TRIGGER interrupted_effect BEFORE UPDATE ON effects BEGIN SELECT RAISE(ABORT,'temporary storage failure');END");
+  const first=(await acquireWorkflow(item.db,ref))!;
+  const bestEffort=async(execution:NonNullable<Awaited<ReturnType<typeof acquireWorkflow>>>)=>execution.step('mileage',async()=>{
+    try{await execution.mutationDb('mileage').prepare('UPDATE effects SET n=n+1').run()}catch{/* Existing projection helpers swallow the error. */}
+  });
+  await expect(bestEffort(first)).rejects.toThrow('unfinished_step');await first.fail();
+  item.raw.exec('DROP TRIGGER interrupted_effect');
+  const resumed=(await acquireWorkflow(item.db,ref))!;await bestEffort(resumed);await resumed.complete();
+  expect(item.raw.prepare('SELECT n FROM effects').get()).toEqual({n:1});
+  expect((await getWorkflowStep(item.db,{...ref,stepKey:'__run'}))!.status).toBe('succeeded');
+ });
  it('caps a repeatedly failing root instead of replaying forever',async()=>{
   for(let n=0;n<2;n++){const e=(await acquireWorkflow(item.db,ref,{maxAttempts:2}))!;await e.fail()}
   expect(await acquireWorkflow(item.db,ref,{maxAttempts:2})).toBeNull();
