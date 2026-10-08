@@ -47,6 +47,7 @@ import {
   type MediaItem,
 } from '@line-crm/shared'
 import Card from '@/components/shared/card'
+import LayoutPicker from '@/components/shared/layout-picker'
 import TargetMissing from '@/components/shared/target-missing'
 import { RowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
@@ -71,7 +72,6 @@ import { CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menu
 import { AreaProperties, intentLabelOf, intentOf } from '@/components/rich-menus/area-properties'
 import {
   NEW_MENU_INTENTS_WITH_SWITCH,
-  RichMenuTemplatePreview,
 } from '@/components/rich-menus/rich-menu-create-form'
 import {
   createAreaDrafts,
@@ -1658,7 +1658,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     <CreatePage boardId={
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
-      } headingSize="large" title={<>リッチメニューを作る</>} description={<>{headNote}{conflict ? (
+      } title={<>リッチメニューを作る</>} description={<>{headNote}{conflict ? (
           /* 板 `r8dGXT`：帯は頭の説明の下に横いっぱい（右の列の上まで）。見た目は共通部品（save-conflict）。比べる窓はこの画面の要約の比べ（VersionCompare）。 */
           <div className={styles.conflictSlot}>
             <SaveConflictBand
@@ -1963,27 +1963,20 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             <SectionHeader title="面の分け方" />
             <p className={styles.cardNote}>押せるところをいくつに分けるか。あとで区切り直せます</p>
           </div>
-          <div className={styles.layoutGrid} role="radiogroup" aria-label="面の分け方">
-            {shownLayouts.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                role="radio"
-                aria-checked={templateKey === item.key}
-                aria-label={V8_LAYOUT_LABEL[item.key] ?? item.label}
-                disabled={locked}
-                className={`${styles.layoutItem} ${templateKey === item.key ? styles.layoutItemOn : ''}`}
-                onClick={() => setTemplateKey(item.key)}
-              >
-                <span className={styles.layoutThumb}>
-                  <RichMenuTemplatePreview template={item} />
-                </span>
-                <span className={styles.layoutName} aria-hidden="true">
-                  {V8_LAYOUT_LABEL[item.key] ?? item.label}
-                </span>
-              </button>
-            ))}
-          </div>
+          <LayoutPicker
+            value={templateKey} onChange={setTemplateKey} disabled={locked}
+            preview={size === 'compact' ? 'compact-menu' : 'menu'}
+            options={shownLayouts.map((item) => ({
+              value: item.key, label: V8_LAYOUT_LABEL[item.key] ?? item.label,
+              areas: item.areas.map((area, index) => ({
+                label: String.fromCharCode(65 + index),
+                x: area.x / RICH_MENU_DIMENSIONS[size].width * 100,
+                y: area.y / RICH_MENU_DIMENSIONS[size].height * 100,
+                width: area.w / RICH_MENU_DIMENSIONS[size].width * 100,
+                height: area.h / RICH_MENU_DIMENSIONS[size].height * 100,
+              })),
+            }))}
+          />
         </Card>
 
         {/* 画像 */}

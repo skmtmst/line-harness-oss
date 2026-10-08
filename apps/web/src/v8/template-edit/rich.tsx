@@ -21,6 +21,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import LayoutPicker from '@/components/shared/layout-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
@@ -438,26 +439,10 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <h2 className={styles.cardTitle}>面の分け方</h2>
             <p className={styles.cardNote}>選んだ形に合わせて、下の設定が増えます</p>
           </div>
-          <div className={rich.shapeRow} role="group" aria-label="面の分け方">
-            {RICH_SHAPES.map((candidate) => (
-              <button
-                key={candidate.value}
-                type="button"
-                className={rich.shape}
-                aria-pressed={shapeValue === candidate.value}
-                onClick={() => requestShape(candidate.value)}
-              >
-                <span className={rich.shapeGlyph} aria-hidden="true">
-                  {candidate.rows.map((row, rowIndex) => (
-                    <span key={rowIndex} className={rich.shapeGlyphRow}>
-                      {row.map((label) => <span key={label} className={rich.shapeGlyphArea} />)}
-                    </span>
-                  ))}
-                </span>
-                <span className={rich.shapeLabel}>{candidate.label}</span>
-              </button>
-            ))}
-          </div>
+          <LayoutPicker
+            value={shapeValue} onChange={requestShape} preview="message"
+            options={RICH_SHAPES.map((candidate) => ({ value: candidate.value, label: candidate.label, areas: candidate.areas }))}
+          />
         </Card>
 
         <Card padding="none" layout="vertical" className={styles.card}>

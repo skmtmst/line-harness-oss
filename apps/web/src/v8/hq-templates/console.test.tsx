@@ -256,7 +256,7 @@ describe('統括のテンプレートを作る（リッチメッセージ g8d6ai
     const file = new File(['png'], 'summer.png', { type: 'image/png' })
     fireEvent.change(screen.getByLabelText('リッチメッセージの画像のファイル'), { target: { files: [file] } })
     await waitFor(() => expect(calls.uploadRichMessageImage).toHaveBeenCalledWith(file))
-    fireEvent.click(screen.getByRole('button', { name: '1面' }))
+    fireEvent.click(screen.getByRole('radio', { name: '1面（面 A）' }))
     fireEvent.click(screen.getByRole('button', { name: '面 A を押したら' }))
     expect(screen.queryByRole('option', { name: '動きを実行する' })).toBeNull()
     fireEvent.click(within(await screen.findByRole('option', { name: 'URLを開く' })).getByRole('button'))
