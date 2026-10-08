@@ -287,3 +287,39 @@ test('EA8rM: 全部そろうと本人確認の上で止める', async () => {
   expect(stop?.body['confirmation']).toBe('停止')
   expect(host?.textContent).toContain('サーバー共通の停止状態を更新しました')
 })
+
+/* 監査 WEB313：補足（任意）に書いた文を、止める要求に乗せる。 */
+test('WEB313: 補足を書いたら止める要求の detail に入る', async () => {
+  await openStopDialog()
+  await typeInto(dialogInput('止める理由'), '宛先の絞り込みを間違えた')
+  const detail = document.body.querySelector('#emergency-detail-v8') as HTMLTextAreaElement
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set
+    setter?.call(detail, '13時の配信が全員に向いていた')
+    detail.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+  await typeInto(dialogInput('確認の言葉'), '停止')
+  await typeCode('481516')
+  await act(async () => {
+    executeButton().click()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  })
+  const stop = stopCalls.find((call) => call.url.includes('/api/operations/incidents'))
+  expect(stop?.body['detail']).toBe('13時の配信が全員に向いていた')
+})
+
+/* 監査 WEB312：停止状態が読めないとき、「動いている」「止めていません」と言わない。 */
+test('WEB312: 状態が読めないときは「—」と読み直しを出す', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.includes('/api/operations/control/preview')) return response({ success: false, error: 'down' }, 503)
+    if (url.includes('/api/operations/history')) return response({ success: true, data: [] })
+    return response({ success: false, error: 'not mocked' }, 500)
+  }))
+  await renderControl()
+  const kpis = host?.querySelector('[aria-label="緊急停止の集計"]')
+  expect(kpis?.textContent).not.toContain('動いている')
+  expect(host?.textContent).not.toContain('いまは止めていません')
+  expect(host?.textContent).toContain('いまの停止状態を確認できませんでした')
+})

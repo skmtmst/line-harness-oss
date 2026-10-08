@@ -181,6 +181,18 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(body).toMatchObject({ messageContent: '直した本文', expectedVersion: 2, requestId: hq.create.mock.calls[0][0].requestId })
   })
 
+  it('WEB011：作れたあと確かめが失敗したら、やり直しは同じ下書きを直す（もう1つ作らない・409 にしない）', async () => {
+    hq.preflight.mockRejectedValueOnce(new Error('network'))
+    render(<HqBroadcastCreate />)
+    await fillToConfirm()
+    await waitFor(() => expect(hq.create).toHaveBeenCalledTimes(1))
+    const again = await screen.findByRole('button', { name: '送る前に確かめる' })
+    fireEvent.click(again)
+    await screen.findByText('送る：1アカウント・6,120人')
+    expect(hq.create).toHaveBeenCalledTimes(1)
+    expect(hq.update).toHaveBeenCalledWith('run-1', expect.objectContaining({ expectedVersion: 1, requestId: hq.create.mock.calls[0][0].requestId }))
+  })
+
   it('?id= の下書きを読み、配信名・本文・送るアカウント（タグで作った下書きはそのタグのアカウント）・時刻を戻して、同じ下書きを直す', async () => {
     params.value = new URLSearchParams('id=run-7&step=confirm')
     hq.get.mockResolvedValue({ data: {

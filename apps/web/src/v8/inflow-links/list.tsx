@@ -29,6 +29,7 @@ import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TrafficPo
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { canEditFeature } from '@/lib/staff-capability'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -96,6 +97,9 @@ const SORT_OPTIONS: Array<{ value: RouteSort; label: string }> = [
   { value: 'name', label: '流入元名順' },
 ]
 
+/** 流入の操作を任された staff の項目キー（Worker の INFLOW_LINKS_PERMISSION と同じ）。 */
+const INFLOW_LINKS_EDIT_KEY = '/inflow-links'
+
 export default function InflowListV8({
   onRouteCountChange,
 }: {
@@ -111,7 +115,13 @@ export default function InflowListV8({
   const narrow = useNarrowViewport()
   const role = useStaffRole()
   // 役割が読めるまでは今までどおり操作を出す。staff と分かったら押せない形にする（最後の守りは口の 403）。
-  const readonly = role !== null && !canManageRole(role)
+  /*
+   * WEB034：経路の作成・編集・止める／再開は、口（requireEntryRouteManagement）が
+   * owner/admin に加えて「流入」を任された staff にも許している。画面も同じ条件で出す。
+   * フォルダの作成・名前の変更は口が owner/admin だけなので、別に分ける。
+   */
+  const readonly = role !== null && !canManageRole(role) && !canEditFeature(INFLOW_LINKS_EDIT_KEY)
+  const canManageFolders = role === null || canManageRole(role)
 
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
@@ -265,12 +275,16 @@ export default function InflowListV8({
   useEffect(() => {
     if (selectedAccountId && visibility.status === 'loading') return
     const accountAtRequest = selectedAccountId
-    const generation = loadRequestRef.current
     const featureAllowed = (key: FeatureKey) =>
       visibility.features == null || visibility.features[key] === true
     let cancelled = false
-    const isCurrent = () =>
-      !cancelled && generation === loadRequestRef.current && accountAtRequest === latestAccountRef.current
+    /*
+     * WEB032：候補（プール・シナリオ・テンプレート・タグ）の世代は、一覧の読み直しの
+     * 世代と分ける。一覧を読み直す（切り替え・やり直し・保存）たびに候補を捨てると、
+     * 候補の取り直しは走らないので、編集窓の候補が空のまま残る。
+     * 捨てるのは、アカウント・機能の可否が変わったとき（この effect の作り直し）だけ。
+     */
+    const isCurrent = () => !cancelled && accountAtRequest === latestAccountRef.current
     const loadAuxiliary = async () => {
       // プールは multi_store_hierarchy が有効と分かるときだけ呼ぶ（403 を出さない、#703）。
       const poolsDisabled = { success: false as const, error: 'feature_disabled' }
@@ -477,7 +491,7 @@ export default function InflowListV8({
       label: genre.name,
       count: accountRows.filter((row) => row.genre === genre.name).length,
       // 名前の変更は選んだフォルダの「…」から（選んでいない行に「…」の箱を出すと件数が左へずれる）。
-      ...(!readonly && !genre.id.startsWith('legacy-') && selectedGenre === genre.name
+      ...(canManageFolders && !genre.id.startsWith('legacy-') && selectedGenre === genre.name
         ? { onEdit: () => setEditingGenre(genre) }
         : {}),
     })),
@@ -674,7 +688,8 @@ export default function InflowListV8({
                 const tag = tags.find((t) => t.id === r.tagId)
                 const editTarget = r.source === 'entry_route' ? routes.find((e) => e.id === r.entryRouteId) ?? null : null
                 const status = routeStatus(r)
-                const [becameFirst, becameSecond] = becameLines(r, sc, tag)
+                const introTemplate = r.introTemplateId ? templates.find((t) => t.id === r.introTemplateId) : undefined
+                const [becameFirst, becameSecond] = becameLines(r, sc, tag, introTemplate?.name ?? null)
                 const menuItems = rowMenuItems(r)
                 const menuLabel = `「${r.name}」の操作`
                 const nameNode = r.source === 'entry_route' && r.entryRouteId ? (
@@ -922,7 +937,7 @@ export default function InflowListV8({
         <FolderPanel
           activeId={selectedGenre}
           onSelect={selectGenre}
-          onAddFolder={readonly ? undefined : () => setEditingGenre('new')}
+          onAddFolder={canManageFolders ? () => setEditingGenre('new') : undefined}
           addFolderLabel="フォルダを追加"
           rows={folderRows}
         >

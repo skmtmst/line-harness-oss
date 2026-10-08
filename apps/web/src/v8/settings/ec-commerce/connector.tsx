@@ -10,7 +10,7 @@
  * 今の部品（app/ec-commerce/connector-panel.tsx）と同じ。
  */
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { EC_EVENT_LABELS, type EcEventType } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -19,6 +19,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
+import { useResponseGate } from '@/lib/use-response-gate'
 import { ApiError, api, type EcConnector, type EcConnectorOverview } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -88,20 +89,32 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
   /* 全部外すこと自体は止めない。保存の直前に確認を1枚だけ挟む。 */
   const [emptyConfirm, setEmptyConfirm] = useState<{ events: boolean; rules: boolean } | null>(null)
 
+  /*
+   * WEB192：アカウントを変えたら、前のアカウントの遅い応答を捨てる（A の設定を B の欄へ入れない）。
+   * 保存の結果も、押したときのアカウントのままのときだけ書く。
+   */
+  const gate = useResponseGate()
+  const accountRef = useRef(accountId)
+  accountRef.current = accountId
   const load = useCallback(async () => {
+    const token = gate.begin()
     if (!accountId) { setData(null); setForm(EMPTY_FORM); setState('empty'); return }
     setState('loading')
+    setData(null)
+    setForm(EMPTY_FORM)
     try {
       const response = await api.ecCommerce.connector(accountId)
+      if (!gate.current(token)) return
       if (!response.success || !response.data?.health) throw new Error('invalid_connector_response')
       setData(response.data)
       setForm(toForm(response.data.connector))
       setReplacingSecret(false)
       setState(response.data.configured ? 'ready' : 'empty')
     } catch (error) {
+      if (!gate.current(token)) return
       setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId])
+  }, [accountId, gate])
 
   useEffect(() => { void load() }, [load])
 
@@ -115,15 +128,18 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
 
   const save = async () => {
     if (!accountId) return
+    const accountAtSave = accountId
     setSaving(true)
     setNotice(null)
     try {
       const response = await api.ecCommerce.updateConnector(accountId, form)
+      if (accountRef.current !== accountAtSave) return
       if (!response.success) throw new Error('save_failed')
       setForm((current) => ({ ...current, inboundSecret: '', expectedVersion: response.data.version }))
       setNotice({ tone: 'success', text: 'つなぎ先の設定を保存しました。' })
       await load()
     } catch (error) {
+      if (accountRef.current !== accountAtSave) return
       if (error instanceof ApiError && error.status === 409) await load()
       setNotice({ tone: 'error', text: error instanceof ApiError && error.status === 409 ? 'ほかの担当者が先に変更しました。最新の内容を読み直しました。' : '設定を保存できませんでした。入力内容を確認してください。' })
     } finally {

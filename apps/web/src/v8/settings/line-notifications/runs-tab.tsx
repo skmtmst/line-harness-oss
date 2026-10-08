@@ -154,12 +154,12 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
   /* 数のマス（DrwMm）。口の集計に内訳が無いので、読み込んだ記録から数える。送れなかった件数だけは口の合計。 */
   const breakdown = useMemo(() => {
     const blocked = items.filter((item) => item.reason?.includes('ブロック')).length
-    const emailed = items.filter((item) => item.channel === 'email' || item.reason?.includes('メール')).length
     const planned = items.filter((item) => item.nextRetryAt !== null)
     const next = planned.map((item) => new Date(item.nextRetryAt as string).getTime()).filter(Number.isFinite).sort((a, b) => a - b)[0]
-    return { blocked, emailed, retry: planned.length, nextRetryAt: next === undefined ? null : new Date(next).toISOString() }
+    return { blocked, retry: planned.length, nextRetryAt: next === undefined ? null : new Date(next).toISOString() }
   }, [items])
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const pageScoped = total > items.length
   const kpiNote = (ready: string): string => {
     if (!lineAccountId) return 'LINEアカウントを選ぶと出ます'
     if (visibleState === 'error') return '読み込めませんでした'
@@ -177,10 +177,15 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
   return <>
     {mode === 'failures' ? (
       <KpiBand data-kpi-presentation="cards" gridClassName={`${styles.kpis} ${styles.opKpis}`} data-design="KPIs">
-        <KpiCard presentation="card" icon={<CircleX size={14} aria-hidden="true" />} title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={kpiNote('この7日')} loading={visibleState === 'loading'} />
-        <KpiCard presentation="card" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={kpiValue(breakdown.blocked)} unit="件" detail={kpiNote('対応不要')} loading={visibleState === 'loading'} />
-        <KpiCard presentation="card" icon={<Mail size={14} aria-hidden="true" />} title="メールで送った" value={kpiValue(breakdown.emailed)} unit="件" detail={kpiNote('LINE未ログイン')} loading={visibleState === 'loading'} />
-        <KpiCard presentation="card" icon={<RotateCw size={14} aria-hidden="true" />} title="再試行の予定" value={kpiValue(breakdown.retry)} unit="件" detail={kpiNote(breakdown.nextRetryAt ? shortJst(breakdown.nextRetryAt) : '予定なし')} loading={visibleState === 'loading'} />
+        {/*
+          * WEB201：期間を口へ送っていないので「この7日」と言わない。ブロック・再試行は読み込んだページから
+          * 数えているので、全件より少ないときは「このページの n件から」と書く。
+          * WEB202：送れなかった一覧にはメールで届いたもの（受付済み）は出ないので、ここでは数えない。
+          */}
+        <KpiCard presentation="card" icon={<CircleX size={14} aria-hidden="true" />} title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={kpiNote('記録の合計')} loading={visibleState === 'loading'} />
+        <KpiCard presentation="card" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={kpiValue(breakdown.blocked)} unit="件" detail={kpiNote(pageScoped ? `このページの${items.length}件から・対応不要` : '対応不要')} loading={visibleState === 'loading'} />
+        <KpiCard presentation="card" icon={<Mail size={14} aria-hidden="true" />} title="メールで送った" value={null} unit="件" detail={kpiNote('お知らせの記録で見られます')} loading={visibleState === 'loading'} />
+        <KpiCard presentation="card" icon={<RotateCw size={14} aria-hidden="true" />} title="再試行の予定" value={kpiValue(breakdown.retry)} unit="件" detail={kpiNote(`${pageScoped ? `このページの${items.length}件から・` : ''}${breakdown.nextRetryAt ? shortJst(breakdown.nextRetryAt) : '予定なし'}`)} loading={visibleState === 'loading'} />
       </KpiBand>
     ) : null}
 
