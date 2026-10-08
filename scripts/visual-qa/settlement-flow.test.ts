@@ -36,7 +36,7 @@ describe('ROOT-18 精算の一連の見本', () => {
     })
 
     let lastError: unknown
-    for (let attempt = 0; attempt < 50; attempt += 1) {
+    for (let attempt = 0; attempt < 300; attempt += 1) {
       try {
         const response = await fetch(`${baseUrl}/__mock-fingerprint`)
         if (response.ok) return
@@ -46,7 +46,7 @@ describe('ROOT-18 精算の一連の見本', () => {
       await new Promise((resolve) => setTimeout(resolve, 20))
     }
     throw lastError ?? new Error('Visual QA モックが起動しませんでした')
-  })
+  }, 15000)
 
   afterAll(() => {
     child?.kill('SIGTERM')
