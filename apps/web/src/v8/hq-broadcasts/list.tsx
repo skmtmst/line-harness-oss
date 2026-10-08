@@ -165,8 +165,9 @@ export default function HqBroadcastList() {
 
   const countIn = (id: string) => all.filter((run) => (id === 'none' ? !folderIdOf(run) || !(folders ?? []).some((f) => f.id === folderIdOf(run)) : folderIdOf(run) === id)).length
   const folderRows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? all.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? all.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
     ...(folders ?? []).map((folder) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
       color: folder.color,
@@ -177,7 +178,7 @@ export default function HqBroadcastList() {
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
-    ...(folders && folders.length > 0 ? [{ id: 'none', label: '未分類', count: ready ? countIn('none') : null }] : []),
+    ...(folders && folders.length > 0 ? [{ kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null }] : []),
   ]
   const selectFolder = (id: string) => { setFolderFilter(id); setPage(1) }
   const saveFolder = async () => {

@@ -315,8 +315,9 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
   ]
 
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: status === 'ready' ? items.length : null },
+    { kind: 'all' as const, id: '', label: 'すべて', count: status === 'ready' ? items.length : null },
     ...folders.map((f, index) => ({
+      kind: 'folder' as const,
       id: f.id,
       label: f.name,
       count: status === 'ready' ? items.filter((field) => field.folderId === f.id).length : null,
@@ -327,7 +328,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
       onDelete: canEdit ? () => setDeletingFolder(f) : undefined,
       deleteNote: '削除しても、中の項目は未分類に残ります。',
     })),
-    { id: UNFILED, label: '未分類', count: status === 'ready' ? items.filter((field) => !field.folderId).length : null },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: status === 'ready' ? items.filter((field) => !field.folderId).length : null },
   ]
   const folderSelectOptions = [
     { value: '', label: 'フォルダ：すべて' },

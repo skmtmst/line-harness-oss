@@ -531,8 +531,8 @@ function FriendAddList() {
   /* ===== 道具 ===== */
   /* 閲覧のみの人には、作る・追加・編集・削除の操作を置かない（押せない形でも出さない。オーナー 2026-10-06）。 */
   const folderRows = [
-    { id: '', label: 'すべて', count: data?.total ?? items.length },
-    ...folders.map((entry) => ({ id: entry.key, label: entry.name, color: entry.color, count: entry.count })),
+    { kind: 'all' as const, id: '', label: 'すべて', count: data?.total ?? items.length },
+    ...folders.map((entry) => ({ kind: entry.key === UNFILED ? 'unfiled' as const : 'folder' as const, id: entry.key, label: entry.name, color: entry.color, count: entry.count })),
   ]
   const createButton = canEdit ? (
     <Button variant="primary" href="/friend-add-settings?view=new" className={styles.createButton}>

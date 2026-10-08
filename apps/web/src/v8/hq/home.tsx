@@ -334,8 +334,9 @@ export default function HqHomeV8() {
   }
 
   const folderRows: FolderPanelRow[] = [
-    { id: ALL, label: 'すべて', count: accounts.length, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: ALL, label: 'すべて', count: accounts.length, icon: <Inbox size={15} aria-hidden="true" /> },
     ...folders.map((f, index) => ({
+      kind: 'folder' as const,
       id: f.id,
       label: f.name,
       count: typeof f.itemCount === 'number' ? f.itemCount : (folderCounts.get(f.id) ?? 0),
@@ -345,7 +346,7 @@ export default function HqHomeV8() {
       onMoveDown: canManage && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
       onDelete: canManage ? () => { setFolderError(''); setDeleteFolder(f) } : undefined,
     })),
-    { id: UNFILED, label: '未分類', count: unfiledCount ?? localUnfiled },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount ?? localUnfiled },
   ]
 
   const createAccount = canManage ? (

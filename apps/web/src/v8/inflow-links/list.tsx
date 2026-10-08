@@ -485,8 +485,9 @@ export default function InflowListV8({
 
   /* ===== フォルダ ===== */
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: accountRows.length, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: accountRows.length, icon: <Inbox size={15} aria-hidden="true" /> },
     ...availableGenres.map((genre) => ({
+      kind: 'folder' as const,
       id: genre.name,
       label: genre.name,
       count: accountRows.filter((row) => row.genre === genre.name).length,
@@ -496,7 +497,7 @@ export default function InflowListV8({
         : {}),
     })),
     ...(hasUncategorized
-      ? [{ id: UNCATEGORIZED, label: '未分類', count: accountRows.filter((row) => !row.genre).length }]
+      ? [{ kind: 'unfiled' as const, id: UNCATEGORIZED, label: '未分類', count: accountRows.filter((row) => !row.genre).length }]
       : []),
   ]
   const selectGenre = (id: string) => { setSelectedGenre(id); setPage(1) }

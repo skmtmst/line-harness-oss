@@ -381,9 +381,9 @@ export default function WebhooksOutgoingV8() {
 
   /* ===== フォルダの列 ===== */
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: ready ? displayed.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
-    { id: UNFILED, label: '未分類', count: ready ? displayed.length : null },
+    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? displayed.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    ...folders.map((folder) => ({ kind: 'folder' as const, id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: ready ? displayed.length : null },
   ]
   const folderSelect = (
     <Select

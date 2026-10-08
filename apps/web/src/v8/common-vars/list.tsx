@@ -957,8 +957,9 @@ function CommonVarsListInner() {
   }
   /* 並びは絵どおり：すべて → 作ったフォルダ → 未分類（最後）。 */
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: listFailed ? null : items.length },
+    { kind: 'all' as const, id: '', label: 'すべて', count: listFailed ? null : items.length },
     ...folders.map((folder) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
       count: folder.itemCount ?? null,
@@ -967,7 +968,7 @@ function CommonVarsListInner() {
       onDelete: canWrite ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
       deleteNote: '削除しても、入っていた共通情報は未分類として残ります。',
     })),
-    { id: UNGROUPED, label: '未分類', count: unfiledCount },
+    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: unfiledCount },
   ]
   const folderOptions = [
     { value: '', label: 'フォルダ：すべて' },

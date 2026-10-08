@@ -986,11 +986,13 @@ export default function TemplatesListV8() {
   /* ===== フォルダの列 ===== */
   const folderRows: FolderPanelRow[] = [
     {
+      kind: 'all' as const,
       id: 'all',
       label: 'すべて',
       count: view === 'ready' || view === 'empty' || view === 'no-match' ? tabItems.length : null,
     },
     ...folders.map((folder, index) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
       // フォルダ件数は API(itemCount) をそのまま出す。来ないときは null。
@@ -1005,6 +1007,7 @@ export default function TemplatesListV8() {
       deleteNote: '削除しても、中のテンプレートは未分類に残ります。',
     })),
     {
+      kind: 'unfiled' as const,
       id: 'unfiled',
       label: '未分類',
       count: view === 'ready' || view === 'empty' || view === 'no-match' ? unfiledCount : null,
