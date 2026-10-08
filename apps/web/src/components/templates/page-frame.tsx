@@ -18,16 +18,14 @@ export interface PageHeadingProps {
   /** 題と説明の下の行に置く、来た道の案内（★BG-B `qIp42` の `HLq5w`・`Y5UR7`）。 */
   crumbs?: ReactNode
   steps?: ReactNode
-  /** 作る型の手順の置き方。既定は題→手順→説明（A0pDt）。FU2aU の同行版は 'inline'。V6xAo は題→説明→手順の 'after-description'。 */
-  stepsPlacement?: 'below' | 'inline' | 'after-description'
-  /** 手順の丸と字の大きさ。'large' は V6xAo・dnzqC の絵（丸22・字13）。既定は A0pDt（丸20・字12）。 */
-  stepsSize?: 'large'
+  /** 作る型の手順の置き方。既定は題と説明の下の行。FU2aU の同行版は 'inline'。 */
+  stepsPlacement?: 'below' | 'inline'
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, description, help, actions, crumbs, steps, headingSize, stepsPlacement = 'below', stepsSize }: PageHeadingProps) {
+export function PageHeading({ title, description, help, actions, crumbs, steps, headingSize, stepsPlacement = 'below' }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
-  return <header className={styles.heading} data-template-region="heading" data-heading-size={headingSize} data-has-steps={!!steps || undefined} data-has-crumbs={!!crumbs || undefined} data-steps-placement={stepsPlacement} data-steps-size={stepsSize}>
+  return <header className={styles.heading} data-template-region="heading" data-heading-size={headingSize} data-has-steps={!!steps || undefined} data-has-crumbs={!!crumbs || undefined} data-steps-placement={stepsPlacement}>
     <div className={styles.headingText}>
       <div className={styles.titleRow}><h2 className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</h2>
         {help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}

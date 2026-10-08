@@ -378,7 +378,6 @@ export default function ScenarioCreateV8() {
     <CreatePage
       boardId="dnzqC"
       title="シナリオを作る"
-      stepsSize="large"
       identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
       steps={(
         <Stepper

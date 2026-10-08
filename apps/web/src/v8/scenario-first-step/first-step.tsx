@@ -542,8 +542,6 @@ export default function ScenarioFirstStepV8() {
     <CreatePage
       boardId={narrow ? 'U5rxyH' : 'V6xAo'}
       title="1通目を設定"
-      stepsPlacement="after-description"
-      stepsSize="large"
       identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
       steps={(
         <Stepper

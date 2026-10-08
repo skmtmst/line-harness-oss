@@ -228,7 +228,3 @@
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { order: 2; }
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .description { flex-basis: 100%; order: 3; }
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 1; }
-/* ★V8 作る型の頭の並び・説明が先の版（シナリオ配信 作る② V6xAo：題 → 説明 → 手順の帯。手順の帯の上に 12）。stepsPlacement="after-description" で選ぶ。 */
-:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='after-description'] > .headingText > .description { order: 2; }
-:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='after-description'] > .steps { order: 3; padding-top: 12px; }
-:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-size='large'] { --tpl-steps-dot: 22px; --tpl-steps-text-size: 13px; --tpl-steps-text-lh: 19px; }
