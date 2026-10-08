@@ -15,6 +15,8 @@ const state = vi.hoisted(() => ({
   role: 'owner' as string,
   tab: '' as string,
   updates: [] as Array<Record<string, unknown>>,
+  plannedTotal: 2,
+  onlyPlanned: false,
 }))
 
 vi.mock('next/link', () => ({
@@ -69,8 +71,10 @@ vi.mock('@/lib/api', () => {
             steps: [{ id: 'st1', stepNumber: 1, offsetMinutes: -1440, messageType: 'text', messageContent: '明日のご案内です。', sent: 212, openRate: null, errors: 1 }],
             items: params?.status === 'planned'
               ? [run('p1', 'planned', '佐藤 花子'), run('p2', 'planned', '高橋 美咲')]
-              : [run('r1', 'succeeded', '佐藤 花子'), run('r2', 'permanent_failed', '鈴木 一郎'), run('r3', 'planned', '予定の人')],
-            pagination: { total: 2, limit: 100, offset: 0 },
+              : state.onlyPlanned
+                ? [run('r3', 'planned', '予定の人')]
+                : [run('r1', 'succeeded', '佐藤 花子'), run('r2', 'permanent_failed', '鈴木 一郎'), run('r3', 'planned', '予定の人')],
+            pagination: { total: params?.status === 'planned' ? state.plannedTotal : state.onlyPlanned ? 40 : 2, limit: 100, offset: 0 },
           },
         })),
         get: vi.fn(async () => ({ success: true, data: { id: 'reminder-1', name: '予約前日のご案内', isActive: true, triggerType: 'booking', deliveryMode: 'time', createdAt: '', updatedAt: '2026-09-28T01:00:00Z', steps: [{ id: 'st1', reminderId: 'reminder-1', offsetMinutes: 0, offsetDays: -1, sendAtTime: '18:00', messageType: 'text', messageContent: '', createdAt: '' }] } })),
@@ -104,6 +108,8 @@ beforeEach(() => {
   state.role = 'owner'
   state.tab = ''
   state.updates = []
+  state.plannedTotal = 2
+  state.onlyPlanned = false
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -173,5 +179,22 @@ describe('V8 リマインダの詳細', () => {
     expect(host.textContent).toContain('山田 太郎')
     expect(buttons()).not.toContain('取り消す')
     expect(buttons()).not.toContain('再開する')
+  })
+
+  it('WEB084：予定を読み切れていないとき、一時停止の窓で今後24時間の数を言い切らない', async () => {
+    state.plannedTotal = 340
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    const dialog = document.querySelector('[data-design-node="RwVo5"]')
+    expect(dialog?.textContent).toContain('今後24時間の分は数え切れませんでした')
+    expect(dialog?.textContent).not.toContain('今後24時間で送る予定の 2通')
+  })
+
+  it('WEB084：先頭が予定ばかりで実行が見えないときは「まだありません」と言わない', async () => {
+    state.onlyPlanned = true
+    await render()
+    const section = host.querySelector('[aria-labelledby="rm-detail-recent"]')
+    expect(section?.textContent).toContain('最近の実行をここでは読み切れませんでした')
+    expect(section?.textContent).not.toContain('まだ実行した通知はありません')
   })
 })

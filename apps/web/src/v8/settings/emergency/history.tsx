@@ -54,6 +54,30 @@ const RESULT: Record<Deployment['phase'], { label: string; tone: 'good' | 'warn'
   verifying: { label: '確かめている', tone: 'muted' },
 }
 
+/**
+ * WEB195：配備の記録は1回の配備につき段階（待っている→入れている→確かめている→成功）ごとに1行ある。
+ * 段階を別々の「更新」と数えない。配備ID ごとに、いちばん新しい段階（記録は新しい順）だけを残す。
+ */
+export function latestDeploymentPhases(deployments: Deployment[]): Deployment[] {
+  const seen = new Set<string>()
+  const latest: Deployment[] = []
+  for (const deployment of deployments) {
+    const key = deployment.deploymentId || `${deployment.version ?? ''}|${deployment.occurredAt}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    latest.push(deployment)
+  }
+  return latest
+}
+
+/** WEB194：表の「結果」。配備の記録が無い・読めないときに「反映済み（成功）」と言わない。 */
+export function releaseResult(deployment: Deployment | null, historyState: 'loading' | 'ready' | 'error'): { label: string; tone: 'good' | 'warn' | 'danger' | 'muted' } {
+  if (deployment) return RESULT[deployment.phase]
+  if (historyState === 'error') return { label: '確認できません', tone: 'muted' }
+  if (historyState === 'loading') return { label: '—', tone: 'muted' }
+  return { label: '配備の記録なし', tone: 'muted' }
+}
+
 export default function UpdateHistoryV8() {
   const [history, setHistory] = useState<OperationHistoryEntry[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -70,7 +94,7 @@ export default function UpdateHistoryV8() {
   }, [])
 
   const releases = useMemo(() => ((releaseLog as { releases?: Release[] }).releases ?? []).filter((item) => item.released), [])
-  const deployments = useMemo(() => history.flatMap((item) => (item.historyKind === 'deployment' && item.deployment ? [item.deployment] : [])), [history])
+  const deployments = useMemo(() => latestDeploymentPhases(history.flatMap((item) => (item.historyKind === 'deployment' && item.deployment ? [item.deployment] : []))), [history])
   const byVersion = useMemo(() => {
     const map = new Map<string, Deployment>()
     for (const d of deployments) if (d.version && !map.has(d.version.replace(/^v/, ''))) map.set(d.version.replace(/^v/, ''), d)
@@ -130,7 +154,7 @@ export default function UpdateHistoryV8() {
           </div>
           <div role="rowgroup">
             {rows.map(({ release, deployment }) => {
-              const result = deployment ? RESULT[deployment.phase] : { label: '反映済み', tone: 'good' as const }
+              const result = releaseResult(deployment, state)
               const title = `v${release.version} ${release.entries[0]?.text ?? ''}`.trim()
               return (
                 <div role="row" key={release.version} className={styles.row}>
