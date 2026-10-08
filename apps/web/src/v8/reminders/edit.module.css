@@ -16,12 +16,11 @@
 }
 .backLink:hover { text-decoration: underline; }
 
-/* 競合の帯（k32cn）：頭の線の下・板の幅いっぱい。型の頭の最後の段に入れて、上下の間を絵の位置に合わせる。 */
+/* 競合の帯（k32cn）：頭の線の下・板の幅いっぱい。型の帯の段（上 0・左右 24・下 8）に入れる。 */
 .conflictBand {
   display: flex;
   align-items: center;
   gap: var(--tpl-rm-band-gap);
-  margin: var(--tpl-rm-conflict-margin);
   padding: var(--tpl-rm-band-pad);
   border-radius: var(--tpl-rm-band-radius);
   outline: 1px solid var(--color-warning);

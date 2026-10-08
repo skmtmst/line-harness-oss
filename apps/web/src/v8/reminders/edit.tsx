@@ -8,6 +8,7 @@ import {
   ArrowUp,
   CalendarClock,
   CalendarDays,
+  Check,
   CheckCircle2,
   CircleAlert,
   Filter,
@@ -188,6 +189,9 @@ type StageFrame = {
   identity: ReactNode
   steps: ReactNode
   description: ReactNode
+  /** 頭の線の下に板の幅で置く帯（競合 k32cn）。 */
+  notice?: ReactNode
+  noticeSpacing?: 'band'
   /** 下の帯の左の文（下書きの自動保存の状態）。 */
   status?: ReactNode
 }
@@ -500,8 +504,8 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
               : 'hjNpJ'
 
   /*
-   * 競合（k32cn）の帯は頭の線の下・本文の上、板の幅いっぱい。型の頭の説明の
-   * 段（最後の行）に入れ、帯の上下の間は自分の CSS で絵の位置に合わせる。
+   * 競合（k32cn）の帯は頭の線の下・本文の上、板の幅いっぱい。型の「帯の段」
+   * （notice・noticeSpacing='band'）に入れる。
    */
   const conflictBand = conflict ? (
     <div className={styles.conflictBand} role="alert">
@@ -531,9 +535,10 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
           : v8stage === 'done'
             ? `名前：${subjectSettings.name}`
             : `名前：${subjectSettings.name}・いまは下書きです`}
-        {conflictBand}
       </>
     ),
+    notice: conflictBand,
+    noticeSpacing: 'band',
     status: autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined,
   }
 
@@ -1558,13 +1563,13 @@ function ScheduleStageV8({
             ))}
           </div>
         )}
-        {preview && preview.summary.duplicateCount > 0 ? (
-          <p className={styles.infoBand}>
-            <Layers size={16} aria-hidden="true" />
-            同じ時刻に送る通知は、止めずに1通にまとめて送ります（{formatNumber(preview.summary.duplicateCount)}件）。まとめたくないときは時刻をずらしてください。
-          </p>
-        ) : null}
       </section>
+      {preview && preview.summary.duplicateCount > 0 ? (
+        <p className={styles.infoBand}>
+          <Layers size={16} aria-hidden="true" />
+          同じ時刻に送る通知は、止めずに1通にまとめて送ります（{formatNumber(preview.summary.duplicateCount)}件）。まとめたくないときは時刻をずらしてください。
+        </p>
+      ) : null}
     </CreatePage>
   )
 }
@@ -1819,7 +1824,7 @@ function DoneStageV8({
       <div className={styles.doneBody}>
         <div className={styles.doneCard}>
           <span className={styles.doneIcon}>
-            <CheckCircle2 size={24} aria-hidden="true" />
+            <Check size={24} aria-hidden="true" />
           </span>
           <h2 className={styles.doneTitle}>「{settings.name}」を有効にしました</h2>
           <p className={styles.doneNote}>
