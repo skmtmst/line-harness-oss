@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { FormLayout } from '@line-crm/shared';
 import Form from './Form.js';
@@ -40,6 +40,10 @@ function layout(): FormLayout {
           { id: 'b2', kind: 'input', type: 'textarea', name: '要望', label: 'ご要望' },
           { id: 'b3', kind: 'input', type: 'prefecture', name: '県', label: 'お住まいの都道府県' },
           { id: 'b4', kind: 'input', type: 'rating', name: '対応', label: '担当の対応は？' },
+          { id: 'b5', kind: 'input', type: 'date', name: '来店日', label: 'ご来店日' },
+          { id: 'b6', kind: 'input', type: 'select', name: '連絡', label: '連絡方法', choices: [{ id: 'c1', label: '電話' }] },
+          { id: 'b7', kind: 'input', type: 'radio', name: '時間帯', label: '希望時間帯', required: true, choices: [{ id: 'c2', label: '午前' }] },
+          { id: 'b8', kind: 'input', type: 'checkbox', name: '曜日', label: '希望曜日', choices: [{ id: 'c3', label: '月曜日' }] },
         ],
       },
     ],
@@ -67,6 +71,21 @@ describe('監査 L12：欄名・説明・直しの文を入力と結ぶ', () => 
     expect(await screen.findByRole('textbox', { name: /お名前/ })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'ご要望' })).toBeTruthy();
     expect(screen.getByRole('combobox', { name: 'お住まいの都道府県' })).toBeTruthy();
+    expect(screen.getByLabelText('ご来店日')).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: '連絡方法' })).toBeTruthy();
+  });
+
+  it('質問と選択肢の名前を両方保ち、選択群にも直し方を結ぶ', async () => {
+    const radioGroup = await screen.findByRole('group', { name: /希望時間帯/ });
+    expect(within(radioGroup).getByRole('radio', { name: '午前' })).toBeTruthy();
+    const checkGroup = screen.getByRole('group', { name: '希望曜日' });
+    expect(within(checkGroup).getByRole('checkbox', { name: '月曜日' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '送信する' }));
+    const error = await screen.findByText('希望時間帯 は必須項目です');
+    expect(document.getElementById(radioGroup.getAttribute('aria-describedby')!) === error).toBe(true);
+    fireEvent.click(within(radioGroup).getByRole('radio', { name: '午前' }));
+    expect(screen.queryByText('希望時間帯 は必須項目です')).toBeNull();
+    expect(radioGroup.hasAttribute('aria-describedby')).toBe(false);
   });
 
   it('★のような選ぶ欄は、欄名の付いた群れになる', async () => {
