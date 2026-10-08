@@ -1547,7 +1547,7 @@ CREATE TABLE "booking_reminders" (
                   CHECK (status IN ('pending','sent','failed','failed_permanent','cancelled')),
   retry_count   INTEGER NOT NULL DEFAULT 0,
   last_error    TEXT
-);
+, retry_key TEXT, recipient_line_user_id TEXT, messages_json TEXT);
 
 CREATE TABLE booking_resource_consumptions (
   booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
