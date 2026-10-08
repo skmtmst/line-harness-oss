@@ -40,7 +40,9 @@ import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { formatNumber } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
 import { distributedAccountsLine, templateSubLine } from './list-row'
-import styles from '../templates/list.module.css'
+import storeStyles from '../templates/list.module.css'
+import hqStyles from './store-list.module.css'
+const styles = { ...storeStyles, ...hqStyles }
 
 /** 店のテンプレートと同じ6種類（上のタブ）。 */
 export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof MessageSquare }[] = [
@@ -297,7 +299,7 @@ export default function HqStoreList(props: HqStoreListProps) {
    *   リッチメニュー noVq4：順・誰に出すか・状態・配布先・今月押された・「…」（API-18 の順・誰に出すか・配った先の押された数）
    *   回答フォーム wZPua：状態・配布先・更新・［アカウントへ配る］と「…」
    */
-  const rowButton = type === 'form' || type === 'scenario'
+  const rowButton = true
   const rankOf = new Map(type === 'rich_menu'
     ? [...rows].sort((a, b) => (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'ja')).map((row, index) => [row.id, index + 1] as const)
     : [])
@@ -343,6 +345,10 @@ export default function HqStoreList(props: HqStoreListProps) {
     { key: 'state', head: '状態', col: <col key="state" className={styles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={styles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
     { key: 'taps', head: '今月押された', col: <col key="taps" className={styles.colMonthly} />, cell: (row) => plainTd('taps', row.tap_count == null ? '—' : `${formatNumber(row.tap_count)}回`, '配った先のアカウントで押された回数の合計') },
+  ] : type === 'form' ? [
+    { key: 'storage', head: '保存先', col: <col key="storage" className={styles.colFormStorage} />, cell: () => plainTd('storage', '—', '保存先の情報はまだ取得できません') },
+    { key: 'state', head: '状態', col: <col key="state" className={styles.colFormState} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'dest', head: '配布先', col: <col key="dest" className={styles.colFormDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
   ] : [
     { key: 'state', head: '状態', col: <col key="state" className={styles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={styles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
@@ -370,7 +376,7 @@ export default function HqStoreList(props: HqStoreListProps) {
           {type === 'rich_menu' ? <col className={styles.colSelect} /> : null}
           <col />
           {columns.map((column) => column.col)}
-          <col className={rowButton ? styles.colHqActions : styles.colMenu} />
+          <col className={type === 'form' ? styles.colFormActions : rowButton ? styles.colHqActions : styles.colMenu} />
         </colgroup>
         <thead>
           <TableHeadRow>
@@ -385,7 +391,7 @@ export default function HqStoreList(props: HqStoreListProps) {
             const folder = folderOf(row.folder_id)
             const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
             return (
-              <Tr key={row.id} data-row-id={row.id}>
+              <Tr key={row.id} data-row-id={row.id} density="template">
                 {type === 'rich_menu' ? <Td className={styles.cellPlain}>{rankOf.get(row.id) ?? '—'}</Td> : null}
                 <NameCell
                   name={(
@@ -405,8 +411,8 @@ export default function HqStoreList(props: HqStoreListProps) {
                     {canEdit ? (
                       <>
                         {rowButton ? (
-                          <Button type="button" variant="text" disabled={busy} onClick={() => onDistribute(row)} aria-label={`${row.name}をアカウントへ配る`}>
-                            <Send size={14} aria-hidden="true" />アカウントへ配る
+                          <Button type="button" size="compact" disabled={busy} onClick={() => onDistribute(row)} aria-label={`${row.name}をアカウントへ配る`}>
+                            <Send size={14} aria-hidden="true" />配る
                           </Button>
                         ) : null}
                         <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
