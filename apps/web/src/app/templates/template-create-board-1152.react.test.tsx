@@ -25,7 +25,7 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('@/lib/staff-capability', () => ({
   isOwnerOrAdmin: () => true,
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: () => {} }))
 
 import TemplateEditV8 from './edit-v8'
 
@@ -58,6 +58,8 @@ function installFetch() {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/templates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   narrowMatches = false
   document.documentElement.dataset.theme = 'v8'
   installMatchMedia()

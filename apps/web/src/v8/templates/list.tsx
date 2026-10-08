@@ -52,6 +52,7 @@ import { contentExcerpt } from '@/lib/broadcast-summary'
 import { ListPage } from '@/components/templates'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
+import LabelPill from '@/components/shared/label-pill'
 import EmptyList from '@/components/shared/empty-list'
 import { RowMenu } from '@/components/shared/row-actions'
 import Checkbox from '@/components/shared/checkbox'
@@ -623,32 +624,11 @@ export default function TemplatesListV8() {
     }
   }
 
-  /*
-   * 使用中なら「使っている所」の窓へ。どこでも使われていない（0か所と分かっている）なら、
-   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
-   * 使っている数が分からないときは、今までどおり確かめの窓。
-   */
+  /** 使用中は参照先を示す。未使用は確認してから削除し、元に戻す機能も残す。 */
   const handleDelete = (t: Template) => {
     setDeleteError('')
     if (t.usageCount > 0) {
       setBlockedDelete({ item: t, accountId: selectedAccountId })
-      return
-    }
-    if (t.usageCount === 0) {
-      if (activeId === t.id) setActiveId(null)
-      setSelectedIds((current) => {
-        if (!current.has(t.id)) return current
-        const next = new Set(current)
-        next.delete(t.id)
-        return next
-      })
-      deferredDelete.schedule({
-        ids: [t.id],
-        message: `テンプレート「${t.name}」を削除しました`,
-        commit: () => api.templates.delete(t.id),
-        onCommitted: () => Promise.all([load(), loadFolders()]),
-        failureMessage: 'テンプレートを削除できませんでした。もう一度お試しください。',
-      })
       return
     }
     setPendingDelete({ item: t, accountId: selectedAccountId })
@@ -662,6 +642,23 @@ export default function TemplatesListV8() {
       return
     }
     const target = pendingDelete.item
+    if (target.usageCount === 0) {
+      setPendingDelete(null)
+      if (activeId === target.id) setActiveId(null)
+      setSelectedIds((current) => {
+        const next = new Set(current)
+        next.delete(target.id)
+        return next
+      })
+      deferredDelete.schedule({
+        ids: [target.id],
+        message: `テンプレート「${target.name}」を削除しました`,
+        commit: () => api.templates.delete(target.id),
+        onCommitted: () => Promise.all([load(), loadFolders()]),
+        failureMessage: 'テンプレートを削除できませんでした。もう一度お試しください。',
+      })
+      return
+    }
     setDeleting(true)
     setDeleteError('')
     try {
@@ -689,7 +686,7 @@ export default function TemplatesListV8() {
    * 1件でも失敗したら元に戻して知らせる（「もう一度」で同じ移動をやり直せる）。
    */
   const runMove = async () => {
-    if (!moveIds) return
+    if (!moveIds || moving) return
     const ids = moveIds
     const folderId = moveDraft === '' ? null : moveDraft
     const previous = templates
@@ -1157,6 +1154,7 @@ export default function TemplatesListV8() {
                     interactive
                     key={t.id}
                     data-row-id={t.id}
+                    aria-label={`テンプレート「${t.name}」の詳細を開く`}
                     className={styles.rowClick}
                     tabIndex={0}
                     onClick={() => setActiveId(t.id)}
@@ -1192,7 +1190,7 @@ export default function TemplatesListV8() {
                       sub={<span className={narrow ? styles.cellSub : `${styles.cellSub} ${styles.dotIndent}`} title={excerpt}>{excerpt}</span>}
                     />
                     <Td>
-                      <span className={styles.kindBadge}>{isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}</span>
+                      <LabelPill>{isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}</LabelPill>
                     </Td>
                     <Td>
                       <span className={styles.publishPill} data-tone={publish.tone}>
@@ -1315,10 +1313,10 @@ export default function TemplatesListV8() {
           { label: 'メッセージ', count: loading ? undefined : templates.filter((t) => !t.question && !isRichVideoTemplate(t)).length, current: activeSection === 'message', onClick: () => switchSection('message') },
           { label: 'カルーセル', count: assetCounts.card_message, current: activeSection === 'card_message', onClick: () => switchSection('card_message') },
           { label: 'リッチメッセージ', count: assetCounts.rich_message, current: activeSection === 'rich_message', onClick: () => switchSection('rich_message') },
-          { label: 'リッチビデオ', count: loading ? undefined : templates.filter(isRichVideoTemplate).length, current: activeSection === 'rich_video', onClick: () => switchSection('rich_video') },
           { label: '質問', count: loading ? undefined : templates.filter((t) => Boolean(t.question)).length, current: activeSection === 'question', onClick: () => switchSection('question') },
           { label: 'クーポン', count: assetCounts.coupon, current: activeSection === 'coupon', onClick: () => switchSection('coupon') },
           { label: 'リサーチ', count: assetCounts.research, current: activeSection === 'research', onClick: () => switchSection('research') },
+          { label: 'リッチビデオ', count: loading ? undefined : templates.filter(isRichVideoTemplate).length, current: activeSection === 'rich_video', onClick: () => switchSection('rich_video') },
         ]}
       />
       </div>
@@ -1413,6 +1411,11 @@ export default function TemplatesListV8() {
         busy={deleting}
         error={deleteError}
         designNode="V6JFnd"
+        designWidth={640}
+        designTop={220}
+        designHeaderPadding="24px 24px 0"
+        designHeadingGap={22}
+        designContentPadding="14px 24px 0"
         onCancel={() => {
           if (deleting) return
           setPendingDelete(null)
@@ -1448,7 +1451,7 @@ export default function TemplatesListV8() {
         }
       >
         <div className={styles.fullWidth}>
-          <Notice tone="danger" message="削除は元に戻せません。" />
+          <Notice tone="danger" message={pendingDelete?.item.usageCount === 0 ? '削除したあと、5秒間は「元に戻す」で取り消せます。' : '削除は元に戻せません。'} />
         </div>
         {pendingDelete !== null && pendingDelete.accountId !== selectedAccountId ? (
           <p className={styles.alertText} role="alert">

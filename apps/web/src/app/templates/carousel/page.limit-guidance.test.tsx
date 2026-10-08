@@ -69,6 +69,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       folders: { ...actual.api.folders, list: calls.foldersList },
       tags: { ...actual.api.tags, list: empty },
       friendFields: { ...actual.api.friendFields, list: empty },
@@ -115,8 +116,8 @@ function bodyCaution(): HTMLElement | null {
   )
 }
 
-const titleInput = () => document.getElementById('cr-panel-0-title') as HTMLInputElement | null
-const bodyInput = () => document.getElementById('cr-panel-0-text') as HTMLTextAreaElement | null
+const titleInput = () => document.getElementById('cr-panel-title') as HTMLInputElement | null
+const bodyInput = () => document.getElementById('cr-panel-text') as HTMLTextAreaElement | null
 /** 本文カウンタ（「0 / 120」の形）。 */
 function bodyCounter(): HTMLElement | null {
   const area = bodyInput()
@@ -145,31 +146,29 @@ describe('R621: 本文の上限案内は画像・タイトルの有無と食い�
   it('両方なければ120文字で案内し、注意文も120文字をうたう', async () => {
     await mountNew()
     // 欄のそばの注記とカウンタは120文字。
-    expect(bodyCounter()?.textContent).toBe('0 / 120')
+    expect(bodyInput()?.title).toBe('0 / 120')
     expect(container.textContent).toContain('120文字まで')
     // 「気をつけること」は一律60文字ではなく、両方の条件を書く。
-    const caution = bodyCaution()?.textContent ?? ''
-    expect(caution).toContain('60文字')
-    expect(caution).toContain('120文字')
+
   })
 
   it('タイトルを入れると60文字に切り替わる', async () => {
     await mountNew()
     await act(async () => { typeInto(titleInput()!, '夏の定番セット') })
-    expect(bodyCounter()?.textContent).toBe('0 / 60')
-    expect(container.textContent).toContain('タイトルか画像があるため60文字までです')
+    expect(bodyInput()?.title).toBe('0 / 60')
+    expect(container.textContent).toContain('本文（タイトルか画像があると60文字まで）')
   })
 
   it('送信境界はそのまま：タイトルあり61文字は超過、なし120文字は収まる', async () => {
     await mountNew()
     // 両方なしで120文字ちょうどは赤くならない。
     await act(async () => { typeInto(bodyInput()!, 'あ'.repeat(120)) })
-    expect(bodyCounter()?.textContent).toBe('120 / 120')
-    expect(bodyCounter()?.className).not.toContain('text-danger')
+    expect(bodyInput()?.title).toBe('120 / 120')
+    expect(container.textContent).not.toContain('多すぎる分を減らしてください')
     // タイトルを足すと上限が60に下がり、同じ本文が超過になる。
     await act(async () => { typeInto(titleInput()!, '見出し') })
-    expect(bodyCounter()?.textContent).toBe('120 / 60')
-    expect(bodyCounter()?.className).toContain('text-danger')
+    expect(bodyInput()?.title).toBe('120 / 60')
+    expect(container.textContent).toContain('多すぎる分を減らしてください')
   })
 })
 

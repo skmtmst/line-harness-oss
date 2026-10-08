@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/template-detail/detail.tsx', import.meta.url), 'utf8')
 
 /** 名前で見つけた関数の本体だけを切り出す。ファイル全体を見ると素通しになる。 */
 function fnBody(src: string, decl: string): string {
@@ -41,14 +41,14 @@ describe('テンプレート詳細の削除確認', () => {
   })
 
   it('削除の処理が二度押しを受け付けない', () => {
-    const body = fnBody(PAGE, 'const remove = async ()')
-    expect(body, '押している間の二度押しを止めていない').toContain('if (deleting) return')
+    const body = fnBody(PAGE, 'const remove = useCallback(async ()')
+    expect(body, '押している間の二度押しを止めていない').toContain('if (deleting || usageCount > 0 || !template) return')
     expect(body).toContain('setDeleting(true)')
     expect(body, '処理中の印を必ず戻していない').toMatch(/finally\s*\{[\s\S]*setDeleting\(false\)/)
   })
 
   it('削除の失敗を握りつぶさず、一覧へ飛ばさない', () => {
-    const body = fnBody(PAGE, 'const remove = async ()')
+    const body = fnBody(PAGE, 'const remove = useCallback(async ()')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '失敗を窓に出していない').toContain(
       "setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')",
@@ -61,7 +61,7 @@ describe('テンプレート詳細の削除確認', () => {
 
   it('確認窓が取り消せない操作として出て、処理中は閉じられない', () => {
     const jsx = dialog(PAGE)
-    expect(jsx, '対象の名前を読ませていない').toContain('template?.name')
+    expect(jsx, '対象の名前を読ませていない').toContain('template.name')
     expect(jsx).toContain('templateDeleteDescription(usageCount)')
     expect(jsx).toContain('destructive')
     expect(jsx).toContain('confirmLabel="削除する"')
@@ -80,20 +80,20 @@ describe('テンプレート詳細の削除確認', () => {
     expect(jsx, '数えられるようになったのに断り書きが残っている').not.toContain(
       '一斉配信からの直接の参照は、まだ数えられません。',
     )
-    expect(PAGE, '一斉配信の使用先を数えていない').toContain('broadcastRefs')
+    expect(PAGE, '一斉配信の使用先を数えていない').toContain('template?.usedBy?.broadcasts')
   })
 
   // 2026-09-02: development (#433) が覚えの名前を confirmOpen → deleteOpen に
   // し、使用中は削除させない形にした。**見張る中身は変えていない。**
   it('削除ボタンは窓を開くだけで、押した時点では消さない', () => {
-    expect(PAGE).toContain("onClick={() => { setDeleteError(''); setDeleteOpen(true) }}")
+    expect(PAGE).toContain("onSelect: openDelete")
   })
 
   // development (#433) が足した「使用中は消さない」も一緒に見張る。
   it('使用中は削除の口を開かない', () => {
-    const body = fnBody(PAGE, 'const remove = async ()')
-    expect(body, '使用中でも消しにいく').toContain('if (usageCount > 0 || !template) return')
-    expect(PAGE, '使用中でもボタンが押せる').toContain('disabled={usageCount > 0}')
+    const body = fnBody(PAGE, 'const remove = useCallback(async ()')
+    expect(body, '使用中でも消しにいく').toContain('if (deleting || usageCount > 0 || !template) return')
+    expect(PAGE).toContain('if (usageCount > 0) setBlockedOpen(true)')
     expect(PAGE, '使用中の窓が開いてしまう').toContain('open={deleteOpen && usageCount === 0}')
   })
 })

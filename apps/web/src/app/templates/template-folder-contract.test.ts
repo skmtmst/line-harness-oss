@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
-const PAGE = read('page.tsx')
+const PAGE = read("../../v8/templates/list.tsx")
 /** 注釈を落とす。「テンプレートと書かない」の説明が自分の見張りに当たらないように。 */
 const withoutComments = (src: string) =>
   src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
@@ -94,10 +94,9 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
     残すと、動くのに「動きません」と書いてある画面になる。
   */
   it('詳細から置き場を移せる', () => {
+expect(PAGE).toContain('フォルダへ移す')
+    expect(PAGE).toContain('api.templates.update(id, { folderId })')
     expect(PAGE).not.toContain('テンプレートをフォルダへ移す操作は、まだ繋がっていません。')
-    expect(PAGE).not.toContain('<Th>置き場</Th>')
-    expect(PAGE).toContain('aria-label="置き場"')
-    expect(PAGE).toContain('api.templates.update(template.id, { folderId })')
   })
 
   /*
@@ -105,12 +104,15 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
     断られたとき（消えたフォルダを指したなど）に、移っていないものが
     移ったように見えたままになる。
   */
-  it('移せたと分かってから一覧を書き換える', () => {
-    const move = PAGE.slice(PAGE.indexOf('const moveTemplate'), PAGE.indexOf('const removeFolder'))
-    expect(move.indexOf('if (!res.success)')).toBeLessThan(move.indexOf('setTemplates('))
+  it('移動に失敗したら一覧を移動前へ戻す', () => {
+const move = PAGE.slice(PAGE.indexOf('const runMove'), PAGE.indexOf('const filteredAssets'))
+    expect(move).toContain('const previous = templates')
+    expect(move).toContain('if (!result.success)')
+    expect(move).toContain('setTemplates(previous)')
   })
 
   it('移しているテンプレートは二重に押させない', () => {
-    expect(PAGE).toContain('disabled={movingId === drawerData.id}')
+expect(PAGE).toContain('if (!moveIds || moving) return')
+    expect(PAGE).toContain('disabled={moving}')
   })
 })

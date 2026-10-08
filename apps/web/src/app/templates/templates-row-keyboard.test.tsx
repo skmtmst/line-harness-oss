@@ -32,7 +32,7 @@ const TEMPLATES = [
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
-  api: {
+  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
     templates: {
       list: () => Promise.resolve({ success: true, data: TEMPLATES }),
       get: templateGet,
@@ -55,6 +55,8 @@ const EMPTY_USED_BY = {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/templates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   // N-144: 変更操作は owner/admin だけに出す。行の操作を試す試験は owner で立てる。
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
@@ -81,7 +83,7 @@ afterEach(() => cleanup())
  * `role="link"` の行が出るので、画面全体では1件に定まらない。
  */
 const tableRow = (name: string) =>
-  within(screen.getByRole('table')).getByRole('link', { name })
+  within(screen.getByRole('table')).getByRole('row', { name: `テンプレート「${name.replace('の詳細を開く', '')}」の詳細を開く` })
 
 async function renderAndWait() {
   render(<TemplatesPage />)
@@ -94,7 +96,8 @@ describe('テンプレート一覧行のキーボード操作 (N-140)', () => {
   test('行はTabでフォーカスできる', async () => {
     await renderAndWait()
     const row = tableRow('来店お礼の詳細を開く')
-    expect(row.getAttribute('tabindex')).toBe('0')
+    expect(row.querySelector('a')?.tabIndex).toBe(0)
+    expect(row.tabIndex).toBe(-1)
   })
 
   test('行にフォーカスしてEnterで詳細を開く', async () => {
@@ -102,15 +105,15 @@ describe('テンプレート一覧行のキーボード操作 (N-140)', () => {
     const row = tableRow('来店お礼の詳細を開く')
     fireEvent.keyDown(row, { key: 'Enter' })
     await act(async () => { await Promise.resolve() })
-    expect(templateGet).toHaveBeenCalledWith('tpl-1')
+    expect(new URLSearchParams(window.location.search).get('row')).toBe('tpl-1')
   })
 
-  test('行にフォーカスしてSpaceでも詳細を開く', async () => {
+  test('行にフォーカスしてSpaceで選択する', async () => {
     await renderAndWait()
     const row = tableRow('予約確認の詳細を開く')
     fireEvent.keyDown(row, { key: ' ' })
     await act(async () => { await Promise.resolve() })
-    expect(templateGet).toHaveBeenCalledWith('tpl-2')
+    expect((row.querySelector('input[type=checkbox]') as HTMLInputElement).checked).toBe(true)
   })
 
   test('行内のリンク・ボタン上のEnterでは詳細を誤作動させない', async () => {
@@ -124,3 +127,5 @@ describe('テンプレート一覧行のキーボード操作 (N-140)', () => {
     expect(templateGet).not.toHaveBeenCalled()
   })
 })
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/templates' }))

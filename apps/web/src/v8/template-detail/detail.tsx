@@ -312,7 +312,7 @@ export default function TemplateDetailV8() {
       <span className={styles.usageState}>{row.status ?? '—'}</span>
       {row.href
         ? <Link href={row.href} className={styles.ghostButton}><ExternalLink size={14} aria-hidden="true" />開く</Link>
-        : <span className={styles.ghostSpacer} aria-hidden="true" />}
+        : <span className={styles.usageState}>開ける画面がありません</span>}
     </div>
   )
 
@@ -477,6 +477,7 @@ export default function TemplateDetailV8() {
                   ) : null}
                 </div>
               ) : null}
+              {versions?.length === 0 ? <p className={styles.empty}>版はまだありません。</p> : null}
               {(versions ?? []).map((version) => (
                 <div key={version.versionNumber} className={version.status === 'in_use' ? styles.versionInUse : styles.versionPast}>
                   <span className={styles.versionNum}>版{version.versionNumber}</span>

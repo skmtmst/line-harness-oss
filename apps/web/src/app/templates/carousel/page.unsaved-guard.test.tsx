@@ -72,6 +72,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       folders: { ...actual.api.folders, list: calls.foldersList },
       tags: { ...actual.api.tags, list: empty },
       friendFields: { ...actual.api.friendFields, list: empty },
@@ -119,8 +120,8 @@ function dialogByText(tag: string, text: string): HTMLElement | null {
   return allIn(document, tag).find((element) => element.textContent?.trim() === text) ?? null
 }
 
-const nameInput = () => document.getElementById('cr-name') as HTMLInputElement | null
-const cancelLink = () => byText('a', 'キャンセル')
+const nameInput = () => document.getElementById('cr-template-name') as HTMLInputElement | null
+const cancelLink = () => byText('button', 'キャンセル')
 
 /** 入力の欄へ、画面と同じく入力の出来事で入れる。 */
 function typeInto(input: HTMLInputElement, value: string) {
@@ -202,7 +203,6 @@ describe('D009: 未保存のままキャンセルすると確認が出る', () =
     // 番兵は止めない。進む役は Link 本体なので、行き先が残っていることだけ見る。
     expect(dialogByText('h2', '保存していない変更があります')).toBeNull()
     expect(dialogByText('button', '保存せずに移る')).toBeNull()
-    expect(cancelLink()!.getAttribute('href')).toBe('/templates')
-    expect(routing.pushed).toEqual([])
+    expect(routing.pushed).toEqual(['/templates'])
   })
 })

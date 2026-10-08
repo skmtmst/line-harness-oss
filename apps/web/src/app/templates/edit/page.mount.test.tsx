@@ -76,6 +76,12 @@ vi.mock('@/components/shared/select', () => ({
   ),
 }))
 
+// 差し込み候補の所属を調べる。ポップアップの配置・キー操作は共通部品の試験で確認する。
+vi.mock('@/components/shared/action-menu', () => ({
+  default: ({ open, items, ariaLabel }: { open: boolean; items: Array<{ id: string; label: string }>; ariaLabel: string }) =>
+    open ? <div aria-label={ariaLabel}>{items.map(item => <span key={item.id}>{item.label}</span>)}</div> : null,
+}))
+
 /* ------------------------------------------------------------ 読み込む口 */
 
 let document: DomDocument
@@ -178,6 +184,7 @@ async function fakeApi(input: string, init?: RequestInit): Promise<Response> {
 
   await held.get(path)?.promise
 
+  if (path === '/api/staff/me') return jsonResponse({ success: true, data: { role: 'owner' } })
   if (path === '/api/line-accounts') {
     return jsonResponse({ success: true, data: [
       lineAccount('account-a', 'A店'),
@@ -307,15 +314,22 @@ async function navigateTo(search: string) {
   await settle()
 }
 
-const saveButton = () => findByText(container, 'button', '保存する')
+const saveButton = () => findByText(container, 'button', '下書きを保存')
 /*
  * 見比べるのは値だけにする。DOM の節をそのまま `expect` へ渡すと、
  * 落ちたときに節の中身を延々と書き出そうとして、**どの条件で落ちたのかが
  * 読めなくなる。**
  */
-const hasSaveButton = () => saveButton() !== null
-const nameValue = () => findById(container, 'tp-name')?.value ?? null
-const insertOptions = () => findByLabel(container, '友だち情報を差し込む')?.textContent ?? null
+const hasSaveButton = () => saveButton() !== null && !isDisabled(saveButton())
+const nameValue = () => findById(container, 'te-name')?.value ?? null
+const insertOptions = async () => {
+  const trigger = findByText(container, 'button', '友だち情報')
+  if (!trigger || isDisabled(trigger)) return null
+  await act(async () => { click(trigger) })
+  const options = findByLabel(container, '差し込む友だち情報')?.textContent ?? null
+  await act(async () => { click(trigger) })
+  return options
+}
 const screenText = () => container.textContent
 
 beforeEach(() => {
@@ -366,7 +380,7 @@ describe('同じ画面のまま編集するテンプレートを替える', () =
      * 1本目の本文を `PUT /api/templates/tmpl-a2` へ送れてしまう。**
      */
     expect(hasSaveButton()).toBe(false)
-    expect(screenText()).toContain('読み込み中')
+    expect(screenText()).toContain('読み込んでいます')
     // 1本目の中身が1文字も残っていない。残っていれば、それが送られる元になる。
     expect(screenText()).not.toContain('A店の定期便')
     expect(nameValue()).toBeNull()
@@ -407,7 +421,7 @@ describe('同じ画面のまま編集するテンプレートを替える', () =
     expect(hasSaveButton()).toBe(false)
     expect(nameValue()).toBeNull()
     expect(screenText()).not.toContain('A店の定期便')
-    expect(screenText()).toContain('読み込み中')
+    expect(screenText()).toContain('読み込んでいます')
 
     await settle()
     expect(writes).toEqual([])
@@ -438,17 +452,17 @@ describe('同じ画面のまま編集するテンプレートを替える', () =
 
   it('差し込み候補も、次のテンプレートが返るまで前のものを出さない', async () => {
     await mountAt('?id=tmpl-a1')
-    expect(insertOptions()).toContain('A店のペット名')
+    expect(await insertOptions()).toContain('A店のペット名')
 
     const pending = hold('/api/templates/tmpl-b')
     await navigateTo('?id=tmpl-b')
-    expect(insertOptions()).toBeNull()
+    expect(await insertOptions()).toBeNull()
 
     pending.release()
     await settle()
 
-    expect(insertOptions()).toContain('B店のコース')
-    expect(insertOptions()).not.toContain('A店のペット名')
+    expect(await insertOptions()).toContain('B店のコース')
+    expect(await insertOptions()).not.toContain('A店のペット名')
   })
 
   it('遅れて届いた前のテンプレートの応答が、いまの画面を書き換えない', async () => {
@@ -507,7 +521,7 @@ describe('上のバーでアカウントを替える', () => {
     expect(screenText()).toContain(Testing.ACCOUNT_MISMATCH_MESSAGE)
     expect(screenText()).toContain('このテンプレートは「A店」のものです')
     expect(isDisabled(saveButton())).toBe(true)
-    expect(insertOptions()).toContain('A店のペット名')
+    expect(await insertOptions()).toContain('A店のペット名')
 
     // 押しても通信は出ない。塞いだ見た目だけでなく、送る口も閉じている。
     await act(async () => { click(saveButton()!) })
@@ -529,6 +543,9 @@ describe('新しく作る', () => {
     expect(nameValue()).toBe('')
     expect(hasSaveButton()).toBe(true)
     expect(isDisabled(saveButton())).toBe(false)
-    expect(insertOptions()).toContain('A店のペット名')
+    expect(await insertOptions()).toContain('A店のペット名')
   })
 })
+
+// The DOM shim stores window and global storage separately; use this test's role fixture.
+vi.mock('@/lib/staff-capability', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/staff-capability')>(), isOwnerOrAdmin: () => ['owner', 'admin'].includes(globalThis.localStorage?.getItem?.('lh_staff_role') ?? '') }))

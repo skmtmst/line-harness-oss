@@ -10,6 +10,7 @@
  * 外枠・名前とフォルダの箱・右の列はクーポン・リサーチ（asset.tsx）と同じ。動きは BEHAVIOR.md。
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useFieldValidation } from '@/lib/use-field-validation'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, ImagePlus, Send } from 'lucide-react'
 import type { Folder, MediaItem, TemplateImagemapUpload } from '@line-crm/shared'
@@ -179,6 +180,9 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
+  const fields = useFieldValidation()
+  const reject = (id: string, message: string) => { setError(''); fields.reject(id, message) }
+  const richProblemField = () => !imageUrl.trim() ? 'te-rich-image' : `te-rich-url-${shapeDef.areas.find((area) => areas[area.label]?.kind === 'uri' && !areas[area.label]?.uri.trim())?.label ?? 'A'}`
   const [saved, setSaved] = useState(false)
   /* 統括：送った画像（5サイズ）と、その payload（baseUrl・baseSize など）。 */
   const [uploaded, setUploaded] = useState<TemplateImagemapUpload | null>(hostInitial?.uploaded ?? null)
@@ -243,9 +247,9 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
 
   const save = async (): Promise<boolean> => {
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
-    if (!name.trim()) { setError('リッチメッセージ名を入力してください。'); return false }
+    if (!name.trim()) { reject('te-rich-name', 'リッチメッセージ名を入力してください。'); return false }
     const built = buildRichPayload({ imageUrl, pickedMedia, shape: shapeDef, areas })
-    if ('error' in built) { setError(built.error); return false }
+    if ('error' in built) { reject(richProblemField(), built.error); return false }
     setSaving(true)
     setError('')
     try {
@@ -272,10 +276,10 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   /* 統括：中身を組み立てて呼ぶ側へ渡す（保存・配るは呼ぶ側）。 */
   const hostSave = (distribute: boolean) => {
     if (!host) return
-    if (!name.trim()) { setError('リッチメッセージ名を入力してください。'); return }
-    if (!uploaded) { setError('画像を選んでください。'); return }
+    if (!name.trim()) { reject('te-rich-name', 'リッチメッセージ名を入力してください。'); return }
+    if (!uploaded) { reject('te-rich-image-pick', '画像を選んでください。'); return }
     const built = buildRichPayload({ imageUrl, pickedMedia: null, shape: shapeDef, areas })
-    if ('error' in built) { setError(built.error); return }
+    if ('error' in built) { reject(richProblemField(), built.error); return }
     const { imageMediaId: _id, imageMediaKind: _kind, ...rest } = built.payload
     void _id; void _kind
     setError('')
@@ -413,7 +417,8 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
           <div className={styles.pair}>
             <div className={`${styles.field} ${styles.grow}`}>
               <label htmlFor="te-rich-name" className={styles.label}>テンプレート名</label>
-              <TextField id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" />
+              <TextField {...fields.attributes('te-rich-name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" />
+              {fields.error('te-rich-name') ? <p id="te-rich-name-error" role="alert" className={styles.error}>{fields.error('te-rich-name')}</p> : null}
             </div>
             <div className={`${styles.field} ${styles.folderField}`}>
               <label htmlFor="te-rich-folder" className={styles.labelSmall}>フォルダ</label>
@@ -451,7 +456,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <p className={styles.cardNote}>1040 × 1040px（正方形）がおすすめ</p>
           </div>
           <div className={rich.imageRow}>
-            <button type="button" className={rich.imageBox} onClick={openImage} disabled={uploading} aria-label="リッチメッセージの画像を選ぶ">
+            <button id="te-rich-image-pick" {...fields.attributes('te-rich-image-pick')} type="button" className={rich.imageBox} onClick={openImage} disabled={uploading} aria-label="リッチメッセージの画像を選ぶ">
               {imageSet ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={imageUrl.trim()} alt="" />
@@ -459,6 +464,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                 <span className={styles.couponImageEmpty}><ImagePlus size={18} aria-hidden="true" />画像を選ぶ</span>
               )}
             </button>
+            {fields.error('te-rich-image-pick') ? <p id="te-rich-image-pick-error" role="alert" className={styles.error}>{fields.error('te-rich-image-pick')}</p> : null}
             <div className={rich.imageSide}>
               <Button type="button" onClick={openImage} disabled={uploading} busy={uploading} busyLabel="画像を送っています…">
                 <ImagePlus size={15} aria-hidden="true" />
@@ -482,12 +488,14 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                 />
               ) : (
               <TextField
+                id="te-rich-image" {...fields.attributes('te-rich-image')}
                 value={imageUrl}
                 onChange={(event) => { setImageUrl(event.target.value); setPickedMedia(null) }}
                 placeholder="または画像のURL（https://…）"
                 aria-label="画像のURL"
               />
               )}
+              {fields.error('te-rich-image') ? <p id="te-rich-image-error" role="alert" className={styles.error}>{fields.error('te-rich-image')}</p> : null}
             </div>
           </div>
         </Card>
@@ -517,12 +525,14 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                 <div className={rich.areaBody}>
                   {draft.kind === 'uri' ? (
                     <TextField
+                      id={`te-rich-url-${area.label}`} {...fields.attributes(`te-rich-url-${area.label}`)}
                       type="url"
                       value={draft.uri}
                       onChange={(event) => updateArea(area.label, { uri: event.target.value })}
                       placeholder="https://example.com"
                       aria-label={`面 ${area.label} のURL`}
                     />
+
                   ) : draft.kind === 'actions' ? (
                     <button type="button" className={rich.actionPick} onClick={() => setActionsFor(area.label)} aria-haspopup="dialog">
                       <span className={rich.actionPickText}>{actionsSummary(draft)}</span>
@@ -531,6 +541,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                   ) : (
                     <p className={rich.areaNone}>押しても何も起きません</p>
                   )}
+                  {fields.error(`te-rich-url-${area.label}`) ? <p id={`te-rich-url-${area.label}-error`} role="alert" className={styles.error}>{fields.error(`te-rich-url-${area.label}`)}</p> : null}
                 </div>
               </div>
             )

@@ -48,7 +48,7 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/',
   useRouter: () => ({ push: mocks.push, replace: mocks.replace, refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(mocks.query),
 }))
@@ -76,6 +76,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       folders: { ...actual.api.folders, list: mocks.foldersList },
       broadcastMessageAssets: { ...actual.api.broadcastMessageAssets, counts: mocks.counts },
       templates: {
@@ -107,6 +108,8 @@ async function mount(node: React.ReactNode) {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/templates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   mocks.query = ''
   mocks.rows = [templateRow('t-1', 'はじめの型', '2026-09-01T00:00:00+09:00')]
   mocks.push.mockClear()

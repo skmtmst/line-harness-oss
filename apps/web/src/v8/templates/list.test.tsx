@@ -5,7 +5,7 @@
  * 使っていない（0か所）ものは窓なしで外して5秒は元に戻せる・数が分からないものは削除の確認（V6JFnd）、使っているものは削除できない窓（Z0g3si）。
  */
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const listTemplates = vi.hoisted(() => vi.fn())
@@ -137,12 +137,13 @@ describe('V8 テンプレートの一覧', () => {
     expect(screen.queryByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeNull()
   })
 
-  it('使っていない（0か所と分かっている）ものは窓を出さずに一覧から外し、5秒たってから消す', async () => {
+  it('使っていないものは確認後に一覧から外し、5秒たってから消す', async () => {
     await renderList()
     render(<ToastHost />)
     vi.useFakeTimers()
     openMenuAndDelete('秋の新商品（画像）')
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    act(() => { within(screen.getByRole('dialog')).getByRole('button', { name: '削除する' }).click() })
     expect(screen.queryByText('秋の新商品（画像）')).toBeNull()
     expect(screen.getByText('テンプレート「秋の新商品（画像）」を削除しました')).toBeTruthy()
     await act(async () => { await vi.advanceTimersByTimeAsync(4999) })
@@ -151,11 +152,12 @@ describe('V8 テンプレートの一覧', () => {
     expect(removeTemplate).toHaveBeenCalledWith('t-unused')
   })
 
-  it('窓なしで外したものは「元に戻す」で行が戻り、消さない', async () => {
+  it('確認後に外したものは「元に戻す」で行が戻り、消さない', async () => {
     await renderList()
     render(<ToastHost />)
     vi.useFakeTimers()
     openMenuAndDelete('秋の新商品（画像）')
+    act(() => { within(screen.getByRole('dialog')).getByRole('button', { name: '削除する' }).click() })
     expect(screen.queryByText('秋の新商品（画像）')).toBeNull()
     act(() => { screen.getByRole('button', { name: '元に戻す' }).click() })
     expect(screen.getByText('秋の新商品（画像）')).toBeTruthy()
