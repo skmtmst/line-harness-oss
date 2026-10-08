@@ -14,7 +14,7 @@ vi.hoisted(() => {
 const state = vi.hoisted(() => ({ accountId: 'account-a' }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/webinars' }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: state.accountId, selectedAccount: null, loading: false }),
+  useOptionalAccount: () => ({ selectedAccountId: state.accountId, selectedAccount: null, loading: false }),
 }))
 
 import FeatureDisabledGate from './feature-disabled-gate'

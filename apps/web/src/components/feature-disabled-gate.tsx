@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import { useAccount } from '@/contexts/account-context'
+import { useOptionalAccount } from '@/contexts/account-context'
 import {
   FEATURE_DISABLED_EVENT,
   type FeatureDisabledEventDetail,
@@ -34,7 +34,7 @@ export function FeatureDisabledScreen({ featureId }: { featureId?: string }) {
  */
 export default function FeatureDisabledGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { selectedAccountId } = useAccount()
+  const selectedAccountId = useOptionalAccount()?.selectedAccountId ?? null
   const [disabledFeatureId, setDisabledFeatureId] = useState<string | undefined>()
 
   /*
