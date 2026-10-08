@@ -172,3 +172,14 @@ it('WEB-148: 閲覧のみでは編集・後処理を隠し、回答とCSVを残�
   expect([...host.querySelectorAll('button')].some((el) => el.textContent?.includes('後処理をやり直す'))).toBe(false)
   expect(host.textContent).toContain('CSVで書き出す')
  })
+
+it('WEB-145: 全体100件の先頭20件なら平均・分布を同じページで示し、次のページを選べる', async () => {
+ const detail = structuredClone(formDetail); Object.assign(detail.layout.sections[0].blocks[0], { type: 'rating' })
+ const page = { ...submissionsPage, total: 100, items: Array.from({ length: 20 }, (_, i) => ({ ...submissionsPage.items[0], id: `s${i}`, data: { purpose: '5' } })), summary: { ...submissionsPage.summary, ratingFields: [{ key: 'purpose', label: '評価', answered: 100, average: 1.8 }] } }
+ fetchApi.mockImplementation(async (url: string) => ({ success: true, data: url.includes('/submissions') ? page : detail }))
+ await act(async () => root.render(<FormResponsesPage />)); await settle()
+ expect(document.body.textContent).toContain('表示中の20件／全100件')
+ expect(document.body.textContent).toContain('平均 5.0')
+ expect(document.body.textContent).not.toContain('平均 1.8')
+ expect(document.querySelector('[aria-label="回答のまとめのページ送り"]')).toBeTruthy()
+})

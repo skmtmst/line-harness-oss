@@ -31,6 +31,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePa
 const formsGet = vi.hoisted(() => vi.fn())
 const formsUpdate = vi.hoisted(() => vi.fn())
 const formsPublish = vi.hoisted(() => vi.fn())
+const scenariosList = vi.hoisted(() => vi.fn())
 const emptyList = vi.hoisted(() => async () => ({ success: true, data: [] as never[] }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -49,7 +50,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       // 下書きの自動保存は閲覧のみの人には動かさないため、役割を読む（通信させない）。
       staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'owner' } }) },
       friendFields: { ...actual.api.friendFields, list: emptyList },
-      scenarios: { ...actual.api.scenarios, list: emptyList },
+      scenarios: { ...actual.api.scenarios, list: scenariosList },
       reminders: { ...actual.api.reminders, list: emptyList },
       templates: { ...actual.api.templates, list: emptyList },
     },
@@ -92,6 +93,7 @@ const render = async (query: string) => {
 
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
+  scenariosList.mockImplementation(emptyList)
   formsGet.mockImplementation(async () => ({ success: true, data: structuredClone(formData) }))
   formsUpdate.mockImplementation(async () => ({ success: true, data: { id: 'form-1', contentRevision: 8, updatedAt: '' } }))
   formsPublish.mockImplementation(async () => ({ success: true, data: { id: 'v4', versionNumber: 4, contentRevision: 8, publishedAt: '', replayed: false } }))
@@ -239,4 +241,21 @@ describe('回答フォームの下書き自動保存（一斉配信と同じ形�
     expect(status()).toContain('自動保存できませんでした')
     expect(host.querySelector('[role="alert"]')).toBeNull()
   })
+})
+
+it('WEB-140: Bを開いてから遅いAが届いても、Bの本文と版を保つ', async () => {
+ let finish!: (value: unknown) => void
+ formsGet.mockImplementation((id: string) => id === 'form-a' ? new Promise(r => { finish = r }) : Promise.resolve({ success: true, data: { ...formData, name: 'フォームB' } }))
+ await render('id=form-a')
+ await render('id=form-b')
+ expect(screen.getByRole('heading', { name: 'フォームB' })).toBeTruthy()
+ await act(async () => { finish({ success: true, data: { ...formData, name: 'フォームA' } }) })
+ expect(screen.queryByRole('heading', { name: 'フォームA' })).toBeNull()
+})
+
+it('WEB-141: 候補の1つが失敗しても本体を読み、候補の失敗を知らせる', async () => {
+ scenariosList.mockRejectedValue(new Error('通信失敗'))
+ await render('id=form-1')
+ expect(screen.getByRole('heading', { name: '来店アンケート' })).toBeTruthy()
+ expect(document.body.textContent).toContain('シナリオの候補を読み込めませんでした')
 })

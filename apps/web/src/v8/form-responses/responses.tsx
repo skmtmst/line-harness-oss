@@ -366,7 +366,7 @@ function Responses() {
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
   const firstKey = fieldKeys[0]
   const headLine = [
-    total === null ? '—' : `${formatNumber(total)}件`,
+    total === null ? '—' : total > items.length && view === 'summary' ? `表示中の${items.length}件／全${total}件（平均・件数・割合はこのページの回答）` : `${formatNumber(total)}件`,
     rate != null ? `答え終えた割合 ${formatNumber(rate)}%` : null,
   ].filter(Boolean).join('・')
   const longKey = fieldKeys.find((key) => blockByKey(key)?.type === 'textarea'
@@ -484,9 +484,11 @@ function Responses() {
                 if (block?.type === 'textarea') return null
                 const answered = fieldSummary.values.reduce((acc, [, count]) => acc + count, 0)
                 const kind = block ? typeLabel(block.type) : null
-                const rating = block?.type === 'rating' ? summary?.ratingFields?.find((field) => field.key === fieldSummary.key) : undefined
-                const sub = rating
-                  ? `5段階・平均 ${ratingAverageText(rating.average)}`
+                const ratings = fieldSummary.values.filter(([value]) => Number.isFinite(Number(value)) && Number(value) >= 1 && Number(value) <= 5)
+                const ratingCount = ratings.reduce((sum, [, count]) => sum + count, 0)
+                const average = ratingCount ? ratings.reduce((sum, [value, count]) => sum + Number(value) * count, 0) / ratingCount : null
+                const sub = block?.type === 'rating'
+                  ? `5段階・平均 ${ratingAverageText(average)}`
                   : `${kind ? `${kind}・` : ''}${answered === 0 ? 'まだ答えがありません' : `${formatNumber(answered)}件が答えた`}`
                 /* 5段階は ★5・★4・★3以下 の3段にまとめる（絵 v0SbYR）。 */
                 const values: Array<[string, number]> = block?.type === 'rating'
@@ -545,6 +547,7 @@ function Responses() {
                   </section>
                 )
               })() : null}
+              {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} disabled={loading} ariaLabel="回答のまとめのページ送り" onPageChange={(next) => void load(next, pageSize)} /> : null}
             </>
           ) : items.length === 0 ? (
             <div className={styles.card}>
