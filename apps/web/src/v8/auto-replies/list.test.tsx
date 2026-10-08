@@ -92,6 +92,7 @@ const ruleA = {
 const ruleB = { ...ruleA, id: 'ar-2', name: '予約変更のお問い合わせ', keyword: '予約', responseContent: 'ご予約を承ります', isActive: false, lifecycleStatus: 'stopped' }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/auto-replies')
   document.documentElement.dataset.theme = 'v8'
   listReplies.mockImplementation(async () => ({ success: true, data: [ruleA, ruleB] }))
   listTemplates.mockImplementation(async () => ({ success: true, data: [] }))
@@ -181,4 +182,27 @@ it('WEB083: 4番目を先頭へドラッグして保存後もD,A,B,Cになる', 
     expect([...stored].sort((a,b) => a.priority - b.priority).map(r => r.id)).toEqual(['D', 'A', 'B', 'C'])
     expect(new Set(stored.map(r => r.priority)).size).toBe(4)
   } finally { restore(); vi.useRealTimers() }
+})
+
+it('取得失敗を空の一覧にせず、その場で読み直すとルールが戻る', async () => {
+  listReplies.mockResolvedValueOnce({ success: false, error: '通信に失敗しました' })
+  act(() => { root.render(<AutoRepliesListV8 />) })
+  await flush()
+  expect(host.textContent).not.toContain('まだ自動応答のルールはありません')
+  const retry = [...host.querySelectorAll('button')].find(button => button.textContent === 'もう一度試す')
+  expect(retry).toBeTruthy()
+  const calls = listReplies.mock.calls.length
+  act(() => { retry!.click() })
+  await flush()
+  expect(listReplies.mock.calls.length).toBe(calls + 1)
+  expect(host.textContent).toContain('営業時間外の自動返信')
+  expect([...host.querySelectorAll('button')].some(button => button.textContent === 'もう一度試す')).toBe(false)
+})
+
+it('取得に成功して0件だったときだけ、空の一覧を出す', async () => {
+  listReplies.mockResolvedValue({ success: true, data: [] })
+  act(() => { root.render(<AutoRepliesListV8 />) })
+  await flush()
+  expect(host.textContent).toContain('まだ自動応答のルールはありません')
+  expect([...host.querySelectorAll('button')].some(button => button.textContent === 'もう一度試す')).toBe(false)
 })

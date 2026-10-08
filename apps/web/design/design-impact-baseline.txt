@@ -56,9 +56,6 @@ shared-button-importer app/analytics/conversion-report-v8.tsx
 shared-button-importer app/analytics/page.tsx
 shared-button-importer app/analytics/reports/new/page.tsx
 shared-button-importer app/auto-replies/edit/wizard-v8.tsx
-shared-button-importer app/auto-replies/page.tsx
-shared-button-importer app/auto-replies/publish/page.tsx
-shared-button-importer app/auto-replies/runs/page.tsx
 shared-button-importer app/automations/automations-v8.tsx
 shared-button-importer app/automations/list-v8.tsx
 shared-button-importer app/automations/new/friend-multi-select.tsx
@@ -99,7 +96,6 @@ shared-button-importer app/broadcasts/detail-v8.tsx
 shared-button-importer app/broadcasts/detail/broadcast-recipients.tsx
 shared-button-importer app/broadcasts/detail/page.tsx
 shared-button-importer app/broadcasts/new/page.tsx
-shared-button-importer app/broadcasts/page.tsx
 shared-button-importer app/broadcasts/reserved-v8.tsx
 shared-button-importer app/broadcasts/reserved/page.tsx
 shared-button-importer app/chats/page.tsx
@@ -149,12 +145,8 @@ shared-button-importer app/form-submissions/edit/form-design-settings.tsx
 shared-button-importer app/form-submissions/edit/page.tsx
 shared-button-importer app/form-submissions/responses/page.tsx
 shared-button-importer app/friend-add-settings/friend-add-rule-editor.tsx
-shared-button-importer app/friend-add-settings/page.tsx
 shared-button-importer app/friend-add-settings/publish/done-v8.tsx
-shared-button-importer app/friend-add-settings/publish/page.tsx
 shared-button-importer app/friend-add-settings/runs/detail/detail-v8.tsx
-shared-button-importer app/friend-add-settings/runs/detail/page.tsx
-shared-button-importer app/friend-add-settings/runs/page.tsx
 shared-button-importer app/friend-add-settings/runs/runs-v8.tsx
 shared-button-importer app/friends/detail/page.tsx
 shared-button-importer app/friends/friends-nav-v8.tsx
@@ -251,12 +243,10 @@ shared-button-importer app/register/page.tsx
 shared-button-importer app/register/sent/page.tsx
 shared-button-importer app/reminders/basics-form-v8.tsx
 shared-button-importer app/reminders/detail/detail-v8.tsx
-shared-button-importer app/reminders/detail/page.tsx
 shared-button-importer app/reminders/detail/registrants-panel.tsx
 shared-button-importer app/reminders/edit/edit-v8.tsx
 shared-button-importer app/reminders/list-v8.tsx
 shared-button-importer app/reminders/new/new-v8.tsx
-shared-button-importer app/reminders/new/page.tsx
 shared-button-importer app/reminders/wizard-v8-ui.tsx
 shared-button-importer app/restaurant-test/google/google-business.tsx
 shared-button-importer app/restaurant-test/google/google-posts.tsx
@@ -288,10 +278,7 @@ shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/detail-v8.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
 shared-button-importer app/scenarios/first-step-v8.tsx
-shared-button-importer app/scenarios/first-step/page.tsx
 shared-button-importer app/scenarios/mode-v8.tsx
-shared-button-importer app/scenarios/mode/page.tsx
-shared-button-importer app/scenarios/results/page.tsx
 shared-button-importer app/scenarios/results/results-v8.tsx
 shared-button-importer app/search-console/page.tsx
 shared-button-importer app/settings/feature-settings-v8.tsx

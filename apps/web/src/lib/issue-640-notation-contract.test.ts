@@ -5,8 +5,8 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 
 /* 完全切り替え：v7 の scenario-list.tsx は捨て、V8 を見る。入口は src/v8/scenarios/list.tsx（古い list-v8.tsx はもう描かれない）。 */
 const SCENARIO_LIST = read('../v8/scenarios/list.tsx')
-const AUTO_REPLIES = read('../app/auto-replies/page.tsx')
-const FRIEND_ADD = read('../app/friend-add-settings/page.tsx')
+const AUTO_REPLIES = read('../v8/auto-replies/list.tsx')
+const FRIEND_ADD = read('../v8/friend-add/list.tsx')
 const VARS = read('../app/contents/vars/page.tsx')
 const NEN_OVERVIEW = read('../app/nen-campaigns/nen-overview.tsx')
 const TAGS = read('../components/friend-fields/tags-page-v4.tsx')
@@ -24,25 +24,16 @@ describe('#640 省略表示の全文確認（title）', () => {
     expect(SCENARIO_LIST).toMatch(/title=\{`購読中[\s\S]{0,200}?読み終えた/)
   })
 
-  it('/auto-replies: 操作列と今月の応答セルは title で全文を出す', () => {
-    expect(AUTO_REPLIES).toMatch(/whitespace-nowrap"[\s\S]{0,120}?title=\{`今月 /)
-    // R527: 見るだけには操作を出さず理由を title に出す。管理者向けの全文は残す。
-    expect(AUTO_REPLIES).toMatch(/\['編集'[\s\S]{0,200}?join\('・'\)/)
-    expect(AUTO_REPLIES).toMatch(/title=\{canManage/)
+  it('/auto-replies V8: 応答数・長い条件・連動内容に全文確認を残す', () => {
+    expect(AUTO_REPLIES).toContain('title={`今月 ${r.hits?.period')
+    expect(AUTO_REPLIES).toContain('title={label}')
+    expect(AUTO_REPLIES).toContain("title={actions.join('・') || 'なし'}")
   })
 
-  it('/auto-replies: 表の見出しは title で意味を補う', () => {
-    expect(AUTO_REPLIES).toContain('title="動く条件（キーワード・適用アカウント）"')
-    expect(AUTO_REPLIES).toContain('title="今月動いた回数"')
-  })
-
-  it('/friend-add-settings: 設定名・見出し・長い値に title', () => {
-    expect(FRIEND_ADD).toMatch(/className="text-ink block truncate font-bold" title=\{rule\.name\}/)
-    const thTitles = FRIEND_ADD.match(/<Th title=/g)
-    expect(thTitles, '見出しセルの title が足りない').not.toBeNull()
-    expect(thTitles!.length).toBeGreaterThanOrEqual(6)
-    expect(FRIEND_ADD).toMatch(/block truncate" title=\{routeLabel\(rule\)\}/)
-    expect(FRIEND_ADD).toMatch(/block truncate" title=\{deliverySummary\(rule\)\}/)
+  it('/friend-add-settings V8: 設定名・経路・送るものに全文確認を残す', () => {
+    expect(FRIEND_ADD).toContain('title={rule.name}')
+    expect(FRIEND_ADD).toContain("title={rule.routeNames.join('、') || '未選択'}")
+    expect(FRIEND_ADD).toContain('title={line}')
   })
 
   it('/contents/vars: 見出し・使用箇所・更新/操作列に title', () => {

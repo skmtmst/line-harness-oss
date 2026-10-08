@@ -22,7 +22,6 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
  */
 const LIST_RANGE_USERS: Array<[string, string]> = [
   ['../../app/friends/page.tsx を使う友だち一覧', '../friends/friend-list-table.tsx'],
-  ['友だち追加時の配信 実行結果', '../../app/friend-add-settings/runs/page.tsx'],
   ['リッチメニュー', '../../app/rich-menus/page.tsx'],
   /*
    * 回答フォーム 一覧は 2026-10-06 に対象から外した：入口は src/v8/forms/list.tsx になり、
@@ -75,8 +74,16 @@ describe('ListRange 統一（監査6 #667）', () => {
     },
   )
 
+  it('V8の実行結果は取得した全件数と表示範囲をページ送りへ渡す', () => {
+    const source = read('../../v8/friend-add-runs/runs.tsx')
+    expect(source).toContain('<Pagination')
+    expect(source).toContain('summary={`${formatNumber(data.total)}件中')
+    expect(source).toContain('(cursorPage - 1) * perPage + 1')
+    expect(source).toContain('(cursorPage - 1) * perPage + items.length')
+  })
+
   it('ページ送りは1ページしかないとき隠す（友だち追加時の配信）', () => {
-    const source = read('../../app/friend-add-settings/page.tsx')
+    const source = read('../../v8/friend-add/list.tsx')
     // 以前は1ページでも「前へ 1 次へ」が常に出ていた。
     expect(source).toContain('canPrev || data.nextCursor')
     expect(source).not.toContain('aria-current="page">{cursorPage}')

@@ -101,14 +101,6 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).toContain('<Th className="w-28 pr-5">状態</Th>')
   })
 
-  it('/reminders/new：外側は16pxにそろえ、操作は右へ寄せる', () => {
-    const body = code(read('app', 'reminders', 'new', 'page.tsx'))
-    expect(body).toContain('<Th className="pl-4">ひな形</Th>')
-    expect(body).toContain('<Th align="right" className="pr-4">操作</Th>')
-    expect(body).toContain('py-2 pr-2 pl-4')
-    expect(body).toContain('py-2 pr-4 pl-2 text-right')
-  })
-
   it('/duplicates：外側は見出しの余白にそろえ、操作は右へ寄せる', () => {
     const body = code(read('app', 'duplicates', 'page.tsx'))
     // 候補の表（20px）。文字だけのセルは span で包み、本当の余白で測らせる（m22b。見た目は同じ）。

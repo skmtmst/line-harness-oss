@@ -8,8 +8,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const TARGETS = [
   'affiliates/tabs.tsx',
   'booking/menus/page.tsx',
-  'broadcasts/page.tsx',
-  'friend-add-settings/publish/page.tsx',
+  '../v8/friend-add-publish/publish.tsx',
   '../components/friends/friend-list-table.tsx',
   'line-notifications/page.tsx',
   'line-notifications/operator-notification-rules.tsx',
@@ -18,7 +17,7 @@ const TARGETS = [
   'nen-members/photo-review-v8.tsx',
   'rich-menus/connections/page.tsx',
   // 失敗表示を持つ本体を指定し、別の詳細画面・ダイアログは取り込まない。
-  'scenarios/results/page.tsx',
+  '../v8/scenarios/results.tsx',
   'tags/mark-editor-v8.tsx',
   '../components/broadcasts/segment-preset-controls.tsx',
   '../components/friend-fields/field-list.tsx',
@@ -58,6 +57,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
       ['../v8/broadcasts/list.tsx', '一斉配信を読み込めませんでした', 'onClick={() => void loadList((page - 1) * pageSize)}'],
       // 一斉配信・回答フォーム・シナリオは入口が src/v8 の新しい一覧を出す（古い list-v8.tsx はもう描かれない）。
       ['../v8/forms/list.tsx', "loadFailureCopy(loadFailure, '回答フォーム')", 'onClick={() => void loadForms()}'],
+      ['../v8/auto-replies/list.tsx', "visibleLoadState === 'error' || visibleLoadState === 'forbidden'", 'onClick={() => void load()}'],
       ['../v8/scenarios/list.tsx', 'シナリオを読み込めませんでした', 'onClick={() => void loadScenarios()}'],
       ['reminders/list-v8.tsx', 'リマインダを読み込めませんでした', 'onClick={reminderList.retry}'],
     ]) {
