@@ -19,7 +19,7 @@ import SectionHeader from '@/components/shared/section-header'
 import StatusBadge from '@/components/shared/status-badge'
 import TextLink from '@/components/shared/text-link'
 import { RowActions } from '@/components/shared/row-actions'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import { useHideSettingsNav, usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
@@ -170,33 +170,33 @@ export default function SnsSettingsPage() {
             help="Instagram をつないだあとの受信箱の並び方の見本です。表の中身は例で、実際のメッセージではありません。"
             helpLabel="受信箱での見え方の説明"
           />
-          <DataTable className={styles.table} data-design="sns-inbox-sample">
-            <thead>
-              <TableHeadRow className={styles.headRow} data-table-layout="columns">
-                <Th className={styles.colWho}>相手</Th>
-                <Th className={styles.colState}>対応・担当</Th>
-                <Th className={styles.colText}>最新のメッセージ</Th>
-                <Th className={styles.colRoute}>経路</Th>
-                <Th className={styles.colLast}>最終接触</Th>
-              </TableHeadRow>
-            </thead>
-            <tbody>
+          <GridTable className={styles.table} label="受信箱での見え方（見本）" design={{ columns: 'var(--sett-sns-columns)', gap: 'var(--tpl-e49-cards-gap)', rowPadding: 'var(--tpl-sett-sns-row-pad)', headPadding: 'var(--tpl-sett-sns-head-pad)', rowHeight: 'var(--tpl-sett-sns-row-h)', headLineHeight: 'var(--tpl-e1-lh-18)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-thead-lh)', headBackground: 'var(--color-table-head)' }}>
+            <div role="rowgroup">
+              <GridHeadRow>
+                <GridCell role="columnheader">相手</GridCell>
+                <GridCell role="columnheader">対応・担当</GridCell>
+                <GridCell role="columnheader">最新のメッセージ</GridCell>
+                <GridCell role="columnheader">経路</GridCell>
+                <GridCell role="columnheader">最終接触</GridCell>
+              </GridHeadRow>
+            </div>
+            <div role="rowgroup">
               {SAMPLE_ROWS.map((row) => (
-                <Tr key={row.who} className={styles.row} data-table-layout="columns">
-                  <Td className={styles.colWho}>
+                <GridRow key={row.who}>
+                  <GridCell>
                     <span className={styles.whoCell}>
                       <span className={styles.face} aria-hidden="true">{row.face}</span>
-                      <span className={styles.whoText}><span className={styles.who}>{row.who}</span><span className={styles.whoSub}>{row.sub}</span></span>
+                      <span className={styles.whoText}><span className={styles.who} title={row.who}>{row.who}</span><span className={styles.whoSub}>{row.sub}</span></span>
                     </span>
-                  </Td>
-                  <Td className={styles.colState}><span className={styles.stateCell}><StatusBadge tone={row.tone}>{row.state}</StatusBadge><span className={styles.owner}>{row.owner}</span></span></Td>
-                  <Td className={styles.colText}><span className={styles.message}>{row.text}</span><span className={styles.owner}>{`今日 ${row.at}`}</span></Td>
-                  <Td className={styles.colRoute}><span className={styles.route}>{row.route}</span></Td>
-                  <Td className={styles.colLast}><span className={styles.last}>{row.last}</span></Td>
-                </Tr>
+                  </GridCell>
+                  <GridCell><span className={styles.stateCell}><StatusBadge tone={row.tone}>{row.state}</StatusBadge><span className={styles.owner}>{row.owner}</span></span></GridCell>
+                  <GridCell><span className={styles.message} title={row.text}>{row.text}</span><span className={styles.owner}>{`今日 ${row.at}`}</span></GridCell>
+                  <GridCell><span className={styles.route}>{row.route}</span></GridCell>
+                  <GridCell><span className={styles.last}>{row.last}</span></GridCell>
+                </GridRow>
               ))}
-            </tbody>
-          </DataTable>
+            </div>
+          </GridTable>
         </div>
       </div>
     </PageFrame>

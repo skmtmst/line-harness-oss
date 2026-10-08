@@ -25,6 +25,7 @@ import Toggle from '@/components/shared/toggle'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
 import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import { RowActions } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
@@ -159,7 +160,10 @@ export default function BookingMediaPage() {
   const [editing, setEditing] = useState<MediaRow | null>(null)
   const [editPage, setEditPage] = useState('')
   const [editLogin, setEditLogin] = useState('')
-  const [editError, setEditError] = useState('')
+  const [editErrors, setEditErrors] = useState<{ page?: string; login?: string }>({})
+  const editPageRef = useRef<HTMLInputElement>(null)
+  const editLoginRef = useRef<HTMLInputElement>(null)
+  const addNameRef = useRef<HTMLInputElement>(null)
   const [adding, setAdding] = useState(false)
   const [addName, setAddName] = useState('')
   const [addError, setAddError] = useState('')
@@ -277,21 +281,31 @@ export default function BookingMediaPage() {
   const setAllClose = (on: boolean) => setRows((list) => list.map((row) => (row.acceptsReservations ? { ...row, closeOnBooking: on } : row)))
 
   const openEdit = (row: MediaRow) => {
-    setEditing(row); setEditPage(row.pageUrl ?? ''); setEditLogin(row.loginUrl ?? ''); setEditError('')
+    setEditing(row); setEditPage(row.pageUrl ?? ''); setEditLogin(row.loginUrl ?? ''); setEditErrors({})
   }
   const applyEdit = () => {
     if (!editing) return
     const page = checkHttpsUrl(editPage)
     const login = checkHttpsUrl(editLogin)
-    if (!page.ok) { setEditError(`店舗ページ：${page.message}`); return }
-    if (!login.ok) { setEditError(`管理画面：${login.message}`); return }
+    if (!page.ok || !login.ok) {
+      setEditErrors({ page: page.ok ? undefined : page.message, login: login.ok ? undefined : login.message })
+      const field = !page.ok ? editPageRef.current : editLoginRef.current
+      field?.focus()
+      field?.scrollIntoView({ block: 'center' })
+      return
+    }
     setRow(editing.code, { pageUrl: page.value, loginUrl: login.value })
     setEditing(null)
   }
 
   const addMedium = async () => {
     const name = addName.trim()
-    if (!name) { setAddError('媒体の名前を入れてください'); return }
+    if (!name) {
+      setAddError('媒体の名前を入れてください')
+      addNameRef.current?.focus()
+      addNameRef.current?.scrollIntoView({ block: 'center' })
+      return
+    }
     if (!selectedAccountId) return
     setAddBusy(true); setAddError('')
     try {
@@ -582,17 +596,14 @@ export default function BookingMediaPage() {
         confirmLabel="変える"
         onConfirm={applyEdit}
         onCancel={() => setEditing(null)}
-        error={editError || undefined}
       >
         <div className={styles.dialogFields}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>店舗ページの URL</span>
-            <TextField value={editPage} onChange={(event) => setEditPage(event.target.value)} placeholder="https://" inputMode="url" />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>管理画面（ログイン）の URL</span>
-            <TextField value={editLogin} onChange={(event) => setEditLogin(event.target.value)} placeholder="https://" inputMode="url" />
-          </label>
+          <Field label="店舗ページの URL" htmlFor="media-page-url" error={editErrors.page}>
+            <TextField ref={editPageRef} id="media-page-url" value={editPage} onChange={(event) => { setEditPage(event.target.value); setEditErrors((current) => ({ ...current, page: undefined })) }} placeholder="https://" inputMode="url" />
+          </Field>
+          <Field label="管理画面（ログイン）の URL" htmlFor="media-login-url" error={editErrors.login}>
+            <TextField ref={editLoginRef} id="media-login-url" value={editLogin} onChange={(event) => { setEditLogin(event.target.value); setEditErrors((current) => ({ ...current, login: undefined })) }} placeholder="https://" inputMode="url" />
+          </Field>
         </div>
       </Dialog>
 
@@ -643,12 +654,11 @@ export default function BookingMediaPage() {
         busy={addBusy}
         onConfirm={() => void addMedium()}
         onCancel={() => setAdding(false)}
-        error={addError || undefined}
+        error={addError === '媒体の名前を入れてください' ? undefined : addError || undefined}
       >
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>媒体の名前</span>
-          <TextField value={addName} onChange={(event) => setAddName(event.target.value)} placeholder="例：OZmall" maxLength={100} />
-        </label>
+        <Field label="媒体の名前" htmlFor="media-name" error={addError === '媒体の名前を入れてください' ? addError : undefined}>
+          <TextField ref={addNameRef} id="media-name" aria-required="true" value={addName} onChange={(event) => { setAddName(event.target.value); setAddError('') }} placeholder="例：OZmall" maxLength={100} />
+        </Field>
       </Dialog>
     </>
   )
