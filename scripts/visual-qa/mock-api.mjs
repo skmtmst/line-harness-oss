@@ -20,7 +20,10 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+// Web と同じ QR 生成器を使う。画像の口を JSON で返すと小窓が壊れる。
+const QRCode = createRequire(new URL('../../apps/web/package.json', import.meta.url))('qrcode')
 
 /** このファイル自身の指紋。動いている中身が古くないかを言うために持つ。 */
 const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
@@ -6330,6 +6333,18 @@ const server = createServer((req, res) => {
     res.setHeader('Content-Type', 'image/png')
     res.setHeader('Cache-Control', 'no-store')
     res.writeHead(200).end(png)
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/qr') {
+    const data = url.searchParams.get('data') || 'https://nen.musubo.jp/r/summer-ig'
+    const width = Number(url.searchParams.get('size')?.split('x')[0]) || 320
+    QRCode.toBuffer(data, { type: 'png', width: Math.max(64, Math.min(width, 1024)), margin: 2 }, (error, png) => {
+      if (error) { res.writeHead(400).end(); return }
+      res.setHeader('Content-Type', 'image/png')
+      res.setHeader('Cache-Control', 'no-store')
+      res.writeHead(200).end(png)
+    })
     return
   }
 
