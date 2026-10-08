@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const CSS = readFileSync(join(HERE, 'create-v8.module.css'), 'utf8')
-const TSX = readFileSync(join(HERE, 'create-v8.tsx'), 'utf8')
+const CSS = readFileSync(new URL('create-v8.module.css', import.meta.url), 'utf8')
+const TSX = readFileSync(new URL('create-v8.tsx', import.meta.url), 'utf8')
 
 /**
  * 板 `F4gELj`（リッチメニュー 作る④ 公開）「公開の前の確認」の行の形。

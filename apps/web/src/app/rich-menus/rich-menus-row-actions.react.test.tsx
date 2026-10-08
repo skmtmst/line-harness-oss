@@ -24,6 +24,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       richMenuGroups: { ...actual.api.richMenuGroups, listPage, tapStats, external },
       folders: { ...actual.api.folders, list: listFolders },
     },
@@ -35,7 +36,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/',
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
@@ -44,7 +45,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccount: { id: 'account-a', name: '本店' }, selectedAccountId: 'account-a', loading: false }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined,
   usePageTitle: () => {},
 }))
 
@@ -71,6 +72,8 @@ const group = {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  window.history.replaceState(null, '', '/rich-menus')
   listPage.mockImplementation(async () => ({
     success: true,
     data: { items: [group], total: 1, facets: { total: 1, published: 1, targeting: 0, draft: 0, folderCounts: {} } },
@@ -100,15 +103,15 @@ describe('#641 リッチメニュー一覧の行操作', () => {
     await flush()
 
     const edit = [...host.querySelectorAll('a')]
-      .find((el) => el.getAttribute('href') === '/rich-menus/edit?id=g-1' && el.textContent?.includes('編集'))
+      .find((el) => el.getAttribute('href') === '/rich-menus/edit?id=g-1' && el.textContent?.includes('通常メニュー'))
     expect(edit, '枠つき「編集」ボタンが見つかりません').toBeTruthy()
 
     // 行にゴミ箱アイコンだけのボタンは置かない。
     expect(host.querySelector('button[aria-label="通常メニューを削除する"]'), 'ゴミ箱アイコンの直置きが残っています').toBeNull()
 
-    const more = host.querySelector('button[data-qa-open="szXsT"]') as HTMLButtonElement
+    const more = host.querySelector('button[aria-label="リッチメニュー「通常メニュー」の操作"]') as HTMLButtonElement
     expect(more, '「…」の撮影口が消えています').toBeTruthy()
-    expect(more.getAttribute('aria-label')).toBe('通常メニューのその他操作')
+    expect(more.getAttribute('aria-label')).toBe('リッチメニュー「通常メニュー」の操作')
     act(() => { more.click() })
     // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const menu = document.querySelector('[role="menu"]')

@@ -59,7 +59,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccount: fixture.selectedAccount }),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/',
   useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {} }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -90,6 +90,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/rich-menus')
   document.documentElement.dataset.theme = 'v8'
   fixture.selectedAccount = { id: 'account-a', name: 'A社' }
 })

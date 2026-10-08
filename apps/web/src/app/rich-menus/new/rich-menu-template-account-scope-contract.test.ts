@@ -18,6 +18,7 @@ describe('m18r テンプレート候補は選択accountで絞る', () => {
   })
 
   it('編集画面はこのメニューのaccountを付けて取る', () => {
-    expect(editPage).toContain('api.templates.list(undefined, group?.accountId ?? undefined)')
+    expect(editPage).toContain("import('../new/create-v8')")
+    expect(newPage).toContain('api.templates.list(undefined, accountId ?? undefined)')
   })
 })

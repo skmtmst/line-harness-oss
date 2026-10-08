@@ -13,12 +13,12 @@ import RichMenuConnectionsPage from './page'
 const mocks = vi.hoisted(() => ({ get: vi.fn() }))
 vi.mock('@/lib/api', async importOriginal => ({
   ...await importOriginal<typeof import('@/lib/api')>(),
-  api: { richMenuGroups: { get: mocks.get } },
+  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) }, richMenuGroups: { get: mocks.get } },
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
-vi.mock('next/navigation', async importOriginal => ({
+vi.mock('next/navigation', async importOriginal => ({ usePathname: () => '/',
   ...await importOriginal<typeof import('next/navigation')>(),
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? 'group-1' : null) }),
   // V8 は src/v8/rich-menus/connections（右上の「…」から移るので useRouter を使う）。
@@ -61,11 +61,5 @@ describe('切替のつながりV8（wxIQ7）', () => {
     // つながりの図：入口のメニューと、行き来の札（タブB ⇄ タブA）。
     expect(host.textContent).toContain('このメニュー・タブA')
     expect(host.textContent).toContain('タブB ⇄ タブA')
-  })
-
-  it('v7はDIUbOのまま', async () => {
-    await render()
-    expect(host.querySelector('[data-design-node="DIUbO"]')).not.toBeNull()
-    expect(host.querySelector('[data-design-node="wxIQ7"]')).toBeNull()
   })
 })

@@ -3,14 +3,14 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('../../v8/rich-menus/list.tsx', import.meta.url), 'utf8')
 
 /** リッチメニューの削除確認（設計 `szXsT` 12-1-E ／ 契約 #608）。 */
 describe('リッチメニューの削除確認', () => {
   it('窓を開けてから影響を読む', () => {
     // 一覧を出すたびに全件ぶん読むと、消さない人にも重い問い合わせが走る。
-    expect(PAGE).toContain('const request = beginImpactRequest(selectedAccount.id, group.id)')
-    expect(PAGE).toContain('void loadImpact(request)')
+    expect(PAGE).toContain('void loadImpact(beginImpactRequest(selectedAccount.id, group.id))')
+    expect(PAGE).toContain('function beginImpactRequest')
     expect(PAGE).toContain('api.richMenuGroups.deleteImpact')
   })
 
@@ -41,12 +41,12 @@ describe('リッチメニューの削除確認', () => {
   })
 
   it('取得できた0件を「ありません」と書き、未取得と混ぜない', () => {
-    expect(PAGE).toContain("=== 0\n                    ? 'ありません'")
+    expect(PAGE).toMatch(/=== 0\s*\? 'ありません'/)
     expect(PAGE).toContain('audienceText(impact.currentAudience)')
   })
 
   it('消せない理由を内部の記号で出さない', () => {
-    expect(PAGE).toContain('blockerTexts(impact.blockers)')
+    expect(PAGE).toContain('blockerLabel(key, impact)')
     expect(PAGE).not.toContain('impact.blockers.join')
   })
 

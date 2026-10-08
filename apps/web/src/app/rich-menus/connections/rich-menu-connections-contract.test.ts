@@ -2,19 +2,19 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const LIST = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(new URL('../../../v8/rich-menus/connections.tsx', import.meta.url), 'utf8')
+const LIST = fs.readFileSync(new URL('../../../v8/rich-menus/list.tsx', import.meta.url), 'utf8')
 
-describe('V6 リッチメニューの切替つながり', () => {
-  it('DIUbOとNXdDkを同じ実データの有無で出し分ける', () => {
-    expect(PAGE).toContain('data-design-node="DIUbO"')
-    expect(PAGE).toContain('data-design-node="NXdDk"')
-    expect(PAGE).toContain('analysis.edges.length === 0')
+describe('V8 リッチメニューの切替つながり', () => {
+  it('接続先は実際のメニューから判定し、切替のないタブも表示する', () => {
+    expect(PAGE).toContain('boardId="wxIQ7"')
+    expect(PAGE).toContain('const others = pages.filter((page) => page.id !== entryId)')
+    expect(PAGE).toContain('analysis.edges.filter((edge) => edge.fromPageId === entryId)')
   })
 
   it('既存のgroup取得だけを使い、切替数を固定値で作らない', () => {
     expect(PAGE).toContain('api.richMenuGroups.get(groupId)')
-    expect(PAGE).toContain('analysis.edges.filter((edge) => edge.fromPageId === page.id)')
+    expect(PAGE).toContain('analysis.edges.filter((edge) => edge.fromPageId === pageId)')
     expect(PAGE).not.toContain('切替ボタン" value="5件')
   })
 
@@ -25,7 +25,7 @@ describe('V6 リッチメニューの切替つながり', () => {
 
   it('アカウント切替後に届いた古い取得結果を表示しない', () => {
     expect(PAGE).toContain('activeAccountIdRef.current !== accountId')
-    expect(PAGE).toContain('requestGenerationRef.current !== requestGeneration')
+    expect(PAGE).toContain('requestGenerationRef.current !== generation')
     expect(PAGE).toContain('setGroup(null)')
   })
 
