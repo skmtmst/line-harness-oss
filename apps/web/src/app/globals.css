@@ -850,7 +850,7 @@
   --tpl-hq-nav-gap: 2px; --tpl-hq-nav-label-lh: 16px; --tpl-hq-nav-item-gap: 8px; --tpl-hq-nav-item-pad: 8px 10px; --tpl-hq-nav-item-lh: 19px; --tpl-hq-nav-icon: 14px;
   --tpl-hq-body-gap: 14px; --tpl-hq-body-pad: 16px 24px 24px; --tpl-hq-button-icon: 15px; --tpl-hq-note-pad: 10px 14px;
   --tpl-hq-cards-gap: 12px; --tpl-hq-card-gap: 4px; --tpl-hq-card-pad: 12px 16px; --tpl-hq-small-lh: 16px; --tpl-hq-metric-lh: 27px; --tpl-hq-unit-drop: 4px;
-  --tpl-hq-col-gap: 14px; --tpl-hq-col-mail: 190px; --tpl-hq-col-role: 100px; --tpl-hq-col-scope: 150px; --tpl-hq-col-state: 80px; --tpl-hq-col-login: 100px; --tpl-hq-col-action: 80px;
+  --tpl-hq-col-gap: 14px; --tpl-hq-col-name: 160px; --tpl-hq-col-role: 80px; --tpl-hq-col-scope: 110px; --tpl-hq-col-state: 80px; --tpl-hq-col-login: 90px; --tpl-hq-col-action: 80px;
   --tpl-hq-head-pad: 9px 16px; --tpl-hq-row-h: 56px; --tpl-hq-row-pad: 0 16px; --tpl-hq-cell-lh: 17px; --tpl-hq-action-pad: 12px;
   --tpl-hq-control-h: 36px; --tpl-hq-contract-pad: 10px 12px; --tpl-hq-contract-lh: 18px; --tpl-hq-seg-pad: 3px; --tpl-hq-seg-item-pad: 5px 14px; --tpl-hq-seg-item-lh: 17px;
   --tpl-hq-plans-gap: 16px; --tpl-hq-plan-gap: 10px; --tpl-hq-plan-h: 355px; --tpl-hq-plan-pad: 20px; --tpl-hq-plan-head-gap: 8px; --tpl-hq-plan-name-lh: 24px; --tpl-hq-plan-current-bg: #f6fcf8;
