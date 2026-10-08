@@ -233,3 +233,11 @@
   .detailColumnAside { display: none; min-height: 0; padding-left: 0; border-left: 0; }
   .detailColumnAside[data-expanded] { display: block; }
 }
+
+/* ページが畳まれても、窓の中のフォルダは窓の寸法で並べる。 */
+:global([data-theme='v8']) .listBody[data-dialog-layout] .folders { display: flex; }
+:global([data-theme='v8']) .listBody[data-dialog-layout] .collapsedFolders { display: none; }
+@media (max-width: 639px) {
+  :global([data-theme='v8']) .listBody[data-dialog-layout] .folders { display: none; }
+  :global([data-theme='v8']) .listBody[data-dialog-layout] .collapsedFolders { display: flex; }
+}
