@@ -1676,9 +1676,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                   <Button type="button" disabled={busy || !host.canOperate} busy={saving || host.busy} busyLabel="保存中…" onClick={() => void hostSave(false)}>
                     下書きのまま保存
                   </Button>
-                  <Button type="button" variant="primary" disabled={busy || !host.canOperate || host.selectedCount === 0} title={host.selectedCount === 0 ? '配るアカウントを選んでください' : undefined} busy={saving || host.busy} busyLabel="保存しています…" onClick={() => void hostSave(true)}>
+                  <Button type="button" variant="primary" disabled={busy || !host.canOperate || host.selectedCount === 0} title={host.selectedCount === 0 ? '配るアカウントを選んでください' : undefined} busy={saving || host.busy} busyLabel="保存しています…" aria-label={saving || host.busy || !name.trim() ? undefined : `${name.trim()}を配る`} onClick={() => void hostSave(true)}>
                     <Send size={14} aria-hidden="true" />
-                    アカウントへ配る
+                    配る
                   </Button>
                 </>
               ) : (

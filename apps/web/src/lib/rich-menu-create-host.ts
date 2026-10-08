@@ -6,7 +6,7 @@ import type { HqRichMenuSeed } from './hq-rich-menu-create'
  *
  * 店は手順①〜④のたびにサーバーへ下書きを保存するが、統括のひな形は一度に保存する形。
  * host を渡したときは、手順の間は画面の中に持ち（画像だけは統括の置き場へ先に上げる）、
- * 「下書きを保存」「アカウントへ配る」で一度だけ onSave に渡す。店の動き（host なし）は変えない。
+ * 「下書きを保存」「配る」で一度だけ onSave に渡す。店の動き（host なし）は変えない。
  */
 export interface RichMenuCreateHost {
   /** 戻る先（キャンセル・頭の「← リッチメニューへ」）。 */
@@ -29,7 +29,7 @@ export interface RichMenuCreateHost {
   distribute: ReactNode
   /** 手順④の右の列「配ると」の行。 */
   distributeSummary: Array<{ key: string; label: string; value: ReactNode }>
-  /** 選んだアカウントの数（0 のときは［アカウントへ配る］を押せない）。 */
+  /** 選んだアカウントの数（0 のときは［配る］を押せない）。 */
   selectedCount: number
   busy: boolean
   notice?: ReactNode
