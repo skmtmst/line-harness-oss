@@ -9,6 +9,7 @@
  *   - 結果の列はアカウントの合計（届いた人数・失敗したアカウント）
  * 1行＝1回の一括配信。行を押すと詳細（送った結果）へ。動きは BEHAVIOR.md。
  */
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { AlertCircle, CalendarClock, FilePen, Inbox, List, Plus, Send } from 'lucide-react'
@@ -78,6 +79,7 @@ function rateLine(targets: HqBroadcastRun['targets'], reached: number): string |
 type HqFolder = { id: string; name: string; revision: number; item_count: number }
 
 export default function HqBroadcastList() {
+  const router = useRouter()
   usePageTitle('一括配信')
   const role = useStaffRole()
   const canManage = role === null || canManageRole(role)
@@ -292,8 +294,8 @@ export default function HqBroadcastList() {
                 <Td className={styles.colMenu}>
                   <div className={styles.menuBox}>
                     <RowActions subjectName={run.title} menuItems={[
-                      { id: 'open', label: run.status === 'prepared' ? '確かめて送る' : '送った結果を見る', onSelect: () => { window.location.href = href } },
-                      ...(run.status === 'prepared' && canManage ? [{ id: 'edit', label: '下書きを直す', onSelect: () => { window.location.href = `${NEW_HREF}?id=${encodeURIComponent(run.id)}` } }] : []),
+                      { id: 'open', label: run.status === 'prepared' ? '確かめて送る' : '送った結果を見る', onSelect: () => { router.push(href) } },
+                      ...(run.status === 'prepared' && canManage ? [{ id: 'edit', label: '下書きを直す', onSelect: () => { router.push(`${NEW_HREF}?id=${encodeURIComponent(run.id)}`) } }] : []),
                     ]} />
                   </div>
                 </Td>

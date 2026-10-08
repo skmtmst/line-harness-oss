@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type BroadcastAssetKind, type BroadcastMessageAsset } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -48,7 +49,7 @@ export default function StaffAssetList({ kind }: { kind: BroadcastAssetKind }) {
           <h3 className="text-ink mt-3 truncate font-bold">{item.name}</h3>
           <p className="text-ink-faint mt-1 text-xs">更新 {formatDateTime(item.updatedAt)}</p>
           <div className="mt-4">
-            <a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="border-accent text-accent-deep rounded-control inline-block border px-3 py-2 text-sm font-bold">一斉配信で使う</a>
+            <Link href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="border-accent text-accent-deep rounded-control inline-block border px-3 py-2 text-sm font-bold">一斉配信で使う</Link>
           </div>
         </article>
       ))}

@@ -8,6 +8,7 @@
  * ①② は下書きで、下の帯の［保存する］でまとめて保存する。③・店で手入力・④の取り消しは、その場で口を呼ぶ。
  * 呼ぶ口は visit-stamps-api（Codex の API-7）だけ。動き・権限は BEHAVIOR.md。
  */
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Check, ImageIcon, KeyRound, Minus, Plus, Stamp, Store } from 'lucide-react'
 import type { VisitStampCard, VisitStampEntryPage, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
@@ -98,6 +99,7 @@ function SectionTitle({ children, help, extra }: { children: string; help: strin
 }
 
 export default function VisitStampsV8() {
+  const router = useRouter()
   usePageTitle('来店スタンプ')
   const { selectedAccountId, accounts } = useAccount()
   const role = useStaffRole()
@@ -505,7 +507,7 @@ export default function VisitStampsV8() {
                                     ) : null}
                                     <RowActions subjectName={`${names.name}さんの申請`} menuItems={[
                                       { id: 'photo', label: '写真を大きく見る', onSelect: () => setPhoto(row) },
-                                      { id: 'friend', label: '友だちの詳細を開く', external: true, onSelect: () => { window.location.href = `/friends/detail?id=${encodeURIComponent(row.friend_id)}` } },
+                                      { id: 'friend', label: '友だちの詳細を開く', external: true, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friend_id)}`) } },
                                     ]} />
                                   </span>
                                 </Td>
@@ -583,7 +585,7 @@ export default function VisitStampsV8() {
                               <Td className={styles.colActor}><span className={styles.muted} title={row.actor}>{row.actor}</span></Td>
                               <Td className={styles.colMenu}>
                                 <RowActions subjectName={`${shortDateTime(row.at)} の記録`}
-                                  menuItems={[{ id: 'friend', label: '友だちの詳細を開く', external: true, onSelect: () => { window.location.href = `/friends/detail?id=${encodeURIComponent(row.friendId)}` } }]}
+                                  menuItems={[{ id: 'friend', label: '友だちの詳細を開く', external: true, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friendId)}`) } }]}
                                   destructiveItem={canManage && row.reversible ? { id: 'reverse', label: 'この記録を取り消す', onSelect: () => { setDialogError(''); setReversing(row.id) } } : undefined} />
                               </Td>
                             </Tr>

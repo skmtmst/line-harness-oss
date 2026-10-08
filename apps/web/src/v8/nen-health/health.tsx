@@ -9,6 +9,7 @@
  * 健康日記はお客さまがマイページで付けるので、ここに変える操作は無い（閲覧のみでも同じ画面）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, PawPrint } from 'lucide-react'
 import { ListPage } from '@/components/templates'
@@ -385,6 +386,7 @@ function HealthListV8({
 }
 
 function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpenSummary: (petId: string) => void; onOpenPdf: (petId: string) => void }) {
+  const router = useRouter()
   const kind = petAnimalTypeLabel(row.pet.animalType)
   const name = row.pet.name || row.pet.callName || '（名前なし）'
   const kindLine = row.pet.breed ? `${kind}・${row.pet.breed}` : kind
@@ -394,8 +396,8 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
     { id: 'summary', label: '30日のまとめ', onSelect: () => onOpenSummary(row.pet.id) },
     /* 1匹の PDF は「30日のまとめ」を開いてから印刷する（開いた引き出しの「印刷・PDF に保存する」）。 */
     { id: 'pdf', label: '獣医師向け PDF', onSelect: () => onOpenPdf(row.pet.id) },
-    { id: 'owner', label: '飼い主を開く', external: true, onSelect: () => { window.location.href = `/friends/detail?id=${friendId}` } },
-    { id: 'talk', label: '飼い主にトークで声をかける', external: true, onSelect: () => { window.location.href = `/chats?friend=${friendId}` } },
+    { id: 'owner', label: '飼い主を開く', external: true, onSelect: () => { router.push(`/friends/detail?id=${friendId}`) } },
+    { id: 'talk', label: '飼い主にトークで声をかける', external: true, onSelect: () => { router.push(`/chats?friend=${friendId}`) } },
   ]
   return (
     <Tr className={styles.row} data-table-layout="columns">

@@ -9,6 +9,7 @@
  * 表は「見出し 36・行 56」の同じ物差しで並べる（タブを替えても表の頭が動かない）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useRouter } from 'next/navigation'
 import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
@@ -298,6 +299,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
 type AutoFilter = '' | 'follow_up' | 'birthday' | 'off'
 
 function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings: NenCampaignSetting[]; sentByKey: Map<string, number>; pausedOnly: boolean }) {
+  const router = useRouter()
   const { autoSettings, sentByKey, pausedOnly, canEdit, kpis } = props
   const tabError = props.tabError ?? ''
   const [query, setQuery] = useState('')
@@ -341,7 +343,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
 
   const menuFor = (setting: NenCampaignSetting): ActionMenuItem[] => {
     const items: ActionMenuItem[] = []
-    if (canEdit) items.push({ id: 'edit', label: '編集', external: true, onSelect: () => { window.location.href = `/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}` } })
+    if (canEdit) items.push({ id: 'edit', label: '編集', external: true, onSelect: () => { router.push(`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`) } })
     items.push({ id: 'preview', label: '中身を見る', onSelect: () => props.onPreviewCampaign(setting.campaignKey) })
     if (canEdit) {
       items.push({ id: 'test', label: 'テスト送信', disabled: props.testing !== null, onSelect: () => props.onTestSend(setting) })
