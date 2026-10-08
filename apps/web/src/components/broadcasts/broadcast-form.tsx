@@ -74,6 +74,9 @@ import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
+import { useStaffRole } from '@/lib/staff-role'
+import { canEditFeature } from '@/lib/staff-capability'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
@@ -268,7 +271,11 @@ export function videoPreviewProblem(value: unknown): string | null {
   return null
 }
 
-function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: (content: Record<string, unknown>) => void }) {
+/**
+ * 画像・動画のアップロード欄。統括の一括配信（v8/hq-broadcasts）も同じ欄を使う。
+ * lineAccountId を渡すと動画の置き場をそのアカウントにする（null＝どの店にも属さない。統括）。省けば今選んでいる店。
+ */
+export function MediaUpload({ bubble, onChange, lineAccountId }: { bubble: BroadcastBubble; onChange: (content: Record<string, unknown>) => void; lineAccountId?: string | null }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const isVideo = bubble.type === 'video' || bubble.type === 'rich_video'
@@ -279,7 +286,7 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
     if (file.size > max) { setError(mediaTooLargeMessage(isVideo, file.size)); return }
     setBusy(true); setError('')
     try {
-      const res = await api.broadcastMessageAssets.upload(file)
+      const res = await api.broadcastMessageAssets.upload(file, lineAccountId)
       if (!res.success) { setError(res.error); return }
       onChange({ ...bubble.content, originalContentUrl: res.data.url, previewImageUrl: isVideo ? (bubble.content.previewImageUrl ?? '') : res.data.url })
     } catch { setError('アップロードに失敗しました。通信を確かめて、もう一度お試しください。') } finally { setBusy(false) }
@@ -297,7 +304,8 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
   </div>
 }
 
-function BubblePreview({ bubble, buttons = [], accountName }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[]; accountName?: string }) {
+/** LINE の見え方の吹き出し1つ。統括の一括配信（v8/hq-broadcasts）も使う。 */
+export function BubblePreview({ bubble, buttons = [], accountName }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[]; accountName?: string }) {
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
   if (bubble.type === 'text') return <BroadcastTextBubble text={text} buttons={buttons} accountName={accountName} legacy={<div className="max-w-[82%]">
@@ -738,7 +746,15 @@ export default function BroadcastForm({
   const [publishedActions, setPublishedActions] = useState<Array<{ versionId: string; name: string; version: number }>>([])
   /** 分類。空なら未分類。 */
   const [folderId, setFolderId] = useState('')
-  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
+  const [folders, setFolders] = useState<Array<{ id: string; name: string; color?: string | null }>>([])
+  // フォルダを選ぶ欄からその場で作る（dLffh）。一覧の左の列の「フォルダを追加」と同じ口・同じ権限。
+  const staffRoleForFolders = useStaffRole()
+  const canCreateFolder = staffRoleForFolders === null || canEditFeature('broadcast.definition.edit')
+  const createFolder = folderCreator(
+    (name, color) => api.folders.create({ kind: 'broadcast', name, color }),
+    folderById,
+    (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]),
+  )
   /*
    * 開封数を取るか。既定は取る。
    *
@@ -991,7 +1007,7 @@ export default function BroadcastForm({
 
   useEffect(() => {
     api.folders.list('broadcast')
-      .then((res) => { if (res.success) setFolders(res.data.map((f) => ({ id: f.id, name: f.name }))) })
+      .then((res) => { if (res.success) setFolders(res.data.map((f) => ({ id: f.id, name: f.name, color: f.color }))) })
       .catch(() => undefined)
   }, [])
 
@@ -2195,7 +2211,7 @@ export default function BroadcastForm({
             <small>友だちには表示されません。一覧で見分けるための名前です</small>
           </label>
           <div className={styles.basicFields}>
-            <label><span className={styles.labelRow}>フォルダ</span><Select aria-label="フォルダ" value={folderId} onChange={setFolderId} options={[{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.id, label: f.name }))]} size="full" /></label>
+            <label><span className={styles.labelRow}>フォルダ</span><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={folders.map(folderById)} onCreate={canCreateFolder ? createFolder : undefined} size="full" /></label>
             <label><span className={styles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません</HelpTip></span><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} className={styles.textInput} placeholder="配信の目的や運用メモ" /></label>
           </div>
           <div className={styles.recentHeader}><h3>最近の配信</h3><Link href="/broadcasts">一斉配信の一覧を見る →</Link></div>

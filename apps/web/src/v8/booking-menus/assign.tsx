@@ -563,7 +563,7 @@ export default function AssignMatrixV8() {
             actions={(
               <>
                 <Button
-                  onClick={() => setGrid(savedGrid ?? grid)}
+                  onClick={() => { setGrid(savedGrid ?? grid); if (!loadFailed) setError(null) }}
                   disabled={saving}
                 >
                   キャンセル
@@ -577,7 +577,8 @@ export default function AssignMatrixV8() {
                     }
                     void saveAll()
                   }}
-                  disabled={saving || !selectedAccountId || loading || Boolean(error)}
+                  // WEB061：保存の失敗で保存を押せなくしない（やり直せるように）。止めるのは読み込みの失敗だけ。
+                  disabled={saving || !selectedAccountId || loading || loadFailed}
                   busy={saving}
                   done={saveDone}
                 >

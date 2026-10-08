@@ -158,9 +158,9 @@ export function distributionUrl(refCode: string, customBase: string | null): str
 const APPROVAL_PAGE_SIZE = 200
 const APPROVAL_MAX_PAGES = 25
 
-export async function listAllConversionApprovals(
+async function fetchAllConversionApprovals(
   status: 'pending' | 'approved' | 'rejected',
-  startOffset = 0,
+  startOffset: number,
 ): Promise<{ items: ConversionApprovalItem[]; truncated: boolean }> {
   const items: ConversionApprovalItem[] = []
   for (let page = 0; page < APPROVAL_MAX_PAGES; page += 1) {
@@ -174,6 +174,29 @@ export async function listAllConversionApprovals(
     if (res.data.length < APPROVAL_PAGE_SIZE) return { items, truncated: false }
   }
   return { items, truncated: true }
+}
+
+/*
+ * WEB003: 同じ条件（アカウント・状態・始まりの位置）で走っている全件読みは1本にまとめる。
+ * タブの名の横の件数（affiliates.tsx）と成果承認タブ（approvals.tsx）が同時に開くと、
+ * 承認待ちの全件読みが2本重なっていた。終わった結果は持ち越さない（次に呼べば読み直す）。
+ * 承認・却下の後は `fresh` で読み直し、操作より前に始まった読み込みを使い回さない。
+ */
+const runningApprovalLoads = new Map<string, Promise<{ items: ConversionApprovalItem[]; truncated: boolean }>>()
+
+export function listAllConversionApprovals(
+  status: 'pending' | 'approved' | 'rejected',
+  startOffset = 0,
+  options: { accountId?: string | null; fresh?: boolean } = {},
+): Promise<{ items: ConversionApprovalItem[]; truncated: boolean }> {
+  const key = `${options.accountId ?? ''}\u0000${status}\u0000${startOffset}`
+  const running = options.fresh ? undefined : runningApprovalLoads.get(key)
+  if (running) return running
+  const request = fetchAllConversionApprovals(status, startOffset)
+  runningApprovalLoads.set(key, request)
+  const forget = () => { if (runningApprovalLoads.get(key) === request) runningApprovalLoads.delete(key) }
+  request.then(forget, forget)
+  return request
 }
 
 /**

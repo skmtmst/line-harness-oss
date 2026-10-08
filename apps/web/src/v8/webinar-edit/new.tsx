@@ -19,6 +19,7 @@ import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { describeSaveFailure, webinarApi, type WebinarFolder } from '@/lib/api'
 import { BackLink, WizardSteps } from './chrome'
+import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
 
 const FOLDERS_BLOCKED = 'フォルダを読み込めていないため、下書きを保存できません。フォルダをもう一度読み込んでください。'
@@ -159,6 +160,9 @@ function NewInner() {
           folders={folders}
           folderState={folderState}
           onReloadFolders={() => void loadFolders()}
+          onCreateFolder={selectedAccountId
+            ? folderCreator((name, color) => webinarApi.createFolder(selectedAccountId, { name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+            : undefined}
           audienceLabel="申込者向け"
           fieldErrors={fieldErrors}
           disabled={saving !== false}
