@@ -122,6 +122,24 @@ describe('V8 投稿（審査）', () => {
     expect(document.querySelector('[data-design-node="ujcar"]')?.textContent).toContain('人の顔や個人情報が写っている')
   })
 
+  it('WEB225：見送りの保存に失敗したら、理由を開いている窓の中に出す', async () => {
+    const base = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://worker.test')
+      if ((init?.method ?? 'GET') !== 'GET' && url.pathname.includes('/photos/')) {
+        return new Response(JSON.stringify({ success: false, error: 'down' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+      }
+      return base(input, init)
+    })
+    await render()
+    await click(buttons('そらちゃんの写真を見送る')[0])
+    const dialog = () => document.querySelector('[data-design-node="ujcar"]')
+    const confirm = [...dialog()!.querySelectorAll('button')].find((button) => button.textContent?.trim() === '見送る')
+    await click(confirm)
+    expect(dialog()).toBeTruthy()
+    expect(dialog()!.textContent).toContain('審査結果を保存できませんでした')
+  })
+
   it('閲覧のみには帯を出し、押せない操作を置かない（無効のボタンが1つも無い）', async () => {
     fixture.role = 'staff'
     await render()

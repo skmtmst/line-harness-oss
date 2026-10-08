@@ -19,6 +19,7 @@ import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficP
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { canEditFeature } from '@/lib/staff-capability'
 import { formatNumber } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -78,11 +79,12 @@ const DELETE_CHOICES: ReadonlyArray<readonly [DeleteChoice, string, string]> = [
   ['delete', 'このまま削除する', '利用履歴がない経路だけ完全に削除できます。元には戻せません。'],
 ]
 
-function monthKeyOf(iso: string | null): string | null {
+/** WEB038：月の区切りは日本時間（今月・先月の鍵と同じ）。ブラウザの時計の地域に寄らない。 */
+export function monthKeyOf(iso: string | null): string | null {
   if (!iso) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return new Date(d.getTime() + 9 * 60 * 60_000).toISOString().slice(0, 7)
 }
 
 function InflowDetailContent() {
@@ -91,7 +93,8 @@ function InflowDetailContent() {
   const id = searchParams.get('id') ?? ''
   const requestedRefCode = searchParams.get('ref') ?? ''
   const role = useStaffRole()
-  const readonly = role !== null && !canManageRole(role)
+  // WEB034：「流入」を任された staff も、経路の編集・止める／再開ができる（口と同じ条件）。完全削除は管理者だけ。
+  const readonly = role !== null && !canManageRole(role) && !canEditFeature('/inflow-links')
 
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [route, setRoute] = useState<EntryRoute | null>(null)
@@ -99,6 +102,9 @@ function InflowDetailContent() {
   const [funnelError, setFunnelError] = useState(false)
   const [funnelAttempt, setFunnelAttempt] = useState(0)
   const [friends, setFriends] = useState<AttributedFriend[]>([])
+  /* WEB036：来た友だちの読み込みは別に持つ。失敗を「まだいません」にしない。 */
+  const [friendsState, setFriendsState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [friendsAttempt, setFriendsAttempt] = useState(0)
   // IDEA-18: 購入・返金の値は注文明細パネルが取った集計と同じ値を使う。未取得は null。
   const [ordersSummary, setOrdersSummary] = useState<RefOrdersResult | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
@@ -199,29 +205,48 @@ function InflowDetailContent() {
     setFunnel(null)
     setFunnelError(false)
     setOrdersSummary(null)
-    void Promise.allSettled([api.entryRoutes.get(selectedId), api.entryRoutes.funnel(selectedId)]).then(async ([r, f]) => {
+    void Promise.allSettled([api.entryRoutes.get(selectedId), api.entryRoutes.funnel(selectedId)]).then(([r, f]) => {
       if (cancelled) return
+      // WEB035：数（段階）は友だちの読み込みを待たずに、今の経路のものだけを書く。
+      if (f.status === 'fulfilled' && f.value.success) setFunnel(f.value.data)
+      else setFunnelError(true)
       if (r.status === 'fulfilled' && r.value.success) {
         setRoute(r.value.data)
-        try {
-          const result = await fetchApi<{ success: boolean; data: { friends: AttributedFriend[] } }>(
-            `/api/analytics/ref/${encodeURIComponent(r.value.data.refCode)}`,
-          )
-          if (!cancelled && result.success && Array.isArray(result.data?.friends)) setFriends(result.data.friends)
-        } catch {
-          if (!cancelled) setFriends([])
-        }
       } else if (r.status === 'rejected' && r.reason instanceof ApiError && r.reason.status === 404) {
         setRouteMissing(true)
       } else setError('リンクの取得に失敗しました。もう一度読み込んでください。')
-      if (f.status === 'fulfilled' && f.value.success) setFunnel(f.value.data)
-      else if (!cancelled) setFunnelError(true)
-      if (!cancelled) setRouteLoading(false)
+      setRouteLoading(false)
     })
     return () => {
       cancelled = true
     }
   }, [selectedId, funnelAttempt])
+
+  // WEB036：この経路から来た友だち。経路が決まってから別に読み、失敗は失敗として出す。
+  const routeRefCode = route && route.id === selectedId ? route.refCode : null
+  useEffect(() => {
+    setFriends([])
+    if (!routeRefCode) {
+      setFriendsState('loading')
+      return
+    }
+    let cancelled = false
+    setFriendsState('loading')
+    void fetchApi<{ success: boolean; data: { friends: AttributedFriend[] } }>(
+      `/api/analytics/ref/${encodeURIComponent(routeRefCode)}`,
+    ).then((result) => {
+      if (cancelled) return
+      if (result.success && Array.isArray(result.data?.friends)) {
+        setFriends(result.data.friends)
+        setFriendsState('ready')
+      } else {
+        setFriendsState('error')
+      }
+    }).catch(() => {
+      if (!cancelled) setFriendsState('error')
+    })
+    return () => { cancelled = true }
+  }, [routeRefCode, friendsAttempt])
 
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const url = route ? `${workerBase}/r/${encodeURIComponent(route.refCode)}` : null
@@ -353,7 +378,7 @@ function InflowDetailContent() {
   const afterMenuItems: ActionMenuItem[] = [
     { id: 'stop', label: '受付を止める', onSelect: () => openDelete('stop') },
     { id: 'redirect', label: '別リンクへ送る', onSelect: () => openDelete('redirect') },
-    { id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: () => openDelete('delete') },
+    ...(canPermanentlyDelete ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: () => openDelete('delete') }] : []),
   ]
 
   if (!selectedId) {
@@ -603,7 +628,15 @@ function InflowDetailContent() {
               />
             </div>
           </div>
-          {friendRows.length === 0 ? (
+          {friendsState === 'error' ? (
+            <ListState
+              kind="error"
+              title="この経路から来た友だちを読み込めませんでした"
+              onRetry={() => setFriendsAttempt((n) => n + 1)}
+            />
+          ) : friendsState === 'loading' ? (
+            <ListState kind="loading" title="この経路から来た友だちを読み込んでいます" />
+          ) : friendRows.length === 0 ? (
             <ListState
               kind="empty"
               title={friends.length > 0 ? '条件に合う友だちがいません' : 'この経路から来た友だちは、まだいません'}

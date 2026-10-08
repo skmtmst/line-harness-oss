@@ -94,6 +94,8 @@ export default function OffersTab() {
   const [scenarios, setScenarios] = useState<(Scenario & { stepCount?: number })[]>([])
   const [approvals, setApprovals] = useState<ConversionApprovalItem[]>([])
   const [approvalState, setApprovalState] = useState<LoadState>('loading')
+  /* WEB209：承認は5000件で読むのを止める。止めたときは数を言い切らない。 */
+  const [approvalsTruncated, setApprovalsTruncated] = useState(false)
   const [monthly, setMonthly] = useState<{ count: number; delta: number | null } | null>(null)
   const [monthlyState, setMonthlyState] = useState<LoadState>('loading')
 
@@ -151,6 +153,7 @@ export default function OffersTab() {
       const results = await Promise.all((['pending', 'approved'] as const).map((status) => listAllConversionApprovals(status, 0, { accountId })))
       if (!mounted.current) return
       setApprovals(results.flatMap((result) => result.items))
+      setApprovalsTruncated(results.some((result) => result.truncated))
       setApprovalState('ready')
     } catch {
       if (mounted.current) setApprovalState('error')
@@ -288,7 +291,21 @@ export default function OffersTab() {
   const duplicate = async (offer: AffiliateOffer) => {
     setBusyId(offer.id)
     try {
+      /*
+       * WEB210：複製は全部の条件を写す（数える期間・上限・受付の期間も）。今の版の決まりを
+       * 読めなかったときは、決まりの抜けた複製を作らずに止める。
+       */
+      const cap = await api.affiliateOffers.capStatus(offer.id)
+      if (!cap.success || !cap.data) throw new Error('terms unavailable')
+      const version = cap.data.version
       const res = await api.affiliateOffers.create({
+        ...(version ? {
+          windowDays: version.windowDays ?? undefined,
+          capTotal: version.capTotal ?? null,
+          capMonthlyPerAffiliate: version.capMonthlyPerAffiliate ?? null,
+          receptionFrom: version.receptionFrom ?? null,
+          receptionTo: version.receptionTo ?? null,
+        } : {}),
         name: `${offer.name}（コピー）`,
         description: offer.description,
         rewardAmount: offer.rewardAmount ?? 0,
@@ -353,9 +370,11 @@ export default function OffersTab() {
         title="平均報酬"
         icon={<Banknote size={14} aria-hidden="true" />}
         value={null}
-        valueText={approvalState === 'ready' && averageReward != null ? formatYen(averageReward) : '—'}
+        valueText={approvalState === 'ready' && !approvalsTruncated && averageReward != null ? formatYen(averageReward) : '—'}
         unit=""
-        detail={approvalState === 'ready' ? (averageReward == null ? '今月はまだ認めた成果がありません' : '1件あたり') : approvalState === 'loading' ? loadingWord : errorWord}
+        detail={approvalState === 'ready'
+          ? (approvalsTruncated ? '件数が多く、全部は数えられませんでした' : averageReward == null ? '今月はまだ認めた成果がありません' : '1件あたり')
+          : approvalState === 'loading' ? loadingWord : errorWord}
       />
       <KpiCard
         presentation="band"
@@ -477,11 +496,11 @@ export default function OffersTab() {
                   <span className={styles.cellNum} title={actionText(offer)}>{actionText(offer)}</span>
                 </Td>
                 <Td className={`${styles.colOfferPeople} ${styles.num}`}>
-                  <span className={styles.cellNum}>{approvalState === 'ready' ? `${formatNumber(stat?.people.size ?? 0)}人` : '—'}</span>
+                  <span className={styles.cellNum}>{approvalState === 'ready' ? `${formatNumber(stat?.people.size ?? 0)}人${approvalsTruncated ? '以上' : ''}` : '—'}</span>
                 </Td>
                 <Td className={`${styles.colOfferConv} ${styles.num}`}>
                   <span className={styles.stackEnd}>
-                    <span className={styles.cellNum}>{approvalState === 'ready' ? (stat ? `${formatNumber(stat.conversions)}件` : '—') : '—'}</span>
+                    <span className={styles.cellNum}>{approvalState === 'ready' ? (stat ? `${formatNumber(stat.conversions)}件${approvalsTruncated ? '以上' : ''}` : '—') : '—'}</span>
                     {stat ? <span className={styles.rowPlan}>{`確定 ${formatYen(stat.reward)}`}</span> : null}
                   </span>
                 </Td>

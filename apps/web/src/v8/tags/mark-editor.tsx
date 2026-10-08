@@ -197,6 +197,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         }
         setBaseline({ name: current.name, color: current.color, displayOrder: current.displayOrder, isDefault: current.isDefault })
         setLoadState('ready')
+        // WEB090：「初めの読み込みが済んだ」は、読めて入力欄を埋めたときだけ立てる。
+        initialLoadRef.current = false
       } else if (editing) {
         setLoadMessage('対応マークが見つかりません。一覧から選び直してください。')
         setLoadState('error')
@@ -204,6 +206,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         setDisplayOrder(rows.length)
         setBaseline({ name: '要確認', color: COLORS[0].value, displayOrder: rows.length, isDefault: false })
         setLoadState('ready')
+        initialLoadRef.current = false
       } else {
         setLoadState('ready')
       }
@@ -219,7 +222,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       }
     } finally {
       if (loadSeqRef.current === seq) {
-        initialLoadRef.current = false
+        // WEB090：失敗したときは立てない（やり直しで入力欄と基準をちゃんと埋める）。
         setReloading(false)
       }
     }
