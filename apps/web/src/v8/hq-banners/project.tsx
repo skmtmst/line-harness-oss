@@ -18,6 +18,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import { RowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -520,6 +521,10 @@ function ProjectInner() {
    */
   const actions = canManage ? (
     <div className={styles.headActions}>
+      {images.length > 0 && !archived ? <RowMenu label={`プロジェクト「${project.name}」の操作`} triggerProps={{ disabled: busy }} items={[
+        { id: 'distribute-project', label: 'このプロジェクトの画像を配る', icon: <Send size={15} aria-hidden="true" />, emphasis: true,
+          onSelect: () => { setSelectedImages(images.map((image) => image.id)); openDistribution() } },
+      ]} /> : null}
       <Button onClick={() => fileRef.current?.click()} disabled={busy || archived || uploading} busy={uploading} busyLabel="取り込み中…">
         <Upload aria-hidden="true" className={styles.icon} />画像を取り込む
       </Button>

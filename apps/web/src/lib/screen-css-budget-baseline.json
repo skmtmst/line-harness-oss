@@ -814,6 +814,11 @@
     "height": 7,
     "font": 0
   },
+  "v8/hq-templates/folder-distribution-dialog.module.css": {
+    "spacing": 1,
+    "height": 0,
+    "font": 0
+  },
   "v8/hq-templates/saved-distribution-dialog.module.css": {
     "spacing": 2,
     "height": 0,

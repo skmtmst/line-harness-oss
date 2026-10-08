@@ -219,6 +219,17 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     expect(document.body.textContent).toContain('1枚中 1枚を1アカウントへ配りました')
   })
 
+  it('G-7：プロジェクトの操作から全画像を選んで既存の配布窓を開く', async () => {
+    act(() => { root.render(<HqBannerProjectV8 />) })
+    await flush()
+    act(() => { (host.querySelector('[aria-label="プロジェクト「秋のキャンペーン」の操作"]') as HTMLButtonElement).click() })
+    await flush()
+    act(() => { (Array.from(document.querySelectorAll('[role="menuitem"]')).find((item) => item.textContent === 'このプロジェクトの画像を配る') as HTMLElement).click() })
+    await flush()
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('2枚の画像をアカウントへ配る')
+    expect(deliverImage).not.toHaveBeenCalled()
+  })
+
   it('アーカイブは確かめてから行い、一覧へ戻る', async () => {
     act(() => { root.render(<HqBannerProjectV8 />) })
     await flush()
@@ -255,6 +266,7 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     await flush()
     expect(host.textContent).toContain('秋のキャンペーン')
     expect(buttonNamed('画像を取り込む')).toBeUndefined()
+    expect(host.querySelector('[aria-label="プロジェクト「秋のキャンペーン」の操作"]')).toBeNull()
     expect(buttonNamed('アーカイブ')).toBeUndefined()
     expect(host.querySelector('[aria-label="画像を生成"]')).toBeNull()
     expect(host.querySelector('input[type="checkbox"]')).toBeNull()

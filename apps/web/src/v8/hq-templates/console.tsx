@@ -16,7 +16,7 @@
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import { ArrowLeft, Check, Plus, RotateCw, Search, Send } from 'lucide-react'
+import { ArrowLeft, Check, Plus, Search, Send } from 'lucide-react'
 import { templateKind, type HqTemplateFolder, type HqTemplateListStats, type HqTemplateReceivedVersion, type HqTemplateVersionDisplay, type TemplateKind } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -59,6 +59,10 @@ import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { HqRichMenuCompatibilityError, hqRichMenuDefinitionFromSeed, hqRichMenuSeedFromDefinition } from '@/lib/hq-rich-menu-create'
 import type { RichMenuDefinition } from '@/lib/hq-templates-api'
 import HqAccountPicker from './account-picker'
+import FolderDistributionDialog from './folder-distribution-dialog'
+import DistributionResultDialog from './distribution-result-dialog'
+import FolderDistributionResult from './folder-distribution-result'
+import { assertTargets, distributeFolder, settledResult, folderResultRows, failedStatus, type FolderRun } from './folder-distribution'
 import SavedDistributionDialog from './saved-distribution-dialog'
 import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, useDistributionFolders, ALL_ACCOUNTS } from './distribution-accounts'
 import HqAttributes from './attributes'
@@ -117,6 +121,10 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const canEdit = staffRole === null || canManageRole(staffRole)
   const router = useRouter()
   const { setSelectedAccountId } = useAccount()
+  const [folderDistribution, setFolderDistribution] = useState<{ name: string; templates: HqTemplate[] } | null>(null)
+  const [folderBatch, setFolderBatch] = useState<{ name: string; runs: FolderRun[]; index: number; history: FolderRun[] } | null>(null)
+  const folderBatchRef = useRef(folderBatch)
+  folderBatchRef.current = folderBatch
   const [stage, setStage] = useState<Stage>('list')
   const [folders, setFolders] = useState<HqTemplateFolder[]>([])
   const [folderLoadFailed, setFolderLoadFailed] = useState(false)
@@ -134,7 +142,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [selected, setSelected] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [accountFolder, setAccountFolder] = useState(ALL_ACCOUNTS)
-  const accountFolders = useDistributionFolders(stage === 'accounts' || stage === 'duplicates' || stage === 'result' || stage === 'saved')
+  const accountFolders = useDistributionFolders(stage === 'accounts' || stage === 'duplicates' || stage === 'result' || stage === 'saved' || folderDistribution !== null)
   /* テンプレートの6種類（店と同じ上のタブ・API-17）。タブを替えたらその種類だけ読む。 */
   const [kind, setKind] = useState<TemplateKind>('message')
   const [kindRows, setKindRows] = useState<HqTemplate[] | null>(null)
@@ -272,6 +280,10 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     } finally { lock.current = false; if (alive.current) setBusy(false) }
   }
   const toList = () => {
+    if (folderBatchRef.current?.runs.some((run) => run.runId && !settledResult(run.result))) { setError('配布結果を確認してから一覧へ戻ってください。'); return }
+    const batchKey = batchStorageKey()
+    if (batchKey) window.sessionStorage.removeItem(batchKey)
+    setFolderBatch(null); setFolderDistribution(null)
     if (createUncertain) return
     reconcileSessionUploads(detail ? uploadedKeysIn(detail.definition) : [])
     createAttempt.current = null; setStage('list'); setSearch(''); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false)
@@ -371,7 +383,70 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     else setStage('list')
   })
   const textMessage = type === 'template' && 'template' in definition && definition.template.messageType === 'text'
+  const batchStorageKey = () => creationScope.current ? `hq-folder-distribution:${creationScope.current.tenantId}:${creationScope.current.actorId}:${type}` : null
+  const rememberBatch = (batch: NonNullable<typeof folderBatch>) => {
+    const key = batchStorageKey()
+    if (!key) throw new Error('所属先を確認できません。再読み込みしてください。')
+    // 保存するのはひな形・アカウント・配布のIDだけ。POST前に必ず残す。
+    window.sessionStorage.setItem(key, JSON.stringify([...batch.history, ...batch.runs].map((run) => ({ templateId: run.template.id, accountIds: run.accountIds, runId: run.runId }))))
+  }
+  const loadBatchConfirmation = async (batch: NonNullable<typeof folderBatch>, index: number) => {
+    const task = batch.runs[index]
+    const loaded = await hqTemplatesApi.get(task.template.id)
+    const checked = await hqTemplatesApi.preflight(task.template.id, task.accountIds)
+    assertTargets(checked, task.accountIds)
+    if (!alive.current) return
+    loadDetailIntoForm(loaded); setSelected(task.accountIds); setTextOverrides({}); setSearch(''); setAccountFolder(ALL_ACCOUNTS)
+    setPendingRun(null); setPreflight(checked); setChoices({}); setBulkMode(''); setNow(Date.now()); setStage('duplicates')
+    setFolderBatch({ ...batch, index })
+  }
+  const startFolderDistribution = (folderName: string, rows: HqTemplate[], ids: string[]) => void perform(async () => {
+    if (!canEdit || !rows.length || !ids.length || ids.some((id) => !accounts.some((account) => account.id === id))) return
+    const batch = { name: folderName, runs: rows.map((template) => ({ template, accountIds: [...ids] })), index: 0, history: [] }
+    await loadBatchConfirmation(batch, 0)
+    if (alive.current) setFolderDistribution(null)
+  })
+  const executeFolder = async (batch: NonNullable<typeof folderBatch>) => {
+    setStage('result'); setPreflight(null); setResult(null)
+    try {
+      await distributeFolder(batch.runs, (runs) => {
+        const next = { ...batch, runs }
+        rememberBatch(next)
+        if (alive.current) setFolderBatch(next)
+      })
+    } catch (cause) {
+      throw new Error(`${errorText(cause)} 配布結果が未確認の行は再配布せず「結果を再確認」を押してください。`)
+    }
+  }
+  const confirmFolder = () => void perform(async () => {
+    const batch = folderBatchRef.current
+    if (!batch || !preflight) return
+    const resolved = resolvedItems(preflight, choices)
+    if (!resolved || !Number.isFinite(Date.parse(preflight.expiresAt)) || Date.parse(preflight.expiresAt) <= Date.now()) throw new Error('確認の有効期限、または未選択の項目を確認してください。')
+    const runs = batch.runs.map((run, index) => index === batch.index ? { ...run, preflight, resolutions: resolved } : run)
+    const next = { ...batch, runs }
+    if (batch.index + 1 < runs.length) await loadBatchConfirmation(next, batch.index + 1)
+    else {
+      setFolderBatch(next)
+      await executeFolder(next)
+    }
+  })
+  const retryFolder = (unsubmitted = false) => void perform(async () => {
+    const batch = folderBatchRef.current
+    if (!batch || batch.runs.some((run) => run.runId && !settledResult(run.result))) return
+    const rows = folderResultRows([...batch.history, ...batch.runs])
+    const tasks = new Map<string, FolderRun>()
+    for (const row of rows) {
+      if (!(unsubmitted ? !row.store : row.store && failedStatus(row.store.status))) continue
+      const task = tasks.get(row.template.id) ?? { template: row.template, accountIds: [] }
+      task.accountIds.push(row.accountId); tasks.set(row.template.id, task)
+    }
+    if (!tasks.size) return
+    await loadBatchConfirmation({ name: batch.name, runs: [...tasks.values()], index: 0,
+      history: [...batch.history, ...batch.runs.filter((run) => Boolean(run.runId))] }, 0)
+  })
   const checkStores = (ids: string[]) => void perform(async () => {
+    if (folderBatch) { await loadBatchConfirmation(folderBatch, folderBatch.index); return }
     if (!detail || !ids.length) return
     const overrides = textMessage ? ids.filter((id) => textOverrides[id] !== undefined).map((accountId) => ({ accountId, text: textOverrides[accountId] })) : undefined
     const checked = await (overrides?.length ? hqTemplatesApi.preflight(detail.template.id, ids, overrides) : hqTemplatesApi.preflight(detail.template.id, ids))
@@ -429,6 +504,25 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   })
   useEffect(() => {
     if (!ready || createAttempt.current) return
+    const batchKey = batchStorageKey()
+    const journal = batchKey ? window.sessionStorage.getItem(batchKey) : null
+    if (journal) {
+      void perform(async () => {
+        const saved = JSON.parse(journal) as Array<{ templateId: string; accountIds: string[]; runId?: string }>
+        if (!Array.isArray(saved) || !saved.length || saved.some((row) => typeof row.templateId !== 'string' || !Array.isArray(row.accountIds) || row.accountIds.some((id) => !accounts.some((account) => account.id === id)))) throw new Error('配布の記録を確認できません。')
+        const runs: FolderRun[] = []
+        for (const row of saved) {
+          const loaded = await hqTemplatesApi.get(row.templateId)
+          if (loaded.template.template_type !== type) throw new Error('配布の種類を確認できません。')
+          runs.push({ template: loaded.template, accountIds: row.accountIds, runId: row.runId })
+        }
+        const batch = { name: '配布結果の再確認', runs, index: 0, history: [] }
+        if (!alive.current) return
+        setFolderBatch(batch); setStage('result')
+        await executeFolder(batch)
+      })
+      return
+    }
     const params = new URLSearchParams(window.location.hash.slice(1))
     const id = params.get('template'), runId = params.get('run')
     if (!id || !runId) return
@@ -526,12 +620,25 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         onCreate={startCreate}
         onEdit={(row) => open(row.id, 'edit')}
         onOpen={type === 'template' ? (row) => open(row.id, 'detail') : undefined}
+        folderContents={templates}
+        onDistributeFolder={(id, folderName) => void perform(async () => {
+          if (!canEdit || type === 'scenario') return
+          const all = await hqTemplatesApi.list(type)
+          if (!alive.current) return
+          setTemplates(all)
+          const contents = all.filter((row) => id === 'none' ? !row.folder_id : row.folder_id === id)
+          if (!contents.length) throw new Error('このフォルダには配るひな形がありません。')
+          setFolderDistribution({ name: folderName, templates: contents })
+        })}
         onDistribute={(row) => open(row.id, 'accounts')}
         onDuplicate={duplicateRow}
         onRemove={(row) => setRemove(row)}
         notices={notices}
         overlays={(
           <>
+          {folderDistribution ? <FolderDistributionDialog name={folderDistribution.name} templates={folderDistribution.templates} accounts={accounts} busy={busy} error={error}
+            onCancel={() => { if (!busy) { setFolderDistribution(null); setError('') } }}
+            onConfirm={(rows, ids) => startFolderDistribution(folderDistribution.name, rows, ids)} /> : null}
           {stage === 'saved' ? <SavedDistributionDialog accounts={accounts} folders={accountFolders} selected={selected} onChange={setSelected}
             filter={accountFolder} onFilter={setAccountFolder} search={search} onSearch={setSearch} received={received} receivedFailed={receivedFailed} busy={busy}
             error={error} onLater={toList} onDistribute={() => checkStores(selected)} /> : null}
@@ -843,6 +950,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     )
   }
 
+  if (stage === 'result' && folderBatch) return <FolderDistributionResult name={folderBatch.name} runs={[...folderBatch.history, ...folderBatch.runs]}
+    accounts={accounts} busy={busy} error={error}
+    onBack={toList} onRefresh={() => void perform(() => executeFolder(folderBatch))}
+    onRetry={() => retryFolder()} onRecheck={() => retryFolder(true)} />
+
   /* ───── アカウントへ配る（meBRB）：選ぶ → 重複の配り方 → 配る（進み具合） ───── */
   const storeOf = (accountId: string) => preflight?.stores.find((store) => store.accountId === accountId)
   const resultOf = (accountId: string) => result?.stores.find((store) => store.accountId === accountId)
@@ -875,6 +987,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   return (
     <PageFrame kind="wizard" boardId={stage === 'result' ? 'dEvJM' : 'meBRB'}>
       <PageHeading title={pageTitle} help="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。一括設定のあと、必要な項目だけアカウントごとに変えられます。" />
+      {folderBatch ? <p className={styles.distributionNotice}>{`フォルダ「${folderBatch.name}」：${folderBatch.index + 1} / ${folderBatch.runs.length} 件目の配布方法を確かめています。すべて確かめてから配ります。`}</p> : null}
       {error || message ? <div className={styles.distributionNotice}>{notices}</div> : null}
       <ListPageBody
         contentInset
@@ -994,9 +1107,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             <Button disabled={busy} onClick={toList}>キャンセル</Button>
             <Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)}><Check size={15} aria-hidden="true" />{selected.length === 1 ? '選んだ1アカウントを確かめる' : `選んだ${selected.length}アカウントを確かめる`}</Button>
           </> : stage === 'duplicates' && preflight ? <>
-            <Button disabled={busy} onClick={() => { setPreflight(null); setStage('accounts') }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
+            <Button disabled={busy} onClick={() => { if (folderBatch) toList(); else { setPreflight(null); setStage('accounts') } }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
             {expired ? <Button disabled={busy} onClick={() => checkStores(selected)}>現在版を再確認</Button> : null}
-            <Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={run}><Send size={15} aria-hidden="true" />{`この内容で${preflight.stores.length}アカウントへ配る`}</Button>
+            <Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={folderBatch ? confirmFolder : run}><Send size={15} aria-hidden="true" />{folderBatch && folderBatch.index + 1 < folderBatch.runs.length ? `次のひな形を確かめる（${folderBatch.index + 1}/${folderBatch.runs.length}）` : folderBatch ? `${folderBatch.runs.length} 件を ${selected.length} アカウントへ配る` : `この内容で${preflight.stores.length}アカウントへ配る`}</Button>
           </> : <>
             <Button disabled={busy} onClick={toList}>{done ? 'ひな形一覧へ' : 'キャンセル'}</Button>
             {!done ? <Button variant="primary" disabled><Plus size={15} aria-hidden="true" />{`配っています（${finished}/${progressTotal}）`}</Button> : null}
@@ -1004,51 +1117,16 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))}>{`失敗${failures.length}アカウントを再確認`}</Button> : null}
           </>}
         </div>
-      <Dialog
+      <DistributionResultDialog
         open={Boolean(result && done && resultDialogFor === `${result.runId}:${result.status}`)}
-        designWidth={640}
-        designTop={220}
         title={`配った結果：${detail?.template.name ?? ''}`}
-        designHeaderPadding="24px 24px 0"
-        busy={busy}
-        cancelLabel="閉じる"
-        onCancel={() => setResultDialogFor(null)}
-        {...(failures.length ? {
-          confirmLabel: `失敗した ${failures.length} 件をやり直す`,
-          confirmIcon: <RotateCw size={15} />,
-          onConfirm: () => { setResultDialogFor(null); checkStores(failures.map((s) => s.accountId)) },
-        } : {})}
-      >
-        {result ? <p className={styles.resultSummary}>{`${result.stores.length} アカウントへ配りました。成功 ${successes.length}・失敗 ${failures.length}。${successes.length ? '成功した所はもう使えます。' : ''}`}</p> : null}
-        <div className={styles.resultList}>
-          {result?.stores.map((store) => {
-            const failed = failures.includes(store)
-            const name = store.accountName ?? accountName(accounts, store.accountId)
-            return (
-              <div key={store.accountId} className={styles.resultRow}>
-                <span className={styles.resultName} title={name}>{name}</span>
-                <span className={styles.resultText}>{failed ? (store.reason || '配布できませんでした。アカウントの現在版を再確認してください。') : resultSentence(store)}</span>
-                {store.status === 'succeeded' ? <StatusBadge tone="success" size="compact">成功</StatusBadge>
-                  : failed ? <StatusBadge tone="danger" size="compact">失敗</StatusBadge>
-                  : <StatusBadge tone="neutral" size="compact">作成中</StatusBadge>}
-              </div>
-            )
-          })}
-        </div>
-        {failures.length ? <p className={styles.resultBand}>{`失敗した ${failures.length} 件だけやり直せます。各行の理由を直してから、やり直してください。`}</p> : null}
-      </Dialog>
+        summary={result ? `${result.stores.length} アカウントへ配りました。成功 ${successes.length}・失敗 ${failures.length}。${successes.length ? '成功した所はもう使えます。' : ''}` : ''}
+        rows={(result?.stores ?? []).map((store) => ({ key: store.accountId, name: store.accountName ?? accountName(accounts, store.accountId), store }))}
+        busy={busy} onClose={() => setResultDialogFor(null)}
+        onRetry={() => { setResultDialogFor(null); checkStores(failures.map((store) => store.accountId)) }}
+      />
     </PageFrame>
   )
-}
-
-/** 配った結果の1行の文（dEvJM）。成功したアカウントで何をしたか。 */
-function resultSentence(store: DistributionResult['stores'][number]): string {
-  if (store.status !== 'succeeded') return '配っています'
-  if (store.counts.aliased > 0) return store.createdName ? `同じ名前があったため「${store.createdName}」で作りました` : '同じ名前があったため、別名で作りました'
-  if (store.counts.overwritten > 0) return '上書きしました'
-  if (store.counts.created > 0) return '新しく作りました'
-  if ((store.counts.reused ?? 0) > 0) return '今あるものを使いました'
-  return '配りました'
 }
 
 /**
