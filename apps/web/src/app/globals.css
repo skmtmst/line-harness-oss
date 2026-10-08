@@ -711,6 +711,8 @@
   --bell-dot: 8px; --bell-dot-color: #2f6fde; --bell-unread-bg: #f7faff; --bell-foot-pad: 10px 16px; --bell-state-pad: 20px 16px; --bell-focus-ring: 2px; --bell-focus-offset: -2px;
   /* 切り替え（3つ）の詰めた形（ベルの小窓の分類）：項目 4/12・文 12/18。 */
   --seg-compact-pad: 4px 12px; --seg-compact-lh: 18px;
+  /* 連動のタイミング（hold・gSsPR）。既定の切り替えの寸法は変えない。 */
+  --seg-timing-h: 40px; --seg-timing-w: 360px; --seg-timing-pad: 4px; --seg-timing-gap: 4px;
   /* 分析（ws9wt・eEhYU・L4Uov）：二段の切り替え・数の帯・棒・右の列。 */
   --tpl-an-nav-gap: 8px; --tpl-an-group-gap: 2px; --tpl-an-group-pad: 2px; --tpl-an-group-item-pad: 5px 12px; --tpl-an-seg-radius: 8px; --tpl-an-seg-item-radius: 6px; --tpl-an-seg-lh: 17px; --tpl-an-seg-thumb-shadow: 0 1px 2px #1d1d1f14;
   /* 設定・ログインユーザー・EC連携・プール・運営・分析の残り（作業役 st2） */ --tpl-st2-setnav-child-pad: 5px 10px; --tpl-st2-ticket-subject-lh: 17px; --tpl-st2-ticket-meta-lh: 16px; --tpl-st2-stop-gap: 14px; --tpl-st2-stop-note-pad: 10px 12px; --tpl-st2-stop-note-lh: 17px; --tpl-st2-member-row-gap: 14px; --tpl-st2-stop-side: 24px;

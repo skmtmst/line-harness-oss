@@ -111,4 +111,23 @@
 [data-theme='v8'] .root[data-size='panel'] .item { padding: 5px 12px; font-size: var(--text-caption); line-height: 17px; }
 [data-theme='v8'] .root[data-size='panel'] .selected { font-weight: 700; }
 [data-theme='v8'] .root[data-size='panel'] .thumb { top: 3px; bottom: 3px; border-radius: var(--radius-mini); }
+/* 連動タイミング（gSsPR）。この寸法を頼んだ場所だけに効く。 */
+[data-theme='v8'] .root[data-size='timing'] {
+  width: var(--seg-timing-w);
+  max-width: 100%;
+  height: var(--seg-timing-h);
+  padding: var(--seg-timing-pad);
+  gap: var(--seg-timing-gap);
+}
+[data-theme='v8'] .root[data-size='timing'] .item {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  white-space: nowrap;
+}
+[data-theme='v8'] .root[data-size='timing'] .thumb {
+  top: var(--seg-timing-pad);
+  bottom: var(--seg-timing-pad);
+  box-shadow: var(--shadow-segment-ring);
+}
 }
