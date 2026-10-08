@@ -83,6 +83,9 @@ export default function BroadcastRecipients({
     setState('loading')
     setNextCursor(null)
     setMoreError(false)
+    // 新しい読込は、進行中の「続きを読み込む」を古い扱いにする。古い方の finally は
+    // もう解除しないので、ここで「読み込み中」を戻す（戻さないと続きのボタンが押せないまま残る）。
+    setMoreBusy(false)
     // ROOT31：再送の成功の知らせは、読み直しで消さない。
     if (!options?.keepMessage) setRetryMessage(null)
     try {
@@ -267,7 +270,7 @@ export default function BroadcastRecipients({
           )}
           {nextCursor ? (
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="secondary" onClick={() => void loadMore()} disabled={moreBusy} busy={moreBusy}>
+              <Button variant="secondary" onClick={() => void loadMore()} disabled={moreBusy} busy={moreBusy} busyLabel="読み込み中…">
                 続きを読み込む
               </Button>
               <span className="text-ink-faint text-xs">{formatNumber(rows.length)}件を表示中</span>
