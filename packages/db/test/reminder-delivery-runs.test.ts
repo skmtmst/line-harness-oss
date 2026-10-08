@@ -247,6 +247,7 @@ describe('リマインダ実行記録', () => {
       targetCount: 1,
       nextScheduledAt: null,
       sentThisMonth: 0,
+      scheduledNext24Hours: 0,
       scheduledNext7Days: 0,
     })
     const list = await listReminderDeliveryRuns(db, {
