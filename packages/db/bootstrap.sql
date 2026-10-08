@@ -1290,7 +1290,8 @@ CREATE TABLE banner_generations (
   started_at       TEXT,
   finished_at      TEXT
 , reference_image_id TEXT REFERENCES banner_images(id), reference_mode TEXT
-  CHECK (reference_mode IS NULL OR reference_mode IN ('edit', 'inspire')), base_color TEXT, accent_color TEXT, reference_images TEXT, emphasis_lines TEXT);
+  CHECK (reference_mode IS NULL OR reference_mode IN ('edit', 'inspire')), base_color TEXT, accent_color TEXT, reference_images TEXT, emphasis_lines TEXT, crop_gravity TEXT NOT NULL DEFAULT 'center'
+  CHECK (crop_gravity IN ('center','top','bottom')), stop_requested_at TEXT);
 
 CREATE TABLE banner_image_deliveries (
   id               TEXT PRIMARY KEY,
@@ -8052,6 +8053,30 @@ CREATE TABLE webinars (
   updated_at TEXT NOT NULL
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL, cta_version INTEGER NOT NULL DEFAULT 0, cta_updated_by TEXT, cta_updated_at TEXT, cta_write_token TEXT);
 
+CREATE TABLE workflow_steps (
+  scope_id TEXT NOT NULL,
+  process_kind TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  step_key TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','running','succeeded','failed','exhausted','unknown','canceled')),
+  lease_owner TEXT,
+  lease_expires_at INTEGER,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  max_attempts INTEGER NOT NULL DEFAULT 5 CHECK (max_attempts > 0),
+  next_attempt_at INTEGER,
+  retry_key TEXT NOT NULL,
+  input_json TEXT,
+  result_json TEXT,
+  error_code TEXT,
+  first_attempt_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (scope_id, process_kind, subject_id, step_key),
+  CHECK ((status = 'running' AND NOT (lease_owner IS NULL) AND NOT (lease_expires_at IS NULL))
+      OR (status <> 'running' AND lease_owner IS NULL AND lease_expires_at IS NULL))
+);
+
 CREATE INDEX booking_sync_notices_account ON booking_sync_notices(line_account_id,status,target_date);
 
 CREATE INDEX broadcasts_hq_run ON broadcasts(hq_run_id);
@@ -10154,6 +10179,8 @@ CREATE UNIQUE INDEX uq_google_calendar_connections_active_staff
 CREATE UNIQUE INDEX visit_stamp_one_paper ON visit_stamp_paper_requests(card_id,friend_id) WHERE status IN ('pending','approved');
 
 CREATE UNIQUE INDEX visit_stamp_one_visit ON visit_stamp_entries(card_id,friend_id,visit_key) WHERE kind='visit';
+
+CREATE INDEX workflow_steps_due ON workflow_steps(process_kind, status, next_attempt_at, lease_expires_at);
 
 CREATE TRIGGER analytics_projection_friend_stage_count
 AFTER INSERT ON analytics_projection_friend_stage
