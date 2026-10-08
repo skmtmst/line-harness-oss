@@ -14,7 +14,7 @@
 import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronDown, Copy, ImageIcon, Info, Plus, Send, Trash2 } from 'lucide-react'
+import { ChevronDown, Copy, ImageIcon, Plus, Send, Trash2, TriangleAlert } from 'lucide-react'
 import type { Folder, MediaItem } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
@@ -490,7 +490,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   <Button type="button" variant="text" disabled={panels.length >= MAX_COLUMNS} title={panels.length >= MAX_COLUMNS ? `カードは${MAX_COLUMNS}枚までです` : undefined} onClick={() => duplicatePanel(selectedIndex)}><Copy size={15} aria-hidden="true" />このカードを複製</Button>
                   <Button type="button" variant="text" disabled={panels.length <= 1} title={panels.length <= 1 ? 'カードは1枚必要です' : undefined} onClick={() => removePanel(selectedIndex)}><Trash2 size={15} aria-hidden="true" />このカードを消す</Button>
                 </div>
-                <p className={own.info}><Info className={own.icon} aria-hidden="true" />画像は全部のカードに入れるか、全部入れないかにします。1枚だけ違うと、高さがそろわず崩れます。</p>
+                <p className={own.info}><TriangleAlert className={own.icon} aria-hidden="true" />画像は全部のカードに入れるか、全部入れないかにします。1枚だけ違うと、高さがそろわず崩れます。</p>
               </section>
             ) : null}
 
