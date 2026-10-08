@@ -170,3 +170,21 @@ describe('画像(R2)の鍵を持つ列', () => {
     ).toEqual([]);
   });
 });
+
+
+describe('共有の工程記録の退会後削除', () => {
+  it('同じ統括の直接記録とLINE記録だけを選び、アカウントより先に消す', () => {
+    sqlite.exec("SAVEPOINT workflow_retention_test");
+    try {
+      sqlite.exec("INSERT INTO tenants(id,name) VALUES('workflow-tenant-a','A'),('workflow-tenant-b','B')");
+      sqlite.exec("INSERT INTO line_accounts(id,tenant_id,name,channel_id,channel_access_token,channel_secret) VALUES('workflow-account-a','workflow-tenant-a','A','workflow-channel-a','test','test'),('workflow-account-b','workflow-tenant-b','B','workflow-channel-b','test','test')");
+      const scopes=['tenant:workflow-tenant-a','line:workflow-account-a','tenant:workflow-tenant-b','line:workflow-account-b'];
+      const insert=sqlite.prepare(`INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,retry_key,created_at,updated_at) VALUES(?,'test','retention','test','key',0,0)`);
+      for(const scope of scopes)insert.run(scope);
+      const rows=sqlite.prepare(`SELECT scope_id FROM workflow_steps WHERE ${tenantScopeCondition('workflow_steps')} ORDER BY scope_id`).all('workflow-tenant-a');
+      expect(rows).toEqual([{scope_id:'line:workflow-account-a'},{scope_id:'tenant:workflow-tenant-a'}]);
+      const order=purgeTablesChildFirst();
+      expect(order.indexOf('workflow_steps')).toBeLessThan(order.indexOf('line_accounts'));
+    } finally {sqlite.exec("ROLLBACK TO workflow_retention_test; RELEASE workflow_retention_test");}
+  });
+});

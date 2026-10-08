@@ -22,6 +22,7 @@ export type RetentionCategory = 'purge' | 'retain' | 'global';
  * parent      … 親表の行に属する。親をたどると最後は tenant か lineAccount に着く。
  */
 export type RetentionScope =
+  | { by: 'workflow'; column: string }
   | { by: 'tenant'; column: string }
   | { by: 'lineAccount'; column: string }
   | { by: 'parent'; column: string; parent: string; parentColumn: string };
@@ -59,7 +60,7 @@ export function purgeTablesChildFirst(): string[] {
     const scope = RETENTION_TABLES[name]?.scope;
     if (!scope) return undefined;
     if (scope.by === 'parent') return scope.parent;
-    if (scope.by === 'lineAccount' && name !== 'line_accounts') return 'line_accounts';
+    if (scope.by === 'workflow' || (scope.by === 'lineAccount' && name !== 'line_accounts')) return 'line_accounts';
     return undefined;
   };
   const measure = (name: string, seen: Set<string>): number => {
@@ -96,6 +97,8 @@ export function tenantScopeCondition(table: string): string {
 }
 
 function buildCondition(table: string, scope: RetentionScope, seen: Set<string>): string {
+  if (scope.by === 'workflow') return `${table}.${scope.column} IN (WITH target(id) AS (SELECT ?)
+    SELECT 'tenant:' || id FROM target UNION ALL SELECT 'line:' || id FROM line_accounts WHERE tenant_id=(SELECT id FROM target))`;
   if (scope.by === 'tenant') return `${table}.${scope.column} = ?`;
   if (scope.by === 'lineAccount') {
     return `${table}.${scope.column} IN (SELECT id FROM line_accounts WHERE tenant_id = ?)`;

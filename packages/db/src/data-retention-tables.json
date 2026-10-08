@@ -4045,5 +4045,12 @@
       "by": "lineAccount",
       "column": "line_account_id"
     }
+  },
+  "workflow_steps": {
+    "category": "purge",
+    "scope": {
+      "by": "workflow",
+      "column": "scope_id"
+    }
   }
 }
