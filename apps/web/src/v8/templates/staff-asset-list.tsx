@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type BroadcastAssetKind, type BroadcastMessageAsset } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { formatDateTime } from '@/lib/format'
+import ListState from '@/components/shared/list-state'
+import { useResponseGate } from '@/lib/use-response-gate'
 
 const LABELS: Record<BroadcastAssetKind, { title: string; singular: string }> = {
   rich_message: { title: 'リッチメッセージ', singular: 'リッチメッセージ' },
@@ -21,24 +23,40 @@ const LABELS: Record<BroadcastAssetKind, { title: string; singular: string }> = 
 export default function StaffAssetList({ kind }: { kind: BroadcastAssetKind }) {
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<BroadcastMessageAsset[]>([])
-  const [loading, setLoading] = useState(true)
+  /*
+   * PKG110：読めなかったことを「まだありません」や前の一覧と混ぜない。
+   * 種類・アカウントを変えたら、前の遅い応答は捨てる。
+   */
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const gate = useResponseGate()
 
   const load = useCallback(async () => {
-    setLoading(true)
+    const token = gate.begin()
+    setState('loading')
+    setItems([])
     try {
       const res = await api.broadcastMessageAssets.list({ accountId: selectedAccountId || undefined, kind })
-      if (res.success) setItems(res.data)
-    } finally {
-      setLoading(false)
+      if (!gate.current(token)) return
+      if (!res.success) {
+        setState('error')
+        return
+      }
+      setItems(res.data)
+      setState('ready')
+    } catch {
+      if (gate.current(token)) setState('error')
     }
-  }, [kind, selectedAccountId])
+  }, [kind, selectedAccountId, gate])
 
   useEffect(() => { void load() }, [load])
 
   const meta = LABELS[kind]
 
-  if (loading) {
+  if (state === 'loading') {
     return <p className="text-ink-faint py-8 text-center text-sm">読み込み中...</p>
+  }
+  if (state === 'error') {
+    return <ListState kind="error" title={`${meta.title}を読み込めませんでした`} onRetry={() => void load()} />
   }
 
   return (

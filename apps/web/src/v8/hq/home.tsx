@@ -172,8 +172,18 @@ export default function HqHomeV8() {
     return () => { cancelled = true }
   }, [loadFolders])
 
+  /*
+   * WEB215：保存のあとの読み直しが失敗しても、黙って捨てない（保存そのものは済んでいる）。
+   * 読み直せなかったことを知らせ、もう一度読み直せるようにする。
+   */
+  const [reloadFailed, setReloadFailed] = useState(false)
   const reloadAfterSave = async () => {
-    await Promise.all([load(), refreshAccounts(), loadFolders()])
+    setReloadFailed(false)
+    try {
+      await Promise.all([load(), refreshAccounts(), loadFolders()])
+    } catch {
+      setReloadFailed(true)
+    }
   }
 
   const refreshConnectionInfo = async () => {
@@ -480,6 +490,13 @@ export default function HqHomeV8() {
 
       {connectionProgress ? <p className={styles.progress} role="status">{connectionProgress}</p> : null}
       {connectionResult ? <Notice tone="info" message={connectionResult} /> : null}
+      {reloadFailed ? (
+        <Notice
+          tone="warn"
+          message="保存はできましたが、一覧を読み直せませんでした。"
+          action={<Button type="button" onClick={() => void reloadAfterSave()}>読み直す</Button>}
+        />
+      ) : null}
 
       {shown.length === 0 ? (
         <EmptyList
@@ -487,7 +504,7 @@ export default function HqHomeV8() {
           title="まだ LINE 公式アカウントがありません"
           description=""
           filtered
-          onClearFilters={() => { setQuery(''); setStatus(STATUS_FILTERS[0].value); resetPage() }}
+          onClearFilters={() => { setQuery(''); setStatus(STATUS_FILTERS[0].value); setFolder(ALL); resetPage() }}
           filteredDescription="検索の言葉や絞り込みを外すと、すべて出ます"
         />
       ) : view === 'cards' ? (
@@ -604,6 +621,8 @@ export default function HqHomeV8() {
             setSettingsAccount(null)
           }}
           onShowDetails={() => { setEditingAccount(settingsAccount); setSettingsAccount(null) }}
+          canCreateFolder={canManage}
+          onFolderCreated={() => void loadFolders()}
         />
       ) : null}
       {archiveTarget?.mode === 'archive' ? (

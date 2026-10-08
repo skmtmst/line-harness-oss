@@ -21,23 +21,35 @@ const DESIGN_TOP = 150
 export default function NoticeLineDialogV8({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [info, setInfo] = useState<HqLineRegistration | null>(null)
   const [qr, setQr] = useState('')
+  /* WEB213：読めなかったことを「まだ設定されていません」と言わない。読み直せる。 */
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     if (!open) return
     let cancelled = false
+    // WEB213：開き直すたびに、前に出した QR・確認コード（24時間）を消してから読み直す。
+    setInfo(null)
+    setQr('')
+    setFailed(false)
     void api.hqNotices.lineRegistration().then(async (res) => {
-      if (cancelled || !res.success) return
+      if (cancelled) return
+      if (!res.success) {
+        setFailed(true)
+        return
+      }
       setInfo(res.data)
       if (res.data.available && res.data.addFriendUrl) {
         try {
-          setQr(await qrToDataURL(res.data.addFriendUrl, { width: 220, margin: 1 }))
+          const dataUrl = await qrToDataURL(res.data.addFriendUrl, { width: 220, margin: 1 })
+          if (!cancelled) setQr(dataUrl)
         } catch {
-          setQr('')
+          if (!cancelled) setQr('')
         }
       }
-    }).catch(() => { if (!cancelled) setInfo({ available: false }) })
+    }).catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true }
-  }, [open])
+  }, [open, attempt])
 
   if (!open) return null
 
@@ -53,7 +65,12 @@ export default function NoticeLineDialogV8({ open, onClose }: { open: boolean; o
       designNode="D6fh3"
     >
       <div className={head.head}>
-        {!info ? (
+        {failed ? (
+          <p className={styles.faint}>
+            案内を読み込めませんでした。{' '}
+            <button type="button" className="font-semibold underline" onClick={() => setAttempt((n) => n + 1)}>読み直す</button>
+          </p>
+        ) : !info ? (
           <p className={styles.faint}>読み込んでいます…</p>
         ) : info.available ? (
           <>

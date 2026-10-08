@@ -446,9 +446,15 @@ function ReminderDetailV8() {
       const at = Date.parse(item.scheduledAt ?? '')
       return Number.isFinite(at) && at >= now && at <= now + DAY_MS
     }).length
-    const truncated = plannedTotal > planned.length && within === planned.length
+    /*
+     * WEB084：予定は新しい順で最大100件しか読めない。読めていない予定があるときは、
+     * 近い予定が抜けていることがあるので、数を言い切らない（0 と言わない）。
+     * 近い順・件数の集計は口に頼んでいる（Codex）。
+     */
+    const truncated = plannedTotal > planned.length
     return { count: within, truncated }
   }, [planned, plannedTotal])
+  const plannedPartial = plannedTotal > planned.length
 
   if (!reminderId) {
     return (
@@ -503,7 +509,7 @@ function ReminderDetailV8() {
             <OverviewTab
               data={data}
               reminder={reminder}
-              nextByStep={nextByStep}
+              nextByStep={plannedPartial ? null : nextByStep}
               onShowErrors={() => {
                 const params = new URLSearchParams(searchParams.toString())
                 params.set('id', reminderId)
@@ -592,7 +598,9 @@ function ReminderDetailV8() {
         designNode="RwVo5"
         title={`「${data.reminder.name}」を一時停止する`}
         description="止めているあいだ、通知は送りません。止めているあいだに送る予定だった通知は、再開しても送りません（過去の日時になるため）"
-        band={`今後24時間で送る予定の ${formatNumber(pauseImpact.count)}通${pauseImpact.truncated ? '以上' : ''} が送られなくなります。`}
+        band={pauseImpact.truncated
+          ? `送る予定の ${formatNumber(plannedTotal)}通が送られなくなります（今後24時間の分は数え切れませんでした）。`
+          : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)}通 が送られなくなります。`}
         busy={pausing}
         onClose={() => { if (!pausing) setConfirmPause(false) }}
         actions={(
@@ -631,7 +639,8 @@ function OverviewTab({
 }: {
   data: ReminderDeliveryRunsResponse
   reminder: (Reminder & { steps?: ReminderStep[] }) | null
-  nextByStep: Record<number, string>
+  /** WEB084：予定を読み切れていないときは null（「次に送る」を言い切らない）。 */
+  nextByStep: Record<number, string> | null
   onShowErrors: () => void
   onShowAllRuns: () => void
 }) {
@@ -674,7 +683,7 @@ function OverviewTab({
               <span role="cell" className={styles.colFlex} title={stepLabel(step)}>{stepTiming(step, detailSteps[index], reminder?.deliveryMode)}</span>
               <span role="cell" className={styles.colSent}>{formatNumber(step.sent)}通</span>
               <span role="cell" className={styles.colFail} data-danger={step.errors > 0 || undefined}>{formatNumber(step.errors)}通</span>
-              <span role="cell" className={styles.colNext}>{formatMd(nextByStep[step.stepNumber] ?? null)}</span>
+              <span role="cell" className={styles.colNext}>{nextByStep ? formatMd(nextByStep[step.stepNumber] ?? null) : '—'}</span>
             </div>
           ))}
         </div>
@@ -684,7 +693,13 @@ function OverviewTab({
         <div className={styles.cardHead}>
           <h2 id="rm-detail-recent" className={styles.cardTitle}>最近の実行</h2>
         </div>
-        {recent.length === 0 ? (
+        {recent.length === 0 && (data.items.length > 0 || data.pagination.total > data.items.length) ? (
+          /* WEB084：先頭5件が予定ばかりで実行が見えないだけのときは「まだありません」と言わない。 */
+          <p className={styles.cardNote}>
+            最近の実行をここでは読み切れませんでした。{' '}
+            <button type="button" className="font-semibold underline" onClick={onShowAllRuns}>実行結果で見る</button>
+          </p>
+        ) : recent.length === 0 ? (
           <p className={styles.cardNote}>まだ実行した通知はありません。届き始めるとここに出ます。</p>
         ) : (
           <>

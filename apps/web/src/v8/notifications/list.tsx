@@ -55,6 +55,7 @@ export default function NotificationsV8() {
   const [loadError, setLoadError] = useState<unknown>(null)
   const lastListFailure = useRef<string | null>(null)
   const requestId = useRef(0)
+  const viewKeyRef = useRef('')
 
   const selectFilter = (next: DashboardNotificationFilter) => {
     const query = new URLSearchParams(params.toString())
@@ -111,11 +112,20 @@ export default function NotificationsV8() {
 
   useEffect(() => { void load(0, false) }, [load])
 
+  /*
+   * WEB071：既読の楽観更新の「戻す」「読み直す」は、押したときのアカウント・分類に結ぶ。
+   * 失敗が届くまでに別のアカウントへ移っていたら、前の一覧・数で今の一覧を巻き戻さない。
+   */
+  viewKeyRef.current = `${selectedAccountId ?? ''}|${filter}`
+  const sameView = (key: string) => viewKeyRef.current === key
+
   /* 既読は押した瞬間に画面へ反映し、裏で保存する。失敗したら未読へ戻してやり直せる知らせ。 */
   const markRead = (item: NotificationCenterItem) => {
     if (!selectedAccountId || item.isRead) return
     const accountId = selectedAccountId
+    const accountKey = `${accountId}|`
     const apply = (isRead: boolean) => {
+      if (!viewKeyRef.current.startsWith(accountKey)) return
       setItems((current) => current.map((row) => (row.id === item.id ? { ...row, isRead } : row)))
       setCounts((current) =>
         current ? { ...current, unread: Math.max(0, current.unread + (isRead ? -1 : 1)) } : current,
@@ -138,6 +148,7 @@ export default function NotificationsV8() {
   const markAllRead = () => {
     if (!selectedAccountId || !counts || counts.unread === 0) return
     const accountId = selectedAccountId
+    const viewKey = viewKeyRef.current
     const beforeItems = items
     const beforeCounts = counts
     setItems((current) => current.map((row) => ({ ...row, isRead: true })))
@@ -145,12 +156,13 @@ export default function NotificationsV8() {
     runOptimistic({
       request: () => api.notifications.center.markAllRead(accountId, filter),
       revert: () => {
+        if (!sameView(viewKey)) return
         setItems(beforeItems)
         setCounts(beforeCounts)
       },
       failureMessage: '通知をまとめて既読にできませんでした。',
       retry: markAllRead,
-      onSuccess: () => void load(0, false),
+      onSuccess: () => { if (sameView(viewKey)) void load(0, false) },
     })
   }
 

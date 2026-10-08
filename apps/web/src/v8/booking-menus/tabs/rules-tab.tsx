@@ -224,8 +224,8 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
     }
   }
 
-  if (status === 'loading' || draft === null) return <SkeletonRows rows={5} />
-  if (status === 'error' || !settings) {
+  // WEB053：失敗を先に見る。draft は成功したときだけできるので、失敗が「読み込み中」のまま残らないように。
+  if (status === 'error' || (status !== 'loading' && !settings)) {
     return (
       <StateCard
         icon={<AccountIcon />}
@@ -235,6 +235,8 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
       />
     )
   }
+
+  if (status === 'loading' || draft === null) return <SkeletonRows rows={5} />
 
   const windowOptions = withCurrent(WINDOW_DAY_CHOICES, draft.bookingWindowDays)
     .map((days) => ({ value: String(days), label: `${days} 日先まで` }))

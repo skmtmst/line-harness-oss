@@ -11,6 +11,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { describeSaveFailure, webinarApi, type WebinarFolder } from '@/lib/api'
+import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import styles from './form.module.css'
@@ -169,6 +170,9 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         folders={folders}
         folderState={folderState}
         onReloadFolders={() => void loadFolders()}
+        onCreateFolder={!readOnly && webinar.accountId
+          ? folderCreator((name, color) => webinarApi.createFolder(webinar.accountId ?? '', { name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+          : undefined}
         audienceLabel={editor.viewingCondition.label || '申込者向け'}
         fieldErrors={fieldErrors}
         disabled={saving || testing}

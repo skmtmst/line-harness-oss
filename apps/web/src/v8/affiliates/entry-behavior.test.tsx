@@ -24,6 +24,7 @@ const create = vi.hoisted(() => vi.fn())
 const update = vi.hoisted(() => vi.fn())
 const friendsList = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
+const approvalsList = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/staff-role', async (original) => ({
   ...await original<typeof import('@/lib/staff-role')>(),
@@ -46,7 +47,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         update,
       },
       affiliateOffers: { ...actual.api.affiliateOffers, list: async () => ({ success: true, data: [] }) },
-      conversionApprovals: { ...actual.api.conversionApprovals, list: async () => ({ success: true, data: [] }) },
+      conversionApprovals: { ...actual.api.conversionApprovals, list: approvalsList },
       accountSettings: { ...actual.api.accountSettings, getLinkBaseUrl: async () => ({ success: true, data: null }) },
     },
   }
@@ -86,6 +87,7 @@ beforeEach(() => {
   friendsList.mockReset().mockResolvedValue({ success: true, data: { items: [], total: 0 } })
   create.mockReset().mockResolvedValue({ success: false, error: 'このコードは既に使われています' })
   update.mockReset().mockResolvedValue({ success: true, data: { id: 'a1' } })
+  approvalsList.mockReset().mockResolvedValue({ success: true, data: [] })
 })
 afterEach(() => cleanup())
 
@@ -105,6 +107,17 @@ describe('権限（今の入口 /affiliates）', () => {
     rerender(<AffiliatesPage />)
     await waitFor(() => expect(screen.getAllByRole('link', { name: /アフィリエイターを作る/ }).length).toBeGreaterThan(0))
     expect(document.body.textContent).not.toContain('閲覧のみで見ています')
+  })
+})
+
+describe('承認待ちの読み込み（WEB003）', () => {
+  it('タブの件数とアフィリエイターの一覧が同時に開いても、承認待ちの全件読みは1本にまとまる', async () => {
+    fixture.role = 'owner'
+    render(<AffiliatesPage />)
+    await waitFor(() => expect(approvalsList).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const pendingCalls = approvalsList.mock.calls.filter(([params]) => params?.status === 'pending')
+    expect(pendingCalls).toHaveLength(1)
   })
 })
 

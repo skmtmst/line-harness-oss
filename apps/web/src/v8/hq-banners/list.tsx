@@ -528,7 +528,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     }
   }
 
-  const deliver = async (image: BannerImage, lineAccountIds: string[]) => {
+  const deliver = async (image: BannerImage, lineAccountIds: string[]): Promise<boolean> => {
     setModalBusy(true)
     setModalError('')
     try {
@@ -536,14 +536,16 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       if (!res.success) throw new Error(res.error)
       replaceImage(res.data.image)
       onChanged()
+      return true
     } catch (caught) {
       setModalError(bannerFailureMessage(caught, 'アカウントへの受け渡し'))
+      return false
     } finally {
       setModalBusy(false)
     }
   }
 
-  const remove = async (image: BannerImage) => {
+  const remove = async (image: BannerImage): Promise<boolean> => {
     setModalBusy(true)
     setModalError('')
     try {
@@ -552,8 +554,10 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       setImages((prev) => prev.filter((i) => i.id !== image.id))
       setOpenImage(null)
       onChanged()
+      return true
     } catch (caught) {
       setModalError(bannerFailureMessage(caught, '一覧からの削除'))
+      return false
     } finally {
       setModalBusy(false)
     }

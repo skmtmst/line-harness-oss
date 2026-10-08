@@ -84,6 +84,8 @@ export type NenCampaignsListProps = {
   settings: NenCampaignSetting[]
   columns: NenColumn[]
   columnsTotal: number | null
+  /** WEB231：200本より先のコラムを読む。渡されたときだけ「続きを読み込む」を出す。 */
+  onLoadMoreColumns?: () => Promise<void>
   kpis: NenKpis | null
   flowMetrics: NenFlowMetrics | null
   columnMetrics: NenColumnMetrics | null
@@ -741,7 +743,12 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
           <Pager total={visible.length} page={safePage} size={pageSize} onPage={setPage} />
           {props.columnsTotal != null && props.columnsTotal > columns.length ? (
             <div className={styles.noteRow}>
-              <Notice tone="warn" message={`コラムは${formatNumber(props.columnsTotal)}本ありますが、${columns.length}本までしか読み込んでいません。探すときは検索を使ってください。`} />
+              {/* WEB231：検索は読み込んだ分の中だけで探す。続きを読み込めるようにし、検索を勧めない。 */}
+              <Notice
+                tone="warn"
+                message={`コラムは${formatNumber(props.columnsTotal)}本ありますが、${columns.length}本までしか読み込んでいません。検索・絞り込みは読み込んだ分の中で探します。`}
+                action={props.onLoadMoreColumns ? <LoadMoreColumnsButton onLoadMore={props.onLoadMoreColumns} /> : undefined}
+              />
             </div>
           ) : null}
           <p className={styles.hint}>{canEdit ? '行の「…」から この内容で予約する・複製・テスト送信。' : '行の「…」から 中身を見る。'}</p>
@@ -749,6 +756,24 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
       )}
       <SelectedColumn {...props} />
     </div>
+  )
+}
+
+/** WEB231：コラムの続きを読み込むボタン。読んでいる間は押せない。失敗は理由を出す。 */
+function LoadMoreColumnsButton({ onLoadMore }: { onLoadMore: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  return (
+    <>
+      <Button type="button" disabled={busy} busy={busy} onClick={() => {
+        setBusy(true)
+        setFailed(false)
+        void onLoadMore().catch(() => setFailed(true)).finally(() => setBusy(false))
+      }}>
+        続きを読み込む
+      </Button>
+      {failed ? <span role="alert">続きを読み込めませんでした。</span> : null}
+    </>
   )
 }
 
