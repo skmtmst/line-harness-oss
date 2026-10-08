@@ -27,6 +27,8 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
+const jobs=vi.hoisted(()=>({record:vi.fn(),process:vi.fn()}));
+vi.mock('../services/tracked-click-steps.js',()=>({recordTrackedClick:jobs.record,processTrackedClick:jobs.process}));
 const { trackedLinks } = await import('./tracked-links.js');
 
 const LINE_UA =
@@ -114,6 +116,8 @@ function request(env: Record<string, unknown>, ua: string, path = '/t/link-1') {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  jobs.record.mockImplementation(async(_db,plan)=>({id:'click-1',plan:{...plan,clickedAt:'2026-09-09T10:00:00.000+09:00'}}));
+  jobs.process.mockResolvedValue(undefined);
   dbMocks.recordLinkClick.mockResolvedValue({});
   dbMocks.getTrackedLinkBaseUrl.mockResolvedValue(null);
   dbMocks.getUrlReachConversionPoints.mockResolvedValue([]);
@@ -223,7 +227,7 @@ describe('GET /t/:linkId — short codes', () => {
     });
     dbMocks.getUrlReachConversionPoints.mockResolvedValue([{ id: 'point-a' }]);
     // 本物のhelper側の決定的試験と同じ拒否。routeはこの例外を握ってeventを作らない。
-    dbMocks.trackConversion.mockRejectedValueOnce(new Error('conversion_account_mismatch'));
+    jobs.process.mockRejectedValueOnce(new Error('conversion_account_mismatch'));
     const env = {
       DB: makeDb({}),
       WORKER_URL: 'https://worker.example.com',
@@ -237,11 +241,10 @@ describe('GET /t/:linkId — short codes', () => {
     );
     expect(res.status).toBe(302);
     await Promise.allSettled(waits);
-    expect(dbMocks.trackConversion).toHaveBeenCalledWith(env.DB, {
-      conversionPointId: 'point-a',
-      friendId: 'friend-b',
-      metadata: JSON.stringify({ via: 'tracked_link', trackedLinkId: 'uuid-link-a' }),
-    });
+    expect(jobs.record).toHaveBeenCalledWith(env.DB,expect.objectContaining({
+      linkId:'uuid-link-a',friendId:'friend-b',accountId:'acc-a',conversionPointIds:['point-a'],
+    }));
+    expect(jobs.process).toHaveBeenCalledWith(env,'click-1',expect.objectContaining({friendId:'friend-b',conversionPointIds:['point-a']}));
   });
 
   test('short-code URLs resolve and record the click against the link UUID', async () => {
@@ -269,7 +272,7 @@ describe('GET /t/:linkId — short codes', () => {
     expect(dbMocks.getTrackedLinkByIdOrShortCode).toHaveBeenCalledWith(env.DB, 'Ab3xY9k');
     await Promise.allSettled(waits);
     // Click must be recorded against the UUID, not the short code
-    expect(dbMocks.recordLinkClick).toHaveBeenCalledWith(env.DB, 'uuid-link-1', null);
+    expect(jobs.record).toHaveBeenCalledWith(env.DB,expect.objectContaining({linkId:'uuid-link-1',friendId:null}));
   });
 
   test('LINE in-app LIFF round-trip keeps the same /t identifier', async () => {
