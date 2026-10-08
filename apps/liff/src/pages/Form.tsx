@@ -1316,19 +1316,42 @@ function BlockView({
     'w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3.5 py-3 text-sm text-ink placeholder:text-liff-idle focus:border-liff-primary focus:outline-none';
   /** 直しがある欄は枠を直しの色にする (お店のテーマの error)。 */
   const invalidStyle = error ? { borderColor: errorColor } : undefined;
+  // 欄名・説明・直しの文を入力と結ぶ（読み上げで欄名と直し方が分かるように）。
+  // id はブロックの id から作る（並べ替えても同じ欄を指す）。
+  const fieldId = `lf-${block.id}`;
+  const labelId = `${fieldId}-label`;
+  const descId = block.description ? `${fieldId}-desc` : undefined;
+  const errorId = error ? `${fieldId}-error` : undefined;
+  const describedBy = [descId, errorId].filter(Boolean).join(' ') || undefined;
+  // 1つの入力で答える欄は label の htmlFor で結ぶ。選択肢・★・住所などは群れにして欄名で呼ぶ。
+  const singleControl =
+    block.type === 'text' ||
+    block.type === 'textarea' ||
+    block.type === 'prefecture' ||
+    block.type === 'select' ||
+    (block.type === 'date' && block.dateStyle !== 'ymd');
+  const fieldProps = { id: fieldId, 'aria-describedby': describedBy };
 
   return (
     <div className="flex flex-col gap-2">
       {/* ★V8 (B8rCt)：欄名と必須の札を1行に並べ、選択肢まで 8 空ける。 */}
-      <label className="flex items-center gap-1.5 text-sm font-bold text-ink">
+      <label
+        id={labelId}
+        htmlFor={singleControl ? fieldId : undefined}
+        className="flex items-center gap-1.5 text-sm font-bold text-ink"
+      >
         {block.label}
         {block.required && <RequiredMark />}
       </label>
       {block.description && (
-        <p className="-mt-1 text-xs text-ink-faint">{block.description}</p>
+        <p id={descId} className="-mt-1 text-xs text-ink-faint">{block.description}</p>
       )}
 
-      <div>
+      <div
+        {...(singleControl
+          ? {}
+          : { role: 'group', 'aria-labelledby': labelId, 'aria-describedby': describedBy })}
+      >
         {block.type === 'text' && (
           <input
             type={block.limit?.format === 'email' ? 'email' : block.limit?.format === 'tel' ? 'tel' : 'text'}
@@ -1339,6 +1362,7 @@ function BlockView({
             className={inputClass}
             style={invalidStyle}
             aria-invalid={!!error}
+            {...fieldProps}
           />
         )}
 
@@ -1352,6 +1376,7 @@ function BlockView({
             className={`${inputClass} min-h-22 resize-y`}
             style={invalidStyle}
             aria-invalid={!!error}
+            {...fieldProps}
           />
         )}
 
@@ -1370,6 +1395,7 @@ function BlockView({
               className={inputClass}
               style={invalidStyle}
               aria-invalid={!!error}
+              {...fieldProps}
             />
           ))}
 
@@ -1380,6 +1406,7 @@ function BlockView({
             className={inputClass}
             style={invalidStyle}
             aria-invalid={!!error}
+            {...fieldProps}
           >
             <option value="">都道府県を選択</option>
             {PREFECTURES.map((p) => (
@@ -1399,6 +1426,7 @@ function BlockView({
               className={inputClass}
               style={invalidStyle}
               aria-invalid={!!error}
+              {...fieldProps}
             >
               <option value="">選択してください</option>
               {(block.choices ?? []).map((choice) => (
@@ -1594,7 +1622,7 @@ function BlockView({
       </div>
 
       {error && (
-        <p className="mt-1 flex items-center gap-1 text-xs font-bold" style={{ color: errorColor }}>
+        <p id={errorId} className="mt-1 flex items-center gap-1 text-xs font-bold" style={{ color: errorColor }}>
           <Icon name="info" className="h-3.5 w-3.5 shrink-0" />
           {error}
         </p>
