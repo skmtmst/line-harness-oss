@@ -22,6 +22,7 @@ import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './quick-send.module.css'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 /** 承認を頼む境目（絵の文どおり）。 */
 /** 「名前」を押して入る文字。送るときに友だちの名前へ置き換わる形（{{name}}）。 */
@@ -67,7 +68,7 @@ export default function QuickSendV8({
   const sendingRef = useRef(false)
   const [pending, setPending] = useState(false)
   const guard = useUnsavedGuard({ dirty: open && (text !== '' || scheduledValue !== ''), busy, onDiscard: onClose })
-  const textRef = useRef<HTMLTextAreaElement | null>(null)
+  const textRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement | null>(null)
 
   // 開いたら入力を空に戻し、タグと承認する人の候補を読む。
   useEffect(() => {
@@ -235,14 +236,14 @@ export default function QuickSendV8({
     >
       <div className={styles.body}>
         <label className={styles.label} htmlFor="quick-send-v8-text">本文</label>
-        <textarea
+        <InsertTextField
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}
           value={text}
           maxLength={TEXT_LIMIT}
           disabled={busy || pending}
-          onChange={(event) => setText(event.target.value)}
+          onValueChange={(next) => setText(next)}
         />
         <div className={styles.metaRow}>
           <span className={styles.meta}>差し込む：</span>
