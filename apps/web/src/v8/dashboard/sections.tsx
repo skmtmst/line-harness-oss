@@ -17,6 +17,7 @@ import { formatDateTime, formatNumber, formatTime, formatRelative } from '@/lib/
 import type { HealthRisk } from './use-dashboard'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { connectionReasonLine } from '@/v8/hq/connection-reasons'
+import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
 
 type Section = NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]
@@ -63,7 +64,7 @@ export function Unavailable({ section, onRetry }: { section?: Section; onRetry: 
   return (
     <p className={styles.note}>
       {partial ? `一部のデータを${STATE_TEXT.error}` : `データを${STATE_TEXT.error}`}
-      <button type="button" className={styles.inlineButton} onClick={onRetry}>もう一度読み込む</button>
+      <button type="button" className={styles.inlineButton} onClick={onRetry}><RetryLabel /></button>
     </p>
   )
 }
@@ -77,8 +78,10 @@ export function Loading({ label }: { label: string }) {
 }
 
 /* ── 右の列：今月の送信枠 ─────────────────────────── */
-export function SendQuota({ delivery, metric, section, onRetry }: {
+export function SendQuota({ delivery, metric, section, onRetry, overviewFailed }: {
   delivery: DashboardOverview['delivery'] | null
+  /** 概要そのものが取れなかった（骨組みのまま待たせない）。 */
+  overviewFailed?: boolean
   metric: NonNullable<DashboardOverview['metrics']>['monthlyQuota'] | undefined
   section?: Section
   onRetry: () => void
@@ -94,15 +97,19 @@ export function SendQuota({ delivery, metric, section, onRetry }: {
   const low = rate !== null && rate <= 10
   const updated = sectionUpdated(section)
   const quotaText = [unlimited ? '契約種別：無制限' : rate === null ? null : `残り ${rate.toFixed(1)}%`, updated].filter(Boolean).join('・')
+  const head = (
+    <SectionHeader
+      title="今月の送信枠"
+      help="送信枠は毎月1日にリセットされます。使い切ると翌月1日まで送れません。"
+      helpLabel="今月の送信枠の説明"
+      href="/accounts"
+      linkLabel="配信設定へ"
+    />
+  )
+  if (overviewFailed) return <div className={styles.asideBlock}>{head}<Unavailable onRetry={onRetry} /></div>
   return (
     <div className={styles.asideBlock}>
-      <SectionHeader
-        title="今月の送信枠"
-        help="送信枠は毎月1日にリセットされます。使い切ると翌月1日まで送れません。"
-        helpLabel="今月の送信枠の説明"
-        href="/accounts"
-        linkLabel="配信設定へ"
-      />
+      {head}
       {loading ? <Loading label="送信枠" /> : (
         <p className={styles.quota}>
           {unlimited ? (
@@ -130,7 +137,7 @@ export function SendQuota({ delivery, metric, section, onRetry }: {
       ) : failed ? (
         <>
           <p className={styles.alert}>LINE から送信枠を取れませんでした。LINE アカウントの接続（チャネルのトークン）を確かめてください。</p>
-          <button type="button" onClick={onRetry} className={styles.retryDanger}>もう一度読み込む</button>
+          <button type="button" onClick={onRetry} className={styles.retryDanger}><RetryLabel /></button>
         </>
       ) : (
         <p className={low ? styles.updatedDanger : styles.updated} title={quotaText}>

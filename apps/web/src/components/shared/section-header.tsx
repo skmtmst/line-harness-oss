@@ -16,6 +16,7 @@ export default function SectionHeader({
   helpLabel,
   href,
   linkLabel,
+  wrap,
 }: {
   /** 段の題（例「最近の動き」） */
   title: React.ReactNode
@@ -29,9 +30,14 @@ export default function SectionHeader({
   href?: string
   /** 行き先リンクの文字（例「すべて見る」） */
   linkLabel?: string
+  /**
+   * 狭い列で題と行き先が1行に入らないとき、題を「…」で切らずに行き先を次の行へ回す。
+   * 入るときは1行のまま（見た目は変わらない）。
+   */
+  wrap?: boolean
 }) {
   return (
-    <div className={styles.root}>
+    <div className={styles.root} data-wrap={wrap ? '' : undefined}>
       <h3 className={styles.title} title={typeof title === 'string' ? title : undefined}>
         {title}
       </h3>
