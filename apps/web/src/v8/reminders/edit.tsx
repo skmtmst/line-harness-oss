@@ -62,7 +62,7 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
-import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
+import ConditionBuilder, { findConditionDraftIssue, pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
@@ -381,6 +381,10 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
    * 応答で上書きせず、そのまま残す（次の自動保存で追って送る）。
    */
   async function saveSettings(next: ReminderDraftSettings, { silent = false }: { silent?: boolean } = {}): Promise<boolean> {
+    if (next.targetCondition && (!pruneCondition(next.targetCondition as SegmentCondition) || findConditionDraftIssue(next.targetCondition as SegmentCondition))) {
+      if (!silent) setError('対象者の条件を完成させてください。')
+      return false
+    }
     if (!silent) {
       setBusy(true)
       setError('')
@@ -404,7 +408,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       setDraft(response.data)
       setConflict(false)
       const untouched = settingsRef.current === sentSettings && basicsRef.current === sentBasics
-      if (!silent || untouched) {
+      if (untouched) {
         setSettings(response.data.settings)
         setBasics(basicsFromDraft(response.data.settings))
       }
@@ -555,6 +559,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
           notice={stageError}
           value={basics ?? basicsFromDraft(subjectSettings)}
           onChange={setBasics}
+          onTemplate={(template) => setSettings(current => current ? {...current, steps: [{stableStepId: crypto.randomUUID(), messageType: 'text', ...template.step}]} : current)}
           stepCount={subjectSettings.steps.length}
           busy={busy}
           onSave={async (value) => {
@@ -700,6 +705,7 @@ function BasicsStageV8({
   notice,
   value,
   onChange,
+  onTemplate,
   stepCount,
   busy,
   onSave,
@@ -710,6 +716,7 @@ function BasicsStageV8({
   notice: ReactNode
   value: BasicsValue
   onChange: (value: BasicsValue) => void
+  onTemplate: (template: ReminderTemplateV8) => void
   stepCount: number
   busy: boolean
   onSave: (value: BasicsValue) => void
@@ -740,13 +747,14 @@ function BasicsStageV8({
       (appliedTemplateId !== null && appliedTemplateId !== template.id) ||
       value.triggerFieldId !== '' ||
       value.triggerEventId !== '' ||
-      value.repeatYearly
+      value.repeatYearly || stepCount > 0
     if (hasInputsToReplace) setPendingTemplate(template)
     else applyTemplate(template)
   }
 
   function applyTemplate(template: ReminderTemplateV8) {
     setAppliedTemplateId(template.id)
+    onTemplate(template)
     onChange({
       ...value,
       triggerType: template.triggerType,
@@ -810,7 +818,7 @@ function BasicsStageV8({
       <ConfirmDialog
         open={pendingTemplate !== null}
         title="ひな形の内容で上書きしますか？"
-        description="いま選んでいる基準日や繰り返しの設定は、ひな形の内容に置き換わります。"
+        description="基準日・繰り返し・通知日時・本文をひな形の内容に置き換えます。いまの通知は残りません。"
         confirmLabel="このひな形を使う"
         onConfirm={() => {
           if (pendingTemplate) applyTemplate(pendingTemplate)
@@ -854,7 +862,7 @@ function TargetStageV8({
   const { selectedAccount } = useAccount()
   const stop = settings.stopConditions
   const condition = (settings.targetCondition ?? null) as SegmentCondition | null
-  const mode = pruneCondition(condition) ? 'condition' : 'all'
+  const mode = condition !== null ? 'condition' : 'all'
 
   // 保存前の条件で数え直した人数。条件が空なら保存済みの検査結果を出す。
   const [recount, setRecount] = useState<{ matched: number; excluded: number; sample: Array<{ id: string; displayName: string }> } | null>(null)

@@ -4,14 +4,14 @@ import { describe, expect, it } from 'vitest'
 
 const ROOT = process.cwd()
 const FLOW = readFileSync(join(ROOT, 'src/components/reminders/reminder-publish-flow.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(ROOT, 'src/app/reminders/new/page.tsx'), 'utf8')
+const NEW_PAGE = readFileSync(join(ROOT, 'src/app/reminders/new/new-v8.tsx'), 'utf8')
 const STEP_EDITOR = readFileSync(join(ROOT, 'src/app/reminders/edit/issue469-reminder-screens.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(ROOT, 'src/app/reminders/edit/page.tsx'), 'utf8')
-const DETAIL_PAGE = readFileSync(join(ROOT, 'src/app/reminders/detail/page.tsx'), 'utf8')
+const DETAIL_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/detail.tsx'), 'utf8')
 const API = readFileSync(join(ROOT, 'src/lib/api.ts'), 'utf8')
 const WORKER_ROUTE = readFileSync(join(ROOT, '../worker/src/routes/reminders.ts'), 'utf8')
 
-describe('V6 リマインダの公開フロー', () => {
+describe('リマインダの公開フロー', () => {
   it('作成時に公開せず、下書きから対象確認へ進む', () => {
     expect(NEW_PAGE).toContain('api.reminders.createDraft(settings)')
     expect(NEW_PAGE).toContain('&stage=target')

@@ -180,6 +180,11 @@ export function ReminderBasicsFormV8({
   const [foldersLoadState, setFoldersLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [foldersReloadToken, setFoldersReloadToken] = useState(0)
 
+  const latestValue = useRef(value)
+  latestValue.current = value
+  const latestOnChange = useRef(onChange)
+  latestOnChange.current = onChange
+
   // DEEP-05: 応答が届いた時点でアカウントが変わっていたら、その応答は捨てる。
   const accountRef = useRef(selectedAccountId)
 
@@ -192,10 +197,9 @@ export function ReminderBasicsFormV8({
       setFolders(res.data)
       setFoldersLoadState('ready')
       const booking = res.data.find((folder) => folder.name.includes('予約'))
-      if (booking && !value.folderId) onChange({ ...value, folderId: booking.id })
+      if (booking && !latestValue.current.folderId) latestOnChange.current({ ...latestValue.current, folderId: booking.id })
     }).catch(() => { if (active) setFoldersLoadState('error') })
     return () => { active = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [foldersReloadToken])
 
   // アカウントが切り替わったら候補一覧・選択ID・取得状態を捨てて取り直す。
