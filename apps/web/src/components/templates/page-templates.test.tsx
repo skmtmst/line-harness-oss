@@ -23,12 +23,11 @@ describe('V8 の型へ渡す操作', () => {
     expect(document.activeElement).toBe(help)
     expect(help.getAttribute('aria-expanded')).toBe('false')
   })
-  it('作る型の手順は既定で題の下の行・inline を渡すと同行に残る', () => {
-    const { rerender } = render(<CreatePage title="作成" steps={<ol><li>手順</li></ol>} footerActions={<button>保存</button>}>入力</CreatePage>)
+  it('作る型の手順は題と説明の下の行だけ（同行の置き方は無い）', () => {
+    render(<CreatePage title="作成" description="説明" steps={<ol><li>手順</li></ol>} footerActions={<button>保存</button>}>入力</CreatePage>)
     const heading = screen.getByText('作成').closest('header')!
-    expect(heading.getAttribute('data-steps-placement')).toBe('below')
-    rerender(<CreatePage title="作成" steps={<ol><li>手順</li></ol>} stepsPlacement="inline" footerActions={<button>保存</button>}>入力</CreatePage>)
-    expect(screen.getByText('作成').closest('header')!.getAttribute('data-steps-placement')).toBe('inline')
+    expect(heading.hasAttribute('data-steps-placement')).toBe(false)
+    expect(heading.querySelector('[data-template-region="steps"]')?.textContent).toBe('手順')
   })
   it('作成の危ない操作と保存を分け、押せない保存は実行しない', () => {
     const save = vi.fn()

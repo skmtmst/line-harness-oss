@@ -50,6 +50,15 @@ export interface LinePreviewProps {
    * 文字ならその文を空の箱で出す。
    */
   empty?: boolean | string
+  /**
+   * リッチメニュー（★V8 gobhu・egdGx・K0gu1・gQabc）。渡すと、本物の LINE と同じく
+   * **トーク画面のいちばん下（入力の帯の位置）**にメニューを出し、トークはその上で縮む。
+   * 下の帯は1本だけで、文字は `chatBarText`（無ければ「メニュー」）。
+   * 渡さない画面はこれまでどおり（トーク＋「メニュー ∨」の帯）。
+   */
+  richMenu?: ReactNode
+  /** リッチメニューの下の帯の文字（トーク画面の下の文言）。`richMenu` と一緒に使う。 */
+  chatBarText?: string
 }
 
 /** 設定画面でその場でテーマを切り替えたときの合図を受ける。 */
@@ -73,6 +82,8 @@ export default function LinePreview({
   note,
   accountName,
   empty = false,
+  richMenu,
+  chatBarText,
 }: LinePreviewProps) {
   const v8 = useSyncExternalStore(subscribeTheme, readIsV8, readIsV8OnServer)
 
@@ -107,8 +118,9 @@ export default function LinePreview({
               <Phone size={17} aria-hidden="true" />
               <Menu size={17} aria-hidden="true" />
             </div>
-            <div className={styles.talk}>
-              <p className={styles.dateChip}><span>{caption ?? '今日'}</span></p>
+            <div className={styles.talk} data-line-preview-part="talk">
+              {/* リッチメニューの見本（gobhu）はトークが空で、日付の札も無い。届く日時を渡したときだけ出す。 */}
+              {richMenu && caption === undefined ? null : <p className={styles.dateChip}><span>{caption ?? '今日'}</span></p>}
               {empty ? (
                 <p className={styles.emptyNote}>
                   {typeof empty === 'string' ? empty : children}
@@ -117,8 +129,9 @@ export default function LinePreview({
                 children
               )}
             </div>
-            <div className={styles.menuBar}>
-              <span>メニュー</span>
+            {richMenu ? <div className={styles.richMenu} data-line-preview-part="rich-menu">{richMenu}</div> : null}
+            <div className={styles.menuBar} data-line-preview-part="menu-bar">
+              <span>{richMenu ? (chatBarText || 'メニュー') : 'メニュー'}</span>
               <ChevronDown size={12} aria-hidden="true" />
             </div>
             <div className={styles.homeBar}><span className={styles.homeLine} aria-hidden="true" /></div>
@@ -147,6 +160,15 @@ export default function LinePreview({
       ) : (
         <div className="mt-3">{children}</div>
       )}
+      {richMenu ? (
+        <div className="mt-3 overflow-hidden rounded-control bg-canvas" data-line-preview-part="rich-menu">
+          {richMenu}
+          <p className="border-hairline flex items-center justify-center gap-1 border-t py-2 text-xs text-ink" data-line-preview-part="menu-bar">
+            {chatBarText || 'メニュー'}
+            <ChevronDown size={11} aria-hidden="true" />
+          </p>
+        </div>
+      ) : null}
     </section>
   )
 }

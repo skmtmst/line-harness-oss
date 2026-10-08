@@ -12,6 +12,7 @@
  * 除くタグ・詳細条件）は統括の口に無いので出さない（BEHAVIOR.md の「今の口で出せないもの」）。
  */
 import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { Steps } from '@/components/templates/steps'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -49,7 +50,6 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import formStyles from '@/components/broadcasts/broadcast-form-v8.module.css'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -766,12 +766,13 @@ export default function HqBroadcastCreate() {
   return (
     <>
       <div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
-        <header className={formStyles.header}>
+        <header className={formStyles.header} data-steps-below="">
           <div className={formStyles.heading}>
             <h2>一括配信を作る</h2>
             <p aria-live="polite">{draftLabel}</p>
           </div>
-          <div className={formStyles.stepRail}><BroadcastStepRail steps={steps} currentKey={step} /></div>
+          {/* 手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。 */}
+          <div className={formStyles.stepsBelow}><Steps label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></div>
           <Button aria-expanded={previewOpen} aria-controls="hq-broadcast-line-preview" className={formStyles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button>
         </header>
         {error ? (

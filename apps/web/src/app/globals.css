@@ -1206,7 +1206,9 @@
   --tpl-ms-fn-field-gap: 6px; --tpl-ms-fn-input-shadow: 0 1px 2px rgb(29 29 31 / 4%); --tpl-ms-fn-input-lh: 21px; --tpl-ms-fn-remove-gap: 2px;
   --tpl-ms-qc-head-pad: 24px 24px 0; --tpl-ms-qc-close-inset: 18px; --tpl-ms-qc-title-size: 18px; --tpl-ms-qc-title-lh: 26px; --tpl-ms-qc-chipbox-pad: 8px 10px; --tpl-ms-qc-chip-gap: 4px; --tpl-ms-qc-chip-pad: 6px 12px; --tpl-ms-qc-input-min: 120px; --tpl-ms-qc-textarea-h: 96px; --tpl-ms-qc-foot-margin: 14px 24px 24px; --tpl-ms-qc-text-btn-pad: 0 14px; --tpl-ms-qc-balance-w: 96px; --tpl-ms-qc-chip-x: 14px; --tpl-ms-qc-chip-x-inset: 2px;
   --tpl-ms-qs-textarea-h: 110px; --tpl-ms-qs-approval-w: 266px; --tpl-ms-qs-approval-lh: 19px; --tpl-ms-qs-when-h: 31px; --tpl-ms-focus-w: 2px; --tpl-ms-focus-offset: -2px;
-  --tpl-steps-gap: 8px; --tpl-steps-dot: 20px; --tpl-steps-dot-gap: 6px; --tpl-steps-text-size: 12px; --tpl-steps-text-lh: 17px;
+  /* 手順（共通部品 Fa8ED・決まり q1xNMz 2026-10-08）：丸22・数11/600・名13・線24×1.5・間8・丸と名6・説明の下に（行の間8＋12）。 */
+  --tpl-steps-gap: 8px; --tpl-steps-dot: 22px; --tpl-steps-dot-gap: 6px; --tpl-steps-text-size: 13px; --tpl-steps-text-lh: 19px;
+  --tpl-steps-num-size: 11px; --tpl-steps-check: 12px; --tpl-steps-line-w: 24px; --tpl-steps-line-h: 1.5px; --tpl-steps-top-gap: 12px; --tpl-steps-head-gap: 8px;
   /* ダッシュボード（WQmep）：数の帯・右の列・グラフ・表・友だち追加リンク・最近の動き。 */
   --tpl-db-num-size: 28px; --tpl-db-num-lh: 32px; --tpl-db-unit-size: 13px; --tpl-db-unit-lh: 20px; --tpl-db-cell-pad: 16px 20px; --tpl-db-cell-gap: 8px;
   --tpl-db-tag-pad: 2px 7px; --tpl-db-tag-radius: 6px; --tpl-db-tag-gap: 3px; --tpl-db-aside-pad: 18px 20px; --tpl-db-aside-pad-narrow: 18px 16px; --tpl-db-aside-gap: 10px; --tpl-db-aside-tail-pad: 0px; --tpl-db-aside-tail-pull: -7px; --tpl-db-aside-inbox-tail-pad: 6px; --tpl-db-kv-gap: 8px; --tpl-db-dot: 7px;

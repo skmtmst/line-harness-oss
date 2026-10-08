@@ -127,6 +127,23 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(push).toHaveBeenCalledWith('/hq/broadcasts/detail?id=run-1')
   })
 
+  it('手順の済みの段（✓）を押すと、その段へ戻る（今とまだの段は押せない）', async () => {
+    render(<HqBroadcastCreate />)
+    fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '1月の限定メニュー' } })
+    fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
+    await screen.findByRole('checkbox', { name: /銀座店/ })
+    const steps = screen.getByRole('navigation', { name: '配信作成の進み' })
+    /* 今の段（配信対象）とまだの段は押せない。 */
+    expect(steps.querySelector('[aria-current="step"]')?.textContent).toContain('配信対象')
+    expect(screen.queryByRole('button', { name: '配信対象に戻る' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'メッセージを作成に戻る' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '基本設定に戻る' }))
+    /* 基本設定の段が出る（配信名の欄・URL も書き換え）。 */
+    expect((await screen.findByLabelText('配信名') as HTMLInputElement).value).toBe('1月の限定メニュー')
+    expect(steps.querySelector('[aria-current="step"]')?.textContent).toContain('基本設定')
+    expect(replace).toHaveBeenLastCalledWith(expect.not.stringContaining('step='), { scroll: false })
+  })
+
   it('API-18：フォルダ・社内メモ・シナリオ購読中・除くタグ・2つの吹き出しを口へ送る', async () => {
     hq.folders.mockResolvedValue({ success: true, data: [{ id: 'bf-1', name: 'キャンペーン', revision: 1, item_count: 0 }] })
     render(<HqBroadcastCreate />)

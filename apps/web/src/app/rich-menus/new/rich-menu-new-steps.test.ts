@@ -9,7 +9,7 @@ const page = readFileSync(join(here, 'create-v8.tsx'), 'utf8')
 
 describe('リッチメニュー作成の手順と面の編集（V8）', () => {
   it('4つの手順の現在地を画面から共通部品へ渡す', () => {
-    expect(page).toContain('steps={<Stepper label="リッチメニューを作る手順"')
+    expect(page).toContain('steps={<Steps label="リッチメニューを作る手順"')
     expect(page).toContain('currentKey={step}')
   })
 

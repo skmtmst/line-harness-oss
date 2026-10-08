@@ -18,6 +18,7 @@ import { Check, Clock, Timer } from 'lucide-react'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 import { notifyToast } from '@/components/shared/toast'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import Button from '@/components/shared/button'
@@ -31,7 +32,6 @@ import {
   scenarioDraftKey,
   useScenarioDraft,
 } from '@/v8/autosave/use-scenario-draft'
-import Stepper from '@/components/shared/stepper'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { TextField } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -380,11 +380,11 @@ export default function ScenarioCreateV8() {
       title="シナリオを作る"
       identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
       steps={(
-        <Stepper
+        <Steps
           label="シナリオ作成の進み方"
           steps={[
             // 既存の下書き（id あり）は1段目が済んでいる。新規は名前を入れたら済み。
-            { label: 'シナリオ情報', state: id || name.trim() ? 'done' : 'current' },
+            { label: 'シナリオ情報', state: id || name.trim() ? 'done' : 'current', anchor: 'scenario-step-info' },
             { label: '配信方式', state: 'current' },
             { label: '1通目を設定', state: 'todo' },
           ]}
@@ -444,7 +444,7 @@ export default function ScenarioCreateV8() {
         <ScenarioDraftConflictNotice ago={browserDraft.conflictAgo} onLoadLatest={loadLatestDraft} onOverwrite={browserDraft.overwrite} />
       </div>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="シナリオ情報">
+      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="シナリオ情報" id="scenario-step-info">
         <h2 className={styles.cardTitle}>シナリオ情報</h2>
         <div className={styles.infoRow}>
           <div className={styles.nameField} ref={nameWrapRef}>

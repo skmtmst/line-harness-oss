@@ -9,11 +9,12 @@
  * → 移行の履歴 → 新しい移行の登録（開いて使う）。
  */
 import { useState } from 'react'
-import { Check, CheckCheck, CircleCheck, Download, Plus, Undo2 } from 'lucide-react'
+import { CheckCheck, CircleCheck, Download, Plus, Undo2 } from 'lucide-react'
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
+import { Steps } from '@/components/templates/steps'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
@@ -140,18 +141,16 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
     const pageCount = Math.max(1, Math.ceil(total / ITEM_PAGE_SIZE))
     body = (
       <>
-        <ol className={styles.steps} aria-label="移行の手順">
-          {MIGRATION_STEPS.map((step, index) => {
-            const done = index < currentStep
-            const current = index === currentStep
-            return (
-              <li key={step} className={done ? `${styles.step} ${styles.stepDone}` : current ? `${styles.step} ${styles.stepCurrent}` : styles.step} aria-current={current ? 'step' : undefined}>
-                <span className={styles.stepDot} aria-hidden="true">{done ? <Check size={12} /> : index + 1}</span>
-                <span className={styles.stepLabel}>{step}</span>
-              </li>
-            )
-          })}
-        </ol>
+        {/* 手順は型の共通部品 Steps（Fa8ED）。タブの中の頭（題と説明の下）に1行で置く。 */}
+        <Steps
+          label="移行の手順"
+          currentKey={currentStep < MIGRATION_STEPS.length ? String(currentStep) : undefined}
+          steps={MIGRATION_STEPS.map((step, index) => ({
+            key: String(index),
+            label: step,
+            state: index < currentStep ? 'done' as const : 'todo' as const,
+          }))}
+        />
 
         {m.message ? <p role="status" className={styles.message}>{m.message}</p> : null}
 
