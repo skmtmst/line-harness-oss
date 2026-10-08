@@ -2238,12 +2238,12 @@ async function scheduled(
     console.error('event-waitlist error:', e);
   }
 
+  // 来店スタンプの期限通知。配信の見張り（observeDispatch）の対応表には未登録なので、
+  // event-waitlist と同じく直接呼ぶ（対応表への追加は Codex の担当で別に行う）。
   try {
-    await observeDispatch('visit stamp expiry reminders', async () => {
-      await processVisitStampReminders(dbFor(env), {
-        now: new Date(event.scheduledTime), proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
-        proxyDispatch: request => Promise.resolve(lineProxy.fetch(request, env, ctx)),
-      });
+    await processVisitStampReminders(dbFor(env), {
+      now: new Date(event.scheduledTime), proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+      proxyDispatch: request => Promise.resolve(lineProxy.fetch(request, env, ctx)),
     });
   } catch {
     console.error(JSON.stringify({ event: 'visit_stamp_reminders_pending' }));
