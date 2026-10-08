@@ -15,7 +15,6 @@
  * 「比べてから保存」で扱う（いきなり上書きしない）。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Combobox from '@/components/shared/combobox'
@@ -772,7 +771,6 @@ export default function MenuFormV8() {
   return (
     <div className={shell.shell} data-design-node="QqER7">
       <header className={styles.head} data-design="Head">
-        <Link href="/booking/menus" className={shell.backLink}>← 予約へ</Link>
         <h1 className={shell.headTitle}>{editTarget ? '予約メニューを直す' : '予約メニューを作る'}</h1>
         <p className={shell.headNote}>
           {editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}
