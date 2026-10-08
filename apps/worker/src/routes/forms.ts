@@ -1304,16 +1304,18 @@ forms.put('/api/forms/:id', async (c) => {
      * 版の確認を要しない。所属は版管理の対象外で、確認を強いると一覧からの
      * 移動のたびに詳細の取得が要る。#723 の例外ではなく、中身が無い要求に
      * 対して確認する版が無いだけ。**中身の更新と一緒のときは確認を免除しない。**
-     * 先に確認してから動かす。逆にすると、409 のとき移動だけ残る。
+     * 複合保存は内容と所属を同じ条件付き UPDATE で書く。先に所属だけ
+     * 動かすと、400・422・409 のとき移動だけが残る。
      */
     const hasContentUpdate = Object.keys(body).some((key) => key !== 'folderId');
     if (hasContentUpdate && (!Number.isInteger(expectedContentRevision) || expectedContentRevision < 1)) {
       return c.json({ success: false, error: '確認した版が必要です' }, 400);
     }
 
+    let nextFolderId: string | null | undefined;
     if ('folderId' in body) {
       const rawFolderId = body.folderId;
-      const nextFolderId = rawFolderId === null || rawFolderId === '' ? null : String(rawFolderId);
+      nextFolderId = rawFolderId === null || rawFolderId === '' ? null : String(rawFolderId);
       if (nextFolderId !== null) {
         // テンプレートの `readFolderId` と同じ決まり。消えた箱・別用途の箱・
         // 別アカウントの箱は断る。**黙って未分類にしない。**
@@ -1324,10 +1326,10 @@ forms.put('/api/forms/:id', async (c) => {
           return c.json({ success: false, error: 'そのフォルダはありません' }, 422);
         }
       }
-      if (!await setFormFolder(c.env.DB, id, nextFolderId)) {
-        return c.json({ success: false, error: 'Form not found' }, 404);
-      }
       if (!hasContentUpdate) {
+        if (!await setFormFolder(c.env.DB, id, nextFolderId)) {
+          return c.json({ success: false, error: 'Form not found' }, 404);
+        }
         const moved = await getFormById(c.env.DB, id);
         if (!moved) return c.json({ success: false, error: 'Form not found' }, 404);
         return c.json({ success: true, data: serializeForm(moved) });
@@ -1336,6 +1338,7 @@ forms.put('/api/forms/:id', async (c) => {
 
     // Only include fields that were explicitly sent (avoid undefined → null conversion)
     const updates: Record<string, unknown> = {};
+    if ('folderId' in body) updates.folderId = nextFolderId;
     if (body.name !== undefined) updates.name = body.name;
     if (body.description !== undefined) updates.description = body.description;
     if (body.fields !== undefined) updates.fields = JSON.stringify(body.fields);
