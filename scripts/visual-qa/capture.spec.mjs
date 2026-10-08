@@ -19,6 +19,7 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test, expect } from '@playwright/test'
+import { captureClockFor, QA_TIMEZONE } from './qa-clock.mjs'
 import { ROUTES, TAG_STATES, WIDTHS } from './routes.mjs'
 
 /** 撮るあいだだけ当てる規則（開発表示を消す）。 */
@@ -59,6 +60,7 @@ const MAX_DIFF_PIXELS = 0
 const DEFAULT_CAPTURE_HEIGHT = 1080
 
 test.describe.configure({ mode: 'parallel' })
+test.use({ timezoneId: QA_TIMEZONE })
 
 /**
  * 認証後の店舗選択は毎回消される仕組みなので、消さない印を先に置く。
@@ -97,7 +99,7 @@ for (const width of WIDTHS) {
     test(`${width}px ${route.name}（${route.path}）`, async ({ page }) => {
       await page.setViewportSize({ width, height: DEFAULT_CAPTURE_HEIGHT })
 
-      await signIn(page, route.clock)
+      await signIn(page, captureClockFor(route.path ?? route.route, route.clock))
       await page.goto(`${BASE}${route.path}`, { waitUntil: 'networkidle' })
 
       // 1・2. そのページに居て、描けているか
