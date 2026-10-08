@@ -8,6 +8,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fetchApi = vi.hoisted(() => vi.fn())
+const role = vi.hoisted(() => ({ current: 'owner' as string | null }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.current, canManageRole: (value: string | null) => value === 'owner' || value === 'admin' }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -100,6 +102,7 @@ function tabButton(label: string): HTMLButtonElement | undefined {
 }
 
 beforeEach(() => {
+  role.current = 'owner'
   document.documentElement.dataset.theme = 'v8'
   fetchApi.mockImplementation((async (url: string) => {
     if (url.startsWith('/api/forms/form-1/submissions')) return { success: true, data: submissionsPage }
@@ -153,3 +156,19 @@ describe('V8 集まった回答', () => {
     expect(host.textContent).toContain('後処理をやり直す')
   })
 })
+
+it('WEB-148: 閲覧のみでは編集・後処理を隠し、回答とCSVを残す', async () => {
+  role.current = 'staff'
+  await act(async () => root.render(<FormResponsesPage />)); await settle()
+  const rowTab = tabButton('1件ずつ見る');
+  if (rowTab) await act(async () => rowTab.click())
+  await settle()
+  const answer = host.querySelector('tbody tr') as HTMLElement | null
+  expect(answer).not.toBeNull()
+  await act(async () => answer!.click()); await settle()
+  expect(host.textContent).toContain('待ち時間が短くて助かりました')
+  expect(host.textContent).toContain('閲覧のみで見ています')
+  expect([...host.querySelectorAll('a,button')].some((el) => el.textContent?.includes('フォームを編集'))).toBe(false)
+  expect([...host.querySelectorAll('button')].some((el) => el.textContent?.includes('後処理をやり直す'))).toBe(false)
+  expect(host.textContent).toContain('CSVで書き出す')
+ })

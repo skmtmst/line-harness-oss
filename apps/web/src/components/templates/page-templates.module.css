@@ -227,8 +227,11 @@
 .detailColumnMain { display: flex; flex-direction: column; gap: var(--tpl-wh-check-gap); min-width: 0; }
 .detailColumnAside { min-width: 0; min-height: 100%; padding-left: var(--tpl-ev-fr-rail-pad); border-left: 1px solid var(--color-hairline); }
 .detailColumnToggle { display: none; }
+.detailColumns[data-presentation='card'] { grid-template-columns: minmax(0, 1fr) var(--tpl-e78-side-w); gap: var(--tpl-e78-row-gap); margin-right: 0; }
+.detailColumns[data-presentation='card'] .detailColumnAside { padding-left: 0; border-left: 0; }
 @container v8-page (max-width: 1099px) {
   .detailColumns { grid-template-columns: minmax(0, 1fr); margin-right: 0; gap: var(--tpl-body-pad); }
+  .detailColumns[data-presentation='card'] { grid-template-columns: minmax(0, 1fr); }
   .detailColumnToggle { display: block; }
   .detailColumnAside { display: none; min-height: 0; padding-left: 0; border-left: 0; }
   .detailColumnAside[data-expanded] { display: block; }

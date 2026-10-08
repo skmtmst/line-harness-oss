@@ -37,9 +37,9 @@ export function OptionalBadge() {
   return <span className={styles.optional}>任意</span>
 }
 
-/** 複合入力欄の下にも、Field と同じ誤りの文を置く。 */
+/** 複合入力欄の下にも、Field と同じ誤りの文を置く（中身が無ければ何も出さない）。 */
 export function FieldError({ id, children }: { id: string; children: ReactNode }) {
-  return <p id={id} className={styles.error} role="alert">{children}</p>
+  return children ? <p id={id} className={styles.error} role="alert">{children}</p> : null
 }
 
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */

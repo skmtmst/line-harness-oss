@@ -9,6 +9,8 @@ vi.hoisted(() => {
 
 import RemindersPage from './page'
 
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
 /*
  * V8「サクサク感」C①・E：リマインダ一覧の行パネル。
  * 行を押すと右に詳細パネル（↑↓で次の行）。「詳細を見る」は詳細へ進む。
@@ -125,10 +127,10 @@ test('パネルの「詳細を見る」は詳細へ進む', async () => {
 })
 
 // 監査 WEB-015：閲覧のみの人には、パネルにも押せない編集・複製・削除を置かない（行の「…」と同じ）。
-test('閲覧のみではパネルに編集・複製・削除を出さない。管理者には出す', async () => {
+test.each(['viewer', 'staff'])('WEB-015: %s の閲覧のみではパネルに編集・複製・削除を出さない', async (readonlyRole) => {
   const panelButtons = () => [...(document.body.querySelector('[data-design-part="detail-panel"]')?.querySelectorAll('button') ?? [])]
     .map((b) => b.textContent?.trim())
-  role = 'viewer'
+  role = readonlyRole
   await openFirstRow()
   await eventually(() => {
     if (!panelButtons().includes('詳細を見る')) throw new Error('panel not open')
