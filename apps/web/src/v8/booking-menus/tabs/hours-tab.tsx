@@ -187,6 +187,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       value={interval.start}
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, start: value } : entry))}
                       className={styles.timeInput}
+                      size="compact"
                     />
                     <span className={styles.intervalTilde}>〜</span>
                     <TimeField
@@ -194,6 +195,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       value={interval.end}
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, end: value } : entry))}
                       className={styles.timeInput}
+                      size="compact"
                     />
                     <span className={styles.sameTimeLabel}>同時</span>
                     <input
@@ -568,7 +570,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
         </label>
         <label className={styles.fieldLabel}>
           開始時刻
-          <TimeField aria-label="確かめる開始時刻" value={time} onChange={(value) => { setTime(value); changeCriteria() }} className="mt-1" />
+          <TimeField aria-label="確かめる開始時刻" size="field" value={time} onChange={(value) => { setTime(value); changeCriteria() }} className="mt-1" />
         </label>
         <Select size="full"
           aria-label="確かめる担当"
