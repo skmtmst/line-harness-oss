@@ -75,7 +75,7 @@ export default function MergedUsersV8() {
 }
 
 function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
-  usePageTitle('統合ユーザー')
+  usePageTitle('友だち')
   const u = useMergedUsers()
   const staffRole = useStaffRole()
   const canManage = staffRole === null || canManageRole(staffRole)
