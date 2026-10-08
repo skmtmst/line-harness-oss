@@ -8,6 +8,7 @@
  * （app/form-submissions/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useListScrollMemory } from '@/components/shared/list-url-state'
 import Link from 'next/link'
@@ -193,6 +194,7 @@ export default function FormsListV8() {
   usePageTitle('回答フォーム')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   /*
@@ -457,7 +459,7 @@ export default function FormsListV8() {
     if (next.sort !== undefined) setFormSort(next.sort)
     if (next.pageSize !== undefined) setPageSize(next.pageSize)
     if (next.page !== undefined) setPage(next.page)
-    router.replace(listHref(next), { scroll: false })
+    samePageUrl.replace(listHref(next))
   }
 
   const createDraft = async () => {

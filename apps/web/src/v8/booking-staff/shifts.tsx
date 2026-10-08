@@ -12,6 +12,7 @@
  * 動き（読み込み・保存・版の競合・権限・失敗時の扱い）は今までの
  * app/booking/staff/shifts/staff-detail-v8.tsx から写した。BEHAVIOR.md を参照。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -249,7 +250,7 @@ function PageState({ node, self, title, desc, icon, actions, head }: {
  * ひも付けが無ければ板 wvGke の案内。R579：2経路とも通信失敗なら「無い」と言わず再試行の口。
  */
 function OwnShiftEntry() {
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const { selectedAccountId } = useAccount()
   const [resolved, setResolved] = useState<'loading' | 'missing' | 'error'>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
@@ -273,7 +274,7 @@ function OwnShiftEntry() {
         }).then((res) => res?.staff ?? [])
       if (cancelled) return
       if (rows.length > 0) {
-        router.replace(`/booking/staff/shifts?staff_id=${rows[0].id}`)
+        samePageUrl.replace(`/booking/staff/shifts?staff_id=${rows[0].id}`)
         return
       }
       if (firstError !== null) {
@@ -284,7 +285,7 @@ function OwnShiftEntry() {
       setResolved('missing')
     })()
     return () => { cancelled = true }
-  }, [router, selectedAccountId, attempt])
+  }, [samePageUrl, selectedAccountId, attempt])
 
   const head = (
     <header className={layout.head}>

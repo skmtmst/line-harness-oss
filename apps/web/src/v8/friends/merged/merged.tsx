@@ -9,8 +9,9 @@
  * 絵の列「配信に使うアカウント」「結び付けた日」は一覧の API に無い。
  * 今の列（状態・最終接触）をその位置に出す（情報を落とさない）。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { ChevronUp, Download, RotateCw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
@@ -43,7 +44,7 @@ const UID_STATUS = {
 
 export default function MergedUsersV8() {
   const searchParams = useSearchParams()
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const personFromUrl = searchParams.get('person')
   const [openedPersonId, setOpenedPersonId] = useState<string | null>(personFromUrl)
   useEffect(() => { setOpenedPersonId(personFromUrl) }, [personFromUrl])
@@ -54,7 +55,7 @@ export default function MergedUsersV8() {
         personId={openedPersonId}
         onClose={() => {
           setOpenedPersonId(null)
-          if (personFromUrl) router.replace('/friends?tab=merged')
+          if (personFromUrl) samePageUrl.replace('/friends?tab=merged')
         }}
       />
     )

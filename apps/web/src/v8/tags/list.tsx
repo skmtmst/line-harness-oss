@@ -10,8 +10,9 @@
  * 受け付ける URL と指定は今と同じ：`/tags`・`/tags?tab=fields|marks|searches`・
  * 行の詳細は `?tag=<id>`。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Eye, Plus, Upload } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -55,7 +56,7 @@ export default function TagsList({
   usePageTitle('友だち属性')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const rawTab = params.get('tab')
   const routeTab: TagsTabKey = TABS.some(([key]) => key === rawTab) ? (rawTab as TagsTabKey) : 'tags'
@@ -124,7 +125,7 @@ export default function TagsList({
           items={TABS.filter(([key]) => tabEnabled(key)).map(([key, label]) => ({
             label,
             current: tab === key,
-            onClick: () => (fixture ? setFixtureTab(key) : router.replace(key === 'tags' ? '/tags' : `/tags?tab=${key}`)),
+            onClick: () => (fixture ? setFixtureTab(key) : samePageUrl.replace(key === 'tags' ? '/tags' : `/tags?tab=${key}`)),
           }))}
         />
       </div>

@@ -7,8 +7,9 @@
  * 送る前（下書き）・予約中は取り消す（cancel）。下書きは店ごとの確かめを見て、そのまま送れる（send）。
  * 送った LINE は取り消せない。動きは BEHAVIOR.md。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Ban, CirclePause, Copy, Download, PencilLine, RotateCcw, Send } from 'lucide-react'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
@@ -297,7 +298,7 @@ export default function HqBroadcastDetail() {
   usePageTitle('一括配信の詳細')
   usePageCrumbs([{ label: '一括配信', href: '/hq/broadcasts' }])
   const params = useSearchParams()
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const id = params.get('id') ?? ''
   /* タブは ?tab=（店の配信の詳細と同じ。履歴を積まない）。 */
   const tabParam = params.get('tab')
@@ -306,7 +307,7 @@ export default function HqBroadcastDetail() {
     setTab(next)
     const q = new URLSearchParams(params.toString())
     if (next === 'overview') q.delete('tab'); else q.set('tab', next)
-    router.replace(`/hq/broadcasts/detail?${q.toString()}`, { scroll: false })
+    samePageUrl.replace(`/hq/broadcasts/detail?${q.toString()}`)
   }
   const role = useStaffRole()
   const canManage = role === null || canManageRole(role)
