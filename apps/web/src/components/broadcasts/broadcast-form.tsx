@@ -81,6 +81,7 @@ import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import {
   ApprovalRequestFields,
   SingleOperatorFields,
@@ -831,6 +832,8 @@ export default function BroadcastForm({
     schedule: '一斉配信を作成・送信設定',
     confirm: '一斉配信を作成・最終確認',
   }
+  /* ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。v7 は今までどおり。 */
+  const showHeadBack = useAdminTheme() !== 'v8'
   usePageTitle(
     preflightDialogOpen
       ? '一斉配信の配信前チェック'
@@ -2119,7 +2122,7 @@ export default function BroadcastForm({
   return <div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
     <header className={styles.header}>
       <div className={styles.heading}>
-        <Button variant="secondary" className={styles.textButton} size="compact" onClick={() => guarded(onCancel)}>← 一斉配信一覧</Button>
+        {showHeadBack ? <Button variant="secondary" className={styles.textButton} size="compact" onClick={() => guarded(onCancel)}>← 一斉配信一覧</Button> : null}
         <h2>一斉配信を作る</h2>
         <p aria-live="polite">{draftStatusLabel || '下書き・未保存'}</p>
       </div>

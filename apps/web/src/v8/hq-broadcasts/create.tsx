@@ -748,7 +748,6 @@ export default function HqBroadcastCreate() {
       <div className={formStyles.root}>
         <header className={formStyles.header}>
           <div className={formStyles.heading}>
-            <Button variant="secondary" className={formStyles.textButton} size="compact" href="/hq/broadcasts">← 一括配信一覧</Button>
             <h2>一括配信を作る</h2>
           </div>
         </header>
@@ -767,7 +766,6 @@ export default function HqBroadcastCreate() {
       <div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
         <header className={formStyles.header}>
           <div className={formStyles.heading}>
-            <Button variant="secondary" className={formStyles.textButton} size="compact" href="/hq/broadcasts">← 一括配信一覧</Button>
             <h2>一括配信を作る</h2>
             <p aria-live="polite">{draftLabel}</p>
           </div>

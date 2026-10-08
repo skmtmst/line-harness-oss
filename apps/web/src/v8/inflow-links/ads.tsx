@@ -12,9 +12,8 @@
  * - 未接続の媒体の「つなぐ」は、今の広告とのつなぎ（v7）と同じ接続の窓を開く
  * 閲覧のみ（owner・admin 以外）には、費用を手で入れる・つなぐ・再読み込み・行の「…」・操作の行を出さない。
  */
-import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, AtSign, Check, Eye, Music, MoreHorizontal, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from 'lucide-react'
+import { AtSign, Check, Eye, Music, MoreHorizontal, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api, type AdPlatform } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -322,7 +321,6 @@ export default function AdsV8() {
   const head = (
     <header className={styles.head}>
       <div className={styles.headText}>
-        <Link href="/inflow-links" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />流入と計測へ</Link>
         <h1 className={styles.title}>広告連携</h1>
         <p className={styles.description}>広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。</p>
       </div>

@@ -44,7 +44,6 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
 
   const head = (title: string, description: string) => (
     <header className={styles.head}>
-      <button type="button" onClick={onClose} className={styles.back}>← 統合ユーザーへ</button>
       <h2 className={styles.title}>{title}</h2>
       <p className={styles.description}>{description}</p>
     </header>
