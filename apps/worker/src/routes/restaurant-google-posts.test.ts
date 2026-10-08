@@ -518,7 +518,7 @@ describe('取り込み（sync）', () => {
 });
 
 /**
- * Instagram 同時投稿（610・★V8-B `U1X7T2`・`HEEN9`／2026-10-07 承認）。
+ * Instagram 同時投稿（611・★V8-B `U1X7T2`・`HEEN9`／2026-10-07 承認）。
  * 本物のMetaへはつながず、graph.facebook.com への呼び出しはすべてモックで受ける。
  */
 describe('Instagram 同時投稿', () => {

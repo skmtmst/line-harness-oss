@@ -92,7 +92,7 @@ interface PostRow {
   google_create_time: string | null;
   google_update_time: string | null;
   content_fingerprint: string | null;
-  // Instagram 同時投稿（610）。instagram_status の 'pending' / 'skipped' はまだ使わないが
+  // Instagram 同時投稿（611）。instagram_status の 'pending' / 'skipped' はまだ使わないが
   // additive-only 規約で CHECK を後から広げられないため列の側には最初から入れてある。
   instagram_enabled: number;
   instagram_caption: string | null;

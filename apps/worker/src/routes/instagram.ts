@@ -50,7 +50,7 @@ type Connection = {
   profile_json: string | null;
   posts_json: string | null;
   synced_at: string | null;
-  /** 同意済みの許可（カンマ区切り）。610 で追加。 */
+  /** 同意済みの許可（カンマ区切り）。611 で追加。 */
   scopes: string;
 };
 // 同時投稿の許可を持たない古い接続も「認可が切れています」にして、同じ接続ボタンで取り直させる。
