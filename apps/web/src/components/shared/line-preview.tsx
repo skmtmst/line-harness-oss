@@ -33,6 +33,8 @@ import styles from './line-preview.module.css'
 export interface LinePreviewProps {
   /** 枠の中身。各画面の吹き出し・カードをそのまま渡す。 */
   children?: ReactNode
+  /** V8で画面が指定する題。nullなら外側の題だけを使う。 */
+  title?: string | null
   /**
    * 題の下に見える札。届く日時・件数など、その場で見せたい情報。
    * 動く内容なので ? には入れず、見えるまま残す。
@@ -66,6 +68,7 @@ const readIsV8OnServer = () => false
 
 export default function LinePreview({
   children,
+  title = 'LINEでの見え方',
   caption,
   note,
   accountName,
@@ -81,11 +84,11 @@ export default function LinePreview({
   if (v8) {
     return (
       <section aria-label="LINEでの見え方" className={styles.phoneRoot}>
-        {/* 絵（JeINq・A0pDt ほか24枚）はすべて「LINEでの見え方」。列の左に寄せ、スマホはその下の真ん中。 */}
-        <p className={styles.phoneTitle}>
-          <span>LINEでの見え方</span>
+        {/* 題は列の左、スマホはその下の真ん中。テンプレートでは「届き方」や外側の題を使う。 */}
+        {title !== null ? <p className={styles.phoneTitle}>
+          <span>{title}</span>
           {note ? <HelpTip label="LINEでの見え方の説明">{note}</HelpTip> : null}
-        </p>
+        </p> : null}
         <div className={styles.phone}>
           <div className={styles.screen}>
             <div className={styles.statusBar}>
