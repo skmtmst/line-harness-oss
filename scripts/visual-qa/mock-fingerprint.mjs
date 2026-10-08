@@ -18,7 +18,10 @@ export function mockFingerprint(entry = new URL('./mock-api.mjs', import.meta.ur
   }
   visit(entry)
   // api-shapes は import ではなくファイルを読むので、その入力も含める。
-  for (const url of inputs) visit(url)
+  for (const url of inputs) {
+    const path = fileURLToPath(url)
+    files.set(path, readFileSync(path, 'utf8'))
+  }
   const root = dirname(fileURLToPath(entry))
   const hash = createHash('sha256')
   for (const [path, source] of [...files].sort(([a], [b]) => a.localeCompare(b))) {
