@@ -325,6 +325,16 @@
   text-decoration: underline;
 }
 
+/* 段を替えて戻るパンくず（ボタン）。見た目はリンクのパンくずと同じにする。 */
+.crumbFromButton {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
 .crumbSep {
   color: var(--color-ink-faint);
 }
@@ -337,6 +347,17 @@
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 子の画面で画面名が一覧の名前のとき、その名前で一覧へ戻る（見た目は画面名のまま、触れたら下線）。 */
+.crumbCurrentLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.crumbCurrentLink:hover {
+  color: var(--color-action);
+  text-decoration: underline;
 }
 
 /* 36px・角丸10・枠つきの絵ボタン（畳むボタンと通知で同じ形） */

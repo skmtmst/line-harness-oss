@@ -244,8 +244,6 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         boardId="l87p1J"
         title={id ? '質問を編集' : '質問を作る'}
         description="ボタンで答えてもらい、答えでタグなどを付ける"
-        backHref={host?.backHref}
-        onBack={host?.onCancel}
         side={(
           <>
             <section className={te.sideCard}>
