@@ -11,7 +11,7 @@
  */
 .galleryHead { display: flex; align-items: center; flex-wrap: wrap; gap: var(--tpl-hb-tool-gap); min-width: 0; }
 .galleryTitle { font-size: var(--text-body); line-height: var(--tpl-hb-label-lh); font-weight: 700; color: var(--color-ink); }
-.galleryTools { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); min-width: 0; }
+.galleryTools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-hb-tool-gap); min-width: 0; }
 .chips { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
 .spacer { flex: 1; }
 .hint { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); white-space: nowrap; }
@@ -36,7 +36,7 @@
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tpl-hb-kpi-gap); }
-.tile { display: flex; flex-direction: column; min-width: 0; }
+.tile { position: relative; display: flex; flex-direction: column; min-width: 0; }
 
 .tileImage {
   display: flex;
@@ -103,3 +103,13 @@
   .split { flex-direction: column; }
   .panel { width: 100%; }
 }
+
+.selectionTools { display: flex; align-items: center; flex-wrap: wrap; gap: var(--tpl-hb-tool-gap); margin-left: var(--tpl-hb-selection-margin); }
+.tileSelect { position: absolute; z-index: 1; top: var(--tpl-hb-tool-gap); left: var(--tpl-hb-tool-gap); }
+.tile[data-selected] .tileImage { outline: var(--tpl-hb-selection-outline); outline-offset: var(--tpl-hb-selection-inset); }
+.selectionCount { white-space: nowrap; font-size: var(--text-caption); font-weight: 600; color: var(--color-ink); }
+.generationInfo { display: flex; flex-direction: column; font-size: var(--text-micro); color: var(--color-ink-secondary); line-height: var(--tpl-hb-small-lh); white-space: nowrap; }
+.distributionProgress { margin-top: var(--tpl-hb-tool-gap); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); color: var(--color-ink-secondary); }
+.tileImage:focus-visible, .star:focus-visible { outline: var(--tpl-hb-selection-outline); outline-offset: var(--tpl-hb-selection-outset); }
+
+.footer { margin-inline: var(--tpl-hb-footer-margin); }

@@ -82,3 +82,6 @@ scripts/visual-qa/v8-design-refs/
 scripts/visual-qa/v8-parity-out/
 # Playwright のブラウザ置き場（砂場では ~/Library に書けないための作業場所）。
 .playwright-browsers/
+
+# bnr G-6 のローカル比較画像・測定用の対応表。
+.g6-qa/
