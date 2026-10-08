@@ -7,6 +7,7 @@ import { MENU_SECTIONS } from '@/lib/menu'
 import { useV8Leave } from './overlay-utils'
 import styles from './command-palette.module.css'
 import { isImeComposing } from './ime'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 
 export type PaletteItem = {
   href: string
@@ -116,7 +117,9 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
 
   const go = (href: string) => {
     setOpen(false)
-    router.push(href)
+    // 書きかけの画面があれば、左メニューのリンクと同じ「保存せずに移りますか」を通す。
+    // 直接 router.push すると未保存の入力が確認なしで消える（監査 WEB-008）。
+    requestUnsavedAction(() => router.push(href))
   }
 
   return createPortal(

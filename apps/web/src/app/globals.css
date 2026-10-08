@@ -911,8 +911,10 @@
   --tpl-bd-tabs-pad: 0 24px; --tpl-bd-main-pad: 20px 28px; --tpl-bd-main-gap: 22px; --tpl-bd-side-width: 380px; --tpl-bd-side-pad: 20px 24px; --tpl-bd-side-gap: 16px; --tpl-bd-row-pad: 8px 0; --tpl-bd-row-label: 96px; --tpl-bd-row-size: 12px; --tpl-bd-row-lh: 17px;
   --tpl-bd-sec-size: 15px; --tpl-bd-sec-lh: 23px; --tpl-bd-sec-gap: 8px; --tpl-bd-link-size: 12px; --tpl-bd-link-lh: 18px; --tpl-bd-desc-size: 12px; --tpl-bd-desc-lh: 19px; --tpl-bd-note-size: 11px; --tpl-bd-note-lh: 18px;
   --tpl-bd-box-pad: 16px; --tpl-bd-box-gap: 12px; --tpl-bd-box-icon: 18px; --tpl-bd-box-title-size: 14px; --tpl-bd-box-title-lh: 20px; --tpl-bd-box-text-gap: 2px; --tpl-bd-soft-gap: 8px;
-  /* 予約からの売上（X26oo）。app/booking/sales/sales-v8.module.css が読む。 */
-  --tpl-bks-head-mb: 16px; --tpl-bks-title-size: 20px; --tpl-bks-tiles-mb: 12px; --tpl-bks-tile-radius: 16px; --tpl-bks-tile-pad: 10px 16px; --tpl-bks-tile-label-size: 13px;
+  /* 予約からの売上（X26oo）。app/booking/sales/sales-v8.module.css が読む。
+     題の大きさは予約スタッフ（--tpl-bks-title-size 22px）と別の名前にする。同じ名前で 20px を
+     後から書くと、予約スタッフの4枚の題まで 20px になっていた（監査 W152）。 */
+  --tpl-bks-head-mb: 16px; --tpl-bks-sales-title-size: 20px; --tpl-bks-tiles-mb: 12px; --tpl-bks-tile-radius: 16px; --tpl-bks-tile-pad: 10px 16px; --tpl-bks-tile-label-size: 13px;
   --tpl-bks-tile-value-size: 22px; --tpl-bks-tile-value-mt: 2px; --tpl-bks-tile-sub-size: 12px; --tpl-bks-tile-sub-mt: 2px; --tpl-bks-detail-open-max-h: 320px; --tpl-bks-detail-open-mb: 12px;
   --tpl-bks-detail-card-radius: 16px; --tpl-bks-detail-card-pad: 12px 16px; --tpl-bks-detail-title-size: 13px; --tpl-bks-detail-title-m: 0 0 8px; --tpl-bks-detail-row-pad: 6px 0; --tpl-bks-detail-row-size: 13px;
   --tpl-bks-panel-radius: 16px; --tpl-bks-panel-pad: 16px; --tpl-bks-panel-title-size: 15px; --tpl-bks-panel-title-m: 0 0 12px; --tpl-bks-menu-row-pad: 8px 0; --tpl-bks-menu-name-size: 13px;

@@ -86,6 +86,7 @@ export default function Notice({
   helpLabel,
   helpHref,
   icon,
+  role,
   ...props
 }: NoticeProps) {
   const canonical = CANONICAL[tone]
@@ -96,7 +97,9 @@ export default function Notice({
     <div
       {...props}
       className={[styles.notice, styles[canonical], className].filter(Boolean).join(' ')}
-      role={canonical === 'danger' ? 'alert' : 'note'}
+      // 呼び出し側が role を指定したらそれを優先する（下書きの競合帯の alert など）。
+      // 指定がないときだけ、種類から既定（危険＝alert、ほかは note）を決める。
+      role={role ?? (canonical === 'danger' ? 'alert' : 'note')}
       data-design-part="notice"
       data-design-node={node}
     >
