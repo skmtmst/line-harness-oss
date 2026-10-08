@@ -64,17 +64,26 @@ import {
   FOLDER_FALLBACK_COLOR,
   DeleteTagDialog,
   QUICK_FILTERS,
-  SOURCE_LABELS,
   UNGROUPED,
   cleanupKnown,
   formatDate,
   hasLinkedActions,
   isThisMonth,
   isUnused,
-  sourceLabel,
   usageLabel,
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list.module.css'
+
+/** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
+const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
+  ec: 'EC 連携',
+  line_login: 'LINE ログイン',
+  form: '回答フォーム',
+  ec_purchase: 'EC 購入',
+  manual: '手動',
+  birthday: '誕生日のきまり',
+}
+const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—')
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -707,6 +716,7 @@ export default function TagsTab({
 
   const folderNote = (
     <>
+      {canEdit ? null : <span className={styles.viewerFolderAddSpace} aria-hidden="true" />}
       <p className={styles.folderNote}>フォルダを消しても、中のタグは未分類に残ります</p>
       {folderError ? (
         <p role="alert" className={styles.folderNote}>

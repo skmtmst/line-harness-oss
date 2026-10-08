@@ -484,6 +484,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
           </span>
           <Select
             aria-label="使っているかで絞り込む"
+            width={157}
             value={usage}
             onChange={(value) => setUsage(value as typeof usage)}
             options={[

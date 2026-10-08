@@ -691,11 +691,11 @@
   /* リマインダの作る②〜⑤・詳細（YChR6・r1l0bT・T0nis・hjNpJ・k32cn・rbAig・loVfW・RwVo5）。 */
   --tpl-rm-back-size: 13px; --tpl-rm-label-size: 13px; --tpl-rm-label-lh: 19px; --tpl-rm-note-size: 12px; --tpl-rm-note-lh: 17px; --tpl-rm-small-size: 11px; --tpl-rm-small-lh: 16px; --tpl-rm-tiny-size: 10px; --tpl-rm-tiny-lh: 13px; --tpl-rm-body-size: 14px; --tpl-rm-title-lh: 22px; --tpl-rm-form-title-lh: 1.4; --tpl-rm-form-note-lh: 1.3; --tpl-rm-loose-lh: 1.5; --tpl-rm-rule-lh: 22px;
   --tpl-rm-row-gap-sm: 8px; --tpl-rm-row-gap: 10px; --tpl-rm-row-gap-lg: 12px; --tpl-rm-side-row-gap: 8px; --tpl-rm-choice-gap: 12px; --tpl-rm-field-grid: minmax(0, 1fr) 220px; --tpl-rm-tpl-card-h: 150px;
-  --tpl-rm-band-gap: 12px; --tpl-rm-band-pad: 12px 16px; --tpl-rm-band-radius: 10px; --tpl-rm-band-lh: 20px; --tpl-rm-conflict-margin: 16px 0 -9px;
+  --tpl-rm-band-gap: 12px; --tpl-rm-band-pad: 12px 16px; --tpl-rm-band-radius: 10px; --tpl-rm-band-lh: 20px;
   --tpl-rm-count-gap: 24px; --tpl-rm-count-pad: 14px; --tpl-rm-count-size: 20px; --tpl-rm-count-lh: 29px; --tpl-rm-stop-pad: 10px 0;
   --tpl-rm-narrow-pull: 8px; --tpl-rm-narrow-margin: -8px -8px 0; --tpl-rm-open-outline: 1.5px; --tpl-rm-open-offset: -0.75px; --tpl-rm-num-size: 24px; --tpl-rm-days-w: 64px; --tpl-rm-time-w: 140px; --tpl-sfs-time-w: 140px; /* 時刻の欄の幅（絵 p5YuP・r1l0bT・V6xAo・U5rxyH）*/
   --tpl-rm-body-pad: 14px; --tpl-rm-body-lh: 22px; --tpl-rm-body-min-h: 88px; --tpl-rm-insert-gap: 4px; --tpl-rm-bubble-pad: 10px 12px; --tpl-rm-bubble-lh: 1.6; --tpl-rm-list-indent: 18px;
-  --tpl-rm-plan-head-pad: 8px 0; --tpl-rm-plan-row-pad: 10px 0; --tpl-rm-col-when: 130px; --tpl-rm-col-step: 80px; --tpl-rm-col-state: 180px; --tpl-rm-info-pad: 10px 14px; --tpl-rm-confirm-key-w: 140px; --tpl-rm-value-lh: 21px; --tpl-rm-dest-pad: 8px 12px;
+  --tpl-rm-plan-head-pad: 8px 0; --tpl-rm-plan-row-pad: 11px 0; --tpl-rm-col-when: 130px; --tpl-rm-col-step: 80px; --tpl-rm-col-state: 180px; --tpl-rm-info-pad: 10px 14px; --tpl-rm-confirm-key-w: 140px; --tpl-rm-value-lh: 21px; --tpl-rm-dest-pad: 8px 12px;
   --tpl-rm-done-pad: 48px 0; --tpl-rm-done-w: 560px; --tpl-rm-done-card-pad: 32px; --tpl-rm-done-icon: 48px; --tpl-rm-done-title-size: 18px; --tpl-rm-done-title-lh: 26px; --tpl-rm-done-note-lh: 22px;
   --tpl-rm-dlg-top: 260px; --tpl-rm-dlg-w: 600px; --tpl-rm-dlg-pad: 24px; --tpl-rm-dlg-close: 28px; --tpl-rm-dlg-title-size: 17px; --tpl-rm-dlg-title-lh: 25px;
   --tpl-rm-side-w: 380px; --tpl-rm-icon-btn: 36px; --tpl-rm-col-num: 48px; --tpl-rm-col-fail: 60px; --tpl-rm-col-time: 110px; --tpl-rm-col-result: 96px; --tpl-rm-col-date: 170px; --tpl-rm-col-ops: 140px; --tpl-rm-pill-gap: 5px; --tpl-rm-pill-pad: 2px 8px; --tpl-rm-pill-lh: 17px; --tpl-rm-search-w: 220px; --tpl-rm-pager-pad: 18px 20px 10px; --tpl-rm-date-h: 32px; --tpl-rm-phone-pull: 4px; --tpl-rm-viewer-create-h: 50px;
@@ -1062,7 +1062,7 @@
   --tpl-rml-blocker-pad: 9px 0; --tpl-rml-blocker-gap: 8px; --tpl-rml-blocker-lh: 17px; --tpl-rml-dlg-w: 600px; --tpl-rml-dlg-pad: 24px; --tpl-rml-dlg-gap: 14px; --tpl-rml-dlg-top: 240px; --tpl-rml-dlg-title-size: 17px; --tpl-rml-dlg-title-lh: 25px; --tpl-rml-dlg-desc-lh: 22px; --tpl-rml-icon-btn: 28px; --tpl-rml-notice-after: 6px; --tpl-rml-grip-w: 14px; --tpl-rml-row-line: inset 0 -1px 0 var(--color-divider);
   --tpl-rml-ext-max-w: 1584px; --tpl-rml-ext-side-w: 430px; --tpl-rml-ext-thumb-w: 48px; --tpl-rml-ext-col-a: 100px; --tpl-rml-ext-col-b: 110px; --tpl-rml-ext-col-c: 120px; --tpl-rml-ext-area-w: 24px; --tpl-rml-ext-ratio-large: 2500 / 1686; --tpl-rml-ext-ratio-compact: 2500 / 843;
   --tpl-band-gap: 0;
-  --tpl-viewer-create-space-h: 36px; --tpl-viewer-create-space-col-h: 49px; /* 閲覧のみで隠した作るボタンの高さ（場所だけ空ける）。列の上に直接置く画面はボタンの下の間 13 も含める */
+  --tpl-viewer-create-space-h: 36px; --tpl-viewer-create-space-col-h: 49px; --tpl-viewer-folder-add-space: 17px; /* 閲覧のみで隠した作るボタンの高さ（場所だけ空ける）。列の上に直接置く画面はボタンの下の間 13 も含める */
   /* 自動応答の一覧（uE9gf・Q5lOCc・WPrd5）。 */
   --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: 64px; --tpl-ar-narrow-head-h: 34px;
   --tpl-badge-h: 22px; --tpl-badge-dot: 6px;
@@ -1209,9 +1209,9 @@
   --tpl-steps-gap: 8px; --tpl-steps-dot: 20px; --tpl-steps-dot-gap: 6px; --tpl-steps-text-size: 12px; --tpl-steps-text-lh: 17px;
   /* ダッシュボード（WQmep）：数の帯・右の列・グラフ・表・友だち追加リンク・最近の動き。 */
   --tpl-db-num-size: 28px; --tpl-db-num-lh: 32px; --tpl-db-unit-size: 13px; --tpl-db-unit-lh: 20px; --tpl-db-cell-pad: 16px 20px; --tpl-db-cell-gap: 8px;
-  --tpl-db-tag-pad: 2px 7px; --tpl-db-tag-radius: 6px; --tpl-db-tag-gap: 3px; --tpl-db-aside-pad: 18px 20px; --tpl-db-aside-pad-narrow: 18px 16px; --tpl-db-aside-gap: 10px; --tpl-db-kv-gap: 8px; --tpl-db-dot: 7px;
+  --tpl-db-tag-pad: 2px 7px; --tpl-db-tag-radius: 6px; --tpl-db-tag-gap: 3px; --tpl-db-aside-pad: 18px 20px; --tpl-db-aside-pad-narrow: 18px 16px; --tpl-db-aside-gap: 10px; --tpl-db-aside-tail-pad: 0px; --tpl-db-aside-tail-pull: -7px; --tpl-db-aside-inbox-tail-pad: 6px; --tpl-db-kv-gap: 8px; --tpl-db-dot: 7px;
   --tpl-db-quota-size: 26px; --tpl-db-quota-lh: 30px; --tpl-db-quota-gap: 4px; --tpl-db-bar-h: 6px; --tpl-db-bar-radius: 3px; --tpl-db-small-lh: 17px; --tpl-db-text-lh: 20px; --tpl-db-caption-lh: 18px;
-  --tpl-db-chart-h: 190px; --tpl-db-chart-axis: 30px; --tpl-db-chart-top: 8px; --tpl-db-chart-plot-h: 140px; --tpl-db-chart-label-gap: 8px; --tpl-db-chart-bar-w: 22px; --tpl-db-chart-bar-gap: 4px; --tpl-db-chart-bar-r: 4px; --tpl-db-chart-bar-soft: #7cc79a; --tpl-db-chart-tick-shift: -8px; --tpl-db-chart-tick-left: 4px;
+  --tpl-db-chart-h: 188px; --tpl-db-chart-axis: 30px; --tpl-db-chart-top: 8px; --tpl-db-chart-plot-h: 140px; --tpl-db-chart-label-gap: 8px; --tpl-db-chart-bar-w: 22px; --tpl-db-chart-bar-gap: 4px; --tpl-db-chart-bar-r: 4px; --tpl-db-chart-bar-soft: #7cc79a; --tpl-db-chart-tick-shift: -8px; --tpl-db-chart-tick-left: 4px;
   --tpl-db-legend-gap: 12px; --tpl-db-swatch: 8px; --tpl-db-swatch-r: 2px; --tpl-db-swatch-gap: 6px;
   --tpl-db-th-pad: 8px 12px; --tpl-db-th-radius: 8px; --tpl-db-th-bg: #fafafb; --tpl-db-td-pad: 10px 12px; --tpl-db-col-gap: 16px; --tpl-db-col-name: 260px; --tpl-db-col-wait: 100px; --tpl-db-col-state: 90px; --tpl-db-route-pad: 1px 6px; --tpl-db-route-radius: 5px;
   --tpl-db-route-w: 220px; --tpl-db-control-h: 36px; --tpl-db-control-radius: 10px; --tpl-db-url-pad: 0 12px; --tpl-db-row-gap: 8px;
@@ -1388,7 +1388,7 @@
   --tpl-fr-col-check: 52px; --tpl-fr-col-star: 36px; --tpl-fr-col-support: 146px; --tpl-fr-col-scenario: 88px; --tpl-fr-col-latest: 206px;
   --tpl-fr-col-tags: 176px; --tpl-fr-col-source: 88px; --tpl-fr-col-last: 96px; --tpl-fr-col-menu: 48px;
   --tpl-fr-star: 20px; --tpl-fr-avatar: 32px; --tpl-fr-avatar-gap: 10px; --tpl-fr-sub-lh: 16px; --tpl-fr-support-gap: 3px;
-  --tpl-fr-dot: 6px; --tpl-fr-dot-gap: 5px; --tpl-fr-dot-box: 16px; --tpl-fr-status-pad: 2px 8px; --tpl-fr-tag-gap: 4px; --tpl-fr-tag-pad: 2px 6px;
+  --tpl-fr-dot: 6px; --tpl-fr-dot-gap: 5px; --tpl-fr-dot-box: 16px; --tpl-fr-status-pad: 2px 8px; --tpl-fr-tag-gap: 4px; --tpl-fr-tag-max: 102px; --tpl-fr-tag-pad: 2px 6px;
   --tpl-fr-state-pad: 40px 24px; --tpl-fr-skel-name: 160px; --tpl-fr-skel-cell: 96px; --tpl-fr-skel-h: 16px;
   --tpl-fr-pager-pull: -10px -24px; --tpl-fr-pager-lh: 21px;
   --tpl-fr-stack-gap: 12px; --tpl-fr-card-pad: 16px; --tpl-fr-card-num-size: 22px; --tpl-fr-head-pad-bottom: 16px;
@@ -1485,6 +1485,7 @@
   --tpl-inbox-dot-sm: 7px;                /* 頭の対応状況の丸 */
   --tpl-inbox-chead-pad: 12px 20px;       /* 会話の頭の内側 */
   --tpl-inbox-chead-gap: 8px;             /* 会話の頭の部品の間 */
+  --tpl-inbox-chead-search-right: 24px;   /* 🔍 を浮かせる右端（やりとりの左右の余白にそろえる） */
   --tpl-inbox-chead-face: 28px;           /* 会話の頭の顔 */
   --tpl-inbox-chead-who-min: 120px;       /* 名前の欄の下限。これより狭いと操作を次の行へ */
   --tpl-inbox-chead-name: 15px;           /* 会話の頭の名前 */
@@ -1505,6 +1506,7 @@
   --tpl-inbox-menu-pill-pad: 2px 8px;     /* 対応状況の札の内側 */
   --tpl-inbox-menu-search-h: 32px;        /* 担当者名を検索 */
   --tpl-inbox-thread-pad: 20px 24px;      /* やりとりの内側 */
+  --tpl-inbox-thread-gap: 12px;           /* 吹き出しの行と行・日付と吹き出しの間 */
   --tpl-inbox-bubble-w: 340px;            /* 吹き出しの幅の上限 */
   --tpl-inbox-bubble-pad: 10px 14px;      /* 吹き出しの内側 */
   --tpl-inbox-bubble-radius: 16px;

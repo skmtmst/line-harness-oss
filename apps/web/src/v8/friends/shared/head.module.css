@@ -9,17 +9,6 @@
   flex-shrink: 0;
 }
 
-.back {
-  align-self: flex-start;
-  color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-fr-back-lh);
-  white-space: nowrap;
-}
-
-.back:hover { text-decoration: underline; }
-
 .title {
   margin: 0;
   color: var(--color-ink);

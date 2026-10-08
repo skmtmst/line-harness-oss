@@ -23,8 +23,12 @@ const STATUS_ORDER: HeadStatus[] = ['unread', 'in_progress', 'on_hold', 'resolve
 
 /** 絵の担当の箱の幅（担当：Kenta）。名前が長いときは省略し、全文は title で読める。 */
 const OPERATOR_WIDTH = 120
-/** 絵の対応状況の箱の幅（● 対応済み まで1行で入る）。 */
-const STATUS_WIDTH = 108
+/**
+ * 絵の対応状況の箱は中身の幅（● 未対応 ⌄ ＝93、● 対応済み ⌄ ＝106）。
+ * 左右の余白・丸・矢印・間で 55、文字は13px の全角で 1字13。
+ */
+const STATUS_FIXED_WIDTH = 55
+const STATUS_CHAR_WIDTH = 13
 
 export function HeadOperatorMenu({
   value,
@@ -63,7 +67,7 @@ export function HeadStatusMenu({
   return (
     <Select
       aria-label={ariaLabel}
-      width={STATUS_WIDTH}
+      width={STATUS_FIXED_WIDTH + STATUS_CHAR_WIDTH * HEAD_STATUS_LABEL[value].length}
       icon={<span className={styles.ctlDot} data-status={value} />}
       value={value}
       onChange={(next) => onChange(next as HeadStatus)}

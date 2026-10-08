@@ -241,7 +241,17 @@
   padding: var(--tpl-inbox-chead-pad);
   box-shadow: var(--tpl-inbox-search-line-bottom);
   background: var(--color-canvas);
+  position: relative;
 }
+/* 🔍：頭の段には置かず、頭の下の右端に浮かせる（絵の頭は4つ）。探す帯が開いている間は隠す。 */
+.cheadSearch {
+  position: absolute;
+  z-index: 1;
+  top: 100%;
+  right: var(--tpl-inbox-chead-search-right);
+  margin-top: var(--tpl-inbox-chead-gap);
+}
+.cheadSearch[aria-expanded='true'] { visibility: hidden; }
 .cheadWho { display: flex; min-width: var(--tpl-inbox-chead-who-min); flex: 1 1 0; align-items: center; gap: var(--tpl-inbox-chead-gap); }
 .cheadBack { flex: none; border: 0; background: none; color: var(--color-ink-faint); cursor: pointer; }
 .cheadText { display: flex; min-width: 0; flex-direction: column; }
@@ -302,7 +312,7 @@
 /* ── やりとり（XqSvX「やりとり」） ───────────────── */
 .thread { padding: var(--tpl-inbox-thread-pad); background: var(--color-table-head); }
 .day {
-  margin: var(--tpl-inbox-pop-gap) 0;
+  margin: 0 0 var(--tpl-inbox-thread-gap);
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-inbox-badge-lh);
@@ -325,10 +335,31 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* 絵は文字の途中でも折る（全体の :lang(ja) の auto-phrase は中の要素にも付くので、中も外す） */
+.bubbleIn, .bubbleOut, .bubbleIn *, .bubbleOut * { word-break: normal; }
 .bubbleIn { background: var(--color-canvas); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 .bubbleOut { background: var(--tpl-inbox-bubble-out); }
-.meta { display: inline-flex; flex: none; align-items: center; gap: var(--tpl-inbox-head-tools-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); white-space: nowrap; }
-.quoteBtn { border: 0; background: none; color: var(--color-ink-faint); font-size: var(--text-micro); cursor: pointer; }
+.meta { position: relative; display: inline-flex; flex: none; align-items: center; gap: var(--tpl-inbox-head-tools-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); white-space: nowrap; }
+/*
+ * 引用：絵（eovoG）の時刻の横は時刻だけ。引用は時刻の外側に浮かせ、行の幅を取らない
+ * （相手の吹き出しは時刻の右、こちらの吹き出しは時刻の左）。行にマウスを置く・触れる・
+ * フォーカスしたときに出る。マウスの無い端末では常に出す。
+ */
+.quoteBtn {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: var(--tpl-inbox-head-tools-gap);
+  border: 0;
+  background: none;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  cursor: pointer;
+  opacity: 0;
+}
+.rowOut .quoteBtn { right: 100%; left: auto; margin-right: var(--tpl-inbox-head-tools-gap); margin-left: 0; }
+.rowIn:hover .quoteBtn, .rowOut:hover .quoteBtn, .quoteBtn:focus-visible { opacity: 1; }
+@media (hover: none) { .quoteBtn { opacity: 1; } }
 .quoteBtn:hover { color: var(--color-action); text-decoration: underline; }
 .quoted {
   margin-bottom: var(--tpl-inbox-chip-gap);

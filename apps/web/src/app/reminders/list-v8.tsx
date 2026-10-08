@@ -30,7 +30,9 @@ import {
   AlertCircle,
   ArrowRight,
   Bell,
+  Calendar,
   CalendarClock,
+  FilePen,
   CircleCheck,
   Copy,
   Eye,
@@ -96,7 +98,7 @@ const STATUS_CHIPS = ['有効', '下書き', '停止中', '失敗あり'] as con
 /* 板 `apLqS`：札には状態の図柄を付ける（有効=丸チェック・下書き=鉛筆・停止中=一時停止・失敗あり=三角注意）。 */
 const STATUS_CHIP_ICONS = {
   '有効': <CircleCheck size={14} aria-hidden="true" />,
-  '下書き': <Pencil size={14} aria-hidden="true" />,
+  '下書き': <FilePen size={14} aria-hidden="true" />,
   '停止中': <Pause size={14} aria-hidden="true" />,
   '失敗あり': <TriangleAlert size={14} aria-hidden="true" />,
 } as const
@@ -661,7 +663,7 @@ export default function RemindersListV8() {
     },
     {
       title: 'これから送る',
-      icon: Send,
+      icon: CalendarClock,
       value: statsFailed ? null : reminderStats?.waiting ?? null,
       unit: '通',
       detail: '今後7日',
@@ -669,7 +671,7 @@ export default function RemindersListV8() {
     },
     {
       title: '今月送った',
-      icon: CalendarClock,
+      icon: Send,
       value: statsFailed ? null : reminderStats?.sentThisMonth ?? null,
       unit: '通',
       detail: '正常に送れた分',
@@ -966,7 +968,7 @@ export default function RemindersListV8() {
                         ) : null}
                       </div>}
                       sub={<span className={styles.dotIndent} title={view.subtitle}>
-                        <CalendarClock size={11} aria-hidden="true" className={styles.cellSubIcon} />
+                        <Calendar size={11} aria-hidden="true" className={styles.cellSubIcon} />
                         {view.subtitle}
                       </span>}
                     />
