@@ -1,6 +1,7 @@
 'use client'
 
 import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import InlineActionRowsV8, { actionRowTitle } from '@/components/auto-replies/inline-action-rows-v8'
 import { CreatePreviewNote, CreateStarterCards, CreateSummaryCard } from '@/components/templates/create-parts'
@@ -54,7 +55,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { findConditionDraftIssue, type SegmentCondition } from '@/lib/segment-condition'
-import Stepper, { type StepperStep } from '@/components/shared/stepper'
+import type { StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import { TextField, TextArea } from '@/components/shared/text-field'
@@ -1176,7 +1177,7 @@ function AutoReplyWizardV8Inner() {
             <ArrowLeft size={14} aria-hidden="true" />
             自動応答へ
           </Link>}
-          steps={<Stepper label="自動応答を作る進み方" steps={doneSteps} />}
+          steps={<Steps label="自動応答を作る進み方" steps={doneSteps} />}
         />
         <div className={styles.doneBody}>
           <section className={styles.done} aria-labelledby="auto-reply-done-title">
@@ -1451,7 +1452,7 @@ function AutoReplyWizardV8Inner() {
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
           <ArrowLeft size={14} aria-hidden="true" />
           自動応答へ
-        </Link>} steps={<Stepper label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={narrow ? <>
+        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={narrow ? <>
             <div className={styles.narrowPhoneOpen}>
               <Button onClick={() => setPreviewOpen(true)}><Smartphone size={14} aria-hidden="true" />LINEでの見え方を見る</Button>
             </div>

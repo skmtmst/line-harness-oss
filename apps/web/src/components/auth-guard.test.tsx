@@ -440,3 +440,178 @@ describe('R505 古い確認の応答は新しいログインを上書きしな�
     expect(replaceMock).not.toHaveBeenCalledWith('/login')
   })
 })
+
+/*
+ * 2026-10-08 オーナー：ページを切り替えると、ときどき灰色の地にくるくるだけになる。
+ *
+ * 画面が丸ごと読み直される移動ではタブ内の使い回しが消え、別サイトの確認が
+ * 終わるまで全画面で待っていた。同じタブで確認が通っていれば、読み直した直後でも
+ * 中身を先に出して裏で確かめ直す。印が無い・指紋が違うときは今までどおり待つ。
+ *
+ * 「読み直し」はモジュールを読み込み直して再現する（モジュールの記憶は消え、
+ * sessionStorage は残る）。
+ */
+describe('読み直した直後も確認済みの印があれば中身を先に出す', () => {
+  let session: MemoryStorage
+
+  beforeEach(() => {
+    currentPath = '/'
+    replaceMock.mockReset()
+    invalidateAuthSessionCheck()
+    storage = new MemoryStorage()
+    session = new MemoryStorage()
+    vi.stubGlobal('localStorage', storage)
+    vi.stubGlobal('sessionStorage', session)
+    fetchSpy = vi.fn(async () => sessionOk())
+    vi.stubGlobal('fetch', fetchSpy)
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+
+  afterEach(() => {
+    act(() => { root.unmount() })
+    host.remove()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  /** 画面の読み直し：描いた木を捨て、モジュールを読み込み直す。sessionStorage と localStorage は残る。 */
+  async function reloadPage() {
+    act(() => { root.unmount() })
+    root = createRoot(host)
+    vi.resetModules()
+    const fresh = await import('./auth-guard')
+    return fresh.default
+  }
+
+  /** 確認の往復だけ保留する。 */
+  function holdSession() {
+    let resolveSession: ((res: Response) => void) | null = null
+    fetchSpy.mockImplementation(async (url: unknown) => {
+      if (String(url).includes('/api/auth/session')) {
+        return new Promise<Response>((resolve) => { resolveSession = resolve })
+      }
+      return sessionOk()
+    })
+    return (res: Response) => resolveSession?.(res)
+  }
+
+  it('確認済みの印があれば、読み直した直後に骨組みを出さず中身を出し、裏の確認が失敗したらログインへ送る', async () => {
+    await render()
+    await settle()
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+    // 印に秘密（CSRF）をそのまま置かない。
+    expect(session.getItem('lh_auth_checked')).not.toBeNull()
+    expect(session.getItem('lh_auth_checked')).not.toContain('csrf-token-1')
+
+    const FreshGuard = await reloadPage()
+    const resolve = holdSession()
+    currentPath = '/friends'
+    await act(async () => { root.render(<FreshGuard><div data-child>中身</div></FreshGuard>) })
+    await settle()
+
+    // 確認の返事を待たずに中身が出ている（全画面の待ちにしない）。
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+    expect(host.querySelector('[data-auth-pending]')).toBeNull()
+    // 裏では確かめ直している。
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('/api/auth/session'))).toBe(true)
+
+    await act(async () => { resolve(new Response(null, { status: 401 })) })
+    await settle()
+    expect(replaceMock).toHaveBeenCalledWith('/login')
+    // 失敗した印は捨てる（次の読み直しでは待つ）。
+    expect(session.getItem('lh_auth_checked')).toBeNull()
+  })
+
+  it('読み直した直後の裏の確認で停止中と分かれば停止の画面に変わる', async () => {
+    await render()
+    await settle()
+
+    const FreshGuard = await reloadPage()
+    const resolve = holdSession()
+    currentPath = '/friends'
+    await act(async () => { root.render(<FreshGuard><div data-child>中身</div></FreshGuard>) })
+    await settle()
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+
+    await act(async () => { resolve(sessionOk('suspended')) })
+    await settle()
+    expect(host.querySelector('[data-child]')).toBeNull()
+    expect(host.querySelector('[data-design-node="CXFjb9"]')).not.toBeNull()
+    // 停止中は印を残さない（次も確かめてから出す）。
+    expect(session.getItem('lh_auth_checked')).toBeNull()
+  })
+
+  it('印が無ければ、確認が済むまで骨組みで待ち中身を出さない', async () => {
+    const FreshGuard = await reloadPage()
+    const resolve = holdSession()
+    await act(async () => { root.render(<FreshGuard><div data-child>中身</div></FreshGuard>) })
+    await settle()
+
+    expect(host.querySelector('[data-child]')).toBeNull()
+    expect(host.querySelector('[data-auth-pending]')).not.toBeNull()
+
+    await act(async () => { resolve(sessionOk()) })
+    await settle()
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+    expect(host.querySelector('[data-auth-pending]')).toBeNull()
+  })
+
+  it('指紋が違えば（別のログイン・権限の更新）印を使わず待つ', async () => {
+    await render()
+    await settle()
+    expect(session.getItem('lh_auth_checked')).not.toBeNull()
+
+    storage.setItem('lh_csrf', 'csrf-other-login')
+    const FreshGuard = await reloadPage()
+    holdSession()
+    currentPath = '/friends'
+    await act(async () => { root.render(<FreshGuard><div data-child>中身</div></FreshGuard>) })
+    await settle()
+
+    expect(host.querySelector('[data-child]')).toBeNull()
+    expect(host.querySelector('[data-auth-pending]')).not.toBeNull()
+  })
+
+  it('期限（30分）を過ぎた印は使わず待つ', async () => {
+    const nowSpy = vi.spyOn(Date, 'now')
+    let now = 5_000_000
+    nowSpy.mockImplementation(() => now)
+    await render()
+    await settle()
+
+    now += 31 * 60_000
+    const FreshGuard = await reloadPage()
+    holdSession()
+    await act(async () => { root.render(<FreshGuard><div data-child>中身</div></FreshGuard>) })
+    await settle()
+
+    expect(host.querySelector('[data-child]')).toBeNull()
+    expect(host.querySelector('[data-auth-pending]')).not.toBeNull()
+  })
+
+  it('401の合図・別タブのログアウトで印を捨てる', async () => {
+    await render()
+    await settle()
+    expect(session.getItem('lh_auth_checked')).not.toBeNull()
+
+    act(() => { window.dispatchEvent(new Event(SESSION_LOST_EVENT)) })
+    expect(session.getItem('lh_auth_checked')).toBeNull()
+
+    // もう一度通してから、別タブのログアウト（lh_csrf の書き換え）。
+    currentPath = '/friends'
+    await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
+    await settle()
+    expect(session.getItem('lh_auth_checked')).not.toBeNull()
+    let event: Event
+    try {
+      event = new StorageEvent('storage', { key: 'lh_csrf' })
+    } catch {
+      event = new Event('storage')
+      Object.defineProperty(event, 'key', { value: 'lh_csrf' })
+    }
+    act(() => { window.dispatchEvent(event) })
+    expect(session.getItem('lh_auth_checked')).toBeNull()
+  })
+})

@@ -153,6 +153,8 @@ vi.mock('@line-crm/db', () => ({
   getFriendFieldById: mocks.getFriendFieldById,
   countFormSubmissionsByFriend: mocks.countFormSubmissionsByFriend,
   countChoiceUsage: mocks.countChoiceUsage,
+  claimFormCapacitySlot: vi.fn(async () => true),
+  releaseFormCapacityClaims: vi.fn(async () => {}),
   applyMileageRulesForEvent: mocks.applyMileageRulesForEvent,
   jstNow: vi.fn(() => '2026-08-20T12:00:00+09:00'),
   toJstString: vi.fn((date: Date) => date.toISOString()),
@@ -1045,4 +1047,18 @@ describe('フォーム回答の冪等予約', () => {
     const retried = await app().fetch(submitRequest({ full_name: '山田' }), env());
     expect(retried.status).toBe(201);
   });
+});
+
+test.each(['once','total'])('W14: 自分の保存済み回答を受付上限(%s)で拒否せず未完工程を再開する', async (kind) => {
+  const layout=simpleLayout();
+  layout.options= { ...layout.options, ...(kind==='once' ? {oncePerFriend:{enabled:true}} : {totalLimit:{enabled:true,max:1}}) };
+  mocks.getFormById.mockResolvedValue(formRow(layout));
+  failures.mileageOnce=true;
+  const first=await app().fetch(submitRequest({full_name:'山田'}),env());
+  expect(first.status).toBe(202);
+  mocks.countFormSubmissionsByFriend.mockResolvedValue(1);
+  mocks.getFormById.mockResolvedValue(formRow(layout,{submit_count:1}));
+  expect((await app().fetch(submitRequest({full_name:'山田'}),env())).status).toBe(200);
+  expect(answerStore.size).toBe(1);
+  expect(claimOf().status).toBe('completed');
 });

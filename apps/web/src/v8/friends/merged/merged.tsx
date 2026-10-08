@@ -6,21 +6,24 @@
  * データの口は今と同じ（/api/users-grouped・/api/duplicates/stats・CSV の全件書き出し）。
  * 詳細（`Hn9eE`）は今と同じく一覧の面を差し替える。URL の `?person=<id>` でも開ける。
  *
- * 絵の列「配信に使うアカウント」「結び付けた日」は一覧の API に無い。
- * 今の列（状態・最終接触）をその位置に出す（情報を落とさない）。
+ * 絵の列「配信に使うアカウント」「結び付けた日」の値は一覧の API に無い。
+ * 出せる分だけ出す：配信に使うアカウントは、友だちが1つだけの人はその名前、
+ * 2つ以上の人は決め方が詳細にあるので「—」。結び付けた日は一覧の API に無いので「—」
+ * （友だちの登録日は結び付けた日ではないので代わりに出さない。詳細の linkedAt を一覧にも足す依頼は Codex へ）。
+ * 「複数アカウントのみ」の絞り込みは絵に口が無いので、所属アカウントの選びの末尾に入れた。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useEffect, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { ChevronUp, Download, RotateCw } from 'lucide-react'
 import { api } from '@/lib/api'
-import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
+import { formatDay, formatNumber, formatYmd } from '@/lib/format'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
-import Checkbox from '@/components/shared/checkbox'
 import KpiCard from '@/components/shared/kpi-card'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -35,21 +38,31 @@ import MergedPersonV8 from './person'
 import { useMergedUsers, USERS_PAGE_SIZES } from './use-merged-users'
 import styles from './merged.module.css'
 
-const UID_STATUS = {
-  url_token: '要確認',
-  uid: 'UIDで連携',
-  solo: '未連携',
-} as const
+/** 所属アカウントの選びの「複数アカウントのみ」（絞り込みの口は今と同じ onlyDups）。 */
+const MULTI_ACCOUNTS = '__multi'
+
+/** 結び付けた日：一覧の API に値が来たら出す。来るまでは「—」。 */
+function linkedDay(row: UserRowData): string {
+  const linkedAt = (row as UserRowData & { linkedAt?: string | null }).linkedAt
+  if (!linkedAt) return '—'
+  const [, m, d] = formatYmd(linkedAt).split('-')
+  return m && d ? `${Number(m)}/${Number(d)}` : '—'
+}
+
+/** 配信に使うアカウント：友だちが1つだけの人は、そのアカウントだけに届く。 */
+function deliveryAccount(row: UserRowData): string {
+  return row.accounts.length === 1 ? `${row.accounts[0].accountName}だけ` : '—'
+}
 
 export default function MergedUsersV8() {
   const searchParams = useSearchParams()
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const personFromUrl = searchParams.get('person')
   const [openedPersonId, setOpenedPersonId] = useState<string | null>(personFromUrl)
   useEffect(() => { setOpenedPersonId(personFromUrl) }, [personFromUrl])
   const close = () => {
     setOpenedPersonId(null)
-    if (personFromUrl) router.replace('/friends?tab=merged')
+    if (personFromUrl) samePageUrl.replace('/friends?tab=merged')
   }
   /*
    * 人の詳細は一覧と同じ URL のまま開くことがあるので、上の帯のパンくずの「統合ユーザー」で
@@ -68,7 +81,7 @@ export default function MergedUsersV8() {
 }
 
 function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
-  usePageTitle('統合ユーザー')
+  usePageTitle('友だち')
   const u = useMergedUsers()
   const staffRole = useStaffRole()
   const canManage = staffRole === null || canManageRole(staffRole)
@@ -158,14 +171,22 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
           <Select
             aria-label="所属アカウントで絞り込む"
             width={200}
-            value={u.account}
-            onChange={u.setAccount}
+            value={u.onlyDups ? MULTI_ACCOUNTS : u.account}
+            onChange={(value) => {
+              if (value === MULTI_ACCOUNTS) {
+                u.setAccount('')
+                u.setOnlyDups(true)
+              } else {
+                u.setOnlyDups(false)
+                u.setAccount(value)
+              }
+            }}
             options={[
               { value: '', label: '所属アカウント：すべて' },
               ...u.accountOptions.map((a) => ({ value: a.id, label: `所属アカウント：${a.name}` })),
+              { value: MULTI_ACCOUNTS, label: '所属アカウント：複数アカウントのみ' },
             ]}
           />
-          <Checkbox checked={u.onlyDups} onCheckedChange={u.setOnlyDups}>複数アカウントのみ</Checkbox>
         </div>
 
         <div className={styles.listArea}>
@@ -199,8 +220,8 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
                 <TableHeadRow>
                   <Th className={styles.th}>人</Th>
                   <Th className={styles.th}>結び付いた友だち</Th>
-                  <Th className={styles.th}>状態</Th>
-                  <Th className={styles.th}>最終接触</Th>
+                  <Th className={styles.th}>配信に使うアカウント</Th>
+                  <Th className={styles.th}>結び付けた日</Th>
                   <Th className={styles.th}><span className="sr-only">操作</span></Th>
                 </TableHeadRow>
               </thead>
@@ -239,15 +260,8 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
                           {`${row.accounts.length}（${row.accounts.map((a) => a.accountName).join('・')}）`}
                         </span>
                       </Td>
-                      <Td className={styles.td}>
-                        <span className={styles.badges}>
-                          <StatusBadge tone={row.identityKeyKind === 'url_token' ? 'warning' : row.identityKeyKind === 'uid' ? 'success' : 'neutral'} size="compact">
-                            {UID_STATUS[row.identityKeyKind]}
-                          </StatusBadge>
-                          {row.isDuplicate ? <StatusBadge tone="warning" size="compact">要確認</StatusBadge> : null}
-                        </span>
-                      </Td>
-                      <Td className={styles.td}><span className={styles.cellText}>{formatDateTime(row.lastActivityAt)}</span></Td>
+                      <Td className={styles.td}><span className={styles.cellText}>{deliveryAccount(row)}</span></Td>
+                      <Td className={styles.td}><span className={styles.cellText}>{linkedDay(row)}</span></Td>
                       <Td className={styles.tdMenu}>
                         <RowMenu label={`${row.displayName || '名前なし'}の操作`} items={items} open={menuFor === row.identityKey} onOpenChange={(next) => setMenuFor(next ? row.identityKey : null)} />
                       </Td>

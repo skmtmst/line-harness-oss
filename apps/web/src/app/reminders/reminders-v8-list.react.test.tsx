@@ -14,8 +14,9 @@ import RemindersPage from './page'
  * ★V8 一覧（Pencil `apLqS`）の契約。V8 だけを出す。
  * 見本が決めた文言・帯・行の操作が出ることを実DOMで固定する。
  */
+const navigation = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
+  useRouter: () => ({ push: navigation.push, replace() {}, prefetch() {} }),
   usePathname: () => '/reminders',
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -178,6 +179,34 @@ test('v8 の行の操作は見本の並びを持つ', async () => {
     // 板 SkY9V：行の「…」を開いた印
     expect(host.querySelector('[data-design-node="SkY9V"]')).toBeTruthy()
   })
+})
+
+// 監査 WEB-013：登録者・配信予定・実行結果は、詳細のそのタブ（?tab=）を開く。概要へ落とさない。
+test('v8 の行の「登録者を管理」「配信予定を見る」「実行結果を見る」は詳細のそのタブを開く', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await act(async () => root.render(<RemindersPage />))
+  await settle()
+  await eventually(() => {
+    expect(host.textContent).toContain('契約終了の前に知らせる')
+  })
+  const expected: Array<[string, string]> = [
+    ['登録者を管理', '/reminders/detail?id=r-1&tab=registrants'],
+    ['配信予定を見る', '/reminders/detail?id=r-1&tab=schedule&status=planned'],
+    ['実行結果を見る', '/reminders/detail?id=r-1&tab=runs'],
+  ]
+  for (const [label, href] of expected) {
+    navigation.push.mockClear()
+    const trigger = [...host.querySelectorAll('button')]
+      .find((item) => item.getAttribute('aria-label') === 'リマインダ「契約終了の前に知らせる」の操作')
+    await act(async () => { trigger!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    let item: HTMLElement | undefined
+    await eventually(() => {
+      item = [...document.querySelectorAll<HTMLElement>('[role="menu"] [role="menuitem"]')].find((el) => el.textContent?.trim() === label)
+      expect(item).toBeTruthy()
+    })
+    await act(async () => { item!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await eventually(() => { expect(navigation.push).toHaveBeenCalledWith(href) })
+  }
 })
 
 // 2026-10-06 オーナー決定：閲覧のみには押せないボタン・項目を置かずに隠す（帯は出す）。板 a5C1p。

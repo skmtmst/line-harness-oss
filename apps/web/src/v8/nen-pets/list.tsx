@@ -6,6 +6,7 @@
  * 表は「見出し 36・行 56」。1152 では 年齢・避妊去勢・運動量 を隠し、年齢は種類の後ろへ寄せる。
  * 取得の口・指定は今の画面と同じ（GET /api/nen/pets）。
  */
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
@@ -191,6 +192,7 @@ export default function PetsListV8({
 }
 
 function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; onEdit: () => void }) {
+  const router = useRouter()
   const kind = petAnimalTypeLabel(pet.animalType)
   const name = pet.name || pet.callName || '（名前なし）'
   const kindLine = pet.breed ? `${kind}・${pet.breed}` : kind
@@ -198,9 +200,9 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
   const friendHref = `/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}`
   const items: ActionMenuItem[] = [
     ...(canEdit ? [{ id: 'edit', label: 'ペットの情報を直す', onSelect: onEdit }] : []),
-    { id: 'owner', label: '飼い主を開く', external: true, onSelect: () => { window.location.href = friendHref } },
+    { id: 'owner', label: '飼い主を開く', external: true, onSelect: () => { router.push(friendHref) } },
     /* マイページの更新を頼む送信の口は無いので、受信箱でこの飼い主とのトークを開いて頼む。 */
-    { id: 'nudge', label: 'マイページで更新を促す', external: true, onSelect: () => { window.location.href = `/chats?friend=${encodeURIComponent(pet.owner.friendId)}` } },
+    { id: 'nudge', label: 'マイページで更新を促す', external: true, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(pet.owner.friendId)}`) } },
   ]
   const updated = pet.weightKg == null ? '—' : monthDay(pet.weightUpdatedAt)
   return (

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Tag, Send, UserRound, CircleCheck, Bell, Zap, Play, Square } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import Stepper from '@/components/shared/stepper'
+import { Steps } from '@/components/templates/steps'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { TableHeadRow, Th, Td } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -64,6 +66,7 @@ export default function BulkRunDialog({
   onClose: () => void
   onDone: () => void
 }) {
+  const v8 = useAdminTheme() === 'v8'
   const [phase, setPhase] = useState<Phase>('operation')
   const [operationKind, setOperationKind] = useState<FriendBulkOperation['kind']>('add_tag')
   const [input, setInput] = useState<BulkOperationInput>(EMPTY_BULK_INPUT)
@@ -361,14 +364,19 @@ export default function BulkRunDialog({
     </div>
   )
 
+  const phaseSteps = (['operation', 'confirm', 'result'] as const).map((key, index) => ({
+    key,
+    label: ['操作を選ぶ', '確かめる', '結果'][index],
+    state: index < phaseIndex ? 'done' as const : 'todo' as const,
+  }))
+
   return (
     <Dialog open={open} title="友だちを一括操作" description="対象を確認してから操作を選んでください" onCancel={close} busy={busy} footer={footer} designNode="CYJ0L">
       <div className={styles.panel} data-design-node="IAf7j">
-        <Stepper label="一括操作の手順" currentKey={phase} steps={(['operation', 'confirm', 'result'] as const).map((key, index) => ({
-          key,
-          label: ['操作を選ぶ', '確かめる', '結果'][index],
-          state: index < phaseIndex ? 'done' : 'todo',
-        }))} />
+        {/* ★V8 は型の共通部品 Steps（Fa8ED）。v7 はこれまでの Stepper。 */}
+        {v8
+          ? <Steps label="一括操作の手順" currentKey={phase} steps={phaseSteps} />
+          : <Stepper label="一括操作の手順" currentKey={phase} steps={phaseSteps} />}
 
         {failure ? (
           <div className={phase === 'result' || failure.kind === 'forbidden' ? styles.notice : styles.warn} role="alert" data-failure-kind={failure.kind}>

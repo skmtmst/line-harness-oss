@@ -1347,6 +1347,12 @@ reminders.get('/api/reminders/:id/runs', async (c) => {
     if (rawStatus && !status) {
       return c.json({ success: false, error: 'statusの値が正しくありません' }, 400);
     }
+    const order = c.req.query('order');
+    const executedOnly = c.req.query('executedOnly');
+    if ((order && !['scheduled_asc', 'recent_desc'].includes(order)) ||
+        (executedOnly !== undefined && !['true', 'false'].includes(executedOnly))) {
+      return c.json({ success: false, error: '取得条件が正しくありません' }, 400);
+    }
     const rawLimit = Number(c.req.query('limit') ?? 20);
     const rawOffset = Number(c.req.query('offset') ?? 0);
     const limit = Number.isInteger(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 20;
@@ -1354,7 +1360,10 @@ reminders.get('/api/reminders/:id/runs', async (c) => {
     const search = c.req.query('search')?.trim().slice(0, 100) || undefined;
 
     const [runs, summary, stepRows, publishedVersion] = await Promise.all([
-      listReminderDeliveryRuns(c.env.DB, { reminderId, status, search, limit, offset, scope }),
+      listReminderDeliveryRuns(c.env.DB, { reminderId, status, search, limit, offset, scope,
+        ...(order ? { order: order as 'scheduled_asc' | 'recent_desc' } : {}),
+        ...(executedOnly !== undefined ? { executedOnly: executedOnly === 'true' } : {}),
+      }),
       getReminderDeliveryRunSummary(c.env.DB, reminderId, scope),
       getReminderDeliveryStepSummaries(c.env.DB, reminderId, scope),
       getReminderPublishedVersion(c.env.DB, reminderId),

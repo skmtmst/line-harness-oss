@@ -11,13 +11,14 @@
  */
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
-  ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, CircleCheck, CircleDashed, CircleDot, CircleX,
+  ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CircleCheck, CircleDashed, CircleDot, CircleX,
   Copy, Download, ExternalLink, Lock, CircleHelp, Plug, QrCode, ShieldCheck, Star, RotateCw, Users, Activity,
 } from 'lucide-react'
 import { api, type FollowerImportState, type LineAccountConnectData, type LineAccountTag } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { Steps } from '@/components/templates/steps'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -412,21 +413,25 @@ export default function AccountRegisterV8() {
 
   return (
     <PageFrame kind="wizard" boardId={shownStep.node}>
-      <PageHeading title="LINEアカウントを登録" description={shownStep.lead} />
+      <PageHeading
+        title="LINEアカウントを登録"
+        description={shownStep.lead}
+        steps={(
+          <Steps
+            label="登録の進捗"
+            currentKey={String(createdId ? 5 : currentStep)}
+            steps={V8_STEPS.map((step) => ({
+              key: String(step.number),
+              label: step.label,
+              order: step.number,
+              state: currentStep > step.number || (Boolean(createdId) && step.number < 5) ? 'done' as const : 'todo' as const,
+              /* 登録する前は、済んだ段を押すとその段へ戻る（入れた値はそのまま）。登録した後は戻らない。 */
+              onSelect: !createdId && currentStep > step.number ? () => setCurrentStep(step.number) : undefined,
+            }))}
+          />
+        )}
+      />
       <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
-        <ol className={styles.steps} aria-label="登録の進捗">
-          {V8_STEPS.map((step) => {
-            const done = currentStep > step.number || (Boolean(createdId) && step.number < 5)
-            const active = createdId ? step.number === 5 : currentStep === step.number
-            return (
-              <li key={step.number} className={styles.step} data-state={active ? 'current' : done ? 'done' : 'todo'} aria-current={active ? 'step' : undefined}>
-                <span className={styles.stepMark} aria-hidden="true">{done ? <Check size={12} strokeWidth={3} /> : step.number}</span>
-                <span className={styles.stepLabel}>{step.label}</span>
-              </li>
-            )
-          })}
-        </ol>
-
         <div ref={stepPanelRef} tabIndex={-1} className={styles.stepBody}>
           {currentStep === 1 && !createdId && (
             <div className={styles.split} data-design-node="xj3zz">

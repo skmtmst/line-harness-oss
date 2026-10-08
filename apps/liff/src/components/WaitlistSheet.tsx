@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
+import { slotStartsAtIso } from '../lib/datetime.js';
 import Button from './ui/Button.js';
 import Icon from './ui/Icon.js';
 
-/** 「2026-11-10」「10:00」→ ISO（JST）。登録と照会で同じ文字列を使う。 */
-export function waitlistStartsAt(date: string, start: string): string {
-  return new Date(`${date}T${start}:00+09:00`).toISOString();
+/**
+ * 待ちの枠の開始 ISO。登録と照会で同じ文字列を使う。空き枠が返した開始の
+ * 瞬間（startUtc）があればそれ、無いときだけ日付と時刻を日本時間として読む。
+ */
+export function waitlistStartsAt(date: string, start: string, startUtc?: string): string {
+  return slotStartsAtIso({ date, start, startUtc });
 }
 
 /** 「10月4日（土）10:00」と出す。店の暦日（JST）で切る。 */
@@ -30,12 +34,15 @@ export default function WaitlistSheet({
   staff,
   date,
   start,
+  startUtc,
   onClose,
 }: {
   menu: MenuItem;
   staff: StaffItem;
   date: string;
   start: string;
+  /** 空き枠が返した開始の瞬間。あれば登録・照会はこれを使う。 */
+  startUtc?: string;
   onClose: () => void;
 }) {
   const [entryId, setEntryId] = useState<string | null | undefined>(undefined);
@@ -43,7 +50,7 @@ export default function WaitlistSheet({
   const [failed, setFailed] = useState(false);
   const [errorMessage,setErrorMessage]=useState<string|null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
-  const startsAt = waitlistStartsAt(date, start);
+  const startsAt = waitlistStartsAt(date, start, startUtc);
 
   useEffect(() => {
     let alive = true;

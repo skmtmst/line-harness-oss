@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronUp, Copy, GitCompare, Info, Plus, Save, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, ChevronUp, Copy, GitCompare, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, describeSaveFailure, type TagDefinition, type TagDependencies, type TagRetroactivePreview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -421,7 +421,7 @@ function TagEditForm({
         </div>
       </dl>
       <p className={styles.infoBand}>
-        <Info size={16} aria-hidden="true" className={styles.infoIcon} />
+        <TriangleAlert size={16} aria-hidden="true" className={styles.infoIcon} />
         <span>このタグを消すと、上の配信やフォームの条件から外れます。消す前に確認が出ます。</span>
       </p>
     </div>
@@ -448,7 +448,7 @@ function TagEditForm({
             {readOnly ? null : <Button href={`/tags/new?copy=${tag.id}`}><Copy size={14} aria-hidden="true" />複製して作る</Button>}
             {readOnly ? null : (
               <Button variant="primary" onClick={conflict ? onCompare : requestSave} busy={saving}>
-                {conflict ? <GitCompare size={14} aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}
+                {conflict ? <GitCompare size={14} aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}
                 {conflict ? '比べてから保存' : 'タグを保存する'}
               </Button>
             )}

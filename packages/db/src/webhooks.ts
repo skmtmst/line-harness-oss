@@ -1,3 +1,4 @@
+import type { WebhookCreateState } from '@line-crm/shared';
 import { readFolderAssignment } from './folder-assignment.js';
 import { EC_EVENT_TYPES } from '@line-crm/shared';
 import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from './credential-crypto.js';
@@ -1192,7 +1193,7 @@ export async function updateIncomingWebhookMaskedSample(
 
 export async function createIncomingWebhook(
   db: D1Database,
-  input: { name: string; sourceType?: string; secret?: string; lineAccountId: string; folderId?: unknown },
+  input: { name: string; sourceType?: string; secret?: string; lineAccountId: string; folderId?: unknown } & WebhookCreateState,
   keys?: WebhookKeyInput | string,
 ): Promise<IncomingWebhookRow> {
   const folderId = await readFolderAssignment(db, 'webhook', input.lineAccountId, input.folderId);
@@ -1203,8 +1204,8 @@ export async function createIncomingWebhook(
     ? null
     : await encryptWebhookSecret(input.secret, keys);
   await db
-    .prepare(`INSERT INTO incoming_webhooks (id, name, source_type, secret, secret_encrypted, line_account_id, created_at, updated_at, folder_id) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.sourceType ?? 'custom', encrypted, input.lineAccountId, now, now, folderId ?? null)
+    .prepare(`INSERT INTO incoming_webhooks (id, name, source_type, secret, secret_encrypted, line_account_id, created_at, updated_at, folder_id, is_active) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, input.name, input.sourceType ?? 'custom', encrypted, input.lineAccountId, now, now, folderId ?? null, input.isActive === false ? 0 : 1)
     .run();
   return (await getIncomingWebhookById(db, id, input.lineAccountId))!;
 }
@@ -1341,7 +1342,7 @@ export async function getOutgoingWebhookById(
 
 export async function createOutgoingWebhook(
   db: D1Database,
-  input: { name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number; lineAccountId: string; folderId?: unknown },
+  input: { name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number; lineAccountId: string; folderId?: unknown } & WebhookCreateState,
   keys?: WebhookKeyInput | string,
 ): Promise<OutgoingWebhookRow> {
   const folderId = await readFolderAssignment(db, 'webhook', input.lineAccountId, input.folderId);
@@ -1352,8 +1353,8 @@ export async function createOutgoingWebhook(
     ? null
     : await encryptWebhookSecret(input.secret, keys);
   await db
-    .prepare(`INSERT INTO outgoing_webhooks (id, name, url, event_types, secret, secret_encrypted, max_retries, line_account_id, created_at, updated_at, folder_id) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), encrypted, input.maxRetries ?? 0, input.lineAccountId, now, now, folderId ?? null)
+    .prepare(`INSERT INTO outgoing_webhooks (id, name, url, event_types, secret, secret_encrypted, max_retries, line_account_id, created_at, updated_at, folder_id, is_active) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), encrypted, input.maxRetries ?? 0, input.lineAccountId, now, now, folderId ?? null, input.isActive === false ? 0 : 1)
     .run();
   return (await getOutgoingWebhookById(db, id, input.lineAccountId))!;
 }

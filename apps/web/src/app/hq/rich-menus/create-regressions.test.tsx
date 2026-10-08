@@ -47,13 +47,14 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
   it('LINEのメニューはトーク本文の外で下の帯の直前に1つだけ置く', async () => {
     const { container } = render(<RichMenuCreateV8 host={host} />)
     const preview = screen.getByRole('region', { name: 'LINEでの見え方' })
-    const menu = preview.querySelector('[data-line-preview-region="rich-menu"]')!
+    const menu = preview.querySelector('[data-line-preview-part="rich-menu"]')!
     expect(menu).not.toBeNull()
-    expect(menu.previousElementSibling?.textContent).toBe('今日')
+    expect(menu.previousElementSibling?.getAttribute('data-line-preview-part')).toBe('talk')
+    expect(menu.previousElementSibling?.textContent).toBe('')
     expect(menu.nextElementSibling?.textContent).toBe('メニュー')
     expect(menu.nextElementSibling?.nextElementSibling).not.toBeNull()
     expect(menu.textContent).not.toContain('メニュー')
-    expect(preview.querySelectorAll('[data-line-preview-region="rich-menu"]')).toHaveLength(1)
+    expect(preview.querySelectorAll('[data-line-preview-part="rich-menu"]')).toHaveLength(1)
     expect(container.textContent).toContain('6面')
   })
   it('作る前は大小を選べ、小さい寸法と面を保存できる', async () => {

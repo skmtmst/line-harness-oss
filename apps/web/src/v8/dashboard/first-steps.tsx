@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { api } from '@/lib/api'
 import { canManageRole } from '@/lib/staff-role'
 import styles from './first-steps.module.css'
@@ -175,7 +175,7 @@ export function FirstStepsCard({ summary, folded, onToggle }: { summary: FirstSt
       <ul id="first-steps-list" className={styles.grid} hidden={folded}>
         {summary.steps.map((step) => (
           <li key={step.key} className={styles.step} data-done={step.done ? '' : undefined}>
-            <span className={styles.check} aria-hidden="true">{step.done ? '✓' : null}</span>
+            <span className={styles.check} aria-hidden="true">{step.done ? <Check className={styles.checkIcon} strokeWidth={3} /> : null}</span>
             <span className={styles.label}>
               {step.label}
               <span className="sr-only">{step.done ? '（済み）' : '（まだ）'}</span>

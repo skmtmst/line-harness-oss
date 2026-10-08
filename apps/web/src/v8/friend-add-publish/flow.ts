@@ -8,6 +8,14 @@ import type { FriendAddRule } from '@/lib/api'
 /** 作る手順（5段）。確認・完了の頭で同じ並びを使う。 */
 export const PUBLISH_STEPS = ['基本設定', '流入リンク', '初回案内', 'あわせて行うこと', '確認'] as const
 
+/** 作る画面（/friend-add-settings?view=edit）の手順の指定。PUBLISH_STEPS と同じ並び。 */
+export const PUBLISH_STEP_KEYS = ['basic', 'routes', 'message', 'actions', 'preview'] as const
+
+/** 済んだ段を押したときの行き先：同じ初回案内の作る画面のその段。 */
+export function editStepHref(ruleId: string, index: number): string {
+  return `/friend-add-settings?view=edit&id=${encodeURIComponent(ruleId)}&step=${PUBLISH_STEP_KEYS[index]}`
+}
+
 /** 有効にできるか。サーバの確認が通り、最後のテストが成功していること。 */
 export function canPublish(input: { validation: FriendAddRoutingValidation | null; busy: boolean }): boolean {
   const v = input.validation

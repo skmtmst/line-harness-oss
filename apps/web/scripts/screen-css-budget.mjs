@@ -8,7 +8,9 @@
  * 数え、本線より増えたら点検で止める
  * （`src/lib/screen-css-budget.test.ts` が比較する）。
  *
- * 数える対象: src/app 以下の *.module.css だけ（画面の CSS）。
+ * 数える対象: src/app と src/v8 以下の *.module.css（画面の CSS）。
+ *   V8 の画面は src/v8 に書くため、src/app だけを見ると V8 へ移した画面が
+ *   見張りから外れる（監査 ROOT-23）。
  * 部品・型の CSS は対象外（変数の定義場所なので）。
  *   spacing  var() 以外の margin*・padding* の宣言
  *   height   var() 以外の height・min-height・max-height の宣言
@@ -27,6 +29,9 @@ import { fileURLToPath } from 'node:url'
 
 export const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', 'src')
 export const APP = join(SRC, 'app')
+export const V8 = join(SRC, 'v8')
+/** 画面の CSS を置く場所。型・部品（components）は変数の定義場所なので数えない。 */
+export const SCREEN_DIRS = [APP, V8]
 export const BASELINE = join(SRC, 'lib', 'screen-css-budget-baseline.json')
 
 const SPACING_CSS =
@@ -49,7 +54,8 @@ function countAll(source, ...patterns) {
   return total
 }
 
-export function screenFiles(dir = APP) {
+export function screenFiles(dir) {
+  if (dir === undefined) return SCREEN_DIRS.flatMap((root) => screenFiles(root)).sort()
   const out = []
   for (const name of readdirSync(dir)) {
     const full = join(dir, name)

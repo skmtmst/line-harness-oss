@@ -194,6 +194,13 @@
 }
 
 /* メニューの帯 30。 */
+/* リッチメニュー：トーク画面のいちばん下（入力の帯の位置）。画面の幅いっぱい・高さは画像の比（大 2500×1686・小 2500×843）。 */
+.richMenu {
+  flex-shrink: 0;
+  width: 100%;
+  background: var(--v8-line-chrome);
+}
+
 .menuBar {
   display: flex;
   flex-shrink: 0;
@@ -280,6 +287,3 @@
 [data-theme='v8'] .tail { display: none; }
 [data-theme='v8'] .bubbleBody { display: block; width: auto; min-height: 0; padding: 8px 12px; border-radius: var(--radius-mini) var(--radius-large) var(--radius-large) var(--radius-large); color: var(--color-ink); font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 [data-theme='v8'] .bubbleText { display: inline; }
-
-/* 専用の受け口を使う画面だけ。トークの下で画像の高さを保つ。 */
-.richMenu { flex-shrink: 0; }

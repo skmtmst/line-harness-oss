@@ -130,7 +130,7 @@ export const hqTemplatesApi = {
   receivedVersions: (id:string) => fetchHqTemplateReceivedVersions(id),
   listStats: (type:TemplateType='template') => fetchHqTemplateListStats(type),
   listAttributeTags: () => request<HqTemplateListItem[]>('?kind=tag'),
-  attributeKindCounts: () => request<{tag:number;friend_field:null;support_mark:null}>('/attribute-kind-counts'),
+  attributeKindCounts: () => request<import("@line-crm/shared").HqAttributeKindCounts>('/attribute-kind-counts'),
   uploadRichMessageImage: async (file:File):Promise<import('@line-crm/shared').TemplateImagemapUpload> => {
     if(!['image/png','image/jpeg'].includes(file.type) || !file.size || file.size>8*1024*1024) throw new Error('PNG・JPEGの画像を8MB以内で選んでください。')
     const response=await fetchApi<{success:true;data:import('@line-crm/shared').TemplateImagemapUpload}>(`/api/hq/templates/media?purpose=rich_message&filename=${encodeURIComponent(file.name)}`,{method:'POST',headers:{'Content-Type':file.type},body:file})
@@ -199,3 +199,5 @@ export async function fetchHqTemplateListStats(type: TemplateType = 'template') 
   const result = await fetchApi<{success: true; stats: import('@line-crm/shared').HqTemplateListStats}>(`/api/hq/templates?type=${type}`)
   return result.stats
 }
+
+export { request as requestHqTemplate };

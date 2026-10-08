@@ -123,8 +123,8 @@ describe('U-3 開催回の変更', () => {
     expect(changeMyEventBooking).toHaveBeenCalledTimes(1);
   });
 
-  it('失敗後の再試行は同じ冪等鍵を使い回す', async () => {
-    changeMyEventBooking.mockRejectedValueOnce({ body: { error: 'slot_full' } });
+  it('結果の分からない失敗（通信）の後の再試行は同じ冪等鍵を使い回す', async () => {
+    changeMyEventBooking.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     changeMyEventBooking.mockResolvedValueOnce({ id: 'b2', status: 'confirmed' });
     setup(
       [booking()],
@@ -136,12 +136,39 @@ describe('U-3 開催回の変更', () => {
     fireEvent.click(await screen.findByRole('button', { name: /時間を変える/ }));
     fireEvent.click(await screen.findByRole('button', { name: /空きあり/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'この時間に変える' }));
-    expect(await screen.findByText('選んだ時間は満席になりました。別の時間を選んでください。')).toBeDefined();
+    expect(await screen.findByText('変えられませんでした。時間をおいて、もう一度お試しください。')).toBeDefined();
     fireEvent.click(await screen.findByRole('button', { name: 'この時間に変える' }));
     expect(changeMyEventBooking).toHaveBeenCalledTimes(2);
     const firstKey = changeMyEventBooking.mock.calls[0]?.[2];
     const secondKey = changeMyEventBooking.mock.calls[1]?.[2];
     expect(firstKey).toBeTruthy();
     expect(secondKey).toBe(firstKey);
+  });
+
+  it('満席で断られた後に別の時間を選ぶと、新しい冪等鍵で送る（監査 L5）', async () => {
+    changeMyEventBooking.mockRejectedValueOnce({ body: { error: 'slot_full' } });
+    changeMyEventBooking.mockResolvedValueOnce({ id: 'b2', status: 'confirmed' });
+    setup(
+      [booking()],
+      [
+        slot({ id: 's1' }),
+        slot({ id: 's2', starts_at: '2099-06-08T01:00:00.000Z', ends_at: '2099-06-08T02:00:00.000Z' }),
+        slot({ id: 's3', starts_at: '2099-06-15T01:00:00.000Z', ends_at: '2099-06-15T02:00:00.000Z' }),
+      ],
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /時間を変える/ }));
+    const open = await screen.findAllByRole('button', { name: /空きあり/ });
+    fireEvent.click(open[0]);
+    fireEvent.click(await screen.findByRole('button', { name: 'この時間に変える' }));
+    expect(await screen.findByText('選んだ時間は満席になりました。別の時間を選んでください。')).toBeDefined();
+    fireEvent.click((await screen.findAllByRole('button', { name: /空きあり/ }))[1]);
+    fireEvent.click(await screen.findByRole('button', { name: 'この時間に変える' }));
+    expect(changeMyEventBooking).toHaveBeenCalledTimes(2);
+    const [, firstSlot, firstKey] = changeMyEventBooking.mock.calls[0]!;
+    const [, secondSlot, secondKey] = changeMyEventBooking.mock.calls[1]!;
+    expect(firstSlot).toBe('s2');
+    expect(secondSlot).toBe('s3');
+    expect(secondKey).toBeTruthy();
+    expect(secondKey).not.toBe(firstKey);
   });
 });

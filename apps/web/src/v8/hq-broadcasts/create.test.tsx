@@ -60,6 +60,8 @@ const folder = (id: string, name: string) => ({ id, kind: 'line_account', name, 
 
 beforeEach(() => {
   role.value = 'owner'
+  // 画面の住所（段の切り替えは同じ住所の中で履歴だけを書き換える）。
+  window.history.replaceState(null, '', '/hq/broadcasts/new')
   params.value = new URLSearchParams()
   accounts.mockResolvedValue({ success: true, data: [
     { id: 'a1', name: '銀座店', tags: [{ id: 't1', name: '関東', color: null }], stats: { friendCount: 6120 }, folderId: 'f1', folder: folder('f1', '関東') },
@@ -110,11 +112,38 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     /* 送信枠の足りない新宿店は外す（口は外した店を送らない）。版は作ったときの 1。 */
     expect(hq.exclude).toHaveBeenCalledWith('run-1', ['a2'], 1)
     /* 保存した下書きは URL に id を残す（読み直しても同じ下書き）。 */
-    expect(replace).toHaveBeenCalledWith(expect.stringContaining('id=run-1'), { scroll: false })
+    expect(new URLSearchParams(window.location.search).get('id')).toBe('run-1')
+    /*
+     * 段の切り替え・id の書き込みはルーターを通さない（2026-10-08 オーナー：「次へ」で
+     * 「このサイトを離れますか？」）。ルーターを通すと RSC を取りに行き、新しい版の後は
+     * 画面を丸ごと読み直す。履歴だけを書き換える。
+     */
+    expect(window.location.pathname).toBe('/hq/broadcasts/new')
+    expect(new URLSearchParams(window.location.search).get('step')).toBe('confirm')
+    expect(replace).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
     fireEvent.click(await screen.findByRole('button', { name: '予約する' }))
     await waitFor(() => expect(hq.send).toHaveBeenCalledWith('run-1', 2))
     expect(push).toHaveBeenCalledWith('/hq/broadcasts/detail?id=run-1')
+  })
+
+  it('手順の済みの段（✓）を押すと、その段へ戻る（今とまだの段は押せない）', async () => {
+    render(<HqBroadcastCreate />)
+    fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '1月の限定メニュー' } })
+    fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
+    await screen.findByRole('checkbox', { name: /銀座店/ })
+    const steps = screen.getByRole('navigation', { name: '配信作成の進み' })
+    /* 今の段（配信対象）とまだの段は押せない。 */
+    expect(steps.querySelector('[aria-current="step"]')?.textContent).toContain('配信対象')
+    expect(screen.queryByRole('button', { name: '配信対象に戻る' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'メッセージを作成に戻る' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '基本設定に戻る' }))
+    /* 基本設定の段が出る（配信名の欄・URL も書き換え）。 */
+    expect((await screen.findByLabelText('配信名') as HTMLInputElement).value).toBe('1月の限定メニュー')
+    expect(steps.querySelector('[aria-current="step"]')?.textContent).toContain('基本設定')
+    /* URL の段は履歴だけを書き換える（ルーターを通さない・#1630 と同じ決まり）。 */
+    expect(new URLSearchParams(window.location.search).get('step')).toBeNull()
+    expect(replace).not.toHaveBeenCalled()
   })
 
   it('API-18：フォルダ・社内メモ・シナリオ購読中・除くタグ・2つの吹き出しを口へ送る', async () => {

@@ -6,7 +6,7 @@ import MenuPortal from './menu-portal'
 import styles from './date-field.module.css'
 
 /**
- * 日付の選択。Pencil ★V7「日付の選択」（V7 文書 `Fw065`）。
+ * 日付の選択。Pencil ★V8（V8.pen）「日付の入力（カレンダー）」。
  *
  * ブラウザ任せの `<input type="date">` は、表示が英語の書式になり、画面ごとに見た目も違った。
  * 値は今までどおり `YYYY-MM-DD` の文字列（空は ''）で受け渡すので、`type="date"` の

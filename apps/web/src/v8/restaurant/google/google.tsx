@@ -9,8 +9,9 @@
  * 営業時間の変更・変更の確認・変更履歴・プロフィールの編集（?tab=profile&view=hours|confirm|history|edit）は
  * 入口の page.tsx が今の画面へ渡す（V8 の絵がまだ無い）。動きは BEHAVIOR.md。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -54,7 +55,7 @@ const RETURN_MESSAGES: Record<string, { tone: 'info' | 'warn' | 'danger'; text: 
 function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   usePageTitle('Googleビジネス')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const { selectedAccountId, setSelectedAccountId, accounts, loading: accountLoading } = useAccount()
   const [data, setData] = useState<GoogleConnectionData | null>(null)
@@ -93,14 +94,14 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     setBanner(RETURN_MESSAGES[result] ?? { tone: 'danger', text: 'Googleとの接続に失敗しました。あとでもう一度お試しください。' })
     const next = new URLSearchParams(searchParams.toString())
     next.delete('google')
-    router.replace(`/restaurant-test/google${next.toString() ? `?${next.toString()}` : ''}`)
-  }, [router, searchParams])
+    samePageUrl.replace(`/restaurant-test/google${next.toString() ? `?${next.toString()}` : ''}`)
+  }, [samePageUrl, searchParams])
 
   const go = useCallback<GoogleNav>((params) => {
     const next = new URLSearchParams()
     for (const [key, value] of Object.entries(params)) if (value) next.set(key, value)
-    router.push(`/restaurant-test/google${next.toString() ? `?${next.toString()}` : ''}`)
-  }, [router])
+    samePageUrl.push(`/restaurant-test/google${next.toString() ? `?${next.toString()}` : ''}`)
+  }, [samePageUrl])
 
   const connected = data?.connection.status === 'connected' || data?.connection.status === 'expired' || data?.connection.status === 'no_permission'
   const requestedTab = searchParams.get('tab') as GoogleTab | null
