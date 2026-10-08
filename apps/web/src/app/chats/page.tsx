@@ -69,6 +69,7 @@ import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import DateTimeField from '@/components/shared/date-time-field'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -580,7 +581,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [memoError, setMemoError] = useState('')
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   // G-4: ピッカーで「まとめて選ぶ」で選んだ本文たち。送る前に確認する。
-  const [pendingPack, setPendingPack] = useState<string[] | null>(null)
+  const [pendingPack, setPendingPack] = useState<{ texts: string[]; chatId: string; accountId: string | null; revision?: number } | null>(null)
+  useEffect(() => { setPendingPack(null); setImagePreviewOpen(false) }, [selectedChatId, selectedAccountId])
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [imageError, setImageError] = useState('')
   /*
@@ -2159,7 +2161,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    * 入力欄・添付・引用とは別系統で、パック自身が完結した送信単位になる。
    * （LINEのpushは1回あたり5通まで。）
    */
-  const handleSendPack = async (texts: string[]) => {
+  const handleSendPack = async (pack: NonNullable<typeof pendingPack>) => {
+    if (pack.chatId !== selectedChatId || pack.accountId !== selectedAccountId) { setPendingPack(null); return }
+    const texts = pack.texts
     if (!selectedChatId || texts.length === 0 || sendLockRef.current) return
     const sendingChatId = selectedChatId
     const sendingAccountId = selectedAccountId
@@ -2169,7 +2173,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       const now = new Date().toISOString()
       const signature = JSON.stringify({ chatId: sendingChatId, combined: true, texts })
       const sendResult = await api.chats.sendCombined(sendingChatId,
-        { texts, revision: chatDetail?.revision },
+        { texts, revision: pack.revision },
         sendKeysRef.current.get(signature),
       )
       sendKeysRef.current.clear(signature)
@@ -3167,13 +3171,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     ),
                   }))
                   const lineRows = (channel === 'email' ? [] : chats)
-                  .filter((chat) =>
-                    nameQuery.trim() === ''
-                      ? true
-                      : [chat.friendName, chat.lastMessageContent]
-                          .filter(Boolean)
-                          .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
-                  )
                   .map((chat) => ({
                   at: chat.lastMessageAt ?? '',
                   unread: chat.isUnread,
@@ -4015,7 +4012,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       // 入力済みの文があれば消さずに続ける。書きかけを失わせない。
                       setMessageContent((prev) => (prev.trim() ? `${prev}\n${content}` : content))
                     }
-                    onPickPack={(texts) => setPendingPack(texts)}
+                    onPickPack={(texts) => { if (selectedChatId) setPendingPack({ texts, chatId: selectedChatId, accountId: selectedAccountId, revision: chatDetail?.revision }); setShowTemplatePicker(false) }}
                   />
                   {/*
                     G-4: パック送信の最終確認。本文を全部読み合わせてから送る。
@@ -4024,15 +4021,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <ConfirmDialog
                     open={pendingPack !== null}
                     title="テンプレートをまとめて送る"
-                    description={pendingPack ? `${pendingPack.length}通をこの順番で一度に送ります。送信すると取り消せません。` : ''}
-                    confirmLabel={pendingPack ? `まとめて送る（${pendingPack.length}通）` : 'まとめて送る'}
+                    description={pendingPack ? `${pendingPack.texts.length}通をこの順番で一度に送ります。送信すると取り消せません。` : ''}
+                    confirmLabel={pendingPack ? `まとめて送る（${pendingPack.texts.length}通）` : 'まとめて送る'}
                     onConfirm={pendingPack ? () => void handleSendPack(pendingPack) : undefined}
                     onCancel={() => setPendingPack(null)}
                     busy={sending}
                   >
                     {pendingPack ? (
                       <ol className="max-h-56 space-y-2 overflow-y-auto">
-                        {pendingPack.map((text, index) => (
+                        {pendingPack.texts.map((text, index) => (
                           <li key={index} className="rounded-control bg-canvas-sunken px-3 py-2 text-xs leading-relaxed text-ink-secondary">
                             <span className="mr-1 font-semibold text-ink">{index + 1}.</span>
                             <span className="whitespace-pre-wrap break-words">{text.length > 200 ? `${text.slice(0, 200)}…` : text}</span>
@@ -4046,36 +4043,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               </div>
 
               {/* INBOX-32: 添付画像を大きく確かめる窓。背景か Esc 相当の閉じるで戻る。 */}
-              {imagePreviewOpen && pendingImage && pendingImage.mode === 'line-image' && typeof document !== 'undefined' && createPortal(
-                <div
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="添付した画像の確認"
-                  className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/60 p-4"
-                  onClick={() => setImagePreviewOpen(false)}
-                >
-                  <div
-                    className="w-full max-w-2xl rounded-card border border-hairline bg-canvas p-4 shadow-overlay"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <img
-                      src={pendingImage.originalContentUrl}
-                      alt={pendingImageMeta?.name ?? '添付した画像'}
-                      className="mx-auto max-h-[70vh] w-auto max-w-full rounded-mini object-contain"
-                    />
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                      <p className="text-ink-faint min-w-0 truncate text-xs" title={pendingImageMeta?.name}>
-                        {pendingImageMeta?.name ?? '画像'}
-                        {pendingImageMeta ? ` ・ ${formatByteSize(pendingImageMeta.size)}` : ''}
-                      </p>
-                      <Button variant="secondary" className="shrink-0 px-4 py-2 text-ink-faint h-auto whitespace-normal" type="button" onClick={() => setImagePreviewOpen(false)}>
-                        閉じる
-                      </Button>
-                    </div>
-                  </div>
-                </div>,
-                document.body,
-              )}
+              {imagePreviewOpen && pendingImage && pendingImage.mode === 'line-image' ? (
+                <Dialog open title="添付した画像の確認" onCancel={() => setImagePreviewOpen(false)} designWidth={800}>
+                  <img src={pendingImage.originalContentUrl} alt={pendingImageMeta?.name ?? '添付した画像'} className="mx-auto max-h-[70vh] w-auto max-w-full rounded-mini object-contain" />
+                  <p className="text-ink-faint mt-3 truncate text-xs" title={pendingImageMeta?.name}>{pendingImageMeta?.name ?? '画像'}{pendingImageMeta ? ` ・ ${formatByteSize(pendingImageMeta.size)}` : ''}</p>
+                </Dialog>
+              ) : null}
             </>
           ) : null}
         </div>

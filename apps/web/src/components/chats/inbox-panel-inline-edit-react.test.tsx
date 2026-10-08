@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   addTag: vi.fn(),
   removeTag: vi.fn(),
+  orders: vi.fn(),
+  metadata: vi.fn(),
 }))
 
 vi.mock('@/lib/api', async () => {
@@ -25,8 +27,8 @@ vi.mock('@/lib/api', async () => {
     ...actual,
     api: {
       friends: {
-        get: () => ok({
-          id: 'friend-0', displayName: 'Kyohei Yamamoto', pictureUrl: null, isFollowing: true, metadata: {},
+        get: (id: string) => ok({
+          id, originalId: 'friend-0', displayName: 'Kyohei Yamamoto', pictureUrl: null, isFollowing: true, metadata: {},
           realName: '山本 恭平', systemDisplayName: null, refCode: null, firstTrackedLinkName: null,
           createdAt: '2025-08-13T15:00:00.000Z', formSubmissions: [], formSubmissionTotal: 0,
           tags: [{ id: 'tag-a', name: '未契約', color: '#8B938D' }],
@@ -36,11 +38,11 @@ vi.mock('@/lib/api', async () => {
         upcoming: () => ok({ nextBooking: null, nextAutoDelivery: null }),
         addTag: mocks.addTag,
         removeTag: mocks.removeTag,
-        updateMetadata: vi.fn(),
+        updateMetadata: mocks.metadata,
       },
       friendFields: { forFriend: () => ok({ items: [] }) },
       tags: { list: () => ok([{ id: 'tag-b', name: 'VIP', color: '#8B938D' }]), create: vi.fn() },
-      ecCommerce: { orders: () => ok({ orders: [] }) },
+      ecCommerce: { orders: mocks.orders },
       chats: { update: mocks.update, get: mocks.get },
     },
   }
@@ -72,13 +74,14 @@ async function eventually(check: () => void) {
 }
 const button = (text: string) => Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.includes(text)) as HTMLButtonElement | undefined
 
-async function renderPanel(notes: string | null = '前のメモ') {
+async function renderPanel(notes: string | null = '前のメモ', friendId = 'friend-0', accountId = 'account-a') {
   await act(async () => {
     root.render(
       <>
         <FriendInfoSidebar
-          friendId="friend-0"
-          chatId="friend-0"
+          friendId={friendId}
+          chatId={friendId}
+          accountId={accountId}
           revision={3}
           chatStatus={{ status: 'unread', notes }}
           operators={[{ id: 'op-k', name: 'Kenta' }, { id: 'op-m', name: 'Masato' }]}
@@ -94,7 +97,13 @@ async function renderPanel(notes: string | null = '前のメモ') {
 beforeEach(() => {
   clearToastsForTest()
   Object.values(mocks).forEach((m) => m.mockReset())
+  mocks.orders.mockResolvedValue({ success: true, data: { items: [] } })
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const values = new Map<string, string>()
+  const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) }
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+  Object.defineProperty(window, 'localStorage', { configurable: true, value: storage })
+  window.localStorage.setItem('lh_staff_role', 'owner')
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -104,6 +113,8 @@ afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
   clearToastsForTest()
+  window.localStorage.removeItem('lh_staff_role')
+  window.localStorage.removeItem('lh_staff_view_permissions')
   delete document.documentElement.dataset.theme
   vi.unstubAllGlobals()
 })
@@ -235,4 +246,59 @@ describe('B-26 右の欄でその場で直す', () => {
       expect((document.getElementById('inbox-panel-memo') as HTMLTextAreaElement).value).toBe('相手のメモ')
     })
   })
+})
+
+describe('古い相手の保存結果（WEB243）', () => {
+  it('前の会話の対応状況保存の失敗を現在の会話へ戻さない', async () => {
+    let reject!: (error: unknown) => void
+    mocks.update.mockReturnValueOnce(new Promise((_, no) => { reject = no }))
+    await renderPanel()
+    const select = document.querySelector('select[aria-label="対応状況を変える"]') as HTMLSelectElement
+    await act(async () => { select.value = 'in_progress'; select.dispatchEvent(new Event('change', { bubbles: true })) })
+    await renderPanel(null, 'friend-b')
+    mocks.update.mockResolvedValue({ success: true, data: { revision: 5 } })
+    const nextSelect = document.querySelector('select[aria-label="対応状況を変える"]') as HTMLSelectElement
+    await act(async () => { nextSelect.value = 'resolved'; nextSelect.dispatchEvent(new Event('change', { bubbles: true })) })
+    await act(async () => { reject(new Error('down')); await Promise.resolve() })
+    expect((document.querySelector('select[aria-label="対応状況を変える"]') as HTMLSelectElement).value).toBe('resolved')
+  })
+  it('同じ会話の古い保存失敗も新しい選択を巻き戻さない', async () => {
+    let reject!: (error: unknown) => void
+    mocks.update.mockReturnValueOnce(new Promise((_, no) => { reject = no })).mockResolvedValue({ success: true, data: { revision: 5 } })
+    await renderPanel()
+    const select = document.querySelector('select[aria-label="対応状況を変える"]') as HTMLSelectElement
+    await act(async () => { select.value='in_progress';select.dispatchEvent(new Event('change',{ bubbles:true })) })
+    await act(async () => { select.value='resolved';select.dispatchEvent(new Event('change',{ bubbles:true })) })
+    await act(async () => { reject(new Error('down'));await Promise.resolve() })
+    expect(select.value).toBe('resolved')
+  })
+})
+describe('購入のAPIの形と宛先（WEB242）', () => {
+  it('現在のアカウントを渡し、同名の別人の注文を合計に含めない', async () => {
+    mocks.orders.mockResolvedValue({ success:true,data:{ items:[
+      { id:'mine',friendId:'friend-0',orderNumber:'注文A',totalAmount:1200,orderedAt:'2026-10-01T00:00:00Z' },
+      { id:'other',friendId:'friend-b',orderNumber:'注文B',totalAmount:9000,orderedAt:'2026-10-02T00:00:00Z' }
+    ] } })
+    await renderPanel()
+    await eventually(() => { expect(host.textContent).toContain('1,200') })
+    expect(mocks.orders).toHaveBeenCalledWith(expect.objectContaining({ lineAccountId:'account-a' }))
+    expect(host.textContent).not.toContain('10,200')
+  })
+  it('取得失敗を購入0件と出さず、再試行を出す', async () => {
+    mocks.orders.mockRejectedValue(new Error('down'));await renderPanel()
+    await eventually(() => { expect(host.textContent).toContain('購入を読み込めませんでした') })
+    expect(document.querySelector('[aria-label="購入をもう一度読み込む"]')).toBeTruthy()
+  })
+})
+
+
+it('閲覧のみでは対応・担当・メモ・タグを変える操作を隠す', async () => {
+  window.localStorage.setItem('lh_staff_role', 'staff')
+  window.localStorage.setItem('lh_staff_view_permissions', '["/chats","/friends"]')
+  await renderPanel()
+  expect(document.querySelector('[aria-label="対応状況を変える"]')).toBeNull()
+  expect(document.querySelector('[aria-label="担当者を変える"]')).toBeNull()
+  expect(document.getElementById('inbox-panel-memo')).toBeNull()
+  expect(button('＋ 追加')).toBeUndefined()
+  expect(document.querySelector('[aria-label="未契約を外す"]')).toBeNull()
 })

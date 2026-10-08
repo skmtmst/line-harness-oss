@@ -56,6 +56,9 @@ export default function NotificationsV8() {
   const lastListFailure = useRef<string | null>(null)
   const requestId = useRef(0)
   const viewKeyRef = useRef('')
+  const viewGeneration = useRef(0)
+  const renderViewKey = `${selectedAccountId ?? ''}|${filter}`
+  if (viewKeyRef.current !== renderViewKey) { viewKeyRef.current = renderViewKey; viewGeneration.current += 1 }
 
   const selectFilter = (next: DashboardNotificationFilter) => {
     const query = new URLSearchParams(params.toString())
@@ -116,16 +119,18 @@ export default function NotificationsV8() {
    * WEB071：既読の楽観更新の「戻す」「読み直す」は、押したときのアカウント・分類に結ぶ。
    * 失敗が届くまでに別のアカウントへ移っていたら、前の一覧・数で今の一覧を巻き戻さない。
    */
-  viewKeyRef.current = `${selectedAccountId ?? ''}|${filter}`
-  const sameView = (key: string) => viewKeyRef.current === key
+  const sameView = (key: string, generation: number, request: number) => viewKeyRef.current === key && viewGeneration.current === generation && requestId.current === request
 
   /* 既読は押した瞬間に画面へ反映し、裏で保存する。失敗したら未読へ戻してやり直せる知らせ。 */
   const markRead = (item: NotificationCenterItem) => {
     if (!selectedAccountId || item.isRead) return
     const accountId = selectedAccountId
-    const accountKey = `${accountId}|`
+    const viewKey = viewKeyRef.current
+    const generation = viewGeneration.current
+    const request = requestId.current
+    const isCurrent = () => sameView(viewKey, generation, request)
     const apply = (isRead: boolean) => {
-      if (!viewKeyRef.current.startsWith(accountKey)) return
+      if (!isCurrent()) return
       setItems((current) => current.map((row) => (row.id === item.id ? { ...row, isRead } : row)))
       setCounts((current) =>
         current ? { ...current, unread: Math.max(0, current.unread + (isRead ? -1 : 1)) } : current,
@@ -133,6 +138,7 @@ export default function NotificationsV8() {
     }
     apply(true)
     runOptimistic({
+      isCurrent,
       request: () => api.notifications.center.markRead(item.id, accountId),
       revert: () => apply(false),
       failureMessage: '通知を既読にできませんでした。',
@@ -149,20 +155,24 @@ export default function NotificationsV8() {
     if (!selectedAccountId || !counts || counts.unread === 0) return
     const accountId = selectedAccountId
     const viewKey = viewKeyRef.current
+    const generation = viewGeneration.current
+    const request = requestId.current
+    const isCurrent = () => sameView(viewKey, generation, request)
     const beforeItems = items
     const beforeCounts = counts
     setItems((current) => current.map((row) => ({ ...row, isRead: true })))
     setCounts((current) => (current ? { ...current, unread: 0 } : current))
     runOptimistic({
+      isCurrent,
       request: () => api.notifications.center.markAllRead(accountId, filter),
       revert: () => {
-        if (!sameView(viewKey)) return
+        if (!isCurrent()) return
         setItems(beforeItems)
         setCounts(beforeCounts)
       },
       failureMessage: '通知をまとめて既読にできませんでした。',
       retry: markAllRead,
-      onSuccess: () => { if (sameView(viewKey)) void load(0, false) },
+      onSuccess: () => { if (isCurrent()) void load(0, false) },
     })
   }
 
