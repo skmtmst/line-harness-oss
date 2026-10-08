@@ -546,6 +546,7 @@ describe('POST /webhook — postback events', () => {
       },
       'env-default-token',
       null,
+      expect.objectContaining({sourceEventId:expect.any(String)}),
     );
     expect(lineClientMocks.replyMessage).not.toHaveBeenCalled();
   });
@@ -643,6 +644,7 @@ describe('POST /webhook — postback events', () => {
       },
       'env-default-token',
       null,
+      expect.objectContaining({sourceEventId:expect.any(String)}),
     );
   });
 });
@@ -758,6 +760,7 @@ describe('POST /webhook — first-contact existing friends', () => {
       expect.objectContaining({ friendId: 'friend-1' }),
       'env-default-token',
       'account-main',
+      expect.objectContaining({sourceEventId:'event-1'}),
     );
     expect(getScenarios).not.toHaveBeenCalled();
     expect(enrollFriendInScenario).not.toHaveBeenCalled();
@@ -900,3 +903,10 @@ describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () =>
     expect(releaseFriendAddSendRight).not.toHaveBeenCalled();
   });
 });
+
+vi.mock('../services/line-webhook-events.js',async()=>{
+ const {unitLineEvents}=await import('../test-utils/workflow-unit.js');const ledger=await import('@line-crm/db');
+ const actual=await vi.importActual<typeof import('../services/line-webhook-events.js')>('../services/line-webhook-events.js');
+ return {...actual,processLineWebhookEvents:(input:any)=>unitLineEvents(input,ledger as any)};
+});
+vi.mock('../services/workflow-line-client.js',()=>({workflowLineClient:(client:any)=>client}));
