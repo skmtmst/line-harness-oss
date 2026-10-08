@@ -16,6 +16,8 @@ import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
+import type { ConversionFieldIssue } from './field-issue'
 import { formatNumber } from '@/lib/format'
 import type {
   ConversionDefinitionEvent,
@@ -474,6 +476,7 @@ export interface ConversionEditDialogProps {
   setEditValueModeNotice: (notice: string | null) => void
   editSaving: boolean
   editError: string
+  editFieldIssue?: ConversionFieldIssue | null
   submitEdit: () => void
 }
 
@@ -488,6 +491,7 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
     setEditValueModeNotice,
     editSaving,
     editError,
+    editFieldIssue,
     submitEdit,
   } = props
   return (
@@ -511,19 +515,17 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
           <p className="bg-canvas-sunken rounded-control px-3 py-2 text-xs text-ink-secondary">
             起点：{originInfoOf(editForm.sourceType).trigger}／{originInfoOf(editForm.sourceType).target}
           </p>
-          <label className="block">
-            <span className="text-ink-faint text-xs">名前</span>
+          <Field label="名前" htmlFor="cv-edit-name" error={editFieldIssue?.field === 'cv-edit-name' ? editFieldIssue.message : undefined}>
             <TextField
               aria-label="成果地点の名前"
               value={editForm.name}
               maxLength={120}
               onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
             />
-          </label>
+          </Field>
           {/* R281: ページ到達の対象URLも編集できる。URL以外は起点が固定で入力欄は出さない。 */}
           {editForm.sourceType === 'url_reach' ? (
-            <label className="block">
-              <span className="text-ink-faint text-xs">数えてよいページ</span>
+            <Field label="数えてよいページ" htmlFor="cv-edit-url" error={editFieldIssue?.field === 'cv-edit-url' ? editFieldIssue.message : undefined}>
               <TextField
                 aria-label="数えてよいページ"
                 inputMode="url"
@@ -532,12 +534,14 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
                 placeholder="https://example.com/thanks"
                 onChange={(event) => setEditForm({ ...editForm, targetUrl: event.target.value })}
               />
-            </label>
+            </Field>
           ) : null}
           {/* 起点に金額が無いものは注文の金額を出さない。選択肢は対応表が持つ(作成と同じ)。 */}
           <label className="block">
             <span className="text-ink-faint text-xs">金額の決め方</span>
             <Select
+              id="cv-edit-value-mode"
+              error={editFieldIssue?.field === 'cv-edit-value-mode' ? editFieldIssue.message : undefined}
               aria-label="金額の決め方"
               value={editForm.valueMode}
               options={originInfoOf(editForm.sourceType).valueModes.map((mode) => ({
@@ -556,15 +560,14 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             ) : null}
           </label>
           {editForm.valueMode === 'fixed' ? (
-            <label className="block">
-              <span className="text-ink-faint text-xs">1件あたりの金額</span>
+            <Field label="1件あたりの金額" htmlFor="cv-edit-value" error={editFieldIssue?.field === 'cv-edit-value' ? editFieldIssue.message : undefined}>
               <TextField
                 aria-label="1件あたりの金額"
                 inputMode="numeric"
                 value={editForm.fixedValue}
                 onChange={(event) => setEditForm({ ...editForm, fixedValue: event.target.value })}
               />
-            </label>
+            </Field>
           ) : null}
           <label className="block">
             <span className="text-ink-faint text-xs">同じ人を何回数えるか</span>
@@ -576,15 +579,14 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             />
           </label>
           {editForm.deduplicationMode === 'window' ? (
-            <label className="block">
-              <span className="text-ink-faint text-xs">数えない日数（1〜365）</span>
+            <Field label="数えない日数（1〜365）" htmlFor="cv-edit-window" error={editFieldIssue?.field === 'cv-edit-window' ? editFieldIssue.message : undefined}>
               <TextField
                 aria-label="数えない日数"
                 inputMode="numeric"
                 value={editForm.deduplicationWindowDays}
                 onChange={(event) => setEditForm({ ...editForm, deduplicationWindowDays: event.target.value })}
               />
-            </label>
+            </Field>
           ) : null}
           <label className="block">
             <span className="text-ink-faint text-xs">取り消しの扱い</span>
@@ -596,13 +598,14 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             />
           </label>
           {/* R281: 友だち追加からの計測期間も編集できる。空欄は既定の90日。 */}
-          <label className="block">
-            <span className="text-ink-faint text-xs">
-              友だち追加からの計測期間（日）{' '}
-              <HelpTip label="計測期間の説明">
-                友だち追加からこの日数までの成果を数えます。同じ人を数えない「数えない日数」とは別の設定です。
-              </HelpTip>
-            </span>
+          <Field
+            label="友だち追加からの計測期間（日）"
+            htmlFor="cv-edit-days"
+            error={editFieldIssue?.field === 'cv-edit-days' ? editFieldIssue.message : undefined}
+            note="空欄なら既定の90日です。"
+            help="友だち追加からこの日数までの成果を数えます。同じ人を数えない「数えない日数」とは別の設定です。"
+            helpLabel="計測期間"
+          >
             <TextField
               aria-label="友だち追加からの計測期間"
               inputMode="numeric"
@@ -610,34 +613,31 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
               placeholder="90"
               onChange={(event) => setEditForm({ ...editForm, attributionDays: event.target.value })}
             />
-            <span className="text-ink-faint mt-1 block text-xs">空欄なら既定の90日です。</span>
-          </label>
+          </Field>
           {/* R40: 数えない条件とメモも編集できる。条件は作成と同じ共通部品。 */}
-          <div>
-            <span className="text-ink-faint text-xs">数えない条件</span>
-            <span className="mt-1 block">
+          <div id="cv-edit-exclusion" aria-invalid={editFieldIssue?.field === 'cv-edit-exclusion' || undefined}>
+            <Field label="数えない条件" error={editFieldIssue?.field === 'cv-edit-exclusion' ? editFieldIssue.message : undefined}>
               <ConditionBuilder
                 value={editForm.exclusion}
                 onChange={(next) => setEditForm({ ...editForm, exclusion: next })}
                 label="数えない条件"
                 showCount={false}
               />
-            </span>
+            </Field>
           </div>
-          <label className="block">
-            <span className="text-ink-faint text-xs">数えない条件のメモ（任意）</span>
+          <Field label="数えない条件のメモ（任意）" htmlFor="cv-edit-memo" error={editFieldIssue?.field === 'cv-edit-memo' ? editFieldIssue.message : undefined}>
             <TextField
               aria-label="数えない条件のメモ"
               value={editForm.exclusionMemo}
               maxLength={500}
               onChange={(event) => setEditForm({ ...editForm, exclusionMemo: event.target.value })}
             />
-          </label>
+          </Field>
           <p className="text-ink-faint text-xs leading-5">
             いま使っている場所（{usageLabel(editTarget!)}）は、この成果地点のまま次の版へ引き継がれます。
             過去の成果は数えたときの金額のままなので、集計額は変わりません。
           </p>
-          {editError ? <p className="text-xs font-semibold text-ink">{editError}</p> : null}
+          {editError ? <Notice tone="danger">{editError}</Notice> : null}
         </div>
       ) : null}
     </Dialog>

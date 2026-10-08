@@ -2,25 +2,10 @@
  * ★V8 成果地点を作る（j8p3yj・競合 cXqlS）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
  * ここは段のカード（枠1・角12・余白20・間14）と、右の列の箱（余白16・間6）の中身だけ。
  */
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-compact-gap);
-  color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-cn-back-lh);
-}
-.backLink:hover {
-  text-decoration: underline;
-}
-
 /* 競合の帯（cXqlS）の置き場：頭と本文の間の段に置き、広い幅でも見せる。帯の見た目は共通部品（save-conflict）。 */
-:global([data-theme='v8'] [data-page-template='create']) > :global(div):has(> .conflictSlot) {
-  display: block;
-}
 .conflictSlot {
   margin: var(--tpl-cn-conflict-margin);
+  margin-top: calc(-1 * var(--tpl-cn-field-gap));
 }
 .viewerBand {
   padding: var(--tpl-ro-band-pad);
@@ -32,16 +17,6 @@
 }
 
 /* 段のカード。 */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-cn-card-gap);
-  padding: var(--tpl-cn-card-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-}
 .cardHead {
   display: flex;
   flex-direction: column;
@@ -94,21 +69,11 @@
   font-weight: 600;
   line-height: var(--tpl-cn-main-lh);
 }
-.input {
-  width: 100%;
-  min-width: 0;
-  height: var(--tpl-cn-control-h);
-  padding: var(--tpl-cn-input-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-body);
-}
-.input:disabled {
-  background: var(--color-canvas-sunken);
+.fieldError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
 }
 /* 選ぶ欄は箱いっぱい（部品の size="full"）。 */
 .selectBox {
@@ -180,43 +145,12 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--tpl-cn-ops-gap);
 }
-.dedupCard {
-  min-width: 0;
-}
-/* 絵の選ぶカードは小さい（余白 12/10・題 13/700・補足 11・間 4）。この段にだけ当てる。 */
-:global([data-theme='v8']) .dedupRow .dedupCard {
-  min-height: 0;
-  padding: var(--tpl-cn-choice-pad);
-  border-radius: var(--radius-control);
-}
-:global([data-theme='v8']) .dedupRow .dedupCard > span:last-child {
-  gap: var(--tpl-cn-choice-gap);
-}
-:global([data-theme='v8']) .dedupRow .dedupCard strong {
-  font-weight: 700;
-  line-height: var(--tpl-cn-name-lh);
-}
-:global([data-theme='v8']) .dedupRow .dedupCard small {
-  font-size: var(--text-micro);
-  line-height: var(--tpl-cn-sub-lh);
-}
-
 /* 右の列。 */
 .side {
   display: flex;
   flex-direction: column;
   gap: var(--tpl-cn-side-gap);
   width: 100%;
-}
-.sideCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-cn-side-card-gap);
-  padding: var(--tpl-side-card-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
 }
 .sideHead {
   display: flex;
