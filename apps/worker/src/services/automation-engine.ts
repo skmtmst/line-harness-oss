@@ -43,7 +43,7 @@ export interface ActionDefinition {
   /** 実行開始時に固定した共通アクション版。実行計画だけが持つ。 */
   commonActionVersionId?: string | null;
   /** 実行計画で固定した、親分岐の通過条件。保存APIから直接は受け取らない。 */
-  branchConditions?: Array<{ condition: SegmentCondition; expected: boolean }>;
+  branchConditions?: Array<{ condition: SegmentCondition; expected: boolean; branchStepKey?: string }>;
 }
 
 interface RunRow {
@@ -215,11 +215,44 @@ function parseActions(text: string): ActionDefinition[] {
         if (!isRecord(entry) || !isRecord(entry.condition) || typeof entry.expected !== 'boolean') {
           throw new AutomationActionError('invalid_branch_condition', '分岐の実行条件が不正です', false);
         }
-        return { condition: entry.condition as unknown as SegmentCondition, expected: entry.expected };
+        if (entry.branchStepKey !== undefined && (typeof entry.branchStepKey !== 'string' || !entry.branchStepKey)) {
+          throw new AutomationActionError('invalid_branch_condition', '分岐の記録先が不正です', false);
+        }
+        return { condition: entry.condition as unknown as SegmentCondition, expected: entry.expected,
+          branchStepKey: entry.branchStepKey as string | undefined };
       });
     }
     return { id, type, params, onFailure, commonActionVersionId, branchConditions };
   });
+}
+
+/** 親分岐の完了記録だけを読む。旧計画は通のパスから親を特定する。 */
+async function recordedBranchSelected(
+  db: D1Database, runId: string, actions: ActionDefinition[], action: ActionDefinition,
+): Promise<boolean> {
+  const used = new Set<string>();
+  for (const item of action.branchConditions ?? []) {
+    const side = item.expected ? 'then' : 'else';
+    const marker = actions.find((candidate) => candidate.type === 'branch_marker'
+      && !used.has(candidate.id)
+      && action.id.startsWith(`${candidate.id}/${side}/`)
+      && (item.branchStepKey ? candidate.id === item.branchStepKey
+        : JSON.stringify(candidate.params.condition) === JSON.stringify(item.condition)));
+    if (!marker) throw new AutomationActionError('branch_result_missing', '分岐の結果を確認できません', false);
+    used.add(marker.id);
+    const saved = await db.prepare(
+      `SELECT status, output_json FROM automation_run_steps
+        WHERE automation_run_id = ? AND step_key = ?`,
+    ).bind(runId, marker.id).first<{ status: string; output_json: string | null }>();
+    let output: Record<string, unknown>;
+    try { output = parseObject(saved?.output_json ?? ''); }
+    catch { throw new AutomationActionError('branch_result_missing', '分岐の結果を確認できません', false); }
+    if (saved?.status !== 'success' || typeof output.matched !== 'boolean') {
+      throw new AutomationActionError('branch_result_missing', '分岐の結果を確認できません', false);
+    }
+    if (output.matched !== item.expected) return false;
+  }
+  return true;
 }
 
 async function getRun(db: D1Database, runId: string): Promise<RunRow | null> {
@@ -288,7 +321,7 @@ async function buildExecutionPlan(
     depth?: number;
     budget?: { count: number };
     branchDepth?: number;
-    branchConditions?: Array<{ condition: SegmentCondition; expected: boolean }>;
+    branchConditions?: ActionDefinition['branchConditions'];
   },
 ): Promise<ActionDefinition[]> {
   const depth = input.depth ?? 0;
@@ -326,7 +359,7 @@ async function buildExecutionPlan(
         actions: thenActions,
         prefix: `${stepKey}/then`,
         branchDepth: branchDepth + 1,
-        branchConditions: [...(input.branchConditions ?? []), { condition, expected: true }],
+        branchConditions: [...(input.branchConditions ?? []), { condition, expected: true, branchStepKey: stepKey }],
         budget,
       }));
       plan.push(...await buildExecutionPlan(db, {
@@ -334,7 +367,7 @@ async function buildExecutionPlan(
         actions: elseActions,
         prefix: `${stepKey}/else`,
         branchDepth: branchDepth + 1,
-        branchConditions: [...(input.branchConditions ?? []), { condition, expected: false }],
+        branchConditions: [...(input.branchConditions ?? []), { condition, expected: false, branchStepKey: stepKey }],
         budget,
       }));
       continue;
@@ -779,13 +812,14 @@ export async function processAutomationRun(
     }
 
     if (action.branchConditions?.length) {
-      const branchSelected = await action.branchConditions.reduce(async (previous, item) => {
-        if (!await previous) return false;
-        const matched = run.friend_id
-          ? await matchesCondition(db, run.friend_id, item.condition)
-          : false;
-        return matched === item.expected;
-      }, Promise.resolve(true));
+      let branchSelected: boolean;
+      try {
+        branchSelected = await recordedBranchSelected(db, run.id, actions, action);
+      } catch (error) {
+        const failure = normalizeError(error);
+        await failConfiguration(db, run.id, now, failure.code, failure.message);
+        return 'failed';
+      }
       if (!branchSelected) {
         await db.prepare(
           `UPDATE automation_run_steps

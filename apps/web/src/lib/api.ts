@@ -1,3 +1,5 @@
+import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
+import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts, BannerGenerationCreateOptions, RichMenuGroupListOptions } from '@line-crm/shared'
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
 import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
@@ -2483,7 +2485,12 @@ export const SESSION_LOST_EVENT = 'lh-session-lost'
 /** 機能設定でオフになっている API を開いたとき、共通 shell へ知らせる合図。 */
 export const FEATURE_DISABLED_EVENT = 'lh-feature-disabled'
 
-export type FeatureDisabledEventDetail = {
+export type ApiAccountEventDetail = {
+  /** 呼び出した時点の対象。未指定・複数店舗のときは null。 */
+  accountId: string | null
+  accountIds?: string[]
+}
+export type FeatureDisabledEventDetail = Partial<ApiAccountEventDetail> & {
   featureId?: string
 }
 
@@ -2714,10 +2721,44 @@ export function shouldAnnounceFeatureDisabled(status: number, code: string | und
   return status === 403 && code === 'FEATURE_DISABLED'
 }
 
-function announceFeatureDisabled(status: number, code: string | undefined, raw: string): void {
+/** 応答待ちの間に画面が切り替わっても、呼出元のアカウントを保持する。 */
+function apiAccountContext(path: string, options?: FetchApiOptions): ApiAccountEventDetail {
+  const accountKeys = ['account_id', 'accountId', 'line_account_id', 'lineAccountId']
+  const valid = (value: unknown): value is string => typeof value === 'string'
+    && value.trim().length > 0 && value.length <= 256
+  const single = (value: string): ApiAccountEventDetail => ({ accountId: value.trim() })
+  if (options?.accountId === null) return { accountId: null }
+  if (valid(options?.accountId)) return single(options.accountId)
+  const query = new URL(path, 'https://request.invalid').searchParams
+  for (const key of accountKeys) {
+    const id = query.get(key)
+    if (valid(id)) return single(id)
+  }
+  const headerId = new Headers(options?.headers).get('X-Line-Account-Id')
+  if (valid(headerId)) return single(headerId)
+  if (typeof options?.body === 'string') {
+    try {
+      const body: unknown = JSON.parse(options.body)
+      if (body && typeof body === 'object' && !Array.isArray(body)) {
+        const input = body as Record<string, unknown>
+        for (const key of accountKeys) if (valid(input[key])) return single(input[key])
+        for (const key of ['accountIds', 'lineAccountIds']) {
+          const value = input[key]
+          if (Array.isArray(value) && value.every(valid)) {
+            const ids = [...new Set(value.map(id => id.trim()))]
+            return { accountId: ids.length === 1 ? ids[0]! : null, accountIds: ids }
+          }
+        }
+      }
+    } catch { /* 本文の検証はAPI側の責務。合図には秘密値・本文を載せない。 */ }
+  }
+  return { accountId: null }
+}
+
+function announceFeatureDisabled(status: number, code: string | undefined, raw: string, context: ApiAccountEventDetail): void {
   if (typeof window === 'undefined' || !shouldAnnounceFeatureDisabled(status, code)) return
   window.dispatchEvent(new CustomEvent<FeatureDisabledEventDetail>(FEATURE_DISABLED_EVENT, {
-    detail: extractFeatureDisabledDetail(raw),
+    detail: { ...extractFeatureDisabledDetail(raw), ...context },
   }))
 }
 
@@ -2812,9 +2853,13 @@ function reportServerFailure(path: string, status: number): void {
  */
 export interface FetchApiOptions extends RequestInit {
   suppressFeatureDisabledEvent?: boolean
+  /** IDだけを持つ経路など、URLに対象アカウントがない呼び出し用。 */
+  accountId?: string | null
 }
 
 export async function fetchApi<T>(path: string, options?: FetchApiOptions): Promise<T> {
+  const context = apiAccountContext(path, options)
+  const { accountId: _accountId, suppressFeatureDisabledEvent: _suppressEvent, ...requestInit } = options ?? {}
   const method = (options?.method ?? 'GET').toUpperCase()
   const csrfHeaders: Record<string, string> = {}
   if (MUTATING_METHODS.has(method)) {
@@ -2832,7 +2877,7 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
    */
   const isBodylessMethod = method === 'GET' || method === 'HEAD'
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
-    ...options,
+    ...requestInit,
     // Send the HttpOnly session cookie with every request.
     credentials: 'include',
     headers: {
@@ -2856,9 +2901,9 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
      * STEP_UP_REQUIRED などの業務401だけは画面が自分で処理するので出さない。
      */
     if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
-      window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
+      window.dispatchEvent(new CustomEvent<ApiAccountEventDetail>(SESSION_LOST_EVENT, { detail: context }))
     }
-    if (!options?.suppressFeatureDisabledEvent) announceFeatureDisabled(res.status, code, raw)
+    if (!options?.suppressFeatureDisabledEvent) announceFeatureDisabled(res.status, code, raw, context)
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
@@ -2915,7 +2960,8 @@ export async function refreshCachedList<T>(path: string): Promise<T> {
   return body
 }
 
-export async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
+export async function fetchApiBlob(path: string, init?: { method?: string; accountId?: string | null }): Promise<Blob> {
+  const context = apiAccountContext(path, init)
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
     credentials: 'include',
@@ -2927,9 +2973,9 @@ export async function fetchApiBlob(path: string, init?: { method?: string }): Pr
     const code = extractApiErrorCode(raw)
     // fetchApi と同じく、業務コード付き401（再認証など）では合図を出さない。
     if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
-      window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
+      window.dispatchEvent(new CustomEvent<ApiAccountEventDetail>(SESSION_LOST_EVENT, { detail: context }))
     }
-    announceFeatureDisabled(res.status, code, raw)
+    announceFeatureDisabled(res.status, code, raw, context)
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
@@ -2962,6 +3008,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   returnedCount: number | null
   truncated: boolean
 }> {
+  const context = apiAccountContext(path)
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     credentials: 'include',
     headers: adminSessionHeaders(),
@@ -2972,8 +3019,9 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
     const code = extractApiErrorCode(raw)
     // fetchApi と同じく、業務コード付き401（再認証など）では合図を出さない。
     if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
-      window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
+      window.dispatchEvent(new CustomEvent<ApiAccountEventDetail>(SESSION_LOST_EVENT, { detail: context }))
     }
+    announceFeatureDisabled(res.status, code, raw, context)
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
@@ -3463,6 +3511,7 @@ export type MileageAdminHistoryItem = {
   occurredAt: string
 }
 export type MileageAdminHistory = {
+  friendSummary?: MileageFriendHistorySummary
   items: MileageAdminHistoryItem[]
   pagination: { total: number; limit: number; offset: number }
   summary: {
@@ -3945,7 +3994,7 @@ export type ReminderDeliveryRunsResponse = {
     sentThisMonth: number
     /** 今後7日以内（期限切れの未送分を含む）に送る予定の件数。 */
     scheduledNext7Days: number
-  }
+  } & ReminderScheduleMetrics
   steps: Array<{
     id: string
     stepNumber: number
@@ -4831,7 +4880,7 @@ export type EcIdentityCandidateOperationsList = {
     impact: IdentityCandidateImpactMetric[]
     detectedAt: string
     reviewedAt: string | null
-  }>
+  } & EcIdentityDuplicateSignal>
   total: number
   summary: EcIdentityCandidateSummary
 }
@@ -4992,6 +5041,7 @@ export type LineNotificationMetrics = {
  * 全期間合計でもない。
  */
 export type LineNotificationSendCounts = {
+  failures: CustomerNotificationFailureCounts
   sentToday: number
   sentLast30d: number
   byEventType: Array<{ eventType: string; today: number; last30d: number }>
@@ -7676,6 +7726,8 @@ export const api = {
   },
   /** メディアライブラリ。1か所に置いて使い回す。 */
   media: {
+    counts: (accountId: string) => fetchApi<ApiResponse<MediaTabCounts>>(
+      `/api/media/counts?accountId=${encodeURIComponent(accountId)}`),
     detail: (id: string, accountId: string) =>
       fetchApi<ApiResponse<{ item: MediaItem; folderName: string | null }>>(
         `/api/media/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
@@ -9000,6 +9052,11 @@ export const api = {
   },
   /** 統括の課金（★V6 36-2）。形は `apps/worker/src/routes/hq-billing.ts`。 */
   hqBilling: {
+    preview: (planKey: PlanKey, interval: BillingInterval = 'month') =>
+      fetchApi<ApiResponse<{ planKey: PlanKey; interval: BillingInterval; afterAmountYen: number;
+        amountDueYen: number; prorationDifferenceYen: number; nextBillingAt: string | null;
+        estimatedAt: string; isEstimate: true; notice: string }>>(
+        `/api/hq/billing/preview?${new URLSearchParams({ planKey, interval })}`),
     summary: () => fetchApi<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
     /** Stripe の申込画面の URL。オーナーだけ。 */
     checkout: (planKey: PlanKey, interval: BillingInterval = 'month') =>
@@ -9071,9 +9128,10 @@ export const api = {
           body: JSON.stringify({}),
         }),
       /** 条件を登録するだけ。画像はまだ作らない。 */
-      createGeneration: (id: string, input: BannerGenerationInput) =>
+      createGeneration: (id: string, input: BannerGenerationInput, options?: BannerGenerationCreateOptions) =>
         fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/projects/${encodeURIComponent(id)}/generations`, {
           method: 'POST',
+          headers: options?.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : undefined,
           body: JSON.stringify(input),
         }),
       /** 手持ちの画像を取り込む。data は base64（data: なし）。 */
@@ -10578,6 +10636,8 @@ export const api = {
       }),
   },
   automations: {
+    counts: (accountId: string) => fetchApi<ApiResponse<AutomationTabCounts>>(
+      `/api/automations/counts?account_id=${encodeURIComponent(accountId)}`),
     list: (params?: { accountId?: string; limit?: number; offset?: number }) => {
       const query = new URLSearchParams()
       if (params?.accountId) query.set('lineAccountId', params.accountId)
@@ -11888,9 +11948,11 @@ export const api = {
     /** 実行結果（設計 `GC4St`）。状態・検索・ページ送りは Worker が受ける。 */
     runs: (
       reminderId: string,
-      params?: { status?: ReminderDeliveryRunStatus; search?: string; limit?: number; offset?: number },
+      params?: { status?: ReminderDeliveryRunStatus; search?: string; limit?: number; offset?: number } & ReminderRunReadOptions,
     ) => {
       const query = new URLSearchParams()
+      if (params?.order) query.set('order', params.order)
+      if (params?.executedOnly !== undefined) query.set('executedOnly', String(params.executedOnly))
       if (params?.status) query.set('status', params.status)
       if (params?.search) query.set('search', params.search)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
@@ -12192,6 +12254,8 @@ export const api = {
       search?: string
       /** V6R-CX-e: この友だちと同じ人の履歴だけ。 */
       friendId?: string
+      kind?: MileageHistoryKind
+      entryTypes?: MileageHistoryTypeFilter['entryTypes']
       entryType?: MileageHistoryItem['entryType']
       status?: MileageHistoryItem['status']
       mode?: 'automatic' | 'manual'
@@ -12203,6 +12267,8 @@ export const api = {
       const query = new URLSearchParams({ accountId: params.accountId })
       if (params.search) query.set('search', params.search)
       if (params.friendId) query.set('friendId', params.friendId)
+      if (params.kind) query.set('kind', params.kind)
+      if (params.entryTypes?.length) query.set('entryTypes', params.entryTypes.join(','))
       if (params.entryType) query.set('entryType', params.entryType)
       if (params.status) query.set('status', params.status)
       if (params.mode) query.set('mode', params.mode)
@@ -12418,7 +12484,7 @@ export const api = {
         fetchApi<ApiResponse<IncomingWebhookDetail>>(
           `/api/webhooks/incoming/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret: string }, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret: string } & WebhookCreateState, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhookCreated>>('/api/webhooks/incoming', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
@@ -12476,7 +12542,7 @@ export const api = {
         fetchApi<ApiResponse<OutgoingWebhook>>(
           `/api/webhooks/outgoing/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number } & WebhookCreateState, stepUpToken?: string) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
@@ -12894,14 +12960,7 @@ export const api = {
     },
   },
   richMenuGroups: {
-    listPage: (accountId: string, input: {
-      page?: number
-      limit?: number
-      query?: string
-      folderId?: string
-      filter?: string
-      sort?: 'priority' | 'taps' | 'updated' | 'name'
-    } = {}) => {
+    listPage: (accountId: string, input: RichMenuGroupListOptions = {}) => {
       const query = new URLSearchParams({ accountId })
       query.set('page', String(input.page ?? 1))
       query.set('limit', String(input.limit ?? 50))
@@ -13528,6 +13587,7 @@ export const api = {
       ),
   },
   conversionApprovals: {
+    counts: () => fetchApi<ApiResponse<ConversionApprovalCounts>>('/api/conversions/approvals/counts'),
     list: (params?: { status?: 'pending' | 'approved' | 'rejected'; limit?: number; offset?: number }) => {
       const p = new URLSearchParams()
       if (params?.status) p.set('status', params.status)
@@ -14896,6 +14956,10 @@ export const bookingApi = {
       method: 'POST',
       headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
       body: JSON.stringify(body),
+    }),
+  reorderMenus: (accountId: string, body: BookingMenuReorderRequest) =>
+    fetchApi<BookingMenuReorderResponse>(withAccount('/api/booking/admin/menus/order', accountId), {
+      method: 'PUT', body: JSON.stringify(body),
     }),
   updateMenu: (accountId: string, id: string, expectedVersion: number, body: Partial<BookingMenu>) =>
     fetchApi<{ ok: true; version: number }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {

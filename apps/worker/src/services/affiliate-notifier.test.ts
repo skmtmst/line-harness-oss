@@ -159,3 +159,21 @@ describe('notifyAffiliateApproval', () => {
     expect(text).not.toContain('確定報酬');
   });
 });
+
+it('承認通知のLINE失敗は呼出元へ伝え、同じ承認の再試行を可能にする', async () => {
+  dbMocks.getAffiliateById.mockResolvedValue({ id: 'aff-1', friend_id: 'friend' });
+  dbMocks.getFriendById.mockResolvedValue({ line_user_id: 'Ufriend', line_account_id: null });
+  pushMessage.mockRejectedValueOnce(new Error('push unavailable'));
+  await expect(notifyAffiliateApproval(DB, env, 'aff-1', 'Offer', 100)).rejects.toThrow('push unavailable');
+  await expect(notifyAffiliateApproval(DB, env, 'aff-1', 'Offer', 100)).resolves.toBeUndefined();
+  expect(pushMessage).toHaveBeenCalledTimes(2);
+});
+
+
+it('W21: 承認の再試行番号をLINEへそのまま渡す', async () => {
+  dbMocks.getAffiliateById.mockResolvedValue({ id: 'aff', friend_id: 'friend' });
+  dbMocks.getFriendById.mockResolvedValue({ id: 'friend', line_user_id: 'Ufriend', line_account_id: null });
+  const key = '00000000-0000-4000-8000-000000000001';
+  await notifyAffiliateApproval(DB, env, 'aff', 'Offer', 100, key);
+  expect(pushMessage).toHaveBeenCalledWith('Ufriend', expect.any(Array), key);
+});

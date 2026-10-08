@@ -1,3 +1,4 @@
+import { buildBroadcastAudienceQuery } from './broadcast-audience-query.js';
 import { describe, expect, it } from 'vitest';
 import { buildWarnings, countAudience } from './broadcast-preflight.js';
 import { buildSegmentQuery, type SegmentCondition } from './segment-query.js';
@@ -166,9 +167,9 @@ describe('詳細条件で絞ったときの人数', () => {
     // 別々に書くと、条件を1つ足したときにどちらかだけ直して食い違う。
     const { db, raw } = setup()
     const counted = await countAudience(db, { targetType: 'segment', segmentConditions: VIP_CONDITION })
-    const query = buildSegmentQuery(VIP_CONDITION)
+    const query = buildBroadcastAudienceQuery(VIP_CONDITION)
     const sent = raw.prepare(query.sql).all(...(query.bindings as never[])) as Array<{ id: string }>
-    // 送信側は非表示の人も含むので、その差だけがずれの許される範囲。
-    expect(sent.length).toBe(counted.total + counted.hiddenExcluded)
+    // 非表示は配信前の人数と実送信の両方から外す。
+    expect(sent.length).toBe(counted.total)
   })
 })
