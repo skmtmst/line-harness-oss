@@ -158,7 +158,7 @@ describe('確定待ちの確定と付与内訳の一致', () => {
     ).toBe(1);
   });
 
-  it('確定待ちの取消では内訳は作られない', async () => {
+  it('PKG52: 確定待ちの取消では財布も減り、内訳は作られない', async () => {
     const entry = await grantPending();
     await voidMileageLedgerEntry(db, {
       entryId: entry.id,
@@ -172,6 +172,45 @@ describe('確定待ちの確定と付与内訳の一致', () => {
     expect(summary.available).toBe(0);
     expect(summary.pending).toBe(0);
     expect(lotOf(entry.id)).toBeUndefined();
+    expect(wallet()).toEqual({ available: 0, pending: 0 });
+  });
+
+  it('PKG52: 取消履歴の保存失敗は台帳・財布を巻き戻し、再送で1回だけ完了する', async () => {
+    const entry = await grantPending();
+    const input = {
+      entryId: entry.id, lineAccountId: 'acc-a', staffId: 'staff-1',
+      staffName: '担当者', reason: '取消',
+    };
+    sqlite.exec(`CREATE TRIGGER fail_void_reversal BEFORE INSERT ON mileage_ledger
+      WHEN NEW.source = 'admin_void' BEGIN SELECT RAISE(ABORT, 'injected reversal failure'); END;`);
+    await expect(voidMileageLedgerEntry(db, input)).rejects.toThrow('injected reversal failure');
+    expect(sqlite.prepare('SELECT status FROM mileage_ledger WHERE id = ?').get(entry.id))
+      .toEqual({ status: 'pending' });
+    expect(wallet()).toEqual({ available: 0, pending: 100 });
+    sqlite.exec('DROP TRIGGER fail_void_reversal');
+    const done = await voidMileageLedgerEntry(db, input);
+    const replay = await voidMileageLedgerEntry(db, input);
+    expect(done.reversalEntryId).not.toBe('');
+    expect(replay).toMatchObject({ reversalEntryId: done.reversalEntryId, replayed: true });
+    expect(wallet()).toEqual({ available: 0, pending: 0 });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM mileage_ledger WHERE reverses_entry_id = ?').get(entry.id))
+      .toEqual({ n: 1 });
+  });
+
+  it('PKG52: 同時取消は勝者だけが財布を減らし、別アカウントは拒否する', async () => {
+    const entry = await grantPending();
+    const input = {
+      entryId: entry.id, lineAccountId: 'acc-a', staffId: 'staff-1',
+      staffName: '担当者', reason: '取消', occurredAt: '2026-10-08T00:00:00+09:00',
+    };
+    await expect(voidMileageLedgerEntry(db, { ...input, lineAccountId: 'other' }))
+      .rejects.toMatchObject({ code: 'mileage_entry_not_found' });
+    const results = await Promise.all([
+      voidMileageLedgerEntry(db, input), voidMileageLedgerEntry(db, input),
+    ]);
+    expect(results.map((r) => r.replayed).sort()).toEqual([false, true]);
+    expect(results[0].reversalEntryId).toBe(results[1].reversalEntryId);
+    expect(wallet()).toEqual({ available: 0, pending: 0 });
   });
 
   it('同じ担当・同じ時刻の同時確定は1回分だけ財布と内訳を動かす', async () => {
