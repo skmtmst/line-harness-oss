@@ -248,6 +248,10 @@
 .cheadName {
   display: block;
   min-width: 0;
+  /* 共通のボタンの最小の高さ（32）を受けない：絵は名前の行 23＋補足 18 で頭が 64 */
+  height: var(--tpl-inbox-chead-name-lh);
+  min-height: 0;
+  padding: 0;
   overflow: hidden;
   border: 0;
   background: none;
@@ -260,7 +264,7 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.cheadName[aria-expanded='true'] { white-space: normal; word-break: break-all; }
+.cheadName[aria-expanded='true'] { height: auto; white-space: normal; word-break: break-all; }
 .cheadSub { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); text-overflow: ellipsis; white-space: nowrap; }
 .cheadTools { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--tpl-inbox-chead-gap); margin-left: auto; }
 .cheadSquare {
@@ -378,3 +382,117 @@
 .countRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-inbox-composer-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
 .bottomRow { margin-top: 0; gap: var(--tpl-inbox-composer-gap); }
 .bottomRow > span:first-of-type span { font-size: var(--text-micro); }
+
+/* ── 添付（M0393「7. 添付」I7Skn・B-6） ─────────────── */
+/* 書く欄の左下のクリップ：白地・薄い枠・32角・角丸10・印16（共通の副ボタン compact に大きさだけ） */
+.attachTrigger {
+  flex: none;
+  width: var(--tpl-inbox-attach-btn);
+  height: var(--tpl-inbox-attach-btn);
+  padding: 0;
+  border-radius: var(--tpl-inbox-attach-btn-radius);
+  color: var(--color-ink-secondary);
+}
+.attachTrigger svg { width: var(--tpl-inbox-attach-icon); height: var(--tpl-inbox-attach-icon); }
+.attachPop {
+  display: flex;
+  flex-direction: column;
+  width: var(--tpl-inbox-attach-pop-w);
+  max-width: calc(100vw - var(--tpl-inbox-pop-gap) * 2);
+  padding: var(--tpl-inbox-attach-pop-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  box-shadow: var(--shadow-float);
+}
+.attachItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-inbox-attach-item-gap);
+  width: 100%;
+  padding: var(--tpl-inbox-attach-item-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.attachItem:hover, .attachItem:focus-visible { background: var(--color-canvas-sunken); }
+.attachItemIcon { flex: none; width: var(--tpl-inbox-attach-icon); height: var(--tpl-inbox-attach-icon); margin-top: var(--tpl-inbox-row-line-gap); color: var(--color-ink-secondary); }
+.attachItemText { display: flex; min-width: 0; flex-direction: column; }
+.attachItemTitle { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; line-height: var(--tpl-inbox-row-preview-lh); }
+.attachItemNote { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-badge-lh); }
+
+/* 書く欄の上の札（名前・大きさ・×） */
+.attachChips { display: flex; flex-wrap: wrap; gap: var(--tpl-inbox-composer-gap); margin-bottom: var(--tpl-inbox-composer-gap); }
+.attachChip {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-composer-gap);
+  min-width: 0;
+  max-width: var(--tpl-inbox-attach-chip-max);
+  padding: var(--tpl-inbox-attach-chip-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+.attachChip[data-status='failed'] { outline-color: var(--color-danger); }
+.attachChipIcon { flex: none; width: var(--tpl-inbox-attach-icon); height: var(--tpl-inbox-attach-icon); color: var(--color-ink-secondary); }
+.attachChipText { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.attachChipName, .attachChipSub, .attachChipError { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachChipName { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-inbox-badge-lh); }
+.attachChipSub { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
+.attachChipError { color: var(--color-danger); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
+.attachChipRetry {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--tpl-inbox-chip-gap);
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.attachChipRetryIcon { width: var(--tpl-inbox-icon-sm); height: var(--tpl-inbox-icon-sm); }
+.attachChipRemove {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-inbox-chead-face);
+  height: var(--tpl-inbox-chead-face);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+.attachChipRemove:hover:not(:disabled) { background: var(--color-canvas); color: var(--color-ink); }
+.attachChipRemove:disabled { opacity: 0.4; cursor: default; }
+.attachChipRemoveIcon { width: var(--tpl-inbox-icon-md); height: var(--tpl-inbox-icon-md); }
+/* ドラッグで近づけている間は書く欄の枠を緑にする */
+.composer[data-drop-over] .inputBox { outline-color: var(--color-accent-deep); background: var(--color-accent-soft); }
+.attachNote { min-width: 0; flex: 1; overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
+.attachNote[data-error] { color: var(--color-danger); }
+.attachLead { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--tpl-inbox-composer-gap); }
+
+/* 会話の中の動画・ファイル */
+.sentVideo { display: block; width: var(--tpl-inbox-sent-video-w); max-width: 100%; border-radius: var(--tpl-inbox-composer-input-radius); background: var(--color-canvas-sunken); }
+.sentFile {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-composer-gap);
+  width: var(--tpl-inbox-sent-file-w);
+  max-width: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+a.sentFile:hover .sentFileName { text-decoration: underline; }
+.sentFileIcon { flex: none; width: var(--tpl-inbox-attach-icon); height: var(--tpl-inbox-attach-icon); color: var(--color-ink-secondary); }
+.sentFileText { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.sentFileName { overflow: hidden; color: var(--color-ink); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.sentFileSub { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
