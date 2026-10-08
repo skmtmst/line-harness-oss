@@ -85,3 +85,6 @@ scripts/visual-qa/v8-parity-out/
 
 # bnr G-6 のローカル比較画像・測定用の対応表。
 .g6-qa/
+
+# fdist G-7 のローカル撮影・比較結果。
+.g7-qa/

@@ -455,6 +455,8 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     render(<HqTemplatesV8 type="template" />)
     const dialog = await selectFolder()
     expect((within(dialog).getByRole('checkbox', { name: '別の種類のひな形' }) as HTMLInputElement).checked).toBe(true)
+    expect(within(dialog).getByText('本文')).toBeTruthy()
+    expect(within(dialog).getByText('カルーセル')).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: '2 件を 0 アカウントへ配る' }).hasAttribute('disabled')).toBe(true)
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '然 -NEN- 本店' }))
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '予約前日のご案内' }))
