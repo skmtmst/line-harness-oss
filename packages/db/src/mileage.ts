@@ -1,3 +1,4 @@
+import type { MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary } from '@line-crm/shared';
 import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
 import { matchesCondition, parseCondition, type SegmentCondition } from './segment-conditions.js';
 import { dbTableExists, jstNow } from './utils.js';
@@ -2672,6 +2673,7 @@ export interface MileageAdminHistoryItem {
 }
 
 export interface MileageAdminHistory {
+  friendSummary?: MileageFriendHistorySummary;
   items: MileageAdminHistoryItem[];
   pagination: { total: number; limit: number; offset: number };
 }
@@ -2940,6 +2942,8 @@ export async function getMileageAdminHistory(
      * 名前で探して100件から拾うと、同名が多いと本人がこぼれた。
      */
     friendId?: string;
+    kind?: MileageHistoryKind;
+    entryTypes?: MileageHistoryTypeFilter['entryTypes'];
     entryType?: MileageEntryType;
     status?: MileageEntryStatus;
     mode?: 'automatic' | 'manual';
@@ -3000,7 +3004,8 @@ export async function getMileageAdminHistory(
        )
   )`;
   const scopeBinds = [accountId, ...visibleAccountIds, ...visibleAccountIds];
-  const where = ["(? = '' OR sp.display_name LIKE '%' || ? || '%')"];
+  const searchColumn = options.friendId ? "lr.reason" : "sp.display_name";
+  const where = [`(? = '' OR ${searchColumn} LIKE '%' || ? || '%')`];
   const filters: unknown[] = [search, search];
   if (options.friendId) {
     where.push(`sp.identity_key = (
@@ -3009,9 +3014,18 @@ export async function getMileageAdminHistory(
     )`);
     filters.push(options.friendId);
   }
+  const earnedPredicate = "(lr.entry_type = 'grant' OR (lr.entry_type = 'adjustment' AND lr.amount > 0))";
+  const friendPredicate = options.friendId ? where[1] : undefined;
+  if (options.kind === 'earned') where.push(earnedPredicate);
+  if (options.kind === 'spent') where.push("lr.entry_type = 'spend'");
+  if (options.kind === 'voided') where.push(`NOT ${earnedPredicate} AND lr.entry_type != 'spend'`);
   if (options.entryType) {
     where.push('lr.entry_type = ?');
     filters.push(options.entryType);
+  }
+  if (options.entryTypes?.length) {
+    where.push(`lr.entry_type IN (SELECT value FROM json_each(?))`);
+    filters.push(JSON.stringify(options.entryTypes));
   }
   if (options.status) {
     where.push('lr.status = ?');
@@ -3032,7 +3046,7 @@ export async function getMileageAdminHistory(
   }
   const whereSql = where.join(' AND ');
 
-  const [rows, count] = await Promise.all([
+  const [rows, count, friendMetrics] = await Promise.all([
     db
       .prepare(
         `${ctes}
@@ -3085,9 +3099,33 @@ export async function getMileageAdminHistory(
       )
       .bind(...scopeBinds, ...filters)
       .first<{ total: number }>(),
+    friendPredicate ? db.prepare(`${ctes}
+      SELECT COUNT(*) AS total,
+        SUM(CASE WHEN ${earnedPredicate} THEN 1 ELSE 0 END) AS earned,
+        SUM(CASE WHEN lr.entry_type = 'spend' THEN 1 ELSE 0 END) AS spent,
+        SUM(CASE WHEN lr.status = 'pending' THEN 1 ELSE 0 END) AS pending,
+        date('now', '+9 hours', 'start of month') AS month_from,
+        SUM(CASE WHEN ${earnedPredicate} AND date(lr.occurred_at, '+9 hours') >= date('now', '+9 hours', 'start of month')
+          AND date(lr.occurred_at, '+9 hours') < date('now', '+9 hours', 'start of month', '+1 month')
+          THEN MAX(0, lr.amount) ELSE 0 END) AS month_amount,
+        SUM(CASE WHEN ${earnedPredicate} AND date(lr.occurred_at, '+9 hours') >= date('now', '+9 hours', 'start of month')
+          AND date(lr.occurred_at, '+9 hours') < date('now', '+9 hours', 'start of month', '+1 month')
+          THEN 1 ELSE 0 END) AS month_count
+      FROM ledger_rows lr JOIN selected_profiles sp ON sp.identity_key = lr.identity_key
+      WHERE ${friendPredicate}`).bind(...scopeBinds, options.friendId).first<{
+        total: number; earned: number; spent: number; pending: number; month_from: string; month_amount: number; month_count: number;
+      }>() : Promise.resolve(null),
   ]);
 
   return {
+    ...(friendMetrics ? { friendSummary: {
+      scope: 'visible_accounts' as const,
+      counts: { all: Number(friendMetrics.total), earned: Number(friendMetrics.earned ?? 0),
+        spent: Number(friendMetrics.spent ?? 0),
+        voided: Number(friendMetrics.total) - Number(friendMetrics.earned ?? 0) - Number(friendMetrics.spent ?? 0) },
+      pendingCount: Number(friendMetrics.pending ?? 0), monthFrom: friendMetrics.month_from,
+      earnedThisMonth: Number(friendMetrics.month_amount ?? 0), earnedCountThisMonth: Number(friendMetrics.month_count ?? 0),
+    } } : {}),
     items: rows.results.map((row) => ({
       id: row.id,
       primaryFriendId: row.primary_friend_id,

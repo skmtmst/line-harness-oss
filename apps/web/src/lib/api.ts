@@ -1,4 +1,5 @@
 import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
+import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts, BannerGenerationCreateOptions, RichMenuGroupListOptions } from '@line-crm/shared'
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
 import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
@@ -3510,6 +3511,7 @@ export type MileageAdminHistoryItem = {
   occurredAt: string
 }
 export type MileageAdminHistory = {
+  friendSummary?: MileageFriendHistorySummary
   items: MileageAdminHistoryItem[]
   pagination: { total: number; limit: number; offset: number }
   summary: {
@@ -3992,7 +3994,7 @@ export type ReminderDeliveryRunsResponse = {
     sentThisMonth: number
     /** 今後7日以内（期限切れの未送分を含む）に送る予定の件数。 */
     scheduledNext7Days: number
-  }
+  } & ReminderScheduleMetrics
   steps: Array<{
     id: string
     stepNumber: number
@@ -4878,7 +4880,7 @@ export type EcIdentityCandidateOperationsList = {
     impact: IdentityCandidateImpactMetric[]
     detectedAt: string
     reviewedAt: string | null
-  }>
+  } & EcIdentityDuplicateSignal>
   total: number
   summary: EcIdentityCandidateSummary
 }
@@ -5039,6 +5041,7 @@ export type LineNotificationMetrics = {
  * 全期間合計でもない。
  */
 export type LineNotificationSendCounts = {
+  failures: CustomerNotificationFailureCounts
   sentToday: number
   sentLast30d: number
   byEventType: Array<{ eventType: string; today: number; last30d: number }>
@@ -9125,9 +9128,10 @@ export const api = {
           body: JSON.stringify({}),
         }),
       /** 条件を登録するだけ。画像はまだ作らない。 */
-      createGeneration: (id: string, input: BannerGenerationInput) =>
+      createGeneration: (id: string, input: BannerGenerationInput, options?: BannerGenerationCreateOptions) =>
         fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/projects/${encodeURIComponent(id)}/generations`, {
           method: 'POST',
+          headers: options?.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : undefined,
           body: JSON.stringify(input),
         }),
       /** 手持ちの画像を取り込む。data は base64（data: なし）。 */
@@ -11944,9 +11948,11 @@ export const api = {
     /** 実行結果（設計 `GC4St`）。状態・検索・ページ送りは Worker が受ける。 */
     runs: (
       reminderId: string,
-      params?: { status?: ReminderDeliveryRunStatus; search?: string; limit?: number; offset?: number },
+      params?: { status?: ReminderDeliveryRunStatus; search?: string; limit?: number; offset?: number } & ReminderRunReadOptions,
     ) => {
       const query = new URLSearchParams()
+      if (params?.order) query.set('order', params.order)
+      if (params?.executedOnly !== undefined) query.set('executedOnly', String(params.executedOnly))
       if (params?.status) query.set('status', params.status)
       if (params?.search) query.set('search', params.search)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
@@ -12248,6 +12254,8 @@ export const api = {
       search?: string
       /** V6R-CX-e: この友だちと同じ人の履歴だけ。 */
       friendId?: string
+      kind?: MileageHistoryKind
+      entryTypes?: MileageHistoryTypeFilter['entryTypes']
       entryType?: MileageHistoryItem['entryType']
       status?: MileageHistoryItem['status']
       mode?: 'automatic' | 'manual'
@@ -12259,6 +12267,8 @@ export const api = {
       const query = new URLSearchParams({ accountId: params.accountId })
       if (params.search) query.set('search', params.search)
       if (params.friendId) query.set('friendId', params.friendId)
+      if (params.kind) query.set('kind', params.kind)
+      if (params.entryTypes?.length) query.set('entryTypes', params.entryTypes.join(','))
       if (params.entryType) query.set('entryType', params.entryType)
       if (params.status) query.set('status', params.status)
       if (params.mode) query.set('mode', params.mode)
@@ -12474,7 +12484,7 @@ export const api = {
         fetchApi<ApiResponse<IncomingWebhookDetail>>(
           `/api/webhooks/incoming/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret: string }, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret: string } & WebhookCreateState, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhookCreated>>('/api/webhooks/incoming', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
@@ -12532,7 +12542,7 @@ export const api = {
         fetchApi<ApiResponse<OutgoingWebhook>>(
           `/api/webhooks/outgoing/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number } & WebhookCreateState, stepUpToken?: string) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
@@ -12950,14 +12960,7 @@ export const api = {
     },
   },
   richMenuGroups: {
-    listPage: (accountId: string, input: {
-      page?: number
-      limit?: number
-      query?: string
-      folderId?: string
-      filter?: string
-      sort?: 'priority' | 'taps' | 'updated' | 'name'
-    } = {}) => {
+    listPage: (accountId: string, input: RichMenuGroupListOptions = {}) => {
       const query = new URLSearchParams({ accountId })
       query.set('page', String(input.page ?? 1))
       query.set('limit', String(input.limit ?? 50))
@@ -14953,6 +14956,10 @@ export const bookingApi = {
       method: 'POST',
       headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
       body: JSON.stringify(body),
+    }),
+  reorderMenus: (accountId: string, body: BookingMenuReorderRequest) =>
+    fetchApi<BookingMenuReorderResponse>(withAccount('/api/booking/admin/menus/order', accountId), {
+      method: 'PUT', body: JSON.stringify(body),
     }),
   updateMenu: (accountId: string, id: string, expectedVersion: number, body: Partial<BookingMenu>) =>
     fetchApi<{ ok: true; version: number }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {

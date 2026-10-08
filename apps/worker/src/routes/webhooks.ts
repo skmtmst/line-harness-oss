@@ -552,7 +552,10 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
     if (!await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
       return stepUpRequiredResponse(c, '秘密の値の登録には本人確認が必要です');
     }
-    const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId: string; folderId?: unknown }>();
+    const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId: string; folderId?: unknown; isActive?: boolean }>();
+    if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
+      return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
+    }
     const nameError = validateWebhookName(body.name);
     if (nameError) {
       return c.json({ success: false, error: nameError }, 400);
@@ -567,6 +570,7 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
     const item = await createIncomingWebhook(c.env.DB, {
+      ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
       name: body.name,
       sourceType: body.sourceType,
       folderId: body.folderId,
@@ -1083,8 +1087,12 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       secret?: string;
       maxRetries?: unknown;
       folderId?: unknown;
+      isActive?: boolean;
       lineAccountId: string;
     }>();
+    if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
+      return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
+    }
     const nameError = validateWebhookName(body.name);
     if (nameError) {
       return c.json({ success: false, error: nameError }, 400);
@@ -1115,6 +1123,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
     const item = await createOutgoingWebhook(c.env.DB, {
+      ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
       name: body.name,
       url: body.url,
       folderId: body.folderId,

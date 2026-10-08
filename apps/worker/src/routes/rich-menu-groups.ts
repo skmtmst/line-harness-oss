@@ -1247,7 +1247,6 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
     const imageByGroupId = new Map<string, { key: string; contentType: string | null }>();
     const shapeByGroupId = new Map<string, { pageCount: number; areaCount: number }>();
     if (pageItems.length > 0) {
-      const placeholders = pageItems.map(() => '?').join(',');
       const result = await c.env.DB
         .prepare(
           `SELECT
@@ -1266,9 +1265,9 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
               (SELECT p2.id FROM rich_menu_pages p2 WHERE p2.group_id = g.id ORDER BY p2.order_index LIMIT 1)
             )) AS default_area_count
            FROM rich_menu_groups g
-          WHERE g.id IN (${placeholders})`,
+          WHERE g.account_id = ? AND g.id IN (SELECT value FROM json_each(?))`,
         )
-        .bind(...pageItems.map((g) => g.id))
+        .bind(accountId, JSON.stringify(pageItems.map((g) => g.id)))
         .all<{
           group_id: string;
           image_r2_key: string | null;

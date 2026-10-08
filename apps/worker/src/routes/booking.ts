@@ -1,3 +1,5 @@
+import { reorderBookingMenus } from '@line-crm/db';
+import type { BookingMenuReorderRequest } from '@line-crm/shared';
 import { getBookingSyncRules, saveBookingSyncRules, validateBookingSyncRules, listBookingSyncNotices } from '@line-crm/db';
 import { evaluateBookingSyncNotices } from '../services/booking-sync-rules.js';
 import { openSeatTables, closuresForRange, closureAffectsTable } from '../services/restaurant-closures.js';
@@ -3247,6 +3249,23 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), a
   // 作った時点の中身を最初の版として残す（T）。
   await recordMenuVersion(c.env.DB, { menuId: id, staffId: c.get('staff')?.id ?? null });
   return c.json({ id, version: 1 }, 201);
+});
+
+booking.put('/api/booking/admin/menus/order', requirePermission(BOOKING_MENUS_KEY), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const body = await c.req.json<BookingMenuReorderRequest>().catch(() => null);
+  const changes = body?.changes;
+  if (!Array.isArray(changes) || changes.length < 1 || changes.length > 1000 ||
+      changes.some((item) => !item || typeof item.id !== 'string' || !item.id ||
+        !Number.isInteger(item.expectedVersion) || item.expectedVersion < 1 || !Number.isSafeInteger(item.sortOrder)) ||
+      new Set(changes.map((item) => item.id)).size !== changes.length) {
+    return c.json({ error: 'invalid_menu_order' }, 400);
+  }
+  if (!await reorderBookingMenus(c.env.DB, accountId, changes, c.get('staff')?.id ?? null)) {
+    return c.json({ success: false, code: 'version_conflict', error: '予約メニューが更新されています。読み直してください' }, 409);
+  }
+  return c.json({ ok: true, versions: changes.map((item) => ({ id: item.id, version: item.expectedVersion + 1 })) });
 });
 
 booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY), async (c) => {
