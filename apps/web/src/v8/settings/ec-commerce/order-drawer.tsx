@@ -10,14 +10,13 @@
  * 「もう一度やる」・会員のつき合わせへ・ECの管理画面で開く を同じ場所に残す。
  * 届き済みの出来事は1行に畳み、止まった・失敗したものだけ下に理由を足す。
  */
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { X } from 'lucide-react'
+import { Link2, ExternalLink } from 'lucide-react'
 import { ecEventLabel } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Drawer from '@/components/shared/drawer'
 import { ApiError, api, type EcActionExecution, type EcOrderDetail, type EcOrderDetailEvent } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import {
@@ -83,7 +82,7 @@ function TimeRow({ time, children, extra }: { time: string; children: ReactNode;
 }
 
 /** 出来事1件。届いて済んだものは1行。止まった・失敗したものは理由と「もう一度やる」を足す。 */
-function EventRow({ event, retryingId, onRetry }: { event: EcOrderDetailEvent; retryingId: string | null; onRetry: (action: EcActionExecution) => void }) {
+function EventRow({ event, retryingId, onRetry, canEdit }: { event: EcOrderDetailEvent; retryingId: string | null; canEdit: boolean; onRetry: (action: EcActionExecution) => void }) {
   const statusInfo = EVENT_STATUS_TEXT[event.status] ?? { label: event.status, tone: 'muted' as const }
   const stoppedStage = eventStoppedStage(event)
   const troubled = event.actions.filter((action) => action.status !== 'succeeded')
@@ -110,7 +109,7 @@ function EventRow({ event, retryingId, onRetry }: { event: EcOrderDetailEvent; r
                   {action.attempts.length > 1 ? `・手動で戻した ${action.attempts.filter((attempt) => attempt.triggerKind === 'manual').length}回` : ''}
                 </span>
                 {kind && (action.status === 'retryable_failed' || action.status === 'permanent_failed' || action.status === 'skipped') ? <span className={styles.hint}>{kind.hint}</span> : null}
-                {action.retryAvailable ? (
+                {canEdit && action.retryAvailable ? (
                   <Button type="button" disabled={retryingId === action.id} onClick={() => onRetry(action)} busy={retryingId === action.id} busyLabel="戻しています…">もう一度やる</Button>
                 ) : null}
               </span>
@@ -140,18 +139,16 @@ export default function OrderDrawer({
   onClose,
   onRetryAction,
   retryingId,
+  canEdit = true,
 }: {
   orderId: string | null
   accountId: string | null
   onClose: () => void
   onRetryAction: (action: EcActionExecution) => Promise<void>
   retryingId: string | null
+  canEdit?: boolean
 }) {
   const open = orderId !== null
-  const titleId = useId()
-  const ref = useOverlayFocus(open, onClose, false)
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
   const [state, setState] = useState<DetailState>('loading')
   const [detail, setDetail] = useState<EcOrderDetail | null>(null)
   const loadSeq = useRef(0)
@@ -206,27 +203,20 @@ export default function OrderDrawer({
     ? detail.outcomes.conversions.length === 0 && detail.outcomes.mileage.length === 0 && detail.outcomes.scores.length === 0
     : true
 
-  const panel = (
-    <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <aside className={styles.drawer} role="dialog" aria-modal="true" aria-labelledby={titleId} data-design-node="nAesv" ref={ref} tabIndex={-1}>
-        <header className={styles.head}>
-          <div className={styles.headText}>
-            <h2 id={titleId} className={styles.title}>{order ? `注文 ${order.orderNumber}` : '注文の状況'}</h2>
-            {order ? (
-              <p className={styles.sub}>
-                {/* 結びついていればお客さまの名前から友だちへ、いなければ会員のつき合わせへ行ける。 */}
-                {friendId && order.customerName
-                  ? <Link className={styles.subLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}`}>{`${order.customerName}さん`}</Link>
-                  : order.customerName ? `${order.customerName}さん` : null}
-                {`${order.customerName ? '・' : ''}${friendId ? 'LINE の友だちと結びついています' : 'LINE の友だちと結びついていません'}${ORDER_STATUS_TEXT[order.status] ? `・${ORDER_STATUS_TEXT[order.status]}` : ''}`}
-                {friendId ? null : <>{'・'}<Link className={styles.link} href="/ec-commerce/identity-candidates">会員のつき合わせへ</Link></>}
-              </p>
-            ) : null}
-          </div>
-          <button type="button" className={styles.close} aria-label="閉じる" onClick={onClose}><X size={16} aria-hidden="true" /></button>
-        </header>
-
-        <div className={styles.body}>
+  return (
+    <Drawer open={open} width="order" title={order ? `注文 ${order.orderNumber}` : '注文の状況'}
+      description={order ? <>
+        {friendId && order.customerName
+          ? <Link className={styles.subLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}`}>{`${order.customerName}さん`}</Link>
+          : order.customerName ? `${order.customerName}さん` : null}
+        {`${order.customerName ? '・' : ''}${friendId ? 'LINE の友だちと結びついています' : 'LINE の友だちと結びついていません'}${ORDER_STATUS_TEXT[order.status] ? `・${ORDER_STATUS_TEXT[order.status]}` : ''}`}
+      </> : undefined}
+      onClose={onClose}
+      footer={order ? <>
+        <Button href="/ec-commerce/identity-candidates"><Link2 size={14} aria-hidden="true" />会員のつき合わせへ</Button>
+        {order.detailUrl ? <Button href={order.detailUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} aria-hidden="true" />ECの管理画面で開く</Button> : null}
+      </> : undefined}
+    >
           {state === 'loading' ? (
             <ListState kind="loading" title="注文の状況を読み込んでいます" />
           ) : state === 'forbidden' ? (
@@ -247,7 +237,6 @@ export default function OrderDrawer({
                     <dt>EC側の注文</dt>
                     <dd>
                       {`${shortTime(order.orderedAt)} 注文`}
-                      {order.detailUrl ? <>{'・'}<a className={styles.link} href={order.detailUrl} target="_blank" rel="noreferrer">ECの管理画面で開く</a></> : null}
                     </dd>
                   </div>
                 </dl>
@@ -257,7 +246,7 @@ export default function OrderDrawer({
                 <h3 className={styles.sectionTitle}>この注文に届いた出来事</h3>
                 {detail.events.length === 0 ? <p className={styles.empty}>届いた出来事はありません。</p> : (
                   <ul className={styles.timeline}>
-                    {detail.events.map((event) => <EventRow key={event.id} event={event} retryingId={retryingId} onRetry={(action) => void retry(action)} />)}
+                    {detail.events.map((event) => <EventRow key={event.id} canEdit={canEdit} event={event} retryingId={retryingId} onRetry={(action) => void retry(action)} />)}
                   </ul>
                 )}
               </section>
@@ -331,9 +320,6 @@ export default function OrderDrawer({
               <p className={styles.footHint}>もう一度行う・再取込では、届き済みの通知や入った成果・マイルは重ねません。</p>
             </>
           )}
-        </div>
-      </aside>
-    </div>
+    </Drawer>
   )
-  return mounted ? createPortal(panel, document.body) : panel
 }
