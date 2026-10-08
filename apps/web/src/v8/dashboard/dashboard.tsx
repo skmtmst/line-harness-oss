@@ -354,7 +354,7 @@ export default function DashboardV8() {
           <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
         </div>
       ) : null}
-      {start.summary ? <FirstStepsCard summary={start.summary} onDismiss={start.dismiss} /> : null}
+      {start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
       {d.error ? (
         <div className={styles.errorBand} role="alert">
           <span>{d.error}</span>
