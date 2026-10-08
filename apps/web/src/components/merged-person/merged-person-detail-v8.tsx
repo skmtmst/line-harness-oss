@@ -4,12 +4,12 @@
  * ★V8 統合ユーザーの詳細（Pencil `Hn9eE`、採用版の流れは `sdbsQ` 板3）。
  *
  * v7（w8W4Eh）と同じ `useMergedPerson` を使う。違いは見せ方——
- * 「← 統合ユーザーへ」で一覧へ戻り、左に「配信に使う」の切替・結び付き・
+ * 一覧へは上の帯のパンくず（統合ユーザー）で戻り（板の頭の戻るは 2026-10-08 に無くした）、左に「配信に使う」の切替・結び付き・
  * 履歴、右に「使っている値」と「使う値を直す」を置く。
  * 「配信に使う」は行ごとのスイッチで即保存（expectedRevision つき）。
  * 見るだけの担当者（staff）は変更口を隠さず押せない形にする（SXCb3）。
  */
-import { ArrowLeft, PencilLine, Unlink } from 'lucide-react'
+import { PencilLine, Unlink } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -80,14 +80,6 @@ export default function MergedPersonDetailViewV8({
 
   return (
     <div className={styles.board} data-design-node="Hn9eE">
-      <div className={styles.manageNav}>
-        <nav aria-label="データ管理の中の現在地" className={styles.manageCrumbs}>
-          <button type="button" onClick={onClose} className={styles.crumbButton}>
-            <ArrowLeft size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> 統合ユーザーへ
-          </button>
-        </nav>
-      </div>
-
       <div className={styles.head}>
         <div className={styles.headText}>
           <h2 className={styles.headTitle}>{person.primaryDisplayName}</h2>

@@ -1,4 +1,5 @@
 import { LineClient } from '@line-crm/line-sdk';
+import type { Message } from '@line-crm/line-sdk';
 import { normalizeTimeZone, tzDateStr, tzHHMM } from './availability.js';
 
 export type NotificationKind =
@@ -95,12 +96,14 @@ export interface SendNotificationParams {
    * (client が成功として扱う)。未指定なら付けずに従来どおり送る。
    */
   retryKey?: string;
+  /** 組み立て済みの通知。予約リマインダの再送は保存した本文をそのまま使う。 */
+  messages?: Message[];
 }
 
 export async function sendBookingNotification(params: SendNotificationParams): Promise<void> {
-  const text = renderNotificationText(params.kind, params.ctx);
+  const messages = params.messages ?? [{ type: 'text' as const, text: renderNotificationText(params.kind, params.ctx) }];
   const client = new LineClient(params.channelAccessToken);
-  await client.pushMessage(params.toLineUserId, [{ type: 'text', text }], params.retryKey);
+  await client.pushMessage(params.toLineUserId, messages, params.retryKey);
 }
 
 export type BookingNotificationSender = (params: SendNotificationParams) => Promise<void>;
