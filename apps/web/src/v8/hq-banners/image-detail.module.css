@@ -55,10 +55,10 @@
 .dot { width: var(--tpl-hb-dot); height: var(--tpl-hb-dot); border-radius: var(--radius-pill); background: currentColor; }
 .deliverFoot { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
 
-.conditions { display: flex; flex-direction: column; gap: 6px; }
+.conditions { display: flex; flex-direction: column; gap: var(--tpl-hb-conditions-gap); }
 .conditionCols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--tpl-hb-detail-col-gap); }
 .conditionCol { display: flex; flex-direction: column; gap: 0; margin: 0; }
-.conditionRow { display: flex; gap: var(--tpl-hb-condition-label-gap); padding: 5px 0 6px; border-top: 1px solid var(--color-hairline); }
+.conditionRow { display: flex; gap: var(--tpl-hb-condition-label-gap); padding: var(--tpl-hb-condition-row-pad); border-top: 1px solid var(--color-hairline); }
 .conditionRow dt { width: var(--tpl-hb-condition-label-w); flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-hb-small-lh); }
 .conditionRow dd { flex: 1; min-width: 0; margin: 0; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-hb-condition-lh); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* テキストは行ごとに出す（1行目・2行目…）。ほかは1行で切り、全文は title で読む。 */
