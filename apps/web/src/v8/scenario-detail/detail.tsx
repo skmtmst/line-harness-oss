@@ -1813,6 +1813,7 @@ export default function ScenarioDetailV8({
               </Button>
             </div>
             <QuestionEditor
+              accountId={scenario?.lineAccountId ?? null}
               value={stepForm.question}
               onChange={(next) => setStepForm({ ...stepForm, question: next })}
               onOpenChoiceActions={
@@ -1892,6 +1893,7 @@ export default function ScenarioDetailV8({
             {stepForm.messageType === 'carousel' ? (
               // カルーセルはテンプレートを指す形。中身はそちらが持つ。
               <CarouselPicker
+                accountId={scenario?.lineAccountId ?? null}
                 value={stepForm.templateId ?? ''}
                 onChange={(id, tpl) =>
                   setStepForm((prev) => ({
@@ -3384,6 +3386,7 @@ export default function ScenarioDetailV8({
       {/* アクション設定 */}
       {actionTarget && (
         <ActionEditor
+          accountId={scenario?.lineAccountId ?? null}
           scenarioId={id}
           hook={actionTarget.hook}
           stepId={actionTarget.stepId}

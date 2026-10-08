@@ -252,6 +252,7 @@ export interface QuestionEditorProps {
   /** 選択肢ごとのアクション設定を開く。保存済みの通でだけ使える。 */
   onOpenChoiceActions?: (choiceIndex: number) => void
   /** 質問テンプレートのように、選択肢を横に見比べる画面。 */
+  accountId?: string | null
   choiceColumns?: boolean
 }
 
@@ -260,31 +261,42 @@ export default function QuestionEditor({
   onChange,
   onOpenChoiceActions,
   choiceColumns = false,
+  accountId,
 }: QuestionEditorProps) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId: contextAccountId } = useAccount()
+  const selectedAccountId = accountId === undefined ? contextAccountId : accountId
   /* 見出しの文字と欄をつなぐための番号。同じ画面に複数置いても重ならない。 */
   const fieldBase = useId()
+  const [referenceLoading, setReferenceLoading] = useState(true)
+  const [referenceError, setReferenceError] = useState(false)
+  const [referenceRetry, setReferenceRetry] = useState(0)
   const [tags, setTags] = useState<{ id: string; name: string }[]>([])
   const [fields, setFields] = useState<{ id: string; name: string }[]>([])
   const [scenarios, setScenarios] = useState<{ id: string; name: string }[]>([])
   const [openChoice, setOpenChoice] = useState<number | null>(0)
 
   useEffect(() => {
-    if (!selectedAccountId) {
-      setFields([])
-      return
-    }
+    let cancelled = false
+    setTags([]); setFields([]); setScenarios([]); setReferenceError(false)
+    setReferenceLoading(Boolean(selectedAccountId))
+    if (!selectedAccountId) return
     void (async () => {
-      const [tagRes, fieldRes, scenarioRes] = await Promise.all([
-        scenarioReferenceData.tags(selectedAccountId),
-        scenarioReferenceData.friendFields(selectedAccountId),
-        scenarioReferenceData.scenarios(selectedAccountId),
-      ])
-      if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
-      if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
-      if (scenarioRes.success) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
+      try {
+        const [tagRes, fieldRes, scenarioRes] = await Promise.all([
+          scenarioReferenceData.tags(selectedAccountId),
+          scenarioReferenceData.friendFields(selectedAccountId),
+          scenarioReferenceData.scenarios(selectedAccountId),
+        ])
+        if (cancelled) return
+        if (!tagRes.success || !fieldRes.success || !scenarioRes.success) throw new Error('候補を取得できませんでした')
+        if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
+        if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
+        if (scenarioRes.success) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
+      } catch { if (!cancelled) setReferenceError(true) }
+      finally { if (!cancelled) setReferenceLoading(false) }
     })()
-  }, [selectedAccountId])
+    return () => { cancelled = true }
+  }, [selectedAccountId, referenceRetry])
 
   const setChoice = (index: number, patch: Partial<QuestionChoice>) => {
     const choices = [...value.choices]
@@ -294,6 +306,7 @@ export default function QuestionEditor({
 
   return (
     <div className="space-y-5">
+      {referenceError && <p role="alert">候補を取得できませんでした。<Button onClick={() => setReferenceRetry(value => value + 1)}>もう一度読み込む</Button></p>}
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <label htmlFor={`${fieldBase}-intro`} className="text-ink-secondary text-xs font-medium">前文</label>
@@ -498,7 +511,7 @@ export default function QuestionEditor({
                         ).map((opt) => (
                           <RadioCard
                             key={opt.value}
-                            name={`${fieldBase}-restart`}
+                            name={`${fieldBase}-${choice.key ?? index}-restart`}
                             value={opt.value}
                             checked={(choice.scenario?.restart ?? 'from_start') === opt.value}
                             onChange={() =>
@@ -617,12 +630,14 @@ export default function QuestionEditor({
                     </div>
 
                     <TagPicker
+                      status={referenceError ? 'error' : referenceLoading ? 'loading' : 'ready'}
                       label="選択時に追加するタグ"
                       tags={tags}
                       selected={choice.addTagIds ?? []}
                       onChange={(ids) => setChoice(index, { addTagIds: ids })}
                     />
                     <TagPicker
+                      status={referenceError ? 'error' : referenceLoading ? 'loading' : 'ready'}
                       label="選択時にはずすタグ"
                       tags={tags}
                       selected={choice.removeTagIds ?? []}
@@ -705,11 +720,13 @@ export default function QuestionEditor({
 }
 
 function TagPicker({
+  status = 'ready',
   label,
   tags,
   selected,
   onChange,
 }: {
+  status?: 'loading' | 'ready' | 'error'
   label: string
   tags: { id: string; name: string }[]
   selected: string[]
@@ -752,7 +769,7 @@ function TagPicker({
             size="full"
           />
         ) : (
-          <span className="text-ink-faint text-xs">タグがまだありません</span>
+          <span className="text-ink-faint text-xs">{status === 'loading' ? '読み込んでいます' : status === 'error' ? '候補を取得できませんでした' : 'タグがまだありません'}</span>
         )}
       </div>
     </div>

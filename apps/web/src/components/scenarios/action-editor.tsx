@@ -286,6 +286,7 @@ export function findConditionDraftIssue(draft: SegmentCondition | null): string 
 
 export interface ActionEditorProps {
   scenarioId: string
+  accountId?: string | null
   hook: ScenarioActionHook
   stepId?: string | null
   choiceIndex?: number | null
@@ -298,6 +299,7 @@ export interface ActionEditorProps {
 
 export default function ActionEditor({
   scenarioId,
+  accountId,
   hook,
   stepId = null,
   choiceIndex = null,
@@ -305,9 +307,15 @@ export default function ActionEditor({
   onClose,
   onChanged,
 }: ActionEditorProps) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId: contextAccountId } = useAccount()
+  const selectedAccountId = accountId === undefined ? contextAccountId : accountId
   // 共通の窓の約束: Escapeで閉じる・Tabは窓の中・閉じたら起点へ戻す。
-  const panelRef = useOverlayFocus(true, onClose)
+  const pendingRef = useRef(0)
+  const [pendingCount, setPendingCount] = useState(0)
+  const errorRef = useRef('')
+  const retryRef = useRef<(() => Promise<void>) | null>(null)
+  const closeWhenSaved = () => { if (!pendingRef.current && !errorRef.current) onClose() }
+  const panelRef = useOverlayFocus(true, closeWhenSaved)
   // 任意機能の動作種は、そのaccountで機能がオフなら追加口ごと出さない。
   const actionFeatureVisibility = useFeatureVisibility(selectedAccountId)
   const [actions, setActions] = useState<ScenarioAction[]>([])
@@ -317,7 +325,13 @@ export default function ActionEditor({
     setActions(next)
   }
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [draftReady, setDraftReady] = useState(false)
+  const [reload, setReload] = useState(0)
+  const scope = `${scenarioId}:${selectedAccountId}:${hook}:${stepId}:${choiceIndex}`
+  const scopeRef = useRef(scope)
+  scopeRef.current = scope
+  const [error, setErrorState] = useState('')
+  const setError = (message: string) => { errorRef.current = message; setErrorState(message) }
   const [conditionFor, setConditionFor] = useState<string | null>(null)
   /*
    * R243: 条件は編集中の下書きとして持ち、保存のときだけ整える。
@@ -363,10 +377,11 @@ export default function ActionEditor({
 
   /* 一覧の取得。表示の作り直しは呼び出し側が決める。 */
   const fetchActions = useCallback(async (): Promise<ScenarioAction[]> => {
+    const at = `${scenarioId}:${selectedAccountId}:${hook}:${stepId}:${choiceIndex}`
     const res = await api.scenarios.actions.list(scenarioId)
+    if (scopeRef.current !== at) return []
     if (!res.success) {
-      setError(res.error)
-      return actionsRef.current
+      throw new Error(res.error)
     }
     return res.data.filter(
         (a) =>
@@ -374,24 +389,28 @@ export default function ActionEditor({
           (a.stepId ?? null) === (stepId ?? null) &&
           (a.choiceIndex ?? null) === (choiceIndex ?? null),
       )
-  }, [scenarioId, hook, stepId, choiceIndex])
+  }, [scenarioId, selectedAccountId, hook, stepId, choiceIndex])
 
   /* 初回の読み込みだけ「読み込んでいます」を出す。R244: 保存のたびに
    * 作り直して編集欄を閉じないよう、更新時は黙って入れ替える。 */
   const load = useCallback(async (): Promise<ScenarioAction[]> => {
+    const at = scopeRef.current
     setLoading(true)
-    const next = await fetchActions()
-    setActionsSync(next)
-    if (initialRef.current === null) initialRef.current = next
-    setLoading(false)
-    return next
+    try {
+      const next = await fetchActions()
+      if (scopeRef.current !== at) return []
+      setActionsSync(next)
+      if (initialRef.current === null) initialRef.current = next
+      return next
+    } finally { if (scopeRef.current === at) setLoading(false) }
   }, [fetchActions])
 
   /* 保存後の読み直し。開いている編集欄・入力焦点を残すため、読み込み中の
    * 表示には切り替えない。 */
   const refresh = useCallback(async (): Promise<ScenarioAction[]> => {
+    const at = scopeRef.current
     const next = await fetchActions()
-    setActionsSync(next)
+    if (scopeRef.current === at) setActionsSync(next)
     return next
   }, [fetchActions])
 
@@ -400,13 +419,21 @@ export default function ActionEditor({
       setError('LINE公式アカウントを選んでください')
       return false
     }
+    const at = scopeRef.current
     setDraftSaving(true)
     try {
+      const current = await api.scenarios.getDraft(scenarioId, selectedAccountId)
+      if (at !== scopeRef.current) return false
+      if (!current.success) throw new Error(current.error)
+      const siblings = (current.data?.afterActions ?? []).filter((action) =>
+        action.hook !== hook || (action.stepId ?? null) !== stepId ||
+        (action.choiceKey ?? null) !== (choiceIndex === null ? null : String(choiceIndex)))
       const response = await api.scenarios.saveDraft(scenarioId, {
         lineAccountId: selectedAccountId,
         expectedVersion: draftVersionRef.current,
-        afterActions: toDraftActions(next),
+        afterActions: [...siblings, ...toDraftActions(next)],
       })
+      if (at !== scopeRef.current) return false
       if (!response.success) {
         setError(response.error)
         return false
@@ -415,45 +442,75 @@ export default function ActionEditor({
       setDraftVersion(response.data.version)
       return true
     } catch (saveError) {
+      if (at !== scopeRef.current) return false
       setError(saveError instanceof Error ? saveError.message : 'V6下書きを保存できませんでした')
       return false
     } finally {
-      setDraftSaving(false)
+      if (at === scopeRef.current) setDraftSaving(false)
     }
   }
 
   /* 保存は1本の列に並べる。打ち続けても順序が入れ替わらない。 */
-  const enqueue = (task: () => Promise<void>) => {
-    const run = saveQueueRef.current.then(task, task)
-    saveQueueRef.current = run.catch(() => {})
+  const enqueue = (task: () => Promise<void>, retrySafe = false) => {
+    const at = scopeRef.current
+    pendingRef.current += 1
+    setPendingCount(pendingRef.current)
+    const run = saveQueueRef.current.then(() => { if (at === scopeRef.current) return task() }).catch((caught) => {
+      if (at !== scopeRef.current) return
+      setError(caught instanceof Error ? caught.message : '保存できませんでした。')
+      retryRef.current = retrySafe ? async () => {
+        // 古い操作の写しを再送せず、その後に打ち足した現在の入力を保存する。
+        const latest = actionsRef.current
+        for (const action of latest) {
+          const response = await api.scenarios.actions.update(scenarioId, action.id, {
+            config: action.config, condition: action.condition,
+            repeatOnRefire: action.repeatOnRefire, sortOrder: action.sortOrder,
+          })
+          if (!response.success) throw new Error(response.error)
+        }
+        if (!await saveDraftSnapshot(latest)) throw new Error(errorRef.current || '下書きを保存できませんでした')
+        onChanged?.()
+      } : null
+    }).finally(() => {
+      pendingRef.current -= 1
+      setPendingCount(pendingRef.current)
+    })
+    saveQueueRef.current = run
     return run
   }
 
   useEffect(() => {
     let cancelled = false
+    setActionsSync([]); initialRef.current = null; setError(''); setDraftReady(false)
+    draftVersionRef.current = 0; setDraftVersion(0); setDraftSaving(false)
     void Promise.all([
       load(),
       selectedAccountId
-        ? api.scenarios.getDraft(scenarioId, selectedAccountId).catch(() => null)
+        ? api.scenarios.getDraft(scenarioId, selectedAccountId)
         : Promise.resolve(null),
     ]).then(([, draftResponse]) => {
       if (cancelled) return
+      if (!draftResponse?.success) { setError('下書きを取得できませんでした。もう一度読み込んでください。'); return }
+      setDraftReady(true)
       const version = draftResponse?.success && draftResponse.data ? draftResponse.data.version : 0
       draftVersionRef.current = version
       setDraftVersion(version)
-    })
+    }).catch((caught) => { if (!cancelled) setError(caught instanceof Error ? caught.message : '取得できませんでした。') })
     return () => {
       cancelled = true
     }
-  }, [load, scenarioId, selectedAccountId])
+  }, [load, scenarioId, selectedAccountId, reload])
 
   useEffect(() => {
+    let cancelled = false
+    setTags([]); setFields([]); setMarks([]); setScenarioOpts([]); setVars([]); setTemplates([]); setReminders([]); setEvents([])
     if (!selectedAccountId) {
       setMarks([])
       return
     }
     void (async () => {
       setTargetsLoading(true)
+      try {
       const toOption = (row: unknown): Option => {
         const record = (row ?? {}) as Record<string, unknown>
         return {
@@ -472,6 +529,8 @@ export default function ActionEditor({
           scenarioReferenceData.reminders(selectedAccountId),
           scenarioReferenceData.events(selectedAccountId),
         ])
+      if (cancelled) return
+      if ([tagRes, fieldRes, markRes, scenarioRes, varRes, templateRes, reminderRes, eventRes].some(response => !response.success)) throw new Error('Reference data failed')
       if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
       if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
       if (markRes.success) setMarks(markRes.data.map((m) => ({ id: m.id, name: m.name })))
@@ -503,9 +562,11 @@ export default function ActionEditor({
           }),
         )
       }
-      setTargetsLoading(false)
+      } catch { if (!cancelled) setError('候補を取得できませんでした。もう一度お試しください。') }
+      finally { if (!cancelled) setTargetsLoading(false) }
     })()
-  }, [scenarioId, selectedAccountId])
+    return () => { cancelled = true }
+  }, [scenarioId, selectedAccountId, reload])
 
   const add = (kind: (typeof ACTION_KINDS)[number]) => {
     setError('')
@@ -519,11 +580,10 @@ export default function ActionEditor({
         repeatOnRefire: true,
       })
       if (!res.success) {
-        setError(res.error)
-        return
+        throw new Error(res.error)
       }
       const fresh = await refresh()
-      await saveDraftSnapshot(fresh)
+      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
       onChanged?.()
     })
   }
@@ -544,12 +604,11 @@ export default function ActionEditor({
         sortOrder: patch.sortOrder ?? action.sortOrder,
       })
       if (!res.success) {
-        setError(res.error)
-        return
+        throw new Error(res.error)
       }
-      await saveDraftSnapshot(next)
+      if (!await saveDraftSnapshot(next)) throw new Error(errorRef.current || '下書きを保存できませんでした')
       onChanged?.()
-    })
+    }, true)
   }
 
   const remove = (action: ScenarioAction) => {
@@ -564,7 +623,7 @@ export default function ActionEditor({
         return
       }
       const fresh = await refresh()
-      await saveDraftSnapshot(fresh)
+      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
       onChanged?.()
     })
   }
@@ -588,10 +647,10 @@ export default function ActionEditor({
       const second = await api.scenarios.actions.update(scenarioId, target.id, {
         sortOrder: current.sortOrder,
       })
-      if (!first.success) setError(first.error)
-      else if (!second.success) setError(second.error)
+      if (!first.success) throw new Error(first.error)
+      if (!second.success) throw new Error(second.error)
       const fresh = await refresh()
-      await saveDraftSnapshot(fresh)
+      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
       onChanged?.()
     })
   }
@@ -627,7 +686,7 @@ export default function ActionEditor({
           return
         }
         const fresh = await refresh()
-        await saveDraftSnapshot(fresh)
+        if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
         onChanged?.()
         setConditionFor(null)
       } finally {
@@ -683,7 +742,7 @@ export default function ActionEditor({
           }
         }
         const fresh = await refresh()
-        await saveDraftSnapshot(fresh)
+        if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
         onChanged?.()
         onClose()
       } catch (restoreError) {
@@ -712,7 +771,7 @@ export default function ActionEditor({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeWhenSaved}
             className="text-ink-secondary shrink-0 px-2 text-2xl leading-none"
             aria-label="閉じる"
           >
@@ -720,6 +779,8 @@ export default function ActionEditor({
           </button>
         </div>
 
+        {pendingCount > 0 && <p role="status">保存しています…</p>}
+        {error && <Button onClick={() => { const retry = retryRef.current; setError(''); if (retry) void enqueue(retry, true); else setReload(value => value + 1) }}>もう一度試す</Button>}
         {editing ? (
           <div className="flex-1 px-6 pb-5 pt-0">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -759,7 +820,7 @@ export default function ActionEditor({
             <p className="text-ink-secondary mb-4 text-xs">
               追加・変更・削除はその場で保存されます。キャンセルは開いたときの状態に戻します。
             </p>
-            {loading ? (
+            {loading || !draftReady ? (
               <p className="text-ink-faint py-8 text-center text-sm">読み込んでいます</p>
             ) : (
               <div className="space-y-4">
@@ -890,7 +951,7 @@ export default function ActionEditor({
           </div>
         )}
         {/* R242: キャンセルは開く前の値に戻して閉じる。反映は今の内容のまま閉じる。 */}
-        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling} busy={cancelling} busyLabel="戻しています…">キャンセル</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
+        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling} busy={cancelling} busyLabel="戻しています…">キャンセル</Button><Button variant="primary" disabled={pendingCount > 0 || Boolean(error) || loading || !draftReady} onClick={closeWhenSaved}>このアクションを反映</Button></div>}
       </div>
     </div>
   )
