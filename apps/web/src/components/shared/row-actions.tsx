@@ -188,6 +188,43 @@ export function RowMenu({
   )
 }
 
+/* ------------------------------------------------------------- よく使う1つ */
+
+export type RowQuickActionProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-label' | 'children' | 'className' | 'type' | 'style'> & {
+  /** 見せる文字（1語。例：「配る」）。 */
+  label: string
+  /** 読み上げ名（例：「秋の新商品を配る」）。行の名前を入れて、どの行の操作か分かるようにする。 */
+  ariaLabel: string
+  /** 文字の前の印（lucide。大きさは部品が 13 にそろえる）。 */
+  icon?: ReactNode
+}
+
+/**
+ * ★V8 行の右端の「…」の左に置く、よく使う1つの操作（統括の一覧の［配る］：絵 i0Ao0R・noVq4・DzdC3・wZPua）。
+ * 幅60・高さ28・角丸8・薄い枠。同じ操作は「…」の中にも残してよい。
+ * 押せない人（閲覧のみ・権限が無い）には呼ぶ側が出さない（押せない形で置かない）。
+ * 押下は行（tr の詳細へ行く押下など）へ伝えない。見た目は部品が決める（className・style は受け取らない）。
+ */
+export function RowQuickAction({ label, ariaLabel, icon, onClick, title, ...rest }: RowQuickActionProps) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      title={title ?? ariaLabel}
+      className={styles.quickAction}
+      data-row-quick-action=""
+      onClick={(event) => {
+        event.stopPropagation()
+        onClick?.(event)
+      }}
+      {...rest}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+}
+
 /* ------------------------------------------------------------- LAY-18 */
 
 /*
