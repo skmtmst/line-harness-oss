@@ -52,6 +52,7 @@
 .startDot { fill: var(--diagram-line); }
 .message { fill: var(--diagram-fill); stroke: var(--diagram-line); }
 .messageTitle { font-weight: 600; }
+.messageDate { font-weight: 400; }
 .bubble { fill: var(--diagram-bubble); stroke: var(--diagram-line); }
 .bubbleText { font-weight: 500; }
 .bubbleStem,

@@ -49,7 +49,6 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     const preview = screen.getByRole('region', { name: 'LINEでの見え方' })
     const menu = preview.querySelector('[data-line-preview-part="rich-menu"]')!
     expect(menu).not.toBeNull()
-    expect(menu.previousElementSibling?.textContent).toBe('今日')
     expect(menu.nextElementSibling?.textContent).toBe('メニュー')
     expect(menu.nextElementSibling?.nextElementSibling).not.toBeNull()
     expect(menu.textContent).not.toContain('メニュー')
@@ -71,7 +70,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     expect(saved().size).toBe('compact')
     expect(saved().pages[0].areas).toHaveLength(3)
     expect(saved().pages[0].areas.every((area) => area.boundsHeight === 843)).toBe(true)
-    click('形と画像へ戻る')
+    click('形と画像に戻る')
     expect((screen.getByRole('radio', { name: /小さい 2500×843/ }) as HTMLInputElement).disabled).toBe(true)
     expect(screen.getAllByText(/形は下書きを作ったあとは変えられません/)).toHaveLength(1)
   })

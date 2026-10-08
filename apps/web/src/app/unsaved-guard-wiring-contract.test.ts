@@ -159,6 +159,7 @@ const GUARDED = [
   'v8/tags/field-editor.tsx',
   'v8/tags/mark-editor.tsx',
   'v8/template-edit/rich.tsx',
+  'v8/template-edit/rich-video.tsx',
   'v8/templates/carousel.tsx',
   'v8/templates/question-new.tsx',
 ] as const

@@ -87,7 +87,7 @@ export default function HqBroadcastSourcePicker({ mode, initialId, onTemplate, o
 
   const items = mode === 'template' ? templates.map(templatePickerItem) : runs.map(broadcastPickerItem)
   const selectedRun = runs.find((run) => run.id === selected)
-  const confirm = async (id: string) => {
+  const confirmSelection = async (id: string) => {
     setBusy(true); setError('')
     try {
       if (mode === 'template') {
@@ -116,6 +116,6 @@ export default function HqBroadcastSourcePicker({ mode, initialId, onTemplate, o
         : selectedRun ? renderBroadcast(selectedRun) : null}
     </LinePreview>}
     confirmDisabled={mode === 'template' && (previewLoading || Boolean(previewError) || !preview)} busy={busy} error={error}
-    onSelect={(id) => { if (mode === 'template' && id !== selected) { setPreview(null); setPreviewError(''); setPreviewLoading(true) }; setSelected(id); setError('') }} onConfirm={(id) => void confirm(id)} onCancel={onClose}
+    onSelect={(id) => { if (mode === 'template' && id !== selected) { setPreview(null); setPreviewError(''); setPreviewLoading(true) }; setSelected(id); setError('') }} onConfirm={(id) => void confirmSelection(id)} onCancel={onClose}
   />
 }

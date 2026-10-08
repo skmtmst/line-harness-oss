@@ -153,6 +153,6 @@ export default function TemplateRichVideoEditor({ id = null, visual = false }: {
       <Card padding="none" layout="vertical" className={styles.card}><div className={styles.toggleRow}><h2 className={styles.cardTitle}>通知に出る文（代わりの文）</h2><HelpTip label="通知に出る文の説明">通知やトーク一覧に、動画の代わりに出る文です。</HelpTip></div><TextField id="rv-altText" invalid={issue?.field==='altText'} aria-describedby={issue?.field==='altText'?'rv-altText-error':undefined} aria-label="通知に出る文" value={draft.altText} onChange={e=>patch({altText:e.target.value})} maxLength={1500} disabled={!canMutate||busy||loading||loadFailed}/>{fieldError('altText')}</Card>
     </TemplateEditFrame>
     <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={()=>setPreviewOpen(false)}><div className={styles.previewDialog}>{phone}</div></Dialog>
-    <UnsavedLeaveDialog open={leaveTarget!==null} subject="リッチビデオの変更" onConfirm={confirmLeave} onCancel={cancelLeave}/>
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="リッチビデオの変更" onConfirm={confirmLeave} onCancel={cancelLeave}/>
   </>
 }

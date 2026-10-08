@@ -440,6 +440,7 @@ shared-button-importer components/scenarios/trigger-editor.tsx
 shared-button-importer components/session-lost-notice.tsx
 shared-button-importer components/shared/condition-builder.tsx
 shared-button-importer components/shared/create-page.tsx
+shared-button-importer components/shared/folder-editor-dialog.tsx
 shared-button-importer components/templates/detail-columns.tsx
 shared-button-importer components/shared/dialog.tsx
 shared-button-importer components/shared/empty-list.tsx
@@ -467,6 +468,7 @@ shared-button-importer lib/unsaved-leave-dialog.tsx
 shared-button-importer app/inflow-links/ad-connection-dialog.tsx
 shared-button-importer app/inflow-links/ad-event-mappings.tsx
 shared-button-importer components/events/event-application-preview.tsx
+shared-button-importer v8/hq/company-contact.tsx
 shared-button-importer v8/tags/create.tsx
 shared-button-importer v8/tags/field-edit.tsx
 shared-button-importer v8/tags/field-editor.tsx
