@@ -57,8 +57,8 @@ export default function AccountHandoverV8() {
   const search = useSearchParams()
   const id = search?.get('id') ?? ''
   const staffRole = useStaffRole()
-  // 役割が分かるまでは今までどおり出す（最後の守りはサーバの 403）。
-  const canManage = staffRole === null || canManageRole(staffRole)
+  // 役割が確認できるまでは、閲覧のみとして変更操作を隠す。
+  const canManage = canManageRole(staffRole)
   const [account, setAccount] = useState<LineAccount | null>(null)
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   /** 補助の一覧（受け取り先の名前）だけの失敗。本体は隠さず、ここだけ読み直す（R521）。 */

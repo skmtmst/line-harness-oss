@@ -292,6 +292,8 @@ describe('共通部品の影響範囲', () => {
       'v8/inflow-links/detail.tsx',
       'v8/inflow-links/ref-orders.tsx',
       'v8/inflow-links/ad-history.tsx',
+      // G-8 来店スタンプの記録。表の下に共通のページ送りを置く。
+      'v8/visit-stamps/visit-stamps.tsx',
     ].sort())
   })
 

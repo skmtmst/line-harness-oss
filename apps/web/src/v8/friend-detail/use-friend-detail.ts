@@ -75,7 +75,15 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
   const [submissionsLoadingMore, setSubmissionsLoadingMore] = useState(false)
   const [submissionsMoreError, setSubmissionsMoreError] = useState(false)
 
-  const loadRequestRef = useRef(0)
+  // 読込・保存の関数も作成時の対象と世代へ固定する。
+  // A→B→A でも、最初の A の完了は新しい A に採用しない。
+  const scopeRef = useRef({ friendId, selectedAccountId, generation: 0 })
+  if (scopeRef.current.friendId !== friendId || scopeRef.current.selectedAccountId !== selectedAccountId) {
+    scopeRef.current = { friendId, selectedAccountId, generation: scopeRef.current.generation + 1 }
+  }
+  const generation = scopeRef.current.generation
+  const [renderedScope, setRenderedScope] = useState(scopeRef.current)
+  const savingRef = useRef(false)
   const fieldsReqRef = useRef(0)
   const foldersReqRef = useRef(0)
   const mileageReqRef = useRef(0)
@@ -89,7 +97,7 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
   /** 世代とアカウントの両方が今の画面と合うときだけ応答を採用する。 */
   const isStale = useCallback(
     (generation: number, requestedAccountId: string | null) =>
-      generation !== loadRequestRef.current || requestedAccountId !== accountRef.current,
+      generation !== scopeRef.current.generation || requestedAccountId !== accountRef.current,
     [],
   )
 
@@ -98,8 +106,8 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
       setLoading(false)
       return
     }
-    const generation = loadRequestRef.current
     const requestedAccountId = selectedAccountId
+    if (isStale(generation, requestedAccountId)) return
     setLoading(true)
     setError('')
     setFriendMissing(false)
@@ -123,12 +131,12 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
     } finally {
       if (!isStale(generation, requestedAccountId)) setLoading(false)
     }
-  }, [friendId, selectedAccountId, isStale])
+  }, [friendId, selectedAccountId, generation, isStale])
 
   const loadUpcoming = useCallback(async () => {
     if (!friendId) return
-    const generation = loadRequestRef.current
     const requestedAccountId = selectedAccountId
+    if (isStale(generation, requestedAccountId)) return
     const req = ++upcomingReqRef.current
     setUpcomingStatus('loading')
     try {
@@ -144,12 +152,12 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
       if (req !== upcomingReqRef.current || isStale(generation, requestedAccountId)) return
       setUpcomingStatus('error')
     }
-  }, [friendId, selectedAccountId, isStale])
+  }, [friendId, selectedAccountId, generation, isStale])
 
   const loadFields = useCallback(async () => {
     if (!friendId) return
-    const generation = loadRequestRef.current
     const requestedAccountId = selectedAccountId
+    if (isStale(generation, requestedAccountId)) return
     const req = ++fieldsReqRef.current
     setFieldsStatus('loading')
     try {
@@ -177,11 +185,11 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
       if (req !== fieldsReqRef.current || isStale(generation, requestedAccountId)) return
       setFieldsStatus('error')
     }
-  }, [friendId, selectedAccountId, isStale])
+  }, [friendId, selectedAccountId, generation, isStale])
 
   const loadFieldFolders = useCallback(async () => {
-    const generation = loadRequestRef.current
     const requestedAccountId = selectedAccountId
+    if (isStale(generation, requestedAccountId)) return
     const req = ++foldersReqRef.current
     setFieldFoldersStatus('loading')
     try {
@@ -197,12 +205,12 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
       if (req !== foldersReqRef.current || isStale(generation, requestedAccountId)) return
       setFieldFoldersStatus('error')
     }
-  }, [selectedAccountId, isStale])
+  }, [selectedAccountId, generation, isStale])
 
   const loadMileage = useCallback(async () => {
     if (!friendId) return
-    const generation = loadRequestRef.current
     const requestedAccountId = selectedAccountId
+    if (isStale(generation, requestedAccountId)) return
     const req = ++mileageReqRef.current
     setMileageStatus('loading')
     try {
@@ -221,12 +229,12 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
       if (req !== mileageReqRef.current || isStale(generation, requestedAccountId)) return
       setMileageStatus('error')
     }
-  }, [friendId, selectedAccountId, isStale])
+  }, [friendId, selectedAccountId, generation, isStale])
 
   const loadRichMenu = useCallback(async () => {
     if (!friendId) return
-    const generation = loadRequestRef.current
     const requestedAccountId = selectedAccountId
+    if (isStale(generation, requestedAccountId)) return
     const req = ++richMenuReqRef.current
     setRichMenuStatus('loading')
     try {
@@ -243,13 +251,13 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
       if (req !== richMenuReqRef.current || isStale(generation, requestedAccountId)) return
       setRichMenuStatus('error')
     }
-  }, [friendId, selectedAccountId, isStale])
+  }, [friendId, selectedAccountId, generation, isStale])
 
   /** 履歴。cursor を渡すと続きを足す（「さらに読み込む」）。 */
   const loadHistory = useCallback(async (cursor?: string) => {
     if (!friendId) return
-    const generation = loadRequestRef.current
     const requestedAccountId = selectedAccountId
+    if (isStale(generation, requestedAccountId)) return
     const req = ++historyReqRef.current
     if (cursor) setHistoryLoadingMore(true)
     else setHistoryStatus('loading')
@@ -284,13 +292,13 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
     } finally {
       if (req === historyReqRef.current && !isStale(generation, requestedAccountId)) setHistoryLoadingMore(false)
     }
-  }, [friendId, selectedAccountId, isStale])
+  }, [friendId, selectedAccountId, generation, isStale])
 
   /** 回答。cursor を渡すと続きを足す。 */
   const loadSubmissions = useCallback(async (cursor?: string) => {
     if (!friendId) return
-    const generation = loadRequestRef.current
     const requestedAccountId = selectedAccountId
+    if (isStale(generation, requestedAccountId)) return
     const req = ++submissionsReqRef.current
     if (cursor) setSubmissionsLoadingMore(true)
     else setSubmissionsStatus('loading')
@@ -319,10 +327,13 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
     } finally {
       if (req === submissionsReqRef.current && !isStale(generation, requestedAccountId)) setSubmissionsLoadingMore(false)
     }
-  }, [friendId, selectedAccountId, isStale])
+  }, [friendId, selectedAccountId, generation, isStale])
 
   /** 情報欄の保存。変わった欄だけ送る（見ただけの欄に更新の記録を付けない）。 */
   const saveFields = useCallback(async () => {
+    const requestedAccountId = selectedAccountId
+    if (!friendId || savingRef.current || isStale(generation, requestedAccountId)) return
+    savingRef.current = true
     setSaving(true)
     setSaveError('')
     setSaveNotice('')
@@ -340,6 +351,7 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
       }
       saveSnapshotRef.current = { ...values }
       const res = await api.friendFields.saveForFriend(friendId, changed)
+      if (isStale(generation, requestedAccountId)) return
       if (!res.success) {
         saveSnapshotRef.current = null
         setSaveError(res.error)
@@ -349,16 +361,23 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
       setSaveNotice(`${res.data.updated} 件を保存しました`)
       void loadFields()
     } catch {
+      if (isStale(generation, requestedAccountId)) return
       saveSnapshotRef.current = null
       setSaveError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
-      setSaving(false)
+      if (!isStale(generation, requestedAccountId)) {
+        savingRef.current = false
+        setSaving(false)
+      }
     }
-  }, [fields, values, friendId, loadFields])
+  }, [fields, values, friendId, selectedAccountId, generation, isStale, loadFields])
 
-  /** 友だち・アカウントの切替。本体を取り直し、補助パネルは全部空にして取り直す。 */
-  useEffect(() => {
-    loadRequestRef.current += 1
+  // 切替時は、次の描画を確定する前に旧データを捨てる。
+  // effect だけで空にすると、最初の B の描画には A の情報と保存入力が残る。
+  if (renderedScope !== scopeRef.current) {
+    setRenderedScope(scopeRef.current)
+    setFriendMissing(false)
+    setLoadForbidden(false)
     setFriend(null)
     setError('')
     setLoading(!!friendId)
@@ -369,6 +388,8 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
     setValues({})
     setFieldsStatus('idle')
     saveSnapshotRef.current = null
+    savingRef.current = false
+    setSaving(false)
     setSaveError('')
     setSaveNotice('')
     setWarnings([])
@@ -391,6 +412,10 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
     setSubmissionsNextCursor(null)
     setSubmissionsLoadingMore(false)
     setSubmissionsMoreError(false)
+  }
+
+  /** 本体と補助パネルを新しい対象で取り直す。 */
+  useEffect(() => {
     void loadFriend()
     void loadUpcoming()
     void loadFields()

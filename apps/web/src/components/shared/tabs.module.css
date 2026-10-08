@@ -187,4 +187,15 @@
 [data-theme='v8'] .list[data-size='compact'] .tab { min-height: 0; line-height: var(--tpl-tabs-compact-lh); }
 /* 選んだタブの下線は段の線に重ねる（絵の下線は段の高さを足さない）。 */
 [data-theme='v8'] .list[data-size='compact'] .current { margin-bottom: var(--tpl-tabs-compact-line-overlap); }
+[data-theme='v8'] .count[data-tone='warning'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  padding: var(--tpl-tab-count-pad);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-tabs-text-lh);
+  color: var(--color-status-warn-deep);
+  background: var(--color-status-warn-soft);
+}
 }
