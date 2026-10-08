@@ -208,4 +208,17 @@ describe('WEB052 atomic reorder', () => {
     expect((await reorder([{ id: 'menu-a', sortOrder: 8 }])).status).toBe(400);
     expect((await reorder([{ id: 'menu-a', expectedVersion: 1, sortOrder: 8 }, { id: 'menu-a', expectedVersion: 1, sortOrder: 0 }])).status).toBe(400);
   });
+  test('history persistence failure rolls back both menu changes in real D1', async () => {
+    await db.prepare("INSERT INTO menus (id,line_account_id,name,duration_minutes,buffer_after_minutes,base_price) VALUES ('menu-c','account-a','C',60,0,1000)").run();
+    await db.prepare(`CREATE TRIGGER audit3_fail_history BEFORE INSERT ON menu_versions
+      WHEN NEW.menu_id = 'menu-c' BEGIN SELECT RAISE(ABORT, 'history unavailable'); END`).run();
+    try {
+      expect((await reorder([{ id: 'menu-a', expectedVersion: 1, sortOrder: 8 }, { id: 'menu-c', expectedVersion: 1, sortOrder: 4 }])).status).toBe(500);
+      const rows = await db.prepare("SELECT id,sort_order,version FROM menus WHERE id IN ('menu-a','menu-c') ORDER BY id").all();
+      expect(rows.results).toEqual([{ id: 'menu-a', sort_order: 0, version: 1 }, { id: 'menu-c', sort_order: 0, version: 1 }]);
+      expect(await db.prepare('SELECT COUNT(*) AS count FROM menu_versions').first()).toEqual({ count: 0 });
+    } finally {
+      await db.prepare('DROP TRIGGER audit3_fail_history').run();
+    }
+  });
 });
