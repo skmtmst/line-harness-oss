@@ -13,6 +13,8 @@ export const hqTemplateAdapterRegistry: HqTemplateAdapterRegistry = Object.freez
   rich_menu: richMenuHqTemplateAdapter,
   form: formHqTemplateAdapter,
   scenario: unsupportedHqTemplateAdapter('scenario'),
+  friend_field: unsupportedHqTemplateAdapter('friend_field'),
+  mark: unsupportedHqTemplateAdapter('mark'),
 });
 
 export function getHqTemplateAdapter(type: HqTemplateType, binding?: { db: D1Database; authority: HqTemplateAuthority }): HqTemplateAdapter {
