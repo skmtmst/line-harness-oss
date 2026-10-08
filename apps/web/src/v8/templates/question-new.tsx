@@ -227,7 +227,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
 
   const busy = saving || publishing || Boolean(host?.busy)
   const phone = (
-    <LinePreview note="質問の見え方（山田 太郎さんの場合）" caption="配信日 10:00">
+    <LinePreview title={null} note="質問の見え方（山田 太郎さんの場合）" caption="配信日 10:00">
       <div className={styles.bubble}>
         {question.intro?.trim() ? <p className={styles.bubbleIntro}>{displayText(question.intro)}</p> : null}
         <p className={styles.bubbleText}>{displayText(question.text) || '質問文を入力すると、ここに出ます。'}</p>

@@ -325,7 +325,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   )
 
   const phone = (
-    <LinePreview note={`${meta.title}の見え方`} caption="配信日 10:00" accountName={sendName}>
+    <LinePreview title={null} note={`${meta.title}の見え方`} caption="配信日 10:00" accountName={sendName}>
       <div className={styles.assetRow}>
         <span className={styles.assetAvatar} aria-hidden="true">{sendName.slice(0, 1)}</span>
         <div className={styles.assetCard}>

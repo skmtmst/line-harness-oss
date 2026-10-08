@@ -42,7 +42,7 @@
 .optional { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; }
 .required { color: var(--color-danger); font-size: var(--text-micro); font-weight: 600; }
 
-/* 形：小さい題＋切り替え（間12）。 */
+/* クーポンの回数・公開範囲：小さい題＋切り替え。 */
 .typeRow { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); }
 
 /* 本文の箱：余白14・間8。字 13/22 の4行・間の16・差し込むの並び。 */
@@ -62,7 +62,7 @@
 }
 .bodyText[data-kind='flex'] { height: var(--tpl-te-flex-h); font-family: var(--font-mono, monospace); font-size: var(--text-caption); }
 .bodySpacer { height: var(--tpl-te-body-spacer); flex-shrink: 0; }
-.insertRow { display: flex; align-items: center; gap: var(--tpl-te-insert-gap); flex-wrap: wrap; }
+.insertRow { display: flex; align-items: center; gap: var(--tpl-rm-insert-gap); flex-wrap: wrap; }
 .insertLine { display: contents; }
 .insertLabel { color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
 .insertChip {
@@ -114,11 +114,9 @@
 .previewHead { align-self: stretch; margin: 0; color: var(--color-ink); font-size: var(--tpl-preview-title-size); font-weight: 600; line-height: var(--tpl-preview-title-lh); }
 /* 届き方の題はこの画面が出す。見本の部品の題（LINEでの見え方）は重ねない。 */
 .phone { align-self: stretch; margin-top: var(--tpl-te-phone-shift); }
-.phone > section > p:first-child { display: none; }
 .previewToggle { display: none; align-self: stretch; }
 .previewToggle > * { width: 100%; }
 .previewDialog { display: flex; justify-content: center; }
-.previewDialog > section > p:first-child { display: none; }
 
 
 /* 1152 の板（a1k3d）：右の列は余白16・中の幅いっぱい。スマホは窓で開く。 */
@@ -127,7 +125,7 @@
   .sideContent { width: 100%; }
   .previewToggle { display: block; }
   .phone, .previewHead { display: none; }
-  .insertLine { display: flex; align-items: center; gap: var(--tpl-te-insert-gap); width: 100%; }
+  .insertLine { display: flex; align-items: center; gap: var(--tpl-rm-insert-gap); width: 100%; }
   .insertRow { flex-direction: column; align-items: stretch; gap: var(--tpl-body-gap); }
 }
 

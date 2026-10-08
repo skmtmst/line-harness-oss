@@ -334,7 +334,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
 
   /* 届き方：トークに流れる正方形の画像。面の線は見本だけ（友だちには見えない）。 */
   const phone = (
-    <LinePreview note="リッチメッセージの見え方" caption="配信日 10:00" accountName={sendName}>
+    <LinePreview title={null} note="リッチメッセージの見え方" caption="配信日 10:00" accountName={sendName}>
       <div className={styles.assetRow}>
         <span className={styles.assetAvatar} aria-hidden="true">{sendName.slice(0, 1)}</span>
         <div className={rich.phoneImage}>
