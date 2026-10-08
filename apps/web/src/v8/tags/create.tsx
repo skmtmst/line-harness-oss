@@ -19,6 +19,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
 import Notice from '@/components/shared/notice'
 import FolderSelect, { folderCreateResult } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -204,6 +205,8 @@ function TagCreate() {
         identity={back}
         preview={(
           <div className={styles.aside}>
+            <h2 className={styles.asideTitle}>できあがるタグ</h2>
+            <TagPill name={name || 'タグ名'} color={groups.find((group) => group.id === groupId)?.color} />
             <h2 className={styles.asideTitle}>このあと</h2>
             <p className={styles.asideText}>作ると、すぐに友だちへ付けられます。タグ連動（付いたときの動き）は作ったあとの編集で足します。</p>
           </div>

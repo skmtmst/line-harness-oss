@@ -194,7 +194,7 @@
 
 .nameRow {
   display: flex;
-  height: var(--tpl-row-name-lh);
+  min-height: var(--tpl-row-name-lh);
   align-items: center;
   gap: var(--tpl-tag-name-gap);
   min-width: 0;

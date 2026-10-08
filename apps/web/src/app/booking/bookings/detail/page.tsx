@@ -18,6 +18,7 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { canOperateBookings } from '../../lib/booking-permissions'
 import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
 import Checkbox from '@/components/shared/checkbox'
 import HelpTip from '@/components/shared/help-tip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -1135,7 +1136,9 @@ function BookingDetailInner() {
               {detail.customer.tags.length > 0 ? (
                 <Row label="タグ">
                   <span className="flex flex-wrap gap-1">
-                    {detail.customer.tags.map((tag) => (
+                    {detail.customer.tags.map((tag) => !showBodyCrumb ? (
+                      <TagPill key={tag.id} name={tag.name} />
+                    ) : (
                       <span
                         key={tag.id}
                         className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs"

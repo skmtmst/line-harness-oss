@@ -39,6 +39,7 @@ import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
 import Checkbox from '@/components/shared/checkbox'
 import Avatar from '@/components/shared/avatar'
 import KpiCard from '@/components/shared/kpi-card'
@@ -849,7 +850,7 @@ export default function FriendsListV8() {
                 {visible.has('tags') ? (
                   <Td className={styles.td}>
                     <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
-                      {tags.shown.map((tag) => <span key={tag.id} className={styles.tag}>{tag.name}</span>)}
+                      {tags.shown.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}
                       {tags.rest > 0 ? <span className={styles.tagRest}>+{tags.rest}</span> : null}
                       {friend.tags.length === 0 ? <span className={styles.faint}>—</span> : null}
                     </div>

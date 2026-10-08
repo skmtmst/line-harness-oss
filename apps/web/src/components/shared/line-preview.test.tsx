@@ -96,6 +96,17 @@ describe('LINEプレビュー共通部品', () => {
     expect(screen.getByText('こんにちは')).toBeTruthy()
   })
 
+  it('V8は画面の題を使え、外側に題があるときはスマホの題だけを外せる', () => {
+    document.documentElement.dataset.theme = 'v8'
+    const view = render(<LinePreview title="届き方"><p>こんにちは</p></LinePreview>)
+    expect(screen.getByText('届き方')).toBeTruthy()
+    view.rerender(<LinePreview title={null}><p>こんにちは</p></LinePreview>)
+    expect(screen.queryByText('届き方')).toBeNull()
+    expect(screen.queryByText('LINEでの見え方')).toBeNull()
+    expect(screen.getByText('こんにちは')).toBeTruthy()
+    expect(screen.getByText('9:41')).toBeTruthy()
+  })
+
   it('枠の色は生の色値ではなくトークンで読む', () => {
     const tsx = read('line-preview.tsx')
     // トーク背景色のトークンを使い、#16進も素の Tailwind 色も書かない。

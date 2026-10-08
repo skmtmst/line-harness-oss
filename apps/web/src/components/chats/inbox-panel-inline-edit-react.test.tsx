@@ -146,10 +146,41 @@ describe('B-26 右の欄でその場で直す', () => {
     await renderPanel()
     await eventually(() => { expect(document.querySelector('button[aria-label="未契約を外す"]')).toBeTruthy() })
     await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
+    expect(mocks.removeTag).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('『未契約』を外しますか？')
+    expect(document.body.textContent).toContain('この友だちからタグを外します。タグそのものは消えません。')
+    await act(async () => { button('外す')!.click() })
     await eventually(() => { expect(host.textContent).toContain('タグ「未契約」を外しました') })
     expect(mocks.removeTag).toHaveBeenCalledWith('friend-0', 'tag-a')
     await act(async () => { button('元に戻す')!.click() })
     await eventually(() => { expect(mocks.addTag).toHaveBeenCalledWith('friend-0', 'tag-a') })
+  })
+
+  it('タグを外す確認をキャンセルすると、タグも保存先も変えない', async () => {
+    await renderPanel()
+    await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
+    await act(async () => { button('キャンセル')!.click() })
+    expect(mocks.removeTag).not.toHaveBeenCalled()
+    expect(document.body.textContent).not.toContain('『未契約』を外しますか？')
+    expect(document.querySelector('button[aria-label="未契約を外す"]')).toBeTruthy()
+  })
+
+  it('確認中に友だちを切り替えたら確認を閉じ、別の友だちから外さない', async () => {
+    await renderPanel()
+    await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
+    await act(async () => { root.render(<FriendInfoSidebar friendId="friend-1" chatId="chat-1" />) })
+    expect(document.body.textContent).not.toContain('『未契約』を外しますか？')
+    expect(mocks.removeTag).not.toHaveBeenCalled()
+  })
+
+  it('v7 は今までの札と付け外しの動きを保つ', async () => {
+    document.documentElement.dataset.theme = 'v7'
+    mocks.removeTag.mockResolvedValue({ success: true, data: null })
+    await renderPanel()
+    expect(document.querySelector('[role="group"][aria-label="タグ「未契約」"]')).toBeNull()
+    await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
+    expect(mocks.removeTag).toHaveBeenCalledWith('friend-0', 'tag-a')
+    expect(document.body.textContent).not.toContain('『未契約』を外しますか？')
   })
 
   describe('メモの同時編集（最後に直した方を残す）', () => {
