@@ -551,7 +551,8 @@
     "606_restaurant_liff_details.sql",
     "607_conversation_search_content.sql",
     "608_line_account_folders.sql",
-    "609_hq_broadcast_authoring.sql"
+    "609_hq_broadcast_authoring.sql",
+    "610_booking_reminder_request_snapshot.sql"
   ],
-  "migrationCount": 552
+  "migrationCount": 553
 }
