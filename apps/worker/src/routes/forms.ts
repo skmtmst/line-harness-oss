@@ -1951,6 +1951,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', async (c) =
         db: c.env.DB,
         formId,
         form: config,
+        expectedLineAccountId: scope.lineAccountId,
         layout,
         friendId: submission.friend_id,
         submissionData: answers,
@@ -3128,6 +3129,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
       db: c.env.DB,
       formId,
       form,
+      expectedLineAccountId: identity.lineAccountId,
       layout,
       friendId: friendId!,
       submissionData,
@@ -3200,6 +3202,7 @@ async function runFormPostEffects(input: {
     on_submit_message_content: string | null;
     on_submit_webhook_url: string | null;
   };
+  expectedLineAccountId: string;
   layout: FormLayout | null;
   friendId: string;
   submissionData: Record<string, unknown>;
@@ -3266,6 +3269,7 @@ async function runFormPostEffects(input: {
       {
         friendId,
         requestedTrackedLinkId: input.trackedLinkId,
+        expectedLineAccountId: input.expectedLineAccountId,
       },
       { getFriendById, getTrackedLinkById, getMessageTemplateById },
     );
