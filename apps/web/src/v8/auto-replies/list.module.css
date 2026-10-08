@@ -330,12 +330,25 @@
 
 /* 削除の窓：危険操作を左端、主ボタン（代わりに止める＝残す方）を中央寄せ。 */
 .deleteFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--tpl-body-gap);
+  width: 100%;
+  padding: var(--tpl-body-gap) var(--tpl-preview-pad) var(--tpl-preview-pad);
+}
+.deleteFooter > :first-child {
+  justify-self: start;
+}
+.deleteFooter > :last-child {
+  justify-self: start;
+}
+.deleteAlternatives {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-cell-gap-half);
-  width: 100%;
+  gap: var(--tpl-body-gap);
 }
+.reasonField { width: 100%; }
 
 /* フォルダへ移す窓の中身。 */
 .moveBody {
@@ -348,26 +361,6 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   font-weight: 600;
-}
-
-/* 止める窓の理由欄。 */
-.reasonLabel {
-  display: block;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 600;
-}
-
-.reasonInput {
-  width: 100%;
-  margin-top: var(--tpl-sub-gap);
-  border: 1px solid var(--color-control-border, var(--color-hairline));
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: 1.6;
-  resize: vertical;
 }
 
 /* 狭い板の畳み方は型と useNarrowViewport が担う。画面CSSの畳みは置かない。 */

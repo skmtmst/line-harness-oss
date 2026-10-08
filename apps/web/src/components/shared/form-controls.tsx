@@ -37,11 +37,17 @@ export function OptionalBadge() {
   return <span className={styles.optional}>任意</span>
 }
 
+/** 複合入力欄の下にも、Field と同じ誤りの文を置く。 */
+export function FieldError({ id, children }: { id: string; children: ReactNode }) {
+  return <p id={id} className={styles.error} role="alert">{children}</p>
+}
+
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */
 export function Field({
   label,
   htmlFor,
   required,
+  optional,
   note,
   error,
   help,
@@ -53,6 +59,8 @@ export function Field({
   label: string
   htmlFor?: string
   required?: boolean
+  /** 任意の入力欄。既存の OptionalBadge をラベルの横に置く。 */
+  optional?: boolean
   note?: ReactNode
   error?: ReactNode
   /**
@@ -111,6 +119,7 @@ export function Field({
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
               何も伝わらない。 */}
           {required && <RequiredBadge />}
+          {!required && optional && <OptionalBadge />}
         </label>
         {hasHelp ? (
           <HelpTip label={`${helpLabel ?? label}の説明`}>
