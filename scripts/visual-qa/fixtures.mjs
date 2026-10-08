@@ -5004,7 +5004,7 @@ export const LOGIN_AUDIT = [
  * STAFF_MEMBERS とID・メールを一致させる(#530)。違うID・メールの
  * ままでは画面の名寄せが「要確認」になり、EOTS4の撮影が回らない。
  */
-const accessUser = (id, name, roleBundle, status, options = {}) => ({
+export const accessUser = (id, name, roleBundle, status, options = {}) => ({
   id, name, email: options.email ?? `${id}@example.invalid`, jobTitle: options.jobTitle ?? null,
   roleBundle, featureCount: roleBundle === 'administrator' ? null : (options.featureCount ?? 8),
   hasFieldMasks: null,
@@ -5012,8 +5012,8 @@ const accessUser = (id, name, roleBundle, status, options = {}) => ({
     type: 'accounts', assignedLineAccountId: 'visual-qa-account',
     lineAccountIds: ['visual-qa-account'], includesDescendants: false,
   },
-  lastLoginAt: options.lastLoginAt ?? (status === 'active' ? '2026-09-06T23:02:00.000Z' : null),
-  lastActionAt: options.lastActionAt ?? (status === 'active' ? '2026-09-07T00:18:00.000Z' : null),
+  lastLoginAt: options.lastLoginAt !== undefined ? options.lastLoginAt : (status === 'active' ? '2026-09-06T23:02:00.000Z' : null),
+  lastActionAt: options.lastActionAt !== undefined ? options.lastActionAt : (status === 'active' ? '2026-09-07T00:18:00.000Z' : null),
   mfaEnabled: options.mfaEnabled ?? false,
   status, policyVersion: options.policyVersion ?? 1,
   createdAt: options.createdAt ?? '2026-01-10T00:00:00.000Z',
