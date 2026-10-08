@@ -1,7 +1,7 @@
 /*
  * はじめにやること（★V8 修正案 D-3・絵 `r3X34`）。
  * 白い角丸カード（枠 hairline・角12・内側 18/20・段の間14）。
- * 頭：題 15/700・数 13・進みの線 160×6・閉じる 13/500。
+ * 頭：題 15/700・数 13・進みの線 160×6・畳む／開く 13/500＋矢印16（間4）。
  * 手順：3列×2行（間8）。済みは薄い灰の地＋青い丸の ✓、まだは白地に枠＋空の丸＋右に行き先。
  */
 .card {
@@ -59,7 +59,10 @@
   min-width: 0;
 }
 
-.close {
+.fold {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-d23-ob-fold-gap);
   padding: 0;
   border: 0;
   background: transparent;
@@ -72,7 +75,15 @@
   white-space: nowrap;
 }
 
-.close:hover { color: var(--color-ink); }
+.fold:hover { color: var(--color-ink); }
+
+.foldIcon {
+  width: var(--tpl-d23-ob-fold-icon);
+  height: var(--tpl-d23-ob-fold-icon);
+  flex-shrink: 0;
+}
+
+.grid[hidden] { display: none; }
 
 .grid {
   display: grid;
