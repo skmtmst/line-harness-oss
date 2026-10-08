@@ -4220,7 +4220,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/reminders') {
-    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status'].some((key) => query.has(key))
+    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status', 'sort'].some((key) => query.has(key))
     if (!usesListContract) return { success: true, data: REMINDERS }
     const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
@@ -4238,11 +4238,26 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       if (status === 'active' && (reminder.lifecycleStatus === 'draft' || reminder.lifecycleStatus === 'stopped' || !reminder.isActive)) return false
       if (status === 'stopped' && reminder.lifecycleStatus !== 'stopped' && reminder.isActive) return false
       return true
-    }).sort((left, right) => (
-      (left.displayOrder ?? 0) - (right.displayOrder ?? 0)
-      || right.createdAt.localeCompare(left.createdAt)
-      || left.id.localeCompare(right.id)
-    ))
+    }).sort((left, right) => {
+      const sort = query.get('sort') ?? 'order'
+      const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0
+      if (sort === 'next') return Number(left.nextScheduledAt == null) - Number(right.nextScheduledAt == null)
+        || compare(left.nextScheduledAt ?? '', right.nextScheduledAt ?? '') || compare(left.id, right.id)
+      if (sort === 'name') return compare(left.name.toLowerCase(), right.name.toLowerCase()) || compare(left.id, right.id)
+      if (sort === 'created' || sort === 'updated') {
+        const key = sort === 'created' ? 'createdAt' : 'updatedAt'
+        return compare(right[key], left[key]) || compare(left.id, right.id)
+      }
+      return (left.displayOrder ?? 0) - (right.displayOrder ?? 0)
+        || compare(right.createdAt, left.createdAt) || compare(left.id, right.id)
+    })
+    const sorts = {
+      order: [{ field: 'displayOrder', direction: 'asc' }, { field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'asc' }],
+      next: [{ field: 'nextScheduledAt', direction: 'asc' }, { field: 'id', direction: 'asc' }],
+      created: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'asc' }],
+      updated: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }],
+      name: [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }],
+    }
     const offset = (page - 1) * limit
     return {
       success: true,
@@ -4250,11 +4265,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         items: filtered.slice(offset, offset + limit),
         total: filtered.length,
         limit,
-        sort: [
-          { field: 'displayOrder', direction: 'asc' },
-          { field: 'createdAt', direction: 'desc' },
-          { field: 'id', direction: 'asc' },
-        ],
+        sort: sorts[query.get('sort') ?? 'order'],
       },
     }
   }
@@ -6190,6 +6201,12 @@ const server = createServer((req, res) => {
   */
   if (url.pathname === '/__mock-fingerprint') {
     res.writeHead(200).end(JSON.stringify({ fingerprint: FINGERPRINT }))
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/reminders' && url.searchParams.has('sort')
+    && !['order', 'next', 'created', 'updated', 'name'].includes(url.searchParams.get('sort'))) {
+    res.writeHead(400).end(JSON.stringify({ success: false, error: 'invalid_sort' }))
     return
   }
 
