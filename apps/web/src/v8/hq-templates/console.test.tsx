@@ -2,7 +2,7 @@
 /*
  * 統括のテンプレート（B-29・B-36）：作るは店のテンプレートの作る画面（メッセージ HfK0O・クーポン C3qMCz）を使い、
  * 下の帯の主ボタンは［保存して配る］。保存は統括の口（ひな形）へ、配るは「アカウントへ配る」へ進む。
- * 詳細（pQ4fH）は「配った先」（API-14 の配った先のアカウント名）と［アカウントへ配る］。
+ * 詳細（pQ4fH）は「配った先」（API-14 の配った先のアカウント名）と［配る］（読み上げは「〇〇を配る」）。
  */
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -133,7 +133,7 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
 })
 
 describe('統括のテンプレートの詳細（pQ4fH）', () => {
-  it('名前を押すと詳細。配った先のアカウント名と［このアカウントへ入る］・［アカウントへ配る］を出す', async () => {
+  it('名前を押すと詳細。配った先のアカウント名と［このアカウントへ入る］・［配る］を出す', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click(await screen.findByRole('button', { name: '予約前日のご案内' }))
     expect(await screen.findByRole('heading', { name: '配った先' })).toBeTruthy()
@@ -144,7 +144,9 @@ describe('統括のテンプレートの詳細（pQ4fH）', () => {
     fireEvent.click(enter[0])
     expect(selectAccount).toHaveBeenCalledWith('a-1')
     expect(push).toHaveBeenCalledWith('/templates')
-    fireEvent.click(screen.getAllByRole('button', { name: /アカウントへ配る/ })[0])
+    const distribute = screen.getByRole('button', { name: '予約前日のご案内を配る' })
+    expect(distribute.textContent?.trim()).toBe('配る')
+    fireEvent.click(distribute)
     expect(await screen.findByRole('checkbox', { name: /然 -NEN- 渋谷店/ })).toBeTruthy()
   })
 })
