@@ -5,6 +5,7 @@ import type {
   BroadcastMessageButton,
 } from '@/lib/api'
 import {
+  validateImagemapMessage,
   convertBroadcastAsset,
   isBroadcastAssetKind,
   type BroadcastAssetKind,
@@ -67,7 +68,9 @@ export function messageTemplateToBubble(template: BroadcastTemplateOption): Broa
 
   if (template.messageType === 'imagemap') {
     try {
-      const p = JSON.parse(template.messageContent) as {baseUrl:string;baseSize:{width:number;height:number};altText?:string;actions:Array<{type:string;area:Record<string,number>;linkUri?:string;text?:string}>}
+      const parsed = JSON.parse(template.messageContent)
+      if (parsed.video) return { id: bubbleId(), type: 'rich_video', content: { ...parsed, templateId: template.id, templateName: template.name } }
+      const p = parsed as {baseUrl:string;baseSize:{width:number;height:number};altText?:string;actions:Array<{type:string;area:Record<string,number>;linkUri?:string;text?:string}>}
       return {id:bubbleId(),type:'rich_message',content:{assetId:template.id,assetName:template.name,imageUrl:`${p.baseUrl}/1040`,baseUrl:p.baseUrl,baseSize:p.baseSize,description:p.altText,coordinateUnit:'px',tapAreas:p.actions.map(a=>({...a.area,actionType:a.type,uri:a.linkUri,text:a.text}))}}
     } catch { return null }
   }
@@ -113,6 +116,7 @@ export function bubbleLegacyMessage(bubble: BroadcastBubble): {
   if (bubble.type === 'flex') {
     return { messageType: 'flex', messageContent: String(bubble.content.flexJson ?? '') }
   }
+  if (bubble.type === 'rich_video') return { messageType: 'imagemap', messageContent: JSON.stringify(bubble.content) }
   if (bubble.type === 'video') {
     return { messageType: 'video', messageContent: JSON.stringify(bubble.content) }
   }
@@ -153,6 +157,7 @@ export function bubbleLegacyMessage(bubble: BroadcastBubble): {
  * 形にならない。
  */
 export function assetBubbleError(bubble: BroadcastBubble): string {
+  if (bubble.type === 'rich_video') return !bubble.content.video ? 'リッチビデオのテンプレートを選択してください' : validateImagemapMessage(bubble.content) || ''
   if (!isBroadcastAssetKind(bubble.type)) return ''
   if (!bubble.content.assetId) return 'テンプレートを選択してください'
   const converted = convertBroadcastAsset(

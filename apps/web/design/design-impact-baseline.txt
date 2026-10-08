@@ -761,3 +761,6 @@ shared-button-importer v8/tag-edit/edit.tsx
 shared-button-importer v8/tag-edit/search-edit.tsx
 shared-button-importer v8/rich-menu-edit/detail.tsx
 shared-button-importer v8/affiliate-offer-new/create.tsx
+
+# リッチビデオ編集も共通の保存・キャンセルを使う。
+shared-button-importer v8/template-edit/rich-video.tsx

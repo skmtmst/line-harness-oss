@@ -1356,6 +1356,7 @@ export default function EditDialog({
                   ...flexTemplates.map((t) => ({ value: t.id, label: `カード：${t.name}` })),
                   ...textTemplates.map((t) => ({ value: t.id, label: `テキスト：${t.name}` })),
                   ...imageTemplates.map((t) => ({ value: t.id, label: `画像：${t.name}` })),
+                  ...templates.filter(t => t.messageType === 'imagemap').map(t => ({ value: t.id, label: `${(/"video"\s*:/.test(t.messageContent)) ? 'リッチビデオ' : 'リッチメッセージ'}：${t.name}` })),
                 ]}
                 size="full"
               />

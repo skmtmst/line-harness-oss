@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { prepareRichVideoTemplate } from '../services/rich-video-template.js';
 import {
   getTemplatesWithUsageCount,
   getTemplateSendCounts,
@@ -564,6 +565,8 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (isBlankText(body.name) || isBlankText(body.messageType) || isBlankText(body.messageContent)) {
       return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
     }
+    try { body.messageContent = await prepareRichVideoTemplate(c.env, body.messageType, body.messageContent, body.accountId, c.env.WORKER_URL || new URL(c.req.url).origin); }
+    catch (err) { return c.json({success:false,error:err instanceof Error ? err.message : '動画を準備できませんでした'},422); }
     const message = validateTemplateMessage(body.messageType, body.messageContent, false);
     if (!message.ok) {
       const { ok: _ok, ...failure } = message;
@@ -667,9 +670,13 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
     const baseMessageType = body.messageType
       ?? existing.draft_message_type
       ?? existing.message_type;
-    const baseMessageContent = body.messageContent
+    let baseMessageContent = body.messageContent
       ?? existing.draft_message_content
       ?? existing.message_content;
+    if (changesMessage) {
+      try { baseMessageContent = await prepareRichVideoTemplate(c.env, baseMessageType, baseMessageContent, existing.line_account_id, c.env.WORKER_URL || new URL(c.req.url).origin); }
+      catch (err) { return c.json({success:false,error:err instanceof Error ? err.message : '動画を準備できませんでした'},422); }
+    }
     const message = changesMessage
       ? validateTemplateMessage(baseMessageType, baseMessageContent, false)
       : { ok: true as const };
