@@ -14,6 +14,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
 import { fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantIntakeAddress } from '@/lib/restaurant-test-api'
 import { Status } from '../booking-kit/shell'
@@ -294,7 +295,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit }: {
             <TextField id="rs-import-guests" type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
           </DialogField>
           <DialogField label="来店の日時" htmlFor="rs-import-at">
-            <TextField id="rs-import-at" type="datetime-local" required value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} />
+            <DateTimeField id="rs-import-at" required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
           </DialogField>
         </div>
         <DialogNote>取り込むと、空いている卓から自動で選んで予約台帳に入れます。</DialogNote>

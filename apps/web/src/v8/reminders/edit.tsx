@@ -60,6 +60,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { TextField } from '@/components/shared/text-field'
+import { TimeField } from '@/components/shared/date-time-field'
 import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
@@ -1417,12 +1418,11 @@ function TimingEditor({
       {dayWritten ? (
         <>
           <span className={styles.timingWord}>の</span>
-          <TextField
-            type="time"
+          <TimeField
             aria-label="送る時刻"
             className={styles.timingTime}
             value={step.sendAtTime ?? ''}
-            onChange={(event) => onChange({ sendAtTime: event.target.value || null })}
+            onChange={(next) => onChange({ sendAtTime: next || null })}
           />
         </>
       ) : null}
