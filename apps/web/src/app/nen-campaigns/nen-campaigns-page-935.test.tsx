@@ -38,6 +38,11 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
+// v8 の一覧は役割を読みに行く。試験では通信させず「役割不明＝編集できる」の既定にする。
+vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
+  const actual = await importOriginal()
+  return { ...actual, useStaffRole: () => null }
+})
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {
@@ -261,5 +266,68 @@ describe('紹介文の書きかけを守る（#935 N-301）', () => {
     const dirty = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(dirty)
     expect(dirty.defaultPrevented).toBe(true)
+  })
+})
+
+/*
+ * 監査 WEB-315：v8 の見た目では確認の窓を描いておらず、別のコラムを選んでも
+ * リンクを押しても「何も起きない」まま止まっていた。v8 でも同じ確認を出す。
+ */
+describe('紹介文の書きかけを守る（v8 の見た目）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
+
+  const v8Intro = (): HTMLTextAreaElement => {
+    const found = container.querySelector('textarea[aria-label="LINE に出る紹介文"]')
+    if (!found) throw new Error('v8 の紹介文の入力欄が見つかりません')
+    return found as HTMLTextAreaElement
+  }
+  const v8Column = (title: string): HTMLButtonElement => {
+    const found = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === title && b.getAttribute('title') === title)
+    if (!found) throw new Error(`コラム「${title}」の行が見つかりません: ${container.textContent?.slice(0, 300)}`)
+    return found as HTMLButtonElement
+  }
+  async function openV8Column() {
+    const tab = Array.from(container.querySelectorAll('[role="tab"], button'))
+      .find((b) => /^コラム\s*\d*$/.test(b.textContent ?? '')) as HTMLElement | undefined
+    if (!tab) throw new Error('コラムのタブが見つかりません')
+    await click(tab)
+    await click(v8Column('題名c1'))
+  }
+  async function typeV8Intro(value: string) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    await act(async () => {
+      setter.call(v8Intro(), value)
+      v8Intro().dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+
+  it('書きかけのまま別のコラムを選ぶと確認が出る。「保存せずに移る」で移る', async () => {
+    await mount()
+    await openV8Column()
+    await typeV8Intro('書きかけの紹介文')
+
+    await click(v8Column('題名c2'))
+    expect(bodyText()).toContain('入力した紹介文が保存されていません')
+    expect(v8Intro().value).toBe('書きかけの紹介文')
+
+    await click(bodyButton('保存せずに移る'))
+    expect(v8Intro().value).toBe('紹介文c2')
+  })
+
+  it('書きかけのまま画面内リンクを押すと確認し、確認後に移動する', async () => {
+    await mount()
+    await openV8Column()
+    await typeV8Intro('書きかけの紹介文')
+
+    const link = Array.from(container.querySelectorAll('a[href]'))
+      .find((a) => a.getAttribute('href') === '/nen-campaigns/columns/new')
+    expect(link).toBeDefined()
+    await click(link as HTMLElement)
+    expect(bodyText()).toContain('このまま移ると、入力した紹介文が消えます')
+    expect(navigation.push).not.toHaveBeenCalled()
+
+    await click(bodyButton('保存せずに移る'))
+    expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns/columns/new')
   })
 })
