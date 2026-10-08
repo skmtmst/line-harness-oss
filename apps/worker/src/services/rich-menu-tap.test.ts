@@ -74,3 +74,14 @@ describe('W43 リッチメニューの構造本文と履歴（実SQL）', () => 
       .toEqual(kind === 'missing' ? [{ var_key: 'hours', reason: 'missing' }] : []);
   });
 });
+
+
+test('PKG47: 同じWebhookのタップ再送は加点せず、次のタップは加点する', async () => {
+  const f = fixture();
+  f.raw.exec(`UPDATE rich_menu_areas SET score_change = 10 WHERE id='area'`);
+  const tap = (sourceEventId: string) => handleRichMenuTap(f.db, {} as LineClient,
+    { id: 'friend', line_user_id: 'U1' }, 'area', { lineAccountId: 'account', sourceEventId });
+  await tap('event-1'); await tap('event-1'); await tap('event-2');
+  expect(f.raw.prepare("SELECT score FROM friends WHERE id='friend'").get()).toEqual({ score: 20 });
+  expect(f.raw.prepare('SELECT COUNT(*) n, SUM(score_change) total FROM friend_scores').get()).toEqual({ n: 2, total: 20 });
+});

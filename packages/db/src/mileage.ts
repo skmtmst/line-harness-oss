@@ -216,6 +216,8 @@ export interface PostMileageEntryInput {
   sourceEventId?: string | null;
   idempotencyKey: string;
   reversesEntryId?: string | null;
+  /** 付与取消の台帳と未使用内訳を同じ取引で閉じる。 */
+  voidReversedGrantLot?: boolean;
   metadata?: Record<string, unknown> | null;
   occurredAt?: string;
 }
@@ -236,8 +238,7 @@ export async function postMileageEntry(
   const now = jstNow();
   const programId = input.programId ?? DEFAULT_MILEAGE_PROGRAM_ID;
   await ensureBuiltInProgram(db, programId);
-  await db
-    .prepare(
+  const statement = db.prepare(
       `INSERT OR IGNORE INTO mileage_ledger
          (id, program_id, beneficiary_user_id, beneficiary_friend_id,
           engagement_event_id, mileage_rule_id, entry_type, status, amount, reason, source,
@@ -263,8 +264,19 @@ export async function postMileageEntry(
       input.metadata ? JSON.stringify(input.metadata) : null,
       input.occurredAt ?? now,
       now,
-    )
-    .run();
+    );
+  if (input.voidReversedGrantLot && input.reversesEntryId && input.entryType === 'reversal' && input.amount < 0
+    && await dbTableExists(db, 'mileage_grant_lots')) {
+    await db.batch([statement, db.prepare(
+      `UPDATE mileage_grant_lots SET remaining_amount = 0, status = 'void'
+        WHERE ledger_entry_id = ? AND status = 'available'
+          AND EXISTS (SELECT 1 FROM mileage_ledger
+            WHERE program_id = ? AND idempotency_key = ? AND reverses_entry_id = ?)`
+    ).bind(input.reversesEntryId, programId, input.idempotencyKey, input.reversesEntryId)]);
+  } else {
+    await statement.run();
+  }
+
 
   const entry = await db
     .prepare(
@@ -2016,7 +2028,8 @@ async function reverseMileageGrantsForCancellation(
             AND original.source_event_id = ?
             AND ((? IS NOT NULL AND original.beneficiary_user_id = ?)
                  OR (? IS NULL AND original.beneficiary_friend_id = ?))
-            AND reversal.id IS NULL`,
+            AND (reversal.id IS NULL OR reversal.idempotency_key = 'mileage-rule-reversal:' || original.id)
+`,
       )
       .bind(ruleId, input.sourceEventId, input.friendUserId, input.friendUserId, input.friendUserId, input.friendId)
       .all<MileageLedgerEntry>();
@@ -2035,6 +2048,7 @@ async function reverseMileageGrantsForCancellation(
         sourceEventId: input.sourceEventId,
         idempotencyKey: `mileage-rule-reversal:${grant.id}`,
         reversesEntryId: grant.id,
+        voidReversedGrantLot: true,
         metadata: { ruleId, eventType: input.eventType, originalEntryId: grant.id },
         occurredAt: input.occurredAt,
       });

@@ -2044,7 +2044,13 @@ scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVis
   try {
     const friendId = c.req.param('id');
     const body = await c.req.json<{ scoreChange: number; reason?: string }>();
-    if (body.scoreChange === undefined) return c.json({ success: false, error: 'scoreChange is required' }, 400);
+    if (typeof body.scoreChange !== 'number' || !Number.isFinite(body.scoreChange)) {
+      return c.json({ success: false, error: 'scoreChange must be a finite number' }, 400);
+    }
+    const requestKey = c.req.header('Idempotency-Key');
+    if (requestKey !== undefined && (!requestKey.trim() || requestKey.length > 128)) {
+      return c.json({ success: false, error: 'Invalid Idempotency-Key' }, 400);
+    }
     const staff = c.get('staff');
     await addScore(c.env.DB, {
       friendId,
@@ -2053,10 +2059,14 @@ scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVis
       // IDEA-17: 手で動かした点数は「だれが」を明細からたどれるようにする。
       executedByStaffId: staff?.id ?? null,
       executedByStaffName: staff?.name ?? null,
+      idempotencyKey: requestKey ? JSON.stringify(['manual', staff?.id ?? null, requestKey]) : undefined,
     });
     const newScore = await getFriendScore(c.env.DB, friendId);
     return c.json({ success: true, data: { friendId, currentScore: newScore } }, 201);
   } catch (err) {
+    if (err instanceof Error && err.message === 'score_idempotency_conflict') {
+      return c.json({ success: false, error: '同じ操作番号で異なる加点はできません' }, 409);
+    }
     console.error('POST /api/friends/:id/score error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

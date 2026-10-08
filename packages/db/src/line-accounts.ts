@@ -375,6 +375,7 @@ export async function saveLineAccountConnectionChecks(
           SET revision = revision + 1, updated_at = ?
         WHERE id = ? AND revision = ? AND archived_at IS NULL`,
     ).bind(input.checkedAt, input.lineAccountId, input.expectedRevision),
+    db.prepare(`SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'LINE_ACCOUNT_REVISION_CONFLICT' END)`),
     ...input.checks.map((check) => db.prepare(
       `INSERT INTO line_account_connection_checks (
          id, line_account_id, check_kind, result, expected_url, registered_url,
@@ -404,7 +405,12 @@ export async function saveLineAccountConnectionChecks(
       nextRevision,
     )),
   ];
-  const results = await db.batch(statements);
+  let results: D1Result[];
+  try { results = await db.batch(statements); }
+  catch (error) {
+    if (error instanceof Error && /malformed JSON/i.test(error.message)) throw new LineAccountRevisionConflictError();
+    throw error;
+  }
   if (Number(results[0]?.meta?.changes ?? 0) !== 1) {
     throw new LineAccountRevisionConflictError();
   }

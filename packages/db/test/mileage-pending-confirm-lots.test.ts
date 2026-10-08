@@ -171,6 +171,7 @@ describe('確定待ちの確定と付与内訳の一致', () => {
     const summary = await getMileageSummaryForFriend(db, 'fa-1');
     expect(summary.available).toBe(0);
     expect(summary.pending).toBe(0);
+    expect(wallet()).toEqual({ available: 0, pending: 0 });
     expect(lotOf(entry.id)).toBeUndefined();
   });
 
@@ -196,4 +197,16 @@ describe('確定待ちの確定と付与内訳の一致', () => {
     const summary = await getMileageSummaryForFriend(db, 'fa-1');
     expect(summary).toMatchObject({ available: 100, pending: 0 });
   });
+});
+
+it('PKG52: 取消の財布保存が失敗しても台帳を半端にせず、同時再送は一度だけ減らす', async () => {
+  const entry = await grantPending();
+  const input = { entryId: entry.id, lineAccountId: 'acc-a', staffId: 'staff-1', staffName: '担当者', reason: '取消' };
+  sqlite.exec("CREATE TRIGGER fail_void_wallet BEFORE UPDATE ON mileage_wallets BEGIN SELECT RAISE(ABORT,'storage unavailable'); END");
+  await expect(voidMileageLedgerEntry(db,input)).rejects.toThrow();
+  expect(sqlite.prepare('SELECT status FROM mileage_ledger WHERE id=?').get(entry.id)).toEqual({status:'pending'});
+  sqlite.exec('DROP TRIGGER fail_void_wallet');
+  await Promise.all([voidMileageLedgerEntry(db,input),voidMileageLedgerEntry(db,input)]);
+  expect(wallet()).toEqual({available:0,pending:0});
+  expect(sqlite.prepare("SELECT COUNT(*) n FROM mileage_ledger WHERE entry_type='reversal'").get()).toEqual({n:1});
 });
