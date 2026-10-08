@@ -13,7 +13,9 @@ import { loadOperators } from '@/lib/operators-cache'
 import type { PanelStatus } from './use-friend-detail'
 import styles from './detail.module.css'
 
-export function useSupportEditor(friendId: string, onSaved: (notice: string) => void, onConflict: (message: string) => void) {
+export function useSupportEditor(friendId: string, onSaved: (notice: string) => void, onConflict: (message: string) => void, accountId: string | null = null) {
+  const scopeRef = useRef({ friendId, accountId })
+  const [targetAccount, setTargetAccount] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   /*
    * 窓を開いた時の友だち（WEB125）。同じ画面のまま ?id= が変わっても、A の入力・改訂値を B へ送らない。
@@ -21,6 +23,11 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
    */
   const [target, setTarget] = useState<string | null>(null)
   const genRef = useRef(0)
+  if (scopeRef.current.friendId !== friendId || scopeRef.current.accountId !== accountId) {
+    genRef.current += 1
+    scopeRef.current = { friendId, accountId }
+  }
+  const scope = scopeRef.current
   const [status, setStatus] = useState<Chat['status']>('resolved')
   const [operatorId, setOperatorId] = useState('')
   const [revision, setRevision] = useState(0)
@@ -29,7 +36,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (target === null || target === friendId) return
+    if (target === null || (target === friendId && targetAccount === accountId)) return
     genRef.current += 1
     setOpen(false)
     setTarget(null)
@@ -38,13 +45,15 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
     setRevision(0)
     setBusy(false)
     setError('')
-  }, [friendId, target])
+  }, [friendId, accountId, target, targetAccount])
 
   /* 開くたびに今の担当・対応状況を取り直す。GET /api/chats/:id は友だちIDでも引ける。 */
   const openEditor = useCallback(async () => {
+    if (scope !== scopeRef.current) return
     const owner = friendId
     const gen = ++genRef.current
     setTarget(owner)
+    setTargetAccount(accountId)
     setOpen(true)
     setError('')
     setBusy(true)
@@ -64,11 +73,11 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
     } finally {
       if (gen === genRef.current) setBusy(false)
     }
-  }, [friendId])
+  }, [friendId, accountId, scope])
 
   const save = async () => {
     // 開いた時の友だちだけへ送る。表示中の友だちと違えば送らない。
-    if (busy || target === null || target !== friendId) return
+    if (scope !== scopeRef.current || busy || target === null || target !== friendId || targetAccount !== accountId) return
     const owner = target
     const gen = ++genRef.current
     setBusy(true)
@@ -86,8 +95,20 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
     } catch (err) {
       if (gen !== genRef.current) return
       if (err instanceof ApiError && err.status === 409) {
-        setOpen(false)
-        onConflict('ほかの担当者が先に更新しました。最新の内容を読み直しました')
+        // 人が入力した状況・担当者は残し、競合した改訂値だけ取り直す。
+        // 取り直せない場合は古い改訂値のまま（再保存も409で保護される）。
+        const message = 'ほかの担当者が先に更新しました。入力を残して最新の内容を読み直しました。確認して保存してください'
+        setError(message)
+        onConflict(message)
+        try {
+          const latest = await api.chats.get(owner)
+          if (gen !== genRef.current) return
+          if (latest.success) setRevision(latest.data.revision)
+          else setError('最新の内容を読み直せませんでした。入力は残っています。もう一度お試しください。')
+        } catch {
+          if (gen !== genRef.current) return
+          setError('最新の内容を読み直せませんでした。入力は残っています。もう一度お試しください。')
+        }
       } else {
         setError(describeSaveFailure(err))
       }
@@ -98,7 +119,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
 
   const dialog = (
     <Dialog
-      open={open && target === friendId}
+      open={open && target === friendId && targetAccount === accountId}
       title="対応状況を編集"
       designWidth={440}
       busy={busy}
@@ -156,21 +177,32 @@ export function useScenarioPicker(
   const [error, setError] = useState('')
   const reqRef = useRef(0)
   const ownerRef = useRef<string | null>(null)
+  const ownerAccountRef = useRef<string | null>(null)
+  const scopeRef = useRef({ friendId, accountId })
+  if (scopeRef.current.friendId !== friendId || scopeRef.current.accountId !== accountId) {
+    reqRef.current += 1
+    scopeRef.current = { friendId, accountId }
+  }
+  const scope = scopeRef.current
 
   /* 開いた後に表示の友だちが変わったら、選んだシナリオを持ち越さずに閉じる（WEB125）。 */
   useEffect(() => {
-    if (ownerRef.current === null || ownerRef.current === friendId) return
+    if (ownerRef.current === null || (ownerRef.current === friendId && ownerAccountRef.current === accountId)) return
     ownerRef.current = null
     reqRef.current += 1
     setOpen(false)
     setPick('')
+    setOptions([])
+    setListStatus('idle')
     setError('')
     setBusy(false)
-  }, [friendId])
+  }, [friendId, accountId])
 
   /* 選べるのは表示中アカウントのシナリオだけ。選ぶ→確認→登録までここで完結（NEXT-09）。 */
   const openPicker = useCallback(async () => {
+    if (scope !== scopeRef.current) return
     ownerRef.current = friendId
+    ownerAccountRef.current = accountId
     setOpen(true)
     setError('')
     setPick('')
@@ -189,11 +221,12 @@ export function useScenarioPicker(
       if (req !== reqRef.current) return
       setListStatus('error')
     }
-  }, [accountId, friendId])
+  }, [accountId, friendId, scope])
 
   const enroll = async () => {
-    if (busy || listStatus !== 'ready' || ownerRef.current !== friendId) return
+    if (scope !== scopeRef.current || busy || listStatus !== 'ready' || ownerRef.current !== friendId || ownerAccountRef.current !== accountId) return
     const owner = friendId
+    const req = ++reqRef.current
     const scenario = options.find((s) => s.id === pick)
     if (!scenario) {
       setError('登録するシナリオを選んでください')
@@ -203,7 +236,7 @@ export function useScenarioPicker(
     setError('')
     try {
       const res = await api.scenarios.enroll(scenario.id, owner)
-      if (ownerRef.current !== owner) return
+      if (req !== reqRef.current || scope !== scopeRef.current) return
       if (res.success) {
         setOpen(false)
         onEnrolled(`「${scenario.name}」に登録しました`)
@@ -211,10 +244,10 @@ export function useScenarioPicker(
         setError(res.error)
       }
     } catch (err) {
-      if (ownerRef.current !== owner) return
+      if (req !== reqRef.current || scope !== scopeRef.current) return
       setError(describeSaveFailure(err))
     } finally {
-      if (ownerRef.current === owner) setBusy(false)
+      if (req === reqRef.current && scope === scopeRef.current) setBusy(false)
     }
   }
 
@@ -222,7 +255,7 @@ export function useScenarioPicker(
   const picked = options.find((s) => s.id === pick)
   const dialog = (
     <Dialog
-      open={open}
+      open={open && ownerRef.current === friendId && ownerAccountRef.current === accountId}
       title="シナリオに登録する"
       designWidth={480}
       busy={busy}

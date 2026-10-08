@@ -165,15 +165,17 @@ export default function BookingStaffPage() {
         押せない理由はボタンの説明に出す。押せないボタンを黙って置かない。
       */}
       <div data-design="Actions" className="flex flex-wrap items-center gap-2">
-        <Button
+        {adminTheme !== 'v8' || canManageStaff ? <Button
           variant="primary"
           onClick={() => setEditing(EMPTY)}
           disabled={!canManageStaff || !selectedAccountId || loadStatus !== 'ready'}
           title={canManageStaff ? undefined : '予約設定の変更権限がありません'}
         >
           ＋ スタッフを作る
-        </Button>
+        </Button> : null}
       </div>
+
+      {adminTheme === 'v8' && !canManageStaff ? <p role="status">閲覧のみで見ています。予約スタッフの変更には予約設定の変更権限が必要です。</p> : null}
 
       {!selectedAccountId ? (
         <div className="bg-canvas rounded-card border border-hairline">
@@ -201,7 +203,7 @@ export default function BookingStaffPage() {
         />
       ) : items.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline">
-          <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ スタッフを作る」から最初のスタッフを追加してください。" />
+          <ListState kind="empty" title="予約スタッフはまだいません" description={adminTheme !== 'v8' || canManageStaff ? "「＋ スタッフを作る」から最初のスタッフを追加してください。" : "スタッフが登録されると、ここに表示されます。"} />
         </div>
       ) : (
         <DataTable data-design="Table">
