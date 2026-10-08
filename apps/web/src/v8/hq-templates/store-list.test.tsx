@@ -87,6 +87,8 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.textContent).toContain('0通')
     expect(host.textContent).toContain('新しい版を未配布')
     const menu = buttons().find((b) => b.getAttribute('aria-label') === 'テンプレート「秋の新商品」の操作')
+    // 統括の一覧の行の「…」は絵（i0Ao0R・noVq4・DzdC3・wZPua）どおり 28角。
+    expect(menu!.getAttribute('data-size')).toBe('row')
     await act(async () => { menu!.click() })
     const item = [...document.querySelectorAll('[role="menuitem"], button')].find((el) => el.textContent?.trim() === 'アカウントへ配る')
     await act(async () => { (item as HTMLElement).click() })

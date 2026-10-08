@@ -409,7 +409,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                             <Send size={14} aria-hidden="true" />アカウントへ配る
                           </Button>
                         ) : null}
-                        <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
+                        <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} size="row" open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
                       </>
                     ) : null}
                   </div>
