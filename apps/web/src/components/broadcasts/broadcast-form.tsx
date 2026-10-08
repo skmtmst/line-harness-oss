@@ -265,7 +265,11 @@ export function videoPreviewProblem(value: unknown): string | null {
   return null
 }
 
-function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: (content: Record<string, unknown>) => void }) {
+/**
+ * 画像・動画のアップロード欄。統括の一括配信（v8/hq-broadcasts）も同じ欄を使う。
+ * lineAccountId を渡すと動画の置き場をそのアカウントにする（null＝どの店にも属さない。統括）。省けば今選んでいる店。
+ */
+export function MediaUpload({ bubble, onChange, lineAccountId }: { bubble: BroadcastBubble; onChange: (content: Record<string, unknown>) => void; lineAccountId?: string | null }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const isVideo = bubble.type === 'video' || bubble.type === 'rich_video'
@@ -276,7 +280,7 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
     if (file.size > max) { setError(mediaTooLargeMessage(isVideo, file.size)); return }
     setBusy(true); setError('')
     try {
-      const res = await api.broadcastMessageAssets.upload(file)
+      const res = await api.broadcastMessageAssets.upload(file, lineAccountId)
       if (!res.success) { setError(res.error); return }
       onChange({ ...bubble.content, originalContentUrl: res.data.url, previewImageUrl: isVideo ? (bubble.content.previewImageUrl ?? '') : res.data.url })
     } catch { setError('アップロードに失敗しました。通信を確かめて、もう一度お試しください。') } finally { setBusy(false) }

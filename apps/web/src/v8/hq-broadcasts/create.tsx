@@ -14,11 +14,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, CheckCircle2, Eye, Plus, Send, Trash2 } from 'lucide-react'
-import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, LineAccount, SegmentCondition } from '@line-crm/shared'
+import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, CheckCircle2, Eye, Plus, Save, Send, Trash2 } from 'lucide-react'
+import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, LineAccount, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
+import { MediaUpload } from '@/components/broadcasts/broadcast-form'
+import MessageKindFields, { emptyMessageKindState, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'
 import { TARGET_MODES } from '@/lib/broadcast-audience'
 import { pruneCondition } from '@/lib/segment-condition'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
@@ -48,7 +50,7 @@ import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/b
 import formStyles from '@/components/broadcasts/broadcast-form-v8.module.css'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError, api, describeSaveFailure, type BroadcastMessageAsset } from '@/lib/api'
-import { assetBubbleError, bubbleLegacyMessage } from '@/lib/broadcast-template'
+import { bubbleLegacyMessage } from '@/lib/broadcast-template'
 import { formatNumber, formatRelative } from '@/lib/format'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { hqTemplatesApi, type HqTemplateListItem } from '@/lib/hq-templates-api'
@@ -57,16 +59,18 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import RowMenu from './row-menu'
 import { ASSET_KIND, STORE_INSERTS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
+import { HQ_KIND_LABEL, HQ_KIND_TABS, HQ_NOT_YET, bubbleFromTemplate, carouselColumns, emptyContent, fromApiBubble, hqBubblePreview, hqBubbleProblem, hqBubbleSummary, newHqBubble, notYetText, toApiBubble, type HqBubble } from './bubbles'
+import HqTemplatePicker from './template-picker'
 import styles from './create.module.css'
 
 type Store = Pick<LineAccount, 'id' | 'name' | 'tags'> & { friendCount: number; folderId: string | null; folder: Folder | null }
 /** 配信対象（店の一斉配信と同じ4つ。名前は店の口と同じ：詳細条件は advanced）。 */
 type Audience = 'all' | 'scenario' | 'tag' | 'advanced'
 type Method = 'new' | 'template' | 'duplicate'
-/** 吹き出し1つ（店の一斉配信と同じく5つまで）。統括で作れる形はテキスト・クーポン・リッチメッセージ。 */
-type Bubble = { id: string; kind: HqKind; body: string; assetId: string }
+/** 吹き出し1つ（店の一斉配信と同じく5つまで）。種類と口への形は bubbles.ts。 */
+type Bubble = HqBubble
 const MAX_BUBBLES = 5
-const newBubble = (kind: HqKind = 'text'): Bubble => ({ id: `hq-b-${Math.random().toString(36).slice(2, 10)}`, kind, body: '', assetId: '' })
+const newBubble = newHqBubble
 /**
  * 統括の条件で選べる種類（API-18：タグ・シナリオは各アカウントの同じ名前に直す）。
  * 友だち情報・対応マーク・回答フォーム・個別の友だち・分析の対象・クリック履歴は店ごとの ID なので選ばせない。
@@ -83,8 +87,7 @@ const ROWS_SHOWN = 4
 const ALL = '__all__'
 const UNFILED = '__none__'
 
-const KIND_TABS: Array<[HqKind, string]> = [['text', 'テキスト'], ['coupon', 'クーポン'], ['rich', 'リッチメッセージ']]
-const KIND_LABEL: Record<HqKind, string> = { text: 'テキスト', coupon: 'クーポン', rich: 'リッチメッセージ' }
+const KIND_LABEL = HQ_KIND_LABEL
 
 function errorText(caught: unknown, fallback: string): string {
   if (caught instanceof ApiError) {
@@ -115,20 +118,16 @@ function splitJst(iso: string): { date: string; time: string } | null {
   return { date: `${j.getUTCFullYear()}-${String(j.getUTCMonth() + 1).padStart(2, '0')}-${String(j.getUTCDate()).padStart(2, '0')}`, time: `${String(j.getUTCHours()).padStart(2, '0')}:${String(j.getUTCMinutes()).padStart(2, '0')}` }
 }
 
-/** 素材（クーポン・リッチメッセージ）の吹き出し。口の messageBubblesJson と同じ形（店側の一斉配信と同じ）。 */
-function assetBubble(asset: BroadcastMessageAsset, id = 'hq-asset-1') {
-  return { id, type: asset.kind, content: { assetId: asset.id, assetName: asset.name, ...asset.payload } }
+/** 素材（クーポン・リッチメッセージ）を吹き出しの中身にする。口の messageBubblesJson と同じ形（店側の一斉配信と同じ）。 */
+function assetContent(asset: BroadcastMessageAsset): Record<string, unknown> {
+  return { assetId: asset.id, assetName: asset.name, ...asset.payload }
 }
 
 /** 保存した吹き出し（messageBubblesJson）を画面の吹き出しに戻す。読めなければ本文1つ。 */
 function bubblesFromInput(saved: Pick<HqBroadcastInput, 'messageBubblesJson' | 'messageContent'>): Bubble[] {
-  let raw: Array<{ id?: string; type?: string; content?: { assetId?: string; text?: string } }> = []
+  let raw: Array<{ id?: string; type?: string; content?: Record<string, unknown> }> = []
   try { raw = saved.messageBubblesJson ? JSON.parse(saved.messageBubblesJson) : [] } catch { raw = [] }
-  const list = (Array.isArray(raw) ? raw : []).flatMap((item): Bubble[] => {
-    if (item.type === 'coupon' || item.type === 'rich_message') return [{ ...newBubble(item.type === 'coupon' ? 'coupon' : 'rich'), assetId: String(item.content?.assetId ?? '') }]
-    if (item.type === 'text' && typeof item.content?.text === 'string') return [{ ...newBubble('text'), body: fromApiContent(item.content.text) }]
-    return []
-  })
+  const list = (Array.isArray(raw) ? raw : []).flatMap((item): Bubble[] => { const b = fromApiBubble(item); return b ? [b] : [] })
   return list.length ? list.slice(0, MAX_BUBBLES) : [{ ...newBubble('text'), body: fromApiContent(saved.messageContent ?? '') }]
 }
 
@@ -206,12 +205,20 @@ export default function HqBroadcastCreate() {
   const kind = active.kind
   const body = active.body
   const setBody = (next: string | ((text: string) => string)) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...item, body: typeof next === 'function' ? next(item.body) : next } : item)))
-  const setKind = (next: HqKind) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...item, kind: next, assetId: '' } : item)))
+  const setKind = (next: HqKind) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...item, kind: next, content: emptyContent(next), cardAsset: undefined } : item)))
+  /** 開いている吹き出しの中身（画像・動画・位置情報・カルーセル・素材など）を差し替える。 */
+  const setContent = (next: Record<string, unknown>, cardAsset?: boolean) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...item, content: next, cardAsset } : item)))
+  /** 開いている吹き出しを、ひな形から読んだ吹き出しに置き換える。 */
+  const replaceActive = (next: Bubble) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...next, id: item.id } : item)))
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   /* 統括で使える共有の素材（どの店にも属さないクーポン・リッチメッセージ）。 */
   const [assets, setAssets] = useState<BroadcastMessageAsset[] | null>(null)
-  const assetId = active.assetId
-  const setAssetId = (next: string) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...item, assetId: next } : item)))
+  const assetId = String(active.content.assetId ?? '')
+  const setAssetId = (next: string) => { const found = (assets ?? []).find((a) => a.id === next); setContent(found ? assetContent(found) : {}) }
+  /* 統括のカルーセルのひな形（③ のカルーセル）と、［テンプレートから選ぶ］の窓。 */
+  const [carousels, setCarousels] = useState<HqTemplateListItem[] | null>(null)
+  const [carouselError, setCarouselError] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [testOpen, setTestOpen] = useState(false)
   const [approvalRequestOpen, setApprovalRequestOpen] = useState(false)
   const [confirmCount, setConfirmCount] = useState('')
@@ -318,7 +325,7 @@ export default function HqBroadcastCreate() {
     legacyTags.current = []
   }, [stores, draftState])
 
-  const needsAssets = bubbles.some((item) => item.kind !== 'text')
+  const needsAssets = bubbles.some((item) => item.kind === 'rich' || item.kind === 'coupon')
   useEffect(() => {
     if (!needsAssets || assets) return
     let current = true
@@ -327,6 +334,14 @@ export default function HqBroadcastCreate() {
       .catch(() => { if (current) setAssets([]) })
     return () => { current = false }
   }, [needsAssets, assets])
+
+  const needsCarousels = bubbles.some((item) => item.kind === 'carousel')
+  useEffect(() => {
+    if (!needsCarousels || carousels) return
+    let current = true
+    void hqTemplatesApi.listByKind('carousel').then((list) => { if (current) setCarousels(list) }).catch(() => { if (current) setCarousels([]) })
+    return () => { current = false }
+  }, [needsCarousels, carousels])
 
   const chosen = useMemo(() => (stores ?? []).filter((s) => accountIds.includes(s.id)), [stores, accountIds])
 
@@ -371,19 +386,12 @@ export default function HqBroadcastCreate() {
   }
 
   const scheduledAt = when === 'now' ? null : jstIso(date, time)
-  const kindAssets = (assets ?? []).filter((a) => kind !== 'text' && a.kind === ASSET_KIND[kind])
-  const assetFor = (item: Bubble) => (item.kind === 'text' ? null : (assets ?? []).find((a) => a.kind === ASSET_KIND[item.kind as 'coupon' | 'rich'] && a.id === item.assetId) ?? null)
-  const asset = assetFor(active)
-  const bubble = asset ? assetBubble(asset) : null
+  const kindAssets = (assets ?? []).filter((a) => (kind === 'rich' || kind === 'coupon') && a.kind === ASSET_KIND[kind])
   /* 吹き出しは口の messageBubblesJson と同じ形（店の一斉配信と同じ）。テキスト1つだけのときは今までどおり本文だけで送る。 */
-  const apiBubbles = bubbles.map((item, index) => {
-    const found = assetFor(item)
-    if (found) return assetBubble(found, `hq-b-${index + 1}`)
-    return item.kind === 'text' ? { id: `hq-b-${index + 1}`, type: 'text', content: { text: toApiContent(item.body) } } : null
-  })
+  const apiBubbles = bubbles.map((item, index) => toApiBubble(item, `hq-b-${index + 1}`))
   const single = bubbles.length === 1
-  const firstAsset = single && asset ? bubble : apiBubbles.find((item) => item && item.type !== 'text') ?? null
-  const legacy = single && bubble ? bubbleLegacyMessage(bubble as never) : null
+  const bubble = single && kind !== 'text' ? apiBubbles[0] : null
+  const legacy = bubble ? bubbleLegacyMessage(bubble) : null
   const firstText = bubbles.find((item) => item.kind === 'text')
   const targetMode = audience === 'scenario' || audience === 'advanced' ? 'segment' : undefined
   const segmentConditions = audience === 'scenario'
@@ -391,7 +399,7 @@ export default function HqBroadcastCreate() {
     : audience === 'advanced' ? pruneCondition(condition) ?? undefined : undefined
   const input: Omit<HqBroadcastInput, 'requestId'> = {
     title: title.trim(),
-    /* 素材は LINE へ渡せる種類（flex・imagemap など）に直して送る。口はどれも受ける。 */
+    /* 画像・動画・スタンプ・カルーセル・素材は、店の一斉配信と同じく LINE へ渡せる種類（image・carousel・flex・imagemap など）に直して送る。 */
     messageType: single ? (kind === 'text' ? 'text' : ((legacy?.messageType ?? 'flex') as HqBroadcastInput['messageType'])) : 'text',
     messageContent: single ? (kind === 'text' ? toApiContent(body) : (legacy?.messageContent ?? '')) : toApiContent(firstText?.body ?? ''),
     ...(single ? (bubble ? { messageBubblesJson: JSON.stringify([bubble]) } : {}) : { messageBubblesJson: JSON.stringify(apiBubbles.filter(Boolean)) }),
@@ -407,7 +415,6 @@ export default function HqBroadcastCreate() {
     ...(internalMemo.trim() ? { internalMemo: internalMemo.trim() } : {}),
     scheduledAt,
   }
-  void firstAsset
   const key = JSON.stringify(input)
   const stale = !!run && !!checks && runKey !== key
   /* 承認の状態（⑤ を開いて確かめたあと。中身を変えると口が承認を外す）。 */
@@ -427,14 +434,9 @@ export default function HqBroadcastCreate() {
     if (audience === 'tag' && !tagName) return { message: '送る相手のタグを選んでください', step: 'audience' }
     if (audience === 'advanced' && !pruneCondition(condition) && !savedName) return { message: '詳細条件を1つ以上入力するか、保存した条件を選んでください。全員に送るなら「友だち全員に配信する」を選んでください', step: 'audience' }
     for (const [index, item] of bubbles.entries()) {
-      const label = bubbles.length > 1 ? `${index + 1}通目の` : ''
-      if (item.kind === 'text' && !item.body.trim()) return { message: `${label}本文を入れてください`, step: 'message' }
-      if (item.kind !== 'text') {
-        const found = assetFor(item)
-        if (!found) return { message: `${label}${KIND_LABEL[item.kind]}を選んでください`, step: 'message' }
-        const why = assetBubbleError(assetBubble(found) as never)
-        if (why) return { message: why, step: 'message' }
-      }
+      /* 質問・紹介（統括の口がまだ受けない）もここで止め、口を呼ばない。 */
+      const why = hqBubbleProblem(item)
+      if (why) return { message: `${bubbles.length > 1 ? `${index + 1}通目の` : ''}${why}`, step: 'message' }
     }
     if (when === 'later' && !scheduledAt) return { message: '送る日時を選んでください', step: 'schedule' }
     if (scheduledAt && Date.parse(scheduledAt) <= Date.now()) return { message: '予約日時は今より後にしてください', step: 'schedule' }
@@ -537,21 +539,48 @@ export default function HqBroadcastCreate() {
     }
   }
 
-  /** ① 配信方法「テンプレートを選択」：統括のメッセージのひな形（テキスト）を本文に読み込む。 */
+  /** ① 配信方法「テンプレートを選択」・③［テンプレートから選ぶ］：統括のメッセージのひな形を開いている吹き出しに読み込む。 */
   const applyTemplate = async (id: string) => {
     setTemplateId(id)
     if (!id) return
     try {
       const detail = await hqTemplatesApi.get(id)
       if (detail.template.template_type !== 'template') return
-      const definition = detail.definition as { template: { messageType: string; messageContent: string; name: string } }
-      if (definition.template.messageType !== 'text') { setError('文章のひな形だけ本文に読み込めます。'); setErrorStep('basic'); return }
-      setKind('text')
-      setBody(fromApiContent(definition.template.messageContent).slice(0, BODY_MAX))
-      if (!title.trim()) setTitle(definition.template.name.slice(0, TITLE_MAX))
+      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
+      if ('error' in read) { setError(read.error); setErrorStep('basic'); return }
+      replaceActive({ ...read.bubble, body: read.bubble.body.slice(0, BODY_MAX) })
+      if (!title.trim()) setTitle((detail.definition as MessageTemplateDefinition).template.name.slice(0, TITLE_MAX))
       setError(''); setErrorStep(null)
     } catch (caught) {
       setError(errorText(caught, 'ひな形を読み込めませんでした。もう一度お試しください。')); setErrorStep('basic')
+    }
+  }
+  /** ③ カルーセル：統括のカルーセルのひな形を読み、中身（カード）を吹き出しに控える。 */
+  const chooseCarousel = async (id: string) => {
+    setCarouselError('')
+    if (!id) { setContent({}); return }
+    try {
+      const detail = await hqTemplatesApi.get(id)
+      if (detail.template.template_type !== 'template') return
+      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
+      if ('error' in read || read.bubble.kind !== 'carousel') { setCarouselError('error' in read ? read.error : 'カルーセルのテンプレートを選んでください'); return }
+      setContent(read.bubble.content, read.bubble.cardAsset)
+    } catch (caught) {
+      setCarouselError(errorText(caught, 'カルーセルを読み込めませんでした。もう一度お試しください。'))
+    }
+  }
+  /** ③［テンプレートから選ぶ］：選んだひな形で開いている吹き出しを置き換える。読めない種類は窓の中に理由を出す。 */
+  const pickTemplate = async (id: string): Promise<string | null> => {
+    try {
+      const detail = await hqTemplatesApi.get(id)
+      if (detail.template.template_type !== 'template') return 'メッセージのテンプレートを選んでください'
+      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
+      if ('error' in read) return read.error
+      replaceActive({ ...read.bubble, body: read.bubble.body.slice(0, BODY_MAX) })
+      setCarouselError('')
+      return null
+    } catch (caught) {
+      return errorText(caught, 'テンプレートを読み込めませんでした。もう一度お試しください。')
     }
   }
   useEffect(() => {
@@ -601,13 +630,13 @@ export default function HqBroadcastCreate() {
     : audience === 'advanced' ? (savedName ? `保存した条件「${savedName}」${pruneCondition(condition) ? '＋詳細条件' : ''}` : pruneCondition(condition) ? '詳細条件' : '詳細条件：未設定')
     : '友だち全員'
   const audienceFull = `${audienceLabel}${excludeTag ? `・タグ「${excludeTag}」を除く` : ''}`
-  const bubblesDone = bubbles.every((item) => (item.kind === 'text' ? Boolean(item.body.trim()) : Boolean(assetFor(item))))
-  const bubbleSummary = (item: Bubble) => (item.kind === 'text' ? (item.body.trim() ? `テキスト ・ ${item.body.trim().slice(0, 40)}` : 'テキスト ・ 本文がまだありません') : `${KIND_LABEL[item.kind]} ・ ${assetFor(item)?.name ?? 'まだ選んでいません'}`)
+  const bubblesDone = bubbles.every((item) => !hqBubbleProblem(item))
+  const bubbleSummary = hqBubbleSummary
   const accountsLabel = chosen.length === 0 ? '未選択' : chosen.length <= 2 ? chosen.map((s) => s.name).join('・') : `${chosen[0].name} ほか ${chosen.length - 1}アカウント`
   const sendWhenLabel = when === 'now' ? '今すぐ' : scheduledAt ? jpDateTime(scheduledAt) : '未設定'
   const { shown, rest } = splitPreflightRows(checks ?? [], showAll ? Infinity : ROWS_SHOWN)
   const exampleStore = (checks ?? []).find((p) => !p.excluded && !p.blockedReasons.length)?.accountName ?? chosen[0]?.name ?? '店の名前'
-  const previewBodies = bubbles.map((item) => (item.kind === 'text' ? previewText(item.body, exampleStore) : assetFor(item) ? `［${KIND_LABEL[item.kind]}］${assetFor(item)!.name}` : ''))
+  const previewBodies = bubbles.map((item) => (item.kind === 'text' ? previewText(item.body, exampleStore) : hqBubblePreview(item)))
   const steps = broadcastSteps({
     basicDone: Boolean(title.trim()) && title.trim().length <= TITLE_MAX,
     audienceDone: chosen.length > 0 && (audience === 'all' || audience === 'scenario' || (audience === 'tag' && Boolean(tagName)) || (audience === 'advanced' && (Boolean(pruneCondition(condition)) || Boolean(savedName)))),
@@ -676,7 +705,7 @@ export default function HqBroadcastCreate() {
                 <RadioCardGroup legend="配信方法" className={formStyles.methodCards}>
                   {([
                     ['new', '新しいメッセージを作成', 'テキスト・クーポン・リッチメッセージから一から作ります。'],
-                    ['template', 'テンプレートを選択', '統括のテンプレート（文章）を呼び出して手直しします。'],
+                    ['template', 'テンプレートを選択', '統括のテンプレートを呼び出して手直しします。'],
                     ['duplicate', '過去の配信を複製', '送った一括配信をそのまま写して作り直します。'],
                   ] as const).map(([value, label, note]) => (
                     <RadioCard key={value} name="hq-broadcast-method" value={value} checked={method === value} title={label} note={note} onChange={(next) => setMethod(next as Method)} />
@@ -861,7 +890,14 @@ export default function HqBroadcastCreate() {
             {/* ③ メッセージを作成（lLyFR） */}
             {shows('message') ? (
               <section id="broadcast-step-message" className={formStyles.section}>
-                <h3>{`メッセージ（${Math.min(openBubble, bubbles.length - 1) + 1} / ${bubbles.length}）`}</h3>
+                <div className={styles.messageHead}>
+                  <h3>{`メッセージ（${Math.min(openBubble, bubbles.length - 1) + 1} / ${bubbles.length}）`}</h3>
+                  {/* 絵 lLyFR：見出しの右に［テンプレートから選ぶ］［保存してテンプレート化する］（店の一斉配信と同じ。保存は店と同じくまだ使えない）。 */}
+                  <span className={styles.messageHeadActions}>
+                    <Button size="compact" onClick={() => setPickerOpen(true)}>テンプレートから選ぶ</Button>
+                    <Button size="compact" disabled title="テンプレートとして保存する機能は、まだ使えません"><Save size={14} aria-hidden /> 保存してテンプレート化する</Button>
+                  </span>
+                </div>
                 {/* 店の一斉配信と同じく吹き出しは5つまで。開いているのは1つで、ほかは1行の要約（API-18 の複数の吹き出し）。 */}
                 {bubbles.map((item, index) => (
                   <details key={item.id} className={formStyles.bubbleFrame} data-embedded open={index === Math.min(openBubble, bubbles.length - 1)}>
@@ -877,9 +913,10 @@ export default function HqBroadcastCreate() {
                     {index === Math.min(openBubble, bubbles.length - 1) ? (
                       <>
                         <div className="flex flex-wrap gap-2" role="tablist" aria-label={bubbles.length > 1 ? `${index + 1}通目のメッセージの形式` : 'メッセージの形式'}>
-                          {KIND_TABS.map(([value, label]) => (
+                          {HQ_KIND_TABS.map(([value, label]) => (
                             <button key={value} type="button" role="tab" aria-selected={kind === value} tabIndex={kind === value ? 0 : -1} className="broadcast-message-type" data-active={kind === value || undefined}
-                              onClick={() => { setKind(value); setAssetId('') }}>{label}</button>
+                              title={HQ_NOT_YET.has(value) ? notYetText(value) : value === 'coupon' ? 'クーポン' : undefined}
+                              onClick={() => { if (kind !== value) setKind(value) }}>{label}</button>
                           ))}
                         </div>
                         {kind === 'text' ? (
@@ -905,8 +942,37 @@ export default function HqBroadcastCreate() {
                             </div>
                             <p className="mt-2 text-xs text-ink-faint">{'{店名}・{店の電話番号}・{予約ページ} は、送るアカウントの名前と共通情報に置き換わります。共通情報が無いアカウントは最終確認で外します。'}</p>
                           </section>
+                        ) : HQ_NOT_YET.has(kind) ? (
+                          <p className={styles.notYet} role="note">{notYetText(kind)}</p>
+                        ) : kind === 'image' || kind === 'video' ? (
+                          /* 店の一斉配信と同じアップロード欄。置き場はどの店にも属さない（統括）ので、どのアカウントからも同じ URL で届く。 */
+                          <MediaUpload bubble={{ id: active.id, type: kind, content: active.content }} lineAccountId={null} onChange={(next) => setContent(next)} />
+                        ) : kind === 'audio' || kind === 'sticker' || kind === 'location' ? (
+                          <MessageKindFields
+                            kind={kind as MessageKind}
+                            value={(active.content.state as MessageKindState | undefined) ?? emptyMessageKindState()}
+                            onChange={(next) => setContent({ state: next })}
+                          />
+                        ) : kind === 'carousel' ? (
+                          <section>
+                            {/* 統括のカルーセルのひな形（コンテンツ ＞ テンプレート ＞ カルーセル）から選ぶ。中身そのものを控えるので、ひな形を消しても送れる。 */}
+                            {carousels === null ? <p className="text-xs text-ink-faint">読み込んでいます…</p> : carousels.length === 0 ? (
+                              <p className="text-xs text-ink-faint">統括のカルーセルのテンプレートがありません。「テンプレート」でカルーセルを作ってください。</p>
+                            ) : (
+                              <Select
+                                aria-label="カルーセルを選ぶ"
+                                value={String(active.content.hqTemplateId ?? active.content.assetId ?? '')}
+                                onChange={(id) => void chooseCarousel(id)}
+                                size="full"
+                                options={[{ value: '', label: '選んでください' }, ...carousels.map((t) => ({ value: t.id, label: t.name }))]}
+                              />
+                            )}
+                            {active.content.templateName || active.content.assetName ? <p className="mt-2 text-xs text-ink-faint">{`カード${carouselColumns(active).length}枚`}</p> : null}
+                            {carouselError ? <p className="mt-2 text-xs text-warning" role="alert">{carouselError}</p> : (active.content.templateName || active.content.assetName) && hqBubbleProblem(active) ? <p className="mt-2 text-xs text-warning" role="alert">{hqBubbleProblem(active)}</p> : null}
+                          </section>
                         ) : (
                           <section>
+                            {kind === 'coupon' ? <p className="mb-2 text-xs text-ink-faint">その他の種類：クーポン</p> : null}
                             {assets === null ? <p className="text-xs text-ink-faint">読み込んでいます…</p> : kindAssets.length === 0 ? (
                               <p className="text-xs text-ink-faint">{`統括で使える${KIND_LABEL[kind]}がありません。「コンテンツ ＞ テンプレート」で、どの店にも属さない素材として作ってください。`}</p>
                             ) : (
@@ -918,7 +984,7 @@ export default function HqBroadcastCreate() {
                                 options={[{ value: '', label: '選んでください' }, ...kindAssets.map((a) => ({ value: a.id, label: a.name }))]}
                               />
                             )}
-                            {asset && assetBubbleError(bubble as never) ? <p className="mt-2 text-xs text-warning" role="alert">{assetBubbleError(bubble as never)}</p> : null}
+                            {assetId && hqBubbleProblem(active) ? <p className="mt-2 text-xs text-warning" role="alert">{hqBubbleProblem(active)}</p> : null}
                           </section>
                         )}
                       </>
@@ -1133,6 +1199,7 @@ export default function HqBroadcastCreate() {
       <HqTestSendDialog open={testOpen} accounts={chosen.filter((s) => !excluded.includes(s.id)).map((s) => ({ id: s.id, name: s.name }))} prepare={prepareForTest} onClose={() => setTestOpen(false)} />
 
       {/* 詳細条件（店の一斉配信と同じ部品。タグ・シナリオは名前で選び、各アカウントの同じ名前に直す） */}
+      <HqTemplatePicker open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={pickTemplate} />
       <Dialog
         open={conditionOpen}
         title="詳細条件で絞り込む"
