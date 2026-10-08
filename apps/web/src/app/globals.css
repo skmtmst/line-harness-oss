@@ -708,7 +708,7 @@
   --bell-w: 380px; --bell-shadow: 0 12px 32px #1d1d1f24; --bell-lh: 1.5; --bell-title-size: 15px;
   --bell-head-pad: 14px 16px 10px; --bell-head-gap: 8px; --bell-seg-pad: 0 16px 10px;
   --bell-row-pad: 10px 16px; --bell-row-gap: 10px; --bell-icon: 28px; --bell-icon-radius: 8px; --bell-icon-glyph: 15px; --bell-text-gap: 2px; --bell-meta-gap: 8px;
-  --bell-dot: 8px; --bell-dot-color: #2f6fde; --bell-unread-bg: #f7faff; --bell-foot-pad: 10px 16px; --bell-settings: 32px; --bell-state-pad: 20px 16px; --bell-focus-ring: 2px; --bell-focus-offset: -2px;
+  --bell-dot: 8px; --bell-dot-color: #2f6fde; --bell-unread-bg: #f7faff; --bell-foot-pad: 10px 16px; --bell-state-pad: 20px 16px; --bell-focus-ring: 2px; --bell-focus-offset: -2px;
   /* 切り替え（3つ）の詰めた形（ベルの小窓の分類）：項目 4/12・文 12/18。 */
   --seg-compact-pad: 4px 12px; --seg-compact-lh: 18px;
   /* 分析（ws9wt・eEhYU・L4Uov）：二段の切り替え・数の帯・棒・右の列。 */
