@@ -11,18 +11,20 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   CircleDot,
-  Ban,
   Bookmark,
   Columns3,
-  Download,
+  ChevronDown,
+  Database,
   Eye,
   Megaphone,
-  MessageCircle,
+  MessageSquare,
+  UserRoundX,
   SlidersHorizontal,
   Star,
+  TrendingUp,
   Upload,
   UserPlus,
   Users,
@@ -53,6 +55,8 @@ import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
+import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
@@ -63,8 +67,7 @@ import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import FriendRowMenu from '@/components/friends/friend-row-menu'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
-import { FriendsTabs } from '../shared/head'
-import { hasEditKey } from '../shared/nav'
+import { FRIENDS_TABS, hasEditKey } from '../shared/nav'
 import { emptyMessageOf } from './empty'
 import { csvExportLine } from './csv-export'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
@@ -104,6 +107,16 @@ function isPageSize(value: number): value is PageSize {
   return (PAGE_SIZE_OPTIONS as readonly number[]).includes(value)
 }
 
+/** 数の帯の「…」。今の「受信箱を開く」はここへ移した。 */
+function KpiMenu({ title, onOpen }: { title: string; onOpen: () => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <span className={styles.kpiMenu}>
+      <RowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={[{ id: 'inbox', label: '受信箱を開く', external: true, onSelect: () => { setOpen(false); onOpen() } }]} />
+    </span>
+  )
+}
+
 export default function FriendsListV8() {
   usePageTitle('友だち')
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -123,6 +136,7 @@ export default function FriendsListV8() {
   const readOnly = !canEditFriends && !canEditChats
   const canImport = manager
 
+  const router = useRouter()
   const searchParams = useSearchParams()
   const scoreMin = scoreBoundary(searchParams.get('scoreMin'))
   const scoreMax = scoreBoundary(searchParams.get('scoreMax'))
@@ -173,6 +187,8 @@ export default function FriendsListV8() {
   const [columnsReady, setColumnsReady] = useState(false)
   const [columnsOpen, setColumnsOpen] = useState(false)
   const columnsButtonRef = useRef<HTMLButtonElement>(null)
+  const dataMenuRef = useRef<HTMLSpanElement>(null)
+  const [dataMenuOpen, setDataMenuOpen] = useState(false)
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('friends.visibleColumns') ?? 'null') as unknown
@@ -495,13 +511,13 @@ export default function FriendsListV8() {
       href: '/chats',
     },
     {
-      key: 'blocked', title: 'ブロック・非表示', icon: Ban, value: stats ? stats.blockedByThem + stats.hiddenByUs : null,
+      key: 'blocked', title: 'ブロック・非表示', icon: UserRoundX, value: stats ? stats.blockedByThem + stats.hiddenByUs : null,
       detail: stats ? `相手から ${stats.blockedByThem}・自分から ${stats.hiddenByUs}` : statsFailed ? '読み込めませんでした' : '—',
       delta: null,
       href: '/chats',
     },
     {
-      key: 'unanswered', title: '未対応', icon: MessageCircle, value: stats?.unanswered ?? null,
+      key: 'unanswered', title: '未対応', icon: MessageSquare, value: stats?.unanswered ?? null,
       detail: stats ? `対応済み ${formatNumber(stats.resolved)}` : statsFailed ? '読み込めませんでした' : '—',
       delta: stats && stats.unanswered > 0 ? { text: '要確認', tone: 'warn' } : null,
       href: '/chats?status=unread',
@@ -530,10 +546,11 @@ export default function FriendsListV8() {
           onRetry={statsFailed ? () => void loadStats(selectedAccountId) : undefined}
           delta={kpi.delta ? (
             <span className={kpi.delta.tone === 'warn' ? `${styles.delta} ${styles.deltaWarn}` : kpi.delta.tone === 'up' ? `${styles.delta} ${styles.deltaUp}` : styles.delta}>
+              {kpi.delta.tone === 'up' ? <TrendingUp size={12} aria-hidden="true" /> : null}
               {kpi.delta.text}
             </span>
           ) : undefined}
-          action={{ label: '受信箱を開く', href: kpi.href }}
+          menu={<KpiMenu title={kpi.title} onOpen={() => router.push(kpi.href)} />}
         />
       ))}
     </KpiBand>
@@ -541,10 +558,29 @@ export default function FriendsListV8() {
 
   const headActions = (
     <>
-      <Button type="button" variant="secondary" onClick={exportCurrentPage} disabled={loadStatus !== 'ready'}>
-        <Download size={14} aria-hidden="true" />
-        表示中をCSVで書き出す
-      </Button>
+      <span ref={dataMenuRef} className={styles.dataMenuBox}>
+        <Button type="button" variant="secondary" aria-haspopup="menu" aria-expanded={dataMenuOpen} onClick={() => setDataMenuOpen((current) => !current)}>
+          <Database size={14} aria-hidden="true" />
+          表示中をCSVで書き出す
+          <ChevronDown size={14} aria-hidden="true" />
+        </Button>
+        <ActionMenu
+          open={dataMenuOpen}
+          ariaLabel="友だちのデータの操作"
+          anchorRef={dataMenuRef}
+          onClose={() => setDataMenuOpen(false)}
+          items={[
+            { id: 'csv', label: '表示中をCSVで書き出す', disabled: loadStatus !== 'ready', onSelect: () => { setDataMenuOpen(false); exportCurrentPage() } },
+            ...FRIENDS_TABS.filter((tab) => tab.key !== 'list' && tab.key !== 'csv').map((tab, index) => ({
+              id: tab.key,
+              label: tab.label,
+              external: true,
+              dividerBefore: index === 0,
+              onSelect: () => { setDataMenuOpen(false); router.push(tab.href) },
+            })),
+          ]}
+        />
+      </span>
       {canImport ? (
         <Button variant="primary" href="/friends/migrations">
           <Upload size={14} aria-hidden="true" />
@@ -892,7 +928,6 @@ export default function FriendsListV8() {
               <span>{VIEWER_NOTE}</span>
             </div>
           ) : null}
-          <FriendsTabs current="list" />
         </>
       )}
       stats={statsBand}

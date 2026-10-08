@@ -1386,7 +1386,7 @@
   --tpl-fr-col-check: 52px; --tpl-fr-col-star: 36px; --tpl-fr-col-support: 146px; --tpl-fr-col-scenario: 88px; --tpl-fr-col-latest: 206px;
   --tpl-fr-col-tags: 176px; --tpl-fr-col-source: 88px; --tpl-fr-col-last: 96px; --tpl-fr-col-menu: 48px;
   --tpl-fr-star: 20px; --tpl-fr-avatar: 32px; --tpl-fr-avatar-gap: 10px; --tpl-fr-sub-lh: 16px; --tpl-fr-support-gap: 3px;
-  --tpl-fr-dot: 6px; --tpl-fr-dot-gap: 5px; --tpl-fr-dot-box: 16px; --tpl-fr-status-pad: 2px 8px; --tpl-fr-tag-gap: 4px; --tpl-fr-tag-pad: 2px 6px;
+  --tpl-fr-dot: 6px; --tpl-fr-dot-gap: 5px; --tpl-fr-dot-box: 16px; --tpl-fr-status-pad: 2px 8px; --tpl-fr-tag-gap: 4px; --tpl-fr-tag-max: 102px; --tpl-fr-tag-pad: 2px 6px;
   --tpl-fr-state-pad: 40px 24px; --tpl-fr-skel-name: 160px; --tpl-fr-skel-cell: 96px; --tpl-fr-skel-h: 16px;
   --tpl-fr-pager-pull: -10px -24px; --tpl-fr-pager-lh: 21px;
   --tpl-fr-stack-gap: 12px; --tpl-fr-card-pad: 16px; --tpl-fr-card-num-size: 22px; --tpl-fr-head-pad-bottom: 16px;
