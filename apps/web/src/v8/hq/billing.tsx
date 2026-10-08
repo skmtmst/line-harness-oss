@@ -7,12 +7,19 @@
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
  * （型のフォルダの列）・契約の帯・周期の切り替えと「支払い方法を管理」・プラン3枚・
  * 支払い履歴の表。
+ *
+ * 2026-10-08 オーナー：いま契約しているプランに印（緑の枠・「利用中」・押せない［いまのプラン］）、
+ * ほかのカードに［このプランに変える］（今のプランが無いときは［このプランにする］）。オーナーだけ。
+ * 課金の対象外の統括でも、API がプラン（planKey）を返すならそのプランを「利用中」にする。
+ * お金が動く操作は新しく作らない：変えるときは確認の窓から、今ある口（支払いの管理＝Stripe の画面）
+ * へ渡す。課金の対象外・支払いの管理画面が無いときは、運営へのお問い合わせへ渡す。
  */
 import { Check, CreditCard, Download } from 'lucide-react'
-import { useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
@@ -35,6 +42,20 @@ import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
+
+/** プランを変える確認の窓の渡し先。portal＝支払いの管理（Stripe の画面）、contact＝運営へのお問い合わせ。 */
+type ChangeRoute = 'portal' | 'contact'
+
+/**
+ * いま使っているプラン。契約中（active・past_due）は API の `current`、
+ * 課金の対象外は API が返す `planKey`（返さなければ無し）。
+ */
+export function currentPlanKey(summary: BillingSummary): BillingSummary['planKey'] {
+  const current = summary.plans.find((plan) => plan.current)
+  if (current) return current.key
+  if (summary.state === 'exempt' && summary.planKey && summary.plans.some((plan) => plan.key === summary.planKey)) return summary.planKey
+  return null
+}
 
 /** 絵の言葉。まだ払われていない請求は「請求中」。 */
 const INVOICE_WORDS: Record<string, string> = { ...INVOICE_STATUS_LABELS, open: '請求中' }
@@ -65,6 +86,7 @@ function BillingInner() {
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
   const settingsNav = useHqSettingsFolderNav('billing')
   const params = useSearchParams()
+  const router = useRouter()
   const checkoutResult = params.get('checkout')
   /* 役割はサーバ（/api/staff/me）から読む。手元の保存値は使わない。 */
   const role = useStaffRole() ?? ''
@@ -79,6 +101,9 @@ function BillingInner() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [interval, setInterval] = useState<BillingInterval>('month')
+  /* 最初に読めたときだけ、周期の切り替えを契約中の周期に合わせる（あとは人が選んだまま）。 */
+  const intervalSynced = useRef(false)
+  const [change, setChange] = useState<{ plan: BillingPlanView; route: ChangeRoute } | null>(null)
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -94,6 +119,10 @@ function BillingInner() {
       ])
       if (!summaryRes.success) throw new Error(summaryRes.error)
       setSummary(summaryRes.data)
+      if (!intervalSynced.current) {
+        intervalSynced.current = true
+        if (summaryRes.data.planInterval) setInterval(summaryRes.data.planInterval)
+      }
       setInvoices(invoiceRes?.success ? invoiceRes.data : null)
       setInvoiceFailed(!invoiceRes?.success)
       setStatus('ready')
@@ -135,6 +164,7 @@ function BillingInner() {
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
     } catch (caught) {
+      setChange(null)
       setError(billingFailureMessage(caught, '支払い方法の管理画面の表示', '支払い方法の管理はオーナーか管理者だけができます。オーナーか管理者の方に操作してもらってください。'))
       setBusy(null)
     }
@@ -159,6 +189,13 @@ function BillingInner() {
   const isOwner = role === 'owner'
   const canManagePayment = role === 'owner' || role === 'admin'
   const canChoose = isOwner && summary.state !== 'exempt' && summary.state !== 'active' && summary.state !== 'past_due'
+  const currentKey = currentPlanKey(summary)
+  /* 契約中の変更は支払いの管理（Stripe の画面）で。管理画面が無い・課金の対象外は運営へ頼む。 */
+  const changeRoute: ChangeRoute | null = summary.state === 'exempt'
+    ? 'contact'
+    : summary.state === 'active' || summary.state === 'past_due'
+      ? (summary.portalAvailable ? 'portal' : 'contact')
+      : null
   const yearlyMins = summary.plans
     .map((plan) => billingPlanPrice(plan, 'year').yearlyYen)
     .filter((yenValue): yenValue is number => yenValue !== null)
@@ -209,13 +246,14 @@ function BillingInner() {
       <div className={styles.plans} data-design="Plans">
         {summary.plans.map((plan) => {
           const price = billingPlanPrice(plan, interval)
+          const isCurrent = plan.key === currentKey
           return (
-            <section key={plan.key} className={plan.current ? `${styles.plan} ${styles.planCurrent}` : styles.plan}>
+            <section key={plan.key} className={isCurrent ? `${styles.plan} ${styles.planCurrent}` : styles.plan} aria-current={isCurrent ? 'true' : undefined}>
               <div className={styles.planHead}>
                 <h2 className={styles.planName}>{plan.name}</h2>
                 {plan.recommended ? <span className={styles.badge}>おすすめ</span> : null}
                 {interval === 'year' ? <span className={styles.badge}>約15% OFF</span> : null}
-                {plan.current ? <span className={`${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />利用中</span> : null}
+                {isCurrent ? <span className={`${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />利用中</span> : null}
               </div>
               <p className={styles.planDesc}>{plan.description}</p>
               <p className={styles.price} data-price-source={price.fromStripe ? 'stripe' : 'fallback'}>
@@ -233,9 +271,17 @@ function BillingInner() {
                 ))}
               </ul>
               <div className={styles.planFoot}>
-                {plan.current ? (
+                {isCurrent ? (
                   <Button disabled className={styles.planButton}>
                     <Check aria-hidden="true" className={styles.buttonIcon} />いまのプラン
+                  </Button>
+                ) : isOwner && changeRoute ? (
+                  <Button
+                    onClick={() => setChange({ plan, route: changeRoute })}
+                    disabled={busy !== null}
+                    className={styles.planButton}
+                  >
+                    {currentKey ? 'このプランに変える' : 'このプランにする'}
                   </Button>
                 ) : isOwner ? (
                   <Button
@@ -248,7 +294,7 @@ function BillingInner() {
                     このプランにする
                   </Button>
                 ) : null}
-                {!price.available && !plan.current ? <p className={styles.planNote}>価格がまだ設定されていません</p> : null}
+                {!price.available && !isCurrent && !changeRoute ? <p className={styles.planNote}>価格がまだ設定されていません</p> : null}
               </div>
             </section>
           )
@@ -256,6 +302,26 @@ function BillingInner() {
       </div>
 
       {blockedNote ? <p className={styles.note} data-design="Note">{blockedNote}</p> : null}
+
+      <ConfirmDialog
+        open={change !== null}
+        title={change ? `${change.plan.name}に${currentKey ? '変えます' : 'します'}か` : ''}
+        description={change?.route === 'portal'
+          ? `プランの変更は Stripe の支払いの画面で確定します。開いた画面で「${change?.plan.name ?? ''}」を選び、差額と適用日を確かめてから確定してください。ここではまだプランは変わりません。`
+          : `この統括は課金の対象外のため、プランの変更は運営が行います。お問い合わせから、変えたいプラン（${change?.plan.name ?? ''}・${interval === 'year' ? '年払い' : '月払い'}）を運営に伝えてください。差額と適用日は運営からの返事で確かめられます。`}
+        confirmLabel={change?.route === 'portal' ? 'Stripe の画面を開く' : 'お問い合わせへ'}
+        busy={busy === 'portal'}
+        onCancel={() => setChange(null)}
+        onConfirm={() => {
+          if (!change) return
+          if (change.route === 'portal') {
+            void portal()
+            return
+          }
+          setChange(null)
+          router.push('/hq/support')
+        }}
+      />
 
       <section className={styles.history} data-design="History">
         <h2 className={styles.historyTitle}>支払い履歴</h2>
@@ -314,6 +380,14 @@ function ContractText({ summary }: { summary: BillingSummary }) {
     return (
       <>
         いまのプラン：{summary.planName}（{[basis, amount].filter(Boolean).join('')}）{summary.currentPeriodEndsLabel ? `・次回の更新日 ${summary.currentPeriodEndsLabel}` : ''}。プランを変えるときは、「支払い方法を管理」から開く Stripe の画面で、差額と適用日を確かめてから確定します。
+      </>
+    )
+  }
+  const exemptPlan = summary.state === 'exempt' ? summary.plans.find((plan) => plan.key === currentPlanKey(summary)) : undefined
+  if (exemptPlan) {
+    return (
+      <>
+        いまのプラン：{exemptPlan.name}（課金の対象外）。この統括は運営用のため、料金はかかりません。プランを変えるときは、お問い合わせから運営に伝えます。
       </>
     )
   }
