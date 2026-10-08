@@ -214,6 +214,8 @@ const EXEMPTIONS: Record<string, string> = {
     '受信箱の右の欄（B-26 その場で直す）。対応状況・担当・タグは押した瞬間に保存し、メモは書くのをやめて1秒で保存する。保存待ちの入力を溜めないので番兵の対象外（失敗は知らせで戻してもう一度試す）',
   'components/hq/account-menu.tsx':
     '編集を持たないメニュー。アカウント解除と移動を共通の未保存確認へ委ねる',
+  'components/shared/top-bar.tsx':
+    '編集を持たない上部の帯の部品。段を替えて戻るパンくず（onSelect）を共通の未保存確認（requestUnsavedAction）へ委ねる',
   'components/shell/app-top-bar.tsx':
     '編集を持たない上部の帯。アカウント切替と移動を共通の未保存確認へ委ねる',
   'components/shared/command-palette.tsx':
