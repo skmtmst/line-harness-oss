@@ -21,7 +21,7 @@ export interface SqliteD1 {
 }
 
 function isSelect(sql: string): boolean {
-  return /^\s*(SELECT|WITH|PRAGMA)/i.test(sql)
+  return /^\s*(SELECT|WITH|PRAGMA)/i.test(sql) || /\bRETURNING\b/i.test(sql)
 }
 
 /*
@@ -49,15 +49,15 @@ function wrap(raw: Database.Database, sql: string, args: unknown[]) {
     return a as never
   })
   return {
-    first: async <T = unknown>(): Promise<T | null> => {
+    first: <T = unknown>(): T | null => {
       const row = raw.prepare(sql).get(...normalized)
       return (row as T) ?? null
     },
-    all: async <T = unknown>(): Promise<{ results: T[] }> => {
+    all: <T = unknown>(): { results: T[] } => {
       const rows = raw.prepare(sql).all(...normalized)
       return { results: rows as T[] }
     },
-    run: async () => {
+    run: () => {
       const info = raw.prepare(sql).run(...normalized)
       return { meta: { changes: info.changes, last_row_id: Number(info.lastInsertRowid) } }
     },
@@ -104,6 +104,7 @@ export function createTestD1(
   // その種の回帰テストは { foreignKeys: true } で作り、実 D1 と同じ制約で確かめる。
   raw.pragma(`foreign_keys = ${options?.foreignKeys ? 'ON' : 'OFF'}`)
 
+  let batchTail:Promise<unknown>=Promise.resolve();
   const db = {
     prepare: (sql: string) => ({
       // batch が SELECT へ .all() を振り分けられるよう、元の SQL を残しておく。
@@ -111,7 +112,8 @@ export function createTestD1(
       sql,
       ...(isSelect(sql) ? wrap(raw, sql, []) : wrap(raw, sql, [])),
     }),
-    batch: async (statements: D1PreparedStatement[]) => {
+    batch: (statements: D1PreparedStatement[]) => {
+      const run=async()=>{
       raw.exec('BEGIN IMMEDIATE')
       try {
         const results = []
@@ -123,15 +125,16 @@ export function createTestD1(
            */
           const sql = (statement as unknown as { sql?: string }).sql ?? '';
           if (!isSelect(sql)) {
-            results.push(await statement.run());
+            const result=statement.run();results.push(result instanceof Promise?await result:result);
             continue;
           }
           try {
-            results.push(await statement.all());
-          } catch {
+            const result=statement.all();results.push(result instanceof Promise?await result:result);
+          } catch (error) {
+            if(!String((error as {message?:unknown})?.message).includes('does not return data'))throw error;
             // WITH x AS (...) INSERT ... のように WITH で始まる書き込みもある。
             // returnsData が無い文に .all() すると実行前に失敗するので .run() へ倒す。
-            results.push(await statement.run());
+            const result=statement.run();results.push(result instanceof Promise?await result:result);
           }
         }
         raw.exec('COMMIT')
@@ -140,6 +143,8 @@ export function createTestD1(
         raw.exec('ROLLBACK')
         throw error
       }
+      };
+      const result=batchTail.then(run);batchTail=result.catch(()=>undefined);return result;
     },
   } as unknown as D1Database
 
