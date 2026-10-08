@@ -7,7 +7,7 @@
  * 申し込んだ人にすること のカードと、右の列（お客さまの申込ページ・保存すると起きること）、
  * 下の帯（キャンセル・下書きを保存・公開する）をはめる。
  * 今の作り（3段階のウィザード）と同じ口を使う：イベントを作る → 最初の枠を作る。
- * 公開は作るときに is_published=1 で送る。絵と今の作りの違いは BEHAVIOR.md。
+ * 最初の枠を作れたあと、版を照合して公開する。絵と今の作りの違いは BEHAVIOR.md。
  */
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -103,6 +103,7 @@ function EventsCreateV8Inner() {
     return next
   })
   const createdIdRef = useRef<string | null>(null)
+  const createdVersionRef = useRef<number | null>(null)
 
   const update = <K extends keyof EventDetail>(key: K, value: EventDetail[K]) => setDraft((current) => ({ ...current, [key]: value }))
 
@@ -147,7 +148,7 @@ function EventsCreateV8Inner() {
       const payload: Partial<EventDetail> = {
         ...draft,
         name: draft.name.trim(),
-        is_published: publish ? 1 : 0,
+        is_published: 0,
         questions: qs,
         account_ids: (draft.target_type ?? 'single') === 'multi-account-dedup' ? [selectedAccountId] : null,
       }
@@ -157,6 +158,12 @@ function EventsCreateV8Inner() {
         const created = await eventsApi.createEvent(selectedAccountId, payload)
         eventId = created.id
         createdIdRef.current = eventId
+        createdVersionRef.current = created.version ?? null
+      } else {
+        if (createdVersionRef.current === null) createdVersionRef.current = (await eventsApi.getEvent(selectedAccountId, eventId)).version ?? null
+        if (createdVersionRef.current === null) throw new Error('下書きの版を確認できませんでした。編集画面から続けてください。')
+        const updated = await eventsApi.updateEvent(selectedAccountId, eventId, payload, createdVersionRef.current)
+        createdVersionRef.current = updated.version ?? null
       }
       const startsAt = jstToUtcIso(date, startTime)
       const endsAt = jstToUtcIso(date, endTime)
@@ -164,6 +171,12 @@ function EventsCreateV8Inner() {
       await eventsApi.createSlots(selectedAccountId, eventId, [
         { starts_at: startsAt, ends_at: endsAt, capacity: Number(capacity), client_key: `first-slot:${eventId}` },
       ])
+      if (publish) {
+        if (createdVersionRef.current === null) createdVersionRef.current = (await eventsApi.getEvent(selectedAccountId, eventId)).version ?? null
+        if (createdVersionRef.current === null) throw new Error('下書きの版を確認できませんでした。編集画面から続けてください。')
+        const published = await eventsApi.updateEvent(selectedAccountId, eventId, { is_published: 1 }, createdVersionRef.current)
+        createdVersionRef.current = published.version ?? null
+      }
       initialRef.current = snapshot
       router.push(`/events?highlight=${encodeURIComponent(eventId)}`)
     } catch (cause) {
@@ -171,7 +184,7 @@ function EventsCreateV8Inner() {
         ? 'イベントを作れるのは統括と管理者だけです。'
         : cause instanceof Error ? cause.message : '保存できませんでした。もう一度お試しください。'
       setError(eventId
-        ? `イベントは下書きで作りましたが、最初の予約枠を作れませんでした。もう一度押すと続きから作ります。（${reason}）`
+        ? `イベントは下書きで作りましたが、予約枠の作成または公開を終えられませんでした。もう一度押すと続きから進めます。（${reason}）`
         : reason)
       setSaving(false)
     }

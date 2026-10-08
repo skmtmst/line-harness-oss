@@ -3,7 +3,7 @@
 import { X } from 'lucide-react'
 import StickyBar from '@/components/shared/sticky-bar'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useRouter } from 'next/navigation'
 import { api, ApiError, EventSlotsPartialError, eventsApi, type EventDetail, type EventSlot, type EventSlotInput } from '@/lib/api'
@@ -100,7 +100,11 @@ export function toEventDraft(row: EventDetail): EventDetail {
   return { ...row, questions: parseEventQuestions(row.questions_json) }
 }
 
-export default function EventForm({ accountId, eventId }: EventFormProps) {
+export default function EventForm(props: EventFormProps) {
+  return <EventFormInner key={`${props.accountId}:${props.eventId ?? 'new'}`} {...props} />
+}
+
+function EventFormInner({ accountId, eventId }: EventFormProps) {
   const router = useRouter()
   const { selectedAccount, accounts } = useAccount()
   const [tab, setTab] = useState<Tab>('overview')
@@ -757,6 +761,7 @@ function SlotsTab({
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
+  const singleSlotKey = useRef(crypto.randomUUID())
   const [showBulk, setShowBulk] = useState(false)
   /*
     確認は設計の窓で出す。**ブラウザの `confirm()` を使わない。**
@@ -979,9 +984,10 @@ function SlotsTab({
         <AddSlotDialog
           onClose={() => setShowAdd(false)}
           onSubmit={async (s) => {
-            await eventsApi.createSlots(accountId, eventId, [s])
-            await refresh()
+            await eventsApi.createSlots(accountId, eventId, [{ ...s, client_key: singleSlotKey.current }])
             setShowAdd(false)
+            singleSlotKey.current = crypto.randomUUID()
+            try { await refresh() } catch { setErr('予約枠は追加済みですが、一覧を読み直せませんでした。画面を再読み込みしてください。') }
           }}
         />
       )}
@@ -1202,8 +1208,10 @@ function EditSlotDialog({
     setBusy(true)
     setErr(null)
     try {
-      const s = jstHHMMToUtcIso(date, startTime)
-      const e = jstHHMMToUtcIso(date, endTime)
+      const sameDate = date === utcIsoToJstDate(slot.starts_at)
+      const s = sameDate && startTime === utcIsoToJstHHMM(slot.starts_at) ? slot.starts_at : jstHHMMToUtcIso(date, startTime)
+      const endDate = sameDate ? utcIsoToJstDate(slot.ends_at) : date
+      const e = sameDate && endTime === utcIsoToJstHHMM(slot.ends_at) ? slot.ends_at : jstHHMMToUtcIso(endDate, endTime)
       if (s >= e) throw new Error('開始時刻 < 終了時刻')
       const cap = capacity === '' ? null : Number(capacity)
       if (cap != null && (!Number.isInteger(cap) || cap < 1)) throw new Error('定員は1以上の整数')
