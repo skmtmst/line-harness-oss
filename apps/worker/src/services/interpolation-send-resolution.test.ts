@@ -251,3 +251,47 @@ describe('差し込み描画を持たない経路の厳格展開(N-189)', () => 
     expect(ledgerRows()).toHaveLength(0);
   });
 });
+
+
+describe('W43 構造本文の安全な差し込み（実SQL）', () => {
+  const value = '引用"\n改行\\日本語 {{var.unknown}}';
+  it.each(['flex', 'carousel', 'image', 'video', 'audio', 'location', 'sticker'])('%s は文字列値だけを展開し引用符・改行・\\を保持する', async (messageType) => {
+    insertVar({ id: 'v-json', key: 'hours', value });
+    const data = { label: '{{var.hours}}', count: 2, active: true,
+      nested: ['{{var.hours}}', null, { text: '{{ var.hours }}' }] };
+    const result = await expandSendCommonVars(db, JSON.stringify(data), { kind: 'automation', id: 'json' },
+      { lineAccountId: 'acc-1', messageType });
+    expect(JSON.parse(result)).toEqual({ label: value, count: 2, active: true,
+      nested: [value, null, { text: value }] });
+    expect(ledgerRows()).toHaveLength(0);
+  });
+  it('JSONのキー内の差し込みは変更せず、値だけを解決する', async () => {
+    insertVar({ id: 'v-key', key: 'hours', value: '営業中' });
+    const result = await expandSendCommonVars(db, '{"{{var.key_only}}":"{{var.hours}}"}', { kind: 'automation', id: 'keys' },
+      { lineAccountId: 'acc-1', messageType: 'flex' });
+    expect(JSON.parse(result)).toEqual({ '{{var.key_only}}': '営業中' });
+    expect(ledgerRows()).toHaveLength(0);
+  });
+  it('旧aliasを正規化するが挿入値を新しい差し込みとして解釈しない', async () => {
+    insertVar({ id: 'v-alias', key: 'store_phone', value });
+    const result = await expandSendCommonVars(db, '{"text":"{店の電話番号}"}', { kind: 'automation', id: 'alias' },
+      { lineAccountId: 'acc-1', messageType: 'flex' });
+    expect(JSON.parse(result)).toEqual({ text: value });
+  });
+  it('JSONから始まるplain textを構造扱いせず生の文字を保つ', async () => {
+    insertVar({ id: 'v-text', key: 'hours', value });
+    expect(await expandSendCommonVars(db, '{"text":"{{var.hours}}"}', { kind: 'automation', id: 'plain' },
+      { lineAccountId: 'acc-1', messageType: 'text' })).toBe('{"text":"' + value + '"}');
+  });
+  it('元のJSONが不正なら差し込み後に修復されたように扱わず拒否する', async () => {
+    insertVar({ id: 'v-invalid', key: 'hours', value: 'valid' });
+    await expect(expandSendCommonVars(db, '{"text":"{{var.hours}}"', { kind: 'automation', id: 'invalid' },
+      { lineAccountId: 'acc-1', messageType: 'flex' })).rejects.toThrow();
+  });
+  it('構造本文でも他accountの値を解決せず失敗台帳に記録する', async () => {
+    insertVar({ id: 'v-other-json', accountId: 'acc-2', key: 'hours', value });
+    await expect(expandSendCommonVars(db, '{"text":"{{var.hours}}"}', { kind: 'rich_menu_tap', id: 'json-other' },
+      { lineAccountId: 'acc-1', messageType: 'flex' })).rejects.toBeInstanceOf(CommonVarResolutionFailedError);
+    expect(ledgerRows()).toEqual([expect.objectContaining({ var_key: 'hours', reason: 'missing', source_id: 'json-other' })]);
+  });
+});
