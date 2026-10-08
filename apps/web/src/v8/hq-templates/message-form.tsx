@@ -17,6 +17,7 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import FolderSelect from '@/components/shared/folder-select'
 import { decodeImageSize, type TemplateMedia } from './definition'
 import styles from './console.module.css'
 
@@ -43,6 +44,8 @@ export interface MessageFormProps {
   folders: HqTemplateFolder[]
   folderId: string | null
   onFolderChange: (id: string | null) => void
+  /** フォルダを選ぶ欄からその場で作る（dLffh）。閲覧のみは渡さない。 */
+  onCreateFolder?: (name: string) => Promise<{ value: string; label: string }>
   folderLoadFailed: boolean
   disabled: boolean
   catalogFailed: boolean
@@ -54,7 +57,7 @@ export interface MessageFormProps {
 }
 
 export default function MessageForm({
-  name, onNameChange, value, onChange, folders, folderId, onFolderChange, folderLoadFailed,
+  name, onNameChange, value, onChange, folders, folderId, onFolderChange, onCreateFolder, folderLoadFailed,
   disabled, catalogFailed, onReloadCatalog, onBusyChange, onReceipt, notice,
 }: MessageFormProps) {
   const current = value.template
@@ -119,7 +122,7 @@ export default function MessageForm({
               ))}
             </div>
             <span className={styles.folderPick}>
-              <Select aria-label="フォルダ" value={folderId ?? ''} disabled={disabled || folderLoadFailed} onChange={(next) => onFolderChange(next || null)} options={[{ value: '', label: 'フォルダ：未分類' }, ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` }))]} />
+              <FolderSelect aria-label="フォルダ" label="フォルダ" value={folderId ?? ''} disabled={disabled || folderLoadFailed} onChange={(next) => onFolderChange(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))} onCreate={onCreateFolder} colors={false} />
             </span>
           </div>
         </div>

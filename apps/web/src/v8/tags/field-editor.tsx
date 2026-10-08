@@ -18,7 +18,7 @@ import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
@@ -85,6 +85,7 @@ export default function FieldEditor({
   foldersState,
   foldersReloading = false,
   onRetryFolders,
+  onCreateFolder,
   siblings,
   siblingsReady,
   saving,
@@ -101,6 +102,8 @@ export default function FieldEditor({
   foldersState: 'loading' | 'ready' | 'error'
   foldersReloading?: boolean
   onRetryFolders?: () => void
+  /** フォルダを選ぶ欄からその場で作る（dLffh）。閲覧のみ・引き継いだ項目は渡さない。 */
+  onCreateFolder?: FolderSelectCreate
   /** 同名・同じ差し込み名の確認に使う既存の項目（IDEA-04）。 */
   siblings: FriendField[]
   /** 既存項目を読めていない間の保存は送らない（R514）。 */
@@ -403,13 +406,14 @@ export default function FieldEditor({
               </div>
             ) : (
               <span className={styles.selectBox}>
-                <Select
+                <FolderSelect
                   aria-label="友だち情報欄のフォルダ"
                   value={folderId}
                   onChange={setFolderId}
                   disabled={locked}
                   size="full"
-                  options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                  folders={folders.map(folderById)}
+                  onCreate={locked ? undefined : onCreateFolder}
                 />
               </span>
             )}
