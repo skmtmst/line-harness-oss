@@ -8,7 +8,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const calls = vi.hoisted(() => Object.fromEntries(['context', 'list', 'listByKind', 'kindCounts', 'accounts', 'get', 'create', 'update', 'remove', 'duplicate', 'preflight', 'distribute', 'result', 'messageReferences', 'folderList', 'deleteImage', 'uploadRichMessageImage', 'listStats', 'versions', 'receivedVersions', 'compareVersions', 'restoreVersion'].map((key) => [key, vi.fn()])))
+const calls = vi.hoisted(() => Object.fromEntries(['context', 'list', 'listByKind', 'kindCounts', 'accounts', 'get', 'create', 'update', 'remove', 'duplicate', 'preflight', 'distribute', 'result', 'messageReferences', 'folderList', 'deleteImage', 'uploadRichMessageImage', 'uploadImage', 'listStats', 'versions', 'receivedVersions', 'compareVersions', 'restoreVersion'].map((key) => [key, vi.fn()])))
 const push = vi.hoisted(() => vi.fn())
 const selectAccount = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag', 'template', 'rich_menu', 'form', 'scenario'], hqTemplatesApi: { ...calls, folders: { list: calls.folderList } } }))
@@ -137,6 +137,27 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
     const definition = calls.create.mock.calls[0][0].definition
     expect(JSON.parse(definition.template.questionJson)).toMatchObject({ text: 'どのコースが好きですか？', tapMode: 'single' })
     expect(definition.asset).toBeUndefined()
+  })
+
+  it('カルーセルの画像は統括の口で受け取り、保存と後片付けの対象を正しく残す', async () => {
+    const media = { id: 'image-1', kind: 'image', filename: 'card.png', mimeType: 'image/png', sizeBytes: 5, width: 1040, height: 1040, durationMs: null, r2Key: 'hq/card.png', publicUrl: 'https://img.test/card.png', versionId: 'v1', versionNo: 1, contentHash: 'hash' }
+    calls.uploadImage.mockResolvedValue(media)
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click(await screen.findByRole('tab', { name: /カルーセル/ }))
+    fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    await screen.findByRole('heading', { name: 'カルーセルを作る' })
+    fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '写真付きのご案内' } })
+    fireEvent.change(screen.getByLabelText(/本文（/), { target: { value: '画像と本文' } })
+    const file = new File(['image'], 'card.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText('カードの画像ファイル'), { target: { files: [file] } })
+    await waitFor(() => expect(screen.getByAltText('カードの画像').getAttribute('src')).toBe(media.publicUrl))
+    expect(calls.uploadImage).toHaveBeenCalledWith(file, 'message')
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    await waitFor(() => expect(calls.create).toHaveBeenCalled())
+    expect(calls.create.mock.calls[0][0].definition.media).toEqual([media])
+    expect(JSON.parse(calls.create.mock.calls[0][0].definition.template.messageContent)[0].thumbnailImageUrl).toBe(media.publicUrl)
+    await waitFor(() => expect(screen.queryByLabelText('カードの画像ファイル')).toBeNull())
+    expect(calls.deleteImage).not.toHaveBeenCalledWith(media.r2Key)
   })
 
   it('カルーセルは店のカルーセルを作る画面で作り、ボタンは URL を開くだけ', async () => {

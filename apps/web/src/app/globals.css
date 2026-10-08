@@ -1178,6 +1178,7 @@
   --tpl-tg2-step-no: 24px;
   --tpl-tg2-map-pad: 12px 0; --tpl-tg2-menu-w: 170px; --tpl-tg2-menu-image-h: 80px; --tpl-tg2-link-w: 96px; --tpl-tg2-link-icon-w: 28px; --tpl-tg2-link-icon-h: 16px; --tpl-tg2-warn-pad: 10px 12px; --tpl-tg2-check-pad: 9px 0; --tpl-tg2-box-gap: 4px;
   --tpl-tg2-folder-w: 220px; --tpl-tg2-seg-pad: 6px 12px; --tpl-tg2-pick-pad: 0 10px 0 12px; --tpl-tg2-bubble-pad: 10px 14px;
+  --tpl-carousel-upload-w: 180px; --tpl-carousel-upload-h: 136px; --tpl-carousel-upload-icon: 18px; --tpl-carousel-upload-border: #9fc4ab; --tpl-carousel-upload-bg: #d9e6dd;
   --tpl-tg2-image-w: 160px; --tpl-tg2-image-h: 106px; --tpl-tg2-image-icon: 18px; --tpl-tg2-col-label: 220px; --tpl-tg2-col-kind: 160px; --tpl-tg2-stat-pad: 10px 0; --tpl-tg2-slide-w: 170px; --tpl-tg2-slide-peek: 60px; --tpl-tg2-slide-image-h: 110px; --tpl-tg2-slide-radius: 14px; --tpl-tg2-slide-body-pad: 8px 10px; --tpl-tg2-avatar: 34px; --tpl-tg2-swipe-pad: 2px 10px; --tpl-tg2-swipe-size: 10px;
   --tpl-tg2-info-pad: 14px 24px 0; --tpl-tg2-pill-pad: 2px 8px; --tpl-tg2-pill-gap: 5px; --tpl-tg2-pill-dot: 6px; --tpl-tg2-pill-lh: 18px;
   --tpl-tg2-safety-pad: 16px 24px; --tpl-tg2-safety-gap: 6px; --tpl-tg2-safety-body-size: 11px;

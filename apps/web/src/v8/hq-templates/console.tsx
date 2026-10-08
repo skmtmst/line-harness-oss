@@ -607,6 +607,16 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
       /* 編集（B-29）：カルーセル・質問・クーポン・リサーチ・リッチメッセージも店の作る画面で直す。 */
       initialContent: editContent,
       readOnly: !canEdit,
+      uploadCarouselImage: async (file) => {
+        setUploadBusy(true)
+        try {
+          const media = await hqTemplatesApi.uploadImage(file, 'message')
+          noteSessionUpload(media)
+          return media
+        } finally {
+          if (alive.current) setUploadBusy(false)
+        }
+      },
       /* g8d6ai：画像は統括の置き場へ送り5サイズを作る（API-17）。保存されなかった画像は一覧へ戻るときに片付ける（R568）。 */
       uploadRichImage: async (file) => {
         setUploadBusy(true)
@@ -1058,7 +1068,9 @@ export function hostDefinition(current: MessageTemplateDefinition, content: Temp
     return { ...rest, media: content.media, asset: { kind: 'rich_message', payload: content.payload as never }, template: { ...rest.template, messageType: 'text', messageContent: '', questionJson: null } }
   }
   if (content.kind === 'carousel') {
-    return { ...rest, template: { ...rest.template, messageType: 'carousel', messageContent: content.messageContent, carouselActionsJson: null, carouselTapLimitMode: content.tapLimitMode, carouselTapLimitText: content.tapLimitText, questionJson: null } }
+    const urls = new Set((JSON.parse(content.messageContent) as Array<{ thumbnailImageUrl?: string }>).map((panel) => panel.thumbnailImageUrl))
+    const media = [...rest.media, ...(content.media ?? [])].filter((item, index, all) => item.publicUrl !== null && urls.has(item.publicUrl) && all.findIndex((candidate) => candidate.id === item.id) === index)
+    return { ...rest, media, template: { ...rest.template, messageType: 'carousel', messageContent: content.messageContent, carouselActionsJson: null, carouselTapLimitMode: content.tapLimitMode, carouselTapLimitText: content.tapLimitText, questionJson: null } }
   }
   return { ...rest, asset: { kind: content.kind, payload: content.payload as never }, template: { ...rest.template, messageType: 'text', messageContent: '', questionJson: null } }
 }
