@@ -552,6 +552,10 @@
  *     器の内側1pxの縁と、白いつまみの薄い影（同上）
  */
 [data-theme="v8"] {
+  /* 面の分け方（案A・JeINq／EFV8l）。タイルと見本の選択色。 */
+  --color-layout-picker-sample: #f1f2f4;
+  --color-layout-picker-sample-selected: #cfe9d8;
+  --color-layout-picker-selected: #e8f5ec;
   /* controls レーン：書き出しHTMLの線・成功・浮く色選びの値。 */
   --color-controls-swatch-line: #1d1d1f1f;
   --shadow-controls-primary: 0 1px 2px #087a3e40, 0 1px 0 #ffffff26;
