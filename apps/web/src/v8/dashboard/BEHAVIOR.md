@@ -11,7 +11,7 @@
 - `?qr=base|<経路ID>`：友だち追加リンクの QR を開いたまま再読込できる。
 
 ## 保存先・API（v7 と同じ）
-- 配置：`GET/PUT/DELETE /api/dashboard/preferences`、手元の写しは `localStorage` の `lh_dashboard_v4:<アカウントID>`。保存は版つき、409 は「別の画面で配置が更新されました」。
+- 配置：`GET/PUT/DELETE /api/dashboard/preferences`、手元の写しは `localStorage` の `lh_dashboard_v4:<アカウントID>`。保存は版つき、409 は「ほかの人が配置を変えました…」（引き出しの下の帯・「最新の配置を読み込む」）。
 - 概要：`GET /api/dashboard/overview?period&account_id`。応答は「どのアカウントのどの期間か」と組で持ち、違う対象の数を出さない（DASH-02）。
 - 受信一覧：`/api/support/inbox?status=open`（30秒ごと・画面に戻ったとき）。表示件数は担当者ごと `lh_pending_inbox_page_size:<担当者ID>` を読むだけ。
 - 補足：写真審査 `photoReviewMetrics`（403 は「権限なし」）、予約 `listRequests`＋`requestsSummary`、稼働 `health`、二段階認証 `staff.list`、対応マーク `supportMarks.list`、今後の予定 `dashboard.upcoming`、配信の失敗 `dashboard.deliveryFailureOrigins`、出荷 `ShipmentPanel`、経路 `entryRoutes.list`、はじめにやること（`gettingStarted.get` の段1・`friendAddRules.list`・`richMenuGroups.listPage`・`broadcasts.list`・`scenarios.listPage`・`staff.list`）、本人 `staff.me`（あいさつの名前・役割）。
@@ -33,7 +33,7 @@
 - 数の帯の「…」から内訳を開く（v7 V8 の「数を押して広げる」の代わり）。
 
 ## 閲覧のみ（役割が owner・admin 以外）
-- 閲覧のみの帯を出す。「配信を作る」「経路を分けて発行」は隠す。ダッシュボード編集（自分の並び）・コピー・QR は出す。
+- 閲覧のみの帯を出す。「配信を作る」「経路を分けて発行」・ダッシュボード編集（板の頭のボタン・数のマスの「…」の項目・`?edit=1`）は隠す（2026-10-08 確認表 B-42）。コピー・QR は出す。
 - 役割が読めるまでは出し、閲覧のみと分かったら隠す。最後の守りはサーバの 403。
 
 ## 失敗・読み込み中
@@ -41,3 +41,11 @@
 - 段ごとに「データを読み込めませんでした」＋「もう一度試す」（V8 の失敗の言葉 RqO7O。v7 は「もう一度読み込む」のまま）。最初の読み込み中は骨組み（受信の一覧も骨組み）。
 - 狭い幅：1280 では右の列の左右の余白を 20→16 に詰めて題を切らない。1152 では題と行き先が1行に入らない段だけ行き先を次の行へ回す（題は「…」にしない）。
 - 送信枠：上限なし・未接続・取得失敗を分ける。残り 10% 以下は赤。
+
+## ダッシュボード編集（mcOqK・2026-10-08）
+- V8 だけの引き出し `dashboard-editor.tsx`（540・共通の Drawer `width="editor"`）。v7 と共有の `components/dashboard/dashboard-editor.tsx` は変えず、並べ替え・表示の ON/OFF・4枠の計算だけを使い回す。
+- 頭：「カードと配置／プレビュー」の切り替え（共通の SegmentedControl）と説明1行。行：持ち手・名前と置き場所・上下（24 の枠つき）・スイッチ。OFF の行は薄い地。
+- 4枠の注意は 5つ目を ON にした瞬間だけ「今日やること」の上に出し、OFF にしたカードの名前を書く。開き直すと消える（今の候補は4つなので実際には出ない）。
+- 下：左に「初期状態に戻す」（確認の窓 400：キャンセル／削除して初期状態へ戻す）、右に「閉じる」「ダッシュボードに反映」（保存中は「保存中…」）。
+- 失敗は下の帯：保存できない（もう一度保存する。初期化の失敗は「もう一度試す」で初期化をやり直す）、409（最新の配置を読み込む）。キーボードで持ち上げている間だけ操作の案内の帯を出し、その間の Esc は移動をやめるだけ（引き出しは閉じない）。
+- 開くのは 200ms、閉じるのは 150ms（提案 F）。動きを減らす設定では動かさない。

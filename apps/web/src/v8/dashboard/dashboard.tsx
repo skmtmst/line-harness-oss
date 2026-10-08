@@ -46,8 +46,8 @@ import {
 import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
 
-/* 編集パネル（dnd-kit を含む重い部品）は開くまで読まない（v7 の V8 と同じ）。 */
-const DashboardEditor = dynamic(() => import('@/components/dashboard/dashboard-editor').then((module) => module.default), {
+/* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
+const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
   loading: () => <p className={styles.note}>編集パネルを読み込んでいます</p>,
 })
 
@@ -104,7 +104,7 @@ export default function DashboardV8() {
         items={[
           { id: 'detail', label: openDetail === id ? '内訳を閉じる' : '内訳を見る', onSelect: () => setOpenDetail((current) => (current === id ? null : id)) },
           { id: 'go', label, external: true, onSelect: () => router.push(href) },
-          { id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor },
+          ...(canManage ? [{ id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor }] : []),
         ]}
       />
     )
@@ -375,11 +375,11 @@ export default function DashboardV8() {
           onChange={d.selectPeriod}
           options={PERIODS.map((item) => ({ value: item.key, label: item.label }))}
         />
-        <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />ダッシュボード編集</Button>
+        {canManage ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />ダッシュボード編集</Button> : null}
         {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={15} aria-hidden="true" />配信を作る</Button> : null}
       </>}
       notice={notice}
-      overlays={d.editorOpen ? <DashboardEditor
+      overlays={d.editorOpen && canManage ? <DashboardEditor
         open={d.editorOpen}
         preferences={d.preferences}
         saving={d.preferenceSaving}
