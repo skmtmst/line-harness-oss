@@ -3,20 +3,25 @@
 import Avatar from '@/components/shared/avatar'
 import { useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { api, type FriendUpcoming, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
+import { api, ApiError, type FriendUpcoming, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
 import { tagTextColor } from '@/lib/presentation'
 import type { FriendField, Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import { TextArea } from '@/components/shared/text-field'
+import Combobox from '@/components/shared/combobox'
+import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import InlineEdit from '@/components/shared/inline-edit'
-import { runOptimistic } from '@/lib/undoable'
+import { runOptimisticWithUndo } from '@/lib/undoable'
 import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { GripVertical, X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
+import chatV8 from '@/v8/inbox-chat/inbox-chat.module.css'
 
 interface FriendDetail {
   id: string
@@ -69,6 +74,21 @@ interface Props {
   /** 保存が通ったあとに親へ知らせる（一覧の読み直しなど）。 */
   onChatChanged?: () => void
 }
+
+/** B-26 知らせの文に使う対応状況の名前（受信箱の状態の切り替えと同じ言葉）。 */
+const STATUS_WORD: Record<NonNullable<ChatStatusInfo['status']>, string> = {
+  unread: '未対応',
+  in_progress: '対応中',
+  on_hold: '保留',
+  resolved: '対応済み',
+}
+
+const STATUS_OPTIONS: Array<{ value: NonNullable<ChatStatusInfo['status']>; label: string }> = [
+  { value: 'unread', label: '未対応' },
+  { value: 'in_progress', label: '対応中' },
+  { value: 'on_hold', label: '保留' },
+  { value: 'resolved', label: '対応済み' },
+]
 
 const DETAIL_SECTIONS = [
   { key: 'profile', label: 'プロフィール' },
@@ -516,35 +536,79 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const tagSearchRef = useRef<HTMLInputElement | null>(null)
   const memoAreaRef = useRef<HTMLTextAreaElement | null>(null)
 
+  /*
+   * B-26（A-2 採用）：押した瞬間に変えて裏で保存し、白い知らせに［元に戻す］（5秒・乗せている間は止まる）。
+   * 失敗したら画面を戻し、理由と［もう一度試す］。
+   * 同時に直したとき：対応状況・担当は版（revision）を送らず、その項目だけを変える（ほかの人が直した
+   * メモや担当を巻き戻さない）。タグは1つずつ付ける・外す（足し引き）。メモは最後に直した方を残す（下の queueMemoSave）。
+   * 親（会話の頭）で変わったら、ここの持ち直しを捨てて親の値に合わせる。
+   */
+  useEffect(() => { setLocalStatus(undefined) }, [chatStatus?.status])
+  useEffect(() => { setLocalOperatorId(undefined) }, [operatorId])
+  useEffect(() => { setLocalNotes(undefined) }, [chatStatus?.notes])
+  useEffect(() => { setLocalTags(undefined) }, [friend?.tags])
+  const revisionRef = useRef<number | undefined>(revision)
+  useEffect(() => { revisionRef.current = revision }, [chatId, revision])
+  const noteRevision = (res: unknown) => {
+    const next = (res as { data?: { revision?: unknown } } | undefined)?.data?.revision
+    if (typeof next === 'number') revisionRef.current = next
+  }
+  const changed = useCallback((res: unknown) => {
+    noteRevision(res)
+    onChatChanged?.()
+  }, [onChatChanged])
+
   const saveChatStatus = useCallback((next: NonNullable<ChatStatusInfo['status']>) => {
     if (!chatId) return
-    const previous = effectiveStatus
+    const previous = effectiveStatus ?? null
+    if (previous === next) return
     setLocalStatus(next)
-    runOptimistic({
-      request: () => api.chats.update(chatId, { status: next, ...(revision !== undefined ? { revision } : {}) }),
+    runOptimisticWithUndo({
+      request: () => api.chats.update(chatId, { status: next }),
       revert: () => setLocalStatus(previous),
+      reapply: () => setLocalStatus(next),
+      successMessage: isV8 ? `対応状況を「${STATUS_WORD[next]}」にしました` : '',
       failureMessage: '対応状況を変えられませんでした。',
       retry: () => saveChatStatus(next),
-      onSuccess: () => onChatChanged?.(),
+      undoRequest: previous ? async () => {
+        const res = await api.chats.update(chatId, { status: previous })
+        changed(res)
+        return res
+      } : undefined,
+      onSuccess: changed,
     })
-  }, [chatId, effectiveStatus, revision, onChatChanged])
+  }, [chatId, effectiveStatus, changed, isV8])
 
   const saveAssignee = useCallback((nextOperatorId: string | null) => {
     if (!chatId) return
-    const previous = effectiveOperatorId
+    const previous = effectiveOperatorId ?? null
+    if (previous === nextOperatorId) return
     setLocalOperatorId(nextOperatorId)
-    runOptimistic({
-      request: () => api.chats.update(chatId, { operatorId: nextOperatorId, ...(revision !== undefined ? { revision } : {}) }),
+    const nameOf = (id: string | null) => (id ? operators?.find((op) => op.id === id)?.name ?? '担当' : '未割り当て')
+    runOptimisticWithUndo({
+      request: () => api.chats.update(chatId, { operatorId: nextOperatorId }),
       revert: () => setLocalOperatorId(previous),
+      reapply: () => setLocalOperatorId(nextOperatorId),
+      successMessage: !isV8 ? '' : nextOperatorId ? `担当を${nameOf(nextOperatorId)}にしました` : '担当を外しました',
       failureMessage: '担当を変えられませんでした。',
       retry: () => saveAssignee(nextOperatorId),
-      onSuccess: () => onChatChanged?.(),
+      undoRequest: async () => {
+        const res = await api.chats.update(chatId, { operatorId: previous })
+        changed(res)
+        return res
+      },
+      onSuccess: changed,
     })
-  }, [chatId, effectiveOperatorId, revision, onChatChanged])
+  }, [chatId, effectiveOperatorId, operators, changed, isV8])
 
-  // メモは書くのをやめて1秒で自動保存。最後に直した日時（revision）で比べ、
-  // ほかの人が先に直していたら上書きせず知らせる。
+  /*
+   * メモは書くのをやめて1秒で自動保存。最後に直した日時（版）で比べる：
+   * 書き始めたあとにほかの人がメモを直していたら（版がずれて 409）、最新を読み直し、
+   * - ほかの人が変えたのがメモ以外（対応状況など）なら、そのまま今の版で保存し直す
+   * - メモも直されていたら、あとから直したこちらを残し、知らせの［元に戻す］で相手のメモに戻せる
+   */
   const memoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const memoToastRef = useRef<{ dismiss: () => void } | null>(null)
   const [memoSaving, setMemoSaving] = useState(false)
   useEffect(() => {
     if (memoTimerRef.current) clearTimeout(memoTimerRef.current)
@@ -558,25 +622,54 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (next === previous) return
       setMemoSaving(true)
       setLocalNotes(next)
-      runOptimistic({
-        request: () => api.chats.update(chatId, { notes: next, ...(revision !== undefined ? { revision } : {}) }),
+      memoToastRef.current?.dismiss()
+      let overwritten: string | null | undefined
+      const save = async () => {
+        try {
+          return await api.chats.update(chatId, { notes: next ?? '', ...(revisionRef.current !== undefined ? { revision: revisionRef.current } : {}) })
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.code !== 'REVISION_CONFLICT') throw error
+          const latest = await api.chats.get(chatId, { limit: 1 })
+          if (!latest.success) throw error
+          revisionRef.current = latest.data.revision
+          const theirs = latest.data.notes ?? null
+          if (theirs !== previous) overwritten = theirs
+          return api.chats.update(chatId, { notes: next ?? '', revision: latest.data.revision })
+        }
+      }
+      memoToastRef.current = runOptimisticWithUndo({
+        request: save,
         revert: () => setLocalNotes(previous),
-        failureMessage: 'メモを保存できませんでした。状態を読み直してから、もう一度お試しください。',
+        reapply: () => setLocalNotes(next),
+        successMessage: '',
+        failureMessage: 'メモを保存できませんでした。',
         retry: () => queueMemoSave(text),
-        onSuccess: () => {
-          setMemoSaving(false)
-          onChatChanged?.()
+        undoRequest: async () => {
+          const back = overwritten !== undefined ? overwritten : previous
+          setLocalNotes(back)
+          // 書く欄（手で書く欄なので値を持たない）にも戻した文を入れる。
+          if (memoAreaRef.current) memoAreaRef.current.value = back ?? ''
+          const res = await api.chats.update(chatId, { notes: back ?? '' })
+          changed(res)
+          return res
         },
+        onSuccess: (res) => {
+          setMemoSaving(false)
+          changed(res)
+        },
+        onFailure: () => setMemoSaving(false),
+        successMessageOf: () => !isV8 ? '' : overwritten !== undefined
+          ? 'ほかの人が先にメモを直していました。あとから直したこの内容で保存しました'
+          : 'メモを保存しました',
       })
-      // runOptimistic は裏で送る。保存中の表示だけここで消す。
-      setTimeout(() => setMemoSaving(false), 1200)
     }, 1000)
-  }, [chatId, effectiveNotes, revision, onChatChanged])
+  }, [chatId, effectiveNotes, changed, isV8])
   useEffect(() => () => {
     if (memoTimerRef.current) clearTimeout(memoTimerRef.current)
   }, [])
 
-  // タグの候補と新規作成。↑↓Enter で選び、×で外す。
+  // タグの候補と新規作成。↑↓Enter で選び、×で外す。1つずつ付ける・外す（足し引き）ので、
+  // ほかの人が同じ時に付けた別のタグを消さない。
   const [tagQuery, setTagQuery] = useState('')
   const [tagOptions, setTagOptions] = useState<Tag[]>([])
   const [tagActive, setTagActive] = useState(0)
@@ -590,38 +683,47 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     }).catch(() => {})
     return () => { cancelled = true }
   }, [friendId])
-  const addTagById = useCallback((tagId: string) => {
+  const addTagById = useCallback((tagId: string, known?: { name: string; color: string }) => {
     if (!friendId || !tagId) return
-    const target = tagOptions.find((t) => t.id === tagId)
+    const target = known ?? tagOptions.find((t) => t.id === tagId)
     // 候補に無い ID は付けない（色は店が付けた値だけを使い、直書きしない）。
     if (!target) return
-    const previous = [...(effectiveTags ?? [])]
-    if (previous.some((t) => t.id === tagId)) return
+    const tag = { id: tagId, name: target.name, color: target.color }
+    if ((effectiveTags ?? []).some((t) => t.id === tagId)) return
     setTagSaving(true)
-    setLocalTags([...previous, { id: tagId, name: target.name, color: target.color }])
-    runOptimistic({
+    setLocalTags((now) => [...(now ?? effectiveTags ?? []), tag])
+    const drop = () => setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId))
+    runOptimisticWithUndo({
       request: () => api.friends.addTag(friendId, tagId),
-      revert: () => setLocalTags(previous),
-      failureMessage: 'タグを付けられませんでした。',
-      retry: () => addTagById(tagId),
+      revert: drop,
+      reapply: () => setLocalTags((now) => [...(now ?? effectiveTags ?? []).filter((t) => t.id !== tagId), tag]),
+      successMessage: isV8 ? `タグ「${tag.name}」を付けました` : '',
+      failureMessage: `タグ「${tag.name}」を付けられませんでした。`,
+      retry: () => addTagById(tagId, target),
+      undoRequest: () => api.friends.removeTag(friendId, tagId),
       onSuccess: () => {
         setTagSaving(false)
         setTagQuery('')
       },
+      onFailure: () => setTagSaving(false),
     })
-    setTimeout(() => setTagSaving(false), 1200)
-  }, [friendId, effectiveTags, tagOptions])
+  }, [friendId, effectiveTags, tagOptions, isV8])
   const removeTagById = useCallback((tagId: string) => {
     if (!friendId) return
-    const previous = [...(effectiveTags ?? [])]
-    setLocalTags(previous.filter((t) => t.id !== tagId))
-    runOptimistic({
+    const tag = (effectiveTags ?? []).find((t) => t.id === tagId)
+    if (!tag) return
+    const putBack = () => setLocalTags((now) => [...(now ?? effectiveTags ?? []).filter((t) => t.id !== tagId), tag])
+    setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId))
+    runOptimisticWithUndo({
       request: () => api.friends.removeTag(friendId, tagId),
-      revert: () => setLocalTags(previous),
-      failureMessage: 'タグを外せませんでした。',
+      revert: putBack,
+      reapply: () => setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId)),
+      successMessage: isV8 ? `タグ「${tag.name}」を外しました` : '',
+      failureMessage: `タグ「${tag.name}」を外せませんでした。`,
       retry: () => removeTagById(tagId),
+      undoRequest: () => api.friends.addTag(friendId, tagId),
     })
-  }, [friendId, effectiveTags])
+  }, [friendId, effectiveTags, isV8])
 
   // 購入（EC の直近3件と合計）。今ある口だけを使い、結びつきが無い人は「—」で出す。
   type PurchaseState =
@@ -683,7 +785,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       const key = event.key.toLowerCase()
       if (key === 't') {
         event.preventDefault()
-        tagSearchRef.current?.focus()
+        ;(tagSearchRef.current ?? document.getElementById('inbox-panel-tag'))?.focus()
       } else if (key === 'm') {
         event.preventDefault()
         memoAreaRef.current?.focus()
@@ -724,233 +826,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     </Button>
   )
 
-  return (
-    <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
-      {/*
-        ★V8（M0393「その人の要点」）：右の列に「顧客情報 ［表示項目］ ×」の頭の段は無い。
-        顔・名前から始まり、「表示項目」は「友だち詳細」の横に並べる（オーナー指摘）。
-        v7 は今までどおり頭の段に置く。
-      */}
-      <div className={isV8 ? 'contents' : 'relative flex min-h-[66px] items-center border-b border-hairline bg-canvas px-4'}>
-        {isV8 ? null : (
-        <div className="flex w-full items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-bold text-ink">顧客情報</h3>
-          </div>
-          {settingsButton}
-        </div>
-        )}
-        {showSettings && typeof document !== 'undefined' ? createPortal(
-          <div
-            data-inbox-v6="detail-sections-panel"
-            role="dialog"
-            aria-label="右パネルの表示項目"
-            style={settingsPanelPos ?? { top: 16, left: 16, right: 16, maxHeight: 'calc(100dvh - 32px)' }}
-            className="bg-canvas border-hairline rounded-panel shadow-float fixed z-[80] flex flex-col overflow-hidden border"
-          >
-            <div className="flex shrink-0 items-start justify-between gap-2 px-4 pt-4">
-              <div className="min-w-0">
-                <p className="text-ink text-xs font-medium">右パネルの表示項目</p>
-                <p className="text-ink-faint text-micro mt-0.5">ドラッグで順番変更・スイッチで表示切替</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSettings(false)}
-                aria-label="表示項目を閉じる"
-                className="text-ink-faint hover:bg-canvas-sunken rounded-control -mt-1 -mr-1 flex h-7 w-7 shrink-0 items-center justify-center"
-              >
-                <X aria-hidden="true" size={16} />
-              </button>
-            </div>
-            {/* 項目の並びはここだけがスクロールする。見出しと操作は常に画面内。 */}
-            <div className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4">
-              {orderedSettingGroups.map((group, index) => {
-                const visible = group.sections.every((key) => !hiddenSections.includes(key))
-                return (
-                  <div
-                    key={group.key}
-                    draggable
-                    onDragStart={(event) => {
-                      setDraggedGroupKey(group.key)
-                      event.dataTransfer.effectAllowed = 'move'
-                    }}
-                    onDragEnd={() => setDraggedGroupKey(null)}
-                    onDragOver={(event) => {
-                      event.preventDefault()
-                      event.dataTransfer.dropEffect = 'move'
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault()
-                      if (draggedGroupKey) moveGroupBefore(draggedGroupKey, group.key)
-                      setDraggedGroupKey(null)
-                    }}
-                    className="border-hairline rounded-control flex items-center gap-2 border px-2 py-1.5"
-                  >
-                    <span className="flex shrink-0 items-center">
-                      <button
-                        type="button"
-                        disabled={index === 0}
-                        onClick={() => moveGroup(group.key, -1)}
-                        aria-label={`${group.label}を上へ`}
-                        className="text-ink-faint hover:text-ink rounded-mini disabled:opacity-30"
-                      >
-                        <GripVertical aria-hidden="true" size={15} />
-                      </button>
-                    </span>
-                    <span className="text-ink min-w-0 flex-1 truncate text-xs">{group.label}</span>
-                    {/* 共通の Checkbox（本物の input）。見た目だけの button にすると読み上げで「入／切」が伝わらない。 */}
-                    <Checkbox
-                      checked={visible}
-                      aria-label={`${group.label}を表示`}
-                      onCheckedChange={() => setHiddenSections((current) => (
-                        visible
-                          ? [...new Set([...current, ...group.sections])]
-                          : current.filter((item) => !group.sections.includes(item))
-                      ))}
-                      className="shrink-0"
-                    />
-                  </div>
-                )
-              })}
-            </div>
-            {/*
-              **全部隠すと右パネルが空になり、何を隠したのかも画面から読めない。**
-              戻す道をここに置く。スクロール領域の外に固定して、低い画面でも
-              「初期状態に戻す」「閉じる」へ届くようにする(#982 LAY-03)。
-            */}
-            <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-hairline px-4 py-3">
-              {/* 設計 `Xi4x9` の2つは h36。共通ボタンと同値なので部品を使う。 */}
-              <Button
-                onClick={() => {
-                  setSectionOrder(DEFAULT_SECTION_ORDER)
-                  setHiddenSections([])
-                }}
-              >
-                初期状態に戻す
-              </Button>
-              <Button variant="primary" onClick={() => setShowSettings(false)}>
-                閉じる
-              </Button>
-            </div>
-          </div>
-        , document.body) : null}
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <DelayedSkeleton
-            loading
-            skeleton={
-              <div className="p-4 space-y-3 animate-pulse">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-pill bg-shell-gray" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 bg-shell-gray rounded-mini w-32" />
-                    <div className="h-2 bg-shell rounded-mini w-20" />
-                  </div>
-                </div>
-              </div>
-            }
-          />
-        ) : error ? (
-          /* INBOX-08: 失敗は文字だけにせず、その場で再試行できるようにする。 */
-          <div className="space-y-2 p-4">
-            <p className="text-xs text-danger">{error}</p>
-            <Button variant="secondary" className="text-ink-secondary items-center px-3 py-1.5 text-xs h-auto whitespace-normal" type="button" onClick={() => setFriendRetry((key) => key + 1)}>
-              再試行する
-            </Button>
-          </div>
-        ) : friend ? (
-          <div className="flex flex-col divide-y divide-hairline">
-            {/* Profile Header — V4は相手・対応・担当をひとまとまりにする。 */}
-            {isV8 ? (
-              <>
-                {/*
-                  ★V8（M0393 XqSvX「その人の要点」）：大きい丸の顔 → 名前 → 友だち追加日 →
-                  タグ・シナリオ・購入・マイル → 顧客情報の節。顔と要点はいつも上（並べ替えの外）。
-                  対応・担当の札は会話の頭にあるので、ここには重ねて出さない。
-                */}
-                <div style={{ order: -3 }} className={`${sectionVisibility('profile')} ${v8.person}`}>
-                  <Avatar name={friend.displayName} src={friend.pictureUrl} size={52} />
-                  <ExpandableText value={friend.displayName} empty="名前なし" className={v8.personName} />
-                  <p className={v8.personSub}>{formatAddedDate(friend.createdAt)}</p>
-                  {!friend.isFollowing ? <span className={v8.blocked}>ブロック済</span> : null}
-                  <div className={v8.personActions}>
-                    <Button variant="secondary" size="compact" className="text-action" href={`/friends/detail?id=${friend.id}`}>
-                      友だち詳細
-                    </Button>
-                    {settingsButton}
-                  </div>
-                </div>
-                <dl style={{ order: -2 }} className={v8.summary} data-inbox-v8="customer-summary">
-                  <div className={v8.summaryRow}>
-                    <dt>タグ</dt>
-                    <dd title={(effectiveTags ?? []).map((t) => t.name).join('・')}>
-                      {(effectiveTags ?? []).length > 0 ? (effectiveTags ?? []).map((t) => t.name).join('・') : <span className={v8.empty}>なし</span>}
-                    </dd>
-                  </div>
-                  <div className={v8.summaryRow}>
-                    <dt>シナリオ</dt>
-                    <dd>
-                      {upcoming.kind === 'data' && upcoming.data.nextAutoDelivery?.kind === 'scenario'
-                        ? upcoming.data.nextAutoDelivery.name
-                        : upcoming.kind === 'loading' ? <span className={v8.empty}>…</span> : <span className={v8.empty}>なし</span>}
-                    </dd>
-                  </div>
-                  <div className={v8.summaryRow}>
-                    <dt>購入</dt>
-                    <dd>
-                      {purchase.kind === 'data'
-                        ? `${purchase.count}件・${formatNumber(purchase.total)}円`
-                        : purchase.kind === 'loading' ? <span className={v8.empty}>…</span>
-                        : purchase.reason === 'none' ? <span className={v8.empty}>0件</span> : <span className={v8.empty}>—</span>}
-                    </dd>
-                  </div>
-                  <div className={v8.summaryRow}>
-                    <dt>マイル</dt>
-                    <dd>
-                      {mileage.kind === 'data'
-                        ? `${formatNumber(mileage.summary.available)} mile`
-                        : mileage.kind === 'loading' ? <span className={v8.empty}>…</span> : <span className={v8.empty}>—</span>}
-                    </dd>
-                  </div>
-                </dl>
-                <h3 style={{ order: -1 }} className={v8.infoTitle}>顧客情報</h3>
-              </>
-            ) : (
-            <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} flex flex-col items-center px-5 py-5 text-center`}>
-              <Avatar name={friend.displayName} src={friend.pictureUrl} size={56} />
-              <ExpandableText
-                value={friend.displayName}
-                empty="名前なし"
-                className="text-ink mt-2 max-w-full text-sm font-bold"
-              />
-              <p className="text-ink-faint mt-0.5 text-micro">LINE表示名</p>
-              <div className="mt-3 flex max-w-full items-center justify-center gap-1.5">
-                {chatStatus?.status && statusLabels[chatStatus.status] ? (
-                  <span className={`inline-flex items-center rounded-pill px-2 py-1 text-micro font-semibold ${statusLabels[chatStatus.status].className}`}>
-                    {statusLabels[chatStatus.status].label}
-                  </span>
-                ) : (
-                  <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-1 text-micro font-semibold">未設定</span>
-                )}
-                <span
-                  className="bg-canvas-sunken text-ink-secondary max-w-[130px] truncate rounded-pill px-2 py-1 text-micro font-semibold"
-                  title={operatorName ?? undefined}
-                >
-                  {operatorName || '未割り当て'}
-                </span>
-              </div>
-              {!friend.isFollowing && (
-                <span className="bg-canvas-sunken text-ink-faint mt-2 inline-block rounded-mini px-1.5 py-0.5 text-nano font-medium">
-                  ブロック済
-                </span>
-              )}
-              <Button variant="secondary" className="text-action mt-3 items-center px-3 py-2 text-xs h-auto whitespace-normal" href={`/friends/detail?id=${friend.id}`}>
-                友だち詳細
-              </Button>
-            </div>
-            )}
+  /*
+   * 顧客情報の節（基本情報・マイル・次の対応・タグ・★つき・リッチメニュー・友だち情報・フォーム回答）。
+   * v7 は今までどおり右の欄に線で並べ、★V8 は角丸の枠（顧客情報）の中に並べる。中身は同じ。
+   */
+  const renderDetailSections = (friend: FriendDetail) => (
+    <>
             {/* 前払いのみの印（友だち詳細と同じ置き場所・顔の下）。前払いの人だけ出る。 */}
             {accountId && friendId ? (
               /* ★V8：前払いでない人は中身が空。空の帯（上下12＋線）を残さない（オーナー指摘）。 */
@@ -1047,7 +928,19 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {/* ①対応状況（3つのボタン・1タップ）。押した瞬間に変えて裏で保存。 */}
               <div>
                 <span className="text-micro text-ink-faint">対応状況（Sキー）</span>
-                {canEditChat ? (
+                {canEditChat && isV8 ? (
+                  /* ★V8 B-26：共通の選ぶ欄（会話の頭と同じ色の点）。選んだ瞬間に変えて裏で保存・知らせに元に戻す。保留も選べる。 */
+                  <div ref={statusButtonRef} className={v8.editField}>
+                    <Select
+                      size="full"
+                      aria-label="対応状況を変える"
+                      icon={<span className={chatV8.ctlDot} data-status={effectiveStatus ?? 'unread'} />}
+                      options={STATUS_OPTIONS}
+                      value={effectiveStatus ?? 'unread'}
+                      onChange={(next) => saveChatStatus(next as NonNullable<ChatStatusInfo['status']>)}
+                    />
+                  </div>
+                ) : canEditChat ? (
                   <div ref={statusButtonRef} role="group" aria-label="対応状況を変える" className="mt-1.5 grid grid-cols-3 gap-1.5">
                     {([
                       { key: 'unread', label: '未対応' },
@@ -1081,7 +974,19 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {/* ②担当（選ぶ）。 */}
               <div>
                 <label htmlFor="inbox-panel-assignee" className="text-micro text-ink-faint">担当者</label>
-                {canEditChat && operators ? (
+                {canEditChat && operators && isV8 ? (
+                  /* ★V8 B-26：共通の選ぶ欄（選んだ行は ✓ だけ）。 */
+                  <div className={v8.editField}>
+                    <Select
+                      id="inbox-panel-assignee"
+                      size="full"
+                      aria-label="担当者を変える"
+                      value={effectiveOperatorId ?? ''}
+                      onChange={(value) => saveAssignee(value || null)}
+                      options={[{ value: '', label: '未割り当て' }, ...operators.map((op) => ({ value: op.id, label: op.name }))]}
+                    />
+                  </div>
+                ) : canEditChat && operators ? (
                   <select
                     id="inbox-panel-assignee"
                     value={effectiveOperatorId ?? ''}
@@ -1100,7 +1005,19 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {/* ④メモ（書くのをやめて1秒で自動保存）。 */}
               <div>
                 <label htmlFor="inbox-panel-memo" className="text-micro text-ink-faint">メモ（Mキー）{memoSaving ? '・保存中…' : ''}</label>
-                {canEditChat ? (
+                {canEditChat && isV8 ? (
+                  /* ★V8 B-26：共通の複数行の入力欄。書くのをやめて1秒で保存し、知らせに元に戻す。 */
+                  <div className={v8.editField}>
+                    <TextArea
+                      id="inbox-panel-memo"
+                      ref={memoAreaRef}
+                      key={chatId ?? ''}
+                      defaultValue={effectiveNotes ?? ''}
+                      onChange={(event) => queueMemoSave(event.target.value)}
+                      placeholder="この人へのメモを書く"
+                    />
+                  </div>
+                ) : canEditChat ? (
                   <textarea
                     id="inbox-panel-memo"
                     ref={memoAreaRef}
@@ -1209,7 +1126,37 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {(effectiveTags ?? []).length === 0 ? (
                 <p className="text-micro text-ink-faint italic mt-1.5">タグなし</p>
               ) : null}
-              {friendId ? (
+              {friendId && isV8 ? (
+                /* ★V8 B-26：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
+                <div className={v8.editField}>
+                  <Combobox
+                    id="inbox-panel-tag"
+                    aria-label="タグを探して付ける"
+                    placeholder="タグを探して付ける"
+                    value=""
+                    options={tagOptions
+                      .filter((t) => !(effectiveTags ?? []).some((own) => own.id === t.id))
+                      .map((t) => ({ value: t.id, label: t.name }))}
+                    onChange={(tagId) => { if (tagId) addTagById(tagId) }}
+                    createLabel={(query) => `＋「${query}」を作って付ける`}
+                    onCreate={(query) => {
+                      const name = query.trim()
+                      if (!name) return
+                      setTagSaving(true)
+                      api.tags.create({ name }).then((res) => {
+                        if (res.success && res.data) {
+                          const created = res.data as Tag
+                          setTagOptions((prev) => [...prev, created])
+                          addTagById(created.id, { name: created.name, color: created.color })
+                        }
+                      }).catch(() => {
+                        notifyToast(`タグ「${name}」を作れませんでした。もう一度お試しください。`, { tone: 'error' })
+                      }).finally(() => setTagSaving(false))
+                    }}
+                    loading={tagSaving}
+                  />
+                </div>
+              ) : friendId ? (
                 <div className="mt-2">
                   <input
                     ref={tagSearchRef}
@@ -1429,10 +1376,10 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               })()}
             </div>
 
-            {/* ⑥購入（EC の直近3件と合計）。数は実データ。無いときは「—」。 */}
-            <div className="p-4">
+            {/* ⑥購入（EC の直近3件と合計）。数は実データ。無いときは「—」。★V8 は顧客情報の枠の最後に置き、見出しをほかの節とそろえる。 */}
+            <div className="p-4" style={isV8 ? { order: DETAIL_SECTIONS.length } : undefined}>
               <div className="mb-2 flex items-center justify-between">
-                <h4 className="text-micro font-semibold text-ink-faint">購入</h4>
+                <h4 className={isV8 ? 'text-ink text-xs font-bold' : 'text-micro font-semibold text-ink-faint'}>購入</h4>
                 <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
                   すべて見る
                 </a>
@@ -1532,6 +1479,246 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               )}
             </div>
 
+    </>
+  )
+
+  return (
+    <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
+      {/*
+        ★V8（M0393「その人の要点」）：右の列に「顧客情報 ［表示項目］ ×」の頭の段は無い。
+        顔・名前から始まり、「表示項目」は「友だち詳細」の横に並べる（オーナー指摘）。
+        v7 は今までどおり頭の段に置く。
+      */}
+      <div className={isV8 ? 'contents' : 'relative flex min-h-[66px] items-center border-b border-hairline bg-canvas px-4'}>
+        {isV8 ? null : (
+        <div className="flex w-full items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-bold text-ink">顧客情報</h3>
+          </div>
+          {settingsButton}
+        </div>
+        )}
+        {showSettings && typeof document !== 'undefined' ? createPortal(
+          <div
+            data-inbox-v6="detail-sections-panel"
+            role="dialog"
+            aria-label="右パネルの表示項目"
+            style={settingsPanelPos ?? { top: 16, left: 16, right: 16, maxHeight: 'calc(100dvh - 32px)' }}
+            className="bg-canvas border-hairline rounded-panel shadow-float fixed z-[80] flex flex-col overflow-hidden border"
+          >
+            <div className="flex shrink-0 items-start justify-between gap-2 px-4 pt-4">
+              <div className="min-w-0">
+                <p className="text-ink text-xs font-medium">右パネルの表示項目</p>
+                <p className="text-ink-faint text-micro mt-0.5">ドラッグで順番変更・スイッチで表示切替</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSettings(false)}
+                aria-label="表示項目を閉じる"
+                className="text-ink-faint hover:bg-canvas-sunken rounded-control -mt-1 -mr-1 flex h-7 w-7 shrink-0 items-center justify-center"
+              >
+                <X aria-hidden="true" size={16} />
+              </button>
+            </div>
+            {/* 項目の並びはここだけがスクロールする。見出しと操作は常に画面内。 */}
+            <div className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4">
+              {orderedSettingGroups.map((group, index) => {
+                const visible = group.sections.every((key) => !hiddenSections.includes(key))
+                return (
+                  <div
+                    key={group.key}
+                    draggable
+                    onDragStart={(event) => {
+                      setDraggedGroupKey(group.key)
+                      event.dataTransfer.effectAllowed = 'move'
+                    }}
+                    onDragEnd={() => setDraggedGroupKey(null)}
+                    onDragOver={(event) => {
+                      event.preventDefault()
+                      event.dataTransfer.dropEffect = 'move'
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      if (draggedGroupKey) moveGroupBefore(draggedGroupKey, group.key)
+                      setDraggedGroupKey(null)
+                    }}
+                    className="border-hairline rounded-control flex items-center gap-2 border px-2 py-1.5"
+                  >
+                    <span className="flex shrink-0 items-center">
+                      <button
+                        type="button"
+                        disabled={index === 0}
+                        onClick={() => moveGroup(group.key, -1)}
+                        aria-label={`${group.label}を上へ`}
+                        className="text-ink-faint hover:text-ink rounded-mini disabled:opacity-30"
+                      >
+                        <GripVertical aria-hidden="true" size={15} />
+                      </button>
+                    </span>
+                    <span className="text-ink min-w-0 flex-1 truncate text-xs">{group.label}</span>
+                    {/* 共通の Checkbox（本物の input）。見た目だけの button にすると読み上げで「入／切」が伝わらない。 */}
+                    <Checkbox
+                      checked={visible}
+                      aria-label={`${group.label}を表示`}
+                      onCheckedChange={() => setHiddenSections((current) => (
+                        visible
+                          ? [...new Set([...current, ...group.sections])]
+                          : current.filter((item) => !group.sections.includes(item))
+                      ))}
+                      className="shrink-0"
+                    />
+                  </div>
+                )
+              })}
+            </div>
+            {/*
+              **全部隠すと右パネルが空になり、何を隠したのかも画面から読めない。**
+              戻す道をここに置く。スクロール領域の外に固定して、低い画面でも
+              「初期状態に戻す」「閉じる」へ届くようにする(#982 LAY-03)。
+            */}
+            <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-hairline px-4 py-3">
+              {/* 設計 `Xi4x9` の2つは h36。共通ボタンと同値なので部品を使う。 */}
+              <Button
+                onClick={() => {
+                  setSectionOrder(DEFAULT_SECTION_ORDER)
+                  setHiddenSections([])
+                }}
+              >
+                初期状態に戻す
+              </Button>
+              <Button variant="primary" onClick={() => setShowSettings(false)}>
+                閉じる
+              </Button>
+            </div>
+          </div>
+        , document.body) : null}
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <DelayedSkeleton
+            loading
+            skeleton={
+              <div className="p-4 space-y-3 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-pill bg-shell-gray" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-shell-gray rounded-mini w-32" />
+                    <div className="h-2 bg-shell rounded-mini w-20" />
+                  </div>
+                </div>
+              </div>
+            }
+          />
+        ) : error ? (
+          /* INBOX-08: 失敗は文字だけにせず、その場で再試行できるようにする。 */
+          <div className="space-y-2 p-4">
+            <p className="text-xs text-danger">{error}</p>
+            <Button variant="secondary" className="text-ink-secondary items-center px-3 py-1.5 text-xs h-auto whitespace-normal" type="button" onClick={() => setFriendRetry((key) => key + 1)}>
+              再試行する
+            </Button>
+          </div>
+        ) : friend ? (
+          <div className={isV8 ? v8.body : 'flex flex-col divide-y divide-hairline'}>
+            {/* Profile Header — V4は相手・対応・担当をひとまとまりにする。 */}
+            {isV8 ? (
+              <>
+                {/*
+                  ★V8（M0393 XqSvX「その人の要点」）：大きい丸の顔 → 名前 → 友だち追加日 →
+                  タグ・シナリオ・購入・マイル → 顧客情報の節。顔と要点はいつも上（並べ替えの外）。
+                  対応・担当の札は会話の頭にあるので、ここには重ねて出さない。
+                */}
+                <div style={{ order: -3 }} className={`${sectionVisibility('profile')} ${v8.person}`}>
+                  <Avatar name={friend.displayName} src={friend.pictureUrl} size={52} />
+                  <ExpandableText value={friend.displayName} empty="名前なし" className={v8.personName} />
+                  <p className={v8.personSub}>{formatAddedDate(friend.createdAt)}</p>
+                  {!friend.isFollowing ? <span className={v8.blocked}>ブロック済</span> : null}
+                  <div className={v8.personActions}>
+                    <Button variant="secondary" size="compact" href={`/friends/detail?id=${friend.id}`}>
+                      友だち詳細
+                    </Button>
+                    {settingsButton}
+                  </div>
+                </div>
+                <dl style={{ order: -2 }} className={v8.summary} data-inbox-v8="customer-summary">
+                  <div className={v8.summaryRow}>
+                    <dt>タグ</dt>
+                    <dd title={(effectiveTags ?? []).map((t) => t.name).join('・')}>
+                      {(effectiveTags ?? []).length > 0 ? (effectiveTags ?? []).map((t) => t.name).join('・') : <span className={v8.empty}>なし</span>}
+                    </dd>
+                  </div>
+                  <div className={v8.summaryRow}>
+                    <dt>シナリオ</dt>
+                    <dd>
+                      {upcoming.kind === 'data' && upcoming.data.nextAutoDelivery?.kind === 'scenario'
+                        ? upcoming.data.nextAutoDelivery.name
+                        : upcoming.kind === 'loading' ? <span className={v8.empty}>…</span> : <span className={v8.empty}>なし</span>}
+                    </dd>
+                  </div>
+                  <div className={v8.summaryRow}>
+                    <dt>購入</dt>
+                    <dd>
+                      {purchase.kind === 'data'
+                        ? `${purchase.count}件・${formatNumber(purchase.total)}円`
+                        : purchase.kind === 'loading' ? <span className={v8.empty}>…</span>
+                        : purchase.reason === 'none' ? <span className={v8.empty}>0件</span> : <span className={v8.empty}>—</span>}
+                    </dd>
+                  </div>
+                  <div className={v8.summaryRow}>
+                    <dt>マイル</dt>
+                    <dd>
+                      {mileage.kind === 'data'
+                        ? `${formatNumber(mileage.summary.available)} mile`
+                        : mileage.kind === 'loading' ? <span className={v8.empty}>…</span> : <span className={v8.empty}>—</span>}
+                    </dd>
+                  </div>
+                </dl>
+                {/*
+                  ★V8（M0393 XqSvX「顧客情報」）：節は角丸の枠の中に、見出し＋中身を線で区切って並べる。
+                  上の要点（顔・名前・タグ・シナリオ・購入・マイル）とは線で切らず、枠で分ける。
+                */}
+                <section style={{ order: -1 }} className={v8.infoCard} data-inbox-v8="customer-info" aria-label="顧客情報">
+                  <h3 className={v8.infoTitle}>顧客情報</h3>
+                  <div className={v8.infoSections}>
+                    {renderDetailSections(friend)}
+                  </div>
+                </section>
+              </>
+            ) : (
+            <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} flex flex-col items-center px-5 py-5 text-center`}>
+              <Avatar name={friend.displayName} src={friend.pictureUrl} size={56} />
+              <ExpandableText
+                value={friend.displayName}
+                empty="名前なし"
+                className="text-ink mt-2 max-w-full text-sm font-bold"
+              />
+              <p className="text-ink-faint mt-0.5 text-micro">LINE表示名</p>
+              <div className="mt-3 flex max-w-full items-center justify-center gap-1.5">
+                {chatStatus?.status && statusLabels[chatStatus.status] ? (
+                  <span className={`inline-flex items-center rounded-pill px-2 py-1 text-micro font-semibold ${statusLabels[chatStatus.status].className}`}>
+                    {statusLabels[chatStatus.status].label}
+                  </span>
+                ) : (
+                  <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-1 text-micro font-semibold">未設定</span>
+                )}
+                <span
+                  className="bg-canvas-sunken text-ink-secondary max-w-[130px] truncate rounded-pill px-2 py-1 text-micro font-semibold"
+                  title={operatorName ?? undefined}
+                >
+                  {operatorName || '未割り当て'}
+                </span>
+              </div>
+              {!friend.isFollowing && (
+                <span className="bg-canvas-sunken text-ink-faint mt-2 inline-block rounded-mini px-1.5 py-0.5 text-nano font-medium">
+                  ブロック済
+                </span>
+              )}
+              <Button variant="secondary" className="text-action mt-3 items-center px-3 py-2 text-xs h-auto whitespace-normal" href={`/friends/detail?id=${friend.id}`}>
+                友だち詳細
+              </Button>
+            </div>
+            )}
+            {isV8 ? null : renderDetailSections(friend)}
             {/*
               編集導線は将来追加予定 (現在の /friends は ?id= をハンドルしないため、
               リンク先が機能しない → Codex review で指摘済 → 代わりに削除。
