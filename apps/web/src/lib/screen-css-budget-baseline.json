@@ -810,7 +810,7 @@
     "font": 0
   },
   "v8/hq-templates/console.module.css": {
-    "spacing": 12,
+    "spacing": 13,
     "height": 7,
     "font": 0
   },
@@ -825,8 +825,8 @@
     "font": 0
   },
   "v8/hq/home.module.css": {
-    "spacing": 9,
-    "height": 2,
+    "spacing": 10,
+    "height": 3,
     "font": 0
   },
   "v8/hq/member-dialog.module.css": {
@@ -1422,6 +1422,21 @@
   "v8/webinars/list.module.css": {
     "spacing": 12,
     "height": 6,
+    "font": 0
+  },
+  "v8/hq-templates/saved-distribution-dialog.module.css": {
+    "spacing": 2,
+    "height": 0,
+    "font": 0
+  },
+  "v8/hq-templates/store-list.module.css": {
+    "spacing": 0,
+    "height": 1,
+    "font": 0
+  },
+  "v8/hq-templates/tag-editor.module.css": {
+    "spacing": 5,
+    "height": 0,
     "font": 0
   }
 }

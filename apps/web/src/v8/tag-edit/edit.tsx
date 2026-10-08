@@ -465,7 +465,7 @@ export function TagEditForm({
             {/* 閲覧のみには押せない操作を置かない（隠す）。 */}
             {readOnly ? null : host?.onSaveDraft ? <Button disabled={saving || !name.trim()} onClick={() => host.onSaveDraft?.(values)}>下書きを保存</Button> : host ? <Button disabled={saving || !name.trim()} onClick={() => host.onSaveAnother(values)}><Copy size={14} aria-hidden="true" />保存して続けて作る</Button> : <Button href={`/tags/new?copy=${tag.id}`}><Copy size={14} aria-hidden="true" />複製して作る</Button>}
             {readOnly ? null : (
-              <Button variant="primary" onClick={conflict ? onCompare : requestSave} busy={saving}>
+              <Button variant="primary" onClick={conflict ? onCompare : requestSave} busy={saving} disabled={Boolean(host) && !name.trim()}>
                 {conflict ? <GitCompare size={14} aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}
                 {conflict ? '比べてから保存' : host ? host.saveLabel ?? 'タグを作る' : 'タグを保存する'}
               </Button>
