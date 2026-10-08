@@ -1,4 +1,5 @@
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
+import type { TenantCompanyContactInfo, SaveTenantCompanyContact } from '@line-crm/shared';
 import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
 import type { BookingConflictsResponse, BookingReassignInput, BookingCustomerNotification } from '@line-crm/shared';
@@ -8992,6 +8993,11 @@ export const api = {
   operatorHistory: () => fetchApi<ApiResponse<OperatorHistoryRow[]>>('/api/hq/operator-history'),
   tenants: {
     me: () => fetchApi<ApiResponse<{ name: string }>>('/api/tenants/me'),
+    companyContact: () => fetchApi<ApiResponse<TenantCompanyContactInfo>>('/api/tenants/me/company-contact'),
+    saveCompanyContact: (body: SaveTenantCompanyContact) =>
+      fetchApi<ApiResponse<TenantCompanyContactInfo>>('/api/tenants/me/company-contact', {
+        method: 'PATCH', body: JSON.stringify(body),
+      }),
     updateName: (name: string) =>
       fetchApi<ApiResponse<{ name: string }>>('/api/tenants/me', {
         method: 'PATCH',
@@ -8999,6 +9005,13 @@ export const api = {
       }),
   },
   /** 統括の課金（★V6 36-2）。形は `apps/worker/src/routes/hq-billing.ts`。 */
+  postalCode: {
+    search: (code: string) => fetchApi<ApiResponse<{
+      status: 'invalid' | 'none' | 'matched' | 'multiple'
+      candidates: Array<{ postalCode: string; prefecture: string; city: string; town: string }>
+      readiness: { fullDataset: boolean }
+    }>>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
+  },
   hqBilling: {
     summary: () => fetchApi<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
     /** Stripe の申込画面の URL。オーナーだけ。 */
