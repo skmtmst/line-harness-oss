@@ -190,7 +190,7 @@ export default function NotificationsV8() {
     >
       <div className={styles.body}>
         <Tabs
-          className={styles.tabs}
+          size="notification"
           label="通知の種類"
           items={filters.map((entry) => ({
             // 絵は「すべて 6」を1つの文字で描く。数が取れないうちは名前だけ。
