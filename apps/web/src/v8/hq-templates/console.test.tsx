@@ -50,11 +50,20 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('統括のテンプレートを作る（店の作る画面＋保存して配る）', () => {
+  it('作る画面の「← テンプレートへ」を押すと一覧へ戻る', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    fireEvent.click(await screen.findByRole('button', { name: '← テンプレートへ' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: '← テンプレートへ' })).toBeNull())
+    expect((await screen.findAllByRole('button', { name: /テンプレートを作る/ })).length).toBeGreaterThan(0)
+  })
   it('メッセージは店の作る画面で作り、［保存して配る］で統括のひな形を作ってアカウントへ配るへ進む', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
     expect(await screen.findByText('保存して配ると、選んだアカウントのテンプレートに新しい版として届きます')).toBeTruthy()
-    expect(screen.getByRole('link', { name: '← テンプレートへ' }).getAttribute('href')).toBe('/hq/templates')
+    // 一覧と同じ URL のまま段を替えるので、戻るはリンクでなくボタン（同じ URL へのリンクは押しても何も起きなかった・10-08）。
+    expect(screen.queryByRole('link', { name: '← テンプレートへ' })).toBeNull()
+    expect(screen.getByRole('button', { name: '← テンプレートへ' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '予約前日' } })
     fireEvent.change(screen.getByLabelText('本文'), { target: { value: '{{name}}さん、明日です' } })
     fireEvent.click(screen.getByRole('button', { name: '保存して配る' }))
