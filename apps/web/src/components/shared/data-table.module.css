@@ -199,3 +199,53 @@
 [data-theme='v8'] .bodyCell { padding-inline: var(--tpl-cell-gap-half); }
 [data-theme='v8'] .bodyCell:first-child { padding-left: var(--tpl-row-pad-side); }
 [data-theme='v8'] .bodyCell:last-child { padding-right: var(--tpl-row-pad-side); }
+
+/* 飲食店のカード内の表（Y8SjT2・hQQlt）。既定の表は変えない。 */
+[data-theme='v8'] .frame[data-table-presentation='inventory'],
+[data-theme='v8'] .frame[data-table-presentation='channels'] {
+  border: 0; border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+}
+[data-theme='v8'] .frame[data-table-presentation='channels'] { border-radius: var(--radius-card); }
+[data-theme='v8'] .frame[data-table-presentation='inventory'] thead tr,
+[data-theme='v8'] .frame[data-table-presentation='channels'] thead tr {
+  height: auto; border: 0; background: var(--color-surface-pearl);
+}
+[data-theme='v8'] .frame[data-table-presentation='inventory'] th {
+  height: auto; padding: var(--tpl-rs-th-pad-block) var(--tpl-rs-inv-col-gap) var(--tpl-rs-th-pad-block) 0;
+  border: 0; color: var(--color-ink-secondary); font-size: var(--text-micro);
+  font-weight: 600; line-height: var(--tpl-rs-lh-11);
+}
+[data-theme='v8'] .frame[data-table-presentation='inventory'] .row { height: var(--tpl-rs-inv-row-h); }
+[data-theme='v8'] .frame[data-table-presentation='inventory'] .bodyCell {
+  padding: 0 var(--tpl-rs-inv-col-gap) 0 0; border: 0; box-shadow: var(--tpl-rs-line-top);
+  color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-rs-lh-12); white-space: nowrap;
+}
+[data-theme='v8'] .frame[data-table-presentation='inventory'] th:first-child,
+[data-theme='v8'] .frame[data-table-presentation='inventory'] .bodyCell:first-child { padding-left: var(--tpl-rs-inv-side-pad); }
+[data-theme='v8'] .frame[data-table-presentation='inventory'] th:nth-child(3),
+[data-theme='v8'] .frame[data-table-presentation='inventory'] .bodyCell:nth-child(3) { padding-right: var(--tpl-rs-inv-col-pad-num); }
+[data-theme='v8'] .frame[data-table-presentation='inventory'] th:last-child,
+[data-theme='v8'] .frame[data-table-presentation='inventory'] .bodyCell:last-child { padding-right: var(--tpl-rs-inv-col-pad-end); }
+[data-theme='v8'] .frame[data-table-presentation='channels'] thead tr { height: var(--tpl-rs-inv-ch-head-h); }
+[data-theme='v8'] .frame[data-table-presentation='channels'] th {
+  height: auto; padding: 0 var(--tpl-rs-cell-gap) 0 0; border: 0; color: var(--color-ink-secondary);
+  font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-rs-lh-12);
+}
+[data-theme='v8'] .frame[data-table-presentation='channels'] .row { height: var(--tpl-rs-inv-ch-row-h); }
+[data-theme='v8'] .frame[data-table-presentation='channels'] .bodyCell {
+  padding: 0 var(--tpl-rs-cell-gap) 0 0; border: 0; box-shadow: var(--tpl-rs-line-top);
+  color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-rs-lh-12); white-space: nowrap;
+}
+[data-theme='v8'] .frame[data-table-presentation='channels'] th:first-child,
+[data-theme='v8'] .frame[data-table-presentation='channels'] .bodyCell:first-child { padding-left: var(--tpl-rs-cell-side); }
+[data-theme='v8'] .frame[data-table-presentation='channels'] th:last-child,
+[data-theme='v8'] .frame[data-table-presentation='channels'] .bodyCell:last-child { padding-right: var(--tpl-rs-cell-side); }
+/* YMVFD の列の並び。共通の行メニューと同じ高さの行。 */
+[data-theme='v8'] .frame[data-table-presentation='columns'] th,
+[data-theme='v8'] .frame[data-table-presentation='columns'] .bodyCell {
+  height: auto; padding: 0; border: 0; box-shadow: none;
+}
+[data-theme='v8'] .frame[data-table-presentation='columns'] .row {
+  height: var(--tpl-e1-close-row-h); border-bottom: 0; box-shadow: var(--shadow-row-line);
+}

@@ -21,7 +21,9 @@ type CommonProps = {
    * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
    * `standard` のままにする。
    */
-  size?: 'standard' | 'field' | 'compact'
+  size?: 'standard' | 'field' | 'compact' | 'inline'
+  /** 行内の時刻など、リンク色にしない文字操作。 */
+  textTone?: 'action' | 'ink'
   className?: string
   children: ReactNode
 }
@@ -73,10 +75,10 @@ const DONE_FLASH_MS = 1200
 export default function Button(props: ButtonProps) {
   const variant = props.variant ?? 'secondary'
   const size = props.size ?? 'standard'
-  const classes = [styles.button, styles[variant], styles[size], props.className].filter(Boolean).join(' ')
+  const classes = [styles.button, styles[variant], styles[size], props.textTone === 'ink' ? styles.textInk : null, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, size: _size, variant: _variant, ...linkProps } = props
+    const { children, className: _className, href, size: _size, variant: _variant, textTone: _textTone, ...linkProps } = props
     return (
       <Link href={href} className={classes} {...linkProps}>
         {children}
@@ -94,6 +96,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     className: _className,
     variant: _variant,
     size: _size,
+    textTone: _textTone,
     href: _href,
     type = 'button',
     busy,

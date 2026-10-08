@@ -97,13 +97,16 @@ export function DataTable({
   children,
   className,
   'data-design': dataDesign,
+  presentation,
 }: {
   children: ReactNode
   className?: string
   'data-design'?: string
+  /** カード内の密度。指定された表だけに適用し、既定の一覧は変えない。 */
+  presentation?: 'inventory' | 'channels' | 'columns'
 }) {
   return (
-    <div className={[shell.frame, className].filter(Boolean).join(' ')}>
+    <div className={[shell.frame, className].filter(Boolean).join(' ')} data-table-presentation={presentation}>
       <table className={shell.table} data-design={dataDesign}>{children}</table>
     </div>
   )

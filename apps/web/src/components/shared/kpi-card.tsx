@@ -73,14 +73,14 @@ export type KpiCardProps = {
   /** 対象画面にV6がある場合はv6、配信予定を強調するカードはbroadcastを使う。 */
   variant?: 'v5' | 'v6' | 'broadcast'
   /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
-  presentation?: 'card' | 'band' | 'cell'
+  presentation?: 'card' | 'band' | 'cell' | 'inline'
   density?: 'compact' | 'comfortable'
   className?: string
   hidden?: boolean
   id?: string
   'aria-label'?: string
   /** faint は「値を出せない」の見せ方。0 を薄くする用途には使わない。 */
-  valueTone?: 'default' | 'warning' | 'faint'
+  valueTone?: 'default' | 'warning' | 'faint' | 'danger'
 }
 
 /** 旧名。KpiCard に寄せたので、新しくは KpiCardProps を使う。 */
@@ -195,6 +195,7 @@ export default function KpiCard({
           className={[
             styles.value,
             valueTone === 'warning' ? styles.valueWarning : null,
+            valueTone === 'danger' ? styles.valueDanger : null,
             valueTone === 'faint' ? styles.valueFaint : null,
           ]
             .filter(Boolean)

@@ -29,6 +29,8 @@ export type TimeFieldV8Props = {
   onChange?: (value: string) => void
   /** 分のきざみ（分）。5・15 など。既定は 1（今までの欄と同じ）。 */
   minuteStep?: number
+  /** 終了時刻だけ24:00を使える。通常の時刻入力は0〜23時のまま。 */
+  allowEndOfDay?: boolean
   /**
    * 欄の高さ。既定 36（絵 YCOoR）。`field` は 40＝日付の欄と横に並ぶとき・日時の欄の中
    * （絵 FU2aU・BBRDb・ZU4Ae）。`compact` は 32＝表の中の細い欄（予約の受付枠）。
@@ -60,6 +62,7 @@ export default function TimeFieldV8({
   defaultValue = '',
   onChange,
   minuteStep = 1,
+  allowEndOfDay = false,
   size = 'default',
   disabled = false,
   readOnly = false,
@@ -80,7 +83,8 @@ export default function TimeFieldV8({
   const step = normalizeStep(minuteStep)
   const [inner, setInner] = useState(defaultValue)
   const current = value ?? inner
-  const parsed = parseHm(current)
+  const parsed = parseHm(current, allowEndOfDay)
+  const hours = allowEndOfDay ? [...HOURS, 24] : HOURS
   const [text, setText] = useState(() => (parsed ? formatShown(parsed) : ''))
   const [editing, setEditing] = useState(false)
   const [note, setNote] = useState<{ kind: 'error' | 'info'; text: string } | null>(null)
@@ -95,7 +99,7 @@ export default function TimeFieldV8({
   /** 開いた直後だけ、列が描かれたら位置合わせと焦点を行う（器が中身を描くのは位置を測った後）。 */
   const pendingOpenRef = useRef({ hours: false, minutes: false })
 
-  const minutes = minuteOptions(step, parsed?.minutes)
+  const minutes = (parsed?.hours ?? activeHour) === 24 ? [0] : minuteOptions(step, parsed?.minutes)
 
   // 外から値が替わったら、打っている最中でなければ欄の字を合わせる。
   useEffect(() => {
@@ -148,7 +152,7 @@ export default function TimeFieldV8({
       if (note?.kind === 'error') setNote(null)
       return
     }
-    const result = normalizeTimeInput(text, step)
+    const result = normalizeTimeInput(text, step, allowEndOfDay)
     if (result.kind === 'empty') {
       setNote(null)
       if (current !== '') emit('')
@@ -166,7 +170,7 @@ export default function TimeFieldV8({
   }
 
   const chooseHour = (hours: number) => {
-    const minutesPart = parsed ? parsed.minutes : activeMinute
+    const minutesPart = hours === 24 ? 0 : parsed ? parsed.minutes : activeMinute
     setActiveHour(hours)
     setNote(null)
     emit(formatValue({ hours, minutes: minutesPart }))
@@ -215,7 +219,7 @@ export default function TimeFieldV8({
 
   const onListKeyDown = (column: Column) => (event: KeyboardEvent<HTMLDivElement>) => {
     if (isComposing(event)) return
-    const list = column === 'hours' ? HOURS : minutes
+    const list = column === 'hours' ? hours : minutes
     const active = column === 'hours' ? activeHour : activeMinute
     const setActive = column === 'hours' ? setActiveHour : setActiveMinute
     const listRef = column === 'hours' ? hourListRef : minuteListRef
@@ -365,7 +369,7 @@ export default function TimeFieldV8({
                   onFocus={() => setActiveColumn('hours')}
                   onKeyDown={onListKeyDown('hours')}
                 >
-                  {HOURS.map((hour) => (
+                  {hours.map((hour) => (
                     <div
                       key={hour}
                       id={`${fieldId}-h-${hour}`}
@@ -444,7 +448,7 @@ export type TimeInputResult =
  * - 時が 24 以上・分が 60 以上は直さず理由を返す
  * - きざみに合わない分は近い方へ合わせ、知らせる文を付ける
  */
-export function normalizeTimeInput(raw: string, minuteStep = 1): TimeInputResult {
+export function normalizeTimeInput(raw: string, minuteStep = 1, allowEndOfDay = false): TimeInputResult {
   const text = raw.normalize('NFKC').replace(/\s+/g, '')
   if (text === '' || text === '--:--') return { kind: 'empty' }
   let hours: number
@@ -465,6 +469,7 @@ export function normalizeTimeInput(raw: string, minuteStep = 1): TimeInputResult
   } else {
     return { kind: 'error', message: '「0900」「9:00」の形で入れてください' }
   }
+  if (allowEndOfDay && hours === 24 && minutes === 0) return { kind: 'ok', time: { hours, minutes }, note: null }
   if (hours > 23) return { kind: 'error', message: '時は 0〜23 で入れてください' }
   if (minutes > 59) return { kind: 'error', message: '分は 0〜59 で入れてください' }
   const snapped = snapToStep({ hours, minutes }, normalizeStep(minuteStep))
@@ -485,11 +490,12 @@ export function snapToStep(time: Hm, minuteStep: number): { time: Hm; changed: b
 }
 
 /** `HH:mm`（秒付きも可）を読む。読めなければ null。 */
-function parseHm(value: string): Hm | null {
+function parseHm(value: string, allowEndOfDay = false): Hm | null {
   const match = /^(\d{2}):(\d{2})/.exec(value)
   if (!match) return null
   const hours = Number(match[1])
   const minutes = Number(match[2])
+  if (allowEndOfDay && hours === 24 && minutes === 0) return { hours, minutes }
   if (hours > 23 || minutes > 59) return null
   return { hours, minutes }
 }

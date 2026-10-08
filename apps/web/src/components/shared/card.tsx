@@ -6,6 +6,9 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   layout?: 'block' | 'vertical'
   overflow?: 'visible' | 'hidden'
   padding?: 'none' | 'default' | 'roomy' | 'spacious'
+  gap?: 'tight'
+  /** 内側の線で寸法を保つカード。指定した面だけに適用。 */
+  surface?: 'inset'
 }
 
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
@@ -15,10 +18,14 @@ export default function Card({
   layout = 'block',
   overflow = 'visible',
   padding = 'none',
+  gap,
+  surface,
   ...props
 }: CardProps) {
   const classes = [
     styles.card,
+    surface === 'inset' ? styles.inset : null,
+    gap === 'tight' ? styles.gapTight : null,
     layout === 'vertical' ? styles.vertical : null,
     overflow === 'hidden' ? styles.overflowHidden : null,
     padding === 'default' ? styles.paddingDefault : null,
@@ -43,22 +50,24 @@ export function CardHeader({
   size = 'standard',
   actionTone = 'accent',
   headingLevel = 2,
+  titleId,
 }: {
   title: ReactNode
   meta?: ReactNode
   action?: ReactNode
-  size?: 'standard' | 'roomy'
+  size?: 'standard' | 'roomy' | 'stacked' | 'panel'
   actionTone?: 'accent' | 'info'
   headingLevel?: 2 | 3
+  titleId?: string
 }) {
   const Heading = headingLevel === 3 ? 'h3' : 'h2'
   return (
     <div
-      className={`${styles.header} ${size === 'roomy' ? styles.headerRoomy : ''}`}
+      className={[styles.header, size === 'roomy' && styles.headerRoomy, size === 'stacked' && styles.headerStacked, size === 'panel' && styles.headerPanel].filter(Boolean).join(' ')}
       data-design-node="t0jk8p"
     >
       <div className={styles.titleGroup}>
-        <Heading className={styles.title}>{title}</Heading>
+        <Heading id={titleId} className={styles.title}>{title}</Heading>
         {meta ? <span className={styles.meta}>{meta}</span> : null}
       </div>
       {action ? (

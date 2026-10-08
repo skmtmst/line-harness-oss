@@ -309,3 +309,12 @@
  */
 [data-theme='v8'] .skeleton { height: 32px; }
 [data-theme='v8'] .card[data-kpi-presentation='band'] .skeleton { height: var(--tpl-band-number-lh); }
+
+/* hQQlt：箱の中の小さな件数。通常のカード・数の帯は変えない。 */
+[data-theme='v8'] .card[data-kpi-presentation='inline'] { min-height: 0; justify-content: flex-start; display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; outline: 0; border-radius: var(--radius-none); background: none; box-shadow: none; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .head { order: 2; min-height: 0; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 11px; font-weight: 400; line-height: 16px; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .number, [data-theme='v8'] .card[data-kpi-presentation='inline'] .unit { font-size: 12px; font-weight: 700; line-height: 18px; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .value { gap: 0; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .detail { display: none; }
+[data-theme='v8'] .valueDanger { color: var(--color-danger); }
