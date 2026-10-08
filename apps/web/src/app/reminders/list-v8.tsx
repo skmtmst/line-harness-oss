@@ -713,9 +713,14 @@ export default function RemindersListV8() {
     const status = statusKeyOf(row)
     const items: ActionMenuItem[] = [
       { id: 'detail', label: '詳細を見る', icon: <ArrowRight size={15} aria-hidden="true" />, onSelect: () => goDetail(detailHref(row.id)) },
-      { id: 'registrants', label: '登録者を管理', icon: <Users size={15} aria-hidden="true" />, onSelect: () => goDetail(detailHref(row.id)) },
-      { id: 'planned', label: '配信予定を見る', icon: <CalendarClock size={15} aria-hidden="true" />, onSelect: () => goDetail(`${detailHref(row.id)}&status=planned`) },
-      { id: 'runs', label: '実行結果を見る', icon: <Activity size={15} aria-hidden="true" />, onSelect: () => goDetail(detailHref(row.id)) },
+      /*
+       * 詳細のタブは ?tab=（registrants・schedule・runs）で開く（src/v8/reminders/BEHAVIOR.md）。
+       * 前は tab を付けず・status=planned だけで、どれを押しても概要が開いていた（監査 WEB-013）。
+       * status=planned は v7 の詳細（実行結果の画面）が読む名前なので残す。
+       */
+      { id: 'registrants', label: '登録者を管理', icon: <Users size={15} aria-hidden="true" />, onSelect: () => goDetail(`${detailHref(row.id)}&tab=registrants`) },
+      { id: 'planned', label: '配信予定を見る', icon: <CalendarClock size={15} aria-hidden="true" />, onSelect: () => goDetail(`${detailHref(row.id)}&tab=schedule&status=planned`) },
+      { id: 'runs', label: '実行結果を見る', icon: <Activity size={15} aria-hidden="true" />, onSelect: () => goDetail(`${detailHref(row.id)}&tab=runs`) },
       {
         id: 'edit',
         label: '編集する',
@@ -1053,34 +1058,36 @@ export default function RemindersListV8() {
                     <Button variant="primary" onClick={() => goDetail(detailHref(panelRow.id))}>
                       詳細を見る
                     </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={!canEdit}
-                      onClick={() => goDetail(`/reminders/edit?id=${encodeURIComponent(panelRow.id)}`)}
-                    >
-                      編集する
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={!canEdit}
-                      onClick={() => {
-                        setDuplicateError('')
-                        setDuplicateTarget(panelRow)
-                        setPanelId(null)
-                      }}
-                    >
-                      複製する
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={!canEdit}
-                      onClick={() => {
-                        setPanelId(null)
-                        requestDelete(panelRow)
-                      }}
-                    >
-                      削除する
-                    </Button>
+                    {/* 閲覧のみの人には押せないボタンを置かない（行の「…」と同じ。監査 WEB-015）。 */}
+                    {canEdit ? (
+                      <>
+                        <Button
+                          variant="secondary"
+                          onClick={() => goDetail(`/reminders/edit?id=${encodeURIComponent(panelRow.id)}`)}
+                        >
+                          編集する
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            setDuplicateError('')
+                            setDuplicateTarget(panelRow)
+                            setPanelId(null)
+                          }}
+                        >
+                          複製する
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            setPanelId(null)
+                            requestDelete(panelRow)
+                          }}
+                        >
+                          削除する
+                        </Button>
+                      </>
+                    ) : null}
                   </>
                 }
               >

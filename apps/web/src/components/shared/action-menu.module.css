@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * ★V7 `xifuV`（Pencil「★V7 メニュー」）。V5 `hGpFq` から移行。
+ * Pencil ★V8 `hnuY9`「その他操作メニュー」。
  * 白地・角丸12・枠・影。項目は高さ36（補足つき52）・
  * アイコン16＋文字14・折り返さない。
  */

@@ -5,7 +5,7 @@ import { useState } from 'react'
 import styles from './avatar.module.css'
 
 /**
- * 友だちの顔。Pencil ★V7「友だちの顔」（V7 文書 `KXDhj`）。
+ * 友だちの顔。Pencil ★V8「顔/小・中・大」（`MFTlt`・`pDKi6`・`zjEbn`）。
  *
  * - 画像があって読み込めた時だけ画像。無い・**読み込みに失敗した**時は頭文字
  *   （2026-09-24 の点検で、失敗した画像が空白のまま出ていた）

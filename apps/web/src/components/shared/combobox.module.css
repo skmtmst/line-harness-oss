@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * 候補つき入力（1つ選ぶ）。Pencil ★V7 `WUVcz` §1。
+ * 候補つき入力（1つ選ぶ）。Pencil ★V8（V8.pen）「候補から選ぶ」。
  *
  *   欄     高さ 40・余白 [0,12]・角丸 8・枠 $hairline（開いている間は $accent-deep）
  *   候補   欄の 6px 下・幅は欄と同じ・角丸 12・余白 6・影 $shadow-float

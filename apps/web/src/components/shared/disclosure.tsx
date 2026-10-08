@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import styles from './disclosure.module.css'
 
 /**
- * 開閉する欄。Pencil ★V7「開閉する欄」（V7 文書 `v9M8P8`）。
+ * 開閉する欄。Pencil ★V8（V8.pen）「開け閉めする段」。
  *
  * 中身はネイティブの `<details>`/`<summary>`。キーボード（Enter・Space）と読み上げ
  * （開いている／閉じている）は最初から効く。見た目と動きだけをそろえる。

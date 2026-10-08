@@ -446,7 +446,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                 <Td className={styles.menuCell}>
                   <div className={`${styles.menuBox} ${styles.hqActions}`}>
                     {canEdit ? (
-                      <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
+                      <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} size="row" open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
                     ) : null}
                   </div>
                 </Td>

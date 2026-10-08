@@ -1842,7 +1842,7 @@ function DoneStageV8({
           </dl>
           <div className={styles.doneActions}>
             <Button href="/reminders"><List size={15} aria-hidden="true" />一覧へ戻る</Button>
-            <Button variant="secondary" href={`/reminders/detail?id=${encodeURIComponent(reminderId)}&status=planned`}>
+            <Button variant="secondary" href={`/reminders/detail?id=${encodeURIComponent(reminderId)}&tab=schedule&status=planned`}>
               <CalendarClock size={15} aria-hidden="true" />配信予定を見る
             </Button>
             <Button variant="primary" href={`/reminders/detail?id=${encodeURIComponent(reminderId)}`}>

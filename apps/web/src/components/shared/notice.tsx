@@ -28,7 +28,7 @@ const CANONICAL: Record<NoticeTone, CanonicalTone> = {
   error: 'danger',
 }
 
-/* 正本は Pencil「★V7 共通部品 その2」uR9s8 の §1。4種とも同じ節点。 */
+/* 正本は Pencil ★V8 `ThDed`「帯/案内」。下の節点の印 uR9s8 は前の版から引き継いだ値で、4種とも同じ。 */
 const NODE_BY_TONE: Record<CanonicalTone, string> = {
   info: 'uR9s8',
   success: 'uR9s8',
@@ -86,6 +86,7 @@ export default function Notice({
   helpLabel,
   helpHref,
   icon,
+  role,
   ...props
 }: NoticeProps) {
   const canonical = CANONICAL[tone]
@@ -96,7 +97,9 @@ export default function Notice({
     <div
       {...props}
       className={[styles.notice, styles[canonical], className].filter(Boolean).join(' ')}
-      role={canonical === 'danger' ? 'alert' : 'note'}
+      // 呼び出し側が role を指定したらそれを優先する（下書きの競合帯の alert など）。
+      // 指定がないときだけ、種類から既定（危険＝alert、ほかは note）を決める。
+      role={role ?? (canonical === 'danger' ? 'alert' : 'note')}
       data-design-part="notice"
       data-design-node={node}
     >
