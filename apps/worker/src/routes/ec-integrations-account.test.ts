@@ -137,3 +137,9 @@ describe('EC-CUBE event account and identity boundary', () => {
     expect(await response.json()).toMatchObject({ status: 'identity_pending' });
   });
 });
+
+vi.mock('../services/workflow-execution.js',async()=>{
+ const {unitWorkflow}=await import('../test-utils/workflow-unit.js');
+ return {acquireWorkflow:async(db:D1Database,ref:any)=>unitWorkflow(db,ref),
+  runWorkflowStep:async(_db:any,_ref:any,work:Function,options:any)=>work({input_json:JSON.stringify(options.input),retry_key:options.retryKey,attempt_count:1,first_attempt_at:Date.now()})};
+});

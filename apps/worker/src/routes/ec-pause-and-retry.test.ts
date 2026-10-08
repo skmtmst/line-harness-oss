@@ -279,3 +279,22 @@ describe('W11 A interrupted processing recovery', () => {
     expect(push).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('W11 B resumes the remaining integration stages on A version recovery',()=>{
+ it('does not repeat member-tag mutations or customer notifications after V6 fails',async()=>{
+  const {syncNenEcTags}=await import('../services/nen-tag-sync.js');
+  const {fireEvent}=await import('../services/event-bus.js');
+  const {__pushMessage:push}=await import('@line-crm/line-sdk') as unknown as {__pushMessage:ReturnType<typeof vi.fn>};
+  db.raw.exec('CREATE TABLE tag_effect(n INTEGER);INSERT INTO tag_effect VALUES(0)');
+  vi.mocked(syncNenEcTags).mockImplementation(async owned=>{await owned.prepare('UPDATE tag_effect SET n=n+1').run();return {added:1,removed:0}});
+  vi.mocked(fireEvent).mockRejectedValueOnce(new Error('downstream interrupted')).mockResolvedValue(undefined);
+  expect((await postEvent('steps-v6-failure')).status).toBe(503);
+  expect(push).toHaveBeenCalledOnce();
+  expect(db.raw.prepare('SELECT n FROM tag_effect').get()).toEqual({n:1});
+  db.raw.exec("UPDATE ec_action_executions SET next_retry_at='2026-09-20T00:00:00Z' WHERE status='retryable_failed'");
+  expect((await processDueEcRetries(db.db,{now:'2026-09-20T10:00:00Z'})).processed).toBe(1);
+  expect(push).toHaveBeenCalledOnce();expect(db.raw.prepare('SELECT n FROM tag_effect').get()).toEqual({n:1});
+  expect(db.raw.prepare("SELECT status FROM workflow_steps WHERE process_kind='ec_event' AND step_key='__run'").get()).toEqual({status:'succeeded'});
+  vi.mocked(syncNenEcTags).mockReset().mockResolvedValue({added:0,removed:0});
+ });
+});
