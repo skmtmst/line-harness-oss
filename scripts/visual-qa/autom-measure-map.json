@@ -1,0 +1,213 @@
+{
+  "generatedBy": "autom 撮影条件（元の対応表は変更しない）",
+  "sources": [
+    "BOARD-INDEX.md",
+    "HANDOVER-MAP.md",
+    "V8B-HANDOVER-MAP.md",
+    "specs/pages/*.md"
+  ],
+  "designDir": "/Users/kentakenta/lh-work/design/v8",
+  "boardCount": 12,
+  "retired": [],
+  "boards": {
+    "En14p": {
+      "doc": "V8-B",
+      "name": "オートメーション 一覧 1152 V8",
+      "kind": "1152",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/En14p.png",
+      "url": "/automations"
+    },
+    "LWQXd": {
+      "doc": "V8-B",
+      "name": "オートメーション 一覧 V8（F-14 は本線にある）",
+      "kind": "画面",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/LWQXd.png",
+      "url": "/automations"
+    },
+    "M4torY": {
+      "doc": "V8-B",
+      "name": "オートメーション ルールを作る V8",
+      "kind": "画面",
+      "route": "/automations/new",
+      "routes": [
+        "/automations/new?draft=automation-v8-new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/M4torY.png",
+      "url": "/automations/new?draft=automation-v8-new"
+    },
+    "S3pdQ": {
+      "doc": "V8-B",
+      "name": "オートメーション 状態 V8",
+      "kind": "状態",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/S3pdQ.png",
+      "url": "/automations",
+      "state": {
+        "manual": "状態の見本帳（横並び）（2026-10-06）"
+      },
+      "unmeasurable": "見本の紙"
+    },
+    "g98F9": {
+      "doc": "V8-B",
+      "name": "オートメーション 動いた記録 V8",
+      "kind": "画面",
+      "route": "/automations/runs",
+      "routes": [
+        "/automations/runs"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/g98F9.png",
+      "url": "/automations/runs"
+    },
+    "nH9L8": {
+      "doc": "V8-B",
+      "name": "オートメーション 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/automations",
+      "routes": [
+        "/automations"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/nH9L8.png",
+      "url": "/automations",
+      "state": {
+        "role": "viewer",
+        "api": {
+          "match": "GET /api/staff/me",
+          "status": 200,
+          "body": {
+            "success": true,
+            "data": {
+              "id": "visual-qa-owner",
+              "name": "Kenta Kawano",
+              "role": "staff",
+              "email": null
+            }
+          }
+        }
+      }
+    },
+    "tJqST": {
+      "doc": "V8-B",
+      "name": "オートメーション ルールを作る（競合）V8",
+      "kind": "競合",
+      "route": "/automations/new",
+      "routes": [
+        "/automations/new?draft=automation-v8-new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/tJqST.png",
+      "url": "/automations/new?draft=automation-v8-new",
+      "state": {
+        "api": {
+          "match": "PUT /api/automation-drafts",
+          "status": 409,
+          "body": {
+            "success": false,
+            "error": "ほかの人が先に保存しました",
+            "code": "version_conflict"
+          }
+        },
+        "click": "下書きを保存"
+      }
+    },
+    "LnGNw": {
+      "doc": "V8-B",
+      "name": "オートメーション 共通アクション V8",
+      "kind": "画面",
+      "route": "/common-actions",
+      "routes": [
+        "/common-actions"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/LnGNw.png",
+      "url": "/common-actions"
+    },
+    "j2hfkS": {
+      "doc": "V8-B",
+      "name": "オートメーション 共通アクションを作る V8",
+      "kind": "画面",
+      "route": "/common-actions/new",
+      "routes": [
+        "/common-actions/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/j2hfkS.png",
+      "url": "/common-actions/new",
+      "state": {
+        "click": [
+          "待ち時間を入れる",
+          "＋ 処理を足す",
+          "条件で分ける",
+          "＋ 処理を足す",
+          "fill:名前=購入のお礼"
+        ]
+      }
+    },
+    "ziSgL": {
+      "doc": "V8-B",
+      "name": "オートメーション 共通アクション 版と使われている場所 V8",
+      "kind": "画面",
+      "route": "/common-actions/versions",
+      "routes": [
+        "/common-actions/versions"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ziSgL.png",
+      "url": "/common-actions/versions?id=ca-2"
+    },
+    "D0AOyx": {
+      "doc": "V8-B",
+      "name": "プール管理 プールを作る V8",
+      "kind": "画面",
+      "route": "/pools/new",
+      "routes": [
+        "/pools/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/D0AOyx.png",
+      "url": "/pools/new",
+      "state": {
+        "click": [
+          "＋ アカウントを足す",
+          "足すアカウント",
+          "然-NEN- 本店",
+          "追加"
+        ]
+      }
+    },
+    "u3iab3": {
+      "doc": "V8-B",
+      "name": "設定 プール管理 V8",
+      "kind": "画面",
+      "route": "/notifications",
+      "routes": [
+        "/notifications",
+        "/line-notifications",
+        "/accounts",
+        "/emergency",
+        "/ec-commerce",
+        "/pools",
+        "/getting-started"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/u3iab3.png",
+      "url": "/pools"
+    }
+  }
+}
