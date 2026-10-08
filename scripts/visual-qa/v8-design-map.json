@@ -137,13 +137,13 @@
       "doc": "V8-B",
       "name": "統括 バナー生成（画像を取り込む）V8",
       "kind": "画面",
-      "route": "/hq",
+      "route": "/hq/banners",
       "routes": [
         "/hq"
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/AnwtH.png",
-      "url": "/hq"
+      "url": "/hq/banners?tab=library"
     },
     "AqDWN": {
       "doc": "V8",
@@ -185,13 +185,13 @@
       "doc": "V8-B",
       "name": "統括 バナー生成（一覧から外す・確認）V8",
       "kind": "小窓",
-      "route": "/hq",
+      "route": "/hq/banners/project",
       "routes": [
         "/hq"
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/B24oNg.png",
-      "url": "/hq"
+      "url": "/hq/banners/project?id=banner-project-qa-1"
     },
     "B8rCt": {
       "doc": "V8",
@@ -207,13 +207,13 @@
       "doc": "V8-B",
       "name": "統括 バナー生成（プロジェクト一覧）V8",
       "kind": "画面",
-      "route": "/hq",
+      "route": "/hq/banners",
       "routes": [
         "/hq"
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/B9ZAr.png",
-      "url": "/hq"
+      "url": "/hq/banners"
     },
     "BERxg": {
       "doc": "V8-B",
@@ -478,7 +478,7 @@
       "doc": "V8-B",
       "name": "プール管理 プールを作る V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/pools/new",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -490,7 +490,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/D0AOyx.png",
-      "url": "/notifications"
+      "url": "/pools/new"
     },
     "D6fh3": {
       "doc": "V8-B",
@@ -562,7 +562,7 @@
       "doc": "V8-B",
       "name": "LINE通知 送れなかったもの V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/line-notifications",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -574,7 +574,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/DrwMm.png",
-      "url": "/notifications"
+      "url": "/line-notifications?tab=failures"
     },
     "DxAAA": {
       "doc": "V8-B",
@@ -884,7 +884,7 @@
       "doc": "V8-B",
       "name": "設定 EC連携 V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/ec-commerce",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -896,7 +896,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/GmVR5.png",
-      "url": "/notifications"
+      "url": "/ec-commerce"
     },
     "GobMd": {
       "doc": "V8",
@@ -1040,13 +1040,13 @@
       "doc": "V8-B",
       "name": "統括 バナー生成（アーカイブ・確認）V8",
       "kind": "小窓",
-      "route": "/hq",
+      "route": "/hq/banners/project",
       "routes": [
         "/hq"
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/I0w2e.png",
-      "url": "/hq"
+      "url": "/hq/banners/project?id=banner-project-qa-1"
     },
     "I1E7Bt": {
       "doc": "V8",
@@ -1064,7 +1064,7 @@
       "doc": "V8-B",
       "name": "運用状態 更新履歴 V8",
       "kind": "状態",
-      "route": "/notifications",
+      "route": "/emergency",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -1076,7 +1076,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/I2V65v.png",
-      "url": "/notifications"
+      "url": "/emergency?tab=history"
     },
     "I3L41O": {
       "doc": "V8",
@@ -1765,7 +1765,7 @@
       "doc": "V8-B",
       "name": "運用状態 緊急コントロール V8",
       "kind": "状態",
-      "route": "/notifications",
+      "route": "/emergency",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -1777,7 +1777,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/OHwbU.png",
-      "url": "/notifications"
+      "url": "/emergency?tab=control"
     },
     "OPGU2": {
       "doc": "V8",
@@ -1936,7 +1936,7 @@
       "doc": "V8-B",
       "name": "LINE通知 記録 V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/line-notifications",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -1948,7 +1948,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/PZBVb.png",
-      "url": "/notifications"
+      "url": "/line-notifications?tab=history"
     },
     "PfA4o": {
       "doc": "V8",
@@ -2441,13 +2441,13 @@
       "doc": "V8-B",
       "name": "統括 バナー生成（参照画像を選ぶ）V8",
       "kind": "画面",
-      "route": "/hq",
+      "route": "/hq/banners/project",
       "routes": [
         "/hq"
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/UcBQ5.png",
-      "url": "/hq"
+      "url": "/hq/banners/project?id=banner-project-qa-1"
     },
     "UkZLi": {
       "doc": "V8-B",
@@ -2522,7 +2522,7 @@
       "doc": "V8-B",
       "name": "設定 LINEアカウント V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/accounts",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -2534,7 +2534,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/V7vn3.png",
-      "url": "/notifications"
+      "url": "/accounts"
     },
     "VDPz5": {
       "doc": "V8-B",
@@ -2662,25 +2662,25 @@
       "doc": "V8-B",
       "name": "統括 バナー生成（画像ライブラリ）V8",
       "kind": "画面",
-      "route": "/hq",
+      "route": "/hq/banners",
       "routes": [
         "/hq"
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/W5Wxr.png",
-      "url": "/hq"
+      "url": "/hq/banners?tab=library"
     },
     "W7Z57": {
       "doc": "V8-B",
       "name": "統括 バナー生成（プロジェクトを作る）V8",
       "kind": "画面",
-      "route": "/hq",
+      "route": "/hq/banners",
       "routes": [
         "/hq"
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/W7Z57.png",
-      "url": "/hq"
+      "url": "/hq/banners"
     },
     "WOPjZ": {
       "doc": "V8",
@@ -2861,7 +2861,7 @@
       "doc": "V8-B",
       "name": "設定 運用状態 V8",
       "kind": "状態",
-      "route": "/notifications",
+      "route": "/emergency",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -2873,7 +2873,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/Y4LkX1.png",
-      "url": "/notifications"
+      "url": "/emergency?tab=health"
     },
     "Y8SjT2": {
       "doc": "V8-B",
@@ -3663,7 +3663,7 @@
       "doc": "V8-B",
       "name": "LINE通知 V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/line-notifications",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -3675,7 +3675,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/g3iDs.png",
-      "url": "/notifications"
+      "url": "/line-notifications?tab=customer"
     },
     "g98F9": {
       "doc": "V8-B",
@@ -3744,7 +3744,7 @@
       "doc": "V8-B",
       "name": "LINE通知 運用者へのお知らせを作る V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/line-notifications/operator/new",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -3756,7 +3756,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/gjUz3.png",
-      "url": "/notifications"
+      "url": "/line-notifications/operator/new"
     },
     "gzkXs": {
       "doc": "V8",
@@ -4014,7 +4014,7 @@
       "doc": "V8-B",
       "name": "EC連携 つなぎ先 V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/ec-commerce",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -4026,25 +4026,25 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/iLJmw.png",
-      "url": "/notifications"
+      "url": "/ec-commerce?tab=connector"
     },
     "iMnph": {
       "doc": "V8-B",
       "name": "統括 バナー生成（プロジェクトの中）V8",
       "kind": "画面",
-      "route": "/hq",
+      "route": "/hq/banners/project",
       "routes": [
         "/hq"
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/iMnph.png",
-      "url": "/hq"
+      "url": "/hq/banners/project?id=banner-project-qa-1"
     },
     "ihjfd": {
       "doc": "V8-B",
       "name": "LINEアカウント 詳細 V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/accounts/detail",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -4056,7 +4056,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/ihjfd.png",
-      "url": "/notifications"
+      "url": "/accounts/detail?id=visual-qa-account"
     },
     "ijxur": {
       "doc": "V8",
@@ -4370,7 +4370,7 @@
       "doc": "V8-B",
       "name": "EC連携 注文の状況（引き出し）V8",
       "kind": "小窓",
-      "route": "/notifications",
+      "route": "/ec-commerce",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -4382,7 +4382,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/nAesv.png",
-      "url": "/notifications"
+      "url": "/ec-commerce"
     },
     "nGcY1": {
       "doc": "V8-B",
@@ -4532,13 +4532,13 @@
       "doc": "V8-B",
       "name": "統括 バナー生成（生成中）V8",
       "kind": "画面",
-      "route": "/hq",
+      "route": "/hq/banners/project",
       "routes": [
         "/hq"
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/p03ImY.png",
-      "url": "/hq"
+      "url": "/hq/banners/project?id=banner-project-qa-1"
     },
     "p0kA3": {
       "doc": "V8-B",
@@ -4762,13 +4762,13 @@
       "doc": "V8-B",
       "name": "統括 バナー生成（画像の詳細）V8",
       "kind": "画面",
-      "route": "/hq",
+      "route": "/hq/banners/project",
       "routes": [
         "/hq"
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/rI5uh.png",
-      "url": "/hq"
+      "url": "/hq/banners/project?id=banner-project-qa-1"
     },
     "rRk0C": {
       "doc": "V8-B",
@@ -5006,7 +5006,7 @@
       "doc": "V8-B",
       "name": "設定 プール管理 V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/pools",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -5018,7 +5018,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/u3iab3.png",
-      "url": "/notifications"
+      "url": "/pools"
     },
     "u5CuB8": {
       "doc": "V8-B",
@@ -5060,7 +5060,7 @@
       "doc": "V8-B",
       "name": "LINE通知 運用者へのお知らせ V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/line-notifications",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -5072,7 +5072,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/u8xibp.png",
-      "url": "/notifications"
+      "url": "/line-notifications?tab=operator"
     },
     "uAWb7": {
       "doc": "V8",
@@ -5291,7 +5291,7 @@
       "doc": "V8-B",
       "name": "EC連携 会員のつき合わせ V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/ec-commerce/identity-candidates",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -5303,7 +5303,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/w1W8h.png",
-      "url": "/notifications"
+      "url": "/ec-commerce/identity-candidates"
     },
     "w5pwG": {
       "doc": "V8-B",
@@ -5419,7 +5419,7 @@
       "doc": "V8-B",
       "name": "EC連携 定期便 V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/ec-commerce",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -5431,7 +5431,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/wqC8x.png",
-      "url": "/notifications"
+      "url": "/ec-commerce?tab=subscriptions"
     },
     "ws9wt": {
       "doc": "V8-B",
@@ -5480,7 +5480,7 @@
       "doc": "V8-B",
       "name": "LINEアカウント 乗り換え V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/accounts/handover",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -5492,7 +5492,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/x2dSNv.png",
-      "url": "/notifications"
+      "url": "/accounts/handover?id=visual-qa-account"
     },
     "x6QsVz": {
       "doc": "V8",
@@ -5589,7 +5589,7 @@
       "doc": "V8-B",
       "name": "設定 はじめの設定 V8",
       "kind": "画面",
-      "route": "/notifications",
+      "route": "/getting-started",
       "routes": [
         "/notifications",
         "/line-notifications",
@@ -5601,7 +5601,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/xuJ7D.png",
-      "url": "/notifications"
+      "url": "/getting-started"
     },
     "xvtSz": {
       "doc": "V8",
@@ -5787,13 +5787,13 @@
       "doc": "V8-B",
       "name": "統括 バナー生成（上限に達した）V8",
       "kind": "画面",
-      "route": "/hq",
+      "route": "/hq/banners/project",
       "routes": [
         "/hq"
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/zOpMG.png",
-      "url": "/hq"
+      "url": "/hq/banners/project?id=banner-project-qa-1"
     },
     "zQ5vY": {
       "doc": "V8-B",
