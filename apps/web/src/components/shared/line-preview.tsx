@@ -43,10 +43,6 @@ export interface LinePreviewProps {
    * v8 のスマホではトークの中の日付の札の位置に出る。
    */
   caption?: ReactNode
-  /** リッチメニュー専用。トークの下、メニュー帯の直上に置く。 */
-  richMenu?: ReactNode
-  /** リッチメニューのトーク画面の下の文言。 */
-  menuBarText?: string
   /** 静かな説明だけ。題の横の？に入り、本文には出さない。 */
   note?: string
   /** 送り主の表示名（分かっている画面だけ渡す）。v8 ではトーク頭の名前になる。 */
