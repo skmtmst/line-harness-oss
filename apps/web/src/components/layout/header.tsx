@@ -22,7 +22,7 @@ export default function Header({ title, description, titleAction, action }: Head
       <div className={styles.content}>
         {title || titleAction ? (
           <div className={styles.titleRow}>
-            {title ? <h1 className={styles.title}>{title}</h1> : null}
+            {title ? <h1 className={styles.title} title={title}>{title}</h1> : null}
             {titleAction}
           </div>
         ) : null}

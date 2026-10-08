@@ -2461,6 +2461,11 @@ const RAW = {
   '/api/booking/admin/availability': BOOKING_AVAILABILITY,
   '/api/booking/admin/resources': { success: true, data: { resources: BOOKING_RESOURCES } },
   '/api/booking/admin/menus': { menus: BOOKING_MENUS },
+  '/api/booking/admin/sales-summary': { success: true, data: {
+    from: '2026-10-01', to: '2026-10-31',
+    total: { bookings: 0, confirmed: 0, revenue: 0, cancelRate: 0, noshowRate: 0, cancelled: 0, noshow: 0 },
+    menus: [], weekdays: [], previous: { revenue: 0, bookings: 0, cancelRate: 0, noshowRate: 0 }, revenueSource: 'menu',
+  } },
   /* 予約経路の連携（V8 予約設定 ZyDd6）。口は `{success,data}` で包む。無いと設定の「予約経路」タブが落ちていた。 */
   '/api/booking/admin/channels': { success: true, data: BOOKING_CHANNELS },
   '/api/booking/admin/conflicts': { success: true, data: { conflicts: [] } },
@@ -4706,6 +4711,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null, tenantId: 'visual-tenant-1' } }
   }
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
+  if (method === 'GET' && pathname === '/api/webhooks/outgoing/owh-slack-order') {
+    return { success: true, data: OUTGOING_WEBHOOKS[0] }
+  }
   // 外部連携の API 接続（板 ralAc・UkZLi）。止めた鍵は一覧に出ないので、使っている2本だけ。
   if (pathname === '/api/webhooks/api-tokens') return { success: true, data: VISUAL_QA_API_TOKENS }
   const incomingUnmatched = /^\/api\/webhooks\/incoming\/([^/]+)\/unmatched$/.exec(pathname)

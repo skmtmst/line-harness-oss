@@ -9,9 +9,12 @@
 }
 
 .title {
-  font-size: var(--tpl-bks-sales-title-size);
-  font-weight: 600;
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
   margin: var(--tpl-bks-none);
+
+  line-height: var(--tpl-title-lh);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .tiles {

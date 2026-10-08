@@ -4,7 +4,7 @@ import styles from './page-templates.module.css'
 
 export interface PageHeadingProps {
   title: ReactNode
-  /** regular と未指定は既定（22/32）。compact は部品どおりの小さい見出し。 */
+  /** 題はすべて22/700/32。compact は題の周りの余白・間隔だけを詰める。 */
   headingSize?: 'regular' | 'compact' | 'large'
   description?: ReactNode
   help?: ReactNode
@@ -22,6 +22,13 @@ export interface PageHeadingProps {
    * （決まりの板 q1xNMz・2026-10-08 オーナー）。題の行の右には操作（actions）だけを置く。
    */
   steps?: ReactNode
+}
+
+/** 型の外に残るページの題も同じ文字の決まりを使う。窓・カードには使わない。 */
+export function PageTitle({ children, as: Tag = 'h2', className }: {
+  children: string; as?: 'h1' | 'h2'; className?: string
+}) {
+  return <Tag className={[styles.pageTitle, className].filter(Boolean).join(' ')} title={children} data-page-title>{children}</Tag>
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */

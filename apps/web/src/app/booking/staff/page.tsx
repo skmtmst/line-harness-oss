@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import Link from 'next/link'
@@ -149,6 +151,7 @@ export default function BookingStaffPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="v8-only"><PageHeading title="担当スタッフ" /></div>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav data-design="Crumb" className="text-ink-faint text-xs" aria-label="パンくず">

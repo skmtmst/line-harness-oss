@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import SupportInbox from '@/components/support/support-inbox'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -16,5 +18,5 @@ import { usePageTitle } from '@/components/shell/page-chrome'
  */
 export default function SupportPage() {
   usePageTitle('問い合わせ')
-  return <SupportInbox channel="email" />
+  return <><div className="v8-only"><PageHeading title="問い合わせ" /></div><SupportInbox channel="email" /></>
 }
