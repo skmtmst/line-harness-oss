@@ -10,7 +10,7 @@ describe('ROOT-19 二つの対応表を同じURLから作る', () => {
   })
   it('予約設定の板は実際のタブで開く', () => {
     for (const [id, tab] of Object.entries({ KRgTQ: 'holidays', VFxWU: 'hours', ZyDd6: 'channels', x1OZS6: 'rules', yRPxl: 'hours' })) {
-      expect(map.boards[id as keyof typeof map.boards].url).toBe(`/booking/menus?tab=${tab}`)
+      expect((map.boards[id as keyof typeof map.boards] as { url?: string }).url).toBe(`/booking/menus?tab=${tab}`)
     }
   })
   it('場所が決まっていない板を古い文書のURLで撮れるようにしない', () => {
