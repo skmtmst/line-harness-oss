@@ -42,7 +42,6 @@ type PayoutKind = 'per_conversion' | 'rate' | 'none'
 
 /* 絵（RaMf3）の並び：報酬なし → 割合 → 1件ごと。 */
 const PAYOUT_KINDS: Array<{ value: PayoutKind; label: string; note: string }> = [
-  { value: 'none', label: '報酬なし（計測のみ）', note: '成果の件数だけを記録' },
   { value: 'rate', label: '売上に対する割合', note: '注文金額の ◯% を報酬に' },
   { value: 'per_conversion', label: '成果1件ごとに定額', note: '金額は案件の「報酬額」で' },
 ]

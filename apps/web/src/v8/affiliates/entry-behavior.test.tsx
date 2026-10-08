@@ -125,6 +125,11 @@ describe('アフィリエイターを作る（今の入口 /affiliates/new）', 
   const fillName = (value: string) => fireEvent.change(screen.getByLabelText(/名前（表示名）/), { target: { value } })
   const fillCode = (value: string) => fireEvent.change(screen.getByRole('textbox', { name: /紹介コード（/ }), { target: { value } })
 
+  it('WEB208 暫定：保存できない報酬なしを選べない', () => {
+    render(<NewAffiliatePage />)
+    expect(screen.queryByRole('radio', { name: /報酬なし/ })).toBeNull()
+  })
+
   it('紹介コードの重なりで競合の帯が出て、入力が残る', async () => {
     render(<NewAffiliatePage />)
     fillName('ペットライフ編集部')
