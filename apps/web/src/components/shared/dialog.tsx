@@ -31,6 +31,8 @@ export type DialogProps = {
   designHeaderHeight?: number
   /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
   designContentPadding?: string
+  /** 指定した窓だけ題と説明の間隔を変える。 */
+  designHeadingGap?: number
   /** 題の隣の補足。ほかの窓の題の並びは変えない。 */
   titleHelp?: ReactNode
   /** 段の帯を使わず、題・手順・本文・操作を1枚に続ける窓（hadfk）。既定の窓は変えない。 */
@@ -94,6 +96,7 @@ export default function Dialog({
   designHeaderPadding,
   designHeaderHeight,
   designContentPadding,
+  designHeadingGap,
   titleHelp,
   layout,
   steps,
@@ -189,11 +192,13 @@ export default function Dialog({
       data-design-width={designWidth ? '' : undefined}
       data-design-header-padding={designHeaderPadding ? '' : undefined}
       data-design-header-height={designHeaderHeight ? '' : undefined}
+      data-design-heading-gap={designHeadingGap !== undefined ? '' : undefined}
       data-design-content-padding={designContentPadding ? '' : undefined}
-      style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding ? ({
+      style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding || designHeadingGap !== undefined ? ({
         ...(designWidth ? { '--dialog-design-width': `${designWidth}px` } : {}),
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
+        ...(designHeadingGap !== undefined ? { '--dialog-design-heading-gap': `${designHeadingGap}px` } : {}),
         ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),
       } as CSSProperties) : undefined}
       data-design-part="dialog"

@@ -404,3 +404,4 @@
 [data-theme='v8'] .panel[data-layout='continuous'] > .steps { padding: 0; border: 0; background: transparent; }
 [data-theme='v8'] .panel[data-layout='continuous'] > .content { padding: 0; }
 [data-theme='v8'] .panel[data-layout='continuous'] .actions { padding: 6px 0 0; border: 0; }
+[data-theme='v8'] .panel[data-design-heading-gap] .headerContent { gap: var(--dialog-design-heading-gap); }

@@ -23,12 +23,15 @@ export function Steps({
   label,
   steps,
   currentKey,
+  allowSelectTodo = false,
 }: {
   /** 何の進みか（例：「リッチメニューを作る手順」）。nav の読み上げ名。 */
   label: string
   steps: ReadonlyArray<StepperStep>
   /** いまいる段の key（例：URL の `?step=`）。渡さないときは state が current の最初の段。 */
   currentKey?: string
+  /** 編集では未着手の段も入力を残して見られる。新規の手順は既定のまま。 */
+  allowSelectTodo?: boolean
 }) {
   const items = steps.map((raw, index) => ({ ...raw, key: raw.key ?? raw.label, order: raw.order ?? index + 1 }))
   const currentIndex = currentKey !== undefined
@@ -77,7 +80,7 @@ export function Steps({
         {items.map((step, index) => {
           const state = stateOf(index)
           const isCurrent = state === 'current'
-          const clickable = (state === 'done' || state === 'attention') && Boolean(step.anchor || step.onSelect)
+          const clickable = (state === 'done' || state === 'attention' || (allowSelectTodo && state === 'todo')) && Boolean(step.anchor || step.onSelect)
           const lineDone = index > 0 && stateOf(index - 1) === 'done'
           const dot = (
             <span className={styles.dot} data-step-dot={state} title={state === 'attention' ? '直すところがあります' : undefined}>

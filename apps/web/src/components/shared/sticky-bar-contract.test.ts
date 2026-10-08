@@ -38,7 +38,7 @@ function pages(dir: string, out: string[] = []): string[] {
  * `page.tsx` だけを読むと「帯が無い」ことになり、直しようがない。
  */
 function readWithParts(file: string, depth = 0, seen = new Set<string>()): string {
-  if (depth > 2 || seen.has(file)) return ''
+  if (depth > 4 || seen.has(file)) return ''
   seen.add(file)
   let source: string
   try {
@@ -57,7 +57,7 @@ function readWithParts(file: string, depth = 0, seen = new Set<string>()): strin
       }
     }
   }
-  for (const m of source.matchAll(/from '(\.\/|\.\.\/)([^']+)'/g)) {
+  for (const m of source.matchAll(/(?:from |import\()'(\.\/|\.\.\/)([^']+)'/g)) {
     const base = path.join(path.dirname(file), m[1], m[2])
     for (const ext of ['.tsx', '.ts']) {
       if (fs.existsSync(base + ext)) {

@@ -1,0 +1,26 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-label-pill-gap);
+  padding: var(--tpl-label-pill-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-label-pill-lh);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.dot {
+  width: var(--tpl-label-pill-dot);
+  height: var(--tpl-label-pill-dot);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+}
+}

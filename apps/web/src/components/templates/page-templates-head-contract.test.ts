@@ -29,7 +29,7 @@ describe('型の見出し（379板の絵）', () => {
       ['--tpl-band-number-size', '22px'], ['--tpl-band-number-lh', '26px'],
       ['--tpl-band-cell-pad-block', '16px'], ['--tpl-band-cell-pad-side', '20px'], ['--tpl-band-cell-gap', '8px'],
       ['--tpl-create-head-pad-top', '20px'], ['--tpl-create-head-pad-side', '24px'], ['--tpl-create-head-pad-bottom', '16px'],
-      ['--tpl-create-head-gap', '8px'],
+      ['--tpl-create-head-gap', '4px'],
       ['--tpl-detail-head-pad-top', '20px'], ['--tpl-detail-head-pad-side', '24px'], ['--tpl-detail-head-pad-bottom', '16px'],
       ['--tpl-detail-head-gap', '12px'], ['--tpl-detail-actions-gap', '6px'], ['--tpl-detail-tabs-pad-bottom', '12px'],
       ['--tpl-create-content-pad-block', '24px'], ['--tpl-create-content-pad-side', '28px'], ['--tpl-create-content-gap', '16px'],
@@ -91,7 +91,7 @@ describe('型の見出し（379板の絵）', () => {
     expect(globals).toMatch(/--text-body--line-height:\s*1\.7/)
   })
 
-  it('作る型の頭は20/24/16・間8・手順は題と説明の下の行（置き場所は1つ・q1xNMz）', () => {
+  it('作る型の頭は20/24/18・間4・手順は題と説明の下の行（置き場所は1つ・q1xNMz）', () => {
     expect(css).toMatch(/\[data-page-template='create'\] \.heading \{[^}]*padding:\s*var\(--tpl-create-head-pad-top\) var\(--tpl-create-head-pad-side\) var\(--tpl-create-head-pad-bottom\)/s)
     expect(css).toMatch(/\[data-page-template='create'\] \.heading \{[^}]*gap:\s*var\(--tpl-create-head-gap\)/s)
     expect(css).toMatch(/\[data-page-template='create'\] \.heading > \.steps \{[^}]*flex-basis:\s*100%/s)

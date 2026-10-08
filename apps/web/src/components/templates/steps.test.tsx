@@ -56,6 +56,17 @@ describe('手順（型の共通部品 Steps）', () => {
     expect(screen.queryByRole('button', { name: '配信対象に戻る' })).toBeNull()
   })
 
+  it('編集で許可したときだけ未着手の段へ移れ、今の段は押せない', () => {
+    const select = vi.fn()
+    render(<Steps label="編集の進み" currentKey="basic" allowSelectTodo steps={[
+      { key: 'basic', label: '基本設定', state: 'todo' },
+      { key: 'review', label: '確認', state: 'todo', onSelect: select },
+    ]} />)
+    fireEvent.click(screen.getByRole('button', { name: '確認に戻る' }))
+    expect(select).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: '基本設定に戻る' })).toBeNull()
+  })
+
   it('済みの段はボタンなので、キーボード（Enter・Space）でも押せる', () => {
     render(<Steps label="配信作成の進み" steps={STEPS} currentKey="audience" />)
     const button = screen.getByRole('button', { name: '基本設定に戻る' })
