@@ -23,3 +23,6 @@ export interface ReminderRunReadOptions {
   executedOnly?: boolean;
 }
 export interface ReminderScheduleMetrics { scheduledNext24Hours: number }
+
+/** Explicit creation state; omit for legacy active creation, false for a draft. */
+export interface WebhookCreateState { isActive?: boolean }
