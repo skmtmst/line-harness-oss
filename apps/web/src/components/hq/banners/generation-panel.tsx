@@ -70,6 +70,7 @@ export default function GenerationPanel({
   usage,
   onReloadUsage,
   usageHeading,
+  monthRemaining,
   v8Layout = false,
 }: {
   presets: BannerPreset[]
@@ -92,6 +93,8 @@ export default function GenerationPanel({
    * 板がそう描いている V8 のプロジェクトの中だけが渡す。v7 の既定は変えない。
    */
   usageHeading?: boolean
+  /** G-6：枚数のそばに残り枚数を置く。 */
+  monthRemaining?: boolean
   /** 統括 V8 の板だけの並び。v7 の既定は変えない。 */
   v8Layout?: boolean
 }) {
@@ -398,6 +401,7 @@ export default function GenerationPanel({
           />
         </Field>
 
+        {monthRemaining ? <p className="text-caption text-ink-secondary" aria-live="polite">{`今月の残り ${usage?.month.remaining ?? '—'}枚`}</p> : null}
         <UsageBars usage={usage ?? null} heading={v8Layout ? false : usageHeading} v8Layout={v8Layout} />
 
         <LimitState usage={usage ?? null} onReload={onReloadUsage} compact />

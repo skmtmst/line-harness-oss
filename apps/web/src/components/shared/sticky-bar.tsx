@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import styles from './sticky-bar.module.css'
 
 /**
@@ -26,6 +26,7 @@ export default function StickyBar({
   info,
   actions,
   outlined,
+  split,
   className,
 }: {
   /**
@@ -63,8 +64,20 @@ export default function StickyBar({
    * v7 の土台は元から枠線のある高さ72なので、渡しても何も変わらない。
    */
   outlined?: boolean
+  /** 左の一覧と右の作る欄を分ける板だけで使う。 */
+  split?: { lead?: ReactNode; trailingWidth: string }
   className?: string
 }) {
+  if (split) return (
+    <div className={[styles.bar, styles.splitBar, outlined ? styles.outlined : null, className].filter(Boolean).join(' ')}
+      style={{ '--sticky-trailing-width': split.trailingWidth } as CSSProperties}>
+      <div className={styles.splitLead}>{split.lead}</div>
+      <div className={styles.splitTrailing}>
+        {info ? <div className={styles.info}>{info}</div> : null}
+        <div className={styles.actions}>{actions}</div>
+      </div>
+    </div>
+  )
   return (
     <div
       className={[
