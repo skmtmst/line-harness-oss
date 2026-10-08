@@ -16,7 +16,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleHelp, Copy, Eye, Mail, MoreHorizontal, Pause, Play, Plus, RefreshCw } from 'lucide-react'
-import { api, type MeasurementSite } from '@/lib/api'
+import { ApiError, api, type MeasurementSite } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { useResponseGate } from '@/lib/use-response-gate'
@@ -29,6 +29,8 @@ import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import { DetailPage } from '@/components/templates'
+import { focusField } from './focus-field'
 import styles from './site-script.module.css'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
@@ -169,8 +171,17 @@ export default function SiteScriptV8() {
     }
   }, [selectedAccountId, keyAttempt])
 
+  const [siteFieldErrors, setSiteFieldErrors] = useState<Record<string, string>>({})
+  const [stopReasonError, setStopReasonError] = useState('')
+
   const saveSite = async () => {
     if (!siteDialog) return
+    const errors: Record<string, string> = {}
+    if (!siteDialog.label.trim()) errors['site-name'] = 'サイトの名前を入力してください'
+    if (!parseDomains(siteDialog.domainsText).length) errors['site-domains'] = '計測を許可するドメインを入力してください'
+    setSiteFieldErrors(errors)
+    setSiteDialog({ ...siteDialog, error: null })
+    if (Object.keys(errors).length) { focusField(Object.keys(errors)[0]); return }
     const accountAtStart = selectedAccountId
     const moved = () => accountRef.current !== accountAtStart
     setSiteBusy(true)
@@ -188,7 +199,17 @@ export default function SiteScriptV8() {
       await load()
     } catch (err) {
       if (moved()) return
-      setSiteDialog({ ...siteDialog, error: err instanceof Error ? err.message : '保存できませんでした' })
+      const message = err instanceof Error ? err.message : '保存できませんでした'
+      const field = err instanceof ApiError && err.status === 400
+        ? message.includes('ドメイン') ? 'site-domains' : message.includes('サイトの名前') ? 'site-name' : null
+        : null
+      if (field) {
+        setSiteFieldErrors({ [field]: message })
+        setSiteDialog({ ...siteDialog, error: null })
+        focusField(field)
+      } else {
+        setSiteDialog({ ...siteDialog, error: message })
+      }
     } finally {
       setSiteBusy(false)
     }
@@ -200,7 +221,9 @@ export default function SiteScriptV8() {
     const moved = () => accountRef.current !== accountAtStart
     const reason = stopDialog.reason.trim()
     if (!reason) {
-      setStopDialog({ ...stopDialog, error: '止める理由を入れてください' })
+      setStopDialog({ ...stopDialog, error: null })
+      setStopReasonError('止める理由を入れてください')
+      focusField('site-stop-reason')
       return
     }
     setSiteBusy(true)
@@ -327,11 +350,11 @@ export default function SiteScriptV8() {
           <span className={styles.rowActionsLabel}>{selectedSite ? `「${selectedSite.label}」の操作：` : '「…」を開いたとき：'}</span>
           <Button
             disabled={!selectedSite}
-            onClick={() => selectedSite && setSiteDialog({ mode: 'edit', site: selectedSite, label: selectedSite.label, domainsText: selectedSite.domains.join('\n'), error: null })}
+            onClick={() => { if (selectedSite) { setSiteFieldErrors({}); setSiteDialog({ mode: 'edit', site: selectedSite, label: selectedSite.label, domainsText: selectedSite.domains.join('\n'), error: null }) } }}
           >
             編集
           </Button>
-          <Button disabled={!selectedSite || selectedStopped} onClick={() => selectedSite && setStopDialog({ site: selectedSite, reason: '', error: null })}>
+          <Button disabled={!selectedSite || selectedStopped} onClick={() => { if (selectedSite) { setStopReasonError(''); setStopDialog({ site: selectedSite, reason: '', error: null }) } }}>
             <Pause size={15} aria-hidden="true" />止める
           </Button>
           <Button disabled={!selectedSite || !selectedStopped} onClick={() => selectedSite && setResumeTarget(selectedSite)}>
@@ -343,15 +366,9 @@ export default function SiteScriptV8() {
   )
 
   return (
-    <div className={styles.board} data-design-node="XjOte">
-      <header className={styles.head}>
-        <div className={styles.headText}>
-          <h1 className={styles.title}>サイトスクリプト</h1>
-          <p className={styles.description}>ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。</p>
-        </div>
-        <Button onClick={() => setHelpOpen(true)}><CircleHelp size={15} aria-hidden="true" />貼りかたが分からないときは</Button>
-      </header>
-
+    <DetailPage boardId="XjOte" title="サイトスクリプト" description="ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。"
+      contentPadding="var(--tpl-detail-head-pad-bottom) var(--tpl-head-pad-side)"
+      actions={<Button onClick={() => setHelpOpen(true)}><CircleHelp size={15} aria-hidden="true" />貼りかたが分からないときは</Button>}>
       <div className={styles.body}>
         {readonly ? (
           <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作は管理者に頼んでください。</p>
@@ -372,7 +389,7 @@ export default function SiteScriptV8() {
             <div className={styles.sitesLead}>
               <p className={styles.lead}>サイトごとにコードを分けます。止めたサイトの成果は数えません。</p>
               {manage ? (
-                <Button onClick={() => setSiteDialog({ mode: 'create', label: '', domainsText: '', error: null })}>
+                <Button onClick={() => { setSiteFieldErrors({}); setSiteDialog({ mode: 'create', label: '', domainsText: '', error: null }) }}>
                   <Plus size={15} aria-hidden="true" />サイトを追加する
                 </Button>
               ) : null}
@@ -498,6 +515,7 @@ export default function SiteScriptV8() {
 
       <Dialog
         open={siteDialog !== null}
+        initialFocusId={Object.entries(siteFieldErrors).find(([, error]) => Boolean(error))?.[0]}
         title={siteDialog?.mode === 'edit' ? '計測サイトを直す' : '計測サイトを追加'}
         description="このサイトから届いた成果だけを数えます。ドメインは1行に1つずつ書きます（例: shop.example.com）。www の有無は同じサイトとして扱います。"
         busy={siteBusy}
@@ -510,11 +528,13 @@ export default function SiteScriptV8() {
           <div className={styles.dialogFields}>
             <label className={styles.dialogField}>
               <span className={styles.dialogLabel}>サイトの名前</span>
-              <TextField value={siteDialog.label} maxLength={100} placeholder="例: 公式ショップ" onChange={(e) => setSiteDialog({ ...siteDialog, label: e.target.value })} />
+              <TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例: 公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} />
+              {siteFieldErrors['site-name'] ? <span id="site-name-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-name']}</span> : null}
             </label>
             <label className={styles.dialogField}>
               <span className={styles.dialogLabel}>計測を許可するドメイン</span>
-              <TextArea rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => setSiteDialog({ ...siteDialog, domainsText: e.target.value })} />
+              <TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} />
+              {siteFieldErrors['site-domains'] ? <span id="site-domains-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-domains']}</span> : null}
             </label>
           </div>
         ) : null}
@@ -535,7 +555,8 @@ export default function SiteScriptV8() {
             <p className={styles.small}>{`対象: ${stopDialog.site.label}`}</p>
             <label className={styles.dialogField}>
               <span className={styles.dialogLabel}>止める理由（必須）</span>
-              <TextField value={stopDialog.reason} maxLength={200} placeholder="例: サイトを閉じたため" onChange={(e) => setStopDialog({ ...stopDialog, reason: e.target.value })} />
+              <TextField id="site-stop-reason" aria-invalid={Boolean(stopReasonError)} aria-describedby={stopReasonError ? 'site-stop-reason-error' : undefined} value={stopDialog.reason} maxLength={200} placeholder="例: サイトを閉じたため" onChange={(e) => { setStopDialog({ ...stopDialog, reason: e.target.value }); setStopReasonError('') }} />
+              {stopReasonError ? <span id="site-stop-reason-error" className={styles.fieldError} role="alert">{stopReasonError}</span> : null}
             </label>
           </div>
         ) : null}
@@ -550,6 +571,6 @@ export default function SiteScriptV8() {
         onConfirm={() => void resumeSite()}
         onCancel={() => { if (!siteBusy) setResumeTarget(null) }}
       />
-    </div>
+    </DetailPage>
   )
 }

@@ -3,33 +3,7 @@
  * 頭（下に細い線）→ 本文（間14）：成果を数えるサイトの段（板いっぱい）→ 左の列と右の列（幅420・間12）。
  * 段はどれも 枠1・角12・余白16。
  */
-.board { display: flex; flex-direction: column; min-width: 0; }
-.head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--tpl-cn-panel-gap);
-  margin: 0 calc(var(--tpl-rsa-bleed) * -1);
-  padding: 0 var(--tpl-rsa-bleed) var(--tpl-detail-head-pad-bottom);
-  box-shadow: var(--tpl-rsa-line-bottom);
-}
-.headText { display: flex; flex-direction: column; gap: var(--tpl-rsa-ss-head-gap); min-width: 0; }
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  gap: var(--tpl-compact-gap);
-  color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-cn-back-lh);
-  text-decoration: none;
-}
-.backLink:hover { text-decoration: underline; }
-.title { margin: 0; color: var(--color-ink); font-size: var(--tpl-create-title-size); font-weight: 700; line-height: var(--tpl-create-title-lh); }
-.description { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-create-desc-size); line-height: var(--tpl-create-desc-lh); }
-
-.body { display: flex; flex-direction: column; gap: var(--tpl-cn-card-gap); padding-top: var(--tpl-detail-head-pad-bottom); }
+.body { display: flex; flex-direction: column; gap: var(--tpl-cn-card-gap); }
 .viewerBand {
   display: flex;
   align-items: center;
@@ -161,3 +135,5 @@
 .dialogFields { display: flex; flex-direction: column; gap: var(--tpl-cn-panel-inner-gap); }
 .dialogField { display: flex; flex-direction: column; gap: var(--tpl-cn-field-gap); }
 .dialogLabel { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; }
+
+.fieldError { color: var(--color-danger); font-size: var(--text-caption); }

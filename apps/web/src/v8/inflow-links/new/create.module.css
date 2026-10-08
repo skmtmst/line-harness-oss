@@ -2,23 +2,6 @@
  * ★V8 流入リンクを作る（KMaMk・競合 vWJEm・競合の比べ E14GFm）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
  * ここは段のカード（枠1・角12・余白20・間14）と、右の列（進む順・スマホ）の中身だけ。
  */
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-compact-gap);
-  color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-cn-back-lh);
-}
-.backLink:hover {
-  text-decoration: underline;
-}
-
-/* 競合の帯（vWJEm）：頭と本文の間の段（余白 12/24）に置き、広い幅でも見せる。 */
-:global([data-theme='v8'] [data-page-template='create']) > :global(div):has(> .conflictBand) {
-  display: block;
-}
 .conflictBand {
   display: flex;
   align-items: center;
@@ -113,19 +96,6 @@
   font-size: var(--text-caption);
   font-weight: 600;
   line-height: var(--tpl-cn-main-lh);
-}
-.input {
-  width: 100%;
-  min-width: 0;
-  height: var(--tpl-cn-control-h);
-  padding: var(--tpl-cn-input-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-body);
 }
 .fieldError {
   color: var(--color-danger);
@@ -252,11 +222,6 @@
   background: var(--color-accent-deep);
   color: var(--color-canvas);
 }
-/* スマホの題「LINEでの見え方」は、この画面では進む順の題が兼ねるので出さない（読み上げ名は残る）。 */
-.phoneBox > section > p:first-child {
-  display: none;
-}
-
 /* 違いを比べる窓（E14GFm）：違う項目だけの表（項目・いまの入力・保存されている内容）と、上書きできない理由の箱。 */
 .compareLead {
   margin: var(--tpl-cn-compare-lead-margin);
@@ -299,6 +264,7 @@
 }
 .compareNote {
   margin: var(--tpl-cn-compare-note-margin);
+  margin-bottom: var(--tpl-compact-gap);
   padding: var(--tpl-cn-compare-note-pad);
   border-radius: var(--radius-segment);
   background: var(--color-surface-pearl);

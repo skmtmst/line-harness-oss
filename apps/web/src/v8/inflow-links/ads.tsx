@@ -31,6 +31,8 @@ import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import AdConnectionDialog from './ad-connection-dialog'
+import { DetailPage } from '@/components/templates'
+import { focusField } from './focus-field'
 import styles from './ads.module.css'
 
 const PROVIDERS = [
@@ -130,6 +132,7 @@ export default function AdsV8() {
   const [cancelReason, setCancelReason] = useState('')
   const [cancelBusy, setCancelBusy] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [cancelReasonError, setCancelReasonError] = useState('')
   const [manualOpen, setManualOpen] = useState(false)
   const [manualBusy, setManualBusy] = useState(false)
   const [manualError, setManualError] = useState('')
@@ -208,18 +211,25 @@ export default function AdsV8() {
     }
   }, [selectedAccountId])
 
+  const [manualFieldErrors, setManualFieldErrors] = useState<Record<string, string>>({})
+
   const openManualEntry = () => {
     setManualError('')
+    setManualFieldErrors({})
     setManualOpen(true)
   }
 
   const submitManualEntry = async () => {
     if (!selectedAccountId || manualBusy) return
-    if (!manualLabel.trim()) return setManualError('流入元の名前を入れてください')
-    if (!manualDay) return setManualError('費用の日付を選んでください')
-    if (!manualAmount.trim()) return setManualError('費用を入力してください')
+    setManualError('')
     const amount = Number(manualAmount.replaceAll(',', ''))
-    if (!Number.isInteger(amount) || amount < 0) return setManualError('費用は0以上の整数(円)で入れてください')
+    const errors: Record<string, string> = {}
+    if (!manualLabel.trim()) errors['ad-cost-name'] = '流入元の名前を入れてください'
+    if (!manualDay) errors['ad-cost-day'] = '費用の日付を選んでください'
+    if (!manualAmount.trim()) errors['ad-cost-amount'] = '費用を入力してください'
+    else if (!Number.isInteger(amount) || amount < 0) errors['ad-cost-amount'] = '費用は0以上の整数(円)で入れてください'
+    setManualFieldErrors(errors)
+    if (Object.keys(errors).length) { focusField(Object.keys(errors)[0]); return }
     setManualBusy(true)
     setManualError('')
     try {
@@ -252,13 +262,16 @@ export default function AdsV8() {
     setCancelTarget(entry)
     setCancelReason('')
     setCancelError('')
+    setCancelReasonError('')
   }
 
   const submitCancel = async () => {
     if (!cancelTarget || cancelBusy) return
     const reason = cancelReason.trim()
     if (!reason) {
-      setCancelError('取り消す理由を入れてください')
+      setCancelError('')
+      setCancelReasonError('取り消す理由を入れてください')
+      focusField('ad-cancel-reason')
       return
     }
     setCancelBusy(true)
@@ -318,19 +331,10 @@ export default function AdsV8() {
     return <ListState kind="empty" title="LINEアカウントを選択してください" description="選んだLINEアカウントの広告費だけを表示します。" />
   }
 
-  const head = (
-    <header className={styles.head}>
-      <div className={styles.headText}>
-        <h1 className={styles.title}>広告連携</h1>
-        <p className={styles.description}>広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。</p>
-      </div>
-      {manage ? <Button onClick={openManualEntry}><Plus size={15} aria-hidden="true" />費用を手で入れる</Button> : null}
-    </header>
-  )
-
   return (
-    <div className={styles.board} data-design-node={manualOpen ? 'ZxKL5' : 'qSTVR'}>
-      {head}
+    <DetailPage boardId="qSTVR" title="広告連携" description="広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。"
+      contentPadding="0 var(--tpl-head-pad-side)"
+      actions={manage ? <Button onClick={openManualEntry}><Plus size={15} aria-hidden="true" />費用を手で入れる</Button> : null}>
       <div className={styles.body}>
         {readonly ? (
           <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作は管理者に頼んでください。</p>
@@ -521,7 +525,8 @@ export default function AdsV8() {
         <div className={styles.dialogBody}>
           <label className={styles.field}>
             <span className={styles.label}>流入元の名前</span>
-            <TextField value={manualLabel} onChange={(event) => setManualLabel(event.target.value)} placeholder="例: 駅前の看板" maxLength={100} title="同じ流入元・同じ日に入れ直すと上書きになります" />
+            <TextField id="ad-cost-name" aria-invalid={Boolean(manualFieldErrors['ad-cost-name'])} aria-describedby={manualFieldErrors['ad-cost-name'] ? 'ad-cost-name-error' : undefined} value={manualLabel} onChange={(event) => { setManualLabel(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-name': '' })) }} placeholder="例: 駅前の看板" maxLength={100} title="同じ流入元・同じ日に入れ直すと上書きになります" />
+            {manualFieldErrors['ad-cost-name'] ? <span id="ad-cost-name-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-name']}</span> : null}
           </label>
           <div className={styles.field}>
             <span className={styles.pickLabel}>計測リンク（分かれば）</span>
@@ -540,11 +545,13 @@ export default function AdsV8() {
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <span className={styles.label}>費用の日付</span>
-              <DateField value={manualDay} onChange={setManualDay} aria-label="費用の日付" />
+              <DateField id="ad-cost-day" invalid={Boolean(manualFieldErrors['ad-cost-day'])} aria-describedby={manualFieldErrors['ad-cost-day'] ? 'ad-cost-day-error' : undefined} value={manualDay} onChange={(value) => { setManualDay(value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-day': '' })) }} aria-label="費用の日付" />
+              {manualFieldErrors['ad-cost-day'] ? <span id="ad-cost-day-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-day']}</span> : null}
             </div>
             <label className={styles.field}>
               <span className={styles.label}>費用（円）</span>
-              <TextField inputMode="numeric" value={manualAmount} onChange={(event) => setManualAmount(event.target.value)} placeholder="例: 30000" />
+              <TextField id="ad-cost-amount" aria-invalid={Boolean(manualFieldErrors['ad-cost-amount'])} aria-describedby={manualFieldErrors['ad-cost-amount'] ? 'ad-cost-amount-error' : undefined} inputMode="numeric" value={manualAmount} onChange={(event) => { setManualAmount(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-amount': '' })) }} placeholder="例: 30000" />
+              {manualFieldErrors['ad-cost-amount'] ? <span id="ad-cost-amount-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-amount']}</span> : null}
             </label>
           </div>
         </div>
@@ -565,7 +572,8 @@ export default function AdsV8() {
             <p className={styles.dialogLead}>{`対象: ${cancelTarget.day} ／ ${cancelTarget.sourceLabel} ／ ${formatMinor(cancelTarget.amountMinor, cancelTarget.currency)}`}</p>
             <label className={styles.field}>
               <span className={styles.label}>取り消す理由（必須）</span>
-              <TextField value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="例: 金額を間違えた" maxLength={200} />
+              <TextField id="ad-cancel-reason" aria-invalid={Boolean(cancelReasonError)} aria-describedby={cancelReasonError ? 'ad-cancel-reason-error' : undefined} value={cancelReason} onChange={(event) => { setCancelReason(event.target.value); setCancelReasonError('') }} placeholder="例: 金額を間違えた" maxLength={200} />
+              {cancelReasonError ? <span id="ad-cancel-reason-error" className={styles.error} role="alert">{cancelReasonError}</span> : null}
             </label>
           </div>
         ) : null}
@@ -581,6 +589,6 @@ export default function AdsV8() {
           onSaved={load}
         />
       ) : null}
-    </div>
+    </DetailPage>
   )
 }

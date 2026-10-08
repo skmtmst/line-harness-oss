@@ -11,10 +11,9 @@
  * - 競合（vWJEm）：発行が 409（見分けるための文字が使用中）で返ったら、板の頭の下に帯を出す
  * - 違いを比べる（E14GFm）：違う項目だけを並べた窓。「最新を取り込んで直す」で保存されている値を入力へ写す
  */
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowLeftRight, ChevronLeft, Link2, RefreshCw, TriangleAlert } from 'lucide-react'
+import { ArrowLeftRight, Link2, RefreshCw, TriangleAlert } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -33,6 +32,8 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 import { Th } from '@/components/shared/table'
 import Toggle from '@/components/shared/toggle'
+import { TextField } from '@/components/shared/text-field'
+import { focusField } from '../focus-field'
 import { groupTagsByFolder } from './tag-options'
 import styles from './create.module.css'
 
@@ -156,21 +157,29 @@ function InflowCreate() {
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
-  const validate = (): string | null => {
-    if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
-    if (!name.trim()) return 'リンク名を入力してください'
-    if (!validRef) return 'refコードは、半角英数字・_・ハイフンで1〜64文字にしてください'
-    return null
-  }
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   /* 発行の失敗は原文のまま出さない（403 は権限、409 は重複の立て直し、ほかは再試行の案内）。 */
   const doSave = async () => {
-    const problem = validate()
-    if (problem) {
-      setSaveError(problem)
+    setSaveError(null)
+    const errors: Record<string, string> = {}
+    if (!name.trim()) errors['ir-name'] = 'リンク名を入力してください'
+    if (!validRef) errors['ir-ref'] = '半角英数字・_・ハイフンで1〜64文字にしてください'
+    if (redirectUrl.trim()) {
+      try {
+        const url = new URL(redirectUrl.trim())
+        if (!['http:', 'https:'].includes(url.protocol)) throw new Error()
+      } catch { errors['ir-redirect'] = 'http または https で始まる URL を入力してください' }
+    }
+    setFieldErrors(errors)
+    if (Object.keys(errors).length) {
+      focusField(Object.keys(errors)[0])
       return
     }
-    if (!selectedAccountId) return
+    if (!selectedAccountId) {
+      setSaveError('LINEアカウントを選んでください（画面上部で選べます）')
+      return
+    }
     setSaving(true)
     setSaveError(null)
     try {
@@ -296,8 +305,6 @@ function InflowCreate() {
   ].filter((row) => row.mine !== row.saved) : []
   const conflictSavedAt = conflict ? formatSavedAt(conflict.updatedAt) : ''
 
-  const back = <Link href="/inflow-links" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />流入と計測へ</Link>
-
   const conflictBand = conflict ? (
     <div className={styles.conflictBand} role="alert" aria-label="文字が重複しています">
       <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
@@ -324,8 +331,8 @@ function InflowCreate() {
         <li className={styles.step}><span className={styles.stepNum} aria-hidden="true">3</span><span>{tagName ? `タグ「${tagName}」が付く` : 'タグは付かない'}</span></li>
         <li className={styles.step}><span className={`${styles.stepNum} ${styles.stepNumNow}`} aria-hidden="true">4</span><span>{step4}</span></li>
       </ol>
-      <div className={styles.phoneBox}>
-        <LinePreview accountName={selectedAccount?.name ?? '公式アカウント'} caption="登録した日 10:00">
+      <div>
+        <LinePreview title={null} accountName={selectedAccount?.name ?? '公式アカウント'} caption="登録した日 10:00">
           <LinePreviewMessage accountName={selectedAccount?.name ?? '公式アカウント'} avatar={(selectedAccount?.name ?? '公').slice(0, 1)} time="10:00">
             {previewMessage}
           </LinePreviewMessage>
@@ -364,9 +371,8 @@ function InflowCreate() {
       boardId="KMaMk"
       title="流入リンクを作る"
       description="発行すると URL と QR コードができます。友だちになった人を、この経路で数えます。"
-      identity={back}
       /* 競合の帯（vWJEm）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
-      previewToggle={conflictBand}
+      notice={conflictBand}
       preview={preview}
       footerActions={(
         <>
@@ -392,18 +398,21 @@ function InflowCreate() {
         <div className={styles.fieldRow}>
           <label className={styles.field}>
             <span className={styles.label}>名前</span>
-            <input
+            <TextField
               id="ir-name"
               type="text"
               value={name}
               onChange={(event) => {
                 setName(event.target.value)
-                if (!refTouched) setRefCode(suggestRef(event.target.value))
+                setFieldErrors((previous) => ({ ...previous, 'ir-name': '' }))
+                if (!refTouched) { setRefCode(suggestRef(event.target.value)); setFieldErrors((previous) => ({ ...previous, 'ir-ref': '' })) }
                 if (saveError) setSaveError(null)
               }}
               placeholder="夏のInstagram投稿"
-              className={styles.input}
+              aria-invalid={Boolean(fieldErrors['ir-name'])}
+              aria-describedby={fieldErrors['ir-name'] ? 'ir-name-error' : undefined}
             />
+            {fieldErrors['ir-name'] ? <span id="ir-name-error" className={styles.fieldError} role="alert">{fieldErrors['ir-name']}</span> : null}
           </label>
           <div className={styles.field}>
             <span className={styles.pickLabel}>フォルダ</span>
@@ -422,13 +431,12 @@ function InflowCreate() {
           </div>
         </div>
         {genre === '__new' ? (
-          <input
+          <TextField
             type="text"
             value={newGenre}
             onChange={(event) => setNewGenre(event.target.value)}
             placeholder="新しいフォルダの名前"
             aria-label="新しいフォルダの名前"
-            className={styles.input}
           />
         ) : null}
         <label className={styles.field}>
@@ -436,27 +444,29 @@ function InflowCreate() {
             <span className={styles.label}>転送先（入れると友だち追加へ進みません）</span>
             <span className={styles.optional}>任意</span>
           </span>
-          <input
+          <TextField
             id="ir-redirect"
             type="url"
             value={redirectUrl}
-            onChange={(event) => setRedirectUrl(event.target.value)}
+            onChange={(event) => { setRedirectUrl(event.target.value); setFieldErrors((previous) => ({ ...previous, 'ir-redirect': '' })) }}
             placeholder="（空欄）"
-            className={styles.input}
+            aria-invalid={Boolean(fieldErrors['ir-redirect'])}
+            aria-describedby={fieldErrors['ir-redirect'] ? 'ir-redirect-error' : undefined}
           />
+          {fieldErrors['ir-redirect'] ? <span id="ir-redirect-error" className={styles.fieldError} role="alert">{fieldErrors['ir-redirect']}</span> : null}
         </label>
         <label className={styles.field}>
           <span className={styles.label}>見分けるための文字（URL の最後に付く）</span>
-          <input
+          <TextField
             id="ir-ref"
             type="text"
             value={refCode}
-            onChange={(event) => { setRefTouched(true); setRefCode(event.target.value); if (saveError) setSaveError(null); clearConflict() }}
+            onChange={(event) => { setRefTouched(true); setRefCode(event.target.value); setFieldErrors((previous) => ({ ...previous, 'ir-ref': '' })); if (saveError) setSaveError(null); clearConflict() }}
             placeholder="summer-ig"
-            aria-invalid={refCode !== '' && !validRef}
-            className={styles.input}
+            aria-invalid={Boolean(fieldErrors['ir-ref']) || (refCode !== '' && !validRef)}
+            aria-describedby={fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? 'ir-ref-error' : undefined}
           />
-          {refCode !== '' && !validRef ? <span className={styles.fieldError} role="alert">半角英数字・_・ハイフンで1〜64文字にしてください</span> : null}
+          {fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? <span id="ir-ref-error" className={styles.fieldError} role="alert">半角英数字・_・ハイフンで1〜64文字にしてください</span> : null}
         </label>
       </section>
 

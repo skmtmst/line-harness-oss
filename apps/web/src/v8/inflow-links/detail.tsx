@@ -658,7 +658,6 @@ function InflowDetailContent() {
               <tbody>
                 {friendPageRows.map((friend) => {
                   const blocked = isBlockedFriend(friend)
-                  const after = [tagName ? `タグ「${tagName}」` : null, friend.conversion ?? null].filter(Boolean).join('・') || '—'
                   return (
                     <Tr key={friend.id} className={styles.row} data-table-layout="columns">
                       <Td className={styles.colWhen}>
@@ -682,7 +681,8 @@ function InflowDetailContent() {
                           <span className={styles.cellSub}>{friend.currentStatus ?? '—'}</span>
                         )}
                       </Td>
-                      <Td className={styles.colTags}><span className={styles.cellSub} title={after}>{after}</span></Td>
+                      {/* 経路の設定タグは、個々の友だちへ付いたタグの実績ではない。口が返すまで代用しない。 */}
+                      <Td className={styles.colTags}><span className={styles.cellSub}>—</span></Td>
                       <Td className={styles.colResult}><span className={styles.cellFaint}>{friend.conversion ?? '—'}</span></Td>
                       <Td className={styles.colMenu}>
                         <div className={styles.menuBox}>

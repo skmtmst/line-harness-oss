@@ -6,6 +6,20 @@ const create = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', () => ({ api: { adPlatforms: { create, connect: async () => ({ success: true }) } } }))
 import AdConnection from './ad-connection-dialog'
 afterEach(cleanup)
+it('不足する接続欄を赤くして最初の欄へ移り、保存を呼ばない', () => {
+  create.mockClear()
+  render(<AdConnection provider={{ key: 'meta', label: 'Meta' }} accountId="a" onClose={vi.fn()} onSaved={async () => {}} />)
+  const first = screen.getByLabelText('広告アカウントID')
+  const scroll = vi.fn()
+  first.scrollIntoView = scroll
+  fireEvent.click(screen.getByRole('button', { name: '接続を確認してつなぐ' }))
+  expect(first.getAttribute('aria-invalid')).toBe('true')
+  expect(document.activeElement).toBe(first)
+  expect(scroll).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
+  expect(screen.getAllByRole('alert')).toHaveLength(3)
+  expect(screen.queryByText('接続に必要な項目を入力してください')).toBeNull()
+  expect(create).not.toHaveBeenCalled()
+})
 it('広告の接続保存中は×・背景・Esc・閉じるで消えない', async () => {
   let resolve!: (value: unknown) => void
   create.mockImplementation(() => new Promise(r => { resolve = r }))
