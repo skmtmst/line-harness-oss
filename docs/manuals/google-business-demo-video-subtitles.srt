@@ -36,7 +36,7 @@ This is Google's consent screen. The app name is "musubo". We request exactly th
 
 10
 00:02:15,000 --> 00:02:30,000
-We do not send include_granted_scopes. If "Manage your Business Profile" is left unchecked, we refuse to save the connection and ask the owner to connect again with that permission granted. Here we keep it checked and allow.
+We allow. We do not send include_granted_scopes, so the stored token carries only the scopes requested on this screen. If the Business Profile permission is not granted, we refuse to save the connection and ask the owner to connect again.
 
 11
 00:02:30,000 --> 00:02:45,000
@@ -72,7 +72,7 @@ The owner edits that draft by hand and saves it as a draft. Nothing has been sen
 
 19
 00:05:05,000 --> 00:05:30,000
-WRITE 1 of 4: we press "Review the reply". This confirmation screen shows the exact text that will be sent to Google.
+WRITE 1 of 4: we press "Review the reply". This confirmation screen shows the exact text that will be sent to Google. The staff member must tick a confirmation box before the send button becomes active.
 
 20
 00:05:30,000 --> 00:05:45,000

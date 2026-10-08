@@ -22,7 +22,7 @@
 | 2 | `https://musubo.jp/privacy/` と `/terms/` がログインなしで開き、施行日が `2026-10-04` になっている | 同じシークレットウィンドウで開く | ☐ |
 | 3 | privacy 第6項・terms 第3項が、読み取り5件・書き込み4件の説明になっている | ページ内を目で読む | ☐ |
 | 4 | `admin.musubo.jp` にログインすると左メニューに「Googleビジネス」が出る | ログインして見る（出ない場合は管理画面の再ビルドが未了） | ☐ |
-| 5 | 「Googleビジネス」→「設定」で、まだ接続されていない状態から始められる | 既に接続済みなら、撮影のために一度解除する | ☐ |
+| 5 | 「Googleビジネス」→「設定」で、まだ接続されていない状態から始められる | 既に接続済みなら、撮影のために一度解除する。**それに加えて `https://myaccount.google.com/connections` → musubo →「すべてのアクセス権を削除」を実行する。** 管理画面側の解除はトークンの取り消しだけで、Googleアカウント側の許可の記録は残る。残ったままだとGoogleの許可画面が「`musubo already has some access`」の青い帯だけになり、要求する許可の文言が1つも表示されず撮り直しになる（この削除でスプレッドシート連携も切れることがあるため、撮影後につなぎ直す） | ☐ |
 | 6 | 本番のOAuthクライアントが設定済みで、承認済みのリダイレクトURIが**1行だけ**（`https://api.musubo.jp/api/restaurant-test/google/oauth/callback`）入っている。スプレッドシート連携のコールバックは**このクライアントに登録しない** | Google Cloud コンソールの「クライアント」→本番クライアントを開き、承認済みリダイレクトURIが1行だけであることを目で確認する。そのうえで接続ボタンを押して `redirect_uri_mismatch` が出ないこと（理由は `google-business-verification-application.md` 5章の注） | ☐ |
 | 7 | 書き込みが本当にGoogleへ届く設定になっている | 返信の確認画面まで進み、送信後にGoogle側へ反映されること（下の 1-3 で戻せる対象を選ぶ） | ☐ |
 
@@ -30,7 +30,7 @@
 
 | # | 確認すること | 済 |
 | --- | --- | --- |
-| 8 | ブラウザの表示言語を English にした（Googleの許可画面だけ英語で出る。管理画面は日本語のまま） | ☐ |
+| 8 | **Googleアカウント**の表示言語を English にした（`myaccount.google.com` →「個人情報」→「ウェブ向けの全般設定」→「言語」）。ログイン中のGoogleのページはブラウザの言語設定を見ないため、ブラウザ側の設定だけでは英語にならない。管理画面は日本語のまま。撮影後に日本語へ戻す | ☐ |
 | 9 | アドレスバーが録画範囲に入っている（許可画面の `client_id=` が写る必要がある） | ☐ |
 | 10 | ターミナル、他のタブ、ブックマークバー、通知を閉じた | ☐ |
 | 11 | 画面に秘密値が出ていない（シークレット、トークン、APIキー、`.env`、`wrangler.toml` を開いていない） | ☐ |
@@ -169,12 +169,12 @@ Googleは不足があると、申請書に書いたデベロッパー連絡先�
 
 ### Q12. The screens in the video are in Japanese. Can you provide an English version?
 
-管理画面に英語化の仕組みは入っていないため、画面は日本語のまま。動画には英語字幕を付けている。Googleの許可画面はブラウザの言語設定で英語表示にしてある。
+管理画面に英語化の仕組みは入っていないため、画面は日本語のまま。動画には英語字幕を付けている。Googleの許可画面は、撮影に使うGoogleアカウントの表示言語を English にして英語で収録している（アカウントの設定で切り替える。ログイン中のGoogleのページはブラウザの言語設定を見ない）。
 
-### Q13. What happens if the user unchecks the permission on the consent screen, or revokes it later?
+### Q13. What happens if the Business Profile permission is not granted on the consent screen, or is revoked later?
 
 認可リクエストで要求するのは `business.manage` / `openid` / `email` の3つだけで、`include_granted_scopes` は送らない（同じOAuthクライアントを別用途でも使う環境があるため、以前許可された別スコープが混ざらないようにしている）。
-同意画面で「ビジネス情報の管理」のチェックを外されたまま戻ってきた場合は、**接続を保存せずに拒否**し、画面で「この許可を付けたまま接続し直してください」と案内する。連携後にGoogleアカウント側で権限を取り消した場合も、アクセストークンの更新時に同じ検証を行い、接続を「再連携が必要（`no_permission`）」の状態にする。
+同意画面で「ビジネス情報の管理」の許可が付与されないまま戻ってきた場合は、**接続を保存せずに拒否**し、画面で「この許可を付けたまま接続し直してください」と案内する。連携後にGoogleアカウント側で権限を取り消した場合も、アクセストークンの更新時に同じ検証を行い、接続を「再連携が必要（`no_permission`）」の状態にする。
 根拠：`GOOGLE_BUSINESS_REQUIRED_SCOPES` と `assertGrantedScopes`（`apps/worker/src/services/google-business.ts`）、接続時と更新時の両方での検証（`apps/worker/src/routes/restaurant-google.ts`）。テスト：`apps/worker/src/services/google-business.test.ts` と回帰テストの「接続と更新で business.manage の許可を検証する」。
 
 ---

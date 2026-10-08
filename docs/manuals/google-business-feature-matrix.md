@@ -7,7 +7,7 @@
 - 使用スコープは全Googleビジネス機能で `https://www.googleapis.com/auth/business.manage` のみ。連携したGoogleアカウントのメールアドレス表示のために `openid` と `https://www.googleapis.com/auth/userinfo.email`（認可要求では短縮名 `email`）を併用する（`apps/worker/src/services/google-business.ts:10-14`）。Googleビジネス系APIには読み取り専用スコープが存在しないため、読み取りだけの機能も同じスコープを使う。
 - 認可リクエストに `include_granted_scopes` は付けない。Googleビジネス用とスプレッドシート用で同じOAuthクライアントを使う環境があり（`services/google-sheets.ts:113-135` の予備クライアント）、付けると以前そのクライアントへ許可した別用途のスコープまで含んだトークンが返るため、申請文の「3つのスコープだけ」と食い違う（`services/google-business.ts:131-163`）。
 - スプレッドシート連携（`https://www.googleapis.com/auth/spreadsheets`）は**この申請の対象外**で、本番コードから到達できない。上記の予備クライアントがあるため、本番の審査対象クライアントには Sheets のコールバックURL（`/api/integrations/google-sheets/oauth/callback`）を**登録しない**運用にしている。登録が無ければGoogleが同意画面の前に `redirect_uri_mismatch` で止めるので、審査対象クライアントが `spreadsheets` を取得する経路は存在しない（手順：`docs/manuals/google-business-oauth-setup.md` 6章、申請文5章）。カレンダー（`https://www.googleapis.com/auth/calendar`）は利用者の同意ではなくサービスアカウントのJWTで認可するため、OAuth同意画面には出ない（`services/google-service-account.ts:2,42-97`）。
-- 同意画面で権限ごとのチェックを外せる（granular consent）ため、トークン取得時に `business.manage` が許可されているかを検証する。外れていた場合は接続を保存せず `no_permission` として扱い、画面で再連携を案内する。検証は認可コードの交換時（接続時）と更新トークンでの再取得時（連携後の取り消し）の両方で行う（`GOOGLE_BUSINESS_REQUIRED_SCOPES` / `assertGrantedScopes`：`services/google-business.ts`、`routes/restaurant-google.ts`）。
+- 同意画面で権限ごとに許可しないことを選べる（granular consent）ため、トークン取得時に `business.manage` が許可されているかを検証する。許可されていなかった場合は接続を保存せず `no_permission` として扱い、画面で再連携を案内する。検証は認可コードの交換時（接続時）と更新トークンでの再取得時（連携後の取り消し）の両方で行う（`GOOGLE_BUSINESS_REQUIRED_SCOPES` / `assertGrantedScopes`：`services/google-business.ts`、`routes/restaurant-google.ts`）。
 
 ## 本番到達性の分類
 
