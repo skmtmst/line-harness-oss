@@ -126,7 +126,7 @@ export default function GenerationPanel({
       </div>
       <div className="border-t border-hairline" />
 
-      <div data-design-node="E8oZc" className={v8Layout ? 'flex flex-col gap-3.5 p-4' : 'flex flex-col gap-4 p-4'}>
+      <div data-design-node="E8oZc" className="flex flex-col gap-4 p-4">
         <OutputSize
           name={`${uid}-preset`}
           presets={presets}
