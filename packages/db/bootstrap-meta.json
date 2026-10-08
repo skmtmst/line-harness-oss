@@ -552,7 +552,8 @@
     "607_conversation_search_content.sql",
     "608_line_account_folders.sql",
     "609_hq_broadcast_authoring.sql",
+    "610_booking_reminder_request_snapshot.sql",
     "611_instagram_cross_post.sql"
   ],
-  "migrationCount": 553
+  "migrationCount": 554
 }
