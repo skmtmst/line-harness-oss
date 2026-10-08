@@ -755,6 +755,7 @@ shared-button-importer v8/hq-templates/console.tsx
 shared-button-importer v8/hq-templates/detail.tsx
 shared-button-importer v8/hq-templates/store-list.tsx
 shared-button-importer v8/hq-templates/attribute-tabs.tsx
+shared-button-importer v8/hq-templates/tag-editor.tsx
 shared-button-importer v8/hq-templates/message-form.tsx
 shared-button-importer v8/template-detail/detail.tsx
 shared-button-importer v8/tag-edit/edit.tsx
@@ -764,3 +765,4 @@ shared-button-importer v8/affiliate-offer-new/create.tsx
 
 # リッチビデオ編集も共通の保存・キャンセルを使う。
 shared-button-importer v8/template-edit/rich-video.tsx
+shared-button-importer v8/hq-templates/saved-distribution-dialog.tsx

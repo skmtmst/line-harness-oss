@@ -391,7 +391,7 @@ export default function HqHomeV8() {
     return (
       <div className={styles.cardButtons}>
         <Button className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`}>
-          <LogIn aria-hidden="true" className={styles.buttonIcon} />入る
+          <LogIn aria-hidden="true" className={styles.buttonIcon} />このアカウントへ入る
         </Button>
         {canManage ? (
           <Button onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`}>
@@ -591,6 +591,7 @@ export default function HqHomeV8() {
       description={`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}
       folders={folderColumn}
       folderInset
+      folderWidth={200}
       folderNav={{ rows: folderRows, activeId: folder, onSelect: selectFolder, createAction: createAccount, label: 'フォルダ' }}
     >
       <div className={styles.body}>

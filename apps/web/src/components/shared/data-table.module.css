@@ -127,6 +127,10 @@
   height: 56px;
 }
 
+/* 店と同じひな形の板 i0Ao0R・wZPua に渡す密度。既定の行は変えない。 */
+[data-theme='v8'] .rowTemplate { height: 61px; }
+[data-theme='v8'] .rowTemplate .bodyCell { padding-block: 11px; }
+
 [data-theme='v8'] .row + .row .bodyCell {
   border-top: 1px solid var(--color-divider);
 }
