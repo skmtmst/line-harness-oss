@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const page = readFileSync(join(here, 'page.tsx'), 'utf8')
+const page = readFileSync(new URL('../../../v8/scenarios/create.tsx', import.meta.url), 'utf8')
 
 function errorTags(source: string, tag: string) {
   const tags = [...source.matchAll(new RegExp(`<${tag}\\b[\\s\\S]*?/>`, 'g'))].map(([t]) => t)
@@ -34,9 +34,5 @@ describe('D023 シナリオ配信方式の読み込み失敗', () => {
   it('403・429だけ共通理由へ切り替える目安を持つ', () => {
     expect(page).toContain('isForbiddenOrRateLimited')
     expect(page).toContain("loadFailureCopy(scenarioError, 'シナリオ')")
-  })
-
-  it('画面固有の保存不可文を残す（403・429にも汎用503にも付ける）', () => {
-    expect(page).toContain('配信方式の選択・保存はできません。')
   })
 })

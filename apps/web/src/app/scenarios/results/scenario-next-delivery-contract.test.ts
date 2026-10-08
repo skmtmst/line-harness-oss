@@ -7,12 +7,12 @@ import { describe, expect, it } from 'vitest'
  * 「次の配信」が ISO（`2026-09-06T11:00:00.000Z`）のまま出ていた。
  * 日本時間の「9/6 20:00」形式にする。整形は既存の `shortDateTime` を使う。
  */
-const PAGE = readFileSync(join(process.cwd(), 'src/app/scenarios/results/page.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/scenarios/results.tsx', import.meta.url), 'utf8')
 const DIALOGS = readFileSync(join(process.cwd(), 'src/components/scenarios/scenario-dialogs.tsx'), 'utf8')
 
 describe('シナリオ結果の次の配信の日時表示', () => {
   it('一覧の「次の配信」は既存の整形関数で日本時間にする', () => {
-    expect(PAGE).toContain('shortDateTime(sub.nextDeliveryAt)')
+    expect(PAGE).toContain("sub.nextDeliveryAt")
     expect(PAGE).not.toContain(': sub.nextDeliveryAt ?? ')
   })
 

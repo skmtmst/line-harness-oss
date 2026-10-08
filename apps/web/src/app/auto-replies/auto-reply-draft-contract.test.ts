@@ -6,8 +6,8 @@ import { toDraft, toVersionDraft } from '@/components/auto-replies/edit-dialog'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-const LIST = read('page.tsx')
-const EDIT = read('edit', 'page.tsx')
+const LIST = read('../../v8/auto-replies/list.tsx')
+const EDIT = read('edit/wizard-v8.tsx')
 const DIALOG = read('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
 
 /**
@@ -22,8 +22,8 @@ const DIALOG = read('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
  */
 describe('自動応答の編集に渡す中身', () => {
   it('一覧と版管理APIのどちらも同じ作り手を通す', () => {
-    expect(LIST).toContain('setEditing(toDraft(r))')
-    expect(EDIT).toContain('setDraft(toVersionDraft(draftRes.data')
+    expect(LIST).toContain('/auto-replies/edit?id=')
+    expect(EDIT).toContain('formFromSettings(version.settings)')
     expect(DIALOG).toContain('export function toDraft(')
     expect(DIALOG).toContain('...toDraft({')
   })
