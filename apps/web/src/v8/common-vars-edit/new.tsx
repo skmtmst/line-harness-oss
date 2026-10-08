@@ -40,6 +40,7 @@ import DateTimeField from '@/components/shared/date-time-field'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './new.module.css'
 
@@ -495,12 +496,15 @@ export default function NewCommonVarV8() {
           <div className={`${styles.field} ${styles.folderField}`}>
             <label htmlFor="cv-folder" className={styles.fieldLabel}>フォルダ</label>
             <div className={styles.selectBox}>
-              <Select
+              <FolderSelect
                 aria-label="フォルダ"
                 id="cv-folder"
                 value={folderId}
                 onChange={(value) => setFolderId(value)}
-                options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                folders={folders.map(folderById)}
+                onCreate={canWrite && selectedAccountId
+                ? folderCreator((name, color) => api.folders.create({ kind: 'common_var', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
+                : undefined}
               />
             </div>
             {foldersError ? (
