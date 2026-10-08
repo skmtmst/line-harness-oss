@@ -3,7 +3,7 @@
 対象：`app/restaurant-test/v8/reservations.tsx`・`reservation-phone.tsx`（今の V8）から写して一から書いた。板 l9NlC0（今日）・xzCK6（今日 1152）・Z3FoM（一覧）・rm92Y（電話の予約を入れる）。
 
 ## 入口・受け付ける URL
-- `app/restaurant-test/reservations/page.tsx`：`theme === 'v8'` のときだけ V8。v7 は `RestaurantConsole view="reservations"`。
+- `app/restaurant-test/reservations/page.tsx`：V8 の予約台帳だけを描く（2026-10-09 オーナー決定で旧画面の分岐を削除）。
 - 受け付ける指定（新しく）：`?view=list|week|month`（見方）、`?date=YYYY-MM-DD`（今日の見方の日付。予約枠・在庫の「予約台帳で 19:00 を見る」から）、`?source=<予約元>`（予約経路の「記録」から）。
 
 ## 読み込み（今と同じ口）
@@ -44,3 +44,9 @@
 
 ## 臨時休業・貸切の帯（提案 E-10）
 - 今日の見方は選んだ日、今週・今月・一覧は今日の `reservations/day` の `closures` を読み、休業・貸切の日なら琥珀の帯と［休業日・貸切を見る］（`/restaurant-test/inventory?tab=closures`）を出す。予約の表はそのまま（取り消さない）。
+
+## 入力の誤り（2026-10-09）
+- 電話予約・変更・受信試しは、誤りのある欄の枠とその下の説明で知らせる。最初の誤りの欄へフォーカスを移し、画面中央へスクロールする。上の帯には重ねない。
+- 上の帯は読み込み・保存・通信・権限・競合の失敗だけに使う。開始・終了日時を検証してから日時を送る。
+- 取消で戻るのはその時間帯の卓。予約は台帳に履歴として残す。
+- 電話予約の前日・当日通知の個別切り替えは保存する口が無い。既存の「LINE来店フォロー」の設定を案内し、切り替えは置かない。

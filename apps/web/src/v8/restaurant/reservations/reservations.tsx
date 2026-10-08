@@ -9,6 +9,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Lock, Plus } from 'lucide-react'
+import SegmentedControl from '@/components/shared/segmented'
+import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -43,20 +45,8 @@ function ViewSwitch({ view, counts, onChange }: {
   onChange: (view: LedgerView) => void
 }) {
   return (
-    <div className={styles.viewSwitch} role="tablist" aria-label="見方の切り替え">
-      {VIEWS.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          role="tab"
-          aria-selected={view === item.key}
-          className={styles.viewTab}
-          onClick={() => onChange(item.key)}
-        >
-          {item.label}{item.key !== 'list' && counts ? ` ${counts[item.key]}` : ''}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl aria-label="見方の切り替え" size="panel" value={view} onChange={onChange}
+      options={VIEWS.map((item) => ({ value: item.key, label: `${item.label}${item.key !== 'list' && counts ? ` ${counts[item.key]}` : ''}` }))} />
   )
 }
 
@@ -215,7 +205,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
 
   return (
     <>
-      {lineWarning ? <p role="alert" className={styles.warnBand}>{lineWarning}</p> : null}
+      {lineWarning ? <Notice tone="warn" role="alert" message={lineWarning} /> : null}
       {dayClosures && dayClosures.closures.length > 0 ? (
         <div role="status" className={styles.closureBand} data-closure-day={dayClosures.day}>
           <p className={styles.closureText}>
@@ -297,8 +287,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         busy={busy}
         onClose={() => setCancelId('')}
         onConfirm={(id) => {
-          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'cancelled' }), cancelling && cancelling.hold_expires_at && cancelling.status === 'pending' ? '押さえを解除しました。' : '予約を取り消しました。')
-          setCancelId('')
+          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'cancelled' }), cancelling && cancelling.hold_expires_at && cancelling.status === 'pending' ? '押さえを解除しました。' : '予約を取り消しました。').then((ok) => { if (ok) setCancelId('') })
         }}
       />
       <InboundTrialDialog
