@@ -591,7 +591,7 @@ function ReminderDetailV8() {
         open={confirmPause}
         designNode="RwVo5"
         title={`「${data.reminder.name}」を一時停止する`}
-        description="止めているあいだ、通知は送りません。止めているあいだに送る予定だった通知は、再開しても送りません（過去の日時になるため）"
+        description="止めているあいだ、通知は送りません。止めているあいだに送る予定だった通知は、再開しても送りません（過去の日時になるため）。登録者と送った履歴は残ります。"
         band={pauseImpact.truncated
           ? `送る予定の ${formatNumber(plannedTotal)}通が送られなくなります（今後24時間の分は数え切れませんでした）。`
           : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)}通 が送られなくなります。`}
