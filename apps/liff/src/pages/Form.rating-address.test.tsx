@@ -116,6 +116,49 @@ describe('5段階評価', () => {
 });
 
 describe('住所', () => {
+  it('複数候補の表示後に郵便番号を替えたら、古い候補を選べない（監査 L11）', async () => {
+    setup();
+    fireEvent.change(await screen.findByLabelText('郵便番号'), { target: { value: '100-0001' } });
+    postalCodeSearch.mockResolvedValue({ success: true, data: {
+      query: '100-0001', normalized: '1000001', status: 'multiple', candidates: [
+        { postalCode: '1000001', prefecture: '東京都', city: '千代田区', town: '千代田' },
+        { postalCode: '1000001', prefecture: '東京都', city: '千代田区', town: '皇居外苑' },
+      ],
+    } });
+    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    await screen.findByRole('button', { name: '東京都千代田区皇居外苑' });
+    fireEvent.change(screen.getByLabelText('郵便番号'), { target: { value: '530-0001' } });
+    expect(screen.queryByRole('button', { name: '東京都千代田区皇居外苑' })).toBeNull();
+    expect(screen.getByLabelText('番地').getAttribute('value')).toBe('');
+  });
+
+  it('古い検索が遅れて終わっても、新しい検索の応答と手入力を残す（監査 L11）', async () => {
+    setup();
+    fireEvent.change(await screen.findByLabelText('郵便番号'), { target: { value: '100-0001' } });
+    type Response = Awaited<ReturnType<typeof postalCodeSearch>>;
+    const pending: Array<(value: Response) => void> = [];
+    postalCodeSearch.mockImplementation(() => new Promise<Response>((resolve) => pending.push(resolve)));
+    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.change(screen.getByLabelText('郵便番号'), { target: { value: '530-0001' } });
+    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.change(screen.getByLabelText('番地'), { target: { value: '2-3-4' } });
+    fireEvent.change(screen.getByLabelText('建物名'), { target: { value: '新しい建物' } });
+    await act(async () => pending[1]({ success: true, data: {
+      query: '530-0001', normalized: '5300001', status: 'matched', candidates: [
+        { postalCode: '5300001', prefecture: '大阪府', city: '大阪市北区', town: '梅田' },
+      ],
+    } }));
+    await act(async () => pending[0]({ success: true, data: {
+      query: '100-0001', normalized: '1000001', status: 'matched', candidates: [
+        { postalCode: '1000001', prefecture: '東京都', city: '千代田区', town: '千代田' },
+      ],
+    } }));
+    expect(screen.getByDisplayValue('大阪市北区')).toBeTruthy();
+    expect(screen.getByDisplayValue('2-3-4')).toBeTruthy();
+    expect(screen.getByDisplayValue('新しい建物')).toBeTruthy();
+    expect(screen.queryByDisplayValue('千代田区')).toBeNull();
+  });
+
   it('郵便番号から候補を入れて送る', async () => {
     setup();
     fireEvent.change(await screen.findByLabelText('郵便番号'), { target: { value: '100-0001' } });
