@@ -141,7 +141,9 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     /* 基本設定の段が出る（配信名の欄・URL も書き換え）。 */
     expect((await screen.findByLabelText('配信名') as HTMLInputElement).value).toBe('1月の限定メニュー')
     expect(steps.querySelector('[aria-current="step"]')?.textContent).toContain('基本設定')
-    expect(replace).toHaveBeenLastCalledWith(expect.not.stringContaining('step='), { scroll: false })
+    /* URL の段は履歴だけを書き換える（ルーターを通さない・#1630 と同じ決まり）。 */
+    expect(new URLSearchParams(window.location.search).get('step')).toBeNull()
+    expect(replace).not.toHaveBeenCalled()
   })
 
   it('API-18：フォルダ・社内メモ・シナリオ購読中・除くタグ・2つの吹き出しを口へ送る', async () => {

@@ -751,7 +751,7 @@
   },
   "v8/friends/list/list.module.css": {
     "spacing": 5,
-    "height": 0,
+    "height": 1,
     "font": 0
   },
   "v8/friends/merged/merged.module.css": {
@@ -865,12 +865,12 @@
     "font": 0
   },
   "v8/inbox-chat/customer-panel.module.css": {
-    "spacing": 6,
-    "height": 0,
+    "spacing": 7,
+    "height": 2,
     "font": 0
   },
   "v8/inbox-chat/inbox-chat.module.css": {
-    "spacing": 9,
+    "spacing": 11,
     "height": 2,
     "font": 0
   },
@@ -1291,7 +1291,7 @@
   },
   "v8/tags/create.module.css": {
     "spacing": 16,
-    "height": 0,
+    "height": 1,
     "font": 0
   },
   "v8/tags/list.module.css": {
@@ -1315,7 +1315,7 @@
     "font": 0
   },
   "v8/templates/carousel.module.css": {
-    "spacing": 7,
+    "spacing": 8,
     "height": 3,
     "font": 0
   },
