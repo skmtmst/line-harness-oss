@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, CalendarClock, Filter, Info, Send, Users } from 'lucide-react'
+import { AlertCircle, Bookmark, CircleDashed, Filter, Lightbulb, MousePointerClick, Send, Users } from 'lucide-react'
 import type { SavedSearch, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
 import { ListPageBody } from '@/components/templates'
@@ -296,10 +296,10 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
   const sharedCount = items.filter((item) => item.isShared).length
   const kpiCards = [
-    { title: '保存した条件', icon: Filter, value: kpis.total, unit: '件', detail: ready ? `自分 ${items.length - sharedCount}・共有 ${sharedCount}` : '—' },
+    { title: '保存した条件', icon: Bookmark, value: kpis.total, unit: '件', detail: ready ? `自分 ${items.length - sharedCount}・共有 ${sharedCount}` : '—' },
     { title: '配信で使っている', icon: Send, value: kpis.usedInBroadcasts, unit: '件', detail: '一斉配信・自動処理' },
-    { title: '該当なし', icon: Users, value: kpis.zeroMatches, unit: '件', detail: '条件が古いかも' },
-    { title: '今月の利用', icon: CalendarClock, value: kpis.callsThisMonth, unit: '回', detail: kpis.callsThisMonth === null ? '利用の記録は未接続' : '友だち一覧で開いた回数' },
+    { title: '該当なし', icon: CircleDashed, value: kpis.zeroMatches, unit: '件', detail: '条件が古いかも' },
+    { title: '今月の利用', icon: MousePointerClick, value: kpis.callsThisMonth, unit: '回', detail: kpis.callsThisMonth === null ? '利用の記録は未接続' : '友だち一覧で開いた回数' },
   ]
 
   const filterActive = Boolean(query || usageFilter !== 'all' || matchFilter !== 'all')
@@ -372,7 +372,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                   <ContextMenu label={`保存した検索「${search.name}」の操作`} items={searchContextItems(search)}>
                     <div className={styles.nameRow}>
                       {editHref ? (
-                        <Link href={editHref} className={styles.name} title={search.name} onClick={(event) => event.stopPropagation()}>
+                        <Link href={editHref} className={`${styles.name} ${styles.nameLink}`} title={search.name} onClick={(event) => event.stopPropagation()}>
                           {search.name}
                         </Link>
                       ) : (
@@ -450,7 +450,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
       <div className={styles.infoRow}>
         <p className={styles.readonlyBand}>
-          <Info className={styles.readonlyIcon} aria-hidden="true" />
+          <Lightbulb className={styles.readonlyIcon} aria-hidden="true" />
           友だち一覧で絞り込みを作り「この条件を保存」で保存します。配信や自動処理の宛先にも使えます。
         </p>
       </div>
@@ -462,6 +462,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
           </span>
           <Select
             value={usageFilter}
+            width={170}
             onChange={(value) => setUsageFilter(value as SavedSearchUsageFilter)}
             aria-label="使っている所で絞り込む"
             options={[
@@ -472,6 +473,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
           />
           <Select
             value={matchFilter}
+            width={145}
             onChange={(value) => setMatchFilter(value as typeof matchFilter)}
             aria-label="該当人数で絞り込む"
             options={[
