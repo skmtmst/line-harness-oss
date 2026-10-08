@@ -8,8 +8,8 @@
  *
  * 絵の列「配信に使うアカウント」「結び付けた日」の値は一覧の API に無い。
  * 出せる分だけ出す：配信に使うアカウントは、友だちが1つだけの人はその名前、
- * 2つ以上の人は決め方が詳細にあるので「—」。結び付けた日は、結び付いた友だちの
- * 登録日のうちいちばん新しい日（結び付けられる条件がそろった日）。
+ * 2つ以上の人は決め方が詳細にあるので「—」。結び付けた日は一覧の API に無いので「—」
+ * （友だちの登録日は結び付けた日ではないので代わりに出さない。詳細の linkedAt を一覧にも足す依頼は Codex へ）。
  * 「複数アカウントのみ」の絞り込みは絵に口が無いので、所属アカウントの選びの末尾に入れた。
  */
 import { useEffect, useState } from 'react'
@@ -40,13 +40,12 @@ import styles from './merged.module.css'
 /** 所属アカウントの選びの「複数アカウントのみ」（絞り込みの口は今と同じ onlyDups）。 */
 const MULTI_ACCOUNTS = '__multi'
 
-/** 結び付いた友だちの登録日のうちいちばん新しい日を「9/30」の形で。 */
+/** 結び付けた日：一覧の API に値が来たら出す。来るまでは「—」。 */
 function linkedDay(row: UserRowData): string {
-  const days = row.accounts.map((a) => formatYmd(a.joinedAt)).filter(Boolean).sort()
-  const latest = days[days.length - 1]
-  if (!latest) return '—'
-  const [, m, d] = latest.split('-')
-  return `${Number(m)}/${Number(d)}`
+  const linkedAt = (row as UserRowData & { linkedAt?: string | null }).linkedAt
+  if (!linkedAt) return '—'
+  const [, m, d] = formatYmd(linkedAt).split('-')
+  return m && d ? `${Number(m)}/${Number(d)}` : '—'
 }
 
 /** 配信に使うアカウント：友だちが1つだけの人は、そのアカウントだけに届く。 */
