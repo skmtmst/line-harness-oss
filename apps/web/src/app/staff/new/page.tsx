@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import { useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -99,7 +101,8 @@ export default function NewStaffPage() {
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
-  return <div data-design-node="I3ZSrU"><CreatePage
+  return <div data-design-node="I3ZSrU">
+      <div className="v8-only"><PageHeading title="ユーザーを追加する" /></div><CreatePage
     title="ユーザーを追加する"
     description="管理画面にログインできる人を追加し、できることの範囲を決めます。"
     parent={['ログインユーザー', '/staff?tab=members']}

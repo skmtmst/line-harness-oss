@@ -4,7 +4,7 @@ import styles from './page-templates.module.css'
 
 export interface PageHeadingProps {
   title: ReactNode
-  /** regular と未指定は既定（22/32）。compact は部品どおりの小さい見出し。 */
+  /** 題はすべて22/700/32。compact は題の周りの余白・間隔だけを詰める。 */
   headingSize?: 'regular' | 'compact' | 'large'
   description?: ReactNode
   help?: ReactNode
@@ -20,6 +20,13 @@ export interface PageHeadingProps {
   steps?: ReactNode
   /** 作る型の手順の置き方。既定は題と説明の下の行。FU2aU の同行版は 'inline'。 */
   stepsPlacement?: 'below' | 'inline'
+}
+
+/** 型の外に残るページの題も同じ文字の決まりを使う。窓・カードには使わない。 */
+export function PageTitle({ children, as: Tag = 'h2', className }: {
+  children: string; as?: 'h1' | 'h2'; className?: string
+}) {
+  return <Tag className={[styles.pageTitle, className].filter(Boolean).join(' ')} title={children} data-page-title>{children}</Tag>
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */

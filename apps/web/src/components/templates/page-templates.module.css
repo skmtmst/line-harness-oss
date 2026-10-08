@@ -17,8 +17,9 @@
 :global([data-theme='v8']) .headingText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
 :global([data-theme='v8']) .titleRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
 :global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
+:global([data-theme='v8']) .pageTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
 :global([data-theme='v8']) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
-/* 部品どおりの小さい見出し（EnlYo：題20/27・間2・説明13/20）。compact を渡した画面だけが使う。regular は既定（22/32）と同じ。 */
+/* compact は間2・説明13/20を維持し、題は標準と同じ22/700/32。 */
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .headingText { gap: var(--tpl-compact-gap); }
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .title { font-size: var(--tpl-compact-title-size); font-weight: var(--tpl-compact-title-weight); line-height: var(--tpl-compact-title-lh); }
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-compact-desc-lh); }
