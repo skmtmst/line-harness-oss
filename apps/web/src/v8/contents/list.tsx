@@ -447,44 +447,39 @@ export default function MediaLibraryListV8() {
     }
   }, [selectedAccountId])
 
-  const load = useCallback(async () => {
+  /*
+    WEB097: 同じアカウントの中でも、検索・絞り込み・ページを変えるたびに新しい要求を出す。
+    遅い検索 A の返事が速い検索 B の結果を上書きしないよう、最後に出した要求の世代だけを反映する。
+    失敗の表示と「読み込み中」の解除も最新の要求だけが行う。
+  */
+  const listSeqRef = useRef(0)
+  const summarySeqRef = useRef(0)
+
+  const loadList = useCallback(async () => {
     const accountAtRequest = selectedAccountId
+    const seq = ++listSeqRef.current
+    const isLatest = () => seq === listSeqRef.current && accountAtRequest === latestAccountRef.current
     if (!accountAtRequest) {
       setItems([])
-      setQuota(null)
       setLoading(false)
       return
     }
     setLoading(true)
     setLoadFailed(false)
-    setQuotaFailed(false)
     setError('')
     try {
-      /*
-        R587: 一覧の失敗で容量まで隠さない。一覧だけ捕まえてnull化し、
-        容量・総数はそれぞれの成否で決める（Promise.allの連鎖で消さない）。
-      */
-      const [res, quotaResponse, overallResponse] = await Promise.all([
-        api.media.list(accountAtRequest, {
-          kind: kinds.size === 1 ? [...kinds][0] : undefined,
-          folderId: folderFilter || undefined,
-          query: query.trim() || undefined,
-          unusedOnly: showUnusedOnly,
-          nearLimitOnly: showNearLimitOnly,
-          archived: showArchivedOnly ? 'only' : undefined,
-          sort,
-          limit: pageSize,
-          offset: (page - 1) * pageSize,
-        }).catch(() => null),
-        api.media.quota(accountAtRequest).catch(() => null),
-        // R38: フォルダ欄の「すべて」は絞り込み前の総数。1件だけ取って数を読む。
-        api.media.list(accountAtRequest, {
-          archived: showArchivedOnly ? 'only' : undefined,
-          limit: 1,
-          offset: 0,
-        }).catch(() => null),
-      ])
-      if (accountAtRequest !== latestAccountRef.current) return
+      const res = await api.media.list(accountAtRequest, {
+        kind: kinds.size === 1 ? [...kinds][0] : undefined,
+        folderId: folderFilter || undefined,
+        query: query.trim() || undefined,
+        unusedOnly: showUnusedOnly,
+        nearLimitOnly: showNearLimitOnly,
+        archived: showArchivedOnly ? 'only' : undefined,
+        sort,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      }).catch(() => null)
+      if (!isLatest()) return
       if (res?.success) {
         setItems(res.data.items)
         setTotal(res.data.total)
@@ -493,21 +488,51 @@ export default function MediaLibraryListV8() {
         setLoadFailed(true)
         setListKnown(false)
       }
-      if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
-      if (quotaResponse?.success) setQuota(quotaResponse.data)
-      else {
-        setQuota(null)
-        setQuotaFailed(true)
-      }
     } catch {
-      if (accountAtRequest === latestAccountRef.current) {
+      if (isLatest()) {
         setLoadFailed(true)
         setListKnown(false)
       }
     } finally {
-      if (accountAtRequest === latestAccountRef.current) setLoading(false)
+      if (isLatest()) setLoading(false)
     }
   }, [folderFilter, kinds, page, pageSize, query, selectedAccountId, showArchivedOnly, showNearLimitOnly, showUnusedOnly, sort])
+
+  /*
+    WEB098: 容量と「すべて」の総数は検索・ページ送り・種別では変わらない。
+    アカウントとアーカイブの表示を変えたとき、または変えた後（load）だけ読み直す。
+    R587: 一覧の失敗で容量まで隠さない（別々に成否を決める）。
+  */
+  const loadSummary = useCallback(async () => {
+    const accountAtRequest = selectedAccountId
+    const seq = ++summarySeqRef.current
+    if (!accountAtRequest) {
+      setQuota(null)
+      return
+    }
+    setQuotaFailed(false)
+    const [quotaResponse, overallResponse] = await Promise.all([
+      api.media.quota(accountAtRequest).catch(() => null),
+      // R38: フォルダ欄の「すべて」は絞り込み前の総数。1件だけ取って数を読む。
+      api.media.list(accountAtRequest, {
+        archived: showArchivedOnly ? 'only' : undefined,
+        limit: 1,
+        offset: 0,
+      }).catch(() => null),
+    ])
+    if (seq !== summarySeqRef.current || accountAtRequest !== latestAccountRef.current) return
+    if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
+    if (quotaResponse?.success) setQuota(quotaResponse.data)
+    else {
+      setQuota(null)
+      setQuotaFailed(true)
+    }
+  }, [selectedAccountId, showArchivedOnly])
+
+  /** 変えた後の読み直し。一覧と容量・総数の両方を読む（フォルダ・数の帯は呼ぶ側が決める）。 */
+  const load = useCallback(async () => {
+    await Promise.all([loadList(), loadSummary()])
+  }, [loadList, loadSummary])
 
   /*
     数の帯の4マス。絞り込み・ページ送りが変わっても数は変わらないので、
@@ -564,13 +589,22 @@ export default function MediaLibraryListV8() {
     setKpis(EMPTY_KPIS)
   }, [accountLoading, selectedAccountId])
 
+  /*
+    WEB098: 一覧・容量と総数・フォルダは変わる時が違うので、別々に読む。
+    検索・ページ送りで読み直すのは一覧だけ。
+  */
   useEffect(() => {
-    if (!accountLoading && urlReady && !detailId) {
-      void load()
-      // R587: フォルダの成否は一覧・容量と切り分ける。
-      void loadFolders()
-    }
-  }, [accountLoading, detailId, load, loadFolders, urlReady])
+    if (!accountLoading && urlReady && !detailId) void loadList()
+  }, [accountLoading, detailId, loadList, urlReady])
+
+  useEffect(() => {
+    if (!accountLoading && urlReady && !detailId) void loadSummary()
+  }, [accountLoading, detailId, loadSummary, urlReady])
+
+  useEffect(() => {
+    // R587: フォルダの成否は一覧・容量と切り分ける。
+    if (!accountLoading && urlReady && !detailId) void loadFolders()
+  }, [accountLoading, detailId, loadFolders, urlReady])
 
   /*
     数の帯は絞り込み・ページ送りでは変わらない。アカウントが変わったときと、
