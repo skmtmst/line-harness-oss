@@ -118,8 +118,10 @@ function MenuCard({ menu, picked, check }: { menu: PhoneMenuCard; picked?: boole
           <span className={styles.phoneCardPrice}>{priceLabel(menu)}</span>
         </span>
       </span>
-      {check && (
-        <svg className={styles.phoneCardCheck} width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M5.5 10.4 8.7 13.6 14.5 6.8" fill="none" stroke="var(--color-canvas)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      {check ? (
+        <svg className={styles.phoneCardCheck} width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M7 10 9 12 13 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      ) : (
+        <svg className={styles.phoneCardNext} width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
       )}
     </div>
   )
