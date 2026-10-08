@@ -49,6 +49,7 @@ import {
   friendHistoryItem,
   mileageDetailHasSourceEvent,
   mileageEntryTypeLabel,
+  mileagePaginationTotal,
   mileageRewardedActions,
   mileageSourceNoteText,
   mileageStatusLabel,
@@ -97,6 +98,8 @@ function FriendDetailInner() {
   const [mileage, setMileage] = useState<MileageDetail | null>(null)
   const [v6Friend, setV6Friend] = useState<MileageFriendV6 | null>(null)
   const [v6History, setV6History] = useState<MileageDetailHistoryItem[] | null>(null)
+  /* WEB075：口が数えた明細の全件数。読めた最新100件より多ければ、ここに出ているのは一部。 */
+  const [historyTotal, setHistoryTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [missing, setMissing] = useState(false)
@@ -152,6 +155,7 @@ function FriendDetailInner() {
       setV6History(historyResponse?.success && Array.isArray(historyResponse.data?.items)
         ? historyResponse.data.items.map(friendHistoryItem)
         : null)
+      setHistoryTotal(historyResponse?.success ? mileagePaginationTotal(historyResponse.data) : null)
       setCanAdjust(Boolean(staffResponse?.success && (staffResponse.data.role === 'owner' || staffResponse.data.role === 'admin')))
       setCanConfigureAdjustmentPolicy(Boolean(staffResponse?.success && staffResponse.data.role === 'owner'))
     } catch (caught) {
@@ -290,6 +294,14 @@ function FriendDetailInner() {
   const available = v6Friend?.available ?? mileage.summary.available
   const pendingMiles = v6Friend?.pending ?? mileage.summary.pending
   const pendingItems = displayedHistory.filter((item) => item.status === 'pending')
+  /*
+   * WEB075：明細は新しい順に最新100件だけ読んでいる。全件より少ないときは「一部」。
+   * 今月の数は、読めた中のいちばん古い記録が今月より前なら全部入っている（数えてよい）。
+   * そうでなければ数え切れないので「—」にする。友だち別の集計は口に頼んでいる（Codex）。
+   */
+  const historyPartial = v6History !== null && historyTotal !== null && historyTotal > displayedHistory.length
+  const oldestLoaded = displayedHistory.length > 0 ? displayedHistory[displayedHistory.length - 1].occurredAt.slice(0, 10) : null
+  const monthComplete = !historyPartial || (oldestLoaded !== null && oldestLoaded < monthStart)
   const thisMonth = displayedHistory.filter((item) => item.occurredAt.slice(0, 10) >= monthStart)
   const earnedThisMonth = thisMonth.filter((item) => kindOf(item) === 'earned')
   const earnedSum = earnedThisMonth.reduce((sum, item) => sum + Math.max(0, item.amount), 0)
@@ -373,9 +385,13 @@ function FriendDetailInner() {
           <KpiCard presentation="band" density="compact" icon={null} title="使える残高" value={available} unit="マイル"
             detail={v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${formatNumber(v6Friend.monthChange)}` : `生涯 ${formatNumber(mileage.summary.lifetimeEarned)}・使用 ${formatNumber(mileage.summary.spent)}`} />
           <KpiCard presentation="band" density="compact" icon={null} title="確定待ち" value={pendingMiles} unit="マイル"
-            detail={pendingItems.length > 0 ? `${pendingItems.length}件が確定待ち` : '確定待ちはありません'} />
-          <KpiCard presentation="band" density="compact" icon={null} title="今月たまった" value={earnedSum} unit="マイル"
-            detail={`できごと ${earnedThisMonth.length} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)}回`}`} />
+            detail={historyPartial
+              ? `最新${formatNumber(displayedHistory.length)}件のうち ${pendingItems.length}件が確定待ち`
+              : pendingItems.length > 0 ? `${pendingItems.length}件が確定待ち` : '確定待ちはありません'} />
+          <KpiCard presentation="band" density="compact" icon={null} title="今月たまった" value={monthComplete ? earnedSum : null} unit="マイル"
+            detail={monthComplete
+              ? `できごと ${earnedThisMonth.length} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)}回`}`
+              : `最新${formatNumber(displayedHistory.length)}件だけでは数えられません`} />
           <KpiCard presentation="band" density="compact" icon={null} title="期限が近い" value={expiring ?? null} unit="マイル" detail={expiringSub} />
         </KpiBand>
       </div>
@@ -498,7 +514,9 @@ function FriendDetailInner() {
         {filtered.length > 0 ? (
           <div className={styles.historyPager}>
             <span className={styles.pagerCount}>
-              {`${formatNumber(filtered.length)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)}件`}
+              {historyPartial
+                ? `最新${formatNumber(displayedHistory.length)}件（全${formatNumber(historyTotal ?? 0)}件）のうち ${formatNumber(filtered.length)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)}件`
+                : `${formatNumber(filtered.length)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)}件`}
             </span>
             {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
           </div>
@@ -508,6 +526,7 @@ function FriendDetailInner() {
       <div className={styles.summaryRow}>
         <section className={styles.summaryBox} aria-label="この人がたまったきっかけ">
           <h2 className={styles.summaryTitle}>この人がたまったきっかけ</h2>
+          {historyPartial ? <p className={styles.cellSub}>{`最新${formatNumber(displayedHistory.length)}件から数えています`}</p> : null}
           {earnedReasons.length === 0 ? (
             <p className={styles.cellSub}>付与理由の記録はありません</p>
           ) : earnedReasons.map((reason) => (

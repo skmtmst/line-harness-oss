@@ -85,6 +85,8 @@ export default function AffiliateDrawer({
   const [links, setLinks] = useState<AffiliateLink[]>([])
   const [pending, setPending] = useState<ConversionApprovalItem[]>([])
   const [pendingError, setPendingError] = useState(false)
+  /* WEB209：5000件で読むのを止めたときは、一部だけと書く。 */
+  const [pendingTruncated, setPendingTruncated] = useState(false)
   const [deciding, setDeciding] = useState<string | null>(null)
   const [journeys, setJourneys] = useState<JourneySummary[]>([])
   const [journeyState, setJourneyState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -126,6 +128,7 @@ export default function AffiliateDrawer({
       const all = await listAllConversionApprovals('pending')
       if (!isCurrent(id, gen)) return
       setPending(all.items.filter((item) => item.affiliateId === id))
+      setPendingTruncated(all.truncated)
     } catch {
       if (isCurrent(id, gen)) setPendingError(true)
     }
@@ -309,10 +312,15 @@ export default function AffiliateDrawer({
         <div className={styles.sectionHead}>
           <h3 className={styles.sectionTitle}>認めるのを待っている成果</h3>
         </div>
+        {pendingTruncated && !pendingError ? (
+          <p className={styles.empty}>件数が多いため、一部だけを出しています。</p>
+        ) : null}
         {pendingError ? (
           <p className={styles.empty}>認めるのを待っている成果を読み込めませんでした。</p>
-        ) : pending.length === 0 ? (
+        ) : pending.length === 0 && !pendingTruncated ? (
           <p className={styles.empty}>認めるのを待っている成果はありません。</p>
+        ) : pending.length === 0 ? (
+          <p className={styles.empty}>読み込んだ範囲には、この人の待っている成果はありません。</p>
         ) : (
           <div className={styles.list}>
             {pending.map((item) => (

@@ -6,7 +6,7 @@
  * 気づく手がかりが画面のどこにも無い。
  */
 import { describe, it, expect } from 'vitest'
-import { messageTypeLabel, contentExcerpt, audienceSummary, rowExcerpt } from './broadcast-summary'
+import { messageTypeLabel, contentExcerpt, audienceSummary, rowExcerpt, audienceNamesNeeded, audienceNamesUsable } from './broadcast-summary'
 
 describe('送るものの種別', () => {
   it('種別ごとの名前を出す', () => {
@@ -173,5 +173,26 @@ describe('一覧の1行目に出す「内容／種別」', () => {
     const value = rowExcerpt('text', '')
     expect(value).toBe('テキスト')
     expect(value).not.toContain('undefined')
+  })
+})
+
+describe('宛先の名前が片方だけ読めないとき（監査 WEB310）', () => {
+  const scenarioOnly = {
+    targetType: 'segment',
+    segmentConditions: { operator: 'AND', rules: [{ type: 'scenario_subscribed', value: 'sc-1' }] },
+  } as unknown as Parameters<typeof audienceNamesNeeded>[0]
+  const tagOnly = { targetType: 'tag', targetTagId: 't-1' }
+
+  it('シナリオ1つの宛先は、シナリオ名が読めていなければ要約しない', () => {
+    const needed = audienceNamesNeeded(scenarioOnly)
+    expect(needed).toEqual({ tags: false, scenarios: true })
+    expect(audienceNamesUsable(needed, { tags: true, scenarios: false })).toBe(false)
+    expect(audienceNamesUsable(needed, { tags: false, scenarios: true })).toBe(true)
+  })
+
+  it('タグの宛先は、タグ名が読めていなければ要約しない（シナリオの失敗は関係ない）', () => {
+    const needed = audienceNamesNeeded(tagOnly)
+    expect(audienceNamesUsable(needed, { tags: false, scenarios: true })).toBe(false)
+    expect(audienceNamesUsable(needed, { tags: true, scenarios: false })).toBe(true)
   })
 })
