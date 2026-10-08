@@ -485,10 +485,6 @@ function ReminderDetailV8() {
   return (
     <PageFrame kind="detail" boardId={tab === 'registrants' ? 'loVfW' : 'rbAig'}>
       <header className={styles.head} data-template-region="heading">
-        <Link href="/reminders" className={styles.backLink}>
-          <ChevronLeft size={14} aria-hidden="true" />
-          リマインダへ
-        </Link>
         <h1 className={styles.title} title={data.reminder.name}>{data.reminder.name}</h1>
         <p className={styles.meta}>{meta}</p>
         <Tabs

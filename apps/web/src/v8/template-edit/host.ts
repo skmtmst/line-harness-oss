@@ -4,7 +4,7 @@
  *
  * 渡さないときは今までどおり店の画面（店の口で保存・公開）。渡したときは：
  *   - 保存は呼ぶ側（統括の口）がする。画面は中身を組み立てて渡すだけ
- *   - フォルダの候補・戻る先・板の頭の説明・下の帯の主ボタン（［保存して配る］）を呼ぶ側が決める
+ *   - フォルダの候補・板の頭の説明・下の帯の主ボタン（［保存して配る］）を呼ぶ側が決める
  *   - 店のアカウントに結びつく欄（登録メディア・タグ・シナリオ・行うこと）は出さない（配った先の ID に直せないため）
  */
 import type { ReactNode } from 'react'
@@ -22,8 +22,8 @@ export type TemplateHostContent =
   | { kind: 'rich_message'; name: string; payload: Record<string, unknown>; media: TemplateImagemapUpload['media'] }
 
 export interface TemplateEditHost {
-  /** 板の頭の「← テンプレートへ」の行き先。 */
-  backHref: string
+  /** @deprecated 板の頭の「← テンプレートへ」は 2026-10-08 に無くした（戻るのは上の帯のパンくずと［キャンセル］）。使わない。 */
+  backHref?: string
   /** 板の頭の説明（統括：保存して配ると…）。 */
   description: string
   /** フォルダの候補（value は呼ぶ側が保存に使う値。未分類は ''）。 */

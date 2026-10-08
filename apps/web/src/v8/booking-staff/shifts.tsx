@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CalendarPlus, Plus, Smartphone, Trash2, UserX } from 'lucide-react'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import {
   ApiError,
   api,
@@ -192,7 +192,12 @@ function exceptionBadge(item: BookingException): string {
 export default function StaffShiftsV8({ staffId }: { staffId: string }) {
   const role = useServerStaffRole()
   // 本人は左メニューの「自分の勤務」から来るので、上の帯の画面名もそれにそろえる。
-  usePageTitle(role === 'staff' ? '自分の勤務' : '予約設定')
+  /*
+   * 管理者がほかの人の勤務を開いたときは、上の帯のパンくずの「予約設定」で担当スタッフへ戻る
+   * （板の頭の「← 担当スタッフへ」は 2026-10-08 に無くした）。題は板の題と同じ「勤務とシフト」。
+   */
+  usePageTitle(role === 'staff' ? '自分の勤務' : staffId ? '勤務とシフト' : '予約設定')
+  usePageCrumbs(role !== null && role !== 'staff' && staffId ? [{ label: '予約設定', href: '/booking/menus?tab=staff' }] : null)
   if (role === null) return <PageState node={staffId ? 'd5fmnM' : 'wvGke'} self={false} title="読み込み中" desc="勤務とシフトを読み込んでいます。" />
   const isSelf = role === 'staff'
   if (staffId) return <StaffShiftsDetail staffId={staffId} isSelf={isSelf} />
@@ -209,7 +214,6 @@ function StoreHoursRedirect() {
 function Head({ self, title }: { self: boolean; title?: string }) {
   return (
     <header className={layout.head} data-design="Head">
-      {self ? null : <Link href="/booking/menus?tab=staff" className={layout.backLink}>← 担当スタッフへ</Link>}
       <h1 className={layout.title}>{title ?? (self ? '自分の勤務' : '勤務とシフト')}</h1>
       <p className={layout.desc}>{self
         ? 'あなたの出勤・休憩・この日だけのシフトと、Google カレンダーのつながりを決めます。ほかの人の勤務は管理者だけが開けます。'

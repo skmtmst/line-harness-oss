@@ -20,7 +20,6 @@ import {
   useRef,
   useState,
 } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Check, Smartphone } from 'lucide-react'
@@ -506,7 +505,6 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     <V8TabEditContext.Provider value={registerTabEdit}>
       <div className={styles.shell} data-design-node="owaS3">
         <header className={styles.boardHead} data-design="Head">
-          <Link href="/booking/bookings" className={styles.backLink}>← 予約へ</Link>
           <h1 className={styles.headTitle}>予約設定</h1>
           <p className={styles.headNote}>お客さまの予約画面に出るメニュー・時間・ルールを決めます</p>
           <div data-design="Tabs">

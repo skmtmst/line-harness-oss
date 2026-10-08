@@ -38,7 +38,7 @@ import {
   Workflow,
 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
 import Stepper, { type StepperStep } from '@/components/shared/stepper'
@@ -204,6 +204,8 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const requestedStep = searchParams.get('step') as Step | null
   const step: Step = STEPS.some((item) => item.key === requestedStep) ? requestedStep! : 'basic'
   usePageTitle('初回案内を作る')
+  /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
+  usePageCrumbs([{ label: '友だち追加時の配信', href: '/friend-add-settings' }])
   const [rule, setRule] = useState<EditorRule>({
     name: '', folderName: null, priority: 1, friendKind: 'first_time', isFallback: false,
     status: 'draft', matchedLast7Days: null, lastTestStatus: null, version: 0,
