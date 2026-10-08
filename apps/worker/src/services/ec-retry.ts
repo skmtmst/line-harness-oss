@@ -23,6 +23,47 @@ export interface EcRetrySweepResult {
 
 
 
+/**
+ * W11 A: 実行の版番号で回収権を取り、中断した processing だけを入口へ戻す。
+ * event が processed / identity_pending / skipped なら触らない。
+ * 工程台帳による未完工程の再開（W11 B）は、この回収関数の後ろへ足せる。
+ */
+export async function claimEcRetryExecution(
+  db: D1Database,
+  input: { executionId: string; eventRowId: string; lineAccountId: string; expectedVersion: number; now: string; staleBefore: string },
+): Promise<number | null> {
+  const results = await db.batch([
+    db.prepare(`UPDATE ec_action_executions
+      SET status = 'processing', version = version + 1, updated_at = ?
+      WHERE id = ? AND event_id = ? AND line_account_id = ? AND version = ?
+        AND attempt_count < max_attempts
+        AND NOT EXISTS (SELECT 1 FROM ec_connectors c WHERE c.line_account_id = ec_action_executions.line_account_id AND c.status = 'paused')
+        AND (status = 'pending'
+          OR (status = 'retryable_failed' AND next_retry_at IS NOT NULL AND julianday(next_retry_at) <= julianday(?))
+          OR (status = 'processing' AND julianday(updated_at) < julianday(?)))
+        AND EXISTS (SELECT 1 FROM ec_events e WHERE e.id = ec_action_executions.event_id
+          AND e.line_account_id = ec_action_executions.line_account_id
+          AND (e.status IN ('received','failed') OR (e.status = 'processing' AND julianday(e.updated_at) < julianday(?))))`)
+      .bind(input.now, input.executionId, input.eventRowId, input.lineAccountId, input.expectedVersion, input.now, input.staleBefore, input.staleBefore),
+    db.prepare(`UPDATE ec_events SET status = 'failed', updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status = 'processing'
+        AND julianday(updated_at) < julianday(?)
+        AND changes() = 1
+        AND EXISTS (SELECT 1 FROM ec_action_executions a
+          WHERE a.id = ? AND a.event_id = ec_events.id AND a.line_account_id = ec_events.line_account_id
+            AND a.status = 'processing' AND a.version = ? AND a.updated_at = ?)`)
+      .bind(input.now, input.eventRowId, input.lineAccountId, input.staleBefore, input.executionId, input.expectedVersion + 1, input.now),
+  ]);
+  return Number(results[0].meta?.changes ?? 0) === 1 ? input.expectedVersion + 1 : null;
+}
+
+/** 自分が持つ回収権だけを解放する。後続の成功・他者の新版を戻さない。 */
+async function releaseEcRetryExecution(db: D1Database, input: { executionId: string; version: number; now: string }) {
+  await db.prepare(`UPDATE ec_action_executions SET status = 'pending', version = version + 1, updated_at = ?
+    WHERE id = ? AND version = ? AND status = 'processing'`)
+    .bind(input.now, input.executionId, input.version).run();
+}
+
 export async function processDueEcRetries(
   db: D1Database,
   input: { now: string; limit?: number; credentialKey?: string },
@@ -36,8 +77,8 @@ export async function processDueEcRetries(
        FROM ec_action_executions a
        JOIN ec_events e ON e.id = a.event_id AND e.line_account_id = a.line_account_id
       WHERE (a.status = 'pending'
-         OR (a.status = 'retryable_failed' AND a.next_retry_at IS NOT NULL AND a.next_retry_at <= ?)
-         OR (a.status = 'processing' AND a.updated_at < ?))
+         OR (a.status = 'retryable_failed' AND a.next_retry_at IS NOT NULL AND julianday(a.next_retry_at) <= julianday(?))
+         OR (a.status = 'processing' AND julianday(a.updated_at) < julianday(?)))
         AND a.attempt_count < a.max_attempts
       ORDER BY a.updated_at
       LIMIT ?`,
@@ -47,24 +88,18 @@ export async function processDueEcRetries(
   }>();
 
   for (const row of due.results ?? []) {
-    //  lease：他の回収と二重に回さない。
-    const leased = await db.prepare(
-      `UPDATE ec_action_executions
-          SET status = 'processing', version = version + 1, updated_at = ?
-        WHERE id = ? AND version = ? AND status IN ('pending', 'retryable_failed', 'processing')`,
-    ).bind(input.now, row.execution_id, row.version).run();
-    if (Number(leased.meta.changes ?? 0) !== 1) {
-      result.skipped += 1;
-      continue;
-    }
-    // 停止中は回さず、再開時の戻しに任せる（試行回数を消費しない）。
     const connector = await db.prepare(
       `SELECT status FROM ec_connectors WHERE line_account_id = ?`,
     ).bind(row.line_account_id).first<{ status: string }>();
     if (connector?.status === 'paused') {
-      await db.prepare(
-        `UPDATE ec_action_executions SET status = ?, updated_at = ? WHERE id = ?`,
-      ).bind(row.execution_status, input.now, row.execution_id).run();
+      result.skipped += 1;
+      continue;
+    }
+    const leaseVersion = await claimEcRetryExecution(db, {
+      executionId: row.execution_id, eventRowId: row.event_row_id, lineAccountId: row.line_account_id,
+      expectedVersion: row.version, now: input.now, staleBefore,
+    });
+    if (leaseVersion === null) {
       result.skipped += 1;
       continue;
     }
@@ -107,9 +142,7 @@ export async function processDueEcRetries(
       });
       if (outcome === 'duplicate') {
         // 誰かが処理中。待ちに戻す。
-        await db.prepare(
-          `UPDATE ec_action_executions SET status = 'pending', updated_at = ? WHERE id = ?`,
-        ).bind(input.now, row.execution_id).run();
+        await releaseEcRetryExecution(db, { executionId: row.execution_id, version: leaseVersion, now: input.now });
         result.skipped += 1;
         continue;
       }
