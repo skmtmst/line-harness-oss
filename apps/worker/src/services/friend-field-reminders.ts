@@ -3,20 +3,27 @@ import {
   getFriendsWithFieldValuePage,
   setFriendFieldReminderScanCursor,
   enrollFriendsInReminderOnce,
+  getOneTimeFriendFieldReminderRegistrants,
+  friendFieldReminderTargetStatements,
 } from '@line-crm/db';
 import { nextAnniversary, toJstParts } from '@line-crm/shared';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { getReminderTargetCondition } from './reminder-trigger.js';
 import { matchesCondition } from './segment-query.js';
 
-/** 存在する暦日だけを受け取り、今日以降の基準日をそのまま使う。 */
-function futureBaseline(value: string, now: Date): string | null {
+/** 存在する暦日だけを受け取る。既存登録は基準日後の工程も保持する。 */
+function calendarBaseline(value: string): string | null {
   const matched = /^(\d{4}-\d{2}-\d{2})(?:$|T)/.exec(value.trim());
   if (!matched) return null;
   const day = matched[1];
   const parsed = new Date(`${day}T00:00:00Z`);
   if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== day) return null;
-  return day >= toJstParts(now).date ? day : null;
+  return day;
+}
+
+function futureBaseline(value: string, now: Date): string | null {
+  const day = calendarBaseline(value);
+  return day && day >= toJstParts(now).date ? day : null;
 }
 
 /**
@@ -72,15 +79,27 @@ export async function processFriendFieldReminders(
         reminder.line_account_id,
         reminder.scan_cursor,
         limit,
+        reminder.id,
       );
       scanned += friends.length;
       remaining -= friends.length;
+      // 日付の変更は登録済み公開版を保ち、未送信の予定だけを作り直す。
+      const registered = await getOneTimeFriendFieldReminderRegistrants(db, reminder.id, friends.map(friend => friend.friend_id));
+      const existingChanges = registered.filter(enrollment => enrollment.status === 'active')
+        .map(enrollment => ({ friendId: enrollment.friend_id, fieldId: enrollment.field_id, value: enrollment.field_value }));
+      const reconciliation = friendFieldReminderTargetStatements(db, existingChanges, now.toISOString());
+      if (reconciliation.length) await db.batch(reconciliation);
       const candidates: Array<{ friendId: string; targetDate: string }> = [];
       // 公開版の対象条件はこのリマインダで1回だけ読む。友だちごとに
       // 読み直すと、走査のたびに同じ行を何千回も読むことになる。
       const targetCondition = await getReminderTargetCondition(db, reminder.id);
 
+      const previouslyRegistered = new Set(registered.map(enrollment => enrollment.friend_id));
       for (const friend of friends) {
+        if (reminder.repeat_yearly === 0 && previouslyRegistered.has(friend.friend_id)) {
+          skipped++;
+          continue;
+        }
         // 毎年くり返すなら「次に来るその日」、くり返さないなら今日以降の基準日を使う。
         // 2月29日は設定者が選んだ平年の扱い（2/28・3/1・送らない）に従う（419）。
         const targetDate = reminder.repeat_yearly === 1
