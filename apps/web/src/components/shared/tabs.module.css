@@ -199,3 +199,9 @@
   background: var(--color-status-warn-soft);
 }
 }
+
+/* 文字18＋下の余白10の段。指定したタブだけで使う。 */
+[data-theme='v8'] .list[data-size='short'] .tab {
+  box-sizing: border-box; height: var(--tpl-wh-tab-h); min-height: 0;
+  align-items: flex-start; padding-bottom: 0; line-height: var(--tpl-tabs-text-lh);
+}

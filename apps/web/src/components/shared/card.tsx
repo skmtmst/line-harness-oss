@@ -8,6 +8,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   padding?: 'none' | 'default' | 'roomy' | 'spacious'
   /** V8 の入力の段・右の箱・一覧の小窓。既定のカードは変えない。 */
   variant?: 'default' | 'form' | 'aside' | 'panel'
+  /** V8 の設定／見本カード。指定したカードだけ枠と内側の間を持つ。 */
+  spacing?: 'settings' | 'preview'
 }
 
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
@@ -18,6 +20,7 @@ export default function Card({
   overflow = 'visible',
   padding = 'none',
   variant = 'default',
+  spacing,
   ...props
 }: CardProps) {
   const classes = [
@@ -28,13 +31,15 @@ export default function Card({
     padding === 'default' ? styles.paddingDefault : null,
     padding === 'roomy' ? styles.paddingRoomy : null,
     padding === 'spacious' ? styles.paddingSpacious : null,
+    spacing && styles.inset,
+    spacing && styles[spacing],
     className,
   ]
     .filter(Boolean)
     .join(' ')
 
   return (
-    <section className={classes} data-design-part="card" {...props}>
+    <section className={classes} data-design-part="card" data-card-spacing={spacing} {...props}>
       {children}
     </section>
   )

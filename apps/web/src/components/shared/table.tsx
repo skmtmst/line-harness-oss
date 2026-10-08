@@ -1,5 +1,5 @@
 import React from 'react'
-import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes } from 'react'
+import type { CSSProperties, ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes } from 'react'
 import shell from './data-table.module.css'
 import { loadFailureCopy } from './api-error-message'
 import HelpTip from './help-tip'
@@ -40,6 +40,10 @@ export type ThProps = Omit<
   scope?: Scope
   /** 短い列では1行で省略し、titleで全文を読める。 */
   truncate?: boolean
+  /** 列の余った幅をこのセルに割り当てる。 */
+  grow?: boolean
+  /** 文字の先頭を名前のフォルダ印に揃える。 */
+  inset?: string
   /**
    * 定義・分母・単位・言葉の意味。見出しのすぐ右の「？」へ入れる
    * （★V7・§2-1b）。表の下の注はここへ移し、2回書かない。
@@ -61,6 +65,8 @@ export function Th({
   helpLabel,
   helpHref,
   truncate,
+  grow,
+  inset,
   ...cellProps
 }: ThProps) {
   const classes = [
@@ -76,7 +82,7 @@ export function Th({
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
 
   return (
-    <th className={classes} scope={scope} {...cellProps}>
+    <th className={classes} scope={scope} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
       {truncate ? <span className={styles.truncated} title={typeof children === 'string' ? children : undefined}>{children}</span> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
@@ -97,14 +103,27 @@ export function DataTable({
   children,
   className,
   'data-design': dataDesign,
+  columnLayout,
+  'aria-label': label,
 }: {
   children: ReactNode
   className?: string
   'data-design'?: string
+  'aria-label'?: string
+  /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
+  columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string }
 }) {
   return (
-    <div className={[shell.frame, className].filter(Boolean).join(' ')}>
-      <table className={shell.table} data-design={dataDesign}>{children}</table>
+    <div className={[shell.frame, className].filter(Boolean).join(' ')} data-column-layout={columnLayout ? '' : undefined} style={columnLayout ? ({
+      '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
+      '--table-column-gap': columnLayout.gap, '--table-column-padding': columnLayout.padding,
+      '--table-number-inset': columnLayout.numberInset ?? '0px', '--table-name-inset': columnLayout.nameInset ?? '0px',
+      '--table-head-padding': columnLayout.headPadding ?? columnLayout.padding,
+      '--table-head-radius': columnLayout.headRadius ?? '0px', '--table-row-gap': columnLayout.rowGap ?? '0px',
+      '--table-head-text-size': columnLayout.headTextSize ?? 'var(--text-caption)',
+      '--table-body-text-size': columnLayout.bodyTextSize ?? 'var(--text-label)',
+    } as CSSProperties) : undefined}>
+      <table className={shell.table} data-design={dataDesign} aria-label={label}>{children}</table>
     </div>
   )
 }
@@ -154,17 +173,18 @@ export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'ch
   children?: ReactNode
   align?: 'left' | 'right' | 'center'
   className?: string
+  grow?: boolean
 }
 
 /** 標準一覧の本文セル。 */
-export function Td({ children, align = 'left', className, ...cellProps }: TdProps) {
+export function Td({ children, align = 'left', className, grow, ...cellProps }: TdProps) {
   const classes = [
     shell.bodyCell,
     align === 'right' && styles.right,
     align === 'center' && styles.center,
     className,
   ].filter(Boolean).join(' ')
-  return <td className={classes} {...cellProps}>{children}</td>
+  return <td className={classes} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
 }
 
 /** 名前・副題・注記を同じ列にまとめる先頭セル。 */

@@ -2587,3 +2587,6 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-bcpick-mobile-preview: 30dvh;
 }
 [data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }
+
+[data-theme='v8'] { --tpl-wh-narrow-column-pad: 9px var(--tpl-af2-wh-narrow-pad); }
+[data-theme='v8'] { --shadow-wh-kpi-top: inset 0 1px 0 var(--color-hairline); }

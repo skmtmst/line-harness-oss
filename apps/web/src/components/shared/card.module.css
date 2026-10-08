@@ -120,3 +120,10 @@
   gap: var(--tpl-cn-panel-inner-gap);
   padding: var(--tpl-cn-panel-pad);
 }
+/* 指定された V8 の入力・設定カードだけ。既定のカードは変えない。 */
+[data-theme='v8'] .inset {
+  display: flex; flex-direction: column; border: 0; box-shadow: none;
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+}
+[data-theme='v8'] .settings { gap: var(--tpl-rule-row-gap); padding: var(--tpl-cn-card-pad); }
+[data-theme='v8'] .preview { gap: var(--tpl-toolbar-gap); padding: var(--tpl-side-card-pad); }
