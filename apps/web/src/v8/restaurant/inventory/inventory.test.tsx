@@ -100,6 +100,20 @@ describe('Y8SjT2 予約枠・在庫', () => {
     expect(screen.getByText('r-1@in.example.jp')).not.toBeNull()
   })
 
+  it('読めなかった予約の空入力は欄で知らせ、最初の欄へ移動して取り込まない', async () => {
+    render(<InventoryPage />)
+    await screen.findByText('19:00 の卓')
+    fireEvent.click(screen.getByRole('tab', { name: '予約経路の連携' }))
+    fireEvent.click(await screen.findByRole('button', { name: '手で直して取り込む' }))
+    fireEvent.click(screen.getByRole('button', { name: '台帳へ取り込む' }))
+    const name = screen.getByLabelText('お客さまのお名前')
+    await waitFor(() => expect(document.activeElement).toBe(name))
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByText('お客さまのお名前を入れてください。')).not.toBeNull()
+    expect(fetchApi.mock.calls.some(([path, options]) => path.includes('/manual-import') && options?.method === 'POST')).toBe(false)
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
   it('閲覧のみ（staff）には保存の帯・時間帯の足し引きを置かない', async () => {
     role.value = 'staff'
     render(<InventoryPage />)

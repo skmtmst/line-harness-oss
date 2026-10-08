@@ -12,12 +12,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'
 import { ListPage } from '@/components/templates/list-page'
+import Chip from '@/components/shared/chip'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
-import { RowActions } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { notifyToast } from '@/components/shared/toast'
@@ -119,9 +120,9 @@ export default function CloseTasksPage() {
   } else {
     content = (
       <div className={styles.tableWrap}>
-      <DataTable className={styles.table} data-design="restaurant-close-tasks">
+      <DataTable presentation="columns" data-design="restaurant-close-tasks">
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
+          <TableHeadRow data-table-layout="columns">
             <Th className={styles.colSlot}>枠の日時</Th>
             <Th className={styles.colRoute}>入った経路</Th>
             <Th className={styles.colMedia}>閉じる媒体</Th>
@@ -136,7 +137,7 @@ export default function CloseTasksPage() {
             const targetMedium = target ? media.find((m) => m.code === target.channel) ?? null : null
             const badge = STATE_BADGE[group.state]
             return (
-              <Tr key={group.slotId} className={styles.row} data-table-layout="columns">
+              <Tr key={group.slotId} data-table-layout="columns">
                 <Td className={styles.colSlot}>
                   <span className={styles.slot}>{slotTitle(group.startsAt)}</span>
                   <span className={styles.reason}>{reasonText(group)}</span>
@@ -146,9 +147,9 @@ export default function CloseTasksPage() {
                 <Td className={styles.colMedia}>
                   <span className={styles.chips} title={group.items.map((item) => `${item.name}${item.status === 'done' ? '（閉じた）' : ''}`).join('・')}>
                     {group.items.map((item) => (
-                      <span key={item.id} className={`${styles.chip} ${item.status === 'done' ? styles.chipDone : ''}`}>
+                      <Chip key={item.id}>
                         {item.name}{item.status === 'done' ? <Check size={12} aria-label="閉じた" /> : null}
-                      </span>
+                      </Chip>
                     ))}
                   </span>
                 </Td>
@@ -165,10 +166,10 @@ export default function CloseTasksPage() {
                         <Check size={15} aria-hidden="true" />閉じた
                       </Button>
                     ) : null}
-                    <RowActions
-                      className={styles.more}
-                      subjectName={slotTitle(group.startsAt)}
-                      menuItems={[
+                    <RowMenu
+                      appearance="box"
+                      label={`${slotTitle(group.startsAt)}の操作`}
+                      items={[
                         ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) })) : []),
                         { id: 'ledger', label: '予約台帳でこの日を見る', external: true, onSelect: () => { router.push(`/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`) } },
                       ]}

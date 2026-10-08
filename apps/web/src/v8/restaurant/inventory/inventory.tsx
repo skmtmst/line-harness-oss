@@ -111,7 +111,7 @@ export default function InventoryPage() {
   }
   const closures = tab === 'closures'
   return (
-    <RestaurantShell
+    <RestaurantShell templateHeading
       storeTab="inventory"
       boardId={closures ? 'UVnvR' : 'Y8SjT2'}
       title="予約枠・在庫"
