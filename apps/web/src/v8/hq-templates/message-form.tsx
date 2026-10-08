@@ -2,17 +2,17 @@
 
 /*
  * ★V8 統括 テンプレート「メッセージのひな形を作る」（板 X4JcOf）。
- * 左に「ひな形の中身」（名前・分類・形式・画像・タイトル・本文・ボタン）、右に LINE での見え方。
+ * 左に「ひな形の中身」（名前・分類・画像・タイトル・本文・ボタン）、右に LINE での見え方。
  * 保存する中身（HqMessageCard と template 本体）・画像の受け取り・ボタンの参照先は今の画面
  * （app/hq/templates/template-definition-editor.tsx の CardEditor・template-message-v8.tsx）と同じ。
- * 画像・カルーセルの形式は、今までどおり共通の MessageTemplateEditor で編集する。
+ * 保存済みの画像・カルーセルは、形を切り替えずに共通の MessageTemplateEditor で編集する。
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ImageIcon, Plus, X } from 'lucide-react'
 import type { HqMessageCard, HqMessageReference, HqTemplateFolder } from '@line-crm/shared'
 import { hqTemplatesApi, type MessageTemplateDefinition } from '@/lib/hq-templates-api'
 import { withMessageCard, withUploadedImage } from '@/lib/hq-template-authoring'
-import { EMPTY_TEMPLATE_REFERENCES, MessageTemplateEditor } from '@/components/templates/message-template-editor'
+import { EMPTY_TEMPLATE_REFERENCES, LEGACY_MESSAGE_NOTICE, MessageTemplateEditor } from '@/components/templates/message-template-editor'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -20,14 +20,6 @@ import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import { decodeImageSize, type TemplateMedia } from './definition'
 import styles from './console.module.css'
-
-const FORMATS = [
-  { value: 'text', label: 'テキスト' },
-  { value: 'image', label: '画像' },
-  { value: 'flex', label: 'カード型' },
-  { value: 'carousel', label: 'カルーセル' },
-] as const
-type Format = typeof FORMATS[number]['value']
 
 const ACTIONS: Array<{ value: HqMessageCard['buttons'][number]['action']; label: string }> = [
   { value: 'url', label: 'URL を開く' },
@@ -61,14 +53,12 @@ export default function MessageForm({
   disabled, catalogFailed, onReloadCatalog, onBusyChange, onReceipt, notice,
 }: MessageFormProps) {
   const current = value.template
-  const [advanced, setAdvanced] = useState(false)
   const [targetDate, setTargetDate] = useState('')
   const [references, setReferences] = useState<HqMessageReference[]>([])
   const [referenceError, setReferenceError] = useState('')
   // カード（タイトル・本文・ボタン）で作るか。今の画面と同じ判定：保存済みのカード、または新しく作ったテキスト。
-  const usesCard = !advanced && (Boolean(value.card) || (current.id === 'hq-authored-message' && (current.messageType === 'text' || current.messageType === 'flex') && !current.carouselActionsJson && !current.questionJson))
+  const usesCard = (Boolean(value.card) || (current.id === 'hq-authored-message' && (current.messageType === 'text' || current.messageType === 'flex') && !current.carouselActionsJson && !current.questionJson))
   const card: HqMessageCard = value.card ?? { format: current.messageType === 'flex' ? 'flex' : 'text', title: '', body: current.messageContent, buttons: [] }
-  const format: Format = usesCard ? card.format : current.messageType
 
   const loadReferences = () => hqTemplatesApi.messageReferences()
     .then((rows) => { setReferences(rows); setReferenceError('') })
@@ -83,17 +73,6 @@ export default function MessageForm({
 
   const updateCard = (next: HqMessageCard) => onChange(withMessageCard(value, next))
   const updateButton = (id: string, patch: Partial<HqMessageCard['buttons'][number]>) => updateCard({ ...card, buttons: card.buttons.map((button) => button.id === id ? { ...button, ...patch } : button) })
-  const chooseFormat = (next: Format) => {
-    if (next === 'text' || next === 'flex') {
-      setAdvanced(false)
-      updateCard({ ...card, format: next })
-      return
-    }
-    // 画像・カルーセルは今までの詳細編集（カードを外し、形式だけ変える）。
-    setAdvanced(true)
-    const { card: _removed, ...rest } = value
-    onChange({ ...rest, template: { ...current, messageType: next } })
-  }
   const image = value.media.find((item) => item.id === card.imageMediaId) ?? value.media[0]
 
   return (
@@ -102,6 +81,7 @@ export default function MessageForm({
         {catalogFailed ? (
           <Notice tone="warn" message="参照先の候補を読み込めませんでした。タグ・テンプレート・回答フォームは選べません。" action={<Button onClick={onReloadCatalog}>もう一度読み込む</Button>} />
         ) : null}
+        {current.messageType === 'flex' || current.messageType === 'image' ? <Notice tone="warn" message={LEGACY_MESSAGE_NOTICE} /> : null}
         <h2 className={styles.editTitle}>ひな形の中身</h2>
         <div className={styles.twoCol}>
           <label className={styles.field}>
@@ -114,17 +94,9 @@ export default function MessageForm({
           </label>
         </div>
         <div className={styles.field}>
-          <span className={styles.smallLabel}>形式</span>
-          <div className={styles.formatRow}>
-            <div className={styles.segment} role="radiogroup" aria-label="ひな形の形式">
-              {FORMATS.map((option) => (
-                <button key={option.value} type="button" role="radio" aria-checked={format === option.value} className={styles.segmentItem} disabled={disabled} onClick={() => chooseFormat(option.value)}>{option.label}</button>
-              ))}
-            </div>
-            <span className={styles.folderPick}>
-              <FolderSelect aria-label="フォルダ" label="フォルダ" value={folderId ?? ''} disabled={disabled || folderLoadFailed} onChange={(next) => onFolderChange(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))} onCreate={onCreateFolder} colors={false} />
-            </span>
-          </div>
+          <span className={styles.folderPick}>
+            <FolderSelect aria-label="フォルダ" label="フォルダ" value={folderId ?? ''} disabled={disabled || folderLoadFailed} onChange={(next) => onFolderChange(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))} onCreate={onCreateFolder} colors={false} />
+          </span>
         </div>
 
         {usesCard ? <>
@@ -209,7 +181,7 @@ export default function MessageForm({
             referenceAccountId={null}
             referenceUnavailableHint="友だち情報と共通情報はアカウントごとに異なるため、配布先のLINEアカウントで設定してください。"
             disabled={disabled}
-            typeOptions={FORMATS.map((option) => ({ value: option.value, label: option.label }))}
+            showTypeSelector={false}
             bodyAriaLabel="配信する本文"
             afterType={(
               <>
