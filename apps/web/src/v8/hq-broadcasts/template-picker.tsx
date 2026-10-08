@@ -24,6 +24,7 @@ export default function HqTemplatePicker({ open, onClose, onPick }: {
 }) {
   const [list, setList] = useState<HqTemplateListItem[] | null>(null)
   const [loadError, setLoadError] = useState<unknown>(null)
+  const [reload, setReload] = useState(0)
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -31,9 +32,10 @@ export default function HqTemplatePicker({ open, onClose, onPick }: {
   useEffect(() => {
     if (!open || list) return
     let current = true
+    setLoadError(null)
     void hqTemplatesApi.listByKind().then((rows) => { if (current) setList(rows) }).catch((caught) => { if (current) setLoadError(caught) })
     return () => { current = false }
-  }, [open, list])
+  }, [open, list, reload])
 
   const q = query.trim().toLowerCase()
   const rows = (list ?? []).filter((t) => !q || t.name.toLowerCase().includes(q) || (t.content_summary ?? '').toLowerCase().includes(q))
@@ -51,7 +53,7 @@ export default function HqTemplatePicker({ open, onClose, onPick }: {
     <Dialog open={open} title="テンプレートから選ぶ" description="統括のテンプレートを選ぶと、開いているメッセージをその内容に置き換えます。" cancelLabel="閉じる" onCancel={() => { setError(''); onClose() }} error={error || undefined}>
       <div className={styles.picker}>
         <SearchField aria-label="テンプレート名・内容で探す" placeholder="テンプレート名・内容で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
-        {loadError && !list ? <ListState kind="error" error={loadError} onRetry={() => { setLoadError(null); setList(null) }} />
+        {loadError && !list ? <ListState kind="error" error={loadError} onRetry={() => { setLoadError(null); setReload((value) => value + 1) }} />
           : !list ? <ListState kind="loading" />
           : rows.length === 0 ? <p className={styles.pickerEmpty}>{list.length === 0 ? '統括のテンプレートがまだありません。「テンプレート」で作ってください。' : '当てはまるテンプレートがありません。'}</p>
           : (

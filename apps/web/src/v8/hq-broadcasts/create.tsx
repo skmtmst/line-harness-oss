@@ -289,6 +289,8 @@ export default function HqBroadcastCreate() {
   const requestRef = useRef('')
   /* WEB011：requestRef を作った中身（key）。中身が同じやり直しは同じ依頼番号を使う。 */
   const createKeyRef = useRef('')
+  /** 保存の成功と事前確認の成功を分ける。後の工程が失敗しても同じ保存を繰り返さない。 */
+  const preparedKeyRef = useRef<{ id: string; key: string } | null>(null)
 
   useEffect(() => {
     let current = true
@@ -333,6 +335,8 @@ export default function HqBroadcastCreate() {
   useEffect(() => {
     const id = params.get('id')
     if (!id) return
+    // 自分の保存でURLへ記録した下書きを取り直して、編集中の内容を置き換えない。
+    if (id === run?.id) return
     let current = true
     void hqBroadcastsApi.get(id)
       .then((res) => {
@@ -353,7 +357,7 @@ export default function HqBroadcastCreate() {
       })
       .catch(() => { if (current) setDraftState('error') })
     return () => { current = false }
-  }, [params])
+  }, [params, run?.id])
 
   /* 詳細の［複製して作る］（?copy=<一括配信の id>）：配信名・中身・送るアカウント・対象を写して新しく作る。 */
   useEffect(() => {
@@ -499,7 +503,7 @@ export default function HqBroadcastCreate() {
     setChecking(true); setError(''); setErrorStep(null)
     try {
       let current = run
-      if (!current || runKey !== key) {
+      if (!current || preparedKeyRef.current?.id !== current.id || preparedKeyRef.current.key !== key) {
         const requestId = current?.input?.requestId || requestRef.current
         if (current && current.status === 'prepared' && requestId) {
           current = (await hqBroadcastsApi.update(current.id, { ...input, requestId, expectedVersion: current.version })).data
@@ -512,8 +516,16 @@ export default function HqBroadcastCreate() {
           current = (await hqBroadcastsApi.create({ ...input, requestId: requestRef.current })).data
         }
         // WEB011：作れた・直せた下書きは、確かめ（preflight）の前にすぐ覚える。
-        // 確かめが失敗してやり直したとき、同じ下書きを新しい版で直す（重複も 409 も起こさない）。
+        // 後の工程が失敗したやり直しは、保存済みの下書きと版から再開する。
         setRun(current)
+        preparedKeyRef.current = { id: current.id, key }
+      }
+      // 保存した下書きの住所は、後の確かめが失敗しても再読込から開けるよう直ちに残す。
+      if (current.id !== draftId) {
+        setDraftId(current.id)
+        const q = new URLSearchParams(window.location.search)
+        q.set('id', current.id)
+        samePageUrl.replace(`/hq/broadcasts/new?${q.toString()}`)
       }
       let list = (await hqBroadcastsApi.preflight(current.id)).data
       const blocked = list.filter((p) => p.blockedReasons.length > 0 && !p.excluded).map((p) => p.accountId)
@@ -524,13 +536,6 @@ export default function HqBroadcastCreate() {
         list = list.map((p) => (ids.includes(p.accountId) ? { ...p, excluded: true } : p))
       }
       setRun(current); setRunKey(key); setChecks(list); setSavedAt(new Date().toISOString())
-      if (current.id !== draftId) {
-        setDraftId(current.id)
-        // 今の URL（段の切り替えで書いた step）に id を足す。この関数を呼んだ時点の段（古い値）で書き戻さない。
-        const q = new URLSearchParams(window.location.search)
-        q.set('id', current.id)
-        samePageUrl.replace(`/hq/broadcasts/new?${q.toString()}`)
-      }
       return { run: current, checks: list }
     } catch (caught) {
       setError(errorText(caught, '送る前の確かめができませんでした。もう一度お試しください。'))
@@ -549,7 +554,9 @@ export default function HqBroadcastCreate() {
       setRun(next)
       setChecks(checks.map((c) => ({ ...c, excluded: ids.includes(c.accountId) })))
       setExcluded(ids)
-      setRunKey(JSON.stringify({ ...input, excludedAccountIds: ids.filter((id) => accountIds.includes(id)) }))
+      const nextKey = JSON.stringify({ ...input, excludedAccountIds: ids.filter((id) => accountIds.includes(id)) })
+      preparedKeyRef.current = { id: next.id, key: nextKey }
+      setRunKey(nextKey)
     } catch (caught) {
       setError(errorText(caught, 'アカウントを外せませんでした。もう一度お試しください。'))
     }
