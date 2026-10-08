@@ -542,6 +542,8 @@ export default function ScenarioFirstStepV8() {
     <CreatePage
       boardId={narrow ? 'U5rxyH' : 'V6xAo'}
       title="1通目を設定"
+      stepsPlacement="after-description"
+      stepsSize="large"
       identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
       steps={(
         <Stepper
@@ -680,15 +682,17 @@ export default function ScenarioFirstStepV8() {
           <p className={styles.whenExample}>{arrivalExample}</p>
         </div>
 
-        <SegmentedControl
-          aria-label="1通目の作り方"
-          value={contentMode}
-          onChange={changeContentMode}
-          options={[
-            { value: 'compose', label: 'この画面で作る' },
-            { value: 'template', label: 'テンプレートから選ぶ' },
-          ]}
-        />
+        <div className={styles.modeRow}>
+          <SegmentedControl
+            aria-label="1通目の作り方"
+            value={contentMode}
+            onChange={changeContentMode}
+            options={[
+              { value: 'compose', label: 'この画面で作る' },
+              { value: 'template', label: 'テンプレートから選ぶ' },
+            ]}
+          />
+        </div>
 
         {preserved && restoreNotice ? <Notice tone="warn" message={restoreNotice} /> : null}
 

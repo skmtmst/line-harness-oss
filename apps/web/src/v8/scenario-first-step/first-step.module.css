@@ -212,3 +212,9 @@
 .previewOpen > * {
   flex: 1 1 auto;
 }
+
+/* 作り方の切り替え：中身の幅だけ（絵の「作り方」は fit-content）。段の中で横いっぱいに伸ばさない。 */
+.modeRow {
+  display: flex;
+  justify-content: flex-start;
+}
