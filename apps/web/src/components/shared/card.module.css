@@ -120,3 +120,13 @@
   gap: var(--tpl-cn-panel-inner-gap);
   padding: var(--tpl-cn-panel-pad);
 }
+
+/* NEN の設定フォーム。既定の面と余白は保つ。 */
+[data-theme='v8'] .inset { min-width: 0; border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; box-shadow: none; }
+[data-theme='v8'] .bordered { min-width: 0; box-shadow: none; }
+[data-theme='v8'] .spacingNormal { gap: var(--tpl-nm-card-gap); }
+[data-theme='v8'] .spacingRoomy { gap: var(--tpl-nc-card-gap-wide); }
+
+[data-theme='v8'] .paddingCompact { padding: var(--tpl-nc-side-pad); }
+[data-theme='v8'] .spacingTight { gap: var(--tpl-nc-field-gap); }
+[data-theme='v8'] .spacingControls { gap: var(--tpl-toolbar-gap); }

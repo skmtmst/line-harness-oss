@@ -5,9 +5,12 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   children: ReactNode
   layout?: 'block' | 'vertical'
   overflow?: 'visible' | 'hidden'
-  padding?: 'none' | 'default' | 'roomy' | 'spacious'
+  padding?: 'none' | 'default' | 'roomy' | 'spacious' | 'compact'
   /** V8 の入力の段・右の箱・一覧の小窓。既定のカードは変えない。 */
   variant?: 'default' | 'form' | 'aside' | 'panel'
+  /** NEN の設定。指定した面だけを変え、既定は保つ。 */
+  surface?: 'standard' | 'inset' | 'bordered'
+  spacing?: 'normal' | 'roomy' | 'tight' | 'controls'
 }
 
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
@@ -18,11 +21,20 @@ export default function Card({
   overflow = 'visible',
   padding = 'none',
   variant = 'default',
+  surface = 'standard',
+  spacing,
   ...props
 }: CardProps) {
   const classes = [
     styles.card,
     variant !== 'default' ? styles[variant] : null,
+    surface === 'inset' ? styles.inset : null,
+    surface === 'bordered' ? styles.bordered : null,
+    spacing === 'normal' ? styles.spacingNormal : null,
+    spacing === 'roomy' ? styles.spacingRoomy : null,
+    spacing === 'tight' ? styles.spacingTight : null,
+    spacing === 'controls' ? styles.spacingControls : null,
+    padding === 'compact' ? styles.paddingCompact : null,
     layout === 'vertical' ? styles.vertical : null,
     overflow === 'hidden' ? styles.overflowHidden : null,
     padding === 'default' ? styles.paddingDefault : null,
