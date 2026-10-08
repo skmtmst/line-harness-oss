@@ -540,6 +540,9 @@
   "components/shared/icon-tile.tsx": {
     "unresolved-classname": 1
   },
+  "components/shared/insert-text-field.tsx": {
+    "unresolved-classname": 2
+  },
   "components/shared/kpi-band.tsx": {
     "unresolved-classname": 1
   },
