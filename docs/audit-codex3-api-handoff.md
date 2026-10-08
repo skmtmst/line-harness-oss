@@ -3,7 +3,7 @@
 9件を実装・コミット。WEB039とWEB208は保存する情報の追加が必要なので、migrationを作らず保留した。画面変更、push、PR、DB更新、配備はしていない。
 
 - ブランチ：`codex/codex-audit-fix3-10081718`
-- 最終検証前に取り込んだ本線：`f7255f2fda`（`origin/codex/development`、競合なし）
+- 最終検証前に取り込んだ本線：`f7255f2fda287fdfb914bf22473d8dbb471e800d`（`origin/codex/development`、競合なし）
 - 開始前doctor：`DOCTOR_LOCAL=1 bash scripts/codex/doctor.sh` → 合格
 - 反映履歴：`docs/release-log/unreleased/audit-codex3.md`。PR採番は司令塔が行う。
 - 2本目の担当機能は変更していない。`lib/api.ts`、DB/sharedのexport、OpenAPIの登録は同じファイルに追加するため、統合時は双方の追加を残す。
@@ -24,7 +24,15 @@
 | WEB205 | 作った：`c608316faa` | 同じキーの並行再送でも生成依頼1件。同じキーで条件変更は409。応答を失った後の再送・tenant/projectの分離 |
 | WEB222 | 作った：`6493a84eeb` | IDのSQL引数上限を100にした実SQLiteで、201件の画像・面数と2ページ目・総件数を取得 |
 
-クライアントの送信・受信契約7件も `75fea377a4` で検査した。各実装の関連試験後にworker/db/webの型検査を実施し、ステージ済み差分を検査してコミットした。
+クライアントの送信・受信契約7件も `75fea377a4` で検査した。WEB052の版履歴保存エラーによる実D1の全件ロールバックも `acef616f2c` で追加検査した（予約メニュー試験10件合格）。各実装の関連試験後にworker/db/webの型検査を実施し、ステージ済み差分を検査してコミットした。
+
+## 最終検証
+
+- 他のvitest実行が終了したことを `pgrep -f vitest` で確認し、Worker全体試験を最後に1回だけ実行した。
+- `pnpm --filter worker exec vitest run --maxWorkers=2 --minWorkers=1`：**870ファイル合格、10,143件合格、30件スキップ**（432.88秒）。検証時HEAD：`1da7e60ab8`。
+- 最新本線取り込み後のworker/web型検査、各DB変更のdb型検査が合格。shared/db等を含む `pnpm --filter worker build` も合格。
+- `git diff --cached --check` と作業ツリーの状態をコミット前後に確認した。全体試験・ビルドによる未整理の生成物なし。
+- 検証後の変更はこの文書への結果追記だけ。APIのコードは変えていない。
 
 ## 画面で置き換える呼び出し
 
