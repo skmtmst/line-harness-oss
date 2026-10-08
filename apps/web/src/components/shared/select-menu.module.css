@@ -1,0 +1,150 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+/*
+ * ★V8 プルダウンの開いた中身（StFE7「選ぶ欄/開いた」）。値は globals.css の
+ * [data-theme="v8"] の --select-menu-*。画面側で上書きしない。
+ * 全体の押した縮み（globals の base 層）より強いよう components 層に置く。
+ */
+@layer components {
+
+/* 器（MenuPortal）そのものが白い板。影を器の外に出すため、ここに見た目を置く。 */
+.surface {
+  box-sizing: border-box;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--select-menu-radius);
+  background: var(--color-canvas);
+  box-shadow: var(--select-menu-shadow);
+  transform-origin: top left;
+}
+
+/* 下に続きがある間は、器が渡す続きの影を浮きの影に重ねる。 */
+.surface[data-has-more='true'] {
+  box-shadow: var(--menu-portal-more), var(--select-menu-shadow);
+}
+
+.surface[data-placement='up'] {
+  transform-origin: bottom left;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .surface {
+    animation: select-menu-enter var(--select-menu-enter) var(--motion-ease-out);
+  }
+}
+
+@keyframes select-menu-enter {
+  from {
+    opacity: 0;
+    transform: scale(var(--select-menu-enter-scale));
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--select-menu-gap);
+  padding: var(--select-menu-pad);
+}
+
+.heading {
+  padding: var(--select-menu-heading-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--select-menu-heading-size);
+  font-weight: 500;
+  line-height: var(--select-menu-item-line);
+  white-space: nowrap;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--select-menu-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
+.spacer {
+  margin-block-end: calc(var(--select-menu-gap) * -1);
+}
+
+.item {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--select-menu-item-gap);
+  padding: var(--select-menu-item-pad);
+  border: 0;
+  border-radius: var(--select-menu-item-radius);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--select-menu-item-size);
+  font-weight: 400;
+  line-height: var(--select-menu-item-line);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  scale: none;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.item:hover:not(:disabled),
+.item[data-active='true'] {
+  background: var(--color-canvas-sunken);
+}
+
+.item[data-selected='true'] {
+  background: var(--color-surface-pearl);
+  font-weight: 600;
+}
+
+/* 選んだ行に乗せた・キーボードで選んでいるときも、ほかの行と同じ薄い灰。 */
+.item[data-selected='true']:hover:not(:disabled),
+.item[data-selected='true'][data-active='true'] {
+  background: var(--color-canvas-sunken);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: -2px;
+}
+
+.item:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.leading {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+/* 1 行のまま。器の幅（画面の幅まで）を越えるときだけ「…」で切り、全文は title。 */
+.label {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check {
+  width: var(--select-menu-check);
+  height: var(--select-menu-check);
+  flex: none;
+  color: var(--color-accent-deep);
+}
+}

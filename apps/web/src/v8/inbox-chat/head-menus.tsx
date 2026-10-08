@@ -67,7 +67,12 @@ export function HeadStatusMenu({
       icon={<span className={styles.ctlDot} data-status={value} />}
       value={value}
       onChange={(next) => onChange(next as HeadStatus)}
-      options={STATUS_ORDER.map((status) => ({ value: status, label: HEAD_STATUS_LABEL[status] }))}
+      // 開いた中身の行にも状態の色の点（jvb3W「5. 会話の頭のメニュー」）。
+      options={STATUS_ORDER.map((status) => ({
+        value: status,
+        label: HEAD_STATUS_LABEL[status],
+        leading: <span className={styles.ctlDot} data-status={status} />,
+      }))}
     />
   )
 }
