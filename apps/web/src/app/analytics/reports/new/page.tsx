@@ -526,8 +526,24 @@ function AnalyticsReportFormPage() {
       conflictBusyRef.current = false
     }
   }, [selectedAccountId, editId])
-  // H5UoIu: 名前は必須。空のまま押したらお知らせに加えて欄の下にも出す。
+  // 入力の誤りは欄だけで知らせ、最初の誤りへ移る。通信・保存の失敗は上の帯。
   const [nameError, setNameError] = useState('')
+  const [validation, setValidation] = useState<{ field: string; message: string } | null>(null)
+  const reportRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!validation) return
+    const field = reportRef.current?.querySelector<HTMLElement>(`[id="${validation.field}"]`)
+    field?.focus()
+    field?.scrollIntoView?.({ block: 'center' })
+  }, [validation])
+  const showValidation = (failure: { field: string; error: string }) => {
+    setError('')
+    setNameError(failure.field === 'report-name' ? failure.error : '')
+    if (failure.field === 'report-channels') setChannelsOpen(true)
+    setValidation({ field: failure.field, message: failure.error })
+  }
+  useEffect(() => { setNameError(''); setValidation(null) }, [selectedAccountId, editId])
+  const fieldMessage = (id: string) => validation?.field === id ? validation.message : undefined
 
   /*
    * 保存する中身の検査と組み立て。submit（つくる・なおす）と
@@ -553,29 +569,30 @@ function AnalyticsReportFormPage() {
   }
   const buildReportPayload = (
     scheduleOptions: AnalyticsReportScheduleOptions,
-  ): { ok: true; payload: ReportPayload } | { ok: false; error: string } => {
+  ): { ok: true; payload: ReportPayload } | { ok: false; error: string; field: string } => {
     if (!name.trim()) {
-      return { ok: false, error: 'レポートの名前を入力してください' }
+      return { ok: false, field: 'report-name', error: 'レポートの名前を入力してください' }
     }
     if (hasInvalidEmail) {
-      return { ok: false, error: 'メールアドレスの形が正しくない宛先があります。該当の行を直すか消してください。' }
+      return { ok: false, field: `report-email-${invalidEmails.findIndex(Boolean)}`, error: 'メールアドレスの形が正しくない宛先があります。該当の行を直すか消してください。' }
     }
     // R453: 通知方法は選んだとおりに送る。1つも選ばれていない・
     // 受け取れる宛先が無い組み合わせはここで止める（裏側と同じ文）。
     if (!dashboardEnabled && !emailEnabled && !lineEnabled) {
-      return { ok: false, error: '通知方法を1つ以上選んでください' }
+      return { ok: false, field: 'report-channels', error: '通知方法を1つ以上選んでください' }
     }
     const emailRecipients = emails.map((item) => item.trim()).filter(Boolean)
     const staffById = new Map(scheduleOptions.recipients.map((item) => [item.id, item]))
     const emailCapable = emailRecipients.length > 0
       || staffIds.some((id) => staffById.get(id)?.email)
     if (emailEnabled && !emailCapable) {
-      return { ok: false, error: 'メールを受け取れる宛先がありません' }
+      return { ok: false, field: 'report-channels', error: 'メールを受け取れる宛先がありません' }
     }
     const lineCapable = staffIds.some((id) => staffById.get(id)?.lineLinked)
     if (lineEnabled && !lineCapable) {
-      return { ok: false, error: 'LINE連携済みの宛先がありません' }
+      return { ok: false, field: 'report-channels', error: 'LINE連携済みの宛先がありません' }
     }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(sendTime)) return { ok: false, field: 'report-send-time', error: '送る時刻を入力してください' }
     // 画面の数値を裏側が受け取れる形へ直す。変な数はここで止める
     // (裏側は不備のある条件を捨てるので、黙って無効になる前に知らせる)。
     const parsedAlertRules: AnalyticsReportSchedule['alertRules'] = []
@@ -585,14 +602,14 @@ function AnalyticsReportFormPage() {
         if (!draft?.enabled) continue
         const threshold = Number(draft.threshold)
         const minimumSample = Number(draft.minimumSample)
-        if (!Number.isFinite(threshold) || threshold < 0 || !Number.isInteger(minimumSample) || minimumSample < 1) {
-          return { ok: false, error: '知らせる条件は、0以上の数と1以上の件数で入力してください' }
+        if (!draft.threshold.trim() || !Number.isFinite(threshold) || threshold < 0 || !Number.isInteger(minimumSample) || minimumSample < 1) {
+          return { ok: false, field: `report-alert-${def.id}-${!draft.threshold.trim() || !Number.isFinite(threshold) || threshold < 0 ? 'threshold' : 'sample'}`, error: '知らせる条件は、0以上の数と1以上の件数で入力してください' }
         }
         parsedAlertRules.push({ metric: def.metric, operator: def.operator, threshold, minimumSample })
       }
       parsedAlertRules.push(...extraAlertRules)
       if (parsedAlertRules.length === 0) {
-        return { ok: false, error: '知らせる条件を1つ以上えらぶか、「大きな変化を知らせる」を外してください' }
+        return { ok: false, field: 'report-alerts-enabled', error: '知らせる条件を1つ以上えらぶか、「大きな変化を知らせる」を外してください' }
       }
     }
     const recipients: ReportPayload['recipients'] = [
@@ -624,9 +641,7 @@ function AnalyticsReportFormPage() {
     if (!selectedAccountId || !options || !canManage || !hasRecipient) return
     const built = buildReportPayload(options)
     if (!built.ok) {
-      setError(built.error)
-      // H5UoIu: 名前の未入力は欄の下にも出す（V8だけ）。
-      setNameError(built.error === 'レポートの名前を入力してください' ? built.error : '')
+      showValidation(built)
       return
     }
     const { payload } = built
@@ -634,6 +649,7 @@ function AnalyticsReportFormPage() {
     setSaving(true)
     setError('')
     setNameError('')
+    setValidation(null)
     // R455: この保存が「どの依頼・どのアカウントへ向けたものか」を
     // 応答時に比べる。移っていたら編集先・文・保存中表示を変えない。
     const wantAccount = selectedAccountId
@@ -846,7 +862,7 @@ function AnalyticsReportFormPage() {
   const saveOverLatest = async () => {
     if (!selectedAccountId || !options || !editing || !canManage || !updateConflict || saving || conflictBusyRef.current) return
     const built = buildReportPayload(options)
-    if (!built.ok) { setCompareError(built.error); return }
+    if (!built.ok) { setCompareOpen(false); showValidation(built); return }
     conflictBusyRef.current = true
     const actionSeq = ++conflictActionSeq.current
     const targetSeq = switchSeqRef.current
@@ -1002,7 +1018,7 @@ function AnalyticsReportFormPage() {
   )
 
   return (
-    <div className="report-v8-page" data-design-node={updateConflict ? 'G83vi' : 'H5UoIu'}>
+    <div className="report-v8-page" ref={reportRef} data-design-node={updateConflict ? 'G83vi' : 'H5UoIu'}>
       <ReportHeadV8 editing={Boolean(editing)} />
       {updateConflict && (
         /* G83vi：板の頭の下に、だれがいつ保存したかと、比べる・読み込む操作の帯。 */
@@ -1037,9 +1053,9 @@ function AnalyticsReportFormPage() {
             <h2 className="report-v8-cardTitle">名前を付けます</h2>
             <label className="report-v8-field report-v8-inputField">
               <span className="report-v8-label">名前</span>
-              <TextField value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例: 週次まとめ" aria-invalid={nameError ? true : undefined} />
+              <TextField id="report-name" aria-describedby={nameError ? 'report-name-error' : undefined} value={name} onChange={(event) => { setName(event.target.value); setNameError(''); setValidation(null) }} placeholder="例: 週次まとめ" aria-invalid={nameError ? true : undefined} />
             </label>
-            {nameError && <p className="report-v8-fieldError" role="alert">{nameError}</p>}
+            {nameError && <p id="report-name-error" className="report-v8-fieldError" role="alert">{nameError}</p>}
           </section>
           <section className="report-v8-card">
             {/* 絵に無い「使われ方」は、段の頭の右に小さく置く（落とさない）。 */}
@@ -1106,7 +1122,7 @@ function AnalyticsReportFormPage() {
                   </li>
                 })}
                 {emails.map((email, index) => <li className="report-v8-recipient" key={index}>
-                  <div className="report-v8-emailRow"><TextField type="email" value={email} onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder="report@example.com" aria-label={`宛先のメールアドレス ${index + 1}行目`} aria-invalid={invalidEmails[index] ? true : undefined} /><Button size="compact" aria-label={`${index + 1}行目の宛先を消す`} onClick={() => setEmails((current) => current.filter((_, itemIndex) => itemIndex !== index))}>消す</Button></div>
+                  <div className="report-v8-emailRow"><TextField id={`report-email-${index}`} type="email" value={email} onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder="report@example.com" aria-label={`宛先のメールアドレス ${index + 1}行目`} aria-invalid={invalidEmails[index] ? true : undefined} /><Button size="compact" aria-label={`${index + 1}行目の宛先を消す`} onClick={() => setEmails((current) => current.filter((_, itemIndex) => itemIndex !== index))}>消す</Button></div>
                   {invalidEmails[index] && <p className="report-v8-fieldError" role="alert">「{invalidEmails[index]}」はメールアドレスの形になっていません。この宛先だけ外れないよう、直すか消してください。</p>}
                 </li>)}
               </ul>
@@ -1114,8 +1130,8 @@ function AnalyticsReportFormPage() {
             </div>
             {hasInvalidEmail && <p className="report-v8-fieldError">形が正しくない宛先があるため、いまのままでは作れません。</p>}
             <div className="report-v8-panel" hidden={!channelsOpen}>
-              <div className="report-v8-sectionCards" role="group" aria-label="通知方法">
-                <Checkbox checked={dashboardEnabled} onCheckedChange={setDashboardEnabled} description="運用状態のお知らせに残します。"><strong>管理画面のお知らせにも出す</strong></Checkbox>
+              <div className="report-v8-sectionCards" role="group" aria-label="通知方法" onChange={() => setValidation(null)}>
+                <Checkbox id="report-channels" invalid={!!fieldMessage('report-channels')} error={fieldMessage('report-channels')} checked={dashboardEnabled} onCheckedChange={setDashboardEnabled} description="運用状態のお知らせに残します。"><strong>管理画面のお知らせにも出す</strong></Checkbox>
                 <Checkbox checked={emailEnabled} onCheckedChange={setEmailEnabled} description="宛先のメールアドレスへ送ります。担当者のメールもここで送ります。"><strong>メールでも送る</strong></Checkbox>
                 <Checkbox checked={lineEnabled} onCheckedChange={setLineEnabled} description="ログインユーザーのLINEに、要点だけを短くまとめて送ります。"><strong>LINEでも同じ内容を送る</strong></Checkbox>
               </div>
@@ -1126,7 +1142,7 @@ function AnalyticsReportFormPage() {
             <div className="report-v8-scheduleGrid">
               <label className="report-v8-field">間かく<Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="full" /></label>
               {cadence === 'weekly' ? <label className="report-v8-field">送る曜日<Select aria-label="送る曜日" value={weekday} onChange={setWeekday} options={WEEKDAY_JA.map((day, value) => ({ value: String(value), label: `${day}曜` }))} size="full" /></label> : <label className="report-v8-field">送る日<Select aria-label="送る日" value={monthDay} onChange={setMonthDay} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="full" /></label>}
-              <span className="report-v8-field">送る時刻<TimeField value={sendTime} onChange={setSendTime} aria-label="送る時刻" /></span>
+              <span className="report-v8-field">送る時刻<TimeField id="report-send-time" invalid={!!fieldMessage('report-send-time')} aria-describedby={fieldMessage('report-send-time') ? 'report-send-time-error' : undefined} value={sendTime} onChange={(value) => { setSendTime(value); setValidation(null) }} aria-label="送る時刻" />{fieldMessage('report-send-time') && <p id="report-send-time-error" className="report-v8-fieldError" role="alert">{fieldMessage('report-send-time')}</p>}</span>
               <label className="report-v8-field">集計する期間<Select aria-label="集計する期間" value={periodDays} onChange={setPeriodDays} options={[{ value: '7', label: '前の7日' }, { value: '30', label: '前の30日' }, { value: '90', label: '前の90日' }]} size="full" /></label>
             </div>
           </section>
@@ -1137,17 +1153,18 @@ function AnalyticsReportFormPage() {
                 <h2 className="report-v8-cardTitle">知らせの決めごと <HelpTip label="変化の判定">前の期間と比べ、条件に合えばレポートに含めて知らせます。集計待ちや一部だけ取れた期間は比べません。</HelpTip></h2>
                 <p className="report-v8-cardSub">数が急に動いたときだけ、すぐに知らせます。少ない数でさわがないよう、最低件数も決めます</p>
               </div>
-              <Checkbox className="report-v8-headCheck" checked={alertsEnabled} onCheckedChange={setAlertsEnabled}>大きな変化を知らせる</Checkbox>
+              <Checkbox id="report-alerts-enabled" invalid={!!fieldMessage('report-alerts-enabled')} aria-describedby={fieldMessage('report-alerts-enabled') ? 'report-alerts-enabled-error' : undefined} className="report-v8-headCheck" checked={alertsEnabled} onCheckedChange={setAlertsEnabled}>大きな変化を知らせる</Checkbox>
             </div>
-            <ul className="report-v8-alerts">
+            {fieldMessage('report-alerts-enabled') && <p id="report-alerts-enabled-error" className="report-v8-fieldError" role="alert">{fieldMessage('report-alerts-enabled')}</p>}
+            <ul className="report-v8-alerts" onChange={() => setValidation(null)}>
               {[...ALERT_RULE_DEFS].sort((a, b) => (a.id === 'friend_adds' ? -1 : b.id === 'friend_adds' ? 1 : 0)).map((def) => {
                 const draft = alertDrafts[def.id]
                 const fieldsDisabled = !alertsEnabled || !draft.enabled
                 return <li className="report-v8-alertCard" key={def.id}>
                   <Checkbox checked={draft.enabled} disabled={!alertsEnabled} aria-label={`${def.name}を使う`} onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}><strong className="report-v8-choiceTitle">{def.id === 'friend_adds' ? '友だちが減った' : def.id === 'block_rate' ? 'ブロックが増えた' : '成果が0件のまま続いた'}</strong></Checkbox>
                   <div className="report-v8-alertGrid">
-                    <label className="report-v8-field report-v8-inputField"><span className="report-v8-label">{def.id === 'conversions' ? '続いた日数' : def.id === 'block_rate' ? 'ブロック率のしきい値（%）' : 'しきい値（%）'}</span><TextField type="number" min={0} step={def.step} inputMode="decimal" aria-label={def.thresholdLabel} value={draft.threshold} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))} /></label>
-                    <label className="report-v8-field report-v8-inputField"><span className="report-v8-label">判定に必要な最低件数<HelpTip label={`${def.name}の最低件数`}>集計できた件数が、この数以上のときだけ判定します。</HelpTip></span><TextField type="number" min={1} step={1} inputMode="numeric" aria-label={def.sampleLabel} value={draft.minimumSample} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))} /></label>
+                    <label className="report-v8-field report-v8-inputField"><span className="report-v8-label">{def.id === 'conversions' ? '続いた日数' : def.id === 'block_rate' ? 'ブロック率のしきい値（%）' : 'しきい値（%）'}</span><TextField id={`report-alert-${def.id}-threshold`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-threshold`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-threshold`) ? `report-alert-${def.id}-threshold-error` : undefined} type="number" min={0} step={def.step} inputMode="decimal" aria-label={def.thresholdLabel} value={draft.threshold} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-threshold`) && <p id={`report-alert-${def.id}-threshold-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-threshold`)}</p>}</label>
+                    <label className="report-v8-field report-v8-inputField"><span className="report-v8-label">判定に必要な最低件数<HelpTip label={`${def.name}の最低件数`}>集計できた件数が、この数以上のときだけ判定します。</HelpTip></span><TextField id={`report-alert-${def.id}-sample`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-sample`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-sample`) ? `report-alert-${def.id}-sample-error` : undefined} type="number" min={1} step={1} inputMode="numeric" aria-label={def.sampleLabel} value={draft.minimumSample} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-sample`) && <p id={`report-alert-${def.id}-sample-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-sample`)}</p>}</label>
                   </div>
                 </li>
               })}

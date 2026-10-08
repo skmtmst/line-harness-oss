@@ -3,6 +3,7 @@
 import Link from 'next/link'
 
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import { PageHeading } from '@/components/templates/page-frame'
 import './report-v8.css'
 
 /**
@@ -14,6 +15,10 @@ import './report-v8.css'
 export default function ReportHeadV8({ editing }: { editing: boolean }) {
   /* ★V8 は板の頭に「← 分析へ」を置かない（オーナー 2026-10-08）。分析へは上の帯のパンくずで戻る。v7 は今までどおり。 */
   const showBack = useAdminTheme() !== 'v8'
+  if (!showBack) return <div data-page-template="create"><PageHeading
+    title={editing ? '定期レポートを直す' : 'レポートを作る'}
+    description="見たい数をまとめて、決まった曜日・時刻に LINE やメールで届けます。数が急に動いたときだけ知らせることもできます。"
+  /></div>
   return (
     <div className="report-v8-head">
       {showBack ? <Link className="report-v8-back" href="/analytics">← 分析へ</Link> : null}

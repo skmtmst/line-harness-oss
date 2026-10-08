@@ -219,7 +219,28 @@ describe('V8 レポート作成（H5UoIu）', () => {
     await act(async () => { fireEvent.click(person) })
     await click(buttonByText('つくって動かす'))
     await settle()
+    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(nameField.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(nameField)
     expect(container.textContent).toContain('レポートの名前を入力してください')
+  })
+
+  it('知らせる条件の空欄は0として保存せず、その欄へ移る', async () => {
+    fixture.editId = 'report-1'
+    await mount()
+    await settle()
+    const toggle = [...container.querySelectorAll('input[type="checkbox"]')].find((item) => item.closest('label')?.textContent?.includes('大きな変化を知らせる')) as HTMLInputElement
+    await act(async () => { fireEvent.click(toggle) })
+    const condition = container.querySelector('input[aria-label="友だち減少の条件を使う"]') as HTMLInputElement
+    await act(async () => { fireEvent.click(condition) })
+    const threshold = container.querySelector('#report-alert-friend_adds-threshold') as HTMLInputElement
+    await act(async () => { fireEvent.change(threshold, { target: { value: '' } }) })
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    expect(document.activeElement).toBe(threshold)
+    expect(threshold.getAttribute('aria-invalid')).toBe('true')
+    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(net.puts).toHaveLength(0)
   })
 })
 
