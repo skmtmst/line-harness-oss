@@ -87,7 +87,7 @@ export default function DateTimeField({
 
   const parsed = parseDateTime(current)
   const datePart = parsed ? current.slice(0, 10) : ''
-  const shownTime = timeDraft ?? (parsed ? { hours: parsed.hours, minutes: parsed.minutes } : { hours: 10, minutes: 0 })
+  const shownTime = timeDraft ?? (parsed ? { hours: parsed.hours, minutes: parsed.minutes } : null)
 
   const emit = (next: string) => {
     if (value === undefined) setInner(next)
@@ -237,8 +237,13 @@ export default function DateTimeField({
                 aria-labelledby={`${fieldId}-time-label`}
                 size="field"
                 minuteStep={minuteStep}
-                value={`${pad(shownTime.hours)}:${pad(shownTime.minutes)}`}
+                value={shownTime ? `${pad(shownTime.hours)}:${pad(shownTime.minutes)}` : ''}
                 onChange={(next) => {
+                  if (next === '') {
+                    setTimeDraft(null)
+                    emit('')
+                    return
+                  }
                   const time = parseTime(next)
                   if (time) chooseTime(time.hours, time.minutes)
                 }}
@@ -252,8 +257,8 @@ export default function DateTimeField({
               <Select
                 size="full"
                 aria-label="時"
-                value={pad(shownTime.hours)}
-                onChange={(value) => chooseTime(Number(value), shownTime.minutes)}
+                value={pad(shownTime?.hours ?? 10)}
+                onChange={(value) => chooseTime(Number(value), (shownTime?.minutes ?? 0))}
                 options={HOURS.map((hour) => ({ value: pad(hour), label: `${hour}時` }))}
               />
             </label>
@@ -262,8 +267,8 @@ export default function DateTimeField({
               <Select
                 size="full"
                 aria-label="分"
-                value={pad(shownTime.minutes)}
-                onChange={(value) => chooseTime(shownTime.hours, Number(value))}
+                value={pad(shownTime?.minutes ?? 0)}
+                onChange={(value) => chooseTime((shownTime?.hours ?? 10), Number(value))}
                 options={MINUTES.map((minute) => ({ value: pad(minute), label: `${minute}分` }))}
               />
             </label>
