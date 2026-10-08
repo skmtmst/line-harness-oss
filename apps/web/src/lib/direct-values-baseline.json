@@ -199,6 +199,11 @@
     "radius": 5,
     "shadow": 0
   },
+  "components/shared/folder-select.tsx": {
+    "color": 6,
+    "radius": 0,
+    "shadow": 0
+  },
   "components/shared/help-tip.module.css": {
     "color": 0,
     "radius": 2,

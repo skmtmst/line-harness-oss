@@ -19,7 +19,7 @@ import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import { CreatePage } from '@/components/templates'
 import { notifyToast } from '@/components/shared/toast'
-import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
@@ -464,7 +464,7 @@ export default function ScenarioCreateV8() {
           <div className={styles.folderField}>
             <span className={styles.fieldLabelStrong}>フォルダ</span>
             <span title={selectedFolderName} className={styles.folderSelect}>
-              <Select
+              <FolderSelect
                 value={folderId}
                 disabled={fieldsDisabled || folderState !== 'ready'}
                 onChange={(value) => {
@@ -473,11 +473,14 @@ export default function ScenarioCreateV8() {
                 }}
                 aria-label="シナリオのフォルダ"
                 size="full"
-                options={[
-                  { value: '', label: '未分類' },
+                folders={[
                   ...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : []),
-                  ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+                  ...folders.map(folderById),
                 ]}
+                // 一覧の左の列の「フォルダを追加」と同じ口（シナリオのフォルダは共有）。
+                onCreate={canEdit && !locked
+                  ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+                  : undefined}
               />
             </span>
             {folderState !== 'ready' || detailsSaving ? (
