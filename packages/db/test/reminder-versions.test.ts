@@ -162,6 +162,28 @@ describe('V6 リマインダの公開版', () => {
     expect(pending.find((row) => row.id === second.id)?.delivery_mode).toBe('countdown')
   })
 
+  it('PKG25: 情報欄のまとめ登録も登録時の公開版を維持し、再走査では書き換えない', async () => {
+    const created = await createReminderWithDraftVersion(db, settings('旧版の案内'))
+    const version1 = await testAndPublish(created.reminder.id)
+    const first = { friendId: 'friend-1', targetDate: '2026-09-01T10:00:00.000Z' }
+    expect(await enrollFriendsInReminderOnce(db, created.reminder.id, [first])).toBe(1)
+
+    await saveReminderDraftVersion(db, created.reminder.id, settings('新版の案内'))
+    const version2 = await testAndPublish(created.reminder.id)
+    expect(await enrollFriendsInReminderOnce(db, created.reminder.id, [first])).toBe(0)
+    expect(await enrollFriendsInReminderOnce(db, created.reminder.id, [
+      { friendId: 'friend-1', targetDate: '2026-09-02T10:00:00.000Z' },
+    ])).toBe(1)
+
+    const rows = sqlite.prepare(
+      'SELECT id, reminder_version_id FROM friend_reminders ORDER BY target_date',
+    ).all() as Array<{ id: string; reminder_version_id: string }>
+    expect(rows.map((row) => row.reminder_version_id)).toEqual([version1.id, version2.id])
+    const pending = await getPendingReminderDeliveries(db)
+    expect(pending.find((row) => row.id === rows[0].id)?.steps[0].message_content).toBe('旧版の案内')
+    expect(pending.find((row) => row.id === rows[1].id)?.steps[0].message_content).toBe('新版の案内')
+  })
+
   it('公開済みの設定・通知・状態を後戻りさせない', async () => {
     const created = await createReminderWithDraftVersion(db, settings('明日のご予約です'))
     const published = await testAndPublish(created.reminder.id)

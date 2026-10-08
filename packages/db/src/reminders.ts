@@ -2673,13 +2673,20 @@ export async function enrollFriendsInReminderOnce(
   candidates: Array<{ friendId: string; targetDate: string }>,
 ): Promise<number> {
   if (candidates.length === 0) return 0;
+  const reminder = await getReminderById(db, reminderId);
+  if (!reminder || reminder.lifecycle_status !== 'published') {
+    throw new Error('REMINDER_NOT_PUBLISHED');
+  }
+  const versionId = await ensureReminderPublishedVersion(db, reminder);
+  const versionSteps = await getReminderVersionSteps(db, versionId);
   let enrolled = 0;
   const now = jstNow();
-  const version = await getReminderPublishedVersion(db, reminderId);
-  const versionId = version?.id ?? null;
-  // 本文とテンプレートの写しを同じ不変の公開版から読む。
-  const steps = versionId ? await getReminderVersionSteps(db, versionId) : await getReminderSteps(db, reminderId);
-  const bulkTemplateSnapshot = await snapshotReminderTemplateVersions(db, steps.map((step) => step.template_id));
+  // R346: まとめ登録も1件ずつと同じ版で送る。この束が使うテンプレートの
+  // 公開版を1度だけ写し、新しい行に付ける（ある行は触らない）。
+  const bulkTemplateSnapshot = await snapshotReminderTemplateVersions(
+    db,
+    versionSteps.map((step) => step.template_id),
+  );
 
   for (let offset = 0; offset < candidates.length; offset += FRIEND_REMINDER_INSERT_CHUNK) {
     const chunk = candidates.slice(offset, offset + FRIEND_REMINDER_INSERT_CHUNK);
@@ -2697,8 +2704,8 @@ export async function enrollFriendsInReminderOnce(
     const result = await db.prepare(
       `WITH candidates(id, friend_id, target_date) AS (VALUES ${values})
        INSERT OR IGNORE INTO friend_reminders
-         (id, friend_id, reminder_id, target_date, reminder_version_id, template_version_snapshot, created_at, updated_at)
-       SELECT c.id, c.friend_id, ?, c.target_date, ?, ?, ?, ?
+         (id, friend_id, reminder_id, reminder_version_id, target_date, template_version_snapshot, created_at, updated_at)
+       SELECT c.id, c.friend_id, ?, ?, c.target_date, ?, ?, ?
          FROM candidates c
         WHERE NOT EXISTS (
           SELECT 1

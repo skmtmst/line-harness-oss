@@ -307,20 +307,23 @@ export async function executeFieldMigration(
     const reminderIds = promised
       .filter((target) => target.switchable && target.kind === 'reminder')
       .map((target) => target.id);
-    if (reminderIds.length > 0) {
+    // 固定4 bindを引いた96件ずつ。全chunkは最終化と同じbatchに置く。
+    for (let offset = 0; offset < reminderIds.length; offset += 96) {
+      const chunk = reminderIds.slice(offset, offset + 96);
       statements.push(db.prepare(
         `UPDATE reminders SET trigger_field_id = ?, updated_at = ?
           WHERE line_account_id = ? AND trigger_field_id = ?
-            AND id IN (SELECT value FROM json_each(?))`,
-      ).bind(run.target_field_id, completedAt, run.line_account_id, run.source_field_id, JSON.stringify(reminderIds)));
+            AND id IN (${chunk.map(() => '?').join(', ')})`,
+      ).bind(run.target_field_id, completedAt, run.line_account_id, run.source_field_id, ...chunk));
     }
     const formIds = promised
       .filter((target) => target.switchable && target.kind === 'form')
       .map((target) => target.id);
-    if (formIds.length > 0) {
+    for (let offset = 0; offset < formIds.length; offset += 100) {
+      const chunk = formIds.slice(offset, offset + 100);
       const drafts = await db.prepare(
-        `SELECT f.id, f.fields FROM forms f WHERE f.id IN (SELECT value FROM json_each(?))`,
-      ).bind(JSON.stringify(formIds)).all<{ id: string; fields: string }>();
+        `SELECT f.id, f.fields FROM forms f WHERE f.id IN (${chunk.map(() => '?').join(', ')})`,
+      ).bind(...chunk).all<{ id: string; fields: string }>();
       for (const draft of drafts.results) {
         const switched = switchDraftFormFields(draft.fields, run.source_field_id, run.target_field_id);
         if (switched) {
