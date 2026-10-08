@@ -199,3 +199,5 @@ export async function fetchHqTemplateListStats(type: TemplateType = 'template') 
   const result = await fetchApi<{success: true; stats: import('@line-crm/shared').HqTemplateListStats}>(`/api/hq/templates?type=${type}`)
   return result.stats
 }
+
+export { request as requestHqTemplate };
