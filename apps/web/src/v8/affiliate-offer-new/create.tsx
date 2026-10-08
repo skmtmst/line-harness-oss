@@ -19,7 +19,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
@@ -48,6 +48,8 @@ type Fetch = 'loading' | 'ready' | 'failed'
 
 export default function AffiliateOfferCreateV8() {
   usePageTitle('案件を作る')
+  /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
+  usePageCrumbs([{ label: '成果とアフィリエイト', href: '/affiliates' }])
   const router = useRouter()
   const role = useStaffRole()
   const canEdit = !role || canManageRole(role)
