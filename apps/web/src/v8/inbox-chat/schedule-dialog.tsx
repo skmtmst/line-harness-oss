@@ -31,6 +31,7 @@ export default function ScheduleSendDialog({
   onClose,
   content,
   hasImage,
+  attachmentLabel,
   value,
   onChange,
   onConfirm,
@@ -48,6 +49,8 @@ export default function ScheduleSendDialog({
   /** 書く欄の本文（送るもの） */
   content: string
   hasImage: boolean
+  /** B-6：準備済みの動画・ファイル（例：動画「説明.mp4」）。無いときは出さない。 */
+  attachmentLabel?: string
   /** 日本時間の datetime-local */
   value: string
   onChange: (next: string) => void
@@ -64,7 +67,7 @@ export default function ScheduleSendDialog({
 }) {
   const presets = schedulePresets(now)
   const firstLine = content.trim().split('\n')[0] ?? ''
-  const summary = [firstLine ? `「${firstLine}」` : '', hasImage ? '画像 1枚' : ''].filter(Boolean).join(' ＋ ')
+  const summary = [firstLine ? `「${firstLine}」` : '', hasImage ? '画像 1枚' : '', attachmentLabel ?? ''].filter(Boolean).join(' ＋ ')
   const night = value ? isNightJst(value) : false
 
   return (
