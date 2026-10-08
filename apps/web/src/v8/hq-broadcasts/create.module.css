@@ -256,32 +256,3 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
 }
-
-/* ① RqYwI：「テンプレートを選ぶ」「写す配信を選ぶ」の一覧 */
-.pickList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-e49-gap-m);
-  min-width: 0;
-}
-
-.pickHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tpl-e49-gap-s);
-}
-
-.pickCards {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-e49-gap-s);
-}
-
-.pickNote {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-e49-lh-18);
-}

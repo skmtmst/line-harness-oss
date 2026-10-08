@@ -2517,3 +2517,29 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-feat-example-radius: 10px;
   --tpl-feat-example-inner-gap: 2px;
 }
+
+/* 一括配信①の選択窓 EpTBB（bcpick）：既存の部品の寸法には影響しない。 */
+[data-theme="v8"] {
+  --tpl-bcpick-z: 80;
+  --tpl-bcpick-scrim: #1d1d1f59;
+  --tpl-bcpick-margin: 24px;
+  --tpl-bcpick-width: 1640px;
+  --tpl-bcpick-height: 1000px;
+  --tpl-bcpick-header-pad: 20px 24px;
+  --tpl-bcpick-footer-pad: 14px 24px;
+  --tpl-bcpick-folder-width: 220px;
+  --tpl-bcpick-preview-width: 360px;
+  --tpl-bcpick-kind-width: 110px;
+  --tpl-bcpick-folder-label-width: 120px;
+  --tpl-bcpick-folder-pad: 16px 12px;
+  --tpl-bcpick-folder-row-pad: 8px 10px;
+  --tpl-bcpick-list-pad: 20px;
+  --tpl-bcpick-row-pad: 12px 16px;
+  --tpl-bcpick-selected-pad: 12px 14px;
+  --tpl-bcpick-gap: 12px;
+  --tpl-bcpick-small-gap: 8px;
+  --tpl-bcpick-chip-gap: 6px;
+  --tpl-bcpick-tiny-gap: 2px;
+  --tpl-bcpick-focus: 2px;
+  --tpl-bcpick-mobile-preview: 30dvh;
+}
