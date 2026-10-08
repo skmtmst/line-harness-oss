@@ -6359,6 +6359,9 @@ export const BOOKING_CONFLICT_ALTERNATIVES = BOOKING_PROXY_CREATE.conflict.body.
 export const BOOKING_ADMIN_DETAIL = {
   booking: {
     id: 'bk-1', startsAt: '2026-09-03T00:00:00.000Z', endsAt: '2026-09-03T01:45:00.000Z', status: 'confirmed',
+    staffId: 'bs-1', menuId: 'bm-1', lockVersion: 1,
+    notificationPolicy: { send_line_confirmation: true, day_before: true, hours_before: true },
+    auditLogTotal: 0, auditLogs: [],
     customerNote: '顔まわりはふんわり仕上げてください。', internalNote: '皮膚の赤みに注意。', price: 8400,
     requestedAt: '2026-09-02T02:00:00.000Z', decidedAt: '2026-09-02T02:05:00.000Z', source: 'liff',
     createdByStaffId: 'visual-qa-owner', calendarSync: 'synced', menuName: 'トリミング（小型犬）', staffName: '佐々木',
