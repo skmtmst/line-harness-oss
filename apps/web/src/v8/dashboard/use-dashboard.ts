@@ -1,7 +1,8 @@
 'use client'
 
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -84,7 +85,7 @@ function useSeenOnce(): { ref: RefObject<HTMLDivElement | null>; ready: boolean 
 }
 
 export function useDashboard() {
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
 
@@ -103,8 +104,8 @@ export function useDashboard() {
     const next = new URLSearchParams(params.toString())
     mutate(next)
     const text = next.toString()
-    router.replace(text ? `/?${text}` : '/')
-  }, [params, router])
+    samePageUrl.replace(text ? `/?${text}` : '/')
+  }, [params, samePageUrl])
   const selectPeriod = useCallback((key: PeriodKey) => {
     setPeriodState(key)
     updateQuery((query) => { if (key === 'today') query.delete('period'); else query.set('period', key) })

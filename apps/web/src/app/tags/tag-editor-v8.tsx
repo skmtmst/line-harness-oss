@@ -16,6 +16,7 @@ import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type CommonActionResources, type TagRetroactivePreview } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
@@ -473,10 +474,7 @@ export default function TagEditorV8({
             <h2 className={styles.sectionTitle}>できあがるタグ</h2>
             <div className={styles.sectionBody}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                <span className={styles.previewTag}>
-                  <span className={styles.previewDot} style={{ backgroundColor: previewColor }} />
-                  <span className={styles.previewName} title={name || undefined}>{name || 'タグ名'}</span>
-                </span>
+                <TagPill name={name || 'タグ名'} color={previewColor} />
                 <span className={styles.previewGroup}>{groupName}</span>
               </div>
               <p className={styles.noteText}>このタグは、配信の絞り込み・シナリオの開始条件・自動応答の付与先として使えます。</p>

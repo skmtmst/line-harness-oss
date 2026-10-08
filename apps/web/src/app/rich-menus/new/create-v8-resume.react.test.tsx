@@ -93,7 +93,7 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     expect(rows.some((t) => t.includes('予約する') && t.includes('URLを開く'))).toBe(true)
     expect(rows.some((t) => t.includes('会員証') && t.includes('未設定'))).toBe(true)
     // ①は戻れる（済み）、③④はまだ押せない（未着手）。
-    expect(host.querySelector('button[aria-label="形と画像へ戻る"]')).not.toBeNull()
+    expect(host.querySelector('button[aria-label="形と画像に戻る"]')).not.toBeNull()
     expect(Array.from(host.querySelectorAll('button')).some((b) => (b.getAttribute('aria-label') ?? '').includes('誰に出すか'))).toBe(false)
   })
 

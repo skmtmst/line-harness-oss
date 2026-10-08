@@ -78,6 +78,8 @@ describe('統括のテンプレートを作る（店の作る画面＋保存し�
     expect(await screen.findByText('保存して配ると、選んだアカウントのテンプレートに新しい版として届きます')).toBeTruthy()
     // 板の頭の「← テンプレートへ」は無くした（2026-10-08）。一覧へは上の帯のパンくずで戻る。
     expect(screen.queryByText('← テンプレートへ')).toBeNull()
+    expect(screen.queryByText('形')).toBeNull()
+    expect(screen.queryByText(/この形は新しく作れません/)).toBeNull()
     fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '予約前日' } })
     fireEvent.change(screen.getByLabelText('本文'), { target: { value: '{{name}}さん、明日です' } })
     fireEvent.click(screen.getByRole('button', { name: '保存して配る' }))
@@ -88,6 +90,23 @@ describe('統括のテンプレートを作る（店の作る画面＋保存し�
     expect(input.definition.template).toMatchObject({ name: '予約前日', messageType: 'text', messageContent: '{{name}}さん、明日です' })
     /* 保存のあとは「アカウントへ配る」（meBRB）。 */
     expect(await screen.findByRole('checkbox', { name: /然 -NEN- 本店/ })).toBeTruthy()
+  })
+
+  it.each([
+    ['flex', JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '元の本文' }] } }), JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '直した本文' }] } })],
+    ['image', 'https://img.example/old.png', 'https://img.example/new.png'],
+  ])('統括の既存%sも帯を出して元の形のまま保存できる', async (messageType, messageContent, next) => {
+    calls.get.mockResolvedValue(detail({ ...message, template: { ...message.template, messageType, messageContent } }))
+    calls.update.mockImplementation(async (_id: string, input: { definition: unknown }) => detail(input.definition))
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click(await screen.findByRole('button', { name: '予約前日のご案内' }))
+    fireEvent.click(await screen.findByRole('button', { name: '編集する' }))
+    expect(await screen.findByText('この形は新しく作れません。新しく作るときはカルーセル・リッチメッセージを使ってください。')).toBeTruthy()
+    expect(screen.queryByText('形')).toBeNull()
+    fireEvent.change(screen.getByLabelText('メッセージ内容'), { target: { value: next } })
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    await waitFor(() => expect(calls.update).toHaveBeenCalled())
+    expect(calls.update.mock.calls[0][1].definition.template).toMatchObject({ messageType, messageContent: next })
   })
 
   it('クーポンは店のクーポンを作る画面で作り、店と同じ形の payload を統括のひな形の素材にする（店のアカウントに結びつく欄は出さない）', async () => {

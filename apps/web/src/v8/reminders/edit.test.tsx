@@ -250,7 +250,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
     expect(host.querySelector('[data-design-node="hjNpJ"]')).toBeTruthy()
     expect(host.querySelector('[data-template-region="footer"]')).toBeNull()
     expect(buttonByText('一覧へ戻る')?.getAttribute('href')).toBe('/reminders')
-    expect(buttonByText('配信予定を見る')?.getAttribute('href')).toBe('/reminders/detail?id=reminder-new&status=planned')
+    expect(buttonByText('配信予定を見る')?.getAttribute('href')).toBe('/reminders/detail?id=reminder-new&tab=schedule&status=planned')
     expect(buttonByText('詳細を見る')?.getAttribute('href')).toBe('/reminders/detail?id=reminder-new')
   })
 })

@@ -10,6 +10,13 @@ vi.mock('next/navigation', () => ({
 }))
 
 import CommandPalette from './command-palette'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+
+/* 書きかけの画面の代わり。未保存の確認を待つ間の状態を見せ、「保存せずに移る」を押せる。 */
+function DirtyScreen() {
+  const guard = useUnsavedGuard({ dirty: true })
+  return guard.leaveTarget ? <button type="button" onClick={guard.confirmLeave}>保存せずに移る</button> : null
+}
 
 const items = [
   { href: '/broadcasts', label: '一斉配信', section: '配信' },
@@ -72,5 +79,29 @@ describe('CommandPalette（探す窓・F②）', () => {
     })
     fireEvent.click(screen.getByRole('option', { name: '友だちを探す「山田」' }))
     expect(push).toHaveBeenCalledWith('/friends?q=%E5%B1%B1%E7%94%B0')
+  })
+
+  it('書きかけの画面では、選んでもすぐ移らず未保存の確認を通す', () => {
+    render(<><DirtyScreen /><CommandPalette items={items} /></>)
+    openPalette()
+    fireEvent.change(screen.getByRole('textbox', { name: '機能と友だちを探す' }), {
+      target: { value: 'テンプレ' },
+    })
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Enter' })
+    expect(push).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
+    expect(push).toHaveBeenCalledWith('/templates')
+  })
+
+  it('日本語の変換を確定する Enter では行き先へ飛ばない', () => {
+    render(<CommandPalette items={items} />)
+    openPalette()
+    fireEvent.change(screen.getByRole('textbox', { name: '機能と友だちを探す' }), {
+      target: { value: 'てんぷれ' },
+    })
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Enter', keyCode: 229 })
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Enter', isComposing: true })
+    expect(push).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).not.toBeNull()
   })
 })

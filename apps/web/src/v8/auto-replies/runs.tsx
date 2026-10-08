@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
   Download,
@@ -146,6 +146,7 @@ function initialOf(name: string | null): string {
 }
 
 export default function AutoReplyRunsV8() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const requestedRuleId = searchParams.get('id') ?? ''
   const staffRole = useStaffRole()
@@ -380,7 +381,7 @@ export default function AutoReplyRunsV8() {
         label: 'トークを開く',
         icon: <MessageCircle size={14} aria-hidden="true" />,
         external: true,
-        onSelect: () => { window.location.assign(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
+        onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
       })
     }
     if (canManage && item.canRetry) {

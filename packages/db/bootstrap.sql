@@ -3599,7 +3599,8 @@ CREATE TABLE hq_template_preflight_resolutions (
   target_id TEXT,
   alias_name TEXT,
   expected_revision TEXT,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), friend_attribute_mode TEXT
+  CHECK (friend_attribute_mode IS NULL OR (friend_attribute_mode='skip' AND resolution_mode='overwrite' AND NOT (target_id IS NULL))),
   PRIMARY KEY (preflight_id, tenant_id, source_id),
   CHECK (resolution_mode != 'overwrite' OR (target_id IS NOT NULL AND expected_revision IS NOT NULL)),
   CHECK (resolution_mode != 'alias' OR alias_name IS NOT NULL),
@@ -3665,7 +3666,8 @@ CREATE TABLE hq_templates (
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  archived_at TEXT, folder_id TEXT, extended_type TEXT CHECK (extended_type IS NULL OR extended_type='scenario'),
+  archived_at TEXT, folder_id TEXT, extended_type TEXT CHECK (extended_type IS NULL OR extended_type='scenario'), friend_attribute_type TEXT
+  CHECK (friend_attribute_type IS NULL OR friend_attribute_type IN ('friend_field','mark')),
   PRIMARY KEY (id, tenant_id),
   FOREIGN KEY (current_version_id, id, tenant_id)
     REFERENCES hq_template_versions(id, template_id, tenant_id)
@@ -10282,6 +10284,18 @@ WHEN EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'conversion point with events or usages cannot be deleted'); END;
 
+CREATE TRIGGER hq_attribute_skip_insert BEFORE INSERT ON hq_template_preflight_resolutions
+WHEN NEW.friend_attribute_mode IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM hq_templates t WHERE t.id=NEW.template_id AND t.tenant_id=NEW.tenant_id
+    AND t.friend_attribute_type=NEW.item_kind)
+BEGIN SELECT RAISE(ABORT,'HQ_ATTRIBUTE_SKIP_INVALID'); END;
+
+CREATE TRIGGER hq_attribute_skip_update BEFORE UPDATE ON hq_template_preflight_resolutions
+WHEN NEW.friend_attribute_mode IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM hq_templates t WHERE t.id=NEW.template_id AND t.tenant_id=NEW.tenant_id
+    AND t.friend_attribute_type=NEW.item_kind)
+BEGIN SELECT RAISE(ABORT,'HQ_ATTRIBUTE_SKIP_INVALID'); END;
+
 CREATE TRIGGER hq_template_binding_guard
 BEFORE UPDATE ON hq_templates
 WHEN NEW.id != OLD.id
@@ -10304,6 +10318,15 @@ BEGIN SELECT RAISE(ABORT, 'HQ_FOLDER_SCOPE_INVALID'); END;
 CREATE TRIGGER hq_template_folder_update BEFORE UPDATE OF folder_id, tenant_id ON hq_templates
 WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_template_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND archived_at IS NULL)
 BEGIN SELECT RAISE(ABORT, 'HQ_FOLDER_SCOPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_friend_attribute_insert BEFORE INSERT ON hq_templates
+WHEN NEW.friend_attribute_type IS NOT NULL
+  AND (NEW.template_type!='tag' OR NEW.extended_type IS NOT NULL)
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_friend_attribute_update BEFORE UPDATE OF friend_attribute_type ON hq_templates
+WHEN NEW.friend_attribute_type IS NOT OLD.friend_attribute_type
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_logical_archive_only
 BEFORE DELETE ON hq_templates

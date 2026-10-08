@@ -162,7 +162,7 @@ describe('V8 ウェビナーの編集', () => {
     await render(<WebinarEditV8 />)
     expect(host.textContent).toContain('通知と視聴後のこと')
     expect(host.querySelector('[aria-current="step"]')?.textContent).toContain('通知')
-    const video = buttons().find((button) => button.textContent?.includes('動画') && button.closest('[data-part="stepper"]'))
+    const video = buttons().find((button) => button.textContent?.includes('動画') && button.closest('[data-part="steps"]'))
     expect(video).toBeTruthy()
     await act(async () => { video!.click() })
     for (let i = 0; i < 4; i += 1) await act(async () => {})

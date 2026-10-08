@@ -9,6 +9,7 @@
  * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
  * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CircleDot, Folder, Gauge, Inbox, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -69,7 +70,7 @@ export default function HqBannersListV8() {
 
 function BannersInner() {
   usePageTitle('バナー生成')
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const tab: Tab = params.get('tab') === 'library' ? 'library' : 'projects'
   const role = useStaffRole()
@@ -109,7 +110,7 @@ function BannersInner() {
   }, [loadSummary])
 
   // タブの切り替えは `?tab=` で、履歴を積まない（v7 と同じ）。
-  const changeTab = (next: Tab) => router.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')
+  const changeTab = (next: Tab) => samePageUrl.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')
 
   const kpis = (
     <div className={styles.kpis} data-design="KPIs">

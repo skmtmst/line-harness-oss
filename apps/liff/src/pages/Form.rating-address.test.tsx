@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { FormLayout } from '@line-crm/shared';
 import Form from './Form.js';
@@ -184,5 +184,48 @@ describe('住所', () => {
     fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
     fireEvent.click(await screen.findByRole('button', { name: '東京都千代田区皇居外苑' }));
     expect(await screen.findByDisplayValue('皇居外苑')).toBeTruthy();
+  });
+
+  it('調べている間に書いた番地・建物名を、届いた応答で消さない（監査 L11）', async () => {
+    setup();
+    fireEvent.change(await screen.findByLabelText('郵便番号'), { target: { value: '100-0001' } });
+    let answer: (v: Awaited<ReturnType<typeof postalCodeSearch>>) => void = () => {};
+    postalCodeSearch.mockImplementation(() => new Promise((r) => { answer = r; }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.change(screen.getByLabelText('番地'), { target: { value: '1-2-3' } });
+    fireEvent.change(screen.getByLabelText('建物名'), { target: { value: 'テストビル 101' } });
+    await act(async () => {
+      answer({
+        success: true,
+        data: {
+          query: '100-0001', normalized: '1000001', status: 'matched',
+          candidates: [{ postalCode: '1000001', prefecture: '東京都', city: '千代田区', town: '千代田' }],
+        },
+      });
+    });
+    expect(await screen.findByDisplayValue('千代田区')).toBeTruthy();
+    expect(screen.getByDisplayValue('1-2-3')).toBeTruthy();
+    expect(screen.getByDisplayValue('テストビル 101')).toBeTruthy();
+  });
+
+  it('調べている間に郵便番号を書き換えたら、前の番号の応答は入れない（監査 L11）', async () => {
+    setup();
+    fireEvent.change(await screen.findByLabelText('郵便番号'), { target: { value: '100-0001' } });
+    let answer: (v: Awaited<ReturnType<typeof postalCodeSearch>>) => void = () => {};
+    postalCodeSearch.mockImplementation(() => new Promise((r) => { answer = r; }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.change(screen.getByLabelText('郵便番号'), { target: { value: '530-0001' } });
+    await act(async () => {
+      answer({
+        success: true,
+        data: {
+          query: '100-0001', normalized: '1000001', status: 'matched',
+          candidates: [{ postalCode: '1000001', prefecture: '東京都', city: '千代田区', town: '千代田' }],
+        },
+      });
+    });
+    expect(screen.queryByDisplayValue('千代田区')).toBeNull();
+    expect(screen.getByDisplayValue('530-0001')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '住所を自動入力' }).hasAttribute('disabled')).toBe(false);
   });
 });

@@ -218,6 +218,8 @@ const EXEMPTIONS: Record<string, string> = {
     '編集を持たない上部の帯の部品。段を替えて戻るパンくず（onSelect）を共通の未保存確認（requestUnsavedAction）へ委ねる',
   'components/shell/app-top-bar.tsx':
     '編集を持たない上部の帯。アカウント切替と移動を共通の未保存確認へ委ねる',
+  'components/shared/command-palette.tsx':
+    '編集を持たない探す窓（⌘K）。選んだ行き先への移動を共通の未保存確認へ委ねる',
   'v8/restaurant/closures/closure-dialog.tsx': '臨時休業・貸切を足す・変える窓（提案 E-10 nVvXy）。保存の口は窓の中だけで、開くたびに押した日か記録から作り直し、閉じると入力を破棄する。',
   'v8/restaurant/front-desk/phone-drawer.tsx': '電話予約の引き出し（提案 E-2）。保存の口は引き出しの中だけで、開くたびに空から始まり、閉じると入力を破棄する（入力中は題に * が付く）。',
   'app/reminders/basics-form-v8.tsx':

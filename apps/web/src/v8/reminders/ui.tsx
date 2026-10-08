@@ -1,10 +1,11 @@
 'use client'
 
+import { Steps } from '@/components/templates/steps'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
-import Stepper, { type StepperStep } from '@/components/shared/stepper'
+import type { StepperStep } from '@/components/shared/stepper'
 import RadioCard from '@/components/shared/radio-card'
 import LinePreview from '@/components/shared/line-preview'
 import Button from '@/components/shared/button'
@@ -58,7 +59,7 @@ export function ReminderV8Stepper({ current, reminderId }: { current: ReminderV8
       onSelect: done ? () => router.push(stepHref(step.key, reminderId)) : undefined,
     }
   })
-  return <Stepper label="リマインダを作る手順" steps={steps} currentKey={current === 'done' ? undefined : current} />
+  return <Steps label="リマインダを作る手順" steps={steps} currentKey={current === 'done' ? undefined : current} />
 }
 
 /** 頭の「← リマインダへ」。 */

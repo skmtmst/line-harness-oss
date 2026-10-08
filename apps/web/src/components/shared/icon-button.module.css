@@ -119,4 +119,21 @@
   border-radius: var(--radius-mini);
 }
 [data-theme='v8'] .button[data-size='small'] > :is(svg, img) { width: var(--tpl-icon-btn-sm-icon); height: var(--tpl-icon-btn-sm-icon); }
+
+/*
+ * 行の右端の「…」（size="row"・★V8 i0Ao0R・noVq4・DzdC3・wZPua の「その他の操作」）：28×28・角丸 control・印 14。
+ * 見た目は 28 のまま、押せる所だけ周りへ 36 まで広げる（::before は透明・行の高さは変えない）。
+ */
+[data-theme='v8'] .button[data-size='row'] {
+  position: relative;
+  width: var(--tpl-icon-btn-row);
+  height: var(--tpl-icon-btn-row);
+  flex-basis: var(--tpl-icon-btn-row);
+}
+[data-theme='v8'] .button[data-size='row'] > :is(svg, img) { width: var(--tpl-icon-btn-row-icon); height: var(--tpl-icon-btn-row-icon); }
+[data-theme='v8'] .button[data-size='row']::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--tpl-icon-btn-row) - var(--tpl-icon-btn-row-hit)) / 2);
+}
 }

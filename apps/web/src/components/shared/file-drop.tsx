@@ -7,7 +7,7 @@ import IconButton from './icon-button'
 import styles from './file-drop.module.css'
 
 /**
- * ファイルを落とす場所。Pencil ★V7 `NQMnx`「★V7 添付ファイル・ファイルを落とす場所」。
+ * ファイルを落とす場所。Pencil ★V8（V8.pen）「ファイルを落とす欄」。
  *
  * 受信箱の返信欄・配信の画像・登録メディアの取り込みでばらばらだった見せ方をそろえる。
  * 形の手本は kobra.systems の Attachment・Magnetic Dropzone
@@ -198,7 +198,7 @@ function matchesAccept(item: DataTransferItem, accept?: string): boolean {
 }
 
 /**
- * 添付ファイルの行。Pencil ★V7 `NQMnx`「1. 添付ファイルの行」。
+ * 添付ファイルの行。Pencil ★V8（V8.pen）「ファイルを落とす欄」の添付ファイルの行。
  *
  * - 行の高さ 56・縮小画像 36（画像は 1px の薄い縁）。`thumbnail` に縮小画像を渡す
  * - 名前は 1 行で省略し、全文は `title` で。補足（種類・大きさ）は `meta`

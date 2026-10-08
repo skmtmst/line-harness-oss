@@ -160,8 +160,9 @@ export default function SeatReserve() {
     if (first && first.date !== date && chips.some((c) => c.date === date)) setDate(first.date);
   }, [chips, days, date, startsAt]);
 
+  // 仮押さえの送信中は選び直させない（表示は B・確定は A の食い違いを作らない）。
   function pickGuests(n: number) {
-    if (!store || n === guestCount) return;
+    if (!store || busy || n === guestCount) return;
     setGuestCount(n);
     setStartsAt(null);
     setError(null);
@@ -172,7 +173,7 @@ export default function SeatReserve() {
   }
 
   function pickDate(d: string) {
-    if (!store) return;
+    if (!store || busy) return;
     setDate(d);
     setStartsAt(null);
     setError(null);
@@ -181,6 +182,7 @@ export default function SeatReserve() {
   }
 
   function pickTime(s: string) {
+    if (busy) return;
     setStartsAt(s);
     setError(null);
     requestId.current = null;
@@ -383,9 +385,10 @@ export default function SeatReserve() {
                 timeZone={store.timezone}
                 storeName={store.name}
                 customerName={customerName}
-                startsAt={slot.startsAt}
-                endsAt={slot.endsAt}
-                guestCount={guestCount}
+                // 確認は仮押さえした中身で出す（確定はこの仮押さえを送る）。
+                startsAt={!target && hold ? hold.startsAt : slot.startsAt}
+                endsAt={!target && hold ? hold.endsAt : slot.endsAt}
+                guestCount={!target && hold ? hold.guestCount : guestCount}
                 cancelDeadlineMinutesBefore={minutes}
                 seat={seatText(target ? target.seatType : hold?.seatType, slot.seatTypes)}
                 late={lateRule(late)}

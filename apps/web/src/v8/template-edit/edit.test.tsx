@@ -111,6 +111,34 @@ afterEach(() => {
 })
 
 describe('V8 メッセージを作る・編集', () => {
+  it('新しいメッセージは形の切り替えを出さず、テキストで保存する', async () => {
+    templatesApi.create.mockResolvedValue({ success: true, data: { id: 'new-text' } })
+    await mount()
+    expect(screen.queryByRole('group', { name: 'メッセージの形' })).toBeNull()
+    expect(screen.queryByText('形')).toBeNull()
+    expect(screen.queryByText(/この形は新しく作れません/)).toBeNull()
+    type(screen.getByLabelText('テンプレート名'), '新しい本文')
+    type(screen.getByLabelText('本文'), 'こんにちは')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await flush()
+    expect(templatesApi.create).toHaveBeenCalledWith(expect.objectContaining({ messageType: 'text', messageContent: 'こんにちは' }))
+  })
+
+  it.each([
+    ['flex', JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '元の本文' }] } }), JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '直した本文' }] } })],
+    ['image', 'https://img.example/old.png', 'https://img.example/new.png'],
+  ])('既存の%sは帯を出し、形の切り替えなしで元の形のまま保存できる', async (messageType, messageContent, next) => {
+    templatesApi.get.mockResolvedValue(detail({ messageType, messageContent }))
+    templatesApi.update.mockResolvedValue({ success: true, data: { id: 'template-1' } })
+    await mount('id=template-1')
+    expect(screen.getByText('この形は新しく作れません。新しく作るときはカルーセル・リッチメッセージを使ってください。')).toBeTruthy()
+    expect(screen.queryByText('形')).toBeNull()
+    type(screen.getByLabelText('メッセージ内容'), next)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await flush()
+    expect(templatesApi.update).toHaveBeenCalledWith('template-1', expect.objectContaining({ messageType, messageContent: next }))
+  })
+
   it('見本から作る（?example=）：見本の名前と本文を入れて開き、保存はしない', async () => {
     loadExamples.mockResolvedValue([{ id: 'template-example-booking', name: '予約の受付', body: 'ご予約を受け付けました。' }])
     await mount('example=template-example-booking')

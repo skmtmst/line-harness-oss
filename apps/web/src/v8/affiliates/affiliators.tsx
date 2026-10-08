@@ -11,8 +11,8 @@
  * フォルダの列：アフィリエイターを分けて保存する口は無いので、報酬の決め方で
  * 分けた見え方の切り替えとして持つ（保存しない）。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Banknote, CircleDot, CircleHelp, Download, Plus, Trophy, Users } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -97,7 +97,7 @@ function folderDotOf(row: AffiliateListRow): { name: string; color?: string } | 
 }
 
 export default function AffiliatorsTab() {
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const { readonly, narrow, accountId, setCount, focusAffiliateId } = useAffiliateShell()
   const settlementPeriod = useMemo(() => currentSettlementPeriod(), [])
 
@@ -657,7 +657,7 @@ export default function AffiliatorsTab() {
             linkBaseUrl={linkBaseUrl}
             onClose={() => {
               setDrawerId(null)
-              if (focusAffiliateId) router.replace('/affiliates')
+              if (focusAffiliateId) samePageUrl.replace('/affiliates')
             }}
             onChanged={() => { void loadList(); void loadApprovals({ fresh: true }) }}
             onStopRequest={(id, name) => setArchiveTarget({ id, name })}

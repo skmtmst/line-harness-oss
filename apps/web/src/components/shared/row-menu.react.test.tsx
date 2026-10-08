@@ -26,6 +26,27 @@ const openMenu = async () => {
 }
 
 describe('RowMenu：行の右端の「…」', () => {
+  it('size="row" は 28角の印（印14）、省略時は 36角のまま（板ごとに絵の大きさ）', () => {
+    const { unmount } = render(<RowMenu label="春のセールの操作" items={items()} size="row" />)
+    expect(trigger().getAttribute('data-size')).toBe('row')
+    expect(trigger().querySelector('svg')?.getAttribute('width')).toBe('14')
+    unmount()
+    render(<RowMenu label="春のセールの操作" items={items()} />)
+    expect(trigger().getAttribute('data-size')).toBeNull()
+    expect(trigger().querySelector('svg')?.getAttribute('width')).toBe('16')
+  })
+
+  it('28角の CSS は v8 だけで効き、押せる所は 36 まで広げる', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const css = readFileSync(join(process.cwd(), 'src/components/shared/icon-button.module.css'), 'utf8')
+    const globals = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8')
+    expect(css).toMatch(/\[data-theme='v8'\] \.button\[data-size='row'\] \{[^}]*width: var\(--tpl-icon-btn-row\)/)
+    expect(css).toMatch(/\[data-size='row'\]::before \{[^}]*--tpl-icon-btn-row-hit/)
+    expect(globals).toContain('--tpl-icon-btn-row: 28px;')
+    expect(globals).toContain('--tpl-icon-btn-row-hit: 36px;')
+  })
+
   it('「…」はメニューを開くボタンとして読み上げ、押すと開いて最初の項目へ移る', async () => {
     render(<RowMenu label="春のセールの操作" items={items()} />)
     expect(trigger().getAttribute('aria-haspopup')).toBe('menu')

@@ -30,6 +30,13 @@ describe('帯（Notice）の4種類', () => {
     }
   })
 
+  it('呼び出し側が role を指定したら上書きしない（注意色でも alert・案内でも status）', () => {
+    const { container: w } = render(<Notice tone="warn" role="alert" message="別の画面で変わりました" />)
+    expect(w.firstElementChild!.getAttribute('role')).toBe('alert')
+    const { container: i } = render(<Notice tone="info" role="status" message="読み込んでいます" />)
+    expect(i.firstElementChild!.getAttribute('role')).toBe('status')
+  })
+
   it('V5 の呼び名（validation・error）は注意・危険として出す', () => {
     const { container: v } = render(<Notice tone="validation" message="確かめてください" />)
     const { container: w } = render(<Notice tone="warn" message="確かめてください" />)

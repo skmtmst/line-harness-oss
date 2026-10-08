@@ -440,6 +440,7 @@ a.way:hover {
 .colorSwatch {
   width: var(--tpl-tg2-swatch);
   height: var(--tpl-tg2-swatch);
+  min-height: 0; /* 全体のボタンの最小の高さ（32）で縦に伸びて楕円になっていた */
   padding: 0;
   border: 0;
   border-radius: var(--radius-pill);
