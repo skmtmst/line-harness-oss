@@ -10,6 +10,7 @@ import type { Env } from '../index.js';
 import { requireHqTemplateAuthority, type HqTemplateAuthority } from '../services/hq-templates/contract.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
+  templateVersions, compareTemplateVersions, restoreTemplateVersion, templateReceivedVersions,
   HqTemplateError, templateCreationRequestId, listTemplates, listTemplateAccounts, templateDetail, saveTemplate, deleteTemplate,
   preflightDistribution, distributeTemplate, distributionResult, type DistributionSelection,
 } from '../services/hq-templates/distribution.js';
@@ -22,7 +23,7 @@ async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
   // A missing database identity does not turn into a tenant-wide administrator.
   if (!member || member.is_active !== 1 || member.tenant_id !== staff.tenantId) throw new HqTemplateError('FORBIDDEN', 403);
   const auth = requireHqTemplateAuthority({ tenantId: staff.tenantId, actorId: staff.id,
-    role: member.role, readOnly: staff.readOnly || member.access_level === 'read_only', accountScoped: member.account_scope === 'accounts' });
+    role: member.role, readOnly: !['GET','HEAD'].includes(c.req.method) && (staff.readOnly || member.access_level === 'read_only'), accountScoped: member.account_scope === 'accounts' });
   if (auth.kind !== 'AUTHORIZED') throw new HqTemplateError('FORBIDDEN', 403);
   return auth.authority;
 }
@@ -95,16 +96,29 @@ hqTemplates.get('/api/hq/templates', async c => {
   const type = c.req.query('type');
   if (type && !HQ_TEMPLATE_TYPES.includes(type as HqTemplateType)) throw new HqTemplateError('INVALID_TYPE');
   const kind=c.req.query('kind');
-  if(kind && (!TEMPLATE_KINDS.includes(kind as TemplateKind) || (type && type!=='template'))) throw new HqTemplateError('INVALID_KIND');
-  const rows=await listTemplates(dbFor(c.env),await authority(c),kind?'template':type as HqTemplateType | undefined);
+  if(kind && (kind==='tag' ? (type && type!=='tag') : (!TEMPLATE_KINDS.includes(kind as TemplateKind) || (type && type!=='template')))) throw new HqTemplateError('INVALID_KIND');
+  const rows=await listTemplates(dbFor(c.env),await authority(c),kind==='tag'?'tag':kind?'template':type as HqTemplateType | undefined);
   const counts=Object.fromEntries(TEMPLATE_KINDS.map(k=>[k,rows.filter(row=>row.kind===k).length])) as TemplateKindCounts;
-  return c.json({success:true,data:kind?rows.filter(row=>row.kind===kind):rows,kind_counts:counts});
+  return c.json({success:true,data:kind&&kind!=='tag'?rows.filter(row=>row.kind===kind):rows,kind_counts:counts,stats:{thisMonthSentCount:rows.some(r=>r.this_month_sent_count===null)?null:rows.reduce((n,r)=>n+(r.this_month_sent_count??0),0),
+    outdatedTemplateCount:rows.filter(r=>(r.outdated_account_count??0)>0).length}});
+});
+hqTemplates.get('/api/hq/templates/attribute-kind-counts',async c=>{
+ const rows=await listTemplates(dbFor(c.env),await authority(c),'tag');
+ return c.json({success:true,data:{tag:rows.length,friend_field:null,support_mark:null},
+   unavailable:{friend_field:'店ごとの所属が未対応',support_mark:'店ごとの所属が未対応'}});
 });
 hqTemplates.get('/api/hq/templates/folders', async c => c.json({ success:true, data:await listTemplateFolders(dbFor(c.env),await authority(c)) }));
 hqTemplates.post('/api/hq/templates/folders', async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c)) },201));
 hqTemplates.patch('/api/hq/templates/folders/:id', async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c),c.req.param('id')) }));
 hqTemplates.delete('/api/hq/templates/folders/:id', async c => c.json({ success:true, data:await deleteTemplateFolder(dbFor(c.env),await authority(c),c.req.param('id'),(await body(c)).expectedRevision) }));
 hqTemplates.post('/api/hq/templates/:id/duplicate', async c => c.json({ success:true, data:await duplicateTemplate(dbFor(c.env),await authority(c),c.req.param('id'),await body(c)) },201));
+hqTemplates.get('/api/hq/templates/:id/versions',async c=>c.json({success:true,data:await templateVersions(dbFor(c.env),await authority(c),c.req.param('id'))}));
+hqTemplates.get('/api/hq/templates/:id/versions/compare',async c=>c.json({success:true,data:await compareTemplateVersions(dbFor(c.env),await authority(c),c.req.param('id'),Number(c.req.query('from')),Number(c.req.query('to')))}));
+hqTemplates.post('/api/hq/templates/:id/versions/:version/restore',async c=>{
+  const input=await body(c),data=await restoreTemplateVersion(dbFor(c.env),await authority(c),c.req.param('id'),Number(c.req.param('version')),input.expectedRevision);
+  c.set('auditRecorded',true);return c.json({success:true,data});
+});
+hqTemplates.get('/api/hq/templates/:id/received-versions',async c=>c.json({success:true,data:await templateReceivedVersions(dbFor(c.env),await authority(c),c.req.param('id'))}));
 hqTemplates.get('/api/hq/templates/:id', async c => c.json({ success: true, data: await templateDetail(dbFor(c.env), await authority(c), c.req.param('id')) }));
 hqTemplates.post('/api/hq/templates', async c => {
   const auth = await authority(c), input = await body(c), headerKey = c.req.header('Idempotency-Key');

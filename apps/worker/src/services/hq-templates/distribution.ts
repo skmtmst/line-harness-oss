@@ -139,6 +139,20 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
     const names = JSON.parse(distributed_account_names_json) as string[];
     return {
       ...template,
+      ...(() => {
+        try {
+          if(template.template_type==='tag'&&definition_json) {
+            const tag=parseTagDefinition(JSON.parse(definition_json)).tag;
+            return {manual_assignment_allowed:tag.manualAssignmentAllowed!==false,
+              assignment_method:tag.manualAssignmentAllowed!==false?'手動・自動':'自動'};
+          }
+          if(template.template_type==='rich_menu'&&definition_json) {
+            const menu=parseRichMenuTemplateDefinition({templateVersionId:'list',definitionJson:definition_json},authority.tenantId).richMenu;
+            return {display_order:menu.displayOrder??0,display_audience:menu.displayAudience==='all'?'全員':'配布先で店が決める'};
+          }
+        } catch { /* 壊れた版は未取得。 */ }
+        return {manual_assignment_allowed:null,assignment_method:null,display_order:null,display_audience:null};
+      })(),
       distributed_account_names: names,
       distributed_account_more: Math.max(0, template.distributed_account_count - names.length),
       kind: template.template_type==='template' && definition_json ? (()=>{try{return templateKind(parseMessageTemplateDefinition(JSON.parse(definition_json)))}catch{return null}})() : null,
@@ -355,4 +369,53 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
   const status = succeeded === preflights.length ? 'completed' : succeeded ? 'partial' : 'failed';
   await db.prepare(`UPDATE hq_template_distribution_runs SET status=?,finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND tenant_id=? AND status='running'`).bind(status, runId, authority.tenantId).run();
   return distributionResult(db, authority, templateId, runId);
+}
+
+export async function templateVersions(db: D1Database, authority: HqTemplateAuthority, id: string) {
+  await templateDetail(db, authority, id);
+  const rows = await db.prepare(`SELECT v.id,v.version,v.created_by,s.name AS creator_name,v.created_at,
+      NOT EXISTS(SELECT 1 FROM hq_template_distribution_results r WHERE r.tenant_id=v.tenant_id AND r.template_id=v.template_id
+        AND r.template_version_id=v.id AND r.status='succeeded') AS is_draft,
+      v.id=t.current_version_id AS is_current
+    FROM hq_template_versions v JOIN hq_templates t ON t.id=v.template_id AND t.tenant_id=v.tenant_id
+    LEFT JOIN staff_members s ON s.id=v.created_by AND s.tenant_id=v.tenant_id
+    WHERE v.tenant_id=? AND v.template_id=? ORDER BY v.version DESC`).bind(authority.tenantId,id).all<{
+      id:string;version:number;created_by:string|null;creator_name:string|null;created_at:string;is_draft:number;is_current:number
+    }>();
+  return rows.results.map(r=>({...r,is_draft:!!r.is_draft,is_current:!!r.is_current}));
+}
+async function historicalVersion(db: D1Database, authority: HqTemplateAuthority, id: string, version: unknown) {
+  if (!Number.isSafeInteger(version) || Number(version)<1) throw new HqTemplateError('INVALID_VERSION');
+  const row=await db.prepare('SELECT definition_json,content_hash FROM hq_template_versions WHERE tenant_id=? AND template_id=? AND version=?')
+    .bind(authority.tenantId,id,Number(version)).first<{definition_json:string;content_hash:string}>();
+  if(!row) throw new HqTemplateError('NOT_FOUND',404);
+  return row;
+}
+export async function compareTemplateVersions(db: D1Database, authority: HqTemplateAuthority, id: string, from: number, to: number) {
+  const versions=await templateVersions(db,authority,id);
+  const a=await historicalVersion(db,authority,id,from),b=await historicalVersion(db,authority,id,to);
+  return {from:{version:versions.find(v=>v.version===from)!,definition:JSON.parse(a.definition_json) as unknown},
+    to:{version:versions.find(v=>v.version===to)!,definition:JSON.parse(b.definition_json) as unknown},changed:a.content_hash!==b.content_hash};
+}
+export async function restoreTemplateVersion(db: D1Database, authority: HqTemplateAuthority, id: string, version: unknown, revision: unknown) {
+  const current=await templateDetail(db,authority,id);
+  const old=await historicalVersion(db,authority,id,version);
+  // 過去の版を書き換えず、新しい版として保存する。通常保存と同じ競合・監査・検証を通す。
+  return saveTemplate(db,authority,{name:current.template.name,description:current.template.description,
+    definition:JSON.parse(old.definition_json),expectedRevision:revision},id);
+}
+export async function templateReceivedVersions(db: D1Database, authority: HqTemplateAuthority, id: string) {
+  const {template}=await templateDetail(db,authority,id);
+  const latest=await db.prepare('SELECT version FROM hq_template_versions WHERE tenant_id=? AND template_id=? AND id=?')
+    .bind(authority.tenantId,id,template.current_version_id).first<{version:number}>();
+  const rows=await db.prepare(`WITH ranked AS (
+      SELECT r.*, ROW_NUMBER() OVER (PARTITION BY target_account_id ORDER BY finished_at DESC,started_at DESC,rowid DESC) AS position
+      FROM hq_template_distribution_results r WHERE tenant_id=? AND template_id=? AND status='succeeded')
+    SELECT a.id,a.name,r.finished_at,v.version FROM ranked r
+    JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
+    JOIN hq_template_versions v ON v.id=r.template_version_id AND v.tenant_id=r.tenant_id AND v.template_id=r.template_id
+    WHERE r.position=1 ORDER BY a.name,a.id`).bind(authority.tenantId,id).all<{id:string;name:string;finished_at:string|null;version:number}>();
+  return rows.results.map(r=>({accountId:r.id,accountName:r.name,receivedAt:r.finished_at,
+    targetVersion:{version:r.version,latestVersion:latest!.version,status:r.version===latest!.version?'latest' as const:'older' as const,
+      label:`版${r.version}${r.version===latest!.version?'（いまの版）':''}`}}));
 }

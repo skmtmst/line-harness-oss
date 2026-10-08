@@ -40,6 +40,17 @@ describe('HQ creation receipt storage', () => {
     persistCreationAttempt(s, scope, 'tag', item)
     expect(loadCreationAttempt(s, scope, 'tag')).toEqual(item)
   })
+  it('店と同じ6種類の素材（クーポン・リッチメッセージ）を含むテンプレートの作成依頼を保存し、知らない種類は保存しない', () => {
+    const template = { id: 'hq-authored-message', name: '冬の10%オフ', category: 'general', messageType: 'text' as const, messageContent: '', carouselActionsJson: null, carouselTapLimitMode: 'none' as const, carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' as const }
+    const item = (asset: unknown) => ({ requestId: 'request-asset', distribute: true, input: { type: 'template' as const, name: '冬の10%オフ', definition: { schemaVersion: 1 as const, template, media: [], asset } } })
+    for (const asset of [{ kind: 'coupon', payload: { description: '割引', startsAt: '2026-12-01', endsAt: '2026-12-31' } }, { kind: 'rich_message', payload: { baseUrl: 'https://img.test/r', tapAreas: [] } }]) {
+      const s = storage()
+      persistCreationAttempt(s, scope, 'template', item(asset) as never)
+      expect(loadCreationAttempt(s, scope, 'template')).toEqual(item(asset))
+    }
+    expect(() => persistCreationAttempt(storage(), scope, 'template', item({ kind: 'unknown', payload: {} }) as never)).toThrow()
+    expect(() => persistCreationAttempt(storage(), scope, 'template', item({ kind: 'coupon', payload: [] }) as never)).toThrow()
+  })
   it('店舗画面と同じ回答フォームのレイアウトを含む作成依頼を保存する', () => {
     const s = storage(), layout = emptyLayout()
     layout.sections[0].blocks.push({ id: 'answer_1', kind: 'input', type: 'text', name: 'answer', label: '回答', required: true })

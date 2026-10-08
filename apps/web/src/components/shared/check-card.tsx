@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import styles from './check-card.module.css'
 
 /**
@@ -13,15 +14,22 @@ export default function CheckCard({
   title,
   note,
   disabled = false,
+  size = 'regular',
   className,
 }: {
   checked: boolean
   onChange: (checked: boolean) => void
-  /** 選択肢の名前 */
-  title: string
+  /** 選択肢の名前（印＋名前のように、文字の前に印を置くときは要素で渡す） */
+  title: ReactNode
   /** 補足（任意） */
   note?: React.ReactNode
   disabled?: boolean
+  /**
+   * 箱の大きさ。既定は高さ 68・余白 14。
+   * `'compact'` は高さ 56・左右 12・間 10・角丸 10・題 13/600・補足 11（★V8 統括の一括配信「送るアカウント」J5DH6o）。
+   * 3つ横に並べる小さな選択肢に使う。渡したときだけ効き、既定の見た目は変えない。
+   */
+  size?: 'regular' | 'compact'
   className?: string
 }) {
   return (
@@ -30,6 +38,7 @@ export default function CheckCard({
         styles.card,
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,
+        size === 'compact' ? styles.compact : null,
         className,
       ].filter(Boolean).join(' ')}
     >

@@ -49,6 +49,7 @@ async function loadBroadcast(
 ): Promise<Broadcast | null> {
   const broadcast = await getBroadcastById(db, id);
   if (!broadcast) return null;
+  if (broadcast.hq_run_id) return null; // 統括配信の承認は統括の口だけで決める。
   if (!await canAccessAllLineAccounts(db, staff, accountIdsOf(broadcast))) return null;
   return broadcast;
 }
