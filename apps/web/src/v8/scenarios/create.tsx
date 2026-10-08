@@ -293,6 +293,9 @@ export default function ScenarioCreateV8() {
           finishDraft()
           router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
         }
+      } catch {
+        // WEB226：通信の失敗（例外）も、方式を選んだときと同じ言葉で出す（黙って何も起きない、にしない）。
+        setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
       } finally {
         setDetailsSaving(false)
       }

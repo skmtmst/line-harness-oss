@@ -22,7 +22,7 @@ import {
 } from '@/components/broadcasts/broadcast-approval'
 import type { BroadcastApprovalCandidate } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
+import { audienceNamesNeeded, audienceNamesUsable, audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
 import { clickInsightDetail, formatBroadcastDateTime, openInsightDetail } from './broadcast-insight-display'
 import { broadcastDetailCsv } from './broadcast-detail-export'
@@ -67,6 +67,7 @@ function BroadcastDetailInner() {
    */
   const [conflict, setConflict] = useState(false)
   const shownVersionRef = useRef<number | null>(null)
+  const approvalTargetRef = useRef('')
   // BROADCAST-15: 宛先の条件に出すタグ名・シナリオ名。配信本体とは別に取る。
   // 読み込めないことと、宛先が消えていることは分けて出す。
   const [audienceNameState, setAudienceNameState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -129,6 +130,9 @@ function BroadcastDetailInner() {
 
   useEffect(() => {
     let active = true
+    // WEB311：前の配信の承認操作の「処理中」を持ち越さない。
+    setApprovalBusy(false)
+    setApprovalMessage(null)
     setBroadcast(null)
     setInsight(null)
     setInsightState('loading')
@@ -188,7 +192,9 @@ function BroadcastDetailInner() {
               if (!active) return
               const tags = tagsRes.status === 'fulfilled' && tagsRes.value.success ? tagsRes.value.data : null
               const scenarios = scenariosRes.status === 'fulfilled' && scenariosRes.value.success ? scenariosRes.value.data : null
-              if (!tags && !scenarios) {
+              // WEB310：要る側が読めていないのに空の一覧で要約すると、
+              // あるタグ・シナリオが「削除済み」と出る。要る側の失敗は失敗として出す。
+              if (!audienceNamesUsable(audienceNamesNeeded(detail.data), { tags: Boolean(tags), scenarios: Boolean(scenarios) })) {
                 setAudienceNameState('error')
                 return
               }
@@ -366,10 +372,18 @@ function BroadcastDetailInner() {
    * 二者承認の操作（設計 A-2・A-3）。終わったら状態を読み直す。
    * 承認して送るは、承認のあと送る操作まで続ける。
    */
-  const reloadApproval = async () => {
+  /*
+   * WEB311：承認の操作・読み直しの応答は、押したときの配信（とアカウント）に
+   * 結びつける。途中で別の配信へ移ったら、前の配信の応答で今の承認の帯・
+   * 文・押せる状態を書き換えない。要求そのものは押した配信の ID へ送る。
+   */
+  approvalTargetRef.current = `${selectedAccountId ?? ''}|${id}`
+  const approvalTargetKey = () => approvalTargetRef.current
+  const reloadApproval = async (target = approvalTargetKey()) => {
     if (!id) return
     try {
       const res = await api.broadcasts.approval.get(id)
+      if (approvalTargetRef.current !== target) return
       if (res.success) setApprovalState(res.data)
     } catch {
       // 読み直しの失敗は黙って次へ。帯の文は古いまま残る。
@@ -379,19 +393,23 @@ function BroadcastDetailInner() {
     action: () => Promise<{ success: boolean; error?: string }>,
   ) => {
     if (approvalBusy) return
+    const target = approvalTargetKey()
+    const moved = () => approvalTargetRef.current !== target
     setApprovalBusy(true)
     setApprovalMessage(null)
     try {
       const res = await action()
+      if (moved()) return
       if (!res.success) {
         setApprovalMessage(res.error ?? '操作できませんでした。')
         return
       }
-      await reloadApproval()
+      await reloadApproval(target)
     } catch {
+      if (moved()) return
       setApprovalMessage('操作できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setApprovalBusy(false)
+      if (!moved()) setApprovalBusy(false)
     }
   }
   const handleApprovalCancel = () => void runApprovalAction(() => api.broadcasts.approval.cancel(id))
@@ -401,10 +419,13 @@ function BroadcastDetailInner() {
   const handleApprovalApprove = (stepUpToken?: string) =>
     void (async () => {
       if (approvalBusy) return
+      const target = approvalTargetKey()
+      const moved = () => approvalTargetRef.current !== target
       setApprovalBusy(true)
       setApprovalMessage(null)
       try {
         const approved = await api.broadcasts.approval.approve(id, stepUpToken)
+        if (moved()) return
         if (!approved.success) {
           setApprovalMessage(approved.error)
           return
@@ -412,16 +433,18 @@ function BroadcastDetailInner() {
         // 予約なし（今すぐ送る分）は、承認のあと既存の送信の流れへ渡す。
         if (approved.data?.needsSend) {
           const sent = await api.broadcasts.send(id)
+          if (moved()) return
           if (!sent.success) {
             setApprovalMessage(`承認しましたが、送信できませんでした。${sent.error}`)
-            await reloadApproval()
+            await reloadApproval(target)
             return
           }
           setReloadToken((value) => value + 1)
           return
         }
-        await reloadApproval()
+        await reloadApproval(target)
       } catch (caught) {
+        if (moved()) return
         // 一斉配信の承認は大事な操作。本人確認を求められたら窓を立てる（V-1）。
         if (!stepUpToken && isStepUpRequired(caught)) {
           setApprovalStepUp({ purpose: 'broadcast.approval', action: '一斉配信を承認する', retry: (token) => Promise.resolve(handleApprovalApprove(token)) })
@@ -429,7 +452,7 @@ function BroadcastDetailInner() {
         }
         setApprovalMessage('操作できませんでした。状態を読み直してから、もう一度お試しください。')
       } finally {
-        setApprovalBusy(false)
+        if (!moved()) setApprovalBusy(false)
       }
     })()
   const handleApprovalRequest = () =>
@@ -439,6 +462,8 @@ function BroadcastDetailInner() {
         setApprovalMessage('承認をお願いする人を選んでください')
         return
       }
+      const target = approvalTargetKey()
+      const moved = () => approvalTargetRef.current !== target
       setApprovalBusy(true)
       setApprovalMessage(null)
       try {
@@ -446,17 +471,19 @@ function BroadcastDetailInner() {
           approverStaffId: reApproverId,
           note: reApprovalNote.trim() || undefined,
         })
+        if (moved()) return
         if (!requested.success) {
           setApprovalMessage(requested.error)
           return
         }
         setReApproverId('')
         setReApprovalNote('')
-        await reloadApproval()
+        await reloadApproval(target)
       } catch {
+        if (moved()) return
         setApprovalMessage('依頼できませんでした。状態を読み直してから、もう一度お試しください。')
       } finally {
-        setApprovalBusy(false)
+        if (!moved()) setApprovalBusy(false)
       }
     })()
   const approvalRequesterName = approvalState?.approval.requestedByStaffId

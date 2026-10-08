@@ -791,6 +791,32 @@ function StaffPageHost() {
   }, [selectedAccountId])
   useEffect(() => { void load() }, [load])
   /*
+   * WEB203：ログインユーザーは200人ずつ読む。全員より少ないときは、続きを読み込んで
+   * 検索・絞り込み・ページ送りが全員に効くようにする（打ち切りの注意だけで終わらせない）。
+   */
+  const usersAccountRef = useRef(selectedAccountId)
+  usersAccountRef.current = selectedAccountId
+  const [moreUsersBusy, setMoreUsersBusy] = useState(false)
+  const [moreUsersError, setMoreUsersError] = useState('')
+  const loadMoreUsers = async () => {
+    if (moreUsersBusy) return
+    const scope = selectedAccountId ?? undefined
+    const offset = accessUsers.length
+    setMoreUsersBusy(true)
+    setMoreUsersError('')
+    try {
+      const result = await api.access.users({ lineAccountId: scope, limit: 200, offset })
+      if ((usersAccountRef.current ?? undefined) !== scope) return
+      if (!result.success) throw new Error(result.error)
+      setAccessUsers((current) => [...current, ...result.data.items.filter((item) => !current.some((known) => known.id === item.id))])
+      setUsersTotal(result.data.pagination?.total ?? usersTotal)
+    } catch {
+      setMoreUsersError('続きを読み込めませんでした。もう一度お試しください。')
+    } finally {
+      setMoreUsersBusy(false)
+    }
+  }
+  /*
    * 入った記録は「入った記録」タブでだけ読む。最初に全部のタブぶんを
    * 先読みすると、表の中身(LoginAudit)が別に読み直す二重取りになる。
    */
@@ -1086,6 +1112,10 @@ function StaffPageHost() {
               {!loading && !error ? (
                 <div className={styles.listFoot}>
                   <p>{`ログインユーザー ${filteredUsers.length}人中 ${shown.length}人を表示${usersTotal > accessUsers.length ? `（全${usersTotal}人中${accessUsers.length}人まで読み込み）` : ''}`}</p>
+                  {usersTotal > accessUsers.length ? (
+                    <Button variant="secondary" size="compact" onClick={() => void loadMoreUsers()} disabled={moreUsersBusy} busy={moreUsersBusy}>続きを読み込む</Button>
+                  ) : null}
+                  {moreUsersError ? <p role="alert">{moreUsersError}</p> : null}
                   <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} />
                 </div>
               ) : null}

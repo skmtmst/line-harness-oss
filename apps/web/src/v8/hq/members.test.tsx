@@ -130,6 +130,29 @@ describe('V8 統括のメンバーの窓', () => {
     expect(body).not.toHaveProperty('role')
     expect(body.isActive).toBe(false)
   })
+
+  it('WEB216：統括（owner）の範囲だけを変えても、役割（owner→admin）を送らない', async () => {
+    const ownerMember = { ...staffMember, id: 'stf-owner', name: '本部 太郎', role: 'owner', accountScope: 'all', scopedLineAccountIds: [] }
+    list.mockResolvedValue({ success: true, data: [ownerMember, staffMember] })
+    await act(async () => { root!.render(<HqMembersV8 key="again" />) })
+    await flush()
+    const edit = buttonByText('本部 太郎さんの権限を変更')
+    expect(edit).toBeTruthy()
+    await act(async () => { edit!.click() })
+    await flush()
+    const accountsOnly = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'accounts')!
+    await act(async () => { accountsOnly.click() })
+    const firstAccount = document.querySelector<HTMLElement>('[role="dialog"] [aria-label="担当するアカウント"] input, [role="dialog"] [aria-label="担当するアカウント"] button[role="checkbox"]')!
+    await act(async () => { firstAccount.click() })
+    await act(async () => { buttonByText('変更を保存')!.click() })
+    await flush()
+    const confirm = buttonByText('変える')
+    if (confirm) await act(async () => { confirm.click() })
+    await flush()
+    expect(update).toHaveBeenCalled()
+    const body = update.mock.calls.at(-1)![1] as Record<string, unknown>
+    expect(body).not.toHaveProperty('role')
+  })
 })
 
 describe('V8 統括のメンバーの表の列（絵 r4ARpV・2026-10-08）', () => {

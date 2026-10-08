@@ -127,3 +127,18 @@ describe('公開完了画面の権限表示（D001）', () => {
     }
   })
 })
+
+describe('公開を止めたあと（W158）', () => {
+  it('止めたら「稼働中」「公開を一時停止」を残さず、止めた状態を出す', async () => {
+    window.localStorage.setItem('lh_staff_role', 'owner')
+    fixture.pause.mockResolvedValue({ data: { ...webinar, status: 'draft' } })
+    await render()
+    const pause = Array.from(host.querySelectorAll('button')).find((button) => button.textContent?.includes('公開を一時停止'))!
+    await act(async () => { pause.click() })
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    expect(host.textContent).toContain('公開を止めました')
+    expect(host.textContent).toContain('止めている（下書き）')
+    expect(host.textContent).not.toContain('稼働中')
+    expect(host.textContent).not.toContain('公開を一時停止')
+  })
+})
