@@ -12,6 +12,7 @@ import Dialog from '@/components/shared/dialog'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
@@ -40,7 +41,7 @@ export function accountHandle(account: AccountWithStats): string {
 }
 
 /* 板 `HMpVx`：アカウントの設定（名前・親・フォルダ・ほかの設定・アーカイブ）。2026-10-08 タグ→フォルダ（1つだけ・API-17）。 */
-export function AccountSettingsDialogV8({ account, accounts, archived, onClose, onSaved, onArchive, onShowDetails }: {
+export function AccountSettingsDialogV8({ account, accounts, archived, onClose, onSaved, onArchive, onShowDetails, canCreateFolder = false, onFolderCreated }: {
   account: AccountWithStats
   accounts: AccountWithStats[]
   archived: boolean
@@ -48,6 +49,10 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
   onSaved: () => void
   onArchive: () => void
   onShowDetails: () => void
+  /** フォルダを選ぶ欄からその場で作れるか（左の列の「フォルダを追加」と同じ権限）。 */
+  canCreateFolder?: boolean
+  /** その場でフォルダを作ったとき（左の列を読み直す）。 */
+  onFolderCreated?: () => void
 }) {
   const [name, setName] = useState(account.name)
   const [parent, setParent] = useState('')
@@ -161,14 +166,20 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
         </div>
         <div className={styles.field}>
           <label htmlFor="hq-account-folder" className={styles.label}>フォルダ</label>
-          <Select
+          <FolderSelect
             id="hq-account-folder"
             aria-label="フォルダ"
             size="full"
             value={folderId}
             disabled={busy}
             onChange={setFolderId}
-            options={[{ value: '', label: '未分類' }, ...folders.map((item) => ({ value: item.id, label: item.name }))]}
+            folders={folders.map(folderById)}
+            onCreate={canCreateFolder
+              ? folderCreator((folderName, color) => api.lineAccountFolders.create({ name: folderName, color }), folderById, (created) => {
+                setFolders((current) => [...current, created])
+                onFolderCreated?.()
+              })
+              : undefined}
           />
           <p className={styles.note}>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</p>
         </div>
