@@ -34,6 +34,7 @@ export function Tabs({
   className,
   label,
   size,
+  spacing,
 }: {
   items: TabItem[]
   /**
@@ -52,6 +53,8 @@ export function Tabs({
    * 'compact' は文字の行を詰めた段（E-1 hKRRF の店のタブ：高さ 30.5）。v7 では効かない。
    */
   size?: 'compact'
+  /** 設定の板のタブ間・下余白。指定した板だけに適用する。 */
+  spacing?: 'settings'
 }) {
   /*
    * Issue #708（監査6 a11y）: タブは見た目どおり tablist/tab の役割を持つ。
@@ -110,7 +113,7 @@ export function Tabs({
   const sliding = indicator !== null
 
   return (
-    <nav className={[styles.list, className].filter(Boolean).join(' ')} data-size={size}>
+    <nav className={[styles.list, className].filter(Boolean).join(' ')} data-size={size} data-spacing={spacing}>
       <span
         ref={itemsRef}
         className={styles.items}

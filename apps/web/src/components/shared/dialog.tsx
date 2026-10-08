@@ -31,6 +31,12 @@ export type DialogProps = {
   designHeaderHeight?: number
   /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
   designContentPadding?: string
+  /** 指定した窓だけ下の操作段の余白を変える。 */
+  designFooterPadding?: string
+  /** 本文と操作が続く窓では区切り線を省く。既定は線あり。 */
+  footerDivider?: boolean
+  /** 左の操作で残り幅を埋めるか。既定は埋める。 */
+  footerLeadFlexible?: boolean
   /** 題の隣の補足。ほかの窓の題の並びは変えない。 */
   titleHelp?: ReactNode
   /** 段の帯を使わず、題・手順・本文・操作を1枚に続ける窓（hadfk）。既定の窓は変えない。 */
@@ -82,7 +88,7 @@ export type DialogProps = {
    */
   primaryAction?: 'confirm' | 'cancel'
   /** ★V8：下のボタンの並び。省くと今までどおり右寄せ。'center' は中央（E-3 ウォークイン PUWyq）。v7 では効かない。 */
-  footerAlign?: 'center'
+  footerAlign?: 'center' | 'start'
 }
 
 /** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
@@ -94,6 +100,9 @@ export default function Dialog({
   designHeaderPadding,
   designHeaderHeight,
   designContentPadding,
+  designFooterPadding,
+  footerDivider = true,
+  footerLeadFlexible = true,
   titleHelp,
   layout,
   steps,
@@ -186,15 +195,18 @@ export default function Dialog({
       data-size={size}
       data-layout={layout}
       data-footer-align={footerAlign}
+      data-footer-divider={footerDivider ? undefined : 'none'}
+      data-footer-lead={footerLeadFlexible ? undefined : 'fixed'}
       data-design-width={designWidth ? '' : undefined}
       data-design-header-padding={designHeaderPadding ? '' : undefined}
       data-design-header-height={designHeaderHeight ? '' : undefined}
       data-design-content-padding={designContentPadding ? '' : undefined}
-      style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding ? ({
+      style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding || designFooterPadding ? ({
         ...(designWidth ? { '--dialog-design-width': `${designWidth}px` } : {}),
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
         ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),
+        ...(designFooterPadding ? { '--dialog-design-footer-padding': designFooterPadding } : {}),
       } as CSSProperties) : undefined}
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
