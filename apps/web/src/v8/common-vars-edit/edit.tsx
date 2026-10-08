@@ -1369,6 +1369,7 @@ function EditCommonVarV8Inner() {
                 <label htmlFor="sc-time" className={styles.fieldLabelStrong}>開始時刻</label>
                 <TimeField
                   id="sc-time"
+                  size="field"
                   value={draft.time}
                   onChange={(v) => setDraft({ ...draft, time: v })}
                 />

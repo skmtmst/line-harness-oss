@@ -29,6 +29,11 @@ export type TimeFieldV8Props = {
   onChange?: (value: string) => void
   /** 分のきざみ（分）。5・15 など。既定は 1（今までの欄と同じ）。 */
   minuteStep?: number
+  /**
+   * 欄の高さ。既定 36（絵 YCOoR）。`field` は 40＝日付の欄と横に並ぶとき・日時の欄の中
+   * （絵 FU2aU・BBRDb・ZU4Ae）。`compact` は 32＝表の中の細い欄（予約の受付枠）。
+   */
+  size?: TimeFieldSize
   disabled?: boolean
   /** 閲覧のみ。値は見せるが打てず、時計も出さない（押せないボタンを置かない決まり）。 */
   readOnly?: boolean
@@ -45,6 +50,8 @@ export type TimeFieldV8Props = {
 
 type Column = 'hours' | 'minutes'
 
+export type TimeFieldSize = 'default' | 'field' | 'compact'
+
 /** 1行の高さ（30）＋行の間（2）。開いたときの位置合わせに使う。 */
 const ROW_PITCH = 32
 
@@ -53,6 +60,7 @@ export default function TimeFieldV8({
   defaultValue = '',
   onChange,
   minuteStep = 1,
+  size = 'default',
   disabled = false,
   readOnly = false,
   invalid = false,
@@ -277,6 +285,7 @@ export default function TimeFieldV8({
         data-invalid={invalid || note?.kind === 'error' || undefined}
         data-disabled={disabled || undefined}
         data-readonly={readOnly || undefined}
+        data-size={size === 'default' ? undefined : size}
       >
         <input
           ref={inputRef}

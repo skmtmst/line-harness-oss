@@ -35,6 +35,16 @@
   transition: outline-color var(--motion-fast) var(--motion-ease-out);
 }
 
+/* 日付の欄と横に並ぶとき・日時の欄の中（絵 FU2aU・BBRDb・ZU4Ae）は日付の欄と同じ 40。 */
+.field[data-size='field'] {
+  height: 40px;
+}
+
+/* 表の中の細い欄（予約の受付枠）は隣の欄と同じ 32。 */
+.field[data-size='compact'] {
+  height: 32px;
+}
+
 .field:focus-within,
 .field[data-open] {
   outline: 2px solid var(--color-accent-deep);

@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import DateField, { formatLabel as formatDateLabel, parseDate } from './date-field'
 import MenuPortal from './menu-portal'
 import Select from './select'
-import TimeFieldV8 from './time-field-v8'
+import TimeFieldV8, { type TimeFieldSize } from './time-field-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import dateStyles from './date-field.module.css'
 import styles from './date-time-field.module.css'
@@ -235,6 +235,7 @@ export default function DateTimeField({
               <span className={styles.timeV8Label} id={`${fieldId}-time-label`}>時刻</span>
               <TimeFieldV8
                 aria-labelledby={`${fieldId}-time-label`}
+                size="field"
                 minuteStep={minuteStep}
                 value={`${pad(shownTime.hours)}:${pad(shownTime.minutes)}`}
                 onChange={(next) => {
@@ -287,6 +288,8 @@ type TimeFieldProps = {
   step?: number
   /** 分のきざみ（分）。`step` より優先。V8 だけが使う（v7 は 1分のまま）。 */
   minuteStep?: number
+  /** ★V8 の欄の高さ。`field`＝40（日付の欄と並ぶ）、`compact`＝32（表の中の細い欄）。v7 は使わない。 */
+  size?: TimeFieldSize
   disabled?: boolean
   /** 閲覧のみ。V8 は値を見せて打てない・時計を出さない。v7 は押せない欄。 */
   readOnly?: boolean
@@ -312,12 +315,13 @@ type TimeFieldProps = {
 export function TimeField(props: TimeFieldProps) {
   const theme = useAdminTheme()
   if (theme === 'v8') {
-    const { step, minuteStep, placeholder, ...rest } = props
+    const { step, minuteStep, placeholder, size, ...rest } = props
     // v7 の置き場所文（「時刻を選ぶ」）は V8 では使わない。絵の空は「-- : --」。
     void placeholder
-    return <TimeFieldV8 {...rest} minuteStep={minuteStep ?? stepSecondsToMinutes(step)} />
+    return <TimeFieldV8 {...rest} size={size} minuteStep={minuteStep ?? stepSecondsToMinutes(step)} />
   }
-  const { readOnly, disabled, ...v7 } = props
+  const { readOnly, disabled, size, ...v7 } = props
+  void size
   return <TimeFieldV7 {...v7} disabled={disabled || readOnly} />
 }
 
