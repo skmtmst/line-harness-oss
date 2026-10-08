@@ -1,0 +1,691 @@
+{
+  "generatedBy": "NEN画面レーン 2026-10-09（共通対応表の担当分を抽出）",
+  "sources": [
+    "BOARD-INDEX.md",
+    "HANDOVER-MAP.md",
+    "V8B-HANDOVER-MAP.md",
+    "specs/pages/*.md"
+  ],
+  "designDir": "/Users/kentakenta/lh-work/design/v8",
+  "retired": [],
+  "boardCount": 23,
+  "notes": [
+    "NEN画面レーンの再撮影用。外部の共通対応表は変更しない。",
+    "Jxmqh は板の6行と選択・予約状態、TkA4D は2件選択状態を使う。実APIや画面のページ数は変えない。",
+    "dzx5D は横長の見本板であり、実画面の一致率の分母から除く。"
+  ],
+  "boards": {
+    "BVuYh": {
+      "doc": "V8-B",
+      "name": "健康日記 30日のまとめ（引き出し）V8",
+      "kind": "小窓",
+      "route": "/nen/health",
+      "routes": [
+        "/nen/health"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/BVuYh.png",
+      "url": "/nen/health",
+      "state": {
+        "click": [
+          "「こむぎ」の操作",
+          "30日のまとめ"
+        ]
+      }
+    },
+    "dEv6G": {
+      "doc": "V8-B",
+      "name": "会員 ランクを消す（確認）V8",
+      "kind": null,
+      "route": "/nen/members",
+      "routes": [
+        "/nen/members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/dEv6G.png",
+      "url": "/nen/members?tab=ranks",
+      "state": {
+        "click": [
+          "ランク「シルバー」のその他操作",
+          "ランクを削除する"
+        ]
+      }
+    },
+    "dzx5D": {
+      "doc": "V8-B",
+      "name": "専用機能 状態 V8",
+      "kind": "状態",
+      "route": "/nen/members",
+      "routes": [
+        "/nen/members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/dzx5D.png",
+      "url": "/nen/members",
+      "state": {
+        "manual": "状態の見本帳（幅1440超・横並び）（2026-10-06）"
+      },
+      "unmeasurable": "見本の紙"
+    },
+    "e5yBLx": {
+      "doc": "V8-B",
+      "name": "会員 ランク設定（競合）V8",
+      "kind": "競合",
+      "route": "/nen/members",
+      "routes": [
+        "/nen/members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/e5yBLx.png",
+      "url": "/nen/members?tab=ranks",
+      "state": {
+        "api": {
+          "match": "DELETE /api/nen/rank-settings",
+          "status": 409,
+          "body": {
+            "success": false,
+            "error": {
+              "code": "VERSION_CONFLICT"
+            }
+          }
+        },
+        "click": [
+          "ランク「シルバー」のその他操作",
+          "ランクを削除する",
+          "2 人を移して消す"
+        ]
+      }
+    },
+    "eLjeQ": {
+      "doc": "V8-B",
+      "name": "マイペット ペットの情報を直す V8",
+      "kind": "小窓",
+      "route": "/nen/pets",
+      "routes": [
+        "/nen/pets"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/eLjeQ.png",
+      "url": "/nen/pets",
+      "state": {
+        "click": [
+          "「こむぎ」の操作",
+          "ペットの情報を直す"
+        ]
+      }
+    },
+    "fb9NJ": {
+      "doc": "V8-B",
+      "name": "会員 ランク設定 V8",
+      "kind": "画面",
+      "route": "/nen/members",
+      "routes": [
+        "/nen/members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/fb9NJ.png",
+      "url": "/nen/members?tab=ranks"
+    },
+    "h7A2F": {
+      "doc": "V8-B",
+      "name": "マイペット ごはんの目安 V8",
+      "kind": "画面",
+      "route": "/nen/pets",
+      "routes": [
+        "/nen/pets"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/h7A2F.png",
+      "url": "/nen/pets?tab=feeding"
+    },
+    "mIwA4": {
+      "doc": "V8-B",
+      "name": "健康日記 一覧 V8",
+      "kind": "画面",
+      "route": "/nen/health",
+      "routes": [
+        "/nen/health"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/mIwA4.png",
+      "url": "/nen/health"
+    },
+    "t2SMXX": {
+      "doc": "V8-B",
+      "name": "マイペット 一覧 1152 V8",
+      "kind": "1152",
+      "route": "/nen/pets",
+      "routes": [
+        "/nen/pets"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/t2SMXX.png",
+      "url": "/nen/pets"
+    },
+    "wTIej": {
+      "doc": "V8-B",
+      "name": "マイペット 一覧 V8",
+      "kind": "画面",
+      "route": "/nen/pets",
+      "routes": [
+        "/nen/pets"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/wTIej.png",
+      "url": "/nen/pets"
+    },
+    "z2tvtX": {
+      "doc": "V8-B",
+      "name": "健康日記 記録の項目 V8",
+      "kind": "画面",
+      "route": "/nen/health",
+      "routes": [
+        "/nen/health"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/z2tvtX.png",
+      "url": "/nen/health?tab=items"
+    },
+    "zQ5vY": {
+      "doc": "V8-B",
+      "name": "会員 ライフタイム V8",
+      "kind": "画面",
+      "route": "/nen/members",
+      "routes": [
+        "/nen/members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/zQ5vY.png",
+      "url": "/nen/members?tab=lifetime"
+    },
+    "Jn95h": {
+      "doc": "V8-B",
+      "name": "投稿 写真の審査（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/nen-members",
+      "routes": [
+        "/nen-members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Jn95h.png",
+      "url": "/nen-members",
+      "state": {
+        "role": "viewer",
+        "api": {
+          "match": "GET /api/staff/me",
+          "status": 200,
+          "body": {
+            "success": true,
+            "data": {
+              "id": "visual-qa-owner",
+              "name": "Kenta Kawano",
+              "role": "staff",
+              "email": null
+            }
+          }
+        }
+      }
+    },
+    "N1br7": {
+      "doc": "V8-B",
+      "name": "投稿 報酬の決まり 版の履歴 V8",
+      "kind": "画面",
+      "route": "/nen-members",
+      "routes": [
+        "/nen-members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/N1br7.png",
+      "url": "/nen-members",
+      "state": {
+        "click": [
+          "版の履歴を見る"
+        ]
+      }
+    },
+    "TkA4D": {
+      "doc": "V8-B",
+      "name": "投稿 写真の審査 V8",
+      "kind": "画面",
+      "route": "/nen-members",
+      "routes": [
+        "/nen-members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/TkA4D.png",
+      "url": "/nen-members",
+      "state": {
+        "click": [
+          "check:こむぎちゃんの写真を選ぶ",
+          "check:そらくんの写真を選ぶ"
+        ]
+      }
+    },
+    "cniyw": {
+      "doc": "V8-B",
+      "name": "投稿 採用 V8",
+      "kind": "画面",
+      "route": "/nen-members",
+      "routes": [
+        "/nen-members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/cniyw.png",
+      "url": "/nen-members",
+      "state": {
+        "click": [
+          "採用 2"
+        ]
+      }
+    },
+    "ujcar": {
+      "doc": "V8-B",
+      "name": "投稿 この写真を見送る V8",
+      "kind": "画面",
+      "route": "/nen-members",
+      "routes": [
+        "/nen-members"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/ujcar.png",
+      "url": "/nen-members",
+      "state": {
+        "click": [
+          "そらくんの写真を見送る"
+        ]
+      }
+    },
+    "Jxmqh": {
+      "doc": "V8-B",
+      "name": "NEN配信 コラム一覧 V8",
+      "kind": "画面",
+      "route": "/nen-campaigns",
+      "routes": [
+        "/nen-campaigns"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Jxmqh.png",
+      "url": "/nen-campaigns?tab=columns",
+      "state": {
+        "click": [
+          "トイレの回数、気にしていますか",
+          "check:日時を予約"
+        ],
+        "api": [
+          {
+            "match": "GET /api/nen-campaigns/columns$",
+            "body": {
+              "success": true,
+              "data": [
+                {
+                  "id": "nen-column-autumn",
+                  "externalId": "external-nen-column-autumn",
+                  "slug": "nen-column-autumn",
+                  "title": "秋の食事、量はどれくらい？",
+                  "category": "季節のこと",
+                  "excerpt": "写真1枚・900字",
+                  "introText": "秋の食事、量はどれくらい？をご紹介します。",
+                  "articleUrl": "https://example.com/columns/nen-column-autumn",
+                  "imageUrl": null,
+                  "publishedAt": null,
+                  "deliveryStatus": "scheduled",
+                  "deliveryAt": "2026-10-10T10:00:00+09:00",
+                  "targetMode": "tag",
+                  "targetTagId": "tag-2",
+                  "completionEventName": "秋の食事、量はどれくらい？を読了",
+                  "completionTagId": "tag-3",
+                  "sourceColumnId": null,
+                  "lineAccountId": "visual-qa-account",
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "id": "nen-column-toilet",
+                  "externalId": "external-nen-column-toilet",
+                  "slug": "nen-column-toilet",
+                  "title": "トイレの回数、気にしていますか",
+                  "category": "からだのこと",
+                  "excerpt": "写真1枚・1,100字",
+                  "introText": "トイレの回数、気にしていますかをご紹介します。",
+                  "articleUrl": "https://example.com/columns/nen-column-toilet",
+                  "imageUrl": null,
+                  "publishedAt": "2026-09-26T10:00:00+09:00",
+                  "deliveryStatus": "sent",
+                  "deliveryAt": null,
+                  "targetMode": "all",
+                  "targetTagId": null,
+                  "completionEventName": "トイレの回数、気にしていますかを読了",
+                  "completionTagId": "tag-3",
+                  "sourceColumnId": null,
+                  "lineAccountId": "visual-qa-account",
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "id": "nen-column-water",
+                  "externalId": "external-nen-column-water",
+                  "slug": "nen-column-water",
+                  "title": "夏の水分補給、どれくらい？",
+                  "category": "季節のこと",
+                  "excerpt": "写真1枚・900字",
+                  "introText": "夏の水分補給、どれくらい？をご紹介します。",
+                  "articleUrl": "https://example.com/columns/nen-column-water",
+                  "imageUrl": null,
+                  "publishedAt": "2026-08-08T10:00:00+09:00",
+                  "deliveryStatus": "sent",
+                  "deliveryAt": null,
+                  "targetMode": "all",
+                  "targetTagId": null,
+                  "completionEventName": "夏の水分補給、どれくらい？を読了",
+                  "completionTagId": "tag-3",
+                  "sourceColumnId": null,
+                  "lineAccountId": "visual-qa-account",
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "id": "nen-column-tooth",
+                  "externalId": "external-nen-column-tooth",
+                  "slug": "nen-column-tooth",
+                  "title": "歯みがきのコツ、3つだけ",
+                  "category": "お手入れ",
+                  "excerpt": "写真2枚・1,200字",
+                  "introText": "歯みがきのコツ、3つだけをご紹介します。",
+                  "articleUrl": "https://example.com/columns/nen-column-tooth",
+                  "imageUrl": null,
+                  "publishedAt": "2026-07-22T10:00:00+09:00",
+                  "deliveryStatus": "sent",
+                  "deliveryAt": null,
+                  "targetMode": "all",
+                  "targetTagId": null,
+                  "completionEventName": "歯みがきのコツ、3つだけを読了",
+                  "completionTagId": "tag-3",
+                  "sourceColumnId": null,
+                  "lineAccountId": "visual-qa-account",
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "id": "nen-column-nail",
+                  "externalId": "external-nen-column-nail",
+                  "slug": "nen-column-nail",
+                  "title": "爪切りが苦手な子へ",
+                  "category": "お手入れ",
+                  "excerpt": "動画1本・700字",
+                  "introText": "爪切りが苦手な子へをご紹介します。",
+                  "articleUrl": "https://example.com/columns/nen-column-nail",
+                  "imageUrl": null,
+                  "publishedAt": "2026-07-01T10:00:00+09:00",
+                  "deliveryStatus": "draft",
+                  "deliveryAt": null,
+                  "targetMode": "all",
+                  "targetTagId": null,
+                  "completionEventName": "爪切りが苦手な子へを読了",
+                  "completionTagId": "tag-3",
+                  "sourceColumnId": null,
+                  "lineAccountId": "visual-qa-account",
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "id": "nen-column-food",
+                  "externalId": "external-nen-column-food",
+                  "slug": "nen-column-food",
+                  "title": "フードの切り替えかた",
+                  "category": "ごはん",
+                  "excerpt": "写真3枚・1,600字",
+                  "introText": "フードの切り替えかたをご紹介します。",
+                  "articleUrl": "https://example.com/columns/nen-column-food",
+                  "imageUrl": null,
+                  "publishedAt": "2026-06-14T10:00:00+09:00",
+                  "deliveryStatus": "sent",
+                  "deliveryAt": null,
+                  "targetMode": "all",
+                  "targetTagId": null,
+                  "completionEventName": "フードの切り替えかたを読了",
+                  "completionTagId": "tag-3",
+                  "sourceColumnId": null,
+                  "lineAccountId": "visual-qa-account",
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                }
+              ]
+            }
+          },
+          {
+            "match": "GET /api/nen-campaigns/settings$",
+            "body": {
+              "success": true,
+              "data": [
+                {
+                  "campaignKey": "order_thanks",
+                  "label": "注文ありがとうございます",
+                  "category": "transactional",
+                  "triggerEvent": "ec.order.confirmed",
+                  "delayDays": 0,
+                  "deliveryTime": "09:00",
+                  "isEnabled": true,
+                  "title": "ご注文ありがとうございます",
+                  "bodyText": "ご注文の内容を確認しました。",
+                  "buttonLabel": null,
+                  "buttonUrl": null,
+                  "imageUrl": null,
+                  "dedupWindowDays": 30,
+                  "excludeFormRespondents": false,
+                  "afterActions": [],
+                  "formIssue": null,
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "campaignKey": "shipping_notice",
+                  "label": "お荷物を送りました",
+                  "category": "transactional",
+                  "triggerEvent": "ec.shipping.shipped",
+                  "delayDays": 0,
+                  "deliveryTime": "09:00",
+                  "isEnabled": true,
+                  "title": "お荷物を発送しました",
+                  "bodyText": "追跡番号から配送状況をご確認いただけます。",
+                  "buttonLabel": "配送状況を見る",
+                  "buttonUrl": "https://example.com/nen",
+                  "imageUrl": null,
+                  "dedupWindowDays": 30,
+                  "excludeFormRespondents": false,
+                  "afterActions": [],
+                  "formIssue": null,
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "campaignKey": "arrival_check",
+                  "label": "使い方のご案内",
+                  "category": "follow_up",
+                  "triggerEvent": "ec.order.arrived",
+                  "delayDays": 1,
+                  "deliveryTime": "10:00",
+                  "isEnabled": true,
+                  "title": "商品は無事に届きましたか？",
+                  "bodyText": "使い方のポイントを3つにまとめました。",
+                  "buttonLabel": "使い方を見る",
+                  "buttonUrl": "https://example.com/nen",
+                  "imageUrl": null,
+                  "dedupWindowDays": 30,
+                  "excludeFormRespondents": false,
+                  "afterActions": [],
+                  "formIssue": null,
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "campaignKey": "care_check",
+                  "label": "困っていませんか",
+                  "category": "follow_up",
+                  "triggerEvent": "ec.order.arrived",
+                  "delayDays": 3,
+                  "deliveryTime": "19:00",
+                  "isEnabled": false,
+                  "title": "お困りのことはありませんか？",
+                  "bodyText": "気になることを、2つの選択肢から教えてください。",
+                  "buttonLabel": "回答する",
+                  "buttonUrl": "https://example.com/nen",
+                  "imageUrl": null,
+                  "dedupWindowDays": 30,
+                  "excludeFormRespondents": false,
+                  "afterActions": [],
+                  "formIssue": null,
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "campaignKey": "review_request",
+                  "label": "口コミのお願い",
+                  "category": "follow_up",
+                  "triggerEvent": "ec.order.arrived",
+                  "delayDays": 10,
+                  "deliveryTime": "10:00",
+                  "isEnabled": true,
+                  "title": "口コミのお願い",
+                  "bodyText": "{{ペットの名前}}ちゃん、{{商品名}}はいかがでしたか。よろしければ、ひとことだけ感想を聞かせてください。星をえらぶだけでも大丈夫です。",
+                  "buttonLabel": "感想を書く（30秒）",
+                  "buttonUrl": "https://example.com/nen",
+                  "imageUrl": null,
+                  "dedupWindowDays": 30,
+                  "excludeFormRespondents": false,
+                  "afterActions": [
+                    {
+                      "kind": "open_form",
+                      "formId": "form-review",
+                      "formName": "口コミ",
+                      "buttonLabel": "感想を書く（30秒）"
+                    },
+                    {
+                      "kind": "award_mileage",
+                      "amount": 200,
+                      "trigger": "form_submitted"
+                    }
+                  ],
+                  "formIssue": null,
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "campaignKey": "cross_sell",
+                  "label": "そろそろ無くなるころ",
+                  "category": "follow_up",
+                  "triggerEvent": "ec.order.arrived",
+                  "delayDays": 30,
+                  "deliveryTime": "10:00",
+                  "isEnabled": true,
+                  "title": "そろそろ無くなるころです",
+                  "bodyText": "次回のお買い物に使えるご案内をお送りします。",
+                  "buttonLabel": "商品を見る",
+                  "buttonUrl": "https://example.com/nen",
+                  "imageUrl": null,
+                  "dedupWindowDays": 30,
+                  "excludeFormRespondents": false,
+                  "afterActions": [],
+                  "formIssue": null,
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "campaignKey": "birthday_coupon",
+                  "label": "お誕生日クーポン",
+                  "category": "birthday",
+                  "triggerEvent": "pet.birthday",
+                  "delayDays": 0,
+                  "deliveryTime": "10:00",
+                  "isEnabled": true,
+                  "title": "{{pet_name}}、お誕生日おめでとうございます",
+                  "bodyText": "{{coupon_code}} を {{coupon_expiry}} までお使いいただけます。",
+                  "buttonLabel": "クーポンを受け取る",
+                  "buttonUrl": "https://example.com/nen",
+                  "imageUrl": null,
+                  "dedupWindowDays": 30,
+                  "excludeFormRespondents": false,
+                  "afterActions": [],
+                  "formIssue": null,
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                },
+                {
+                  "campaignKey": "column",
+                  "label": "NENコラム",
+                  "category": "column",
+                  "triggerEvent": "column.scheduled",
+                  "delayDays": 0,
+                  "deliveryTime": "10:00",
+                  "isEnabled": true,
+                  "title": "今週のNENコラム",
+                  "bodyText": "愛犬・愛猫との暮らしに役立つ読みものをお届けします。",
+                  "buttonLabel": "コラムを読む",
+                  "buttonUrl": "https://example.com/nen",
+                  "imageUrl": null,
+                  "dedupWindowDays": 30,
+                  "excludeFormRespondents": false,
+                  "afterActions": [],
+                  "formIssue": null,
+                  "updatedAt": "2026-08-25T10:00:00+09:00"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "MuhWR": {
+      "doc": "V8-B",
+      "name": "NEN配信 一覧（自動配信）V8",
+      "kind": "画面",
+      "route": "/nen-campaigns",
+      "routes": [
+        "/nen-campaigns"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/MuhWR.png",
+      "url": "/nen-campaigns"
+    },
+    "Tj7n4": {
+      "doc": "V8-B",
+      "name": "NEN配信 送った履歴 V8",
+      "kind": "画面",
+      "route": "/nen-campaigns",
+      "routes": [
+        "/nen-campaigns"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/Tj7n4.png",
+      "url": "/nen-campaigns?tab=history"
+    },
+    "oqSJP": {
+      "doc": "V8-B",
+      "name": "NEN配信 誕生日クーポンの決めごと（引き出し）V8",
+      "kind": "小窓",
+      "route": "/nen-campaigns",
+      "routes": [
+        "/nen-campaigns"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/oqSJP.png",
+      "url": "/nen-campaigns",
+      "state": {
+        "click": [
+          "「お誕生日クーポン」の操作",
+          "クーポンの決めごと"
+        ]
+      }
+    },
+    "w5pwG": {
+      "doc": "V8-B",
+      "name": "NEN配信 配信を直す（口コミのお願い）V8",
+      "kind": "画面",
+      "route": "/nen-campaigns/edit",
+      "routes": [
+        "/nen-campaigns/edit"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/w5pwG.png",
+      "url": "/nen-campaigns/edit?key=review_request"
+    },
+    "yRDwW": {
+      "doc": "V8-B",
+      "name": "NEN配信 コラムを書く V8",
+      "kind": "画面",
+      "route": "/nen-campaigns/columns/new",
+      "routes": [
+        "/nen-campaigns/columns/new"
+      ],
+      "width": 1440,
+      "shot": "lint/V8-B/shots/yRDwW.png",
+      "url": "/nen-campaigns/columns/new"
+    }
+  }
+}
