@@ -2,14 +2,13 @@
 
 /*
  * ★V8 飲食店向け 利用規約（Pencil `VdKOK`）。
- * 左に本文（今と同じ TERMS_DOCUMENT）、右に目次（幅260）と「店舗追加へ戻る」。
- * 目次は条の数が多いので、絵の5行ぶんの高さで中だけ流す（戻るボタンの位置を動かさない）。
+ * 左に本文（今と同じ TERMS_DOCUMENT）、右に目次（幅260）。
+ * 目次は条の数が多いので、絵の5行ぶんの高さで中だけ流す。
+ * 「店舗追加へ戻る」は 2026-10-08 に無くした（戻るのは上の帯のパンくず「店舗を追加」）。
  */
-import { ArrowLeft } from 'lucide-react'
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import Button from '@/components/shared/button'
 import TermsBody, { termsSectionId } from '../store-new/terms-body'
 import styles from './terms.module.css'
 
@@ -40,7 +39,6 @@ export default function TermsV8() {
               </li>
             ))}
           </ol>
-          <Button href="/restaurant-test/stores/new"><ArrowLeft aria-hidden className={styles.icon15} />店舗追加へ戻る</Button>
         </nav>
       </div>
     </PageFrame>

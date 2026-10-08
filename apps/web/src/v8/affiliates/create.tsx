@@ -21,7 +21,7 @@ import type { Friend } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CreatePage } from '@/components/templates'
@@ -69,6 +69,8 @@ function commissionRateError(payoutKind: PayoutKind, value: string): string | nu
 
 export default function CreateAffiliateV8() {
   usePageTitle('アフィリエイターを作る')
+  /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
+  usePageCrumbs([{ label: '成果とアフィリエイト', href: LIST_PATH }])
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
