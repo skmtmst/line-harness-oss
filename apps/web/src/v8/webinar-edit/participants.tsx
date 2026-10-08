@@ -158,7 +158,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const kpis = [
     { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : '—', help: '申し込んだ人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
     { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.completed, summary.reservations)}` : '—', help: '動画の9割以上を見た人です。' },
-    { key: 'dropped', title: '途中で離れた', icon: LogOut, value: dropped, unit: '人', detail: summary ? `平均 ${Math.round(summary.avgWatchedSeconds / 60)}分で離脱` : '—', help: '視聴を始めた人から、視聴完了の人を引いた数です。' },
+    { key: 'dropped', title: '途中で離れた', icon: LogOut, value: dropped, unit: '人', detail: '平均離脱時間 —', help: '入場した人から、視聴完了の人を引いた数です。途中で離れた人だけの平均離脱時間は取得できません。' },
     { key: 'unviewed', title: '見ていない', icon: Undo2, value: unviewed, unit: '人', detail: '見逃し案内の対象', help: '申し込んだが入場の記録がない人です。' },
   ]
 
