@@ -387,9 +387,9 @@ export async function getFormVersionContentsByIds(
               on_submit_message_type, on_submit_message_content,
               on_submit_webhook_url, on_submit_webhook_headers,
               on_submit_webhook_fail_message, save_to_metadata
-         FROM form_versions WHERE id IN (${unique.map(() => '?').join(', ')})`,
+         FROM form_versions WHERE id IN (SELECT value FROM json_each(?))`,
     )
-    .bind(...unique)
+    .bind(JSON.stringify(unique))
     .all<FormVersionContent>();
   for (const row of result.results) versions.set(row.id, row);
   return versions;
@@ -1541,9 +1541,9 @@ export async function getFormSubmitClaimsBySubmissionIds(
   if (unique.length === 0) return claims;
   const result = await db
     .prepare(
-      `SELECT * FROM form_submit_claims WHERE submission_id IN (${unique.map(() => '?').join(', ')})`,
+      `SELECT * FROM form_submit_claims WHERE submission_id IN (SELECT value FROM json_each(?))`,
     )
-    .bind(...unique)
+    .bind(JSON.stringify(unique))
     .all<FormSubmitClaim>();
   for (const row of result.results) {
     if (row.submission_id) claims.set(row.submission_id, row);
