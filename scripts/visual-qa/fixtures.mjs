@@ -1,3 +1,5 @@
+import { storeAt } from './qa-clock.mjs'
+
 /**
  * 画面確認のための、固定の中身。
  *
@@ -4180,13 +4182,10 @@ export const REMINDER_PREVIEW = {
 /*
  * 板 `ltAaq`（確認）の配信予定の行は `今後7日 124通（重なり 3件はまとめる）`。
  * `T0nis` の表は「今後7日」を実時計で絞るため、行の日時は見本の API を立てた
- * 時刻から数える（明日 18:00 ×2〈重なり〉・明後日 13:00・明後日 18:00 の4行）。
+ * 固定時計から数える（明日 18:00 ×2〈重なり〉・明後日 13:00・明後日 18:00 の4行）。
  */
 function reminderNewPreviewAt(dayOffset, hour) {
-  const at = new Date()
-  at.setDate(at.getDate() + dayOffset)
-  at.setHours(hour, 0, 0, 0)
-  return at.toISOString()
+  return storeAt(hour, 0, dayOffset)
 }
 export const REMINDER_NEW_PREVIEW = {
   ...REMINDER_PREVIEW,

@@ -21,6 +21,7 @@ import { chromium } from '@playwright/test'
 import { pathToFileURL } from 'node:url'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { QA_TIMEZONE, captureClockFor } from './qa-clock.mjs'
 import { mockFingerprint } from './mock-fingerprint.mjs'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { SCREENS, DESIGN_SIZE, WIDTHS, screensOf } from './screens.mjs'
@@ -153,7 +154,7 @@ async function newPage(browser, width, height, clock) {
   const page = await browser.newPage({
     viewport: { width, height },
     deviceScaleFactor: 1,
-    timezoneId: 'Asia/Tokyo',
+    timezoneId: QA_TIMEZONE,
     locale: 'ja-JP',
   })
   /*
@@ -539,7 +540,7 @@ async function captureImpl(feature) {
 
     for (const shotSpec of shots) {
     for (const width of captureWidths) {
-      const page = await newPage(browser, width, implementationViewportHeight(s, designHeight), s.clock)
+      const page = await newPage(browser, width, implementationViewportHeight(s, designHeight), captureClockFor(s.route, s.clock))
       try {
         const stateHits = shotSpec.state ? await applyState(page, s.node, shotSpec.state) : null
         /*

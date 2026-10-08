@@ -22,6 +22,7 @@ import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { fileURLToPath } from 'node:url'
 
+import { QA_CLOCK, storeAt, storeYmd } from './qa-clock.mjs'
 import { mockFingerprint } from './mock-fingerprint.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
@@ -1305,15 +1306,9 @@ const EC_CONNECTOR = {
  * 飲食店向けテスト（`/restaurant-test/*`）のスナップショット。
  * `restaurantTestApi.snapshot` が一度に返す形（`apps/worker` の restaurant-test）を
  * そのまま写す。板 CHz31 の並び（渋谷・表参道・中目黒の3店舗）に寄せた固定データ。
- * 日時は撮るたびに変わる絵にならないよう「今日」を基準に組み立てる。
+ * 日時は店舗の timezone と qa-clock の固定時計から組み立てる。
  */
-const RESTAURANT_TODAY = new Date()
-const restaurantAt = (hour, minute = 0, dayOffset = 0) => {
-  const d = new Date(RESTAURANT_TODAY)
-  d.setDate(d.getDate() + dayOffset)
-  d.setHours(hour, minute, 0, 0)
-  return d.toISOString()
-}
+const restaurantAt = (hour, minute = 0, dayOffset = 0) => storeAt(hour, minute, dayOffset, RESTAURANT_STORES[0].timezone)
 const RESTAURANT_STORES = [
   { id: 'store-sby', organization_id: 'org-nen', name: '然 渋谷店', code: 'SBY-01', area: '渋谷', capacity: 80, timezone: 'Asia/Tokyo', status: 'active', line_status: 'connected', google_status: 'connected', line_account_id: 'visual-qa-account', line_account_name: '然 渋谷店', friend_count: 1280 },
   { id: 'store-omt', organization_id: 'org-nen', name: '然 表参道店', code: 'OMT-02', area: '表参道', capacity: 64, timezone: 'Asia/Tokyo', status: 'active', line_status: 'connected', google_status: 'warning', line_account_id: 'visual-qa-account-2', line_account_name: '然 表参道店', friend_count: 842 },
@@ -1524,8 +1519,9 @@ const RESTAURANT_CLOSE_TASKS = [
  * 提案 E-10（臨時休業・貸切 UVnvR・足す窓 nVvXy）：今月の 20日（臨時休業・終日全卓）・24日（貸切・18〜22時・個室A と T1）・月末（貸切・終日）。
  * サーバ（/api/restaurant-test/closures）と同じ形。月は撮る日の今月にする（カレンダーに出るように）。
  */
-const RESTAURANT_CLOSURE_MONTH = `${RESTAURANT_TODAY.getFullYear()}-${String(RESTAURANT_TODAY.getMonth() + 1).padStart(2, '0')}`
-const RESTAURANT_CLOSURE_LAST = String(new Date(RESTAURANT_TODAY.getFullYear(), RESTAURANT_TODAY.getMonth() + 1, 0).getDate())
+const RESTAURANT_CLOSURE_MONTH = storeYmd(QA_CLOCK, RESTAURANT_STORES[0].timezone).slice(0, 7)
+const [closureYear, closureMonth] = RESTAURANT_CLOSURE_MONTH.split('-').map(Number)
+const RESTAURANT_CLOSURE_LAST = String(new Date(Date.UTC(closureYear, closureMonth, 0)).getUTCDate())
 const restaurantClosure = (id, day, over) => ({
   id, storeId: 'store-sby', startDate: `${RESTAURANT_CLOSURE_MONTH}-${day}`, endDate: `${RESTAURANT_CLOSURE_MONTH}-${day}`, allDay: true, startTime: null, endTime: null,
   kind: 'temporary_closed', memo: null, tableIds: [], createdBy: 'mem-2', createdByName: '中川 由美', createdAt: restaurantAt(10, 0, -3), updatedAt: restaurantAt(10, 0, -3), version: 1, ...over,
@@ -2857,7 +2853,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/reservations/day') {
     const storeId = query.get('storeId') || 'store-sby'
     const date = query.get('date') || ''
-    const sameDay = (iso) => { const d = new Date(iso); const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${dd}` === date }
+    const timezone = RESTAURANT_STORES.find((store) => store.id === storeId)?.timezone ?? RESTAURANT_STORES[0].timezone
+    const sameDay = (iso) => storeYmd(iso, timezone) === date
     return { success: true, data: { date, reservations: RESTAURANT_RESERVATIONS.filter((r) => r.store_id === storeId && sameDay(r.starts_at)), closures: RESTAURANT_CLOSURES.filter((c) => c.storeId === storeId && c.startDate <= date && c.endDate >= date) } }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/customers/search') {
