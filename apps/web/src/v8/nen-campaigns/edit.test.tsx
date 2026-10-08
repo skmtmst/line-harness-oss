@@ -111,6 +111,24 @@ async function pick(label: string, option: string) {
   await act(async () => { fireEvent.click(item!.querySelector('button') ?? item!) })
 }
 
+describe('狭い板の配信プレビュー', () => {
+  it.each(['配信を直す', 'コラムを書く'])('%s でも畳んだ見え方を開き、閉じられる', async (screen) => {
+    await act(async () => { root.render(screen === '配信を直す' ? <CampaignEdit campaignKey="review_request" /> : <ColumnNew />) })
+    await flush()
+    await act(async () => { fireEvent.click(button('プレビューを見る')!) })
+    await flush()
+    const drawer = document.querySelector('[role="dialog"]')!
+    expect(drawer.textContent).toContain('配信のプレビュー')
+    expect(drawer.textContent).toContain('LINEでの見え方')
+    expect(host.querySelector('[data-template-region="preview"]')).toBeNull()
+    await act(async () => { fireEvent.click(drawer.querySelector('button[aria-label="閉じる"]')!) })
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)) })
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(calls.updateSetting).not.toHaveBeenCalled()
+    expect(calls.createColumn).not.toHaveBeenCalled()
+  })
+})
+
 describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
   it('V8 のテーマで節が並び、選んだ日数・時刻・マイルが保存に乗る', async () => {
     await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
@@ -120,7 +138,8 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
     for (const heading of ['配信フロー', 'いつ送りますか', '送るもの', '押されたあとにすること']) expect(host.textContent).toContain(heading)
     expect(host.textContent).toContain('200 マイル')
     await pick('きっかけからの日数', '注文が届いた日から 14 日後')
-    await pick('送る時刻', '19:00')
+    const time = host.querySelector('input[aria-label="送る時刻"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(time, { target: { value: '19:00' } }); fireEvent.blur(time) })
     await pick('回答後にマイルを付ける', '500 マイル')
     await act(async () => { fireEvent.click(button('配信内容を保存する')!) })
     await flush()
@@ -170,6 +189,17 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     await flush()
     expect(calls.createColumn).not.toHaveBeenCalled()
     expect(host.textContent).toContain('HTTPSの記事URLを入力してください。')
+    const title = host.querySelector('input[aria-label="題名"]') as HTMLInputElement
+    const article = host.querySelector('input[aria-label="記事の URL"]') as HTMLInputElement
+    expect(title.getAttribute('aria-invalid')).toBe('true')
+    expect(article.getAttribute('aria-invalid')).toBe('true')
+    expect(host.querySelectorAll('#nen-col-title')).toHaveLength(1)
+    expect(host.querySelectorAll('[data-design-part="notice"][role="alert"]')).toHaveLength(0)
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 40)) })
+    expect(document.activeElement).toBe(title)
+    await act(async () => { fireEvent.change(title, { target: { value: '秋の食事' } }) })
+    expect(title.getAttribute('aria-invalid')).not.toBe('true')
+    expect(host.querySelector('#nen-col-title-error')).toBeNull()
   })
 
   it('閲覧のみの人には書く欄も保存も置かず、帯と戻る道だけ出す', async () => {

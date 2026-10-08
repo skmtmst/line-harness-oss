@@ -26,20 +26,7 @@
 
 /* 閲覧のみの帯（数の帯の上）。 */
 .viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
   margin: var(--tpl-nc-viewer-margin);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
 }
 
 /* コラム・送った履歴の板は、案内から下が左右にもう一段（24）入る。 */
@@ -190,28 +177,6 @@
 }
 
 /* 状態の札（点＋文字 12/600）。 */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-nc-pill-gap);
-  padding: var(--tpl-nc-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-nc-pill-lh);
-  white-space: nowrap;
-}
-.pillDot {
-  width: var(--tpl-nc-pill-dot);
-  height: var(--tpl-nc-pill-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-  flex-shrink: 0;
-}
-.pill[data-tone='ok'] { background: var(--color-success-bg); color: var(--color-success); }
-.pill[data-tone='info'] { background: var(--color-status-info-soft); color: var(--color-action); }
-.pill[data-tone='off'] { background: var(--color-track); color: var(--color-ink-secondary); }
-.pill[data-tone='danger'] { background: var(--color-status-danger-soft); color: var(--color-status-danger); }
 
 /* 行の右端の「…」（36 の四角）。メニューの目印で行を伸ばさない。 */
 .menuBox {
@@ -223,25 +188,6 @@
   display: block;
   width: var(--tpl-nc-menu-size);
   height: var(--tpl-nc-menu-size);
-}
-/* 「…」は共通の RowMenu。今の見た目（枠・大きさ・地）を共通の印ボタンより強く当てる。 */
-.menuBox > button.menuButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-nc-menu-size);
-  height: var(--tpl-nc-menu-size);
-  flex: 0 0 var(--tpl-nc-menu-size);
-  padding: 0;
-  border: 1px solid var(--color-hairline);
-  outline: 0;
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-}
-.menuBox > button.menuButton:hover {
-  background: var(--color-table-head);
 }
 
 /* 表の下（件数とページ送り・ヒント）。 */
@@ -383,22 +329,28 @@
 }
 
 /* 選んだコラム（表の下）。 */
-.selectPanel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-nc-field-gap);
-  padding: var(--tpl-nc-select-pad);
-}
 .selectTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-nc-text-lh);
+}
+.selectDescription {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-tabs-text-lh);
+}
+.selectFields {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--tpl-toolbar-gap);
 }
 .selectGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--tpl-nc-pair-gap);
+  gap: var(--tpl-cn-panel-gap);
 }
 .buttonRow,
 .selectFoot,
@@ -411,3 +363,5 @@
 .selectFoot {
   justify-content: flex-end;
 }
+
+.radioRow { gap: var(--tpl-cn-panel-gap); }

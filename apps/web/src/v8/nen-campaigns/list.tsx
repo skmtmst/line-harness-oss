@@ -10,17 +10,19 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useRouter } from 'next/navigation'
-import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   Bookmark,
   CalendarDays,
   CircleHelp,
   Columns2,
+  Copy,
   Download,
   Eye,
   History,
   PenLine,
+  Send,
   Undo2,
 } from 'lucide-react'
 import type {
@@ -33,6 +35,7 @@ import type {
 } from '@/lib/api'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -50,6 +53,8 @@ import Toggle from '@/components/shared/toggle'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import { Field, FieldError } from '@/components/shared/form-controls'
+import { useFieldValidation } from '@/lib/use-field-validation'
 import DateTimeField from '@/components/shared/date-time-field'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { csvCell } from '@/lib/presentation'
@@ -72,6 +77,7 @@ import {
   type NenKpis,
   type NenTab,
 } from './display'
+import StatusBadge from '@/components/shared/status-badge'
 import styles from './list.module.css'
 
 export type { NenTab } from './display'
@@ -166,10 +172,7 @@ function rangeText(total: number, page: number, size: number): string {
 /** 状態の札（点＋文字）。tone は 動いている＝ok・予約中＝info・止めている／送っていない＝off。 */
 function Pill({ tone, children }: { tone: 'ok' | 'info' | 'off' | 'danger'; children: ReactNode }) {
   return (
-    <span className={styles.pill} data-tone={tone}>
-      <span className={styles.pillDot} aria-hidden="true" />
-      {children}
-    </span>
+    <StatusBadge tone={tone === 'ok' ? 'success' : tone === 'off' ? 'neutral' : tone}>{children}</StatusBadge>
   )
 }
 
@@ -178,7 +181,7 @@ function RowMenu({ subject, items }: { subject: string; items: ActionMenuItem[] 
   if (items.length === 0) return <span className={styles.menuSpace} aria-hidden="true" />
   return (
     <span className={styles.menuBox}>
-      <SharedRowMenu className={styles.menuButton} label={`「${subject}」の操作`} items={items} />
+      <SharedRowMenu label={`「${subject}」の操作`} items={items} />
     </span>
   )
 }
@@ -241,19 +244,16 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
   const kpiPending = loading && kpis === null
   const kpiMissing = props.kpisFailed ? '読み込めませんでした' : kpiPending ? '読み込んでいます' : '—'
   const sentDiff = kpis?.sentThisMonth != null && kpis.sentLastMonth != null ? kpis.sentThisMonth - kpis.sentLastMonth : null
-  const openDetail = tab === 'history' ? '配信ごとの開封の集計から' : tab === 'columns' ? 'コラムを開いた割合' : '自動配信は開封を取れません（コラムだけ）'
+  const openDetail = tab === 'history' ? '配信ごとの開封は LINE から取れません' : tab === 'columns' ? 'コラムを開いた割合' : '自動配信は開封を取れません（コラムだけ）'
   const stats = (
     <>
       {!canEdit ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
-        </div>
+        <div className={styles.viewerBand}><Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></div>
       ) : null}
       <KpiBand data-design="KPIs" className={styles.band}>
         <KpiCard presentation="band" title="自動配信" icon={<History size={13} aria-hidden="true" />} help="注文・発送・誕生日などのきっかけで送る配信の数です。" value={settings.length === 0 && loading ? null : autoSettings.length} unit="件" detail={settings.length === 0 && loading ? kpiMissing : `動いている ${enabledCount}・止めている ${pausedCount}`} />
         <KpiCard presentation="band" title="今月送った" icon={<CircleHelp size={13} aria-hidden="true" />} help="今月（日本時間の月初から）送った通数です。" value={kpis?.sentThisMonth ?? null} unit={kpis?.sentThisMonth == null ? '' : '通'} detail={sentDiff == null ? kpiMissing : `先月より ${sentDiff >= 0 ? '+' : ''}${formatNumber(sentDiff)}`} />
-        <KpiCard presentation="band" title={tab === 'history' ? '取得不可' : '開封（コラムを開いた割合）'} icon={<CircleHelp size={13} aria-hidden="true" />} help={tab === 'history' ? '配信ごとの開封は LINE から取れません。数はコラムの記事を開いた割合です。' : 'コラムの記事を開いた割合です。自動配信は LINE から一人ずつの開封を取れません。'} value={kpis?.openRate ?? null} unit={kpis?.openRate == null ? '' : '%'} detail={kpis ? openDetail : kpiMissing} />
+        <KpiCard presentation="band" title={tab === 'history' ? '取得不可' : '開封（コラムを開いた割合）'} icon={<CircleHelp size={13} aria-hidden="true" />} help={tab === 'history' ? '配信ごとの開封は LINE から取れません。' : 'コラムの記事を開いた割合です。自動配信は LINE から一人ずつの開封を取れません。'} value={tab === 'history' ? null : kpis?.openRate ?? null} unit={tab === 'history' || kpis?.openRate == null ? '' : '%'} detail={kpis ? openDetail : kpiMissing} />
         <KpiCard presentation="band" title="コラム" icon={<Undo2 size={13} aria-hidden="true" />} help="外部サイトの記事へつなぐコラムの本数です。" value={columns.length === 0 && loading ? null : columnTotal} unit="本" detail={columns.length === 0 && loading ? kpiMissing : `公開中 ${publishedCount}・下書き ${columns.length - publishedCount}`} />
       </KpiBand>
     </>
@@ -512,6 +512,15 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
   onChange: (coupon: NenCoupon) => void
   onSave: () => void
 }) {
+  const fields = useFieldValidation([
+    ...(!Number.isInteger(coupon.discountAmount) || coupon.discountAmount < 1 || coupon.discountAmount > 100000
+      ? [{ id: 'coupon-discount', message: '割引の額は1〜100,000円の整数で入力してください。' }] : []),
+    ...(!Number.isInteger(coupon.validityDays) || coupon.validityDays < 1 || coupon.validityDays > 365
+      ? [{ id: 'coupon-days', message: '使える日数は1〜365日の整数で入力してください。' }] : []),
+    ...(!/^[A-Z0-9-]{3,10}$/.test(coupon.codePrefix)
+      ? [{ id: 'coupon-prefix', message: '半角大文字・数字・-で3〜10文字にしてください。' }] : []),
+  ])
+  useEffect(() => { if (!open) fields.reset() }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
   const prefix = coupon.codePrefix || 'NENBDAY'
   const leapLabel = coupon.leapYearPolicy === 'mar1' ? '3月1日に送る' : coupon.leapYearPolicy === 'skip' ? 'その年は送らない' : '2月28日に送る'
   // 閲覧のみの人には、押せない入力欄を置かずに値だけ見せる。
@@ -543,7 +552,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
       footer={(
         <div className={styles.drawerFoot}>
           <Button type="button" disabled={saving} onClick={onClose}>キャンセル</Button>
-          <Button type="button" variant="primary" disabled={saving} busy={saving} busyLabel="保存中…" onClick={onSave}>設定を保存する</Button>
+          <Button type="button" variant="primary" disabled={saving} busy={saving} busyLabel="保存中…" onClick={() => { if (fields.submit()) onSave() }}>設定を保存する</Button>
         </div>
       )}
     >
@@ -562,16 +571,19 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
         <div className={styles.fieldPair}>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>割引額（円）</span>
-            <TextField type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
+            <TextField {...fields.bind('coupon-discount')} type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
+            <FieldError id="coupon-discount-error">{fields.error('coupon-discount')}</FieldError>
           </label>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>使える日数</span>
-            <TextField type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
+            <TextField {...fields.bind('coupon-days')} type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
+            <FieldError id="coupon-days-error">{fields.error('coupon-days')}</FieldError>
           </label>
         </div>
         <label className={styles.field}>
           <span className={styles.fieldLabel}>コードの頭の文字（10文字まで・大文字）</span>
-          <TextField value={coupon.codePrefix} maxLength={10} title="半角大文字・数字・- で3〜10文字" onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />
+          <TextField {...fields.bind('coupon-prefix')} value={coupon.codePrefix} maxLength={10} title="半角大文字・数字・- で3〜10文字" onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />
+            <FieldError id="coupon-prefix-error">{fields.error('coupon-prefix')}</FieldError>
         </label>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>2月29日生まれの子への平年の扱い</span>
@@ -790,25 +802,26 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
   const audience = `${selected.targetMode === 'tag' ? 'タグで絞り込み' : '友だち 全員'}（${num(audienceCount)}人）`
 
   return (
-    <section className={styles.selectPanel} aria-label={`選んだコラム：${selected.title}`}>
+    <Card variant="panel" aria-label={`選んだコラム：${selected.title}`}>
       <h2 className={styles.selectTitle}>{`選んだコラム：${selected.title}`}</h2>
-      <p className={styles.muted}>LINE に届くカードと、送る相手・時刻を決めます。</p>
+      <p className={styles.selectDescription}>LINE に届くカードと、送る相手・時刻を決めます。</p>
       <div className={styles.selectGrid}>
-        <div className={styles.field}>
-          <span className={styles.fieldLabel}>LINE に出る紹介文</span>
-          <TextArea aria-label="LINE に出る紹介文" value={introDraft} rows={3} maxLength={1500} readOnly={!canEdit} onChange={(event) => props.onIntroChange(event.target.value)} />
+        <div className={styles.selectFields}>
+          <Field label="LINE に出る紹介文">
+            <TextArea size="single-row" rows={1} aria-label="LINE に出る紹介文" value={introDraft} maxLength={1500} readOnly={!canEdit} onChange={(event) => props.onIntroChange(event.target.value)} />
+          </Field>
           {canEdit ? (
             <span className={styles.buttonRow}>
               <Button type="button" disabled={introDraft === selected.introText || props.savingColumnId === selected.id || !introDraft.trim()} busy={props.savingColumnId === selected.id} busyLabel="保存中…" onClick={() => props.onSaveIntro(selected)}>紹介文を保存する</Button>
-              <Button type="button" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)}>{props.duplicatingColumnId === selected.id ? '複製しています' : '同じ形で書く'}</Button>
+              <Button type="button" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)}><Copy size={15} aria-hidden="true" />{props.duplicatingColumnId === selected.id ? '複製しています' : '同じ形で書く'}</Button>
               <span className={styles.muted}>{`${introDraft.length}／1500文字`}</span>
             </span>
           ) : null}
         </div>
-        <div className={styles.field}>
-          <span className={styles.fieldLabel}>だれに</span>
-          <span className={styles.cell}>{audience}</span>
-          <span className={styles.muted}>送る相手はコラムを作るときに決めます。友だち解除・ブロックの人には送られません。</span>
+        <div className={styles.selectFields}>
+          <Field label="だれに" help="送る相手はコラムを作るときに決めます。友だち解除・ブロックの人には送られません。">
+            <TextField aria-label="送る相手" value={audience} readOnly />
+          </Field>
           {canEdit ? (
             <>
               <span className={styles.fieldLabel}>いつ</span>
@@ -817,11 +830,10 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
                 <Radio name="nen-deliver-when-v8" checked={plan.when === 'schedule'} onChange={() => props.onPlanChange({ ...plan, when: 'schedule' })}>日時を予約</Radio>
               </span>
               {plan.when === 'schedule' ? (
-                <>
-                  <span className={styles.fieldLabel}>送る日時</span>
+                <Field label="送る日時">
                   <DateTimeField aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(value) => props.onPlanChange({ ...plan, scheduledAt: value })} />
                   {schedulePast ? <span className={styles.error} role="alert">予約日時が過去になっています。いまより先の日時を選んでください。</span> : null}
-                </>
+                </Field>
               ) : null}
             </>
           ) : null}
@@ -831,7 +843,7 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
       {canEdit ? (
         <div className={styles.selectFoot}>
           <TestRecipientPicker friends={props.friends} value={props.testFriendId} onChange={props.onTestFriendChange} accountId={props.accountId} />
-          <Button type="button" disabled={!props.testFriendId || props.testing !== null} busy={props.testing === selected.id} busyLabel="送信中…" onClick={() => props.onTestColumn(selected)}>自分にテストを送る</Button>
+          <Button type="button" disabled={!props.testFriendId || props.testing !== null} busy={props.testing === selected.id} busyLabel="送信中…" onClick={() => props.onTestColumn(selected)}><Send size={15} aria-hidden="true" />自分にテストを送る</Button>
           <Button type="button" variant="primary" disabled={!columnEnabled || scheduleInvalid} onClick={() => setConfirm({ column: selected, scheduledAt: scheduledIso ?? undefined })}>配信を予約する</Button>
         </div>
       ) : null}
@@ -845,7 +857,7 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
         onConfirm={() => { if (confirm) props.onDeliverColumn(confirm.column, confirm.scheduledAt); setConfirm(null) }}
         onCancel={() => setConfirm(null)}
       />
-    </section>
+    </Card>
   )
 }
 
