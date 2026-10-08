@@ -13,10 +13,12 @@ import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { TextField } from '@/components/shared/text-field'
+import Notice from '@/components/shared/notice'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
+import CompanyContactCard from './company-contact'
 import styles from './settings.module.css'
 
 const TITLE = '統括の情報'
@@ -34,7 +36,9 @@ export default function HqSettingsV8() {
   return (
     <ListPage boardId="K7HYu" title={TITLE} description={DESCRIPTION} folders={<HqSettingsNavV8 active="info" />} folderNav={settingsNav}>
       <div className={styles.body}>
+        {role && !canEdit ? <Notice tone="info">閲覧のみで見ています。統括名の変更と会社・連絡先の登録は管理者だけができます。</Notice> : null}
         <TenantNameCard canEdit={canEdit} />
+        {canEdit ? <CompanyContactCard canEdit /> : null}
       </div>
     </ListPage>
   )
