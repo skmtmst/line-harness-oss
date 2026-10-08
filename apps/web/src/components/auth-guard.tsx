@@ -5,10 +5,12 @@ import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-ses
 import { clearSelectionAfterAuthentication } from '@/lib/hq-navigation'
 import { isPublicAuthPath } from '@/lib/auth-email'
 import { SESSION_LOST_EVENT, type OpsImpersonation } from '@/lib/api'
-import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { forgetSessionSnapshot, rememberSessionSnapshot, type SessionSnapshot } from '@/lib/session-snapshot'
+import { forgetAuthCheck, readAuthCheck, rememberAuthCheck } from '@/lib/auth-check-marker'
 import { clearCommonCaches } from '@/lib/common-caches'
 import { prefetchLineAccounts } from '@/lib/line-accounts-cache'
 import TenantSuspended from './tenant-suspended'
+import AuthPendingShell from './auth-pending-shell'
 import { TenantAccessProvider, type TenantStatus } from './tenant-access-context'
 
 /*
@@ -46,6 +48,7 @@ function sessionFingerprint(handoffToken: string): string {
 export function invalidateAuthSessionCheck(): void {
   lastSessionCheck = null
   forgetSessionSnapshot()
+  forgetAuthCheck()
   clearCommonCaches()
 }
 
@@ -65,7 +68,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
 
     // セッション切れ・別タブでのログアウトは、次の遷移で必ず確認し直す。
     // 使い回していた共通の答えも捨てる（古い権限や別アカウントを見せない）。
-    const invalidate = () => { lastSessionCheck = null; forgetSessionSnapshot(); clearCommonCaches() }
+    const invalidate = () => { lastSessionCheck = null; forgetSessionSnapshot(); forgetAuthCheck(); clearCommonCaches() }
     const onStorage = (event: StorageEvent) => {
       if (event.key === 'lh_csrf' || event.key === 'lh_staff_role') invalidate()
     }
@@ -95,6 +98,18 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         window.removeEventListener(SESSION_LOST_EVENT, invalidate)
         window.removeEventListener('storage', onStorage)
       }
+    }
+
+    /*
+     * 読み直した直後（タブ内の使い回しが消えた）でも、同じタブで確認が通っていれば
+     * 中身を先に出し、下の確認は裏で走らせる（lib/auth-check-marker.ts）。
+     * 失敗したらいつもどおりログインへ送り、停止中なら停止の画面に変わる。
+     */
+    const verified = readAuthCheck(fingerprint)
+    if (verified) {
+      if (verified.snapshot) rememberSessionSnapshot(verified.snapshot)
+      setTenantStatus('active')
+      setChecked(true)
     }
 
     // Verify the session via the HttpOnly cookie. /api/auth/session returns the
@@ -143,19 +158,23 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         localStorage.setItem('lh_staff_view_permissions', JSON.stringify(data.data.viewPermissionKeys ?? []))
         if (data.csrfToken) localStorage.setItem('lh_csrf', data.csrfToken)
         // 代理ログイン帯はこの結果を読む。同じ応答をもう一度取りに行かせない（V6R-S0-a）。
-        rememberSessionSnapshot({
+        const snapshot: SessionSnapshot = {
           impersonation: (data.data.impersonation as OpsImpersonation | null | undefined) ?? null,
           unfamiliarAt: typeof data.data.unfamiliarAt === 'string' ? data.data.unfamiliarAt : null,
           stepUpMethod: data.data.stepUpMethod === 'totp' || data.data.stepUpMethod === 'password'
             ? data.data.stepUpMethod
             : 'none',
-        })
+        }
+        rememberSessionSnapshot(snapshot)
         // 「消した」印の正本は共有の localStorage。新規タブ・再読込では
         // 印が残るので他タブの店舗選択を消さず、ログインし直しのときだけ
         // 一度だけ消える（NEXT-07）。sessionStorage の残存印も残存扱いにする。
         clearSelectionAfterAuthentication(localStorage, sessionStorage)
         // 確認した時点の指紋で記憶する（CSRF更新を受けたなら新しい値で）。
-        lastSessionCheck = { at: Date.now(), fingerprint: sessionFingerprint(handoffToken), tenantStatus: nextTenantStatus }
+        const confirmedFingerprint = sessionFingerprint(handoffToken)
+        lastSessionCheck = { at: Date.now(), fingerprint: confirmedFingerprint, tenantStatus: nextTenantStatus }
+        // 読み直しても中身を先に出せるよう、このタブに印を残す（停止中は残さない）。
+        rememberAuthCheck(confirmedFingerprint, nextTenantStatus, snapshot)
         if (!cancelled) setChecked(true)
       } catch {
         // 古い確認の失敗で新しいログインの状態を消さない。送りもしない。
@@ -166,6 +185,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         }
         lastSessionCheck = null
         forgetSessionSnapshot()
+        forgetAuthCheck()
         if (!cancelled) router.replace('/login')
       }
     }
@@ -178,13 +198,8 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     }
   }, [pathname, router])
 
-  if (!checked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-[3px] border-hairline border-t-green-500 rounded-pill" />
-      </div>
-    )
-  }
+  // 初めての確認（開いた直後・ログイン直後）だけ。くるくるではなく外枠の骨組みで待つ。
+  if (!checked) return <AuthPendingShell />
 
   if ((tenantStatus === 'suspended' || tenantStatus === 'archived') && !pathname.startsWith('/hq/support')) {
     return <TenantAccessProvider status={tenantStatus}><TenantSuspended /></TenantAccessProvider>

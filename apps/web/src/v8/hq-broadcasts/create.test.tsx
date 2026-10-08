@@ -60,6 +60,8 @@ const folder = (id: string, name: string) => ({ id, kind: 'line_account', name, 
 
 beforeEach(() => {
   role.value = 'owner'
+  // 画面の住所（段の切り替えは同じ住所の中で履歴だけを書き換える）。
+  window.history.replaceState(null, '', '/hq/broadcasts/new')
   params.value = new URLSearchParams()
   accounts.mockResolvedValue({ success: true, data: [
     { id: 'a1', name: '銀座店', tags: [{ id: 't1', name: '関東', color: null }], stats: { friendCount: 6120 }, folderId: 'f1', folder: folder('f1', '関東') },
@@ -110,7 +112,15 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     /* 送信枠の足りない新宿店は外す（口は外した店を送らない）。版は作ったときの 1。 */
     expect(hq.exclude).toHaveBeenCalledWith('run-1', ['a2'], 1)
     /* 保存した下書きは URL に id を残す（読み直しても同じ下書き）。 */
-    expect(replace).toHaveBeenCalledWith(expect.stringContaining('id=run-1'), { scroll: false })
+    expect(new URLSearchParams(window.location.search).get('id')).toBe('run-1')
+    /*
+     * 段の切り替え・id の書き込みはルーターを通さない（2026-10-08 オーナー：「次へ」で
+     * 「このサイトを離れますか？」）。ルーターを通すと RSC を取りに行き、新しい版の後は
+     * 画面を丸ごと読み直す。履歴だけを書き換える。
+     */
+    expect(window.location.pathname).toBe('/hq/broadcasts/new')
+    expect(new URLSearchParams(window.location.search).get('step')).toBe('confirm')
+    expect(replace).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
     fireEvent.click(await screen.findByRole('button', { name: '予約する' }))
     await waitFor(() => expect(hq.send).toHaveBeenCalledWith('run-1', 2))

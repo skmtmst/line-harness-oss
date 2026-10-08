@@ -12,6 +12,7 @@
  * （口・版・下書き・冪等の鍵の扱いを変えない）。違うのは見せ方と、先に保存された
  * ときの帯（違いを比べる・最新を読み込んで続ける）。BEHAVIOR.md に書き出した。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -194,6 +195,7 @@ export default function FriendAddEditorV8({ ruleId }: { ruleId?: string }) {
 
 function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
@@ -385,7 +387,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       savedSnapshot.current = editorSnapshot(rule, definition)
       setConflict(false)
       setNotice('下書きを保存しました。')
-      if (!ruleId || nextStep) router.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
+      if (!ruleId || nextStep) samePageUrl.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {
@@ -436,7 +438,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const moveToStep = (nextStep: Step) => {
     if (nextStep === step || saving || enabling) return
     if (!hasUnsavedChanges) {
-      router.replace(hrefFor(nextStep))
+      samePageUrl.replace(hrefFor(nextStep))
       return
     }
     void save(nextStep)

@@ -11,6 +11,7 @@
  * 読み書きは統括の一括配信の口（API-7 の hq-broadcasts）。店の口（承認・テスト送信・分散・配信後のアクション・
  * 除くタグ・詳細条件）は統括の口に無いので出さない（BEHAVIOR.md の「今の口で出せないもの」）。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -179,6 +180,7 @@ export default function HqBroadcastCreate() {
   usePageTitle(composer === 'carousel' ? 'カルーセルを作る' : composer === 'rich' ? 'リッチメッセージを作る' : '一括配信を作る')
   usePageCrumbs(composer ? [{ label: '一括配信', href: '/hq/broadcasts' }, { label: '一括配信を作る', href: '/hq/broadcasts/new' }] : [{ label: '一括配信', href: '/hq/broadcasts' }])
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const role = useStaffRole()
   const canManage = role === null || canManageRole(role)
@@ -427,10 +429,10 @@ export default function HqBroadcastCreate() {
 
   const changeStep = (next: BroadcastStepKey) => {
     setStep(next)
-    const q = new URLSearchParams(params.toString())
+    const q = new URLSearchParams(window.location.search)
     if (next === 'basic') q.delete('step'); else q.set('step', next)
     if (draftId) q.set('id', draftId)
-    router.replace(`/hq/broadcasts/new${q.size ? `?${q.toString()}` : ''}`, { scroll: false })
+    samePageUrl.replace(`/hq/broadcasts/new${q.size ? `?${q.toString()}` : ''}`)
     if (next === 'confirm' && (!checks || stale)) void check()
   }
 
@@ -526,10 +528,10 @@ export default function HqBroadcastCreate() {
       setRun(current); setRunKey(key); setChecks(list); setSavedAt(new Date().toISOString())
       if (current.id !== draftId) {
         setDraftId(current.id)
-        const q = new URLSearchParams(params.toString())
+        // 今の URL（段の切り替えで書いた step）に id を足す。この関数を呼んだ時点の段（古い値）で書き戻さない。
+        const q = new URLSearchParams(window.location.search)
         q.set('id', current.id)
-        if (step !== 'basic') q.set('step', step)
-        router.replace(`/hq/broadcasts/new?${q.toString()}`, { scroll: false })
+        samePageUrl.replace(`/hq/broadcasts/new?${q.toString()}`)
       }
       return { run: current, checks: list }
     } catch (caught) {

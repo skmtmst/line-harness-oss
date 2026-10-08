@@ -12,8 +12,9 @@
  * （友だちの登録日は結び付けた日ではないので代わりに出さない。詳細の linkedAt を一覧にも足す依頼は Codex へ）。
  * 「複数アカウントのみ」の絞り込みは絵に口が無いので、所属アカウントの選びの末尾に入れた。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useEffect, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { ChevronUp, Download, RotateCw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatDay, formatNumber, formatYmd } from '@/lib/format'
@@ -55,13 +56,13 @@ function deliveryAccount(row: UserRowData): string {
 
 export default function MergedUsersV8() {
   const searchParams = useSearchParams()
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const personFromUrl = searchParams.get('person')
   const [openedPersonId, setOpenedPersonId] = useState<string | null>(personFromUrl)
   useEffect(() => { setOpenedPersonId(personFromUrl) }, [personFromUrl])
   const close = () => {
     setOpenedPersonId(null)
-    if (personFromUrl) router.replace('/friends?tab=merged')
+    if (personFromUrl) samePageUrl.replace('/friends?tab=merged')
   }
   /*
    * 人の詳細は一覧と同じ URL のまま開くことがあるので、上の帯のパンくずの「統合ユーザー」で

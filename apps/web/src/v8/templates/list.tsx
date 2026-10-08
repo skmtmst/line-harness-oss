@@ -799,7 +799,7 @@ export default function TemplatesListV8() {
       {
         id: 'broadcast',
         label: '一斉配信で使う',
-        onSelect: () => window.location.assign(`/broadcasts/new?templateId=${encodeURIComponent(t.id)}`),
+        onSelect: () => router.push(`/broadcasts/new?templateId=${encodeURIComponent(t.id)}`),
       },
       ...(canMutate ? [
         {

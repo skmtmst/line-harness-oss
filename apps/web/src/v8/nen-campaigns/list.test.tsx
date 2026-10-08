@@ -16,6 +16,8 @@ vi.hoisted(() => {
 
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
+// 行の「…」の移動は router.push（画面を丸ごと読み直さない）。
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }) }))
 vi.mock('next/link', () => ({
   default: ({ children, href, className, title }: { children: React.ReactNode; href: string; className?: string; title?: string }) =>
     React.createElement('a', { href, className, title }, children),
