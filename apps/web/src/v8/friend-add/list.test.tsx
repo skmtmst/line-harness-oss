@@ -106,7 +106,7 @@ const openMenu = async (name: string) => {
   const button = host.querySelector<HTMLButtonElement>(`button[aria-label="設定「${name}」の操作"]`)
   expect(button).not.toBeNull()
   await act(async () => { button!.click() })
-  return Array.from(document.querySelectorAll('[role="menuitem"]')).map((el) => el.textContent?.trim() ?? '')
+  return Array.from(document.querySelectorAll('[role="menuitem"]')).filter(el => !el.closest('[aria-hidden="true"], [inert]')).map((el) => el.textContent?.trim() ?? '')
 }
 
 describe('友だち追加時の配信の一覧（V8）', () => {

@@ -52,3 +52,12 @@ it('共通点検5: 小さい行のボタンはブラウザ既定の余白を足�
 it('WEB253: span内の旧SVGにもV8のアイコン寸法を渡す', () => {
   expect(read('components/layout/sidebar.tsx')).toContain('<NavIcon className={isV8 ? styles.v8NavIcon : undefined}')
 })
+
+it('共通点検4・5: 同じCSSを使う残りの3タブも消した札とボタンの上書きを見ない', () => {
+  for (const tab of ['fields-tab', 'marks-tab', 'searches-tab']) {
+    const source = read(`v8/tags/${tab}.tsx`)
+    expect(source).not.toContain('styles.menuButton')
+    expect(source).not.toContain('styles.miniBadge')
+    expect(source).toMatch(/<RowMenu\s+size="row"/)
+  }
+})

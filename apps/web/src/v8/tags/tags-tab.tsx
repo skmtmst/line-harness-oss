@@ -56,7 +56,6 @@ import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import TagPill from '@/components/shared/tag-pill'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
-import { TagRowsSkeleton } from '@/app/tags/tag-rows-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useLiveReorder } from '@/lib/use-live-reorder'
@@ -714,7 +713,7 @@ export default function TagsTab({
       filteredDescription="検索語・フォルダ・絞り込みを外すと、すべて出ます"
     />
   ) : (
-    <DelayedSkeleton loading={!ready} skeleton={<TagRowsSkeleton designNode="U0aKD" />}>
+    <DelayedSkeleton loading={!ready} skeleton={<div className={styles.skeleton} aria-busy="true" data-design-node="U0aKD" />}>
       <DataTable className={styles.table} data-design="TagTable">
         <thead>
           <TableHeadRow>

@@ -452,7 +452,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
                     {(!host || canEdit) ? <RowMenu
-                      className={styles.menuButton}
+                      size="row"
                       label={`項目「${field.name}」の操作`}
                       items={rowMenuItems(field)}
                       open={openMenuId === field.id}

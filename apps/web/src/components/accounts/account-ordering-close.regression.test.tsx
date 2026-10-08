@@ -30,3 +30,16 @@ it('WEB-239: 構成を変えた窓は×とEscで確認し、保存中は閉じ�
   expect(screen.getByRole('dialog', { name: '構成を直す' })).toBeTruthy()
   await act(async () => finish({ success: true }))
 })
+
+it('WEB-239: 構成の保存で通信が失敗しても、変更を残して編集と離脱確認に戻れる', async () => {
+  apiMocks.list.mockResolvedValue({ success: true, data: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }] })
+  apiMocks.update.mockRejectedValue(new Error('通信が切れました'))
+  render(<Harness />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Aの移動先を選ぶ' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: /「B」の子にする/ }))
+  fireEvent.click(screen.getByRole('button', { name: /並びを保存する/ }))
+  await screen.findByText('通信が切れました')
+  await waitFor(() => expect(screen.getByRole('button', { name: '閉じる' }).disabled).toBe(false))
+  fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+  expect(screen.getByRole('dialog', { name: /保存していない変更/ })).toBeTruthy()
+})

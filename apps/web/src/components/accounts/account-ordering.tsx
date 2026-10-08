@@ -148,12 +148,17 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange }: {
     if (changed.length === 0 || saving) return
     setSaving(true)
     setError('')
-    const response = await api.lineAccounts.updateHierarchy(
-      changed.map((item) => ({ id: item.id, parentLineAccountId: item.parentLineAccountId ?? null })),
-    )
-    if (response.success) await load()
-    else setError(response.error)
-    setSaving(false)
+    try {
+      const response = await api.lineAccounts.updateHierarchy(
+        changed.map((item) => ({ id: item.id, parentLineAccountId: item.parentLineAccountId ?? null })),
+      )
+      if (response.success) await load()
+      else setError(response.error)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '構成を保存できませんでした。もう一度お試しください。')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const cancelChanges = () => {

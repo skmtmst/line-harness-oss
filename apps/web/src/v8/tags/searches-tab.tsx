@@ -26,6 +26,7 @@ import { withViewTransition } from '@/components/shared/view-transition'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
@@ -379,7 +380,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                         <span className={styles.name} title={search.name}>{search.name}</span>
                       )}
                       {!search.lineAccountId ? (
-                        <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`}>対象アカウント未割り当て</span>
+                        <StatusBadge tone="warning" size="annotation" dot={false}>対象アカウント未割り当て</StatusBadge>
                       ) : null}
                     </div>
                     <p className={styles.sub} title={summaryText}>{summaryText}</p>
@@ -403,7 +404,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
                     <RowMenu
-                      className={styles.menuButton}
+                      size="row"
                       label={`保存した検索「${search.name}」の操作`}
                       items={rowMenuItems(search)}
                       open={openMenuId === search.id}
