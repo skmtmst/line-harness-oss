@@ -516,6 +516,7 @@ shared-button-importer v8/webhooks/incoming.tsx
 shared-button-importer v8/webhooks/interactions.tsx
 shared-button-importer v8/webhooks/outgoing.tsx
 shared-button-importer v8/template-edit/asset.tsx
+shared-button-importer v8/template-edit/carousel-image.tsx
 shared-button-importer v8/template-edit/media-picker.tsx
 shared-button-importer v8/template-edit/insert-row.tsx
 shared-button-importer v8/template-edit/message.tsx
