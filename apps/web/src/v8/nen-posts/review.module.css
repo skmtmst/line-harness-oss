@@ -18,21 +18,6 @@
 .viewerRow {
   padding: var(--tpl-nm-ro-row-pad);
 }
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
 
 /* 数の帯（絵：タブの直下・高さ115）。上の線は場所を取らない内側の影で引く。 */
 :global([data-theme='v8']) .stats :global([data-kpi-strip][data-kpi-presentation='band']) {
@@ -494,44 +479,6 @@
   margin: 0;
   padding: 0;
   border: 0;
-}
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-nm-action-gap);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  min-height: 0;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: var(--tpl-nm-pill-lh);
-  cursor: pointer;
-}
-.pillDot {
-  display: inline-block;
-  width: var(--tpl-nm-radio);
-  height: var(--tpl-nm-radio);
-  flex-shrink: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
-  box-shadow: var(--tpl-nm-radio-off);
-}
-.pill[aria-checked='true'] .pillDot {
-  box-shadow: var(--tpl-nm-radio-on);
-}
-.reasonTextarea {
-  box-sizing: border-box;
-  width: 100%;
-  height: var(--tpl-nm-textarea-h);
-  padding: var(--tpl-nm-textarea-pad);
-  resize: vertical;
-  border: 1px solid var(--color-control-border);
-  border-radius: var(--radius-segment);
-  color: var(--color-ink);
-  font-size: var(--tpl-nm-row-size);
-  font-weight: 400;
-  line-height: var(--tpl-nm-textarea-lh);
 }
 .checkLine {
   display: flex;
