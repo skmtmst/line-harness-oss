@@ -110,4 +110,13 @@
 /* V8 正本HTMLの実寸。v7には適用しない。 */
 [data-theme='v8'] .button { border: 0; padding: 0; gap: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
 [data-theme='v8'] .button > :is(svg, img) { width: 16px; height: 16px; }
+
+/* 行の中の小さい形（size="small"・mcOqK の上下 24×24・印 12）。既定の 36 は変えない。 */
+[data-theme='v8'] .button[data-size='small'] {
+  width: var(--tpl-icon-btn-sm);
+  height: var(--tpl-icon-btn-sm);
+  flex-basis: var(--tpl-icon-btn-sm);
+  border-radius: var(--radius-mini);
+}
+[data-theme='v8'] .button[data-size='small'] > :is(svg, img) { width: var(--tpl-icon-btn-sm-icon); height: var(--tpl-icon-btn-sm-icon); }
 }
