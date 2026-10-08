@@ -55,6 +55,7 @@ import MediaDetailDialog from './media-detail-dialog'
 import FileScanStoppedBanner from './file-scan-stopped-banner'
 import { MediaQuotaGuidance } from './media-quota-guidance'
 import MediaReplacementDialog from './media-replacement-dialog'
+import { folderById, folderCreator } from '@/components/shared/folder-select'
 import MediaUploadDialog from './media-upload-dialog'
 import { ListPage } from '@/components/templates'
 import KpiBand from '@/components/shared/kpi-band'
@@ -1612,6 +1613,10 @@ export default function MediaLibraryListV8() {
         accountId={selectedAccountId}
         folders={folders}
         initialFolderId={folderFilter}
+        // 左の列の「フォルダを追加」と同じ口・同じ権限。作ったフォルダは左の列にも足す。
+        onCreateFolder={canManageMedia
+          ? folderCreator((name, color) => api.folders.create({ kind: 'media', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+          : undefined}
         onClose={() => setUploadOpen(false)}
         onComplete={() => {
           notifyToast('登録できたメディアを一覧へ反映しました。')
