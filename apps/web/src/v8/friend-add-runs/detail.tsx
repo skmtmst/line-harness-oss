@@ -10,9 +10,8 @@
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { AlertCircle, ArrowLeft, CheckCircle2, Clock, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Clock, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -257,7 +256,6 @@ function FriendAddRunDetailInner() {
   return (
     <PageFrame kind="detail" boardId="N43uVX">
       <PageHeading
-        identity={<Link href={listHref} className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />実行結果へ</Link>}
         title={`${displayName}さんの友だち追加`}
         description={`${jstTitleDate(detail.receivedAt)} に追加・${friendKindLabel}`}
       />

@@ -3,8 +3,6 @@
  * 並び・寸法は自動応答の実行結果（nWmLg）と同じ絵なので、その値（--tpl-ar-run-*）を使う。
  * 頭・本文の余白・数の帯は型（DetailPage・KpiBand）が持つ。ここは失敗の帯・実行の記録・下の2つの箱だけ。
  */
-.backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }
-
 /* 頭の右の3つ：縦位置は型に任せる。間12。 */
 .headActions { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); }
 
