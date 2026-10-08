@@ -16,14 +16,14 @@ import FriendAddSettingsPage from './page'
  * `i1nThZ`・`U8Xm3X`）の契約。`<html data-theme="v8">` の下でだけ
  * 新しい作る手順に切り替わり、手順の輪・右の「設定内容」・下の帯が
  */
-const navigation = vi.hoisted(() => ({ query: 'view=new&step=basic' }))
+const navigation = vi.hoisted(() => ({ account: 'account-a', query: 'view=new&step=basic' }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
   usePathname: () => '/friend-add-settings',
   useSearchParams: () => new URLSearchParams(navigation.query),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
-  selectedAccountId: 'account-a', selectedAccount: null, loading: false, accounts: [{ id: 'account-a' }],
+  selectedAccountId: navigation.account, selectedAccount: null, loading: false, accounts: [{ id: 'account-a' }],
 }) }))
 vi.mock('@/lib/staff-role', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/staff-role')>()
@@ -81,6 +81,7 @@ async function eventually(check: () => void, timeout = 5000) {
 }
 
 beforeEach(() => {
+  navigation.account = 'account-a'
   navigation.query = 'view=new&step=basic'
   vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {})
   const values = new Map<string, string>()
@@ -217,3 +218,37 @@ test('狭い画面の条件編集は小窓で開き、変更した期間を閉�
   expect(payload.definition.activeFrom).toBeNull()
   expect(payload.definition.activeUntil).toBe('2026-11-30T23:59')
 })
+
+test('WEB155: 新規作成のアカウント切替で前の名前を引き継がない', async () => {
+ document.documentElement.dataset.theme='v8'
+ await act(async()=>root.render(<FriendAddSettingsPage/>));await settle()
+ const name=host.querySelector<HTMLInputElement>('input[placeholder="例：店頭QRの初回案内"]') ?? host.querySelector<HTMLInputElement>('input')!
+ fireEvent.change(name,{target:{value:'前のアカウントの名前'}})
+ expect(name.value).toBe('前のアカウントの名前')
+ navigation.account='account-b'
+ await act(async()=>root.render(<FriendAddSettingsPage/>));await settle()
+ expect([...host.querySelectorAll<HTMLInputElement>('input')].some(input=>input.value==='前のアカウントの名前')).toBe(false)
+})
+
+test('WEB157: 競合の比較はシナリオと条件の差も表示する',async()=>{
+ navigation.query='view=edit&id=test-draft&step=basic'
+ let reads=0
+ vi.stubGlobal('fetch',vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
+  const url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url)
+  if(url.pathname.startsWith('/api/friend-add-rules/test-draft')){
+   if(init?.method && init.method!=='GET') return response({success:false,error:'先に保存されました'},409)
+   const original=await base(url).json();reads++
+   if(reads>1){original.data.rule.definition.scenarioId='changed-scenario';original.data.rule.definition.friendCondition='条件が変わった'}
+   return response(original)
+  }
+  return base(url)
+ }))
+ await act(async()=>root.render(<FriendAddSettingsPage/>));await settle()
+ const save=[...host.querySelectorAll('button')].find(button=>button.textContent?.includes('下書きを保存'))!
+ await act(async()=>save.click());await settle()
+ const compare=[...host.querySelectorAll('button')].find(button=>button.textContent?.includes('違いを比べる'))!
+ expect(compare).toBeTruthy()
+ await act(async()=>compare.click());await settle()
+ expect(document.body.textContent).toContain('友だちの条件')
+ expect(document.body.textContent).toContain('changed-scenario')
+});

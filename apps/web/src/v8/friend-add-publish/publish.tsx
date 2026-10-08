@@ -130,6 +130,8 @@ function FriendAddPublish() {
     requestRef.current = { accountId: selectedAccountId, generation }
     const isCurrent = () => alive && requestRef.current.accountId === selectedAccountId && requestRef.current.generation === generation
     setPhase('loading')
+    setBusy(false)
+    setTesting(false)
     setFailure(null)
     // アカウント固有の結果を先に捨てる。残すと、別のアカウントの数を見ながら公開することになる。
     setDetail(null)
@@ -255,7 +257,7 @@ function FriendAddPublish() {
 
   /* 有効にしたあと（e0FD1J）。`?done=1` は作る⑤から有効にして来たとき（読み込んだ設定で出す）。 */
   if (published) return <FriendAddDoneV8 {...published} ruleId={ruleId} />
-  if (searchParams.get('done') === '1') {
+  if (searchParams.get('done') === '1' && detail.rule.status === 'published') {
     return <FriendAddDoneV8 ruleId={ruleId} ruleName={detail.rule.name} routeNames={detail.rule.routeNames} priority={detail.rule.priority} slackConnected={slackOf(detail)} />
   }
 

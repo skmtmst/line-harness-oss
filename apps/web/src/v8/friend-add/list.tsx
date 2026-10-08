@@ -123,7 +123,7 @@ export function actionLine(rule: FriendAddRule) {
     parts.push(`＋シナリオ「${rule.scenarioName}」`)
   }
   for (const action of rule.definition.actions) {
-    if (action.type === 'start_scenario' && rule.scenarioName) continue
+    if (action.type === 'start_scenario' && rule.scenarioName && action.targetId === rule.definition.scenarioId) continue
     if (action.label) parts.push(`＋${actionName(action.label)}`)
   }
   return parts.join(' ')
@@ -737,7 +737,7 @@ function FriendAddList() {
                       >
                         <span aria-hidden="true" className={styles.grip}>⠿</span>
                       </ReorderHandle> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`}>⠿</span>}
-                      <span className={styles.orderNum}>{index + 1}</span>
+                      <span className={styles.orderNum}>{rule.priority}</span>
                     </span>
                   </Td>
                   <Td className={styles.colName}>
