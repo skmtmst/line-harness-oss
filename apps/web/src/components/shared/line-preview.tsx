@@ -39,6 +39,10 @@ export interface LinePreviewProps {
    * v8 のスマホではトークの中の日付の札の位置に出る。
    */
   caption?: ReactNode
+  /** リッチメニュー専用。トークの下、メニュー帯の直上に置く。 */
+  richMenu?: ReactNode
+  /** リッチメニューのトーク画面の下の文言。 */
+  menuBarText?: string
   /** 静かな説明だけ。題の横の？に入り、本文には出さない。 */
   note?: string
   /** 送り主の表示名（分かっている画面だけ渡す）。v8 ではトーク頭の名前になる。 */
@@ -67,6 +71,8 @@ const readIsV8OnServer = () => false
 export default function LinePreview({
   children,
   caption,
+  richMenu,
+  menuBarText = 'メニュー',
   note,
   accountName,
   empty = false,
@@ -114,8 +120,9 @@ export default function LinePreview({
                 children
               )}
             </div>
+            {richMenu ? <div className={styles.richMenu} data-line-preview-region="rich-menu">{richMenu}</div> : null}
             <div className={styles.menuBar}>
-              <span>メニュー</span>
+              <span>{menuBarText}</span>
               <ChevronDown size={12} aria-hidden="true" />
             </div>
             <div className={styles.homeBar}><span className={styles.homeLine} aria-hidden="true" /></div>
@@ -142,7 +149,7 @@ export default function LinePreview({
       ) : empty ? (
         <div className="border-ink-secondary mt-3 rounded-control border border-dashed p-7 text-center text-xs leading-relaxed whitespace-pre-wrap text-ink">{children}</div>
       ) : (
-        <div className="mt-3">{children}</div>
+        <div className="mt-3">{children}{richMenu}</div>
       )}
     </section>
   )

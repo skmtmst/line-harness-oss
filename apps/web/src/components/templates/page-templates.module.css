@@ -228,3 +228,18 @@
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { order: 2; }
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .description { flex-basis: 100%; order: 3; }
 :global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 1; }
+
+/* リッチメニュー JeINq・Z0uO6 の頭。指定した画面だけ説明の下へ手順を置く。 */
+:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='after-description'] > .headingText > .description { order: 2; }
+:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='after-description'] > .steps { order: 3; }
+:global([data-theme='v8']) .heading[data-steps-placement='after-description'] .steps :global([data-part='stepper']) li > span:not([aria-hidden]),
+:global([data-theme='v8']) .heading[data-steps-placement='after-description'] .steps :global([data-part='stepper']) li > button { gap: var(--tpl-bm-4); }
+:global([data-theme='v8']) .heading[data-steps-placement='after-description'] .steps :global([data-part='stepper']) li > span:not([aria-hidden]) > span:first-child,
+:global([data-theme='v8']) .heading[data-steps-placement='after-description'] .steps :global([data-part='stepper']) li > button > span:first-child { width: var(--tpl-bm-24); height: var(--tpl-bm-24); }
+:global([data-theme='v8']) .heading[data-steps-placement='after-description'] .steps :global([data-part='stepper']) li span span,
+:global([data-theme='v8']) .heading[data-steps-placement='after-description'] .steps :global([data-part='stepper']) li > button > span:not(:first-child) { font-size: var(--tpl-bm-13); line-height: var(--tpl-bm-19); }
+
+:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='after-description'] { padding-bottom: var(--tpl-bm-16); row-gap: var(--tpl-bm-12); }
+
+:global([data-theme='v8']) .heading[data-steps-placement='after-description'] .steps :global([data-part='stepper']) li > span:not([aria-hidden]) > span:first-child,
+:global([data-theme='v8']) .heading[data-steps-placement='after-description'] .steps :global([data-part='stepper']) li > button > span:first-child { font-size: var(--tpl-bm-11); line-height: var(--tpl-bm-13); }

@@ -19,7 +19,7 @@ export interface PageHeadingProps {
   crumbs?: ReactNode
   steps?: ReactNode
   /** 作る型の手順の置き方。既定は題と説明の下の行。FU2aU の同行版は 'inline'。 */
-  stepsPlacement?: 'below' | 'inline'
+  stepsPlacement?: 'below' | 'inline' | 'after-description'
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */

@@ -280,3 +280,6 @@
 [data-theme='v8'] .tail { display: none; }
 [data-theme='v8'] .bubbleBody { display: block; width: auto; min-height: 0; padding: 8px 12px; border-radius: var(--radius-mini) var(--radius-large) var(--radius-large) var(--radius-large); color: var(--color-ink); font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 [data-theme='v8'] .bubbleText { display: inline; }
+
+/* 専用の受け口を使う画面だけ。トークの下で画像の高さを保つ。 */
+.richMenu { flex-shrink: 0; }
