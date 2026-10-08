@@ -212,11 +212,13 @@ function SaveAnalysisAction({
   sourceKind,
   sourceResultId,
   defaultName,
+  compact = false,
 }: {
   accountId: string
   sourceKind: 'cross' | 'funnel'
   sourceResultId: string
   defaultName: string
+  compact?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(defaultName)
@@ -267,7 +269,7 @@ function SaveAnalysisAction({
   }
 
   return (
-    <div className="space-y-2">
+    <div className={compact && !open ? undefined : 'space-y-2'}>
       {open ? (
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor={`saved-analysis-${sourceKind}`} className="sr-only">保存する分析名</label>
@@ -291,7 +293,7 @@ function SaveAnalysisAction({
         </Button>
       )}
       {error && <p className="text-danger text-xs">{error}</p>}
-      <p className="text-ink-faint text-xs">条件の定義と、いま表示している結果を別々に固定して残します。</p>
+      {!compact && <p className="text-ink-faint text-xs">条件の定義と、いま表示している結果を別々に固定して残します。</p>}
     </div>
   )
 }
@@ -3305,7 +3307,7 @@ function AnalyticsInner() {
 const ANALYTICS_V8_SLOTS: AnalyticsSlotsV8 = {
   // ★V8 のファネルを作る・直すは src/v8 の窓（板 `VDPz5`）。v7 は下の FunnelForm のまま。
   renderFunnelForm: ({ accountId, edit, presetConversion, onCancel, onCreated }) => <FunnelFormV8 accountId={accountId} edit={edit} presetConversion={presetConversion} onCancel={onCancel} onCreated={onCreated} />,
-  renderSave: ({ accountId, sourceKind, sourceResultId, defaultName }) => <SaveAnalysisAction accountId={accountId} sourceKind={sourceKind} sourceResultId={sourceResultId} defaultName={defaultName} />,
+  renderSave: ({ accountId, sourceKind, sourceResultId, defaultName }) => <SaveAnalysisAction accountId={accountId} sourceKind={sourceKind} sourceResultId={sourceResultId} defaultName={defaultName} compact={sourceKind === 'cross'} />,
   funnelStepKindsLabel: FUNNEL_STEP_KIND_OPTIONS.map((item) => item.label).join('・'),
 }
 

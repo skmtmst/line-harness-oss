@@ -32,21 +32,8 @@
 }
 
 .stepCol {
-  flex: 1 1 0;
-}
-
-.labelRow {
   position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.label {
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 500;
-  line-height: var(--tpl-ms-key-info-lh);
-  white-space: nowrap;
+  flex: 1 1 0;
 }
 
 .subLabel {
@@ -55,31 +42,6 @@
   font-weight: 600;
   line-height: var(--tpl-ms-key-cell-lh);
   white-space: nowrap;
-}
-
-.input {
-  width: 100%;
-  height: var(--tpl-ms-key-btn-h);
-  padding: var(--tpl-ms-key-input-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--tpl-ms-fn-input-shadow);
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  line-height: var(--tpl-ms-fn-input-lh);
-}
-
-.input:focus-visible {
-  outline: var(--tpl-ms-focus-w) solid var(--color-action);
-  outline-offset: var(--tpl-ms-focus-offset);
-}
-
-.input:disabled {
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-faint);
 }
 
 .steps {

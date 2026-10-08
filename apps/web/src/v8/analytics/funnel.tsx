@@ -280,10 +280,10 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   const showForm = creating || editTarget
 
   return <>
-    {!showForm && funnels.length > 0 ? <KpiBand className={styles.band}>
+    {funnels.length > 0 ? <KpiBand className={styles.band}>
       <KpiCard presentation="band" title="入口" icon={<LogIn size={13} aria-hidden="true" />} menu={menu('入口')} value={overall?.entry ?? null} unit="人" detail={measurable ? (overall?.entryLabel ?? '—') : run ? '判定不能' : '—'} />
       <KpiCard presentation="band" title="最後まで" icon={<Flag size={13} aria-hidden="true" />} menu={menu('最後まで')} value={overall?.last ?? null} unit="人" detail={measurable ? (overall?.rate != null ? `入口の ${overall.rate}%` : '—') : run ? '判定不能' : '—'} />
-      <KpiCard presentation="band" title="いちばん落ちる段" icon={<ArrowDownRight size={13} aria-hidden="true" />} menu={menu('いちばん落ちる段')} value={worst ? Math.round(worst.rate * 100) : null} valueText={worst ? `−${Math.round(worst.rate * 100)}` : undefined} unit="%" detail={worst && result ? `${result[worst.index - 1].label} → ${result[worst.index].label}` : run && !measurable ? '判定不能' : '—'} />
+      <KpiCard presentation="band" title="いちばん落ちる段" icon={<ArrowDownRight size={13} aria-hidden="true" />} menu={menu('いちばん落ちる段')} value={worst ? -Math.round(worst.rate * 100) : null} unit="%" detail={worst && result ? `${result[worst.index - 1].label} → ${result[worst.index].label}` : run && !measurable ? '判定不能' : '—'} />
       {/* 段ごとの到達日時を持っていない（集計は「通ったか」だけを見る）。 */}
       <KpiCard presentation="band" title="平均の到達日数" icon={<CalendarClock size={13} aria-hidden="true" />} menu={menu('平均の到達日数')} value={null} unit="日" detail="到達日時が無く未取得" />
     </KpiBand> : null}
@@ -297,7 +297,8 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
           setUsageNotice(usageWarnings && usageWarnings.length > 0 ? `作成はできましたが、成果地点への利用先記録に失敗しました：${usageWarnings.join('、')}。成果地点側の利用先一覧には出ていません。` : '')
           void reloadFunnels(id)
         },
-      }) : listError ? <ListState kind="error" title="ファネルを読み込めませんでした。" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => setFunnelsReload((n) => n + 1)} />
+      }) : null}
+      {listError ? <ListState kind="error" title="ファネルを読み込めませんでした。" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => setFunnelsReload((n) => n + 1)} />
         : funnels.length === 0 ? <ListState kind="empty" title="ファネルがまだありません" description={canManage ? '段を2つ以上つないで、どこで離れているかを見られます。' : '段を2つ以上つないで、どこで離れているかを見られます。作成は統括・管理者へ依頼してください。'} action={canManage ? <Button variant="secondary" onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />ファネルを作る</Button> : undefined} />
         : <>
           <div className={styles.controls}>
@@ -335,8 +336,10 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
                 return <button key={step.stepOrder} type="button" className={styles.funnelStep} data-selected={shownPick === i || undefined} disabled={!measurable} onClick={() => setPicked(i)} aria-pressed={shownPick === i} title={previous ? `止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人` : undefined}>
                   <span className={styles.funnelNumber}>{i + 1}</span>
                   <span className={styles.funnelLabel} title={step.label}>{step.label}</span>
-                  <span className={styles.funnelTrack} aria-hidden="true"><span style={{ width: top > 0 && measurable ? `${step.reached / top * 100}%` : '0%' }} /></span>
-                  <span className={styles.funnelValue}>{measurable ? `${formatNumber(step.reached)} 人` : '—'}</span>
+                  <span className={styles.funnelMeasure}>
+                    <span className={styles.funnelTrack} aria-hidden="true"><span style={{ width: top > 0 && measurable ? `${step.reached / top * 100}%` : '0%' }} /></span>
+                    <span className={styles.funnelValue}>{measurable ? `${formatNumber(step.reached)} 人` : '—'}</span>
+                  </span>
                   <span className={styles.funnelDrop} data-tone={measurable && dropRate !== null ? 'warn' : undefined}>{measurable && dropRate !== null ? `−${dropRate.toFixed(0)}%` : '—'}</span>
                 </button>
               })}
