@@ -1,4 +1,6 @@
-import { jstNow } from './utils.js';
+import { jstNow, nextVersionToken } from './utils.js';
+import { getPlatformSetting, setPlatformSetting } from './platform-announcements.js';
+import { accountFeatureOffExclusionSql } from './account-settings.js';
 // リマインダ配信クエリヘルパー
 
 export interface ReminderRow {
@@ -556,8 +558,8 @@ export async function saveReminderDraftVersion(
 ): Promise<ReminderVersionRow> {
   const reminder = await getReminderById(db, reminderId);
   if (!reminder) throw new Error('REMINDER_NOT_FOUND');
-  const now = jstNow();
   const existing = await getReminderDraftVersion(db, reminderId);
+  const now = nextVersionToken(existing?.updated_at ?? reminder.updated_at);
   // N-080 (#869): 開いたときの版を指定されたら照合する。別タブで先に保存・
   // 公開された下書きへ、古い画面の内容をそのまま上書きさせない。
   // R148 監査：通常保存は版IDを付け替えないため、版IDだけでは A の保存後に
@@ -574,44 +576,58 @@ export async function saveReminderDraftVersion(
   }
   const versionId = existing?.id ?? crypto.randomUUID();
 
-  if (existing) {
-    await db.batch([
-      db.prepare(
-        `UPDATE reminder_versions
-            SET settings_snapshot = ?, last_test_status = NULL, last_tested_at = NULL,
-                last_tested_by_staff_id = NULL, updated_at = ?
-          WHERE id = ? AND status = 'draft'`,
-      ).bind(JSON.stringify(settings), now, versionId),
-      db.prepare(`DELETE FROM reminder_version_steps WHERE reminder_version_id = ?`).bind(versionId),
-      ...reminderVersionStepStatements(db, versionId, settings.steps, now),
-    ]);
-  } else {
-    const next = await db.prepare(
-      `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
-         FROM reminder_versions WHERE reminder_id = ?`,
-    ).bind(reminderId).first<{ version_number: number }>();
-    await db.batch([
-      db.prepare(
-        `INSERT INTO reminder_versions
-           (id, reminder_id, version_number, status, settings_snapshot, created_at, updated_at)
-         VALUES (?, ?, ?, 'draft', ?, ?, ?)`,
-      ).bind(
-        versionId,
-        reminderId,
-        Number(next?.version_number ?? 1),
-        JSON.stringify(settings),
-        now,
-        now,
-      ),
-      db.prepare(
-        `UPDATE reminders
-            SET current_draft_version_id = ?,
-                lifecycle_status = CASE WHEN current_published_version_id IS NULL THEN 'draft' ELSE lifecycle_status END,
-                updated_at = ?
-          WHERE id = ? AND deleted_at IS NULL`,
-      ).bind(versionId, now, reminderId),
-      ...reminderVersionStepStatements(db, versionId, settings.steps, now),
-    ]);
+  const guard = db.prepare(`SELECT json(CASE WHEN EXISTS (
+    SELECT 1 FROM reminders r WHERE r.id = ? AND r.deleted_at IS NULL
+      AND r.current_draft_version_id IS ? AND r.updated_at = ?
+      ${existing ? "AND EXISTS (SELECT 1 FROM reminder_versions v WHERE v.id = r.current_draft_version_id AND v.status = 'draft' AND v.updated_at = ?)" : ''}
+  ) THEN '{}' ELSE 'REMINDER_DRAFT_CONFLICT' END)`)
+    .bind(reminderId, reminder.current_draft_version_id, reminder.updated_at,
+      ...(existing ? [existing.updated_at] : []));
+  try {
+    if (existing) {
+      await db.batch([
+        guard,
+        db.prepare(
+          `UPDATE reminder_versions
+              SET settings_snapshot = ?, last_test_status = NULL, last_tested_at = NULL,
+                  last_tested_by_staff_id = NULL, updated_at = ?
+            WHERE id = ? AND status = 'draft' AND updated_at = ?`,
+        ).bind(JSON.stringify(settings), now, versionId, existing.updated_at),
+        db.prepare(`DELETE FROM reminder_version_steps WHERE reminder_version_id = ?`).bind(versionId),
+        ...reminderVersionStepStatements(db, versionId, settings.steps, now),
+      ]);
+    } else {
+      const next = await db.prepare(
+        `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
+           FROM reminder_versions WHERE reminder_id = ?`,
+      ).bind(reminderId).first<{ version_number: number }>();
+      await db.batch([
+        guard,
+        db.prepare(
+          `INSERT INTO reminder_versions
+             (id, reminder_id, version_number, status, settings_snapshot, created_at, updated_at)
+           VALUES (?, ?, ?, 'draft', ?, ?, ?)`,
+        ).bind(
+          versionId,
+          reminderId,
+          Number(next?.version_number ?? 1),
+          JSON.stringify(settings),
+          now,
+          now,
+        ),
+        db.prepare(
+          `UPDATE reminders
+              SET current_draft_version_id = ?,
+                  lifecycle_status = CASE WHEN current_published_version_id IS NULL THEN 'draft' ELSE lifecycle_status END,
+                  updated_at = ?
+            WHERE id = ? AND deleted_at IS NULL`,
+        ).bind(versionId, now, reminderId),
+        ...reminderVersionStepStatements(db, versionId, settings.steps, now),
+      ]);
+    }
+  } catch (error) {
+    if (error instanceof Error && /malformed JSON/i.test(error.message)) throw new Error('REMINDER_DRAFT_CONFLICT');
+    throw error;
   }
   const saved = await getReminderVersionById(db, versionId);
   if (!saved) throw new Error('REMINDER_DRAFT_NOT_SAVED');
@@ -1734,48 +1750,60 @@ export async function getPendingReminderDeliveries(
   version_settings_snapshot: string | null;
   steps: ReminderStepRow[];
 }>> {
-  // activeなリマインダ登録を取得
-  // 配信方式（153）も一緒に引く。通ごとに引き直すと、通の数だけ問い合わせが増える。
-  const activeReminders = await db
-    .prepare(`SELECT fr.*,
-                     COALESCE(json_extract(rv.settings_snapshot, '$.deliveryMode'), r.delivery_mode) AS delivery_mode,
-                     COALESCE(json_extract(rv.settings_snapshot, '$.lineAccountId'), r.line_account_id) AS line_account_id,
-                     rv.settings_snapshot AS version_settings_snapshot
-                FROM friend_reminders fr
-                INNER JOIN reminders r ON r.id = fr.reminder_id
-                LEFT JOIN reminder_versions rv ON rv.id = fr.reminder_version_id
-               WHERE fr.status = 'active' AND r.is_active = 1 AND r.deleted_at IS NULL`)
-    .all<FriendReminderRow & {
-      delivery_mode: string;
-      line_account_id: string | null;
+  // 同じ公開版を人数分読み直さない。500人ずつIDで巡回し、失敗した読込は
+  // カーソルを進めず再試行する。未来の通知も準備する契約は保つ。
+  const cursorKey = 'reminder_delivery_scan_cursor';
+  const cursor = await getPlatformSetting(db, cursorKey) ?? '';
+  const pageSize = 500;
+  const activeReminders = (await db.prepare(`SELECT fr.*,
+    COALESCE(fr.reminder_version_id,r.current_published_version_id) AS effective_version_id,
+    COALESCE(json_extract(rv.settings_snapshot,'$.deliveryMode'),r.delivery_mode) AS delivery_mode,
+    COALESCE(json_extract(rv.settings_snapshot,'$.lineAccountId'),r.line_account_id) AS line_account_id,
+    rv.settings_snapshot AS version_settings_snapshot
+    FROM friend_reminders fr JOIN reminders r ON r.id=fr.reminder_id
+    LEFT JOIN reminder_versions rv ON rv.id=COALESCE(fr.reminder_version_id,r.current_published_version_id)
+    WHERE fr.status='active' AND r.is_active=1 AND r.deleted_at IS NULL AND fr.id>?
+      AND NOT ${accountFeatureOffExclusionSql('r.line_account_id', 'reminders')}
+    ORDER BY fr.id LIMIT ?`).bind(cursor,pageSize).all<FriendReminderRow & {
+      effective_version_id: string | null; delivery_mode: string; line_account_id: string | null;
       version_settings_snapshot: string | null;
-    }>();
-
-  const results: Array<
-    FriendReminderRow & {
-      delivery_mode: string;
-      line_account_id: string | null;
-      version_settings_snapshot: string | null;
-      steps: ReminderStepRow[];
+    }>()).results;
+  const results: Array<FriendReminderRow & {
+    delivery_mode: string; line_account_id: string | null; version_settings_snapshot: string | null;
+    steps: ReminderStepRow[];
+  }> = [];
+  if (activeReminders.length) {
+    const versionIds=[...new Set(activeReminders.flatMap(fr=>fr.effective_version_id?[fr.effective_version_id]:[]))];
+    const legacyIds=[...new Set(activeReminders.filter(fr=>!fr.effective_version_id).map(fr=>fr.reminder_id))];
+    const steps=(await db.prepare(`SELECT 'version:'||rvs.reminder_version_id AS scan_key,
+      rvs.stable_step_id AS id,rv.reminder_id,rvs.offset_minutes,rvs.message_type,rvs.message_content,
+      rvs.created_at,rvs.offset_days,rvs.send_at_time,rvs.template_id,rvs.position AS sort_order
+      FROM reminder_version_steps rvs JOIN reminder_versions rv ON rv.id=rvs.reminder_version_id
+      WHERE rvs.reminder_version_id IN (SELECT value FROM json_each(?))
+      UNION ALL SELECT 'legacy:'||reminder_id,id,reminder_id,offset_minutes,message_type,message_content,
+      created_at,offset_days,send_at_time,template_id,offset_minutes AS sort_order
+      FROM reminder_steps WHERE reminder_id IN (SELECT value FROM json_each(?))
+      ORDER BY scan_key,sort_order,id`).bind(JSON.stringify(versionIds),JSON.stringify(legacyIds))
+      .all<ReminderStepRow & {scan_key:string;sort_order:number}>()).results;
+    const delivered=(await db.prepare(`SELECT friend_reminder_id,reminder_step_id FROM friend_reminder_deliveries
+      WHERE friend_reminder_id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(activeReminders.map(fr=>fr.id)))
+      .all<{friend_reminder_id:string;reminder_step_id:string}>()).results;
+    const byVersion=new Map<string,ReminderStepRow[]>();
+    for(const {scan_key,sort_order,...step} of steps) {
+      const group=byVersion.get(scan_key)??[];group.push(step);byVersion.set(scan_key,group);
     }
-  > = [];
-  for (const fr of activeReminders.results) {
-    const steps = fr.reminder_version_id
-      ? await getReminderVersionSteps(db, fr.reminder_version_id)
-      : await getReminderSteps(db, fr.reminder_id);
-    // 配信済みステップを取得
-    const delivered = await db
-      .prepare(`SELECT reminder_step_id FROM friend_reminder_deliveries WHERE friend_reminder_id = ?`)
-      .bind(fr.id)
-      .all<{ reminder_step_id: string }>();
-    const deliveredIds = new Set(delivered.results.map((d) => d.reminder_step_id));
-
-    // 未配信で配信時刻が到来しているステップをフィルタ
-    const pending = steps.filter((step) => !deliveredIds.has(step.id));
-    if (pending.length > 0) {
-      results.push({ ...fr, steps: pending });
+    const deliveredByEnrollment=new Map<string,Set<string>>();
+    for(const row of delivered) {
+      const group=deliveredByEnrollment.get(row.friend_reminder_id)??new Set<string>();
+      group.add(row.reminder_step_id);deliveredByEnrollment.set(row.friend_reminder_id,group);
+    }
+    for(const {effective_version_id,...fr} of activeReminders) {
+      const key=effective_version_id?'version:'+effective_version_id:'legacy:'+fr.reminder_id;
+      const pending=(byVersion.get(key)??[]).filter(step=>!deliveredByEnrollment.get(fr.id)?.has(step.id));
+      if(pending.length)results.push({...fr,steps:pending});
     }
   }
+  await setPlatformSetting(db,cursorKey,activeReminders.length===pageSize?activeReminders.at(-1)!.id:null,'reminder-delivery');
   return results;
 }
 
@@ -2632,14 +2660,14 @@ export async function enrollFriendsInReminderOnce(
   reminderId: string,
   candidates: Array<{ friendId: string; targetDate: string }>,
 ): Promise<number> {
+  if (candidates.length === 0) return 0;
   let enrolled = 0;
   const now = jstNow();
-  // R346: まとめ登録も1件ずつと同じ版で送る。この束が使うテンプレートの
-  // 公開版を1度だけ写し、新しい行に付ける（ある行は触らない）。
-  const bulkTemplateSnapshot = await snapshotReminderTemplateVersions(
-    db,
-    (await getReminderSteps(db, reminderId)).map((step) => step.template_id),
-  );
+  const version = await getReminderPublishedVersion(db, reminderId);
+  const versionId = version?.id ?? null;
+  // 本文とテンプレートの写しを同じ不変の公開版から読む。
+  const steps = versionId ? await getReminderVersionSteps(db, versionId) : await getReminderSteps(db, reminderId);
+  const bulkTemplateSnapshot = await snapshotReminderTemplateVersions(db, steps.map((step) => step.template_id));
 
   for (let offset = 0; offset < candidates.length; offset += FRIEND_REMINDER_INSERT_CHUNK) {
     const chunk = candidates.slice(offset, offset + FRIEND_REMINDER_INSERT_CHUNK);
@@ -2652,13 +2680,13 @@ export async function enrollFriendsInReminderOnce(
         candidate.targetDate,
       );
     }
-    bindings.push(reminderId, bulkTemplateSnapshot, now, now);
+    bindings.push(reminderId, versionId, bulkTemplateSnapshot, now, now);
 
     const result = await db.prepare(
       `WITH candidates(id, friend_id, target_date) AS (VALUES ${values})
        INSERT OR IGNORE INTO friend_reminders
-         (id, friend_id, reminder_id, target_date, template_version_snapshot, created_at, updated_at)
-       SELECT c.id, c.friend_id, ?, c.target_date, ?, ?, ?
+         (id, friend_id, reminder_id, target_date, reminder_version_id, template_version_snapshot, created_at, updated_at)
+       SELECT c.id, c.friend_id, ?, c.target_date, ?, ?, ?, ?
          FROM candidates c
         WHERE NOT EXISTS (
           SELECT 1

@@ -6,33 +6,55 @@ import {
   updateReminder,
 } from './reminders.js';
 
+const OLD_STAMP = '2026-09-27T10:00:00.000+09:00';
+
 function asD1(sqlite: Database.Database): D1Database {
   function prepare(query: string): D1PreparedStatement {
     const statement = sqlite.prepare(query);
-    const bound = (params: unknown[]): D1PreparedStatement => ({
-      bind: (...next: unknown[]) => bound(next),
-      async all<T>() {
-        return { results: statement.all(...params) as T[], success: true, meta: {} };
-      },
-      async first<T>() {
-        return (statement.get(...params) as T | undefined) ?? null;
-      },
-      async run<T>() {
-        const result = statement.run(...params);
-        return { success: true, meta: { changes: result.changes }, results: [] } as T;
-      },
-    } as unknown as D1PreparedStatement);
-    return bound([]);
+    const make = (params: unknown[]): D1PreparedStatement => {
+      function runSync<T>() {
+        const info = statement.run(...params);
+        return { success: true, meta: { changes: info.changes }, results: [] } as T;
+      }
+      return {
+        bind: (...next: unknown[]) => {
+          if (next.length > 100) {
+            throw new Error(`D1 bind limit exceeded: ${next.length} > 100`);
+          }
+          return make(next);
+        },
+        async all<T>() {
+          return { results: statement.all(...params) as T[], success: true, meta: {} };
+        },
+        async first<T>() {
+          return (statement.get(...params) as T | undefined) ?? null;
+        },
+        async run<T>() {
+          return runSync<T>();
+        },
+        raw: async () => [],
+        // batch 用の同期実行口。async run() は失敗を rejected promise に変えるため、
+        // better-sqlite3 の transaction が巻き戻しを見逃す。ここでは投げ直す。
+        runSyncForBatch: <T>() => runSync<T>(),
+      } as unknown as D1PreparedStatement;
+    };
+    return make([]);
   }
   return {
     prepare,
     async batch<T>(statements: D1PreparedStatement[]) {
-      return Promise.all(statements.map((statement) => statement.run())) as T;
+      const results: unknown[] = [];
+      sqlite.transaction(() => {
+        for (const statement of statements) {
+          const sync = (statement as unknown as { runSyncForBatch?: <T>() => T }).runSyncForBatch;
+          results.push(sync ? sync() : statement.run());
+        }
+      })();
+      return Promise.all(results) as T;
     },
   } as unknown as D1Database;
 }
 
-const OLD_STAMP = '2026-09-27T10:00:00.000+09:00';
 
 function setup(): { sqlite: Database.Database; db: D1Database } {
   const sqlite = new Database(':memory:');
@@ -196,4 +218,22 @@ describe('R146 監査：未公開の下書きは再開できない', () => {
     expect(stopped?.is_active).toBe(0);
     expect(stopped?.lifecycle_status).toBe('stopped');
   });
+  it('PKG26: batch直前の共同保存を検知し、勝った本文と通を一切上書きしない', async () => {
+    const { sqlite, db } = setup(); insertDraft(sqlite, 'r-1', null);
+    sqlite.exec("INSERT INTO reminder_version_steps(id,reminder_version_id,stable_step_id,position,offset_minutes,message_type,message_content,created_at) VALUES('winner-step','v-1','s-1',0,0,'text','Winner','2026-09-27T10:00:00.000+09:00')");
+    const batch = db.batch.bind(db); let interleaved = false;
+    db.batch = async statements => {
+      if (!interleaved) { interleaved = true; sqlite.exec("UPDATE reminder_versions SET settings_snapshot='{\"name\":\"Winner\"}',updated_at='2026-09-27T10:00:01.000+09:00' WHERE id='v-1'"); }
+      return batch(statements);
+    };
+    await expect(saveReminderDraftVersion(db, 'r-1', SETTINGS_B, {
+      expectedVersionId: 'v-1', expectedUpdatedAt: OLD_STAMP,
+    })).rejects.toThrow('REMINDER_DRAFT_CONFLICT');
+    expect(sqlite.prepare("SELECT settings_snapshot FROM reminder_versions WHERE id='v-1'").get())
+      .toEqual({ settings_snapshot: '{"name":"Winner"}' });
+    expect(sqlite.prepare('SELECT id,message_content FROM reminder_version_steps').all())
+      .toEqual([{ id: 'winner-step', message_content: 'Winner' }]);
+    sqlite.close();
+  });
+
 });
