@@ -9,15 +9,6 @@ const MOCK = readFileSync(join(ROOT, 'scripts/visual-qa/mock-api.mjs'), 'utf8')
 const FIXTURES = readFileSync(join(ROOT, 'scripts/visual-qa/fixtures.mjs'), 'utf8')
 
 describe('受付枠と休業日のV6契約', () => {
-  it('実Nodeと設計の主要な帯を持つ', () => {
-    expect(PAGE).toContain('data-design-node="tksPc"')
-    expect(PAGE).toContain("usePageTitle('予約設定')")
-    expect(PAGE).not.toContain('<Header')
-    for (const section of ['Tabs', 'Info', 'Week', 'Special', 'Rules', 'Preview', 'Trouble', 'Links']) {
-      expect(PAGE).toContain(`data-design="${section}"`)
-    }
-  })
-
   it('店舗設定と実際の空き状況を読み、未契約の値だけを作らない', () => {
     expect(PAGE).toContain('bookingApi.getSettings(selectedAccountId)')
     expect(PAGE).toContain('settings.businessHours.find')

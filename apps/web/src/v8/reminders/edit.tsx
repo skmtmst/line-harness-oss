@@ -49,6 +49,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
+import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Dialog from '@/components/shared/dialog'
@@ -58,7 +59,7 @@ import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
-import { TextArea, TextInput } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
@@ -76,6 +77,14 @@ import {
 import { describeReminderDiff } from './conflict-diff'
 import { BackToReminders, ChoiceCardV8, PhoneV8, ReminderV8Stepper, SummaryCardV8, WizardFooterV8, type ReminderV8StepKey } from './ui'
 import styles from './edit.module.css'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import type { InsertTokenSpec } from '@/components/shared/insert-tokens'
+
+/** リマインダの本文で札にする差し込み（{{date}} はリマインダでは予約日時）。 */
+const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
+  { token: '{{date}}', label: '予約日時', hint: '予約日時に置き換わります', icon: 'calendar' },
+  { token: '{{meet_url}}', label: 'Google Meet の URL', hint: '予約の Google Meet の URL に置き換わります', icon: 'video' },
+]
 
 /*
  * ★V8 リマインダを作る・手順1の直し〜5と完了（src/v8 に一から書いた版）。
@@ -1083,7 +1092,7 @@ function MessagesStageV8({
   const [selectedStepId, setSelectedStepId] = useState<string | null>(settings.steps[0]?.stableStepId ?? null)
   const [fields, setFields] = useState<FriendField[]>([])
   const [phoneOpen, setPhoneOpen] = useState(false)
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const sampleBase = useRef<Date>(sampleBaseDate())
 
   useEffect(() => {
@@ -1125,15 +1134,20 @@ function MessagesStageV8({
     if (selectedStepId === stableStepId) setSelectedStepId(null)
   }
 
-  const moveStep = (stableStepId: string, direction: -1 | 1) => {
-    const index = settings.steps.findIndex((step) => step.stableStepId === stableStepId)
-    const next = index + direction
-    if (index < 0 || next < 0 || next >= settings.steps.length) return
-    const steps = [...settings.steps]
-    const [moved] = steps.splice(index, 1)
-    steps.splice(next, 0, moved)
-    onChange({ ...settings, steps })
-  }
+  /*
+   * 通知の並べ替え（共通の並び替え）。つまみのドラッグ・上下キー・「前へ／後ろへ」は
+   * どれも同じ入口で並びを変える。
+   */
+  const stepOrder = useReorder({
+    items: settings.steps,
+    idOf: (step) => step.stableStepId,
+    disabledReason: settings.steps.length < 2 ? '通知が1つのときは並び替えできません' : null,
+    onReorder: ({ ids }) => {
+      const byId = new Map(settings.steps.map((step) => [step.stableStepId, step]))
+      const steps = ids.map((id) => byId.get(id)).filter((step): step is typeof settings.steps[number] => Boolean(step))
+      if (steps.length === settings.steps.length) onChange({ ...settings, steps })
+    },
+  })
 
   /** 差し込みをカーソルの位置に入れる。 */
   const insertToken = (token: string) => {
@@ -1215,12 +1229,20 @@ function MessagesStageV8({
           {settings.steps.length === 0 ? (
             <p className={styles.fieldNote}>通知はまだありません。「通知を足す」で1通目を作成してください。本文が入るまで次へは進めません。</p>
           ) : null}
-          {settings.steps.map((step, index) => {
+          {stepOrder.shown.map((step, index) => {
             const open = step.stableStepId === (selectedStep?.stableStepId ?? null)
             return (
-              <div key={step.stableStepId} className={styles.stepCard} data-open={open || undefined}>
+              <div key={step.stableStepId} className={styles.stepCard} data-open={open || undefined} {...stepOrder.rowProps(step.stableStepId)}>
                 <div className={styles.stepHead}>
-                  <GripVertical size={16} aria-hidden="true" className={styles.grip} />
+                  <ReorderHandle
+                    look="bare"
+                    className={styles.grip}
+                    label={`${index + 1}通目の通知`}
+                    {...stepOrder.handle(step.stableStepId)}
+                    {...stepOrder.handleProps(step.stableStepId)}
+                  >
+                    <GripVertical size={16} aria-hidden="true" />
+                  </ReorderHandle>
                   <span className={styles.stepNum}>{index + 1}</span>
                   <button
                     type="button"
@@ -1231,10 +1253,10 @@ function MessagesStageV8({
                     {stepShortTiming(step, settings.deliveryMode)}
                   </button>
                   <span className={styles.spacer} aria-hidden="true" />
-                  <Button type="button" variant="text" disabled={index === 0} onClick={() => moveStep(step.stableStepId, -1)}>
+                  <Button type="button" variant="text" disabled={!stepOrder.canMoveBy(step.stableStepId, -1)} onClick={() => stepOrder.moveBy(step.stableStepId, -1, 'menu')}>
                     <ArrowUp size={15} aria-hidden="true" />前へ
                   </Button>
-                  <Button type="button" variant="text" disabled={index === settings.steps.length - 1} onClick={() => moveStep(step.stableStepId, 1)}>
+                  <Button type="button" variant="text" disabled={!stepOrder.canMoveBy(step.stableStepId, 1)} onClick={() => stepOrder.moveBy(step.stableStepId, 1, 'menu')}>
                     <ArrowDown size={15} aria-hidden="true" />後ろへ
                   </Button>
                   <Button type="button" variant="text" disabled={settings.steps.length <= 1} onClick={() => removeStep(step.stableStepId)}>
@@ -1250,15 +1272,16 @@ function MessagesStageV8({
                       onChange={(patch) => updateStep(step.stableStepId, patch)}
                     />
                     <div className={styles.bodyBox}>
-                      <TextArea
+                      <InsertTextField
                         ref={bodyRef}
                         className={styles.bodyArea}
                         value={step.messageContent}
                         maxLength={BODY_LIMIT}
                         aria-label={`${index + 1}通目の本文`}
                         placeholder="友だちに届く本文を書きます"
-                        onChange={(event) => updateStep(step.stableStepId, { messageContent: event.target.value })}
-                      />
+                        onValueChange={(next) => updateStep(step.stableStepId, { messageContent: next })}
+                        extraTokens={REMINDER_TOKENS}
+/>
                       <span className={styles.bodyGap} aria-hidden="true" />
                       <div className={styles.insertRow}>
                         <span className={styles.insertLabel}>差し込む</span>
@@ -1365,7 +1388,7 @@ function TimingEditor({
   return (
     <div className={styles.timingRow}>
       <span className={styles.timingWord}>基準日の</span>
-      <TextInput
+      <TextField
         type="number"
         min={0}
         max={unit === 'day' ? 365 : undefined}
@@ -1394,7 +1417,7 @@ function TimingEditor({
       {dayWritten ? (
         <>
           <span className={styles.timingWord}>の</span>
-          <TextInput
+          <TextField
             type="time"
             aria-label="送る時刻"
             className={styles.timingTime}

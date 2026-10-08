@@ -20,7 +20,6 @@ import {
   GitBranch,
   Link2,
   ListChecks,
-  MoreHorizontal,
   PhoneOff,
   Plus,
   Radio,
@@ -34,15 +33,16 @@ import { formatNumber } from '@/lib/format'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -323,8 +323,11 @@ export default function CommonActionsV8() {
                 return (
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
-                      <a className={styles.name} href={versionsHref(item.id)} title={item.name} onClick={(event) => { event.preventDefault(); router.push(versionsHref(item.id)) }}>{item.name}</a>
-                      <span className={styles.sub} title={item.description ?? undefined}>{item.description || '説明はありません'}</span>
+                      {/* 名前の前にフォルダの丸（共通アクションはフォルダに入れないので未分類の輪）。説明は名前の頭にそろえる。 */}
+                      <FolderDotName folder={null}>
+                        <a className={styles.name} href={versionsHref(item.id)} title={item.name} onClick={(event) => { event.preventDefault(); router.push(versionsHref(item.id)) }}>{item.name}</a>
+                      </FolderDotName>
+                      <span className={`${styles.sub} ${styles.subIndent}`} title={item.description ?? undefined}>{item.description || '説明はありません'}</span>
                     </Td>
                     <Td className={styles.colState}>
                       <span className={styles.pill} data-tone={item.status === 'published' ? 'active' : 'neutral'}>
@@ -341,19 +344,10 @@ export default function CommonActionsV8() {
                     <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
                         <Button href={versionsHref(item.id)}>中身を見る</Button>
-                        <IconButton
-                          title={menuLabel}
-                          aria-label={menuLabel}
-                          aria-haspopup="menu"
-                          aria-expanded={openMenuId === item.id}
-                          onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
-                        <ActionMenu
+                        <RowMenu
+                          label={menuLabel}
                           open={openMenuId === item.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={menuLabel}
+                          onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                           note={canEdit ? undefined : READONLY_REASON}
                           items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect() } }))}
                         />
@@ -423,6 +417,7 @@ export default function CommonActionsV8() {
           <p className={styles.folderNote}>フォルダを消しても、中の共通アクションは未分類に残ります</p>
         </FolderPanel>
       </>}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

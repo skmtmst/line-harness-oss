@@ -202,24 +202,39 @@
 }
 
 /*
- * ★V8 仕上げ（M10）：開くときに少し下から（opacity＋translateY 4px→0、
- * 200ms ease-out）。全画面の規定（globals の lh-surface-in は上から）に
- * そろえず、V8 の指定どおり下からにする。
+ * ★V8 動きの決まり（提案 F・採用）：「…」のメニューは押した角から
+ * 120ms（--motion-fast）・0.96→1 で開く。起点は開いた向き（器の data-placement）と
+ * 寄せ（data-align）から決める：下へ開く＝上の角、上へ開く＝下の角、
+ * 右寄せ（既定）＝右の角、左寄せ＝左の角。器の無い（inline）ときは右上。
+ * globals の lh-surface-in は v7 だけに当たる（層の外の指定がこれに勝たないように）。
+ * 動きを減らす設定では globals の末尾の規定で一瞬になる。
  */
 [data-theme='v8'] .menu {
-  animation: action-menu-v8-enter var(--motion-base) var(--motion-ease-out);
+  animation: action-menu-v8-enter var(--motion-fast) var(--motion-ease-out);
   transform-origin: top right;
+}
+
+[data-theme='v8'] [data-placement='up'] > .menu {
+  transform-origin: bottom right;
+}
+
+[data-theme='v8'] [data-align='start'] > .menu {
+  transform-origin: top left;
+}
+
+[data-theme='v8'] [data-placement='up'][data-align='start'] > .menu {
+  transform-origin: bottom left;
 }
 
 @keyframes action-menu-v8-enter {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: scale(0.96);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: scale(1);
   }
 }
 }

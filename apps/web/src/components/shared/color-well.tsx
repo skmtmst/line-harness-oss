@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { ChevronDown, Pipette } from 'lucide-react'
 import styles from './color-well.module.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import { isImeComposing } from './ime'
 
 /** よく使う色の見本（8×3）。Pencil ★BG-2 `d6PU4a` の色グリッドと同じ並び。 */
 const DEFAULT_COLORS = [
@@ -453,7 +454,7 @@ export default function ColorWell({
                 aria-label="色を十六進で入力"
                 onChange={(event) => setHexText(event.target.value.replace(/^#/, ''))}
                 onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return
+                  if (event.key !== 'Enter' || isImeComposing(event)) return
                   event.preventDefault()
                   applyHex(hexText)
                 }}

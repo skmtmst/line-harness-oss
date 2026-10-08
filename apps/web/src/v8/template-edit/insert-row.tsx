@@ -6,8 +6,8 @@
  * 差し込む文字（{{name}}・{{field.x}}・{{var.x}}・{{date…}}・{{days_until:…}}）は
  * 今の画面（TemplateInsertControls）と同じ。
  */
-import { useRef, useState, type ReactNode, type RefObject } from 'react'
-import { Braces, CalendarDays, Ellipsis, IdCard, User } from 'lucide-react'
+import { useRef, useState, type RefObject } from 'react'
+import { InsertButton } from '@/components/shared/insert-text-field'
 import ActionMenu from '@/components/shared/action-menu'
 import Dialog from '@/components/shared/dialog'
 import DateField from '@/components/shared/date-field'
@@ -38,29 +38,25 @@ export const OTHER_OPTIONS = [
 
 type MenuKey = 'field' | 'var' | 'date' | 'other'
 
-function Chip({ icon, label, onClick, disabled, title, buttonRef, expanded }: {
-  icon: ReactNode
+function Chip({ label, onClick, disabled, title, buttonRef, expanded, more = false }: {
   label: string
   onClick: () => void
   disabled?: boolean
   title?: string
   buttonRef?: RefObject<HTMLButtonElement | null>
   expanded?: boolean
+  more?: boolean
 }) {
   return (
-    <button
+    <InsertButton
       ref={buttonRef}
-      type="button"
-      className={styles.insertChip}
+      icon={more ? 'more' : 'plus'}
+      label={label}
       onClick={onClick}
       disabled={disabled}
       title={title ?? `${label}を差し込む`}
-      aria-haspopup={expanded === undefined ? undefined : 'menu'}
-      aria-expanded={expanded}
-    >
-      {icon}
-      {label}
-    </button>
+      expanded={expanded}
+    />
   )
 }
 
@@ -98,10 +94,9 @@ export default function InsertRow({
   const fieldsReady = Boolean(accountId) && state === 'ready' && references.friendFields.length > 0
   const varsReady = Boolean(accountId) && state === 'ready' && references.commonVars.length > 0
 
-  const nameChip = <Chip icon={<User size={15} aria-hidden="true" />} label="名前" disabled={disabled} onClick={() => onInsert('{{name}}')} />
+  const nameChip = <Chip label="名前" disabled={disabled} onClick={() => onInsert('{{name}}')} />
   const fieldChip = fieldsEnabled ? (
     <Chip
-      icon={<IdCard size={15} aria-hidden="true" />}
       label="友だち情報"
       buttonRef={fieldRef}
       expanded={menu === 'field'}
@@ -112,7 +107,6 @@ export default function InsertRow({
   ) : null
   const varChip = varsEnabled ? (
     <Chip
-      icon={<Braces size={15} aria-hidden="true" />}
       label="共通情報"
       buttonRef={varRef}
       expanded={menu === 'var'}
@@ -121,8 +115,8 @@ export default function InsertRow({
       onClick={() => toggle('var')}
     />
   ) : null
-  const dateChip = <Chip icon={<CalendarDays size={15} aria-hidden="true" />} label="配信日" buttonRef={dateRef} expanded={menu === 'date'} disabled={disabled} onClick={() => toggle('date')} />
-  const otherChip = <Chip icon={<Ellipsis size={15} aria-hidden="true" />} label="その他" buttonRef={otherRef} expanded={menu === 'other'} disabled={disabled} title="その他の差し込みを選ぶ" onClick={() => toggle('other')} />
+  const dateChip = <Chip label="配信日" buttonRef={dateRef} expanded={menu === 'date'} disabled={disabled} onClick={() => toggle('date')} />
+  const otherChip = <Chip label="その他" more buttonRef={otherRef} expanded={menu === 'other'} disabled={disabled} title="その他の差し込みを選ぶ" onClick={() => toggle('other')} />
   const over = length > 5000
 
   return (

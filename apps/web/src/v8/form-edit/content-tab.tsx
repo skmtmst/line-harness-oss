@@ -22,7 +22,7 @@ import BlockEditor from '@/components/forms/block-editor'
 import type { FormRefs } from '@/components/forms/form-refs'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import { TextArea, TextInput } from '@/components/shared/form-controls'
+import { TextArea, TextField } from '@/components/shared/text-field'
 import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -38,6 +38,8 @@ type Props = {
   selectedBlockId: string | null
   inputCount: number
   accountId: string | null
+  /** 統括のひな形（host.ts）：配った先の ID に直せない画像（登録メディア・画像の URL）は足せない。 */
+  portable?: boolean
   onSelectPage: (index: number) => void
   onAddPage: () => void
   onRenamePage: (index: number, name: string) => boolean
@@ -114,7 +116,7 @@ export function ContentTab(props: Props) {
             ),
           )
         )}
-        <AddGrid onAdd={(make) => props.onAddBlock(make(props.inputCount))} />
+        <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />
       </section>
 
       <RenameDialog
@@ -148,7 +150,7 @@ function RenameDialog({ value, onCancel, onSave }: { value: string | null; onCan
   }
   return (
     <Dialog open={value !== null} title="ページの名前" confirmLabel="この名前にする" onConfirm={() => onSave(draft)} onCancel={onCancel}>
-      <TextInput aria-label="ページの名前" value={draft} onChange={(e) => setDraft(e.target.value)} />
+      <TextField aria-label="ページの名前" value={draft} onChange={(e) => setDraft(e.target.value)} />
     </Dialog>
   )
 }
@@ -289,7 +291,7 @@ function InputFields({ block, refs, patch }: { block: FormInputBlock; refs: Form
   return (
     <>
       <Labeled label="質問文" htmlFor={labelId}>
-        <TextInput id={labelId} value={block.label} placeholder="質問の文" onChange={(e) => set({ label: e.target.value })} />
+        <TextField id={labelId} value={block.label} placeholder="質問の文" onChange={(e) => set({ label: e.target.value })} />
       </Labeled>
       {isChoiceType(block.type) ? <ChoiceFields block={block} set={set} /> : null}
       {block.type === 'booking' ? <BookingFields block={block} refs={refs} set={set} /> : <SaveTo block={block} refs={refs} set={set} />}
@@ -333,7 +335,7 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
               }
             }}
           />
-          <TextInput
+          <TextField
             aria-label={`選択肢${index + 1}`}
             className={styles.choiceInput}
             value={choice.label}
@@ -458,7 +460,7 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
       return (
         <div className={styles.decoRow}>
           <Labeled label="見出し" htmlFor={id}>
-            <TextInput id={id} value={block.text} onChange={(e) => patch({ text: e.target.value } as Partial<FormBlock>)} />
+            <TextField id={id} value={block.text} onChange={(e) => patch({ text: e.target.value } as Partial<FormBlock>)} />
           </Labeled>
           <Labeled label="大きさ">
             <Select aria-label="大きさ" value={String(block.level ?? 2)} onChange={(v) => patch({ level: Number(v) as 1 | 2 | 3 } as Partial<FormBlock>)} options={[{ value: '1', label: '見出し1' }, { value: '2', label: '見出し2' }, { value: '3', label: '見出し3' }]} />
@@ -475,10 +477,10 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
       return (
         <div className={styles.decoRow}>
           <Labeled label="ボタンの文字" htmlFor={id}>
-            <TextInput id={id} value={block.label} onChange={(e) => patch({ label: e.target.value } as Partial<FormBlock>)} />
+            <TextField id={id} value={block.label} onChange={(e) => patch({ label: e.target.value } as Partial<FormBlock>)} />
           </Labeled>
           <Labeled label="開くURL" htmlFor={`${id}-url`}>
-            <TextInput id={`${id}-url`} type="url" placeholder="https://..." value={block.url} onChange={(e) => patch({ url: e.target.value } as Partial<FormBlock>)} />
+            <TextField id={`${id}-url`} type="url" placeholder="https://..." value={block.url} onChange={(e) => patch({ url: e.target.value } as Partial<FormBlock>)} />
           </Labeled>
         </div>
       )
@@ -487,10 +489,10 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
         <>
           <div className={styles.decoRow}>
             <Labeled label="画像のURL" htmlFor={id}>
-              <TextInput id={id} type="url" placeholder="https://..." value={block.mediaUrl} onChange={(e) => patch({ mediaUrl: e.target.value } as Partial<FormBlock>)} />
+              <TextField id={id} type="url" placeholder="https://..." value={block.mediaUrl} onChange={(e) => patch({ mediaUrl: e.target.value } as Partial<FormBlock>)} />
             </Labeled>
             <Labeled label="押したときに開くURL（任意）" htmlFor={`${id}-link`}>
-              <TextInput id={`${id}-link`} type="url" value={block.linkUrl ?? ''} onChange={(e) => patch({ linkUrl: e.target.value } as Partial<FormBlock>)} />
+              <TextField id={`${id}-link`} type="url" value={block.linkUrl ?? ''} onChange={(e) => patch({ linkUrl: e.target.value } as Partial<FormBlock>)} />
             </Labeled>
           </div>
           <span>
@@ -518,7 +520,10 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
 
 /* ---------------- ブロックを足す ---------------- */
 
-function AddGrid({ onAdd }: { onAdd: (make: (count: number) => FormBlock) => void }) {
+/** 統括のひな形で足せないブロック（画像は配った先の登録メディアに直せない）。 */
+const PORTABLE_HIDDEN_CARDS: ReadonlySet<string> = new Set(['image'])
+
+function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number) => FormBlock) => void; hide?: ReadonlySet<string> }) {
   return (
     <div className={styles.addBox}>
       <p className={styles.addTitle}>ブロックを足す</p>
@@ -526,7 +531,7 @@ function AddGrid({ onAdd }: { onAdd: (make: (count: number) => FormBlock) => voi
         <div key={group.title} className={styles.addGroup}>
           <p className={styles.addGroupTitle}>{group.title}</p>
           <div className={styles.addCards}>
-            {group.cards.map((card) => (
+            {group.cards.filter((card) => !hide?.has(card.key)).map((card) => (
               <button key={card.key} type="button" className={styles.addCard} data-fresh={card.fresh || undefined} onClick={() => onAdd(card.make)}>
                 <span className={styles.addCardTop}>
                   <Plus size={15} aria-hidden="true" />

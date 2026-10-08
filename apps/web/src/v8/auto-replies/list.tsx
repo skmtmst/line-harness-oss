@@ -34,7 +34,6 @@ import {
   Inbox,
   Layers,
   MessageSquare,
-  MoreHorizontal,
   Pause,
   Pencil,
   Square,
@@ -64,7 +63,6 @@ import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shar
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import KpiBand from '@/components/shared/kpi-band'
@@ -74,14 +72,16 @@ import SortSelect from '@/components/ui/sort-select'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { movePriorityUpdates } from './order'
 import {
   LOAD_STATE_WORDS,
@@ -367,6 +367,18 @@ export default function AutoRepliesListV8() {
       // 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
     }
   }, [])
+
+  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
+  const folderActions = useFolderRowActions({
+    kind: 'auto_reply',
+    folders,
+    accountId: null,
+    enabled: canEdit,
+    itemLabel: '自動応答',
+    countOf: (id) => folders.find((f) => f.id === id)?.itemCount ?? null,
+    onChanged: () => loadFolders(),
+    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
+  })
 
   useEffect(() => { load() }, [load])
   useEffect(() => { void loadFolders() }, [loadFolders])
@@ -964,7 +976,7 @@ export default function AutoRepliesListV8() {
   }
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: rules.length, icon: <Inbox size={15} aria-hidden="true" /> },
-    ...folders.map((f) => ({
+    ...folders.map((f, index) => ({ ...folderActions.rowActions(f, index),
       id: f.id,
       label: f.name,
       // フォルダ件数は API(itemCount) をそのまま出す。来ないときは null（出さない）。
@@ -1213,14 +1225,13 @@ export default function AutoRepliesListV8() {
                     onDragStart={() => setDragId(r.id)}
                     onDragEnd={() => setDragId(null)}
                   >
-                    {canEdit && <ReorderGrip
+                    {canEdit && <ReorderHandle
                       label={name}
-                      disabled={sortKey !== 'priority'}
-                      disabledReason={sortKey !== 'priority' ? '並びを「評価順」にすると動かせます' : undefined}
+                      disabledReason={sortKey !== 'priority' ? '並びを「評価順」にすると動かせます' : null}
                       onMove={(direction) => keyboardMove(r.id, direction)}
                     >
                       <span aria-hidden>⠿</span>
-                    </ReorderGrip>}
+                    </ReorderHandle>}
                   </Td>
                   <NameCell
                     name={<div className={styles.nameRow}>
@@ -1318,21 +1329,13 @@ export default function AutoRepliesListV8() {
                         label={`自動応答「${name}」の操作`}
                         items={rowContextItems(r)}
                       >
-                        <IconButton
-                          title={`自動応答「${name}」の操作`}
-                          aria-label={`自動応答「${name}」の操作`}
-                          aria-expanded={openMenuId === r.id}
-                          onClick={() => setOpenMenuId((current) => (current === r.id ? null : r.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
+                        <RowMenu
+                          label={`自動応答「${name}」の操作`}
+                          items={rowMenuItems(r)}
+                          open={openMenuId === r.id}
+                          onOpenChange={(next) => setOpenMenuId(next ? r.id : null)}
+                        />
                       </ContextMenu>
-                      <ActionMenu
-                        open={openMenuId === r.id}
-                        onClose={() => setOpenMenuId(null)}
-                        ariaLabel={`自動応答「${name}」の操作`}
-                        items={rowMenuItems(r)}
-                      />
                       </div>
                     </Td>
                 </Tr>
@@ -1654,6 +1657,7 @@ export default function AutoRepliesListV8() {
         V7＋V8 の和集合で見えてしまい、どちらの設計とも一致しなくなる。
         KPIs は V7 と同じ節名なので残す。
       */}
+      {folderActions.dialogs}
       {folderDialogOpen && (
         <FolderAddDialog
           kind="auto_reply"

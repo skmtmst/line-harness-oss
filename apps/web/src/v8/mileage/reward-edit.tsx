@@ -19,7 +19,8 @@ import Button from '@/components/shared/button'
 import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
-import { Field, OptionalBadge, TextArea, TextInput } from '@/components/shared/form-controls'
+import { Field, OptionalBadge } from '@/components/shared/form-controls'
+import { TextArea, TextField } from '@/components/shared/text-field'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -381,10 +382,10 @@ function RewardEditorInner() {
         <h2 className={styles.cardTitle}>基本</h2>
         <div className={styles.grid2}>
           <Field label="名前" htmlFor="reward-name" error={touched && !form.name.trim() ? '使い道の名前を入力してください' : undefined}>
-            <TextInput id="reward-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例：送料無料クーポン" />
+            <TextField id="reward-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例：送料無料クーポン" />
           </Field>
           <Field label="必要マイル" htmlFor="reward-miles" error={errorOf('必要マイルは1以上の整数で入力してください')}>
-            <TextInput id="reward-miles" inputMode="numeric" value={form.requiredMiles} onChange={(e) => set('requiredMiles', e.target.value)} placeholder="例：500" />
+            <TextField id="reward-miles" inputMode="numeric" value={form.requiredMiles} onChange={(e) => set('requiredMiles', e.target.value)} placeholder="例：500" />
           </Field>
         </div>
       </section>
@@ -470,12 +471,12 @@ function RewardEditorInner() {
         <div className={styles.grid2}>
           <div className={styles.field}>
             <label htmlFor="reward-stock" className={styles.label}>出す数<OptionalBadge /></label>
-            <TextInput id="reward-stock" inputMode="numeric" title="空欄なら限りなし。0 と書くと品切れ（交換できません）" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="制限なし" />
+            <TextField id="reward-stock" inputMode="numeric" title="空欄なら限りなし。0 と書くと品切れ（交換できません）" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="制限なし" />
             {errorOf(LIMIT_FIELD_ERRORS.stockLimit) ? <p className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.stockLimit}</p> : null}
           </div>
           <div className={styles.field}>
             <label htmlFor="reward-per-friend" className={styles.label}>1人あたり<OptionalBadge /></label>
-            <TextInput id="reward-per-friend" inputMode="numeric" title="空欄なら何回でも" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="1回まで" />
+            <TextField id="reward-per-friend" inputMode="numeric" title="空欄なら何回でも" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="1回まで" />
             {errorOf(LIMIT_FIELD_ERRORS.perFriendLimit) ? <p className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.perFriendLimit}</p> : null}
           </div>
         </div>
@@ -496,7 +497,7 @@ function RewardEditorInner() {
         <h2 className={styles.cardTitle}>そのほか（任意）</h2>
         <div className={styles.grid2}>
           <Field label="交換後に使える日数" htmlFor="reward-expires" help="空欄なら期限なし" error={errorOf(LIMIT_FIELD_ERRORS.benefitExpiresDays)}>
-            <TextInput id="reward-expires" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', normalizeDigits(e.target.value))} placeholder="期限なし" />
+            <TextField id="reward-expires" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', normalizeDigits(e.target.value))} placeholder="期限なし" />
           </Field>
           <div />
         </div>

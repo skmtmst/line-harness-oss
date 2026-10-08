@@ -29,7 +29,6 @@ import {
   FolderCog,
   Link2,
   Lock,
-  MoreHorizontal,
   Pause,
   Plus,
   TriangleAlert,
@@ -67,6 +66,7 @@ import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
 import HelpTip from '@/components/shared/help-tip'
@@ -1365,21 +1365,12 @@ function CommonVarsListInner() {
                       {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。
                           閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す）。 */}
                       {canWrite ? <div className={styles.menuBox}>
-                        <IconButton
+                        <RowMenu
                           className={styles.rowMenuButton}
-                          title={`共通情報「${item.name}」の操作`}
-                          aria-label={`共通情報「${item.name}」の操作`}
-                          aria-haspopup="menu"
-                          aria-expanded={openMenuId === item.id}
-                          onClick={() => setOpenMenuId((currentId) => (currentId === item.id ? null : item.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
-                        <ActionMenu
-                          open={openMenuId === item.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={`共通情報「${item.name}」の操作`}
+                          label={`共通情報「${item.name}」の操作`}
                           items={rowMenuItems(item)}
+                          open={openMenuId === item.id}
+                          onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                         />
                       </div> : null}
                     </Td>
@@ -2008,6 +1999,8 @@ function CommonVarsListInner() {
           ))}
         </KpiBand>
       }
+      /* 1281〜1339 の幅は板が狭いのに 1152 用の道具の段にならない。そこだけ型が作る・フォルダを出す。 */
+      folderNav={narrow ? undefined : { rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
       folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
       toolbar={<>
         {hasAlerts ? <div className={styles.alertSlot}>{alerts}</div> : null}

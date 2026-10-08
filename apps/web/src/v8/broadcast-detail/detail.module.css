@@ -183,26 +183,29 @@ a.railStep:hover .railLabel {
   gap: var(--tpl-bd-head-gap);
 }
 
-.iconButton {
+/* 「…」は共通の RowMenu。絵の枠（影の輪）・色（墨）・大きさを共通の印ボタンより強く当てる。 */
+.actions > button.iconButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: var(--tpl-bd-icon-btn);
   height: var(--tpl-bd-icon-btn);
+  flex: 0 0 var(--tpl-bd-icon-btn);
   padding: 0;
   border: 0;
   border-radius: var(--radius-control);
+  outline: 0;
   background: var(--color-canvas);
   box-shadow: var(--tpl-bd-ring);
   color: var(--color-ink);
   cursor: pointer;
 }
 
-.iconButton:hover {
+.actions > button.iconButton:hover {
   background: var(--color-canvas-sunken);
 }
 
-.iconButton:focus-visible {
+.actions > button.iconButton:focus-visible {
   outline: var(--tpl-bd-focus) solid var(--color-action);
   outline-offset: var(--tpl-bd-focus);
 }

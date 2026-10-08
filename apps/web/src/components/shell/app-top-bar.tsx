@@ -3,14 +3,20 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '@/components/shared/top-bar'
+import BellNotifications from './bell-notifications'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { usePageChrome } from './page-chrome'
-import { HQ_MENU_SECTIONS, MENU_SECTIONS } from '@/lib/menu'
+import { HQ_MENU_SECTIONS, MENU_SECTIONS, isHqShellPath } from '@/lib/menu'
+import { brandInitial } from '@/components/layout/brand-initial'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { useBrand } from '@/lib/use-brand'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useManualHref } from '@/lib/use-manual-href'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import { setDocumentTitle } from '@/lib/document-title'
+import { canReturnToHqFrom } from '@/lib/hq-return'
 
 /**
  * 共通トップバーを、いまの画面の値へつなぐ層。
@@ -60,6 +66,7 @@ export function documentTitleForPath(pathname: string, shownTitle: string): stri
  *
  * V6 の設計（Pencil `cBSCb`）が「統括」だったが、2026-10-01 のオーナー決定で
  * 「オーナー」にそろえた。「統括」は組織と統括コンソールの名前だけに使う。
+ * ただし V8 の統括の画面では、名前の下に「統括」と出す（絵 `V8-B/JKjsE`・オーナー 2026-10-07）。
  */
 const ROLE_LABELS: Record<string, string> = {
   owner: 'オーナー',
@@ -85,7 +92,8 @@ export default function AppTopBar() {
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      if (!selectedAccountId) return
+      // 店を選んでいない（統括で店を選ぶ前など）ときは数を出さない。前の店の数を残さない。
+      if (!selectedAccountId) { setNotificationUnread(0); return }
       if (document.documentElement.dataset.theme !== 'v8') return
       try {
         const { api } = await import('@/lib/api')
@@ -126,6 +134,32 @@ export default function AppTopBar() {
   // タブの題も上の帯と同じ画面名にする（「<画面名> | musubo」）。
   useEffect(() => { setDocumentTitle(documentTitleForPath(pathname, shownTitle)) }, [pathname, shownTitle])
   const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
+  /*
+   * ★V8 統括の外側（絵 `V8-B/JKjsE`・オーナー 2026-10-07）：統括の画面（LINEアカウントの登録も含む）では、
+   * 切替の札に「統括」と統括名、名前の下に「統括」を出す。v7 は今までどおり。
+   */
+  const isV8 = useAdminTheme() === 'v8'
+  const hqShell = isV8 && isHqShellPath(pathname)
+  const [hqName, setHqName] = useState<string | null>(null)
+  useEffect(() => {
+    if (!hqShell) return
+    let cancelled = false
+    void import('@/lib/api').then(({ api }) => api.tenants.me()).then((res) => {
+      if (!cancelled && res.success && res.data?.name) setHqName(res.data.name)
+    }).catch(() => {
+      // 取れなければ「統括」だけで出す
+    })
+    return () => { cancelled = true }
+  }, [hqShell])
+  const hqPill = hqShell ? { name: hqName ?? '統括', mark: brandInitial(hqName ?? '統括') } : null
+  const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (ROLE_LABELS[staffRole] ?? '')
+  /* 統括の札から店を選んだら、その店へ入る（カードの「このアカウントへ入る」と同じ）。 */
+  const changeAccount = (accountId: string) => {
+    requestUnsavedAction(() => {
+      setSelectedAccountId(accountId)
+      if (hqShell && accountId) router.push('/')
+    })
+  }
 
   const options = useMemo(
     () => accounts.map((a) => ({ id: a.id, label: a.displayName || a.name })),
@@ -139,13 +173,27 @@ export default function AppTopBar() {
    * バーの印と同じ言葉が2つ並ぶので、印のほうへ畳んだ。統括以外は押せない。
    * すでに統括の画面にいるときも押せない。
    */
-  const canReturnToHq = staffRole === 'owner' && !pathname.startsWith('/hq')
+  // 統括へ戻る口はオーナーと管理者に出す（管理者も統括を開ける。2026-10-07 オーナーの役割が管理者のため）
+  const canReturnToHq = canReturnToHqFrom(staffRole, pathname, hqShell)
   const returnToHq = () => {
-    clearSelectedAccountId()
-    router.push('/hq')
+    requestUnsavedAction(() => {
+      clearSelectedAccountId()
+      router.push('/hq')
+    })
   }
 
   const logout = () => logoutAndGoToLogin()
+
+  /*
+   * ★V8 店の画面から統括へ戻る口（絵 V8 `DIHFx/Psg7n`・オーナー 2026-10-07）。
+   * 統括の権限がある人（オーナー・管理者）にだけ、切り替えの一覧のいちばん上に「統括に戻る」を出す。
+   * 帯の［統括へ］ボタンはやめ、左下の自分のメニューへまとめた（オーナー 2026-10-07）。
+   * 店だけの担当には出さない。
+   */
+  const brand = useBrand()
+  const hqReturn = isV8 && canReturnToHq
+    ? { companyName: brand.name ?? '統括', accountCount: accounts.length, onReturn: returnToHq }
+    : null
 
   /*
    * ★V8：帯の探す欄は V8 の外側から外した（オーナー決定 2026-10-01）。
@@ -184,15 +232,27 @@ export default function AppTopBar() {
       manualHref={manualHref}
       accounts={options}
       selectedAccountId={selectedAccountId ?? ''}
-      onAccountChange={setSelectedAccountId}
+      onAccountChange={changeAccount}
       showAccountSwitcher={true}
-      roleLabel={ROLE_LABELS[staffRole] ?? ''}
+      roleLabel={roleLabel}
       onRoleClick={canReturnToHq ? returnToHq : undefined}
       userName={staffName}
       onLogout={logout}
       notificationUnreadCount={notificationUnread}
+      renderNotifications={isV8 ? (popover) => (
+        <BellNotifications popover={popover} accountId={selectedAccountId || null} onUnreadChange={setNotificationUnread} />
+      ) : undefined}
       v8Chrome
+      chromeVariant="shell"
       crumbs={crumbs}
+      hq={hqPill}
+      homeHref={hqShell ? '/hq' : '/'}
+      hqReturn={hqReturn}
+      /*
+        ★V8：自分の名前・役割・ログアウトは左下の自分のメニューへ移した
+        （オーナー 2026-10-07・絵 zUg8S の zyFtB・l0VY4 を隠した）。v7 は今までどおり。
+      */
+      showIdentity={!isV8}
     />
     </div>
     {accountsLoadFailed ? (

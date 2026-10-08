@@ -1,13 +1,30 @@
 import type Database from 'better-sqlite3';
 import { Hono } from 'hono';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { hqTemplates } from './hq-templates.js';
 import { routeClassification } from '../middleware/feature-enforcement.js';
+import { listTemplates } from '../services/hq-templates/distribution.js';
+import { fieldsToLayout } from '@line-crm/shared';
 
 const definition = { schemaVersion: 1, tag: { name: '常連', color: '#123456', description: 'ご案内', folderId: 'child' }, folders: [{ id: 'child', name: 'ご利用', parentId: 'root' }, { id: 'root', name: 'お客様' }] };
+const summaryBody = '一覧に含めない本文';
+const messageDefinition = (messageType = 'text', messageContent = summaryBody, media: unknown[] = []) => ({ schemaVersion: 1,
+  template: { id: 'message', name: '試験', category: 'general', messageType, messageContent,
+    carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media });
+const imageMedia = (id: string) => ({ id, kind: 'image', filename: `${id}.png`, mimeType: 'image/png', sizeBytes: 10,
+  width: 100, height: 100, durationMs: null, r2Key: `hq-templates/tenant-a/${id}.png`, publicUrl: `https://worker.test/${id}.png`,
+  versionId: `version-${id}`, versionNo: 1, contentHash: 'a'.repeat(64) });
+const formFields = Array.from({ length: 4 }, (_, i) => ({ name: `q${i}`, label: `質問${i}`, type: 'text' as const }));
+const formDefinition = { schemaVersion: 1, form: { name: '試験', description: null, fields: formFields, layout: null,
+  on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: false } };
+const richMenuDefinition = { schemaVersion: 1, richMenu: { id: 'menu', name: '試験', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page',
+  pages: [{ id: 'page', name: 'メイン', imageR2Key: 'hq-templates/tenant-a/menu.png', areas: Array.from({ length: 6 }, (_, i) => ({
+    id: `area-${i}`, bounds: { x: (i % 3) * 800, y: Math.floor(i / 3) * 800, width: 800, height: 800 },
+    actionType: 'message', actionData: { text: summaryBody }, label: 'ご案内',
+  })) }] } };
 let sql: Database.Database, db: D1Database, app: Hono<Env>, staff: AuthenticatedStaff, images: R2Bucket;
 function count(table: string) { return (sql.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n; }
 async function request(path: string, method = 'GET', body?: unknown, extraHeaders: Record<string,string> = {}) {
@@ -48,6 +65,115 @@ beforeEach(() => {
 afterEach(() => sql.close());
 
 describe('HQ tag HTTP and real SQLite boundaries', () => {
+  test.each([
+    { type: 'tag', definition, summary: 'タグ 1' },
+    { type: 'template', definition: messageDefinition(), summary: '本文' },
+    { type: 'template', definition: { ...messageDefinition('flex'), card: { format: 'flex', title: '', body: summaryBody, imageMediaId: 'image-1', buttons: [] },
+      media: [imageMedia('image-1'), imageMedia('unused')] }, summary: '本文・画像 1' },
+    { type: 'template', definition: messageDefinition('image', imageMedia('image-1').publicUrl, [imageMedia('image-1')]), summary: '画像 1' },
+    { type: 'template', definition: messageDefinition('flex', JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: summaryBody }] } })), summary: 'カード' },
+    { type: 'template', definition: messageDefinition('carousel', JSON.stringify({ type: 'carousel', contents: [] })), summary: 'カルーセル' },
+    { type: 'rich_menu', definition: richMenuDefinition, summary: '6分割・画像あり' },
+    { type: 'rich_menu', definition: { ...richMenuDefinition, richMenu: { ...richMenuDefinition.richMenu, defaultPageId: 'other', pages: [
+      { id: 'other', name: '小メニュー', imageR2Key: 'hq-templates/tenant-a/other.png', areas: [{ ...richMenuDefinition.richMenu.pages[0].areas[0], id: 'other-area' }] },
+      ...richMenuDefinition.richMenu.pages,
+    ] } }, summary: '1分割・画像あり・ページ 2' },
+    { type: 'form', definition: formDefinition, summary: '質問 4' },
+    { type: 'form', definition: { ...formDefinition, form: { ...formDefinition.form, fields: [], layout: fieldsToLayout(formFields) } }, summary: '質問 4' },
+    { type: 'scenario', definition: { schemaVersion: 1, scenario: { name: '試験', description: null }, steps: [
+      { id: 'step-1', delayMinutes: 0, messageType: 'text', messageContent: summaryBody },
+      { id: 'step-2', delayMinutes: 10, messageType: 'text', messageContent: summaryBody },
+    ] }, summary: 'ステップ 2' },
+  ])('種類別に短い要約を返し、全文を出さない: $type / $summary', async ({ type, definition, summary }) => {
+    const created = await request('', 'POST', { type, name: '一覧試験', definition, requestId: crypto.randomUUID() });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const list = await request(`?type=${type}`);
+    expect(list.status).toBe(200);
+    expect(list.body.data).toHaveLength(1);
+    expect(list.body.data[0]).toMatchObject({ id: created.body.data.template.id, content_summary: summary,
+      distributed_account_names: [], distributed_account_more: 0, distributed_account_count: 0 });
+    expect(JSON.stringify(list.body)).not.toContain(summaryBody);
+    expect(JSON.stringify(list.body)).not.toContain('definition');
+    expect(JSON.stringify(list.body)).not.toContain('hq-templates/');
+    expect((await request(type === 'tag' ? '?type=form' : '?type=tag')).body.data).toEqual([]);
+  });
+  test('3件以内は残り0、同名の別アカウントは別件として数える', async () => {
+    const t = await create();
+    sql.exec("UPDATE line_accounts SET name='同名' WHERE id IN ('a1','a2','a3')");
+    await execute(t.id, await preflight(t.id));
+    expect((await request('')).body.data[0]).toMatchObject({ distributed_account_names: ['同名','同名','同名'],
+      distributed_account_more: 0, distributed_account_count: 3 });
+  });
+  test('一覧は成功した配布先を名前順3件と残り件数で返し、再配布・失敗・別統括を混ぜない', async () => {
+    const t = await create(), empty = await create();
+    sql.exec(`UPDATE line_accounts SET name=CASE id WHEN 'a1' THEN '本店' WHEN 'a2' THEN '渋谷店' ELSE 'イベント' END WHERE tenant_id='tenant-a';
+      INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES
+      ('a4','新宿店','fixture-a4','fixture','fixture','tenant-a'),('a5','失敗店','fixture-a5','fixture','fixture','tenant-a'),
+      ('a6','処理中店','fixture-a6','fixture','fixture','tenant-a'),('a7','競合店','fixture-a7','fixture','fixture','tenant-a');`);
+    for (const accounts of [['a1','a2','a3','a4'], ['a1'], ['a7']]) {
+      expect((await execute(t.id, await preflight(t.id, accounts))).status).toBe(200);
+    }
+    const unfinished = await preflight(t.id, ['a5','a6']);
+    sql.prepare(`INSERT INTO hq_template_distribution_runs(id,tenant_id,template_id,template_version_id,idempotency_fingerprint,created_by,status)
+      SELECT DISTINCT idempotency_fingerprint,tenant_id,template_id,template_version_id,idempotency_fingerprint,created_by,'running'
+      FROM hq_template_preflights WHERE idempotency_fingerprint=?`).run(unfinished.preflightId);
+    sql.prepare(`INSERT INTO hq_template_distribution_results(run_id,tenant_id,template_id,template_version_id,target_account_id,preflight_id,idempotency_fingerprint,snapshot_token,status)
+      SELECT idempotency_fingerprint,tenant_id,template_id,template_version_id,target_account_id,id,idempotency_fingerprint,snapshot_token,
+        CASE target_account_id WHEN 'a5' THEN 'failed' ELSE 'pending' END
+      FROM hq_template_preflights WHERE idempotency_fingerprint=?`).run(unfinished.preflightId);
+    // 配布後に所属が変わったアカウントの現在の名前を別統括へ漏らさない。
+    sql.prepare("UPDATE line_accounts SET tenant_id='tenant-b' WHERE id='a7'").run();
+    const list = await request('?type=tag');
+    expect(list.status).toBe(200);
+    expect(list.body.data.find((row: any) => row.id === t.id)).toMatchObject({
+      distributed_account_names: ['イベント','新宿店','本店'], distributed_account_more: 1,
+      distributed_account_count: 4, content_summary: 'タグ 1',
+    });
+    expect(list.body.data.find((row: any) => row.id === empty.id)).toMatchObject({
+      distributed_account_names: [], distributed_account_more: 0, distributed_account_count: 0, content_summary: 'タグ 1',
+    });
+    expect(JSON.stringify(list.body)).not.toContain('definition_json');
+    expect(JSON.stringify(list.body)).not.toContain('distributed_account_names_json');
+    expect(JSON.stringify(list.body)).not.toContain('display_type');
+    expect(JSON.stringify(list.body)).not.toContain('ご案内');
+    sql.prepare("UPDATE line_accounts SET name='改名店',is_active=0,archived_at='2026-10-07' WHERE id='a3'").run();
+    expect((await request('')).body.data.find((row: any) => row.id === t.id).distributed_account_names).toContain('改名店');
+  });
+  test('件数が増えても一覧の材料は1回の問い合わせで集める', async () => {
+    await create();
+    const prepare = vi.spyOn(db, 'prepare');
+    const auth = { tenantId: 'tenant-a', actorId: 'owner', role: 'owner', readOnly: false, accountScoped: false } as const;
+    try {
+      expect(await listTemplates(db, auth)).toHaveLength(1);
+      expect(prepare).toHaveBeenCalledTimes(1);
+      prepare.mockClear();
+      for (let i = 0; i < 30; i++) await create();
+      prepare.mockClear();
+      expect(await listTemplates(db, auth)).toHaveLength(31);
+      expect(prepare).toHaveBeenCalledTimes(1);
+    } finally { prepare.mockRestore(); }
+  });
+  test('最新の版だけを要約し、壊れた版や未保存の版は未取得として返す', async () => {
+    const t = await create();
+    const definition = { schemaVersion: 1, tag: { name: '変更後' }, folders: [] };
+    expect((await request(`/${t.id}`, 'PATCH', { name: t.name, expectedRevision: t.revision, definition })).status).toBe(200);
+    const current = sql.prepare('SELECT current_version_id FROM hq_templates WHERE id=?').get(t.id) as { current_version_id: string };
+    sql.prepare("UPDATE hq_template_versions SET definition_json='invalid' WHERE template_id=? AND id<>?").run(t.id,current.current_version_id);
+    expect((await request('')).body.data[0].content_summary).toBe('タグ 1');
+    sql.prepare("UPDATE hq_template_versions SET definition_json='invalid' WHERE id=?").run(current.current_version_id);
+    expect((await request('')).body.data[0].content_summary).toBeNull();
+    sql.prepare('UPDATE hq_templates SET current_version_id=NULL WHERE id=?').run(t.id);
+    expect((await request('')).body.data[0].content_summary).toBeNull();
+  });
+  test('回答フォームを改訂したら、一覧の質問数も最新の数へ変わる', async () => {
+    const created = await request('', 'POST', { type: 'form', name: '試験', definition: formDefinition, requestId: crypto.randomUUID() });
+    expect(created.status).toBe(201);
+    expect((await request('?type=form')).body.data[0].content_summary).toBe('質問 4');
+    const t = created.body.data.template;
+    expect((await request(`/${t.id}`, 'PATCH', { name: t.name, expectedRevision: t.revision,
+      definition: { ...formDefinition, form: { ...formDefinition.form, fields: formFields.slice(0, 1) } } })).status).toBe(200);
+    expect((await request('?type=form')).body.data[0].content_summary).toBe('質問 1');
+  });
   test('配布先ごとに版1・版2（最新）・未配布を返し、失敗を成功版に数えない', async () => {
     const t = await create();
     expect((await preflight(t.id, ['a1'])).stores[0].targetVersion)
@@ -201,7 +327,7 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     sql.exec("UPDATE staff_members SET role='admin'"); staff.role='admin';
     const t = await create(); expect((await execute(t.id,await preflight(t.id,['a1']))).body.data.status).toBe('completed');
   });
-  test.each(['readOnly','databaseReadOnly','staff','scoped','inactive','missingTenant','missingActor'])('%s cannot read or mutate any HQ API', async kind => {
+  test.each(['readOnly','databaseReadOnly','staff','scoped','inactive','missingTenant','missingActor'])('%s は編集を拒否し、閲覧のみの人は一覧を読める', async kind => {
     const t = await create();
     if (kind==='readOnly') staff.readOnly=true;
     if (kind==='databaseReadOnly') sql.exec("UPDATE staff_members SET access_level='read_only'");
@@ -211,7 +337,7 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     if (kind==='missingTenant') staff.tenantId=null;
     if (kind==='missingActor') staff.id='unknown';
     for (const [path,method] of [['','GET'],['/accounts','GET'],[`/${t.id}`,'GET'],['','POST'],[`/${t.id}`,'PATCH'],[`/${t.id}`,'DELETE'],[`/${t.id}/preflight`,'POST'],[`/${t.id}/distribute`,'POST'],[`/${t.id}/distributions/run`,'GET']]) {
-      expect((await request(path,method,method==='GET'?undefined:{})).status).toBe(403);
+      expect((await request(path,method,method==='GET'?undefined:{})).status).toBe(['readOnly','databaseReadOnly'].includes(kind)&&method==='GET'?(path.endsWith('/distributions/run')?404:200):403);
     }
     expect(count('hq_template_versions')).toBe(1); expect(count('hq_template_preflights')).toBe(0);
   });
@@ -477,4 +603,63 @@ describe('V8 account wording',()=>{
   expect((await request(`/${id}`)).body.data.definition.template.messageContent).toBe('原本の案内');
   for(const textOverrides of [[{accountId:'b1',text:'範囲外'}],[{accountId:'a1',text:''}],[{accountId:'a1',text:'1'},{accountId:'a1',text:'2'}]]) expect((await request(`/${id}/preflight`,'POST',{accountIds:['a1'],textOverrides})).status).toBe(422);
  });
+});
+
+describe('統括を店と同じ欄で使う API-18',()=>{
+  test('版の作成者・下書き・受取版・比較・復元を返し、過去の版と配布先を変えない',async()=>{
+    const t=await create();
+    let versions=(await request(`/${t.id}/versions`)).body.data;
+    expect(versions).toEqual([expect.objectContaining({version:1,created_by:'owner',creator_name:'管理者',is_draft:true,is_current:true})]);
+    await execute(t.id,await preflight(t.id,['a1','a2']));
+    expect((await request(`/${t.id}/versions`)).body.data[0].is_draft).toBe(false);
+    const changed=await request(`/${t.id}`,'PATCH',{name:'現在の名前',expectedRevision:t.revision,definition:{...definition,tag:{...definition.tag,name:'新しいタグ'}}});
+    expect(changed.status).toBe(200);
+    expect((await request(`/${t.id}/received-versions`)).body.data).toEqual(['a1','a2'].map(id=>expect.objectContaining({accountId:id,targetVersion:{version:1,latestVersion:2,status:'older',label:'版1'}})));
+    expect((await request('')).body.stats.outdatedTemplateCount).toBe(1);
+    expect((await request(`/${t.id}/versions/compare?from=1&to=2`)).body.data).toMatchObject({changed:true,from:{version:{version:1},definition:{tag:{name:'常連'}}},to:{version:{version:2},definition:{tag:{name:'新しいタグ'}}}});
+    const restored=await request(`/${t.id}/versions/1/restore`,'POST',{expectedRevision:changed.body.data.template.revision});expect(restored.status).toBe(200);
+    expect(restored.body.data).toMatchObject({template:{name:'現在の名前'},definition:{tag:{name:'常連'}}});
+    versions=(await request(`/${t.id}/versions`)).body.data;
+    expect(versions.map((v:any)=>v.version)).toEqual([3,2,1]);expect(versions[0]).toMatchObject({is_current:true,is_draft:true});
+    expect((await request(`/${t.id}/versions/compare?from=1&to=3`)).body.data.changed).toBe(false);
+    expect((await request(`/${t.id}/versions/1/restore`,'POST',{expectedRevision:t.revision})).status).toBe(409);
+    expect((await request(`/${t.id}/versions/compare?from=0&to=3`)).status).toBe(400);
+    expect((await request(`/${t.id}/versions/99/restore`,'POST',{expectedRevision:restored.body.data.template.revision})).status).toBe(404);
+    staff.tenantId='tenant-b';sql.exec("UPDATE staff_members SET tenant_id='tenant-b' WHERE id='owner'");
+    expect((await request(`/${t.id}/versions`)).status).toBe(404);
+  });
+  test('今月送った実通数は成功配布の主項目だけ集計し、再配布・テスト・他店を重複計上しない',async()=>{
+    const made=await request('','POST',{type:'template',name:'送信の集計',definition:{...messageDefinition(),template:{...messageDefinition().template,id:'hq-authored-message'}},requestId:crypto.randomUUID()});const t=made.body.data.template;
+    await execute(t.id,await preflight(t.id,['a1']));await execute(t.id,await preflight(t.id,['a1']));
+    const local=(sql.prepare("SELECT target_id FROM hq_template_preflight_resolutions WHERE template_id=? AND item_kind='template' LIMIT 1").get(t.id) as any).target_id;
+    sql.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f1','Uf1','a1'),('f2','Uf2','a2')");
+    const put=sql.prepare(`INSERT INTO messages_log(id,friend_id,direction,message_type,content,template_id_at_send,line_account_id,delivery_type,created_at) VALUES(?,?,'outgoing','text','本文',?,?,?,?)`);
+    const now=new Date(Date.now()+9*3600_000).toISOString();
+    put.run('m1','f1',local,'a1','push',now);put.run('m2','f1',local,'a1','reply',now);
+    put.run('test','f1',local,'a1','test',now);put.run('foreign','f2',local,'a2','push',now);put.run('old','f1',local,'a1','push','2020-01-01');
+    expect((await request('?type=template')).body).toMatchObject({data:[{this_month_sent_count:2}],stats:{thisMonthSentCount:2}});
+    sql.exec("UPDATE line_accounts SET tenant_id='tenant-b' WHERE id='a1'");
+    expect((await request('?type=template')).body.stats.thisMonthSentCount).toBe(0);
+  });
+  test('タグのkindで絞り、配布先の人数と手動の可否を返す',async()=>{
+    const t=await create();await execute(t.id,await preflight(t.id,['a1','a2']));
+    sql.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f1','Uf1','a1'),('f2','Uf2','a2')");
+    sql.exec("INSERT INTO friend_tags(friend_id,tag_id) SELECT f.id,t.id FROM friends f JOIN tags t ON t.line_account_id=f.line_account_id");
+    await execute(t.id,await preflight(t.id,['a1']));
+    expect((await request('?kind=tag')).body.data).toEqual([expect.objectContaining({friend_count:2,manual_assignment_allowed:true,assignment_method:'手動・自動'})]);
+    expect((await request('?type=template&kind=tag')).status).toBe(400);
+  });
+  test('リッチメニューの順と誰に出すかを保存し、押された数は未配布で0',async()=>{
+    const made=await request('','POST',{type:'rich_menu',name:'メニュー',definition:{...richMenuDefinition,richMenu:{...richMenuDefinition.richMenu,displayOrder:3,displayAudience:'all'}},requestId:crypto.randomUUID()});
+    expect(made.status).toBe(201);
+    expect((await request('?type=rich_menu')).body.data).toEqual([expect.objectContaining({display_order:3,display_audience:'全員',tap_count:0})]);
+    expect((await request('','POST',{type:'rich_menu',name:'不正',definition:{...richMenuDefinition,richMenu:{...richMenuDefinition.richMenu,displayOrder:-1}},requestId:crypto.randomUUID()})).status).toBe(400);
+  });
+  test('閲覧のみは履歴・比較・受取版を読めるが、復元と配布は拒否する',async()=>{
+    const t=await create();staff.readOnly=true;
+    for(const path of [`/${t.id}/versions`,`/${t.id}/versions/compare?from=1&to=1`,`/${t.id}/received-versions`])expect((await request(path)).status).toBe(200);
+    expect((await request(`/${t.id}/versions/1/restore`,'POST',{expectedRevision:t.revision})).status).toBe(403);
+    expect((await request(`/${t.id}/preflight`,'POST',{accountIds:['a1']})).status).toBe(403);
+    expect(count('hq_template_versions')).toBe(1);
+  });
 });

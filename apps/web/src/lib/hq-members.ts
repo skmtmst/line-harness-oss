@@ -80,3 +80,35 @@ export function sortMembers(members: StaffMember[], meId: string | null): StaffM
   const rank = (m: StaffMember) => (m.id === meId ? 0 : memberStatus(m) === 'active' ? 1 : memberStatus(m) === 'invited' ? 2 : 3)
   return [...members].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'ja'))
 }
+
+/**
+ * ★V8 の表の「最終ログイン」（絵 `r4ARpV`：「9/30 10:12」）。日本時間の 月/日 時:分。
+ * 今年でないときは年を前に付ける（「2025/8/31 12:00」）。取れないときは「—」。
+ */
+export function lastLoginShort(iso: string | undefined, now = new Date()): string {
+  if (!iso) return '—'
+  const date = parseJstDateTime(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  const fmt = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  })
+  const pick = (d: Date) => Object.fromEntries(fmt.formatToParts(d).map((part) => [part.type, part.value]))
+  const at = pick(date)
+  const year = at.year === pick(now).year ? '' : `${at.year}/`
+  return `${year}${Number(at.month)}/${Number(at.day)} ${at.hour}:${at.minute}`
+}
+
+const ROLE_ORDER: Record<StaffMember['role'], number> = { owner: 0, admin: 1, staff: 2, viewer: 3 }
+const STATUS_ORDER: Record<MemberStatus, number> = { active: 0, invited: 1, expired: 2, inactive: 3 }
+
+/**
+ * ★V8 の表の並び（絵 `r4ARpV`：高田（オーナー）→中川（管理者）→佐野（閲覧のみ）→外部デザイン（招待中）→森（停止中））。
+ * 状態（有効→招待中→期限切れ→停止中）、同じ状態の中は役割（オーナー→管理者→担当者→閲覧のみ）、そのあと名前順。
+ * v7 の表は `sortMembers`（自分を先頭）のまま。
+ */
+export function sortMembersByRole(members: StaffMember[]): StaffMember[] {
+  return [...members].sort((a, b) =>
+    STATUS_ORDER[memberStatus(a)] - STATUS_ORDER[memberStatus(b)]
+    || (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9)
+    || a.name.localeCompare(b.name, 'ja'))
+}

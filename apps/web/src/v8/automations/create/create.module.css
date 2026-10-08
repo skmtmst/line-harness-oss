@@ -274,11 +274,13 @@
   flex-shrink: 0;
   align-items: center;
 }
-.menuButton {
+/* 「…」は共通の RowMenu。絵の大きさ（chip の高さ）を共通の印ボタン（36）より強く当てる。 */
+.menuBox > button.menuButton {
   display: inline-grid;
   place-items: center;
   width: var(--tpl-chip-h);
   height: var(--tpl-chip-h);
+  flex: 0 0 var(--tpl-chip-h);
   border: 0;
   border-radius: var(--radius-control);
   outline: 1px solid var(--color-hairline);
@@ -287,7 +289,7 @@
   color: var(--color-ink-secondary);
   cursor: pointer;
 }
-.menuButton:hover {
+.menuBox > button.menuButton:hover {
   background: var(--color-shell);
 }
 
@@ -398,4 +400,26 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--tpl-rule-row-gap);
+}
+
+/* 下書きを仕上げる（J1VA8）：どの見本から作ったかの帯。頭の説明のすぐ下（間 8）。 */
+.sourceBand {
+  display: flex;
+  margin-top: var(--tpl-ro-band-after);
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.sourceBand > span {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sourceIcon {
+  flex-shrink: 0;
+  color: var(--color-status-info);
 }

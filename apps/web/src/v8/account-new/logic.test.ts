@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LineAccountConnectData } from '@/lib/api'
-import { DRAFT_KEY, allV8RowsPassed, readDraft, toV8CheckRows } from './logic'
+import { DRAFT_KEY, allV8RowsPassed, checkRowText, readDraft, toV8CheckRows } from './logic'
 
 const storage = (value: unknown) => ({ getItem: (key: string) => key === DRAFT_KEY ? JSON.stringify(value) : null })
 const connection = (webhook: 'passed' | 'failed'): LineAccountConnectData => ({
@@ -30,5 +30,14 @@ describe('LINEアカウントを登録（★V8）の小さな計算', () => {
     const passed = toV8CheckRows(connection('passed'))
     expect(allV8RowsPassed(passed)).toBe(true)
     expect(passed[4].detail).toBe('https://lin.ee/nen')
+  })
+
+  it('④の止まった行は理由を1つだけ出す（Webhook のオフの説明に段の文を重ねない）', () => {
+    const stopped = toV8CheckRows(connection('failed'))
+    expect(checkRowText(stopped[2])).toBe('LINE Developers で「Webhook の利用」がオフです。オンにしてから押し直してください')
+    expect(checkRowText(stopped[2])).not.toContain('段3')
+    const noDetail = toV8CheckRows({ ...connection('failed'), verification: undefined })
+    expect(checkRowText(noDetail[2])).toBe('受け口へ届きませんでした（段3）')
+    expect(checkRowText(stopped[0])).toBe('Messaging API・LINE Login とも認証済み')
   })
 })

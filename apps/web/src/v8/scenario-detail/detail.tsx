@@ -111,8 +111,7 @@ import ScheduleInput, {
   type ScheduleValue,
 } from '@/components/scenarios/schedule-input'
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
-import ActionMenu from '@/components/shared/action-menu'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -139,6 +138,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -592,13 +592,15 @@ export default function ScenarioDetailV8({
   /** 開始のきっかけ。窓の開閉と、札に出す件数。 */
   const [triggerOpen, setTriggerOpen] = useState(false)
   const [triggerCount, setTriggerCount] = useState<number | null>(null)
+  /* WEB229：開始のきっかけを保存した回数。見出しの名前・試算の鍵を取り直す。 */
+  const [triggerRevision, setTriggerRevision] = useState(0)
   /** 位置情報・動画・音声・スタンプの入力。 */
   const [kindState, setKindState] = useState<MessageKindState>(() => emptyMessageKindState())
   /** 通の入力欄を開いた回の番号。開くたびに「開いた直後の形」を比べる元として採り直す。 */
   const [stepFormNonce, setStepFormNonce] = useState(0)
   const [stepFormBaseline, setStepFormBaseline] = useState<{ nonce: number; value: { stepForm: StepFormState; kindState: MessageKindState } } | null>(null)
   /** 差し込みをカーソルの位置に入れるために、本文の入力欄を持つ。 */
-  const stepBodyRef = useRef<HTMLTextAreaElement>(null)
+  const stepBodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
 
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -750,7 +752,7 @@ export default function ScenarioDetailV8({
    * id と lineAccountId が変わらないので、鍵を見ないと古い人数が
    * 残り続ける（以前の挙動）。
    */
-  const simulationKey = scenarioSimulationKey(scenario, triggerCount)
+  const simulationKey = scenarioSimulationKey(scenario, triggerCount === null || triggerRevision === 0 ? triggerCount : `${triggerCount}:${triggerRevision}`)
   /** 今の設定に対する試算。旧鍵の結果は確定値として出さない。 */
   const simulation = simulationForKey(simulationResult, simulationKey)
   /** 設定が変わって取り直し中か（初回の取得中も true）。 */
@@ -804,7 +806,7 @@ export default function ScenarioDetailV8({
         }
       })
       .catch(() => {})
-  }, [id])
+  }, [id, triggerRevision])
 
   /*
    * ★V8: 各通の「届く日時の例」（行の時刻の下の青い行）は /preview の
@@ -1122,7 +1124,7 @@ export default function ScenarioDetailV8({
    * simulation / runs をそのまま使う（確認窓で取り直さない）。
    */
   const handleStart = async () => {
-    if (!scenario || startBusy) return
+    if (!scenario || startBusy || !startConfirmed) return
     setStartBusy(true)
     setStartError('')
     try {
@@ -1924,13 +1926,13 @@ export default function ScenarioDetailV8({
                     />
                   </div>
                 )}
-                <textarea
+                <InsertTextField
                   ref={stepBodyRef}
                   className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   rows={4}
                   placeholder="メッセージ内容を入力..."
                   value={stepForm.messageContent}
-                  onChange={(e) => setStepForm({ ...stepForm, messageContent: e.target.value })}
+                  onValueChange={(next) => setStepForm({ ...stepForm, messageContent: next })}
                 />
               </div>
             )}
@@ -2340,15 +2342,12 @@ export default function ScenarioDetailV8({
           ) : null}
           {canEdit ? (
             <span className={styles.menuBox}>
-              <MoreAction
+              <RowMenu
+                appearance="plain"
                 label="このシナリオのその他操作"
-                aria-expanded={stepMenuId === '__head__'}
-                onClick={() => setStepMenuId((current) => (current === '__head__' ? null : '__head__'))}
-              />
-              <ActionMenu
+                menuLabel="このシナリオの操作"
                 open={stepMenuId === '__head__'}
-                ariaLabel="このシナリオの操作"
-                onClose={() => setStepMenuId(null)}
+                onOpenChange={(next) => setStepMenuId(next ? '__head__' : null)}
                 items={[
                   {
                     id: 'duplicate',
@@ -2677,17 +2676,12 @@ export default function ScenarioDetailV8({
                             <ArrowDown aria-hidden />
                           </button>
                           <span className={styles.menuBox} onClick={(e) => e.stopPropagation()}>
-                            <MoreAction
+                            <RowMenu
+                              appearance="plain"
                               label={`${step.stepOrder}通目のその他操作`}
-                              aria-expanded={stepMenuId === step.id}
-                              onClick={() =>
-                                setStepMenuId((current) => (current === step.id ? null : step.id))
-                              }
-                            />
-                            <ActionMenu
+                              menuLabel={`${step.stepOrder}通目の操作`}
                               open={stepMenuId === step.id}
-                              ariaLabel={`${step.stepOrder}通目の操作`}
-                              onClose={() => setStepMenuId(null)}
+                              onOpenChange={(next) => setStepMenuId(next ? step.id : null)}
                               items={[
                                 { id: 'edit', label: '編集', onSelect: () => openEditStep(step) },
                                 { id: 'preview', label: 'プレビュー', onSelect: () => setSelectedStepId(step.id) },
@@ -2767,7 +2761,8 @@ export default function ScenarioDetailV8({
                           <StatusChip status="draft" />
                         ) : (
                           <span className={styles.statBar} aria-hidden>
-                            <span className={styles.statBarFill} style={{ width: `${reachBarWidth}%` }} />
+                            {/* WEB227：幅は scenarioReachBarWidth が「50%」の形で返す。もう一度 % を付けない。 */}
+                            <span className={styles.statBarFill} style={{ width: reachBarWidth ?? '0%' }} />
                           </span>
                         )}
                       </span>
@@ -2916,6 +2911,7 @@ export default function ScenarioDetailV8({
       {/* 名前・説明・置き場を変える鉛筆の小窓。 */}
       <Dialog
         open={renameOpen}
+        busy={saving}
         title="名前・説明・置き場を変える"
         description="ここで変えた内容は、下の「保存する」で確定します。"
         onCancel={() => {
@@ -2934,6 +2930,7 @@ export default function ScenarioDetailV8({
         footer={
           <>
             <Button
+              disabled={saving}
               onClick={() => {
                 if (scenario) {
                   setEditForm({
@@ -3034,6 +3031,8 @@ export default function ScenarioDetailV8({
         busy={startBusy}
         error={startError}
         onConfirm={preflightLoading || preflightFailed ? undefined : () => void handleStart()}
+        // WEB228：「内容と対象を確かめました」のチェックが入るまで「この内容ではじめる」を押せない。
+        confirmDisabled={!startConfirmed}
         onCancel={() => {
           if (startBusy) return
           setStartOpen(false)
@@ -3376,7 +3375,7 @@ export default function ScenarioDetailV8({
         <TriggerEditor
           scenarioId={id}
           onClose={() => setTriggerOpen(false)}
-          onChanged={setTriggerCount}
+          onChanged={(count) => { setTriggerCount(count); setTriggerRevision((n) => n + 1) }}
           audienceCondition={scenario.audienceCondition}
           activeNow={stats?.activeNow ?? null}
           lineAccountId={scenario.lineAccountId}

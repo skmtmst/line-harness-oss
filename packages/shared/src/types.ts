@@ -1111,7 +1111,11 @@ export interface LineAccountTagInput {
   name: string; color?: string | null; displayOrder?: number
 }
 
+export interface LineAccountFolderList { folders: Folder[]; total: number; unclassifiedCount: number }
+export type LineAccountFolderInput = Pick<Folder,'name'> & Partial<Pick<Folder,'color'|'displayOrder'>>;
 export interface LineAccount {
+  folderId?: string | null;
+  folder?: Folder | null;
   /** 統括内での分類。友だちタグとは別。 */
   tags?: LineAccountTagSummary[];
   /** 表示と新しい日時入力に使う IANAタイムゾーン。 */

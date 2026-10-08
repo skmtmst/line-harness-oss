@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -13,7 +13,7 @@ import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
 import { TimeField } from '@/components/shared/date-time-field'
 import Toggle from '@/components/shared/toggle'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import { notifyToast } from '@/components/shared/toast'
 import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from '@/lib/api'
 import { slotReasonLabel } from '../lib/slot-reason'
@@ -113,8 +113,8 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
     }
   }
 
-  if (settingsStatus === 'loading' || draft === null) return <SkeletonRows rows={7} />
-  if (settingsStatus === 'error' || !settings) {
+  // WEB053：失敗を先に見る（draft は成功したときだけできる）。
+  if (settingsStatus === 'error' || (settingsStatus !== 'loading' && !settings)) {
     return (
       <StateCard
         icon={<AccountIcon />}
@@ -124,6 +124,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
       />
     )
   }
+  if (settingsStatus === 'loading' || draft === null || !settings) return <SkeletonRows rows={7} />
 
   return (
     <div className={styles.tabStack} data-design="Week">
@@ -293,7 +294,6 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
   onSaved: (resource: BookingResource) => void
   onDeleted: (id: string) => void
 }) {
-  const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -368,23 +368,13 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
       <span className={styles.equipType}>{resource.type}</span>
       <span className={styles.equipCap}>{resource.capacity}</span>
       <span className={styles.colMenu}>
-        {menuItems.length > 0 ? (
-          <>
-            <MoreAction
-              label={`「${resource.name}」のそのほかの操作`}
-              aria-expanded={open}
-              onClick={() => setOpen((current) => !current)}
-              className={styles.rowMenuButton}
-            />
-            <ActionMenu
-              open={open}
-              inline
-              ariaLabel={`「${resource.name}」の操作`}
-              onClose={() => setOpen(false)}
-              items={menuItems}
-            />
-          </>
-        ) : null}
+        <RowMenu
+          appearance="plain"
+          className={styles.rowMenuButton}
+          label={`「${resource.name}」のそのほかの操作`}
+          menuLabel={`「${resource.name}」の操作`}
+          items={menuItems}
+        />
       </span>
       {error ? <p className="text-danger w-full text-xs" role="alert">{error}</p> : null}
       <ResourceDialog
@@ -504,6 +494,20 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
   const [checkError, setCheckError] = useState<string | null>(null)
   const [result, setResult] = useState<BookingSlotCheckResult | null>(null)
   const requestRef = useRef(0)
+  /* WEB054：条件・アカウントを変えたら、確かめている途中の結果を捨てる（古い条件の結果を新しい条件の下に出さない）。 */
+  const changeCriteria = () => {
+    requestRef.current += 1
+    setResult(null)
+    setChecking(false)
+    setCheckError(null)
+  }
+
+  useEffect(() => {
+    requestRef.current += 1
+    setResult(null)
+    setChecking(false)
+    setCheckError(null)
+  }, [accountId])
 
   useEffect(() => {
     let cancelled = false
@@ -552,7 +556,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
         <Select size="full"
           aria-label="確かめるメニュー"
           value={menuId}
-          onChange={(value) => { setMenuId(value); setResult(null) }}
+          onChange={(value) => { setMenuId(value); changeCriteria() }}
           options={[
             ...(activeMenus.length === 0 ? [{ value: '', label: '受付中のメニューがありません' }] : []),
             ...activeMenus.map((menu) => ({ value: menu.id, label: menu.name })),
@@ -560,16 +564,16 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
         />
         <label className={styles.fieldLabel}>
           日付
-          <DateField aria-label="確かめる日付" value={date} onChange={(value) => { setDate(value); setResult(null) }} className="mt-1" />
+          <DateField aria-label="確かめる日付" value={date} onChange={(value) => { setDate(value); changeCriteria() }} className="mt-1" />
         </label>
         <label className={styles.fieldLabel}>
           開始時刻
-          <TimeField aria-label="確かめる開始時刻" value={time} onChange={(value) => { setTime(value); setResult(null) }} className="mt-1" />
+          <TimeField aria-label="確かめる開始時刻" value={time} onChange={(value) => { setTime(value); changeCriteria() }} className="mt-1" />
         </label>
         <Select size="full"
           aria-label="確かめる担当"
           value={staffId}
-          onChange={(value) => { setStaffId(value); setResult(null) }}
+          onChange={(value) => { setStaffId(value); changeCriteria() }}
           options={[
             { value: '', label: '担当：指名なし' },
             ...staffOptions.map((person) => ({ value: person.id, label: `担当：${person.display_name}` })),

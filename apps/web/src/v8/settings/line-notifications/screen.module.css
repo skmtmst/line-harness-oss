@@ -251,3 +251,211 @@
 .previewBrand {
   letter-spacing: var(--tpl-sb-ln-brand-track);
 }
+
+/*
+ * 運用者へのお知らせ（u8xibp）：数のマスは印つき（内側 16/20・間 8・数 22/26・題 12/18）。
+ * 帯は印なし。探す 260・並び 150。表はお知らせ・きっかけ・受け取る人・送る時間・今日・状態・操作。
+ */
+.opKpis {
+  gap: var(--tpl-sb-group-gap);
+}
+
+:global([data-theme='v8']) .opKpis > [data-design-version] {
+  gap: var(--tpl-rest3-op-kpi-gap);
+  padding: var(--tpl-rest3-op-kpi-pad);
+}
+
+:global([data-theme='v8']) .opKpis > [data-design-version] > :first-child,
+:global([data-theme='v8']) .opKpis > [data-design-version] > :first-child > p {
+  font-size: var(--tpl-rest3-op-kpi-title);
+  line-height: var(--tpl-rest3-op-kpi-title-lh);
+}
+
+:global([data-theme='v8']) .opKpis > [data-design-version] > :last-child {
+  font-size: var(--tpl-rest3-op-kpi-title);
+  line-height: var(--tpl-rest3-op-kpi-title-lh);
+}
+
+:global([data-theme='v8']) .opKpis [data-kpi-number] {
+  font-size: var(--tpl-rest3-op-kpi-num);
+  line-height: var(--tpl-rest3-op-kpi-num-lh);
+}
+
+.opBand {
+  padding: var(--tpl-rest3-op-band-pad);
+}
+
+.opSearch {
+  width: var(--tpl-rest3-op-search-w);
+  max-width: 100%;
+}
+
+.opSort {
+  width: var(--tpl-rest3-op-sort-w);
+}
+
+.opSearch :global(*),
+.opSort :global(*) {
+  max-width: 100%;
+}
+
+.opRow {
+  display: grid;
+  grid-template-columns: var(--tpl-rest3-op-cols);
+  align-items: center;
+  column-gap: var(--tpl-sb-ec-gap);
+  padding: var(--tpl-rest3-op-row-pad);
+  box-shadow: var(--tpl-sb-line-top);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sb-tbl-head);
+  line-height: var(--tpl-sb-ec-lh);
+}
+
+.opRow.headRow {
+  padding: var(--tpl-rest3-op-head-pad);
+}
+
+.opName {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.opNameLink {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-ink);
+  font-weight: 600;
+  word-break: normal;
+}
+
+.opNameLink:hover { text-decoration: underline; }
+
+.opSub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-sb-row-sub);
+  line-height: var(--tpl-sb-row-sub-lh);
+}
+
+.opNum {
+  padding-right: var(--tpl-rest3-op-num-pad);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.opActions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+.status[data-tone='danger'] { background: var(--color-status-danger-soft); color: var(--color-danger); }
+
+/*
+ * 送れなかったもの（DrwMm）・記録（PZBVb）：探す 300・対象 150・期間 136。
+ * 表は日時・お知らせ・対象者・状態・理由・対応・試行・クリック（1行 53）。
+ */
+.runSearch {
+  width: var(--tpl-rest3-run-search-w);
+  max-width: 100%;
+}
+
+.runRecipient {
+  width: var(--tpl-rest3-op-sort-w);
+}
+
+.runPeriod {
+  width: var(--tpl-rest3-run-period-w);
+}
+
+.runSearch :global(*),
+.runRecipient :global(*),
+.runPeriod :global(*) {
+  max-width: 100%;
+}
+
+.runSpacer {
+  flex: 1;
+}
+
+.runRow {
+  display: grid;
+  grid-template-columns: var(--tpl-rest3-run-cols);
+  align-items: center;
+  column-gap: var(--tpl-sb-ec-gap);
+  padding: var(--tpl-rest3-run-row-pad);
+  box-shadow: var(--tpl-sb-line-top);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sb-tbl-head);
+  line-height: var(--tpl-sb-ec-lh);
+}
+
+.runRow.headRow {
+  padding: var(--tpl-rest3-op-head-pad);
+}
+
+.runWhen {
+  align-self: start;
+}
+
+.runWho {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.runOpen {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.runOpen:hover { text-decoration: underline; }
+.runOpen:focus-visible { outline: var(--tpl-sb-focus-ring); }
+
+.runFoot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+.runDetail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+.runAttempts {
+  margin: 0;
+  padding-left: var(--tpl-rest3-run-list-indent);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sb-row-sub);
+  line-height: var(--tpl-sb-row-sub-lh);
+}
+
+.runWhoCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-row-sub-gap);
+  min-width: 0;
+}
+
+.opRow.headRow > span,
+.runRow.headRow > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

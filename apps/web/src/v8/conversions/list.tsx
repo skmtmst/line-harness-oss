@@ -23,7 +23,6 @@ import {
   Eye,
   FilePen,
   Inbox,
-  MoreHorizontal,
   Pause,
   Play,
   Plus,
@@ -37,7 +36,6 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
@@ -46,8 +44,10 @@ import Select from '@/components/shared/select'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -1035,6 +1035,8 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                     onClick={() => setPanelId((currentId) => (currentId === point.id ? null : point.id))}
                   >
                     <Td className={styles.colName}>
+                      {/* 名前の前にフォルダの丸（成果地点はまだフォルダの口が無いので未分類の輪）。札は名前の頭にそろえる。 */}
+                      <FolderDotName folder={null}>
                       <button
                         type="button"
                         className={styles.nameButton}
@@ -1045,7 +1047,8 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                       >
                         {point.name}
                       </button>
-                      <StatePill point={point} />
+                      </FolderDotName>
+                      <span className={styles.pillIndent}><StatePill point={point} /></span>
                     </Td>
                     <Td className={styles.colTrigger}>
                       <span className={styles.cellMain} title={sourceTriggerLabel(point)}>{shortTrigger(point)}</span>
@@ -1064,19 +1067,10 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                         {canEdit
                           ? <Button href={addUsageHref(point)}>使う場所を足す</Button>
                           : <span className={styles.opsSpace} aria-hidden="true" />}
-                        <IconButton
-                          title={menuLabel}
-                          aria-label={menuLabel}
-                          aria-haspopup="menu"
-                          aria-expanded={openMenuId === point.id}
-                          onClick={() => setOpenMenuId((currentId) => (currentId === point.id ? null : point.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
-                        <ActionMenu
+                        <RowMenu
+                          label={menuLabel}
                           open={openMenuId === point.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={menuLabel}
+                          onOpenChange={(next) => setOpenMenuId(next ? point.id : null)}
                           items={rowMenuItems(point).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
                         />
                       </div>

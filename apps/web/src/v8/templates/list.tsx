@@ -30,7 +30,6 @@ import {
   List,
   Mail,
   MessageSquare,
-  MoreHorizontal,
   Plus,
   Send,
   SquareArrowOutUpRight,
@@ -53,7 +52,7 @@ import { ListPage } from '@/components/templates'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
+import { RowMenu } from '@/components/shared/row-actions'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
@@ -68,6 +67,7 @@ import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { exampleHref, loadTemplateExamples, type TemplateExample } from './examples'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
@@ -159,11 +159,11 @@ const KIND_CARDS: Array<{
   href: string
 }> = [
   { key: 'message', title: 'メッセージ', icon: MessageSquare, desc: 'テキスト・カード型・画像。差し込みも使える', useFor: 'いちばんよく使う', cannot: 'できない：答えを集める（→ 質問・リサーチ）', href: '/templates/edit' },
-  { key: 'card_message', title: 'カルーセル', icon: GalleryHorizontalEnd, desc: '横にめくるカードを最大10枚', useFor: '商品の紹介に', cannot: 'できない：1枚の画像を面に分ける（→ リッチメッセージ）', href: '/templates/carousel' },
+  { key: 'card_message', title: 'カルーセル', icon: GalleryHorizontalEnd, desc: '横にめくるカードを最大10枚', useFor: '商品の紹介に', cannot: 'できない：1枚の画像を面に分ける（→ リッチ）', href: '/templates/carousel' },
   { key: 'rich_message', title: 'リッチメッセージ', icon: ImageIcon, desc: '1枚の画像を面に分けて、押すと動く', useFor: 'キャンペーンの告知に', cannot: 'できない：文字だけの本文（→ メッセージ）', href: '/templates/edit?kind=rich_message' },
   { key: 'question', title: '質問', icon: HelpCircle, desc: 'ボタンで答えてもらい、答えでタグなどを付ける', useFor: '好みを聞くときに', cannot: 'できない：何問も続けて聞く（→ リサーチ）', href: '/templates/questions/new' },
   { key: 'coupon', title: 'クーポン', icon: Ticket, desc: '期間・回数・抽選を決めて配る', useFor: '来店・購入のきっかけに', cannot: 'できない：本文を自由に組む（→ メッセージ）', href: '/templates/edit?kind=coupon' },
-  { key: 'research', title: 'リサーチ', icon: ClipboardList, desc: 'いくつかの質問にまとめて答えてもらう', useFor: '満足度調査に', cannot: 'できない：答えごとにタグを付ける（→ 質問）', href: '/templates/edit?kind=research' },
+  { key: 'research', title: 'リサーチ', icon: ClipboardList, desc: 'いくつかの質問にまとめて答えてもらう', useFor: '満足度の調査に', cannot: 'できない：答えですぐタグを付ける（→ 質問）', href: '/templates/edit?kind=research' },
 ]
 
 /** 検索欄と検索対象を、大小文字・全半角・空白の違いで外れない形へそろえる。 */
@@ -262,6 +262,21 @@ export default function TemplatesListV8() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  /* 見本から作る（F-5）。窓を初めて開いたときに1回だけ読む。読めなければ段を出さない。 */
+  const [examples, setExamples] = useState<TemplateExample[] | null>(null)
+  const examplesRequested = useRef(false)
+  useEffect(() => {
+    if (!pickerOpen || examplesRequested.current) return
+    examplesRequested.current = true
+    let cancelled = false
+    loadTemplateExamples()
+      .then((items) => { if (!cancelled) setExamples(items) })
+      .catch(() => {
+        examplesRequested.current = false
+        if (!cancelled) setExamples([])
+      })
+    return () => { cancelled = true }
+  }, [pickerOpen])
   const [savedMenuOpen, setSavedMenuOpen] = useState(false)
   const savedAnchorRef = useRef<HTMLElement | null>(null)
 
@@ -888,13 +903,14 @@ export default function TemplatesListV8() {
     </Button>
   )
 
+  const selectCategory = (id: string) => {
+    setSelectedCategory(id)
+    setPage(1)
+  }
   const folderPanel = (
     <FolderPanel
       activeId={selectedCategory}
-      onSelect={(id) => {
-        setSelectedCategory(id)
-        setPage(1)
-      }}
+      onSelect={selectCategory}
       onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
       addFolderLabel="フォルダを追加"
       rows={folderRows}
@@ -1205,19 +1221,11 @@ export default function TemplatesListV8() {
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                       {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。 */}
                       <div className={styles.menuBox}>
-                        <IconButton
-                          title={`テンプレート「${t.name}」の操作`}
-                          aria-label={`テンプレート「${t.name}」の操作`}
-                          aria-expanded={openMenuId === t.id}
-                          onClick={() => setOpenMenuId((current) => (current === t.id ? null : t.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
-                        <ActionMenu
-                          open={openMenuId === t.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={`テンプレート「${t.name}」の操作`}
+                        <RowMenu
+                          label={`テンプレート「${t.name}」の操作`}
                           items={rowMenuItems(t)}
+                          open={openMenuId === t.id}
+                          onOpenChange={(next) => setOpenMenuId(next ? t.id : null)}
                         />
                       </div>
                     </Td>
@@ -1314,42 +1322,74 @@ export default function TemplatesListV8() {
   const overlays = (
     <>
       {savedMenu}
-      {/* 種類を選ぶ窓（`R9XUMr`）。 */}
+      {/*
+        種類を選ぶ窓（`R9XUMr`）：6つの種類（3つずつ2段）と「見本から作る」（F-5）、下に真ん中のキャンセル。
+        窓の頭は絵の値（上と左右 24・題の行 24）、キャンセルは本文の続きに置く（絵は線なし・間 20）。
+      */}
       <Dialog
         open={pickerOpen}
         title="どの種類を作りますか"
         designNode="R9XUMr"
+        designWidth={840}
+        designTop={200}
+        designHeaderPadding="24px 24px 0"
+        designHeaderHeight={48}
         onCancel={() => setPickerOpen(false)}
-        footer={
-          <div className={styles.centerFooter}>
+        footer={<></>}
+      >
+        <div className={styles.picker}>
+          <div className={styles.pickerGrid}>
+            {KIND_CARDS.map((card) => (
+              <button
+                key={card.key}
+                type="button"
+                className={styles.kindCard}
+                onClick={() => {
+                  setPickerOpen(false)
+                  router.push(card.href)
+                }}
+              >
+                <span className={styles.kindIcon}>
+                  <card.icon size={16} aria-hidden="true" />
+                </span>
+                <span className={styles.kindTitle}>{card.title}</span>
+                <span className={styles.kindDesc}>{card.desc}</span>
+                <span className={styles.kindSpacer} aria-hidden="true" />
+                <span className={styles.kindMeta}>
+                  <span>{card.useFor}</span>
+                  <span>{card.cannot}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          {examples && examples.length > 0 ? (
+            <section className={styles.examples} aria-label="見本から作る">
+              <h3 className={styles.examplesTitle}>見本から作る</h3>
+              <div className={styles.exampleRow}>
+                {examples.slice(0, 4).map((example) => (
+                  <button
+                    key={example.id}
+                    type="button"
+                    className={styles.exampleCard}
+                    title={example.body}
+                    onClick={() => {
+                      setPickerOpen(false)
+                      router.push(exampleHref(example))
+                    }}
+                  >
+                    <span className={styles.exampleName}>{example.name}</span>
+                    {/* 見本はどれも文字のメッセージ（口が返すのは名前と本文だけ）。 */}
+                    <span className={styles.exampleKind}>メッセージ</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+          <div className={styles.pickerFooter}>
             <Button type="button" variant="secondary" onClick={() => setPickerOpen(false)}>
               キャンセル
             </Button>
           </div>
-        }
-      >
-        <div className={styles.pickerGrid}>
-          {KIND_CARDS.map((card) => (
-            <button
-              key={card.key}
-              type="button"
-              className={styles.kindCard}
-              onClick={() => {
-                setPickerOpen(false)
-                router.push(card.href)
-              }}
-            >
-              <span className={styles.kindIcon}>
-                <card.icon size={16} aria-hidden="true" />
-              </span>
-              <span className={styles.kindTitle}>{card.title}</span>
-              <span className={styles.kindDesc}>{card.desc}</span>
-              <span className={styles.kindMeta}>
-                <span>{card.useFor}</span>
-                <span>{card.cannot}</span>
-              </span>
-            </button>
-          ))}
         </div>
       </Dialog>
 
@@ -1739,6 +1779,7 @@ export default function TemplatesListV8() {
           ))}
         </KpiBand>
       }
+      folderNav={narrow ? undefined : { rows: folderRows, activeId: selectedCategory, onSelect: selectCategory, createAction: createButton(false) }}
       folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={listPager}

@@ -21,7 +21,7 @@ import Checkbox from '@/components/shared/checkbox'
 import ColorWell from '@/components/shared/color-well'
 import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
-import { TextArea, TextInput } from '@/components/shared/form-controls'
+import { TextArea, TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import MediaPickerDialog from './media-picker'
@@ -43,6 +43,8 @@ const RADIUS_LABEL: Record<FormCornerRadius, string> = { none: '角ばった', m
 type Props = {
   options: FormOptions
   accountId: string | null
+  /** 統括のひな形（host.ts）：背景の画像・リンクの見え方は置き場が無い（配った先で決める）。 */
+  portable?: boolean
   name: string
   nameError: string | null
   description: string
@@ -103,7 +105,7 @@ export function AppearanceTab(props: Props) {
         {options.totalLimit?.enabled ? (
           <div className={styles.limitRow}>
             <label className={styles.fieldLabel} htmlFor="fe-total-limit">締め切る件数</label>
-            <TextInput
+            <TextField
               id="fe-total-limit"
               type="number"
               min={1}
@@ -122,11 +124,11 @@ export function AppearanceTab(props: Props) {
           <Checkbox checked={options.confirmDialog?.enabled ?? false} onCheckedChange={(enabled) => onChangeOptions({ confirmDialog: { ...options.confirmDialog, enabled } })}>送る前に確認の画面を出す</Checkbox>
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="fe-deadline-message">期限を過ぎた人に出す文</label>
-            <TextInput id="fe-deadline-message" value={options.deadline?.message ?? ''} placeholder="受付は終了しました" onChange={(e) => onChangeOptions({ deadline: { ...options.deadline, enabled: options.deadline?.enabled ?? false, message: e.target.value } })} />
+            <TextField id="fe-deadline-message" value={options.deadline?.message ?? ''} placeholder="受付は終了しました" onChange={(e) => onChangeOptions({ deadline: { ...options.deadline, enabled: options.deadline?.enabled ?? false, message: e.target.value } })} />
           </div>
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="fe-page-title">ページの題名（LINE の上に出る）</label>
-            <TextInput id="fe-page-title" value={options.pageTitle ?? ''} placeholder="回答フォーム" onChange={(e) => onChangeOptions({ pageTitle: e.target.value || null })} />
+            <TextField id="fe-page-title" value={options.pageTitle ?? ''} placeholder="回答フォーム" onChange={(e) => onChangeOptions({ pageTitle: e.target.value || null })} />
           </div>
         </div>
 
@@ -169,7 +171,7 @@ export function AppearanceTab(props: Props) {
           </div>
         </div>
 
-        <div className={styles.subBox}>
+        {props.portable ? null : <div className={styles.subBox}>
           <h3 className={styles.subTitle}>背景とリンクの見え方</h3>
           <div className={styles.tight}>
             <span className={styles.inlineButtons}>
@@ -184,7 +186,7 @@ export function AppearanceTab(props: Props) {
               <Link2 size={14} aria-hidden="true" />
             </button>
           </div>
-        </div>
+        </div>}
 
         <div className={styles.cardHeadText}>
           <h2 className={styles.cardTitle}>ボタンの言葉</h2>
@@ -195,9 +197,9 @@ export function AppearanceTab(props: Props) {
           <span>送る</span>
         </div>
         <div className={styles.wordsRow}>
-          <TextInput aria-label="前へボタンの文字" value={options.prevLabel ?? ''} placeholder="前へ" onChange={(e) => onChangeOptions({ prevLabel: e.target.value })} />
-          <TextInput aria-label="次へボタンの文字" value={options.nextLabel ?? ''} placeholder="次へ" onChange={(e) => onChangeOptions({ nextLabel: e.target.value })} />
-          <TextInput aria-label="送るボタンの文字" value={options.submitLabel ?? ''} placeholder="送信する" onChange={(e) => onChangeOptions({ submitLabel: e.target.value })} />
+          <TextField aria-label="前へボタンの文字" value={options.prevLabel ?? ''} placeholder="前へ" onChange={(e) => onChangeOptions({ prevLabel: e.target.value })} />
+          <TextField aria-label="次へボタンの文字" value={options.nextLabel ?? ''} placeholder="次へ" onChange={(e) => onChangeOptions({ nextLabel: e.target.value })} />
+          <TextField aria-label="送るボタンの文字" value={options.submitLabel ?? ''} placeholder="送信する" onChange={(e) => onChangeOptions({ submitLabel: e.target.value })} />
         </div>
       </section>
 
@@ -208,7 +210,7 @@ export function AppearanceTab(props: Props) {
         </div>
         <div className={styles.field}>
           <label className={styles.fieldLabel} htmlFor="fe-name">フォーム名</label>
-          <TextInput id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onChange={(e) => props.onChangeName(e.target.value)} />
+          <TextField id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onChange={(e) => props.onChangeName(e.target.value)} />
           {props.nameError ? <p role="alert" className={styles.fieldError}>{props.nameError}</p> : null}
         </div>
         <div className={styles.field}>
@@ -221,7 +223,7 @@ export function AppearanceTab(props: Props) {
         <div className={styles.dialogFields}>
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="fe-og-title">カードの見出し</label>
-            <TextInput id="fe-og-title" maxLength={80} value={props.ogTitle} onChange={(e) => props.onChangeOgTitle(e.target.value)} />
+            <TextField id="fe-og-title" maxLength={80} value={props.ogTitle} onChange={(e) => props.onChangeOgTitle(e.target.value)} />
           </div>
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="fe-og-desc">カードの説明</label>
@@ -229,7 +231,7 @@ export function AppearanceTab(props: Props) {
           </div>
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="fe-og-image">カードの画像URL</label>
-            <TextInput id="fe-og-image" type="url" inputMode="url" placeholder="https://" value={props.ogImageUrl} invalid={Boolean(ogImageError)} onChange={(e) => props.onChangeOgImageUrl(e.target.value)} />
+            <TextField id="fe-og-image" type="url" inputMode="url" placeholder="https://" value={props.ogImageUrl} invalid={Boolean(ogImageError)} onChange={(e) => props.onChangeOgImageUrl(e.target.value)} />
             {ogImageError ? <p role="alert" className={styles.fieldError}>{ogImageError}</p> : null}
           </div>
           <span>

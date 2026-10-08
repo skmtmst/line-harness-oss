@@ -10,6 +10,8 @@ const dbMocks = {
   getLineAccountScopeEntries: vi.fn(),
   getLineAccountsByIds: vi.fn(),
   getLineAccountListStats: vi.fn(),
+  getLineAccountFoldersByAccountIds: vi.fn(async()=>({})),
+  getLineAccountTag: vi.fn(),
   getLineAccountTagsByAccountIds: vi.fn(async () => ({})),
   getLineAccountById: vi.fn(),
   getLineAccountCredentialHealth: vi.fn(),
@@ -125,6 +127,8 @@ beforeEach(() => {
   lineClientMocks.getFollowersInsight.mockReset();
   lineClientMocks.getFollowerIds.mockReset();
   dbMocks.getAccountSetting.mockResolvedValue(null);
+  dbMocks.getLineAccountFoldersByAccountIds.mockResolvedValue({});
+  dbMocks.getLineAccountTag.mockResolvedValue({id:'folder-1'});
   dbMocks.listLineAccountTags.mockResolvedValue([{id:'tag-own',tenant_id:'tenant-1'}]);
   dbMocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
   dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
@@ -1046,6 +1050,44 @@ describe('POST /api/line-accounts/:id/connection-checks', () => {
     });
   });
 
+  test.each([
+    ['https://stg.example.test/webhook', 'matched'],
+    ['https://alias.example.test/webhook', 'matched'],
+    ['https://alias.example.test/webhook/', 'matched'],
+    ['https://prod.example.test/webhook', 'mismatched'],
+  ] as const)('この Worker の別の入口（%s）に登録された Webhook は %s と判定する', async (registered, expected) => {
+    dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/v2/bot/info')) return Response.json({ displayName: 'テスト' });
+      if (url.endsWith('/v2/bot/channel/webhook/endpoint')) return Response.json({ endpoint: registered, active: true });
+      if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
+      return new Response(null, { status: 404 });
+    }));
+    const app = new Hono<TestEnv>();
+    app.use('*', async (c, next) => {
+      c.set('staff', { id: 'test-staff', name: 'Test', role: 'owner', readOnly: false });
+      c.env = {
+        DB: makeDbStub(),
+        WORKER_PUBLIC_URL: 'https://stg.example.test',
+        WORKER_URL: 'https://stg.example.test',
+        WORKER_ALIAS_URLS: 'https://alias.example.test/, not-a-url',
+      } as unknown as TestEnv['Bindings'];
+      await next();
+    });
+    app.route('/', lineAccounts);
+
+    const res = await requestCheck(app);
+    expect(res.status).toBe(200);
+    const webhook = dbMocks.saveLineAccountConnectionChecks.mock.calls[0][1].checks
+      .find((check: { kind: string }) => check.kind === 'webhook_endpoint');
+    expect(webhook).toMatchObject({
+      result: expected,
+      expectedUrl: 'https://stg.example.test/webhook',
+      registeredUrl: registered,
+    });
+  });
+
   test('統括画面の管理者も接続情報を更新できる', async () => {
     const res = await requestCheck(setupApp('admin'));
 
@@ -1163,7 +1205,18 @@ describe('PATCH /api/line-accounts/hierarchy', () => {
 });
 
 describe('GET /api/line-accounts', () => {
-  test('資格情報は末尾4文字と更新日だけを返す', async () => {
+  test('フォルダの色と1所属を返し、フォルダと未分類で一覧を絞る',async()=>{
+    dbMocks.getLineAccounts.mockResolvedValue([{...fakeAccount,folder_id:'folder-1'},{...fakeAccount,id:'acc-2',channel_id:'2',folder_id:null}]);
+    const f={id:'folder-1',name:'渋谷',color:'#2f6fde',kind:'line_account',parentId:null};
+    dbMocks.getLineAccountFoldersByAccountIds.mockResolvedValue({'acc-1':f});
+    const app=setupApp();
+    const list=await app.request('/api/line-accounts?folderId=folder-1',{}, {DB:makeDbStub()} as any);
+    expect(list.status).toBe(200);const result=await list.json() as any;
+    expect(result.data).toHaveLength(1);expect(result.data[0]).toMatchObject({folderId:'folder-1',folder:f});
+    const unclassified=await app.request('/api/line-accounts?folderId=__none__',{}, {DB:makeDbStub()} as any);
+    expect((await unclassified.json() as any).data.map((a:any)=>a.id)).toEqual(['acc-2']);
+  });
+  test('資格情報は末尾4文字と更新日だけを返す' , async () => {
     dbMocks.getLineAccounts.mockResolvedValue([{
       ...fakeAccount,
       channel_access_token: 'full-access-token',

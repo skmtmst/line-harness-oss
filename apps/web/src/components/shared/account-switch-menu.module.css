@@ -1,0 +1,139 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/* ★V8 上の帯の切り替えを開いた一覧（絵 DIHFx/Psg7n）。値は globals.css の --tpl-hq2-*。 */
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: var(--tpl-hq2-switch-w);
+  padding: var(--tpl-hq2-switch-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-float);
+}
+
+.hqRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq2-switch-gap);
+  width: 100%;
+  padding: var(--tpl-hq2-switch-hq-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.hqRow:hover,
+.row:hover {
+  background: var(--color-table-head);
+}
+
+.hqRow:focus-visible,
+.row:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: -2px;
+}
+
+.hqIcon,
+.hqArrow {
+  flex-shrink: 0;
+  width: var(--tpl-hq2-switch-icon);
+  height: var(--tpl-hq2-switch-icon);
+  color: var(--color-ink-secondary);
+}
+
+.hqText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hqTitle {
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-hq2-switch-title-lh);
+}
+
+.hqSub {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq2-switch-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rule {
+  height: 1px;
+  margin: var(--tpl-hq2-switch-rule-margin);
+  background: var(--color-hairline);
+}
+
+.heading {
+  margin: 0;
+  padding: var(--tpl-hq2-switch-heading-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq2-switch-sub-lh);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq2-switch-gap);
+  width: 100%;
+  height: var(--tpl-hq2-switch-row-h);
+  padding: var(--tpl-hq2-switch-row-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowSelected,
+.rowSelected:hover {
+  background: var(--color-accent-soft);
+  font-weight: 700;
+}
+
+.mark {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-hq2-switch-mark);
+  height: var(--tpl-hq2-switch-mark);
+  border-radius: var(--radius-control);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-nano);
+  font-weight: 700;
+}
+
+.name {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check {
+  flex-shrink: 0;
+  width: var(--tpl-hq2-switch-icon);
+  height: var(--tpl-hq2-switch-icon);
+  color: var(--color-accent-deep);
+}
+}

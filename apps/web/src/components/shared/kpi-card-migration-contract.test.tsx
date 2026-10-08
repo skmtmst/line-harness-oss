@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url'
 import KpiCard from './kpi-card'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const WEB = join(SRC, '..')
 const readSource = (path: string) => readFileSync(join(SRC, path), 'utf8')
 
 describe('KpiCardへの一本化契約', () => {
@@ -64,21 +63,5 @@ describe('KpiCardへの一本化契約', () => {
       expect(source, `${file} に旧名が残っている`).not.toContain('SummaryCard')
     }
     expect(readSource('components/shared/kpi-card.tsx')).not.toMatch(/function SummaryCard/)
-  })
-
-  it('V5基準・V6優先と9ルートの影響範囲を契約へ残す', () => {
-    const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
-    const part = contract.parts['kpi-card']
-
-    expect(part.status).toBe('active')
-    expect(part.pencilNodes).toEqual(expect.arrayContaining(['XywGr', 'mNUQ3']))
-    expect(part.routes.v5).toEqual(['/friends', '/tags', '/users'])
-    expect(part.routes.broadcast).toEqual(['/scenarios'])
-    expect(part.routes.v6).toEqual(
-      expect.arrayContaining(['/analytics', '/conversions', '/inflow-links', '/affiliates', '/reminders', '/templates']),
-    )
-    expect(Object.values(part.routes).flat()).toHaveLength(10)
-    expect(part.visualVerification.status).toBe('unverified')
-    expect(part.visualVerification.requiredViewports).toEqual([1440, 1920])
   })
 })

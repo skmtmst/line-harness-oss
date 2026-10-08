@@ -5,13 +5,13 @@
  * 状態の札・空と失敗の1枚・行の「…」）。形は一覧の型と共通部品に任せ、
  * ここは並べ方だけを持つ。
  */
-import { useState, type ReactNode } from 'react'
-import { Bookmark, MoreHorizontal, TriangleAlert } from 'lucide-react'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ReactNode } from 'react'
+import { Bookmark, TriangleAlert } from 'lucide-react'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
+import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import styles from './affiliates.module.css'
@@ -174,20 +174,10 @@ export function RetryButton({ onRetry }: { onRetry: () => void }) {
 
 /** 行の右端の「…」。メニューの目印が行を1段増やさないよう箱で包む。 */
 export function RowMenu({ label, items }: { label: string; items: ActionMenuItem[] }) {
-  const [open, setOpen] = useState(false)
   if (items.length === 0) return null
   return (
     <span className={styles.menuBox}>
-      <IconButton
-        aria-label={label}
-        title={label}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </IconButton>
-      <ActionMenu open={open} ariaLabel={label} onClose={() => setOpen(false)} items={items} />
+      <SharedRowMenu label={label} items={items} />
     </span>
   )
 }

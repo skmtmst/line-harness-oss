@@ -23,12 +23,12 @@ describe('V8 オートメーション3板の印', () => {
   })
 
   it('下書き仕上げの外枠に J1VA8 を付ける', () => {
-    const draft = read('drafts/draft-v8.tsx')
-    expect(draft, '下書き仕上げの板が無い').toContain('data-design-node="J1VA8"')
+    const draft = read('../../v8/automations/create/create.tsx')
+    expect(draft, '下書き仕上げの板が無い').toContain("isDraft ? 'J1VA8'")
   })
 
   it('下書き仕上げに「1人で試す」を置く（F-15）', () => {
-    const draft = read('drafts/draft-v8.tsx')
+    const draft = read('../../v8/automations/create/create.tsx')
     expect(draft, 'F-15 の試しが無い').toContain('1人で試す')
   })
 

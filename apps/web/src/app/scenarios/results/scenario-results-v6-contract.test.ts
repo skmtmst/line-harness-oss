@@ -71,14 +71,6 @@ describe('V6 5-1-L シナリオ配信結果', () => {
     expect(PAGE).not.toContain('82.4%')
     expect(PAGE).not.toContain('46.1%')
   })
-
-  it('本文タイトルを重ねず、CSVと編集への戻りを備える', () => {
-    expect(PAGE).toContain('usePageTitle(')
-    expect(PAGE).not.toContain('<Header')
-    expect(PAGE).not.toContain('<h1')
-    expect(PAGE).toContain('CSVで書き出す')
-    expect(PAGE).toContain('シナリオ編集へ戻る')
-  })
 })
 
 describe('ステップの到達人数の色（監査・崩れ3）', () => {

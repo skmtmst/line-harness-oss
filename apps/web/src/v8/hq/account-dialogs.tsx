@@ -6,94 +6,27 @@
  * 読み書きの口・本人確認は v7（app/hq/account-settings-dialogs.tsx）と同じ（import できないので写した）。
  * 設定の窓だけ、見た目を絵 `HMpVx` どおりに組み直した。
  */
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { CircleDot, Star, TrendingUp, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CircleHelp, RotateCcw, Users } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
-import { otpDigits, otpFailureMessage } from '@/components/shared/otp-input'
+import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import Button from '@/components/shared/button'
-import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import { api, type LineAccountTag } from '@/lib/api'
+import { api } from '@/lib/api'
+import type { Folder } from '@line-crm/shared'
 import type { AccountWithStats } from '@/contexts/account-context'
 import head from './dialog-head.module.css'
 import styles from './account-dialogs.module.css'
+import { FALLBACK_REASON, connectionReasons, lineHandle } from './connection-reasons'
 
 /** 絵 `HMpVx` の窓の幅と上からの位置（px）。 */
 const SETTINGS_WIDTH = 560
 const SETTINGS_TOP = 200
-
-/* 6桁コードの升。貼り付けに対応し、動きは付けない（HANDOFF §8）。 */
-function CodeBoxes({ value, onChange, onComplete, disabled, invalid = false, label }: {
-  value: string
-  onChange: (next: string) => void
-  /** 6桁そろった瞬間に1回（送るボタンを押させない。動きの点検・6）。 */
-  onComplete?: (code: string) => void
-  disabled?: boolean
-  /** 違った。6桁を消して1枠目へ戻す。 */
-  invalid?: boolean
-  label: string
-}) {
-  const boxes = useRef<Array<HTMLInputElement | null>>([])
-  const write = (next: string) => {
-    const clean = otpDigits(next).slice(0, 6)
-    onChange(clean)
-    if (clean.length === 6 && value.length !== 6 && !disabled) onComplete?.(clean)
-  }
-  useEffect(() => {
-    if (!invalid) return
-    onChange('')
-    boxes.current[0]?.focus()
-    // 違ったと分かった瞬間だけ。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invalid])
-  const setDigit = (index: number, raw: string) => {
-    if (raw === '') {
-      onChange(value.slice(0, index) + value.slice(index + 1))
-      if (index > 0) boxes.current[index - 1]?.focus()
-      return
-    }
-    // 全角の数字は半角に。自動入力で1枠に6桁まとめて来たら、全部の枠へ振り分ける。
-    const digits = otpDigits(raw)
-    if (!digits) return
-    if (digits.length > 1) {
-      write(value.slice(0, index) + digits)
-      boxes.current[Math.min(index + digits.length, 5)]?.focus()
-      return
-    }
-    write(value.slice(0, index) + digits + value.slice(index + 1))
-    if (index < 5) boxes.current[index + 1]?.focus()
-  }
-  return (
-    <div className={styles.codeBoxes} role="group" aria-label={label}>
-      {[0, 1, 2, 3, 4, 5].map((index) => (
-        <input
-          key={index}
-          ref={(node) => { boxes.current[index] = node }}
-          className={styles.codeBox}
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          value={value[index] ?? ''}
-          disabled={disabled}
-          aria-invalid={invalid || undefined}
-          aria-label={`${label}${index + 1}文字目`}
-          onChange={(event) => setDigit(index, event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Backspace' && !value[index] && index > 0) boxes.current[index - 1]?.focus()
-          }}
-          onPaste={(event) => {
-            const pasted = otpDigits(event.clipboardData.getData('text')).slice(0, 6)
-            if (!pasted) return
-            event.preventDefault()
-            write(pasted)
-            boxes.current[Math.min(pasted.length, 5)]?.focus()
-          }}
-        />
-      ))}
-    </div>
-  )
-}
+/** 絵 `D6ljr`・`HFsO9` の窓の幅と上からの位置（px）。 */
+const ARCHIVE_WIDTH = 520
+const ARCHIVE_TOP = 240
+const RESTORE_TOP = 220
 
 async function stepUpToken(code: string): Promise<string> {
   const res = await api.auth.stepUp({ method: 'totp', value: code, purpose: 'line_account.archive' })
@@ -101,12 +34,12 @@ async function stepUpToken(code: string): Promise<string> {
   return res.data.token
 }
 
-/** 窓に出す呼び名。「然 -NEN- 渋谷店（@nen-shibuya）」。 */
+/** 窓に出す呼び名。「然 -NEN- 渋谷店（@nen-shibuya）」。@ は付けて返す（LINE の basicId は @ 付きで来るので二重にしない）。 */
 export function accountHandle(account: AccountWithStats): string {
-  return account.basicId || account.channelId
+  return lineHandle(account)
 }
 
-/* 板 `HMpVx`：アカウントの設定（名前・親・タグ・ほかの設定・アーカイブ）。 */
+/* 板 `HMpVx`：アカウントの設定（名前・親・フォルダ・ほかの設定・アーカイブ）。2026-10-08 タグ→フォルダ（1つだけ・API-17）。 */
 export function AccountSettingsDialogV8({ account, accounts, archived, onClose, onSaved, onArchive, onShowDetails }: {
   account: AccountWithStats
   accounts: AccountWithStats[]
@@ -118,46 +51,19 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
 }) {
   const [name, setName] = useState(account.name)
   const [parent, setParent] = useState('')
-  const [tags, setTags] = useState<LineAccountTag[]>([])
-  const [selectedTags, setSelectedTags] = useState<string[]>(() => (account.tags ?? []).map((tag) => tag.id))
-  const [addingTag, setAddingTag] = useState(false)
-  const [newTagName, setNewTagName] = useState('')
+  const initialFolder = (account as { folderId?: string | null }).folderId ?? ''
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [folderId, setFolderId] = useState<string>(initialFolder)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    void api.lineAccountTags.list().then((res) => {
-      if (!cancelled && res.success && Array.isArray(res.data)) setTags(res.data)
+    void api.lineAccountFolders.list().then((res) => {
+      if (!cancelled && res.success && Array.isArray(res.data?.folders)) setFolders([...res.data.folders].sort((a, b) => a.displayOrder - b.displayOrder))
     }).catch(() => {})
     return () => { cancelled = true }
   }, [])
-
-  const toggleTag = (id: string) => {
-    setSelectedTags((prev) => (prev.includes(id) ? prev.filter((tagId) => tagId !== id) : [...prev, id]))
-  }
-
-  const createTag = async () => {
-    const tagName = newTagName.trim()
-    if (!tagName || busy) return
-    setBusy(true)
-    setError('')
-    try {
-      const res = await api.lineAccountTags.create(tagName)
-      if (!res.success) {
-        setError(res.error)
-        return
-      }
-      setTags((prev) => [...prev, res.data])
-      setSelectedTags((prev) => (prev.includes(res.data.id) ? prev : [...prev, res.data.id]))
-      setNewTagName('')
-      setAddingTag(false)
-    } catch {
-      setError('タグを追加できませんでした。通信を確認して、もう一度お試しください。')
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const save = async () => {
     if (busy) return
@@ -184,13 +90,10 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
           return
         }
       }
-      const before = new Set((account.tags ?? []).map((tag) => tag.id))
-      const after = new Set(selectedTags)
-      const changed = before.size !== after.size || [...after].some((id) => !before.has(id))
-      if (changed) {
-        const res = await api.lineAccountTags.replace(account.id, selectedTags)
+      if (folderId !== initialFolder) {
+        const res = await api.lineAccountFolders.move(account.id, folderId || null)
         if (!res.success) {
-          setError(res.error === 'ACCOUNT_ARCHIVED' ? 'アーカイブ済みのためタグを変えられません。' : res.error)
+          setError(res.error === 'ACCOUNT_ARCHIVED' ? 'アーカイブ済みのためフォルダを変えられません。' : res.error)
           return
         }
       }
@@ -209,7 +112,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
     <Dialog
       open
       title="アカウントの設定"
-      description={`${account.displayName || account.name}（@${accountHandle(account)}）`}
+      description={`${account.displayName || account.name}（${accountHandle(account)}）`}
       designNode="HMpVx"
       designWidth={SETTINGS_WIDTH}
       designTop={SETTINGS_TOP}
@@ -256,45 +159,34 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
             ]}
           />
         </div>
-        <div className={styles.tagField}>
-          <p className={styles.labelRow}><span className={styles.label}>タグ</span><span className={styles.note}>複数つけられます</span></p>
-          <div className={styles.tagRow}>
-            {tags.map((tag) => (
-              <FilterChip
-                key={tag.id}
-                selected={selectedTags.includes(tag.id)}
-                icon={selectedTags.includes(tag.id) ? <CircleDot size={14} aria-hidden="true" /> : <Star size={14} aria-hidden="true" />}
-                disabled={busy}
-                onChange={() => toggleTag(tag.id)}
-              >
-                {tag.name}
-              </FilterChip>
-            ))}
-            {!addingTag ? (
-              <Button type="button" disabled={busy} onClick={() => { setNewTagName(''); setAddingTag(true) }}>タグを追加</Button>
-            ) : null}
-          </div>
-          {addingTag ? (
-            <div className={styles.addRow}>
-              <TextField
-                aria-label="新しいタグの名前"
-                value={newTagName}
-                maxLength={100}
-                disabled={busy}
-                placeholder="例: 渋谷エリア"
-                onChange={(event) => setNewTagName(event.target.value)}
-                className={styles.full}
-              />
-              <Button type="button" onClick={() => void createTag()} disabled={!newTagName.trim() || busy}>追加</Button>
-            </div>
-          ) : null}
-          <p className={styles.note}>タグは アカウント一覧の左の列で絞り込みに使います</p>
+        <div className={styles.field}>
+          <label htmlFor="hq-account-folder" className={styles.label}>フォルダ</label>
+          <Select
+            id="hq-account-folder"
+            aria-label="フォルダ"
+            size="full"
+            value={folderId}
+            disabled={busy}
+            onChange={setFolderId}
+            options={[{ value: '', label: '未分類' }, ...folders.map((item) => ({ value: item.id, label: item.name }))]}
+          />
+          <p className={styles.note}>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</p>
         </div>
+        {!archived && account.connection?.status === 'warn' ? (
+          /* 要確認のときだけ：引っかかった確認ごとの理由（URL は折り返して全文）。 */
+          <div className={styles.field}>
+            <p className={styles.label}>接続の確認</p>
+            <ul className={styles.reasonList} aria-label="要確認の理由">
+              {(connectionReasons(account).length > 0 ? connectionReasons(account).map((reason) => reason.detail) : [FALLBACK_REASON])
+                .map((detail) => <li key={detail}>{detail}</li>)}
+            </ul>
+          </div>
+        ) : null}
         <div className={styles.field}>
           <p className={styles.label}>ほかの設定</p>
           <div className={styles.buttonRow}>
             <Button type="button" onClick={onShowDetails}>
-              <TrendingUp aria-hidden="true" className={styles.icon} />詳しい数値を見る
+              <CircleHelp aria-hidden="true" className={styles.icon} />詳しい数値を見る
             </Button>
             <Button href="/hq/members">
               <Users aria-hidden="true" className={styles.icon} />メンバー・担当範囲
@@ -344,18 +236,23 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
     <Dialog
       open
       title={`「${account.name}」をアーカイブしますか？`}
-      description="一覧から外します。送受信は止まり、友だちと履歴は残ります。あとで「戻す」で戻せます（オーナーのみ）。"
-      tone="destructive"
       designNode="D6ljr"
-      confirmLabel="本人確認してアーカイブする"
+      designWidth={ARCHIVE_WIDTH}
+      designTop={ARCHIVE_TOP}
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void archive()}
       onCancel={onClose}
+      footer={
+        <div className={`${head.footer} ${head.footerEnd}`}>
+          <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
+          <Button type="button" variant="danger" onClick={() => void archive()} disabled={busy} busy={busy} busyLabel="アーカイブ中…">本人確認してアーカイブする</Button>
+        </div>
+      }
     >
-      <div className={styles.stack}>
+      <div className={head.head}>
+        <p className={styles.lead}>一覧から外します。送受信は止まり、友だちと履歴は残ります。あとで「戻す」で戻せます（オーナーのみ）。</p>
         <div className={styles.field}>
-          <label htmlFor="hq-account-archive-reason" className={styles.label}>アーカイブの理由（任意）</label>
+          <label htmlFor="hq-account-archive-reason" className={styles.labelLarge}>アーカイブの理由（任意）</label>
           <TextField
             id="hq-account-archive-reason"
             value={reason}
@@ -367,8 +264,8 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
           />
         </div>
         <div className={styles.field}>
-          <span className={styles.label}>本人確認（認証アプリの6桁）</span>
-          <CodeBoxes value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void archive(entered)} invalid={Boolean(error)} disabled={busy} label="認証コード" />
+          <span className={styles.stepLabel}>本人確認（認証アプリの6桁）</span>
+          <OtpInput visualLabel="認証コード（6桁）" label="認証コード" value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void archive(entered)} invalid={Boolean(error)} busy={busy} />
         </div>
       </div>
     </Dialog>
@@ -412,18 +309,27 @@ export function AccountRestoreDialogV8({ account, onClose, onDone }: {
     <Dialog
       open
       title={`「${account.name}」をアーカイブから戻しますか？`}
-      description="戻した直後は「止まっている」状態です。送受信を始めるときは、アカウントの詳細で「動かす」を押します。"
       designNode="HFsO9"
-      confirmLabel="本人確認して戻す"
+      designWidth={ARCHIVE_WIDTH}
+      designTop={RESTORE_TOP}
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void restore()}
       onCancel={onClose}
+      footer={
+        <div className={`${head.footer} ${head.footerEnd}`}>
+          <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
+          <Button type="button" variant="primary" onClick={() => void restore()} disabled={busy} busy={busy} busyLabel="戻しています…">
+            <RotateCcw aria-hidden="true" className={styles.icon} />本人確認して戻す
+          </Button>
+        </div>
+      }
     >
-      <div className={styles.field}>
-        <span className={styles.label}>本人確認（認証アプリの6桁）</span>
-        <CodeBoxes value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void restore(entered)} invalid={Boolean(error)} disabled={busy} label="認証コード" />
-        <Link href="/hq/members" className={styles.link}>戻すのはオーナー・本人確認のある人だけです</Link>
+      <div className={head.head}>
+        <p className={styles.lead}>戻した直後は「止まっている」状態です。送受信を始めるときは、アカウントの詳細で「動かす」を押します。</p>
+        <div className={styles.field}>
+          <span className={styles.stepLabel}>本人確認（認証アプリの6桁）</span>
+          <OtpInput visualLabel="認証コード（6桁）" label="認証コード" value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void restore(entered)} invalid={Boolean(error)} busy={busy} />
+        </div>
       </div>
     </Dialog>
   )

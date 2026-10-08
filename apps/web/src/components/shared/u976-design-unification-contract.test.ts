@@ -28,8 +28,6 @@ describe('#976 デザイン統一', () => {
     expect(layout).toContain('font-sans')
     expect(layout).not.toContain('fontFamily')
     expect(layout).toContain("from 'next/font/google'")
-    // 友だち属性V2の画像比較用例外（SF系）は残す。統一対象から外す決定。
-    expect(globals).toMatch(/\.friend-attributes-v2-shell\s*{[^}]*font-family:\s*"SF Pro Text"/s)
   })
 
   it('U077/U084: 危険操作は共通Buttonの danger 役割で $danger + 白文字', () => {

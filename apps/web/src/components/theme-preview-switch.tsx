@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Toggle from '@/components/shared/toggle'
+import { adminThemeLocked } from '@/lib/admin-theme-default'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 
 /*
@@ -33,6 +34,8 @@ export function applyAdminTheme(next: 'v7' | 'v8') {
 export default function ThemePreviewSwitch() {
   // null の間は描画しない（SSR と localStorage の差でちらつかないようにする）
   const [theme, setTheme] = useState<'v7' | 'v8' | null>(null)
+  // 既定が v8 の環境（検証環境）は V8 だけ。切り替えは出さない（2026-10-07 オーナー）
+  const locked = adminThemeLocked()
 
   useEffect(() => {
     setTheme(document.documentElement.dataset.theme === 'v8' ? 'v8' : 'v7')
@@ -44,7 +47,7 @@ export default function ThemePreviewSwitch() {
     setTheme(next)
   }
 
-  if (theme === null) return null
+  if (locked || theme === null) return null
 
   return (
     <div data-design="theme-preview" className="rounded-card border-hairline bg-canvas border p-4">

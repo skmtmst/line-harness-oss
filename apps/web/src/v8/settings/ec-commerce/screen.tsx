@@ -12,11 +12,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CircleDot, MoreHorizontal, Plug, Star } from 'lucide-react'
+import { CircleDot, Plug, Star } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -41,6 +41,7 @@ import {
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
+import EcConnector from './connector'
 import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
 
@@ -467,19 +468,12 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                       : null}
                   </span>
                   <span role="cell" className={styles.menuBox}>
-                    <IconButton
-                      title="この行のその他操作"
-                      aria-label="この行のその他操作"
-                      aria-expanded={openMenuId === action.id}
-                      onClick={() => setOpenMenuId((current) => (current === action.id ? null : action.id))}
-                    >
-                      <MoreHorizontal size={16} aria-hidden="true" />
-                    </IconButton>
-                    <ActionMenu
-                      open={openMenuId === action.id}
-                      ariaLabel="この行の操作"
-                      onClose={() => setOpenMenuId(null)}
+                    <RowMenu
+                      label="この行のその他操作"
+                      menuLabel="この行の操作"
                       items={rowMenu(action)}
+                      open={openMenuId === action.id}
+                      onOpenChange={(next) => setOpenMenuId(next ? action.id : null)}
                     />
                   </span>
                 </div>
@@ -586,7 +580,7 @@ export default function EcCommerceScreen({
       <EcTabsV8 accountId={selectedAccountId} active={tab} />
       {tab === 'events' ? <EventsPanel accountId={selectedAccountId} /> : null}
       {tab === 'subscriptions' ? renderSubscriptions?.(selectedAccountId) : null}
-      {tab === 'connector' ? renderConnector?.(selectedAccountId, canEdit) : null}
+      {tab === 'connector' ? (renderConnector ? renderConnector(selectedAccountId, canEdit) : <EcConnector accountId={selectedAccountId} canEdit={canEdit} />) : null}
     </SbSettingsScreen>
   )
 }

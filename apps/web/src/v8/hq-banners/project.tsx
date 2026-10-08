@@ -6,26 +6,27 @@
  *
  * v7 の画面（app/hq/banners/project/page.tsx）と、読み書きの口・1枚ずつ作る繰り返し・
  * 戻ったら続きから動く・失敗時の扱い・`?id=` `?from=` は同じ。見た目だけを絵どおりに一から組んだ：
- * 頭（型 ListPage：題・説明・画像を取り込む・アーカイブする・「…」）→ 左に札と画像のます、右に生成パネル。
+ * 頭（型 ListPage：題・説明／来た道の案内・操作5つ）→ 左に札と画像のます、右に生成パネル。
  *
  * 右の生成パネルは共通の GenerationPanel をそのまま使う。絵（iMnph）は「用途の選ぶ欄・切り抜きの位置・
  * 色2つ・参照画像1枚」の古い形で、2026-10-06 のオーナーの決定（切り替えと切り抜きを置かない・出力サイズの小箱・
  * 色4つ・参照画像3枚・強調）と食い違うため、決定どおりの今のパネルを残した。参照画像を選ぶ窓（承認済み ★BG-C）も同じ。
  */
-import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, MoreHorizontal, Pencil, Sparkles, Star, Upload } from 'lucide-react'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Sparkles, Star, Upload } from 'lucide-react'
+import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
-import ActionMenu from '@/components/shared/action-menu'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
-import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
+import ExportSizeChip from '@/components/hq/banners/export-size-chip'
 import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -33,6 +34,7 @@ import {
   BANNER_MAX_REFERENCE_IMAGES,
   EMPTY_GENERATION_INPUT,
   activeGeneration,
+  exportSizeText,
   inputFromGeneration,
   packedTextLines,
   readFileAsBase64,
@@ -98,7 +100,8 @@ function ProjectInner() {
   const [formBusy, setFormBusy] = useState(false)
   const [formError, setFormError] = useState('')
   const [archiveConfirm, setArchiveConfirm] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
+  // 画像のますの枠（section）が指す見出し。板の `KWlQY` をそのまま見出しに使う。
+  const galleryHeadId = useId()
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   // 参照に選んだ画像の実体。他プロジェクトの画像も選べるので、この一覧に関係なく手元に置く。
@@ -112,6 +115,8 @@ function ProjectInner() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   usePageTitle(project?.name ?? null)
+  // ★V8 パンくずは「ホーム › バナー生成 › プロジェクト名」（絵 `V8-B/iMnph`）。
+  usePageCrumbs([{ label: 'バナー生成', href: '/hq/banners' }])
 
   const loadUsage = useCallback(async () => {
     const res = await api.hqBanners.usage().catch(() => null)
@@ -222,8 +227,16 @@ function ProjectInner() {
       ? 'アーカイブ済みのプロジェクトでは生成できません。復元してからお試しください'
       : validation ?? refusal
 
+  /*
+   * WEB205：作り始める要求が返るまでは、もう一度押せない（連打で別の生成が2つ並ばない）。
+   * 同じ依頼を見分ける鍵を口に渡すのは Codex に依頼（口が鍵を受けない）。
+   */
+  const startingRef = useRef(false)
+  const [starting, setStarting] = useState(false)
   const startGeneration = async () => {
-    if (!project || blockedReason || running) return
+    if (!project || blockedReason || running || startingRef.current) return
+    startingRef.current = true
+    setStarting(true)
     setGenerationError('')
     setActionError('')
     try {
@@ -240,6 +253,9 @@ function ProjectInner() {
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '生成を始められませんでした。')
       void loadUsage()
+    } finally {
+      startingRef.current = false
+      setStarting(false)
     }
   }
 
@@ -302,21 +318,23 @@ function ProjectInner() {
     }
   }
 
-  const deliver = async (image: BannerImage, ids: string[]) => {
+  const deliver = async (image: BannerImage, ids: string[]): Promise<boolean> => {
     setModalBusy(true)
     setModalError('')
     try {
       const res = await api.hqBanners.images.deliver(image.id, ids)
       if (!res.success) throw new Error(res.error)
       replaceImage(res.data.image)
+      return true
     } catch (caught) {
       setModalError(bannerFailureMessage(caught, 'アカウントへの受け渡し'))
+      return false
     } finally {
       setModalBusy(false)
     }
   }
 
-  const removeImage = async (image: BannerImage) => {
+  const removeImage = async (image: BannerImage): Promise<boolean> => {
     setModalBusy(true)
     setModalError('')
     try {
@@ -325,8 +343,10 @@ function ProjectInner() {
       setImages((prev) => prev.filter((i) => i.id !== image.id))
       setOpenImage(null)
       setProject((p) => (p ? { ...p, imageCount: Math.max(p.imageCount - 1, 0) } : p))
+      return true
     } catch (caught) {
       setModalError(bannerFailureMessage(caught, '一覧からの削除'))
+      return false
     } finally {
       setModalBusy(false)
     }
@@ -436,23 +456,14 @@ function ProjectInner() {
   const deliveredCount = images.filter((i) => i.deliveredAccountIds.length > 0).length
   const doneSoFar = running ? running.doneCount + running.failedCount : 0
 
+  /*
+   * 頭の操作は承認済み ★BG-B `qIp42` の `e3LG3u`「操作ボタン群」どおり、5つを横並びで出す
+   * （画像を取り込む／お気に入り／複製／名前と説明を変える／アーカイブ）。
+   * 「…」の畳んだメニューに入れていたが、板はどのボタンも開いた姿で描いている。
+   * `docs/v8-design-rules.md` §1 は「板」＞「共通部品」なので、板に合わせる。
+   */
   const actions = canManage ? (
     <div className={styles.headActions}>
-      <span className={styles.menuBox}>
-        <IconButton aria-label={`${project.name} のほかの操作`} title="ほかの操作" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)} disabled={busy}>
-          <MoreHorizontal size={16} aria-hidden="true" />
-        </IconButton>
-        <ActionMenu
-          open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          ariaLabel={`${project.name} のほかの操作`}
-          items={[
-            { id: 'favorite', label: project.isFavorite ? 'お気に入りから外す' : 'お気に入りにする', icon: <Star size={14} aria-hidden="true" />, onSelect: () => { setMenuOpen(false); void patchProject('お気に入り', { isFavorite: !project.isFavorite }) } },
-            { id: 'duplicate', label: '複製する', icon: <Copy size={14} aria-hidden="true" />, onSelect: () => { setMenuOpen(false); void duplicate() } },
-            { id: 'rename', label: '名前と説明を変える', icon: <Pencil size={14} aria-hidden="true" />, onSelect: () => { setMenuOpen(false); setFormError(''); setFormOpen(true) } },
-          ]}
-        />
-      </span>
       <Button onClick={() => fileRef.current?.click()} disabled={busy || archived || uploading} busy={uploading} busyLabel="取り込み中…">
         <Upload aria-hidden="true" className={styles.icon} />画像を取り込む
       </Button>
@@ -465,41 +476,61 @@ function ProjectInner() {
         aria-hidden="true"
         onChange={(event) => { void takeIn(event.target.files?.[0]); event.target.value = '' }}
       />
+      <Button onClick={() => void patchProject('お気に入り', { isFavorite: !project.isFavorite })} disabled={busy}>
+        <Star aria-hidden="true" className={project.isFavorite ? styles.starOn : styles.icon} />{project.isFavorite ? 'お気に入りから外す' : 'お気に入り'}
+      </Button>
+      <Button onClick={() => void duplicate()} disabled={busy}>
+        <Copy aria-hidden="true" className={styles.icon} />複製
+      </Button>
+      <Button onClick={() => { setFormError(''); setFormOpen(true) }} disabled={busy}>
+        <Pencil aria-hidden="true" className={styles.icon} />名前と説明を変える
+      </Button>
       {archived ? (
         <Button onClick={() => void patchProject('復元', { archived: false })} disabled={busy}>
           <ArchiveRestore aria-hidden="true" className={styles.icon} />復元
         </Button>
       ) : (
         <Button onClick={() => setArchiveConfirm(true)} disabled={busy || Boolean(running)}>
-          <Archive aria-hidden="true" className={styles.icon} />アーカイブする
+          <Archive aria-hidden="true" className={styles.icon} />アーカイブ
         </Button>
       )}
     </div>
   ) : undefined
 
   return (
-    <ListPage boardId={boardId} title={project.name} description={description} actions={actions}>
+    <ListPage boardId={boardId} title={project.name} description={description} actions={actions}
+      crumbs={<Breadcrumb items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />}>
       <div className={styles.body}>
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}
         <div className={styles.split}>
-          <section className={styles.gallery} aria-label="このプロジェクトの画像">
+          <section className={styles.gallery} aria-labelledby={galleryHeadId}>
+            {/*
+              * 見出しの行（承認済み `qIp42` の `KWlQY`「このプロジェクトの画像」・`LWv01`「12枚」・
+              * `h4yzAO`「画像を押すと詳細・アカウントへ渡す」）。板では3つが左から続いて並び、
+              * 絞り込みの札はその下の行（`sc16B`・`TngIp`・`JlVG7`）。
+              */}
+            <div className={styles.galleryHead}>
+              <h3 id={galleryHeadId} className={styles.galleryTitle}>このプロジェクトの画像</h3>
+              <span className={styles.hint}>{`${images.length}枚`}</span>
+              <span className={styles.hint}>画像を押すと詳細・アカウントへ渡す</span>
+            </div>
             <div className={styles.galleryTools}>
               <div role="group" aria-label="画像の絞り込み" className={styles.chips}>
                 <FilterChip selected={filter === 'all'} icon={<Sparkles size={14} aria-hidden="true" />} onChange={() => setFilter('all')}>{`すべて ${images.length}`}</FilterChip>
                 <FilterChip selected={filter === 'favorite'} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>{`お気に入り ${favoriteCount}`}</FilterChip>
                 <FilterChip selected={filter === 'delivered'} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>{`アカウントへ渡し済み ${deliveredCount}`}</FilterChip>
               </div>
-              <span className={styles.spacer} />
-              <span className={styles.hint}>画像を押すと詳細・アカウントへ渡す</span>
             </div>
 
+            {/*
+              * 生成中の注記（承認済み `qIp42` の `k7sbSR`「注記 生成中のとき」）。
+              * 止める操作は下の帯（`An26R` の `CzXI2`「生成をやめる」）だけに置く。
+              * 同じ操作のボタンを2か所に出すと、どちらを押したか分からなくなる。
+              */}
             {running ? (
               <div className={styles.runningBand} role="status" aria-live="polite">
                 <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
                 <span className={styles.runningText}>{`${Math.min(doneSoFar + 1, running.requestedCount)} / ${running.requestedCount} 枚目を作っています。この画面を閉じるとここで止まります（できた枚数は残ります）`}</span>
-                {canManage ? (
-                  <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">止める</Button>
-                ) : null}
               </div>
             ) : null}
             {generationError ? <Notice tone="danger" message={generationError} onClose={() => setGenerationError('')} /> : null}
@@ -509,7 +540,7 @@ function ProjectInner() {
               <ListState
                 kind="empty"
                 title="まだ画像がありません"
-                description="右の生成パネルで用途とテキストを決めて「画像を生成」を押すと、ここに並びます。手持ちの画像は「画像を取り込む」から入れられます。"
+                description="右の生成パネルで用途とテキストを決めて「生成する」を押すと、ここに並びます。手持ちの画像は「画像を取り込む」から入れられます。"
               />
             ) : visible.length === 0 && pendingCount === 0 ? (
               <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => setFilter('all')}>条件を外す</Button>} />
@@ -553,24 +584,67 @@ function ProjectInner() {
                 referenceBusy={referenceBusy}
                 usage={usage}
                 onReloadUsage={loadUsage}
+                /* 承認済み ★BG-B `qIp42` の `ta8eS`「利用量」。この板だけが見出しを持つ。 */
+                usageHeading
               />
-              <Button variant="primary" className={styles.full} onClick={() => void startGeneration()} disabled={busy || Boolean(blockedReason) || Boolean(running)}>
-                {running ? <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} /> : <Sparkles aria-hidden="true" className={styles.icon} />}
-                {running ? '生成中…' : `画像を生成（${input.count}枚）`}
-              </Button>
-              <div className={styles.panelFoot}>
-                <span className={blockedReason && input.presetKey ? styles.warnText : styles.hint}>
-                  {running
-                    ? `${running.requestedCount}枚中 ${running.doneCount}枚できました・今月の残り ${usage?.month.remaining ?? '—'}枚`
-                    : blockedReason && input.presetKey ? blockedReason : usageStatusText(usage, input.count)}
-                </span>
-                <button type="button" className={styles.linkButton} onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy || Boolean(running)}>
-                  条件をクリア
-                </button>
-              </div>
             </div>
           ) : null}
         </div>
+
+        {/*
+          * 下の帯（承認済み ★BG-B `qIp42` → `X2oLn`「下部追従バー」）。
+          * 左=残り枚数 `M118zK`／中=大きさの札 `WDJak`／
+          * 右=`wCvLN`「条件をクリア」＋`abZle` 生成するボタン。
+          * 生成中は `An26R`「帯（生成中）」——`CzXI2`「生成をやめる」＋
+          * `q9hrn`「生成中（押せない）」。
+          *
+          * 2026-10-07: ここをパネルの中（全幅ボタン＋その下の行）に置いていたが、
+          * 絵と配置が違っていた（差し戻し）。v7（app/hq/banners/project/page.tsx）と
+          * 同じ並び・同じ札の部品にそろえた。生成の押し場所は帯だけにする。
+          * 変えられない人（閲覧のみ）には押せないボタンを置かないので帯ごと出さない。
+          */}
+        {canManage ? (
+          <StickyBar
+            /*
+             * 承認済み ★BG-B `qIp42` の帯 `X2oLn` は **枠線つき・高さ72・影なし**。
+             * V8 の既定（★A/M10 の浮かせ）は**別の板**なので、この画面は板どおりに戻す。
+             * 根拠は `docs/v8-design-rules.md` §1「画面ごとに、その板の絵のとおり」。
+             */
+            outlined
+            status={
+              running
+                ? `${running.requestedCount}枚中 ${running.doneCount}枚できました・今月の残り ${usage?.month.remaining ?? '—'}枚`
+                : blockedReason && input.presetKey
+                  ? <span className={styles.warnText}>{blockedReason}</span>
+                  : usageStatusText(usage, input.count)
+            }
+            info={
+              exportSizeText(presets, input.presetKey) ? (
+                <ExportSizeChip text={exportSizeText(presets, input.presetKey)} />
+              ) : undefined
+            }
+            actions={
+              running ? (
+                <>
+                  <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">生成をやめる</Button>
+                  <Button variant="primary" disabled>
+                    <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
+                    生成中… 画面を離れても続きます
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy}>条件をクリア</Button>
+                  <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || starting || Boolean(blockedReason)} busy={starting}>
+                    <Sparkles aria-hidden="true" className={styles.icon} />
+                    {/* 板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。パネルの見出し `S0ay0i`「画像を生成」とは別。 */}
+                    生成する（{input.count}枚）
+                  </Button>
+                </>
+              )
+            }
+          />
+        ) : null}
       </div>
 
       <CreateProjectDialogV8

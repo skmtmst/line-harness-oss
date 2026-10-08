@@ -1,7 +1,7 @@
 'use client'
 
 import { createPortal } from 'react-dom'
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
 export type MenuPortalAlign = 'start' | 'end'
 export type MenuPortalPlacement = 'down' | 'up'
@@ -22,8 +22,22 @@ export type MenuPortalProps = {
   matchWidth?: boolean | 'min'
   /** 外を押した・Esc で閉じるとき。開くボタンの押下は含まない。 */
   onClose: () => void
+  /**
+   * 位置だけ別の箱に合わせるとき（ベルの小窓は上の帯の右端から 8 内側・帯の下）。
+   * 外を押したかの判定は getAnchor のまま（開くボタンの押下は外にしない）。
+   */
+  getPositionRect?: () => MenuPortalRect | null
+  /**
+   * 器そのものに見た目（白地・角丸・浮きの影）を付けるとき（select-menu）。
+   * 子に影を付けると器の overflow に切られるので、影ごと器に持たせる。
+   * 渡したときは続きの影を `--menu-portal-more` で渡す（続きがある間だけ。
+   * class は `[data-has-more='true']` のときに浮きの影と重ねる）。
+   */
+  className?: string
   children: ReactNode
 }
+
+export type MenuPortalRect = Pick<DOMRect, 'top' | 'bottom' | 'left' | 'right' | 'width'>
 
 type Geometry = {
   top: number
@@ -34,6 +48,9 @@ type Geometry = {
   /** 開く方向に使える高さ（画面 − ボタン − 余白8px）。器の最大の高さ。 */
   maxHeight: number
 }
+
+/** 下に続きがあるときの下端の影。 */
+const MORE_SHADOW = 'inset 0 -16px 12px -12px rgb(0 0 0 / 22%)'
 
 /** 画面端の余白。上下左右とも 8px。 */
 export const MENU_PORTAL_MARGIN = 8
@@ -72,6 +89,8 @@ export default function MenuPortal({
   gap = 4,
   matchWidth = false,
   onClose,
+  getPositionRect,
+  className,
   children,
 }: MenuPortalProps) {
   const [mounted, setMounted] = useState(false)
@@ -82,6 +101,8 @@ export default function MenuPortal({
   closeRef.current = onClose
   const anchorRef = useRef(getAnchor)
   anchorRef.current = getAnchor
+  const positionRef = useRef(getPositionRect)
+  positionRef.current = getPositionRect
 
   useLayoutEffect(() => {
     setMounted(true)
@@ -93,9 +114,12 @@ export default function MenuPortal({
       const anchor = anchorRef.current()
       const panel = panelRef.current
       if (!anchor || !panel) return
-      const anchorRect = anchor.getBoundingClientRect()
-      const panelWidth = matchWidth === true ? anchorRect.width : panel.offsetWidth
+      const anchorRect = positionRef.current?.() ?? anchor.getBoundingClientRect()
       const minWidth = matchWidth === 'min' ? anchorRect.width : undefined
+      // 'min' は欄の幅を下限にする。位置は下限を当てた後の幅で決める。
+      const panelWidth = matchWidth === true
+        ? anchorRect.width
+        : Math.max(panel.offsetWidth, minWidth ?? 0)
       // 上限で切った後の高さではなく中身の全部の高さで開く向きを決める。
       const contentHeight = panel.scrollHeight || panel.offsetHeight
       const viewportWidth = window.innerWidth
@@ -116,7 +140,10 @@ export default function MenuPortal({
         placement === 'down'
           ? anchorRect.bottom + gap
           : Math.max(margin, anchorRect.top - gap - shownHeight)
-      const rawLeft = align === 'end' ? anchorRect.right - panelWidth : anchorRect.left
+      // 寄せた側で画面の端を越えるときは、反対側の端にそろえる（左寄せ→右端・右寄せ→左端）。
+      let rawLeft = align === 'end' ? anchorRect.right - panelWidth : anchorRect.left
+      if (align === 'start' && rawLeft + panelWidth > viewportWidth - margin) rawLeft = anchorRect.right - panelWidth
+      if (align === 'end' && rawLeft < margin) rawLeft = anchorRect.left
       const left = Math.max(margin, Math.min(rawLeft, viewportWidth - panelWidth - margin))
       setGeometry({
         top,
@@ -181,7 +208,11 @@ export default function MenuPortal({
       closeRef.current()
     }
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') closeRef.current()
+      if (event.key === 'Escape') {
+        // メニューで処理した印。下の詳細パネルなどが同じ Esc で閉じないように。
+        event.preventDefault()
+        closeRef.current()
+      }
     }
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -198,11 +229,14 @@ export default function MenuPortal({
       // 静的に読める形にする（直書き借金の見張り）。重なりの数字と
       // 画面端の上限は style へ。見た目（白地・角丸・浮きの影）は子が持つ。
       // 高さの上限と続きの影だけは器が持つ（子は自分の上限を外す）。
-      className="fixed min-w-0"
+      className={className ? `fixed min-w-0 ${className}` : 'fixed min-w-0'}
       data-menu-portal=""
       data-placement={geometry?.placement ?? 'down'}
+      // 開く動きの起点（押した角）を部品の CSS が決めるための印。
+      data-align={align}
       data-has-more={hasMore ? 'true' : 'false'}
       style={{
+        ...(className && hasMore ? ({ '--menu-portal-more': MORE_SHADOW } as CSSProperties) : null),
         top: geometry?.top ?? 0,
         left: geometry?.left ?? 0,
         width: geometry?.width,
@@ -214,7 +248,8 @@ export default function MenuPortal({
         overflowY: 'auto',
         overscrollBehavior: 'contain',
         // 下に続きがある間だけ下端の影（続きの目印）。
-        boxShadow: hasMore ? 'inset 0 -16px 12px -12px rgb(0 0 0 / 22%)' : undefined,
+        // 見た目を器に持たせたとき（className）は、class が --menu-portal-more を重ねる。
+        boxShadow: className ? undefined : hasMore ? MORE_SHADOW : undefined,
         // 測る前の一瞬だけ隠す（左上へのちらつき防止）。
         visibility: geometry ? undefined : 'hidden',
       }}

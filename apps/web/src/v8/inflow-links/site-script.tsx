@@ -14,11 +14,12 @@
  * - 閲覧のみ（owner・admin 以外）には、サイトを追加する・「…」・操作の行を出さない
  */
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, CircleHelp, Copy, Eye, Mail, MoreHorizontal, Pause, Play, Plus, RefreshCw } from 'lucide-react'
 import { api, type MeasurementSite } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
+import { useResponseGate } from '@/lib/use-response-gate'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -89,7 +90,31 @@ export default function SiteScriptV8() {
   const snippet = trackingKey ? `<script async src="${apiUrl}/api/site/script.js" data-key="${trackingKey}"></script>` : null
   const manage = canManage && !readonly
 
+  /*
+   * WEB040：アカウントを切り替えたら、前のアカウントのサイト・集計・選択・開いた窓を捨て、
+   * 前のアカウントの遅い応答・操作の結果を今の画面へ書かない。
+   */
+  const gate = useResponseGate()
+  const accountRef = useRef(selectedAccountId)
+  const previousAccountRef = useRef(selectedAccountId)
+  accountRef.current = selectedAccountId
+  useEffect(() => {
+    if (previousAccountRef.current === selectedAccountId) return
+    previousAccountRef.current = selectedAccountId
+    setPages([])
+    setSummary(null)
+    setSites([])
+    setSitesFailed(false)
+    setSelectedSiteId(null)
+    setSiteDialog(null)
+    setStopDialog(null)
+    setResumeTarget(null)
+    setSiteActionError('')
+    setSiteBusy(false)
+  }, [selectedAccountId])
+
   const load = useCallback(async () => {
+    const token = gate.begin()
     setLoading(true)
     setFailed(false)
     const [pagesResult, summaryResult, sitesResult] = await Promise.allSettled([
@@ -97,6 +122,7 @@ export default function SiteScriptV8() {
       api.siteTracking.summary(selectedAccountId ?? undefined),
       api.measurementSites.list(selectedAccountId ?? undefined),
     ])
+    if (!gate.current(token)) return
     if (pagesResult.status === 'fulfilled' && pagesResult.value.success) setPages(pagesResult.value.data)
     if (summaryResult.status === 'fulfilled' && summaryResult.value.success) setSummary(summaryResult.value.data)
     else setFailed(true)
@@ -107,7 +133,7 @@ export default function SiteScriptV8() {
       setSitesFailed(true)
     }
     setLoading(false)
-  }, [selectedAccountId])
+  }, [selectedAccountId, gate])
 
   useEffect(() => {
     let active = true
@@ -145,6 +171,8 @@ export default function SiteScriptV8() {
 
   const saveSite = async () => {
     if (!siteDialog) return
+    const accountAtStart = selectedAccountId
+    const moved = () => accountRef.current !== accountAtStart
     setSiteBusy(true)
     try {
       const domains = parseDomains(siteDialog.domainsText)
@@ -155,9 +183,11 @@ export default function SiteScriptV8() {
         const res = await api.measurementSites.update(siteDialog.site.id, { label: siteDialog.label, domains })
         if (!res.success) throw new Error(res.error || '更新できませんでした')
       }
+      if (moved()) return
       setSiteDialog(null)
       await load()
     } catch (err) {
+      if (moved()) return
       setSiteDialog({ ...siteDialog, error: err instanceof Error ? err.message : '保存できませんでした' })
     } finally {
       setSiteBusy(false)
@@ -166,6 +196,8 @@ export default function SiteScriptV8() {
 
   const stopSite = async () => {
     if (!stopDialog) return
+    const accountAtStart = selectedAccountId
+    const moved = () => accountRef.current !== accountAtStart
     const reason = stopDialog.reason.trim()
     if (!reason) {
       setStopDialog({ ...stopDialog, error: '止める理由を入れてください' })
@@ -175,10 +207,12 @@ export default function SiteScriptV8() {
     try {
       const res = await api.measurementSites.stop(stopDialog.site.id, reason)
       if (!res.success) throw new Error(res.error || '停止できませんでした')
+      if (moved()) return
       setStopDialog(null)
       setSiteActionError('')
       await load()
     } catch (err) {
+      if (moved()) return
       setStopDialog({ ...stopDialog, error: err instanceof Error ? err.message : '停止できませんでした' })
     } finally {
       setSiteBusy(false)
@@ -187,14 +221,18 @@ export default function SiteScriptV8() {
 
   const resumeSite = async () => {
     if (!resumeTarget) return
+    const accountAtStart = selectedAccountId
+    const moved = () => accountRef.current !== accountAtStart
     setSiteBusy(true)
     try {
       const res = await api.measurementSites.resume(resumeTarget.id)
       if (!res.success) throw new Error(res.error || '再開できませんでした')
+      if (moved()) return
       setResumeTarget(null)
       setSiteActionError('')
       await load()
     } catch (err) {
+      if (moved()) return
       setResumeTarget(null)
       setSiteActionError(err instanceof Error ? err.message : '再開できませんでした')
     } finally {

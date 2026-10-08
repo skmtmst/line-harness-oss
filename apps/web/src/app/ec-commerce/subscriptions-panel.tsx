@@ -74,7 +74,9 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
       if (!response.success || !Array.isArray(response.data?.items)) throw new Error('invalid_subscription_response')
       setData(response.data)
       setTotal(response.pagination?.total ?? response.data.items.length)
-      setState(response.data.items.length ? 'ready' : 'empty')
+      // ROOT32：表示条件で0件になったときは「まだありません」にせず、
+      // 条件の切り替え（タブ）を残したまま「条件に合うものはありません」を出す。
+      setState(response.data.items.length || filter !== 'all' ? 'ready' : 'empty')
     } catch (error) {
       if (generation !== loadGeneration.current) return
       setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
@@ -132,7 +134,7 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
           onClick: () => setFilter(item.key),
         }))} />
       </div>
-      {shown.length === 0 ? <ListState kind="empty" title="条件に合う定期便はありません" description="検索する言葉か表示条件を変えてください。" /> : (
+      {shown.length === 0 ? <ListState kind="empty" title="条件に合う定期便はありません" description="検索する言葉か表示条件を変えてください。" action={filter !== 'all' || search ? <Button variant="secondary" onClick={() => { setFilter('all'); setSearch('') }}>条件を外す</Button> : undefined} /> : (
         <DataTable>
           <thead><TableHeadRow><Th>お客様と中身</Th><Th>次の発送</Th><Th>続いた回数</Th><Th align="right">1回の金額</Th><Th>ようす</Th><Th align="right">操作</Th></TableHeadRow></thead>
           <tbody>

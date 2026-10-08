@@ -55,8 +55,12 @@ import {
   type TemplateReferences,
 } from './core'
 import { TemplateEditFrame } from './frame'
+import type { TemplateEditHost } from './host'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import InsertRow from './insert-row'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { referenceTokenNames } from '@/components/shared/insert-tokens'
+import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
 
 const MESSAGE_TYPES: Array<{ value: string; label: string }> = [
@@ -70,16 +74,24 @@ const snapshot = (draft: TemplateDraft) => JSON.stringify(draft)
 /** 競合の帯（NCbYn）。誰が・いつ・どれを保存したかと、2つの出口。 */
 type Conflict = { name: string; at: string; latest: TemplateDraft | null }
 
-export default function TemplateMessageEditor({ id, visual }: { id: string | null; visual: boolean }) {
+/**
+ * `host` を渡すと、統括のテンプレートの入口から同じ画面を使う（host.ts）。保存は呼ぶ側、主ボタンは［保存して配る］、
+ * 読み込み・自動保存・公開・店の差し込み候補（友だち情報・共通情報）は使わない。
+ */
+export default function TemplateMessageEditor({ id, visual, example = null, host }: { id: string | null; visual: boolean; example?: string | null; host?: TemplateEditHost }) {
   const router = useRouter()
   const role = useStaffRole()
   // 役割の確認が済むまでは操作を出す（最後の守りはサーバの 403）。staff と分かったら隠す。
-  const canMutate = role === null || canManageRole(role)
+  const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
   const narrow = useNarrowViewport(1351)
   const { accounts, selectedAccountId } = useAccount()
 
-  const [editorState, setEditor] = useState<TemplateEditorState>(() => newTemplateEditorState(id, visual))
-  const [clean, setClean] = useState(() => snapshot(newTemplateEditorState(id, visual).draft))
+  const initialState = (): TemplateEditorState => {
+    const fresh = newTemplateEditorState(id, visual)
+    return host?.initialMessage ? { ...fresh, draft: { ...fresh.draft, ...host.initialMessage } } : fresh
+  }
+  const [editorState, setEditor] = useState<TemplateEditorState>(initialState)
+  const [clean, setClean] = useState(() => snapshot(initialState().draft))
   const [folders, setFolders] = useState<Folder[]>([])
   const [references, setReferences] = useState<TemplateReferences>(EMPTY_REFERENCES)
   const [referenceState, setReferenceState] = useState<TemplateReferenceState>('idle')
@@ -117,15 +129,16 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
   const saveBinding = !id && autoCreated
     ? { templateId: autoCreated.id, templateStatus: 'ready' as const, templateAccountId: autoCreated.accountId, selectedAccountId }
     : binding
-  const editorAccountId = resolveEditorAccountId(binding)
-  const accountMismatch = templateAccountMismatch(binding)
-  const saveGuard = templateSaveGuard(binding)
+  /* 統括の入口では店のアカウントに結びつけない（差し込み候補・フォルダは店のものを使わない）。 */
+  const editorAccountId = host ? null : resolveEditorAccountId(binding)
+  const accountMismatch = host ? false : templateAccountMismatch(binding)
+  const saveGuard = host ? null : templateSaveGuard(binding)
   const loadFailed = editor.status === 'failed'
   const loading = Boolean(id) && (editor.status === 'idle' || editor.status === 'loading')
   const accountName = (accountId: string | null) => accounts.find((account) => account.id === accountId)?.name ?? null
   const dirty = !loading && snapshot(editor.draft) !== clean
-  const title = id ? 'メッセージを編集' : 'メッセージを作る'
-  usePageTitle(title)
+  const title = id || host?.initialMessage ? 'メッセージを編集' : 'メッセージを作る'
+  usePageTitle(host ? 'テンプレート' : title)
   const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
   /* 自動保存と手の保存が同時に新規作成へ流れて2件できないよう、送っている途中の保存を待ってから送る。 */
   const inFlightRef = useRef<Promise<unknown> | null>(null)
@@ -199,8 +212,42 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
     return () => { templateGeneration.current += 1 }
   }, [id, reloadKey])
 
+  /*
+   * 見本から作る（F-5・`?example=<見本の番号>`）：作るときだけ、見本の名前と本文を入れて開く。
+   * 入れるのは1回だけ（入れたあとの入力は上書きしない）。保存はしない（保存は利用者が押す）。
+   * 見本が読めない・見つからないときは白紙のまま、帯で知らせる。
+   */
+  const [exampleNote, setExampleNote] = useState('')
+  const exampleApplied = useRef<string | null>(null)
+  useEffect(() => {
+    if (id || !example || exampleApplied.current === example) return
+    exampleApplied.current = example
+    let cancelled = false
+    let settled = false
+    loadTemplateExamples()
+      .finally(() => { settled = true })
+      .then((items) => {
+        if (cancelled) return
+        const found = items.find((item) => item.id === example)
+        if (!found) {
+          setExampleNote('見本が見つかりませんでした。白紙から作れます。')
+          return
+        }
+        setEditor((prev) => (prev.requestedId === null
+          ? { ...prev, draft: { ...prev.draft, name: found.name, messageType: 'text', messageContent: found.body } }
+          : prev))
+        setExampleNote('')
+      })
+      .catch(() => { if (!cancelled) setExampleNote('見本を読み込めませんでした。白紙から作れます。') })
+    return () => {
+      cancelled = true
+      // 読み終わる前に片付けた（開いた直後の二度目の実行）なら、もう一度読めるように戻す。
+      if (!settled) exampleApplied.current = null
+    }
+  }, [id, example])
+
   /* 差し込みはカーソルの位置へ入れる（今の画面と同じ）。 */
-  const contentRef = useRef<HTMLTextAreaElement | null>(null)
+  const contentRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement | null>(null)
   const insert = (token: string) => {
     const element = contentRef.current
     const start = element?.selectionStart ?? messageContent.length
@@ -267,7 +314,7 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
   const autosave = useDraftAutosave({
     fingerprint: snapshot(editor.draft),
     dirty,
-    active: canMutate,
+    active: canMutate && !host,
     enabled: !loading && !conflict && validateTemplateSave({ ...saveBinding, ...editor.draft }) === null,
     paused: leaveTarget !== null || saving || publishing,
     save: async () => (await saveNow({ silent: true })) !== null,
@@ -301,7 +348,20 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
     }
   }
 
+  /* 統括の入口：中身を確かめて呼ぶ側へ渡す（保存・配る・失敗の知らせは呼ぶ側）。 */
+  const hostSave = (distribute: boolean) => {
+    if (!host) return
+    const draft = editor.draft
+    if (!draft.name.trim()) { setError('テンプレート名を入力してください。'); return }
+    if (!draft.messageContent.trim()) { setError('本文を入力してください。'); return }
+    if (draft.messageType === 'flex' && validateFlexContent('flex', draft.messageContent)) { setError('カードの形を直してから保存してください。'); return }
+    setError('')
+    setClean(snapshot(draft))
+    host.onSave({ kind: 'message', name: draft.name.trim(), messageType: draft.messageType, messageContent: draft.messageContent }, distribute)
+  }
+
   const onSaveDraft = async () => {
+    if (host) { hostSave(false); return }
     const savedId = await saveNow()
     if (savedId) autosave.markSaved()
     if (savedId) {
@@ -312,6 +372,7 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
 
   /* 保存して公開：使っている場所があれば、どこへ届くかを見せてから（cuR8I）。 */
   const onPublish = async () => {
+    if (host) { hostSave(true); return }
     const savedId = await saveNow()
     if (!savedId) return
     setPublishing(true)
@@ -364,7 +425,7 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
   }
 
   const boardId = id ? (conflict ? 'NCbYn' : 'u5YC6') : narrow ? 'a1k3d' : 'u5YC6'
-  const description = '保存しただけでは、どこにも送られません'
+  const description = host ? host.description : '保存しただけでは、どこにも送られません'
 
   /* 閲覧のみ：作る・保存の操作は置かず、帯で知らせる。 */
   if (!canMutate) {
@@ -385,10 +446,11 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
   }
 
   const preview = buildTemplatePreview(messageContent, references)
+  const tokenNames = referenceTokenNames(references)
   const urls = extractMessageUrls(messageContent)
   const flexError = messageType === 'flex' ? validateFlexContent('flex', messageContent) : null
   const sendName = accountName(editorAccountId) ?? undefined
-  const busy = saving || publishing
+  const busy = saving || publishing || Boolean(host?.busy)
   const blocked = loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : saveGuard
   const phone = (
     <LinePreview
@@ -421,6 +483,8 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
         boardId={boardId}
         title={title}
         description={description}
+        backHref={host?.backHref}
+        onBack={host?.onCancel}
         band={conflict ? (
           <div className={styles.band} role="alert" data-design-node="NCbYn">
             <CircleAlert size={18} aria-hidden="true" className={styles.bandIcon} />
@@ -456,7 +520,7 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
         status={autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined}
         footerActions={(
           <>
-            <Button href="/templates">キャンセル</Button>
+            {host ? <Button type="button" onClick={host.onCancel}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}
             <Button
               type="button"
               onClick={() => void onSaveDraft()}
@@ -473,11 +537,11 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
               onClick={conflict ? () => void openCompare() : () => void onPublish()}
               disabled={busy || Boolean(blocked)}
               title={blocked ?? undefined}
-              busy={publishing}
-              busyLabel="公開中…"
+              busy={publishing || Boolean(host?.busy)}
+              busyLabel={host ? '保存中…' : '公開中…'}
             >
               {conflict ? <GitCompare size={15} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />}
-              {conflict ? '比べてから保存' : '保存して公開'}
+              {conflict ? '比べてから保存' : host ? host.primaryLabel ?? '保存して配る' : '保存して公開'}
             </Button>
           </>
         )}
@@ -488,7 +552,9 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
           </Card>
         ) : (
           <>
+            {host?.notice}
             {error || loadFailed ? <p role="alert" className={styles.error}>{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p> : null}
+            {exampleNote && !id ? <p role="status" className={styles.error}>{exampleNote}</p> : null}
             <Card padding="none" layout="vertical" className={styles.card}>
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>名前とフォルダ</h2>
@@ -504,9 +570,9 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
                   <Select
                     id="te-folder"
                     aria-label="フォルダ"
-                    value={folderId ?? ''}
-                    onChange={(value) => updateDraft({ folderId: value || null })}
-                    options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                    value={host ? host.folder : folderId ?? ''}
+                    onChange={host ? host.onFolderChange : (value) => updateDraft({ folderId: value || null })}
+                    options={[{ value: '', label: '未分類' }, ...(host ? host.folders : folders.map((folder) => ({ value: folder.id, label: folder.name })))]}
                   />
                 </div>
               </div>
@@ -521,7 +587,7 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
                 <SegmentedControl aria-label="メッセージの形" options={MESSAGE_TYPES} value={messageType} onChange={(value) => updateDraft({ messageType: value })} />
               </div>
               <div className={styles.bodyBox}>
-                <textarea
+                <InsertTextField
                   id="te-content"
                   ref={contentRef}
                   aria-label={messageType === 'text' ? '本文' : 'メッセージ内容'}
@@ -529,7 +595,8 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
                   className={styles.bodyText}
                   data-kind={messageType}
                   value={messageContent}
-                  onChange={(event) => updateDraft({ messageContent: event.target.value })}
+                  onValueChange={(next) => updateDraft({ messageContent: next })}
+                  tokenNames={tokenNames}
                   placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：{{name}}さん、こんにちは。'}
                 />
                 <span className={styles.bodySpacer} aria-hidden="true" />
@@ -545,7 +612,8 @@ export default function TemplateMessageEditor({ id, visual }: { id: string | nul
                 {messageContent.length > 4500 ? ' 約4,500文字を超えると複数のメッセージに分かれて届きます。' : ''}
               </p>
               {referenceState === 'failed' ? <p role="alert" className={styles.error}>差し込み項目を読み込めませんでした。画面を再読み込みしてください。</p> : null}
-              {!editorAccountId && !loading ? <p className={styles.hint}>LINE公式アカウントを選ぶと、友だち情報と共通情報を選べます。</p> : null}
+              {host ? <p className={styles.hint}>統括のテンプレートで差し込めるのは、名前・配信日・その他です（友だち情報・共通情報はアカウントごとに違うため）。</p>
+                : !editorAccountId && !loading ? <p className={styles.hint}>LINE公式アカウントを選ぶと、友だち情報と共通情報を選べます。</p> : null}
               {accountMismatch ? (
                 <div role="alert" className={styles.readonly}>
                   {ACCOUNT_MISMATCH_MESSAGE}（このテンプレートは「{accountName(editor.templateAccountId) ?? editor.templateAccountId}」のものです。差し込み候補もそのアカウントのまま出しています）

@@ -17,6 +17,8 @@ const fixture = vi.hoisted(() => ({
   params: new URLSearchParams('friend=friend-a'),
   scheduled: [] as Array<{ id: string; scheduledAt: string; content: string; status: string }>,
   sentBodies: [] as Array<Record<string, unknown>>,
+  uploads: [] as Array<{ type: string | null; filename: string | null }>,
+  scheduledTypes: [] as string[],
 }))
 
 vi.mock('next/link', () => ({ default: () => null }))
@@ -81,7 +83,8 @@ function responseFor(url: URL, init?: RequestInit): Response {
     return json({ success: true, data: { scheduled: fixture.scheduled } })
   }
   if (url.pathname === '/api/chats/friend-a/schedule' && init?.method === 'POST') {
-    const body = JSON.parse(String(init.body)) as { content: string; scheduledAt: string; quotedMessageId?: string }
+    const body = JSON.parse(String(init.body)) as { content: string; scheduledAt: string; quotedMessageId?: string; messageType?: string }
+    fixture.scheduledTypes.push(body.messageType ?? 'text')
     const row = {
       id: `sched-${fixture.scheduled.length + 1}`,
       messageType: 'text',
@@ -100,6 +103,15 @@ function responseFor(url: URL, init?: RequestInit): Response {
     const id = url.pathname.split('/').pop()!
     fixture.scheduled = fixture.scheduled.filter((row) => row.id !== id)
     return json({ success: true, data: { cancelled: true } })
+  }
+  /* B-6：受信箱の添付（API-15）。ファイルは期限30日のリンクとして届く。 */
+  if (url.pathname === '/api/chats/friend-a/attachments/upload' && init?.method === 'POST') {
+    const headers = new Headers(init.headers)
+    fixture.uploads.push({ type: headers.get('Content-Type'), filename: headers.get('X-Filename') })
+    return json({ success: true, data: {
+      id: '11111111-2222-4333-8444-555555555555', key: 'private/chat-attachments/x', url: 'https://worker.example/a/x',
+      filename: '案内.pdf', mimeType: 'application/pdf', size: 8, kind: 'file', expiresAt: '2026-11-07T03:00:00.000Z',
+    } }, 201)
   }
   if (url.pathname === '/api/chats/friend-a/send' && init?.method === 'POST') {
     fixture.sentBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>)
@@ -308,5 +320,161 @@ describe('N-025 引用返信と送信予約', () => {
       expect(fixture.scheduled).toHaveLength(0)
       expect(document.querySelector('[data-inbox-v6="scheduled-row"]')).toBeNull()
     })
+  })
+})
+
+/*
+ * ★V8（M0393 段2）：書く欄の上に「送る日時」の段を出さず、［予約］から窓で開く。
+ * 送信の設定は「送るキー」の切り替え、画像は「添付」で動画・ファイルは理由を出して止める。
+ */
+describe('★V8 書く欄：予約は窓・送るキーの切り替え・添付', () => {
+  let host: HTMLDivElement
+  let root: Root
+  let values: Map<string, string>
+
+  beforeEach(() => {
+    fixture.params = new URLSearchParams('friend=friend-a')
+    fixture.scheduled = []
+    fixture.sentBodies = []
+    values = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    })
+    vi.stubGlobal('fetch', (input: string | URL, init?: RequestInit) =>
+      Promise.resolve(responseFor(new URL(String(input), 'http://localhost'), init)))
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    document.documentElement.dataset.theme = 'v8'
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+
+  afterEach(async () => {
+    await act(async () => { root.unmount() })
+    host.remove()
+    delete document.documentElement.dataset.theme
+    vi.unstubAllGlobals()
+  })
+
+  it('［予約］で窓が開き、すぐ選ぶの日時で予約が作られ、窓が閉じる（書く欄の上の段は出ない）', async () => {
+    await act(async () => { root.render(<ChatsPage />) })
+    await eventually(() => { expect(host.textContent).toContain('値段はいくらですか？') })
+    await typeText(host, '明日の朝に送ります')
+    await act(async () => {
+      document.querySelector<HTMLElement>('[data-inbox-v6="schedule-toggle"]')!.click()
+    })
+    await eventually(() => {
+      expect(document.querySelector('[role="dialog"][aria-labelledby]')?.textContent).toContain('予約して送る')
+    })
+    expect(document.querySelector('[data-inbox-v6="schedule-panel"]')).toBeNull()
+    await act(async () => {
+      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === '明日 13:00')!.click()
+    })
+    const confirm = Array.from(document.querySelectorAll('button')).find((b) => /13:00 に予約$/.test(b.textContent ?? ''))!
+    expect(confirm).toBeTruthy()
+    await act(async () => { confirm.click() })
+    await eventually(() => {
+      expect(fixture.scheduled).toHaveLength(1)
+      expect(fixture.scheduled[0].content).toBe('明日の朝に送ります')
+      // 日本時間の 13:00 として送る（04:00 UTC）
+      expect(fixture.scheduled[0].scheduledAt).toMatch(/T04:00:00/)
+    })
+    await eventually(() => {
+      expect(Array.from(document.querySelectorAll('h2')).some((h) => h.textContent === '予約して送る')).toBe(false)
+    })
+    expect(fixture.sentBodies).toHaveLength(0)
+  })
+
+  it('送信の設定は「送るキー」の切り替え。選んだキーをこの端末に覚え、Enter で送れる', async () => {
+    await act(async () => { root.render(<ChatsPage />) })
+    await eventually(() => { expect(host.textContent).toContain('値段はいくらですか？') })
+    await act(async () => {
+      Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === '送信の設定')!.click()
+    })
+    const group = document.querySelector('[role="group"][aria-label="送るキー"]')!
+    expect(group).toBeTruthy()
+    await act(async () => {
+      Array.from(group.querySelectorAll('button')).find((b) => b.textContent === 'Enter')!.click()
+    })
+    await eventually(() => { expect(values.get('chat.sendMode')).toBe('enter') })
+    expect(host.textContent).toContain('Enter で送る／Shift+Enter で改行（この端末に覚える）')
+    await typeText(host, 'Enterで送る')
+    const textarea = document.querySelector('textarea[aria-label="メッセージを入力"]') as HTMLTextAreaElement
+    await act(async () => {
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    await eventually(() => { expect(fixture.sentBodies).toHaveLength(1) })
+  })
+
+  /*
+   * B-6（M0393「7. 添付」I7Skn・API-15）：［添付］の道具はやめ、入力欄の左下のクリップから
+   * 画像・動画／ファイルを選ぶ。ファイルは先に準備（アップロード）し、札を出してから本文と一緒に送る。
+   */
+  const pickFile = async (file: File) => {
+    const input = document.querySelector('[data-inbox-v8="attach-file-input"]') as HTMLInputElement
+    expect(input.accept).toContain('application/pdf')
+    Object.defineProperty(input, 'files', { value: [file], configurable: true })
+    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })) })
+  }
+
+  it('［添付］の道具は無く、左下のクリップから選んだファイルを準備して、本文と一緒に送る', async () => {
+    fixture.uploads = []
+    await act(async () => { root.render(<ChatsPage />) })
+    await eventually(() => { expect(host.textContent).toContain('値段はいくらですか？') })
+    expect(Array.from(document.querySelectorAll('button')).some((b) => b.textContent?.trim() === '添付')).toBe(false)
+    expect(document.querySelector('button[aria-label="添付するものを選ぶ"]')).toBeTruthy()
+    expect(host.textContent).toContain('画像・動画・ファイルを添付')
+    await pickFile(new File(['%PDF-1.7'], '案内.pdf', { type: 'application/pdf' }))
+    await eventually(() => {
+      expect(fixture.uploads).toEqual([{ type: 'application/pdf', filename: encodeURIComponent('案内.pdf') }])
+      expect(document.querySelector('[data-inbox-v8="attachment-chip"]')?.getAttribute('data-status')).toBe('ready')
+    })
+    expect(host.textContent).toContain('期限30日のリンクで届く')
+    await typeText(host, '資料をお送りします')
+    const send = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === '送信') as HTMLButtonElement
+    await act(async () => { send.click() })
+    await eventually(() => { expect(fixture.sentBodies).toHaveLength(2) })
+    expect(fixture.sentBodies[0]).toMatchObject({ messageType: 'file', content: JSON.stringify({ attachmentId: '11111111-2222-4333-8444-555555555555' }) })
+    expect(fixture.sentBodies[1]).toMatchObject({ content: '資料をお送りします' })
+    await eventually(() => { expect(document.querySelector('[data-inbox-v8="attachment-chip"]')).toBeNull() })
+  })
+
+  it('送れない形式・大きすぎるものは、その場で理由を出して止める（何も上げない・送らない）', async () => {
+    fixture.uploads = []
+    await act(async () => { root.render(<ChatsPage />) })
+    await eventually(() => { expect(host.textContent).toContain('値段はいくらですか？') })
+    await pickFile(new File(['a,b'], '名簿.csv', { type: 'text/csv' }))
+    await eventually(() => { expect(host.textContent).toContain('「名簿.csv」は送れない形式です') })
+    const big = new File(['x'], '大きい.pdf', { type: 'application/pdf' })
+    Object.defineProperty(big, 'size', { value: 10 * 1024 * 1024 + 1 })
+    await pickFile(big)
+    await eventually(() => { expect(host.textContent).toContain('ファイルは10MBまでです') })
+    expect(fixture.uploads).toHaveLength(0)
+    expect(fixture.sentBodies).toHaveLength(0)
+  })
+
+  it('準備したファイルは予約でも送れる（ファイルの予約として作る）', async () => {
+    fixture.scheduledTypes = []
+    await act(async () => { root.render(<ChatsPage />) })
+    await eventually(() => { expect(host.textContent).toContain('値段はいくらですか？') })
+    await pickFile(new File(['%PDF-1.7'], '案内.pdf', { type: 'application/pdf' }))
+    await eventually(() => {
+      expect(document.querySelector('[data-inbox-v8="attachment-chip"]')?.getAttribute('data-status')).toBe('ready')
+    })
+    await act(async () => {
+      document.querySelector<HTMLElement>('[data-inbox-v6="schedule-toggle"]')!.click()
+    })
+    await eventually(() => {
+      expect(document.querySelector('[role="dialog"][aria-labelledby]')?.textContent).toContain('ファイル「案内.pdf」')
+    })
+    await act(async () => {
+      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === '明日 13:00')!.click()
+    })
+    const confirm = Array.from(document.querySelectorAll('button')).find((b) => /13:00 に予約$/.test(b.textContent ?? ''))!
+    await act(async () => { confirm.click() })
+    await eventually(() => { expect(fixture.scheduledTypes).toEqual(['file']) })
+    expect(fixture.sentBodies).toHaveLength(0)
   })
 })

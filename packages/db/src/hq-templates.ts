@@ -201,6 +201,99 @@ export async function listHqTemplates(
   return result.results ?? [];
 }
 
+/** 一覧の材料を一度の問い合わせで取得する。definition_jsonはHTTP応答へ出さない。 */
+export interface HqTemplateListSource extends HqTemplate {
+  display_type: HqTemplateType;
+  definition_json: string | null;
+  distributed_account_names_json: string;
+  distributed_account_count: number;
+  this_month_sent_count: number | null;
+  outdated_account_count: number;
+  current_version: number | null;
+  friend_count: number | null;
+  tap_count: number | null;
+}
+
+export async function listHqTemplateDisplaySources(
+  db: D1Database,
+  tenantId: string,
+  type?: HqTemplateType,
+): Promise<HqTemplateListSource[]> {
+  const result = await db.prepare(`
+    WITH templates AS (
+      SELECT *, COALESCE(extended_type,template_type) AS display_type
+      FROM hq_templates WHERE tenant_id=?1 AND archived_at IS NULL
+        AND (?2 IS NULL OR COALESCE(extended_type,template_type)=?2)
+    ), successful_accounts AS (
+      SELECT DISTINCT r.template_id, a.id AS account_id, a.name
+      FROM hq_template_distribution_results r
+      JOIN templates t ON t.id=r.template_id AND t.tenant_id=r.tenant_id
+      JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
+      WHERE r.tenant_id=?1 AND r.status='succeeded'
+    ), received AS (
+      SELECT r.template_id,r.target_account_id,r.template_version_id,
+        ROW_NUMBER() OVER (PARTITION BY r.template_id,r.target_account_id ORDER BY r.finished_at DESC,r.started_at DESC,r.rowid DESC) AS position
+      FROM hq_template_distribution_results r
+      JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
+      WHERE r.tenant_id=?1 AND r.status='succeeded'
+    ), outdated AS (
+      SELECT r.template_id,COUNT(*) AS count FROM received r JOIN templates t ON t.id=r.template_id
+      WHERE r.position=1 AND r.template_version_id<>t.current_version_id GROUP BY r.template_id
+    ), sent AS (
+      SELECT r.template_id,COUNT(DISTINCT m.id) AS count
+      FROM hq_template_distribution_results r
+      JOIN templates t ON t.id=r.template_id AND t.tenant_id=r.tenant_id AND t.display_type='template'
+      JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
+      JOIN hq_template_versions v ON v.id=r.template_version_id AND v.tenant_id=r.tenant_id AND v.template_id=r.template_id
+      JOIN hq_template_preflight_resolutions p ON p.preflight_id=r.preflight_id AND p.tenant_id=r.tenant_id
+        AND p.target_account_id=r.target_account_id AND p.item_kind='template'
+        AND p.source_id='template:' || json_extract(v.definition_json,'$.template.id')
+      JOIN messages_log m ON m.template_id_at_send=p.target_id AND m.line_account_id=r.target_account_id
+      WHERE r.tenant_id=?1 AND r.status='succeeded' AND m.direction='outgoing'
+        AND COALESCE(m.delivery_type,'')<>'test' AND substr(m.created_at,1,7)=strftime('%Y-%m','now','+9 hours')
+      GROUP BY r.template_id
+    ), tag_population AS (
+      SELECT r.template_id,COUNT(DISTINCT f.id) AS count FROM hq_template_distribution_results r
+      JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
+      JOIN hq_template_preflight_resolutions p ON p.preflight_id=r.preflight_id AND p.tenant_id=r.tenant_id
+        AND p.target_account_id=r.target_account_id AND p.item_kind='tag' AND p.source_id='tag'
+      JOIN friend_tags ft ON ft.tag_id=p.target_id JOIN friends f ON f.id=ft.friend_id AND f.line_account_id=r.target_account_id
+      WHERE r.tenant_id=?1 AND r.status='succeeded' GROUP BY r.template_id
+    ), menu_taps AS (
+      SELECT r.template_id,COUNT(DISTINCT tap.id) AS count FROM hq_template_distribution_results r
+      JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
+      JOIN hq_template_preflight_resolutions p ON p.preflight_id=r.preflight_id AND p.tenant_id=r.tenant_id
+        AND p.target_account_id=r.target_account_id AND p.item_kind='rich_menu'
+      JOIN rich_menu_area_taps tap ON tap.group_id=p.target_id AND tap.line_account_id=r.target_account_id
+      WHERE r.tenant_id=?1 AND r.status='succeeded' GROUP BY r.template_id
+    ), ranked_accounts AS (
+      SELECT *, ROW_NUMBER() OVER (PARTITION BY template_id ORDER BY name,account_id) AS position
+      FROM successful_accounts
+    ), distribution AS (
+      SELECT template_id, COUNT(*) AS account_count,
+        json_group_array(name) FILTER (WHERE position<=3) AS names_json
+      FROM (SELECT * FROM ranked_accounts ORDER BY template_id,position)
+      GROUP BY template_id
+    )
+    SELECT t.*, t.display_type AS template_type, v.definition_json,
+      COALESCE(d.account_count,0) AS distributed_account_count,
+      COALESCE(d.names_json,'[]') AS distributed_account_names_json,
+      CASE WHEN json_type(CASE WHEN json_valid(v.definition_json) THEN v.definition_json ELSE '{}' END,'$.asset')='object' THEN NULL ELSE COALESCE(s.count,0) END AS this_month_sent_count, COALESCE(o.count,0) AS outdated_account_count, v.version AS current_version,
+      CASE WHEN t.display_type='tag' THEN COALESCE(tp.count,0) ELSE NULL END AS friend_count,
+      CASE WHEN t.display_type='rich_menu' THEN COALESCE(mt.count,0) ELSE NULL END AS tap_count
+    FROM templates t
+    LEFT JOIN hq_template_versions v ON v.id=t.current_version_id
+      AND v.tenant_id=t.tenant_id AND v.template_id=t.id
+    LEFT JOIN distribution d ON d.template_id=t.id
+    LEFT JOIN outdated o ON o.template_id=t.id
+    LEFT JOIN sent s ON s.template_id=t.id
+    LEFT JOIN tag_population tp ON tp.template_id=t.id
+    LEFT JOIN menu_taps mt ON mt.template_id=t.id
+    ORDER BY t.updated_at DESC,t.id
+  `).bind(tenantId, type ?? null).all<HqTemplateListSource>();
+  return result.results ?? [];
+}
+
 export async function updateHqTemplate(
   db: D1Database,
   input: {

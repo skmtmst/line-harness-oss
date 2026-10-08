@@ -15,11 +15,12 @@ import { ListPage } from '@/components/templates'
 import StepUpPrompt from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api, ApiError } from '@/lib/api'
-import { canResendInvite, lastLoginLabel, memberKpis, memberStatus, sortMembers, type MemberStatus } from '@/lib/hq-members'
-import HqSettingsNavV8 from './settings-nav'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersByRole, type MemberStatus } from '@/lib/hq-members'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
 
@@ -41,6 +42,14 @@ const STATUS_WORDS: Record<MemberStatus, string> = {
   inactive: '停止中',
 }
 
+/** 状態の札の色（絵 `r4ARpV` の「状態の札」：有効＝緑・招待中＝青・停止中＝灰）。 */
+const STATUS_TONES: Record<MemberStatus, StatusBadgeTone> = {
+  active: 'success',
+  invited: 'info',
+  expired: 'danger',
+  inactive: 'neutral',
+}
+
 const VIEWER_NOTE = '閲覧のみで見ています。権限者の招待・変更はオーナーか管理者に頼んでください。'
 
 export default function HqMembersV8() {
@@ -52,7 +61,10 @@ export default function HqMembersV8() {
 }
 
 function MembersInner() {
-  usePageTitle('メンバー管理')
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/r4ARpV`）。
+  usePageTitle('メンバー')
+  usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
+  const settingsNav = useHqSettingsFolderNav('members')
 
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [members, setMembers] = useState<StaffMember[]>([])
@@ -104,7 +116,8 @@ function MembersInner() {
   }, [load])
 
   const accountNames = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts])
-  const rows = sortMembers(members, me?.id ?? null)
+  /* 絵 `r4ARpV` の並び：状態→役割（オーナー→管理者→担当者→閲覧のみ）→名前。 */
+  const rows = sortMembersByRole(members)
   const kpis = useMemo(() => memberKpis(members), [members])
   const canManage = me?.role === 'owner' || me?.role === 'admin'
   const restricted = me?.accountScope === 'accounts'
@@ -115,8 +128,12 @@ function MembersInner() {
     try {
       if (dialog.member) {
         const res = await api.staff.update(dialog.member.id, {
-          /* 役割は変えたときだけ送る（担当者のまま保存しても管理者へ上がらない）。 */
-          ...(value.role !== dialog.member.role ? { role: value.role } : {}),
+          /*
+           * 役割は変えたときだけ送る（担当者のまま保存しても管理者へ上がらない）。
+           * WEB216：統括（owner）は窓の中では「管理者」として出る。役割を触らずに範囲だけ
+           * 保存したとき、owner→admin の変更（と本人確認）を混ぜない。
+           */
+          ...(value.role !== (dialog.member.role === 'owner' ? 'admin' : dialog.member.role) ? { role: value.role } : {}),
           isActive: value.isActive,
           assignedLineAccountId: value.assignedLineAccountId,
           accountScope: value.accountScope,
@@ -187,7 +204,7 @@ function MembersInner() {
           権限者を招待
         </Button>
       ) : undefined}
-      folders={<HqSettingsNavV8 active="members" />}
+      folders={<HqSettingsNavV8 active="members" />} folderNav={settingsNav}
     >
       <div className={styles.body}>
         {ready && !canManage ? <p className={styles.viewerBand} role="status">{VIEWER_NOTE}</p> : null}
@@ -233,8 +250,8 @@ function MembersInner() {
                     <span role="cell" className={styles.cell} title={member.email ?? ''}>{member.email ?? '—'}</span>
                     <span role="cell" className={styles.cell}>{ROLE_WORDS[member.role] ?? member.role}</span>
                     <span role="cell" className={styles.cell} title={scope}>{scope}</span>
-                    <span role="cell"><span className={state === 'active' ? `${styles.pill} ${styles.pillOk}` : state === 'invited' ? `${styles.pill} ${styles.pillInfo}` : state === 'expired' ? `${styles.pill} ${styles.pillDanger}` : `${styles.pill} ${styles.pillIdle}`}><span className={styles.dot} aria-hidden="true" />{STATUS_WORDS[state]}</span></span>
-                    <span role="cell" className={styles.cell}>{lastLoginLabel(lastLogins[member.id])}</span>
+                    <span role="cell"><StatusBadge tone={STATUS_TONES[state]}>{STATUS_WORDS[state]}</StatusBadge></span>
+                    <span role="cell" className={styles.cell}>{lastLoginShort(lastLogins[member.id])}</span>
                     <span role="cell" className={styles.actions}>
                       {canManage && canResendInvite(member) ? (
                         <button

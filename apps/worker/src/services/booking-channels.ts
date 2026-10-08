@@ -6,6 +6,8 @@ import { GoogleCalendarReadError } from './google-calendar.js';
 import { getAccountTimeZone, tzDateStr } from './availability.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
+import type { BookingConflict, BookingReceptionSource } from '@line-crm/shared';
+export type { BookingConflict } from '@line-crm/shared';
 
 const AUTO_ASSIGN_KEY = 'booking_auto_assign';
 export async function getBookingAutoAssign(db: D1Database, accountId: string): Promise<boolean> {
@@ -78,21 +80,46 @@ export async function getBookingChannels(db: D1Database, accountId: string, cred
   ] };
 }
 
-export interface BookingConflict {
-  staffId: string; staffName: string; bookingId: string; otherBookingId: string;
-  startsAt: string; endsAt: string; otherStartsAt: string; otherEndsAt: string;
-  version: number; otherVersion: number;
-}
+const BOOKING_SOURCE_LABELS: Record<BookingReceptionSource, string> = {
+  liff: 'LINE（musubo）', phone: '電話', counter: '店頭', operator: 'スタッフによる登録', import: '外部取り込み',
+};
+
 export async function listBookingConflicts(db: D1Database, accountId: string): Promise<BookingConflict[]> {
   const rows = await db.prepare(`SELECT a.staff_id AS staffId,s.display_name AS staffName,a.id AS bookingId,b.id AS otherBookingId,
     a.starts_at AS startsAt,a.ends_at AS endsAt,b.starts_at AS otherStartsAt,b.ends_at AS otherEndsAt,
-    a.lock_version AS version,b.lock_version AS otherVersion
+    a.lock_version AS version,b.lock_version AS otherVersion,
+    COALESCE(NULLIF(af.display_name,''),NULLIF(ac.display_name,''),'名前未設定') AS customerName,
+    COALESCE(NULLIF(bf.display_name,''),NULLIF(bc.display_name,''),'名前未設定') AS otherCustomerName,
+    am.name AS menuName,bm.name AS otherMenuName,a.source AS source,b.source AS otherSource,
+    EXISTS(SELECT 1 FROM google_calendar_connections gc
+      WHERE gc.staff_id=a.staff_id AND gc.line_account_id=a.line_account_id AND gc.is_active=1) AS calendarConnected
     FROM bookings a INNER JOIN bookings b ON a.id < b.id AND a.line_account_id=b.line_account_id AND a.staff_id=b.staff_id
     INNER JOIN staff s ON s.id=a.staff_id AND s.line_account_id=a.line_account_id
+    INNER JOIN menus am ON am.id=a.menu_id AND am.line_account_id=a.line_account_id
+    INNER JOIN menus bm ON bm.id=b.menu_id AND bm.line_account_id=b.line_account_id
+    LEFT JOIN friends af ON af.id=a.friend_id AND af.line_account_id=a.line_account_id
+    LEFT JOIN friends bf ON bf.id=b.friend_id AND bf.line_account_id=b.line_account_id
+    LEFT JOIN booking_customers ac ON ac.id=a.booking_customer_id AND ac.line_account_id=a.line_account_id
+    LEFT JOIN booking_customers bc ON bc.id=b.booking_customer_id AND bc.line_account_id=b.line_account_id
     WHERE a.line_account_id = ? AND a.status IN ('requested','confirmed') AND b.status IN ('requested','confirmed')
       AND julianday(a.starts_at) < julianday(b.ends_at) AND julianday(b.starts_at) < julianday(a.ends_at)
-    ORDER BY a.starts_at,a.id,b.id`).bind(accountId).all<BookingConflict>();
-  return rows.results;
+    ORDER BY a.starts_at,a.id,b.id`).bind(accountId).all<Omit<BookingConflict, 'bookings' | 'reasonCode' | 'reason' | 'calendarConnected' | 'guidance'> & {
+      customerName: string; otherCustomerName: string; menuName: string; otherMenuName: string;
+      source: BookingReceptionSource; otherSource: BookingReceptionSource; calendarConnected: number;
+    }>();
+  return rows.results.map(({ customerName, otherCustomerName, menuName, otherMenuName, source, otherSource, calendarConnected, ...pair }) => ({
+    ...pair,
+    bookings: [
+      { bookingId: pair.bookingId, customerName, menuName, staffId: pair.staffId, staffName: pair.staffName,
+        startsAt: pair.startsAt, endsAt: pair.endsAt, source, sourceLabel: BOOKING_SOURCE_LABELS[source], version: pair.version },
+      { bookingId: pair.otherBookingId, customerName: otherCustomerName, menuName: otherMenuName, staffId: pair.staffId, staffName: pair.staffName,
+        startsAt: pair.otherStartsAt, endsAt: pair.otherEndsAt, source: otherSource, sourceLabel: BOOKING_SOURCE_LABELS[otherSource], version: pair.otherVersion },
+    ],
+    reasonCode: 'same_staff_time_overlap',
+    reason: '同じ担当の予約時間が重なっています。',
+    calendarConnected: Boolean(calendarConnected),
+    guidance: calendarConnected ? null : '担当のGoogleカレンダーをつなぎ、外の予約もカレンダーへ書き出すと、次から重なりを防げます。',
+  }));
 }
 
 export async function bookingAutomaticNotificationAllowed(db: D1Database, accountId: string): Promise<boolean> {

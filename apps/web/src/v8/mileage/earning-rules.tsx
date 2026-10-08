@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, MoreHorizontal, Plus, TriangleAlert, Wallet } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, TriangleAlert, Wallet } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -25,7 +25,7 @@ import {
   type MileageEarningRuleV6,
   type MileageEarningRulesV6Overview,
 } from '@/lib/api'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -722,18 +722,10 @@ export default function EarningRulesTab() {
     const active = rule.published.status === 'published'
     return (
       <div className={styles.menuBox}>
-        <IconButton
-          aria-label={`${rule.draft.name}の操作`}
-          title={`${rule.draft.name}の操作`}
-          aria-expanded={menuId === rule.id}
-          onClick={() => setMenuId((current) => (current === rule.id ? null : rule.id))}
-        >
-          <MoreHorizontal size={16} aria-hidden="true" />
-        </IconButton>
-        <ActionMenu
+        <RowMenu
+          label={`${rule.draft.name}の操作`}
           open={menuId === rule.id}
-          ariaLabel={`${rule.draft.name}の操作`}
-          onClose={() => setMenuId(null)}
+          onOpenChange={(next) => setMenuId(next ? rule.id : null)}
           items={[
             /* 閲覧のみの人には、変える操作を出さない（押せない形で残さない）。 */
             ...(readonly ? [] : [
@@ -916,7 +908,7 @@ export default function EarningRulesTab() {
       }
       stats={stats}
       folders={<>{createButton(true)}{folderPanel}</>}
-      collapsedFolders={undefined}
+      folderNav={narrow ? undefined : { rows: FOLDERS.map((item) => ({ id: item.key, label: item.label })), activeId: folder, onSelect: (id) => resetPage(() => setFolder(id as FolderKey)), createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

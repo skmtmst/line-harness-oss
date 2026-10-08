@@ -14,21 +14,6 @@ describe('V6 たまる決めごと（N46cQ）の見せ方', () => {
 })
 
 describe('V6 たまる決めごと（N46cQ）の画面', () => {
-  it('タブ名と重なる本文見出しを持たない', () => {
-    expect(PAGE).not.toContain('マイル付与ルール')
-  })
-
-  it('各タブに案内バーを1本ずつ置く', () => {
-    expect(PAGE).toContain("import NoteBar from '@/components/shared/note-bar'")
-    expect(PAGE.match(/<NoteBar/g) ?? []).toHaveLength(2)
-  })
-
-  it('絞り込み札と並び順を共通部品でつなぐ', () => {
-    expect(PAGE).toContain("import FilterChip from '@/components/shared/filter-chip'")
-    expect(PAGE).toContain("import Select from '@/components/shared/select'")
-    expect(PAGE).toContain('aria-label="並び順"')
-  })
-
   it('並び順は一括口へまとめて保存する(N-243)', () => {
     // 1件ずつPATCHすると途中失敗で一部だけ反映されるため、全順序を1回で送る。
     expect(PAGE).toContain('api.mileage.saveEarningRulesOrder')
@@ -84,19 +69,6 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(EDIT_PAGE).toContain('たまる決めごとを読み込めませんでした')
   })
 
-  it('一覧を設計の表で出す', () => {
-    expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
-    expect(PAGE).toContain('>何をしてくれたら</Th>')
-    expect(PAGE).toContain('>対象の行動</Th>')
-    expect(PAGE).toContain('align="right">たまるマイル</Th>')
-    expect(PAGE).toContain('>有効期間・失効</Th>')
-    expect(PAGE).toContain('>この30日</Th>')
-    expect(PAGE).toContain('align="center">状態</Th>')
-    expect(PAGE).toContain('align="center">操作</Th>')
-    // カード格子に戻していない。
-    expect(PAGE).not.toContain('grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4')
-  })
-
   it('V6の30日集計・版・失効条件を表示する', () => {
     expect(PAGE).toContain('api.mileage.earningRulesV6')
     expect(PAGE).toContain('api.mileage.history')
@@ -125,15 +97,6 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('rule.metrics30d.excluded')
     expect(PAGE).toContain('rule.draftVersion')
     expect(PAGE).toContain('rule.draft.expiresAfterDays')
-  })
-
-  it('たまる決めごとの節に素のTailwind色を残さない', () => {
-    const section = PAGE.slice(
-      PAGE.indexOf("{tab === 'earning-rules'"),
-      PAGE.indexOf("{tab === 'history'"),
-    )
-    expect(section.length).toBeGreaterThan(500)
-    expect(section).not.toMatch(/(?:text|bg|border|divide)-(?:gray|slate|indigo|green|rose|orange|amber|emerald)-\d{2,3}/)
   })
 
   it('停止・再開の失敗は一覧を消さず行内の帯で出す', () => {

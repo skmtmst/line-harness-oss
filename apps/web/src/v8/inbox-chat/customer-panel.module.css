@@ -1,0 +1,73 @@
+/*
+ * ★V8 受信箱の右の列「その人の要点」（M0393 XqSvX）：顔52・名前15/600・追加日12、
+ * 要点の行（鍵12 薄い字・値13/500）、その下に「顧客情報」の節。値は --tpl-inbox-*。
+ */
+.person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-inbox-head-tools-gap);
+  padding: var(--tpl-inbox-summary-pad) var(--tpl-inbox-summary-pad) 0;
+  text-align: center;
+}
+.personName {
+  max-width: 100%;
+  color: var(--color-ink);
+  font-size: var(--tpl-inbox-chead-name);
+  font-weight: 600;
+  line-height: var(--tpl-inbox-chead-name-lh);
+}
+.personSub { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); }
+.blocked { color: var(--color-ink-faint); font-size: var(--text-micro); }
+.personActions { display: flex; align-items: center; justify-content: center; gap: var(--tpl-inbox-composer-gap); margin-top: var(--tpl-inbox-head-tools-gap); }
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-inbox-summary-gap);
+  padding: var(--tpl-inbox-summary-gap) var(--tpl-inbox-summary-pad) var(--tpl-inbox-summary-pad);
+}
+.summaryRow { display: flex; min-width: 0; flex-direction: column; gap: var(--tpl-inbox-seg-gap); }
+.summaryRow dt { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); }
+.summaryRow dd {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-inbox-row-preview-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.empty { color: var(--color-ink-faint); font-weight: 400; }
+/* 右の欄の中身：顔・要点・顧客情報の枠を縦に並べる（v7 の線の区切りは使わない）。 */
+.body { display: flex; flex-direction: column; padding-bottom: var(--tpl-inbox-summary-pad); }
+/* 顧客情報の枠（XqSvX：角丸12・薄い枠・内側16）。中の節は線で区切る。 */
+.infoCard {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  margin: 0 var(--tpl-inbox-summary-pad);
+  padding: var(--tpl-inbox-info-card-pad) 0 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+}
+.infoTitle {
+  position: relative;
+  z-index: 1;
+  padding: 0 var(--tpl-inbox-info-card-pad) var(--tpl-inbox-head-tools-gap);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+}
+.infoSections { display: flex; flex-direction: column; margin-top: -1px; } /* 見出しのすぐ下の節の線を見出しの地で隠す（並べ替えても先頭に線を出さない） */
+/* 節の左右は枠の内側にそろえ、上に区切りの線（枠の内側16の幅）。 */
+.infoSections > div {
+  margin: 0 var(--tpl-inbox-info-card-pad);
+  padding-right: 0;
+  padding-left: 0;
+  box-shadow: var(--tpl-inbox-line-top);
+}
+.infoSections > div:empty { display: none; }
+/* その場で直す欄（B-26）：見出しとの間を空け、共通部品の幅は欄いっぱい。 */
+.editField { margin-top: var(--tpl-inbox-head-tools-gap); }
+.editField :global(*) { max-width: 100%; }

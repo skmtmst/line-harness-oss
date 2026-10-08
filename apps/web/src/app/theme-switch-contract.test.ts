@@ -18,7 +18,10 @@ const settings = readFileSync(join(WEB, 'src/v8/settings/features/screen.tsx'), 
 describe('テーマの切り替え（V8 移行②）', () => {
   it('<html> に data-theme が出る。既定は v7、環境変数 NEXT_PUBLIC_ADMIN_THEME=v8 で v8 にできる', () => {
     expect(layout).toContain('data-theme={ADMIN_THEME}')
-    expect(layout).toContain("NEXT_PUBLIC_ADMIN_THEME === 'v8' ? 'v8' : 'v7'")
+    // 既定の読み方は lib/admin-theme-default.ts に1つだけ（React の初期状態と同じ関数）。
+    expect(layout).toContain('const ADMIN_THEME = adminThemeDefault()')
+    expect(readFileSync(join(WEB, 'src/lib/admin-theme-default.ts'), 'utf8'))
+      .toContain("NEXT_PUBLIC_ADMIN_THEME === 'v8' ? 'v8' : 'v7'")
   })
 
   it('担当者の localStorage 指定を描画前に反映する短いスクリプトがある', () => {

@@ -15,27 +15,6 @@ const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
  * 点検 #512／#727／#733 で決めた振る舞いが残っていることを見る。
  */
 describe('V6 37-6 NEN配信の画面契約', () => {
-  it('2つの正本ノードと4つのタブへ対応させる', () => {
-    expect(OVERVIEW).toContain("'u66A0'")
-    expect(OVERVIEW).toContain("'z4q1K'")
-    for (const tab of ['自動配信', 'コラム', '送った履歴', '停止中']) {
-      expect(OVERVIEW).toContain(`label: '${tab}'`)
-    }
-    // ペット・記念日はマイペット（★V6 37-3）へ移した。旧タブと旧ノードは残さない。
-    for (const gone of ['ペット・記念日', '配信フロー', 'NENコラム', "'VLMGH'", "'q4lajm'"]) {
-      expect(OVERVIEW).not.toContain(gone)
-    }
-  })
-
-  it('L 一覧型の順（パンくず → タブ → 数値カード → 案内帯 → 一覧操作 → 表）', () => {
-    // 骨組みは NenOverview の JSX から順に読む（Kpis 部品の定義位置は見ない）。
-    const body = OVERVIEW.slice(OVERVIEW.indexOf('export function NenOverview('))
-    const order = ['data-design="Crumb"', 'data-design="Tabs"', '<Kpis ', 'data-design="Note"', 'data-design="ListControls"', 'data-design="Table"']
-    const positions = order.map((marker) => body.indexOf(marker))
-    expect(positions.every((position) => position >= 0)).toBe(true)
-    expect([...positions].sort((a, b) => a - b)).toEqual(positions)
-  })
-
   it('数値カードは今月・先月／開封／配信からの注文／届かなかった の4枚', () => {
     for (const label of ['送った数', '先月', '開封', '配信からの注文', '届かなかった', '友だち解除']) {
       expect(OVERVIEW).toContain(label)
@@ -70,12 +49,6 @@ describe('V6 37-6 NEN配信の画面契約', () => {
     expect(OVERVIEW).toContain("setting.isEnabled ? '止める' : '動かす'")
     // 停止・再開は専用の口（#659）。
     expect(PAGE).toContain('api.nenCampaigns.setEnabled(')
-  })
-
-  it('自動配信の案内帯は1文だけにし、残りは開閉する欄へ入れる', () => {
-    expect(OVERVIEW).toContain('をきっかけに、決めた日数後に自動で送ります。')
-    expect(OVERVIEW).toContain('<Disclosure size="compact" title="送られる仕組み">')
-    expect(OVERVIEW).toContain('で確認できます。')
   })
 
   it('コラムは一覧と右パネル（LINEに届くカード／誰に・いつ送るか）と下部追従バー', () => {

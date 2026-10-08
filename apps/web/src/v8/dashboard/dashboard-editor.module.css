@@ -1,0 +1,249 @@
+/* ★V8 ダッシュボード編集（mcOqK）。値は globals.css の --tpl-de-*。 */
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-de-head-gap);
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-de-hint-lh);
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-de-group-gap);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-de-list-gap);
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-de-row-gap);
+}
+
+.groupTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-de-name-lh);
+  white-space: nowrap;
+}
+
+.groupNote {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-de-hint-lh);
+  white-space: nowrap;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-de-list-gap);
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-de-row-gap);
+  border-radius: var(--radius-segment);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+  background: var(--color-canvas);
+  padding: var(--tpl-de-row-pad);
+}
+
+.row[data-off] {
+  background: var(--color-table-head);
+}
+
+.row[data-dragging] {
+  z-index: 1;
+  box-shadow: var(--shadow-card);
+}
+
+.grip {
+  color: var(--color-ink-faint);
+}
+
+.grip svg {
+  width: var(--tpl-de-row-grip);
+  height: var(--tpl-de-row-grip);
+}
+
+.names {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.name,
+.where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-de-name-lh);
+}
+
+.row[data-off] .name {
+  color: var(--color-ink-faint);
+}
+
+.where {
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  line-height: var(--tpl-de-sub-lh);
+}
+
+.moves {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--tpl-de-row-gap);
+}
+
+.limitTitle {
+  display: block;
+  font-weight: 600;
+}
+
+.limitText {
+  display: block;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-de-row-gap);
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.resetLink {
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  padding: var(--tpl-de-row-pad);
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.resetLink:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.resetLink:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.resetLink:focus-visible {
+  outline: var(--tpl-de-focus) solid var(--color-action);
+  outline-offset: var(--tpl-de-focus);
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-de-preview-gap);
+}
+
+.previewHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-de-row-gap);
+}
+
+.previewBoard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-de-preview-gap);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+  padding: var(--tpl-de-preview-pad);
+}
+
+.previewSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-de-list-gap);
+}
+
+.previewLabel,
+.previewEmpty {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-nano);
+  font-weight: 600;
+}
+
+.previewToday {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tpl-de-list-gap);
+}
+
+.previewColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tpl-de-preview-aside-w);
+  gap: var(--tpl-de-list-gap);
+}
+
+.previewStack {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--tpl-de-list-gap);
+}
+
+.previewCard {
+  display: block;
+  min-height: var(--tpl-de-preview-card-min);
+  overflow: hidden;
+  border-radius: var(--radius-segment);
+  background: var(--color-canvas);
+  padding: var(--tpl-de-preview-card-pad);
+  color: var(--color-ink);
+  font-size: var(--text-nano);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewCard[data-aside] {
+  min-height: 0;
+  padding: var(--tpl-de-row-pad);
+}
+
+.previewCard[data-muted] {
+  background: transparent;
+  outline: 1px dashed var(--color-hairline);
+  color: var(--color-ink-faint);
+}

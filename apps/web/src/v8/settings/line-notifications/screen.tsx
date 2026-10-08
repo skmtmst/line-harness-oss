@@ -11,13 +11,14 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
-import NotificationRunList from '@/components/line-notifications/notification-run-list'
 import KpiBand from '@/components/shared/kpi-band'
 import Toggle from '@/components/shared/toggle'
-import { CircleDot, Info, Star } from 'lucide-react'
+import { CircleDot, Download, Info, Plus, Star } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
+import OperatorTab from './operator-tab'
+import RunsTab from './runs-tab'
 import styles from './screen.module.css'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -266,7 +267,14 @@ type CustomerMutationOutcome =
       settleDraft: boolean
     }
   | { kind: 'stale'; contentSaved: boolean; settleDraft: false }
-  | { kind: 'failed'; message: string; contentSaved: boolean; settleDraft: false }
+  | {
+      kind: 'failed'
+      message: string
+      contentSaved: boolean
+      settleDraft: false
+      /** WEB199：作れたあと公開だけ失敗した定義。覚えておき、やり直しは同じ定義を公開する。 */
+      createdDefinition?: LineNotificationDefinition
+    }
 
 /**
  * 送った文面が、いまも画面の文面と同じアカウント・同じ中身で残っているか。
@@ -352,7 +360,7 @@ async function sendCustomerTestNotification(args: {
   }
 }
 
-async function saveCustomerNotification(args: {
+export async function saveCustomerNotification(args: {
   api: CustomerMutationApi
   accountId: string
   setting: EcNotificationSetting
@@ -361,6 +369,7 @@ async function saveCustomerNotification(args: {
   guard: CustomerMutationGuard
 }): Promise<CustomerMutationOutcome> {
   const { setting, definition, enabled, guard } = args
+  let created: Awaited<ReturnType<CustomerMutationApi['createDefinition']>> | null = null
   try {
     if (definition && enabled === setting.isEnabled) {
       const result = await args.api.updateDraft(definition.id, customerDraftPayload(setting, definition))
@@ -391,7 +400,7 @@ async function saveCustomerNotification(args: {
      * テーブルへの二重書き込みをやめる。`key` はイベントごとに固定し、
      * 同じ設定から定義が2つ生えないようにする。
      */
-    const created = await args.api.createDefinition({
+    created = await args.api.createDefinition({
       lineAccountId: args.accountId,
       key: `ec:${setting.eventType}`,
       name: setting.title || setting.label,
@@ -431,7 +440,17 @@ async function saveCustomerNotification(args: {
       contentSaved: true, settleDraft,
     }
   } catch {
-    if (isStale(guard)) return { kind: 'stale', contentSaved: false, settleDraft: false }
+    const createdDefinition = created?.success ? created.data : undefined
+    if (isStale(guard)) return { kind: 'stale', contentSaved: Boolean(createdDefinition), settleDraft: false }
+    if (createdDefinition) {
+      return {
+        kind: 'failed',
+        message: `${setting.label}の下書きは作りましたが、出せませんでした。もう一度お試しください。`,
+        contentSaved: true,
+        settleDraft: false,
+        createdDefinition,
+      }
+    }
     return { kind: 'failed', message: `${setting.label}を保存できませんでした。`, contentSaved: false, settleDraft: false }
   }
 }
@@ -639,6 +658,8 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   /* 変える操作（出す・止める・文面を直す）はオーナー・管理者だけ。閲覧のみには押せないボタンを置かない。役割が分かるまでは今までどおり出す。 */
   const staffRole = useStaffRole()
   const canManage = staffRole ? canManageRole(staffRole) : true
+  /* 運用者へのお知らせ（u8xibp）：板の頭の「CSVで書き出す」で開く理由の窓。 */
+  const [operatorExportOpen, setOperatorExportOpen] = useState(false)
   /*
    * N-340: `loadGeneration` は load() の useEffect の中でしか進まない。
    * アカウント切替の描画コミットと、その useEffect が実際に発火する瞬間の
@@ -652,7 +673,8 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   selectedAccountRef.current = selectedAccountId
   const tab = useMergedTab(TABS, 'tab', 'customer')
   const [settings, setSettings] = useState<EcNotificationSetting[]>([])
-  const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
+  // 読めたことの確かめだけに使う（WEB198：件数としては出さない）。
+  const [, setOverview] = useState<EcCommerceOverview | null>(null)
   const [definitions, setDefinitions] = useState<LineNotificationDefinition[]>([])
   const [sendCounts, setSendCounts] = useState<LineNotificationSendCounts | null>(null)
   // send-countsだけ取れなかった・形が違ったときの印。一覧全体は表示を続ける。
@@ -663,6 +685,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   const [loadState, setLoadState] = useState<CustomerLoadState>('loading')
   const [busy, setBusy] = useState<string | null>(null)
   const [pendingToggle, setPendingToggle] = useState<EcNotificationSetting | null>(null)
+  const [definitionsFailed, setDefinitionsFailed] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   /*
@@ -705,6 +728,8 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
     setQuota(null)
     setNotice(null)
     setCloseConfirmOpen(false)
+    // WEB197：出す・止めるの確認も、前のアカウントの通知のまま残さない。
+    setPendingToggle(null)
     // アカウントを切り替えたら、前のアカウント宛の確認は残さない。
     setTestSendDraft(null)
     testRecipientGeneration.current += 1
@@ -785,6 +810,8 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       if (stale()) return
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
       const loadedDefinitions = definitionRes?.success ? definitionRes.data : []
+      // WEB199：定義が読めなかったことを「定義が無い」と見なさない（作り直して重複にしない）。
+      setDefinitionsFailed(needCustomer && !definitionRes?.success)
       const loadedDefinitionByEvent = new Map(loadedDefinitions.map((definition) => [definition.sourceEventType, definition]))
       const mergedSettings = settingRes.data.map((setting) => {
         const definition = loadedDefinitionByEvent.get(setting.eventType)
@@ -908,7 +935,9 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
     sentToday: typeof sendCounts?.sentToday === 'number' ? sendCounts.sentToday : null,
     sentLast30d: typeof sendCounts?.sentLast30d === 'number' ? sendCounts.sentLast30d : null,
     sentBreakdown,
-    failed: overview?.failed ?? null,
+    // WEB198：EC の取り込み失敗（overview.failed）は「送れなかったお知らせ」の数ではない。
+    // 送れなかった通数を返す口がまだ無いので「—」にする（Codex に依頼）。
+    failed: null,
     quota,
     loadFailed: customerLoadFailed,
   })
@@ -924,7 +953,8 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
     if (item.key === 'customer') return { ...item, label: `${item.label} ${loadState === 'ready' ? settings.length : '—'}` }
     // N-341: 運用者タブの件数は実データ。取れなかったときは「取得失敗」と区別する。
     if (item.key === 'operator') return { ...item, label: `${item.label} ${operatorTabCountLabel(operatorState, operatorCount)}` }
-    if (item.key === 'failures') return { ...item, label: `${item.label} ${overview?.failed ?? '—'}` }
+    // WEB198：EC の取り込み失敗の数を「送れなかった」の件数として出さない。
+    if (item.key === 'failures') return item
     return item
   })
   const update = (eventType: string, patch: Partial<EcNotificationSetting>) => setSettings((current) => current.map((setting) => setting.eventType === eventType ? { ...setting, ...patch } : setting))
@@ -1014,7 +1044,17 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       setDirtyEvents((prev) => prev.filter((value) => value !== setting.eventType))
     }
     if (outcome.kind === 'stale' || generation !== loadGeneration.current) return
-    if (outcome.kind === 'failed') { setNotice({ tone: 'error', text: outcome.message }); return }
+    if (outcome.kind === 'failed') {
+      // WEB199：作れた定義は一覧に足す（やり直しで同じキーの作成をもう一度送らない）。
+      const createdDefinition = outcome.createdDefinition
+      if (createdDefinition) {
+        setDefinitions((current) => current.some((item) => item.id === createdDefinition.id)
+          ? current.map((item) => item.id === createdDefinition.id ? createdDefinition : item)
+          : [...current, createdDefinition])
+      }
+      setNotice({ tone: 'error', text: outcome.message })
+      return
+    }
     const saved = outcome.definition
     // N-330: 従来設定から作った新しい定義は、一覧に無いので足す。
     if (saved) setDefinitions((current) => current.some((item) => item.id === saved.id)
@@ -1032,6 +1072,10 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   const save = async (setting: EcNotificationSetting, enabled = setting.isEnabled) => {
     if (!setting.title?.trim()) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
+    if (definitionsFailed && !definitionByEvent.get(setting.eventType)) {
+      setNotice({ tone: 'error', text: 'お知らせの設定を読み込めなかったため、保存できません。読み直してから、もう一度お試しください。' })
+      return
+    }
     const accountId = selectedAccountId
     const guard = guardFor(setting)
     setBusy(setting.eventType)
@@ -1121,6 +1165,10 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   return <SbSettingsScreen
     boardId={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}
     layout="narrow-nav"
+    actions={tab === 'operator' && expandedSetting === null && canManage ? <>
+      <Button onClick={() => setOperatorExportOpen(true)} disabled={!selectedAccountId}><Download aria-hidden="true" size={15} />CSVで書き出す</Button>
+      <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
+    </> : undefined}
     title="LINE通知"
     description="注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。"
   >
@@ -1141,9 +1189,11 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       </p>
     ) : null}
     {!canManage && expandedSetting === null ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</p> : null}
-    {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
-    {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
-    {tab === 'operator' ? renderOperatorRules?.(selectedAccountId) : null}
+    {tab === 'failures' ? <RunsTab lineAccountId={selectedAccountId} mode="failures" /> : null}
+    {tab === 'history' ? <RunsTab lineAccountId={selectedAccountId} mode="history" /> : null}
+    {tab === 'operator' ? (renderOperatorRules
+      ? renderOperatorRules(selectedAccountId)
+      : <OperatorTab lineAccountId={selectedAccountId} canManage={canManage} exportOpen={operatorExportOpen} onExportClose={() => setOperatorExportOpen(false)} />) : null}
     {tab === 'customer' && expandedSetting ? <>
       <CustomerNotificationEditor
         setting={expandedSetting}

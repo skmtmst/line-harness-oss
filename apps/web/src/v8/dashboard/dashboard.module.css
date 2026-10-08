@@ -28,7 +28,7 @@
 :global([data-theme='v8']) .todayBand.todayBand > * { padding: var(--tpl-db-cell-pad); gap: var(--tpl-db-cell-gap); }
 :global([data-theme='v8']) .todayBand.todayBand [data-kpi-number] { font-size: var(--tpl-db-num-size); line-height: var(--tpl-db-num-lh); font-variant-numeric: normal; }
 :global([data-theme='v8']) .todayBand.todayBand [data-kpi-number] + span { font-size: var(--tpl-db-unit-size); line-height: var(--tpl-db-unit-lh); }
-.cellMenu.cellMenu { width: var(--tpl-db-menu); height: var(--tpl-db-menu); min-width: 0; min-height: 0; box-shadow: none; outline: 0; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); }
+.cellMenu.cellMenu { width: var(--tpl-db-menu); height: var(--tpl-db-menu); flex-basis: var(--tpl-db-menu); min-width: 0; min-height: 0; box-shadow: none; outline: 0; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); }
 .cellDetail {
   display: flex; flex-wrap: wrap; gap: var(--tpl-db-row-gap) var(--tpl-db-fig-gap);
   padding: var(--tpl-db-th-pad); border-bottom: 1px solid var(--color-hairline);
@@ -66,6 +66,8 @@
   color: var(--color-action); font: inherit; font-weight: 500;
 }
 .inlineButton:hover { text-decoration: underline; }
+/* 文の中・行の右の小さな文字の操作は、押せる最小の高さ 32 で行を押し広げない（数のマスの「もう一度試す」と同じ）。 */
+.inlineButton, .retryDanger, .inlineAction { min-height: 0; }
 .retryDanger { align-self: flex-start; padding: 0; border: 0; background: transparent; cursor: pointer; color: var(--color-danger); font-size: var(--text-caption); font-weight: 500; }
 .alert { margin: 0; color: var(--color-danger); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); }
 .stale { margin: 0; color: var(--color-status-warn-deep); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); }
@@ -88,9 +90,18 @@ a.kv:hover .kvKey { text-decoration: underline; }
 .dot { width: var(--tpl-db-dot); height: var(--tpl-db-dot); flex-shrink: 0; border-radius: var(--radius-pill); background: var(--color-ink-faint); }
 .dot_success { background: var(--color-success); }
 .dot_danger { background: var(--color-danger); }
+/* 状態の色の丸（受信箱の状態の札と同じ色：未対応 赤・対応中 橙・保留 灰・対応済み 緑）。 */
+.dot_warning { background: var(--color-warning); }
+/* 行の右に小さな操作（接続状態の「確かめる」）。 */
+.kvWithAction { display: flex; align-items: center; gap: var(--tpl-db-kv-gap); min-width: 0; }
+.kvWithAction > .kv { flex: 1; min-width: 0; }
+.inlineAction { flex-shrink: 0; padding: 0; border: 0; background: transparent; cursor: pointer; color: var(--color-action); font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-db-caption-lh); white-space: nowrap; }
+.inlineAction:hover { text-decoration: underline; }
+.inlineAction:disabled { cursor: default; color: var(--color-ink-faint); text-decoration: none; }
 .quota { display: flex; align-items: flex-end; gap: var(--tpl-db-quota-gap); margin: 0; white-space: nowrap; }
 .quotaPre { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); }
-.quotaNum { color: var(--color-ink); font-family: var(--font-inter), Inter, sans-serif; font-size: var(--tpl-db-quota-size); font-weight: 600; line-height: var(--tpl-db-quota-lh); letter-spacing: var(--tpl-db-num-ls); }
+/* 数字は絵と同じ比例幅（右の列の等幅の数字を受けない）。 */
+.quotaNum { color: var(--color-ink); font-family: var(--font-inter), Inter, sans-serif; font-variant-numeric: normal; font-size: var(--tpl-db-quota-size); font-weight: 600; line-height: var(--tpl-db-quota-lh); letter-spacing: var(--tpl-db-num-ls); }
 .track { position: relative; display: block; width: 100%; height: var(--tpl-db-bar-h); border-radius: var(--tpl-db-bar-radius); background: var(--color-track); overflow: hidden; }
 .fill, .fillDanger { position: absolute; inset: 0 auto 0 0; border-radius: var(--tpl-db-bar-radius); background: var(--color-accent-deep); }
 .fillDanger { background: var(--color-danger); }
@@ -124,7 +135,7 @@ a.kv:hover .kvKey { text-decoration: underline; }
 .barLatest { background: var(--color-accent-deep); }
 .barBlocked { background: var(--color-control-border); }
 .day, .dayLatest {
-  width: var(--tpl-db-chart-day-w); margin-top: var(--tpl-db-chart-label-gap); color: var(--color-ink-faint);
+  width: var(--tpl-db-chart-day-w); margin-top: var(--tpl-db-chart-label-gap); color: var(--color-ink-faint); text-align: center;
   font-size: var(--text-micro); line-height: var(--tpl-db-small-lh); white-space: nowrap;
 }
 .dayLatest { color: var(--color-ink); font-weight: 600; }
@@ -192,14 +203,20 @@ a.planTitle:hover { text-decoration: underline; }
 
 /* 段の題は絵の高さ（23）。「？」の当たり（28）は上下へはみ出させ、段を押し広げない。 */
 .head { display: flex; flex-direction: column; justify-content: center; height: var(--tpl-db-head-h); flex-shrink: 0; }
+
+/*
+ * 板が狭い幅（右の列が1マス分＝約250px 以下になる 1280 以下）：
+ * 右の列の左右の余白を少し詰め、題（「現在の対応状況」など）を「…」で切らない。
+ * さらに狭い板（1152）では、題と行き先が1行に入らない段だけ行き先を次の行へ回すので、題の箱の高さを中身に合わせる。
+ */
+@container v8-page (max-width: 1099px) {
+  .asideBlock { padding: var(--tpl-db-aside-pad-narrow); }
+}
+@container v8-page (max-width: 959px) {
+  .head { height: auto; min-height: var(--tpl-db-head-h); }
+}
 /* グラフ／表の小さな切り替えは絵の高さ（項目 24・全体 28）。押せる最小の高さ 32 をここだけ外す。 */
 .trendTools [data-size='small'] button { min-height: 0; }
 
-/* 型が右の列を隠す幅では、右の列のカードを横並びの段で出す（数字を落とさない）。 */
-.narrowAside { display: none; }
-@container v8-page (max-width: 1099px) {
-  .narrowAside { display: block; }
-}
 /* 数のマスの下の補足は1行（狭い幅で2行に割らない）。全文は内訳で読める。 */
 .todayBand > * > p:last-child > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.narrowAside .asideBlock { padding: 0; }

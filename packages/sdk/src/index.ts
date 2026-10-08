@@ -40,6 +40,7 @@ export type {
   Broadcast,
   CreateBroadcastInput,
   UpdateBroadcastInput,
+  BroadcastSendOptions,
   SegmentRule,
   SegmentCondition,
   StepDefinition,

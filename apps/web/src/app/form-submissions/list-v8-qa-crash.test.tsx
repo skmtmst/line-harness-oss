@@ -326,12 +326,12 @@ describe('V8 サクサク感 A・B', () => {
       .filter((b) => !b.getAttribute('aria-label'))
       .map((b) => b.textContent)
     expect(order()[1]).toContain('受付中')
-    // 1つ目の箱の「…」から「並び順を下へ」。
+    // 1つ目の箱の「…」から「並べ替える（下へ）」（V8 の言葉・nH0fZ）。
     const menuButton = aside!.querySelector('button[aria-label="フォルダ「受付中」の操作"]')
     expect(menuButton).not.toBeNull()
     await act(async () => { fireEvent.click(menuButton!) })
     await flush()
-    const down = [...document.querySelectorAll('[role="menuitem"]')].find((m) => m.textContent === '並び順を下へ')
+    const down = [...document.querySelectorAll('[role="menuitem"]')].find((m) => m.textContent === '並べ替える（下へ）')
     expect(down).toBeTruthy()
     await act(async () => { fireEvent.click(down!) })
     await flush()

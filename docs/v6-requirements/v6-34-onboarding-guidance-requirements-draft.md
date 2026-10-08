@@ -1,5 +1,7 @@
 # V6 34 はじめの設定と案内 要件定義（実装照合版・下書き）
 
+> この文書は機能（動き）の正本。見た目は ★V8（[docs/v8-design-rules.md](../v8-design-rules.md)）が正本で、この文書の見た目・ノードID・V6 の絵の指定は使わない。
+
 作成日: 2026-09-03
 対象: 初回セットアップの順路、レシピ、マニュアル導線、エラー文面の対応表、空状態の文言規則。現行 `packages/create-line-harness`、Worker `/setup` 導入ガイド、共通トップバー `shared/top-bar.tsx`、`lib/manual-links.ts`、`shared/not-connected.tsx`、`shared/list-state.tsx`、各 route のエラー応答
 

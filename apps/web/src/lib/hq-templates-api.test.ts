@@ -9,10 +9,33 @@ const transport = vi.hoisted(() => {
   return { request: vi.fn(), ApiError }
 })
 vi.mock('./api', () => ({ fetchApi: transport.request, ApiError: transport.ApiError }))
-import { hqTemplatesApi, HqTemplatesApiError } from './hq-templates-api'
+import { hqTemplatesApi, HqTemplatesApiError, type HqTemplateListItem } from './hq-templates-api'
 const request = transport.request
 beforeEach(() => { request.mockReset(); request.mockResolvedValue({ success: true, data: { value: 'ok' } }) })
 describe('HQ template API transport', () => {
+  it('6種類のフィルタと件数を取得し、リッチ画像の5サイズを同じtransportで送る',async()=>{
+    await hqTemplatesApi.listByKind('carousel')
+    expect(request).toHaveBeenCalledWith('/api/hq/templates?type=template&kind=carousel',{method:'GET'})
+    const counts={message:1,carousel:2,rich_message:3,question:4,coupon:5,research:6}
+    request.mockResolvedValue({success:true,data:counts})
+    expect(await hqTemplatesApi.kindCounts()).toEqual(counts)
+    const file=new File(['fixture'],'rich.png',{type:'image/png'})
+    const uploaded={media:[],payload:{baseSize:{width:1040,height:1040}}}
+    request.mockResolvedValue({success:true,data:uploaded})
+    expect(await hqTemplatesApi.uploadRichMessageImage(file)).toEqual(uploaded)
+    expect(request).toHaveBeenLastCalledWith('/api/hq/templates/media?purpose=rich_message&filename=rich.png',{method:'POST',headers:{'Content-Type':'image/png'},body:file})
+  })
+  it('一覧の配布先名・残り件数・要約を共有型のまま返す', async () => {
+    const rows: HqTemplateListItem[] = [{ id: 't1', name: 'ご案内', description: null, template_type: 'template', revision: 1,
+      updated_at: '2026-10-07T00:00:00Z', distributed_account_names: ['本店','渋谷店','イベント'],
+      distributed_account_more: 2, distributed_account_count: 5, content_summary: '本文・画像 1' }];
+    request.mockResolvedValue({ success: true, data: rows });
+    const list = await hqTemplatesApi.list('template');
+    expect(list).toEqual(rows);
+    expect(request).toHaveBeenCalledWith('/api/hq/templates?type=template', { method: 'GET' });
+    request.mockResolvedValue({ success: true, data: [{ ...rows[0], content_summary: null }] });
+    expect((await hqTemplatesApi.list())[0].content_summary).toBeNull();
+  });
   it('配布先の版と作った名前を、既存の項目や件数を残して返す', async () => {
     const preflight = { preflightId: 'p1', expiresAt: '2026-10-07T00:00:00Z', stores: [{ accountId: 'a', accountName: '試験店舗',
       items: [], targetVersion: { version: 2, latestVersion: 2, status: 'latest', label: '版2（最新）' } }] };
@@ -98,3 +121,12 @@ describe('HQ template API transport', () => {
     expect(error.message).not.toContain('D1_ERROR')
   })
 })
+
+it('統括の版履歴・比較・復元・受取版と件数を認証済みtransportで呼ぶ',async()=>{
+ await hqTemplatesApi.versions('t/1');expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t%2F1/versions',{method:'GET'});
+ await hqTemplatesApi.compareVersions('t1',1,3);expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t1/versions/compare?from=1&to=3',{method:'GET'});
+ await hqTemplatesApi.restoreVersion('t1',2,4);expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t1/versions/2/restore',{method:'POST',body:JSON.stringify({expectedRevision:4})});
+ await hqTemplatesApi.receivedVersions('t1');expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t1/received-versions',{method:'GET'});
+ request.mockResolvedValue({success:true,stats:{thisMonthSentCount:12,outdatedTemplateCount:2}});
+ expect(await hqTemplatesApi.listStats()).toEqual({thisMonthSentCount:12,outdatedTemplateCount:2});
+});

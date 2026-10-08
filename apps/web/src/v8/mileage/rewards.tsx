@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ArrowLeftRight, CircleDot, Download, FilePen, Gift, MoreHorizontal, Plus, Star } from 'lucide-react'
+import { AlertCircle, ArrowLeftRight, CircleDot, Download, FilePen, Gift, Plus, Star } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -26,13 +26,13 @@ import {
 } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import HelpTip from '@/components/shared/help-tip'
-import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -612,18 +612,10 @@ export default function RewardsTab() {
     const operable = !readonly && (reward.status === 'published' || reward.status === 'draft' || reward.status === 'stopped')
     return (
       <div className={styles.menuBox}>
-        <IconButton
-          aria-label={`${reward.name}の操作`}
-          title={`${reward.name}の操作`}
-          aria-expanded={menuId === reward.id}
-          onClick={() => setMenuId((current) => (current === reward.id ? null : reward.id))}
-        >
-          <MoreHorizontal size={16} aria-hidden="true" />
-        </IconButton>
-        <ActionMenu
+        <RowMenu
+          label={`${reward.name}の操作`}
           open={menuId === reward.id}
-          ariaLabel={`${reward.name}の操作`}
-          onClose={() => setMenuId(null)}
+          onOpenChange={(next) => setMenuId(next ? reward.id : null)}
           items={[
             {
               id: 'open',
@@ -682,8 +674,11 @@ export default function RewardsTab() {
             return (
               <Tr key={reward.id} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
-                  <span className={styles.rowName} title={reward.name}>{reward.name}</span>
-                  <span className={styles.rowSub}>
+                  {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
+                  <FolderDotName folder={folderOf(reward) === '未分類' ? null : { name: folderOf(reward) }}>
+                    <span className={styles.rowName} title={reward.name}>{reward.name}</span>
+                  </FolderDotName>
+                  <span className={`${styles.rowSub} ${styles.dotIndent}`}>
                     {reach ? `今すぐ交換できる人 ${formatMileageNumber(reach.reachableFriendCount)}` : '今すぐ交換できる人 —'}
                   </span>
                 </Td>
@@ -837,6 +832,7 @@ export default function RewardsTab() {
       }
       stats={stats}
       folders={<>{createButton(true)}{folderPanel}</>}
+      folderNav={narrow ? undefined : { rows: FOLDERS.map((key) => ({ id: key, label: key })), activeId: folder, onSelect: (id) => { setPage(1); setFolder(id as Folder) }, createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
     >

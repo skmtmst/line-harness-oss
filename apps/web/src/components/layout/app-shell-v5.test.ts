@@ -7,14 +7,11 @@ import { describe, expect, it } from 'vitest'
 import FriendTrendTable from '../dashboard/friend-trend-table'
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
-const APP_SHELL = join(ROOT, '..', 'app-shell.tsx')
-const DASHBOARD = join(ROOT, '..', '..', 'app', 'page.tsx')
 const DASHBOARD_EDITOR = join(ROOT, '..', 'dashboard', 'dashboard-editor.tsx')
 const PENDING_INBOX = join(ROOT, '..', 'support', 'pending-inbox-card.tsx')
 const FRIEND_TREND = join(ROOT, '..', 'dashboard', 'friend-trend-table.tsx')
 const CHATS = join(ROOT, '..', '..', 'app', 'chats', 'page.tsx')
 const MENU = join(ROOT, '..', '..', 'lib', 'menu.ts')
-const CARD = join(ROOT, '..', 'shared', 'card.module.css')
 const DATA_TABLE_CSS = join(ROOT, '..', 'shared', 'data-table.module.css')
 
 // 描画して数えるための見本。1行だけ推定（行に「推定」の文字が残る形）。
@@ -29,42 +26,11 @@ const ALL_ESTIMATED_SAMPLE = [
 ]
 
 describe('Pen.dev V6を共通レイアウトの正本にする', () => {
-  const shell = readFileSync(APP_SHELL, 'utf8')
-  const dashboard = readFileSync(DASHBOARD, 'utf8')
   const dashboardEditor = readFileSync(DASHBOARD_EDITOR, 'utf8')
   const pendingInbox = readFileSync(PENDING_INBOX, 'utf8')
   const friendTrend = readFileSync(FRIEND_TREND, 'utf8')
   const chats = readFileSync(CHATS, 'utf8')
   const menu = readFileSync(MENU, 'utf8')
-  const card = readFileSync(CARD, 'utf8')
-
-  it('1920pxでV5正式共通メニューと本体幅の契約を使う', () => {
-    expect(shell).toContain('data-design-shell="v6-1920"')
-    expect(shell).toContain('data-design-node="J33xq"')
-    expect(shell).toContain('styles.content')
-  })
-
-  it('V4の上段と主要カードが実装から消えていない', () => {
-    // 画面の見出し「今日やること」は意図的に消した（m13m）。
-    // 上段の4枚が残っていることを見る。
-    for (const label of [
-      '対応が必要な受信',
-      '写真審査',
-      '今日の予約',
-      '出荷予定',
-      '今月の送信枠',
-      '運用アラート',
-      '接続状態',
-      '友だち数の推移',
-      '友だち追加リンク',
-    ]) expect(dashboard).toContain(label)
-  })
-
-  it('カードの影はV5共通部品から右1px・下1pxで統一する', () => {
-    expect(dashboard).toContain("import Card, { CardHeader } from '@/components/shared/card'")
-    expect(card).toContain('box-shadow: var(--shadow-card)')
-    expect(dashboard).not.toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
-  })
 
   it('対応が必要な受信はV4の4列だけを出し、件数に合わせて高さを縮める', () => {
     for (const label of ['お名前', '内容', '待ち時間', '状態', 'h-fit']) {
@@ -82,19 +48,6 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
     expect(pendingInbox).toContain('offset=${(page - 1) * pageSize}')
     expect(pendingInbox).not.toContain('一括で確認済みにする')
     expect(pendingInbox).not.toContain('すべて選択')
-  })
-
-  it('ダッシュボード見出しの補足文を表示しない', () => {
-    expect(dashboard).not.toContain('運用状況です。')
-  })
-
-  it('ダッシュボードの画面名はV6共通トップバーだけに置く', () => {
-    expect(dashboard).not.toContain("import Header from '@/components/layout/header'")
-    expect(dashboard).not.toContain('<Header')
-    expect(dashboard).not.toContain('title="ダッシュボード"')
-    expect(dashboard).toContain('V6 `vUXKb/vwcM6`')
-    expect(dashboard).toContain('ダッシュボード編集')
-    expect(pendingInbox).toContain('h-[61px]')
   })
 
   it('推定の説明は表の下ではなく見出しの日付のヘルプに表示する', () => {

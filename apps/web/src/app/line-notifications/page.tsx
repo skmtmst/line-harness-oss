@@ -1282,11 +1282,11 @@ function LineNotificationsPage() {
  * 画面の hook を作り替えず、実APIと同じ非同期境界のまま
  * 逆順応答・保存失敗・狭幅の並びを確かめられるようにする。
  */
-/* ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/line-notifications）。運用者へのお知らせの一覧は今の部品を差し込む。 */
+/* ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/line-notifications）。運用者へのお知らせも src/v8 の一覧（u8xibp）。 */
 function LineNotificationsEntry() {
   const theme = useAdminTheme()
   return theme === 'v8'
-    ? <LineNotificationsScreen renderOperatorRules={(lineAccountId) => <OperatorNotificationRules lineAccountId={lineAccountId} />} />
+    ? <LineNotificationsScreen />
     : <LineNotificationsPage />
 }
 

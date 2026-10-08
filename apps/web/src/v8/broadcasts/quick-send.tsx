@@ -18,7 +18,11 @@ import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import DateTimeField from '@/components/shared/date-time-field'
 import { formatNumber } from '@/lib/format'
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './quick-send.module.css'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 /** 承認を頼む境目（絵の文どおり）。 */
 /** 「名前」を押して入る文字。送るときに友だちの名前へ置き換わる形（{{name}}）。 */
@@ -60,11 +64,18 @@ export default function QuickSendV8({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const estimateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const textRef = useRef<HTMLTextAreaElement | null>(null)
+  const pendingRef = useRef<{ id: string; scheduledAt: string | null; needsApproval: boolean } | null>(null)
+  const sendingRef = useRef(false)
+  const [pending, setPending] = useState(false)
+  const guard = useUnsavedGuard({ dirty: open && (text !== '' || scheduledValue !== ''), busy, onDiscard: onClose })
+  const textRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement | null>(null)
 
   // 開いたら入力を空に戻し、タグと承認する人の候補を読む。
   useEffect(() => {
     if (!open) return
+    pendingRef.current = null
+    sendingRef.current = false
+    setPending(false)
     setText('')
     setTarget('all')
     setTagId('')
@@ -85,9 +96,12 @@ export default function QuickSendV8({
 
   // 本文・相手が変わったら人数を見積もる（少し待ってから1回だけ）。
   useEffect(() => {
+    let cancelled = false
+    setEstimate(null)
+    setEstimating(false)
     if (!open || !accountId) return
     if (estimateTimer.current) clearTimeout(estimateTimer.current)
-    if (!text.trim()) {
+    if (!text.trim() || (target === 'tag' && !tagId)) {
       setEstimate(null)
       return
     }
@@ -102,23 +116,24 @@ export default function QuickSendV8({
             messageContent: text,
             messageCount: 1,
           })
-          if (res.success) {
+          if (!cancelled && res.success) {
             setEstimate({ count: res.data.audienceCount, blocked: res.data.hiddenExcluded, remaining: res.data.quota?.remaining ?? null })
           }
         } catch {
           // 見積もれなくても入力は続けられる。送る前に止めない。
         } finally {
-          setEstimating(false)
+          if (!cancelled) setEstimating(false)
         }
       })()
     }, 500)
     return () => {
+      cancelled = true
       if (estimateTimer.current) clearTimeout(estimateTimer.current)
     }
   }, [open, accountId, text, target, tagId])
 
   const needsApproval = (estimate?.count ?? 0) >= APPROVAL_THRESHOLD
-  const scheduledAt = when === 'scheduled' && scheduledValue ? `${scheduledValue}:00` : null
+  const scheduledAt = when === 'scheduled' && scheduledValue ? datetimeLocalJstToUtcIso(scheduledValue) : null
   const canSend = text.trim().length > 0
     && text.length <= TEXT_LIMIT
     && (target === 'all' || tagId !== '')
@@ -137,34 +152,54 @@ export default function QuickSendV8({
   }
 
   async function handleSend() {
-    if (!canSend || !accountId) return
+    if (!canSend || !accountId || sendingRef.current) return
+    sendingRef.current = true
     setBusy(true)
     setError(null)
     try {
-      const created = await api.broadcasts.create({
-        title: text.trim().slice(0, 20) || 'かんたん送信',
-        messageType: 'text',
-        messageContent: text,
-        targetType: target === 'tag' ? 'tag' : 'all',
-        targetTagId: target === 'tag' ? tagId : null,
-        scheduledAt,
-        status: scheduledAt ? 'scheduled' : 'draft',
-        lineAccountId: accountId,
-      })
-      if (!created.success) throw new Error(created.error ?? '作れませんでした')
-      const id = created.data.id
-      if (needsApproval) {
+      let attempt = pendingRef.current
+      if (!attempt) {
+        const created = await api.broadcasts.create({
+          title: text.trim().slice(0, 20) || 'かんたん送信',
+          messageType: 'text',
+          messageContent: text,
+          targetType: target === 'tag' ? 'tag' : 'all',
+          targetTagId: target === 'tag' ? tagId : null,
+          scheduledAt,
+          status: scheduledAt ? 'scheduled' : 'draft',
+          lineAccountId: accountId,
+        })
+        if (!created.success) throw new Error(created.error ?? '作れませんでした')
+        attempt = { id: created.data.id, scheduledAt, needsApproval }
+        pendingRef.current = attempt
+        setPending(true)
+      } else {
+        // 応答だけを失った場合は実物を読み、既に始まった送信・承認依頼を繰り返さない。
+        const current = await api.broadcasts.get(attempt.id)
+        if (!current.success) throw new Error(current.error ?? '配信の状態を確認できませんでした')
+        if (current.data.status === 'sent' || current.data.status === 'sending'
+          || (attempt.needsApproval && current.data.approvalStatus === 'pending')) {
+          guard.disarm()
+          onSent()
+          onClose()
+          return
+        }
+      }
+      const id = attempt.id
+      if (attempt.needsApproval) {
         const requested = await api.broadcasts.approval.request(id, { approverStaffId: approverId })
         if (!requested.success) throw new Error(requested.error)
-      } else if (!scheduledAt) {
+      } else if (!attempt.scheduledAt) {
         const sent = await api.broadcasts.send(id)
         if (!sent.success) throw new Error(sent.error)
       }
+      guard.disarm()
       onSent()
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : '送れませんでした。もう一度お試しください。')
     } finally {
+      sendingRef.current = false
       setBusy(false)
     }
   }
@@ -172,6 +207,7 @@ export default function QuickSendV8({
   const sendLabel = needsApproval ? '承認を頼む' : scheduledAt ? '予約する' : '送る'
 
   return (
+    <>
     <Dialog
       open={open}
       confirmation
@@ -200,17 +236,18 @@ export default function QuickSendV8({
     >
       <div className={styles.body}>
         <label className={styles.label} htmlFor="quick-send-v8-text">本文</label>
-        <textarea
+        <InsertTextField
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}
           value={text}
           maxLength={TEXT_LIMIT}
-          onChange={(event) => setText(event.target.value)}
+          disabled={busy || pending}
+          onValueChange={(next) => setText(next)}
         />
         <div className={styles.metaRow}>
           <span className={styles.meta}>差し込む：</span>
-          <button type="button" className={styles.insert} onClick={insertName}>名前</button>
+          <button type="button" className={styles.insert} disabled={busy || pending} onClick={insertName}>名前</button>
           <span className={styles.spacer} aria-hidden="true" />
           <span className={styles.meta}>{`${formatNumber(text.length)} / ${formatNumber(TEXT_LIMIT)}`}</span>
         </div>
@@ -218,7 +255,7 @@ export default function QuickSendV8({
         <p className={styles.label} id="quick-send-v8-target">送る相手</p>
         <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-target">
           {([['all', '友だち全員'], ['tag', 'タグで絞る']] as const).map(([value, label]) => (
-            <button key={value} type="button" role="radio" aria-checked={target === value} className={styles.chip} onClick={() => setTarget(value)}>
+            <button key={value} type="button" role="radio" disabled={busy || pending} aria-checked={target === value} className={styles.chip} onClick={() => setTarget(value)}>
               {label}
             </button>
           ))}
@@ -226,6 +263,7 @@ export default function QuickSendV8({
             <div className={styles.tagPick}>
               <Select
                 aria-label="タグ"
+                disabled={busy || pending}
                 value={tagId}
                 onChange={setTagId}
                 options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]}
@@ -237,13 +275,13 @@ export default function QuickSendV8({
         <p className={styles.label} id="quick-send-v8-when">いつ</p>
         <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-when">
           {([['now', '今すぐ'], ['scheduled', '日時を決める']] as const).map(([value, label]) => (
-            <button key={value} type="button" role="radio" aria-checked={when === value} className={styles.chip} onClick={() => setWhen(value)}>
+            <button key={value} type="button" role="radio" disabled={busy || pending} aria-checked={when === value} className={styles.chip} onClick={() => setWhen(value)}>
               {label}
             </button>
           ))}
           {when === 'scheduled' ? (
             <div className={styles.whenPick}>
-              <DateTimeField value={scheduledValue} onChange={setScheduledValue} aria-label="送る日時" />
+              <DateTimeField disabled={busy || pending} value={scheduledValue} onChange={setScheduledValue} aria-label="送る日時" />
             </div>
           ) : null}
         </div>
@@ -271,5 +309,7 @@ export default function QuickSendV8({
         </div>
       </div>
     </Dialog>
+    <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+    </>
   )
 }

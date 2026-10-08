@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ClipboardList, FileText, GripVertical, Info, MoreHorizontal, PenLine, Plus, Users } from 'lucide-react'
+import { AlertCircle, ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Users } from 'lucide-react'
 import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
@@ -21,7 +21,8 @@ import { ListPageBody } from '@/components/templates'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -38,7 +39,7 @@ import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { notifyToast } from '@/components/shared/toast'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from '@/components/friend-fields/field-list'
@@ -418,14 +419,13 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
                       onDragStart={() => setDragId(field.id)}
                       onDragEnd={() => setDragId(null)}
                     >
-                      <ReorderGrip
+                      <ReorderHandle
                         label={field.name}
-                        disabled={field.isInherited === true}
-                        disabledReason="共通項目は移行後に並び替えできます"
+                        disabledReason={field.isInherited === true ? '共通項目は移行後に並び替えできます' : null}
                         onMove={(direction) => void keyboardMove(field.id, direction)}
                       >
                         <GripVertical className={styles.gripIcon} aria-hidden="true" />
-                      </ReorderGrip>
+                      </ReorderHandle>
                     </span>
                   ) : <span className={styles.gripSpace} aria-hidden="true" />}
                 </Td>
@@ -451,22 +451,12 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
                 <Td className={styles.fieldColPlace}><span className={styles.cellText} title={destinationLabel(field)}>{destinationLabel(field)}</span></Td>
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
-                    <button
-                      type="button"
+                    <RowMenu
                       className={styles.menuButton}
-                      aria-label={`項目「${field.name}」の操作`}
-                      aria-haspopup="menu"
-                      aria-expanded={openMenuId === field.id}
-                      title={`項目「${field.name}」の操作`}
-                      onClick={() => setOpenMenuId((current) => (current === field.id ? null : field.id))}
-                    >
-                      <MoreHorizontal className={styles.menuIcon} aria-hidden="true" />
-                    </button>
-                    <ActionMenu
-                      open={openMenuId === field.id}
-                      onClose={() => setOpenMenuId(null)}
-                      ariaLabel={`項目「${field.name}」の操作`}
+                      label={`項目「${field.name}」の操作`}
                       items={rowMenuItems(field)}
+                      open={openMenuId === field.id}
+                      onOpenChange={(next) => setOpenMenuId(next ? field.id : null)}
                     />
                   </span>
                 </Td>

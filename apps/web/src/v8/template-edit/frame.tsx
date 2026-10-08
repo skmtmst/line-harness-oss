@@ -21,6 +21,8 @@ export function TemplateEditFrame({
   side,
   footerActions,
   status,
+  backHref = '/templates',
+  onBack,
 }: {
   boardId: string
   title: string
@@ -32,11 +34,20 @@ export function TemplateEditFrame({
   footerActions?: ReactNode
   /** 下の帯の左の文（下書きの自動保存の状態）。 */
   status?: ReactNode
+  /** 「← テンプレートへ」の行き先（統括のテンプレートから使うときは /hq/templates）。 */
+  backHref?: string
+  /**
+   * 統括のひな形の作る画面は一覧と同じ URL のまま中の段だけ替えるので、同じ URL へのリンクでは戻れない。
+   * 渡されたら、リンクの代わりにこの動き（［キャンセル］と同じ）で一覧へ戻る（オーナー 10-08「反応しない」）。
+   */
+  onBack?: () => void
 }) {
   return (
     <PageFrame kind="create" boardId={boardId} hasFooter={Boolean(footerActions)}>
       <PageHeading
-        identity={<Link href="/templates" className={styles.back}>← テンプレートへ</Link>}
+        identity={onBack
+          ? <button type="button" onClick={onBack} className={styles.back}>← テンプレートへ</button>
+          : <Link href={backHref} className={styles.back}>← テンプレートへ</Link>}
         title={title}
         description={description}
       />

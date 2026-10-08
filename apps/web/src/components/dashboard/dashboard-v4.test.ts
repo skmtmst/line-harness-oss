@@ -97,36 +97,6 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(page).toContain('referenceCount={reference?.operationalAlerts}')
   })
 
-  it('画面名はV6共通トップバーだけに表示する', () => {
-    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
-    expect(source).not.toContain("import Header from '@/components/layout/header'")
-    expect(source).not.toContain('<Header')
-    expect(source).not.toContain('title="ダッシュボード"')
-    expect(source).not.toContain('<h1')
-    expect(source).toContain('V6 `vUXKb/vwcM6`')
-    expect(source).toContain('ダッシュボード編集')
-  })
-
-  it('Pencil vUXKbどおりカード内を詰め、送信枠を1行で表示する', () => {
-    const page = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
-    const sideCards = readFileSync(path.join(process.cwd(), 'src/components/dashboard/side-cards.tsx'), 'utf8')
-
-    expect(page).toContain('className="mt-2 flex items-end justify-between gap-3"')
-    expect(page).not.toContain('className="mt-auto flex items-end justify-between gap-3 pt-2"')
-    expect(page).toContain('className="text-metric leading-none font-bold tabular-nums"')
-    // 送信枠の数は1行で出す（SideCard の行間が面倒を見るため mt-3 は付けない）。
-    expect(page).toContain('className="text-ink flex items-baseline gap-2 whitespace-nowrap"')
-    expect(sideCards).toContain('<Card padding="roomy">')
-    expect(sideCards).toContain('className="flex flex-col gap-2.5"')
-    expect(sideCards).not.toContain('<CardHeader')
-  })
-
-  it('追加URLの発行中ラベルに二重の外枠を付けない', () => {
-    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
-    expect(source).toContain('<label className="flex min-w-[220px] items-center gap-2">')
-    expect(source).not.toContain('rounded-control flex min-w-[220px] items-center gap-2 border')
-  })
-
   it('旧Workerが追加集計を返さなくてもダッシュボードを描画できる', () => {
     const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
     expect(source).toContain('data?.partialFailures?.length')

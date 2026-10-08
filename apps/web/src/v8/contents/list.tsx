@@ -21,8 +21,7 @@ import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Checkbox from '@/components/shared/checkbox'
 import ListToolbar from '@/components/shared/list-toolbar'
-import ActionMenu from '@/components/shared/action-menu'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
 import MediaPreviewOverlay from './media-preview-overlay'
 import Dialog from '@/components/shared/dialog'
@@ -447,44 +446,39 @@ export default function MediaLibraryListV8() {
     }
   }, [selectedAccountId])
 
-  const load = useCallback(async () => {
+  /*
+    WEB097: 同じアカウントの中でも、検索・絞り込み・ページを変えるたびに新しい要求を出す。
+    遅い検索 A の返事が速い検索 B の結果を上書きしないよう、最後に出した要求の世代だけを反映する。
+    失敗の表示と「読み込み中」の解除も最新の要求だけが行う。
+  */
+  const listSeqRef = useRef(0)
+  const summarySeqRef = useRef(0)
+
+  const loadList = useCallback(async () => {
     const accountAtRequest = selectedAccountId
+    const seq = ++listSeqRef.current
+    const isLatest = () => seq === listSeqRef.current && accountAtRequest === latestAccountRef.current
     if (!accountAtRequest) {
       setItems([])
-      setQuota(null)
       setLoading(false)
       return
     }
     setLoading(true)
     setLoadFailed(false)
-    setQuotaFailed(false)
     setError('')
     try {
-      /*
-        R587: 一覧の失敗で容量まで隠さない。一覧だけ捕まえてnull化し、
-        容量・総数はそれぞれの成否で決める（Promise.allの連鎖で消さない）。
-      */
-      const [res, quotaResponse, overallResponse] = await Promise.all([
-        api.media.list(accountAtRequest, {
-          kind: kinds.size === 1 ? [...kinds][0] : undefined,
-          folderId: folderFilter || undefined,
-          query: query.trim() || undefined,
-          unusedOnly: showUnusedOnly,
-          nearLimitOnly: showNearLimitOnly,
-          archived: showArchivedOnly ? 'only' : undefined,
-          sort,
-          limit: pageSize,
-          offset: (page - 1) * pageSize,
-        }).catch(() => null),
-        api.media.quota(accountAtRequest).catch(() => null),
-        // R38: フォルダ欄の「すべて」は絞り込み前の総数。1件だけ取って数を読む。
-        api.media.list(accountAtRequest, {
-          archived: showArchivedOnly ? 'only' : undefined,
-          limit: 1,
-          offset: 0,
-        }).catch(() => null),
-      ])
-      if (accountAtRequest !== latestAccountRef.current) return
+      const res = await api.media.list(accountAtRequest, {
+        kind: kinds.size === 1 ? [...kinds][0] : undefined,
+        folderId: folderFilter || undefined,
+        query: query.trim() || undefined,
+        unusedOnly: showUnusedOnly,
+        nearLimitOnly: showNearLimitOnly,
+        archived: showArchivedOnly ? 'only' : undefined,
+        sort,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      }).catch(() => null)
+      if (!isLatest()) return
       if (res?.success) {
         setItems(res.data.items)
         setTotal(res.data.total)
@@ -493,21 +487,51 @@ export default function MediaLibraryListV8() {
         setLoadFailed(true)
         setListKnown(false)
       }
-      if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
-      if (quotaResponse?.success) setQuota(quotaResponse.data)
-      else {
-        setQuota(null)
-        setQuotaFailed(true)
-      }
     } catch {
-      if (accountAtRequest === latestAccountRef.current) {
+      if (isLatest()) {
         setLoadFailed(true)
         setListKnown(false)
       }
     } finally {
-      if (accountAtRequest === latestAccountRef.current) setLoading(false)
+      if (isLatest()) setLoading(false)
     }
   }, [folderFilter, kinds, page, pageSize, query, selectedAccountId, showArchivedOnly, showNearLimitOnly, showUnusedOnly, sort])
+
+  /*
+    WEB098: 容量と「すべて」の総数は検索・ページ送り・種別では変わらない。
+    アカウントとアーカイブの表示を変えたとき、または変えた後（load）だけ読み直す。
+    R587: 一覧の失敗で容量まで隠さない（別々に成否を決める）。
+  */
+  const loadSummary = useCallback(async () => {
+    const accountAtRequest = selectedAccountId
+    const seq = ++summarySeqRef.current
+    if (!accountAtRequest) {
+      setQuota(null)
+      return
+    }
+    setQuotaFailed(false)
+    const [quotaResponse, overallResponse] = await Promise.all([
+      api.media.quota(accountAtRequest).catch(() => null),
+      // R38: フォルダ欄の「すべて」は絞り込み前の総数。1件だけ取って数を読む。
+      api.media.list(accountAtRequest, {
+        archived: showArchivedOnly ? 'only' : undefined,
+        limit: 1,
+        offset: 0,
+      }).catch(() => null),
+    ])
+    if (seq !== summarySeqRef.current || accountAtRequest !== latestAccountRef.current) return
+    if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
+    if (quotaResponse?.success) setQuota(quotaResponse.data)
+    else {
+      setQuota(null)
+      setQuotaFailed(true)
+    }
+  }, [selectedAccountId, showArchivedOnly])
+
+  /** 変えた後の読み直し。一覧と容量・総数の両方を読む（フォルダ・数の帯は呼ぶ側が決める）。 */
+  const load = useCallback(async () => {
+    await Promise.all([loadList(), loadSummary()])
+  }, [loadList, loadSummary])
 
   /*
     数の帯の4マス。絞り込み・ページ送りが変わっても数は変わらないので、
@@ -564,13 +588,22 @@ export default function MediaLibraryListV8() {
     setKpis(EMPTY_KPIS)
   }, [accountLoading, selectedAccountId])
 
+  /*
+    WEB098: 一覧・容量と総数・フォルダは変わる時が違うので、別々に読む。
+    検索・ページ送りで読み直すのは一覧だけ。
+  */
   useEffect(() => {
-    if (!accountLoading && urlReady && !detailId) {
-      void load()
-      // R587: フォルダの成否は一覧・容量と切り分ける。
-      void loadFolders()
-    }
-  }, [accountLoading, detailId, load, loadFolders, urlReady])
+    if (!accountLoading && urlReady && !detailId) void loadList()
+  }, [accountLoading, detailId, loadList, urlReady])
+
+  useEffect(() => {
+    if (!accountLoading && urlReady && !detailId) void loadSummary()
+  }, [accountLoading, detailId, loadSummary, urlReady])
+
+  useEffect(() => {
+    // R587: フォルダの成否は一覧・容量と切り分ける。
+    if (!accountLoading && urlReady && !detailId) void loadFolders()
+  }, [accountLoading, detailId, loadFolders, urlReady])
 
   /*
     数の帯は絞り込み・ページ送りでは変わらない。アカウントが変わったときと、
@@ -1078,6 +1111,39 @@ export default function MediaLibraryListV8() {
     { key: 'archived', title: 'アーカイブ', icon: Archive, value: kpis.archivedTotal ?? null, unit: '件', detail: '一覧と新規選択から外したもの' },
   ]
 
+  /* 登録と取得は担当者も使える（今と同じ）。消す・移す・名前を変えるは管理者だけ。 */
+  const uploadButton = (
+    <Button type="button" variant="primary" className="v8-folder-create w-full" onClick={() => setUploadOpen(true)}>
+      <Plus size={15} aria-hidden="true" />メディアを登録する
+    </Button>
+  )
+  const selectFolder = (id: string) => {
+    setFolderFilter(id)
+    setPage(1)
+  }
+  const mediaFolderRows = [
+    // R38: 「すべて」は絞り込み前の総数。絞り込み後の件数を
+    // 入れると「すべて0・未分類2」のように母集団が混ざる。
+    // m26m: 一覧が読めていない（初回・失敗・別アカウント切替直後）の
+    // total=0 は偽ゼロなので数えない（null は数を出さない約束）。
+    { id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null },
+    ...folders.map((folder) => ({
+      id: folder.id,
+      label: folder.name,
+      // #721: フォルダ件数はAPI(itemCount)をそのまま出す。kind=media
+      // は件数未対応で来ないため「—」になる。読み込み済み範囲だけを
+      // 数える計算は、黙って別の母集団にすり替わるため廃止。
+      count: folder.itemCount ?? null,
+      color: folder.color,
+      // R37: 名前変更・削除を「…」へ接続する。権限の無い人には
+      // 押して失敗する口を見せない。
+      onEdit: canManageMedia ? () => setEditingFolder(folder) : undefined,
+      onDelete: canManageMedia ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
+      deleteNote: '削除しても、中のメディアは未分類に残ります。',
+    })),
+    { id: UNGROUPED, label: '未分類', count: unfiledCount },
+  ]
+
   return (
     <ListPage
       boardId="O7hUt7"
@@ -1108,41 +1174,14 @@ export default function MediaLibraryListV8() {
       )}
       folders={(
         <>
-          {/* 登録と取得は担当者も使える（今と同じ）。消す・移す・名前を変えるは管理者だけ。 */}
-          <Button type="button" variant="primary" className="v8-folder-create w-full" onClick={() => setUploadOpen(true)}>
-            <Plus size={15} aria-hidden="true" />メディアを登録する
-          </Button>
+          {uploadButton}
           <FolderPanel
             /* m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム #m18k と同じ形）。絞り込み後の件数は一覧側の ListRange に出す。 */
             activeId={folderFilter}
-            onSelect={(id) => {
-              setFolderFilter(id)
-              setPage(1)
-            }}
+            onSelect={selectFolder}
             /* 閲覧のみ：フォルダを追加は置かない（理由は上の閲覧のみの帯で伝える。2026-10-06 オーナー決定）。 */
             onAddFolder={canManageMedia ? () => setAddingFolder(true) : undefined}
-            rows={[
-              // R38: 「すべて」は絞り込み前の総数。絞り込み後の件数を
-              // 入れると「すべて0・未分類2」のように母集団が混ざる。
-              // m26m: 一覧が読めていない（初回・失敗・別アカウント切替直後）の
-              // total=0 は偽ゼロなので数えない（null は数を出さない約束）。
-              { id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null },
-              ...folders.map((folder) => ({
-                id: folder.id,
-                label: folder.name,
-                // #721: フォルダ件数はAPI(itemCount)をそのまま出す。kind=media
-                // は件数未対応で来ないため「—」になる。読み込み済み範囲だけを
-                // 数える計算は、黙って別の母集団にすり替わるため廃止。
-                count: folder.itemCount ?? null,
-                color: folder.color,
-                // R37: 名前変更・削除を「…」へ接続する。権限の無い人には
-                // 押して失敗する口を見せない。
-                onEdit: canManageMedia ? () => setEditingFolder(folder) : undefined,
-                onDelete: canManageMedia ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
-                deleteNote: '削除しても、中のメディアは未分類に残ります。',
-              })),
-              { id: UNGROUPED, label: '未分類', count: unfiledCount },
-            ]}
+            rows={mediaFolderRows}
           >
             {folderFailure ? (
               <div role="alert">
@@ -1184,6 +1223,7 @@ export default function MediaLibraryListV8() {
           </FolderPanel>
         </>
       )}
+      folderNav={{ rows: mediaFolderRows, activeId: folderFilter, onSelect: selectFolder, createAction: uploadButton }}
       toolbar={(
         <>
           <div className={styles.noticeRow}>
@@ -1875,16 +1915,13 @@ function MediaCardV8({
 
         <div className={styles.cardFoot}>
           <span className={styles.menuWrap} title={canManageMedia ? undefined : managementPermissionReason}>
-            <MoreAction
+            <RowMenu
+              appearance="plain"
               label={`${item.filename}のその他操作`}
-              aria-expanded={menuOpen}
-              data-qa-open="YfTfJ"
-              onClick={onToggleMenu}
-            />
-            <ActionMenu
+              menuLabel={`${item.filename}の操作`}
               open={menuOpen}
-              ariaLabel={`${item.filename}の操作`}
-              onClose={onCloseMenu}
+              onOpenChange={(next) => (next ? onToggleMenu() : onCloseMenu())}
+              triggerProps={{ 'data-qa-open': 'YfTfJ' }}
               items={[
                 {
                   id: 'preview',

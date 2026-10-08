@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
@@ -60,4 +60,20 @@ it('閲覧のみには作る・編集・変更・停止・発行のボタンを�
   for (const name of ['店舗を追加する', '編集', 'ユーザーを追加する', '変更', '停止', 'アドレスを発行']) {
     expect(screen.queryByRole('button', { name })).toBeNull()
   }
+})
+
+it('ユーザーの保存中は窓の×・キャンセル・Escで閉じられない', async () => {
+  let resolve!: (value: unknown) => void
+  fixture.linkMembershipLogin.mockImplementation(() => new Promise(r => { resolve = r }))
+  render(<OrganizationV8 />)
+  const row = (await screen.findByText('試験担当')).closest('[role="row"]') as HTMLElement
+  fireEvent.click(within(row).getByRole('button', { name: '変更' }))
+  fireEvent.click(await screen.findByRole('button', { name: '試験担当のログインメンバー' }))
+  fireEvent.click(within(await screen.findByRole('option', { name: '別のログイン' })).getByRole('button'))
+  fireEvent.click(screen.getByRole('button', { name: 'ログインと連携' }))
+  expect(screen.getByRole('button', { name: '閉じる' }).hasAttribute('disabled')).toBe(true)
+  expect(screen.getByRole('button', { name: 'キャンセル' }).hasAttribute('disabled')).toBe(true)
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  await act(async () => resolve({ success: true }))
 })

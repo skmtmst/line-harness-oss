@@ -3,12 +3,12 @@
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { Fragment, useState, type ReactNode } from 'react'
-import { Calendar, Eye, Image as ImageIcon, Inbox, MoreHorizontal, Package, Plus, SlidersHorizontal } from 'lucide-react'
+import { Calendar, Eye, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
 import type { DashboardCardId } from '@line-crm/shared'
 import { DashboardColumns, DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import SectionHeader from './head'
@@ -17,6 +17,9 @@ import { STATE_TEXT } from '@/components/shared/not-connected'
 import ShipmentPanel from '@/components/dashboard/shipment-panel'
 import { dashboardPeriodLabel, formatDashboardAsOf } from '@/components/dashboard/freshness'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useAccount } from '@/contexts/account-context'
+import Notice from '@/components/shared/notice'
+import { partialFailureLabels, partialFailuresWithoutCard } from '@/components/dashboard/partial-failure-labels'
 import { formatWaitRough } from '@/lib/format-duration'
 import { formatNumber, formatTime } from '@/lib/format'
 import { PERIODS, jstDay, useDashboard, type PeriodKey } from './use-dashboard'
@@ -40,12 +43,22 @@ import {
   Unavailable,
   Upcoming,
 } from './sections'
+import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
 
-/* 編集パネル（dnd-kit を含む重い部品）は開くまで読まない（v7 の V8 と同じ）。 */
-const DashboardEditor = dynamic(() => import('@/components/dashboard/dashboard-editor').then((module) => module.default), {
+/* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
+const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
   loading: () => <p className={styles.note}>編集パネルを読み込んでいます</p>,
 })
+
+/**
+ * ダッシュボード編集（自分の並び）を出してよい役割か。隠すのは閲覧のみ（読み取り専用。
+ * `/api/staff/me` の role が 'viewer'＝サーバーが保存を断る人）だけ。書き込みできる
+ * スタッフは押せるので出す（決まりは「押せないボタンを隠す」）。読めるまで（null）は出す。
+ */
+export function canEditDashboardLayout(role: string | null): boolean {
+  return role !== 'viewer'
+}
 
 /** 時間帯のあいさつ（日本時間）。 */
 export function greeting(name: string | null, now = new Date()): string {
@@ -64,21 +77,7 @@ export function headline(asOf: string | null | undefined, risk: 'normal' | 'warn
 
 /** 「…」のメニュー。数のマスごとに1つ。 */
 function CellMenu({ title, items }: { title: string; items: ActionMenuItem[] }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <IconButton
-        title={`${title}の操作`}
-        aria-label={`${title}の操作`}
-        aria-expanded={open}
-        className={styles.cellMenu}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </IconButton>
-      <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel={`${title}の操作`} items={items} />
-    </>
-  )
+  return <RowMenu className={styles.cellMenu} label={`${title}の操作`} items={items} />
 }
 
 /* 右の列の組み合わせ（WQmep）：どの本文の段の右に、どの右の列のカードを置くか。 */
@@ -97,8 +96,10 @@ export default function DashboardV8() {
   const router = useRouter()
   const d = useDashboard()
   const role = useStaffRole()
+  const { refreshAccounts } = useAccount()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
   const canManage = role === null || canManageRole(role)
+  const canEditLayout = canEditDashboardLayout(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
   const start = useFirstSteps(d.selectedAccountId, role)
   const [openDetail, setOpenDetail] = useState<DashboardCardId | null>(null)
@@ -113,7 +114,7 @@ export default function DashboardV8() {
         items={[
           { id: 'detail', label: openDetail === id ? '内訳を閉じる' : '内訳を見る', onSelect: () => setOpenDetail((current) => (current === id ? null : id)) },
           { id: 'go', label, external: true, onSelect: () => router.push(href) },
-          { id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor },
+          ...(canEditLayout ? [{ id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor }] : []),
         ]}
       />
     )
@@ -220,13 +221,15 @@ export default function DashboardV8() {
   const todayCells = d.visibleToday.map((item) => ({ id: item.id, cell: todayCell(item.id) })).filter((entry) => entry.cell !== null)
   const openCell = todayCells.find((entry) => entry.id === openDetail)
 
+  const overviewFailed = !data && !d.loading && d.error !== ''
   /* ── 右の列・段D のカード ──────────────────────── */
   const rightCard = (id: DashboardCardId): ReactNode => {
-    const unavailable = (key: Parameters<typeof d.sectionAvailable>[0]) => data && !d.sectionAvailable(key)
-    if (id === 'send-quota') return <SendQuota delivery={d.sectionAvailable('quota') ? data?.delivery ?? null : null} metric={data?.metrics?.monthlyQuota} section={data?.sections?.quota} onRetry={() => void d.load()} />
+    /* 概要が取れなかった（data なし）ときは骨組みを出し続けず、段ごとに「読み込めませんでした」を出す。 */
+    const unavailable = (key: Parameters<typeof d.sectionAvailable>[0]) => overviewFailed || (data && !d.sectionAvailable(key))
+    if (id === 'send-quota') return <SendQuota overviewFailed={overviewFailed} delivery={d.sectionAvailable('quota') ? data?.delivery ?? null : null} metric={data?.metrics?.monthlyQuota} section={data?.sections?.quota} onRetry={() => void d.load()} />
     if (id === 'operational-alerts') return <OperationalAlerts risk={d.displayedHealthRisk} healthIssues={d.healthIssueCount} oldestWaitMinutes={d.pendingOldest} twoFactor={d.displayedTwoFactor} referenceCount={reference?.operationalAlerts} failed={d.healthFailed} updatedAt={d.supplementLoadedAt} />
     if (id === 'support-mark-status') return <SupportStatus inbox={d.sectionAvailable('inbox') ? (data && reference?.supportInbox ? { ...data.inbox, ...reference.supportInbox } : data?.inbox ?? null) : null} autoOnInbound={d.supportMarkAutoOnInbound} />
-    if (id === 'connection-status') return <ConnectionStatus webhook={d.selectedAccount?.webhook?.status} risk={d.displayedHealthRisk} activeFriends={d.activeFriends} healthFailed={d.healthFailed} />
+    if (id === 'connection-status') return <ConnectionStatus account={d.selectedAccount} canCheck={role !== null && canManageRole(role)} onChecked={refreshAccounts} risk={d.displayedHealthRisk} activeFriends={d.activeFriends} healthFailed={d.healthFailed} />
     if (id === 'friend-status') return unavailable('friends')
       ? <><SectionHeader title="友だちの状態" /><Unavailable section={data?.sections?.friends} onRetry={() => void d.load()} /></>
       : data ? <FriendStatus friends={data.friends} /> : <><SectionHeader title="友だちの状態" /><Loading label="友だちの状態" /></>
@@ -250,6 +253,8 @@ export default function DashboardV8() {
   }
 
   /* ── 本文の段（編集の並び順どおり） ───────────────── */
+  /* 右の列は上の数の帯の1マス分（帯が3・4マスのとき。帯が無い・2マス以下は4等分の1列）。 */
+  const asideColumns = todayCells.length >= 3 ? todayCells.length : undefined
   const visibleRightIds = new Set(d.visibleRight.map((item) => item.id))
   const placedAside = new Set<DashboardCardId>()
   const rows: ReactNode[] = []
@@ -303,6 +308,8 @@ export default function DashboardV8() {
       <DashboardRow
         key={item.id}
         variant={variant}
+        asideSize="column"
+        asideColumns={asideColumns}
         aside={asideIds.length > 0 ? (
           variant === 'link'
             ? <>{asideIds.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</>
@@ -311,19 +318,6 @@ export default function DashboardV8() {
       >
         {main}
       </DashboardRow>,
-    )
-  }
-  /*
-   * 板が狭い（型が右の列を隠す幅）ときは、右の列のカードを段Dと同じ並びで出し直す。
-   * 隠したまま数字を落とさないため。広い板では CSS で隠れている。
-   */
-  const placedList = [...placedAside]
-  for (let index = 0; index < placedList.length; index += 4) {
-    const chunk = placedList.slice(index, index + 4)
-    rows.push(
-      <div key={`narrow-${index}`} className={styles.narrowAside}>
-        <DashboardColumns>{chunk.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</DashboardColumns>
-      </div>,
     )
   }
   const columnIds: DashboardCardId[] = [
@@ -340,12 +334,19 @@ export default function DashboardV8() {
     return metric === undefined ? data?.trend ?? [] : metric.value ?? []
   }
   function unavailableTrend(): ReactNode | null {
-    if (!data || d.sectionAvailable('trend')) return null
-    return <><SectionHeader title="友だち数の推移" /><Unavailable section={data.sections?.trend} onRetry={() => void d.load()} /></>
+    if (!data && !overviewFailed) return null
+    if (data && d.sectionAvailable('trend')) return null
+    return <><SectionHeader title="友だち数の推移" /><Unavailable section={data?.sections?.trend} onRetry={() => void d.load()} /></>
   }
 
   const viewer = role !== null && !canManageRole(role)
-  const notice = start.summary || viewer || d.error || data?.partialFailures?.length ? (
+  /* 部品の中で自分のエラーを出すものは帯に重ねない。出し先の無いものだけ日本語の名前で帯に出す。 */
+  const shownCardIds = new Set<string>([
+    ...d.preferences.main.filter((item) => item.visible).map((item) => item.id),
+    ...d.visibleRight.map((item) => item.id),
+  ])
+  const looseFailures = partialFailuresWithoutCard(data?.partialFailures ?? [], shownCardIds)
+  const notice = start.summary || viewer || d.error || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
         <div className={styles.viewerBand} role="status">
@@ -357,11 +358,16 @@ export default function DashboardV8() {
       {d.error ? (
         <div className={styles.errorBand} role="alert">
           <span>{d.error}</span>
-          <Button type="button" onClick={() => void d.load()}>もう一度読み込む</Button>
+          <Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>
         </div>
       ) : null}
-      {data?.partialFailures?.length ? (
-        <p className={styles.note} role="status">{`一部のデータを${STATE_TEXT.error}（${data.partialFailures.join('、')}）。0件としては表示していません。`}</p>
+      {looseFailures.length ? (
+        <Notice
+          tone="warn"
+          role="status"
+          message={`${partialFailureLabels(looseFailures)}を${STATE_TEXT.error}。0件としては表示していません。`}
+          action={<Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>}
+        />
       ) : null}
     </div>
   ) : undefined
@@ -379,11 +385,11 @@ export default function DashboardV8() {
           onChange={d.selectPeriod}
           options={PERIODS.map((item) => ({ value: item.key, label: item.label }))}
         />
-        <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />ダッシュボード編集</Button>
+        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />ダッシュボード編集</Button> : null}
         {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={15} aria-hidden="true" />配信を作る</Button> : null}
       </>}
       notice={notice}
-      overlays={d.editorOpen ? <DashboardEditor
+      overlays={d.editorOpen && canEditLayout ? <DashboardEditor
         open={d.editorOpen}
         preferences={d.preferences}
         saving={d.preferenceSaving}

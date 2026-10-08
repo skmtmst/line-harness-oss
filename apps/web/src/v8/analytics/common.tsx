@@ -1,10 +1,8 @@
 'use client'
 
 /* ★V8 分析の見かたで共通に使う小さな部品（期間の切り替え・数の帯の「…」・日時の短い形）。 */
-import { useState, type ReactNode } from 'react'
-import { MoreHorizontal } from 'lucide-react'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu from '@/components/shared/action-menu'
+import { type ReactNode } from 'react'
+import { RowMenu } from '@/components/shared/row-actions'
 import SegmentedControl from '@/components/shared/segmented'
 import { RANGES } from './parts'
 import styles from './analytics.module.css'
@@ -16,10 +14,8 @@ export function RangePickerV8({ days, onChange, size = 'medium' }: { days: numbe
 
 /** 数の帯の「…」。この見かたで使える操作だけ（いまは CSV の書き出し）。 */
 export function KpiMenu({ title, label = 'CSV で書き出す', onExport, disabled }: { title: string; label?: string; onExport: () => void; disabled: boolean }) {
-  const [open, setOpen] = useState(false)
   return <span className={styles.kpiMenu}>
-    <IconButton className={styles.kpiMenuButton} aria-label={`${title}の操作`} aria-expanded={open} onClick={() => setOpen((value) => !value)}><MoreHorizontal size={16} aria-hidden="true" /></IconButton>
-    <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel={`${title}の操作`} items={[{ id: 'csv', label, disabled, onSelect: () => { setOpen(false); onExport() } }]} />
+    <RowMenu className={styles.kpiMenuButton} label={`${title}の操作`} items={[{ id: 'csv', label, disabled, onSelect: onExport }]} />
   </span>
 }
 

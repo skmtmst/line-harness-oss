@@ -11,13 +11,16 @@
  */
 import { ImagePlus, Paperclip, Send, X } from 'lucide-react'
 import Link from 'next/link'
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import type { StaffMember } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import TargetMissing from '@/components/shared/target-missing'
 import { TextArea } from '@/components/shared/text-field'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
 import { readFileAsBase64 } from '@/lib/hq-banners'
 import {
@@ -27,8 +30,8 @@ import {
   type HqSupportDetail,
   type HqSupportRequest,
 } from '@/lib/hq-support'
-import HqSettingsNavV8 from './settings-nav'
-import { SUPPORT_STATUS_WORDS, supportTime } from './support-words'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
+import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support-detail.module.css'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
@@ -49,8 +52,25 @@ function sentNotice(hasEmail: boolean): string {
     : '続きを送りました。運営に届きました。返信はこの画面のやり取りに届きます。'
 }
 
+/*
+ * WEB212：同じ画面のまま別の問い合わせ（?id=）へ移ったら、画面を作り直す。
+ * 初めに1回だけ URL を読むと、前の問い合わせ・入力が残り、前の id へ送ってしまう。
+ */
 export default function HqSupportDetailV8() {
-  usePageTitle('お問い合わせ')
+  return (
+    <Suspense fallback={null}>
+      <HqSupportDetailByQuery />
+    </Suspense>
+  )
+}
+
+function HqSupportDetailByQuery() {
+  const queryId = useSearchParams().get('id')
+  return <HqSupportDetailInner key={queryId ?? ''} queryId={queryId} />
+}
+
+function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
+  const settingsNav = useHqSettingsFolderNav('contact')
   const uid = useId()
   const fileRef = useRef<HTMLInputElement>(null)
   /* U099: `undefined` はまだ URL を読んでいない、`null` は URL に id が無い。 */
@@ -70,8 +90,14 @@ export default function HqSupportDetailV8() {
   const [notice, setNotice] = useState('')
 
   useEffect(() => {
-    setId(new URLSearchParams(window.location.search).get('id'))
-  }, [])
+    setId(queryId)
+  }, [queryId])
+
+  /* WEB212：続きの本文・添付を書きかけのまま離れるときは確かめる（新しい問い合わせと同じ）。 */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: body.trim() !== '' || attachments.length > 0,
+    busy: sending,
+  })
 
   const idMissing = id === null
   const hasSenderEmail = (me?.email ?? '').trim().length > 0
@@ -152,12 +178,16 @@ export default function HqSupportDetailV8() {
   const ready = !idMissing && !detailLoading && id !== undefined && !detailMissing && !loadError && detail
   const accountName = detail?.lineAccountId ? accounts.find((a) => a.id === detail.lineAccountId)?.name ?? null : null
   const title = ready ? detail.subject : 'お問い合わせのやり取り'
+  // ★V8 パンくずは「ホーム › 統括の設定 › お問い合わせ › 番号」（絵 `V8-B/OhguS`）。番号が無い・読み込み中は「お問い合わせ」。
+  const ticketLabel = ready ? detail.ticketLabel ?? '' : ''
+  usePageTitle(ticketLabel || 'お問い合わせ')
+  usePageCrumbs(ticketLabel ? [{ label: '統括の設定', href: '/hq/settings' }, { label: 'お問い合わせ', href: '/hq/support' }] : [{ label: '統括の設定', href: '/hq/settings' }])
   const description = ready
-    ? [detail.ticketLabel, detail.kindLabel, accountName, `${supportTime(detail.createdAt)} に送信`].filter(Boolean).join(' ・ ')
+    ? [detail.ticketLabel, supportKindWord(detail.kind, detail.kindLabel), accountName, `${supportTime(detail.createdAt)} に送信`].filter(Boolean).join(' ・ ')
     : '問い合わせの内容と運営からの返事を確認します。'
 
   return (
-    <ListPage boardId="OhguS" title={title} description={description} folders={<HqSettingsNavV8 active="contact" />}>
+    <ListPage boardId="OhguS" title={title} description={description} folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}>
       <div className={styles.body}>
         <div className={styles.main}>
           {idMissing ? (
@@ -271,6 +301,7 @@ export default function HqSupportDetailV8() {
           </section>
         </aside>
       </div>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="書きかけの続き" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </ListPage>
   )
 }

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Bell, Send, TriangleAlert, UserPlus } from 'lucide-react'
 import type { NotificationCenterItem } from '@line-crm/shared'
-import { api, type BookingRequest, type DashboardOverview, type DashboardUpcoming, type DeliveryFailureOrigins } from '@/lib/api'
+import { api, fetchApi, type BookingRequest, type DashboardOverview, type DashboardUpcoming, type DeliveryFailureOrigins } from '@/lib/api'
 import SectionHeader from './head'
 import ActivityItem from '@/components/shared/activity-item'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -15,6 +15,9 @@ import { dashboardNotificationDestination } from '@/components/dashboard/notific
 import { formatWaitRough } from '@/lib/format-duration'
 import { formatDateTime, formatNumber, formatTime, formatRelative } from '@/lib/format'
 import type { HealthRisk } from './use-dashboard'
+import type { AccountWithStats } from '@/contexts/account-context'
+import { connectionReasonLine } from '@/v8/hq/connection-reasons'
+import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
 
 type Section = NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]
@@ -40,14 +43,14 @@ export function KeyValue({ label, value, tone = 'default', dot, href, title }: {
   label: string
   value: ReactNode
   tone?: 'default' | 'danger' | 'success' | 'faint'
-  dot?: 'success' | 'danger' | 'faint'
+  dot?: 'success' | 'danger' | 'warning' | 'faint'
   href?: string
   title?: string
 }) {
   const body = (
     <>
-      {dot ? <span className={dot === 'success' ? `${styles.dot} ${styles.dot_success}` : dot === 'danger' ? `${styles.dot} ${styles.dot_danger}` : styles.dot} aria-hidden="true" /> : null}
-      <span className={styles.kvKey}>{label}</span>
+      {dot ? <span className={dot === 'success' ? `${styles.dot} ${styles.dot_success}` : dot === 'danger' ? `${styles.dot} ${styles.dot_danger}` : dot === 'warning' ? `${styles.dot} ${styles.dot_warning}` : styles.dot} aria-hidden="true" /> : null}
+      <span className={styles.kvKey} title={label}>{label}</span>
       <span className={styles.kvValue}>{value}</span>
     </>
   )
@@ -61,7 +64,7 @@ export function Unavailable({ section, onRetry }: { section?: Section; onRetry: 
   return (
     <p className={styles.note}>
       {partial ? `一部のデータを${STATE_TEXT.error}` : `データを${STATE_TEXT.error}`}
-      <button type="button" className={styles.inlineButton} onClick={onRetry}>もう一度読み込む</button>
+      <button type="button" className={styles.inlineButton} onClick={onRetry}><RetryLabel /></button>
     </p>
   )
 }
@@ -75,8 +78,10 @@ export function Loading({ label }: { label: string }) {
 }
 
 /* ── 右の列：今月の送信枠 ─────────────────────────── */
-export function SendQuota({ delivery, metric, section, onRetry }: {
+export function SendQuota({ delivery, metric, section, onRetry, overviewFailed }: {
   delivery: DashboardOverview['delivery'] | null
+  /** 概要そのものが取れなかった（骨組みのまま待たせない）。 */
+  overviewFailed?: boolean
   metric: NonNullable<DashboardOverview['metrics']>['monthlyQuota'] | undefined
   section?: Section
   onRetry: () => void
@@ -92,15 +97,19 @@ export function SendQuota({ delivery, metric, section, onRetry }: {
   const low = rate !== null && rate <= 10
   const updated = sectionUpdated(section)
   const quotaText = [unlimited ? '契約種別：無制限' : rate === null ? null : `残り ${rate.toFixed(1)}%`, updated].filter(Boolean).join('・')
+  const head = (
+    <SectionHeader
+      title="今月の送信枠"
+      help="送信枠は毎月1日にリセットされます。使い切ると翌月1日まで送れません。"
+      helpLabel="今月の送信枠の説明"
+      href="/accounts"
+      linkLabel="配信設定へ"
+    />
+  )
+  if (overviewFailed) return <div className={styles.asideBlock}>{head}<Unavailable onRetry={onRetry} /></div>
   return (
     <div className={styles.asideBlock}>
-      <SectionHeader
-        title="今月の送信枠"
-        help="送信枠は毎月1日にリセットされます。使い切ると翌月1日まで送れません。"
-        helpLabel="今月の送信枠の説明"
-        href="/accounts"
-        linkLabel="配信設定へ"
-      />
+      {head}
       {loading ? <Loading label="送信枠" /> : (
         <p className={styles.quota}>
           {unlimited ? (
@@ -126,7 +135,10 @@ export function SendQuota({ delivery, metric, section, onRetry }: {
       {notConnected ? (
         <Updated>LINEアカウントが未接続です</Updated>
       ) : failed ? (
-        <button type="button" onClick={onRetry} className={styles.retryDanger}>{`送信枠を${STATE_TEXT.error}。もう一度読み込む`}</button>
+        <>
+          <p className={styles.alert}>LINE から送信枠を取れませんでした。LINE アカウントの接続（チャネルのトークン）を確かめてください。</p>
+          <button type="button" onClick={onRetry} className={styles.retryDanger}><RetryLabel /></button>
+        </>
       ) : (
         <p className={low ? styles.updatedDanger : styles.updated} title={quotaText}>
           {quotaText}
@@ -167,11 +179,11 @@ export function OperationalAlerts({ risk, healthIssues, oldestWaitMinutes, twoFa
 /* ── 右の列：現在の対応状況 ───────────────────────── */
 export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOverview['inbox'] | null; autoOnInbound: boolean | null }) {
   const rows = [
-    { label: '未対応', value: inbox?.unanswered ?? null, href: '/chats?status=unread' },
-    { label: '対応中', value: inbox?.inProgress ?? null, href: '/chats?status=in_progress' },
-    { label: '保留', value: inbox?.onHold ?? null, href: '/chats?status=on_hold' },
-    { label: '対応済み', value: inbox?.resolved ?? null, href: '/chats?status=resolved' },
-  ]
+    { label: '未対応', value: inbox?.unanswered ?? null, href: '/chats?status=unread', dot: 'danger' },
+    { label: '対応中', value: inbox?.inProgress ?? null, href: '/chats?status=in_progress', dot: 'warning' },
+    { label: '保留', value: inbox?.onHold ?? null, href: '/chats?status=on_hold', dot: 'faint' },
+    { label: '対応済み', value: inbox?.resolved ?? null, href: '/chats?status=resolved', dot: 'success' },
+  ] as const
   const autoText = `メッセージ受信時の自動変更：${autoOnInbound === null ? '—' : autoOnInbound ? '有効' : '無効'}`
   return (
     <div className={styles.asideBlock}>
@@ -189,6 +201,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
           value={row.value === null ? '—' : `${formatNumber(row.value)}件`}
           tone={row.label === '未対応' && (row.value ?? 0) > 0 ? 'danger' : 'default'}
           href={row.href}
+          dot={row.dot}
           title={`${row.label}で絞った受信箱を開く`}
         />
       ))}
@@ -198,19 +211,73 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
 }
 
 /* ── 右の列：接続状態 ─────────────────────────────── */
-export function ConnectionStatus({ webhook, risk, activeFriends, healthFailed }: {
-  webhook: string | undefined
+export type WebhookState = { label: '正常' | '要確認' | '未確認'; reason: { text: string; title: string } | null }
+
+/**
+ * LINE Webhook の値。統括のアカウントの接続（connection）と同じ判定・理由の言葉を使う。
+ * 「確認中」は確かめるを押して走らせている間だけ（ここでは出さない）。
+ */
+export function webhookState(account: Pick<AccountWithStats, 'connection' | 'webhook' | 'basicId' | 'channelId'> | null | undefined): WebhookState {
+  const connection = account?.connection
+  const webhook = account?.webhook?.status
+  if (connection?.status === 'warn' || webhook === 'mismatched' || webhook === 'unconfigured') {
+    return { label: '要確認', reason: account ? connectionReasonLine(account as AccountWithStats) : null }
+  }
+  if (connection?.status === 'ok' || (!connection && webhook === 'matched')) return { label: '正常', reason: null }
+  return { label: '未確認', reason: null }
+}
+
+export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFriends, healthFailed }: {
+  account: AccountWithStats | null | undefined
+  /** 確かめるを押せる（オーナー・管理者）。 */
+  canCheck: boolean
+  /** 確認の後にアカウントの一覧を読み直す。 */
+  onChecked: () => Promise<void> | void
   risk: HealthRisk
   activeFriends: number | null
   healthFailed?: boolean
 }) {
-  const webhookLabel = webhook === 'matched' ? '正常' : webhook === 'mismatched' || webhook === 'unconfigured' ? '要確認' : '確認中'
+  const [checking, setChecking] = useState(false)
+  const [checkError, setCheckError] = useState('')
+  const state = webhookState(account)
+  const webhookLabel = checking ? '確認中' : state.label
   const autoLabel = healthFailed ? '未取得' : risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'
   const dotOf = (label: string) => (label === '正常' || label === '稼働中' ? 'success' : label === '要確認' ? 'danger' : 'faint') as 'success' | 'danger' | 'faint'
+  /* Webhook の要確認は黄の丸と理由（統括のアカウントの接続と同じ）。 */
+  const webhookDot = webhookLabel === '要確認' ? 'warning' : dotOf(webhookLabel)
+  const revision = account?.revision
+  const canRun = canCheck && !!account && !account.archivedAt && typeof revision === 'number' && Number.isInteger(revision) && revision >= 1
+  const check = async () => {
+    if (!account || !canRun || checking) return
+    setChecking(true)
+    setCheckError('')
+    try {
+      await fetchApi(`/api/line-accounts/${encodeURIComponent(account.id)}/connection-checks`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': `dashboard-check-${account.id}-${crypto.randomUUID()}` },
+        body: JSON.stringify({ expectedRevision: revision }),
+      })
+      await onChecked()
+    } catch {
+      setCheckError('接続を確かめられませんでした。時間をおいてもう一度押してください。')
+    } finally {
+      setChecking(false)
+    }
+  }
+  const showCheck = canRun && (state.label !== '正常' || checking)
   return (
     <div className={styles.asideBlock}>
       <SectionHeader title="接続状態" />
-      <KeyValue label="LINE Webhook" value={webhookLabel} dot={dotOf(webhookLabel)} tone={webhookLabel === '要確認' ? 'danger' : 'default'} />
+      <div className={styles.kvWithAction}>
+        <KeyValue label="LINE Webhook" value={webhookLabel} dot={webhookDot} />
+        {showCheck ? (
+          <button type="button" className={styles.inlineAction} onClick={() => void check()} disabled={checking} aria-label="LINE Webhook の接続を確かめる">
+            確かめる
+          </button>
+        ) : null}
+      </div>
+      {state.label === '要確認' && state.reason && !checking ? <p className={styles.stale} title={state.reason.title}>{state.reason.text}</p> : null}
+      {checkError ? <p className={styles.alert} role="alert">{checkError}</p> : null}
       <KeyValue label="自動処理" value={autoLabel} dot={dotOf(autoLabel)} tone={autoLabel === '要確認' ? 'danger' : 'default'} />
       <KeyValue label="有効友だち" value={activeFriends === null ? '—' : `${formatNumber(activeFriends)}人`} />
     </div>
@@ -222,15 +289,14 @@ export function FriendStatus({ friends }: { friends: DashboardOverview['friends'
   const blocked = friends.blockedByThem + friends.hiddenByUs + friends.blockedBoth
   const base = friends.active + blocked
   const rate = base > 0 ? (blocked / base) * 100 : 0
+  const breakdown = `相手から ${formatNumber(friends.blockedByThem)}人・自分から ${formatNumber(friends.hiddenByUs)}人・相互に ${formatNumber(friends.blockedBoth)}人`
   return (
     <>
       <SectionHeader title="友だちの状態" note="現在" href="/friends" linkLabel="友だちを見る" />
       <KeyValue label="友だち総数" value={`${formatNumber(friends.total)}人`} />
       <KeyValue label="有効" value={`${formatNumber(friends.active)}人`} />
       <KeyValue label="ブロック・非表示" value={`${formatNumber(blocked)}人（${rate.toFixed(1)}%）`} />
-      <p className={styles.small}>
-        {`相手から ${formatNumber(friends.blockedByThem)}人・自分から ${formatNumber(friends.hiddenByUs)}人・相互に ${formatNumber(friends.blockedBoth)}人`}
-      </p>
+      <p className={styles.small} title={breakdown}>{breakdown}</p>
     </>
   )
 }

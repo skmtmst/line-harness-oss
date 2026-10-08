@@ -1,0 +1,498 @@
+/*
+ * ★V8 受信箱の真ん中・書く欄・窓（M0393）。値は globals.css の [data-theme="v8"] の --tpl-inbox-*。
+ * このファイルは V8 の画面だけが読む（入口の page.tsx が v8 のときだけ部品を出す）。
+ */
+
+/* ── 対応ルールの小窓 ─────────────────────────── */
+.popWrap { position: relative; display: inline-flex; }
+/* 受信箱の頭の印のボタン（絵 XqSvX：32角・印14・ink-secondary）。共通の副ボタン（compact）に大きさだけ。 */
+.popTrigger { flex: none; width: var(--tpl-inbox-tool-size); padding: 0; color: var(--color-ink-secondary); }
+.popTrigger svg { width: var(--tpl-inbox-tool-icon); height: var(--tpl-inbox-tool-icon); }
+
+.pop {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-inbox-pop-gap);
+  width: var(--tpl-inbox-pop-w);
+  max-width: calc(100vw - var(--tpl-inbox-pop-gap) * 2);
+  padding: var(--tpl-inbox-pop-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  box-shadow: var(--shadow-float);
+}
+
+.popTitle { color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--text-label--line-height); }
+.popNote { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--text-caption--line-height); }
+.popError { color: var(--color-danger); font-size: var(--text-caption); }
+.popList { display: flex; flex-direction: column; }
+.popRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-chead-gap);
+  padding: var(--tpl-inbox-pop-row-pad);
+  box-shadow: var(--tpl-inbox-line-bottom-soft);
+  font-size: var(--text-caption);
+}
+.popRow:last-child { box-shadow: none; }
+.popName { flex: none; color: var(--color-ink); font-weight: 600; white-space: nowrap; }
+.popRule { min-width: 0; flex: 1; overflow: hidden; color: var(--color-ink-faint); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.popLink { align-self: flex-start; color: var(--color-action); font-size: var(--text-caption); font-weight: 600; }
+.popLink:hover { text-decoration: underline; }
+
+.dot {
+  flex: none;
+  width: var(--tpl-inbox-dot);
+  height: var(--tpl-inbox-dot);
+  border-radius: var(--radius-pill);
+}
+
+/* ── 予約して送る（段2「6.」） ─────────────────── */
+.schBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-inbox-row-line-gap);
+  width: 100%;
+  padding: var(--tpl-inbox-sch-box-pad);
+  border-radius: var(--tpl-inbox-seg-item-radius);
+  background: var(--color-surface-pearl);
+}
+.schBoxLabel { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
+.schBoxValue { display: flex; align-items: center; gap: var(--tpl-inbox-chip-gap); min-width: 0; color: var(--color-ink); font-size: var(--text-label); }
+.schBoxIcon { flex: none; width: var(--tpl-inbox-chead-ctl-icon); height: var(--tpl-inbox-chead-ctl-icon); color: var(--color-ink-secondary); }
+.schBoxText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.schGroup { display: flex; flex-direction: column; gap: var(--tpl-inbox-composer-gap); width: 100%; }
+.schLabel { color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; }
+.schChips { display: flex; flex-wrap: wrap; gap: var(--tpl-inbox-head-tools-gap); }
+.schField { width: 100%; }
+.schNote { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--text-caption--line-height); }
+.schWarn { color: var(--color-warning); font-size: var(--text-caption); font-weight: 600; }
+.schError { color: var(--color-danger); font-size: var(--text-caption); }
+.schLink { margin-left: var(--tpl-inbox-chip-gap); border: 0; background: none; color: var(--color-action); font-size: var(--text-caption); font-weight: 600; cursor: pointer; white-space: nowrap; }
+.schLink:disabled { opacity: 0.4; cursor: default; }
+.schRows { display: flex; flex-direction: column; gap: var(--tpl-inbox-head-tools-gap); width: 100%; }
+.schRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-inbox-chead-gap);
+  padding: var(--tpl-inbox-sch-box-pad);
+  border-radius: var(--tpl-inbox-seg-item-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  font-size: var(--text-caption);
+}
+.schRowAt { flex: none; color: var(--color-ink); font-weight: 600; white-space: nowrap; }
+.schRowText { min-width: 0; flex: 1; overflow: hidden; color: var(--color-ink-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.schRowField { flex: 1 1 100%; order: 3; }
+
+/* ── 書く欄の道具・予約・送信（XqSvX「書く前の道具」「下」） ─────── */
+.composerToolsRow { margin-bottom: var(--tpl-inbox-composer-gap); }
+.composerTools { gap: var(--tpl-inbox-composer-gap); }
+
+.tool, .send { flex: none; white-space: nowrap; }
+/* 開いている間（送信の設定・内部メモ）は緑の地と枠（段2「2.」「3.」の絵）。共通の副ボタンに無い状態だけ足す。 */
+.tool[data-active] { background: var(--color-accent-soft); outline-color: var(--color-accent-deep); color: var(--color-accent-deep); }
+
+/* ── 送信の設定（段2「2.」） ─────────────────────── */
+.sendKey {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-inbox-composer-gap);
+  margin-bottom: var(--tpl-inbox-composer-gap);
+  padding: var(--tpl-inbox-sendkey-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+}
+.sendKeyTitle { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; }
+.sendKeyNote { color: var(--color-ink-faint); font-size: var(--text-micro); }
+
+/* ── テンプレートを選ぶ（段2「4.」幅640） ───────────── */
+.tpBody {
+  display: flex;
+  width: 100%;
+  height: var(--tpl-inbox-tp-body-h);
+  max-height: var(--tpl-inbox-tp-body-max);
+  box-shadow: var(--tpl-inbox-line-top);
+}
+.tpSide {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--tpl-inbox-seg-gap);
+  width: var(--tpl-inbox-tp-side-w);
+  padding: var(--tpl-inbox-tp-side-pad);
+  overflow-y: auto;
+  box-shadow: var(--tpl-inbox-line-right);
+}
+.tpSideRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-chead-gap);
+  width: 100%;
+  padding: var(--tpl-inbox-tp-side-row-pad);
+  border: 0;
+  border-radius: var(--tpl-inbox-seg-item-radius);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.tpSideRow[data-depth] { padding-left: var(--tpl-inbox-tp-side-indent); }
+.tpSideRow:hover { background: var(--color-canvas-sunken); }
+.tpSideRow[aria-pressed='true'] { background: var(--color-surface-pearl); font-weight: 700; }
+.tpSideIcon { flex: none; width: var(--tpl-inbox-chead-ctl-icon); height: var(--tpl-inbox-chead-ctl-icon); color: var(--color-ink-secondary); }
+.tpSideName { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tpSideCount { flex: none; color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; }
+.tpSideLabel { padding: var(--tpl-inbox-pop-row-pad); color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 700; }
+.tpSideNote { color: var(--color-danger); font-size: var(--text-micro); }
+
+.tpList {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--tpl-inbox-composer-gap);
+  padding: var(--tpl-inbox-tp-list-pad);
+  overflow-y: auto;
+}
+.tpSearchField { flex: none; }
+.tpNote { color: var(--color-ink-faint); font-size: var(--text-caption); }
+.tpError { width: 100%; padding: var(--tpl-inbox-tp-band-pad); color: var(--color-danger); font-size: var(--text-caption); }
+.tpList .tpError { padding: 0; }
+.tpCards { display: flex; flex-direction: column; gap: var(--tpl-inbox-composer-gap); }
+.tpCard {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-row-gap);
+  width: 100%;
+  padding: var(--tpl-inbox-tp-card-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  text-align: left;
+  cursor: pointer;
+}
+.tpCard:hover { background: var(--color-surface-pearl); }
+.tpCard[aria-pressed='true'] { background: var(--color-accent-soft); outline: var(--tpl-inbox-tp-card-on); outline-offset: var(--tpl-inbox-tp-card-on-offset); }
+.tpCardText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: var(--tpl-inbox-row-line-gap); }
+.tpCardName { overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tpCardBody { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
+.tpNum {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-inbox-tp-num);
+  height: var(--tpl-inbox-tp-num);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+.tpBox {
+  flex: none;
+  width: var(--tpl-inbox-icon-md);
+  height: var(--tpl-inbox-icon-md);
+  border-radius: var(--tpl-inbox-badge-radius);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+}
+.tpBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-chead-gap);
+  width: 100%;
+  padding: var(--tpl-inbox-tp-band-pad);
+  background: var(--color-accent-soft);
+  font-size: var(--text-caption);
+}
+.tpBandLabel { flex: none; color: var(--color-accent-deep); font-weight: 700; }
+.tpBandOrder { min-width: 0; flex: 1; overflow: hidden; color: var(--color-ink); text-overflow: ellipsis; white-space: nowrap; }
+.tpBandCount { flex: none; color: var(--color-accent-deep); font-weight: 700; }
+.tpFoot {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-composer-gap);
+  width: 100%;
+  padding: var(--tpl-inbox-tp-foot-pad);
+  box-shadow: var(--tpl-inbox-line-top);
+}
+.tpFootLead { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--tpl-inbox-composer-gap); }
+.tpFootText { display: flex; min-width: 0; flex-direction: column; }
+.tpFootTitle { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; white-space: nowrap; }
+.tpFootSub { color: var(--color-ink-faint); font-size: var(--text-nano); white-space: nowrap; }
+.tpFootActions { display: flex; flex: none; align-items: center; gap: var(--tpl-inbox-composer-gap); }
+
+/* ── 会話の頭（XqSvX「会話の頭」。LINE もメールも同じ形） ───────── */
+.chead {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-inbox-chead-gap);
+  padding: var(--tpl-inbox-chead-pad);
+  box-shadow: var(--tpl-inbox-search-line-bottom);
+  background: var(--color-canvas);
+}
+.cheadWho { display: flex; min-width: var(--tpl-inbox-chead-who-min); flex: 1 1 0; align-items: center; gap: var(--tpl-inbox-chead-gap); }
+.cheadBack { flex: none; border: 0; background: none; color: var(--color-ink-faint); cursor: pointer; }
+.cheadText { display: flex; min-width: 0; flex-direction: column; }
+.cheadName {
+  display: block;
+  min-width: 0;
+  /* 共通のボタンの最小の高さ（32）を受けない：絵は名前の行 23＋補足 18 で頭が 64 */
+  height: var(--tpl-inbox-chead-name-lh);
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font-size: var(--tpl-inbox-chead-name);
+  font-weight: 600;
+  line-height: var(--tpl-inbox-chead-name-lh);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cheadName[aria-expanded='true'] { height: auto; white-space: normal; word-break: break-all; }
+.cheadSub { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); text-overflow: ellipsis; white-space: nowrap; }
+.cheadTools { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--tpl-inbox-chead-gap); margin-left: auto; }
+.cheadSquare {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-inbox-chead-ctl);
+  height: var(--tpl-inbox-chead-ctl);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+.cheadSquare:hover { background: var(--color-canvas-sunken); }
+.cheadSquare svg { width: var(--tpl-inbox-chead-panel-icon); height: var(--tpl-inbox-chead-panel-icon); }
+.cheadStar { width: var(--tpl-inbox-chead-star); height: var(--tpl-inbox-chead-star); }
+.cheadStar svg { width: var(--tpl-inbox-chead-star-icon); height: var(--tpl-inbox-chead-star-icon); }
+.cheadStar[aria-pressed='true'] { background: var(--color-status-warn-soft); outline-color: var(--color-warning); color: var(--color-warning); }
+.cheadSquare[aria-expanded='true'] { background: var(--color-surface-pearl); }
+.cheadSquare:disabled { cursor: wait; opacity: 0.6; }
+
+/* 対応状況の選ぶ欄の先頭の色の点 */
+.ctlDot { display: block; flex: none; width: var(--tpl-inbox-dot-sm); height: var(--tpl-inbox-dot-sm); border-radius: var(--radius-pill); }
+
+.ctlDot[data-status='unread'] { background: var(--color-danger); }
+.ctlDot[data-status='in_progress'] { background: var(--tpl-inbox-st-progress); }
+.ctlDot[data-status='on_hold'] { background: var(--color-ink-secondary); }
+.ctlDot[data-status='resolved'] { background: var(--color-success); }
+
+/* ── やりとり（XqSvX「やりとり」） ───────────────── */
+.thread { padding: var(--tpl-inbox-thread-pad); background: var(--color-table-head); }
+.day {
+  margin: var(--tpl-inbox-pop-gap) 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-inbox-badge-lh);
+  text-align: center;
+}
+.day[data-first] { margin-top: 0; }
+.rowIn, .rowOut { display: flex; align-items: flex-end; gap: var(--tpl-inbox-chead-gap); width: 100%; }
+.rowIn { justify-content: flex-start; }
+.rowOut { justify-content: flex-end; }
+.outCol { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; gap: var(--tpl-inbox-seg-gap); }
+.outLine { display: flex; min-width: 0; align-items: flex-end; gap: var(--tpl-inbox-chead-gap); }
+.bubbleIn, .bubbleOut {
+  min-width: 0;
+  max-width: var(--tpl-inbox-bubble-w);
+  padding: var(--tpl-inbox-bubble-pad);
+  border-radius: var(--tpl-inbox-bubble-radius);
+  color: var(--color-ink);
+  font-size: var(--tpl-inbox-bubble-text);
+  line-height: var(--tpl-inbox-bubble-lh);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bubbleIn { background: var(--color-canvas); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+.bubbleOut { background: var(--tpl-inbox-bubble-out); }
+.meta { display: inline-flex; flex: none; align-items: center; gap: var(--tpl-inbox-head-tools-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); white-space: nowrap; }
+.quoteBtn { border: 0; background: none; color: var(--color-ink-faint); font-size: var(--text-micro); cursor: pointer; }
+.quoteBtn:hover { color: var(--color-action); text-decoration: underline; }
+.quoted {
+  margin-bottom: var(--tpl-inbox-chip-gap);
+  padding-left: var(--tpl-inbox-chead-gap);
+  box-shadow: var(--tpl-inbox-quote-line);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+.sender { display: inline-flex; max-width: 100%; align-items: center; gap: var(--tpl-inbox-chip-gap); color: var(--color-ink-secondary); font-size: var(--text-micro); font-weight: 600; white-space: nowrap; }
+.senderFace, .senderBot {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-inbox-icon-md);
+  height: var(--tpl-inbox-icon-md);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-nano);
+  font-weight: 700;
+}
+.senderFace { background: var(--color-action); color: var(--color-on-action); }
+.senderBot { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
+.senderBot svg { width: var(--tpl-inbox-menu-search-icon); height: var(--tpl-inbox-menu-search-icon); }
+
+/* ── 書く欄の箱（XqSvX「書く欄」「入力」） ──────────── */
+.composer { padding: var(--tpl-inbox-composer-pad); }
+.inputBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-inbox-composer-gap);
+  padding: var(--tpl-inbox-composer-input-pad);
+  border-radius: var(--tpl-inbox-composer-input-radius);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+.inputBox:focus-within { outline-color: var(--color-accent-deep); }
+.textarea {
+  width: 100%;
+  min-height: var(--tpl-inbox-composer-input-h);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-inbox-row-preview-lh);
+  resize: none;
+  outline: none;
+}
+.textarea::placeholder { color: var(--color-ink-faint); }
+.countRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-inbox-composer-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
+.bottomRow { margin-top: 0; gap: var(--tpl-inbox-composer-gap); }
+.bottomRow > span:first-of-type span { font-size: var(--text-micro); }
+
+/* ── 添付（M0393「7. 添付」I7Skn・B-6） ─────────────── */
+/* 書く欄の左下のクリップ：白地・薄い枠・32角・角丸10・印16（共通の副ボタン compact に大きさだけ） */
+.attachTrigger {
+  flex: none;
+  width: var(--tpl-inbox-attach-btn);
+  height: var(--tpl-inbox-attach-btn);
+  padding: 0;
+  border-radius: var(--tpl-inbox-attach-btn-radius);
+  color: var(--color-ink-secondary);
+}
+.attachTrigger svg { width: var(--tpl-inbox-attach-icon); height: var(--tpl-inbox-attach-icon); }
+.attachPop {
+  display: flex;
+  flex-direction: column;
+  width: var(--tpl-inbox-attach-pop-w);
+  max-width: calc(100vw - var(--tpl-inbox-pop-gap) * 2);
+  padding: var(--tpl-inbox-attach-pop-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  box-shadow: var(--shadow-float);
+}
+.attachItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-inbox-attach-item-gap);
+  width: 100%;
+  padding: var(--tpl-inbox-attach-item-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.attachItem:hover, .attachItem:focus-visible { background: var(--color-canvas-sunken); }
+.attachItemIcon { flex: none; width: var(--tpl-inbox-attach-icon); height: var(--tpl-inbox-attach-icon); margin-top: var(--tpl-inbox-row-line-gap); color: var(--color-ink-secondary); }
+.attachItemText { display: flex; min-width: 0; flex-direction: column; }
+.attachItemTitle { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; line-height: var(--tpl-inbox-row-preview-lh); }
+.attachItemNote { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-badge-lh); }
+
+/* 書く欄の上の札（名前・大きさ・×） */
+.attachChips { display: flex; flex-wrap: wrap; gap: var(--tpl-inbox-composer-gap); margin-bottom: var(--tpl-inbox-composer-gap); }
+.attachChip {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-composer-gap);
+  min-width: 0;
+  max-width: var(--tpl-inbox-attach-chip-max);
+  padding: var(--tpl-inbox-attach-chip-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+.attachChip[data-status='failed'] { outline-color: var(--color-danger); }
+.attachChipIcon { flex: none; width: var(--tpl-inbox-attach-icon); height: var(--tpl-inbox-attach-icon); color: var(--color-ink-secondary); }
+.attachChipText { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.attachChipName, .attachChipSub, .attachChipError { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachChipName { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-inbox-badge-lh); }
+.attachChipSub { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
+.attachChipError { color: var(--color-danger); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
+.attachChipRetry {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--tpl-inbox-chip-gap);
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.attachChipRetryIcon { width: var(--tpl-inbox-icon-sm); height: var(--tpl-inbox-icon-sm); }
+.attachChipRemove {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-inbox-chead-face);
+  height: var(--tpl-inbox-chead-face);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+.attachChipRemove:hover:not(:disabled) { background: var(--color-canvas); color: var(--color-ink); }
+.attachChipRemove:disabled { opacity: 0.4; cursor: default; }
+.attachChipRemoveIcon { width: var(--tpl-inbox-icon-md); height: var(--tpl-inbox-icon-md); }
+/* ドラッグで近づけている間は書く欄の枠を緑にする */
+.composer[data-drop-over] .inputBox { outline-color: var(--color-accent-deep); background: var(--color-accent-soft); }
+.attachNote { min-width: 0; flex: 1; overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
+.attachNote[data-error] { color: var(--color-danger); }
+.attachLead { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--tpl-inbox-composer-gap); }
+
+/* 会話の中の動画・ファイル */
+.sentVideo { display: block; width: var(--tpl-inbox-sent-video-w); max-width: 100%; border-radius: var(--tpl-inbox-composer-input-radius); background: var(--color-canvas-sunken); }
+.sentFile {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-composer-gap);
+  width: var(--tpl-inbox-sent-file-w);
+  max-width: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+a.sentFile:hover .sentFileName { text-decoration: underline; }
+.sentFileIcon { flex: none; width: var(--tpl-inbox-attach-icon); height: var(--tpl-inbox-attach-icon); color: var(--color-ink-secondary); }
+.sentFileText { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.sentFileName { overflow: hidden; color: var(--color-ink); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.sentFileSub { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }

@@ -6,9 +6,8 @@ import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { SIDEBAR_TOGGLE_EVENT, UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
-import { adminSessionHeaders } from '@/lib/admin-session'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
-import { HQ_MENU_SECTIONS, menuOwnerForScreen, orderedMenuSections, type MenuItem, type MenuSection } from '@/lib/menu'
+import { HQ_MENU_SECTIONS, isHqShellPath, menuOwnerForScreen, orderedMenuSections, type MenuItem, type MenuSection } from '@/lib/menu'
 import { HQ_TEMPLATE_DISTRIBUTION_ENABLED } from '@/lib/hq-template-availability'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageChrome } from '@/components/shell/page-chrome'
@@ -17,20 +16,56 @@ import SidebarIdentity from './sidebar-identity'
 import { brandInitial } from './brand-initial'
 import SidebarVersion from './sidebar-version'
 import Notice from '@/components/shared/notice'
-import HqAccountMenu from '@/components/hq/account-menu'
+import HqAccountMenu, { SidebarAccountMenu } from '@/components/hq/account-menu'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   SIDEBAR_FEATURE_BY_HREF,
   SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
 import styles from './sidebar.module.css'
+import {
+  Bell, CalendarCheck, CalendarCog, Clipboard, ClipboardList, Clock, FileText, Folder, House, Inbox,
+  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Type, UserPlus, Users, Video, type LucideIcon,
+} from 'lucide-react'
+
+/*
+ * ★V8 の左メニューの印（絵 d8X09・WQmep の「項目 〇〇 / 印」は lucide）。
+ * V8 のときだけ使い、v7 は MENU_SECTIONS の線画のまま。載っていない項目も v7 の線画。鍵は MENU_SECTIONS の id。
+ */
+const V8_NAV_ICONS: Record<string, LucideIcon> = {
+  dashboard: House,
+  inbox: Inbox,
+  friends: Users,
+  'friend-attributes': Tag,
+  scenarios: ClipboardList,
+  broadcasts: Send,
+  reminders: Bell,
+  'auto-replies': MessageCircleMore,
+  'friend-add-settings': UserPlus,
+  webinars: Video,
+  templates: FileText,
+  'rich-menus': LayoutGrid,
+  forms: Clipboard,
+  'common-vars': Type,
+  contents: Folder,
+  'booking-bookings': CalendarCheck,
+  'booking-menus': CalendarCog,
+  events: Ticket,
+  'booking-own-shifts': Clock,
+}
 
 /* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
    反映するため同型のエイリアスを使う（描画後の1回分のズレを防ぐ）。 */
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 /** ★V8（夕44-A）：はじめから開く4組。ほかは見出しだけで畳む。 */
-const V8_GROUPS_OPEN_BY_DEFAULT = new Set(['basic', 'delivery', 'contents', 'booking'])
+const V8_GROUPS_OPEN_BY_DEFAULT = new Set(['basic', 'delivery', 'contents', 'booking', 'hq'])
+
+/** ★V8 統括の左メニューの組の見出し（絵 `V8-B/JKjsE`）。v7 の統括は見出しの無い組のまま。 */
+const HQ_V8_SECTION_LABEL = '統括'
+
+/** ★V8 統括の左下「統括の設定」が選ばれた形になる画面（統括の設定の中のメニューの4つ）。 */
+const HQ_SETTINGS_PATHS = ['/hq/settings', '/hq/members', '/hq/billing', '/hq/support']
 
 /** 組の開閉を覚えるキー（ブラウザごと）。 */
 const SIDEBAR_GROUPS_KEY = 'lh-sidebar-groups'
@@ -97,11 +132,8 @@ export function clearSidebarCountCache(): void {
   sidebarCountCache.clear()
 }
 
-/** 統括の左メニューを出す住所（/hq の下と、統括から開く LINEアカウントの登録）。 */
-export function isHqShellPath(pathname: string | null | undefined): boolean {
-  if (!pathname) return false
-  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new'
-}
+/** 統括の左メニューを出す住所。決め方は上の帯と同じものを使う（`@/lib/menu`）。 */
+export { isHqShellPath }
 
 export default function Sidebar({
   friendAttributesV2Mode = false,
@@ -222,22 +254,6 @@ export default function Sidebar({
 
   const [staffName, setStaffName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<string | null>(null)
-  /*
-   * ★V8 殻合わせ：脇の頭の会社名。契約先の名前は /api/tenants/me が返す。
-   * 統括の殻のときだけ取る（ふだんの殻は選んだ店の看板で変わらない）。
-   * 取れなければ null のまま「統括」で出す。
-   */
-  const [tenantName, setTenantName] = useState<string | null>(null)
-  useEffect(() => {
-    if (!isHq) return
-    let cancelled = false
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL
-    fetch(`${apiUrl}/api/tenants/me`, { credentials: 'include', headers: adminSessionHeaders() })
-      .then((res) => res.json() as Promise<{ data?: { name?: string } } | null>)
-      .then((tenant) => { if (!cancelled) setTenantName(tenant?.data?.name ?? null) })
-      .catch(() => { if (!cancelled) setTenantName(null) })
-    return () => { cancelled = true }
-  }, [isHq])
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
   const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
 
@@ -392,8 +408,10 @@ export default function Sidebar({
          * ★V7 C6: 統括のひな形配布（4画面）は Worker の受け口が無いあいだ
          * 「利用できません」だけのページになるため、サイドバーには出さない。
          * ページ自体は残し、配布が有効になれば再表示する。
+         * ★V8 は4画面とも中身を出す（app/hq/hq-template-page.tsx と同じ条件）ので、
+         * 左メニューにも出す（絵 `V8-B/JKjsE`・`LRc93` の6項目）。v7 は今までどおり。
          */
-        if (isHq && !HQ_TEMPLATE_DISTRIBUTION_ENABLED && HQ_UNAVAILABLE_DISTRIBUTION_HREFS.has(item.href)) return false
+        if (isHq && !isV8 && !HQ_TEMPLATE_DISTRIBUTION_ENABLED && HQ_UNAVAILABLE_DISTRIBUTION_HREFS.has(item.href)) return false
         if (isHq) return true
         // 移行中のV2画面では、承認画像どおり「友だち属性」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
@@ -600,7 +618,8 @@ export default function Sidebar({
         // 統括の「店舗管理」(/hq) も完全一致にする。/hq/banners や /hq/members を
         // 開いたときに店舗管理が光ってしまうため。
         if (item.href === '/hq') {
-          if (activePathname === '/hq') best = '/hq'
+          // 統括から開く LINEアカウントの登録（/accounts/new）も「アカウント」の中（絵 `xj3zz` のパンくず）。
+          if (activePathname === '/hq' || activePathname === '/accounts/new') best = '/hq'
           continue
         }
         const path = item.href.split('?')[0]
@@ -646,6 +665,7 @@ export default function Sidebar({
    * ★V8（夕41）：左メニューのいちばん下の「設定」（歯車）は、設定の組の
    * どこかの画面を開いているとき選ばれた形にする。
    */
+  const hqSettingsActive = HQ_SETTINGS_PATHS.some((path) => activePathname === path || activePathname.startsWith(`${path}/`))
   const settingsActive = Boolean(
     sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)),
   )
@@ -688,21 +708,11 @@ export default function Sidebar({
             </div>
           </div>
           {/*
-            ★V8 殻合わせ（絵 `V8-B/JKjsE`）：脇の頭は会社のロゴ（緑の四角に
-            頭1字）＋会社名＋小さく musubo。会社名は契約先（/api/tenants/me）。
-            取れなければ「統括」で出す。v7 は上の札のまま。
+            ★V8 殻合わせ（絵 `V8-B/JKjsE`）：脇の頭は店の画面と同じ部品（会社の印＋会社名＋小さく musubo）。
+            会社名と頭の1字（「株式会社」などを外す）は店の画面と同じ決め方にする（オーナー 2026-10-07）。
+            統括の名前（統括名）は上の帯の切り替えの札に出す。v7 は上の札のまま。
           */}
-          <div className={`v8-only px-3 pb-3 pt-4 ${styles.collapseHide}`}>
-            <div className="flex items-center gap-3 px-1">
-              <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-accent-deep text-lg font-bold text-canvas">
-                {(tenantName ?? '統').slice(0, 1)}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-lead font-bold text-ink" title={tenantName ?? undefined}>{tenantName ?? '統括'}</span>
-                <span className="mt-0.5 block text-micro font-medium text-ink-faint">musubo</span>
-              </span>
-            </div>
-          </div>
+          <div className="v8-only"><SidebarIdentity /></div>
         </>
       ) : preview ? (
         <div className={`px-[13px] pb-[9px] pt-[18px] ${styles.collapseHide}`}>
@@ -753,7 +763,8 @@ export default function Sidebar({
            * 畳めない。いまいる画面の組は常に開く。アイコンだけの帯では
            * 見出し自体が無いので、畳みは効かせず全部のアイコンを出す。
            */
-          const collapsible = isV8 && Boolean(section.label)
+          const sectionLabel = section.label ?? (isHq && isV8 ? HQ_V8_SECTION_LABEL : null)
+          const collapsible = isV8 && Boolean(sectionLabel)
           const sectionOpen =
             !collapsible || groupIsOpen(section) || section.items.some((item) => isActive(item))
           /*
@@ -763,7 +774,7 @@ export default function Sidebar({
           const animatedGroup = collapsible && !(collapsed && !drawer)
           return (
           <div key={section.id} className={styles.section}>
-            {section.label && (
+            {sectionLabel && (
               isV8 ? (
                 <button
                   type="button"
@@ -771,7 +782,7 @@ export default function Sidebar({
                   onClick={() => toggleGroup(section)}
                   aria-expanded={sectionOpen}
                 >
-                  <span className="min-w-0 flex-1 truncate text-left">{section.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-left">{sectionLabel}</span>
                   <svg
                     className={`${styles.sectionChevron} ${sectionOpen ? '' : styles.sectionChevronClosed}`}
                     viewBox="0 0 24 24"
@@ -819,7 +830,10 @@ export default function Sidebar({
                         : ''
                   }`}
                 >
-                  <span className="shrink-0"><NavIcon d={item.icon} /></span>
+                  <span className="shrink-0">{(() => {
+                    const V8Icon = isV8 && !isHq ? V8_NAV_ICONS[item.id] : undefined
+                    return V8Icon ? <V8Icon className={styles.v8NavIcon} aria-hidden="true" /> : <NavIcon d={isV8 && item.iconV8 ? item.iconV8 : item.icon} />
+                  })()}</span>
                   <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>{visibleLabel}</span>
                   {badgeCount(item) > 0 && (
                     <>
@@ -872,19 +886,32 @@ export default function Sidebar({
         </div>
       )}
       {/*
-        統括（/hq）の脇の下には歯車の入口を置かない
-        （Pencil 承認 2026-10-06・`LINE-Harness-V8-B.pen` の `s6kZt/wCdWg`）。
-        統括の情報の画面へは左下のアカウントの行から行く。店舗側（上の枠）はそのまま。
+        ★V8 統括（/hq）の左下は「統括の設定」（歯車）と版（絵 `V8-B/JKjsE`・`r4ARpV`、オーナー 2026-10-07）。
+        統括の設定の中（メンバー・統括の情報・請求・お問い合わせ）を開いているとき選ばれた形にする。
+        v7 の統括は今までどおり左下のアカウントの行から行く。
       */}
+      {isV8 && isHq && !preview && (
+        <div className={styles.settingsEntry}>
+          <Link
+            href="/hq/settings"
+            prefetch={false}
+            title="統括の設定"
+            className={`${styles.item} ${hqSettingsActive ? styles.active : ''}`}
+          >
+            <span className="shrink-0"><NavIcon d={SETTINGS_GEAR_ICON} /></span>
+            <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>統括の設定</span>
+          </Link>
+        </div>
+      )}
 
       {/*
         メニューの下の版の表示（★V7 監査の直し E）。いま動いている版・
         commit・配備日時と環境。取れないときは「版の情報なし」。
         移行中の見た目承認（preview）は版の取得をしない。
-        統括（/hq）には出さない（同じ承認・`s6kZt/wCdWg`）。
+        v7 の統括（/hq）には出さない。V8 の統括は店の画面と同じく出す（絵 `V8-B/JKjsE`）。
         V8 でメニューを畳んだときは枠ごと隠す（`styles.collapseHide`）。
       */}
-      {preview || isHq ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
+      {preview || (isHq && !isV8) ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
@@ -894,8 +921,15 @@ export default function Sidebar({
         統括（/hq）だけは例外（2026-09-12、§1-2）。下端にログイン中のアカウントを置き、
         押すとメンバー管理・お問い合わせ・ログアウトのメニューが上に開く。
         正本は ★V6 36-1 `qAvlC`。中身は `components/hq/account-menu.tsx` が持つ。
+        V8 の統括は店の画面と同じ形（名前・ログアウトは上の帯、メンバー・お問い合わせは「統括の設定」の中）。
       */}
-      {isHq ? <div className={styles.collapseHide}><HqAccountMenu /></div> : <div className={styles.footer} />}
+      {isHq && !isV8 ? <div className={styles.collapseHide}><HqAccountMenu /></div> : <div className={styles.footer} />}
+      {/*
+        ★V8 左下の自分とメニュー（オーナー 2026-10-07・絵 `zUg8S/T7XSI6/shBJJ`・`ZBjxY/Xn3xt`）。
+        店・統括の両方で版の下に置く。上の帯の名前・ログアウト・［統括へ］はここへまとめた。
+        畳んだ左メニューでは顔だけ。v7 は上の行のまま（統括の HqAccountMenu・店は上の帯）。
+      */}
+      {isV8 && !preview ? <SidebarAccountMenu hq={isHq} collapsed={collapsed && !drawer} /> : null}
     </>
   )
 

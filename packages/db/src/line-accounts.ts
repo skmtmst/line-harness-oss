@@ -23,6 +23,7 @@ async function resolveCredentialEncryptionKey(explicit?: string): Promise<string
 }
 
 export interface LineAccount {
+  folder_id?: string | null;
   id: string;
   channel_id: string;
   name: string;
@@ -669,7 +670,48 @@ export interface LineAccountListStats {
   connection: {
     status: 'ok' | 'warn' | 'unknown';
     checkedAt: string | null;
+    /** 期限切れのトークンを持っている（自動の更新が止まっている）。 */
+    tokenExpired: boolean;
+    /** 最新の確認のうち、引っかかったもの（要確認の理由）。 */
+    issues: LineAccountConnectionIssue[];
   };
+}
+
+/** 一覧に載せる、引っかかった確認1件。秘密値は含まない。 */
+export interface LineAccountConnectionIssue {
+  kind: 'bot_info' | 'webhook_endpoint' | 'webhook_test' | 'token_refresh';
+  result: 'mismatched' | 'unconfigured' | 'failed';
+  expectedUrl: string | null;
+  registeredUrl: string | null;
+  webhookActive: boolean | null;
+  httpStatus: number | null;
+}
+
+const CONNECTION_ISSUE_ORDER: LineAccountConnectionIssue['kind'][] = [
+  'bot_info', 'token_refresh', 'webhook_endpoint', 'webhook_test',
+];
+
+function parseConnectionIssues(raw: string | null): LineAccountConnectionIssue[] {
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+    .map((item) => ({
+      kind: item.kind as LineAccountConnectionIssue['kind'],
+      result: item.result as LineAccountConnectionIssue['result'],
+      expectedUrl: typeof item.expectedUrl === 'string' ? item.expectedUrl : null,
+      registeredUrl: typeof item.registeredUrl === 'string' ? item.registeredUrl : null,
+      webhookActive: item.webhookActive == null ? null : Boolean(item.webhookActive),
+      httpStatus: typeof item.httpStatus === 'number' ? item.httpStatus : null,
+    }))
+    .filter((item) => CONNECTION_ISSUE_ORDER.includes(item.kind))
+    .sort((a, b) => CONNECTION_ISSUE_ORDER.indexOf(a.kind) - CONNECTION_ISSUE_ORDER.indexOf(b.kind));
 }
 
 /**
@@ -752,7 +794,8 @@ export async function getLineAccountListStats(
            FROM staff_assignments
           GROUP BY line_account_id
        ), ranked_checks AS (
-         SELECT checks.line_account_id, checks.result, checks.checked_at,
+         SELECT checks.line_account_id, checks.check_kind, checks.result, checks.checked_at,
+                checks.expected_url, checks.registered_url, checks.webhook_active, checks.http_status,
                 ROW_NUMBER() OVER (
                   PARTITION BY checks.line_account_id, checks.check_kind
                   ORDER BY checks.checked_at DESC, checks.id DESC
@@ -768,7 +811,14 @@ export async function getLineAccountListStats(
                 COUNT(*) AS check_count,
                 MAX(checked_at) AS checked_at,
                 MAX(CASE WHEN result IN ('mismatched', 'unconfigured', 'failed') THEN 1 ELSE 0 END) AS has_warning,
-                MAX(CASE WHEN result NOT IN ('matched', 'ok') THEN 1 ELSE 0 END) AS has_unconfirmed
+                MAX(CASE WHEN result NOT IN ('matched', 'ok') THEN 1 ELSE 0 END) AS has_unconfirmed,
+                json_group_array(
+                  CASE WHEN result IN ('mismatched', 'unconfigured', 'failed') THEN json_object(
+                    'kind', check_kind, 'result', result,
+                    'expectedUrl', expected_url, 'registeredUrl', registered_url,
+                    'webhookActive', webhook_active, 'httpStatus', http_status
+                  ) END
+                ) AS issues
            FROM ranked_checks
           WHERE recency = 1
           GROUP BY line_account_id
@@ -779,6 +829,12 @@ export async function getLineAccountListStats(
               COALESCE(SUM(source.messages_this_month), 0) AS messages_this_month,
               COALESCE(staff_counts.staff_count, 0) AS staff_count,
               connection.checked_at AS connection_checked_at,
+              connection.issues AS connection_issues,
+              CASE
+                WHEN account.token_expires_at IS NOT NULL
+                 AND datetime(account.token_expires_at) < datetime('now') THEN 1
+                ELSE 0
+              END AS token_expired,
               CASE
                 WHEN account.token_expires_at IS NOT NULL
                  AND datetime(account.token_expires_at) < datetime('now') THEN 'warn'
@@ -806,6 +862,8 @@ export async function getLineAccountListStats(
       staff_count: number;
       connection_status: 'ok' | 'warn' | 'unknown';
       connection_checked_at: string | null;
+      connection_issues: string | null;
+      token_expired: number;
     }>();
 
   return Object.fromEntries(
@@ -819,6 +877,8 @@ export async function getLineAccountListStats(
         connection: {
           status: row.connection_status,
           checkedAt: row.connection_checked_at,
+          tokenExpired: Number(row.token_expired) === 1,
+          issues: parseConnectionIssues(row.connection_issues),
         },
       },
     ]),

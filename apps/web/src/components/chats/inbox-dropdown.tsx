@@ -180,6 +180,7 @@ export function OperatorDropdown({
         aria-label={ariaLabel}
         aria-expanded={open}
         onClick={() => setOpen((now) => !now)}
+        title={`${label}：${current?.name ?? (allowAll ? 'すべて' : '未割り当て')}`}
         className={`border-hairline rounded-control bg-canvas text-ink flex h-10 w-full items-center gap-1.5 whitespace-nowrap border px-2.5 text-xs ${open ? 'border-accent' : ''}`}
       >
         {compact ? (

@@ -2,12 +2,10 @@
  * ★V8 統括のアカウント（ホーム）（Pencil `JKjsE`）。頭・左の列の枠は型（ListPage）。
  * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
  */
-.folderInset {
-  margin-left: var(--tpl-hq-folder-inset);
-  min-width: 0;
-}
+.folderBox { min-width: 0; }
 
 .createButton { width: 100%; }
+.createSpace { display: block; height: var(--tpl-htn-input-h); }
 .buttonIcon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
 .full { width: 100%; }
 
@@ -29,7 +27,7 @@
 
 .progress { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
 
-/* 数のカード4枚（余白14・間4・題/数/単位の3段） */
+/* 数のカード4枚（余白14・間4・題と「数＋単位」の2段。B-33：単位は数の横に1行） */
 .cards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -65,6 +63,14 @@
 }
 
 .statWarn { color: var(--color-status-warn-deep); }
+
+.statLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-hq-card-gap);
+  min-width: 0;
+  white-space: nowrap;
+}
 
 .statSub {
   color: var(--color-ink-faint);
@@ -108,7 +114,6 @@
   flex-direction: column;
   gap: var(--tpl-hq-form-gap);
   min-width: 0;
-  min-height: var(--tpl-hq-home-account-h);
   padding: var(--tpl-hq-home-account-pad);
   border-radius: var(--radius-card);
   outline: 1px solid var(--color-hairline);
@@ -116,9 +121,13 @@
   background: var(--color-canvas);
 }
 
-.cardWarn { outline-color: var(--color-status-warn); }
-/* 接続の注意の行を持つカードも、ほかのカードと同じ高さ（226）に収める（下の余白を詰める）。 */
-.cardWarn { padding-bottom: var(--tpl-hq-home-warn-pad-end); }
+.cardWarn { outline-color: var(--color-status-warn-deep); }
+/*
+ * 絵 JKjsE（2026-10-08 B-31）：高さは固定せず中身の高さ。同じ段のカードだけ、いちばん高いカードに
+ * そろえる（grid の行の stretch）。名前の下は1行なので、ボタンは同じ段で同じ位置に並ぶ。
+ * ボタンの下は余白18。要確認の行はボタンの下に入り、その下にも余白18（はみ出さない）。
+ * 段の中で低いカードは、下に余白が増える（高い方に合わせ、ボタンは下へ押さない）。
+ */
 
 .cardHead {
   display: flex;
@@ -165,29 +174,12 @@
 
 .meta {
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-hq-small-lh);
-}
-
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--tpl-hq-feature-gap);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tag {
-  padding: var(--tpl-hq-pill-pad);
-  border-radius: var(--radius-mini);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-hq-pill-lh);
-  white-space: nowrap;
 }
 
 .stats {
@@ -220,6 +212,13 @@
   line-height: var(--tpl-hq-small-lh);
 }
 
+.warnText {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .linkButton {
   flex-shrink: 0;
   min-height: 0;
@@ -235,7 +234,6 @@
 }
 
 .linkButton:hover { text-decoration: underline; }
-.headAction { font-size: var(--text-caption); }
 .linkButton:disabled { cursor: not-allowed; opacity: 0.5; }
 
 .pill {
@@ -308,6 +306,8 @@
 
 .footNote {
   flex: 1;
+  /* 絵は言葉のまとまりで折らず、行の端まで詰めて折る（全体の auto-phrase を外す）。 */
+  word-break: normal;
   min-width: 0;
   margin: 0;
   color: var(--color-ink-faint);

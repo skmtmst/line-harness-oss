@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import React, { useContext, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
 import Button from './button'
 import IconButton from './icon-button'
-import { useOverlayFocus, useV8Leave } from './overlay-utils'
+import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
 
 export type DialogProps = {
@@ -43,6 +43,8 @@ export type DialogProps = {
    */
   descriptionBand?: 'warning' | 'danger'
   busy?: boolean
+  /** 実行ボタンを押せない形で出す（確かめのチェックが入るまで、など）。処理中の busy とは別。 */
+  confirmDisabled?: boolean
   error?: string
   confirmLabel?: string
   cancelLabel?: string
@@ -93,6 +95,7 @@ export default function Dialog({
   error,
   confirmLabel = '保存する',
   cancelLabel = 'キャンセル',
+  confirmDisabled = false,
   onConfirm,
   onCancel,
   children,
@@ -106,6 +109,7 @@ export default function Dialog({
   primaryAction = 'confirm',
   footerAlign,
 }: DialogProps) {
+  const depth = useContext(OverlayDepthContext)
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
@@ -221,7 +225,7 @@ export default function Dialog({
             variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             className={styles.designButton}
             onClick={onConfirm}
-            disabled={busy} busy={busy} busyLabel="処理中…">
+            disabled={busy || confirmDisabled} busy={busy} busyLabel="処理中…">
             {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
             {confirmLabel}
           </Button>
@@ -231,7 +235,7 @@ export default function Dialog({
     </div>
   )
 
-  if (!modal) return panel
+  if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}</OverlayDepthContext.Provider>
   const overlay = (
     <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) onCancel()
@@ -239,7 +243,7 @@ export default function Dialog({
       {panel}
     </div>
   )
-  return mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay
+  return <OverlayDepthContext.Provider value={depth + 1}>{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>
 }
 
 /** q3DPdz の手順。済みは戻れるボタン、現在は aria-current で伝える。 */

@@ -1,0 +1,190 @@
+/*
+ * ★V8 運用状態 更新履歴（I2V65v）。数字は書かない（globals.css の [data-theme="v8"] の --tpl-rest3-em-*・--tpl-rest3-uh-*）。
+ * 数のマスは緊急コントロール（OHwbU）と同じ形で3つ。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rest3-em-gap);
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-rest3-em-kpi-gap);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rest3-em-kpi-inner-gap);
+  min-width: 0;
+  padding: var(--tpl-rest3-em-kpi-pad);
+  border-radius: var(--tpl-rest3-em-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.kpiHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rest3-em-kpi-inner-gap);
+  min-width: 0;
+}
+
+.kpiTile {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-rest3-em-tile);
+  height: var(--tpl-rest3-em-tile);
+  border-radius: var(--tpl-rest3-em-tile-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  color: var(--color-ink-secondary);
+}
+
+.kpiLabel {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-em-small);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-em-small-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpiValue {
+  display: flex;
+  align-items: baseline;
+  height: var(--tpl-rest3-em-num-lh);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-em-num);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-em-num-lh);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiValueDanger {
+  color: var(--color-danger);
+}
+
+.kpiUnit {
+  margin-left: var(--tpl-rest3-em-unit-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rest3-em-small);
+  font-weight: 400;
+}
+
+.kpiDetail {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-rest3-em-small);
+  line-height: var(--tpl-rest3-em-small-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table {
+  overflow: hidden;
+  border-radius: var(--tpl-rest3-em-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: var(--tpl-rest3-uh-cols);
+  align-items: center;
+  column-gap: var(--tpl-rest3-uh-gap);
+  min-height: var(--tpl-rest3-uh-row-h);
+  padding: var(--tpl-rest3-uh-row-pad);
+  box-shadow: var(--tpl-rsa-line-top);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rest3-em-body);
+  line-height: var(--tpl-rest3-em-td-lh);
+}
+
+.head {
+  min-height: var(--tpl-rest3-uh-head-h);
+  background: var(--color-surface-pearl);
+  box-shadow: none;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-rest3-em-th);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-em-th-lh);
+  white-space: nowrap;
+}
+
+.cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.num {
+  padding-right: var(--tpl-rest3-em-num-pad);
+  text-align: right;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-rest3-ec-dot-gap);
+  padding: var(--tpl-rest3-ec-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--tpl-rest3-em-small);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-em-small-lh);
+  white-space: nowrap;
+}
+
+.status[data-tone='good'] { background: var(--color-accent-soft); color: var(--color-success); }
+.status[data-tone='warn'] { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
+.status[data-tone='danger'] { background: var(--color-status-danger-soft); color: var(--color-danger); }
+.status[data-tone='muted'] { background: var(--color-shell); color: var(--color-ink-secondary); }
+
+.dot {
+  width: var(--tpl-rest3-ec-dot);
+  height: var(--tpl-rest3-ec-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-rest3-em-row-gap);
+}
+
+.footText {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-rest3-em-small);
+  line-height: var(--tpl-rest3-em-th-lh);
+}
+
+@container (max-width: 760px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .row {
+    grid-template-columns: var(--tpl-rest3-uh-cols-narrow);
+  }
+}

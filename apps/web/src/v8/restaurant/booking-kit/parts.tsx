@@ -5,27 +5,18 @@
  * - RowMore：行の右端の「…」（右クリックだけで開く操作にしない）。
  * - RsDialog：絵の窓（幅・上からの位置・題の下 14 の間・下の線と右寄せのボタン）。
  */
-import { useRef, useState, type FormEvent, type ReactNode } from 'react'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type FormEvent, type ReactNode } from 'react'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Dialog from '@/components/shared/dialog'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import styles from './parts.module.css'
 
 /** 行の「…」。読み上げ名は「{subject}の操作」。 */
 export function RowMore({ subject, items }: { subject: string; items: ActionMenuItem[] }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLButtonElement>(null)
   if (items.length === 0) return <span className={styles.morePlaceholder} aria-hidden="true" />
   return (
     <span className={styles.moreBox}>
-      <MoreAction
-        buttonRef={ref}
-        label={`${subject}の操作`}
-        className={styles.more}
-        aria-expanded={open}
-        onClick={(event) => { event.stopPropagation(); setOpen((value) => !value) }}
-      />
-      <ActionMenu open={open} ariaLabel={`${subject}の操作の一覧`} onClose={() => setOpen(false)} items={items} anchorRef={ref} />
+      <RowMenu appearance="plain" label={`${subject}の操作`} menuLabel={`${subject}の操作の一覧`} className={styles.more} items={items} />
     </span>
   )
 }

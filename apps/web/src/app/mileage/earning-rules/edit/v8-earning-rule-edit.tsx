@@ -28,6 +28,7 @@ import LinePreview from '@/components/shared/line-preview'
 import { ApiError, api, type MileageEarningRuleV6 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useResponseGate } from '@/lib/use-response-gate'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   EARNING_RULE_EVENT_TYPES as EVENT_TYPES,
@@ -62,7 +63,13 @@ function EditInner() {
   /* BnrQp：保存時に版がずれていたら競合の帯を出す。 */
   const [conflict, setConflict] = useState(false)
 
+  /* W156：対象（ルール・アカウント）が変わったら、前の読み込みの応答を捨てる。 */
+  const gate = useResponseGate()
+
   const load = useCallback(async () => {
+    const token = gate.begin()
+    // 前の対象の版・中身で、今の対象へ保存できないようにする。
+    setRule(null)
     if (!ruleId || !selectedAccountId) {
       setState(selectedAccountId ? 'missing' : 'loading')
       return
@@ -73,6 +80,7 @@ function EditInner() {
       let offset = 0
       while (!found) {
         const res = await api.mileage.earningRulesV6({ accountId: selectedAccountId, limit: 100, offset })
+        if (!gate.current(token)) return
         if (!res.success) throw new Error(res.error)
         found = res.data.items.find((item) => item.id === ruleId)
         offset += res.data.items.length
@@ -118,9 +126,10 @@ function EditInner() {
       setConflict(false)
       setState('ready')
     } catch {
+      if (!gate.current(token)) return
       setState('error')
     }
-  }, [ruleId, selectedAccountId])
+  }, [ruleId, selectedAccountId, gate])
 
   useEffect(() => {
     void load()
@@ -150,7 +159,7 @@ function EditInner() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const save = async () => {
-    if (!rule || !selectedAccountId) return
+    if (!rule || !selectedAccountId || rule.id !== ruleId) return
     if (!name.trim()) {
       setSaveError('ルール名を入力してください')
       return

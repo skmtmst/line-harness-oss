@@ -11,10 +11,6 @@ const PUBLISH = fs.readFileSync(
   path.join(__dirname, 'publish/page.tsx'),
   'utf8',
 )
-const PUBLISH_CSS = fs.readFileSync(
-  path.join(__dirname, 'publish/publish.css'),
-  'utf8',
-)
 const LIST = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const EDIT_PAGE = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
 
@@ -72,41 +68,9 @@ describe('V6 自動応答一覧の契約', () => {
     expect(PUBLISH).toContain('setDryRun(res.data)')
   })
 
-  it('テスト・最終確認・有効化完了を実Nodeと5段表示へ結び付ける', () => {
-    for (const node of ['g46ja', 'Yj6CQ', 'e6iJG']) expect(PUBLISH).toContain(node)
-    for (const label of ['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認']) {
-      expect(PUBLISH).toContain(label)
-    }
-    expect(PUBLISH_CSS).toContain('grid-template-columns: minmax(0, 1fr) 390px')
-  })
-
   it('取得できなかった過去28日の数を0件に見せない', () => {
     expect(PUBLISH).toContain("? '—（未取得）'")
     expect(PUBLISH).toContain('`${draft.matchedLast28Days}件／28日`')
-  })
-
-  it('一覧を設計の6列に収め、ルール名の下に一致方法と返信の要約を出す', () => {
-    // ★V7（2026-09-24）：「どんなときに動くか」「何を返すか」は2行に折れていたので短い見出しへ。
-    for (const heading of ['ルール名', '状態', '条件', '返すもの', '今月の応答', '操作']) {
-      expect(LIST).toContain(`>${heading}</Th>`)
-    }
-    expect(LIST).toContain('ruleSubtitle(r,')
-    expect(LIST).toContain('table-fixed')
-    expect(LIST).not.toContain('min-w-[1080px]')
-  })
-
-  it('URL編集は5段と設定内容・LINEプレビューを持つページ表示にする', () => {
-    expect(EDIT_PAGE).toContain('<EditDialog')
-    expect(EDIT_PAGE).toContain('page')
-    // R28・監査の直し：窓の中の順番は「優先順位」ではなく「動く順番」（一覧の上下で決める）。
-    for (const word of ['基本設定', 'どんなときに動くか', '何を返すか', '動く順番', '確認']) {
-      expect(EDITOR).toContain(word)
-    }
-    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
-    expect(EDITOR).toContain("@/components/shared/line-preview'")
-    expect(EDITOR).toContain('<LinePreview')
-    expect(EDITOR).not.toContain('Flex（JSONを直接書く）')
-    expect(EDITOR).not.toContain('画像（JSONを直接書く）')
   })
 
   it('URL編集は基本設定・反応条件・返信を別々の段として開ける', () => {

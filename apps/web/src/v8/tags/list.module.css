@@ -309,12 +309,14 @@
   text-decoration: underline;
 }
 
-.menuButton {
+/* 行の「…」（共通の RowMenu）。絵は 28 なので、共通の印ボタン（36）より強く当てる。 */
+.menuAnchor > button.menuButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: var(--tpl-tag-menu-btn);
   height: var(--tpl-tag-menu-btn);
+  flex: 0 0 var(--tpl-tag-menu-btn);
   padding: 0;
   border: 0;
   border-radius: var(--radius-control);
@@ -325,7 +327,7 @@
   cursor: pointer;
 }
 
-.menuButton:hover {
+.menuAnchor > button.menuButton:hover {
   background: var(--color-canvas-sunken);
 }
 

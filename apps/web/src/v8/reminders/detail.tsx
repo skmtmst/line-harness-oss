@@ -6,7 +6,7 @@
  * 枠は型（PageFrame）。頭の中にタブを持つ形（絵の「板の頭」）は型の頭に無いので、ここで組む。
  * 読む口・操作は今の画面（app/reminders/detail/detail-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
  */
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -17,7 +17,6 @@ import {
   Copy,
   Download,
   Info,
-  MoreHorizontal,
   Pause,
   Pencil,
   Play,
@@ -41,12 +40,12 @@ import { csvCell } from '@/lib/presentation'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
 import FilterChip from '@/components/shared/filter-chip'
-import IconButton from '@/components/shared/icon-button'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -223,8 +222,6 @@ function ReminderDetailV8() {
   const [missing, setMissing] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
   const [exporting, setExporting] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuAnchorRef = useRef<HTMLSpanElement>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -447,9 +444,15 @@ function ReminderDetailV8() {
       const at = Date.parse(item.scheduledAt ?? '')
       return Number.isFinite(at) && at >= now && at <= now + DAY_MS
     }).length
-    const truncated = plannedTotal > planned.length && within === planned.length
+    /*
+     * WEB084：予定は新しい順で最大100件しか読めない。読めていない予定があるときは、
+     * 近い予定が抜けていることがあるので、数を言い切らない（0 と言わない）。
+     * 近い順・件数の集計は口に頼んでいる（Codex）。
+     */
+    const truncated = plannedTotal > planned.length
     return { count: within, truncated }
   }, [planned, plannedTotal])
+  const plannedPartial = plannedTotal > planned.length
 
   if (!reminderId) {
     return (
@@ -504,7 +507,7 @@ function ReminderDetailV8() {
             <OverviewTab
               data={data}
               reminder={reminder}
-              nextByStep={nextByStep}
+              nextByStep={plannedPartial ? null : nextByStep}
               onShowErrors={() => {
                 const params = new URLSearchParams(searchParams.toString())
                 params.set('id', reminderId)
@@ -548,25 +551,14 @@ function ReminderDetailV8() {
                 {isUnpublishedDraft ? '編集を続ける' : '編集する'}
               </Button>
             ) : null}
-            <span ref={menuAnchorRef} className={styles.menuAnchor}>
-              <IconButton
+            <span className={styles.menuAnchor}>
+              <RowMenu
                 className={styles.menuButton}
-                aria-label={`リマインダ「${data.reminder.name}」のその他の操作`}
+                label={`リマインダ「${data.reminder.name}」のその他の操作`}
                 title="その他の操作"
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-                onClick={() => setMenuOpen((open) => !open)}
-              >
-                <MoreHorizontal size={16} aria-hidden="true" />
-              </IconButton>
+                items={menuItems}
+              />
             </span>
-            <ActionMenu
-              open={menuOpen}
-              onClose={() => setMenuOpen(false)}
-              ariaLabel={`リマインダ「${data.reminder.name}」のその他の操作`}
-              items={menuItems}
-              anchorRef={menuAnchorRef}
-            />
           </div>
 
           <CreateSummaryCard
@@ -604,7 +596,9 @@ function ReminderDetailV8() {
         designNode="RwVo5"
         title={`「${data.reminder.name}」を一時停止する`}
         description="止めているあいだ、通知は送りません。止めているあいだに送る予定だった通知は、再開しても送りません（過去の日時になるため）"
-        band={`今後24時間で送る予定の ${formatNumber(pauseImpact.count)}通${pauseImpact.truncated ? '以上' : ''} が送られなくなります。`}
+        band={pauseImpact.truncated
+          ? `送る予定の ${formatNumber(plannedTotal)}通が送られなくなります（今後24時間の分は数え切れませんでした）。`
+          : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)}通 が送られなくなります。`}
         busy={pausing}
         onClose={() => { if (!pausing) setConfirmPause(false) }}
         actions={(
@@ -643,7 +637,8 @@ function OverviewTab({
 }: {
   data: ReminderDeliveryRunsResponse
   reminder: (Reminder & { steps?: ReminderStep[] }) | null
-  nextByStep: Record<number, string>
+  /** WEB084：予定を読み切れていないときは null（「次に送る」を言い切らない）。 */
+  nextByStep: Record<number, string> | null
   onShowErrors: () => void
   onShowAllRuns: () => void
 }) {
@@ -686,7 +681,7 @@ function OverviewTab({
               <span role="cell" className={styles.colFlex} title={stepLabel(step)}>{stepTiming(step, detailSteps[index], reminder?.deliveryMode)}</span>
               <span role="cell" className={styles.colSent}>{formatNumber(step.sent)}通</span>
               <span role="cell" className={styles.colFail} data-danger={step.errors > 0 || undefined}>{formatNumber(step.errors)}通</span>
-              <span role="cell" className={styles.colNext}>{formatMd(nextByStep[step.stepNumber] ?? null)}</span>
+              <span role="cell" className={styles.colNext}>{nextByStep ? formatMd(nextByStep[step.stepNumber] ?? null) : '—'}</span>
             </div>
           ))}
         </div>
@@ -696,7 +691,13 @@ function OverviewTab({
         <div className={styles.cardHead}>
           <h2 id="rm-detail-recent" className={styles.cardTitle}>最近の実行</h2>
         </div>
-        {recent.length === 0 ? (
+        {recent.length === 0 && (data.items.length > 0 || data.pagination.total > data.items.length) ? (
+          /* WEB084：先頭5件が予定ばかりで実行が見えないだけのときは「まだありません」と言わない。 */
+          <p className={styles.cardNote}>
+            最近の実行をここでは読み切れませんでした。{' '}
+            <button type="button" className="font-semibold underline" onClick={onShowAllRuns}>実行結果で見る</button>
+          </p>
+        ) : recent.length === 0 ? (
           <p className={styles.cardNote}>まだ実行した通知はありません。届き始めるとここに出ます。</p>
         ) : (
           <>

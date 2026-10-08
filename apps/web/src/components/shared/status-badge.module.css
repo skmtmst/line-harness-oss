@@ -92,6 +92,8 @@
   line-height: 18px;
 }
 [data-theme='v8'] .badge::before { border-radius: 50%; }
+/* 点なしの札（dot={false}）。 */
+[data-theme='v8'] .noDot::before { content: none; }
 [data-theme='v8'] .neutral { background: var(--color-v8-pill-off); color: var(--color-ink-secondary); }
 [data-theme='v8'] .info { background: var(--color-status-info-soft); color: #0b63ce; }
 [data-theme='v8'] .warning { background: var(--color-status-warn-soft); color: #94600a; }

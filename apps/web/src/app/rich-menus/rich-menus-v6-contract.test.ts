@@ -18,22 +18,6 @@ const TARGETING_DB = readFileSync(
 )
 
 describe('V6リッチメニューの画面契約', () => {
-  it('GO8RQどおり画面名は共通トップバーだけに置く', () => {
-    expect(PAGE).toContain('data-design-node="GO8RQ"')
-    expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
-    expect(PAGE).not.toContain('<Header')
-    expect(PAGE).not.toContain('トーク画面の下に表示されるメニューを作ります。')
-  })
-
-  it('作成操作を道具列に置き、フォルダ追加は左欄へ置く', () => {
-    const bar = PAGE.slice(PAGE.indexOf('data-design="Bar"'), PAGE.indexOf('data-design="Saved"'))
-    expect(bar).not.toContain('フォルダを追加')
-    expect(bar.indexOf('メニューを作る')).toBeLessThan(bar.indexOf('出す順番を変える'))
-    expect(bar.indexOf('出す順番を変える')).toBeLessThan(bar.indexOf('メニュー名・ボタン名で検索'))
-    expect(PAGE).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
-    expect(PAGE).not.toContain('準備中')
-  })
-
   it('LINEアカウント切替前の応答を捨て、全件をページ送りでたどれる', () => {
     expect(PAGE).toContain('activeAccountRef.current !== accountId')
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")

@@ -46,56 +46,41 @@
   white-space: nowrap;
 }
 
-.control {
-  box-sizing: border-box;
-  width: 100%;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-family: inherit;
-  /* #976 U079: 入力文字は `$size-body`(14px)。text-field.module.css と同じ。 */
-  font-size: var(--text-body);
+/*
+ * 入力欄そのものの見た目は text-field.module.css（正本）が持つ。
+ * ここの TextInput・TextArea は正本の包みで、v7 のときだけ元の見た目の差を足す
+ * （v7 は本番で動いているので変えない）。v8 では正本と同じ物になる。
+ */
+:root:not([data-theme='v8']) .legacyControl {
+  display: inline-block;
 }
 
-.control::placeholder {
-  /*
-   * #976 U087: 置き文字は入力済みの値と見分けがつく薄さにする。
-   * 以前は `$ink`（本文色）で、説明文が実際の入力に見えてしまった。
-   * text-field.module.css の `::placeholder` と同じ `$ink-faint`。
-   */
-  color: var(--color-ink-faint);
-  opacity: 1;
+:root:not([data-theme='v8']) .legacyControl:read-only {
+  background: var(--color-canvas-sunken);
 }
 
-.control:focus-visible {
+:root:not([data-theme='v8']) .legacyControl:disabled {
+  opacity: 0.5;
+}
+
+/* 「？」の中の「くわしく」。キーボードで来たときに輪郭を出す。 */
+.helpLink:focus-visible {
   outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
 
-.control:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+/* 文字数（Field の count）。欄の下の右。上限を超えたら赤。 */
+.count {
+  margin-top: 4px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+  text-align: right;
 }
 
-.control:read-only {
-  background: var(--color-canvas-sunken);
-}
-
-.control[aria-invalid='true'] {
-  border-color: var(--color-danger);
-}
-
-.input {
-  height: 40px;
-  padding: 0 12px;
-}
-
-.textarea {
-  min-height: 120px;
-  padding: 14px;
-  line-height: 1.7;
-  resize: none;
+.countOver {
+  color: var(--color-danger);
 }
 
 .note,
@@ -113,44 +98,19 @@
   color: var(--color-danger);
 }
 
-/* #976 U079/U083: タッチ端末は入力文字16px・1行欄の高さ44px。 */
-@media (pointer: coarse) {
-  .control {
-    font-size: var(--text-lead);
-  }
-
-  .input {
-    height: 44px;
-  }
-}
-
 /*
- * ★V8「入力欄・ラジオ」（Ume2U・y4YQSB）：欄そのものは v7 と同じ
- * （高さ40・文字14）。枠は control-border、ラベルは墨の 13px/500。
+ * ★V8「入力欄・ラジオ」（Ume2U・y4YQSB）：ラベルは墨の 13px/500。
+ * 欄そのもの（高さ36・枠 control-border）は text-field.module.css。
  */
 [data-theme='v8'] .label {
   color: var(--color-ink);
   font-size: var(--text-label);
 }
 
-[data-theme='v8'] .control {
-  border-color: var(--color-control-border);
-}
-
-[data-theme='v8'] .control[aria-invalid='true'] {
-  border-color: var(--color-danger);
-}
-
-/* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .input { height: 36px; border: 0; padding: 0 12px; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; box-shadow: var(--shadow-board); line-height: 21px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
-[data-theme='v8'] .input[aria-invalid='true'] { outline-color: var(--color-danger); }
-[data-theme='v8'] .input:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
-
 /* V8 正本HTMLの実寸。v7には適用しない。 */
 [data-theme='v8'] .field { display: flex; flex-direction: column; gap: 6px; }
 [data-theme='v8'] .labelRow { margin-bottom: 0; gap: 6px; }
 [data-theme='v8'] .label { line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
-[data-theme='v8'] .input { gap: 0; }
 
 /* 打ち直している間（Field の data-field-quiet）は、誤りの赤を引っ込めて普段の枠に戻す。 */
 .field[data-field-quiet] [aria-invalid='true'] {
@@ -160,4 +120,9 @@
 [data-theme='v8'] .field[data-field-quiet] [aria-invalid='true'] {
   outline-color: var(--color-toggle-off);
 }
+}
+
+/* v7 の複数行（TextArea の包み）は元どおり大きさ固定。正本の層の外の resize: vertical より強くするため層の外に置く。 */
+:root:not([data-theme='v8']) .legacyTextarea {
+  resize: none;
 }

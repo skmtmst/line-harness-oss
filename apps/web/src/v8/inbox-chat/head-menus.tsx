@@ -1,0 +1,78 @@
+'use client'
+
+/*
+ * ★V8 会話の頭の「担当」「対応状況」（M0393 XqSvX の頭・段2「5. 会話の頭のメニュー」）。
+ *
+ * どちらも1つだけ選ぶもの。共通の選ぶ欄（shared/select）を使う。V8 の選ぶ欄は
+ * 四角い箱を出さず、選んでいる行は ✓ だけ（オーナー指摘：複数選べないのにチェックボックス）。
+ * 対応状況は先頭に状態の色の点。LINE の会話もメールの会話も、この同じ部品を使う。
+ */
+import Select from '@/components/shared/select'
+import { buildOperatorRows, type OperatorOption } from '@/components/chats/inbox-dropdown'
+import styles from './inbox-chat.module.css'
+
+export type HeadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
+
+export const HEAD_STATUS_LABEL: Record<HeadStatus, string> = {
+  unread: '未対応',
+  in_progress: '対応中',
+  on_hold: '保留',
+  resolved: '対応済み',
+}
+const STATUS_ORDER: HeadStatus[] = ['unread', 'in_progress', 'on_hold', 'resolved']
+
+/** 絵の担当の箱の幅（担当：Kenta）。名前が長いときは省略し、全文は title で読める。 */
+const OPERATOR_WIDTH = 120
+/** 絵の対応状況の箱の幅（● 対応済み まで1行で入る）。 */
+const STATUS_WIDTH = 108
+
+export function HeadOperatorMenu({
+  value,
+  operators,
+  onChange,
+  ariaLabel = '担当者を変える',
+}: {
+  /** 担当者ID。未割り当ては 'unassigned' */
+  value: string
+  operators: OperatorOption[]
+  onChange: (next: string) => void
+  ariaLabel?: string
+}) {
+  const rows = buildOperatorRows(operators, false, value)
+  return (
+    <Select
+      aria-label={ariaLabel}
+      label="担当"
+      width={OPERATOR_WIDTH}
+      value={value}
+      onChange={onChange}
+      options={rows.map((row) => ({ value: row.id, label: row.name }))}
+    />
+  )
+}
+
+export function HeadStatusMenu({
+  value,
+  onChange,
+  ariaLabel = '対応状況を変える',
+}: {
+  value: HeadStatus
+  onChange: (next: HeadStatus) => void
+  ariaLabel?: string
+}) {
+  return (
+    <Select
+      aria-label={ariaLabel}
+      width={STATUS_WIDTH}
+      icon={<span className={styles.ctlDot} data-status={value} />}
+      value={value}
+      onChange={(next) => onChange(next as HeadStatus)}
+      // 開いた中身の行にも状態の色の点（jvb3W「5. 会話の頭のメニュー」）。
+      options={STATUS_ORDER.map((status) => ({
+        value: status,
+        label: HEAD_STATUS_LABEL[status],
+        leading: <span className={styles.ctlDot} data-status={status} />,
+      }))}
+    />
+  )
+}

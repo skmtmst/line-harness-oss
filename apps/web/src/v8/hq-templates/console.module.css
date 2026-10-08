@@ -15,28 +15,18 @@
 
 /* 左の列（種類・分類）。絵は列の中の左に 12 の余白（作るボタン・種類の頭が 264）。 */
 .rail { padding-left: var(--tpl-htn-rail-pad); min-width: 0; }
-.listArea { display: flex; flex-direction: column; gap: var(--tpl-htn-list-gap); padding: var(--tpl-htn-list-pad); }
 .topCell { vertical-align: top; }
 .tableBox .table tbody td.topCell { vertical-align: top; padding-top: var(--tpl-htn-top-cell-pad); }
+.listArea { display: flex; flex-direction: column; gap: var(--tpl-htn-list-gap); padding: var(--tpl-htn-list-pad); }
 .createSpace { display: block; height: var(--tpl-htn-input-h); }
-.railNote { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-faint); }
-.folderBlock { display: flex; flex-direction: column; gap: var(--tpl-htn-folder-gap); padding-top: var(--tpl-htn-gap-s); }
-.folderHead { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 600; color: var(--color-ink-secondary); }
-.folderItem {
-  display: flex; align-items: center; gap: var(--tpl-htn-gap-s); min-height: 0; padding: var(--tpl-htn-folder-item-pad);
-  border: 0; border-radius: var(--tpl-htn-radius-s); background: none; cursor: pointer; text-align: left;
-  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary);
-}
-.folderItem[aria-pressed='true'] { background: var(--color-shell-gray); color: var(--color-ink); font-weight: 600; }
-.folderItem span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.folderForm { display: flex; align-items: center; gap: var(--tpl-htn-chip-gap); }
-.folderTools { display: flex; flex-wrap: wrap; gap: var(--tpl-htn-chip-gap); }
-/* フォルダの色の丸は共通部品 FolderDot。分類の列では読み上げを名前に任せる（箱を作らない包み）。 */
-.dotSlot { display: contents; }
+.railNote { margin: 0; line-break: anywhere; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-faint); }
+.folderBlock { margin-top: var(--tpl-htn-folder-block-gap); }
+.folderForm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-htn-chip-gap); }
 
 /* 道具の段 */
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s); min-width: 0; width: 100%; flex: 1 1 auto; }
-.listToolbar { margin-left: var(--tpl-htn-toolbar-pull); }
+/* 畳んだ段（1280 など）でも検索を「作る・種類・分類」と同じ段に残す：段の残りだけを使う。 */
+.listToolbar { margin-left: var(--tpl-htn-toolbar-pull); width: auto; flex: 1 1 0; min-width: var(--tpl-htn-search-w); }
 .search {
   display: inline-flex; align-items: center; gap: var(--tpl-htn-gap-s); width: var(--tpl-htn-search-w); height: var(--tpl-htn-input-h);
   padding: var(--tpl-htn-input-pad); border-radius: var(--tpl-htn-radius-m); background: var(--color-canvas);
@@ -44,6 +34,9 @@
 }
 .search[data-size='account'] { width: var(--tpl-htn-search-w); }
 .search input { flex: 1; min-width: 0; border: 0; outline: 0; padding: 0; background: transparent; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); color: var(--color-ink); }
+.search input::placeholder { color: var(--color-ink-faint); opacity: 1; }
+/* 絵：空の値の「—」は薄い字。 */
+.cellEmpty { color: var(--color-ink-faint); }
 .search:focus-within { box-shadow: var(--tpl-htn-ring-focus); }
 .count { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-faint); white-space: nowrap; }
 .bulkPick { width: var(--tpl-htn-bulk-w); flex-shrink: 0; }
@@ -62,7 +55,7 @@
 .colMode { width: var(--tpl-htn-col-mode); }
 .tableBox .table thead th {
   height: var(--tpl-htn-head-h); padding: var(--tpl-htn-head-pad); background: var(--tpl-htn-soft-bg); box-shadow: none; border: 0;
-  text-align: left; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); font-weight: 600; color: var(--color-ink-faint); white-space: nowrap;
+  text-align: left; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); font-weight: 600; color: var(--color-ink-secondary); white-space: nowrap;
 }
 .tableBox .table tbody td {
   height: var(--tpl-htn-row-h); padding: var(--tpl-htn-cell-pad); vertical-align: middle;
@@ -147,7 +140,8 @@
 }
 .progressPanel h2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; }
 .progressRow { display: flex; align-items: center; gap: var(--tpl-htn-panel-gap); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); }
-.progressTrack { flex: 1; height: var(--tpl-htn-progress-h); border-radius: var(--tpl-htn-radius-pill); background: var(--color-track); overflow: hidden; }
+/* 絵（meBRB）：棒は高さ 8・地は薄い灰（#fafafc）。 */
+.progressTrack { flex: 1; height: var(--tpl-htn-dist-progress-h); border-radius: var(--tpl-htn-radius-pill); background: var(--tpl-htn-soft-bg); overflow: hidden; }
 .progressFill { display: block; height: 100%; border-radius: var(--tpl-htn-radius-pill); background: var(--color-accent-deep); }
 
 /* 下の帯：本文のすぐ下・長いときは画面の下に追従。ボタンは中央。 */
@@ -155,3 +149,19 @@
   position: sticky; bottom: 0; z-index: 2; display: flex; justify-content: center; align-items: center; gap: var(--tpl-htn-gap-s);
   padding: var(--tpl-htn-footer-pad); background: var(--color-canvas); box-shadow: var(--tpl-htn-line-top);
 }
+
+/* 配った結果の窓（dEvJM）：名前 200・文・札。行は下に線、上下 8。窓の下の帯は薄い地。 */
+.resultSummary { margin: var(--tpl-htn-result-summary-pull) 0 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
+.resultList { display: flex; flex-direction: column; align-self: stretch; }
+.resultRow { display: flex; align-items: center; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn-result-row-pad); box-shadow: var(--tpl-htn-line-bottom); }
+.resultName { flex: 0 0 var(--tpl-htn-result-name-w); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 600; color: var(--color-ink); }
+.resultText { flex: 1 1 0; min-width: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
+.resultBand { align-self: stretch; margin: 0; padding: var(--tpl-htn-info-pad); border-radius: var(--tpl-htn-radius-s); background: var(--tpl-htn-soft-bg); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink); }
+
+/* 白い板が狭い（左の列を畳んだ）とき：道具の段は「分類」の欄と間を空け、表は作るボタンの左端（板の余白 24）にそろえる。 */
+@container v8-page (max-width: 1099px) {
+  .listToolbar { margin-left: 0; }
+  .listArea { padding-left: var(--tpl-htn-list-pad-narrow); }
+}
+/* 絵（dEvJM）は中身の最後と下の線の間が 14。窓の中身の下の余白（24）から詰める。 */
+.resultList:last-child, .resultBand { margin-bottom: var(--tpl-htn-result-summary-pull); }

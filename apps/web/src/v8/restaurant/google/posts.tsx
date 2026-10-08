@@ -7,14 +7,14 @@
  * （src/v8 から @/app を読まないため）。渡されないときは登録メディアから選ぶだけ。
  */
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
-import { ImageIcon, MoreHorizontal, Plus, RefreshCw, Send } from 'lucide-react'
+import { ImageIcon, Plus, RefreshCw, Send } from 'lucide-react'
 import type { InstagramConnectionStatus, MediaItem } from '@line-crm/shared'
 import { api, ApiError, type MediaUploadSession } from '@/lib/api'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import IconButton from '@/components/shared/icon-button'
+import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -232,10 +232,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
                     <span className={`${styles.kindChip} ${badge.tone === 'success' ? styles.kindOffer : badge.tone === 'warning' ? styles.kindEvent : badge.tone === 'danger' ? styles.chipDanger : badge.tone === 'info' ? styles.chipInfo : styles.kindStandard}`}>{badge.label}</span>
                     {igBadge ? <span className={`${styles.kindChip} ${igBadge.tone === 'success' ? styles.kindOffer : igBadge.tone === 'danger' ? styles.chipDanger : styles.kindStandard}`} title={igBadge.title}>{igBadge.label}</span> : null}
                     <span className={styles.menuBox}>
-                      <IconButton aria-label={`投稿「${name}」の操作`} title={`投稿「${name}」の操作`} aria-expanded={menuFor === post.id} onClick={() => setMenuFor((current) => (current === post.id ? null : post.id))}>
-                        <MoreHorizontal aria-hidden className={styles.icon16} />
-                      </IconButton>
-                      <ActionMenu open={menuFor === post.id} onClose={() => setMenuFor(null)} ariaLabel={`投稿「${name}」の操作`} items={menuItems(post)} />
+                      <RowMenu label={`投稿「${name}」の操作`} items={menuItems(post)} open={menuFor === post.id} onOpenChange={(next) => setMenuFor(next ? post.id : null)} />
                     </span>
                   </div>
                 )

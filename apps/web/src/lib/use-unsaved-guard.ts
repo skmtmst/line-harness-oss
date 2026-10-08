@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { UNSAVED_ACTION_EVENT } from './unsaved-action'
 
 export type UnsavedLeaveTarget =
   | { kind: 'link'; href: string }
@@ -121,6 +122,18 @@ export function useUnsavedGuard(options: {
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
+  }, [dirty, busy])
+
+  useEffect(() => {
+    if (!dirty && !busy) return
+    const request = (event: Event) => {
+      if (event.defaultPrevented || disarmedRef.current) return
+      event.preventDefault()
+      const run = (event as CustomEvent<{ run: () => void }>).detail.run
+      if (!busy) setLeaveTarget({ kind: 'action', run })
+    }
+    window.addEventListener(UNSAVED_ACTION_EVENT, request)
+    return () => window.removeEventListener(UNSAVED_ACTION_EVENT, request)
   }, [dirty, busy])
 
   /**

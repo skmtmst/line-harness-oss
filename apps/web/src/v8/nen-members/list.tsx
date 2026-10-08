@@ -10,7 +10,6 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { RowActions } from '@/components/shared/row-actions'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -181,27 +180,26 @@ export default function MembersListV8({
           )
         ) : data ? (
           <>
-            <div className={styles.tableWrap}>
-              <DataTable className="@container">
-                <thead>
-                  <TableHeadRow>
-                    <Th className="w-64">会員</Th>
-                    <Th className="w-24">ランク</Th>
-                    <Th className="w-24" align="right">通年</Th>
-                    <Th className="w-28" align="right">ライフタイム</Th>
-                    <Th className="w-24" align="right">マイル残高</Th>
-                    <Th>ペット</Th>
-                    <Th className="cq-hide-below-1010 w-20">最終購入</Th>
-                    <Th className="cq-hide-below-1010 w-20" align="right">マイル還元</Th>
-                    <Th className="w-14" align="right"><span className="sr-only">操作</span></Th>
-                  </TableHeadRow>
-                </thead>
-                <tbody>
-                  {data.items.map((member) => (
-                    <MemberRow key={member.friendId} member={member} rankOrder={rankOrder} onOpen={(href) => router.push(href)} />
-                  ))}
-                </tbody>
-              </DataTable>
+            {/* 絵 AOWoJ：表は白い板の幅いっぱい（行の内側 24）。列は 会員・ランク・通年・ライフタイム・マイル残高・ペット・最終購入・マイル還元・「…」。 */}
+            <div className={styles.mTable} role="table" aria-label="会員の一覧">
+              <div role="rowgroup">
+                <div role="row" className={`${styles.mRow} ${styles.mHead}`}>
+                  <span role="columnheader">会員</span>
+                  <span role="columnheader">ランク</span>
+                  <span role="columnheader">通年</span>
+                  <span role="columnheader">ライフタイム</span>
+                  <span role="columnheader">マイル残高</span>
+                  <span role="columnheader">ペット</span>
+                  <span role="columnheader" className={styles.mWide}>最終購入</span>
+                  <span role="columnheader" className={styles.mWide}>マイル還元</span>
+                  <span role="columnheader"><span className={styles.srOnly}>操作</span></span>
+                </div>
+              </div>
+              <div role="rowgroup">
+                {data.items.map((member) => (
+                  <MemberRow key={member.friendId} member={member} rankOrder={rankOrder} onOpen={(href) => router.push(href)} />
+                ))}
+              </div>
             </div>
             <div className={styles.listFoot}>
               <ListRange
@@ -230,36 +228,23 @@ function MemberRow({
   rankOrder: string[]
   onOpen: (href: string) => void
 }) {
-  const initial = (member.name || '?').slice(0, 1)
   const friendDetail = `/friends/detail?id=${encodeURIComponent(member.friendId)}`
   return (
-    <Tr>
-      <Td className="w-64">
-        <span className={styles.memberCell}>
-          {member.pictureUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- LINEのCDN画像
-            <img src={member.pictureUrl} alt="" className={styles.avatar} />
-          ) : (
-            <span aria-hidden="true" className={styles.avatarInitial}>{initial}</span>
-          )}
-          <span className={styles.memberText}>
-            <span className={styles.memberName} title={member.name}>{member.name || '（名前なし）'}</span>
-            <span className={styles.memberSub}>{member.customerId ? `EC会員 ${member.customerId}` : 'EC未連携'}</span>
-          </span>
-        </span>
-      </Td>
-      <Td className="w-24"><RankChip rankKey={member.rankKey} name={member.rankName} rankOrder={rankOrder} /></Td>
-      <Td align="right" className="w-24"><span className={styles.numStrong}>{yen(member.annualMilesYen)}</span></Td>
-      <Td align="right" className="w-28"><span className={styles.numSoft}>{yen(member.lifetimeMilesYen)}</span></Td>
-      <Td align="right" className="w-24"><span className={styles.numPlain}>{formatNumber(member.mileBalance)}</span></Td>
-      <Td>
-        <span className={styles.cellText} title={member.petNames ?? ''}>
-          {member.petNames ? `${member.petNames}${member.petCount > 2 ? ` ほか${member.petCount - 2}頭` : ''}` : '—'}
-        </span>
-      </Td>
-      <Td className="cq-hide-below-1010 w-20"><span className={styles.cellText}>{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span></Td>
-      <Td className="cq-hide-below-1010 w-20" align="right"><span className={styles.numStrong}>{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></Td>
-      <Td align="right" className="w-14">
+    <div role="row" className={styles.mRow}>
+      <span role="cell" className={styles.memberText}>
+        <span className={styles.memberName} title={member.name}>{member.name || '（名前なし）'}</span>
+        <span className={styles.memberSub}>{member.customerId ? `EC会員 ${member.customerId}` : 'EC未連携'}</span>
+      </span>
+      <span role="cell"><RankChip rankKey={member.rankKey} name={member.rankName} rankOrder={rankOrder} /></span>
+      <span role="cell"><span className={styles.numStrong}>{yen(member.annualMilesYen)}</span></span>
+      <span role="cell"><span className={styles.numSoft}>{yen(member.lifetimeMilesYen)}</span></span>
+      <span role="cell"><span className={styles.numPlain}>{formatNumber(member.mileBalance)}</span></span>
+      <span role="cell" className={styles.cellText} title={member.petNames ?? ''}>
+        {member.petNames ? `${member.petNames}${member.petCount > 2 ? ` ほか${member.petCount - 2}頭` : ''}` : '—'}
+      </span>
+      <span role="cell" className={`${styles.cellText} ${styles.mWide}`}>{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span>
+      <span role="cell" className={styles.mWide}><span className={styles.numStrong}>{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></span>
+      <span role="cell" className={styles.mOps}>
         {/*
           行の「…」：会員の詳細（＝友だち詳細の会員の区画）・友だちを開く・ECで開く。
           EC 側に会員の管理ページの住所は無いので、「ECで開く」はECのつなぎの画面へ。
@@ -279,7 +264,7 @@ function MemberRow({
             },
           ]}
         />
-      </Td>
-    </Tr>
+      </span>
+    </div>
   )
 }

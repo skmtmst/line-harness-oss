@@ -45,12 +45,6 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
     expect(PAGE).toContain('setFolderDialogOpen(true)') // フォルダを追加
   })
 
-  it('設計と同じ操作メニューを撮る入口がある', () => {
-    // 真ん中の行を開き、上へ・下へを同時に画像へ残す。
-    expect(PAGE).toContain("qaOpen: canMutateTemplates && folder.name === '予約' ? 'CzndJ' : undefined")
-    expect(PANEL).toContain('data-qa-open={row.qaOpen}')
-  })
-
   it('端の行には並び替えの口を出さない', () => {
     /*
       押せない矢印を置くと、押せないのか壊れているのか分からない。
@@ -81,7 +75,8 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
     // ★V7（m13g）：独自の見た目から共通 ActionMenu へ移した。描く項目は同じ。
     expect(PANEL).toContain('if (row.onMoveUp)')
     expect(PANEL).toContain('if (row.onDelete)')
-    expect(PANEL).toContain('note={row.deleteNote}')
+    // V8（nH0fZ）は吹き出しを出さず確認の窓で読ませる。v7 は今までどおり但し書きを出す。
+    expect(PANEL).toContain('note={v8 ? undefined : row.deleteNote}')
   })
 
   it('名前と色を直す窓は、追加と同じ窓を使う', () => {

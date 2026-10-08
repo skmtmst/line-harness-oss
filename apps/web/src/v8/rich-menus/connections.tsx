@@ -13,12 +13,13 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeftRight, ArrowRight, GitFork, MoreHorizontal, Pencil, Plus, TriangleAlert } from 'lucide-react'
+import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from 'lucide-react'
 import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
@@ -56,9 +57,19 @@ export function linkLabel(analysis: ConnectionAnalysis, entryId: string, pageId:
   const back = analysis.edges.filter((edge) => edge.fromPageId === pageId)
   const goIndex = out.findIndex((edge) => edge.targetPageId === pageId)
   const backIndex = back.findIndex((edge) => edge.targetPageId === entryId)
-  if (goIndex < 0 && backIndex < 0) return { label: 'つながりなし', both: false }
+  /*
+   * WEB220：直接のタブが無くても、別のメニューを通って行ける・戻れることがある（A→B→C→A）。
+   * 行けるか・戻れるかは、たどり着けるかの解析（reachable・cannotReturn）で決める。
+   */
+  const reachable = analysis.reachablePageIds.has(pageId)
+  const returnable = reachable && !analysis.cannotReturnPageIds.has(pageId)
+  if (goIndex < 0 && backIndex < 0) {
+    if (reachable && returnable) return { label: '別のメニュー経由で行き来', both: true }
+    if (reachable) return { label: '別のメニュー経由・戻りなし', both: false }
+    return { label: 'つながりなし', both: false }
+  }
   if (goIndex < 0) return { label: `タブ${tabLetter(backIndex)} → トップ`, both: false }
-  if (backIndex < 0) return { label: `タブ${tabLetter(goIndex + 1)} → 戻りなし`, both: false }
+  if (backIndex < 0) return { label: returnable ? `タブ${tabLetter(goIndex + 1)} → 経由して戻れる` : `タブ${tabLetter(goIndex + 1)} → 戻りなし`, both: returnable }
   return { label: `タブ${tabLetter(goIndex + 1)} ⇄ タブ${tabLetter(backIndex)}`, both: true }
 }
 
@@ -81,7 +92,6 @@ function Connections() {
   const [error, setError] = useState('')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
 
   usePageTitle('切替のつながり')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'リッチメニュー', href: '/rich-menus' }])
@@ -146,7 +156,8 @@ function Connections() {
   const others = pages.filter((page) => page.id !== entryId)
   const editHref = `/rich-menus/edit?id=${encodeURIComponent(group.id)}`
   const buttonsHref = `/rich-menus/edit?id=${encodeURIComponent(group.id)}&step=buttons`
-  const noReturn = others.filter((page) => !analysis.edges.some((edge) => edge.fromPageId === page.id && edge.targetPageId === entryId))
+  // WEB220：直接のタブが無くても、別のメニューを通ってトップへ戻れるなら「帰れない」と言わない。
+  const noReturn = others.filter((page) => analysis.cannotReturnPageIds.has(page.id))
   const draftTargets = group.status === 'published' ? others.filter((page) => !page.lineRichmenuId) : []
   const audienceText = group.isDefaultForAll || !group.targetingEnabled || !group.targetingCondition ? 'すべての友だち（既定）' : '条件で出し分け'
   const reach = group.monthlyStats?.uniqueAudience?.value ?? group.audienceCount ?? null
@@ -163,10 +174,7 @@ function Connections() {
         <Button href={editHref} className={styles.asideButton}><Pencil size={15} aria-hidden="true" />編集する</Button>
         <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} aria-current="page" className={styles.asideButton}><GitFork size={15} aria-hidden="true" />切替のつながり</Button>
         <span className={styles.menuAnchor}>
-          <button type="button" className={styles.moreButton} aria-label="そのほかの操作" aria-haspopup="menu" aria-expanded={menuOpen} title="そのほかの操作" onClick={() => setMenuOpen((open) => !open)}>
-            <MoreHorizontal className={styles.icon} aria-hidden="true" />
-          </button>
-          <ActionMenu open={menuOpen} onClose={() => setMenuOpen(false)} ariaLabel="そのほかの操作" items={menuItems} />
+          <RowMenu className={styles.moreButton} label="そのほかの操作" items={menuItems} />
         </span>
       </div>
       <section className={styles.box} aria-labelledby="rm-state">

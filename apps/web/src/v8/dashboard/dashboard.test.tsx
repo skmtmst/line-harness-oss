@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { greeting, headline } from './dashboard'
+import { canEditDashboardLayout, greeting, headline } from './dashboard'
 import { FIRST_STEPS, shouldShowFirstSteps, summarizeFirstSteps, type FirstStepFacts } from './first-steps'
 import { trendDay, trendRangeNote } from './trend'
 
@@ -50,5 +52,27 @@ describe('V8 ダッシュボードの言葉', () => {
     const day = (date: string) => ({ date, added: 0, blocked: 0, active: 0, estimated: false })
     expect(trendRangeNote([day('2026-09-24'), day('2026-09-30')])).toBe('直近7日（9月24日〜9月30日）')
     expect(trendRangeNote([])).toBe('直近7日')
+  })
+})
+
+/*
+ * ダッシュボード編集の入口（2026-10-08 司令塔・確認表 B-42）：隠すのは閲覧のみ（role 'viewer'＝
+ * 読み取り専用でサーバーが保存を断る人）だけ。書き込みできるスタッフは自分の並びを編集できる。
+ */
+describe('ダッシュボード編集の入口', () => {
+  it('スタッフ・管理者・オーナーには出す。閲覧のみには出さない。役割を読む前は出す', () => {
+    expect(canEditDashboardLayout('staff')).toBe(true)
+    expect(canEditDashboardLayout('admin')).toBe(true)
+    expect(canEditDashboardLayout('owner')).toBe(true)
+    expect(canEditDashboardLayout(null)).toBe(true)
+    expect(canEditDashboardLayout('viewer')).toBe(false)
+  })
+
+  it('板の頭のボタン・数のマスの「…」・?edit=1 の窓の3か所とも同じ判定で出し入れする（配信を作るの判定と混ぜない）', () => {
+    const src = readFileSync(join(__dirname, 'dashboard.tsx'), 'utf8')
+    expect(src).toMatch(/\.\.\.\(canEditLayout \? \[\{ id: 'edit', label: 'ダッシュボード編集'/)
+    expect(src).toMatch(/\{canEditLayout \? <Button type="button" onClick=\{d\.openEditor\}>/)
+    expect(src).toMatch(/overlays=\{d\.editorOpen && canEditLayout \? <DashboardEditor/)
+    expect(src.match(/onClick=\{d\.openEditor\}|onSelect: d\.openEditor/g)).toHaveLength(2)
   })
 })

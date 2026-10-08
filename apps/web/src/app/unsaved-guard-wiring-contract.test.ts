@@ -20,6 +20,9 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/settings/pools/create.tsx',
+  'v8/broadcasts/quick-send.tsx',
+  'v8/auto-replies/quick-create.tsx',
   'app/inflow-links/ad-event-mappings.tsx',
   'app/settings/feature-settings-v8.tsx',
   'components/ops/knowledge-editor.tsx',
@@ -40,6 +43,7 @@ const GUARDED = [
   'app/contents/vars/new/page.tsx',
   'app/conversions/new/page.tsx',
   'app/ec-commerce/connector-panel.tsx',
+  'v8/settings/ec-commerce/connector.tsx',
   'app/form-submissions/edit/page.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',
   'app/inflow-links/new/page.tsx',
@@ -147,6 +151,7 @@ const GUARDED = [
   'v8/accounts-detail/handover.tsx',
   'v8/restaurant/inventory/stock.tsx',
   'v8/hq/support.tsx',
+  'v8/hq/support-detail.tsx',
   /* 2026-10-07：src/v8 に一から書いた画面（まとめの取り込みで見張りの対象に入った）。それぞれ自分で useUnsavedGuard と離脱確認を持つ。 */
   'v8/affiliate-offer-new/create.tsx',
   'v8/tag-edit/search-edit.tsx',
@@ -205,6 +210,12 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'components/chats/friend-info-sidebar.tsx':
+    '受信箱の右の欄（B-26 その場で直す）。対応状況・担当・タグは押した瞬間に保存し、メモは書くのをやめて1秒で保存する。保存待ちの入力を溜めないので番兵の対象外（失敗は知らせで戻してもう一度試す）',
+  'components/hq/account-menu.tsx':
+    '編集を持たないメニュー。アカウント解除と移動を共通の未保存確認へ委ねる',
+  'components/shell/app-top-bar.tsx':
+    '編集を持たない上部の帯。アカウント切替と移動を共通の未保存確認へ委ねる',
   'v8/restaurant/closures/closure-dialog.tsx': '臨時休業・貸切を足す・変える窓（提案 E-10 nVvXy）。保存の口は窓の中だけで、開くたびに押した日か記録から作り直し、閉じると入力を破棄する。',
   'v8/restaurant/front-desk/phone-drawer.tsx': '電話予約の引き出し（提案 E-2）。保存の口は引き出しの中だけで、開くたびに空から始まり、閉じると入力を破棄する（入力中は題に * が付く）。',
   'app/hq/account-browser-v8.tsx': 'タグ名だけの小さな窓。保存の口は窓内だけにあり、閉じると入力を破棄する。',
@@ -219,8 +230,6 @@ const EXEMPTIONS: Record<string, string> = {
     'new/page.tsx と同じ画面の★V8版（M4torY・tJqST・J1VA8）。サーバーへ下書き保存する多段入力で、離脱の扱いは元の画面と一緒に決めるため同じ扱い',
   'app/common-actions/common-action-new-v8.tsx':
     'new/page.tsx（s3 未判定）と同じ画面の★V8版。番兵の要否は元の画面と一緒に決めるため、同じ扱いでここに置く',
-  'app/automations/drafts/draft-v8.tsx':
-    '見本から作った下書きの仕上げ面。保存は下書き保存・つくって動かすの明示操作でサーバーへ送り、離脱の扱いは new と同じく別途検討',
   'app/accounts/new/page.tsx':
     '登録ウィザードでdirty管理なし（コメント中の「未保存」記述のみ。R523の復帰案内の文言）',
   'app/accounts/new/register-v8.tsx':
@@ -263,12 +272,12 @@ const EXEMPTIONS: Record<string, string> = {
     '重なりの共通部品。初回フォーカスの寄せ先を呼出側で選べるだけで、編集を持たない',
   'components/shared/button.tsx':
     'ボタンの共通部品。開いた直後の標的用の ref を受けられるだけで、編集を持たない',
-  'v8/settings/pools/create.tsx':
-    'new/page.tsx（hq 未判定）と同じ画面の★V8版（前の app/pools/new/pool-new-v8.tsx を置き換えた）。作る前の一時入力だけで下書きを持たないため、番兵の要否は元の画面と一緒に決める',
   'app/form-submissions/page.tsx':
     '一覧と絞り込みが中心。作る操作は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/inflow-links/page.tsx':
     '一覧の一括操作（移動・再開）は押した直後に即時保存し、下書きを持たない',
+  'v8/automations/list.tsx':
+    '自動化の一覧。入力欄は「試しに動かす」の窓の友だちIDだけで、押して試すまでの一時の値。保存する下書きを持たない（2026-10-08 入力欄を正本の TextField へ移したので見張りに拾われた）',
   'v8/automations/common-action-new.tsx':
     'app/common-actions/common-action-new-v8.tsx と同じ画面を src/v8 に一から書いたもの（j2hfkS）。番兵の要否は元の画面（new/page.tsx・s3 未判定）と一緒に決めるため、同じ扱いでここに置く',
   'v8/tags/field-migrate.tsx':
@@ -283,8 +292,6 @@ const EXEMPTIONS: Record<string, string> = {
     '下書き保存式の編集画面。番兵の扱いは別途検討',
   'app/mileage/v8-score-tab.tsx':
     '★V8 の行動スコア一覧（IRPw8）。点数の変更・ルールの公開停止・できごとの除外は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。名前・できごとの検索欄は絞り込みで閉じると戻る',
-  'components/friend-attributes-v2/tag-list-v2.tsx':
-    '分類の変更は選んだ直後に即時保存し、下書きを持たない',
   'components/friend-fields/tags-page-v4.tsx':
     '一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
   'app/tags/tags-tab-v8.tsx':
@@ -363,8 +370,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 案件を作る・編集する窓（app/affiliates/tabs.tsx の写し）。入力はすべて窓の中で、閉じると戻る',
   'v8/booking-staff/shifts.tsx':
     'app/booking/staff/shifts/staff-detail-v8.tsx と同じ画面の★V8版（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定する。元の画面と同じ扱い',
-  'v8/broadcasts/quick-send.tsx':
-    '★V8 一斉配信のかんたんに送る（P6vbxn）。小窓の中の入力で、閉じると戻る',
   'v8/common-vars/list.tsx':
     'app/contents/vars/list-v8.tsx と同じ一覧の★V8版。一覧上の操作は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。窓内の理由欄は閉じると戻る',
   'v8/contents/list.tsx':

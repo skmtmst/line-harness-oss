@@ -29,7 +29,7 @@ import Toggle from '@/components/shared/toggle'
 import StatusBadge from '@/components/shared/status-badge'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
-  DRAFT_KEY, allV8RowsPassed, canSave, channelErrors, insightDateJst, isDuplicateChannelError,
+  DRAFT_KEY, allV8RowsPassed, canSave, channelErrors, checkRowText, insightDateJst, isDuplicateChannelError,
   matchRegisteredAccountId, readDraft, toSteps, toV8CheckRows, webhookDetail,
   type DraftState, type StepNumber, type V8CheckRow,
 } from './logic'
@@ -518,7 +518,7 @@ export default function AccountRegisterV8() {
                     const on = form.tagIds.includes(tag.id)
                     return (
                       <button key={tag.id} type="button" className={styles.tagChip} aria-pressed={on} onClick={() => toggleTag(tag.id)}>
-                        {on ? <CircleDot size={12} aria-hidden="true" /> : <Star size={12} aria-hidden="true" />}{tag.name}
+                        {on ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />}{tag.name}
                       </button>
                     )
                   })}
@@ -589,7 +589,7 @@ export default function AccountRegisterV8() {
             <section className={styles.panel} aria-label="登録完了" data-design-node="TvXII">
               <h2 className={styles.panelTitle}>登録が完了しました</h2>
               <p className={styles.doneLine}>
-                <CircleCheck size={18} aria-hidden="true" />
+                <CircleCheck size={24} aria-hidden="true" />
                 {`${(connection.displayName ?? form.name.trim()) || 'LINEアカウント'}${connection.basicId ? `（${connection.basicId}）` : ''}を登録しました`}
               </p>
               <div className={styles.progressBox}>
@@ -712,7 +712,7 @@ function CheckRow({ row }: { row: V8CheckRow }) {
     <li className={styles.checkRow} data-state={row.state}>
       <Icon size={18} className={styles.checkIcon} aria-hidden="true" />
       <strong className={styles.checkTitle}>{row.title}</strong>
-      <span className={styles.checkDetail} title={row.message ?? row.detail}>{row.state === 'failed' && row.message ? `${row.detail}（${row.message}）` : row.detail}</span>
+      <span className={styles.checkDetail} title={checkRowText(row)}>{checkRowText(row)}</span>
       <StatusBadge tone={row.state === 'passed' ? 'success' : row.state === 'failed' ? 'neutral' : 'warning'}>
         {row.state === 'passed' ? '通った' : row.state === 'failed' ? '止まった' : 'まだ'}
       </StatusBadge>

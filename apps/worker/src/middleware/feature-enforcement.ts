@@ -153,6 +153,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/staff', 'core', 'ログインユーザーと権限管理'),
   exempt('/api/access', 'core', '権限と監査の共通基盤'),
   exempt('/api/capabilities', 'core', '権限判定の共通基盤'),
+  exempt('/api/line-account-folders', 'core', '統括内のLINEアカウント分類'),
   exempt('/api/line-account-tags', 'core', '統括内のLINEアカウント分類'),
   exempt('/api/line-accounts', 'core', 'LINEアカウント選択の共通基盤'),
   exempt('/api/friends', 'core', '友だち管理は必須機能'),

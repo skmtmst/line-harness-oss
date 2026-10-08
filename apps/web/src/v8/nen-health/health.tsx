@@ -10,12 +10,12 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, MoreHorizontal, PawPrint } from 'lucide-react'
+import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, PawPrint } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
-import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -134,7 +134,18 @@ export default function HealthV8({
   useEffect(() => {
     if (!printPetId || !canPrint || summaryPetId !== printPetId) return
     setPrintPetId(null)
-    window.print()
+    /*
+     * WEB224：紙の面（SummarySheet）は、まとめが読めた同じ描画で初めて置かれ、次の描画で中身が入る。
+     * ここですぐ印刷すると、紙の面がまだ無いまま印刷の窓が開く。面が置かれるのを待ってから開く。
+     */
+    const printWhenReady = (tries: number) => {
+      if (document.querySelector('[data-print-sheet]') || tries >= 20) {
+        window.print()
+        return
+      }
+      window.setTimeout(() => printWhenReady(tries + 1), 16)
+    }
+    printWhenReady(0)
   }, [printPetId, canPrint, summaryPetId])
 
   /** 数の帯・札からの絞り込み。記録のあるペットのタブへ戻して当てる。 */
@@ -210,10 +221,7 @@ function KpiMenu({ title, items }: { title: string; items: ActionMenuItem[] }) {
   const [open, setOpen] = useState(false)
   return (
     <span className={styles.kpiMenu}>
-      <IconButton className={styles.kpiMenuButton} aria-label={`${title}のメニュー`} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </IconButton>
-      <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel={`${title}のメニュー`} items={items.map((item) => ({ ...item, onSelect: () => { setOpen(false); item.onSelect() } }))} />
+      <SharedRowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={items.map((item) => ({ ...item, onSelect: () => { setOpen(false); item.onSelect() } }))} />
     </span>
   )
 }
@@ -269,6 +277,14 @@ function HealthListV8({
   useEffect(() => {
     void load()
   }, [load])
+
+  /*
+   * WEB223：探す言葉が外から変わったとき（数の帯の「すべてのペットを出す」など）は、欄の中身も合わせる。
+   * 合わせないと、0.3秒後に欄に残った前の言葉がまた当たる。打っている間（欄＝条件）は触らない。
+   */
+  useEffect(() => {
+    setDraft((current) => (current.trim() === filters.q ? current : filters.q))
+  }, [filters.q])
 
   // 探す欄は打ち終わってから（0.3秒）取り直す。
   useEffect(() => {

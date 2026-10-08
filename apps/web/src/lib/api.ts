@@ -1,4 +1,7 @@
+import { CHAT_FILE_TYPES } from '@line-crm/shared';
+import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
+import type { BookingConflictsResponse, BookingReassignInput, BookingCustomerNotification } from '@line-crm/shared';
 import type { LineMessageType, BookingWaitlistSlotSummary,SeatWaitlistSlotSummary,CustomerSeatWaitlist } from '@line-crm/shared';
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
@@ -1873,31 +1876,7 @@ export type BroadcastApprovalCandidate = {
 };
 
 /** 二者承認の今の状態と判定（GET /:id/approval の応答）。 */
-export type BroadcastApprovalState = {
-  approval: {
-    status: NonNullable<ApiBroadcast['approvalStatus']>;
-    requestedByStaffId: string | null;
-    requestedAt: string | null;
-    approverStaffId: string | null;
-    note: string | null;
-    decidedByStaffId: string | null;
-    decidedAt: string | null;
-    rejectReason: string | null;
-    confirmedCount: number | null;
-  };
-  gate: {
-    required: boolean;
-    recipientCount: number;
-    threshold: number;
-    singleOperator: boolean;
-    operatorCount: number;
-  };
-  viewer: {
-    isApprover: boolean;
-    canApprove: boolean;
-    isRequester: boolean;
-  };
-};
+export type BroadcastApprovalState = import('@line-crm/shared').BroadcastApprovalState;
 
 /**
  * 送達台帳の内訳（#662 / N-059）。
@@ -1922,15 +1901,8 @@ export type BroadcastLedger = {
   retryableCount: number
 };
 
-export type BroadcastMessageButton = {
-  label: string
-  type: 'url' | 'pdf'
-  value: string
-}
-
-export type BroadcastMessageOptions = {
-  buttons?: BroadcastMessageButton[]
-}
+export type { BroadcastMessageButton, BroadcastMessageOptions } from '@line-crm/shared';
+import type { BroadcastMessageOptions } from '@line-crm/shared';
 
 export type BroadcastPreflight = {
   audienceCount: number
@@ -1982,8 +1954,8 @@ export type BroadcastSavedView = {
   version: number
 }
 
-export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'flex' | 'location' | 'audio' | 'carousel' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
-export type BroadcastBubble = { id: string; type: BroadcastBubbleType; content: Record<string, unknown> };
+export type { BroadcastBubbleType, BroadcastBubble } from '@line-crm/shared';
+import type { BroadcastBubble } from '@line-crm/shared';
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
   id: string;
@@ -8482,42 +8454,7 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`),
-    create: (data: {
-      title: string
-      messageType: LineMessageType
-      messageContent: string
-      messageBubbles?: BroadcastBubble[]
-      targetType: ApiBroadcast['targetType']
-      targetTagId?: string | null
-      scheduledAt?: string | null
-      status?: ApiBroadcast['status']
-      lineAccountId?: string | null
-      accountIds?: string[]
-      dedupPriority?: string[]
-      trackLinks?: boolean
-      /** 何分かけて配るか。0（既定）は一気に送る */
-      stealthSpreadMinutes?: number
-      /**
-       * 絞り込み条件。targetType が 'segment' のときに必須。
-       * 下書きに保存され、送信のときにこの条件で宛先を出す。
-       */
-      /*
-       * 宛先の条件。形は worker の `SegmentCondition` と同じ。
-       * 値の型はルールごとに違う（真偽・文字列・日付の範囲・ID の配列）ので
-       * ここでは絞らない。絞ると、条件を1つ増やすたびにここも直すことになり、
-       * 直し忘れたぶんが**画面では作れるのに保存できない条件**になる。
-       */
-      segmentConditions?: SegmentCondition
-      folderId?: string | null
-      measureOpens?: boolean
-      saveAsDraft?: boolean
-      draftStep?: ApiBroadcast['draftStep']
-      internalMemo?: string | null
-      messageOptions?: BroadcastMessageOptions | null
-      afterActionVersionId?: string | null
-      /** 1人運用のとき、送る人が確認で入れた人数 */
-      confirmedRecipientCount?: number
-    }, options?: { idempotencyKey?: string }) =>
+    create: (data: import('@line-crm/shared').BroadcastDefinitionInput, options?: { idempotencyKey?: string }) =>
       fetchApi<ApiResponse<ApiBroadcast>>('/api/broadcasts', {
         method: 'POST',
         headers: options?.idempotencyKey
@@ -9424,7 +9361,15 @@ export const api = {
     ),
     jobs: () => fetchApi<ApiResponse<FriendMigrationJob[]>>('/api/friends/migration-jobs'),
   },
-  /** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。形は `apps/worker/src/routes/line-account-tags.ts`。 */
+  /** 統括のアカウントフォルダ（板 `JKjsE`）。店のFolder型を共用する。 */
+  lineAccountFolders: {
+    list: () => fetchApi<ApiResponse<import('@line-crm/shared').LineAccountFolderList>>('/api/line-account-folders'),
+    create: (input: import('@line-crm/shared').LineAccountFolderInput) => fetchApi<ApiResponse<import('@line-crm/shared').Folder>>('/api/line-account-folders', {method:'POST',body:JSON.stringify(input)}),
+    update: (id:string,input:Partial<import('@line-crm/shared').LineAccountFolderInput>) => fetchApi<ApiResponse<import('@line-crm/shared').Folder>>(`/api/line-account-folders/${encodeURIComponent(id)}`, {method:'PATCH',body:JSON.stringify(input)}),
+    remove: (id:string) => fetchApi<ApiResponse<{id:string}>>(`/api/line-account-folders/${encodeURIComponent(id)}`, {method:'DELETE'}),
+    move: (id:string,folderId:string|null) => fetchApi<ApiResponse<{id:string;folderId:string|null;folder:import('@line-crm/shared').Folder|null}>>(`/api/line-accounts/${encodeURIComponent(id)}/folder`, {method:'PUT',body:JSON.stringify({folderId})}),
+  },
+  /** 移行期間用の旧タグAPI。複数タグは先頭1件をフォルダにする。 */
   lineAccountTags: {
     setForAccount: (id: string, tagIds: string[]) =>
       fetchApi<ApiResponse<{ id: string; tags: LineAccountTag[] }>>(
@@ -9448,8 +9393,12 @@ export const api = {
     update: (id: string, input: Partial<import("@line-crm/shared").LineAccountTagInput>) => fetchApi<ApiResponse<import("@line-crm/shared").LineAccountTagSummary>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
   },
   lineAccounts: {
-    list: (live = false) =>
-      fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '?live=1' : ''}`),
+    list: (live = false, folderId?:string|null) => {
+      const query=new URLSearchParams()
+      if(live) query.set('live','1')
+      if(folderId!==undefined) query.set('folderId',folderId ?? '__none__')
+      return fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${query.size?`?${query}`:''}`)
+    },
     summary: () =>
       fetchApi<ApiResponse<{ uniqueFriendCount: number }>>('/api/line-accounts/summary'),
     get: (id: string) =>
@@ -11691,6 +11640,40 @@ export const api = {
     delete: (accountId:string,key:string,expectedVersion:string) => fetchApi<ApiResponse<unknown>>(`/api/scenario-drafts/${encodeURIComponent(key)}?${new URLSearchParams({lineAccountId:accountId})}`,{method:'DELETE',body:JSON.stringify({expectedVersion})}),
   },
   chats: {
+    attachments: {
+      createUploadSession: (id: string, input: { filename: string; mimeType: 'video/mp4'; sizeBytes: number }) =>
+        fetchApi<ApiResponse<ChatAttachmentUploadSession>>(`/api/chats/${encodeURIComponent(id)}/attachments/upload-sessions`, {
+          method: 'POST', body: JSON.stringify(input),
+        }),
+      completeUploadSession: (id: string, sessionId: string, etag: string) =>
+        fetchApi<ApiResponse<ChatAttachment>>(`/api/chats/${encodeURIComponent(id)}/attachments/upload-sessions/${encodeURIComponent(sessionId)}/complete`, {
+          method: 'POST', body: JSON.stringify({ etag }),
+        }),
+      upload: async (id: string, file: File): Promise<ApiResponse<ChatAttachment>> => {
+        const path = `/api/chats/${encodeURIComponent(id)}/attachments`;
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        const inferredMime = Object.entries(CHAT_FILE_TYPES).find(([, ext]) => ext === extension)?.[0];
+        const mimeType = !file.type || ['application/octet-stream', 'application/x-zip-compressed'].includes(file.type)
+          ? inferredMime ?? file.type : file.type;
+        if (mimeType !== 'video/mp4') return fetchApi<ApiResponse<ChatAttachment>>(`${path}/upload`, {
+          method: 'POST', body: file,
+          headers: { 'Content-Type': mimeType || 'application/octet-stream', 'X-Filename': encodeURIComponent(file.name) },
+        });
+        const prepared = await fetchApi<ApiResponse<ChatAttachmentUploadSession>>(`${path}/upload-sessions`, {
+          method: 'POST', body: JSON.stringify({ filename: file.name, mimeType: file.type, sizeBytes: file.size }),
+        });
+        if (!prepared.success || !prepared.data) return prepared as unknown as ApiResponse<ChatAttachment>;
+        const response = await fetch(prepared.data.uploadUrl, {
+          method: 'PUT', headers: prepared.data.requiredHeaders, body: file, credentials: 'omit',
+        });
+        if (!response.ok) throw new Error('動画をアップロードできませんでした');
+        const etag = response.headers.get('etag');
+        if (!etag) throw new Error('アップロード結果を確認できませんでした。R2のCORS設定を確認してください');
+        return fetchApi<ApiResponse<ChatAttachment>>(`${path}/upload-sessions/${encodeURIComponent(prepared.data.id)}/complete`, {
+          method: 'POST', body: JSON.stringify({ etag }),
+        });
+      },
+    },
     searchMessages: (friendId:string,q:string,offset=0,limit=30) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationSearchResult>>(`/api/chats/${encodeURIComponent(friendId)}/messages/search?${new URLSearchParams({q,offset:String(offset),limit:String(limit)})}`),
     messagesAt: (friendId:string,params:{cursorAt?:string;cursorId?:string;direction?:'before'|'after'|'around';limit?:number}={}) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationMessagePage>>(`/api/chats/${encodeURIComponent(friendId)}/messages?${new URLSearchParams(Object.entries(params).map(([k,v])=>[k,String(v)]))}`),
     list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
@@ -11759,7 +11742,7 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    send: (id: string, data: { content: string; messageType?: string; revision?: number; quotedMessageId?: string }, idempotencyKey: string) =>
+    send: (id: string, data: ChatSendInput, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ sent: true; messageId: string; sentByStaffName: string; revision: number }>>(`/api/chats/${id}/send`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
@@ -11781,7 +11764,7 @@ export const api = {
       }),
     // N-025: 送信予約。scheduledAt は JST の datetime-local 値でも受け付ける
     // (サーバー側でUTCへ正規化)。取消・変更は送信中以降になると409で拒否される。
-    schedule: (id: string, data: { content: string; scheduledAt: string; quotedMessageId?: string }, idempotencyKey: string) =>
+    schedule: (id: string, data: ChatScheduleInput, idempotencyKey: string) =>
       fetchApi<ApiResponse<ScheduledChatSend & { replayed: boolean }>>(`/api/chats/${id}/schedule`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
@@ -14696,6 +14679,15 @@ export const bookingApi = {
   },
   getBooking: (accountId: string, id: string) =>
     fetchApi<{ booking: BookingAdminDetail }>(withAccount(`/api/booking/admin/bookings/${id}`, accountId)),
+  /** 重なった2件の表示情報と理由、カレンダー連携の案内。 */
+  getConflicts: (accountId: string) =>
+    fetchApi<ApiResponse<BookingConflictsResponse>>(withAccount('/api/booking/admin/conflicts', accountId)),
+  /** 既存の枠照合・変更通知を使う。LINE未連携なら電話連絡の案内が返る。 */
+  reassignBooking: (accountId: string, id: string, body: BookingReassignInput) =>
+    fetchApi<UpdateBookingResult & { customerNotification: BookingCustomerNotification }>(
+      withAccount(`/api/booking/admin/bookings/${encodeURIComponent(id)}/reassign`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   getAlternatives: (
     accountId: string,
     input: { menuId: string; staffId: string; startsAt: string },

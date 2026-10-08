@@ -23,7 +23,6 @@ import {
   Hand,
   Image as ImageIcon,
   ListOrdered,
-  MoreHorizontal,
   Plus,
   Split,
   TriangleAlert,
@@ -47,7 +46,6 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import Notice from '@/components/shared/notice'
@@ -55,13 +53,15 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import {
@@ -192,6 +192,9 @@ function thumbCells(g: RichMenuGroupListItem): { rows: number; cols: number } {
   if (n <= 4) return { rows: 2, cols: 2 }
   return { rows: 2, cols: 3 }
 }
+
+/** WEB222：並べ替えのために全件を読むときの安全弁（200件×50ページ）。 */
+const REORDER_MAX_PAGES = 50
 
 export default function RichMenusListV8() {
   usePageTitle('リッチメニュー')
@@ -429,6 +432,18 @@ export default function RichMenusListV8() {
     }
   }, [selectedAccount?.id])
 
+  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
+  const folderActions = useFolderRowActions({
+    kind: 'rich_menu',
+    folders,
+    accountId: selectedAccount?.id ?? null,
+    enabled: canEdit,
+    itemLabel: 'リッチメニュー',
+    countOf: (id) => groupFacets?.folderCounts[id] ?? null,
+    onChanged: () => loadFolders(),
+    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
+  })
+
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => { void loadTapStats() }, [loadTapStats])
   useEffect(() => { void loadTags() }, [loadTags])
@@ -451,20 +466,37 @@ export default function RichMenusListV8() {
           ? '順番を保存しています'
           : null
 
+  /*
+   * WEB222：並べ替えの口は全部の ID を求める。200件の1ページ目だけで計算せず、
+   * 全件そろうまで続きを読む。読めなかった・そろわなかったときは null（呼び出し側が失敗を出す）。
+   */
   const fullOrderedGroups = useCallback(async (): Promise<RichMenuGroupListItem[] | null> => {
     if (!selectedAccount?.id) return null
     if (groups.length === groupTotal) return orderTargetingGroups(groups)
-    const res = await api.richMenuGroups.listPage(selectedAccount.id, {
-      page: 1,
-      limit: 200,
-      query: '',
-      folderId: '',
-      filter: '',
-      sort: 'priority',
-    })
-    if (!res.success) return null
-    if (activeAccountRef.current !== selectedAccount.id) return null
-    return orderTargetingGroups(res.data.items)
+    const accountId = selectedAccount.id
+    try {
+      const all: RichMenuGroupListItem[] = []
+      let total = Infinity
+      for (let page = 1; page <= REORDER_MAX_PAGES && all.length < total; page += 1) {
+        const res = await api.richMenuGroups.listPage(accountId, {
+          page,
+          limit: 200,
+          query: '',
+          folderId: '',
+          filter: '',
+          sort: 'priority',
+        })
+        if (!res.success) return null
+        if (activeAccountRef.current !== accountId) return null
+        all.push(...res.data.items.filter((item) => !all.some((known) => known.id === item.id)))
+        total = res.data.total ?? all.length
+        if (res.data.items.length === 0) break
+      }
+      if (all.length < total) return null
+      return orderTargetingGroups(all)
+    } catch {
+      return null
+    }
   }, [groups, groupTotal, selectedAccount?.id])
 
   /* 押した瞬間に並べ、裏で保存する。失敗したら元に戻し「もう一度」でやり直せる。 */
@@ -766,7 +798,7 @@ export default function RichMenusListV8() {
   }
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal },
-    ...folders.map((f) => ({
+    ...folders.map((f, index) => ({ ...folderActions.rowActions(f, index),
       id: f.id,
       label: f.name,
       count: groupFacets?.folderCounts[f.id] ?? 0,
@@ -1045,14 +1077,13 @@ export default function RichMenusListV8() {
                     <span className={styles.orderInner}>
                       {/* 閲覧のみ：つまみは隠し、幅だけ空けて順番の数字の位置を保つ */}
                       {!canEdit && <span className={styles.gripSpace} aria-hidden="true">⠿</span>}
-                      {canEdit && <ReorderGrip
+                      {canEdit && <ReorderHandle
                         label={g.name}
-                        disabled={reorderDisabledReason !== null}
-                        disabledReason={reorderDisabledReason ?? undefined}
+                        disabledReason={reorderDisabledReason}
                         onMove={(direction) => void keyboardMove(g.id, direction)}
                       >
                         <span aria-hidden>⠿</span>
-                      </ReorderGrip>}
+                      </ReorderHandle>}
                       <span className={styles.orderNumber}>{g.targetingPriority + 1}</span>
                     </span>
                   </Td>
@@ -1112,20 +1143,12 @@ export default function RichMenusListV8() {
                     </Td>
                   <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                     <div className={styles.menuBox}>
-                      <IconButton
+                      <RowMenu
                         className={styles.menuBtn}
-                        title={menuLabel}
-                        aria-label={menuLabel}
-                        aria-expanded={openMenuId === g.id}
-                        onClick={() => setOpenMenuId((current) => (current === g.id ? null : g.id))}
-                      >
-                        <MoreHorizontal size={16} aria-hidden="true" />
-                      </IconButton>
-                      <ActionMenu
-                        open={openMenuId === g.id}
-                        onClose={() => setOpenMenuId(null)}
-                        ariaLabel={menuLabel}
+                        label={menuLabel}
                         items={rowMenuItems(g)}
+                        open={openMenuId === g.id}
+                        onOpenChange={(next) => setOpenMenuId(next ? g.id : null)}
                       />
                     </div>
                   </Td>
@@ -1357,10 +1380,12 @@ export default function RichMenusListV8() {
           />
         </KpiBand>
       </>}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: (id) => { setFolderFilter(id); setPage(1) }, createAction: createButton ?? undefined }}
       folders={narrow ? undefined : folderPanel}
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={listPager}
       overlays={<>
+        {folderActions.dialogs}
         {folderDialogOpen ? (
           <FolderAddDialog
             kind="rich_menu"

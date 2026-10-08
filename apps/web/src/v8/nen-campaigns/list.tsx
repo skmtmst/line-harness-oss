@@ -19,7 +19,6 @@ import {
   Download,
   Eye,
   History,
-  MoreHorizontal,
   PenLine,
   Undo2,
 } from 'lucide-react'
@@ -34,6 +33,7 @@ import type {
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Drawer from '@/components/shared/drawer'
 import FilterChip from '@/components/shared/filter-chip'
@@ -83,6 +83,8 @@ export type NenCampaignsListProps = {
   settings: NenCampaignSetting[]
   columns: NenColumn[]
   columnsTotal: number | null
+  /** WEB231：200本より先のコラムを読む。渡されたときだけ「続きを読み込む」を出す。 */
+  onLoadMoreColumns?: () => Promise<void>
   kpis: NenKpis | null
   flowMetrics: NenFlowMetrics | null
   columnMetrics: NenColumnMetrics | null
@@ -172,24 +174,10 @@ function Pill({ tone, children }: { tone: 'ok' | 'info' | 'off' | 'danger'; chil
 
 /** 行の右端の「…」。押すと行の操作のメニュー（右クリックだけにしない）。 */
 function RowMenu({ subject, items }: { subject: string; items: ActionMenuItem[] }) {
-  const [open, setOpen] = useState(false)
-  const anchorRef = useRef<HTMLButtonElement | null>(null)
   if (items.length === 0) return <span className={styles.menuSpace} aria-hidden="true" />
   return (
     <span className={styles.menuBox}>
-      <button
-        ref={anchorRef}
-        type="button"
-        className={styles.menuButton}
-        aria-label={`「${subject}」の操作`}
-        title={`「${subject}」の操作`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </button>
-      <ActionMenu open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} ariaLabel={`「${subject}」の操作`} items={items} />
+      <SharedRowMenu className={styles.menuButton} label={`「${subject}」の操作`} items={items} />
     </span>
   )
 }
@@ -753,7 +741,12 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
           <Pager total={visible.length} page={safePage} size={pageSize} onPage={setPage} />
           {props.columnsTotal != null && props.columnsTotal > columns.length ? (
             <div className={styles.noteRow}>
-              <Notice tone="warn" message={`コラムは${formatNumber(props.columnsTotal)}本ありますが、${columns.length}本までしか読み込んでいません。探すときは検索を使ってください。`} />
+              {/* WEB231：検索は読み込んだ分の中だけで探す。続きを読み込めるようにし、検索を勧めない。 */}
+              <Notice
+                tone="warn"
+                message={`コラムは${formatNumber(props.columnsTotal)}本ありますが、${columns.length}本までしか読み込んでいません。検索・絞り込みは読み込んだ分の中で探します。`}
+                action={props.onLoadMoreColumns ? <LoadMoreColumnsButton onLoadMore={props.onLoadMoreColumns} /> : undefined}
+              />
             </div>
           ) : null}
           <p className={styles.hint}>{canEdit ? '行の「…」から この内容で予約する・複製・テスト送信。' : '行の「…」から 中身を見る。'}</p>
@@ -761,6 +754,24 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
       )}
       <SelectedColumn {...props} />
     </div>
+  )
+}
+
+/** WEB231：コラムの続きを読み込むボタン。読んでいる間は押せない。失敗は理由を出す。 */
+function LoadMoreColumnsButton({ onLoadMore }: { onLoadMore: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  return (
+    <>
+      <Button type="button" disabled={busy} busy={busy} onClick={() => {
+        setBusy(true)
+        setFailed(false)
+        void onLoadMore().catch(() => setFailed(true)).finally(() => setBusy(false))
+      }}>
+        続きを読み込む
+      </Button>
+      {failed ? <span role="alert">続きを読み込めませんでした。</span> : null}
+    </>
   )
 }
 

@@ -60,7 +60,6 @@ shared-button-importer app/auto-replies/page.tsx
 shared-button-importer app/auto-replies/publish/page.tsx
 shared-button-importer app/auto-replies/runs/page.tsx
 shared-button-importer app/automations/automations-v8.tsx
-shared-button-importer app/automations/drafts/draft-v8.tsx
 shared-button-importer app/automations/list-v8.tsx
 shared-button-importer app/automations/new/friend-multi-select.tsx
 shared-button-importer app/automations/new/new-v8.tsx
@@ -384,7 +383,6 @@ shared-button-importer components/forms/action-editor.tsx
 shared-button-importer components/forms/choice-table.tsx
 shared-button-importer components/forms/hq-form-definition-editor.tsx
 shared-button-importer components/forms/options-dialog.tsx
-shared-button-importer components/friend-attributes-v2/tag-list-v2.tsx
 shared-button-importer components/friend-fields/edit-tag-page-v4.tsx
 shared-button-importer components/friend-fields/mark-list.tsx
 shared-button-importer components/friend-fields/saved-search-list.tsx
@@ -555,8 +553,12 @@ shared-button-importer v8/hq/home.tsx
 shared-button-importer v8/hq/member-dialog.tsx
 shared-button-importer v8/hq/members.tsx
 shared-button-importer v8/hq/notice-line-dialog.tsx
+shared-button-importer v8/hq/settings.tsx
 shared-button-importer v8/hq/support-detail.tsx
 shared-button-importer v8/hq/support.tsx
+shared-button-importer v8/inbox-chat/attach-menu.tsx
+shared-button-importer v8/inbox-chat/rules-popover.tsx
+shared-button-importer v8/inbox-chat/template-picker-view.tsx
 shared-button-importer v8/affiliates/frame.tsx
 shared-button-importer v8/affiliates/parts.tsx
 shared-button-importer v8/affiliates/affiliators.tsx
@@ -674,11 +676,15 @@ shared-button-importer v8/settings/features/screen.tsx
 shared-button-importer v8/settings/manual-links/screen.tsx
 shared-button-importer v8/settings/file-scan/screen.tsx
 shared-button-importer v8/settings/ec-commerce/screen.tsx
+shared-button-importer v8/settings/ec-commerce/connector.tsx
 shared-button-importer v8/settings/ec-commerce/order-drawer.tsx
 shared-button-importer v8/settings/ec-commerce/identity.tsx
 shared-button-importer v8/settings/pools/create.tsx
 shared-button-importer v8/settings/line-notifications/screen.tsx
+shared-button-importer v8/settings/line-notifications/operator-tab.tsx
+shared-button-importer v8/settings/line-notifications/runs-tab.tsx
 shared-button-importer v8/settings/emergency/screen.tsx
+shared-button-importer v8/settings/emergency/history.tsx
 shared-button-importer v8/settings/emergency/health.tsx
 shared-button-importer v8/restaurant-reservations/detail-dialog.tsx
 # ★V8 飲食店 提案 E（今日のお店 hKRRF・電話予約 wEzuG・枠を閉じる知らせ YMVFD・SNS 連携 y3GGTs）。全店の一覧 CHz31 は stores.tsx へ移した。
@@ -693,6 +699,7 @@ shared-button-importer v8/restaurant/inventory/inventory.tsx
 shared-button-importer v8/settings/sns/sns.tsx
 # ★V8 提案 E-4 予約サイト・グルメ媒体（aSmph）・E-9 統括の一括配信（p17Qku・xOXuY）。
 shared-button-importer v8/settings/booking-media/screen.tsx
+shared-button-importer v8/hq-broadcasts/approval.tsx
 shared-button-importer v8/hq-broadcasts/create.tsx
 shared-button-importer v8/hq-broadcasts/detail.tsx
 shared-button-importer v8/hq-broadcasts/list.tsx
@@ -709,6 +716,7 @@ shared-button-importer v8/conversions/dialogs.tsx
 shared-button-importer v8/conversions/create.tsx
 shared-button-importer v8/inflow-links/new/create.tsx
 shared-button-importer v8/dashboard/dashboard.tsx
+shared-button-importer v8/dashboard/dashboard-editor.tsx
 shared-button-importer v8/dashboard/friend-add.tsx
 shared-button-importer v8/events/create.tsx
 shared-button-importer v8/events/application-preview.tsx
@@ -741,6 +749,8 @@ shared-button-importer v8/accounts-detail/dialogs.tsx
 shared-button-importer v8/accounts-detail/handover.tsx
 shared-button-importer v8/account-new/register.tsx
 shared-button-importer v8/hq-templates/console.tsx
+shared-button-importer v8/hq-templates/detail.tsx
+shared-button-importer v8/hq-templates/store-list.tsx
 shared-button-importer v8/hq-templates/message-form.tsx
 shared-button-importer v8/template-detail/detail.tsx
 shared-button-importer v8/tag-edit/edit.tsx

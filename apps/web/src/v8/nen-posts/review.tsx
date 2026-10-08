@@ -6,8 +6,7 @@ import { Check, Eye, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X 
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
 import Button from '@/components/shared/button'
-import ActionMenu from '@/components/shared/action-menu'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Chip from '@/components/shared/chip'
@@ -345,7 +344,10 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       await load()
     } catch (error) {
       if (generation === accountGeneration.current) {
-        setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。'))
+        const message = photoNoticeFor(error, '審査結果を保存できませんでした。')
+        setNotice(message)
+        // WEB225：見送りの窓が開いたままなら、失敗の理由を窓の中に出す（裏の一覧にだけ出さない）。
+        if (nextStatus === 'rejected') setReasonError(message)
         if (error instanceof ApiError && error.status === 409) {
           reviewKeys.current.delete(id)
           await load()
@@ -436,7 +438,10 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       await load()
     } catch (error) {
       if (generation === accountGeneration.current) {
-        setNotice(photoNoticeFor(error, 'まとめて審査できませんでした。'))
+        const message = photoNoticeFor(error, 'まとめて審査できませんでした。')
+        setNotice(message)
+        // WEB225：まとめて見送りの窓の中にも出す。
+        if (decision === 'return') setReasonError(message)
       }
     } finally {
       setBulkReviewing(false)
@@ -1233,7 +1238,7 @@ function PublicationsV8({
                             busyLabel="外しています..."
                           >
                             掲載先から外す
-                          </Button><MoreAction aria-label={`${name}の掲載操作`} onClick={() => setMenuId(menuId === text(item.id) ? null : text(item.id))} /><ActionMenu open={menuId === text(item.id)} onClose={() => setMenuId(null)} items={[{ id: 'placements', label: '使う場所', onSelect: () => openPlacements(item) }]} /></div> : null}
+                          </Button><RowMenu appearance="plain" label={`${name}の掲載操作`} menuLabel="操作" triggerProps={{ title: 'そのほかの操作' }} open={menuId === text(item.id)} onOpenChange={(next) => setMenuId(next ? text(item.id) : null)} items={[{ id: 'placements', label: '使う場所', onSelect: () => openPlacements(item) }]} /></div> : null}
                         </Td>
                       </Tr>
                     )

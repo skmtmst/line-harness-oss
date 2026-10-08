@@ -2,6 +2,8 @@ import type { CustomerBookingWaitlist,CustomerSeatWaitlist,RegisterSeatWaitlistI
 import type { FormLayout } from '@line-crm/shared';
 import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
 import type { WebinarAudience } from '@line-crm/shared';
+import type { BookingHistoryResponse, LiffBookingChangeResponse } from '@line-crm/shared';
+export type { BookingHistoryItem } from '@line-crm/shared';
 export type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
 export type { WebinarAudience } from '@line-crm/shared';
 import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
@@ -64,16 +66,6 @@ export interface LiffBookingSettings extends LiffLookApiSettings {
   approval_mode?: 'automatic' | 'manual';
 }
 
-export interface BookingHistoryItem {
-  id: string;
-  starts_at: string;
-  status: string;
-  customer_note?: string | null;
-  menu_name: string;
-  staff_name: string;
-  profile_image_url: string | null;
-}
-
 /** 予約作成の応答。お支払いありの店・メニューだけ payment が付く。 */
 export interface CreateBookingResponse {
   booking_id: string;
@@ -128,6 +120,31 @@ async function get<T>(path: string): Promise<T> {
     throw err;
   }
   return res.json();
+}
+
+/**
+ * Worker が `{ success: true, data }` の包みで返す口だけ、ここで中身を取り出す。
+ * GET を一律に剥がすと、包み無しで返す口（イベント・ウェビナーなど）が壊れるので、
+ * 包みで返すと確かめた口だけがこれを通す。包みが無い・success が true でない応答は
+ * 契約違反として投げる（黙って undefined を画面へ渡さない）。
+ */
+export function unwrapSuccessData<T>(body: unknown, path: string): T {
+  if (
+    body !== null
+    && typeof body === 'object'
+    && (body as { success?: unknown }).success === true
+    && 'data' in (body as object)
+  ) {
+    return (body as { data: T }).data;
+  }
+  const err = new Error(`API 応答の形が違います: ${path}`) as Error & { status: number; body: unknown };
+  err.status = 0;
+  err.body = body;
+  throw err;
+}
+
+async function getData<T>(path: string): Promise<T> {
+  return unwrapSuccessData<T>(await get<unknown>(path), path);
 }
 
 async function remove<T>(path:string):Promise<T>{
@@ -355,7 +372,13 @@ export const api = {
     get<{ payment: BookingPayment | null }>(
       `/api/liff/booking/payments/by-booking?bookingId=${encodeURIComponent(bookingId)}`,
     ),
-  me: () => get<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] }>('/api/liff/booking/me'),
+  me: () => get<BookingHistoryResponse>('/api/liff/booking/me'),
+  /** F-6 本人の取消。版（lock_version）が合わないと 409。期限を過ぎると 403 self_deadline_passed。 */
+  cancelMyBooking: (id: string, lockVersion: number) =>
+    post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/cancel`, { lock_version: lockVersion }),
+  /** F-6 本人の日時変更。starts_at は UTC の ISO。埋まっていると 409 slot_not_available。 */
+  rescheduleMyBooking: (id: string, body: { lock_version: number; starts_at: string; reason?: string }) =>
+    post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/reschedule`, body),
   /** 前回と同じで予約：本人の前回の予約を返す。失敗・対象外は呼び側が黙って隠す。 */
   lastBooking: () => get<LastBookingResponse>('/api/liff/booking/last-booking'),
   /** 満席の枠に「空いたら知らせる」を登録する。 */
@@ -440,11 +463,15 @@ export const api = {
    * P（試し回答）：試し合言葉を添えると、未公開の下書きをお客さまの形で返す。
    * 合言葉が違うときは 403 になる（本物としては扱わない）。
    */
+  // Worker（routes/forms.ts）は `{ success: true, data: PublicForm }` で返す。
   getForm: (id: string, testToken?: string) =>
-    get<PublicForm>(`/api/forms/${id}${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`),
-  /** 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る */
+    getData<PublicForm>(`/api/forms/${id}${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`),
+  /**
+   * 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る。
+   * Worker は `{ success: true, data: { answers, createdAt } | null }` で返す。
+   */
   getMyLatestFormAnswer: (id: string) =>
-    get<{ answers: Record<string, unknown>; createdAt: string } | null>(
+    getData<{ answers: Record<string, unknown>; createdAt: string } | null>(
       `/api/forms/${id}/my-latest`,
     ),
   /**

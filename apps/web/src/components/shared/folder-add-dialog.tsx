@@ -15,6 +15,7 @@ import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import { isImeComposing } from './ime'
 
 /** フォルダの色。全画面で同じ8色を使う。 */
 export const FOLDER_COLORS = [
@@ -112,7 +113,8 @@ export default function FolderAddDialog({
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && name.trim()) void add()
+              // 変換の確定の Enter で書きかけの名前を作らない。
+              if (e.key === 'Enter' && !isImeComposing(e) && name.trim()) void add()
             }}
             placeholder={placeholder}
             className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"

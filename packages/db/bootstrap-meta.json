@@ -550,7 +550,9 @@
     "605_restaurant_screen_api_additions.sql",
     "606_restaurant_liff_details.sql",
     "607_conversation_search_content.sql",
-    "610_instagram_cross_post.sql"
+    "608_line_account_folders.sql",
+    "609_hq_broadcast_authoring.sql",
+    "611_instagram_cross_post.sql"
   ],
-  "migrationCount": 551
+  "migrationCount": 553
 }

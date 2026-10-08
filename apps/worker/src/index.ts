@@ -73,8 +73,10 @@ import { tags } from './routes/tags.js';
 import { scenarios } from './routes/scenarios.js';
 import { broadcasts } from './routes/broadcasts.js';
 import { broadcastApprovals } from './routes/broadcast-approvals.js';
+import { chatAttachments } from './routes/chat-attachments.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
+import { lineAccountFolders } from './routes/line-account-folders.js';
 import { lineAccountTags } from './routes/line-account-tags.js';
 import { lineAccounts } from './routes/line-accounts.js';
 import { gettingStarted } from './routes/getting-started.js';
@@ -362,6 +364,12 @@ export type Env = {
     D1_DATABASE_ID?: string;
     MANIFEST_URL?: string;
     WORKER_PUBLIC_URL?: string;
+    /**
+     * Comma-separated extra origins that reach this same Worker (for example
+     * its workers.dev address). A LINE webhook registered on one of them is
+     * treated as pointing at this environment.
+     */
+    WORKER_ALIAS_URLS?: string;
     ADMIN_PUBLIC_URL?: string;
     LIFF_PUBLIC_URL?: string;
     // Google Calendar booking sync. Store the private key as a Worker secret.
@@ -519,9 +527,11 @@ app.route('/', scenarioDrafts);
 // broadcasts の PUT /:id が先だと approval-threshold を id と読んで404になる。
 app.route('/', broadcastApprovals);
 app.route('/', broadcasts);
+app.route('/', chatAttachments);
 app.route('/', broadcastMessageAssets);
 app.route('/', broadcastMediaDirect);
 app.route('/', users);
+app.route('/', lineAccountFolders);
 app.route('/', lineAccountTags);
 app.route('/', lineAccounts);
 app.route('/', brand);

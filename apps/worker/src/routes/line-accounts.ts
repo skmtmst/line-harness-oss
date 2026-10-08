@@ -1,3 +1,4 @@
+import { getLineAccountFoldersByAccountIds, getLineAccountTag } from '@line-crm/db';
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
@@ -110,6 +111,7 @@ function serializeLineAccount(row: DbLineAccount) {
     channelId: row.channel_id,
     name: row.name,
     displayName: row.line_display_name || row.name,
+    folderId: row.folder_id ?? null,
     pictureUrl: row.line_picture_url ?? null,
     basicId: row.line_basic_id ?? null,
     isActive: Boolean(row.is_active),
@@ -199,25 +201,34 @@ lineAccounts.get('/api/line-accounts', async (c) => {
   try {
     const db = c.env.DB;
     const visibleScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    const items = await getLineAccountsByIds(
+    let items = await getLineAccountsByIds(
       db,
       visibleScope.allowedAccountIds,
       c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
     );
+    const folderParam=c.req.query('folderId');
+    if(folderParam!==undefined) {
+      const folderId=folderParam==='' || folderParam==='__none__' ? null : folderParam;
+      if(folderId && !await getLineAccountTag(db,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,folderId)) return c.json({success:false,error:'フォルダが見つかりません'},404);
+      items=items.filter(item=>(item.folder_id ?? null)===folderId);
+    }
     const tagsByAccount = await getLineAccountTagsByAccountIds(db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map(item => item.id));
+    const foldersByAccount = await getLineAccountFoldersByAccountIds(db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map(item => item.id));
     const statsByAccount = await getLineAccountListStats(db, items.map((item) => item.id));
     const serializeWithStats = (item: DbLineAccount) => {
       const overview = statsByAccount[item.id];
       return {
         ...serializeLineAccount(item),
         tags: tagsByAccount[item.id] ?? [],
+        folderId: foldersByAccount[item.id]?.id ?? null,
+        folder: foldersByAccount[item.id] ?? null,
         stats: {
           friendCount: overview?.friendCount ?? 0,
           activeScenarios: overview?.activeScenarios ?? 0,
           messagesThisMonth: overview?.messagesThisMonth ?? 0,
           staffCount: overview?.staffCount ?? 0,
         },
-        connection: overview?.connection ?? { status: 'unknown' as const, checkedAt: null },
+        connection: overview?.connection ?? { status: 'unknown' as const, checkedAt: null, tokenExpired: false, issues: [] },
       };
     };
 
@@ -302,10 +313,40 @@ type ConnectionCheckDraft = {
   httpStatus?: number | null;
 };
 
+function trimTrailingSlash(value: string): string {
+  return value.trim().replace(/\/+$/, '');
+}
+
+/**
+ * Webhook URLs that reach this Worker. The canonical public URL comes first;
+ * WORKER_URL and the configured aliases (such as the workers.dev address) are
+ * the same Worker, so LINE registered on any of them is not a mismatch.
+ */
+export function acceptedWebhookUrls(
+  env: Pick<Env['Bindings'], 'WORKER_PUBLIC_URL' | 'WORKER_URL' | 'WORKER_ALIAS_URLS'>,
+  canonicalWebhookUrl: string,
+): string[] {
+  const origins = [
+    env.WORKER_PUBLIC_URL,
+    env.WORKER_URL,
+    ...(env.WORKER_ALIAS_URLS ?? '').split(','),
+  ]
+    .map((value) => (value ? trimTrailingSlash(value) : ''))
+    .filter((value) => /^https:\/\/[^/]+$/.test(value));
+  const urls = [trimTrailingSlash(canonicalWebhookUrl), ...origins.map((origin) => `${origin}/webhook`)];
+  return [...new Set(urls)];
+}
+
+function isAcceptedWebhookUrl(registeredUrl: string | null | undefined, accepted: readonly string[]): boolean {
+  if (!registeredUrl) return false;
+  return accepted.includes(trimTrailingSlash(registeredUrl));
+}
+
 function publicAccountUrls(c: Context<Env>, liffId: string | null) {
   const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
   return {
     webhook: `${base}/webhook`,
+    webhookAccepted: acceptedWebhookUrls(c.env, `${base}/webhook`),
     callback: `${base}/auth/callback`,
     liffEndpoint: liffId ? `${base}?liffId=${encodeURIComponent(liffId)}` : null,
   };
@@ -342,6 +383,7 @@ async function collectConnectionChecks(
   account: DbLineAccount,
   expectedWebhookUrl: string,
   expectedLiffEndpointUrl: string | null,
+  acceptedWebhook: readonly string[] = [expectedWebhookUrl],
 ): Promise<{ checks: ConnectionCheckDraft[]; botProfile: BotProfile | null }> {
   const checks: ConnectionCheckDraft[] = [];
   const headers = { Authorization: `Bearer ${account.channel_access_token}` };
@@ -376,7 +418,7 @@ async function collectConnectionChecks(
           kind: 'webhook_endpoint',
           result: !registeredUrl
             ? 'unconfigured'
-            : registeredUrl === expectedWebhookUrl && active
+            : isAcceptedWebhookUrl(registeredUrl, acceptedWebhook) && active
               ? 'matched'
               : 'mismatched',
           expectedUrl: expectedWebhookUrl,
@@ -440,6 +482,7 @@ async function verifyConnection(input: {
   loginChannelSecret: string;
   liffId: string;
   expectedWebhookUrl: string | null;
+  acceptedWebhookUrls?: readonly string[];
 }): Promise<ConnectionVerification> {
   const result: ConnectionVerification = {
     messagingApi: false,
@@ -472,7 +515,8 @@ async function verifyConnection(input: {
       if (endpointResponse.ok) {
         const endpoint = await endpointResponse.json<{ endpoint?: string; active?: boolean }>();
         result.webhookUrl = endpoint.endpoint ?? null;
-        const sameEndpoint = !input.expectedWebhookUrl || endpoint.endpoint === input.expectedWebhookUrl;
+        const sameEndpoint = !input.expectedWebhookUrl
+          || isAcceptedWebhookUrl(endpoint.endpoint, input.acceptedWebhookUrls ?? [input.expectedWebhookUrl]);
         if (endpoint.active && sameEndpoint) {
           const testResponse = await fetch('https://api.line.me/v2/bot/channel/webhook/test', {
             method: 'POST',
@@ -529,6 +573,7 @@ lineAccounts.post(
       loginChannelSecret: body.loginChannelSecret?.trim() ?? '',
       liffId: body.liffId?.trim() ?? '',
       expectedWebhookUrl: `${base}/webhook`,
+      acceptedWebhookUrls: acceptedWebhookUrls(c.env, `${base}/webhook`),
     });
     return c.json({ success: true, data });
   },
@@ -569,7 +614,7 @@ lineAccounts.post(
         return c.json({ success: false, error: 'REVISION_CONFLICT', currentRevision }, 409);
       }
 
-      const collected = await collectConnectionChecks(account, urls.webhook, urls.liffEndpoint);
+      const collected = await collectConnectionChecks(account, urls.webhook, urls.liffEndpoint, urls.webhookAccepted);
       const rows = await saveLineAccountConnectionChecks(c.env.DB, {
         lineAccountId: id,
         expectedRevision: Number(body.expectedRevision),
@@ -780,7 +825,7 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
 
     // 再開の前に接続を確かめる。bot_info が通らなければ再開しない。
     const urls = publicAccountUrls(c, account.liff_id);
-    const collected = await collectConnectionChecks(account, urls.webhook, urls.liffEndpoint);
+    const collected = await collectConnectionChecks(account, urls.webhook, urls.liffEndpoint, urls.webhookAccepted);
     const botInfo = collected.checks.find((check) => check.kind === 'bot_info');
     const connectionOk = botInfo?.result === 'ok';
     try {
@@ -1569,6 +1614,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
       loginChannelSecret,
       liffId,
       expectedWebhookUrl: `${base}/webhook`,
+      acceptedWebhookUrls: acceptedWebhookUrls(c.env, `${base}/webhook`),
     });
     if (!verification.messagingApi || !verification.webhook || !verification.lineLogin || !verification.liff) {
       return c.json({ success: false, error: 'すべての接続確認を完了してください', details: { connection: verification.errors } }, 400);

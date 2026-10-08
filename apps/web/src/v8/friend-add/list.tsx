@@ -26,7 +26,6 @@ import {
   Link2,
   Lock,
   MessageSquareMore,
-  MoreHorizontal,
   Pause,
   Pencil,
   Plus,
@@ -45,7 +44,6 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
@@ -58,9 +56,10 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { Tabs } from '@/components/shared/tabs'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { describeFriendAddFailure } from './failure'
 import { useCursorStack } from './use-cursor-stack'
@@ -529,6 +528,10 @@ function FriendAddList() {
 
   /* ===== 道具 ===== */
   /* 閲覧のみの人には、作る・追加・編集・削除の操作を置かない（押せない形でも出さない。オーナー 2026-10-06）。 */
+  const folderRows = [
+    { id: '', label: 'すべて', count: data?.total ?? items.length },
+    ...folders.map((entry) => ({ id: entry.key, label: entry.name, count: entry.count })),
+  ]
   const createButton = canEdit ? (
     <Button variant="primary" href="/friend-add-settings?view=new" className={styles.createButton}>
       <Plus size={15} aria-hidden="true" />初回案内を作る
@@ -616,22 +619,13 @@ function FriendAddList() {
     return (
       <Td className={styles.colMenu}>
         <div className={styles.menuBox} data-design-node={rule.isFallback && openMenuId === rule.id ? 'C0lfUP' : undefined}>
-          <IconButton
-            title={label}
-            aria-label={label}
-            aria-haspopup="menu"
-            aria-expanded={openMenuId === rule.id}
+          <RowMenu
+            label={label}
             className={styles.menuButton}
-            onClick={() => setOpenMenuId((current) => (current === rule.id ? null : rule.id))}
-          >
-            <MoreHorizontal size={16} aria-hidden="true" />
-          </IconButton>
-          <ActionMenu
-            open={openMenuId === rule.id}
-            onClose={() => setOpenMenuId(null)}
-            ariaLabel={label}
             note={rule.isFallback && canEdit ? 'この設定は消せません（いちばん最後の受け皿）' : undefined}
             items={rowMenuItems(rule).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+            open={openMenuId === rule.id}
+            onOpenChange={(next) => setOpenMenuId(next ? rule.id : null)}
           />
         </div>
       </Td>
@@ -734,14 +728,13 @@ function FriendAddList() {
                     title={canReorder ? '上下に動かして並び替え' : reorderReason}
                   >
                     <span className={styles.orderBox}>
-                      {canEdit ? <ReorderGrip
+                      {canEdit ? <ReorderHandle
                         label={rule.name}
-                        disabled={!canReorder}
-                        disabledReason={reorderReason}
+                        disabledReason={canReorder ? null : reorderReason ?? READONLY_REASON}
                         onMove={(direction) => keyboardMove(rule.id, direction)}
                       >
                         <span aria-hidden="true" className={styles.grip}>⠿</span>
-                      </ReorderGrip> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`}>⠿</span>}
+                      </ReorderHandle> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`}>⠿</span>}
                       <span className={styles.orderNum}>{index + 1}</span>
                     </span>
                   </Td>
@@ -862,14 +855,12 @@ function FriendAddList() {
           onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
           addFolderLabel="フォルダを追加"
           addFolderDisabled={folderBusy}
-          rows={[
-            { id: '', label: 'すべて', count: data?.total ?? items.length },
-            ...folders.map((entry) => ({ id: entry.key, label: entry.name, count: entry.count })),
-          ]}
+          rows={folderRows}
         >
           <p className={styles.folderNote}>フォルダを消しても、中の設定は未分類に残ります</p>
         </FolderPanel>
       </>}
+      folderNav={narrow ? undefined : { rows: folderRows, activeId: folder ?? '', onSelect: (id) => selectFolder(id || null), createAction: createButton ?? undefined }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

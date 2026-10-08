@@ -42,7 +42,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '会社', iconUrl: null }) }))
 vi.mock('@/components/layout/sidebar-identity', () => ({ default: () => <div>identity</div> }))
 vi.mock('@/components/layout/sidebar-version', () => ({ default: () => <div>version</div> }))
-vi.mock('@/components/hq/account-menu', () => ({ default: () => <div>hq</div> }))
+vi.mock('@/components/hq/account-menu', () => ({ default: () => <div>hq</div>, SidebarAccountMenu: ({ hq }: { hq: boolean }) => <div data-testid="sidebar-account">{hq ? 'me-hq' : 'me-store'}</div> }))
 vi.mock('@/lib/api', () => ({
   api: {
     featureSettings: {
@@ -173,6 +173,12 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(staffView.queryAllByRole('link', { name: '設定' })).toHaveLength(0)
   })
 
+  it('★V8 店の画面の左下に自分のメニュー（店の形）を出す（オーナー 2026-10-07）', async () => {
+    const view = await renderSidebar()
+    expect(view.getAllByText('me-store').length).toBeGreaterThan(0)
+    expect(view.queryAllByText('me-hq')).toHaveLength(0)
+  })
+
   it('V2 の友だち属性モードでも、v8 では組を丸ごと隠さない', async () => {
     const view = await renderSidebar({ friendAttributesV2Mode: true })
     // v7 では「自動化・予約・設定」の組が消えるが、v8 では見出しが残る
@@ -191,6 +197,8 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(view.getAllByRole('link', { name: '機能設定' }).length).toBeGreaterThan(0)
     // 歯車の「設定」リンクは無い
     expect(view.queryAllByRole('link', { name: '設定' })).toHaveLength(0)
+    // V8 の左下の自分も出さない（v7 の店は上の帯の名前とログアウトのまま）
+    expect(view.queryAllByTestId('sidebar-account')).toHaveLength(0)
   })
 
   it('v7 では V2 モードの組隠しが今までどおり効く', async () => {
@@ -198,6 +206,68 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     const view = await renderSidebar({ friendAttributesV2Mode: true })
     expect(view.queryAllByText('自動化')).toHaveLength(0)
     expect(view.queryAllByText('予約')).toHaveLength(0)
+  })
+})
+
+describe('★V8 統括の左メニュー（絵 V8-B/JKjsE・オーナー 2026-10-07）', () => {
+  beforeEach(() => {
+    clearFeatureVisibilityCache()
+    fixture.visibility.mockReset()
+    fixture.get.mockReset()
+    fixture.visibility.mockResolvedValue({ success: true, data: { features: ALL_FEATURES_ON } })
+    fixture.get.mockResolvedValue({ success: true, data: { features: ALL_FEATURES_ON, sidebarOrder: null, sidebarItemOrder: null, specializedFeatureKeys: [] } })
+    fixture.pathname = '/hq'
+    window.localStorage.clear()
+    window.localStorage.setItem('lh_staff_role', 'owner')
+    window.localStorage.setItem('lh-sidebar-collapsed', '0')
+  })
+
+  afterEach(() => {
+    cleanup()
+    delete document.documentElement.dataset.theme
+  })
+
+  async function renderHq() {
+    const view = render(<Sidebar />)
+    await act(async () => { await Promise.resolve() })
+    return view
+  }
+
+  it('V8 は「統括」の組の見出し・左下の「統括の設定」と版。左下のアカウントの行は出さない', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    const view = await renderHq()
+    expect(view.getAllByRole('button', { name: '統括' }).length).toBeGreaterThan(0)
+    const settings = view.getAllByRole('link', { name: '統括の設定' })
+    expect(settings.length).toBeGreaterThan(0)
+    expect(settings[0].getAttribute('href')).toBe('/hq/settings')
+    expect(view.getAllByText('version').length).toBeGreaterThan(0)
+    expect(view.getAllByText('identity').length).toBeGreaterThan(0)
+    expect(view.queryAllByText('hq')).toHaveLength(0)
+    // ★V8 左下の自分とメニュー（オーナー 2026-10-07）：統括でも左下に出す（統括の形で）。
+    expect(view.getAllByText('me-hq').length).toBeGreaterThan(0)
+    expect(view.queryAllByText('me-store')).toHaveLength(0)
+  })
+
+  it('V8 の統括の設定の中（メンバーなど）では「統括の設定」が選ばれた形、アカウントの画面では選ばれない', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    fixture.pathname = '/hq/members'
+    const members = await renderHq()
+    expect(members.getAllByRole('link', { name: '統括の設定' })[0].className).toMatch(/active/)
+    cleanup()
+    fixture.pathname = '/hq'
+    const home = await renderHq()
+    expect(home.getAllByRole('link', { name: '統括の設定' })[0].className).not.toMatch(/active/)
+  })
+
+  it('v7 の統括は今までどおり（見出し無し・左下はアカウントの行・統括の設定と版は無し）', async () => {
+    document.documentElement.dataset.theme = 'v7'
+    const view = await renderHq()
+    expect(view.queryAllByRole('button', { name: '統括' })).toHaveLength(0)
+    expect(view.queryAllByRole('link', { name: '統括の設定' })).toHaveLength(0)
+    expect(view.queryAllByText('version')).toHaveLength(0)
+    expect(view.getAllByText('hq').length).toBeGreaterThan(0)
+    // v7 の統括には V8 の左下の自分を出さない。
+    expect(view.queryAllByTestId('sidebar-account')).toHaveLength(0)
   })
 })
 

@@ -14,9 +14,10 @@ const topBar = read('../../../components/shell/app-top-bar.tsx')
  * 正本は Pencil `V6正本.pen` と `docs/v6-requirements/v6-36-hq-account-billing-requirements-draft.md`。
  */
 describe('統括の左下アカウントメニュー', () => {
-  it('統括のサイドバーだけに置き、アカウントの画面は下端に何も置かない（§1-2 の例外）', () => {
+  it('v7 の統括のサイドバーだけに置き、アカウントの画面は下端に何も置かない（§1-2 の例外）', () => {
     // V8 移行③: 畳んだメニューでは枠ごと隠す collapseHide の皮で包む。
-    expect(sidebar).toContain("{isHq ? <div className={styles.collapseHide}><HqAccountMenu /></div> : <div className={styles.footer} />}")
+    // V8 の統括は店の画面と同じ形（絵 V8-B/JKjsE・オーナー 2026-10-07）。左下は「統括の設定」と版。
+    expect(sidebar).toContain("{isHq && !isV8 ? <div className={styles.collapseHide}><HqAccountMenu /></div> : <div className={styles.footer} />}")
   })
 
   it('メニューにはメンバー管理・課金プラン・お問い合わせ・ログアウトを置き、まだ無い画面（プロフィール）は出さない', () => {
