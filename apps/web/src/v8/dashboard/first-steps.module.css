@@ -127,6 +127,12 @@
   line-height: var(--tpl-d23-ob-check);
 }
 
+/* 済みの印は文字の ✓ ではなく線画にする（文字は書体の都合で丸の中心から右下へずれる・2026-10-08 オーナー指摘）。 */
+.checkIcon {
+  width: var(--tpl-d23-ob-check-size);
+  height: var(--tpl-d23-ob-check-size);
+}
+
 .step[data-done] .check {
   background: var(--color-action);
   outline: 0;
