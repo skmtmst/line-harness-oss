@@ -46,7 +46,8 @@ export function v8FilesOf(entryFile) {
   const source = readFileSync(entryFile, 'utf8')
   const v8 = []
   const local = []
-  for (const match of source.matchAll(/from\s+'([^']+)'/g)) {
+  // 静的な import と、dynamic(() => import('…')) の両方を読む（リッチメニューの編集などは後者）。
+  for (const match of source.matchAll(/(?:from\s+|import\(\s*)'([^']+)'/g)) {
     const spec = match[1]
     if (spec.startsWith('@/v8/')) {
       v8.push(resolveTsx(join(SRC, spec.slice(2))))
