@@ -71,10 +71,24 @@ export default function AdConnectionsV8() {
     return () => { generationRef.current += 1 }
   }, [loadMappings])
 
+  /*
+   * WEB041：前のアカウントで押した保存の結果で、今のアカウントの対応表を
+   * 読み直さない（前のアカウントの古い読み直しが今の表を上書きする）。
+   * 切り替えたら保存中・失敗の文も捨てる。
+   */
+  const accountRef = useRef(accountId)
+  accountRef.current = accountId
+  useEffect(() => {
+    setSavingKey(null)
+    setSaveError('')
+  }, [accountId])
+
   /* 結びつけない ⇔ 自動で返す（口が出す自動の名前）。版が合わないと 409（ほかの人が先に変えた）。 */
   const saveMode = async (item: AdEventMapping, mode: 'auto' | 'off') => {
     if (!accountId || savingKey) return
     const key = `${item.pointId}:${item.provider}`
+    const accountAtStart = accountId
+    const moved = () => accountRef.current !== accountAtStart
     setSavingKey(key)
     setSaveError('')
     try {
@@ -84,12 +98,14 @@ export default function AdConnectionsV8() {
         mode,
         expectedVersion: item.version,
       })
+      if (moved()) return
       if (!res.success) setSaveError(res.error ?? '対応を保存できませんでした。読み直してからもう一度お試しください。')
       await loadMappings()
     } catch {
+      if (moved()) return
       setSaveError('対応を保存できませんでした。通信状態を確かめて、もう一度お試しください。')
     } finally {
-      setSavingKey(null)
+      if (!moved()) setSavingKey(null)
     }
   }
 

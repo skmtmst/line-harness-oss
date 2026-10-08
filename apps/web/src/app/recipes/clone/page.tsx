@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, type Recipe } from '@/lib/api'
+import { useResponseGate } from '@/lib/use-response-gate'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
@@ -54,9 +55,20 @@ function RecipeClone() {
 
   usePageTitle(recipe ? `${recipe.name}を作る` : null)
 
-  const reload = useCallback(async (): Promise<'ok' | 'missing' | 'error'> => {
+  /*
+   * WEB321：レシピ・アカウントを変えたら、前の遅い応答（読み込み・作成の結果）を
+   * 今の画面へ書かない。作成の再送キーと版（R126）はそのまま使う。
+   */
+  const gate = useResponseGate()
+  const targetRef = useRef('')
+  targetRef.current = `${id}|${selectedAccountId ?? ''}`
+  useEffect(() => { setCloneState('idle') }, [id, selectedAccountId])
+
+  const reload = useCallback(async (): Promise<'ok' | 'missing' | 'error' | 'stale'> => {
+    const token = gate.begin()
     try {
       const res = await api.recipes.get(id, selectedAccountId ?? undefined)
+      if (!gate.current(token)) return 'stale'
       if (!res.success || !res.data) {
         setLoadError(null)
         return 'error'
@@ -65,17 +77,19 @@ function RecipeClone() {
       setLoadError(null)
       return 'ok'
     } catch (caught: unknown) {
+      if (!gate.current(token)) return 'stale'
       if (caught instanceof ApiError && caught.status === 404) return 'missing'
       setLoadError(caught)
       return 'error'
     }
-  }, [id, selectedAccountId])
+  }, [id, selectedAccountId, gate])
 
   const refresh = useCallback(() => {
     setStatus('loading')
     setMissing(false)
     setLoadError(null)
     void reload().then((outcome) => {
+      if (outcome === 'stale') return
       if (outcome === 'missing') {
         setMissing(true)
         setStatus('ready')
@@ -155,14 +169,17 @@ function RecipeClone() {
     if (cloneKeyRef.current?.intent !== intent) {
       cloneKeyRef.current = { intent, key: crypto.randomUUID() }
     }
+    const target = targetRef.current
     try {
       const result = await api.recipes.clone(
         recipe.id,
         { accountId: selectedAccountId, namePrefix: prefix || null, expectedVersion: recipe.version },
         cloneKeyRef.current.key,
       )
+      if (targetRef.current !== target) return
       setCloneState(result.success ? 'success' : 'error')
     } catch {
+      if (targetRef.current !== target) return
       setCloneState('error')
     }
   }

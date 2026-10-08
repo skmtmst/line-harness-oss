@@ -180,10 +180,11 @@ export default function AffiliatorsTab() {
     }
   }, [])
 
-  const loadApprovals = useCallback(async () => {
+  const loadApprovals = useCallback(async (options: { fresh?: boolean } = {}) => {
     setApprovalState('loading')
     try {
-      const pending = await listAllConversionApprovals('pending')
+      // 件数用（affiliates.tsx）と同じ条件なので、同時に走れば1本にまとまる（WEB003）。
+      const pending = await listAllConversionApprovals('pending', 0, { accountId, fresh: options.fresh })
       if (!mounted.current) return
       setPendingItems(pending.items)
       setApprovalTruncated(pending.truncated)
@@ -191,7 +192,7 @@ export default function AffiliatorsTab() {
     } catch {
       if (mounted.current) setApprovalState('error')
     }
-  }, [])
+  }, [accountId])
 
   const loadPayment = useCallback(async () => {
     if (!accountId) {
@@ -658,7 +659,7 @@ export default function AffiliatorsTab() {
               setDrawerId(null)
               if (focusAffiliateId) router.replace('/affiliates')
             }}
-            onChanged={() => { void loadList(); void loadApprovals() }}
+            onChanged={() => { void loadList(); void loadApprovals({ fresh: true }) }}
             onStopRequest={(id, name) => setArchiveTarget({ id, name })}
           />
         ) : null}
