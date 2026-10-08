@@ -10,6 +10,7 @@ import { useId, useState } from 'react'
 import type { EntryRouteGenre } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
+import { isImeComposing } from '@/components/shared/ime'
 import styles from './list.module.css'
 
 export default function GenreDialog({
@@ -67,7 +68,8 @@ export default function GenreDialog({
         value={name}
         onChange={(event) => setName(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') void save()
+          // 変換の確定の Enter で書きかけの名前を保存しない。
+          if (event.key === 'Enter' && !isImeComposing(event)) void save()
         }}
         maxLength={80}
         placeholder="例: A店"

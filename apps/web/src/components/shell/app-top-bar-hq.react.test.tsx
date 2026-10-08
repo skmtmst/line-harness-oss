@@ -123,17 +123,13 @@ describe('★V8 統括の上の帯', () => {
     expect(fixture.push).not.toHaveBeenCalled()
   })
 
-  it('店の画面：統括の権限がある人には切り替えの一覧の頭に「統括に戻る」。帯の［統括へ］はやめた', async () => {
+  it('店の画面：切り替えの一覧はアカウントだけ。統括に戻るのは左下の自分のメニュー（オーナー 2026-10-08）', async () => {
     fixture.pathname = '/friends'
     const view = render(<AppTopBar />)
     await act(async () => { await Promise.resolve() })
     fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
-    await waitFor(() => expect(view.getByRole('menuitem', { name: /統括に戻る/ })).toBeTruthy())
-    expect(view.getByText('株式会社 然 ・ アカウント 1')).toBeTruthy()
-    expect(view.getByRole('menuitemradio', { name: '然-NEN- 本店' })).toBeTruthy()
-    fireEvent.click(view.getByRole('menuitem', { name: /統括に戻る/ }))
-    expect(fixture.push).toHaveBeenCalledWith('/hq')
-    // ［統括へ］は左下の自分のメニューへまとめた（オーナー 2026-10-07）。
+    await waitFor(() => expect(view.getByRole('menuitemradio', { name: '然-NEN- 本店' })).toBeTruthy())
+    expect(view.queryAllByRole('menuitem', { name: /統括に戻る/ })).toHaveLength(0)
     expect(view.queryAllByRole('button', { name: /統括へ/ })).toHaveLength(0)
   })
 

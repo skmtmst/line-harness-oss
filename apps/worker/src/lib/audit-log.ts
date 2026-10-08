@@ -17,6 +17,10 @@ import type { Env } from '../index.js';
 
 export type AuditAction =
   | 'ad_conversion.retry'
+  | 'line_account_folder.create'
+  | 'line_account_folder.update'
+  | 'line_account_folder.delete'
+  | 'line_account_folder.move'
   | 'line_account_tag.create'
   | 'line_account_tag.update'
   | 'line_account_tag.delete'

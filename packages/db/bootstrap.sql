@@ -583,7 +583,7 @@ CREATE TABLE affiliates (
   friend_id       TEXT REFERENCES friends (id),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , email TEXT, hold_days INTEGER, payout_cycle TEXT, notify_on_conversion INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id), lifecycle_status TEXT NOT NULL DEFAULT 'active'
-  CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT, operation_id TEXT);
+  CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT, operation_id TEXT, reward_mode TEXT CHECK (reward_mode IN ('none', 'fixed', 'rate')));
 
 CREATE TABLE ai_loop_slack_reports (
   work_key        TEXT PRIMARY KEY,
@@ -1547,7 +1547,7 @@ CREATE TABLE "booking_reminders" (
                   CHECK (status IN ('pending','sent','failed','failed_permanent','cancelled')),
   retry_count   INTEGER NOT NULL DEFAULT 0,
   last_error    TEXT
-);
+, retry_key TEXT, recipient_line_user_id TEXT, messages_json TEXT);
 
 CREATE TABLE booking_resource_consumptions (
   booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -2995,7 +2995,8 @@ CREATE TABLE friend_add_rule_folders (
   create_idempotency_key  TEXT NOT NULL,
   created_by_staff_id     TEXT NOT NULL,
   created_at              TEXT NOT NULL,
-  updated_at              TEXT NOT NULL,
+  updated_at              TEXT NOT NULL, color TEXT
+  CHECK (color IS NULL OR (typeof(color) = 'text' AND length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')),
   UNIQUE (line_account_id, name),
   UNIQUE (line_account_id, create_idempotency_key)
 );
@@ -3445,11 +3446,18 @@ CREATE TABLE hq_broadcast_audit (
  actor_id TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT(datetime('now'))
 );
 
+CREATE TABLE hq_broadcast_folders (
+ id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), name TEXT NOT NULL,
+ revision INTEGER NOT NULL DEFAULT 1, archived_at TEXT,
+ created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+, color TEXT
+  CHECK (color IS NULL OR (typeof(color) = 'text' AND length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')));
+
 CREATE TABLE hq_broadcast_runs (
  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), request_id TEXT NOT NULL, actor_id TEXT NOT NULL,
  input_json TEXT NOT NULL CHECK(json_valid(input_json)), status TEXT NOT NULL DEFAULT 'prepared' CHECK(status IN ('prepared','scheduled','stopped','cancelled')),
  version INTEGER NOT NULL DEFAULT 1, scheduled_at TEXT, dispatch_token TEXT,
- created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), UNIQUE(tenant_id,request_id)
+ created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), approval_json TEXT CHECK(approval_json IS NULL OR json_valid(approval_json)), UNIQUE(tenant_id,request_id)
 );
 
 CREATE TABLE hq_broadcast_targets (
@@ -3559,7 +3567,8 @@ CREATE TABLE hq_template_folders (
   revision INTEGER NOT NULL DEFAULT 1,
   archived_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), color TEXT
+  CHECK (color IS NULL OR (typeof(color) = 'text' AND length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')),
   UNIQUE(id, tenant_id)
 );
 
@@ -3592,7 +3601,8 @@ CREATE TABLE hq_template_preflight_resolutions (
   target_id TEXT,
   alias_name TEXT,
   expected_revision TEXT,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), friend_attribute_mode TEXT
+  CHECK (friend_attribute_mode IS NULL OR (friend_attribute_mode='skip' AND resolution_mode='overwrite' AND NOT (target_id IS NULL))),
   PRIMARY KEY (preflight_id, tenant_id, source_id),
   CHECK (resolution_mode != 'overwrite' OR (target_id IS NOT NULL AND expected_revision IS NOT NULL)),
   CHECK (resolution_mode != 'alias' OR alias_name IS NOT NULL),
@@ -3658,7 +3668,8 @@ CREATE TABLE hq_templates (
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  archived_at TEXT, folder_id TEXT, extended_type TEXT CHECK (extended_type IS NULL OR extended_type='scenario'),
+  archived_at TEXT, folder_id TEXT, extended_type TEXT CHECK (extended_type IS NULL OR extended_type='scenario'), friend_attribute_type TEXT
+  CHECK (friend_attribute_type IS NULL OR friend_attribute_type IN ('friend_field','mark')),
   PRIMARY KEY (id, tenant_id),
   FOREIGN KEY (current_version_id, id, tenant_id)
     REFERENCES hq_template_versions(id, template_id, tenant_id)
@@ -3972,7 +3983,7 @@ CREATE TABLE line_accounts (
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT, inactive_reason TEXT
   CHECK (inactive_reason IS NULL OR inactive_reason IN ('manual', 'ban_detected', 'credential_invalid')), inactive_reason_detail TEXT, inactivated_at TEXT, login_channel_secret_encrypted TEXT, last_webhook_received_at TEXT, webhook_silence_exempt INTEGER NOT NULL DEFAULT 0
-  CHECK (webhook_silence_exempt IN (0, 1)));
+  CHECK (webhook_silence_exempt IN (0, 1)), folder_id TEXT REFERENCES line_account_tags(id) ON DELETE SET NULL);
 
 CREATE TABLE line_message_unsends (
   line_message_account_key TEXT NOT NULL,
@@ -7441,7 +7452,7 @@ CREATE TABLE tenants (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , feature_packs TEXT NOT NULL DEFAULT '[]', plan_key TEXT, plan_status TEXT NOT NULL DEFAULT 'exempt'
   CHECK (plan_status IN ('exempt', 'trialing', 'active', 'past_due', 'canceled')), trial_ends_at TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT, current_period_ends_at TEXT, plan_updated_at TEXT, signup_device_marker TEXT, retention_anchor_at TEXT, purge_requested_at TEXT, data_purged_at TEXT, login_display_name TEXT, logo_media_id TEXT REFERENCES media(id) ON DELETE SET NULL, logo_background_color TEXT NOT NULL DEFAULT '#ffffff', company_settings_version INTEGER NOT NULL DEFAULT 0
-  CHECK (company_settings_version >= 0));
+  CHECK (company_settings_version >= 0), legal_company_name TEXT, company_postal_code TEXT, company_address TEXT, company_building TEXT, company_phone TEXT, contact_name TEXT, contact_email TEXT, invoice_addressee TEXT);
 
 CREATE TABLE tiktok_pnl_order_lines (
   -- `<TikTok注文ID>:<行番号>`。シートのキー列（A列）にもこの値を使う。
@@ -8997,6 +9008,8 @@ CREATE INDEX idx_handover_decisions_handover
 
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
+CREATE UNIQUE INDEX idx_hq_broadcast_folder_name ON hq_broadcast_folders(tenant_id,name) WHERE archived_at IS NULL;
+
 CREATE UNIQUE INDEX idx_hq_folder_name ON hq_template_folders(tenant_id, name) WHERE archived_at IS NULL;
 
 CREATE INDEX idx_hq_support_messages_request
@@ -9107,6 +9120,8 @@ CREATE INDEX idx_line_accounts_archived
 
 CREATE INDEX idx_line_accounts_display_order
   ON line_accounts (display_order, created_at);
+
+CREATE INDEX idx_line_accounts_folder ON line_accounts(folder_id);
 
 CREATE UNIQUE INDEX idx_line_accounts_liff_id_unique
   ON line_accounts(liff_id);
@@ -10245,6 +10260,18 @@ WHEN EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'conversion point with events or usages cannot be deleted'); END;
 
+CREATE TRIGGER hq_attribute_skip_insert BEFORE INSERT ON hq_template_preflight_resolutions
+WHEN NEW.friend_attribute_mode IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM hq_templates t WHERE t.id=NEW.template_id AND t.tenant_id=NEW.tenant_id
+    AND t.friend_attribute_type=NEW.item_kind)
+BEGIN SELECT RAISE(ABORT,'HQ_ATTRIBUTE_SKIP_INVALID'); END;
+
+CREATE TRIGGER hq_attribute_skip_update BEFORE UPDATE ON hq_template_preflight_resolutions
+WHEN NEW.friend_attribute_mode IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM hq_templates t WHERE t.id=NEW.template_id AND t.tenant_id=NEW.tenant_id
+    AND t.friend_attribute_type=NEW.item_kind)
+BEGIN SELECT RAISE(ABORT,'HQ_ATTRIBUTE_SKIP_INVALID'); END;
+
 CREATE TRIGGER hq_template_binding_guard
 BEFORE UPDATE ON hq_templates
 WHEN NEW.id != OLD.id
@@ -10267,6 +10294,15 @@ BEGIN SELECT RAISE(ABORT, 'HQ_FOLDER_SCOPE_INVALID'); END;
 CREATE TRIGGER hq_template_folder_update BEFORE UPDATE OF folder_id, tenant_id ON hq_templates
 WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_template_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND archived_at IS NULL)
 BEGIN SELECT RAISE(ABORT, 'HQ_FOLDER_SCOPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_friend_attribute_insert BEFORE INSERT ON hq_templates
+WHEN NEW.friend_attribute_type IS NOT NULL
+  AND (NEW.template_type!='tag' OR NEW.extended_type IS NOT NULL)
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_friend_attribute_update BEFORE UPDATE OF friend_attribute_type ON hq_templates
+WHEN NEW.friend_attribute_type IS NOT OLD.friend_attribute_type
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_logical_archive_only
 BEFORE DELETE ON hq_templates
@@ -10387,6 +10423,18 @@ WHEN NOT EXISTS (
     AND archived_at IS NULL
 )
 BEGIN SELECT RAISE(ABORT, 'ACCOUNT_TAG_SCOPE_INVALID'); END;
+
+CREATE TRIGGER line_accounts_folder_scope_insert BEFORE INSERT ON line_accounts
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM line_account_tags WHERE id=NEW.folder_id
+    AND tenant_id=COALESCE(NEW.tenant_id,'00000000-0000-4000-8000-000000000001')
+) BEGIN SELECT RAISE(ABORT,'ACCOUNT_FOLDER_SCOPE_INVALID'); END;
+
+CREATE TRIGGER line_accounts_folder_scope_update BEFORE UPDATE OF folder_id,tenant_id ON line_accounts
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM line_account_tags WHERE id=NEW.folder_id
+    AND tenant_id=COALESCE(NEW.tenant_id,'00000000-0000-4000-8000-000000000001')
+) BEGIN SELECT RAISE(ABORT,'ACCOUNT_FOLDER_SCOPE_INVALID'); END;
 
 CREATE TRIGGER messages_search_invalidate AFTER UPDATE OF content,unsent_at,delivery_type ON messages_log
 WHEN OLD.content IS NOT NEW.content OR OLD.unsent_at IS NOT NEW.unsent_at OR OLD.delivery_type IS NOT NEW.delivery_type

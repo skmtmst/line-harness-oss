@@ -5,6 +5,7 @@ import { useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './combobox.module.css'
+import { isImeComposing } from './ime'
 
 export type ComboboxDot = 'green' | 'blue' | 'amber' | 'gray'
 
@@ -44,7 +45,7 @@ export interface ComboboxProps {
 }
 
 /**
- * 候補つき入力（1つ選ぶ）。Pencil ★V7 `WUVcz`「候補つき入力・複数選択」§1。
+ * 候補つき入力（1つ選ぶ）。Pencil ★V8（V8.pen）「候補から選ぶ」。
  *
  * 形の手本は select.tsx（開閉・枠・誤り）と date-field（欄の 6px 下の
  * 候補・motion-fast の出方）。寸法・色・文字は WUVcz の書き出しから。
@@ -129,6 +130,8 @@ export default function Combobox({
   }
 
   const onInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    // 変換中のキー（確定の Enter・候補の上下・Esc）は日本語入力のもの。候補を選ばない。
+    if (isImeComposing(event)) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       if (!open) {

@@ -43,6 +43,7 @@ export async function updateLineAccountTag(db: D1Database, tenantId: string, id:
 }
 export async function deleteLineAccountTag(db: D1Database, tenantId: string, id: string): Promise<void> {
   await db.batch([
+    db.prepare('UPDATE line_accounts SET folder_id=NULL, revision=revision+1, updated_at=? WHERE folder_id=? AND COALESCE(tenant_id,?)=?').bind(jstNow(),id,DEFAULT_TENANT_ID,tenantId),
     db.prepare('DELETE FROM line_account_tag_links WHERE tenant_id = ? AND tag_id = ?').bind(tenantId, id),
     db.prepare('DELETE FROM line_account_tags WHERE tenant_id = ? AND id = ?').bind(tenantId, id),
   ]);
@@ -65,8 +66,10 @@ export async function replaceLineAccountTags(db: D1Database, tenantId: string, a
   const active = `EXISTS (SELECT 1 FROM line_accounts a WHERE a.id = ? AND COALESCE(a.tenant_id, ?) = ? AND a.archived_at IS NULL)`;
   const scope = [accountId, DEFAULT_TENANT_ID, tenantId];
   const results = await db.batch([
-    db.prepare('UPDATE line_accounts SET revision = revision + 1, updated_at = ? WHERE id = ? AND COALESCE(tenant_id, ?) = ? AND archived_at IS NULL')
-      .bind(jstNow(), ...scope),
+    db.prepare(`UPDATE line_accounts SET folder_id = (SELECT t.id FROM line_account_tags t
+        WHERE t.tenant_id = ? AND t.id IN (SELECT value FROM json_each(?))
+        ORDER BY t.display_order,t.name,t.id LIMIT 1), revision = revision + 1, updated_at = ? WHERE id = ? AND COALESCE(tenant_id, ?) = ? AND archived_at IS NULL`)
+      .bind(tenantId, JSON.stringify(tagIds), jstNow(), ...scope),
     db.prepare(`DELETE FROM line_account_tag_links WHERE line_account_id = ? AND tenant_id = ? AND ${active}`)
       .bind(accountId, tenantId, ...scope),
     ...tagIds.map(id => db.prepare(`INSERT INTO line_account_tag_links (line_account_id, tag_id, tenant_id)
@@ -79,5 +82,32 @@ export async function replaceLineAccountTags(db: D1Database, tenantId: string, a
 /** 新規登録用。版を進めず、途中の失敗はまとめて巻き戻す。 */
 export async function attachLineAccountRegistrationTags(db: D1Database, tenantId: string, accountId: string, tagIds: string[]): Promise<void> {
   if (!tagIds.length) return;
-  await db.batch(tagIds.map(id => db.prepare('INSERT INTO line_account_tag_links (line_account_id, tag_id, tenant_id) VALUES (?, ?, ?)').bind(accountId, id, tenantId)));
+  await db.batch([
+    ...tagIds.map(id => db.prepare('INSERT INTO line_account_tag_links (line_account_id, tag_id, tenant_id) VALUES (?, ?, ?)').bind(accountId, id, tenantId)),
+    db.prepare(`UPDATE line_accounts SET folder_id=(SELECT t.id FROM line_account_tags t
+      WHERE t.tenant_id=? AND t.id IN (SELECT value FROM json_each(?))
+      ORDER BY t.display_order,t.name,t.id LIMIT 1) WHERE id=? AND COALESCE(tenant_id,?)=?`)
+      .bind(tenantId,JSON.stringify(tagIds),accountId,DEFAULT_TENANT_ID,tenantId),
+  ]);
+}
+
+/** 店の汎用Folderと同じ返り値。統括内かつ閲覧可能な現役アカウントだけを数える。 */
+export async function listLineAccountFolders(db: D1Database, tenantId: string, accountIds: string[]) {
+  const rows = await listLineAccountTags(db, tenantId);
+  const counts = accountIds.length ? (await db.prepare(`SELECT folder_id,COUNT(*) AS count FROM line_accounts
+    WHERE id IN (${accountIds.map(() => '?').join(',')}) AND COALESCE(tenant_id,?)=? AND archived_at IS NULL
+    GROUP BY folder_id`).bind(...accountIds,DEFAULT_TENANT_ID,tenantId).all<{folder_id:string|null;count:number}>()).results : [];
+  return { folders: rows.map(row => ({ ...serializeLineAccountTag(row),kind:'line_account',parentId:null,
+    itemCount:counts.find(count => count.folder_id===row.id)?.count ?? 0 })),
+    total:counts.reduce((n,row)=>n+row.count,0),unclassifiedCount:counts.find(row=>row.folder_id===null)?.count ?? 0 };
+}
+export async function getLineAccountFoldersByAccountIds(db: D1Database, tenantId: string, accountIds: string[]) {
+  const out: Record<string, import('@line-crm/shared').Folder | null> = {};
+  if (!accountIds.length) return out;
+  const rows = (await db.prepare(`SELECT t.*,a.id AS account_id FROM line_accounts a
+    LEFT JOIN line_account_tags t ON t.id=a.folder_id AND t.tenant_id=COALESCE(a.tenant_id,?)
+    WHERE COALESCE(a.tenant_id,?)=? AND a.id IN (${accountIds.map(()=>'?').join(',')})`)
+    .bind(DEFAULT_TENANT_ID,DEFAULT_TENANT_ID,tenantId,...accountIds).all<LineAccountTag & {account_id:string}>()).results;
+  for(const row of rows) out[row.account_id]=row.id ? {...serializeLineAccountTag(row),kind:'line_account',parentId:null} : null;
+  return out;
 }

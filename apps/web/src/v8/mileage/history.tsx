@@ -410,7 +410,14 @@ export default function HistoryTab() {
   ) : error ? (
     <StateCard tone="error" title="マイルの履歴を読み込めませんでした" description="数の帯は「—」にしています。道具はそのまま使えます。" action={<RetryButton onRetry={() => void load()} />} />
   ) : items.length === 0 ? (
-    filtered ? (
+    /*
+     * WEB074：「使った・取り消しのみ」は口に種類の絞り込みが無く、1ページずつ手元で絞っている。
+     * このページに無くても、ほかのページにあることがある。「ありません」と言い切らず、ページ送りを残す。
+     * （口に種類の絞り込みが入ったら、ここは要らなくなる。Codex へ依頼済み）
+     */
+    spentOnly && pageCount > 1 ? (
+      <StateCard title="このページには、使った・取り消しの履歴がありません" description="この絞り込みは1ページずつ見ています。ほかのページにある場合があります。下のページ送りで確かめてください。" />
+    ) : filtered ? (
       <StateCard title="条件に合う履歴はありません" description="検索や絞り込みを外すと、すべて出ます" action={<Button type="button" onClick={resetAll}>条件を外す</Button>} />
     ) : (
       <StateCard title="まだ履歴がありません" description="マイルを付けたり使ったりすると、ここに記録が残ります" />
@@ -418,11 +425,13 @@ export default function HistoryTab() {
   ) : table
 
   /* 絵 oRbJi：表 → ページ送り（件数つき）→ 下の案内。 */
-  const footer = ready && items.length > 0 ? (
+  const footer = ready && (items.length > 0 || (spentOnly && pageCount > 1)) ? (
     <>
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>
-          {`${formatNumber(total ?? 0)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)}件`}
+          {spentOnly
+            ? `${formatNumber(total ?? 0)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)}件のうち、使った・取り消し ${formatNumber(items.length)}件`
+            : `${formatNumber(total ?? 0)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)}件`}
         </span>
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading} /> : null}
       </div>

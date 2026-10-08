@@ -11,6 +11,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { describeSaveFailure } from '@/lib/api'
 import type { FormErrors } from '@/lib/use-form-errors'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /*
  * D005: `ApiError.message` は安全と判定されない応答では `API error: <番号>` の
@@ -123,6 +124,7 @@ export default function CreatePage({
   children,
 }: CreatePageProps) {
   const router = useRouter()
+  const theme = useAdminTheme()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -231,10 +233,10 @@ export default function CreatePage({
   )
 
   /*
-   * 絵の板の頭は戻る行を頭の内側に持つ。外側の素の div に入れるだけなので
-   * v7 の描画は変わらない（順番も箱も同じ）。
+   * v7 は頭の上に「親 / 今の題」の行を置く。★V8 は描かない（オーナー 2026-10-08）：
+   * 戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ。
    */
-  const crumb = (
+  const crumb = theme === 'v8' ? null : (
     <nav data-design="Crumb" className={`${styles.crumb} text-ink-faint mb-2 text-xs`}>
       <Link href={parent[1]} className="hover:underline">
         {parent[0]}

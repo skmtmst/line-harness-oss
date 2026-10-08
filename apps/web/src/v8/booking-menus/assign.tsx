@@ -17,7 +17,6 @@ import { Th } from '@/components/shared/table'
  * 読まれず、従来の見た目が出る。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -326,7 +325,6 @@ export default function AssignMatrixV8() {
   return (
     <div className={shell.shell} data-design-node="ooufy">
       <header className={shell.boardHead} data-design="Head">
-        <Link href="/booking/bookings" className={shell.backLink}>← 予約へ</Link>
         <h1 className={shell.headTitle}>担当メニューをまとめて決める</h1>
         <p className={shell.headNote} role="status" aria-live="polite">
           {dirty ? '未保存の変更があります' : 'メニューごとに、予約を受けられるスタッフを決めます'}
@@ -458,7 +456,7 @@ export default function AssignMatrixV8() {
                 {selectedStaff && selectedMenu && selectedRow ? (
                   <div className={styles.overrideCard} data-design="Override">
                     <h3 className={styles.overrideTitle}>
-                      升を押したとき（{staffLabel(selectedStaff)} × {selectedMenu.name}）
+                      {`升を押したとき（${staffLabel(selectedStaff)} × ${selectedMenu.name}）`}
                     </h3>
                   <div className={styles.overrideFields}>
                     <label className={styles.field}>
@@ -565,7 +563,7 @@ export default function AssignMatrixV8() {
             actions={(
               <>
                 <Button
-                  onClick={() => setGrid(savedGrid ?? grid)}
+                  onClick={() => { setGrid(savedGrid ?? grid); if (!loadFailed) setError(null) }}
                   disabled={saving}
                 >
                   キャンセル
@@ -579,7 +577,8 @@ export default function AssignMatrixV8() {
                     }
                     void saveAll()
                   }}
-                  disabled={saving || !selectedAccountId || loading || Boolean(error)}
+                  // WEB061：保存の失敗で保存を押せなくしない（やり直せるように）。止めるのは読み込みの失敗だけ。
+                  disabled={saving || !selectedAccountId || loading || loadFailed}
                   busy={saving}
                   done={saveDone}
                 >

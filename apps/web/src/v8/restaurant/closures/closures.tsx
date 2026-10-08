@@ -7,6 +7,7 @@
  * ｜右：これからの休業・貸切（「…」から変える・消す）と Google の営業時間。
  * 足す・変える窓（`nVvXy`）は closure-dialog.tsx。動きは BEHAVIOR.md。
  */
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bell, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { RestaurantChannelCloseTask, RestaurantClosure, RestaurantOpeningDay } from '@line-crm/shared'
@@ -63,6 +64,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   dialog: ClosureDialogTarget | null
   onDialog: (target: ClosureDialogTarget | null) => void
 }) {
+  const router = useRouter()
   const store = ctx.store
   const storeId = ctx.selectedStoreId
   const timezone = store?.timezone || 'Asia/Tokyo'
@@ -346,7 +348,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                   ...(canWrite ? [
                     { id: 'edit', label: '変える', onSelect: () => onDialog({ mode: 'edit', closure }) },
                   ] : []),
-                  { id: 'ledger', label: '予約台帳でこの日を見る', onSelect: () => { window.location.href = `/restaurant-test/reservations?date=${closure.startDate}` } },
+                  { id: 'ledger', label: '予約台帳でこの日を見る', onSelect: () => { router.push(`/restaurant-test/reservations?date=${closure.startDate}`) } },
                   ...(canWrite ? [
                     { id: 'remove', label: '消して開ける', tone: 'danger' as const, dividerBefore: true, onSelect: () => { setRemoveError(''); setRemoving(closure) } },
                   ] : []),

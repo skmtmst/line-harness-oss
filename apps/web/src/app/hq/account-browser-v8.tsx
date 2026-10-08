@@ -207,8 +207,8 @@ export default function AccountBrowser({
     }
     return (
       <div className="flex gap-2">
-        <Button size="field" className="flex-1" onClick={() => onSelect(account.id)}>
-          <LogIn aria-hidden="true" className="h-4 w-4" />このアカウントへ入る
+        <Button size="field" className="flex-1" onClick={() => onSelect(account.id)} aria-label={`${account.displayName || account.name} へ入る`}>
+          <LogIn aria-hidden="true" className="h-4 w-4" />入る
         </Button>
         <Button
           size="field"

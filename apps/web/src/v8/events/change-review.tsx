@@ -14,6 +14,7 @@ import { ArrowLeft, Check } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -256,11 +257,11 @@ function ChangeReview({ eventId }: { eventId: string }) {
           <div className={styles.pair}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="ev-cr-start">開始日時</label>
-              <input id="ev-cr-start" type="datetime-local" className={styles.input} value={activeEdit.startsAt} onChange={(e) => updateActive({ startsAt: e.target.value })} />
+              <DateTimeField id="ev-cr-start" value={activeEdit.startsAt} onChange={(next) => updateActive({ startsAt: next })} />
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="ev-cr-end">終了日時</label>
-              <input id="ev-cr-end" type="datetime-local" className={styles.input} value={activeEdit.endsAt} onChange={(e) => updateActive({ endsAt: e.target.value })} />
+              <DateTimeField id="ev-cr-end" value={activeEdit.endsAt} onChange={(next) => updateActive({ endsAt: next })} />
             </div>
           </div>
           <div className={styles.pair}>

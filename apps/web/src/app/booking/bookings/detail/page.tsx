@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -18,6 +20,7 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { canOperateBookings } from '../../lib/booking-permissions'
 import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
 import Checkbox from '@/components/shared/checkbox'
 import HelpTip from '@/components/shared/help-tip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -28,6 +31,7 @@ import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
 type BookingAction = 'approve' | 'reject' | 'cancel' | 'complete' | 'no_show'
@@ -332,6 +336,8 @@ function BookingDetailInner() {
     ? detailState.booking
     : null
   usePageTitle(detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細')
+  /* ★V8 は本文の「予約管理 / 予約の詳細」を置かない（オーナー 2026-10-08）。一覧へは上の帯のパンくずで戻る。v7 は今までどおり。 */
+  const showBodyCrumb = useAdminTheme() !== 'v8'
   /**
    * R322: 保存・再試行・承認を始めた対象を覚える。今見ている対象と
    * 違う操作の完了では、現在の表示・編集中の内容を変えない。
@@ -890,14 +896,17 @@ function BookingDetailInner() {
 
   return (
     <div className="flex flex-col gap-4" data-design-node="If9Mh">
+      <div className="v8-only"><PageHeading title={detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細'} /></div>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <nav className="text-ink-faint text-xs" aria-label="パンくず">
-        <Link href="/booking/bookings" className="hover:underline">
-          予約管理
-        </Link>
-        <span className="mx-1.5">/</span>
-        <span>予約の詳細</span>
-      </nav>
+      {showBodyCrumb ? (
+        <nav className="text-ink-faint text-xs" aria-label="パンくず">
+          <Link href="/booking/bookings" className="hover:underline">
+            予約管理
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>予約の詳細</span>
+        </nav>
+      ) : null}
 
       {error && detail && (
         <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
@@ -1130,7 +1139,9 @@ function BookingDetailInner() {
               {detail.customer.tags.length > 0 ? (
                 <Row label="タグ">
                   <span className="flex flex-wrap gap-1">
-                    {detail.customer.tags.map((tag) => (
+                    {detail.customer.tags.map((tag) => !showBodyCrumb ? (
+                      <TagPill key={tag.id} name={tag.name} />
+                    ) : (
                       <span
                         key={tag.id}
                         className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs"

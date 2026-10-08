@@ -10,6 +10,7 @@
  * `app/friend-add-settings/runs/runs-v8.tsx` から写した（import はしない）。動きの一覧は BEHAVIOR.md。
  */
 
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -111,6 +112,7 @@ function FriendAddRunsInner() {
   const canManage = role === null || canManageRole(role)
   const searchParams = useSearchParams()
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const ruleIdFilter = searchParams.get('rule_id')
   const kindParam = searchParams.get('kind')
   const kind: KindFilter = kindParam === 'first_time' || kindParam === 'returning' ? kindParam : 'all'
@@ -200,8 +202,8 @@ function FriendAddRunsInner() {
     if (trail) params.set('pages', trail)
     else params.delete('pages')
     const next = params.toString()
-    if (next !== searchParams.toString()) router.replace(`?${next}`, { scroll: false })
-  }, [cursorStack, searchParams, router])
+    if (next !== searchParams.toString()) samePageUrl.replace(`?${next}`)
+  }, [cursorStack, searchParams, samePageUrl])
 
   const applyFilter = (patch: { kind?: KindFilter; routing?: RoutingFilter }) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -214,7 +216,7 @@ function FriendAddRunsInner() {
       else params.set('status', patch.routing)
     }
     params.delete('pages')
-    router.replace(`?${params.toString()}`, { scroll: false })
+    samePageUrl.replace(`?${params.toString()}`)
     resetCursor()
   }
 

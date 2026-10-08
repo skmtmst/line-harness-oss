@@ -25,7 +25,7 @@ export interface RewardResolverDeps {
 
 export async function resolveRewardTemplate(
   db: D1Database,
-  args: { friendId: string; requestedTrackedLinkId: string | null },
+  args: { friendId: string; requestedTrackedLinkId: string | null; expectedLineAccountId: string },
   deps: RewardResolverDeps,
 ): Promise<MessageTemplate | null> {
   // 1. Per-campaign: ref-driven. When `requestedTrackedLinkId` resolves to a
@@ -40,6 +40,9 @@ export async function resolveRewardTemplate(
   if (args.requestedTrackedLinkId) {
     const link = await deps.getTrackedLinkById(db, args.requestedTrackedLinkId);
     if (link) {
+      // Known links remain authoritative, including links from another account:
+      // they must not redirect the request to a different first-touch reward.
+      if (link.line_account_id != null && link.line_account_id !== args.expectedLineAccountId) return null;
       if (!link.reward_template_id) return null;
       return await deps.getMessageTemplateById(db, link.reward_template_id);
     }
@@ -49,7 +52,8 @@ export async function resolveRewardTemplate(
   const friend = await deps.getFriendById(db, args.friendId);
   if (friend?.first_tracked_link_id) {
     const link = await deps.getTrackedLinkById(db, friend.first_tracked_link_id);
-    if (link?.reward_template_id) {
+    if (link?.reward_template_id
+      && (link.line_account_id == null || link.line_account_id === args.expectedLineAccountId)) {
       const tpl = await deps.getMessageTemplateById(db, link.reward_template_id);
       if (tpl) return tpl;
     }

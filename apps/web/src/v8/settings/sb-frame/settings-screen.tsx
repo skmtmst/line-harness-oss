@@ -19,7 +19,6 @@ export function SbSettingsScreen({
   boardId,
   title,
   description,
-  identity,
   actions,
   children,
   saveActions,
@@ -34,6 +33,7 @@ export function SbSettingsScreen({
   boardId?: string
   title: ReactNode
   description?: ReactNode
+  /** @deprecated ★V8 では板の頭に戻るを描かない（オーナー 2026-10-08）。戻るのは上の帯のパンくず。 */
   identity?: ReactNode
   actions?: ReactNode
   children: ReactNode
@@ -45,13 +45,12 @@ export function SbSettingsScreen({
       boardId={boardId}
       title={title}
       description={description}
-      identity={identity}
       actions={actions}
       navigation={<SettingsInnerNav inline />}
       saveActions={saveActions}
       saveStatus={saveStatus}
     >
-      <div className={styles.screen} data-sb-settings-screen="" data-sb-identity={identity ? '' : undefined} data-sb-layout={layout}>{children}</div>
+      <div className={styles.screen} data-sb-settings-screen="" data-sb-layout={layout}>{children}</div>
     </SettingsPage>
   )
 }

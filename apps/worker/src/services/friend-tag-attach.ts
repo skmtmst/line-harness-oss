@@ -213,7 +213,7 @@ async function claimAndRunStep(
 ): Promise<{ outcome: StepOutcome; error: unknown | null }> {
   let claim;
   try {
-    claim = await claimFriendTagSideEffectRun(db, friendId, tagId, step);
+    claim = await claimFriendTagSideEffectRun(db, friendId, tagId, step, assignedAt);
   } catch (error) {
     // 予約が取れたか分からない。走らせない。行は元の状態で残るので、
     // 次にこの経路へ来たときに拾える。
@@ -242,12 +242,12 @@ async function claimAndRunStep(
       error,
     );
     await recordLedger(step, () =>
-      markFriendTagSideEffectFailed(db, friendId, tagId, step, error),
+      markFriendTagSideEffectFailed(db, friendId, tagId, step, error, assignedAt),
     );
     await notifyIfStuck(db, friendId, tagId, step);
     return { outcome: 'failed', error };
   }
-  await recordLedger(step, () => markFriendTagSideEffectCompleted(db, friendId, tagId, step));
+  await recordLedger(step, () => markFriendTagSideEffectCompleted(db, friendId, tagId, step, assignedAt));
   return { outcome: 'completed', error: null };
 }
 

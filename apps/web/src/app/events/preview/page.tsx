@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 /*
  * U お客様表示確認（v6-29 §5）。
  * 公開条件で申込画面を確認する。運営向けの注記は帯に1本だけ置き、
@@ -9,6 +11,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { useResponseGate } from '@/lib/use-response-gate'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -38,7 +41,10 @@ function PreviewInner({ eventId }: { eventId: string }) {
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [slots, setSlots] = useState<EventSlot[]>([])
 
+  /* WEB320：アカウント・イベントを変えたら、前の遅い応答を捨てる。 */
+  const gate = useResponseGate()
   const refresh = useCallback(async () => {
+    const token = gate.begin()
     if (!selectedAccountId) return
     setStatus('loading')
     try {
@@ -46,17 +52,19 @@ function PreviewInner({ eventId }: { eventId: string }) {
         eventsApi.getEvent(selectedAccountId, eventId),
         eventsApi.listSlots(selectedAccountId, eventId),
       ])
+      if (!gate.current(token)) return
       setEvent(detail)
       setSlots(slotList.items.filter((slot) => slot.is_active === 1))
       setStatus('ready')
     } catch (error) {
+      if (!gate.current(token)) return
       if ((error as { status?: number }).status === 404) {
         setStatus('not-found')
       } else {
         setStatus('error')
       }
     }
-  }, [selectedAccountId, eventId])
+  }, [selectedAccountId, eventId, gate])
 
   useEffect(() => {
     void refresh()
@@ -93,6 +101,7 @@ function PreviewInner({ eventId }: { eventId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="v8-only"><PageHeading title="お客様表示の確認" /></div>
       <div>
         <nav className="text-ink-faint text-xs" aria-label="パンくず">
           <Link href="/events" className="hover:underline">

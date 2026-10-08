@@ -43,25 +43,6 @@
   line-height: var(--tpl-hq-small-lh);
 }
 
-.tagField {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hq-plan-head-gap);
-}
-
-.tagRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-hq-field-gap);
-}
-
-.addRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-hq-plan-head-gap);
-}
-
 .reasonList {
   display: flex;
   flex-direction: column;

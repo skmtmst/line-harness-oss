@@ -170,6 +170,37 @@ export function audienceSummary(
 }
 
 /**
+ * 宛先の要約に、タグ名・シナリオ名のどちらが要るか（監査 WEB310）。
+ *
+ * 名前の読み込みが片方だけ失敗したとき、失敗した側を空の一覧にして
+ * 要約すると、実在するタグ・シナリオが「削除済み」と出る。要る側が
+ * 読めていないときは、要約せず「確認できませんでした」にする。
+ */
+export function audienceNamesNeeded(broadcast: {
+  targetType: string
+  segmentConditions?: SegmentCondition | null
+}): { tags: boolean; scenarios: boolean } {
+  if (broadcast.targetType === 'tag') return { tags: true, scenarios: false }
+  // audienceSummary が名前を引くのは「条件が1行だけ」のときだけ。同じ形を見る。
+  const condition = broadcast.segmentConditions
+  const rules = (condition?.rules ?? []).filter((rule) => rule.type !== 'is_following')
+  if (!condition || (condition.groups ?? []).length > 0 || rules.length !== 1) return { tags: false, scenarios: false }
+  const only = rules[0]
+  return {
+    tags: only.type === 'tag_exists' && typeof only.value === 'string',
+    scenarios: only.type === 'scenario_subscribed' && typeof only.value === 'string' && only.value !== '',
+  }
+}
+
+/** 読めた側だけで要約してよいか。要る側が1つでも読めていなければ false。 */
+export function audienceNamesUsable(
+  needed: { tags: boolean; scenarios: boolean },
+  loaded: { tags: boolean; scenarios: boolean },
+): boolean {
+  return (!needed.tags || loaded.tags) && (!needed.scenarios || loaded.scenarios)
+}
+
+/**
  * 一覧の1行目に出す「内容／種別」。
  *
  * `contentExcerpt` は読めない中身のとき**種別の名前をそのまま返す**ので、

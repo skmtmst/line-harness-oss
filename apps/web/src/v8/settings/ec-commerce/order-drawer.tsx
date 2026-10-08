@@ -179,9 +179,19 @@ export default function OrderDrawer({
     void load()
   }, [load])
 
+  /*
+   * WEB193：やり直しが終わるまでに別の注文（またはアカウント）へ移っていたら、
+   * 前の注文を読み直して今の引き出しを上書きしない。読み直すのは今の注文だけ。
+   */
+  const targetRef = useRef('')
+  targetRef.current = `${accountId ?? ''}|${orderId ?? ''}`
+  const loadRef = useRef(load)
+  loadRef.current = load
   const retry = async (action: EcActionExecution) => {
+    const target = targetRef.current
     await onRetryAction(action)
-    await load(false)
+    if (targetRef.current !== target) return
+    await loadRef.current(false)
   }
 
   if (!open) return null

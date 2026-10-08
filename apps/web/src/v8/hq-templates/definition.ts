@@ -34,6 +34,8 @@ export function definitionError(type: TemplateType, definition: TemplateDefiniti
     if (definition.card) {
       try { parseHqMessageCard(definition.card) } catch (error) { return error instanceof Error ? error.message : '入力内容を確認してください。' }
     }
+    /* クーポン・リサーチ・カルーセル（素材）と質問は本文を持たない（店の素材と同じ形の payload・質問の JSON が中身）。 */
+    if (definition.asset || definition.template.questionJson) return null
     return definition.template.messageContent.trim() ? null : '配信する本文を入力してください。'
   }
   if (type === 'rich_menu' && 'richMenu' in definition) {

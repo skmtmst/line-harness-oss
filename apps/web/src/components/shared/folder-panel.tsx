@@ -3,7 +3,9 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
-import { Ellipsis, FolderOpen, FolderPlus } from 'lucide-react'
+import HelpTip from './help-tip'
+import { ArrowDown, ArrowUp, Ellipsis, FolderOpen, FolderPlus, Inbox, Palette, Pencil, Trash2 } from 'lucide-react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import styles from './folder-panel.module.css'
 
 /** テンプレート一覧を正とする、全画面共通のフォルダ欄幅。 */
@@ -17,7 +19,7 @@ export const FOLDER_RAIL_STYLE = {
  *
  * Pencil V5 の `Pw4WX`（共通 フォルダレール）。
  *
- * 設計では友だち属性（タグ・友だち情報欄）がどちらもこの形をしている。
+ * 設計ではタグ（タグ・友だち情報欄）がどちらもこの形をしている。
  * 以前は一覧の上に横の帯として並べていたが、分類が増えると折り返して
  * 2段3段になり、その下の検索や表が押し下げられていた。縦なら増えても
  * 幅が変わらない。
@@ -28,6 +30,8 @@ export const FOLDER_RAIL_STYLE = {
 export interface FolderPanelRow {
   id: string
   label: string
+  /** V8 共通部品 faSbC。未指定の古い呼び方は「すべて」「未分類」の名前から判定する。 */
+  kind?: 'all' | 'unfiled' | 'folder'
   /**
    * このフォルダに属する件数。`null` は「数えていない」（#631）。
    *
@@ -40,8 +44,10 @@ export interface FolderPanelRow {
    * 未設定は null。色はフォルダに付き、属するタグに出る。
    */
   color?: string | null
-  /** V8 の分類の印。「すべて」などは呼び出し側が渡す。 */
+  /** V8 の分類の印。all・unfiled では無視し、共通部品で決める。 */
   icon?: ReactNode
+  /** フォルダ全体の選択など、行の右に置く操作。 */
+  trailing?: ReactNode
   /**
    * 直せる行だけ渡す。「すべて」「未分類」は直せない。
    *
@@ -49,6 +55,8 @@ export interface FolderPanelRow {
    * 直したいときに作り直すしかなかった。
    */
   onEdit?: () => void
+  /** 色を持たないフォルダ（統括のひな形の分類など）は false。「色を変える」を出さない。 */
+  colorEditable?: boolean
   /**
    * 並び順を動かす。**端の行には渡さない**（押せない口を置かない）。
    * 設計 `CzndJ` の「並び順を上へ／下へ」。
@@ -77,24 +85,36 @@ export interface FolderPanelRow {
 function folderMenuItems(
   row: FolderPanelRow,
   runAction: (action: (() => void) | undefined) => void,
+  v8 = false,
 ): ActionMenuItem[] {
+  /*
+   * ★V8（V8.pen 共通部品4 の H・nH0fZ、B-35 2026-10-08）：言葉は 名前を変える・色を変える・並べ替える・消す。
+   * 印を左に付ける。並べ替えは隣と入れ替える口なので、上へ・下へを括弧で添える。v7 は今までの言葉のまま。
+   */
+  const label = v8
+    ? { rename: '名前を変える', color: '色を変える', up: '並べ替える（上へ）', down: '並べ替える（下へ）', remove: '消す' }
+    : { rename: '名前を変更', color: '色を変える', up: '並び順を上へ', down: '並び順を下へ', remove: 'フォルダを削除' }
+  const icon = (node: ReactNode) => (v8 ? node : undefined)
   const items: ActionMenuItem[] = []
   if (row.onEdit) {
     items.push(
-      { id: `${row.id}-rename`, label: '名前を変更', onSelect: () => runAction(row.onEdit) },
-      { id: `${row.id}-color`, label: '色を変える', onSelect: () => runAction(row.onEdit) },
+      { id: `${row.id}-rename`, label: label.rename, icon: icon(<Pencil size={14} aria-hidden="true" />), onSelect: () => runAction(row.onEdit) },
     )
+    if (row.colorEditable !== false) {
+      items.push({ id: `${row.id}-color`, label: label.color, icon: icon(<Palette size={14} aria-hidden="true" />), onSelect: () => runAction(row.onEdit) })
+    }
   }
   if (row.onMoveUp) {
-    items.push({ id: `${row.id}-up`, label: '並び順を上へ', onSelect: () => runAction(row.onMoveUp) })
+    items.push({ id: `${row.id}-up`, label: label.up, icon: icon(<ArrowUp size={14} aria-hidden="true" />), onSelect: () => runAction(row.onMoveUp) })
   }
   if (row.onMoveDown) {
-    items.push({ id: `${row.id}-down`, label: '並び順を下へ', onSelect: () => runAction(row.onMoveDown) })
+    items.push({ id: `${row.id}-down`, label: label.down, icon: icon(<ArrowDown size={14} aria-hidden="true" />), onSelect: () => runAction(row.onMoveDown) })
   }
   if (row.onDelete) {
     items.push({
       id: `${row.id}-delete`,
-      label: 'フォルダを削除',
+      label: label.remove,
+      icon: icon(<Trash2 size={14} aria-hidden="true" />),
       tone: 'danger',
       dividerBefore: items.length > 0,
       onSelect: () => runAction(row.onDelete),
@@ -109,6 +129,7 @@ export default function FolderPanel({
   onSelect,
   total,
   heading = 'フォルダ',
+  headingHelp,
   onAddFolder,
   addFolderLabel = 'フォルダを追加する',
   addFolderDisabled = false,
@@ -116,9 +137,12 @@ export default function FolderPanel({
   addFolderNote,
   children,
   createAction,
+  reserveCreateSpace = false,
 }: {
   /** V8: 作る操作はフォルダ列の先頭に置く。 */
   createAction?: ReactNode
+  /** 閲覧のみで作る操作を隠すときも、フォルダの位置は変えない。V8 のみ。 */
+  reserveCreateSpace?: boolean
   rows: FolderPanelRow[]
   activeId: string
   onSelect: (id: string) => void
@@ -130,6 +154,7 @@ export default function FolderPanel({
   total?: string
   /** 予約管理の「メニュー」など、分類の呼び名が異なる画面で使う。 */
   heading?: string
+  headingHelp?: ReactNode
   /** 一覧の下に置く追加操作。道具列へ重複して置かない。 */
   onAddFolder?: () => void
   addFolderLabel?: string
@@ -141,6 +166,7 @@ export default function FolderPanel({
   children?: ReactNode
 }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const v8 = useAdminTheme() === 'v8'
   const runAction = (action: (() => void) | undefined) => {
     setOpenMenuId(null)
     action?.()
@@ -149,15 +175,17 @@ export default function FolderPanel({
   return (
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
     <aside aria-label="フォルダ" className={`${styles.panel} v7:bg-canvas v7:rounded-card v7:border-hairline v7:h-fit overflow-visible v7:border`}>
-      {createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : null}
+      {createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder} v8-only`} aria-hidden="true" /> : null}
       <div className={`${styles.heading} v7:border-hairline flex items-center justify-between v7:border-b v7:px-4 v7:py-3`}>
-        <p className="v7:text-ink v7:text-sm font-semibold">{heading}</p>
+        {headingHelp ? <p className="v7:text-ink v7:text-sm font-semibold">{heading}<HelpTip label={`${heading}の説明`}>{headingHelp}</HelpTip></p>
+          : <p className="v7:text-ink v7:text-sm font-semibold">{heading}</p>}
         {total === undefined ? null : <span className="text-ink-faint v7:text-xs v7:tabular-nums">{total}</span>}
       </div>
       <nav className={`${styles.rows} v7:p-2`}>
         {rows.map((row) => {
           const hasActions = Boolean(row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
           const isActive = activeId === row.id
+          const kind = row.kind ?? (row.label === 'すべて' ? 'all' : row.label === '未分類' ? 'unfiled' : 'folder')
 
           return (
             <div
@@ -204,7 +232,7 @@ export default function FolderPanel({
                     />
                   </svg>
                 )}
-                <span className={`${styles.folderIcon} v8-only`} aria-hidden="true">{row.icon ?? (row.color ? <svg width="15" height="15" viewBox="0 0 14 14"><path fill={row.color} d="M11.8125 3.9375H7.16406L5.6875 2.46094Q5.41406 2.1875 5.08594 2.1875H2.1875Q1.80469 2.1875 1.55859 2.43359T1.3125 3.0625V10.99219Q1.3125 11.32031 1.55859 11.56641T2.13281 11.8125H11.86719Q12.19531 11.8125 12.44141 11.56641T12.6875 10.99219V4.8125Q12.6875 4.42969 12.44141 4.18359T11.8125 3.9375ZM2.1875 3.0625H5.08594L5.96094 3.9375H2.1875Z" /></svg> : <FolderOpen size={15} />)}</span>
+                <span className={`${styles.folderIcon} v8-only`} aria-hidden="true">{kind === 'all' ? <Inbox size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={15} style={{ color: 'var(--color-ink-secondary)' }} /> : row.icon ?? (row.color ? <svg width="15" height="15" viewBox="0 0 14 14"><path fill={row.color} d="M11.8125 3.9375H7.16406L5.6875 2.46094Q5.41406 2.1875 5.08594 2.1875H2.1875Q1.80469 2.1875 1.55859 2.43359T1.3125 3.0625V10.99219Q1.3125 11.32031 1.55859 11.56641T2.13281 11.8125H11.86719Q12.19531 11.8125 12.44141 11.56641T12.6875 10.99219V4.8125Q12.6875 4.42969 12.44141 4.18359T11.8125 3.9375ZM2.1875 3.0625H5.08594L5.96094 3.9375H2.1875Z" /></svg> : <FolderOpen size={15} />)}</span>
                 <span className={`${styles.label} min-w-0 flex-1 truncate`}>{row.label}</span>
                 {row.count === null ? null : <span className={`${styles.count} text-ink-faint shrink-0 v7:text-xs v7:tabular-nums`}>{row.count}</span>}
               </button>
@@ -212,7 +240,8 @@ export default function FolderPanel({
                   並べると、選択との押し間違いが増え、短い名前も狭くなる。 */}
               {/* I3L41O：選んだ行には絵どおり「…」の場所を取る。操作なしの
                   選んだ行（すべて・未分類）は空きの場所取りを置く。 */}
-              {isActive && !hasActions ? (
+              {row.trailing}
+              {isActive && !hasActions && !row.trailing ? (
                 <div className={styles.menuSlot} aria-hidden="true" />
               ) : null}
               {hasActions && (
@@ -239,8 +268,8 @@ export default function FolderPanel({
                     open={openMenuId === row.id}
                     onClose={() => setOpenMenuId(null)}
                     ariaLabel={`フォルダ「${row.label}」の操作`}
-                    note={row.deleteNote}
-                    items={folderMenuItems(row, runAction)}
+                    note={v8 ? undefined : row.deleteNote}
+                    items={folderMenuItems(row, runAction, v8)}
                   />
                 </div>
               )}

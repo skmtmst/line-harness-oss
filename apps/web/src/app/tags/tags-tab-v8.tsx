@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性「タグ」タブの一覧（Pencil `I1E7Bt`、フォルダ窓 `IjVpM`、
+ * ★V8 タグ「タグ」タブの一覧（Pencil `I1E7Bt`、フォルダ窓 `IjVpM`、
  * 状態の板 `U0aKD`）。
  *
  * 数え方・絞り込み・並べ替え・保管の判断は v7（`tags-page-v4.tsx`）と
@@ -549,8 +549,9 @@ export default function TagsTabV8({
 
   /* フォルダの列。数は一覧と同じものを数える（v7 と同じ）。 */
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: ready ? items.length : null, color: 'var(--color-accent)' },
+    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? items.length : null, color: 'var(--color-accent)' },
     ...groups.map((group, index) => ({
+      kind: 'folder' as const,
       id: group.id,
       label: group.name,
       count: ready ? items.filter((tag) => tag.groupId === group.id).length : null,
@@ -561,7 +562,7 @@ export default function TagsTabV8({
       onDelete: canEdit ? () => setDeletingGroup(group) : undefined,
       deleteNote: '削除しても、中のタグは未分類に残ります。',
     })),
-    { id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)' },
+    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)' },
   ]
 
   const folderSelectOptions = [

@@ -201,7 +201,8 @@ describe('V8 リマインダを作る②〜⑤', () => {
     expect(cards).toHaveLength(1)
     expect(host.textContent).toContain('1日前 18:00')
     expect(host.textContent).toContain('まもなくです。…')
-    expect((host.querySelector('input[type="time"]') as HTMLInputElement | null)?.value).toBe('18:00')
+    // 送る時刻は ★V8 の時刻の欄（打てる欄・提案 YCOoR）。欄の字は「18 : 00」。
+    expect((host.querySelector('input[aria-label="送る時刻"]') as HTMLInputElement | null)?.value).toBe('18 : 00')
     const add = buttonByText('通知を足す')
     await act(async () => { add!.click() })
     expect(host.textContent).toContain('3通目')
@@ -249,7 +250,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
     expect(host.querySelector('[data-design-node="hjNpJ"]')).toBeTruthy()
     expect(host.querySelector('[data-template-region="footer"]')).toBeNull()
     expect(buttonByText('一覧へ戻る')?.getAttribute('href')).toBe('/reminders')
-    expect(buttonByText('配信予定を見る')?.getAttribute('href')).toBe('/reminders/detail?id=reminder-new&status=planned')
+    expect(buttonByText('配信予定を見る')?.getAttribute('href')).toBe('/reminders/detail?id=reminder-new&tab=schedule&status=planned')
     expect(buttonByText('詳細を見る')?.getAttribute('href')).toBe('/reminders/detail?id=reminder-new')
   })
 })

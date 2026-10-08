@@ -7,8 +7,9 @@ const SRC = join(__dirname, '..', '..')
 const read = (p: string) => readFileSync(join(SRC, p), 'utf8')
 
 /**
- * ★V6 0-1 ログイン・36-4 会員登録・36-6 パスワード再設定の見張り。
- * 正本は Pencil `V6正本.pen` と `docs/v6-requirements/v6-36-hq-account-billing-requirements-draft.md`。
+ * ログイン（0-1）・会員登録（36-4）・パスワード再設定（36-6）の見張り。
+ * 動きの正本は `docs/hq-signup-and-password-login.md`、見た目の正本は Pencil ★V8（`docs/v8-design-rules.md`）。
+ * 当時の下書き v6-36 は本線に入らなかった（原本なし）。
  */
 describe('ログイン前の画面（0-1／36-4／36-6）', () => {
   it('ログイン前に開ける画面はすべて page.tsx があり、shell と guard の両方が同じ一覧を見る', () => {

@@ -1,9 +1,9 @@
 'use client'
 
 import { Check, Upload } from 'lucide-react'
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { type DialogProps } from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -41,6 +41,7 @@ export default function ReferencePickerDialog({
   onClose,
   onPick,
   onUpload,
+  frame: Frame = Dialog,
 }: {
   open: boolean
   projectId: string
@@ -52,6 +53,8 @@ export default function ReferencePickerDialog({
   /** 選び終わったとき。使い方つきの参照と、その画像の実体（親が手元に置く）を渡す。 */
   onPick: (references: BannerReference[], images: BannerImage[]) => void
   onUpload: (file: File) => void
+  /** V8 の板が別の窓枠を描くときの差し替え。選択・検索・送信の動きは共有する。 */
+  frame?: ComponentType<DialogProps>
 }) {
   const theme = useAdminTheme()
   const v8 = theme === 'v8'
@@ -172,7 +175,7 @@ export default function ReferencePickerDialog({
   }
 
   return (
-    <Dialog
+    <Frame
       open={open}
       title="参照画像を選ぶ"
       description={
@@ -189,7 +192,7 @@ export default function ReferencePickerDialog({
        * （2026-10-06 オーナー指示「枠の隅までボタンがあり余白がない」）。
        */
       footer={
-        <div className="flex w-full flex-wrap items-center gap-2 border-t border-hairline px-6 py-3.5">
+        <div className={Frame === Dialog ? 'flex w-full flex-wrap items-center gap-2 border-t border-hairline px-6 py-3.5' : 'flex w-full flex-wrap items-center gap-2'}>
           <Button onClick={() => fileRef.current?.click()}>
             <Upload aria-hidden="true" className="h-4 w-4" />
             ファイルを選ぶ
@@ -343,6 +346,6 @@ export default function ReferencePickerDialog({
           </div>
         ) : null}
       </div>
-    </Dialog>
+    </Frame>
   )
 }

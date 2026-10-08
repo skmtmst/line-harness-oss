@@ -21,6 +21,8 @@ import { scenarioReferenceData } from './scenario-reference-data'
 import DateField from '@/components/shared/date-field'
 import MenuPortal from '@/components/shared/menu-portal'
 import Button from '@/components/shared/button'
+import { InsertButton, type InsertTextTarget } from '@/components/shared/insert-text-field'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
 const DATE_FORMATS: { token: string; label: string; example: string }[] = [
@@ -42,7 +44,7 @@ interface Option {
 
 export interface InsertToolbarProps {
   /** 差し込み先。入力欄そのものを渡す。 */
-  targetRef: React.RefObject<HTMLTextAreaElement | HTMLInputElement | null>
+  targetRef: React.RefObject<HTMLTextAreaElement | HTMLInputElement | InsertTextTarget | null>
   value: string
   onChange: (next: string) => void
   /** 一斉配信の本文編集で、設計上の回答フォーム差し込み口を表示する。 */
@@ -60,6 +62,8 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   const [vars, setVars] = useState<Option[]>([])
   const [targetDate, setTargetDate] = useState('')
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  /* ★V8（絵 OVCot）：差し込むボタンは丸い枠（＋名前・＋配信日・…その他）。v7 は今のまま。 */
+  const v8 = useAdminTheme() === 'v8'
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -112,7 +116,15 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     })
   }
 
-  const menuButton = (key: string, label: string, token?: string) => (
+  const menuButton = (key: string, label: string, token?: string) => v8 ? (
+    <InsertButton
+      ref={(element) => { buttonRefs.current[key] = element }}
+      icon={key === 'other' ? 'more' : 'plus'}
+      label={label}
+      expanded={token ? undefined : open === key}
+      onClick={() => token ? insert(token) : setOpen(open === key ? null : key)}
+    />
+  ) : (
     <Button variant="secondary" className={(`border-hairline rounded-control v7:h-8 border px-2.5 text-xs transition-colors ${
         open === key ? 'bg-accent-soft text-accent-deep border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
       }`) + ' whitespace-normal'} type="button" ref={(element) => {
@@ -154,12 +166,14 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   )
 
   return (
-    <div className="relative flex flex-wrap items-center gap-1.5">
-      <span className="text-ink-faint text-xs">差し込み</span>
+    <div className="relative flex flex-wrap items-center gap-1.5 v8:gap-x-3 v8:gap-y-2">
+      <span className="text-ink-faint text-xs v8:text-micro">差し込み</span>
 
-      <Button variant="secondary" className="text-ink-secondary v7:h-8 px-2.5 text-xs whitespace-normal" type="button" onClick={() => insert('{{name}}')}>
-        名前
-      </Button>
+      {v8 ? <InsertButton label="名前" onClick={() => insert('{{name}}')} /> : (
+        <Button variant="secondary" className="text-ink-secondary v7:h-8 px-2.5 text-xs whitespace-normal" type="button" onClick={() => insert('{{name}}')}>
+          名前
+        </Button>
+      )}
 
       {fieldsEnabled && (
         <div className="relative">

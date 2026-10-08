@@ -25,6 +25,7 @@ import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { TimeField } from '@/components/shared/date-time-field'
 import ApplicationPreview from './application-preview'
 import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso, todayJst } from './shared'
 import styles from './create.module.css'
@@ -321,9 +322,9 @@ function EventsCreateV8Inner() {
           <div className={styles.field}>
             <span className={styles.label} id="ev-new-time-label">開始</span>
             <div className={styles.timeRow} role="group" aria-labelledby="ev-new-time-label">
-              <input type="time" className={styles.input} aria-label="開始の時刻" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+              <TimeField aria-label="開始の時刻" value={startTime} onChange={setStartTime} />
               <span className={styles.timeSep} aria-hidden="true">〜</span>
-              <input type="time" className={styles.input} aria-label="終わりの時刻" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+              <TimeField aria-label="終わりの時刻" value={endTime} onChange={setEndTime} />
             </div>
           </div>
         </div>

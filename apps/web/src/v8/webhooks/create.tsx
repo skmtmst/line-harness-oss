@@ -121,6 +121,8 @@ function WebhooksCreateV8Inner() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const accountRef = useRef(selectedAccountId)
+  /* WEB232：作れたが止められなかった送り先（下書きのつもりで、いまは動いている）。 */
+  const createdActiveRef = useRef<{ id: string; accountId: string } | null>(null)
   accountRef.current = selectedAccountId
   const searchParams = useSearchParams()
   const presetEvent = searchParams.get('event')
@@ -204,6 +206,29 @@ function WebhooksCreateV8Inner() {
     }
     setSaving(true)
     setError(null)
+    /*
+     * WEB232：前の「下書きを保存」で作れたのに止められなかった送り先がある。もう一度作らず、
+     * 止めるところだけやり直す（作る口に「止めた状態で作る」は無い。Codex に依頼）。
+     */
+    const pendingStop = createdActiveRef.current
+    if (next === 'active' && pendingStop && pendingStop.accountId === accountId) {
+      // もう作れていて動いている。同じ送り先をもう1つ作らない。
+      createdActiveRef.current = null
+      router.push('/webhooks')
+      return
+    }
+    if (next === 'draft' && pendingStop && pendingStop.accountId === accountId) {
+      try {
+        const stop = await api.webhooks.outgoing.update(pendingStop.id, accountId, { isActive: false })
+        if (!stop.success) throw new Error(stop.error)
+        createdActiveRef.current = null
+        router.push('/webhooks')
+      } catch {
+        setError('送り先は作れましたが、まだ止められていません（いまは動いています）。もう一度「下書きを保存」を押すと、止めるところだけやり直します。')
+        setSaving(false)
+      }
+      return
+    }
     try {
       const payload = {
         lineAccountId: accountId,
@@ -235,11 +260,19 @@ function WebhooksCreateV8Inner() {
       if (!res.success) throw new Error(res.error)
       if (next === 'draft') {
         // 作る口に止めた状態の指定が無いので、作ってから止める。
-        const stop = await api.webhooks.outgoing.update(res.data.id, accountId, { isActive: false })
-        if (!stop.success) {
-          router.push('/webhooks')
-          throw new Error('送り先は作れましたが、止めるところで失敗しました。一覧の「設定 → 止める」で止めてください。')
+        // WEB232：止められなかったら一覧へ移らず、この画面で知らせて、止めるところだけやり直せるようにする。
+        createdActiveRef.current = { id: res.data.id, accountId }
+        let stopped = false
+        try {
+          const stop = await api.webhooks.outgoing.update(res.data.id, accountId, { isActive: false })
+          stopped = stop.success
+        } catch {
+          stopped = false
         }
+        if (!stopped) {
+          throw new Error('送り先は作れましたが、まだ止められていません（いまは動いています）。もう一度「下書きを保存」を押すと、止めるところだけやり直します。')
+        }
+        createdActiveRef.current = null
       }
       router.push('/webhooks')
     } catch (cause) {

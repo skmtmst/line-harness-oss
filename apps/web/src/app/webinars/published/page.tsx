@@ -1,5 +1,7 @@
 'use client'
 
+import { PageTitle } from '@/components/templates/page-frame'
+
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle2 } from 'lucide-react'
@@ -14,6 +16,7 @@ import { useAccount } from '@/contexts/account-context'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 type PublishedWebinar = Webinar & {
   publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
@@ -30,6 +33,8 @@ function publicationWindow(webinar: PublishedWebinar): string {
 }
 
 function PublishedWebinarContent() {
+  /* ★V8 は頭の「← ウェビナー一覧」を置かない（オーナー 2026-10-08）。一覧へは上の帯のパンくずと［ウェビナー一覧へ］。 */
+  const showHeadBack = useAdminTheme() !== 'v8'
   usePageTitle('ウェビナー・公開完了')
   const id = useSearchParams().get('id')
   const { accounts, loading: accountsLoading } = useAccount()
@@ -41,6 +46,8 @@ function PublishedWebinarContent() {
   const [missing, setMissing] = useState(false)
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  /* W158：この画面で公開を止めた。口が返した状態（下書き）を出し、「稼働中」「公開を一時停止」を残さない。 */
+  const [pausedHere, setPausedHere] = useState(false)
   /*
    * D001: 一時停止・通知テスト・複製の口は owner/admin だけ（Worker の
    * requireRole とそろえる）。閲覧だけの担当者には押せる口を出さず、
@@ -123,7 +130,7 @@ function PublishedWebinarContent() {
     )
   }
 
-  if (webinar.status !== 'active') {
+  if (webinar.status !== 'active' && !pausedHere) {
     return (
       <ListState
         kind="error"
@@ -146,8 +153,10 @@ function PublishedWebinarContent() {
     setNotice('')
     try {
       if (action === 'pause') {
-        await webinarApi.pause(id, editor.version)
-        setNotice('公開を止めました。')
+        const response = await webinarApi.pause(id, editor.version)
+        if (response?.data) setWebinar(response.data)
+        setPausedHere(true)
+        setNotice('公開を止めました。いまは下書きです。編集画面から内容を確かめて、もう一度公開できます。')
       } else if (action === 'test') {
         const response = await webinarApi.testNotifications(id)
         setNotice(`通知テスト: 成功 ${response.data.sent}件・失敗 ${response.data.failed}件`)
@@ -164,19 +173,19 @@ function PublishedWebinarContent() {
 
   return (
     <div data-design-node="TimXl" className="mx-auto max-w-[1600px] space-y-4 px-6 pb-12 pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3"><a href="/webinars" className="text-action text-sm font-semibold">← ウェビナー一覧</a><Button href="/webinars">ウェビナー一覧へ</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3">{showHeadBack ? <a href="/webinars" className="text-action text-sm font-semibold">← ウェビナー一覧</a> : <span />}<Button href="/webinars">ウェビナー一覧へ</Button></div>
       <ol className="grid grid-cols-2 gap-2 py-2 sm:grid-cols-5">{['基本設定', '動画', 'CTA・フォーム', '通知', '確認'].map((label, index) => <li key={label} className="text-ink flex items-center gap-2 px-3 py-2 text-xs font-semibold"><span className="bg-accent-deep text-on-accent flex h-7 w-7 items-center justify-center rounded-pill">✓</span><span><span className="text-accent-deep block text-nano">STEP {index + 1}</span>{label}</span></li>)}</ol>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
         <section className="border-hairline bg-canvas min-h-[720px] rounded-card border p-8 shadow-card">
-          <div className="text-center"><CheckCircle2 className="mx-auto text-accent-deep" size={48} aria-hidden="true" /><h2 className="text-ink mt-5 text-2xl font-bold">公開しました</h2><p className="text-ink-secondary mt-3 text-sm">申込・配信条件に合う友だちが、このウェビナーを視聴できます。</p></div>
+          <div className="text-center"><CheckCircle2 className="mx-auto text-accent-deep" size={48} aria-hidden="true" /><PageTitle className="text-ink mt-5 text-2xl font-bold">{pausedHere ? '公開を止めました' : '公開しました'}</PageTitle><p className="text-ink-secondary mt-3 text-sm">{pausedHere ? 'いまは下書きです。友だちはこのウェビナーを視聴できません。' : '申込・配信条件に合う友だちが、このウェビナーを視聴できます。'}</p></div>
           <dl className="border-hairline divide-hairline mx-auto mt-6 max-w-3xl divide-y rounded-control border">{[
-            ['ウェビナー名', webinar.title], ['動画・公開', editor.viewingCondition.label], ['対象', publicPeriod], ['公開URL', publicUrl ?? '—（LIFF ID未設定）'], ['状態', '稼働中'],
+            ['ウェビナー名', webinar.title], ['動画・公開', editor.viewingCondition.label], ['対象', publicPeriod], ['公開URL', publicUrl ?? '—（LIFF ID未設定）'], ['状態', pausedHere ? '止めている（下書き）' : '稼働中'],
           ].map(([label, value]) => <div key={label} className="flex flex-wrap items-baseline justify-between gap-3 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">{label}</dt><dd className="text-ink max-w-[70%] truncate text-sm font-semibold" title={value}>{value}</dd></div>)}</dl>
           <div className="mx-auto mt-4 max-w-3xl space-y-3"><NoteBar>申込通知・動画配信・リマインド・相談予約の失敗は、運用者通知と要対応で確認できます。</NoteBar>{!publicUrl ? <NoteBar>{editor.publicPage.unavailableReason ?? publicPageUnavailable}</NoteBar> : null}{notice ? <NoteBar>{notice}</NoteBar> : null}</div>
           <div className="mt-5 flex flex-wrap justify-center gap-3"><Button href="/webinars">ウェビナー一覧へ</Button><Button variant="primary" href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=participants`}>参加状況を確認</Button>{publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : null}</div>
         </section>
         <aside className="space-y-4">
-          <section className="border-hairline bg-canvas rounded-card border p-5 shadow-card"><h2 className="text-ink font-bold">次にできること</h2><p className="text-ink-faint mt-1 text-xs">公開中でも下書き版を作り、安全に内容を変更できます。</p><div className="mt-4 grid gap-2">{canMutateWebinars ? <Button disabled={busy} onClick={() => void run('pause')}>公開を一時停止</Button> : null}<Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーを編集</Button>{canMutateWebinars ? <Button disabled={busy} onClick={() => void run('test')}>通知をテスト</Button> : null}{canMutateWebinars ? <Button disabled={busy} onClick={() => void run('duplicate')}>ウェビナーを複製して作る</Button> : null}{canMutateWebinars ? null : <p className="text-ink-secondary text-xs">公開の変更（停止・通知テスト・複製）はオーナーか管理者が行います。必要なときは依頼してください。</p>}</div></section>
+          <section className="border-hairline bg-canvas rounded-card border p-5 shadow-card"><h2 className="text-ink font-bold">次にできること</h2><p className="text-ink-faint mt-1 text-xs">公開中でも下書き版を作り、安全に内容を変更できます。</p><div className="mt-4 grid gap-2">{canMutateWebinars && !pausedHere ? <Button disabled={busy} onClick={() => void run('pause')}>公開を一時停止</Button> : null}<Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーを編集</Button>{canMutateWebinars ? <Button disabled={busy} onClick={() => void run('test')}>通知をテスト</Button> : null}{canMutateWebinars ? <Button disabled={busy} onClick={() => void run('duplicate')}>ウェビナーを複製して作る</Button> : null}{canMutateWebinars ? null : <p className="text-ink-secondary text-xs">公開の変更（停止・通知テスト・複製）はオーナーか管理者が行います。必要なときは依頼してください。</p>}</div></section>
           <section className="border-hairline bg-canvas rounded-card border p-5 shadow-card"><h2 className="text-ink font-bold">監視中</h2><p className="text-ink-faint mt-1 text-xs">問題が起きた場合だけ表示します。</p><div className="mt-4 space-y-3">{[
             ['通知失敗', editor.monitoring.notificationFailures],
             ['申込重複', editor.monitoring.duplicateRegistrations],

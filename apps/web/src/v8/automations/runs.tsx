@@ -9,6 +9,7 @@
  * 型（ListPage）に、タブ・数の帯・案内の帯・道具の段・表（絵の列の並び）を渡す。
  * 中身は右の詳細パネルで開く。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -162,6 +163,7 @@ export default function AutomationRunsV8() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const pathname = usePathname()
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const searchFromUrl = searchParams.get('search') ?? ''
   const tabCounts = useAutomationTabCounts()
@@ -207,7 +209,7 @@ export default function AutomationRunsV8() {
   const changeQuery = (value: string) => {
     setQuery(value)
     setPage(1)
-    router.replace(runsSearchUrl(pathname, searchParams.toString(), value), { scroll: false })
+    samePageUrl.replace(runsSearchUrl(pathname, searchParams.toString(), value))
   }
   const toggleResult = (value: Exclude<ResultFilter, 'all'>, next: boolean) => {
     setResultFilter(next ? value : 'all')

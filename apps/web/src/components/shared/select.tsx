@@ -3,13 +3,34 @@
 import { ArrowUpDown, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
+import { isImeComposing } from './ime'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import MenuPortal from './menu-portal'
+import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption, SelectMenuSpacer, splitOptionHeads } from './select-menu'
 import styles from './select.module.css'
+import pillStyles from './status-pill.module.css'
 
 export interface SelectOption {
   value: string
   label: string
   disabled?: boolean
+  /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。v7 では出さない。 */
+  leading?: ReactNode
+}
+
+/** 「＋ 〇〇」を押した後の板に渡すもの。 */
+export interface SelectCreateContext {
+  /** 一覧へ戻る（［やめる］・Esc）。 */
+  back: () => void
+  /** 作ったものを選んで閉じる。 */
+  finish: (value: string) => void
+}
+
+export interface SelectCreateAction {
+  /** 一覧の下の行の文（「新しいフォルダを作る」）。 */
+  label: string
+  /** 押した後、同じ板に出す中身（iBuZH）。 */
+  render: (context: SelectCreateContext) => ReactNode
 }
 
 export interface SelectProps {
@@ -32,14 +53,21 @@ export interface SelectProps {
   width?: number
   /**
    * 見せ方。既定 'box' は枠の箱。'text' は枠なし文字＋上下矢印
-   * （x6QsVz の並び替えどおり）。v8 だけで枠を消す。
+   * （x6QsVz の並び替えどおり）。'pill' は対応状況の丸い札。V8 にだけ適用する。
    */
-  treatment?: 'box' | 'text'
+  treatment?: 'box' | 'text' | 'pill'
   /**
    * 箱の先頭の図柄（v19Ivv のよく使う絞り込みの栞どおり）。
    * 渡さなければ出ない。
    */
   icon?: ReactNode
+  /**
+   * ★V8 だけ：開いた中身の一番下に区切りと「＋ 〇〇」を置き、押すと同じ板で作れるようにする
+   * （dLffh・iBuZH。ふつうは FolderSelect が渡す）。渡さなければ出ない（閲覧のみ・権限なし）。
+   */
+  createAction?: SelectCreateAction
+  /** ★V8 の開いた中身の上の小さな見出し（label・選択肢の頭から出ないとき。dLffh の「フォルダ」）。 */
+  menuHeading?: string
 }
 
 /*
@@ -50,7 +78,7 @@ export interface SelectProps {
  * キーボードで動かした先が描かれていなければ、そこまでスクロールしてから描く。
  */
 const WINDOW_THRESHOLD = 100
-const OPTION_HEIGHT = 38
+const OPTION_HEIGHT_V7 = 38
 const WINDOW_OVERSCAN = 12
 
 /** Pencil V5 `rpot9` / `Gfsb4` を正本にした単一選択。 */
@@ -70,6 +98,8 @@ export default function Select({
   value,
   width,
   treatment = 'box',
+  createAction,
+  menuHeading,
 }: SelectProps) {
   const generatedId = useId()
   const buttonId = id ?? `${generatedId}-button`
@@ -77,6 +107,11 @@ export default function Select({
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(defaultOpen)
+  // 'create' は「＋ 〇〇」を押した後（同じ板で名前を入れている）。閉じたら一覧へ戻す。
+  const [mode, setMode] = useState<'list' | 'create'>('list')
+  // 作る板の回。閉じる・一覧へ戻る・ほかを選ぶ・作り直すで進め、古い回の遅い応答に今の選択を上書きさせない。
+  const createSessionRef = useRef(0)
+  const menuRef = useRef<HTMLDivElement>(null)
   const enabledOptions = options.filter((option) => !option.disabled)
   const selectedIndex = Math.max(0, enabledOptions.findIndex((option) => option.value === value))
   const [activeIndex, setActiveIndex] = useState(selectedIndex)
@@ -88,6 +123,13 @@ export default function Select({
     return map
   }, [enabledOptions])
   const windowed = options.length > WINDOW_THRESHOLD
+  /*
+   * ★V8 は開いた中身を共通部品 select-menu（StFE7）で描く（2026-10-08 B-45）。
+   * 選択肢の「並び：」などの頭は外して上の見出しにし、閉じたボタンは今のまま。
+   */
+  const v8 = useAdminTheme() === 'v8'
+  const OPTION_HEIGHT = v8 ? SELECT_MENU_ROW_STRIDE : OPTION_HEIGHT_V7
+  const heads = useMemo(() => splitOptionHeads(options, label), [options, label])
   // 一覧は器（MenuPortal）が後から描くので、ref ではなく描かれた時に受け取る。
   const [listEl, setListEl] = useState<HTMLUListElement | null>(null)
   const [scrollWindow, setScrollWindow] = useState({ top: 0, height: 0 })
@@ -145,21 +187,58 @@ export default function Select({
   }, [disabled])
 
   useEffect(() => {
+    if (open) return
+    createSessionRef.current += 1
+    setMode('list')
+  }, [open])
+
+  const hasCreate = Boolean(createAction) && v8
+  // キーボードで動く行の数。「＋ 〇〇」は使える候補の後ろの1行。
+  const rowCount = enabledOptions.length + (hasCreate ? 1 : 0)
+  const createActive = hasCreate && activeIndex === enabledOptions.length
+  const startCreate = () => {
+    createSessionRef.current += 1
+    setMode('create')
+  }
+  const backToList = () => {
+    createSessionRef.current += 1
+    // 焦点を先にボタンへ戻す（入力欄が消えて焦点が迷子になり閉じるのを防ぐ）。
+    triggerRef.current?.focus()
+    setMode('list')
+  }
+  // 板に渡す受け口は、その回の番号を覚える。回が終わった後に届いた完了は選ばず・焦点も動かさず・閉じない。
+  const createContext = (session: number): SelectCreateContext => ({
+    back: () => {
+      if (session === createSessionRef.current) backToList()
+    },
+    finish: (next: string) => {
+      if (session !== createSessionRef.current) return
+      createSessionRef.current += 1
+      onChange(next)
+      triggerRef.current?.focus()
+      setOpen(false)
+    },
+  })
+
+  useEffect(() => {
     setActiveIndex(selectedIndex)
   }, [selectedIndex])
 
   const choose = (option: SelectOption) => {
     if (option.disabled) return
+    createSessionRef.current += 1
     onChange(option.value)
     setOpen(false)
   }
 
   const move = (direction: 1 | -1) => {
-    if (enabledOptions.length === 0) return
-    setActiveIndex((current) => (current + direction + enabledOptions.length) % enabledOptions.length)
+    if (rowCount === 0) return
+    setActiveIndex((current) => (current + direction + rowCount) % rowCount)
   }
 
   const onButtonKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    // 日本語の変換中のキー（確定の Enter・候補の上下）は選ぶ欄で使わない。
+    if (isImeComposing(event)) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       if (!open) setOpen(true)
@@ -168,7 +247,8 @@ export default function Select({
     }
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
-      if (open && enabledOptions[activeIndex]) choose(enabledOptions[activeIndex])
+      if (open && createActive) startCreate()
+      else if (open && enabledOptions[activeIndex]) choose(enabledOptions[activeIndex])
       else setOpen(true)
       return
     }
@@ -192,7 +272,13 @@ export default function Select({
         .join(' ')}
       style={width ? { width: `${width}px`, minWidth: `${width}px` } : undefined}
       onBlur={(event) => {
-        if (!rootRef.current?.contains(event.relatedTarget)) setOpen(false)
+        const next = event.relatedTarget as Node | null
+        if (rootRef.current?.contains(next)) return
+        // 板の中（「名前を入れる」の欄）へ焦点が移ったときは閉じない。
+        if (next && menuRef.current?.contains(next)) return
+        // 板の中で焦点が外れただけ（入れ替わり）。外を押したときは器が閉じる。
+        if (!next && menuRef.current?.contains(event.target as Node)) return
+        setOpen(false)
       }}
       data-design-node={open ? 'Gfsb4' : size === 'page-size' ? 'niGPF' : 'rpot9'}
     >
@@ -201,7 +287,7 @@ export default function Select({
         ref={triggerRef}
         id={buttonId}
         type="button"
-        className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : ''}`}
+        className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' && v8 ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
         aria-label={ariaLabel}
         aria-controls={listboxId}
         aria-expanded={open}
@@ -229,7 +315,56 @@ export default function Select({
           <ChevronDown className={styles.chevron} aria-hidden="true" />
         )}
       </button>
-      {open ? (
+      {open && v8 ? (
+        <SelectMenu
+          open={open}
+          getAnchor={() => triggerRef.current}
+          onClose={() => setOpen(false)}
+          listboxId={listboxId}
+          labelledBy={buttonId}
+          heading={heads.heading ?? menuHeading}
+          listRef={setListEl}
+          innerRef={menuRef}
+          onEscape={mode === 'create' ? backToList : undefined}
+          onPanelBlur={(event) => {
+            const next = event.relatedTarget as Node | null
+            if (!next || menuRef.current?.contains(next) || rootRef.current?.contains(next)) return
+            setOpen(false)
+          }}
+          panel={hasCreate && mode === 'create' && createAction ? createAction.render(createContext(createSessionRef.current)) : undefined}
+          footer={hasCreate && createAction ? (
+            <SelectMenuAction
+              label={createAction.label}
+              active={createActive}
+              onHover={() => setActiveIndex(enabledOptions.length)}
+              onSelect={startCreate}
+            />
+          ) : undefined}
+        >
+          {windowStart > 0 ? <SelectMenuSpacer rows={windowStart} /> : null}
+          {options.slice(windowStart, windowEnd).map((option, offset) => {
+            const optionIndex = enabledIndexOf.get(option.value) ?? -1
+            return (
+              <SelectMenuOption
+                key={option.value}
+                label={heads.labelOf(option)}
+                leading={option.leading}
+                selected={option.value === value}
+                active={optionIndex >= 0 && optionIndex === activeIndex}
+                disabled={option.disabled}
+                setSize={windowed ? options.length : undefined}
+                posInSet={windowed ? windowStart + offset + 1 : undefined}
+                onHover={() => {
+                  if (optionIndex >= 0) setActiveIndex(optionIndex)
+                }}
+                onSelect={() => choose(option)}
+              />
+            )
+          })}
+          {windowEnd < options.length ? <SelectMenuSpacer rows={options.length - windowEnd} /> : null}
+        </SelectMenu>
+      ) : null}
+      {open && !v8 ? (
         <MenuPortal
           open={open}
           align="start"

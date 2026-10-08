@@ -5,7 +5,6 @@
  * 作る⑤の「有効にする」のあとに出る面。読み直しはしない——公開した
  * ときの数（設定名・順番・知らせのつながり）をそのまま出す。
  */
-import Link from 'next/link'
 import { Activity, Check, Link2, List } from 'lucide-react'
 import Button from '@/components/shared/button'
 import styles from './done-v8.module.css'
@@ -20,7 +19,6 @@ export default function FriendAddDoneV8({ ruleName, routeNames, priority, slackC
 }) {
   return (
     <div className={styles.board} data-design-node="e0FD1J">
-      <Link className={styles.backLink} href="/friend-add-settings">← 友だち追加時の配信へ</Link>
       <h2 className={styles.title}>初回案内を作る</h2>
       <nav className={styles.steps} aria-label="初回案内の作る手順">
         {DONE_STEPS.map((label, index) => (

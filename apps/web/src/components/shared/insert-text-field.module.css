@@ -1,0 +1,80 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * 差し込みを札で見せる本文の欄（絵 OVCot ①）。v8 のときだけ描く（v7 は今の textarea）。
+ * 箱の大きさ・余白・枠は呼び出し側の className（今の textarea と同じもの）が決める。
+ * ここは「textarea と同じに見える」ための最小限と、札の見た目だけ。
+ */
+.editor {
+  display: block;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  cursor: text;
+  text-align: left;
+}
+.editor[aria-disabled='true'] { cursor: not-allowed; opacity: 0.6; }
+
+/* 空のときの例文（textarea の placeholder と同じ色）。高さ0の段で、カーソルは行の頭に残す。 */
+.editor[data-empty]::before {
+  content: attr(placeholder);
+  display: block;
+  height: 0;
+  overflow: visible;
+  color: var(--color-ink-faint);
+  pointer-events: none;
+}
+
+/*
+ * 札：薄い緑の地・緑の字 13/600・角丸6・左に小さな印（11）。
+ * 文の行の高さを変えないよう、上下の余白は1だけ。
+ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 2px;
+  padding: 1px 6px 1px 5px;
+  border-radius: var(--radius-mini);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  vertical-align: baseline;
+  white-space: nowrap;
+  user-select: all;
+  cursor: default;
+}
+.chipIcon { width: 11px; height: 11px; flex-shrink: 0; }
+.chipLabel { white-space: nowrap; }
+
+
+/*
+ * 下の「差し込む」の丸い枠のボタン（絵 OVCot ①の下の並び）。
+ * 枠 1px control-border・角丸いっぱい・内側 3/8・間4・印12・文字 12/600。
+ */
+.insertButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -0.5px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.insertButton svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--color-ink-secondary); }
+.insertButton:hover:not(:disabled) { background: var(--color-canvas-sunken); }
+.insertButton:disabled { cursor: not-allowed; opacity: 0.5; }
+.insertButton:focus-visible { outline: 2px solid var(--color-action); outline-offset: 1px; }
+.insertButton[aria-expanded='true'] { outline-color: var(--color-accent); background: var(--color-accent-soft); }
+}

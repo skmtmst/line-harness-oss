@@ -15,8 +15,9 @@ const v8Project = read('../../../v8/hq-banners/project.tsx')
 const banners = [listPage, projectPage, panel, modal, projects, library, shell, read('../../../components/hq/banners/image-tile.tsx'), read('../../../components/hq/banners/project-card.tsx')]
 
 /**
- * ★V6 35 系（バナー生成）の画面が、設計と共通ルールから外れていないかを見張る。
- * 正本は Pencil `V6正本.pen` と `docs/v6-requirements/v6-35-banner-generation-requirements-draft.md`。
+ * 統括のバナー生成の画面が、設計と共通ルールから外れていないかを見張る。
+ * 動きの正本は `docs/hq-banner-generation.md`、見た目の正本は Pencil ★V8（`docs/v8-design-rules.md`）。
+ * 当時の下書き v6-35 は本線に入らなかった（原本なし）。
  */
 describe('統括 バナー生成', () => {
   it('統括メニューに「バナー生成」があり、行き先は /hq/banners', () => {

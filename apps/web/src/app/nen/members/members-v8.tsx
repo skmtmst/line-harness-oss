@@ -11,7 +11,7 @@
  * deleteRank・resync）は同じ。違いは置き場と見せ方だけ——
  * ・会員の数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
  * ・道具の段は「会員を探す」＋よく使う札（○○以上・ペットあり・EC未連携）。
- * ・ランクの表には 友だち属性タグ・会員数 列があり、削除は移す先つきの
+ * ・ランクの表には タグ・会員数 列があり、削除は移す先つきの
  *   版つき DELETE（版が違うと競合の帯 e5yBLx へ）。
  * ・「ECとの照合」タブは今の作りどおり /ec-commerce/identity-candidates へ。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
@@ -660,7 +660,7 @@ export function RankSettingsTabV8({
       setComparing(false)
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced'
-        ? 'ランク設定を保存し、ECへ同期しました。友だち属性のタグも付け替えています。'
+        ? 'ランク設定を保存し、ECへ同期しました。タグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
       setError(describeApiFailure(caught, 'ランク設定の保存', {
@@ -790,7 +790,7 @@ export function RankSettingsTabV8({
                     <Th className="w-40">ランク名</Th>
                     <Th className="w-36">通年のしきい値</Th>
                     <Th className="w-28">マイル還元</Th>
-                    <Th>友だち属性タグ</Th>
+                    <Th>タグ</Th>
                     <Th className="cq-hide-below-1010 w-20" align="right">会員数</Th>
                     <Th className="w-14" align="right"><span className="sr-only">削除</span></Th>
                   </TableHeadRow>
@@ -846,7 +846,7 @@ export function RankSettingsTabV8({
 
         <section className={styles.card} data-design-node="vMRJs">
           <h2 className={styles.cardTitle}>ECとの同期</h2>
-          <p className={styles.cardDesc}>保存すると、ランクをネットショップへ送り、友だち属性のタグも付け替えます</p>
+          <p className={styles.cardDesc}>保存すると、ランクをネットショップへ送り、タグも付け替えます</p>
           <div className={styles.syncRow}>
             {rules?.syncStatus === 'synced' ? <Chip tone="ok">同期済み</Chip> : rules?.syncStatus === 'failed' ? <Chip tone="danger">失敗</Chip> : <Chip tone="warn">未同期</Chip>}
             <span className="text-caption text-ink-secondary">

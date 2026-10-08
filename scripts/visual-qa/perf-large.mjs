@@ -22,10 +22,13 @@
  *   friends        友だち一覧（10,000 人）
  *   tags           タグ一覧（2,000 個）と、一斉配信の宛先のタグ選び
  *   tag-csv        タグの CSV 取り込みの確認（画面の上限 500 行。CSV_ROWS で変える）
- *   audit          監査の記録（5,000 件）
+ *   audit          監査の記録（5,000 件）。/staff?tab=audit の「入った記録」と行が出てから測る
+ *
+ * 準備の条件（perf-ready.mjs）を満たさない場面は速さを記録せず error にし、終わりの番号を 1 にする。
  */
 import { writeFileSync } from 'node:fs'
 import { chromium } from '@playwright/test'
+import { auditReady, waitUntilReady } from './perf-ready.mjs'
 
 const [base, apiBase, outPath, onlyArg] = process.argv.slice(2)
 if (!base || !apiBase) {
@@ -479,7 +482,13 @@ async function simplePage(browser, path, waitFn, scrollerFn) {
   const { page, cdp, context } = await newPage(browser)
   const t0 = Date.now()
   await page.goto(`${base}${path}`, { waitUntil: 'domcontentloaded' })
-  await page.waitForFunction(waitFn, null, { timeout: 30000 }).catch(() => {})
+  // ROOT11: 準備待ちの失敗を捨てない。出ていない画面の時間を速さとして記録しない。
+  try {
+    await waitUntilReady(page, path, waitFn)
+  } catch (error) {
+    await context.close()
+    throw error
+  }
   const r = { openMs: Date.now() - t0 }
   await page.waitForTimeout(1000)
   r.dom = await domCount(page)
@@ -552,7 +561,12 @@ async function scenarioTagCsv(browser) {
   await page.waitForTimeout(500)
   const t0 = Date.now()
   await clickByText(page, '取り込む内容を確認')
-  await page.waitForFunction(() => document.body.innerText.includes('行を読み込みました'), null, { timeout: 60000 }).catch(() => {})
+  try {
+    await waitUntilReady(page, '/tags（CSV の確認）', () => document.body.innerText.includes('行を読み込みました'), { timeout: 60000 })
+  } catch (error) {
+    await context.close()
+    throw error
+  }
   r.previewMs = Date.now() - t0
   await page.waitForTimeout(500)
   r.dom = await domCount(page)
@@ -568,7 +582,8 @@ async function scenarioTagCsv(browser) {
 }
 
 async function scenarioAudit(browser) {
-  const { context, r } = await simplePage(browser, '/staff', () => !!document.querySelector('main'), DOC_SCROLLER)
+  // ROOT11: 測るのは「入った記録」のタブ。タブと記録の行が出てから測る（main が出ただけでは測らない）。
+  const { context, r } = await simplePage(browser, '/staff?tab=audit', auditReady, DOC_SCROLLER)
   await context.close()
   return r
 }
@@ -598,5 +613,8 @@ for (const [name, fn] of Object.entries(SCENARIOS)) {
   process.stderr.write(`[perf-large] ${name} ${JSON.stringify(result.scenarios[name]).slice(0, 600)}\n`)
 }
 await browser.close()
+// 準備できなかった場面は失敗として残し、終わりの番号でも知らせる（速さの値として採らない）。
+result.failed = Object.entries(result.scenarios).filter(([, value]) => value && typeof value === 'object' && 'error' in value).map(([name]) => name)
+if (result.failed.length > 0) process.exitCode = 1
 if (outPath) writeFileSync(outPath, `${JSON.stringify(result, null, 2)}\n`)
 else console.log(JSON.stringify(result, null, 2))

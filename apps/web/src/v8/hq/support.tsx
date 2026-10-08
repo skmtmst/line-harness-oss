@@ -7,6 +7,7 @@
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
  * （型のフォルダの列）・問い合わせのカード・これまでの問い合わせの表。
  */
+import StatusPill from '@/components/shared/status-pill'
 import { CheckCircle2, ImagePlus, Plus, X } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -346,7 +347,7 @@ export default function HqSupportV8() {
                   </span>
                   <span role="cell" className={styles.cell} title={item.kindLabel}>{supportKindWord(item.kind, item.kindLabel)}</span>
                   <span role="cell">
-                    <span className={item.status === 'open' ? `${styles.pill} ${styles.pillInfo}` : `${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />{SUPPORT_STATUS_WORDS[item.status]}</span>
+                    <StatusPill tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusPill>
                   </span>
                   <span role="cell">{supportTime(item.createdAt)}</span>
                 </div>

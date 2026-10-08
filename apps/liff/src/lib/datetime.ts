@@ -94,6 +94,20 @@ export function formatHoldLeft(seconds: number): string {
   return h > 0 ? `${h}時間 ${m}分` : `${m}分`;
 }
 
+/**
+ * 選んだ枠の開始を API へ送る ISO にする。空き枠が返した開始の瞬間
+ * （startUtc・店のタイムゾーンで計算済み）があればそれを使う。無い・読めない
+ * ときだけ、日付と時刻を日本時間として読む（古い応答・前回の予約など）。
+ * 正しい枠かどうかはサーバーがもう一度確かめる。
+ */
+export function slotStartsAtIso(slot: { date: string; start: string; startUtc?: string | null }): string {
+  if (slot.startUtc) {
+    const ms = Date.parse(slot.startUtc);
+    if (Number.isFinite(ms)) return new Date(ms).toISOString();
+  }
+  return jstStartsAtIso(slot.date, slot.start);
+}
+
 export function jstStartsAtIso(date: string, hhmm: string): string {
   // `+09:00` suffix tells JS to treat the wall-clock time as JST.
   return new Date(`${date}T${hhmm}:00+09:00`).toISOString();

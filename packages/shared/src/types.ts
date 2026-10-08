@@ -1111,7 +1111,11 @@ export interface LineAccountTagInput {
   name: string; color?: string | null; displayOrder?: number
 }
 
+export interface LineAccountFolderList { folders: Folder[]; total: number; unclassifiedCount: number }
+export type LineAccountFolderInput = Pick<Folder,'name'> & Partial<Pick<Folder,'color'|'displayOrder'>>;
 export interface LineAccount {
+  folderId?: string | null;
+  folder?: Folder | null;
   /** 統括内での分類。友だちタグとは別。 */
   tags?: LineAccountTagSummary[];
   /** 表示と新しい日時入力に使う IANAタイムゾーン。 */
@@ -1402,6 +1406,7 @@ export interface Affiliate {
   /** トラッキングコード (ユニーク) */
   code: string;
   /** コミッション率 (0-100) */
+  rewardMode?: 'none' | 'fixed' | 'rate';
   commissionRate: number;
   /** 有効/無効 */
   isActive: boolean;
@@ -2599,7 +2604,7 @@ export interface HqBannerImageQuery {
 }
 export interface HqBannerImageCounts { all: number; favorite: number; delivered: number; unused: number }
 
-export interface HqTemplateFolder { id: string; name: string; revision: number }
+export interface HqTemplateFolder { id: string; name: string; revision: number; color?: string | null }
 
 export interface HqScenarioDefinition {
   schemaVersion: 1

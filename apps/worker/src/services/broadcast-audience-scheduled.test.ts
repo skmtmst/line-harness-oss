@@ -277,3 +277,25 @@ describe('分析対象者の予約・キュー再確認(N-274)', () => {
     expect(broadcastRow(store, 'bc-5').status).toBe('sent');
   });
 });
+
+it('絞り込みの実配信も非表示・ブロック中・別店を除き、事前人数と一致する', async () => {
+  const store = createTestD1();
+  line.pushed = [];
+  try {
+    seedAccount(store.raw, 'acc-a');
+    seedAccount(store.raw, 'acc-b');
+    for (const id of ['shown', 'hidden', 'blocked']) seedFriend(store.raw, id, 'acc-a');
+    seedFriend(store.raw, 'other', 'acc-b');
+    store.raw.exec("UPDATE friends SET is_hidden=1 WHERE id='hidden'; UPDATE friends SET is_following=0 WHERE id='blocked'");
+    const condition = { operator: 'AND' as const, rules: [{ type: 'is_following', value: true }] };
+    store.raw.prepare("INSERT INTO broadcasts(id,title,message_type,message_content,target_type,segment_conditions,status,batch_offset,track_links,line_account_id) VALUES('eligibility','Check','text','Hello','segment',?,'sending',0,0,'acc-a')")
+      .run(JSON.stringify(condition));
+    const { countAudience } = await import('./broadcast-preflight.js');
+    const counted = await countAudience(store.db, { targetType: 'segment', segmentConditions: condition, lineAccountId: 'acc-a' });
+    await processQueuedBroadcasts(store.db, {} as never);
+    const recipients = (line.pushed as Array<{ to: string[] }>).flatMap(call => call.to);
+    expect(recipients).toEqual(['U-shown']);
+    expect(recipients.length).toBe(counted.total);
+    expect(counted.hiddenExcluded).toBe(1);
+  } finally { store.raw.close(); }
+});

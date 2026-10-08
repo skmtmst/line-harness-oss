@@ -8,7 +8,7 @@ import styles from './progress.module.css'
 export type ProgressState = 'preparing' | 'active' | 'done' | 'partial'
 
 /**
- * 処理の進み。Pencil ★V7 `xiHO8`「★V7 処理の進み」。
+ * 処理の進み。Pencil ★V8 `tydx2`「進みの棒」。
  *
  * 一斉配信の送信・CSV取り込み・一括操作で「押した後いま何が起きているか」を見せる。
  * 形の手本は kobra.systems の Progress（コードは写していない）。

@@ -12,7 +12,7 @@ const fixture = vi.hoisted(() => ({ staff: [] as Array<Record<string, unknown>> 
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 
 const MENUS = ['カット', 'シャンプー', '爪切り', '歯みがき', '足裏ケア', '毛刈り'].map((name, i) => ({
   id: `m-${i}`, name, duration_minutes: 30, base_price: 1000, price_mode: 'fixed', is_active: 1, sort_order: i,

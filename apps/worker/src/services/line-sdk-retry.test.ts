@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { pushViaHarnessProxy } from './line-proxy-send.js';
 import { LineClient } from '@line-crm/line-sdk';
 
 describe('LineClient retry keys', () => {
@@ -35,5 +36,25 @@ describe('LineClient retry keys', () => {
       [{ type: 'text', text: 'hello' }],
       '123e4567-e89b-12d3-a456-426614174000',
     )).resolves.toEqual({ retryAccepted: true });
+  });
+});
+
+
+describe('PKG05 provider receipt identity', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  test.each(['broadcast', 'multicast', 'proxy'] as const)('%s prefers the accepted receipt and falls back on first acceptance', async (path) => {
+    for (const status of [409, 200]) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status, headers: {
+        'Content-Type': 'application/json', 'x-line-request-id': 'current-request',
+        ...(status === 409 ? { 'x-line-accepted-request-id': 'original-acceptance' } : {}),
+      } })));
+      const client = new LineClient('token');
+      const retryKey = '123e4567-e89b-12d3-a456-426614174000';
+      const messages = [{ type: 'text' as const, text: 'hello' }];
+      const result = path === 'broadcast' ? await client.broadcast(messages, retryKey)
+        : path === 'multicast' ? await client.multicast(['U1'], messages, undefined, retryKey)
+        : await pushViaHarnessProxy('https://proxy.example.test', 'token', 'U1', messages, retryKey);
+      expect(result.requestId).toBe(status === 409 ? 'original-acceptance' : 'current-request');
+    }
   });
 });

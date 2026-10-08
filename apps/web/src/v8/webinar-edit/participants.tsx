@@ -5,6 +5,7 @@
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
  * 口・権限・失敗の扱いは app/webinars/edit/participants-v8.tsx と同じ（BEHAVIOR.md）。
  */
+import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bookmark, CircleCheck, CircleSlash, Download, History, LogOut, Undo2 } from 'lucide-react'
 import { ListPageBody, ListPagePagination } from '@/components/templates'
@@ -157,7 +158,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const kpis = [
     { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : '—', help: '申し込んだ人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
     { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.completed, summary.reservations)}` : '—', help: '動画の9割以上を見た人です。' },
-    { key: 'dropped', title: '途中で離れた', icon: LogOut, value: dropped, unit: '人', detail: summary ? `平均 ${Math.round(summary.avgWatchedSeconds / 60)}分で離脱` : '—', help: '視聴を始めた人から、視聴完了の人を引いた数です。' },
+    { key: 'dropped', title: '途中で離れた', icon: LogOut, value: dropped, unit: '人', detail: '平均離脱時間 —', help: '入場した人から、視聴完了の人を引いた数です。途中で離れた人だけの平均離脱時間は、まだ数えていません。' },
     { key: 'unviewed', title: '見ていない', icon: Undo2, value: unviewed, unit: '人', detail: '見逃し案内の対象', help: '申し込んだが入場の記録がない人です。' },
   ]
 
@@ -196,7 +197,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             return (
               <Tr key={participant.friendId} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
-                  <a href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</a>
+                  <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</Link>
                   <span className={styles.sub}>{`${joinNote(participant)}${joinKindLabel(participant)}`}</span>
                 </Td>
                 <Td className={styles.colWhen}><span className={styles.main}>{shortDateTime(participant.latestJoinedAt)}</span></Td>

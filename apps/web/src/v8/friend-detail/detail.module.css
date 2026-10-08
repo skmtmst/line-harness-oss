@@ -4,7 +4,7 @@
 .head { display: flex; align-items: center; gap: var(--tpl-fdt-head-gap); padding: var(--tpl-fdt-head-pad); min-width: 0; }
 .nameBlock { display: flex; flex-direction: column; gap: var(--tpl-fdt-title-gap); flex: 1 1 0; min-width: 0; }
 .nameRow { display: flex; align-items: center; gap: var(--tpl-fdt-name-gap); min-width: 0; }
-.name { margin: 0; font-size: var(--tpl-fdt-name-size); line-height: var(--tpl-fdt-name-lh); font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.name { margin: 0; font-size: var(--tpl-title-size); line-height: var(--tpl-title-lh); font-weight: var(--tpl-title-weight); color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sub { margin: 0; font-size: var(--tpl-fdt-sub-size); line-height: var(--tpl-fdt-sub-lh); color: var(--color-ink-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menuAnchor { position: relative; display: inline-flex; flex-shrink: 0; }
 /* 「…」は共通の RowMenu。前の共通ボタン（副）の色（墨）と影を、共通の印ボタンより強く当てる。 */

@@ -289,7 +289,9 @@ export default function WebhooksIncomingV8() {
     }
     try {
       const res = await api.webhooks.incoming.update(item.id, accountId, { isActive: !currentActive })
-      if (accountRef.current !== accountId) return
+      // 返事の前にアカウントを移った：知らせは出さないが、仮の表示は必ず外す。
+      // 外さないと、戻ったときにサーバーの状態と違う「止めています」が残る（監査 WEB-024）。
+      if (accountRef.current !== accountId) { clear(); return }
       if (!res.success) {
         fail(`「${item.name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。`)
         return
@@ -301,7 +303,7 @@ export default function WebhooksIncomingV8() {
         onAction: () => { void handleToggle(item, !currentActive) },
       })
     } catch (caught) {
-      if (accountRef.current !== accountId) return
+      if (accountRef.current !== accountId) { clear(); return }
       const forbidden = caught instanceof ApiError && caught.status === 403
       fail(forbidden
         ? `「${item.name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`

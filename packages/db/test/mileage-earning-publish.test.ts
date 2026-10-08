@@ -1,3 +1,4 @@
+import { asD1 } from './d1-test-helper.js';
 /**
  * N-231 案1(公開版)の直接試験。
  *
@@ -57,32 +58,6 @@ function setupSqlite() {
                      ('friend-2', 'U2', 'ユーザーB', NULL, 'user-1', 'account-2')`).run();
   migratedSnapshot = db.serialize();
   return db;
-}
-
-function asD1(sqlite: Database.Database): D1Database {
-  return {
-    prepare(sql: string) {
-      return {
-        bind(...params: unknown[]) {
-          const statement = sqlite.prepare(sql);
-          return {
-            async run() {
-              const result = statement.run(...params);
-              return { success: true, results: [], meta: { changes: result.changes } };
-            },
-            async first<T>() { return (statement.get(...params) as T) ?? null; },
-            async all<T>() { return { success: true, results: statement.all(...params) as T[], meta: {} }; },
-          };
-        },
-      };
-    },
-    // D1 の batch は原子。本物の同時書き込みは試験に無いので逐次でよい。
-    async batch(statements: Array<{ run: () => Promise<unknown> }>) {
-      const results: unknown[] = [];
-      for (const statement of statements) results.push(await statement.run());
-      return results;
-    },
-  } as unknown as D1Database;
 }
 
 function makeDraft(amount: number, name = 'あいさつでたまる') {
@@ -357,6 +332,18 @@ describe('mileage earning rule publish (N-231 案1)', () => {
     expect(parsePublishedSnapshot(row.s)).toEqual({ [rule.id]: 1 });
     expect(await getAccountRuleVersionMap(db, 'account-1')).toEqual({ [rule.id]: 1 });
   });
+  it('PKG54: 公開batchの直前に下書きが進んだら旧版を公開しない', async () => {
+  const {rule,draftVersion} = await makeRuleWithDraft(db,{liveAmount:100,draftAmount:200});
+  const originalBatch=db.batch.bind(db);
+  let raced=false;
+  db.batch=async (statements) => {
+    if(!raced) {raced=true; await saveMileageEarningRuleDraft(asD1(sqlite),{ruleId:rule.id,lineAccountId:'account-1',expectedVersion:draftVersion,draft:makeDraft(300),updatedByStaffId:'staff-2'});}
+    return originalBatch(statements);
+  };
+  await expect(publishMileageEarningRule(db,{ruleId:rule.id,lineAccountId:'account-1',expectedVersion:draftVersion,idempotencyKey:'old-publication'})).rejects.toMatchObject({code:'version_conflict'});
+  expect(sqlite.prepare('SELECT amount,published_version_number FROM mileage_rules WHERE id=?').get(rule.id)).toEqual({amount:100,published_version_number:null});
+  expect(sqlite.prepare('SELECT COUNT(*) n FROM mileage_earning_rule_published_versions WHERE rule_id=?').get(rule.id)).toEqual({n:0});
+});
 });
 
 describe('parsePublishedSnapshot', () => {
@@ -370,4 +357,7 @@ describe('parsePublishedSnapshot', () => {
     expect(parsePublishedSnapshot('{}')).toEqual({});
     expect(parsePublishedSnapshot('{"r1":0,"r2":3}')).toEqual({ r1: 0, r2: 3 });
   });
+
+
+
 });

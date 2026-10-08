@@ -94,7 +94,7 @@ describe('7 予約からの売上', () => {
       };
     };
     expect(json.data.total).toEqual({
-      bookings: 4, confirmed: 2, revenue: 16000, cancelRate: 0.25, noshowRate: 0.25,
+      bookings: 4, confirmed: 2, revenue: 16000, paidRevenue: 0, cancelRate: 0.25, noshowRate: 0.25,
       cancelled: 1, noshow: 1,
     });
     expect(json.data.menus).toHaveLength(1);
@@ -104,7 +104,7 @@ describe('7 予約からの売上', () => {
     expect(json.data.previous).toMatchObject({ revenue: 0, bookings: 0 });
   });
 
-  it('決済を入れた店は実際の入金で数える', async () => {
+  it('オンライン決済でも今期・前期とも料金×確定数で比較し、入金は別に返す', async () => {
     seedBase();
     sqlite.exec(`
       INSERT INTO booking_payment_configs
@@ -115,6 +115,17 @@ describe('7 予約からの売上', () => {
          idempotency_key, paid_at, created_at, updated_at)
       VALUES ('pay-1', 'account-a', 'b-confirmed-1', 5000, 'JPY', 'paid', 'none',
         'booking:b-confirmed-1', '2026-11-04T03:00:00.000Z', '2026-11-04', '2026-11-04');
+      INSERT INTO bookings
+        (id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at,
+         block_ends_at, status, price_at_booking, requested_at)
+      VALUES ('b-previous', 'account-a', 'friend-a', 'staff-1', 'menu-a',
+        '2026-10-04T01:00:00.000Z', '2026-10-04T02:00:00.000Z', '2026-10-04T02:00:00.000Z',
+        'confirmed', 8000, '2026-10-01');
+      INSERT INTO booking_payments
+        (id, line_account_id, booking_id, amount, currency, status, provider,
+         idempotency_key, paid_at, created_at, updated_at)
+      VALUES ('pay-prev', 'account-a', 'b-previous', 3000, 'JPY', 'paid', 'none',
+        'booking:b-previous', '2026-10-04T03:00:00.000Z', '2026-10-04', '2026-10-04');
     `);
     const response = await staffApp(bookingPlus).request(
       '/api/booking/admin/sales-summary?account_id=account-a&from=2026-11-01&to=2026-12-01',
@@ -123,10 +134,48 @@ describe('7 予約からの売上', () => {
     );
     expect(response.status).toBe(200);
     const json = await response.json() as {
-      data: { total: { revenue: number }; revenueSource: string };
+      data: { total: { revenue: number; paidRevenue: number }; revenueSource: string;
+        previous: { revenue: number; paidRevenue: number }; menus: Array<{ revenue: number; paidRevenue: number }> };
     };
-    expect(json.data.revenueSource).toBe('paid');
-    expect(json.data.total.revenue).toBe(5000);
+    expect(json.data.revenueSource).toBe('menu');
+    expect(json.data.total).toMatchObject({ revenue: 16000, paidRevenue: 5000 });
+    expect(json.data.previous).toMatchObject({ revenue: 8000, paidRevenue: 3000 });
+    expect(json.data.menus[0]).toMatchObject({ revenue: 16000, paidRevenue: 5000 });
+    // 設定を止めても過去の入金は残す。返金・失敗分は受け取った額に混ぜない。
+    sqlite.exec(`UPDATE booking_payment_configs SET mode = 'none';
+      INSERT INTO booking_payments
+        (id, line_account_id, booking_id, amount, currency, status, provider,
+         idempotency_key, paid_at, created_at, updated_at)
+      VALUES ('pay-refunded', 'account-a', 'b-confirmed-2', 2000, 'JPY', 'refunded', 'none',
+        'refunded', '2026-11-04T03:00:00.000Z', '2026-11-04', '2026-11-04')`);
+    const disabled = await staffApp(bookingPlus).request(
+      '/api/booking/admin/sales-summary?account_id=account-a&from=2026-11-01&to=2026-12-01', {}, env(),
+    );
+    await expect(disabled.json()).resolves.toMatchObject({ data: {
+      total: { revenue: 16000, paidRevenue: 5000 }, previous: { revenue: 8000, paidRevenue: 3000 },
+    } });
+  });
+
+  it.each([
+    ['Asia/Tokyo', '2026-11-03T16:00:00.000Z', 3],
+    ['America/New_York', '2026-11-04T01:00:00.000Z', 2],
+    ['UTC', '2026-11-04T01:00:00.000Z', 3],
+  ])('曜日は店の時刻で数える（%s）', async (timezone, startsAt, weekday) => {
+    seedBase();
+    sqlite.prepare(`INSERT INTO booking_settings (id, line_account_id, timezone) VALUES ('settings', 'account-a', ?)`).run(timezone);
+    sqlite.exec("DELETE FROM bookings WHERE id <> 'b-confirmed-1'");
+    sqlite.prepare("UPDATE bookings SET starts_at = ? WHERE id = 'b-confirmed-1'").run(startsAt);
+    sqlite.exec(`INSERT INTO booking_payments
+      (id, line_account_id, booking_id, amount, currency, status, provider,
+       idempotency_key, paid_at, created_at, updated_at)
+      VALUES ('paid', 'account-a', 'b-confirmed-1', 5000, 'JPY', 'paid', 'stripe',
+        'paid', '2026-11-04T03:00:00.000Z', '2026-11-04', '2026-11-04')`);
+    const response = await staffApp(bookingPlus).request(
+      '/api/booking/admin/sales-summary?account_id=account-a&from=2026-11-01&to=2026-12-01', {}, env(),
+    );
+    await expect(response.json()).resolves.toMatchObject({ data: {
+      timeZone: timezone, weekdays: [{ weekday, bookings: 1, confirmed: 1, revenue: 8000, paidRevenue: 5000 }],
+    } });
   });
 
   it('from・to がおかしいと400', async () => {

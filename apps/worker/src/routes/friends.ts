@@ -1699,7 +1699,7 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
       resolvedContent = await expandSendCommonVars(
         db, body.content,
         { kind: 'friend_direct', id: friend.id },
-        { lineAccountId: friendAccountId },
+        { lineAccountId: friendAccountId, messageType },
       );
     } catch (error) {
       if (error instanceof CommonVarResolutionFailedError) {

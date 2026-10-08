@@ -7,7 +7,7 @@ import IconButton from './icon-button'
 import styles from './file-drop.module.css'
 
 /**
- * ファイルを落とす場所。Pencil ★V7 `NQMnx`「★V7 添付ファイル・ファイルを落とす場所」。
+ * ファイルを落とす場所。Pencil ★V8（V8.pen）「ファイルを落とす欄」。
  *
  * 受信箱の返信欄・配信の画像・登録メディアの取り込みでばらばらだった見せ方をそろえる。
  * 形の手本は kobra.systems の Attachment・Magnetic Dropzone
@@ -22,6 +22,9 @@ import styles from './file-drop.module.css'
  */
 export default function FileDropzone({
   previewState,
+  icon,
+  invalid = false,
+  variant = 'default',
   title,
   hint,
   accept,
@@ -39,6 +42,9 @@ export default function FileDropzone({
   'aria-label': ariaLabel,
 }: {
   /** 見本・検証用にドラッグ状態を固定する。指定時はドラッグ操作で見た目が変わらない。 */
+  icon?: ReactNode
+  invalid?: boolean
+  variant?: 'default' | 'video'
   previewState?: 'active' | 'reject'
   /** 見出し（「ここに画像を落とす」など）。 */
   title: string
@@ -110,7 +116,10 @@ export default function FileDropzone({
       role="group"
       aria-label={ariaLabel ?? title}
       aria-busy={busy || undefined}
+      aria-invalid={invalid || undefined}
+      data-invalid={invalid || undefined}
       data-design-node="NQMnx"
+      data-variant={variant}
       data-drag={shown}
       data-busy={busy || undefined}
       data-disabled={disabled || undefined}
@@ -140,11 +149,11 @@ export default function FileDropzone({
         </>
       ) : (
         <>
-          <Upload aria-hidden="true" size={24} className={shown === 'active' ? styles.activeIcon : styles.idleIcon} />
+          {icon ?? <Upload aria-hidden="true" size={24} className={shown === 'active' ? styles.activeIcon : styles.idleIcon} />}
           <p className={shown === 'active' ? styles.activeTitle : styles.zoneTitle}>
             {shown === 'active' ? '離すと追加します' : title}
           </p>
-          {shown === 'active' ? null : hint ? <p className={styles.zoneHint}>{hint}</p> : null}
+          {shown === 'active' || variant === 'video' ? null : hint ? <p className={styles.zoneHint}>{hint}</p> : null}
           {shown === 'active' ? null : (
             <Button
               type="button"
@@ -154,11 +163,13 @@ export default function FileDropzone({
                 openPicker()
               }}
             >
+              {variant === 'video' ? <Upload size={14} aria-hidden="true" /> : null}
               {chooseLabel}
             </Button>
           )}
         </>
       )}
+      {variant === 'video' && hint && shown === 'idle' && !busy ? <p className={styles.zoneHint}>{hint}</p> : null}
       <input
         ref={inputRef}
         type="file"
@@ -198,7 +209,7 @@ function matchesAccept(item: DataTransferItem, accept?: string): boolean {
 }
 
 /**
- * 添付ファイルの行。Pencil ★V7 `NQMnx`「1. 添付ファイルの行」。
+ * 添付ファイルの行。Pencil ★V8（V8.pen）「ファイルを落とす欄」の添付ファイルの行。
  *
  * - 行の高さ 56・縮小画像 36（画像は 1px の薄い縁）。`thumbnail` に縮小画像を渡す
  * - 名前は 1 行で省略し、全文は `title` で。補足（種類・大きさ）は `meta`

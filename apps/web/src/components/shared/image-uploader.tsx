@@ -29,6 +29,15 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [manualUrlMode, setManualUrlMode] = useState(false)
+  /*
+   * 送り出した取り込みの世代。新しい画像を選ぶ・取り消す・URL を手で入れると進める。
+   * 遅れて返った前の取り込みで、あとから選んだ画像や取り消しを上書きしない（監査 WEB-026）。
+   */
+  const uploadGenRef = useRef(0)
+  const invalidateUpload = useCallback(() => {
+    uploadGenRef.current += 1
+    setBusy(false)
+  }, [])
 
   const upload = useCallback(
     async (file: File) => {
@@ -48,10 +57,12 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
         setError('10MB 以下にしてください')
         return
       }
+      const gen = ++uploadGenRef.current
       setBusy(true)
       setError('')
       try {
         const res = await api.uploads.image(file)
+        if (gen !== uploadGenRef.current) return
         if (!res.success) {
           setError(res.error ?? 'アップロード失敗')
           return
@@ -63,9 +74,10 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
           onChange({ mode: 'line-image', originalContentUrl: url, previewImageUrl: url })
         }
       } catch {
+        if (gen !== uploadGenRef.current) return
         setError('アップロード失敗')
       } finally {
-        setBusy(false)
+        if (gen === uploadGenRef.current) setBusy(false)
       }
     },
     [mode, onChange],
@@ -126,6 +138,7 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
                 : value.originalContentUrl
           }
           onChange={(e) => {
+            invalidateUpload()
             const url = e.target.value
             if (!url) {
               onChange(null)
@@ -161,7 +174,10 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
               </button>
               <button
                 type="button"
-                onClick={() => onChange(null)}
+                onClick={() => {
+                  invalidateUpload()
+                  onChange(null)
+                }}
                 className="ml-3 text-xs font-medium text-status-danger underline"
               >
                 取り消し

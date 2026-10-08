@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import styles from './inline-edit.module.css'
+import { isImeComposing } from './ime'
 
 export type InlineEditProps = {
   /** 今の値（実データ）。 */
@@ -87,6 +88,8 @@ export default function InlineEdit({ value, label, onSave, placeholder, maxLengt
         disabled={saving}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
+          // 変換中の Enter（確定）・Esc（変換をやめる）は入力欄のもの。保存・取り消しにしない。
+          if (isImeComposing(event)) return
           if (event.key === 'Enter') void save()
           else if (event.key === 'Escape') cancel()
         }}

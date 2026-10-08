@@ -11,7 +11,6 @@ import { usePageChrome } from './page-chrome'
 import { HQ_MENU_SECTIONS, MENU_SECTIONS, isHqShellPath } from '@/lib/menu'
 import { brandInitial } from '@/components/layout/brand-initial'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import { useBrand } from '@/lib/use-brand'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useManualHref } from '@/lib/use-manual-href'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
@@ -25,7 +24,7 @@ import { canReturnToHqFrom } from '@/lib/hq-return'
  * 分けているのは、部品を1つの画面にも縛らないため（`docs/v8-design-rules.md` §5）。
  */
 
-/** ルート → メニューのラベル。長いほうから当てるので、`/tags/new` は「友だち属性」になる。 */
+/** ルート → メニューのラベル。長いほうから当てるので、`/tags/new` は「タグ」になる。 */
 const MENU_LABELS: Array<[string, string]> = MENU_SECTIONS
   .flatMap((section) => section.items.map((item): [string, string] => [item.href, item.label]))
   .sort((a, b) => b[0].length - a[0].length)
@@ -62,6 +61,32 @@ export function documentTitleForPath(pathname: string, shownTitle: string): stri
 }
 
 /**
+ * ★V8：画面がパンくずを渡さないときの「親の画面」（2026-10-08 オーナー「全部消す」）。
+ *
+ * 板の頭の「← 〇〇へ」を無くしたので、子の画面（作る・編集・詳細）から一覧へ戻る口は
+ * 上の帯のパンくずだけになる。パンくずを渡し忘れた子の画面でも親へ戻れるよう、
+ * 左メニューの項目のうち「いまの道の手前にあるいちばん長いもの」を親として出す。
+ * 一覧そのもの（道がメニューの項目と同じ）では出さない。
+ */
+const PARENT_CRUMBS: Array<[string, string]> = [
+  ...MENU_SECTIONS.flatMap((section) => section.items.map((item): [string, string] => [item.href, item.label])),
+  ...HQ_MENU_SECTIONS.flatMap((section) => section.items.map((item): [string, string] => [item.href, item.label])),
+  ['/hq/support', 'お問い合わせ'] as [string, string],
+  ['/common-actions', '共通アクション'] as [string, string],
+]
+  .filter(([href]) => href !== '/' && href !== '/hq' && !href.includes('?'))
+  .sort((a, b) => b[0].length - a[0].length)
+
+export function parentCrumbForPath(pathname: string): { label: string; href: string } | null {
+  // 一覧そのもの（左メニューの項目。/contents/vars のように別の項目の下にあるものも）は親を持たない。
+  if (PARENT_CRUMBS.some(([href]) => href === pathname)) return null
+  for (const [href, label] of PARENT_CRUMBS) {
+    if (pathname.startsWith(`${href}/`)) return { label, href }
+  }
+  return null
+}
+
+/**
  * 権限の呼び名。言葉の表（GLOSSARY.md）どおり **`owner` は「オーナー」**。
  *
  * V6 の設計（Pencil `cBSCb`）が「統括」だったが、2026-10-01 のオーナー決定で
@@ -77,7 +102,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function AppTopBar() {
   const pathname = usePathname() ?? '/'
-  const { title, crumbs } = usePageChrome()
+  const { title, crumbs: pageCrumbs } = usePageChrome()
   const router = useRouter()
   const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
   const [staffName, setStaffName] = useState('')
@@ -139,6 +164,15 @@ export default function AppTopBar() {
    * 切替の札に「統括」と統括名、名前の下に「統括」を出す。v7 は今までどおり。
    */
   const isV8 = useAdminTheme() === 'v8'
+  /*
+   * 画面がパンくずを渡さない（または「ホーム」だけの）子の画面では、左メニューの親へ戻れるようにする。
+   * - 画面名が親と違う（「テンプレートを作る」）→ 手前に親を置く（ホーム › テンプレート › テンプレートを作る）
+   * - 画面名が親と同じ（絵の上の帯が「ホーム › ウェビナー」）→ その名前を親への戻り口にする（文字は絵のまま）
+   */
+  const onlyHome = pageCrumbs === null || pageCrumbs.every((crumb) => crumb.label === 'ホーム')
+  const parentCrumb = onlyHome ? parentCrumbForPath(pathname) : null
+  const crumbs = parentCrumb && parentCrumb.label !== shownTitle ? [parentCrumb] : pageCrumbs
+  const titleHref = parentCrumb && parentCrumb.label === shownTitle ? parentCrumb.href : undefined
   const hqShell = isV8 && isHqShellPath(pathname)
   const [hqName, setHqName] = useState<string | null>(null)
   useEffect(() => {
@@ -186,14 +220,12 @@ export default function AppTopBar() {
 
   /*
    * ★V8 店の画面から統括へ戻る口（絵 V8 `DIHFx/Psg7n`・オーナー 2026-10-07）。
-   * 統括の権限がある人（オーナー・管理者）にだけ、切り替えの一覧のいちばん上に「統括に戻る」を出す。
+   * 統括へ戻るのは左下の自分のメニューだけ（切り替えの一覧には置かない・オーナー 2026-10-08）。
    * 帯の［統括へ］ボタンはやめ、左下の自分のメニューへまとめた（オーナー 2026-10-07）。
    * 店だけの担当には出さない。
    */
-  const brand = useBrand()
-  const hqReturn = isV8 && canReturnToHq
-    ? { companyName: brand.name ?? '統括', accountCount: accounts.length, onReturn: returnToHq }
-    : null
+  // 2026-10-08 オーナー「左下から統括に戻れるので右上はアカウント切り替えだけでいい」：切り替えの一覧には出さない。
+  const hqReturn = null
 
   /*
    * ★V8：帯の探す欄は V8 の外側から外した（オーナー決定 2026-10-01）。
@@ -245,6 +277,7 @@ export default function AppTopBar() {
       v8Chrome
       chromeVariant="shell"
       crumbs={crumbs}
+      titleHref={titleHref}
       hq={hqPill}
       homeHref={hqShell ? '/hq' : '/'}
       hqReturn={hqReturn}

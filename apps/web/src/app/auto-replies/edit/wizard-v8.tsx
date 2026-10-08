@@ -1,6 +1,7 @@
 'use client'
 
 import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import InlineActionRowsV8, { actionRowTitle } from '@/components/auto-replies/inline-action-rows-v8'
 import { CreatePreviewNote, CreateStarterCards, CreateSummaryCard } from '@/components/templates/create-parts'
@@ -54,7 +55,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { findConditionDraftIssue, type SegmentCondition } from '@/lib/segment-condition'
-import Stepper, { type StepperStep } from '@/components/shared/stepper'
+import type { StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import { TextField, TextArea } from '@/components/shared/text-field'
@@ -65,6 +66,7 @@ import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
 import { SaveConflictBand, SaveConflictCompareDialog } from '@/components/shared/save-conflict'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import Toggle from '@/components/shared/toggle'
 import Notice from '@/components/shared/notice'
 import LinePreview from '@/components/shared/line-preview'
@@ -103,6 +105,7 @@ import { inEvaluationOrder, PRIORITY_MAX, PRIORITY_MIN, type OrderedRule } from 
 import { canPublish, conflictTone, publishGates } from '@/app/auto-replies/publish/publish-flow'
 import AutoReplyInsertChips, { insertedLabels } from './insert-chips'
 import styles from './wizard-v8.module.css'
+import InsertTextField from '@/components/shared/insert-text-field'
 
 /*
  * ★V8 自動応答の作成・編集・有効化。
@@ -456,7 +459,7 @@ function AutoReplyWizardV8Inner() {
   // 作る②の1152（`Z2LIUx`）。折り畳みはCSSが担い、ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; messageType: string; messageContent: string }>>([])
-  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
+  const [folders, setFolders] = useState<Array<{ id: string; name: string; color?: string | null }>>([])
   const [rules, setRules] = useState<RuleRow[]>([])
   const [conflicts, setConflicts] = useState<AutoReplyConflict[]>([])
   const [friends, setFriends] = useState<FriendListItem[]>([])
@@ -515,7 +518,7 @@ function AutoReplyWizardV8Inner() {
         api.folders.list('auto_reply').catch(() => null),
       ])
       if (folderRes?.success && Array.isArray(folderRes.data)) {
-        setFolders(folderRes.data.map((f) => ({ id: f.id, name: f.name })))
+        setFolders(folderRes.data.map((f) => ({ id: f.id, name: f.name, color: f.color })))
       }
       let accountId: string | null = null
       if (autoReplyId) {
@@ -1174,7 +1177,7 @@ function AutoReplyWizardV8Inner() {
             <ArrowLeft size={14} aria-hidden="true" />
             自動応答へ
           </Link>}
-          steps={<Stepper label="自動応答を作る進み方" steps={doneSteps} />}
+          steps={<Steps label="自動応答を作る進み方" steps={doneSteps} />}
         />
         <div className={styles.doneBody}>
           <section className={styles.done} aria-labelledby="auto-reply-done-title">
@@ -1449,7 +1452,7 @@ function AutoReplyWizardV8Inner() {
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
           <ArrowLeft size={14} aria-hidden="true" />
           自動応答へ
-        </Link>} steps={<Stepper label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={narrow ? <>
+        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={narrow ? <>
             <div className={styles.narrowPhoneOpen}>
               <Button onClick={() => setPreviewOpen(true)}><Smartphone size={14} aria-hidden="true" />LINEでの見え方を見る</Button>
             </div>
@@ -1542,15 +1545,17 @@ function AutoReplyWizardV8Inner() {
                     <label htmlFor="wiz-folder" className={styles.label}>
                       フォルダ
                     </label>
-                    <Select
+                    <FolderSelect
                       id="wiz-folder"
                       aria-label="フォルダ"
                       value={form.folderId}
                       onChange={(value) => patch({ folderId: value })}
-                      options={[
-                        { value: '', label: '分けない' },
-                        ...folders.map((f) => ({ value: f.id, label: f.name })),
-                      ]}
+                      unfiled={{ value: '', label: '分けない' }}
+                      folders={folders.map(folderById)}
+                      // 一覧の左の列の「フォルダを追加」と同じ口（自動応答のフォルダは共有）。
+                      onCreate={canManage
+                        ? folderCreator((name, color) => api.folders.create({ kind: 'auto_reply', name, color }), folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
+                        : undefined}
                     />
                   </div>
                 </div>
@@ -1968,12 +1973,12 @@ function AutoReplyWizardV8Inner() {
 
                 {form.mode === 'inline-text' && (
                   <div className={styles.bodyBox}>
-                    <textarea
+                    <InsertTextField
                       id="wiz-content"
                       aria-label="返す文"
                       className={styles.bodyText}
                       value={form.responseContent}
-                      onChange={(e) => patch({ responseContent: e.target.value })}
+                      onValueChange={(next) => patch({ responseContent: next })}
                       placeholder="例：予約の変更を承りました。担当者が確認次第ご連絡します。"
                       maxLength={5000}
                       rows={2}

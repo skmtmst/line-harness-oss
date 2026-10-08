@@ -47,6 +47,7 @@ export function registerCreateForm(server: McpServer): void {
     },
     async ({
       name,
+      accountId,
       description,
       fields,
       onSubmitTagId,
@@ -62,6 +63,7 @@ export function registerCreateForm(server: McpServer): void {
         const client = getClient();
         const form = await client.forms.create({
           name,
+          accountId,
           description,
           fields: JSON.parse(fields),
           onSubmitTagId,

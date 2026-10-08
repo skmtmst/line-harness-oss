@@ -10,6 +10,7 @@
 }
 [data-theme='v8'] .create { width: 100%; margin-bottom: 16px; }
 [data-theme='v8'] .create > * { width: 100%; }
+[data-theme='v8'] .createPlaceholder { height: 36px; }
 [data-theme='v8'] .heading { border: 0; padding: 0; margin-bottom: 8px; }
 [data-theme='v8'] .heading > p { font-size: 12px; font-weight: 600; line-height: normal; color: var(--color-ink-faint); }
 [data-theme='v8'] .rows { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 0; }

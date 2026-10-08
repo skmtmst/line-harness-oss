@@ -958,7 +958,7 @@ async function handleEvent(
             const introContent = await expandSendCommonVars(
               db, template.message_content,
               { kind: 'notification', id: referralRoute.id },
-              { lineAccountId, friendId: friend.id },
+              { lineAccountId, friendId: friend.id, messageType: template.message_type },
             );
             const message = buildMessage(template.message_type, introContent);
             try {
@@ -1249,6 +1249,7 @@ async function handleEvent(
         const tapResult = await handleRichMenuTap(db, lineClient, friend, tap.areaId, {
           lineAccountId,
           replyToken: postbackReplyToken,
+          sourceEventId: event.webhookEventId,
         });
         if (tapResult.replyTokenConsumed) postbackReplyToken = undefined;
         tapLabel = tapResult.target?.label ?? null;

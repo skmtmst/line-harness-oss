@@ -1,3 +1,5 @@
+import { reorderBookingMenus } from '@line-crm/db';
+import type { BookingMenuReorderRequest } from '@line-crm/shared';
 import { getBookingSyncRules, saveBookingSyncRules, validateBookingSyncRules, listBookingSyncNotices } from '@line-crm/db';
 import { evaluateBookingSyncNotices } from '../services/booking-sync-rules.js';
 import { openSeatTables, closuresForRange, closureAffectsTable } from '../services/restaurant-closures.js';
@@ -26,6 +28,7 @@ import {
   getBookingAdminSettings,
   saveBookingAdminSettings,
   createBookingPayment,
+  getBookingPaymentByBooking,
   decidePrepayOnly,
   prepayNoticeFor,
   resolveBookingPaymentConfig,
@@ -910,7 +913,31 @@ booking.post('/api/liff/booking/requests', async (c) => {
     now: new Date(),
   });
   if (cached) {
-    return c.json(cached.body as Record<string, unknown>, cached.status as 200 | 201 | 400 | 409 | 422);
+    if (cached.status !== 202) {
+      return c.json(cached.body as Record<string, unknown>, cached.status as 200 | 201 | 400 | 409 | 422);
+    }
+    // 完成応答を書けなかった要求は、先に確保した予約IDを本人の範囲で引く。
+    // INSERT前の同時要求は409で待たせる。保存済みの予約は作り直さず、
+    // 通知・タグ等の副作用もこの再送口から重ねて実行しない。
+    const pendingBookingId = (cached.body as { booking_id?: unknown }).booking_id;
+    if (typeof pendingBookingId === 'string') {
+      const saved = await c.env.DB.prepare(
+        `SELECT id, status FROM bookings WHERE id = ? AND line_account_id = ? AND friend_id = ?`,
+      ).bind(pendingBookingId, accountId, friendId).first<{ id: string; status: string }>();
+      if (saved) {
+        const payment = await getBookingPaymentByBooking(c.env.DB, accountId, saved.id);
+        const prepayNotice = await prepayNoticeFor(
+          c.env.DB, accountId, await decidePrepayOnly(c.env.DB, accountId, friendId),
+        );
+        return c.json({
+          booking_id: saved.id,
+          status: saved.status,
+          ...(payment ? { payment: { id: payment.id, status: payment.status, holdUntil: payment.hold_until } } : {}),
+          ...(prepayNotice ? { prepayNotice } : {}),
+        }, 201);
+      }
+    }
+    return c.json({ error: 'request_in_progress' }, 409);
   }
 
   // 案内を受けた本人・枠・有効期限を確認してから、通常の予約確定処理を使う。
@@ -991,6 +1018,23 @@ booking.post('/api/liff/booking/requests', async (c) => {
   const autoConfirm = adminSettings?.approvalMode === 'automatic';
   const initialStatus = (autoConfirm ? 'confirmed' : 'requested') satisfies BookingStatus;
   const decidedAt = autoConfirm ? nowIso : null;
+  const reserved = await reserveIdempotencyResponse(c.env.DB, {
+    key: idemKey,
+    lineAccountId: accountId,
+    friendId,
+    body: { error: 'request_in_progress', booking_id: bookingId },
+    ttlMinutes: IDEMPOTENCY_TTL_MINUTES,
+    now: new Date(),
+  });
+  if (!reserved) {
+    const raced = await findIdempotencyResponse(c.env.DB, {
+      key: idemKey, lineAccountId: accountId, friendId, now: new Date(),
+    });
+    if (raced && raced.status !== 202) {
+      return c.json(raced.body as Record<string, unknown>, raced.status as 200 | 201 | 400 | 409 | 422);
+    }
+    return c.json({ error: raced ? 'request_in_progress' : 'idempotency_key_conflict' }, 409);
+  }
   // 競合チェックと INSERT を 1 ステートメントで原子化する。
   // INSERT ... SELECT WHERE NOT EXISTS パターンで、同一スタッフの overlap 行がある場合は
   // 0 行 INSERT に落とす。changes=0 を 409 として扱う。
@@ -1063,22 +1107,31 @@ booking.post('/api/liff/booking/requests', async (c) => {
         blockEndsAt: blockEndsAt.toISOString(),
       }),
     );
-  const insertResult = await insertBookingWithResourceSnapshot(c.env.DB, {
-    bookingInsert,
-    bookingId,
-    lineAccountId: accountId,
-    menuId: body.menu_id,
-  });
+  let insertResult: { inserted: boolean; consumptionCount: number };
+  try {
+    insertResult = await insertBookingWithResourceSnapshot(c.env.DB, {
+      bookingInsert, bookingId, lineAccountId: accountId, menuId: body.menu_id,
+    });
+  } catch (error) {
+    // DB応答だけ消えた場合はcommit済みかもしれない。不在を確認できた
+    // ときだけ自分の仮応答を消す。救出の読取も失敗したら確保を残す。
+    try {
+      const saved = await c.env.DB.prepare('SELECT id FROM bookings WHERE id = ? AND line_account_id = ? AND friend_id = ?')
+        .bind(bookingId, accountId, friendId).first();
+      if (!saved) await releaseReservedIdempotencyResponse(c.env.DB, {
+        key: idemKey, lineAccountId: accountId, friendId, bookingId,
+      });
+    } catch { /* 不明な結果はキーを残して二重作成を止める。 */ }
+    throw error;
+  }
   if (!insertResult.inserted) {
     const err = { error: 'slot_conflict' };
-    await saveIdempotencyResponse(c.env.DB, {
+    await completeIdempotencyResponse(c.env.DB, {
       key: idemKey,
       lineAccountId: accountId,
       friendId,
       status: 409,
       body: err,
-      ttlMinutes: IDEMPOTENCY_TTL_MINUTES,
-      now: new Date(),
     });
     return c.json(err, 409);
   }
@@ -1262,14 +1315,12 @@ booking.post('/api/liff/booking/requests', async (c) => {
     ...(bookingPayment ? { payment: bookingPayment } : {}),
     ...(selfPrepayNotice ? { prepayNotice: selfPrepayNotice } : {}),
   };
-  await saveIdempotencyResponse(c.env.DB, {
+  await completeIdempotencyResponse(c.env.DB, {
     key: idemKey,
     lineAccountId: accountId,
     friendId,
     status: 201,
     body: responseBody,
-    ttlMinutes: IDEMPOTENCY_TTL_MINUTES,
-    now: new Date(),
   });
   return c.json(responseBody, 201);
 });
@@ -3198,6 +3249,23 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), a
   // 作った時点の中身を最初の版として残す（T）。
   await recordMenuVersion(c.env.DB, { menuId: id, staffId: c.get('staff')?.id ?? null });
   return c.json({ id, version: 1 }, 201);
+});
+
+booking.put('/api/booking/admin/menus/order', requirePermission(BOOKING_MENUS_KEY), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const body = await c.req.json<BookingMenuReorderRequest>().catch(() => null);
+  const changes = body?.changes;
+  if (!Array.isArray(changes) || changes.length < 1 || changes.length > 1000 ||
+      changes.some((item) => !item || typeof item.id !== 'string' || !item.id ||
+        !Number.isInteger(item.expectedVersion) || item.expectedVersion < 1 || !Number.isSafeInteger(item.sortOrder)) ||
+      new Set(changes.map((item) => item.id)).size !== changes.length) {
+    return c.json({ error: 'invalid_menu_order' }, 400);
+  }
+  if (!await reorderBookingMenus(c.env.DB, accountId, changes, c.get('staff')?.id ?? null)) {
+    return c.json({ success: false, code: 'version_conflict', error: '予約メニューが更新されています。読み直してください' }, 409);
+  }
+  return c.json({ ok: true, versions: changes.map((item) => ({ id: item.id, version: item.expectedVersion + 1 })) });
 });
 
 booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY), async (c) => {

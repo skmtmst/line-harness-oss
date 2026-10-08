@@ -1,5 +1,6 @@
 /** 統括のひな形一覧にだけ付く表示用の材料。本文や画像URLは含めない。 */
 export interface HqTemplateListDisplay {
+  kind?: import('./template-definition').TemplateKind | null;
   /** 配布に成功したアカウントの現在の表示名。名前順、最大3件。同じアカウントは1件。 */
   distributed_account_names: string[];
   /** 表示した3件を除いたアカウント数。 */
@@ -7,4 +8,13 @@ export interface HqTemplateListDisplay {
   distributed_account_count: number;
   /** 種類と件数の短い要約。最新の内容を確認できない場合はnull。 */
   content_summary: string | null;
+  this_month_sent_count?: number | null;
+  outdated_account_count?: number;
+  current_version?: number | null;
+  friend_count?: number | null;
+  manual_assignment_allowed?: boolean | null;
+  assignment_method?: string | null;
+  display_order?: number | null;
+  display_audience?: string | null;
+  tap_count?: number | null;
 }

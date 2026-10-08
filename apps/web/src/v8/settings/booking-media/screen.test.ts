@@ -2,7 +2,7 @@
  * 予約サイト・グルメ媒体（提案 E-4）の入力の確かめと札の試験。URL は https だけ・ID とパスワードの入った URL は断る。
  */
 import { describe, expect, it } from 'vitest'
-import { checkHttpsUrl, gourmetCode, importBadge, recipientText, shortUrl } from './screen'
+import { checkHttpsUrl, gourmetCode, importBadge, mergeReloadedRows, recipientText, shortUrl, withSavedVersion } from './screen'
 
 describe('予約サイト・グルメ媒体', () => {
   it('URL は https だけ。空は消す。ID・パスワード入りは断る', () => {
@@ -35,5 +35,26 @@ describe('予約サイト・グルメ媒体', () => {
     expect(recipientText({ recipientMode: 'manager', membershipIds: [] }, members)).toBe('店長')
     expect(recipientText({ recipientMode: 'selected', membershipIds: ['m1', 'm2'] }, members)).toBe('店長・ホール責任者（2人）')
     expect(recipientText({ recipientMode: 'selected', membershipIds: ['gone'] }, members)).toBe('選んだスタッフ（1人）')
+  })
+})
+
+describe('途中まで保存できたとき・媒体を足したとき（WEB004/005）', () => {
+  const row = (code: string, pageUrl: string | null, version: number) => ({
+    code, name: code, acceptsReservations: true, pageUrl, loginUrl: null, closeOnBooking: false, version,
+  })
+
+  it('読み直しは、保存していない行の入力を残し、ほかの行はサーバーの値にする', () => {
+    const saved = [row('a', null, 1), row('b', null, 1)]
+    const current = [row('a', 'https://a.example/', 1), row('b', null, 1)]
+    const server = [row('a', null, 1), row('b', 'https://b-other.example/', 2), row('gourmet_x', null, 1)]
+    const merged = mergeReloadedRows(server, current, saved)
+    expect(merged.map((item) => item.pageUrl)).toEqual(['https://a.example/', 'https://b-other.example/', null])
+  })
+
+  it('保存できた行は版だけ進め、入力は残す', () => {
+    const list = [row('a', 'https://a.example/', 1), row('b', 'https://b.example/', 1)]
+    const next = withSavedVersion(list, 'a', 2)
+    expect(next[0]).toMatchObject({ pageUrl: 'https://a.example/', version: 2 })
+    expect(next[1].version).toBe(1)
   })
 })

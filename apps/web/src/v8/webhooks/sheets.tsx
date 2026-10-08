@@ -80,6 +80,16 @@ export function groupRuns(runs: GoogleSheetsSyncRun[]): RunGroup[] {
   return [...groups.values()]
 }
 
+/** WEB233：同期の結果（HTTP 200）から、運用者へ出す失敗の理由。問題が無ければ null。 */
+export function syncResultProblem(data: { status: string; results?: Array<{ status: string; error?: string | null }> } | null | undefined): string | null {
+  if (!data) return null
+  const reason = data.results?.find((result) => result.error)?.error ?? null
+  if (data.status === 'error') return reason ? `同期できませんでした（${reason}）` : '同期できませんでした。時間をおいて、もう一度お試しください。'
+  if (data.status === 'partial') return reason ? `一部だけ書き出しました（${reason}）` : '一部だけ書き出しました。記録で失敗した内容を確かめてください。'
+  if (data.status === 'already_running') return 'いま同期しています。終わってから、もう一度お試しください。'
+  return null
+}
+
 export default function WebhooksSheetsV8() {
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -241,8 +251,14 @@ export default function WebhooksSheetsV8() {
     try {
       const res = await api.webhooks.googleSheets.sync(accountId)
       if (accountRef.current !== accountId) return
-      if (!res.success) setActionError(res.error)
+      /*
+       * WEB233：同期の失敗は、HTTP 200 のまま data.status / results で返ることがある。
+       * 読み直し（load）は帯の文を消すので、読み直したあとに理由を出す。
+       */
+      const problem = res.success ? syncResultProblem(res.data) : res.error
       await load()
+      if (accountRef.current !== accountId) return
+      if (problem) setActionError(problem)
     } catch {
       if (accountRef.current !== accountId) return
       setActionError('同期を始められませんでした。時間をおいて、もう一度お試しください。')

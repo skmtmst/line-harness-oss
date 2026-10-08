@@ -10,7 +10,7 @@
  * 保存した URL は「今日のお店」の右の列と「枠を閉じる知らせ」の［管理画面を開く ↗］に使われる。
  * 動きは BEHAVIOR.md。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, Info, MessageCircle, Plus } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -105,6 +105,23 @@ function sameRow(a: MediaRow, b: MediaRow): boolean {
   return a.pageUrl === b.pageUrl && a.loginUrl === b.loginUrl && a.closeOnBooking === b.closeOnBooking
 }
 
+/**
+ * WEB005：読み直した行に、まだ保存していない入力を重ねる。入力中の行は
+ * 自分の入力と（読み込んだときの）版を残し、ほかの行はサーバーの値にする。
+ */
+export function mergeReloadedRows(server: MediaRow[], current: MediaRow[], saved: MediaRow[] | null): MediaRow[] {
+  return server.map((row) => {
+    const mine = current.find((item) => item.code === row.code)
+    const before = saved?.find((item) => item.code === row.code)
+    return mine && before && !sameRow(before, mine) ? mine : row
+  })
+}
+
+/** WEB004：1行の保存が通ったら、その行の版だけ進める（入力は残す）。 */
+export function withSavedVersion(list: MediaRow[], code: string, version: number): MediaRow[] {
+  return list.map((item) => (item.code === code ? { ...item, version } : item))
+}
+
 function UrlCell({ url }: { url: string | null }) {
   if (!url) return <span className={styles.none}>—</span>
   return (
@@ -126,6 +143,10 @@ export default function BookingMediaPage() {
   const [stores, setStores] = useState<RestaurantStore[]>([])
   const [storeId, setStoreId] = useState('')
   const [saved, setSaved] = useState<MediaRow[] | null>(null)
+  const savedRef = useRef<MediaRow[] | null>(null)
+  savedRef.current = saved
+  /* WEB005：保存していない変更があるまま店舗を変えるときは確かめる。 */
+  const [pendingStoreId, setPendingStoreId] = useState<string | null>(null)
   const [rows, setRows] = useState<MediaRow[]>([])
   const [channels, setChannels] = useState<ChannelState[]>([])
   const [loadError, setLoadError] = useState<unknown>(null)
@@ -167,7 +188,11 @@ export default function BookingMediaPage() {
     return () => { current = false }
   }, [selectedAccountId])
 
-  const load = useCallback(async () => {
+  /*
+   * WEB005：読み直し（媒体を足したあとなど）は、まだ保存していない行の入力を消さない。
+   * 入力中の行は自分の入力と版を残し、ほかの行だけサーバーの値にする。
+   */
+  const load = useCallback(async (options?: { keepEdits?: boolean }) => {
     if (!selectedAccountId || !storeId) return
     try {
       const [links, channelRows] = await Promise.all([
@@ -184,7 +209,12 @@ export default function BookingMediaPage() {
         closeOnBooking: !!row.closeOnBooking,
         version: row.version,
       }))
-      setSaved(next); setRows(next); setChannels(channelRows); setLoadError(null); setConflict(false)
+      if (options?.keepEdits) {
+        setRows((current) => mergeReloadedRows(next, current, savedRef.current))
+      } else {
+        setRows(next)
+      }
+      setSaved(next); setChannels(channelRows); setLoadError(null); setConflict(false)
     } catch (caught) {
       setLoadError(caught)
     }
@@ -268,7 +298,7 @@ export default function BookingMediaPage() {
       await restaurantTestApi.addGourmetMedia(selectedAccountId, { code: gourmetCode(), name })
       setAdding(false); setAddName('')
       notifyToast(`グルメ媒体「${name}」を足しました。URL は行の「…」から入れます`)
-      await load()
+      await load({ keepEdits: true })
     } catch (caught) {
       setAddError(caught instanceof ApiError && caught.status === 409 ? '同じ媒体が登録済みです' : '媒体を足せませんでした。もう一度お試しください')
     } finally {
@@ -281,15 +311,31 @@ export default function BookingMediaPage() {
     setSaving(true); setSaveError('')
     try {
       for (const row of dirty) {
-        await restaurantTestApi.saveMediaLink(selectedAccountId, row.code, {
+        const res = await restaurantTestApi.saveMediaLink(selectedAccountId, row.code, {
           storeId, pageUrl: row.pageUrl, loginUrl: row.loginUrl, closeOnBooking: row.acceptsReservations && row.closeOnBooking, expectedVersion: row.version,
         })
+        /*
+         * WEB004：1行ずつ保存できた分は、その場で新しい版と保存済みの値にする。
+         * 途中の行で失敗してやり直したとき、保存できた行を古い版で送り直して 409 にしない。
+         * 入力（rows）は消さず、版だけ進める。
+         */
+        const version = res.data?.version
+        if (typeof version === 'number') {
+          const savedRow = { ...row, version }
+          setRows((list) => withSavedVersion(list, row.code, version))
+          setSaved((list) => list ? list.map((item) => (item.code === row.code ? savedRow : item)) : list)
+        }
       }
       if (notice && noticeDirty) {
-        await restaurantTestApi.saveCloseNotificationSettings(selectedAccountId, {
+        const res = await restaurantTestApi.saveCloseNotificationSettings(selectedAccountId, {
           storeId, notifyReopen: notice.notifyReopen, recipientMode: notice.recipientMode,
           membershipIds: notice.recipientMode === 'selected' ? notice.membershipIds : [], expectedVersion: notice.version,
         })
+        const version = (res as { data?: { version?: number } } | undefined)?.data?.version
+        if (typeof version === 'number') {
+          const next = { ...notice, version }
+          setNotice(next); setNoticeSaved(next)
+        }
       }
       notifyToast('予約サイト・グルメ媒体の設定を保存しました')
       await Promise.all([load(), loadNotice()])
@@ -380,7 +426,7 @@ export default function BookingMediaPage() {
             <span className={styles.headActions}>
               {stores.length > 1 ? (
                 <span className={styles.storeSelect}>
-                  <Select aria-label="店舗" value={storeId} onChange={(value) => setStoreId(value)} options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+                  <Select aria-label="店舗" value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ value: s.id, label: s.name }))} />
                 </span>
               ) : null}
               {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError('') }}><Plus size={15} aria-hidden="true" />媒体を足す</Button> : null}
@@ -518,6 +564,15 @@ export default function BookingMediaPage() {
         busy={saving}
         onCancel={() => { if (!saving) cancelLeave() }}
         onConfirm={() => { confirmLeave() }}
+      />
+
+      <UnsavedLeaveDialog
+        open={pendingStoreId !== null}
+        subject="予約サイト・グルメ媒体の変更"
+        description="店舗を切り替えると、保存していない変更が消えます。"
+        busy={saving}
+        onCancel={() => setPendingStoreId(null)}
+        onConfirm={() => { if (pendingStoreId) setStoreId(pendingStoreId); setPendingStoreId(null) }}
       />
 
       <Dialog

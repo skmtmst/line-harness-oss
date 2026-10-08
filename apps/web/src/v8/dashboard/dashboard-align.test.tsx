@@ -39,9 +39,8 @@ describe('右の列を帯の1マス分にする口', () => {
     expect(css).toMatch(/\.dashboardRow\[data-aside-size='column'\] \{ display: grid; grid-template-columns: repeat\(var\(--tpl-dash-cols\), minmax\(0, 1fr\)\); \}/)
     expect(css).toMatch(/\[data-aside-size='column'\] > \.dashboardCell \{ grid-column: 1 \/ -2; \}/)
     expect(css).toMatch(/\[data-aside-size='column'\] > \.dashboardAside \{ grid-column: -2 \/ -1; width: auto; \}/)
-    // 横並びの段も等分の格子（flex の配分だと線の太さ分ずれる）。高さの下限は置かない（中身の下に空きを作らない）。
-    expect(css).toMatch(/\.dashboardColumns \{ display: grid; grid-auto-flow: column; grid-auto-columns: minmax\(0, 1fr\); \}/)
-    expect(css).not.toMatch(/\.dashboardColumns \{ min-height/)
+    // 横並びの段も等分の格子（flex の配分だと線の太さ分ずれる）。高さは絵（WQmep の下の4つ＝200）に合わせた下限だけ置く（中身が増えれば伸びる）。
+    expect(css).toMatch(/\.dashboardColumns \{ min-height: 200px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax\(0, 1fr\); \}/)
   })
 
   it('狭い板（1100 未満）でも 1マス分の右の列は隠さない', () => {
@@ -86,12 +85,12 @@ describe('読めなかった項目は日本語の名前', () => {
 describe('右の列：現在の対応状況と接続状態', () => {
   it('対応状況の4行は状態の色の丸を前に置く（未対応 赤・対応中 橙・保留 灰・対応済み 緑）', () => {
     const { container } = render(<SupportStatus inbox={{ unanswered: 5, inProgress: 0, onHold: 0, resolved: 38 } as never} autoOnInbound />)
-    const dots = [...container.querySelectorAll('a > span[aria-hidden="true"]')].map((dot) => dot.className)
+    const dots = [...container.querySelectorAll('a span[aria-hidden="true"]')].map((dot) => (dot as HTMLElement).dataset.tone)
     expect(dots).toHaveLength(4)
-    expect(dots[0]).toMatch(/dot_danger/)
-    expect(dots[1]).toMatch(/dot_warning/)
-    expect(dots[2]).not.toMatch(/dot_(danger|warning|success)/)
-    expect(dots[3]).toMatch(/dot_success/)
+    expect(dots[0]).toBe('danger')
+    expect(dots[1]).toBe('warning')
+    expect(dots[2]).toBe('neutral')
+    expect(dots[3]).toBe('success')
   })
 
   it('Webhook の値は 正常／要確認（理由つき）／未確認。「確認中」で止まらない', () => {
@@ -156,5 +155,51 @@ describe('ダッシュボード編集の表示の切り替え', () => {
     await act(async () => { render(<DashboardEditor {...props()} />) })
     expect(screen.queryByRole('switch', { name: '写真審査を表示' })).toBeNull()
     expect(document.querySelector('input[aria-label="写真審査を非表示にする"]')).not.toBeNull()
+  })
+})
+
+describe('狭い幅でも題を「…」で切らない（1280・1152）', () => {
+  const dashCss = readFileSync(join(__dirname, 'dashboard.module.css'), 'utf8')
+  const headerCss = readFileSync(join(__dirname, '../../components/shared/section-header.module.css'), 'utf8')
+
+  it('ダッシュボードの段の題は行き先を次の行へ回せる（入るときは1行のまま）', async () => {
+    const { default: Head } = await import('./head')
+    const { container } = render(<Head title="現在の対応状況" href="/chats" linkLabel="受信箱を見る" />)
+    expect(container.querySelector('[data-wrap]')).not.toBeNull()
+    expect(headerCss).toMatch(/\.root\[data-wrap\] \{\s*flex-wrap: wrap;/)
+  })
+
+  it('右の列の余白は狭い板で詰め、1152 の板では題の箱の高さを中身に合わせる', () => {
+    expect(dashCss).toMatch(/@container v8-page \(max-width: 1099px\) \{\s*\.asideBlock \{ padding: var\(--tpl-db-aside-pad-narrow\); \}/)
+    expect(dashCss).toMatch(/@container v8-page \(max-width: 959px\) \{\s*\.head \{ height: auto; min-height: var\(--tpl-db-head-h\); \}/)
+  })
+
+  it('数のマスの「…」は絵の 16px（部品の 36px の箱を受けない）', () => {
+    expect(dashCss).toMatch(/\.cellMenu\.cellMenu \{[^}]*flex-basis: var\(--tpl-db-menu\);/)
+  })
+
+  it('送信枠の数字は比例幅、グラフの日付は棒の真ん中', () => {
+    expect(dashCss).toMatch(/\.quotaNum \{[^}]*font-variant-numeric: normal;/)
+    expect(dashCss).toMatch(/\.day, \.dayLatest \{[^}]*text-align: center;/)
+  })
+})
+
+describe('概要が取れないとき・やり直しの言葉', () => {
+  it('送信枠は骨組みのまま待たせず「読み込めませんでした」と「もう一度試す」', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    const { SendQuota } = await import('./sections')
+    const onRetry = vi.fn()
+    render(<SendQuota overviewFailed delivery={null} metric={undefined} onRetry={onRetry} />)
+    expect(screen.getByText(/データを読み込めませんでした/)).toBeTruthy()
+    expect(screen.queryByLabelText('送信枠を読み込んでいます')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
+  it('概要が取れないとき送信枠以外の段も骨組みを出し続けない（data なし・読み込み終わり・失敗あり）', () => {
+    const src = readFileSync(join(__dirname, 'dashboard.tsx'), 'utf8')
+    expect(src).toContain("const overviewFailed = !data && !d.loading && d.error !== ''")
+    expect(src).toContain('const unavailable = (key: Parameters<typeof d.sectionAvailable>[0]) => overviewFailed || (data && !d.sectionAvailable(key))')
+    expect(src).toContain('if (!data && !overviewFailed) return null')
   })
 })

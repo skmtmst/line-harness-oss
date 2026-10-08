@@ -42,7 +42,7 @@ afterEach(() => {
 
 const CASES = [
   { type: 'form' as const, label: '回答フォーム', target: 'form-submissions' as const },
-  { type: 'tag' as const, label: '友だち属性', target: 'tags' as const },
+  { type: 'tag' as const, label: 'タグ', target: 'tags' as const },
   { type: 'rich_menu' as const, label: 'リッチメニュー', target: 'rich-menus' as const },
   { type: 'template' as const, label: 'テンプレート', target: 'templates' as const },
 ]

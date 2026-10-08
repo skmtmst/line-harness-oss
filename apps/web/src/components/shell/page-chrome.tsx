@@ -26,6 +26,12 @@ import { setDocumentTitle } from '@/lib/document-title'
 export interface PageCrumb {
   label: string
   href?: string
+  /**
+   * 同じ URL のまま中の段だけ替える画面で、押したら一覧の段へ戻す動き（★V8・2026-10-08）。
+   * 板の頭の「← 〇〇へ」を無くしたので、戻るのは上の帯のパンくず。書きかけなら確かめてから動く。
+   * 中身で比べる（JSON）ので、渡す関数は描き直しで変わってもよいが、最新の動きを呼ぶよう ref 越しに渡す。
+   */
+  onSelect?: () => void
 }
 
 export interface PageChrome {

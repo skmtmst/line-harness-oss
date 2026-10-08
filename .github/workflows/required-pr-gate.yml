@@ -550,6 +550,7 @@ jobs:
     # 今までどおり止まる。1（崩れの確認）は飛ばさない。
     env:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8788
+      NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -641,6 +642,9 @@ jobs:
       - name: No layout breaks at 1152, 1440 and 1920 (v7 and v8)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
+      - name: All admin page titles are 22px / 700 / 32px at 1440
+        if: steps.scope.outputs.run == 'true'
+        run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv
       # 速さ予算（2026-10-04 オーナー採用「1」、同日司令塔決定で判定を変更）。
       # 主要10画面を V8 で開き、1画面3回測った真ん中で比べる。
       # 落とすのは悪化だけ：時間は基準より20%、JS は1KB超の増加。

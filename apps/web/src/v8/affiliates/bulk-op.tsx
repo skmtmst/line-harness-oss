@@ -7,11 +7,11 @@
  *
  * 認めない札の補足に「理由を書きます」とは書かない。却下理由の記録は未接続のため。
  */
+import { Steps } from '@/components/templates/steps'
 import { useState } from 'react'
 import { ArrowRight, Check, ListChecks, X } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Stepper from '@/components/shared/stepper'
 import { formatNumber } from '@/lib/format'
 import styles from './affiliates.module.css'
 
@@ -50,7 +50,7 @@ export default function BulkOpWizard({
       description="対象を確認してから操作を選んでください"
       onCancel={onClose}
       steps={(
-        <Stepper
+        <Steps
           label="まとめて操作の進み"
           currentKey="choose"
           steps={[

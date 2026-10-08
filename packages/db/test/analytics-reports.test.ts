@@ -325,4 +325,16 @@ describe('V6 定期レポート', () => {
     expect(recent[0].lastRun).toBeNull();
     expect(await getRecentOneTimeAnalyticsReportRuns(db, 'account-b')).toEqual([]);
   });
+  it('PKG39: 分析OFFの10件を保持しながら後ろのONの定期配信を選ぶ', async () => {
+    sqlite.exec("INSERT INTO account_settings(id,line_account_id,key,value) VALUES('off','account-a','feature.analytics','false'),('on','account-b','feature.analytics','true')");
+    for (let i=0; i<11; i++) await createAnalyticsReportSchedule(db, {
+      lineAccountId: i<10 ? 'account-a' : 'account-b', name: `Report${i}`, sections: ['friends'],
+      savedAnalysisIds: [], cadence: 'weekly', weekday: 1, monthDay: null, sendTime: '09:00', timeZone: 'Asia/Tokyo', periodDays: 7,
+      recipients: [], channels: ['dashboard'], alertRules: [], nextRunAt: i<10 ? '2026-10-01T00:00:00Z' : '2026-10-02T00:00:00Z',
+      createdBy: 'staff', now: '2026-09-01T00:00:00Z',
+    });
+    for (let i=0; i<2; i++) expect((await claimDueAnalyticsReportSchedules(db, '2026-10-08T00:00:00Z')).map(row => row.lineAccountId)).toEqual(['account-b']);
+    expect(sqlite.prepare("SELECT COUNT(*) n FROM analytics_report_schedules WHERE line_account_id='account-a' AND next_run_at='2026-10-01T00:00:00Z'").get()).toEqual({ n: 10 });
+  });
+
 });

@@ -27,7 +27,7 @@
 
 .progress { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
 
-/* 数のカード4枚（余白14・間4・題/数/単位の3段） */
+/* 数のカード4枚（余白14・間4・題と「数＋単位」の2段。B-33：単位は数の横に1行） */
 .cards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -63,6 +63,14 @@
 }
 
 .statWarn { color: var(--color-status-warn-deep); }
+
+.statLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-hq-card-gap);
+  min-width: 0;
+  white-space: nowrap;
+}
 
 .statSub {
   color: var(--color-ink-faint);
@@ -106,7 +114,7 @@
   flex-direction: column;
   gap: var(--tpl-hq-form-gap);
   min-width: 0;
-  min-height: var(--tpl-hq-home-account-h);
+  height: var(--tpl-hql-home-card-h);
   padding: var(--tpl-hq-home-account-pad);
   border-radius: var(--radius-card);
   outline: 1px solid var(--color-hairline);
@@ -116,21 +124,16 @@
 
 .cardWarn { outline-color: var(--color-status-warn-deep); }
 /*
- * 絵 JKjsE（2026-10-07 直し）：並ぶカードは全部同じ高さ240、余白は上下左右18。
- * ボタンの段は「すき間」（.cardGap）でカードの下へ押し、名前が2行のカードでも位置をそろえる。
- * すき間の前後にも段の間12が入る（絵どおり）。接続の注意の行があるカードは、その行が
- * ボタンの下に入り、絵と同じく下の余白を詰めて同じ高さ240に収める。
+ * JKjsE の書き出しは高さ206。通常カードの操作は下へ寄せ、要確認のカードは
+ * 下に確認の行を置く。狭い板では中身に合わせた高さに戻し、はみ出しを防ぐ。
  */
-.cardGap { flex: 1 1 0; }
-.cardWarn { padding-bottom: var(--tpl-hq-home-warn-pad-end); }
-/* 要確認の行はボタンのすぐ下（間2）に置き、下の余白の中に収める。名前の下が2行になっても高さ240のまま（絵 JKjsE）。 */
-.cardWarn .warnLine { margin-top: var(--tpl-hq-home-warn-pull); }
 
 .cardHead {
   display: flex;
   align-items: center;
   gap: var(--tpl-hq-attach-gap);
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .logo {
@@ -171,30 +174,15 @@
 
 .meta {
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-hq-small-lh);
-}
-
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--tpl-hq-feature-gap);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tag {
-  padding: var(--tpl-hq-pill-pad);
-  background: var(--color-canvas);
-  border-radius: var(--radius-mini);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-hq-pill-lh);
-  white-space: nowrap;
 }
 
 .stats {
@@ -202,6 +190,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--tpl-hq-form-gap);
   margin: 0;
+  flex-shrink: 0;
 }
 
 .stat { display: flex; flex-direction: column; gap: var(--tpl-hq-nav-gap); min-width: 0; }
@@ -212,6 +201,13 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-hq-plan-head-gap);
+  margin-top: var(--tpl-hq-body-gap);
+  flex-shrink: 0;
+}
+.card:not(.cardWarn) .cardButtons { margin-top: auto; }
+@container v8-page (max-width: 1099px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card { height: auto; min-height: var(--tpl-hql-home-card-h); }
 }
 
 .grow { flex: 1; min-width: 0; }

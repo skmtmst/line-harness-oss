@@ -14,7 +14,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { AlertCircle, ArrowLeft, CheckCircle2, Clock, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -106,6 +106,8 @@ function FriendAddRunDetailInner() {
     const query = params.toString()
     return `/friend-add-settings/runs${query ? `?${query}` : ''}`
   }, [searchParams])
+  /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
+  usePageCrumbs([{ label: '友だち追加時の配信', href: '/friend-add-settings' }, { label: '実行結果', href: listHref }])
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
   const canManage = role === null || canManageRole(role)

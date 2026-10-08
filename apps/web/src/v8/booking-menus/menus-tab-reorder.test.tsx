@@ -163,3 +163,20 @@ describe('予約メニューの並び替え', () => {
     expect(toasts.at(-1)).toContain('予約メニューを保存できませんでした')
   })
 })
+
+describe('並べ替えが途中で失敗し、戻しもできなかったとき（WEB052）', () => {
+  it('「一部だけが変わりました」と知らせる', async () => {
+    // 1件目（カット→20）は通り、2件目で失敗、戻す（カット→10）も失敗する。
+    updateMenu.mockImplementation(async (_account: string, id: string, version: number, body: Partial<BookingMenu>) => {
+      calls += 1
+      if (calls >= 2) throw new Error('network')
+      const row = server.find((item) => item.id === id)!
+      row.sort_order = body.sort_order as number
+      row.version = version + 1
+      return { ok: true, version: row.version }
+    })
+    const { container } = render(<Harness />)
+    await moveBy('key', container)
+    expect(toasts.at(-1)).toContain('一部だけが変わりました')
+  })
+})

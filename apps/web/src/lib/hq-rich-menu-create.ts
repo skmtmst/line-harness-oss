@@ -4,9 +4,12 @@ import type { RichMenuDefinition } from './hq-templates-api'
 import { TEMPLATES } from './rich-menu-templates'
 
 export class HqRichMenuCompatibilityError extends Error {
+  /** 画面にそのまま出せる日本語の理由。 */
+  readonly reason: string
   constructor(message: string) {
     super(message)
     this.name = 'HqRichMenuCompatibilityError'
+    this.reason = message
   }
 }
 
@@ -142,6 +145,129 @@ export function richMenuCreateValueToHqDefinition(value: RichMenuCreateValue, pr
       size: value.size,
       pages,
       defaultPageId: pages.some((page) => page.id === old.defaultPageId) ? old.defaultPageId : pages[0].id,
+    },
+  }
+}
+
+/* ───── 統括のリッチメニューを、店のリッチメニューの作る画面（app/rich-menus/new/create-v8.tsx）で作る口（B-36・gobhu〜gQabc） ───── */
+
+/**
+ * 作る画面が手順①〜④の間に画面の中で持つ統括のひな形。店は手順ごとにサーバーへ下書きを保存するが、
+ * 統括のひな形は一度に保存する形なので、最後に一度だけ統括のひな形の口へ保存する。
+ */
+export interface HqRichMenuSeed {
+  /** 保存してある定義の id（新しく作るときは無い）。 */
+  id?: string
+  name: string
+  chatBarText: string
+  folderId: string | null
+  size: 'large' | 'compact'
+  /** 誰に出すか：すべての友だち（配った先の既定）／配った先で店が決める。 */
+  displayAudience: 'all' | 'store'
+  displayOrder: number
+  defaultPageId: string
+  pages: Array<{ id: string; name: string; imageR2Key: string | null; areas: Area[] }>
+}
+
+/** 統括のひな形で選べるボタンの動き（配った先の同じ名前の参照に直せるもの）。 */
+export const HQ_RICH_MENU_INTENTS = ['url', 'text', 'form', 'template', 'switch'] as const
+
+const HQ_ID = /^[A-Za-z0-9_-]{1,128}$/
+
+export function hqRichMenuSeedFromDefinition(definition: RichMenuDefinition, folderId: string | null): HqRichMenuSeed {
+  const menu = definition.richMenu
+  return {
+    id: menu.id,
+    name: menu.name,
+    chatBarText: menu.chatBarText,
+    folderId,
+    size: menu.size,
+    displayAudience: menu.displayAudience === 'all' ? 'all' : 'store',
+    displayOrder: menu.displayOrder ?? 0,
+    defaultPageId: menu.defaultPageId,
+    pages: menu.pages.map((page) => ({
+      id: page.id,
+      name: page.name,
+      imageR2Key: page.imageR2Key || null,
+      areas: page.areas.map((area) => ({
+        id: area.id,
+        boundsX: area.bounds.x,
+        boundsY: area.bounds.y,
+        boundsWidth: area.bounds.width,
+        boundsHeight: area.bounds.height,
+        actionType: area.actionType,
+        actionData: { ...area.actionData },
+        intent: area.intent ?? null,
+        label: area.label ?? null,
+        tagIds: [...(area.tagIds ?? [])],
+        scoreChange: null,
+        templateId: area.templateId ?? null,
+        formId: area.formId ?? null,
+        trackedLinkId: null,
+      })),
+    })),
+  }
+}
+
+const ACTION_BY_INTENT = { url: 'uri', form: 'uri', text: 'message', template: 'postback', switch: 'richmenuswitch' } as const
+
+/** 画面の中の下書きを、統括のひな形の定義にする。統括で持てない動き・参照は保存の前に断る。 */
+export function hqRichMenuDefinitionFromSeed(seed: HqRichMenuSeed): RichMenuDefinition {
+  const used = new Set<string>()
+  const pageIds = new Map<string, string>()
+  seed.pages.forEach((page, index) => {
+    const id = HQ_ID.test(page.id) && !used.has(page.id) ? page.id : uniqueId('page', used)
+    used.add(id)
+    pageIds.set(page.id, id)
+    void index
+  })
+  const pages = seed.pages.map((page) => {
+    if (!page.imageR2Key) fail(`ページ「${page.name}」の画像を選んでください。`)
+    return {
+      id: pageIds.get(page.id)!,
+      name: page.name.trim() || 'ページ',
+      imageR2Key: page.imageR2Key ?? '',
+      areas: page.areas.map((area, index) => {
+        const name = area.label?.trim() || `面 ${String.fromCharCode(65 + index)}`
+        if (area.trackedLinkId) fail(`「${name}」の計測リンクは店ごとの参照です。配った先で決めてください。`)
+        if (area.scoreChange != null && area.scoreChange !== 0) fail(`「${name}」のスコアは統括のひな形では決められません。`)
+        const intent = area.intent
+        if (!intent || !(HQ_RICH_MENU_INTENTS as readonly string[]).includes(intent)) fail(`「${name}」の動きを決めてください（統括では URL・メッセージ・回答フォーム・テンプレート・メニューの切り替えだけ選べます）。`)
+        const hqIntent = intent as typeof HQ_RICH_MENU_INTENTS[number]
+        if (area.tagIds?.length && hqIntent !== 'text' && hqIntent !== 'template') fail(`「${name}」でタグを付けられるのは「メッセージを送る」「テンプレートを送る」だけです。`)
+        const data = area.actionData ?? {}
+        const actionData: Record<string, string> = hqIntent === 'url' ? { uri: String(data.uri ?? '') }
+          : hqIntent === 'text' ? { text: String(data.text ?? '') }
+          : hqIntent === 'switch' ? { targetPageId: pageIds.get(String(data.targetPageId ?? '')) ?? String(data.targetPageId ?? '') }
+          : {}
+        const id = HQ_ID.test(area.id) && !used.has(area.id) ? area.id : uniqueId('area', used)
+        used.add(id)
+        return {
+          id,
+          bounds: { x: area.boundsX, y: area.boundsY, width: area.boundsWidth, height: area.boundsHeight },
+          actionType: ACTION_BY_INTENT[hqIntent],
+          actionData,
+          intent: hqIntent,
+          ...(area.label?.trim() ? { label: area.label.trim() } : {}),
+          ...(area.tagIds?.length ? { tagIds: [...area.tagIds] } : {}),
+          ...(hqIntent === 'form' && area.formId ? { formId: area.formId } : {}),
+          ...(hqIntent === 'template' && area.templateId ? { templateId: area.templateId } : {}),
+        }
+      }),
+    }
+  })
+  const menuId = seed.id && HQ_ID.test(seed.id) ? seed.id : uniqueId('menu', used)
+  return {
+    schemaVersion: 1,
+    richMenu: {
+      id: menuId,
+      name: seed.name.trim(),
+      chatBarText: seed.chatBarText.trim(),
+      size: seed.size,
+      defaultPageId: pageIds.get(seed.defaultPageId) ?? pages[0]?.id ?? '',
+      displayOrder: Math.max(0, Math.round(seed.displayOrder)),
+      displayAudience: seed.displayAudience,
+      pages,
     },
   }
 }

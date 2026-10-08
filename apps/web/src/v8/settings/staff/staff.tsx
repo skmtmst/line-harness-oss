@@ -652,7 +652,7 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
   return <Modal onClose={onClose} wide><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold text-ink">二段階認証を設定</h2><p className="mt-1 text-xs text-ink-secondary">認証アプリを登録して、ログインを安全にします。</p></div></div>
     <div className="mt-5 grid grid-cols-2 gap-2 text-sm"><div className="rounded-control bg-accent-soft px-4 py-3 font-medium text-accent-deep">1　QRコードを読み取る</div><div className="rounded-control bg-canvas-sunken px-4 py-3 text-ink-secondary">2　6桁コードを入力</div></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
     <div className={`mt-5 grid gap-5 ${styles.twoFactorGrid}`}>{qr ? <img src={qr} alt="Authenticator登録用QRコード" className={`${styles.qrImage} rounded-control border border-hairline`} /> : <DelayedSkeleton loading skeleton={<Skeleton width={220} height={220} className="block rounded-control" />} />}<div><h3 className="font-semibold text-ink">認証アプリで読み取る</h3><p className="mt-3 text-sm leading-6 text-ink-secondary">Google Authenticator、Microsoft AuthenticatorなどでQRコードを読み取ってください。</p><div className="mt-4 rounded-control bg-info-bg p-3"><p className="text-xs text-ink-secondary">読み取れない場合はキーを手動入力</p><p className="mt-1 break-all font-mono text-sm font-bold tracking-wider text-ink">{manualKey || '—'}</p></div></div></div>
-    <p id="staff-totp-label" className="mt-5 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p><div className="mt-2">{/* ★V7 共通 認証コード入力（xHzFK）。 */}<OtpInput value={code} onChange={setCode} onComplete={(entered) => void save(entered)} labelledBy="staff-totp-label" invalid={Boolean(error)} busy={saving} /></div><p className="mt-4 rounded-control bg-info-bg p-3 text-xs text-ink-secondary">登録後はLINEログインのあとに認証アプリのコード入力が必要です。</p>
+    <p id="staff-totp-label" className="mt-5 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p><div className="mt-2">{/* 共通 OTP入力（Pencil ★V8 RfHCo）。 */}<OtpInput value={code} onChange={setCode} onComplete={(entered) => void save(entered)} labelledBy="staff-totp-label" invalid={Boolean(error)} busy={saving} /></div><p className="mt-4 rounded-control bg-info-bg p-3 text-xs text-ink-secondary">登録後はLINEログインのあとに認証アプリのコード入力が必要です。</p>
     <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving || !uri}>✓ {saving ? '確認中…' : '設定を完了'}</Button></div></Modal>
 }
 
@@ -790,6 +790,32 @@ function StaffPageHost() {
     }
   }, [selectedAccountId])
   useEffect(() => { void load() }, [load])
+  /*
+   * WEB203：ログインユーザーは200人ずつ読む。全員より少ないときは、続きを読み込んで
+   * 検索・絞り込み・ページ送りが全員に効くようにする（打ち切りの注意だけで終わらせない）。
+   */
+  const usersAccountRef = useRef(selectedAccountId)
+  usersAccountRef.current = selectedAccountId
+  const [moreUsersBusy, setMoreUsersBusy] = useState(false)
+  const [moreUsersError, setMoreUsersError] = useState('')
+  const loadMoreUsers = async () => {
+    if (moreUsersBusy) return
+    const scope = selectedAccountId ?? undefined
+    const offset = accessUsers.length
+    setMoreUsersBusy(true)
+    setMoreUsersError('')
+    try {
+      const result = await api.access.users({ lineAccountId: scope, limit: 200, offset })
+      if ((usersAccountRef.current ?? undefined) !== scope) return
+      if (!result.success) throw new Error(result.error)
+      setAccessUsers((current) => [...current, ...result.data.items.filter((item) => !current.some((known) => known.id === item.id))])
+      setUsersTotal(result.data.pagination?.total ?? usersTotal)
+    } catch {
+      setMoreUsersError('続きを読み込めませんでした。もう一度お試しください。')
+    } finally {
+      setMoreUsersBusy(false)
+    }
+  }
   /*
    * 入った記録は「入った記録」タブでだけ読む。最初に全部のタブぶんを
    * 先読みすると、表の中身(LoginAudit)が別に読み直す二重取りになる。
@@ -1086,6 +1112,10 @@ function StaffPageHost() {
               {!loading && !error ? (
                 <div className={styles.listFoot}>
                   <p>{`ログインユーザー ${filteredUsers.length}人中 ${shown.length}人を表示${usersTotal > accessUsers.length ? `（全${usersTotal}人中${accessUsers.length}人まで読み込み）` : ''}`}</p>
+                  {usersTotal > accessUsers.length ? (
+                    <Button variant="secondary" size="compact" onClick={() => void loadMoreUsers()} disabled={moreUsersBusy} busy={moreUsersBusy}>続きを読み込む</Button>
+                  ) : null}
+                  {moreUsersError ? <p role="alert">{moreUsersError}</p> : null}
                   <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} />
                 </div>
               ) : null}

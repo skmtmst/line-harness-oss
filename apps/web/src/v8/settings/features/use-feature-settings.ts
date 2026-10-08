@@ -71,7 +71,7 @@ type FeatureSaveResponse = {
 /*
  * オン／オフを持たない項目だけが使う、分類ごとの利用数バッジ。
  * 切り替えられる機能（keys を持つ行）は共有カタログの featureId で
- * 機械照合する features 側を見る。ここに残るのは「友だち属性」だけ。
+ * 機械照合する features 側を見る。ここに残るのは「タグ」だけ。
  */
 const USAGE_ITEM_IDS_BY_KEY: Record<string, string[]> = {
   friend_attributes: ['friend-attributes'],
@@ -295,7 +295,12 @@ export function useFeatureSettings() {
     return splitFeatureGroups(groups, 3)
   }, [groups])
 
+  /*
+   * WEB191：保存中は切り替えを受け付けない。保存後の読み直しはサーバー値で
+   * features を置き換えるので、保存中に押した変更は黙って消える。
+   */
   const toggleItem = (item: FeatureItem, next: boolean) => {
+    if (saving) return
     if (item.required || item.keys.length === 0) return
     setFeatures((current) => {
       const changed = { ...current }
@@ -305,6 +310,7 @@ export function useFeatureSettings() {
   }
 
   const toggleGroup = (group: FeatureGroup, next: boolean) => {
+    if (saving) return
     setFeatures((current) => {
       const changed = { ...current }
       for (const item of group.items) {
@@ -476,6 +482,9 @@ export function useFeatureSettings() {
           setItemOrder(currentOrder)
         }
       } catch {
+        // WEB190：読み直しの失敗でも、途中でアカウントが変わっていたら
+        // 前のアカウントの版・中身を今の画面へ書かない。
+        if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
         setSettingsVersion(response.data.version)
         setSavedFeatures({ ...features })
         setSavedItemOrder(currentOrder)

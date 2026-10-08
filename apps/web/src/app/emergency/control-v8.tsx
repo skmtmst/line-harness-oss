@@ -387,7 +387,8 @@ const EmergencyControlV8 = (
         lineAccountId: targetAccountId === 'all' ? null : targetAccountId,
         capabilities: selectedCapabilities,
         reason: reason.trim(),
-        detail: null,
+        // WEB313：入力欄の補足をそのまま送る（空なら null）。
+        detail: reasonDetail.trim() || null,
         confirmation: '停止',
         expectedVersion: control.version,
       }, grant.data.token, requestKey)
@@ -550,10 +551,11 @@ const EmergencyControlV8 = (
             <span className={styles.kpiLabel}>緊急停止状態</span>
           </div>
           <p className={`${styles.kpiValue} ${isStopped ? styles.kpiValueDanger : ''}`}>
-            {previewSettled ? (isStopped ? '止めている' : '動いている') : '—'}
+            {/* WEB312：状態が読めていないときは「動いている」と言わない。 */}
+            {previewSettled && control ? (isStopped ? '止めている' : '動いている') : '—'}
           </p>
           <p className={styles.kpiDetail}>
-            {calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'}
+            {impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -671,7 +673,19 @@ const EmergencyControlV8 = (
           <div className={styles.stoppedBand}>
             <p className={styles.stoppedTitle}>止めているとき</p>
             <div className={styles.stoppedLine}>
-              <p className={styles.stoppedText}>いまは止めていません。止めると、ここに止めた時刻・担当・止めたものが出ます。</p>
+              {control ? (
+                <p className={styles.stoppedText}>いまは止めていません。止めると、ここに止めた時刻・担当・止めたものが出ます。</p>
+              ) : impactFailed ? (
+                <>
+                  {/* WEB312：読めていないのに「止めていません」と言わない。読み直しを出す。 */}
+                  <p className={styles.stoppedText}>いまの停止状態を確認できませんでした。読み直してください。</p>
+                  <Button type="button" variant="secondary" onClick={() => void reloadControl()} disabled={reloading}>
+                    読み直す
+                  </Button>
+                </>
+              ) : (
+                <p className={styles.stoppedText}>いまの停止状態を確認しています。</p>
+              )}
             </div>
             <p className={styles.stoppedNote}>
               復旧するとき：止める前に動いていたものだけを戻します。理由を書いて、本人確認（6桁）をしてから戻します。

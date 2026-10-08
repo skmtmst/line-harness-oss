@@ -31,35 +31,6 @@
   color: var(--color-action);
 }
 
-/* 4つの段の札。 */
-.pills {
-  display: flex;
-  gap: var(--tpl-acd-actions-gap);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.pill {
-  flex: 1;
-  min-width: 0;
-  padding: var(--tpl-acd-ho-step-pad);
-  border-radius: var(--tpl-acd-ho-step-radius);
-  box-shadow: var(--tpl-acd-ring);
-  color: var(--color-ink);
-  font-size: var(--tpl-acd-ho-step-size);
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pill[data-state='current'] {
-  box-shadow: var(--tpl-acd-ring-current);
-  font-weight: 700;
-}
-.pill[data-state='todo'] {
-  color: var(--color-ink-faint);
-}
-
 .duo {
   display: flex;
   align-items: stretch;

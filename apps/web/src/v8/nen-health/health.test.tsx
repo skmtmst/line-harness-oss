@@ -156,6 +156,30 @@ describe('V8 健康日記（src/v8/nen-health）', () => {
     expect(String(listCalls().at(-1)?.[0])).toContain('change=concern')
   })
 
+  it('WEB224：行の「獣医師向け PDF」は、紙の面が置かれてから印刷の窓を開く', async () => {
+    let sheetAtPrint: boolean | null = null
+    vi.spyOn(window, 'print').mockImplementation(() => { sheetAtPrint = document.querySelector('[data-print-sheet]') !== null })
+    await render('logs')
+    await click(byLabel('「こむぎ」の操作'))
+    await click(byText('獣医師向け PDF'))
+    await settle(120)
+    expect(sheetAtPrint).toBe(true)
+  })
+
+  it('WEB223：数の帯の「すべてのペットを出す」で、探す欄の言葉も消える（0.3秒後に前の言葉で絞り直さない）', async () => {
+    await render('logs')
+    const box = host.querySelector('input[type="search"], input[aria-label*="探す"]') as HTMLInputElement
+    expect(box).toBeTruthy()
+    await act(async () => { fireEvent.change(box, { target: { value: 'こむぎ' } }) })
+    await settle(400)
+    expect(String(listCalls().at(-1)?.[0])).toContain('q=')
+    await click(byLabel('記録のあるペットのメニュー'))
+    await click(byText('すべてのペットを出す'))
+    await settle(400)
+    expect(box.value).toBe('')
+    expect(String(listCalls().at(-1)?.[0])).not.toContain('q=%E3')
+  })
+
   it('記録の項目は、変えられない決まりの表を出す', async () => {
     await render('items')
     expect(host.textContent).toContain('「気になる変化」に出る条件')

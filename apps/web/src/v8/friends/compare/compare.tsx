@@ -12,12 +12,11 @@
  * - 判定の履歴は小窓の右に出す
  */
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { CircleHelp, Link2, UserX } from 'lucide-react'
 import type { IdentityCandidateDecision } from '@line-crm/shared'
 import type { IdentityCandidateWithProfiles } from '@/lib/api'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -43,6 +42,8 @@ const CONSENTS = ['利用目的の範囲で結び付ける', '本人の同意（
 
 function CompareInner() {
   usePageTitle('重複候補を比べて決める')
+  /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
+  usePageCrumbs([{ label: '友だち', href: '/friends' }, { label: '重複検出', href: '/friends?tab=duplicates' }])
   const review = useIdentityReview('friend_duplicate')
   const searchParams = useSearchParams()
   const wantedId = searchParams.get('id')
@@ -116,7 +117,6 @@ function CompareInner() {
   return (
     <PageFrame kind="detail" boardId="fcg2D">
       <header className={styles.head}>
-        <Link href="/friends?tab=duplicates" className={styles.back}>← 重複検出へ</Link>
         <h2 className={styles.title}>{detail ? `${detail.left.label} ↔ ${detail.right.label}` : '重複候補を比べて決める'}</h2>
         <p className={styles.description}>
           {detail ? `確からしさ：${CONFIDENCE_WORD[detail.confidence.label]}${decisive ? `・根拠：${decisive.label}` : ''}` : '同じ人かどうかを、根拠を見て決めます'}

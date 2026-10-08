@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useId, useRef, type ReactNode } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import styles from './detail-panel.module.css'
+import { isImeComposing } from './ime'
 
 export type DetailPanelProps = {
   open: boolean
@@ -20,9 +21,34 @@ export type DetailPanelProps = {
 }
 
 /**
+ * キーが詳細パネル以外の面から来たか。そこでのキーはその面のもの。
+ * - 開いている面（メニュー・候補の一覧・別の窓）：Esc も上下も、その面を閉じる・動かすだけ。
+ * - 自分で上下を使う部品（選ぶ箱・タブの並び・丸の選択など）：上下だけその部品のもの（Esc は閉じてよい）。
+ */
+const POPUP_SURFACE = ['[data-menu-portal]', '[role="menu"]', '[role="menubar"]', '[role="listbox"]'].join(',')
+const ARROW_SURFACE = [
+  POPUP_SURFACE,
+  '[role="combobox"]',
+  '[role="tablist"]',
+  '[role="radiogroup"]',
+  '[role="grid"]',
+  '[role="tree"]',
+  '[role="slider"]',
+  '[role="spinbutton"]',
+].join(',')
+
+function fromOtherSurface(target: Element | null, panel: HTMLElement | null, key: string): boolean {
+  if (!target) return false
+  if (target.closest(key === 'Escape' ? POPUP_SURFACE : ARROW_SURFACE)) return true
+  const dialog = target.closest('[role="dialog"], [role="alertdialog"]')
+  return Boolean(dialog && dialog !== panel && !dialog.contains(panel))
+}
+
+/**
  * 右から出る詳細パネル（V8「サクサク感」C①）。窓（Drawer）の
  * 埋め込み面を土台にし、一覧は左に見えたままにする。↑↓で前・次の行、
- * Esc で閉じる。入力欄の中では上下キーを横取りしない。
+ * Esc で閉じる。入力欄の中では上下キーを横取りしない。ほかの部品が処理したキー・
+ * 別の面（メニュー・候補・別の窓）からのキー・変換中のキーは触らず、保存中（busy）は閉じない。
  * V8 のときだけ開閉の動きが付く（drawer の V8 規定）。
  */
 export default function DetailPanel({
@@ -53,15 +79,20 @@ export default function DetailPanel({
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     panelRef.current?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' && event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+      // ほかの部品（「…」のメニュー・選ぶ箱など）が先に処理したキー・日本語の変換中のキーは触らない。
+      if (event.defaultPrevented || isImeComposing(event)) return
+      const target = event.target instanceof Element ? event.target : null
+      if (fromOtherSurface(target, panelRef.current, event.key)) return
+      const nav = navRef.current
       if (event.key === 'Escape') {
+        // 開いているメニューの Esc はメニューを閉じるだけ。保存中は閉じない（書きかけを失わない）。
+        if (document.querySelector('[data-menu-portal]') || nav.busy) return
         event.preventDefault()
         onCloseRef.current()
         return
       }
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
-      const target = event.target as HTMLElement | null
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return
-      const nav = navRef.current
+      if (target instanceof HTMLElement && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return
       if (nav.busy) return
       event.preventDefault()
       if (event.key === 'ArrowUp') {

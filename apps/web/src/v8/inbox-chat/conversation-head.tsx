@@ -82,18 +82,6 @@ export default function ConversationHead({
         <HeadOperatorMenu value={operator.value} operators={operator.operators} onChange={operator.onChange} />
         <HeadStatusMenu value={status.value} onChange={status.onChange} />
         {extra}
-        {search ? (
-          <button
-            type="button"
-            className={styles.cheadSquare}
-            data-design-node="bvHXu"
-            aria-label="会話の中を探す（⌘F）"
-            aria-expanded={search.open}
-            onClick={search.onToggle}
-          >
-            <Search aria-hidden="true" />
-          </button>
-        ) : null}
         {panel ? (
           <button
             type="button"
@@ -107,6 +95,23 @@ export default function ConversationHead({
           </button>
         ) : null}
       </div>
+      {/*
+        ★V8：絵（eovoG）の頭は ☆・担当・対応状況・右の列の出し入れの4つ。🔍 を同じ段に置くと
+        担当・対応状況が左へ44ずれるので、頭の下の右端に重ねて浮かせる（⌘F でも開く）。
+        探す帯が開いている間は帯の「探すのをやめる」で閉じるので隠す。
+      */}
+      {search ? (
+        <button
+          type="button"
+          className={`${styles.cheadSquare} ${styles.cheadSearch}`}
+          data-design-node="bvHXu"
+          aria-label="会話の中を探す（⌘F）"
+          aria-expanded={search.open}
+          onClick={search.onToggle}
+        >
+          <Search aria-hidden="true" />
+        </button>
+      ) : null}
     </div>
   )
 }

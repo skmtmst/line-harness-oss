@@ -1,4 +1,4 @@
-import { REVENUE_IMPACT_KEYS, type EcIdentityCandidateSummary } from '@line-crm/shared';
+import { REVENUE_IMPACT_KEYS, type EcIdentityCandidateSummary, type EcIdentityDuplicateSignal } from '@line-crm/shared';
 
 export type EcOrderState = 'current' | 'refunded' | 'cancelled';
 export type EcActionExecutionStatus =
@@ -658,17 +658,21 @@ export async function listEcIdentityCandidates(
     offset: number;
   },
 ): Promise<{
-  items: Array<Record<string, unknown>>;
+  items: Array<Record<string, unknown> & EcIdentityDuplicateSignal>;
   total: number;
   summary: EcIdentityCandidateSummary;
 }> {
   const [rows, count, pendingSummary, unmatched, linked, duplicates, revenue, withoutCandidates] = await Promise.all([
     db.prepare(
-      `SELECT id, status, version, confidence_score, left_snapshot_json, right_snapshot_json,
-              evidence_json, impact_json, detected_at, reviewed_at
-         FROM identity_candidates
-        WHERE tenant_id = ? AND kind = 'ec_member' AND left_line_account_id = ? AND status = ?
-        ORDER BY detected_at DESC, id DESC LIMIT ? OFFSET ?`,
+      `SELECT c.id, c.status, c.version, c.confidence_score, c.left_snapshot_json, c.right_snapshot_json,
+              c.evidence_json, c.impact_json, c.detected_at, c.reviewed_at, c.external_customer_id,
+              (SELECT COUNT(*) FROM identity_candidates grouped
+                WHERE grouped.tenant_id = c.tenant_id AND grouped.kind = 'ec_member'
+                  AND grouped.left_line_account_id = c.left_line_account_id AND grouped.status = 'pending'
+                  AND grouped.external_customer_id = c.external_customer_id) AS duplicate_candidate_count
+         FROM identity_candidates c
+        WHERE c.tenant_id = ? AND c.kind = 'ec_member' AND c.left_line_account_id = ? AND c.status = ?
+        ORDER BY c.detected_at DESC, c.id DESC LIMIT ? OFFSET ?`,
     ).bind(input.tenantId, input.lineAccountId, input.status, input.limit, input.offset)
       .all<Record<string, unknown>>(),
     db.prepare(
@@ -715,13 +719,18 @@ export async function listEcIdentityCandidates(
           AND c.status = 'pending' AND c.external_customer_id = e.customer_id AND c.source_key = e.source)`)
       .bind(input.lineAccountId,input.tenantId).first<{count:number}>(),
   ]);
-  const items = rows.results.map((row) => ({
+  const items = await Promise.all(rows.results.map(async (row) => ({
+    duplicateGroupKey: row.external_customer_id == null ? null : [...new Uint8Array(await crypto.subtle.digest(
+      'SHA-256', new TextEncoder().encode(JSON.stringify([input.tenantId, input.lineAccountId, String(row.external_customer_id)])),
+    ))].map((byte) => byte.toString(16).padStart(2, '0')).join(''),
+    duplicateCandidateCount: Number(row.duplicate_candidate_count ?? 0),
+    isDuplicateSuspicion: row.status === 'pending' && Number(row.duplicate_candidate_count) > 1,
     id: String(row.id), status: String(row.status), version: Number(row.version),
     confidenceScore: Number(row.confidence_score),
     left: parseMaskedJson(row.left_snapshot_json), right: parseMaskedJson(row.right_snapshot_json),
     evidence: parseMaskedJson(row.evidence_json), impact: parseMaskedJson(row.impact_json),
     detectedAt: String(row.detected_at), reviewedAt: row.reviewed_at == null ? null : String(row.reviewed_at),
-  }));
+  })));
   return {
     items, total: Number(count?.count ?? 0),
     summary: {

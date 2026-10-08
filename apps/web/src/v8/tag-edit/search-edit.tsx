@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性：保存した検索の編集（一から書いた画面・2026-10-07）。Pencil `AqDWN`。
+ * ★V8 タグ：保存した検索の編集（一から書いた画面・2026-10-07）。Pencil `AqDWN`。
  *
  * 型は「作る」（CreatePage）：頭（戻る・条件名・人数と共有と使っている所）→ 左に「名前と共有」「条件」
  * 「友だち一覧での見せ方」、右に「当てはまる人」「使っている所」、下の帯（削除は左端・中央にキャンセル／複製して保存する／保存する）。
@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Copy, Info, Plus, RefreshCw, Save, Users, X } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X } from 'lucide-react'
 import {
   isSavedSearchOpAllowed,
   isSavedSearchValueOptionalOp,
@@ -507,7 +507,7 @@ export default function SavedSearchEditV8() {
   const [reloadKey, setReloadKey] = useState(0)
 
   usePageTitle(original?.name ?? '保存した検索を編集')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }, { label: '保存した検索', href: '/tags?tab=searches' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }, { label: '保存した検索', href: '/tags?tab=searches' }])
 
   /*
     ATTR-12: 再計算の連打・条件変更・アカウント切替で、古い計算結果が
@@ -847,7 +847,7 @@ export default function SavedSearchEditV8() {
         ))}
       </dl>
       <p className={styles.infoBand}>
-        <Info size={16} aria-hidden="true" className={styles.infoIcon} />
+        <TriangleAlert size={16} aria-hidden="true" className={styles.infoIcon} />
         <span>{hasLive ? '条件を変えると、上の配信の宛先も変わります。' : inUse ? '固定で使っている所は、条件を変えても宛先は変わりません。' : '使っている所はないので、条件を変えてもほかに影響しません。'}{inUse ? '使っている間は削除できません。' : ''}</span>
       </p>
     </div>
@@ -872,7 +872,7 @@ export default function SavedSearchEditV8() {
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
             <Button type="button" disabled={saving} onClick={() => void duplicate()}><Copy size={14} aria-hidden="true" />複製して保存する</Button>
-            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}><Save size={14} aria-hidden="true" />保存する</Button>
+            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}><Check size={14} aria-hidden="true" />保存する</Button>
           </>
         )}
       >

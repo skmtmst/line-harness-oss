@@ -187,4 +187,24 @@ describe('席の予約の流れ', () => {
     open();
     await screen.findByText('予約のページが見つかりません');
   });
+
+  it('仮押さえの送信中に時刻を押しても選び直さず、確認は仮押さえした時刻で出す（監査 L6）', async () => {
+    let resolveHold: (v: { success: true; data: RestaurantCustomerBooking }) => void = () => {};
+    vi.mocked(seat.hold).mockImplementation(() => new Promise((r) => { resolveHold = r; }));
+    vi.mocked(seat.confirm).mockResolvedValue({ success: true, data: held({ status: 'confirmed', version: 4, holdExpiresAt: null }) });
+    open();
+    fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
+    fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
+    await screen.findByRole('button', { name: 'お取りしています…' });
+    // 送信中に別の時刻を押す。
+    fireEvent.click(screen.getByRole('radio', { name: '18:00 空きあり' }));
+    expect(screen.getByRole('radio', { name: '19:00 空きあり' }).getAttribute('aria-checked')).toBe('true');
+    resolveHold({ success: true, data: held() });
+    await screen.findByText('この内容で予約します');
+    expect(screen.queryByText(/18:00/)).toBeNull();
+    expect(screen.getAllByText(/19:00/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
+    await screen.findByText('ご予約を受け付けました');
+    expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null });
+  });
 });

@@ -151,6 +151,7 @@ const GUARDED = [
   'v8/accounts-detail/handover.tsx',
   'v8/restaurant/inventory/stock.tsx',
   'v8/hq/support.tsx',
+  'v8/hq/support-detail.tsx',
   /* 2026-10-07：src/v8 に一から書いた画面（まとめの取り込みで見張りの対象に入った）。それぞれ自分で useUnsavedGuard と離脱確認を持つ。 */
   'v8/affiliate-offer-new/create.tsx',
   'v8/tag-edit/search-edit.tsx',
@@ -158,6 +159,7 @@ const GUARDED = [
   'v8/tags/field-editor.tsx',
   'v8/tags/mark-editor.tsx',
   'v8/template-edit/rich.tsx',
+  'v8/template-edit/rich-video.tsx',
   'v8/templates/carousel.tsx',
   'v8/templates/question-new.tsx',
 ] as const
@@ -209,12 +211,22 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'components/chats/friend-info-sidebar.tsx':
+    '受信箱の右の欄（B-26 その場で直す）。対応状況・担当・タグは押した瞬間に保存し、メモは書くのをやめて1秒で保存する。保存待ちの入力を溜めないので番兵の対象外（失敗は知らせで戻してもう一度試す）',
   'components/hq/account-menu.tsx':
     '編集を持たないメニュー。アカウント解除と移動を共通の未保存確認へ委ねる',
+  'components/shared/top-bar.tsx':
+    '編集を持たない上部の帯の部品。段を替えて戻るパンくず（onSelect）を共通の未保存確認（requestUnsavedAction）へ委ねる',
   'components/shell/app-top-bar.tsx':
     '編集を持たない上部の帯。アカウント切替と移動を共通の未保存確認へ委ねる',
+  'components/shared/command-palette.tsx':
+    '編集を持たない探す窓（⌘K）。選んだ行き先への移動を共通の未保存確認へ委ねる',
   'v8/restaurant/closures/closure-dialog.tsx': '臨時休業・貸切を足す・変える窓（提案 E-10 nVvXy）。保存の口は窓の中だけで、開くたびに押した日か記録から作り直し、閉じると入力を破棄する。',
   'v8/restaurant/front-desk/phone-drawer.tsx': '電話予約の引き出し（提案 E-2）。保存の口は引き出しの中だけで、開くたびに空から始まり、閉じると入力を破棄する（入力中は題に * が付く）。',
+  'app/reminders/basics-form-v8.tsx':
+    'リマインダを作る画面（app/reminders/new/new-v8.tsx・番兵あり）の中の①基本の欄。保存の口に見えるのはフォルダを選ぶ欄からその場でフォルダを作る口（dLffh）だけで、入力の保存は親の画面の番兵が見張る',
+  'v8/reminders/basics-form.tsx':
+    'リマインダの作る・直す画面（v8/reminders/edit.tsx・番兵あり）の中の①基本の欄。保存の口に見えるのはフォルダを選ぶ欄からその場でフォルダを作る口（dLffh）だけで、入力の保存は親の画面の番兵が見張る',
   'app/hq/account-browser-v8.tsx': 'タグ名だけの小さな窓。保存の口は窓内だけにあり、閉じると入力を破棄する。',
   'app/nen-members/photo-policy-history-v8.tsx': '報酬版を追加する小さな窓。親の設定画面から開き、閉じれば保存前の値を破棄する。',
   'app/affiliates/payment-tab.tsx':

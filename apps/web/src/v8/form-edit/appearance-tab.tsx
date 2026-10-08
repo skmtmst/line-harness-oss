@@ -43,6 +43,8 @@ const RADIUS_LABEL: Record<FormCornerRadius, string> = { none: '角ばった', m
 type Props = {
   options: FormOptions
   accountId: string | null
+  /** 統括のひな形（host.ts）：背景の画像・リンクの見え方は置き場が無い（配った先で決める）。 */
+  portable?: boolean
   name: string
   nameError: string | null
   description: string
@@ -169,7 +171,7 @@ export function AppearanceTab(props: Props) {
           </div>
         </div>
 
-        <div className={styles.subBox}>
+        {props.portable ? null : <div className={styles.subBox}>
           <h3 className={styles.subTitle}>背景とリンクの見え方</h3>
           <div className={styles.tight}>
             <span className={styles.inlineButtons}>
@@ -184,7 +186,7 @@ export function AppearanceTab(props: Props) {
               <Link2 size={14} aria-hidden="true" />
             </button>
           </div>
-        </div>
+        </div>}
 
         <div className={styles.cardHeadText}>
           <h2 className={styles.cardTitle}>ボタンの言葉</h2>

@@ -76,7 +76,7 @@ export async function deleteHqImage(bucket: R2Bucket, authority: HqTemplateAutho
   if (key.length < 1 || key.length > 400) error('INVALID_IMAGE');
   const prefix = `hq-templates/${authority.tenantId}/uploads/`;
   const rest = key.startsWith(prefix) ? key.slice(prefix.length) : '';
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(rest)) error('INVALID_IMAGE');
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}(?:\/(?:240|300|460|700|1040))?$/.test(rest)) error('INVALID_IMAGE');
   const object = await bucket.head(key);
   if (!object) return { deleted: false };
   const stored = object.customMetadata ?? {};
@@ -89,4 +89,36 @@ export async function deleteHqImage(bucket: R2Bucket, authority: HqTemplateAutho
   if (!registered) error('NOT_FOUND');
   await bucket.delete(key);
   return { deleted: true };
+}
+
+/** LINEイメージマップ用5サイズ。統括の登録画像からだけ作り、配布時は全サイズをコピーする。 */
+export async function uploadHqImagemap(env: import('../../index.js').Env['Bindings'], authority: HqTemplateAuthority, request: Request, origin: string): Promise<import('@line-crm/shared').TemplateImagemapUpload> {
+  if (!env.CF_IMAGES) error('IMAGE_TRANSFORM_UNAVAILABLE');
+  const url=new URL(request.url); url.searchParams.set('purpose','message');
+  const source=await uploadHqImage(env.IMAGES,authority,new Request(url,request),origin);
+  const object=await env.IMAGES.get(source.r2Key);
+  if(!object || !('body' in object)) error('INVALID_IMAGE');
+  const bytes=await readMessageTemplateSourceBytes(object!.body,source.sizeBytes);
+  const height=Math.round(source.height! / source.width! * 1040),group=crypto.randomUUID();
+  const baseKey=`hq-templates/${authority.tenantId}/uploads/${group}`;
+  const media: MessageTemplateMediaDefinition[]=[];
+  let total=0;
+  try {
+    for(const width of [240,300,460,700,1040]) {
+      const h=Math.max(1,Math.round(height * width/1040));
+      const output=await env.CF_IMAGES!.input(new Blob([bytes]).stream()).transform({width,height:h,fit:'squeeze'}).output({format:'image/png'});
+      const resized=await readMessageTemplateSourceBytes(output.image(),8*1024*1024);
+      total+=resized.length;
+      if(!resized.length || total>16*1024*1024) error('MEDIA_SIZE_LIMIT');
+      const r2Key=`${baseKey}/${width}`,id=crypto.randomUUID(),contentHash=await hash(resized);
+      const m:MessageTemplateMediaDefinition={...source,id,filename:`${group}-${width}.png`,width,height:h,r2Key,publicUrl:`${new URL(origin).origin}/images/${r2Key}`,versionId:id,sizeBytes:resized.length,mimeType:'image/png',contentHash};
+      media.push(m);
+      const saved=await env.IMAGES.put(r2Key,resized,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:m.mimeType},customMetadata:{hqTenant:authority.tenantId,hqMedia:JSON.stringify(m)}});
+      if(!saved || !isRegisteredHqMedia(await env.IMAGES.head(r2Key),m,authority.tenantId)) error('UPLOAD_UNCONFIRMED');
+    }
+  } catch(e) {
+    for(const m of media) if(isRegisteredHqMedia(await env.IMAGES.head(m.r2Key),m,authority.tenantId)) await env.IMAGES.delete(m.r2Key);
+    throw e;
+  }
+  return {media,payload:{imageUrl:media.at(-1)!.publicUrl,baseUrl:`${new URL(origin).origin}/images/${baseKey}`,baseSize:{width:1040,height}}};
 }

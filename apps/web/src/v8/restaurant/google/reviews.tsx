@@ -4,6 +4,7 @@
  * ★V8 Googleビジネス 口コミ（一覧 `j0Wcg`・返信を作る `x9HIR`・公開の確認 `xSudF`）。
  * 口（一覧・絞り込み・並び・同期・下書き作成・保存・公開）は今の画面と同じ。
  */
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, Sparkles } from 'lucide-react'
 import { ApiError } from '@/lib/api'
@@ -154,8 +155,8 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         </IconButton>
         <Select aria-label="並び順" width={150} value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
       </div>
-      {connection.status === 'expired' ? <Notice tone="danger" action={<a href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</a>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
-      {connection.status === 'no_permission' ? <Notice tone="danger" action={<a href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認</a>}>この店舗を操作する権限がありません。</Notice> : null}
+      {connection.status === 'expired' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</Link>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
+      {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認</Link>}>この店舗を操作する権限がありません。</Notice> : null}
       {syncError ? <Notice tone="warn" action={<button type="button" className={styles.textButton} onClick={() => void sync()}>もう一度</button>}>{syncError}</Notice> : null}
       {syncing && (list?.total ?? 0) === 0 ? <Notice tone="info">口コミを取得中… すべてのページを取得してから表示します。</Notice> : null}
       {listLoading && !list ? <div className={styles.stateBox}><ListState kind="loading" title="口コミを読み込んでいます" /></div> : null}

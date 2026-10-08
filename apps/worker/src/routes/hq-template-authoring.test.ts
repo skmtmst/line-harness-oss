@@ -102,7 +102,7 @@ describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
     referencedCard();sql.raw.exec("UPDATE line_accounts SET tenant_id='other' WHERE id='c'");
     const rows=await request('/message-references');expect(rows.status).toBe(200);
     expect(rows.body.data.map((row:any)=>row.id).sort()).toEqual(['form-a','form-b','scenario-a','scenario-b']);
-    staff.readOnly=true;expect((await request('/message-references')).status).toBe(403);
+    staff.readOnly=true;expect((await request('/message-references')).status).toBe(200);
   });
   test('card composition is authoritative over stale raw body and copies its uploaded hero image',async()=>{
     const uploaded=await upload();expect(uploaded.status).toBe(201);
@@ -144,11 +144,21 @@ describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
   });
   test('rich menu upload supports actual three-store draft and null LINE ID',async()=>{
     const uploaded=await upload('rich_menu');expect(uploaded.status).toBe(201);
-    const value=freshDefinition('rich_menu') as any;value.richMenu.name='メニュー';value.richMenu.pages[0].imageR2Key=uploaded.body.data.r2Key;
+    const value=freshDefinition('rich_menu') as any;value.richMenu.name='メニュー';value.richMenu.displayOrder=7;value.richMenu.displayAudience='all';value.richMenu.pages[0].imageR2Key=uploaded.body.data.r2Key;
     value.richMenu.pages[0].areas.push({id:'main-area',bounds:{x:0,y:0,width:100,height:100},actionType:'message',actionData:{text:'案内'},intent:'text',label:'案内'});
-    await distribute(await save('rich_menu',value));
-    const rows=sql.raw.prepare('SELECT g.status,g.account_id,p.image_r2_key,p.line_richmenu_id FROM rich_menu_groups g JOIN rich_menu_pages p ON p.group_id=g.id').all() as any[];
+    const id=await save('rich_menu',value);await distribute(id);
+    const rows=sql.raw.prepare('SELECT g.id,g.status,g.account_id,g.display_order,g.is_default_for_all,p.image_r2_key,p.line_richmenu_id FROM rich_menu_groups g JOIN rich_menu_pages p ON p.group_id=g.id').all() as any[];
     expect(rows).toHaveLength(3);for(const row of rows){expect(row.status).toBe('draft');expect(row.line_richmenu_id).toBeNull();expect(row.image_r2_key).toMatch(new RegExp(`^rich-menus/${row.account_id}/hq/`))}
+    for(const row of rows){
+      expect(row).toMatchObject({display_order:7,is_default_for_all:1});
+      sql.raw.prepare('INSERT INTO rich_menu_area_taps(id,group_id,page_id,area_id,line_account_id) VALUES(?,?,?,?,?)').run(`tap-${row.account_id}`,row.id,'page','main-area',row.account_id);
+    }
+    const list=await request('?type=rich_menu');
+    expect(list.body.data.find((item:any)=>item.id===id)).toMatchObject({display_order:7,display_audience:'全員',tap_count:3});
+    await distribute(id);
+    expect((await request('?type=rich_menu')).body.data.find((item:any)=>item.id===id).tap_count).toBe(3);
+    sql.raw.exec("UPDATE line_accounts SET tenant_id='other' WHERE id='c'");
+    expect((await request('?type=rich_menu')).body.data.find((item:any)=>item.id===id).tap_count).toBe(2);
   });
   test('rich menu distribution persists reference choices and rejects a changed destination revision',async()=>{
     const uploaded=await upload('rich_menu');expect(uploaded.status).toBe(201);

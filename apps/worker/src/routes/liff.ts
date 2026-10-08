@@ -1185,7 +1185,7 @@ liffRoutes.get('/auth/callback', async (c) => {
             message_content: await expandSendCommonVars(
               db, introTemplate.message_content,
               { kind: 'liff', id: introTemplate.id },
-              { lineAccountId: friend.line_account_id, friendId: friend.id },
+              { lineAccountId: friend.line_account_id, friendId: friend.id, messageType: introTemplate.message_type },
             ),
           };
         }
@@ -2395,7 +2395,7 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
         message_content: await expandSendCommonVars(
           c.env.DB, introTemplate.message_content,
           { kind: 'liff', id: introTemplate.id },
-          { lineAccountId: (friend as any).line_account_id ?? null, friendId: friend.id },
+          { lineAccountId: (friend as any).line_account_id ?? null, friendId: friend.id, messageType: introTemplate.message_type },
         ),
       };
     }

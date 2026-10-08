@@ -14,16 +14,14 @@ import {
  *   A) friend-add via an affiliate link  → notifyAffiliateFriendAdd
  *   B) conversion approved               → notifyAffiliateApproval
  *
- * Both flow through notifyAffiliate, which resolves:
+ * Both resolve:
  *   affiliates.friend_id → friends(line_user_id, line_account_id)
  *   → line_accounts.channel_access_token (fallback: env.LINE_CHANNEL_ACCESS_TOKEN)
  *   → LINE push.
  *
- * Best-effort by contract: any failure is swallowed (try/catch + console.error)
- * so it can never break the caller's primary flow (friend attribution / CV
- * approval). Callers should still `await` it — Workers keeps the isolate alive
- * for an awaited promise — but must not let a rejection escape (this never
- * rejects).
+ * Friend-add failures are logged without interrupting attribution. Approval
+ * failures propagate to notifyApprovalOnce, which releases the owned notification
+ * claim and keeps the approval itself successful so a retry can repair delivery.
  */
 
 /** Minimal env surface needed to resolve the fallback push token. */
@@ -41,15 +39,15 @@ export interface AffiliateNotifierEnv {
  *   - the bound friend row is missing or has no line_user_id,
  *   - no push token can be resolved.
  *
- * Never throws. All errors are logged and swallowed.
+ * Internal delivery errors propagate; the public best-effort wrapper logs them.
  */
-export async function notifyAffiliate(
+async function pushAffiliate(
   db: D1Database,
   env: AffiliateNotifierEnv,
   affiliateId: string,
   text: string,
+  retryKey?: string,
 ): Promise<void> {
-  try {
     const affiliate = await getAffiliateById(db, affiliateId);
     if (!affiliate?.friend_id) return; // unbound affiliate — nothing to push to
 
@@ -76,7 +74,14 @@ export async function notifyAffiliate(
     if (!accessToken) return;
 
     const client = new LineClient(accessToken);
-    await client.pushMessage(friend.line_user_id, [{ type: 'text', text }]);
+    if (retryKey) await client.pushMessage(friend.line_user_id, [{ type: 'text', text }], retryKey);
+    else await client.pushMessage(friend.line_user_id, [{ type: 'text', text }]);
+}
+
+/** 友だち追加など、従来の通知は主処理を止めない。 */
+export async function notifyAffiliate(db: D1Database, env: AffiliateNotifierEnv, affiliateId: string, text: string): Promise<void> {
+  try {
+    await pushAffiliate(db, env, affiliateId, text);
   } catch (err) {
     console.error('notifyAffiliate failed (non-blocking):', err);
   }
@@ -119,6 +124,7 @@ export async function notifyAffiliateApproval(
   affiliateId: string,
   offerName: string | null,
   rewardAmount: number,
+  retryKey?: string,
 ): Promise<void> {
   let text: string;
   if (offerName && offerName.trim()) {
@@ -132,5 +138,5 @@ export async function notifyAffiliateApproval(
       `✅ 成果が承認されました！\n` +
       `『アフィリ』と送るとマイページで確認できます`;
   }
-  await notifyAffiliate(db, env, affiliateId, text);
+  await pushAffiliate(db, env, affiliateId, text, retryKey);
 }

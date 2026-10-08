@@ -22,9 +22,10 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
 }))
 
+const chrome = vi.hoisted(() => ({ crumbs: null as Array<{ label: string; href?: string }> | null }))
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
-  usePageCrumbs: () => {},
+  usePageCrumbs: (crumbs: Array<{ label: string; href?: string }> | null) => { chrome.crumbs = crumbs },
 }))
 
 const roleState = vi.hoisted(() => ({ role: 'owner' as string }))
@@ -138,10 +139,10 @@ describe('実行の詳細の画面（N43uVX）', () => {
     expect(host.textContent).toContain('9/7 10:14:01')
   })
 
-  it('戻るは一覧の絞り込みとページを残す', async () => {
+  it('戻るは上の帯のパンくずで、一覧の絞り込みとページを残す（板の頭の「← 実行結果へ」は 2026-10-08 に無くした）', async () => {
     await render()
-    const back = Array.from(host.querySelectorAll('a')).find((link) => link.textContent?.includes('実行結果へ'))
-    expect(back?.getAttribute('href')).toBe('/friend-add-settings/runs?status=failed&pages=c2')
+    expect(Array.from(host.querySelectorAll('a')).some((link) => link.textContent?.includes('実行結果へ'))).toBe(false)
+    expect(chrome.crumbs?.find((crumb) => crumb.label === '実行結果')?.href).toBe('/friend-add-settings/runs?status=failed&pages=c2')
   })
 
   it('「失敗した処理をもう一度」で再試行の口を呼ぶ', async () => {

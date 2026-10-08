@@ -237,9 +237,9 @@ export default function CommonActionsV8() {
 
   /* ===== フォルダ ===== */
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: ready ? summary.total : null },
-    ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: null, color: folder.color })),
-    { id: UNFILED, label: '未分類', count: ready ? summary.total : null },
+    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? summary.total : null },
+    ...folders.map((folder) => ({ kind: 'folder' as const, id: folder.id, label: folder.name, count: null, color: folder.color })),
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: ready ? summary.total : null },
   ]
   /* 閲覧のみには押せない「共通アクションを作る」を置かない（場所だけ空ける）。 */
   const createButton = canEdit

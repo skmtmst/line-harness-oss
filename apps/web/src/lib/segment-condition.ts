@@ -21,16 +21,8 @@ export type FieldOperator =
   | 'lte'
   | 'lt'
 
-export interface SegmentRule {
-  type: string
-  value: unknown
-}
-
-export interface SegmentCondition {
-  operator: 'AND' | 'OR'
-  rules: SegmentRule[]
-  groups?: SegmentCondition[]
-}
+import type { SegmentCondition, SegmentRule } from '@line-crm/shared';
+export type { SegmentCondition, SegmentRule } from '@line-crm/shared';
 
 /**
  * まだ書きかけの行か。

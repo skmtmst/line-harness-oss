@@ -455,6 +455,7 @@
 }
 
 .previewMenuEmpty {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -467,16 +468,11 @@
   text-align: center;
 }
 
-.previewMenuBar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 8px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: 11px;
-  border-top: 1px solid var(--color-hairline);
+/* 画像が無いときも面の区切り（点線）を出し、文はその上に重ねる。 */
+.previewMenuEmptyText {
+  position: relative;
+  padding: 0 4px;
+  background: var(--color-canvas-sunken);
 }
 
 /* 出す順番（番号つきの並び）。 */

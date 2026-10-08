@@ -70,7 +70,7 @@
 
 /* 時刻・数の小さい箱（幅84・高さ36）。時計の印と消すボタンは出さない。 */
 .time { width: var(--tpl-wc-nt-time-w); flex-shrink: 0; }
-.time :global(svg) { display: none; }
+.time > button :global(svg) { display: none; } /* v7 の時刻の選択だけ。★V8 の時刻の欄は時計を出す（提案 YCOoR） */
 .time button[aria-label='時刻を消す'] { display: none; }
 :global([data-theme='v8']) .time > button { height: var(--tpl-wc-control-h); padding: var(--tpl-wc-nt-time-pad); font-size: var(--text-label); }
 .small { width: var(--tpl-wc-nt-small-w); flex-shrink: 0; }

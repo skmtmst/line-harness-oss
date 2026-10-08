@@ -12,7 +12,7 @@ import { ImagesResource } from './resources/images.js'
 import { AutoRepliesResource } from './resources/auto-replies.js'
 import { ConversationsResource } from './resources/conversations.js'
 import { Workflows } from './workflows.js'
-import type { LineHarnessConfig, StepDefinition, ScenarioTriggerType, ScenarioWithSteps, Broadcast, MessageType, SegmentCondition } from './types.js'
+import type { LineHarnessConfig, StepDefinition, ScenarioTriggerType, ScenarioWithSteps, Broadcast, BroadcastSendOptions, MessageType, SegmentCondition } from './types.js'
 
 export class LineHarness {
   readonly friends: FriendsResource
@@ -33,9 +33,9 @@ export class LineHarness {
   private readonly workflows: Workflows
 
   readonly createStepScenario: (name: string, triggerType: ScenarioTriggerType, steps: StepDefinition[]) => Promise<ScenarioWithSteps>
-  readonly broadcastText: (text: string) => Promise<Broadcast>
-  readonly broadcastToTag: (tagId: string, messageType: MessageType, content: string) => Promise<Broadcast>
-  readonly broadcastToSegment: (messageType: MessageType, content: string, conditions: SegmentCondition) => Promise<Broadcast>
+  readonly broadcastText: (text: string, options?: BroadcastSendOptions) => Promise<Broadcast>
+  readonly broadcastToTag: (tagId: string, messageType: MessageType, content: string, options?: BroadcastSendOptions) => Promise<Broadcast>
+  readonly broadcastToSegment: (messageType: MessageType, content: string, conditions: SegmentCondition, options?: BroadcastSendOptions) => Promise<Broadcast>
   readonly sendTextToFriend: (friendId: string, text: string) => Promise<{ messageId: string }>
   readonly sendFlexToFriend: (friendId: string, flexJson: string) => Promise<{ messageId: string }>
 
@@ -55,7 +55,7 @@ export class LineHarness {
     this.broadcasts = new BroadcastsResource(http, this.defaultAccountId)
     this.richMenus = new RichMenusResource(http)
     this.trackedLinks = new TrackedLinksResource(http)
-    this.forms = new FormsResource(http)
+    this.forms = new FormsResource(http, config.lineAccountId)
     this.adPlatforms = new AdPlatformsResource(http)
     this.staff = new StaffResource(http)
     this.images = new ImagesResource(http)

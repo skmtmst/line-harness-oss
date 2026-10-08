@@ -23,7 +23,7 @@ describe('V8 統括のアカウントを探す', () => {
     render(<AccountBrowser accounts={accounts} onSelect={select} onSettings={vi.fn()} {...baseProps} />)
     expect(screen.queryByText('店舗00')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '2ページ目へ' }))
-    fireEvent.click(screen.getAllByRole('button', { name: 'このアカウントへ入る' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: / へ入る$/ })[0])
     expect(select).toHaveBeenCalledWith('a2')
     expect(screen.getByText(/21〜23件/)).toBeTruthy()
   })
@@ -54,7 +54,7 @@ describe('V8 統括のアカウントを探す', () => {
     expect(screen.getByRole('button', { name: '詳細' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '戻す' }))
     expect(restore).toHaveBeenCalledWith(archived)
-    expect(screen.queryByRole('button', { name: 'このアカウントへ入る' })).toBeNull()
+    expect(screen.queryByRole('button', { name: / へ入る$/ })).toBeNull()
   })
   it('接続状態の絞り込みと表へ切り替えても同じアカウントを表示する', () => {
     render(<AccountBrowser accounts={accounts} onSelect={vi.fn()} onSettings={vi.fn()} {...baseProps} />)

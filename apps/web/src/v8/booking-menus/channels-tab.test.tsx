@@ -68,3 +68,26 @@ describe('予約経路の連携（ZyDd6）', () => {
     expect(screen.queryByRole('button', { name: 'つなぎ直す' })).toBeNull()
   })
 })
+
+describe('予約経路の世代と閲覧のみ（WEB058/059）', () => {
+  it('WEB059：閲覧のみには「重なりを解消する」を置かず、重なりの知らせは出す', async () => {
+    api.conflicts.mockResolvedValue({ success: true, data: { conflicts: [{ id: 'c1' }, { id: 'c2' }] } })
+    render(<ChannelsTabV8 accountId="account-a" canEdit={false} staff={staff} />)
+    await screen.findByText(/予約が 2 件重なっています/)
+    expect(screen.queryByRole('button', { name: '重なりを解消する' })).toBeNull()
+  })
+
+  it('WEB058：B に切り替えたあとに A の応答が届いても、B の一覧のまま', async () => {
+    let releaseA: () => void = () => undefined
+    api.channels.mockImplementation(async (accountId: string) => {
+      if (accountId === 'account-a') await new Promise<void>((resolve) => { releaseA = resolve })
+      return { success: true, data: { ...channelsData, staff: [{ ...channelsData.staff[1], displayName: accountId === 'account-a' ? 'Aの人' : 'Bの人' }] } }
+    })
+    const view = render(<ChannelsTabV8 accountId="account-a" canEdit staff={staff} />)
+    view.rerender(<ChannelsTabV8 accountId="account-b" canEdit staff={staff} />)
+    await screen.findByText('Bの人')
+    await act(async () => { releaseA() })
+    await act(async () => { await Promise.resolve() })
+    expect(screen.queryByText('Aの人')).toBeNull()
+  })
+})

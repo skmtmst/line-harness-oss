@@ -19,8 +19,10 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+import FolderSelect, { folderCreateResult } from '@/components/shared/folder-select'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import Toggle from '@/components/shared/toggle'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
@@ -49,10 +51,12 @@ export default function TagCreateV8() {
 
 function TagCreate() {
   usePageTitle('タグを作る')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }])
   const router = useRouter()
   const params = useSearchParams()
   const { selectedAccountId } = useAccount()
+  const staffRole = useStaffRole()
+  const canEditFolders = staffRole === null || canManageRole(staffRole)
   const copyId = params.get('copy') ?? ''
   /* 直前に作ったタグの名前。URL に残すので再読み込みでも消えない。 */
   const createdName = params.get('created') ?? ''
@@ -183,8 +187,15 @@ function TagCreate() {
 
   if (loading) return <ListState kind="loading" title="複製元を読み込んでいます…" />
 
-  const back = <Link href="/tags" className={styles.backLink}>← 友だち属性へ</Link>
-  const groupOptions = [{ value: '', label: '未分類' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]
+  const back = <Link href="/tags" className={styles.backLink}>← タグへ</Link>
+  const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
+  // その場でタグのフォルダを作る（dLffh）。左の列の「フォルダを追加」と同じ受け口・同じ権限。
+  const createGroup = async (name: string, color: string | null) => {
+    const response = await api.tagGroups.create({ name, color, accountId: selectedAccountId })
+    const created = folderCreateResult(response, (group: TagGroup) => ({ value: group.id, label: group.name, color: group.color }))
+    if (response.success) setGroups((current) => [...current, response.data])
+    return created
+  }
 
   return (
     <>
@@ -194,6 +205,8 @@ function TagCreate() {
         identity={back}
         preview={(
           <div className={styles.aside}>
+            <h2 className={styles.asideTitle}>できあがるタグ</h2>
+            <TagPill name={name || 'タグ名'} color={groups.find((group) => group.id === groupId)?.color} />
             <h2 className={styles.asideTitle}>このあと</h2>
             <p className={styles.asideText}>作ると、すぐに友だちへ付けられます。タグ連動（付いたときの動き）は作ったあとの編集で足します。</p>
           </div>
@@ -226,7 +239,7 @@ function TagCreate() {
           <div className={styles.field}>
             <span className={styles.label} id="tag-new-folder">所属フォルダ</span>
             <span className={styles.selectBox}>
-              <Select size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} options={groupOptions} />
+              <FolderSelect size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} />
             </span>
             {foldersFailed ? (
               <div className={styles.inlineRetry}>

@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * 開閉する欄。Pencil ★V7「開閉する欄」（V7 文書 `v9M8P8`）。
+ * 開閉する欄。Pencil ★V8（V8.pen）「開け閉めする段」。
  *
  *   枠     角丸 10・枠 $hairline・地 $canvas
  *   見出し 高さ 48・余白 [0,16]・14px 太字。右に「3項目」などの要約（12px $ink-faint）と ∨

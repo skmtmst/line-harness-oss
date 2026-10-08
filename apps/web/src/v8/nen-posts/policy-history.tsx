@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import VersionCompare from '@/components/shared/version-compare'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatPhotoReceivedAt } from './time'
 import styles from './review.module.css'
@@ -106,7 +107,7 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
             <div className={styles.historyFields}><label className={styles.inputLabel}>採用したら（マイル）<TextField aria-label="採用したら（マイル）" inputMode="numeric" value={points} onChange={(event) => setPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /></label>
               <label className={styles.inputLabel} title="掲載時の追加報酬は、同じ写真に一度だけ付与します。">掲載されたら（さらに）<TextField aria-label="掲載されたら（さらに）" inputMode="numeric" value={publicationPoints} onChange={(event) => setPublicationPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /></label></div>
             <label className={styles.inputLabel}>ひとこと（なぜ変えるか）<TextField value={summary} maxLength={200} disabled={saving} onChange={(event) => setSummary(event.target.value)} /></label>
-            <label className={styles.inputLabel} title="日本時間。空ならすぐ使い始めます。">使い始め<TextField type="datetime-local" aria-label="使い始め（日本時間・空ならすぐ）" value={effective} disabled={saving} onChange={(event) => setEffective(event.target.value)} /></label>
+            <div className={styles.inputLabel} title="日本時間。空ならすぐ使い始めます。"><span aria-hidden="true">使い始め</span><DateTimeField aria-label="使い始め（日本時間・空ならすぐ）" placeholder="空ならすぐ" value={effective} disabled={saving} onChange={setEffective} /></div>
             {saveError ? <p role="alert" className={styles.errorText}>{saveError}</p> : null}
             <div className={styles.historyActions}><Button variant="secondary" disabled={saving} onClick={() => { setPoints(''); setPublicationPoints('0'); setSummary(''); setEffective(''); setSaveError('') }}>キャンセル</Button><Button type="submit" variant="primary" busy={saving} disabled={saving}>{effective ? '版を予約する' : '版を保存する'}</Button></div>
           </form> : null}

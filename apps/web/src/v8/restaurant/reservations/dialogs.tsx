@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
 import type { RestaurantMenuItem, RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
 import { INACTIVE_STATUSES, hm, isHold, pad2 } from './format'
@@ -101,7 +102,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             )
           ) : null}
           <Button type="button" onClick={onClose} disabled={busy}>{canWrite && !hold ? 'キャンセル' : '閉じる'}</Button>
-          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy || !draft.customerName.trim()}>保存する</Button> : null}
+          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy || !draft.customerName.trim() || !draft.startsAt || !draft.endsAt}>保存する</Button> : null}
         </>
       )}
     >
@@ -129,10 +130,10 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
           </div>
           <div className={styles.pair}>
             <DialogField label="開始日時" htmlFor="rs-edit-start">
-              <TextField id="rs-edit-start" type="datetime-local" required readOnly={!canWrite} value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} />
+              <DateTimeField id="rs-edit-start" required readOnly={!canWrite} value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
             </DialogField>
             <DialogField label="終了日時" htmlFor="rs-edit-end">
-              <TextField id="rs-edit-end" type="datetime-local" required readOnly={!canWrite} value={draft.endsAt} onChange={(event) => setDraft({ ...draft, endsAt: event.target.value })} />
+              <DateTimeField id="rs-edit-end" required readOnly={!canWrite} value={draft.endsAt} onChange={(next) => setDraft({ ...draft, endsAt: next })} />
             </DialogField>
           </div>
           <DialogField label="コース" kind="select">
@@ -224,7 +225,7 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
         </DialogField>
       </div>
       <DialogField label="開始日時" htmlFor="rs-trial-start">
-        <TextField id="rs-trial-start" type="datetime-local" required value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} />
+        <DateTimeField id="rs-trial-start" required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
       </DialogField>
       <DialogNote>試した予約は台帳に入ります。予約媒体へは何も送りません。</DialogNote>
     </RsDialog>

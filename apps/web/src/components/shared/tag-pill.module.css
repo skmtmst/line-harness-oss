@@ -1,0 +1,77 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.pill {
+  --tag-pill-font: 14px;
+  --tag-pill-dot: 10px;
+  --tag-pill-pad: 6px 12px;
+  --tag-pill-gap: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tag-pill-gap);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--tag-pill-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--tag-pill-font);
+  font-weight: 600;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+.pill[data-size='sm'] {
+  --tag-pill-font: 13px;
+  --tag-pill-dot: 8px;
+  --tag-pill-pad: 4px 10px;
+  --tag-pill-gap: 6px;
+}
+.dot {
+  width: var(--tag-pill-dot);
+  height: var(--tag-pill-dot);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-shell-gray);
+}
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tag-pill-gap);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.link:hover { text-decoration: underline; }
+.remove {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tag-pill-font);
+  height: var(--tag-pill-font);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+.remove::before { content: ''; position: absolute; inset: -6px; }
+.remove svg { width: var(--tag-pill-font); height: var(--tag-pill-font); }
+.remove:hover { background: var(--color-shell); }
+.link:focus-visible, .remove:focus-visible, .toggle:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+.toggle { cursor: pointer; }
+.toggle[data-selected='false'] { background: var(--color-shell); color: var(--color-ink-secondary); }
+}

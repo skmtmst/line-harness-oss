@@ -19,6 +19,7 @@ import UnfamiliarLoginNotice from './unfamiliar-login-notice'
 import SuspendedSidebar from './layout/suspended-sidebar'
 import CommandPalette from './shared/command-palette'
 import HoverPrefetch from './shared/hover-prefetch'
+import RowEntranceSettle from './shared/row-entrance-settle'
 import TopBar from './shared/top-bar'
 import NoteBar from './shared/note-bar'
 import PlatformNotices from './hq/platform-notices'
@@ -102,6 +103,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div className={styles.workspace}>
                 {/* V8 の先読み（F①）。V8 のときだけ中の聞き耳が働く。 */}
                 <HoverPrefetch />
+                <RowEntranceSettle />
                 {/* V8 の探す窓（F②）。⌘K・Ctrl+K で開く。帯には置かない。 */}
                 <CommandPalette />
                 <Sidebar />

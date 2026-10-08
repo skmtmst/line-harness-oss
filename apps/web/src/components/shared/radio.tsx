@@ -8,6 +8,7 @@ export default function Radio({
   children,
   className,
   size = 'medium',
+  fill = false,
   ...props
   /*
    * `size` は入力欄そのものの属性（数字）としても使えるが、この部品では
@@ -22,9 +23,11 @@ export default function Radio({
    * 丸の 18 と間隔 8 はどちらも同じ。v8 だけで効く。
    */
   size?: 'medium' | 'small'
+  /** 一覧行の名前を省略できるよう、ラベルを残りの幅に収める。 */
+  fill?: boolean
 }) {
   return (
-    <label className={[styles.root, className].filter(Boolean).join(' ')} data-size={size}>
+    <label className={[styles.root, className].filter(Boolean).join(' ')} data-size={size} data-fill={fill || undefined}>
       <input type="radio" className={styles.input} {...props} />
       <span className={styles.label}>{children}</span>
     </label>

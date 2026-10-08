@@ -40,7 +40,7 @@ describe('型の見出し（379板の絵）', () => {
       ['--tpl-settings-nav-width', '208px'], ['--tpl-settings-nav-pad-block', '16px'], ['--tpl-settings-nav-pad-side', '12px'],
       ['--tpl-settings-content-pad-block', '24px'], ['--tpl-settings-content-pad-side', '28px'], ['--tpl-settings-content-gap', '16px'],
       ['--tpl-settings-gap', '16px'],
-      ['--tpl-inbox-list-width', '372px'], ['--tpl-inbox-summary-width', '260px'],
+      ['--tpl-inbox-list-width', '372px'], ['--tpl-inbox-summary-width', '320px'],
       ['--tpl-inbox-summary-pad', '20px'], ['--tpl-inbox-summary-gap', '16px'],
       ['--tpl-conv-head-pad-block', '12px'], ['--tpl-conv-head-pad-side', '20px'], ['--tpl-conv-head-gap', '8px'],
       ['--tpl-conv-messages-pad-block', '20px'], ['--tpl-conv-messages-pad-side', '24px'], ['--tpl-conv-messages-gap', '12px'],
@@ -91,11 +91,11 @@ describe('型の見出し（379板の絵）', () => {
     expect(globals).toMatch(/--text-body--line-height:\s*1\.7/)
   })
 
-  it('作る型の頭は20/24/16・間8・手順は下の行（FU2aU の同行版は inline で残す）', () => {
+  it('作る型の頭は20/24/16・間8・手順は題と説明の下の行（置き場所は1つ・q1xNMz）', () => {
     expect(css).toMatch(/\[data-page-template='create'\] \.heading \{[^}]*padding:\s*var\(--tpl-create-head-pad-top\) var\(--tpl-create-head-pad-side\) var\(--tpl-create-head-pad-bottom\)/s)
     expect(css).toMatch(/\[data-page-template='create'\] \.heading \{[^}]*gap:\s*var\(--tpl-create-head-gap\)/s)
-    expect(css).toMatch(/\[data-page-template='create'\] \.heading(?::not\(\[data-steps-placement='inline'\]\))? > \.steps \{[^}]*flex-basis:\s*100%/s)
-    expect(css).toMatch(/data-steps-placement='inline'/)
+    expect(css).toMatch(/\[data-page-template='create'\] \.heading > \.steps \{[^}]*flex-basis:\s*100%/s)
+    expect(css).not.toMatch(/data-steps-placement/)
     expect(css).not.toMatch(/\[data-page-template='create'\] \.heading \{[^}]*padding-block:\s*16px/s)
   })
 

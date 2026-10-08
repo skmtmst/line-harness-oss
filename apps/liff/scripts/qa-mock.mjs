@@ -7,9 +7,9 @@
  * (apps/liff/src/lib/api.ts・pages/Affiliate.tsx) に合わせる。
  * 実在の個人情報は入れない。
  *
- * 注意: GET /api/forms/:id は本物の Worker が {success,data} の包みで
- * 返すが、LIFF の api.getForm は包みなし (PublicForm そのまま) を読む。
- * 偽物は LIFF が読む形 (包みなし) を返す。#要確認: 本物との差は要申告。
+ * フォーム (GET /api/forms/:id・/my-latest) は本物の Worker と同じく
+ * {success:true,data} の包みで返す。LIFF の api.getForm・getMyLatestFormAnswer が
+ * その境界で中身を取り出す (lib/form-api-contract.test.ts が両方を同じ契約で見張る)。
  *
  * 撮影の操作口:
  *   POST /__qa/state { delayMs, fail }  delayMs=応答を遅らせるms(読み込み中を撮る)
@@ -717,7 +717,8 @@ const server = createServer(async (req, res) => {
   {
     const m = pathname.match(/^\/api\/forms\/([^/]+)\/my-latest$/);
     if (method === 'GET' && m) {
-      json(res, 200, null);
+      // 本物と同じ包み。「前回の回答を出す」設定が無いフォームは data:null。
+      json(res, 200, { success: true, data: null });
       return;
     }
   }
@@ -741,7 +742,9 @@ const server = createServer(async (req, res) => {
   {
     const m = pathname.match(/^\/api\/forms\/([^/]+)$/);
     if (method === 'GET' && m) {
-      json(res, 200, qaForm());
+      // 本物と同じ包み。試し合言葉付きは本物と同じく isTest:true を足す。
+      const testToken = url.searchParams.get('test_token');
+      json(res, 200, { success: true, data: testToken ? { ...qaForm(), isTest: true } : qaForm() });
       return;
     }
   }

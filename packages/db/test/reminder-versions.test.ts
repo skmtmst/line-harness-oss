@@ -9,6 +9,7 @@ import {
   createReminderStep,
   createReminderWithDraftVersion,
   enrollFriendInReminder,
+  enrollFriendsInReminderOnce,
   getPendingReminderDeliveries,
   getReminderDraftVersion,
   getReminderPublishedVersion,
@@ -102,6 +103,26 @@ describe('V6 リマインダの公開版', () => {
     return publishReminderDraftVersion(db, reminderId, 'staff-1')
   }
 
+  it('PKG28: 1001件を500件ずつ巡回し、公開版の読込をまとめ、未来と配信済みの区別を保つ', async () => {
+    const created=await createReminderWithDraftVersion(db,settings('旧版の未来の通知'));
+    const published=await testAndPublish(created.reminder.id);
+    for(let index=0;index<1001;index++)sqlite.prepare(`INSERT INTO friend_reminders
+      (id,friend_id,reminder_id,target_date,reminder_version_id) VALUES(?,'friend-1',?,'2027-01-01T00:00:00+09:00',?)`)
+      .run('page-'+String(index).padStart(4,'0'),created.reminder.id,published.id);
+    sqlite.exec("INSERT INTO friend_reminder_deliveries(id,friend_reminder_id,reminder_step_id) VALUES('delivered','page-0000','day-before')");
+    await saveReminderDraftVersion(db,created.reminder.id,settings('新版'));
+    await testAndPublish(created.reminder.id);
+    let reads=0;
+    const counted={prepare:(sql:string)=>{reads++;return db.prepare(sql)},batch:db.batch.bind(db)} as D1Database;
+    const first=await getPendingReminderDeliveries(counted);
+    expect(reads).toBeLessThanOrEqual(5);
+    expect(first).toHaveLength(499);expect(first[0].steps[0].message_content).toBe('旧版の未来の通知');
+    const second=await getPendingReminderDeliveries(counted),third=await getPendingReminderDeliveries(counted);
+    expect(second).toHaveLength(500);expect(third).toHaveLength(1);
+    expect(new Set([...first,...second,...third].map(row=>row.id)).size).toBe(1000);
+    expect(await getPendingReminderDeliveries(counted)).toHaveLength(499);
+  });
+
   it('既存登録は旧版を維持し、新規登録だけ新版へ進める', async () => {
     const created = await createReminderWithDraftVersion(db, settings('明日のご予約です'))
     const version1 = await testAndPublish(created.reminder.id)
@@ -139,6 +160,28 @@ describe('V6 リマインダの公開版', () => {
     expect(pending.find((row) => row.id === second.id)?.steps[0].message_content).toBe('明後日のご予約です')
     expect(pending.find((row) => row.id === first.id)?.delivery_mode).toBe('time')
     expect(pending.find((row) => row.id === second.id)?.delivery_mode).toBe('countdown')
+  })
+
+  it('PKG25: 情報欄のまとめ登録も登録時の公開版を維持し、再走査では書き換えない', async () => {
+    const created = await createReminderWithDraftVersion(db, settings('旧版の案内'))
+    const version1 = await testAndPublish(created.reminder.id)
+    const first = { friendId: 'friend-1', targetDate: '2026-09-01T10:00:00.000Z' }
+    expect(await enrollFriendsInReminderOnce(db, created.reminder.id, [first])).toBe(1)
+
+    await saveReminderDraftVersion(db, created.reminder.id, settings('新版の案内'))
+    const version2 = await testAndPublish(created.reminder.id)
+    expect(await enrollFriendsInReminderOnce(db, created.reminder.id, [first])).toBe(0)
+    expect(await enrollFriendsInReminderOnce(db, created.reminder.id, [
+      { friendId: 'friend-1', targetDate: '2026-09-02T10:00:00.000Z' },
+    ])).toBe(1)
+
+    const rows = sqlite.prepare(
+      'SELECT id, reminder_version_id FROM friend_reminders ORDER BY target_date',
+    ).all() as Array<{ id: string; reminder_version_id: string }>
+    expect(rows.map((row) => row.reminder_version_id)).toEqual([version1.id, version2.id])
+    const pending = await getPendingReminderDeliveries(db)
+    expect(pending.find((row) => row.id === rows[0].id)?.steps[0].message_content).toBe('旧版の案内')
+    expect(pending.find((row) => row.id === rows[1].id)?.steps[0].message_content).toBe('新版の案内')
   })
 
   it('公開済みの設定・通知・状態を後戻りさせない', async () => {
@@ -206,4 +249,19 @@ describe('V6 リマインダの公開版', () => {
       }),
     ).resolves.toBeTruthy()
   })
+  it('PKG25: 情報欄のまとめ登録も公開版を固定し、次の公開で既存の本文・時刻を変えない', async () => {
+    const created = await createReminderWithDraftVersion(db, settings('First'));
+    await recordReminderDraftTest(db, created.version.id, { succeeded: true, staffId: null });
+    const first = await publishReminderDraftVersion(db, created.reminder.id, null);
+    expect(await enrollFriendsInReminderOnce(db, created.reminder.id,
+      [{ friendId: 'friend-1', targetDate: '2030-10-08T00:00:00+09:00' }])).toBe(1);
+    const nextSettings = settings('Second'); nextSettings.steps[0].offsetDays = -2;
+    const second = await saveReminderDraftVersion(db, created.reminder.id, nextSettings);
+    await recordReminderDraftTest(db, second.id, { succeeded: true, staffId: null });
+    await publishReminderDraftVersion(db, created.reminder.id, null);
+    const pending = await getPendingReminderDeliveries(db);
+    expect(pending[0].reminder_version_id).toBe(first.id);
+    expect(pending[0].steps[0]).toMatchObject({ message_content: 'First', offset_days: -1 });
+  });
+
 })

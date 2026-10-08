@@ -12,7 +12,6 @@
  * 今までの app/booking/staff/new（v7・staff-new-v8）から写した。BEHAVIOR.md を参照。
  */
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Check, ChevronDown, Smartphone } from 'lucide-react'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
@@ -28,7 +27,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { canEditFeature } from '@/lib/staff-capability'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
 import layout from './layout.module.css'
@@ -42,6 +41,8 @@ export default function StaffNewV8() {
   const router = useRouter()
   // /booking/staff/new はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
   usePageTitle('予約スタッフを登録')
+  /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
+  usePageCrumbs([{ label: '予約設定', href: '/booking/menus?tab=staff' }])
   const [name, setName] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [role, setRole] = useState('')
@@ -283,7 +284,6 @@ export default function StaffNewV8() {
   return (
     <div className={layout.shell} data-design-node="CcA4k">
       <header className={layout.head} data-design="Head">
-        <Link href="/booking/menus?tab=staff" className={layout.backLink}>← 担当スタッフへ</Link>
         <h1 className={layout.title}>予約スタッフを登録</h1>
         <p className={layout.desc}>お客さまが予約するときに指名できる担当者を登録します。</p>
       </header>

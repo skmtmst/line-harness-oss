@@ -5,7 +5,6 @@
  * 下の帯を、型の部品（PageFrame・PageHeading）と型の CSS で組む。
  * 型に無いのは1つだけ：頭のすぐ下の「帯の段」（絵 NCbYn の競合の帯）。
  */
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import tpl from '@/components/templates/page-templates.module.css'
@@ -35,8 +34,8 @@ export function TemplateEditFrame({
 }) {
   return (
     <PageFrame kind="create" boardId={boardId} hasFooter={Boolean(footerActions)}>
+      {/* 板の頭に戻る（← テンプレートへ）は置かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］（オーナー 2026-10-08）。 */}
       <PageHeading
-        identity={<Link href="/templates" className={styles.back}>← テンプレートへ</Link>}
         title={title}
         description={description}
       />

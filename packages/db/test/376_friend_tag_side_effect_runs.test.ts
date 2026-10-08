@@ -120,9 +120,9 @@ describe('friend_tag_side_effect_runs', () => {
 
   test('済んだ工程は未了の一覧から外れ、落ちた工程は理由付きで残る', async () => {
     await open();
-    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage')).toBe('claimed');
-    await markFriendTagSideEffectCompleted(db, 'friend-1', 'tag-1', 'mileage');
-    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'scenario_enroll')).toBe(
+    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT)).toBe('claimed');
+    await markFriendTagSideEffectCompleted(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT);
+    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'scenario_enroll', ASSIGNED_AT)).toBe(
       'claimed',
     );
     await markFriendTagSideEffectFailed(
@@ -130,8 +130,7 @@ describe('friend_tag_side_effect_runs', () => {
       'friend-1',
       'tag-1',
       'scenario_enroll',
-      new Error('enroll outage'),
-    );
+      new Error('enroll outage'), ASSIGNED_AT);
 
     const unfinished = await listUnfinishedFriendTagSideEffectRuns(db, 'friend-1', 'tag-1');
     expect(unfinished.map((r) => r.step_key)).toEqual(['scenario_enroll', 'event_tag_change']);
@@ -147,11 +146,11 @@ describe('friend_tag_side_effect_runs', () => {
   // ============================================================
   test('予約は1本しか取れない。2本目は走らせない', async () => {
     await open();
-    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change')).toBe(
+    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change', ASSIGNED_AT)).toBe(
       'claimed',
     );
     // running は event_tag_change の遷移元に無いので、2本目は取れない。
-    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change')).toBe(
+    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change', ASSIGNED_AT)).toBe(
       'not_claimable',
     );
     expect(run('event_tag_change').attempt_count).toBe(1);
@@ -159,36 +158,36 @@ describe('friend_tag_side_effect_runs', () => {
 
   test('冪等な工程でも、走っている最中の1本しか取れない', async () => {
     await open();
-    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage')).toBe('claimed');
+    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT)).toBe('claimed');
     // running は mileage の遷移元にあるので取れる。ただし取れるのは1本ずつで、
     // 取った側だけが走る(attempt_count が進むので上限で止まる)。
-    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage')).toBe('claimed');
+    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT)).toBe('claimed');
     expect(run('mileage').attempt_count).toBe(2);
   });
 
   test('済んだ工程は予約できない', async () => {
     await open();
-    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage');
-    await markFriendTagSideEffectCompleted(db, 'friend-1', 'tag-1', 'mileage');
-    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage')).toBe(
+    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT);
+    await markFriendTagSideEffectCompleted(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT);
+    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT)).toBe(
       'not_claimable',
     );
     expect(run('mileage').status).toBe('completed');
   });
 
   test('行が無いときは missing を返す(取れないこととは分ける)', async () => {
-    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage')).toBe('missing');
+    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT)).toBe('missing');
     expect(await getFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage')).toBeNull();
   });
 
   test('上限に達した行は予約できない', async () => {
     await open();
     for (let i = 0; i < FRIEND_TAG_SIDE_EFFECT_MAX_ATTEMPTS; i += 1) {
-      expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage')).toBe('claimed');
-      await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'mileage', 'boom');
+      expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT)).toBe('claimed');
+      await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'mileage', 'boom', ASSIGNED_AT);
     }
     expect(run('mileage').attempt_count).toBe(FRIEND_TAG_SIDE_EFFECT_MAX_ATTEMPTS);
-    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage')).toBe(
+    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT)).toBe(
       'not_claimable',
     );
   });
@@ -205,7 +204,7 @@ describe('friend_tag_side_effect_runs', () => {
             WHERE step_key = 'event_tag_change'`,
         )
         .run(status);
-      expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change')).toBe(
+      expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change', ASSIGNED_AT)).toBe(
         'not_claimable',
       );
       expect(run('event_tag_change').attempt_count).toBe(1); // 進んでいない
@@ -219,7 +218,7 @@ describe('friend_tag_side_effect_runs', () => {
         sqlite
           .prepare(`UPDATE friend_tag_side_effect_runs SET status = ? WHERE step_key = ?`)
           .run(status, step);
-        expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', step)).toBe('claimed');
+        expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', step, ASSIGNED_AT)).toBe('claimed');
       }
     }
   });
@@ -270,13 +269,13 @@ describe('friend_tag_side_effect_runs', () => {
     expect(await countStuckFriendTagSideEffectRuns(db)).toBe(0);
 
     // 冪等な工程が1回落ちただけなら、まだ自動で走り直す = 止まっていない。
-    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'scenario_enroll');
-    await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'scenario_enroll', 'boom');
+    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'scenario_enroll', ASSIGNED_AT);
+    await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'scenario_enroll', 'boom', ASSIGNED_AT);
     expect(await countStuckFriendTagSideEffectRuns(db)).toBe(0);
 
     // 外へ出る工程が落ちたら、自動では動かない = 止まっている。
-    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change');
-    await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'event_tag_change', 'boom');
+    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change', ASSIGNED_AT);
+    await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'event_tag_change', 'boom', ASSIGNED_AT);
     expect(await countStuckFriendTagSideEffectRuns(db)).toBe(1);
 
     const stuck = await listStuckFriendTagSideEffectRuns(db, { limit: 10 });
@@ -294,8 +293,8 @@ describe('friend_tag_side_effect_runs', () => {
 
   test('タグが外れた行は、未了の一覧にも止まっている行にも出さない', async () => {
     await open();
-    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change');
-    await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'event_tag_change', 'boom');
+    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change', ASSIGNED_AT);
+    await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'event_tag_change', 'boom', ASSIGNED_AT);
     expect((await listPendingFriendTagSideEffectRuns(db)).length).toBe(3);
     expect(await countStuckFriendTagSideEffectRuns(db)).toBe(1);
 
@@ -310,8 +309,8 @@ describe('friend_tag_side_effect_runs', () => {
   // ============================================================
   test('reopen は試行回数と理由を残したまま pending へ戻す', async () => {
     await open();
-    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change');
-    await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'event_tag_change', 'boom');
+    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change', ASSIGNED_AT);
+    await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'event_tag_change', 'boom', ASSIGNED_AT);
 
     expect(await reopenFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change')).toBe(
       true,
@@ -321,23 +320,23 @@ describe('friend_tag_side_effect_runs', () => {
     expect(row.attempt_count).toBe(1); // 上限は効いたまま
     expect(row.last_error).toBe('boom'); // 履歴も残る
     // pending からは予約できる = 人の判断で走り直せる。
-    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change')).toBe(
+    expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change', ASSIGNED_AT)).toBe(
       'claimed',
     );
   });
 
   test('reopen は済んだ工程を戻さない', async () => {
     await open();
-    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage');
-    await markFriendTagSideEffectCompleted(db, 'friend-1', 'tag-1', 'mileage');
+    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT);
+    await markFriendTagSideEffectCompleted(db, 'friend-1', 'tag-1', 'mileage', ASSIGNED_AT);
     expect(await reopenFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'mileage')).toBe(false);
     expect(run('mileage').status).toBe('completed');
   });
 
   test('付け直しは同じ行を新しい付与時刻で pending へ戻す', async () => {
     await open();
-    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'scenario_enroll');
-    await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'scenario_enroll', 'boom');
+    await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'scenario_enroll', ASSIGNED_AT);
+    await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'scenario_enroll', 'boom', ASSIGNED_AT);
 
     const next = '2026-09-12T09:00:00.000+09:00';
     await openFriendTagSideEffectRuns(db, {
@@ -376,4 +375,17 @@ describe('friend_tag_side_effect_runs', () => {
         .run(ASSIGNED_AT, ASSIGNED_AT, ASSIGNED_AT),
     ).toThrow(/CHECK constraint failed/);
   });
+});
+
+test('以前の付与の完了・失敗・占有は新しい付与の工程を変更しない', async () => {
+  await open();
+  expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change', ASSIGNED_AT)).toBe('claimed');
+  const next = '2026-09-11T10:01:00.000+09:00';
+  sqlite.prepare("UPDATE friend_tags SET assigned_at=? WHERE friend_id='friend-1' AND tag_id='tag-1'").run(next);
+  await openFriendTagSideEffectRuns(db, { friendId: 'friend-1', tagId: 'tag-1', assignedAt: next });
+  await markFriendTagSideEffectCompleted(db, 'friend-1', 'tag-1', 'event_tag_change', ASSIGNED_AT);
+  await markFriendTagSideEffectFailed(db, 'friend-1', 'tag-1', 'event_tag_change', 'old error', ASSIGNED_AT);
+  expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change', ASSIGNED_AT)).toBe('not_claimable');
+  expect(run('event_tag_change')).toMatchObject({ assigned_at: next, status: 'pending', attempt_count: 0, last_error: null });
+  expect(await claimFriendTagSideEffectRun(db, 'friend-1', 'tag-1', 'event_tag_change', next)).toBe('claimed');
 });

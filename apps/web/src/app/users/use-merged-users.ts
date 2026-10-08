@@ -17,6 +17,9 @@ export interface UsersAccountOption {
   name: string
 }
 
+/** CSV は200人ずつ読む。これを超えて続きがあれば書き出さない（WEB323）。 */
+export const USERS_CSV_MAX_PAGES = 500
+
 export function useMergedUsers() {
   const [rows, setRows] = useState<UserRowData[]>([])
   const [total, setTotal] = useState(0)
@@ -134,14 +137,27 @@ export function useMergedUsers() {
         uid: uid === 'linked' || uid === 'unlinked' ? uid : undefined,
       } as const
       const all: UserRowData[] = []
-      let exportTotal = total
+      /*
+       * WEB323：画面の件数（total）は読めていないと 0 のまま。それを信じて
+       * 1件も読まずに見出しだけの CSV を出さない。件数は書き出し側で必ず
+       * 1ページ目から読み直し、最後まで集まったかを確かめる。
+       */
+      let exportTotal: number | null = null
+      let complete = false
       // 上限は途中で件数が増えても無限に追い続けないための安全弁。
-      for (let p = 1; all.length < exportTotal && p <= 500; p += 1) {
+      for (let p = 1; p <= USERS_CSV_MAX_PAGES; p += 1) {
         const res = await api.usersGrouped.list({ ...filters, page: p, pageSize: 200 })
         if (!res.success) throw new Error('fetch failed')
         all.push(...res.data.rows)
         exportTotal = res.data.total
-        if (res.data.rows.length === 0) break
+        if (res.data.rows.length === 0 || all.length >= exportTotal) {
+          complete = true
+          break
+        }
+      }
+      if (!complete) {
+        setExportError(`人数が多すぎるため、CSVに書き出せませんでした（${all.length}人より先があります）。条件で絞ってからやり直してください。`)
+        return
       }
       const lines = [
         ['統合ユーザー', '連絡先', '紐付くアカウント', 'UID', '最終接触'].map(csvCell).join(','),

@@ -12,6 +12,7 @@
  * （口・版・下書き・冪等の鍵の扱いを変えない）。違うのは見せ方と、先に保存された
  * ときの帯（違いを比べる・最新を読み込んで続ける）。BEHAVIOR.md に書き出した。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -37,10 +38,11 @@ import {
   Workflow,
 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
-import Stepper, { type StepperStep } from '@/components/shared/stepper'
+import type { StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import CheckCard from '@/components/shared/check-card'
@@ -50,8 +52,10 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } from '@/components/shared/folder-select'
 import SegmentedControl from '@/components/shared/segmented'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import Toggle from '@/components/shared/toggle'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -73,6 +77,7 @@ import { describeFriendAddFailure } from './failure'
 import { addTimeWindow, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow } from './flow'
 import { resendSuppressionText } from './text'
 import styles from './editor.module.css'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
 type EditorRule = {
@@ -191,6 +196,7 @@ export default function FriendAddEditorV8({ ruleId }: { ruleId?: string }) {
 
 function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
@@ -200,6 +206,8 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const requestedStep = searchParams.get('step') as Step | null
   const step: Step = STEPS.some((item) => item.key === requestedStep) ? requestedStep! : 'basic'
   usePageTitle('初回案内を作る')
+  /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
+  usePageCrumbs([{ label: '友だち追加時の配信', href: '/friend-add-settings' }])
   const [rule, setRule] = useState<EditorRule>({
     name: '', folderName: null, priority: 1, friendKind: 'first_time', isFallback: false,
     status: 'draft', matchedLast7Days: null, lastTestStatus: null, version: 0,
@@ -228,6 +236,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     stateChanged: false
   } | null>(null)
   const saveIdempotencyKey = useRef(crypto.randomUUID())
+  const folderKey = useRef(crypto.randomUUID())
   const saveInFlight = useRef(false)
   const savedSnapshot = useRef<string | null>(null)
   const loadRequestRef = useRef({ accountId: null as string | null, ruleId: null as string | null, generation: 0 })
@@ -379,7 +388,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       savedSnapshot.current = editorSnapshot(rule, definition)
       setConflict(false)
       setNotice('下書きを保存しました。')
-      if (!ruleId || nextStep) router.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
+      if (!ruleId || nextStep) samePageUrl.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {
@@ -430,7 +439,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const moveToStep = (nextStep: Step) => {
     if (nextStep === step || saving || enabling) return
     if (!hasUnsavedChanges) {
-      router.replace(hrefFor(nextStep))
+      samePageUrl.replace(hrefFor(nextStep))
       return
     }
     void save(nextStep)
@@ -620,7 +629,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       identity={
         <Link href="/friend-add-settings" className={styles.backLink}>← 友だち追加時の配信へ</Link>
       }
-      steps={<Stepper label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
+      steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
       description={<>
         {step === 'basic'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'
@@ -681,6 +690,17 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
           canEdit={canEdit}
           isExisting={Boolean(ruleId)}
           nameError={fieldError?.step === 'basic' ? fieldError.message : undefined}
+          onCreateFolder={canEdit && selectedAccountId
+            ? folderCreator(
+              // 一覧の左の列と同じ口。やり直しで二重に作らないよう、作れるまで同じ鍵で送る。
+              (name, color) => api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current, color),
+              folderByName,
+              (created) => {
+                folderKey.current = crypto.randomUUID()
+                setOptions((current) => ({ ...current, folders: [...current.folders, { id: created.id, name: created.name, color: created.color }] }))
+              },
+            )
+            : undefined}
         />
       ) : null}
       {step === 'routes' ? (
@@ -765,13 +785,15 @@ function sharedPrefix(names: string[]) {
 
 /* ===== 作る① 基本設定（板 `wDzkc`） ===== */
 
-function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError }: {
+function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onCreateFolder }: {
   rule: EditorRule
   setRule: Dispatch<SetStateAction<EditorRule>>
   options: FriendAddRuleOptions
   canEdit: boolean
   isExisting: boolean
   nameError?: string
+  /** フォルダを選ぶ欄からその場で作る（dLffh）。閲覧のみは渡さない。 */
+  onCreateFolder?: FolderSelectCreate
 }) {
   const locked = rule.isFallback || isExisting
   const folderOptions = options.folders.some((folder) => folder.name === (rule.folderName ?? ''))
@@ -802,16 +824,15 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError }: {
           <div className={styles.field}>
             <label htmlFor="fa-folder" className={styles.label}>フォルダ</label>
             {canEdit ? (
-              <Select
+              <FolderSelect
                 id="fa-folder"
                 aria-label="フォルダ"
                 size="full"
                 value={rule.folderName ?? ''}
                 onChange={(value) => setRule((current) => ({ ...current, folderName: value || null }))}
-                options={[
-                  { value: '', label: '未分類' },
-                  ...folderOptions.map((folder) => ({ value: folder.name, label: folder.name })),
-                ]}
+                folders={folderOptions.map(folderByName)}
+                onCreate={onCreateFolder}
+
               />
             ) : (
               <ReadOnlyText id="fa-folder" label="フォルダ" value={rule.folderName || '未分類'} />
@@ -948,22 +969,20 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
           <div className={styles.datePair}>
             <div className={styles.field}>
               <label htmlFor="fa-from" className={styles.label}>有効期間 はじめ</label>
-              <TextField
+              <DateTimeField
                 id="fa-from"
-                type="datetime-local"
                 value={localInputValue(definition.activeFrom)}
                 readOnly={!canEdit}
-                onChange={(event) => setDefinition((current) => ({ ...current, activeFrom: event.target.value || null }))}
+                onChange={(next) => setDefinition((current) => ({ ...current, activeFrom: next || null }))}
               />
             </div>
             <div className={styles.field}>
               <label htmlFor="fa-until" className={styles.label}>有効期間 おわり</label>
-              <TextField
+              <DateTimeField
                 id="fa-until"
-                type="datetime-local"
                 value={localInputValue(definition.activeUntil)}
                 readOnly={!canEdit}
-                onChange={(event) => setDefinition((current) => ({ ...current, activeUntil: event.target.value || null }))}
+                onChange={(next) => setDefinition((current) => ({ ...current, activeUntil: next || null }))}
               />
             </div>
           </div>
@@ -1031,7 +1050,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
   scenarios: FriendAddRuleOptions['scenarios']
   canEdit: boolean
 }) {
-  const messageRef = useRef<HTMLTextAreaElement | null>(null)
+  const messageRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement | null>(null)
   const insertToken = (token: string) => {
     const area = messageRef.current
     if (!area) return
@@ -1080,7 +1099,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
         </div>
         )}
         <div className={styles.bodyBox}>
-          <textarea
+          <InsertTextField
             ref={messageRef}
             aria-label="最初に送るメッセージ"
             className={styles.bodyText}
@@ -1088,7 +1107,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             maxLength={MESSAGE_LIMIT}
             value={definition.messageText}
             readOnly={!canEdit}
-            onChange={(event) => setDefinition((current) => ({ ...current, messageText: event.target.value }))}
+            onValueChange={(next) => setDefinition((current) => ({ ...current, messageText: next }))}
           />
           <div className={styles.insertRow}>
             {/* 閲覧のみ：差し込むボタンは置かない（文字数だけ見せる）。 */}
@@ -1164,20 +1183,18 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             )}
             {(definition.timeWindows ?? []).map((slot, index) => (
               <div key={index} className={styles.timeRow}>
-                <TextField
-                  type="time"
+                <TimeField
                   aria-label={`時間帯${index + 1}の開始`}
                   value={slot.start}
                   readOnly={!canEdit}
-                  onChange={(event) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: event.target.value }) }))}
+                  onChange={(next) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: next }) }))}
                 />
                 <span aria-hidden="true">〜</span>
-                <TextField
-                  type="time"
+                <TimeField
                   aria-label={`時間帯${index + 1}の終了`}
                   value={slot.end}
                   readOnly={!canEdit}
-                  onChange={(event) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { end: event.target.value }) }))}
+                  onChange={(next) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { end: next }) }))}
                 />
                 {canEdit ? (
                   <Button type="button" variant="text" aria-label={`時間帯${index + 1}を削除`} onClick={() => setDefinition((current) => ({ ...current, timeWindows: removeTimeWindow(current.timeWindows, index) }))}>削除</Button>

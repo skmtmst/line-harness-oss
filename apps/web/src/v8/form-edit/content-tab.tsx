@@ -38,6 +38,8 @@ type Props = {
   selectedBlockId: string | null
   inputCount: number
   accountId: string | null
+  /** 統括のひな形（host.ts）：配った先の ID に直せない画像（登録メディア・画像の URL）は足せない。 */
+  portable?: boolean
   onSelectPage: (index: number) => void
   onAddPage: () => void
   onRenamePage: (index: number, name: string) => boolean
@@ -114,7 +116,7 @@ export function ContentTab(props: Props) {
             ),
           )
         )}
-        <AddGrid onAdd={(make) => props.onAddBlock(make(props.inputCount))} />
+        <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />
       </section>
 
       <RenameDialog
@@ -518,7 +520,10 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
 
 /* ---------------- ブロックを足す ---------------- */
 
-function AddGrid({ onAdd }: { onAdd: (make: (count: number) => FormBlock) => void }) {
+/** 統括のひな形で足せないブロック（画像は配った先の登録メディアに直せない）。 */
+const PORTABLE_HIDDEN_CARDS: ReadonlySet<string> = new Set(['image'])
+
+function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number) => FormBlock) => void; hide?: ReadonlySet<string> }) {
   return (
     <div className={styles.addBox}>
       <p className={styles.addTitle}>ブロックを足す</p>
@@ -526,7 +531,7 @@ function AddGrid({ onAdd }: { onAdd: (make: (count: number) => FormBlock) => voi
         <div key={group.title} className={styles.addGroup}>
           <p className={styles.addGroupTitle}>{group.title}</p>
           <div className={styles.addCards}>
-            {group.cards.map((card) => (
+            {group.cards.filter((card) => !hide?.has(card.key)).map((card) => (
               <button key={card.key} type="button" className={styles.addCard} data-fresh={card.fresh || undefined} onClick={() => onAdd(card.make)}>
                 <span className={styles.addCardTop}>
                   <Plus size={15} aria-hidden="true" />

@@ -1,3 +1,4 @@
+import { buildBroadcastAudienceQuery as buildSegmentQuery } from './broadcast-audience-query.js';
 import { buildMessage } from './line-message.js';
 import {
   getBroadcastById,
@@ -189,7 +190,6 @@ export async function processBroadcastSend(
       }
       // 分析の一時対象者は送信直前にも所属・期限を確かめ直す。
       await assertAnalyticsAudiencesUsable(db, storedConditions, accountId);
-      const { buildSegmentQuery } = await import('./segment-query.js');
       const { sql, bindings } = buildSegmentQuery(storedConditions);
       const segmentAudienceSql = accountId
         ? `SELECT COUNT(*) AS total,
@@ -264,7 +264,6 @@ export async function processBroadcastSend(
     if (!conditions || !Array.isArray(conditions.rules)) {
       throw new Error('segment_conditions is malformed');
     }
-    const { buildSegmentQuery } = await import('./segment-query.js');
     const accountId = raw.line_account_id as string | null;
     // 分析の一時対象者は送信直前にも所属・期限を確かめ直す。
     // BroadcastAudienceError は呼出し側が拾い、予約を下書きへ戻す。
@@ -397,7 +396,7 @@ export async function processBroadcastSend(
       }
 
       const friends = await getFriendsByTag(db, broadcast.target_tag_id, broadcastAccountId);
-      const followingFriends = friends.filter((f) => f.is_following);
+      const followingFriends = friends.filter((f) => f.is_following && !f.is_hidden);
       totalCount = followingFriends.length;
 
       // Send in batches with stealth delays to mimic human patterns
@@ -1008,7 +1007,6 @@ async function processQueuedBroadcastBatches(
   const accountId = raw.line_account_id as string | null;
   let friends: Array<{ id: string; line_user_id: string; display_name: string | null }>;
   if (segmentConditionsStr) {
-    const { buildSegmentQuery } = await import('./segment-query.js');
     const condition = JSON.parse(segmentConditionsStr);
     const { sql, bindings } = buildSegmentQuery(condition);
     // アカウントフィルタを追加（line_account_idで絞り込み）
@@ -1027,7 +1025,7 @@ async function processQueuedBroadcastBatches(
   } else if (broadcast.target_tag_id) {
     const { getFriendsByTag } = await import('@line-crm/db');
     const tagFriends = await getFriendsByTag(db, broadcast.target_tag_id, accountId);
-    friends = tagFriends.filter(f => f.is_following).map(f => ({
+    friends = tagFriends.filter(f => f.is_following && !f.is_hidden).map(f => ({
       id: f.id,
       line_user_id: f.line_user_id,
       display_name: f.display_name,

@@ -2,8 +2,8 @@
  * ★V8 友だちの段のタブ（Pencil x6QsVz・ADjK8・hn6Y8・T9gblG・L48eY）。
  *
  * 行き先は今の画面と同じ URL（app/friends/friends-tabs.ts と同じ名前・同じ順）。
- * 絵では「CSVで書き出す・取り込む」も同じタブの並びに入っているので足す
- * （今は「データ管理」メニューの中から行く /friends/migrations）。
+ * 絵のタブは4つ。「CSVで書き出す・取り込む」（/friends/migrations）はタブに置かず、
+ * 友だち一覧の「友だちを取り込む」から行く（画面の頭の説明の文だけ残す）。
  */
 export type FriendsTabKey = 'list' | 'duplicates' | 'merged' | 'uid-migration' | 'csv'
 
@@ -12,7 +12,6 @@ export const FRIENDS_TABS: ReadonlyArray<{ key: FriendsTabKey; label: string; hr
   { key: 'duplicates', label: '重複検出', href: '/friends?tab=duplicates' },
   { key: 'merged', label: '統合ユーザー', href: '/friends?tab=merged' },
   { key: 'uid-migration', label: 'UID移行', href: '/friends/migrations?tab=uid' },
-  { key: 'csv', label: 'CSVで書き出す・取り込む', href: '/friends/migrations' },
 ]
 
 /** タブの下に出す1行の説明（絵の「タブの説明」）。 */

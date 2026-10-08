@@ -92,3 +92,32 @@ it('店の電話番号と予約ページは決定した共通キーで調べ、�
  expect((await preflightHqBroadcast(f.db,r))[0].blockedReasons).toEqual([]);
  f.raw.exec("UPDATE common_vars SET value=' ' WHERE var_key='store_phone'");expect((await preflightHqBroadcast(f.db,r))[0].blockedReasons).toContain('店舗の共通情報を確認してください');
 });
+
+it('店舗名・LIFFは構造を壊さず吹き出しと実際の子配信へ固定する',async()=>{
+ f.raw.prepare("UPDATE line_accounts SET name=?,liff_id='liff-shop1' WHERE id='shop1'").run('店"\nA');
+ const bubbles=[
+  {id:'text',type:'text',content:{text:'{{account.name}} https://liff.line.me/{{liff_id}}'}},
+  {id:'image',type:'image',content:{originalContentUrl:'https://example.test/{{liff_id}}/image.png',previewImageUrl:'https://example.test/{{liff_id}}/image.png'}},
+  {id:'video',type:'video',content:{originalContentUrl:'https://example.test/{{liff_id}}/video.mp4',previewImageUrl:'https://example.test/{{liff_id}}/preview.png'}},
+  {id:'carousel',type:'carousel',content:{templateId:'template',columnsJson:JSON.stringify([{text:'{{account.name}}',actions:[{type:'uri',label:'予約',uri:'https://liff.line.me/{{liff_id}}'}]}])}},
+ ];
+ const b={...input,accountIds:['shop1'],messageBubbles:bubbles} as HqBroadcastInput;
+ const run=await prepareHqBroadcast(f.db,tenant,'owner',b);
+ expect((await preflightHqBroadcast(f.db,run))[0].blockedReasons).toEqual([]);
+ await dispatchHqBroadcast(f.db,run,'owner',1);
+ const stored=f.raw.prepare('SELECT message_type,message_content,message_bubbles_json FROM broadcasts').get() as {message_type:string;message_content:string;message_bubbles_json:string};
+ expect(stored.message_content).toBe('店"\nAのお知らせ');
+ const values=JSON.parse(stored.message_bubbles_json);
+ expect(values[0].content.text).toBe('店"\nA https://liff.line.me/liff-shop1');
+ expect(JSON.parse(values[3].content.columnsJson)[0].text).toBe('店"\nA');
+ const {parseBroadcastMessageParts,buildMessages}=await import('./broadcast-message-set.js');
+ expect(buildMessages(parseBroadcastMessageParts({messageType:stored.message_type,messageContent:stored.message_content,messageBubblesJson:stored.message_bubbles_json})).map(m=>m.type)).toEqual(['text','image','video','template']);
+ expect(stored.message_bubbles_json).not.toContain('{{liff_id}}');
+});
+it('LIFFの差し込みが必要な店舗にLIFFが無ければ予約前に止める',async()=>{
+ const b={...input,accountIds:['shop1'],messageContent:'https://liff.line.me/{{liff_id}}'};
+ const run=await prepareHqBroadcast(f.db,tenant,'owner',b);
+ expect((await preflightHqBroadcast(f.db,run))[0].blockedReasons).toContain('店舗のLIFF IDを確認してください');
+ await expect(dispatchHqBroadcast(f.db,run,'owner',1)).rejects.toMatchObject({status:409});
+ expect(f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get()).toEqual({n:0});
+});

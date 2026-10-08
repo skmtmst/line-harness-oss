@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api, type CreateBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
-import { addMinutesHm, formatJpLong, jstStartsAtIso } from '../lib/datetime.js';
+import { addMinutesHm, formatJpLong, slotStartsAtIso } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
 import Icon from './ui/Icon.js';
@@ -52,7 +52,8 @@ export default function Confirm({
         {
           menu_id: menu.id,
           staff_id: staff.id,
-          starts_at: jstStartsAtIso(slot.date, slot.start),
+          // 空き枠が返した開始の瞬間を送る（店が日本時間以外でもずれない）。
+          starts_at: slotStartsAtIso(slot),
           customer_note: note || undefined,
         },
         idemKey,

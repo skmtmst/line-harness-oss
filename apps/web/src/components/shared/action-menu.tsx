@@ -56,7 +56,7 @@ export type ActionMenuProps = {
   anchorRef?: RefObject<HTMLElement | null>
 }
 
-/** Pencil ★V7 `xifuV` を正本にした小型操作メニュー（V5 `hGpFq` から移行）。 */
+/** Pencil ★V8 `hnuY9`「その他操作メニュー」を正本にした小型操作メニュー。 */
 export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef }: ActionMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const anchorMarkRef = useRef<HTMLSpanElement>(null)

@@ -179,7 +179,6 @@ function HqMark() {
 
 export default function BroadcastListV8() {
   usePageTitle('一斉配信')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   /* かんたんに送る（板 `P6vbxn`）の窓。 */
@@ -207,6 +206,13 @@ export default function BroadcastListV8() {
   const statusFilter: StatusChipKey = STATUS_CHIPS.some((chip) => chip.key === statusParam) ? (statusParam as StatusChipKey) : 'all'
   const setStatusFilter = setStatusParam as (next: StatusChipKey) => void
   const [showCreate, setShowCreate] = useState(false)
+  /*
+   * 作る画面は一覧と同じ URL のまま開くので、上の帯のパンくずの「一斉配信」で一覧へ戻す
+   * （板の頭の「← 一斉配信一覧」は 2026-10-08 に無くした）。書きかけなら確かめてから戻る。
+   */
+  usePageCrumbs(showCreate
+    ? [{ label: '一斉配信', href: '/broadcasts', onSelect: () => setShowCreate(false) }]
+    : [{ label: 'ホーム', href: '/' }])
   const [openTemplatePicker, setOpenTemplatePicker] = useState(false)
   const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const createAnchorRef = useRef<HTMLElement | null>(null)
@@ -651,8 +657,9 @@ export default function BroadcastListV8() {
   const rangeLast = (page - 1) * pageSize + visibleBroadcasts.length
 
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: statusCounts?.all ?? listTotal },
+    { kind: 'all' as const, id: '', label: 'すべて', count: statusCounts?.all ?? listTotal },
     ...folders.map((f, index) => ({
+      kind: 'folder' as const,
       id: f.id,
       label: f.name,
       count: f.itemCount ?? null,
@@ -663,7 +670,7 @@ export default function BroadcastListV8() {
       onDelete: canEdit ? () => setDeletingFolder(f) : undefined,
       deleteNote: '削除しても、中の配信は未分類に残ります。',
     })),
-    { id: UNFILED, label: '未分類', count: unfiledCount },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
 
   const folderSelectOptions = [

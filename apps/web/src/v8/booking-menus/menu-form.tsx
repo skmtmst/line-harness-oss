@@ -15,7 +15,6 @@
  * 「比べてから保存」で扱う（いきなり上書きしない）。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Combobox from '@/components/shared/combobox'
@@ -219,7 +218,10 @@ export default function MenuFormV8() {
       menu.name, menu.category_label ?? '', menu.description ?? '', String(menu.duration_minutes),
       menu.price_mode === 'inquiry' ? '' : String(menu.base_price), String(menu.concurrent_capacity ?? 1),
       String(menu.buffer_after_minutes ?? 0), own,
-      menu.booking_window_days ?? '', menu.cutoff_hours_before ?? '', menu.cancel_deadline_hours_before ?? '',
+      // WEB064：入力欄と同じ文字の形でそろえる（数のままだと開いた直後から「直しかけ」になる）。
+      menu.booking_window_days != null ? String(menu.booking_window_days) : '',
+      menu.cutoff_hours_before != null ? String(menu.cutoff_hours_before) : '',
+      menu.cancel_deadline_hours_before != null ? String(menu.cancel_deadline_hours_before) : '',
       Boolean(menu.intake_question), menu.intake_question ?? '', menu.auto_tag_id,
       [...ids].sort().join(','), [...(menu.assigned_resources ?? []).map((item) => item.resourceId)].sort().join(','),
       optionalHit,
@@ -610,6 +612,12 @@ export default function MenuFormV8() {
         const res = await bookingApi.createMenu(selectedAccountId, menuBody(publish), idempotencyKey)
         menuId = res.id
         setCreatedMenuNeedingFollowUp({ menuId, remainingStaffIds: assignedIds, resourcesPending: resourceIds.size > 0 })
+      } else if (createdMenuNeedingFollowUp && !editTarget) {
+        /*
+         * WEB062：作れたメニューの続き（担当・設備）だけをやり直す。メニューそのものは
+         * 作ったとき（公開・下書きの選択も）のまま。版の無い「直す」へ進めて 409 にしたり、
+         * 公開を黙って下書きへ戻したりしない。版は下でいまの版を取り直す。
+         */
       } else {
         /* 編集。競合からの上書きのときは読み直した最新版を使う。 */
         const expectedVersion = overwrite && conflict ? conflict.version : editTarget?.version
@@ -645,7 +653,11 @@ export default function MenuFormV8() {
       }
 
       /* 設備（選んだときだけ）。 */
-      let resourcesPending = createdMenuNeedingFollowUp?.resourcesPending ?? resourceIds.size > 0
+      // WEB063：設備は「選んだときだけ」ではなく、前と変わったときに保存する（全部外したときも）。
+      const resourcesChanged = editTarget
+        ? [...(editTarget.assigned_resources ?? []).map((item) => item.resourceId)].sort().join(',') !== [...resourceIds].sort().join(',')
+        : resourceIds.size > 0
+      let resourcesPending = createdMenuNeedingFollowUp?.resourcesPending ?? resourcesChanged
       if (resourcesPending && version >= 1) {
         try {
           version = await writeResources(menuId, version)
@@ -759,7 +771,6 @@ export default function MenuFormV8() {
   return (
     <div className={shell.shell} data-design-node="QqER7">
       <header className={styles.head} data-design="Head">
-        <Link href="/booking/menus" className={shell.backLink}>← 予約へ</Link>
         <h1 className={shell.headTitle}>{editTarget ? '予約メニューを直す' : '予約メニューを作る'}</h1>
         <p className={shell.headNote}>
           {editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}

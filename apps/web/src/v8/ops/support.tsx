@@ -1,5 +1,6 @@
 'use client'
 
+import StatusPill from '@/components/shared/status-pill'
 import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -84,6 +85,9 @@ function shortDateTime(value: string | null): string {
   return m ? `${Number(m[2])}/${Number(m[3])} ${m[4]}` : full
 }
 
+/** WEB218：チケットを1回に読む件数。 */
+const TICKET_PAGE = 50
+
 export default function OpsSupportV8() {
   const readOnly = useOpsReadOnly()
   const [summary, setSummary] = useState<OpsSupportSummary | null>(null)
@@ -128,19 +132,42 @@ export default function OpsSupportV8() {
     if (res.success) setSummary(res.data)
   }, [])
 
+  /*
+   * WEB218：チケットは50件ずつ読む。50件ちょうど返ったときは続きがあるかもしれないので、
+   * 「続きを読み込む」で足す（絞り込みや直接のリンクでしか51件目へ行けない、をなくす）。
+   */
+  const [mayHaveMore, setMayHaveMore] = useState(false)
+  const [moreBusy, setMoreBusy] = useState(false)
+  const loadMore = async () => {
+    if (moreBusy) return
+    const sequence = listRequest.current
+    setMoreBusy(true)
+    const res = await opsCall(api.ops.support.tickets({ stage, priority: priority || undefined, q: q.trim() || undefined, sort, limit: TICKET_PAGE, offset: tickets.length }))
+    setMoreBusy(false)
+    if (sequence !== listRequest.current) return
+    if (!res.success) { setError(res.error || '続きを読み込めませんでした'); return }
+    setTickets((current) => [...current, ...res.data.filter((item) => !current.some((known) => known.id === item.id))])
+    setMayHaveMore(res.data.length >= TICKET_PAGE)
+  }
+
   const loadList = useCallback(async () => {
     const sequence = ++listRequest.current
     setLoading(true)
     setListFailed(false)
-    const res = await opsCall(api.ops.support.tickets({ stage, priority: priority || undefined, q: q.trim() || undefined, sort, limit: 50 }))
+    const res = await opsCall(api.ops.support.tickets({ stage, priority: priority || undefined, q: q.trim() || undefined, sort, limit: TICKET_PAGE }))
     if (sequence !== listRequest.current) return
     setLoading(false)
     if (!res.success) { setError(res.error || '読み込めませんでした'); setListFailed(true); return }
     setTickets(res.data)
+    setMayHaveMore(res.data.length >= TICKET_PAGE)
     setSelectedId((current) => deepLink.current || (current && res.data.some((t) => t.id === current) ? current : res.data[0]?.id ?? null))
   }, [stage, priority, q, sort])
 
-  const loadDetail = useCallback(async (id: string) => {
+  /*
+   * WEB219：同じチケットを読み直すとき（優先度を変えたあとなど）は、書きかけの返信を
+   * サーバーの下書きで置き換えない。返信の欄を入れ直すのは、チケットを開いたときだけ。
+   */
+  const loadDetail = useCallback(async (id: string, options?: { keepReply?: boolean }) => {
     const sequence = ++detailRequest.current
     setDetailLoading(true)
     setDetailFailed(false)
@@ -149,6 +176,7 @@ export default function OpsSupportV8() {
     setDetailLoading(false)
     if (!res.success) { setError(res.error || '内容を読み込めませんでした'); setDetailFailed(true); return }
     setDetail(res.data)
+    if (options?.keepReply) return
     setReply(res.data.draft?.body ?? '')
     setReplyFromAi(res.data.draft?.aiGenerated ? { generatedAt: res.data.draft.generatedAt } : null)
     setReferences(res.data.draft?.references ?? [])
@@ -219,7 +247,8 @@ export default function OpsSupportV8() {
     if (!detail) return
     const res = await opsCall(api.ops.support.update(detail.ticket.id, { priority: next }))
     if (!res.success) { setError(res.error || '変更できませんでした'); return }
-    await refreshAll()
+    await Promise.all([loadSummary(), loadList()])
+    if (selectedId) await loadDetail(selectedId, { keepReply: true })
   }
 
   const saveDraft = async () => {
@@ -279,7 +308,8 @@ export default function OpsSupportV8() {
     if (!detail || !reply.trim()) return
     setBusy(true)
     setError('')
-    const res = await opsCall(api.ops.support.reply(detail.ticket.id, { body: reply, aiAssisted: replyFromAi !== null }))
+    // WEB217：確かめの窓は「送って解決にする」。送るときに解決へ進めることを口へ伝える（省くと「返事待ち」になる）。
+    const res = await opsCall(api.ops.support.reply(detail.ticket.id, { body: reply, nextStage: 'resolved', aiAssisted: replyFromAi !== null }))
     setBusy(false)
     if (!res.success) { setError(res.error || '返信できませんでした'); return }
     setReply('')
@@ -363,7 +393,7 @@ export default function OpsSupportV8() {
                   <button type="button" aria-current={t.id === selectedId ? 'true' : undefined} onClick={() => pick(t.id)} className={`${styles.ticket} ${t.id === selectedId ? styles.ticketSelected : ''}`}>
                     <span className={styles.ticketTop}>
                       <span className={styles.ticketNo}>{t.ticketLabel}</span>
-                      <StatusBadge tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusBadge>
+                      <StatusPill tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusPill>
                     </span>
                     <span className={styles.ticketSubject}>{t.subject}</span>
                     <span className={styles.ticketMeta}>{`${t.tenantName}・優先度 ${t.priorityLabel}`}</span>
@@ -372,6 +402,9 @@ export default function OpsSupportV8() {
               ))}
             </ul>
           )}
+          {mayHaveMore && !loading ? (
+            <Button onClick={() => void loadMore()} disabled={moreBusy} busy={moreBusy}>続きを読み込む</Button>
+          ) : null}
         </section>
 
         <section aria-label="内容と返信" className={styles.detail}>
@@ -392,7 +425,7 @@ export default function OpsSupportV8() {
                 {readOnly ? null : <Button disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)}><LogIn aria-hidden="true" />代理ログイン</Button>}
               </div>
               <div className={styles.detailMeta}>
-                <StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge>
+                <StatusPill tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusPill>
                 <span>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : 'なし'}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
                 {ticket.subjectAuto ? <StatusBadge tone="neutral">自動で付けた件名</StatusBadge> : null}
               </div>

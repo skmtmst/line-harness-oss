@@ -269,6 +269,17 @@ beforeEach(() => {
 // =====================================================
 
 describe('POST /api/webhooks/outgoing — validation', () => {
+  test('WEB232 forwards inactive creation and rejects non-boolean creation state', async () => {
+    vi.mocked(createOutgoingWebhook).mockResolvedValue({ id: 'draft', name: 'draft', url: 'https://example.com/hook', event_types: '["*"]', secret: null, secret_encrypted: null, is_active: 0, max_retries: 0, consecutive_failures: 0, last_failed_at: null, created_at: '2026-10-08', updated_at: '2026-10-08' });
+    const body = { lineAccountId: ACCOUNT_ID, name: 'draft', url: 'https://example.com/hook', eventTypes: ['*'], secret: VALID_SECRET, isActive: false };
+    const send = (payload: unknown) => setupApp().request('/api/webhooks/outgoing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }, baseEnv);
+    const response = await send(body);
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ data: { isActive: false } });
+    expect(createOutgoingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ isActive: false }), expect.anything());
+    expect((await send({ ...body, isActive: 'false' })).status).toBe(400);
+  });
+
   test('rejects missing secret with 400', async () => {
     const app = setupApp();
     const res = await app.request(

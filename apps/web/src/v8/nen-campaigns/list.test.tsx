@@ -16,6 +16,8 @@ vi.hoisted(() => {
 
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
+// 行の「…」の移動は router.push（画面を丸ごと読み直さない）。
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }) }))
 vi.mock('next/link', () => ({
   default: ({ children, href, className, title }: { children: React.ReactNode; href: string; className?: string; title?: string }) =>
     React.createElement('a', { href, className, title }, children),
@@ -166,6 +168,14 @@ describe('V8 NEN配信の一覧', () => {
     expect(host.textContent).toContain('9/26')
     expect(host.textContent).toContain('予約中')
     expect(host.textContent).toContain('コラムを書く')
+  })
+
+  it('WEB231：コラムが読み込んだ分より多いときは「続きを読み込む」を出し、検索を勧めない', async () => {
+    const onLoadMoreColumns = vi.fn(async () => undefined)
+    await render(baseProps({ tab: 'columns', columnsTotal: 250, onLoadMoreColumns }))
+    expect(host.textContent).not.toContain('探すときは検索を使ってください')
+    await act(async () => { button('続きを読み込む')!.click() })
+    expect(onLoadMoreColumns).toHaveBeenCalledTimes(1)
   })
 
   it('クーポンの決めごとの引き出しで、保存とキャンセルが呼べる', async () => {

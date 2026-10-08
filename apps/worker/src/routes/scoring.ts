@@ -845,7 +845,16 @@ scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), asyn
     if (!accountScope.allowedAccountIds.includes(accountId)) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
+    const kind = c.req.query('kind');
+    if (kind && !['earned', 'spent', 'voided'].includes(kind)) {
+      return c.json({ success: false, error: 'kind is invalid' }, 400);
+    }
     const entryTypeValue = c.req.query('entryType');
+    const entryTypesValue = c.req.query('entryTypes');
+    const entryTypes = entryTypesValue?.split(',');
+    if (entryTypes && (!entryTypes.length || entryTypes.some((value) => !MILEAGE_ENTRY_TYPES.has(value as MileageEntryType)))) {
+      return c.json({ success: false, error: 'entryTypes is invalid' }, 400);
+    }
     const statusValue = c.req.query('status');
     const modeValue = c.req.query('mode');
     const fromValue = c.req.query('from')?.trim();
@@ -868,11 +877,13 @@ scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), asyn
     const requestedLimit = Number(c.req.query('limit') || 50);
     const requestedOffset = Number(c.req.query('offset') || 0);
     const historyInput = {
+      ...(kind ? { kind: kind as 'earned' | 'spent' | 'voided' } : {}),
       accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
       search: c.req.query('search') || '',
       // V6R-CX-e: 友だち詳細は、その人（名寄せした複数アカウント）の履歴だけを取る。
       friendId: c.req.query('friendId')?.trim() || undefined,
+      ...(entryTypes ? { entryTypes: entryTypes as MileageEntryType[] } : {}),
       entryType: entryTypeValue as MileageEntryType | undefined,
       status: statusValue as MileageEntryStatus | undefined,
       mode: modeValue as 'automatic' | 'manual' | undefined,
@@ -2044,7 +2055,13 @@ scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVis
   try {
     const friendId = c.req.param('id');
     const body = await c.req.json<{ scoreChange: number; reason?: string }>();
-    if (body.scoreChange === undefined) return c.json({ success: false, error: 'scoreChange is required' }, 400);
+    if (typeof body.scoreChange !== 'number' || !Number.isFinite(body.scoreChange)) {
+      return c.json({ success: false, error: 'scoreChange must be a finite number' }, 400);
+    }
+    const requestKey = c.req.header('Idempotency-Key');
+    if (requestKey !== undefined && (!requestKey.trim() || requestKey.length > 128)) {
+      return c.json({ success: false, error: 'Invalid Idempotency-Key' }, 400);
+    }
     const staff = c.get('staff');
     await addScore(c.env.DB, {
       friendId,
@@ -2053,10 +2070,14 @@ scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVis
       // IDEA-17: 手で動かした点数は「だれが」を明細からたどれるようにする。
       executedByStaffId: staff?.id ?? null,
       executedByStaffName: staff?.name ?? null,
+      idempotencyKey: requestKey ? JSON.stringify(['manual', staff?.id ?? null, requestKey]) : undefined,
     });
     const newScore = await getFriendScore(c.env.DB, friendId);
     return c.json({ success: true, data: { friendId, currentScore: newScore } }, 201);
   } catch (err) {
+    if (err instanceof Error && err.message === 'score_idempotency_conflict') {
+      return c.json({ success: false, error: '同じ操作番号で異なる加点はできません' }, 409);
+    }
     console.error('POST /api/friends/:id/score error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

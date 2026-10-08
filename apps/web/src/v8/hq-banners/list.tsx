@@ -9,6 +9,7 @@
  * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
  * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CircleDot, Folder, Gauge, Inbox, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -69,7 +70,7 @@ export default function HqBannersListV8() {
 
 function BannersInner() {
   usePageTitle('バナー生成')
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const tab: Tab = params.get('tab') === 'library' ? 'library' : 'projects'
   const role = useStaffRole()
@@ -109,7 +110,7 @@ function BannersInner() {
   }, [loadSummary])
 
   // タブの切り替えは `?tab=` で、履歴を積まない（v7 と同じ）。
-  const changeTab = (next: Tab) => router.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')
+  const changeTab = (next: Tab) => samePageUrl.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')
 
   const kpis = (
     <div className={styles.kpis} data-design="KPIs">
@@ -269,10 +270,10 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
 
   const ready = status === 'ready' && !archivedMode
   const rows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? projects.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    { id: 'favorite', label: 'お気に入り', count: ready ? projects.filter((p) => p.isFavorite).length : null, color: 'var(--color-status-info)' },
-    { id: 'running', label: '生成中', count: ready ? projects.filter((p) => p.runningCount > 0).length : null, color: 'var(--color-accent)' },
-    { id: 'archived', label: 'アーカイブ', count: archivedCount, color: 'var(--color-status-warn)' },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? projects.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'folder' as const, id: 'favorite', label: 'お気に入り', count: ready ? projects.filter((p) => p.isFavorite).length : null, color: 'var(--color-status-info)' },
+    { kind: 'folder' as const, id: 'running', label: '生成中', count: ready ? projects.filter((p) => p.runningCount > 0).length : null, color: 'var(--color-accent)' },
+    { kind: 'folder' as const, id: 'archived', label: 'アーカイブ', count: archivedCount, color: 'var(--color-status-warn)' },
   ]
 
   const createProject = canManage ? (
@@ -527,7 +528,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     }
   }
 
-  const deliver = async (image: BannerImage, lineAccountIds: string[]) => {
+  const deliver = async (image: BannerImage, lineAccountIds: string[]): Promise<boolean> => {
     setModalBusy(true)
     setModalError('')
     try {
@@ -535,14 +536,16 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       if (!res.success) throw new Error(res.error)
       replaceImage(res.data.image)
       onChanged()
+      return true
     } catch (caught) {
       setModalError(bannerFailureMessage(caught, 'アカウントへの受け渡し'))
+      return false
     } finally {
       setModalBusy(false)
     }
   }
 
-  const remove = async (image: BannerImage) => {
+  const remove = async (image: BannerImage): Promise<boolean> => {
     setModalBusy(true)
     setModalError('')
     try {
@@ -551,8 +554,10 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       setImages((prev) => prev.filter((i) => i.id !== image.id))
       setOpenImage(null)
       onChanged()
+      return true
     } catch (caught) {
       setModalError(bannerFailureMessage(caught, '一覧からの削除'))
+      return false
     } finally {
       setModalBusy(false)
     }
@@ -560,10 +565,10 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
 
   const ready = status === 'ready'
   const rows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? counts?.all ?? images.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    { id: 'favorite', label: 'お気に入り', count: ready ? counts?.favorite ?? null : null, color: 'var(--color-status-info)' },
-    { id: 'delivered', label: '渡し済み', count: ready ? counts?.delivered ?? null : null, color: 'var(--color-accent)' },
-    { id: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null, color: 'var(--color-status-warn)' },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? counts?.all ?? images.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'folder' as const, id: 'favorite', label: 'お気に入り', count: ready ? counts?.favorite ?? null : null, color: 'var(--color-status-info)' },
+    { kind: 'folder' as const, id: 'delivered', label: '渡し済み', count: ready ? counts?.delivered ?? null : null, color: 'var(--color-accent)' },
+    { kind: 'folder' as const, id: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null, color: 'var(--color-status-warn)' },
   ]
 
   const uploadImage = canManage ? (

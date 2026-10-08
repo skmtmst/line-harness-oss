@@ -93,7 +93,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: { usage: FeatureUsage; lab
   return <span className={styles.usage} title={title}>90日で {activity.value}{activityUnit}</span>
 }
 
-function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwitch, canManage, onToggle }: {
+function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwitch, canManage, busy, onToggle }: {
   item: FeatureItem
   features: Record<string, boolean>
   usage?: UsageCategory
@@ -101,6 +101,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
   usageRetry?: () => void
   sharedSwitch: boolean
   canManage: boolean
+  busy?: boolean
   onToggle: (item: FeatureItem, next: boolean) => void
 }) {
   const enabled = itemIsEnabled(item, features)
@@ -125,6 +126,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
         <Toggle
           checked={enabled}
           label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
+          disabled={busy}
           onChange={(next) => onToggle(item, next)}
         />
       ) : (
@@ -143,7 +145,7 @@ function settingsGroupLast<T extends { id: string }>(groups: T[]): T[] {
   return [...groups.filter((group) => !LAST_GROUP_IDS.includes(group.id)), ...groups.filter((group) => LAST_GROUP_IDS.includes(group.id))]
 }
 
-function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, usageRetry, open, canManage, onOpenChange, onItemToggle, onGroupToggle }: {
+function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, usageRetry, open, canManage, busy, onOpenChange, onItemToggle, onGroupToggle }: {
   group: FeatureGroup
   features: Record<string, boolean>
   usageByItemId: Map<string, UsageCategory>
@@ -151,6 +153,7 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
   usageRetry?: () => void
   open: boolean
   canManage: boolean
+  busy?: boolean
   onOpenChange: (open: boolean) => void
   onItemToggle: (item: FeatureItem, next: boolean) => void
   onGroupToggle: (group: FeatureGroup, next: boolean) => void
@@ -182,6 +185,7 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
         {total > 0 && canManage && (
           <Button
             variant="text"
+            disabled={busy}
             onClick={() => onGroupToggle(group, !allEnabled)}
             aria-label={`${group.label}をまとめて${allEnabled ? 'オフ' : 'オン'}にする`}
           >
@@ -201,6 +205,7 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
               usageRetry={usageRetry}
               sharedSwitch={Boolean(item.keys[0]) && (switchCount.get(item.keys[0]) ?? 0) > 1}
               canManage={canManage}
+              busy={busy}
               onToggle={onItemToggle}
             />
           ))}
@@ -544,6 +549,7 @@ export default function FeatureSettingsScreen() {
                   usageRetry={() => void loadUsage()}
                   open={isOpen(group)}
                   canManage={canManage}
+                  busy={saving}
                   onOpenChange={(next) => toggleOpen(group.id, next)}
                   onItemToggle={toggleItem}
                   onGroupToggle={toggleGroup}

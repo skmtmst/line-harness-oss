@@ -11,8 +11,8 @@
  * フォルダの列：アフィリエイターを分けて保存する口は無いので、報酬の決め方で
  * 分けた見え方の切り替えとして持つ（保存しない）。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Banknote, CircleDot, CircleHelp, Download, Plus, Trophy, Users } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -84,9 +84,9 @@ const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; s
 /* 色は行の名前の前の丸と左のフォルダの列で同じものを使う（絵 v9JWQ）。止めているは色の無い輪。 */
 const GROUPS: Array<{ key: GroupKey; label: string; color?: string; match: (row: AffiliateListRow) => boolean }> = [
   { key: 'all', label: 'すべて', match: () => true },
-  { key: 'rate', label: '売上の割合で払う', color: FOLDER_COLORS[0], match: (row) => row.isActive && row.commissionRate > 0 },
-  { key: 'fixed', label: '1件ごとに払う', color: FOLDER_COLORS[1], match: (row) => row.isActive && row.commissionRate <= 0 && row.rewardAmount > 0 },
-  { key: 'none', label: '報酬なし（計測のみ）', color: FOLDER_COLORS[2], match: (row) => row.isActive && row.commissionRate <= 0 && row.rewardAmount <= 0 },
+  { key: 'rate', label: '売上の割合で払う', color: FOLDER_COLORS[0], match: (row) => row.isActive && (row.rewardMode === 'rate' || (!row.rewardMode && row.commissionRate > 0)) },
+  { key: 'fixed', label: '1件ごとに払う', color: FOLDER_COLORS[1], match: (row) => row.isActive && (row.rewardMode === 'fixed' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount > 0)) },
+  { key: 'none', label: '報酬なし（計測のみ）', color: FOLDER_COLORS[2], match: (row) => row.isActive && (row.rewardMode === 'none' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount <= 0)) },
   { key: 'stopped', label: '止めている', match: (row) => !row.isActive },
 ]
 
@@ -97,7 +97,7 @@ function folderDotOf(row: AffiliateListRow): { name: string; color?: string } | 
 }
 
 export default function AffiliatorsTab() {
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const { readonly, narrow, accountId, setCount, focusAffiliateId } = useAffiliateShell()
   const settlementPeriod = useMemo(() => currentSettlementPeriod(), [])
 
@@ -180,10 +180,11 @@ export default function AffiliatorsTab() {
     }
   }, [])
 
-  const loadApprovals = useCallback(async () => {
+  const loadApprovals = useCallback(async (options: { fresh?: boolean } = {}) => {
     setApprovalState('loading')
     try {
-      const pending = await listAllConversionApprovals('pending')
+      // 件数用（affiliates.tsx）と同じ条件なので、同時に走れば1本にまとまる（WEB003）。
+      const pending = await listAllConversionApprovals('pending', 0, { accountId, fresh: options.fresh })
       if (!mounted.current) return
       setPendingItems(pending.items)
       setApprovalTruncated(pending.truncated)
@@ -191,7 +192,7 @@ export default function AffiliatorsTab() {
     } catch {
       if (mounted.current) setApprovalState('error')
     }
-  }, [])
+  }, [accountId])
 
   const loadPayment = useCallback(async () => {
     if (!accountId) {
@@ -415,7 +416,7 @@ export default function AffiliatorsTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={GROUPS.map((item) => ({ id: item.key, label: item.label, count: ready ? groupCount(item.key) : null, color: item.color }))}
+      rows={GROUPS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: ready ? groupCount(item.key) : null, color: item.color }))}
       activeId={group}
       onSelect={(id) => resetPage(() => { setSaved(''); setGroup(id as GroupKey) })}
       addFolderNote={<p className={styles.stateDesc}>報酬の決め方で分けた見え方です</p>}
@@ -656,9 +657,9 @@ export default function AffiliatorsTab() {
             linkBaseUrl={linkBaseUrl}
             onClose={() => {
               setDrawerId(null)
-              if (focusAffiliateId) router.replace('/affiliates')
+              if (focusAffiliateId) samePageUrl.replace('/affiliates')
             }}
-            onChanged={() => { void loadList(); void loadApprovals() }}
+            onChanged={() => { void loadList(); void loadApprovals({ fresh: true }) }}
             onStopRequest={(id, name) => setArchiveTarget({ id, name })}
           />
         ) : null}

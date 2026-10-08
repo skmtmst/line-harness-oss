@@ -12,7 +12,7 @@ import { auditLog } from '../lib/audit-log.js';
 
 export const lineAccountTags = new Hono<Env>();
 const tenantOf = (c: Context<Env>) => c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-function readInput(body: unknown, creating: boolean) {
+export function readAccountClassificationInput(body: unknown, creating: boolean) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
   const b = body as Record<string, unknown>;
   const input: { name?: string; color?: string | null; displayOrder?: number } = {};
@@ -41,7 +41,7 @@ lineAccountTags.get('/api/line-account-tags', requireRole('owner', 'admin'), den
   return c.json({ success: true, data: (await listLineAccountTags(c.env.DB, tenantOf(c))).map(serializeLineAccountTag) });
 });
 lineAccountTags.post('/api/line-account-tags', requireRole('owner', 'admin'), denyReadOnly(), async c => {
-  const input = readInput(await c.req.json().catch(() => null), true);
+  const input = readAccountClassificationInput(await c.req.json().catch(() => null), true);
   if (!input?.name) return c.json({ success: false, error: 'タグの名前・色・並び順を確認してください' }, 400);
   const tag = await createLineAccountTag(c.env.DB, tenantOf(c), { ...input, name: input.name });
   auditLog(c, 'line_account_tag.create', { kind: 'line_account_tag', id: tag.id });
@@ -50,7 +50,7 @@ lineAccountTags.post('/api/line-account-tags', requireRole('owner', 'admin'), de
 lineAccountTags.patch('/api/line-account-tags/:id', requireRole('owner', 'admin'), denyReadOnly(), async c => {
   const id = c.req.param('id');
   if (!await getLineAccountTag(c.env.DB, tenantOf(c), id)) return c.json({ success: false, error: 'タグが見つかりません' }, 404);
-  const input = readInput(await c.req.json().catch(() => null), false);
+  const input = readAccountClassificationInput(await c.req.json().catch(() => null), false);
   if (!input) return c.json({ success: false, error: 'タグの名前・色・並び順を確認してください' }, 400);
   const tag = await updateLineAccountTag(c.env.DB, tenantOf(c), id, input);
   if (!tag) return c.json({ success: false, error: 'タグが見つかりません' }, 404);

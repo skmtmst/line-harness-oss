@@ -73,11 +73,11 @@ async function call(
   method: string,
   path: string,
   body?: unknown,
-  opts: { staff?: AuthenticatedStaff; env?: Partial<Env['Bindings']> } = {},
+  opts: { staff?: AuthenticatedStaff; env?: Partial<Env['Bindings']>; headers?: Record<string, string> } = {},
 ) {
   return app(opts.staff ?? hqAdmin()).request(path, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...opts.headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   }, env(opts.env));
 }
@@ -710,6 +710,28 @@ describe('参照画像つき生成（35-2）', () => {
     res = await call('POST', `/api/hq/banners/generations/${generation.id}/run`);
     expect(res.status).toBe(400);
     expect((await res.json<{ error: string }>()).error).toContain('参照画像が見つかりません');
+    expect(openai.generate).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('WEB205 idempotent generation creation', () => {
+  it('simultaneous retries create one record, replay despite mutable limits, and reject changed choices', async () => {
+    const project = await createProject();
+    const path = `/api/hq/banners/projects/${project.id}/generations`;
+    const headers = { 'Idempotency-Key': 'same-operation' };
+    const responses = await Promise.all([call('POST',path,GENERATE_BODY,{headers}), call('POST',path,GENERATE_BODY,{headers})]);
+    expect(responses.map(r=>r.status)).toEqual([201,201]);
+    const ids = await Promise.all(responses.map(async r=>(await r.json() as any).data.id));
+    expect(ids[0]).toBe(ids[1]);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM banner_generations').get()).toEqual({ n: 1 });
+    const replay = await call('POST',path,GENERATE_BODY,{headers,env:{ OPENAI_API_KEY: undefined }});
+    expect(replay.status).toBe(201);
+    expect((await replay.json() as any).data.id).toBe(ids[0]);
+    expect((await call('POST',path,{...GENERATE_BODY,count:1},{headers})).status).toBe(409);
+    expect((await call('POST',path,GENERATE_BODY,{headers,staff:hqAdmin({tenantId:'tenant-2'})})).status).toBe(404);
+    const other = await createProject('別の試み');
+    expect((await call('POST',`/api/hq/banners/projects/${other.id}/generations`,GENERATE_BODY,{headers})).status).toBe(201);
     expect(openai.generate).not.toHaveBeenCalled();
   });
 });

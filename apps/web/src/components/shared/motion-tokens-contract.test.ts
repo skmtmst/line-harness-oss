@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /*
- * 動きの物差し（Pencil ★V7「基礎 動き」、V7 文書 `bi8Au`）の契約。
+ * 動きの物差し（Pencil ★V8 の動きの表 `NF3uI`）の契約。
  *
  * 部品ごとに 120ms・150ms・300ms と長さがばらばらだったので、V7 から
  * `--motion-*` の4段と2本の曲線だけを使う。ここでは

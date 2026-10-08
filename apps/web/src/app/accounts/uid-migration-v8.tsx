@@ -16,6 +16,7 @@
  */
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
 import Button from '@/components/shared/button'
+import { Steps } from '@/components/templates/steps'
 import Checkbox from '@/components/shared/checkbox'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import ListState from '@/components/shared/list-state'
@@ -134,19 +135,16 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
         </div>
       </div>
 
-      {/* 5つの段（Z0jHp 上部の段送り）。 */}
-      <ol className={styles.stepper} aria-label="移行の手順">
-        {MIGRATION_STEPS.map((step, index) => {
-          const done = index < currentStep
-          const current = index === currentStep
-          return (
-            <li key={step} className={[styles.step, done ? styles.stepDone : '', current ? styles.stepCurrent : ''].filter(Boolean).join(' ')} aria-current={current ? 'step' : undefined}>
-              <span className={styles.stepDot} aria-hidden="true">{done ? '✓' : index + 1}</span>
-              <span className={styles.stepLabel}>{step}</span>
-            </li>
-          )
-        })}
-      </ol>
+      {/* 5つの段（Z0jHp）。手順は型の共通部品 Steps（Fa8ED）で、題と説明のすぐ下・左寄せ・1行。 */}
+      <Steps
+        label="移行の手順"
+        currentKey={currentStep < MIGRATION_STEPS.length ? String(currentStep) : undefined}
+        steps={MIGRATION_STEPS.map((step, index) => ({
+          key: String(index),
+          label: step,
+          state: index < currentStep ? 'done' as const : 'todo' as const,
+        }))}
+      />
 
       {/* FRIEND-15: 「まだ変更していません」は本移行前の履歴だけに出す。 */}
       {(!active || PRE_EXECUTE_STATUSES.includes(active.status)) && (

@@ -12,7 +12,7 @@
 - 行：`GET /api/entry-routes?account_id=`・`api.entryRouteGenres.list()`・`GET /api/analytics/ref-summary?lineAccountId=`・`api.trackedLinks.list()`
 - 補助（行を待たせない）：`api.pools.list`（multi_store_hierarchy が有効のときだけ）・`api.pools.listAccounts`・`api.scenarios.list`・`api.messageTemplates.list`・`api.tags.list`（切られている機能は呼ばない）
 - 数の帯の4枚目：`api.adPlatforms.list(accountId)`（有効なものの数と名前）
-- 役割：`api.staff.me()`（`useStaffRole`）。owner／admin 以外は閲覧のみ
+- 役割：`api.staff.me()`（`useStaffRole`）。owner／admin 以外は閲覧のみ。ただし「流入」（`/inflow-links`）を任された staff は、経路の作る・編集・止める／再開ができる（口の `requireEntryRouteManagement` と同じ。監査 WEB034）。フォルダの追加・名前の変更・完全削除は owner／admin だけ
 - 受付の停止・再開（行の「…」）・まとめて操作：`api.entryRoutes.update(id, { isActive })`／`{ genre }`
 - 作る・直す・未登録 ref の登録：`edit-route-dialog.tsx`（今の `_components/edit-route-modal.tsx` の写し。口・送る形は同じ）
 - フォルダの追加・名前の変更：`api.entryRouteGenres.create(name)`／`update(id, name)`
@@ -54,7 +54,7 @@
 - 受付を止める・別リンクへ送る・削除するは「その後」の段の右上の「…」（今は段の題の右）。帯の「止める」も同じ窓を開く
 - 月別内訳は「その後」の段の中に畳んで置く（絵に無い）
 - 友だちが1ページに収まるときも「〇人中 1〜〇人」の行を出す（送りの部品は2ページ以上のときだけ）
-- 閲覧のみ（owner・admin 以外）には、リンクを編集・止める・することを変える・「…」を出さず、閲覧のみの帯を出す
+- 閲覧のみ（owner・admin 以外で「流入」を任されていない人）には、リンクを編集・止める・することを変える・「…」を出さず、閲覧のみの帯を出す。任された staff の「…」には削除を出さない
 - QR コードを保存は今と同じく PNG（320×320）を直に落とす。QR コードを表示の小窓からは印刷用 PDF も選べる
 
 # サイトスクリプト（V8・site-script.tsx・板 XjOte）

@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, CalendarCheck, Clock3, ClipboardList, EyeOff, MailX, MessageCircle, MousePointerClick, Pencil, Plus, RefreshCw, ShoppingBag, UserPlus, WalletCards } from 'lucide-react'
@@ -464,6 +466,7 @@ export default function ActionScoreRulesPage() {
 
   return (
     <div data-design-node="s6MBc" className="flex flex-col gap-3.5" style={{ minHeight: 'calc(100vh - 98px)' }}>
+      <div className="v8-only"><PageHeading title="スコアのルール" /></div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: '行動スコア', href: '/mileage?tab=score' }, { label: 'ルール' }]} />
         <Button onClick={() => setTestOpen(true)}>1人で試す</Button>

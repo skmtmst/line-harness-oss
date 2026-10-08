@@ -1,12 +1,13 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ApiError, api, type NenColumn } from '@/lib/api'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useResponseGate } from '@/lib/use-response-gate'
 import CampaignEditorV8 from './campaign-editor-v8'
 import CampaignEdit from '@/v8/nen-campaigns/edit'
 import { useAdminTheme } from '@/lib/use-admin-theme'
@@ -61,7 +62,13 @@ function NenColumnEditInner() {
   // ?key= が付いていれば、その配信そのものを編集する（設計 9-1-1）。
   // 付いていないときは、EC側のコラムに添える紹介文の一覧を出す。
 
+  /* PKG109：アカウントを切り替えたら、前のアカウントの遅い応答で一覧・入力を置き換えない。 */
+  const gate = useResponseGate()
+  const accountRef = useRef(selectedAccountId)
+  accountRef.current = selectedAccountId
+
   const load = useCallback(async () => {
+    const token = gate.begin()
     setLoading(true)
     setError('')
     setLatestIntro(null)
@@ -73,6 +80,7 @@ function NenColumnEditInner() {
     }
     try {
       const res = await api.nenCampaigns.columns(selectedAccountId)
+      if (!gate.current(token)) return
       if (res.success) {
         setColumns(res.data)
         const next: Record<string, string> = {}
@@ -80,11 +88,12 @@ function NenColumnEditInner() {
         setDrafts(next)
       }
     } catch {
+      if (!gate.current(token)) return
       setError('読み込みに失敗しました。もう一度読み込んでください。')
     } finally {
-      setLoading(false)
+      if (gate.current(token)) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, gate])
 
   useEffect(() => {
     void load()
@@ -92,6 +101,8 @@ function NenColumnEditInner() {
 
   const save = async (column: Column) => {
     if (!selectedAccountId) return
+    const accountId = selectedAccountId
+    const stale = () => accountRef.current !== accountId
     setSavingId(column.id)
     setError('')
     setSaveError(null)
@@ -99,6 +110,7 @@ function NenColumnEditInner() {
     try {
       // M507: 開いたときの版を添える。ほかの人が先に保存していたら409で止まる。
       const res = await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, drafts[column.id] ?? '', column.updatedAt)
+      if (stale()) return
       if (!res.success) {
         setSaveError({ id: column.id, message: '保存に失敗しました。時間をおいてもう一度お試しください。' })
         return
@@ -111,6 +123,7 @@ function NenColumnEditInner() {
       // M507残差: 保存を通したら比べる相手は要らない。比較表示を消す。
       setLatestIntro(null)
     } catch (e) {
+      if (stale()) return
       // M507: 競合時は最新の紹介文を読み直し、入力は残したまま比べながら
       // 保存し直せるようにする。
       if (e instanceof ApiError && e.status === 409 && e.code === 'VERSION_CONFLICT') {
@@ -162,7 +175,7 @@ function NenColumnEditInner() {
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
-      ) : columns.length === 0 ? (
+      ) : columns.length === 0 && error ? null : columns.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           コラムがまだありません。EC側で公開されると、ここに出ます。
         </div>

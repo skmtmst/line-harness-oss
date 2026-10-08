@@ -1,5 +1,7 @@
 'use client'
 
+import { PageTitle } from '@/components/templates/page-frame'
+
 import { useEffect, useState } from 'react'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -63,7 +65,7 @@ export default function UpdatesPage() {
   return (
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <h1 className="text-ink text-xl font-semibold">アップデート履歴</h1>
+      <PageTitle as="h1" className="text-ink text-xl font-semibold">アップデート履歴</PageTitle>
       {state.kind === 'unconfigured' && (
         <>
           <div><NoteBar>この環境では自動アップデートが構成されていないため、履歴はありません。</NoteBar></div>

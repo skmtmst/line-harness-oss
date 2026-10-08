@@ -16,6 +16,8 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
+import { folderById, folderCreator } from '@/components/shared/folder-select'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import FieldEditor, { type FieldEditorValues } from './field-editor'
 
 export default function FieldEdit() {
@@ -27,6 +29,9 @@ export default function FieldEdit() {
   const [field, setField] = useState<FriendField | null>(null)
   const [siblings, setSiblings] = useState<FriendField[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
+  // その場でフォルダを作れるのは、左の列の「フォルダを追加」と同じ人（閲覧のみは作れない）。
+  const staffRole = useStaffRole()
+  const canCreateFolder = staffRole === null || canManageRole(staffRole)
   const [foldersState, setFoldersState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [foldersReloading, setFoldersReloading] = useState(false)
   /* R517: 版の衝突で返ってきた最新の内容。 */
@@ -238,6 +243,9 @@ export default function FieldEdit() {
       foldersState={foldersState}
       foldersReloading={foldersReloading}
       onRetryFolders={() => void loadFolders()}
+      onCreateFolder={canCreateFolder
+        ? folderCreator((name, color) => api.folders.create({ kind: 'friend_field', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+        : undefined}
       siblings={siblings}
       siblingsReady
       saving={saving}

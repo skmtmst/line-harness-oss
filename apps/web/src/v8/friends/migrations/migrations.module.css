@@ -99,24 +99,6 @@
 .faint { color: var(--color-ink-faint); }
 
 /* ── UID移行（Z0jHp・L48eY） ── */
-.steps { display: flex; align-items: center; gap: var(--tpl-fr-stack-gap); min-height: var(--tpl-fr-uid-step-h); margin: 0; padding: 0; list-style: none; }
-.step { display: flex; align-items: center; gap: var(--tpl-fr-btn-gap); color: var(--color-ink-faint); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-fr-desc-lh); white-space: nowrap; }
-.step + .step::before { content: ''; width: var(--tpl-fr-uid-step-line); height: 1px; margin-right: var(--tpl-fr-uid-step-line-gap); background: var(--color-hairline); }
-.stepDot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-fr-uid-step-dot);
-  height: var(--tpl-fr-uid-step-dot);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--tpl-fr-shadow-outline);
-  font-size: var(--text-nano);
-  flex-shrink: 0;
-}
-.stepDone, .stepCurrent { color: var(--color-ink); }
-.stepDone .stepDot { background: var(--color-accent-deep); box-shadow: none; color: var(--color-on-accent); }
-.stepCurrent .stepDot { box-shadow: var(--tpl-fr-shadow-step-ring); color: var(--color-accent-deep); }
-.stepLabel { line-height: var(--tpl-fr-desc-lh); }
 
 .cards4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-fr-stack-gap); }
 

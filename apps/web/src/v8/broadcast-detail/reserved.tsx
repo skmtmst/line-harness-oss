@@ -8,7 +8,6 @@
  * 右の欄（次にできること → メッセージのスマホ）。
  * 予約の読み込み・取消・複製・テスト送信の中身は入口（app/broadcasts/reserved/page.tsx）が持つ。
  */
-import Link from 'next/link'
 import { CalendarCheck2, Copy, Eye, Info, Send, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -92,7 +91,6 @@ export default function Reserved({
   return (
     <PageFrame kind="detail" boardId="cdZBf CRtK8">
       <header className={styles.head}>
-        <Link href="/broadcasts" className={styles.back}>← 一斉配信の一覧へ</Link>
         <div className={styles.titleRow}>
           <h2 className={styles.title} title={broadcast.title}>{broadcast.title}</h2>
           <span className={styles.badge}>

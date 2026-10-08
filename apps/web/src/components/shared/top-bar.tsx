@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type
 import AccountSwitchMenu, { type AccountSwitchMenuHq } from './account-switch-menu'
 import type { MenuPortalRect } from './menu-portal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import styles from './top-bar.module.css'
 
 export interface TopBarAccount {
@@ -78,7 +79,7 @@ export interface TopBarProps {
    * 渡されなければ従来どおり選んでいるアカウント名を出す。
    * v7 では描かない。
    */
-  crumbs?: { label: string; href?: string }[] | null
+  crumbs?: { label: string; href?: string; onSelect?: () => void }[] | null
   /**
    * ★V8 統括の画面（/hq）のとき、切替の札に「統括」と統括名を出す（絵 `V8-B/JKjsE`）。
    * 渡さなければ店の画面の札（「LINEアカウント」と選んでいるアカウント）。v7 では描かない。
@@ -86,6 +87,11 @@ export interface TopBarProps {
   hq?: { name: string; mark: string } | null
   /** ★V8 パンくずの「ホーム」の行き先。統括の画面は統括のホーム（/hq）。 */
   homeHref?: string
+  /**
+   * ★V8 子の画面で、画面名が左メニューの名前と同じ（絵の上の帯が「ホーム › 一覧の名前」）とき、
+   * その名前を一覧への戻り口にする行き先（2026-10-08 板の頭の「← 〇〇へ」を無くしたため）。
+   */
+  titleHref?: string
   /**
    * ★V8 店の画面から統括へ戻る口（絵 V8 `DIHFx/Psg7n`）。統括の権限がある人にだけ渡す。
    * 渡すと切り替えの左に［統括へ］、切り替えを開いた一覧のいちばん上に「統括に戻る」を出す。v7 では描かない。
@@ -125,6 +131,7 @@ export default function TopBar({
   crumbs,
   hq = null,
   homeHref = '/',
+  titleHref,
   hqReturn = null,
   showIdentity = true,
   className,
@@ -210,7 +217,14 @@ export default function TopBar({
             */}
             {(crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').map((crumb) => (
               <span key={crumb.label} className={styles.crumbFromWrap}>
-                {crumb.href ? (
+                {crumb.onSelect ? (
+                  /*
+                   * 同じ URL のまま中の段だけ替える画面（統括のテンプレート・統合ユーザーの詳細など）は、
+                   * 同じ URL へのリンクでは戻れない。画面が渡した動きで戻す。書きかけなら
+                   * requestUnsavedAction が「保存せずに移りますか」を出してから動く（2026-10-08）。
+                   */
+                  <button type="button" className={`${styles.crumbFromLink} ${styles.crumbFromButton}`} onClick={() => requestUnsavedAction(crumb.onSelect!)}>{crumb.label}</button>
+                ) : crumb.href ? (
                   <Link href={crumb.href} className={styles.crumbFromLink}>{crumb.label}</Link>
                 ) : (
                   <span className={styles.crumbFrom}>{crumb.label}</span>
@@ -218,7 +232,7 @@ export default function TopBar({
                 <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
               </span>
             ))}
-            <h1 className={styles.crumbCurrent} title={title}>{title}</h1>
+            <h1 className={styles.crumbCurrent} title={title}>{titleHref ? <Link href={titleHref} className={styles.crumbCurrentLink}>{title}</Link> : title}</h1>
           </nav>
         </div>
       ) : null}

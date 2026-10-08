@@ -175,3 +175,6 @@ export * from './friend-summary.js';
 export * from './dashboard-activity.js';
 
 export * from './mileage-reward-folders';
+
+export * from './booking-menu-order.js';
+export * from './tenant-company-contact.js';

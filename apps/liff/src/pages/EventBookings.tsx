@@ -38,6 +38,20 @@ function canCancel(b: EventBookingMine): boolean {
  * キャンセルは期限まで。確認の出し方と失敗の文言はそのまま。
  * 見た目だけ ★V7 (日付の四角＋名前＋札＋補足)。
  */
+/** 変更の断りが確定した応答（同じ受付キーで送り直しても結果は変わらない）。 */
+const DECIDED_CHANGE_ERRORS = new Set([
+  'slot_full',
+  'change_deadline_passed',
+  'change_not_allowed',
+  'slot_inactive',
+  'slot_started',
+  'entry_closed',
+  'same_slot',
+  'over_friend_limit',
+  'duplicate_friend_booking',
+  'invalid_state',
+]);
+
 export default function EventBookings() {
   const navigate = useNavigate();
   // ?liffId=... を引き継ぐ (再読み込みで失わない)。
@@ -156,8 +170,18 @@ export default function EventBookings() {
           default: return '変えられませんでした。時間をおいて、もう一度お試しください。';
         }
       })();
+      // 断りが確定した応答（満席・期限切れなど）なら、次の操作は別の受付キーで送る。
+      // 同じキーのままだと、別の時間を選んでも前の断りが返ってくる。
+      // 通信で結果が分からないときは同じキーのまま（成功の二重を防ぐ）。
+      const decided = DECIDED_CHANGE_ERRORS.has(e.body?.error ?? '');
       setPendingChange((current) =>
-        current && current.booking.id === target.booking.id ? { ...current, changeError: msg } : current,
+        current && current.booking.id === target.booking.id
+          ? {
+              ...current,
+              changeError: msg,
+              idempotencyKey: decided ? crypto.randomUUID() : current.idempotencyKey,
+            }
+          : current,
       );
     } finally {
       setBusy(false);

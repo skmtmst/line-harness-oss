@@ -118,7 +118,11 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   }, [accountId, savedReload])
 
   const schedulesAlive = useRef(true)
-  useEffect(() => () => { schedulesAlive.current = false }, [])
+  // 付くたびに true へ戻す（開発時の StrictMode の付ける→外す→付けるで false が残らないように）。
+  useEffect(() => {
+    schedulesAlive.current = true
+    return () => { schedulesAlive.current = false }
+  }, [])
   // 再読込の応答も「どのアカウントへ向けた取得か」の世代で比べる（切替後の遅い旧応答を捨てる）。
   const schedulesGen = useRef(0)
   const scheduleErrorText = (caught: unknown) => caught instanceof TypeError ? '定期レポートを確認できませんでした' : caught instanceof Error ? caught.message : '定期レポートを確認できませんでした'

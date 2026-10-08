@@ -1,0 +1,141 @@
+/*
+ * ★V8 の手順（共通部品 Fa8ED・決まりの板 q1xNMz。2026-10-08 オーナー）。
+ * 寸法は app/globals.css の [data-theme="v8"] の --tpl-steps-*（丸22・名13・線24×1.5・間8・丸と名6）。
+ * 1行を守る：折り返さず、入らない幅では今の段だけ名を出す（data-compact）。
+ */
+.root {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.list {
+  display: flex;
+  width: max-content;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--tpl-steps-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.item {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--tpl-steps-gap);
+}
+
+.line {
+  flex: 0 0 auto;
+  width: var(--tpl-steps-line-w);
+  height: var(--tpl-steps-line-h);
+  background: var(--color-divider);
+}
+
+.line[data-step-line='done'] {
+  background: var(--color-accent-deep);
+}
+
+.step {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--tpl-steps-dot-gap);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.step {
+  cursor: pointer;
+  border-radius: var(--radius-pill);
+}
+
+button.step:hover .name {
+  text-decoration: underline;
+}
+
+button.step:focus-visible {
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: 2px;
+}
+
+.dot {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-steps-dot);
+  height: var(--tpl-steps-dot);
+  border-radius: var(--radius-pill);
+  font-size: var(--tpl-steps-num-size);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.dot[data-step-dot='done'] {
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+}
+
+.dot[data-step-dot='current'] {
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+
+.dot[data-step-dot='todo'] {
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+}
+
+.dot[data-step-dot='attention'] {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.check {
+  width: var(--tpl-steps-check);
+  height: var(--tpl-steps-check);
+}
+
+.name {
+  color: var(--color-ink);
+  font-size: var(--tpl-steps-text-size);
+  font-weight: 400;
+  line-height: var(--tpl-steps-text-lh);
+  white-space: nowrap;
+}
+
+.name[data-step-name='current'] {
+  font-weight: 600;
+}
+
+.name[data-step-name='todo'] {
+  color: var(--color-ink-secondary);
+}
+
+/* 入らない幅：今の段だけ名を出す。ほかの名は読み上げにだけ残す（title にも全文）。 */
+.root[data-compact] .name:not([data-step-name='current']),
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -7,6 +7,7 @@
  * ［閉じた］は媒体ごと（まだ閉じていない先頭の媒体。ほかの媒体は「…」から）。
  * 席が空いた枠は「もう開けてよい」。読む口・書く口は channel-close-tasks（今ある口）だけ。動きは BEHAVIOR.md。
  */
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'
@@ -41,6 +42,7 @@ const STATE_BADGE: Record<CloseGroup['state'], { label: string; tone: 'danger' |
 }
 
 export default function CloseTasksPage() {
+  const router = useRouter()
   usePageTitle('枠を閉じる知らせ')
   usePageCrumbs([{ label: '店舗ダッシュボード', href: '/restaurant-test/dashboard' }])
   const { selectedAccountId } = useAccount()
@@ -168,7 +170,7 @@ export default function CloseTasksPage() {
                       subjectName={slotTitle(group.startsAt)}
                       menuItems={[
                         ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) })) : []),
-                        { id: 'ledger', label: '予約台帳でこの日を見る', external: true, onSelect: () => { window.location.href = `/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}` } },
+                        { id: 'ledger', label: '予約台帳でこの日を見る', external: true, onSelect: () => { router.push(`/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`) } },
                       ]}
                     />
                   </span>

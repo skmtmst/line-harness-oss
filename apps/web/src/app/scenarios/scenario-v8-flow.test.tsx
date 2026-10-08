@@ -256,9 +256,8 @@ describe('V8 シナリオの通し：作る→1通目→詳細', () => {
     const body = host.querySelector('#first-step-body') as HTMLTextAreaElement
     expect(body, '本文の入力が見つかりません').toBeTruthy()
     fireEvent.change(body, { target: { value: 'ようこそ' } })
-    // ★V8（src/v8/scenario-first-step）の時刻は30分きざみの選択。開いて 15:00 を選ぶ。
-    fireEvent.click(screen.getByRole('button', { name: '配信する時刻' }))
-    fireEvent.click(within(await screen.findByRole('listbox')).getByRole('button', { name: '15:00' }))
+    // ★V8（src/v8/scenario-first-step）の時刻は共通の時刻の欄（提案 YCOoR・30分きざみ）。この試験では欄を打てる入力に差し替えている。
+    fireEvent.change(screen.getByLabelText('配信する時刻'), { target: { value: '15:00' } })
 
     fireEvent.click(screen.getByRole('button', { name: '作って編集へ' }))
     await waitFor(() => expect(addStep).toHaveBeenCalledTimes(1))

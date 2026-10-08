@@ -8,7 +8,7 @@
  * 中身（帯・入力欄・下の操作）はここで並べる。保存の口・本人確認の流れは今の画面
  * （app/accounts/detail・components/accounts/account-edit-modal）と同じ。
  */
-import { useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Check, ShieldCheck } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
@@ -345,6 +345,28 @@ export function CredentialsDialog({ account, kind, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
+  /*
+   * 対象のアカウント・種類ごとに中身を作り直す（WEB132）。A で入れかけた値を B へ持ち越して保存しない。
+   * 登録の編集（EditDialog）と同じ形。
+   */
+  if (!account) return null
+  return <CredentialsDialogBody key={`${account.id}:${kind}`} account={account} kind={kind} onClose={onClose} onSaved={onSaved} />
+}
+
+function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
+  account: LineAccount
+  kind: CredentialKind
+  onClose: () => void
+  onSaved: () => void
+}) {
+  // 保存中に対象が変わって中身が消えたら、A の結果で B の窓を閉じたり読み直したりしない。
+  // 付くたびに true へ戻す。開発時の StrictMode は付ける→外す→付けるを1回ずつ多く回すので、
+  // 外すときだけ false にすると、付いているのに false が残って保存の結果と「保存中」の解除を捨てる。
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
   const [secret, setSecret] = useState('')
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
@@ -362,7 +384,6 @@ export function CredentialsDialog({ account, kind, onClose, onSaved }: {
   }
 
   const save = async (stepUpToken?: string) => {
-    if (!account) return
     const payload: Parameters<typeof api.lineAccounts.update>[1] = {}
     if (kind === 'messaging') {
       if (secret.trim()) payload.channelSecret = secret.trim()
@@ -378,12 +399,14 @@ export function CredentialsDialog({ account, kind, onClose, onSaved }: {
     setError('')
     try {
       const res = await api.lineAccounts.update(account.id, payload, stepUpToken)
+      if (!alive.current) return
       if (!res.success) throw new Error(res.error)
       setSecret('')
       setToken('')
       onSaved()
       onClose()
     } catch (caught) {
+      if (!alive.current) return
       // 接続情報の書き換えは大事な操作。本人確認を求められたら窓を立てる（V-1）。
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'line_account.credentials', action: '接続情報を変更する', retry: save })
@@ -391,14 +414,14 @@ export function CredentialsDialog({ account, kind, onClose, onSaved }: {
       }
       setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
-      setBusy(false)
+      if (alive.current) setBusy(false)
     }
   }
 
   return (
     <>
       <Frame
-        open={account !== null}
+        open
         node="Msb1j"
         width={560}
         top={200}

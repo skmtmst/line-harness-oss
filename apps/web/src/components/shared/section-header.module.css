@@ -34,6 +34,11 @@
   color: var(--color-ink-faint);
 }
 
+.root[data-wrap] {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
 .link {
   margin-left: auto;
   display: inline-flex;

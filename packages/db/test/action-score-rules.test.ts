@@ -316,4 +316,23 @@ describe('V6 action score rule versions', () => {
       bands: { min: 0, max: 100, normalMin: 70, highMin: 30 },
     })).rejects.toMatchObject({ code: 'bands_invalid' });
   });
+  it('PKG31: 同じ友だちへの並行加点を両方残し、履歴を次の現在値から計算する', async () => {
+    sqlite.exec("UPDATE friends SET score=50 WHERE id='friend-1'");
+    const results = await Promise.all([10,20].map((scoreChange,i) => postActionScoreManualAdjustment(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', scoreChange, reason: 'Adjustment', idempotencyKey: `request${i}`,
+      executedByStaffId: null, executedByStaffName: null,
+    })));
+    expect(sqlite.prepare("SELECT score FROM friends WHERE id='friend-1'").get()).toEqual({ score: 80 });
+    expect(results.map(r => [r.scoreBefore,r.scoreAfter])).toEqual([[50,60],[60,80]]);
+  });
+  it('PKG32: 200人の適用済みの友だちで後続が止まらず、同じ期間には再適用しない', async () => {
+    await publishDefaults(db);
+    for (let i=0; i<201; i++) sqlite.prepare(`INSERT INTO friends(id,line_user_id,line_account_id,created_at,updated_at)
+      VALUES (?,?,'account-1','2026-06-01T00:00:00Z','2026-06-01T00:00:00Z')`).run(`friend-more${i}`,`Umore${i}`);
+    expect((await processActionScoreInactivity(db, { now: NOW })).applied).toBe(200);
+    expect((await processActionScoreInactivity(db, { now: NOW })).applied).toBe(2);
+    expect((await processActionScoreInactivity(db, { now: NOW })).applied).toBe(0);
+    expect(sqlite.prepare("SELECT COUNT(*) n FROM friend_scores WHERE event_type='inactivity_30d'").get()).toEqual({ n: 202 });
+  });
+
 });

@@ -105,6 +105,14 @@ export function useUidMigration() {
   const [purpose, setPurpose] = useState('友だち情報と配信停止状態を新しいアカウントへ引き継ぐ')
   const [file, setFile] = useState<File | null>(null)
   const [mappings, setMappings] = useState<ReturnType<typeof parseUidCsv>>([])
+  /*
+   * WEB316：対応表の中身（mappings）がどのファイルから読んだものか。
+   * A を選んで読み終わる前に B を選んだら、遅い A の読み取りで B の対応表を
+   * 置き換えない。テスト移行は「選んでいるファイル」と「読んだファイル」が
+   * 同じときだけ送る（名前・checksum と対応表を同じファイルにそろえる）。
+   */
+  const fileSeq = useRef(0)
+  const [mappingsFile, setMappingsFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [page, setPage] = useState(0)
@@ -203,11 +211,16 @@ export function useUidMigration() {
   */
   const onUidFile = async (files: File[]) => {
     const selected = files[0] ?? null
+    const seq = ++fileSeq.current
     setFile(selected)
-    if (!selected) { setMappings([]); return }
+    setMappings([])
+    setMappingsFile(null)
+    if (!selected) return
     const text = await selected.text()
+    if (seq !== fileSeq.current) return
     const parsed = parseUidCsv(text)
     setMappings(parsed)
+    setMappingsFile(selected)
     const dataLines = Math.max(text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim()).length - 1, 0)
     setMessage(dataLines > parsed.length
       ? `対応表のうち ${dataLines - parsed.length} 行は読み取れなかったため除いています。列の数と引用符を確認してください。`
@@ -215,7 +228,7 @@ export function useUidMigration() {
   }
 
   const createDryRun = async () => {
-    if (!file || mappings.length === 0 || !fromAccountId || !toAccountId || !purpose.trim()) {
+    if (!file || mappingsFile !== file || mappings.length === 0 || !fromAccountId || !toAccountId || !purpose.trim()) {
       setMessage('移行元・移行先・利用目的と、old_uid / new_uid 列を持つCSVを選んでください。')
       return
     }

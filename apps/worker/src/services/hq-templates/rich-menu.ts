@@ -21,7 +21,7 @@ interface Area {
 interface Page { id: string; name: string; imageR2Key: string; areas: Area[] }
 export interface RichMenuHqDefinition {
   schemaVersion: 1;
-  richMenu: { id: string; name: string; chatBarText: string; size: 'large' | 'compact'; defaultPageId: string; pages: Page[] };
+  richMenu: { id: string; name: string; chatBarText: string; size: 'large' | 'compact'; defaultPageId: string; displayOrder?: number; displayAudience?: 'all' | 'store'; pages: Page[] };
 }
 export interface RichMenuReferenceResolver {
   (reference: HqTemplateReference, targetAccountId: string): Promise<string | null | { targetId: string; operation: 'reuse' | 'create'; expectedRevision?: string }>;
@@ -89,7 +89,9 @@ export function parseRichMenuTemplateDefinition(input: HqTemplateAdapterInput, t
   keys(d, ['schemaVersion', 'richMenu']);
   if (d.schemaVersion !== 1) fail('INVALID_DEFINITION');
   const g = d.richMenu;
-  keys(g, ['id', 'name', 'chatBarText', 'size', 'defaultPageId', 'pages']);
+  keys(g, ['id', 'name', 'chatBarText', 'size', 'defaultPageId', 'pages', 'displayOrder', 'displayAudience']);
+  if(g.displayOrder!==undefined&&(!Number.isSafeInteger(g.displayOrder)||Number(g.displayOrder)<0))fail('INVALID_DEFINITION');
+  if(g.displayAudience!==undefined&&!['all','store'].includes(String(g.displayAudience)))fail('INVALID_DEFINITION');
   ident(g.id); text(g.name); text(g.chatBarText, 14); ident(g.defaultPageId);
   if (g.size !== 'large' && g.size !== 'compact') fail('INVALID_DEFINITION');
   if (!Array.isArray(g.pages) || !g.pages.length || g.pages.length > 10) fail('INVALID_DEFINITION');
@@ -284,6 +286,9 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
         add('DELETE FROM rich_menu_pages WHERE group_id=?', groupId);
         add("UPDATE rich_menu_groups SET name=?, chat_bar_text=?, size=?, default_page_id=?, status='draft', is_default_for_all=0, targeting_enabled=0, targeting_condition=NULL, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND account_id=?", name, g.chatBarText, g.size, resolve(g.defaultPageId), groupId, c.targetAccountId);
       } else add('INSERT INTO rich_menu_groups (id,account_id,name,chat_bar_text,size,default_page_id,status) VALUES (?,?,?,?,?,?,\'draft\')', groupId, c.targetAccountId, name, g.chatBarText, g.size, resolve(g.defaultPageId));
+      if(g.displayOrder!==undefined)add('UPDATE rich_menu_groups SET display_order=? WHERE id=? AND account_id=?',g.displayOrder,groupId,c.targetAccountId);
+      // 下書きを配るだけで公開はしない。全員向けの指定も、店での公開を経て反映する。
+      if(g.displayAudience==='all')add('UPDATE rich_menu_groups SET is_default_for_all=1 WHERE id=? AND account_id=?',groupId,c.targetAccountId);
       g.pages.forEach((p, i) => {
         add('INSERT INTO rich_menu_pages (id,group_id,order_index,name,alias_id,line_richmenu_id,image_r2_key,image_content_type) VALUES (?,?,?,?,?,NULL,?,?)', resolve(p.id), groupId, i, p.name, `lhx-${groupId.slice(0, 8)}-${i}`, stage[i].key, stage[i].contentType);
         for (const a of p.areas) {

@@ -55,7 +55,7 @@ P0は公開処理である。現行はページごとに新メニュー作成→
 | 削除確認 | `szXsT` | 問題なし |
 | 一覧の空・読込・エラー | `RW5Tb` | 問題なし |
 
-実装PRでは上記V6実Node IDを設計画像・実装画像へ固定する。
+上記の V6実Node ID は当時調べた画面の記録で、見た目の根拠にしない（見た目は ★V8 の板。2026-10-07 に V6 実Node ID の固定は失効）。
 
 Pencilの現在の画像書き出しはノイズ画像になり、見た目の比較証拠として採用できなかった。この文書ではNode構造、全文言、はみ出し情報、コード・DB・APIを照合した。色、コントラスト、ピクセル位置、フォーカス表示は実装PRの正常な画像書き出しで再確認する。
 
@@ -283,7 +283,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `group_id`, `version_number`, `definition_snapshot`
 - `status`: draft / published / archived
 - `created_by_staff_id`, `published_at`
-> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことは本書 §17（#822）。
 
 `rich_menu_publish_runs`:
 
@@ -291,7 +291,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `mode`: publish / unpublish / scheduled_restore / reconcile
 - `status`, `started_at`, `completed_at`
 - `requested_by_staff_id`, `last_error_code`
-> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことは本書 §17（#822）。
 
 `rich_menu_publish_run_pages`:
 
@@ -299,7 +299,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `old_line_richmenu_id`, `new_line_richmenu_id`, `alias_id`
 - `create_status`, `image_status`, `alias_status`, `cleanup_status`
 - `line_request_ids_json`, `last_error_code`
-> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことは本書 §17（#822）。
 
 `rich_menu_assignments`:
 
@@ -350,7 +350,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 7. 旧rich menuを非同期で削除
 
 途中失敗時は新規に作った未使用メニューを削除し、aliasと公開版を旧状態に維持する。alias切替後に失敗した場合は照合・修復状態へ送り、自動で旧・新どちらかに揃える。
-> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことは本書 §17（#822）。
 
 ### 7-3. 出し分け
 
@@ -375,7 +375,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `GET /api/rich-menu-groups/{id}/runs`
 - `POST /api/rich-menu-publish-runs/{id}/retry`
 - `POST /api/rich-menu-publish-runs/{id}/reconcile`
-> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことは本書 §17（#822）。
 - `GET /api/rich-menu-groups/external`
 - `POST /api/rich-menu-groups/external/{lineRichMenuId}/import`
 - `GET /api/rich-menu-groups/{id}/usages`
@@ -437,7 +437,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 
 ## 13. 完了条件
 
-- V6実Node IDと1920px設計画像をPR固定
+- 見た目の合格は ★V8 の板との照合（`docs/v8-design-rules.md` §3）。V6 実Node ID・設計画像の固定は 2026-10-07 に失効
 - 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 - V6 9画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
 - 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
@@ -448,7 +448,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - 公開途中失敗で旧メニューを壊さない
 - alias更新中の空白時間を作らない
 - LINE・DB・R2・alias・既定の 5 者照合で作った不一致を、修復ジョブ 1 回で 0 件にする自動テストが通る
-> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことは本書 §17（#822）。
 - 条件変更イベント後に正しい1件へ切り替わる
 - 一括割当の部分成功・再試行が`rich_menu_assignment_runs`から追跡できることを自動テストで確認する
 - 期間終了後に指定メニューへ復元
@@ -459,9 +459,9 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 
 1. 版、公開実行、ページ実行台帳
 2. alias更新APIを使う公開saga
-> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことは本書 §17（#822）。
 3. LINE照合・修復
-> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことと画面は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) の #822。
+> 確定（2026-09-25 オーナー判断で作ることに変更）：合格条件に戻す。決めたことは本書 §17（#822）。
 4. 出し分け実行台帳と再評価イベント拡張
 5. 公開予約・終了後復元
 6. action label、日時選択、クリップボード
@@ -493,3 +493,27 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - https://developers.line.biz/en/reference/messaging-api/#rich-menu
 - https://developers.line.biz/en/docs/messaging-api/switch-rich-menus/
 - https://developers.line.biz/en/docs/messaging-api/rich-menus-overview/
+
+## 17. 確定した追加条件（#822 公開の手順・照合と修復・公開前の確認）
+
+2026-09-25 にオーナー判断で作ることに決めた条件を、2026-10-08 に旧「未実装機能の確定」（履歴）から本書へ書き写した。本書のほかの節と食い違うときは、ほかの節が勝つ。
+
+### 17-1. 公開の手順と照合（K）
+
+- 公開の手順は §7-2 のとおり（全ページの新しいメニュー → 全画像 → alias → 割り当て → DB の確定 → 古いメニューを非同期で片付け）。alias を切り替える前の失敗は、新しく作った分を消して前の状態のまま。切り替えた後の失敗は照合・修復へ進む。旧案の「どこで失敗しても前の状態へ戻す」は採らない
+- 画面を開いた時と定期的に照合する。定期の頻度は未決定（オーナー確認）
+- ずれの種類ごとに直し方を1つ決め、直したら記録に残す
+- 版・公開の実行・ページの実行を台帳に残す（§6）
+
+### 17-2. 公開前の確認（O）
+
+- 公開の前に、LINE の検査の API を全ページに通す。ページは 10 まで（§5-2・§7-1）
+- 日時を選ぶ・コピーのボタンの動きを確かめる
+- 担当者が自分のスマートフォンで見て「実機で見た」を記録するまで、公開できない（§5-6）
+
+### 17-3. 合格条件
+
+- alias を切り替える前の段で失敗しても、友だちの画面は前のメニューのまま
+- alias を切り替えた後の失敗は、照合・修復で前か新しいかのどちらかにそろう
+- ずれを直すと、記録が残る
+- 「実機で見た」の記録が無いと公開できない

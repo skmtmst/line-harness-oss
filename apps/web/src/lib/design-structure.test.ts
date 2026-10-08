@@ -67,7 +67,7 @@ const V8_SECTIONS: Record<string, string[]> = {
   '/ec-commerce': ['Head'],
   '/form-submissions': [],
   '/friends/detail': ['Left', 'Right'],
-  // ★V8 友だち属性の作る画面（d9xoI・w9zY5・GobMd）は src/v8/tags に一から書き、型（CreatePage）が節を持つ。
+  // ★V8 タグの作る画面（d9xoI・w9zY5・GobMd）は src/v8/tags に一から書き、型（CreatePage）が節を持つ。
   // 残る印は v7 の画面（同じ page.tsx の中）のもの。
   '/tags/new': [],
   '/tags/fields/new': ['Basic', 'Immutable', 'Value'],

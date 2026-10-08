@@ -10,8 +10,9 @@ const settings = read('../settings/page.tsx')
 const topBar = read('../../../components/shell/app-top-bar.tsx')
 
 /**
- * ★V6 36-1（アカウントメニュー）・36-3（お問い合わせ）・36-5（メンバー管理）の見張り。
- * 正本は Pencil `V6正本.pen` と `docs/v6-requirements/v6-36-hq-account-billing-requirements-draft.md`。
+ * 統括のアカウントメニュー・お問い合わせ・メンバー管理の見張り（番号 36-1・36-3・36-5 は当時の下書きの節）。
+ * 見た目の正本は Pencil ★V8（メンバーは V8-B.pen `K7HYu`、`docs/v8-design-rules.md`）、請求の動きは `docs/hq-billing.md`。
+ * 当時の下書き v6-36 は本線に入らなかった（原本なし。`docs/hq-signup-and-password-login.md` の冒頭）。
  */
 describe('統括の左下アカウントメニュー', () => {
   it('v7 の統括のサイドバーだけに置き、アカウントの画面は下端に何も置かない（§1-2 の例外）', () => {

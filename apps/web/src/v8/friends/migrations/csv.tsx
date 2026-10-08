@@ -32,7 +32,7 @@ const COLUMN_CHOICES = [
 ] as const
 
 export default function CsvMigrationsV8() {
-  usePageTitle('CSVで書き出す・取り込む')
+  usePageTitle('友だち')
   const m = useFriendMigrations()
   const reflectable = m.summary ? m.summary.add + m.summary.update : 0
   const blocked = m.summary ? m.summary.conflict + m.summary.error > 0 : true

@@ -18,11 +18,11 @@ import TemplateMessageFormV8 from './template-message-v8'
 import { formatDateTime } from '@/lib/format'
 
 const LABELS: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
-const PAGE_TITLES: Record<TemplateType, string> = { tag: '友だち属性', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
+const PAGE_TITLES: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
 const CREATE_LABELS: Record<TemplateType, string> = { tag: '＋ タグを作る', template: 'テンプレートを作る', rich_menu: 'メニューを作る', form: 'フォームを作る', scenario: 'シナリオを作る' }
 const LIST_DESCRIPTIONS: Record<TemplateType, string> = {
   tag: 'タグのひな形を作成し、各LINEアカウントへ配布します。',
-  template: 'メッセージのひな形を作成し、各LINEアカウントへ配布します。友だち属性・リッチメニュー・回答フォームも同じ形です。配るときは、行の「アカウントへ配る」から。',
+  template: 'メッセージのひな形を作成し、各LINEアカウントへ配布します。タグ・リッチメニュー・回答フォームも同じ形です。配るときは、行の「アカウントへ配る」から。',
   rich_menu: 'リッチメニューのひな形を作成し、各LINEアカウントへ配布します。',
   scenario: 'シナリオのひな形を作り、停止中の下書きとして各LINEアカウントへ配布します。',
   form: '回答フォームのひな形を作成し、各LINEアカウントへ配布します。',

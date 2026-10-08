@@ -13,6 +13,8 @@ import { api, describeSaveFailure } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
+import { folderById, folderCreator } from '@/components/shared/folder-select'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import FieldEditor, { type FieldEditorValues } from './field-editor'
 
 export default function FieldNew() {
@@ -22,6 +24,9 @@ export default function FieldNew() {
   const { selectedAccountId } = useAccount()
 
   const [folders, setFolders] = useState<Folder[]>([])
+  // その場でフォルダを作れるのは、左の列の「フォルダを追加」と同じ人（閲覧のみは作れない）。
+  const staffRole = useStaffRole()
+  const canCreateFolder = staffRole === null || canManageRole(staffRole)
   const [foldersState, setFoldersState] = useState<'loading' | 'ready' | 'error'>('loading')
   /* R514: 既存項目が取れていないのに空一覧として扱わない。 */
   const [existing, setExisting] = useState<FriendField[]>([])
@@ -103,6 +108,9 @@ export default function FieldNew() {
       foldersState={foldersState}
       foldersReloading={reloading}
       onRetryFolders={() => void loadFolders()}
+      onCreateFolder={canCreateFolder
+        ? folderCreator((name, color) => api.folders.create({ kind: 'friend_field', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+        : undefined}
       siblings={existing}
       siblingsReady={existingState === 'ready'}
       saving={saving}

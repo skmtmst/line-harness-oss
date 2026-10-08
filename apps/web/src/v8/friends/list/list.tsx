@@ -9,20 +9,22 @@
  * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
  * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
  */
+import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   CircleDot,
-  Ban,
   Bookmark,
   Columns3,
   Download,
   Eye,
   Megaphone,
-  MessageCircle,
+  MessageSquare,
+  UserRoundX,
   SlidersHorizontal,
   Star,
+  TrendingUp,
   Upload,
   UserPlus,
   Users,
@@ -38,6 +40,7 @@ import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
 import Checkbox from '@/components/shared/checkbox'
 import Avatar from '@/components/shared/avatar'
 import KpiCard from '@/components/shared/kpi-card'
@@ -53,6 +56,7 @@ import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
+import { RowMenu } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
@@ -63,8 +67,8 @@ import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import FriendRowMenu from '@/components/friends/friend-row-menu'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
-import { FriendsTabs } from '../shared/head'
 import { hasEditKey } from '../shared/nav'
+import { FriendsTabs } from '../shared/head'
 import { emptyMessageOf } from './empty'
 import { csvExportLine } from './csv-export'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
@@ -104,6 +108,16 @@ function isPageSize(value: number): value is PageSize {
   return (PAGE_SIZE_OPTIONS as readonly number[]).includes(value)
 }
 
+/** 数の帯の「…」。今の「受信箱を開く」はここへ移した。 */
+function KpiMenu({ title, onOpen }: { title: string; onOpen: () => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <span className={styles.kpiMenu}>
+      <RowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={[{ id: 'inbox', label: '受信箱を開く', external: true, onSelect: () => { setOpen(false); onOpen() } }]} />
+    </span>
+  )
+}
+
 export default function FriendsListV8() {
   usePageTitle('友だち')
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -123,6 +137,7 @@ export default function FriendsListV8() {
   const readOnly = !canEditFriends && !canEditChats
   const canImport = manager
 
+  const router = useRouter()
   const searchParams = useSearchParams()
   const scoreMin = scoreBoundary(searchParams.get('scoreMin'))
   const scoreMax = scoreBoundary(searchParams.get('scoreMax'))
@@ -495,13 +510,13 @@ export default function FriendsListV8() {
       href: '/chats',
     },
     {
-      key: 'blocked', title: 'ブロック・非表示', icon: Ban, value: stats ? stats.blockedByThem + stats.hiddenByUs : null,
+      key: 'blocked', title: 'ブロック・非表示', icon: UserRoundX, value: stats ? stats.blockedByThem + stats.hiddenByUs : null,
       detail: stats ? `相手から ${stats.blockedByThem}・自分から ${stats.hiddenByUs}` : statsFailed ? '読み込めませんでした' : '—',
       delta: null,
       href: '/chats',
     },
     {
-      key: 'unanswered', title: '未対応', icon: MessageCircle, value: stats?.unanswered ?? null,
+      key: 'unanswered', title: '未対応', icon: MessageSquare, value: stats?.unanswered ?? null,
       detail: stats ? `対応済み ${formatNumber(stats.resolved)}` : statsFailed ? '読み込めませんでした' : '—',
       delta: stats && stats.unanswered > 0 ? { text: '要確認', tone: 'warn' } : null,
       href: '/chats?status=unread',
@@ -530,10 +545,11 @@ export default function FriendsListV8() {
           onRetry={statsFailed ? () => void loadStats(selectedAccountId) : undefined}
           delta={kpi.delta ? (
             <span className={kpi.delta.tone === 'warn' ? `${styles.delta} ${styles.deltaWarn}` : kpi.delta.tone === 'up' ? `${styles.delta} ${styles.deltaUp}` : styles.delta}>
+              {kpi.delta.tone === 'up' ? <TrendingUp size={12} aria-hidden="true" /> : null}
               {kpi.delta.text}
             </span>
           ) : undefined}
-          action={{ label: '受信箱を開く', href: kpi.href }}
+          menu={<KpiMenu title={kpi.title} onOpen={() => router.push(kpi.href)} />}
         />
       ))}
     </KpiBand>
@@ -812,7 +828,7 @@ export default function FriendsListV8() {
                   <Td className={styles.td}>
                     <div className={styles.supportCell}>
                       <span className={styles.statusRow}>
-                        <span className={status.tone === 'danger' ? `${styles.status} ${styles.status_danger}` : status.tone === 'warn' ? `${styles.status} ${styles.status_warn}` : status.tone === 'info' ? `${styles.status} ${styles.status_info}` : `${styles.status} ${styles.status_ok}`}><span className={styles.dot} aria-hidden="true" />{status.label}</span>
+                        <StatusPill tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusPill>
                         {friend.supportMark ? <span className={styles.mark} title={`対応マーク：${friend.supportMark.name}`}>{friend.supportMark.name}</span> : null}
                       </span>
                       <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>
@@ -835,7 +851,7 @@ export default function FriendsListV8() {
                 {visible.has('tags') ? (
                   <Td className={styles.td}>
                     <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
-                      {tags.shown.map((tag) => <span key={tag.id} className={styles.tag}>{tag.name}</span>)}
+                      {tags.shown.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}
                       {tags.rest > 0 ? <span className={styles.tagRest}>+{tags.rest}</span> : null}
                       {friend.tags.length === 0 ? <span className={styles.faint}>—</span> : null}
                     </div>

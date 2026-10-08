@@ -53,6 +53,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -191,6 +192,9 @@ function thumbCells(g: RichMenuGroupListItem): { rows: number; cols: number } {
   if (n <= 4) return { rows: 2, cols: 2 }
   return { rows: 2, cols: 3 }
 }
+
+/** WEB222：並べ替えのために全件を読むときの安全弁（200件×50ページ）。 */
+const REORDER_MAX_PAGES = 50
 
 export default function RichMenusListV8() {
   usePageTitle('リッチメニュー')
@@ -428,6 +432,18 @@ export default function RichMenusListV8() {
     }
   }, [selectedAccount?.id])
 
+  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
+  const folderActions = useFolderRowActions({
+    kind: 'rich_menu',
+    folders,
+    accountId: selectedAccount?.id ?? null,
+    enabled: canEdit,
+    itemLabel: 'リッチメニュー',
+    countOf: (id) => groupFacets?.folderCounts[id] ?? null,
+    onChanged: () => loadFolders(),
+    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
+  })
+
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => { void loadTapStats() }, [loadTapStats])
   useEffect(() => { void loadTags() }, [loadTags])
@@ -450,20 +466,37 @@ export default function RichMenusListV8() {
           ? '順番を保存しています'
           : null
 
+  /*
+   * WEB222：並べ替えの口は全部の ID を求める。200件の1ページ目だけで計算せず、
+   * 全件そろうまで続きを読む。読めなかった・そろわなかったときは null（呼び出し側が失敗を出す）。
+   */
   const fullOrderedGroups = useCallback(async (): Promise<RichMenuGroupListItem[] | null> => {
     if (!selectedAccount?.id) return null
     if (groups.length === groupTotal) return orderTargetingGroups(groups)
-    const res = await api.richMenuGroups.listPage(selectedAccount.id, {
-      page: 1,
-      limit: 200,
-      query: '',
-      folderId: '',
-      filter: '',
-      sort: 'priority',
-    })
-    if (!res.success) return null
-    if (activeAccountRef.current !== selectedAccount.id) return null
-    return orderTargetingGroups(res.data.items)
+    const accountId = selectedAccount.id
+    try {
+      const all: RichMenuGroupListItem[] = []
+      let total = Infinity
+      for (let page = 1; page <= REORDER_MAX_PAGES && all.length < total; page += 1) {
+        const res = await api.richMenuGroups.listPage(accountId, {
+          page,
+          limit: 200,
+          query: '',
+          folderId: '',
+          filter: '',
+          sort: 'priority',
+        })
+        if (!res.success) return null
+        if (activeAccountRef.current !== accountId) return null
+        all.push(...res.data.items.filter((item) => !all.some((known) => known.id === item.id)))
+        total = res.data.total ?? all.length
+        if (res.data.items.length === 0) break
+      }
+      if (all.length < total) return null
+      return orderTargetingGroups(all)
+    } catch {
+      return null
+    }
   }, [groups, groupTotal, selectedAccount?.id])
 
   /* 押した瞬間に並べ、裏で保存する。失敗したら元に戻し「もう一度」でやり直せる。 */
@@ -764,14 +797,14 @@ export default function RichMenusListV8() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal },
-    ...folders.map((f) => ({
+    { kind: 'all' as const, id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal },
+    ...folders.map((f, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(f, index),
       id: f.id,
       label: f.name,
       count: groupFacets?.folderCounts[f.id] ?? 0,
       color: f.color,
     })),
-    { id: UNFILED, label: '未分類', count: groupFacets?.folderCounts[UNFILED] ?? 0 },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: groupFacets?.folderCounts[UNFILED] ?? 0 },
   ]
   const folderSelectOptions = [
     { value: '', label: 'フォルダ：すべて' },
@@ -1352,6 +1385,7 @@ export default function RichMenusListV8() {
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={listPager}
       overlays={<>
+        {folderActions.dialogs}
         {folderDialogOpen ? (
           <FolderAddDialog
             kind="rich_menu"

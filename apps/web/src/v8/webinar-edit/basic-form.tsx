@@ -11,6 +11,7 @@ import HelpTip from '@/components/shared/help-tip'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import type { WebinarFolder } from '@/lib/api'
@@ -34,6 +35,7 @@ export function BasicForm({
   folders,
   folderState,
   onReloadFolders,
+  onCreateFolder,
   audienceLabel,
   fieldErrors,
   onBlurTitle,
@@ -47,6 +49,8 @@ export function BasicForm({
   folders: WebinarFolder[]
   folderState: 'loading' | 'ready' | 'error'
   onReloadFolders: () => void
+  /** フォルダを選ぶ欄からその場で作る（dLffh）。閲覧のみは渡さない。 */
+  onCreateFolder?: FolderSelectCreate
   audienceLabel: string
   fieldErrors: { title?: string; slug?: string }
   onBlurTitle?: () => void
@@ -103,7 +107,7 @@ export function BasicForm({
             <label className={styles.labelSmall} htmlFor={`${idPrefix}-folder`}>フォルダ</label>
             {readOnly
               ? <ReadValue label="フォルダ">{folderOptions.find((option) => option.value === values.folderId)?.label ?? '未分類'}</ReadValue>
-              : <Select id={`${idPrefix}-folder`} aria-label="フォルダ" size="full" value={values.folderId} disabled={disabled || folderState !== 'ready'} onChange={(value) => onChange({ folderId: value })} options={folderOptions} />}
+              : <FolderSelect id={`${idPrefix}-folder`} aria-label="フォルダ" size="full" value={values.folderId} disabled={disabled || folderState !== 'ready'} onChange={(value) => onChange({ folderId: value })} folders={folderOptions.slice(1).map((option) => ({ ...option, color: folders.find((folder) => folder.id === option.value)?.color ?? null }))} onCreate={onCreateFolder} />}
             {folderState === 'error' ? (
               <p className={styles.help}>フォルダを読み込めませんでした。<Button size="compact" onClick={onReloadFolders}>もう一度読み込む</Button></p>
             ) : null}

@@ -65,9 +65,11 @@ describe('FRIEND-10 統合ユーザーCSVは全件を共通部品で書き出す
     expect(PAGE).toContain('all.push(...res.data.rows)')
     // 1回の応答上限で順に取り、件数分集まるまで続ける。
     expect(PAGE).toContain('pageSize: 200')
-    expect(PAGE).toContain('all.length < exportTotal')
-    // 安全弁（無限に追い続けない上限）。
-    expect(PAGE).toContain('p <= 500')
+    // WEB323：画面の件数（読めていないと0）を信じず、口の件数まで集める。
+    expect(PAGE).toContain('all.length >= exportTotal')
+    // 安全弁（無限に追い続けない上限）。上限で止めたときは書き出さない（WEB323）。
+    expect(PAGE).toContain('USERS_CSV_MAX_PAGES = 500')
+    expect(PAGE).toContain('if (!complete)')
   })
 
   it('UTF-8 BOM を付け、成否どちらでも exporting を戻す', () => {

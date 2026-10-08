@@ -10,7 +10,6 @@
  */
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Check, Download, Send } from 'lucide-react'
 import { api, eventsApi, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from '@/lib/api'
@@ -419,8 +418,7 @@ function Bookings({ eventId }: { eventId: string }) {
       title={title}
       description={(
         <span className={styles.subLine}>
-          <Link href="/events" className={styles.backLink}>← イベント予約へ</Link>
-          {subLine ? <span>{` ・ ${subLine}`}</span> : null}
+          {subLine ? <span>{subLine}</span> : null}
         </span>
       )}
       actions={(

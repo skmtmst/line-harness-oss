@@ -14,7 +14,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check, ChevronLeft, FlaskConical, Plus } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -145,6 +145,8 @@ function SelectField({ label, htmlFor, help, error, children }: { label: string;
 
 function RewardEditorInner() {
   usePageTitle('使い道を作る')
+  /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
+  usePageCrumbs([{ label: 'マイル', href: '/mileage?tab=rewards' }])
   const router = useRouter()
   const rewardId = useSearchParams().get('id')
   const editing = Boolean(rewardId)

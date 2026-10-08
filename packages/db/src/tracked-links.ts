@@ -318,20 +318,12 @@ export async function recordLinkClick(
   const id = crypto.randomUUID();
   const now = jstNow();
 
-  await db
-    .prepare(
-      `INSERT INTO link_clicks (id, tracked_link_id, friend_id, clicked_at)
-       VALUES (?, ?, ?, ?)`,
-    )
-    .bind(id, trackedLinkId, friendId ?? null, now)
-    .run();
-
-  await db
-    .prepare(
-      `UPDATE tracked_links SET click_count = click_count + 1, updated_at = ? WHERE id = ?`,
-    )
-    .bind(now, trackedLinkId)
-    .run();
+  await db.batch([
+    db.prepare(`INSERT INTO link_clicks (id, tracked_link_id, friend_id, clicked_at)
+       VALUES (?, ?, ?, ?)`).bind(id, trackedLinkId, friendId ?? null, now),
+    db.prepare(`UPDATE tracked_links SET click_count = click_count + 1, updated_at = ? WHERE id = ?`)
+      .bind(now, trackedLinkId),
+  ]);
 
   return (await db
     .prepare(`SELECT * FROM link_clicks WHERE id = ?`)

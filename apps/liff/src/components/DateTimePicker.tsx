@@ -11,7 +11,11 @@ import Icon from './ui/Icon.js';
 import BottomBar from './ui/BottomBar.js';
 import Button from './ui/Button.js';
 
-export type SlotPick = { date: string; start: string };
+/**
+ * 選んだ枠。date・start は店の暦日・壁時刻（表示用）。startUtc・timeZone は
+ * 空き枠が返した開始の瞬間と店のタイムゾーンで、予約・待ちの登録はこれを送る。
+ */
+export type SlotPick = { date: string; start: string; startUtc?: string; timeZone?: string };
 
 /** 日時を選ぶ段の見せ方。'list' が週5日の並び (M2p63S)、'calendar' が月の表 (k3aJKU)。 */
 export type DateView = 'list' | 'calendar';
@@ -46,9 +50,16 @@ function monthOf(date: string): string {
   return date.slice(0, 7);
 }
 
-type AvailSlot = { date: string; start: string; remaining?: number; state?: string };
+type AvailSlot = {
+  date: string;
+  start: string;
+  remaining?: number;
+  state?: string;
+  startUtc?: string;
+  timeZone?: string;
+};
 /** 時刻の枠。open=false は埋まった枠 (灰色で出す・押せない)。 */
-export type TimeSlot = { start: string; open: boolean };
+export type TimeSlot = { start: string; open: boolean; startUtc?: string; timeZone?: string };
 
 /**
  * 空き読み出しのまとめ役（週・カレンダー共通）。
@@ -82,8 +93,15 @@ function groupSlots(
       const prev = seen.get(`${s.date}\0${s.start}`);
       if (prev) {
         prev.open ||= open;
+        prev.startUtc ??= s.startUtc;
+        prev.timeZone ??= s.timeZone;
       } else {
-        seen.set(`${s.date}\0${s.start}`, { start: s.start, open });
+        seen.set(`${s.date}\0${s.start}`, {
+          start: s.start,
+          open,
+          ...(s.startUtc ? { startUtc: s.startUtc } : {}),
+          ...(s.timeZone ? { timeZone: s.timeZone } : {}),
+        });
       }
       if (open && !limited) strictOpen.add(s.date);
       if (limited) limitedOnly.add(s.date);
@@ -189,6 +207,16 @@ function weekMark(state: DayState): string {
   return '満';
 }
 
+/** 時刻の札から選んだ枠を作る。開始の瞬間と店のタイムゾーンを持って運ぶ。 */
+function pickOf(day: string, t: TimeSlot): SlotPick {
+  return {
+    date: day,
+    start: t.start,
+    ...(t.startUtc ? { startUtc: t.startUtc } : {}),
+    ...(t.timeZone ? { timeZone: t.timeZone } : {}),
+  };
+}
+
 /**
  * 選んだ日の時刻3列 (★V8・M2p63S)。埋まった時刻は灰色で押せない。
  * 埋まった時刻には鈴の印を付ける (booking-plus 2)。鈴を押すと
@@ -221,7 +249,7 @@ function DaySlots({
               <button
                 key={t.start}
                 type="button"
-                onClick={() => onSelect({ date: day, start: t.start })}
+                onClick={() => onSelect(pickOf(day, t))}
                 disabled={!t.open}
                 aria-pressed={active}
                 className={`liff-press liff-num h-11 w-full rounded-(--liff-radius) px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
@@ -241,7 +269,7 @@ function DaySlots({
                 {timeButton}
                 <button
                   type="button"
-                  onClick={() => onWaitlist({ date: day, start: t.start })}
+                  onClick={() => onWaitlist(pickOf(day, t))}
                   aria-label={`${t.start}に空いたら知らせる`}
                   className="liff-hit liff-press absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-canvas text-liff-primary shadow outline-1 -outline-offset-1 outline-liff-line-strong focus-visible:outline-2 focus-visible:outline-ink"
                 >
@@ -458,7 +486,8 @@ export default function DateTimePicker({
     if (loadedMonths.includes(month) || loadingMonthsRef.current.has(`${calReloadKey}:${month}`)) {
       return;
     }
-    loadingMonthsRef.current.add(`${calReloadKey}:${month}`);
+    const loadingKey = `${calReloadKey}:${month}`;
+    loadingMonthsRef.current.add(loadingKey);
     const from = monthStart(month) < today ? today : monthStart(month);
     const to = monthEnd(month) > windowEnd ? windowEnd : monthEnd(month);
     if (from > to) {
@@ -466,10 +495,12 @@ export default function DateTimePicker({
       return;
     }
     let cancelled = false;
+    let settled = false;
     void Promise.all(
       splitRange(from, to).map(([head, tail]) => api.availability(menu.id, staff.id, head, tail)),
     )
       .then((results) => {
+        settled = true;
         if (cancelled) return;
         const buckets = results.flatMap((r) => (r.by_staff[0] ? [r.by_staff[0]] : []));
         const { byDate: grouped, fullDates, limitedDates, openDates } = groupSlots(buckets);
@@ -485,12 +516,16 @@ export default function DateTimePicker({
         setLoadedMonths((prev) => (prev.includes(month) ? prev : [...prev, month]));
       })
       .catch((e) => {
+        settled = true;
         if (cancelled) return;
         logFailure('availability', e);
         setCalFailed(true);
       });
     return () => {
       cancelled = true;
+      // 読み終わる前に月・見せ方を替えたら「読み中」の印を外す。
+      // 外さないと、その月へ戻っても読み始めず読み込み中のまま残る。
+      if (!settled) loadingMonthsRef.current.delete(loadingKey);
     };
   }, [view, settings, month, menu.id, staff.id, today, windowEnd, loadedMonths, calReloadKey]);
 
@@ -526,6 +561,9 @@ export default function DateTimePicker({
     weekDays.push(d);
   }
   const weekHasOpen = weekDays.some((d) => weekByDate?.[d]?.some((t) => t.open));
+  // 満席の日がある週は日の並びを出す（満席の日を押すと時刻の鈴＝空いたら知らせるへ進める）。
+  const weekHasFull = weekDays.some((d) => weekFull[d]);
+  const weekShowsStrip = weekHasOpen || weekHasFull;
   const calHasSlots = Object.values(calByDate).some((times) => times.some((t) => t.open));
   const monthLoaded = loadedMonths.includes(month);
   useEffect(() => {
@@ -700,7 +738,7 @@ export default function DateTimePicker({
           <LoadErrorView onRetry={retryWeek} />
         ) : weekLoading || !weekByDate || !loadedWins.has(winStart) ? (
           <LoadingView />
-        ) : !weekHasOpen ? (
+        ) : !weekShowsStrip ? (
           // ★V8 (ADutg)：印・題・本文・ボタンを 12 ずつ空け、画面の真ん中の高さに置く。
           <div className="flex flex-col items-center gap-3 px-2 pt-16 text-center" data-design-node="ADutg">
             <span className="text-liff-idle" aria-hidden="true">
@@ -749,6 +787,8 @@ export default function DateTimePicker({
                   const open = state === 'open';
                   // 残りわずかの日も押せる (金の印だけ付ける)。
                   const selectable = open || state === 'few';
+                  // 満席の日も押せる。時刻は灰色で予約できず、鈴から「空いたら知らせる」だけ選べる。
+                  const pressable = selectable || state === 'full';
                   const active = d === listDay;
                   return (
                     <button
@@ -758,7 +798,7 @@ export default function DateTimePicker({
                         userPickedDayRef.current = true;
                         setListDay(d);
                       }}
-                      disabled={!selectable}
+                      disabled={!pressable}
                       aria-pressed={active}
                       aria-label={dayStateLabel(d, state)}
                       title={dayStateLabel(d, state)}
@@ -821,6 +861,7 @@ export default function DateTimePicker({
                     staff={staff}
                     date={waitSlot.date}
                     start={waitSlot.start}
+                    startUtc={waitSlot.startUtc}
                     onClose={() => setWaitSlot(null)}
                   />
                 )}
@@ -904,6 +945,8 @@ export default function DateTimePicker({
                     const dayNum = Number(d.slice(8, 10));
                     // 残りわずかの日も押せる (金の点だけ付ける)。
                     const selectable = state === 'open' || state === 'few';
+                    // 満席の日も押せる（週の時刻へ移ると、鈴から空いたら知らせるを登録できる）。
+                    const pressable = selectable || state === 'full';
                     const active = d === calDay;
                     return (
                       <button
@@ -913,7 +956,7 @@ export default function DateTimePicker({
                           userPickedDayRef.current = true;
                           setCalDay(d);
                         }}
-                        disabled={!selectable}
+                        disabled={!pressable}
                         aria-pressed={active}
                         aria-label={dayStateLabel(d, state)}
                         className={`liff-press flex h-11 flex-col items-center justify-center gap-0.5 rounded-(--liff-radius) focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
@@ -966,7 +1009,7 @@ export default function DateTimePicker({
       )}
       {/* 下の操作の帯 (週: 選んだ時間で確かめる / カレンダー: その日の週へ)。
           空きの無い週は帯を出さず、中身の中に次の手を置く。 */}
-      {view === 'calendar' || (weekByDate && !weekFailed && weekHasOpen) ? bar : null}
+      {view === 'calendar' || (weekByDate && !weekFailed && weekShowsStrip) ? bar : null}
       {/* 帯の分の余白 */}
       <div className="pb-40" aria-hidden="true" />
     </div>

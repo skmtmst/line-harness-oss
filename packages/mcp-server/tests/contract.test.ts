@@ -164,11 +164,12 @@ describe('broadcast (配信)', () => {
       altText: undefined,
       accountId: 'acc-1',
       trackLinks: true,
+      confirmIrreversible: 'broadcast-send',
     })
     expect(client.broadcasts.create).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Sale', targetType: 'all', lineAccountId: 'acc-1', trackLinks: true }),
     )
-    expect(client.broadcasts.send).toHaveBeenCalledWith('b1')
+    expect(client.broadcasts.send).toHaveBeenCalledWith('b1', { confirmIrreversible: 'broadcast-send', confirmedRecipientCount: undefined })
     expect(JSON.parse(textOf(result)).success).toBe(true)
   })
 
@@ -187,6 +188,7 @@ describe('broadcast (配信)', () => {
       altText: undefined,
       accountId: undefined,
       trackLinks: true,
+      confirmIrreversible: 'broadcast-send',
     })
     expect(client.broadcasts.create).toHaveBeenCalled()
     expect(client.broadcasts.send).not.toHaveBeenCalled()
@@ -207,6 +209,7 @@ describe('broadcast (配信)', () => {
       altText: undefined,
       accountId: undefined,
       trackLinks: true,
+      confirmIrreversible: 'broadcast-send',
     })
     expect(isError(result)).toBe(true)
     expect(textOf(result)).toContain('segmentConditions is required')
@@ -228,6 +231,7 @@ describe('broadcast (配信)', () => {
       altText: undefined,
       accountId: undefined,
       trackLinks: true,
+      confirmIrreversible: 'broadcast-send',
     })
     expect(isError(result)).toBe(true)
     expect(textOf(result)).toContain('must be valid JSON')
@@ -249,6 +253,7 @@ describe('broadcast (配信)', () => {
       altText: undefined,
       accountId: undefined,
       trackLinks: true,
+      confirmIrreversible: 'broadcast-send',
     })
     expect(isError(result)).toBe(true)
     expect(textOf(result)).toContain('not supported')
@@ -277,11 +282,12 @@ describe('broadcast (配信)', () => {
       altText: undefined,
       accountId: 'acc-2',
       trackLinks: false,
+      confirmIrreversible: 'broadcast-send',
     })
     expect(client.broadcasts.create).toHaveBeenCalledWith(
       expect.objectContaining({ title: '[SEGMENT] Sale', targetType: 'all', lineAccountId: 'acc-2' }),
     )
-    expect(client.broadcasts.sendToSegment).toHaveBeenCalledWith('b9', conditions)
+    expect(client.broadcasts.sendToSegment).toHaveBeenCalledWith('b9', conditions, { confirmIrreversible: 'broadcast-send', confirmedRecipientCount: undefined })
     expect(client.broadcasts.delete).toHaveBeenCalledWith('b9')
     expect(isError(result)).toBe(true)
     expect(textOf(result)).toContain('segment send boom')
@@ -441,7 +447,7 @@ describe('forms (フォーム)', () => {
     mockGetClient.mockReturnValue(client)
     const handler = handlers().get('get_form_submissions')!.handler as (args: unknown) => Promise<unknown>
     await handler({ formId: 'form-1' })
-    expect(client.forms.getSubmissions).toHaveBeenCalledWith('form-1')
+    expect(client.forms.getSubmissions).toHaveBeenCalledWith('form-1', { accountId: undefined })
   })
 })
 
@@ -665,3 +671,81 @@ describe('manage_broadcasts (配信の管理操作)', () => {
     expect(client.broadcasts.sendToSegment).not.toHaveBeenCalled()
   })
 })
+
+
+describe('PKG03 MCP 明示確認の入口', () => {
+  it('未確認の即時配信は下書きも作らず拒否する', async () => {
+    const client = fakeClient(); mockGetClient.mockReturnValue(client);
+    const result = await (handlers().get('broadcast')!.handler as (args: unknown) => Promise<unknown>)({
+      title: '未確認', messageType: 'text', messageContent: '本文', targetType: 'all',
+    });
+    expect(isError(result)).toBe(true);
+    expect(textOf(result)).toContain('confirmIrreversible');
+    expect(client.broadcasts.create).not.toHaveBeenCalled();
+    expect(client.broadcasts.send).not.toHaveBeenCalled();
+  });
+  it.each(['send', 'send_to_segment'])('%s: 確認と確認人数をSDKに渡す', async (action) => {
+    const client = fakeClient(); mockGetClient.mockReturnValue(client);
+    const conditions = { operator: 'AND', rules: [] };
+    const result = await (handlers().get('manage_broadcasts')!.handler as (args: unknown) => Promise<unknown>)({
+      action, broadcastId: 'b1', segmentConditions: JSON.stringify(conditions),
+      confirmIrreversible: 'broadcast-send', confirmedRecipientCount: 1234,
+    });
+    expect(isError(result)).toBe(false);
+    const options = { confirmIrreversible: 'broadcast-send', confirmedRecipientCount: 1234 };
+    if (action === 'send') expect(client.broadcasts.send).toHaveBeenCalledWith('b1', options);
+    else expect(client.broadcasts.sendToSegment).toHaveBeenCalledWith('b1', conditions, options);
+  });
+});
+
+
+describe('PKG04 MCP 編集版の入力契約', () => {
+  it.each(['manage_broadcasts', 'manage_forms'])('%s: 編集版なしでは保存しない', async (toolName) => {
+    const broadcastsUpdate = vi.fn(); const formsUpdate = vi.fn();
+    mockGetClient.mockReturnValue(fakeClient({ broadcasts: { update: broadcastsUpdate }, forms: { update: formsUpdate } }));
+    const result = await (handlers().get(toolName)!.handler as (args: unknown) => Promise<unknown>)({
+      action: 'update', broadcastId: 'b1', formId: 'f1', title: '配信', name: 'フォーム',
+    });
+    expect(isError(result)).toBe(true);
+    expect(textOf(result)).toContain(toolName === 'manage_forms' ? 'expectedContentRevision' : 'expectedVersion');
+    expect(broadcastsUpdate).not.toHaveBeenCalled(); expect(formsUpdate).not.toHaveBeenCalled();
+  });
+  it('読んだ版をそのまま保存へ渡し勝手に再取得しない', async () => {
+    const broadcastsUpdate = vi.fn().mockResolvedValue({ version: 8 });
+    const formsUpdate = vi.fn().mockResolvedValue({ contentRevision: 10 });
+    mockGetClient.mockReturnValue(fakeClient({ broadcasts: { update: broadcastsUpdate }, forms: { update: formsUpdate } }));
+    await (handlers().get('manage_broadcasts')!.handler as (args: unknown) => Promise<unknown>)({ action: 'update', broadcastId: 'b1', title: '配信', expectedVersion: 7 });
+    await (handlers().get('manage_forms')!.handler as (args: unknown) => Promise<unknown>)({ action: 'update', formId: 'f1', name: 'フォーム', expectedContentRevision: 9 });
+    expect(broadcastsUpdate).toHaveBeenCalledWith('b1', { title: '配信', expectedVersion: 7 });
+    expect(formsUpdate).toHaveBeenCalledWith('f1', { name: 'フォーム', expectedContentRevision: 9 }, { accountId: undefined });
+  });
+});
+
+
+describe('PKG10 MCP フォームの操作アカウント', () => {
+  it('作成と一覧と回答取得へ明示したアカウントを渡す', async () => {
+    const client = fakeClient(); mockGetClient.mockReturnValue(client);
+    const tools = handlers();
+    const run = (name: string, args: unknown) => (tools.get(name)!.handler as (args: unknown) => Promise<unknown>)(args);
+    await run('create_form', { name: '試験', fields: '[]', accountId: 'chosen' });
+    expect(client.forms.create).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'chosen' }));
+    await run('manage_forms', { action: 'list', accountId: 'chosen' });
+    await run('list_crm_objects', { objectType: 'forms', accountId: 'chosen' });
+    expect(client.forms.list).toHaveBeenCalledWith({ accountId: 'chosen' });
+    await run('get_form_submissions', { formId: 'f1', accountId: 'chosen' });
+    expect(client.forms.getSubmissions).toHaveBeenCalledWith('f1', { accountId: 'chosen' });
+  });
+  it('保存と削除でも選択アカウントと確認した版を保つ', async () => {
+    const forms = { update: vi.fn().mockResolvedValue({}), delete: vi.fn().mockResolvedValue(undefined), get: vi.fn().mockResolvedValue({}) };
+    mockGetClient.mockReturnValue(fakeClient({ forms }));
+    const run = handlers().get('manage_forms')!.handler as (args: unknown) => Promise<unknown>;
+    await run({ action: 'get', formId: 'f1', accountId: 'chosen' });
+    expect(forms.get).toHaveBeenCalledWith('f1', { accountId: 'chosen' });
+    await run({ action: 'update', formId: 'f1', accountId: 'chosen', folderId: null });
+    expect(forms.update).toHaveBeenCalledWith('f1', { folderId: null }, { accountId: 'chosen' });
+    expect(isError(await run({ action: 'delete', formId: 'f1', accountId: 'chosen' }))).toBe(true);
+    expect(forms.delete).not.toHaveBeenCalled();
+    await run({ action: 'delete', formId: 'f1', accountId: 'chosen', expectedRevision: 7 });
+    expect(forms.delete).toHaveBeenCalledWith('f1', { accountId: 'chosen', expectedRevision: 7 });
+  });
+});

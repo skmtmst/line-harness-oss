@@ -3856,6 +3856,13 @@
   "hq_broadcast_audit": {
     "category": "retain"
   },
+  "hq_broadcast_folders": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
   "hq_broadcast_runs": {
     "category": "retain"
   },

@@ -1,10 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { Settings, Sparkles, TriangleAlert } from 'lucide-react'
+import { Sparkles, TriangleAlert } from 'lucide-react'
 import MenuPortal, { type MenuPortalRect } from './menu-portal'
 import SegmentedControl from './segmented'
-import IconButton from './icon-button'
 import styles from './bell-popover.module.css'
 
 export type BellFilter = 'all' | 'error' | 'update'
@@ -43,7 +42,6 @@ export type BellPopoverProps = {
   onSelect: (id: string) => void
   onMarkAllRead: () => void
   onViewAll: () => void
-  onOpenSettings: () => void
 }
 
 const FILTERS: { value: BellFilter; label: string }[] = [
@@ -75,7 +73,6 @@ export default function BellPopover({
   onSelect,
   onMarkAllRead,
   onViewAll,
-  onOpenSettings,
 }: BellPopoverProps) {
   const panelRef = useRef<HTMLElement>(null)
 
@@ -169,11 +166,9 @@ export default function BellPopover({
           </ul>
         )}
 
+        {/* 下は「すべて見る」だけ。通知設定はその先のお知らせの画面にある（オーナー 2026-10-08：押すものが2つ並ぶのはおかしい）。 */}
         <footer className={styles.foot}>
           <button type="button" className={styles.viewAll} onClick={onViewAll}>すべて見る →</button>
-          <IconButton className={styles.settings} onClick={onOpenSettings} aria-label="通知設定" title="通知設定">
-            <Settings aria-hidden="true" />
-          </IconButton>
         </footer>
       </section>
     </MenuPortal>

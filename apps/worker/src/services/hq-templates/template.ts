@@ -23,40 +23,9 @@ export class TemplateHqTemplateError extends Error {
   }
 }
 
-export type MessageTemplateMediaDefinition = Readonly<{
-  id: string;
-  kind: 'image' | 'video' | 'audio' | 'file';
-  filename: string;
-  mimeType: string;
-  sizeBytes: number;
-  width: number | null;
-  height: number | null;
-  durationMs: number | null;
-  r2Key: string;
-  publicUrl: string | null;
-  versionId: string;
-  versionNo: number;
-  contentHash: string;
-}>;
-
-export type MessageTemplateDefinition = Readonly<{
-  card?: HqMessageCard;
-  schemaVersion: 1;
-  template: Readonly<{
-    id: string;
-    name: string;
-    category: string;
-    messageType: 'text' | 'image' | 'flex' | 'carousel';
-    messageContent: string;
-    carouselActionsJson: string | null;
-    carouselTapLimitMode: 'none' | 'once';
-    carouselTapLimitText: string | null;
-    questionJson: string | null;
-    questionStatus: 'draft' | 'published';
-  }>;
-  media: readonly MessageTemplateMediaDefinition[];
-}>;
-
+export type { MessageTemplateDefinition, MessageTemplateMediaDefinition } from '@line-crm/shared';
+import { type MessageTemplateDefinition, type MessageTemplateMediaDefinition, validateAssetPayload, isBroadcastAssetKind, convertBroadcastAsset, templateKind } from '@line-crm/shared';
+import { parseQuestion } from '../scenario-question.js';
 export type MessageTemplateTargetSnapshot = Readonly<{
   tenantId: string;
   targetAccountId: string;
@@ -127,6 +96,7 @@ export type MessageTemplatePreflightItem = Readonly<{
 export interface MessageTemplateAdapterDependencies {
   /** Trusted runtime resolutions of card references, checked against the preflight snapshot. */
   cardTargets?: Readonly<Record<string, string>>;
+  referenceTargets?: Readonly<Record<string,string>>;
   /** Must resolve by tenant + source account + immutable version id in one authoritative DB lookup. */
   resolveSourceVersion(input: Readonly<{
     authority: MessageTemplateSourceAuthority;
@@ -316,7 +286,29 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
     if (card.imageMediaId && (!image || image.kind !== 'image' || !image.publicUrl)) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
     Object.assign(template, composeHqMessageCard(card, requiredText(template.id, 100), image?.publicUrl ?? undefined));
   }
+  let asset: MessageTemplateDefinition['asset'];
+  if (root.asset !== undefined) {
+    const value=object(root.asset),payload=object(value.payload);
+    if (!isBroadcastAssetKind(value.kind) || validateAssetPayload(value.kind,payload)) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    if (card) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    // 店の保存と同じ共有型・検査を使い、配布先でIDを取り直す。
+    if(value.kind==='research' && payload.questions===undefined) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    asset={kind:value.kind,payload};
+    if (value.kind==='rich_message') {
+      const base=String(payload.baseUrl ?? '');
+      if (![240,300,460,700,1040].every(width => media.some(m=>m.kind==='image' && m.publicUrl===`${base}/${width}`))) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+      const converted=convertBroadcastAsset(value.kind,String(template.name),payload);
+      if(!converted.ok) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    }
+  }
+  const questionJson=jsonText(template.questionJson,1_000_000);
+  if(questionJson) {
+    const q=parseQuestion(questionJson);
+    if(!q || q.text.length>160 || q.choices.length>13 || q.choices.some(c=>!c || typeof c.label!=='string' || !c.label.trim() || c.label.length>20 || !['none','url','tel','add_friend','mail','form','scenario'].includes(c.behavior))) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    if(asset || card) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+  }
   const parsed: MessageTemplateDefinition = {
+    ...(asset?{asset}:{}),
     ...(card?{card}:{}),
     schemaVersion: 1,
     template: {
@@ -324,11 +316,13 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
       name: requiredText(template.name, 255),
       category: requiredText(template.category ?? 'general', 100),
       messageType: messageType as MessageTemplateDefinition['template']['messageType'],
-      messageContent: requiredText(template.messageContent, 1_000_000),
+      messageContent: asset || questionJson
+        ? optionalText(template.messageContent, 1_000_000) ?? ''
+        : requiredText(template.messageContent, 1_000_000),
       carouselActionsJson: jsonText(template.carouselActionsJson, 1_000_000),
       carouselTapLimitMode: tapLimitMode,
       carouselTapLimitText: optionalText(template.carouselTapLimitText, 10_000),
-      questionJson: jsonText(template.questionJson, 1_000_000),
+      questionJson,
       questionStatus,
     },
     media,
@@ -445,6 +439,7 @@ function templateTextFields(definition: MessageTemplateDefinition): readonly str
     template.carouselActionsJson,
     template.carouselTapLimitText,
     template.questionJson,
+    definition.asset ? JSON.stringify(definition.asset.payload) : null,
   ].filter((value): value is string => value !== null);
 }
 
@@ -467,6 +462,7 @@ function exactStringValues(value: string): readonly string[] {
 /** Only media actually referenced by the template body is distributed. */
 export function referencedMedia(definition: MessageTemplateDefinition): readonly MessageTemplateMediaDefinition[] {
   const exactValues = new Set(templateTextFields(definition).flatMap(exactStringValues));
+  if(definition.asset?.kind==='rich_message') for(const width of [240,300,460,700,1040]) exactValues.add(`${definition.asset.payload.baseUrl}/${width}`);
   const references = definition.media.filter((media) =>
     [media.id, media.r2Key, media.publicUrl].some((locator) => locator !== null && exactValues.has(locator)),
   );
@@ -590,8 +586,8 @@ function conflictGuard(sql: string, bindings: readonly HqTemplateBinding[]): HqT
   };
 }
 
-function nameInventoryGuard(kind: 'template' | 'media', accountId: string, names: readonly (readonly [string, string])[]): HqTemplateStatement {
-  const table = kind === 'template' ? 'templates' : 'media';
+function nameInventoryGuard(kind: 'template' | 'media', accountId: string, names: readonly (readonly [string, string])[], asset = false): HqTemplateStatement {
+  const table = kind === 'template' ? (asset ? 'broadcast_message_assets' : 'templates') : 'media';
   const column = kind === 'template' ? 'name' : 'filename';
   const expected = JSON.stringify(names);
   // SQLite lower() cannot reproduce JavaScript NFKC/case folding. Prove the entire
@@ -631,7 +627,7 @@ export async function planMessageTemplateDistribution(input: {
   const stage: HqTemplateStoreAtomicCommitPlan['stage'][number][] = [];
   const compensateOnDbFailure: HqTemplateStoreAtomicCommitPlan['compensateOnDbFailure'][number][] = [];
   const reconcile: HqTemplateStoreAtomicCommitPlan['reconcile'][number][] = [];
-  const replacements = new Map<string, string>();
+  const replacements = new Map<string, string>(Object.entries(dependencies.referenceTargets ?? {}));
   const resolved: HqTemplateResolution[] = [];
   const occupiedTemplateNames = [...snapshot.templates.map((entry) => entry.name)];
   const occupiedMediaNames = [...snapshot.media.map((entry) => entry.filename)];
@@ -669,7 +665,7 @@ export async function planMessageTemplateDistribution(input: {
       const names: [string, string][] = item.itemKind === 'template'
         ? snapshot.templates.map(row => [row.id, row.name])
         : snapshot.media.map(row => [row.id, row.filename]);
-      dbCommit.push(nameInventoryGuard(item.itemKind, context.targetAccountId, names));
+      dbCommit.push(nameInventoryGuard(item.itemKind, context.targetAccountId, names, Boolean(definition.asset)));
       guardedInventories.add(item.itemKind);
     }
     resolved.push({
@@ -779,6 +775,7 @@ export async function planMessageTemplateDistribution(input: {
   const carouselActionsJson = replaceExactLocators(template.carouselActionsJson, replacements);
   const carouselTapLimitText = replaceExactLocators(template.carouselTapLimitText, replacements);
   const questionJson = replaceExactLocators(template.questionJson, replacements);
+  if (!definition.asset) {
   if (rootResolution.mode === 'overwrite') {
     dbCommit.push(conflictGuard(
       'SELECT 1 FROM templates WHERE id = ? AND line_account_id = ? AND updated_at = ?',
@@ -806,6 +803,30 @@ export async function planMessageTemplateDistribution(input: {
         carouselActionsJson, template.carouselTapLimitMode, carouselTapLimitText, questionJson,
         template.questionStatus, now, now, context.targetAccountId, now],
     });
+  }
+  } else {
+    const asset=definition.asset;
+    if(asset.kind==='rich_message') {
+      const sourceBase=String(asset.payload.baseUrl);
+      const target1040=replacements.get(`${sourceBase}/1040`);
+      if(!target1040?.endsWith('/1040')) throw new TemplateHqTemplateError('MEDIA_COPY_INVALID',422);
+      replacements.set(sourceBase,target1040.slice(0,-5));
+    }
+    const payload=JSON.parse(replaceExactLocators(JSON.stringify(asset.payload),replacements)!);
+    // assetId と画像の旧所属を持ち越さない。
+    payload.assetId=targetTemplateId;
+    if(payload.imageMediaId) payload.imageMediaId=replacements.get(payload.imageMediaId) ?? null;
+    // 各サイズも使用台帳の点検で見つかるよう、配布先URLを保存する。
+    if (asset.kind === 'rich_message') {
+      payload.imagemapImages = referencedMedia(definition).map(media => replacements.get(media.publicUrl!));
+    }
+    const json=JSON.stringify(payload);
+    if(rootResolution.mode==='overwrite') {
+      dbCommit.push(conflictGuard('SELECT 1 FROM broadcast_message_assets WHERE id=? AND line_account_id=? AND updated_at=?', [targetTemplateId,context.targetAccountId,rootItem.expectedRevision]));
+      dbCommit.push({sql:`UPDATE broadcast_message_assets SET kind=?,name=?,payload_json=?,published_version=published_version+1,published_at=?,draft_payload_json=NULL,draft_revision=0,updated_at=? WHERE id=? AND line_account_id=? AND updated_at=?`,bindings:[asset.kind,rootName,json,now,now,targetTemplateId,context.targetAccountId,rootItem.expectedRevision]});
+    } else dbCommit.push({sql:`INSERT INTO broadcast_message_assets(id,line_account_id,kind,name,payload_json,published_version,published_at,draft_revision,created_at,updated_at) VALUES (?,?,?,?,?,1,?,0,?,?)`,bindings:[targetTemplateId,context.targetAccountId,asset.kind,rootName,json,now,now,now]});
+    dbCommit.push({sql:`INSERT INTO broadcast_asset_versions(id,asset_id,version_number,payload_json,created_at) SELECT ?,id,published_version,payload_json,? FROM broadcast_message_assets WHERE id=? AND line_account_id=?`,bindings:[crypto.randomUUID(),now,targetTemplateId,context.targetAccountId]});
+    if(asset.kind==='rich_message') for(const m of referencedMedia(definition)) dbCommit.push({sql:'INSERT OR IGNORE INTO imagemap_images(id,line_account_id,r2_key,created_at) VALUES (?,?,?,?)',bindings:[crypto.randomUUID(),context.targetAccountId,replacements.get(m.r2Key)!,now]});
   }
   for (const media of referencedMedia(definition)) {
     dbCommit.push({

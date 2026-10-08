@@ -136,6 +136,13 @@ export function useScenarioDraft<T>({
   linkRef.current = { scenarioId, stepId }
   const targetRef = useRef<{ account: string; key: string } | null>(null)
   targetRef.current = account && draftKey ? { account, key: draftKey } : null
+  /*
+   * 世代。下書きの相手（アカウント・キー）が変わる・「捨てる」で 1 つ進める。
+   * 遅れて返った読み・保存の結果は、始めたときと世代が違えば版にも画面にも入れない
+   * （前のアカウントの版で今の下書きを上書きしない：監査 WEB-020、捨てた下書きを作り直さない：WEB-021）。
+   */
+  const targetGenRef = useRef(0)
+  const clearGenRef = useRef(0)
 
   const link = () => {
     const { scenarioId: sid, stepId: tid } = linkRef.current
@@ -144,6 +151,7 @@ export function useScenarioDraft<T>({
 
   // キーが決まったとき（読み込み済み）に一度だけ、残っている下書きを確かめる。
   useEffect(() => {
+    targetGenRef.current += 1
     versionRef.current = 0
     setSavedJson(null)
     setSavedAt(null)
@@ -156,6 +164,8 @@ export function useScenarioDraft<T>({
       let remote: Remote<T> | null = null
       try {
         const res = await api.scenarioDrafts.get(account, draftKey)
+        // 切り替えたあとに返った前の相手の版は、今の下書きの版に入れない。
+        if (cancelled) return
         if (res.success) {
           versionRef.current = res.data.version
           remote = toRemote<T>(res.data)
@@ -219,6 +229,10 @@ export function useScenarioDraft<T>({
   const save = useCallback(async (): Promise<boolean> => {
     const target = targetRef.current
     if (!target) return false
+    const targetGen = targetGenRef.current
+    const clearGen = clearGenRef.current
+    /** 送ったあとに相手が変わった・捨てられたか。 */
+    const stale = () => targetGenRef.current !== targetGen || clearGenRef.current !== clearGen
     const sendingJson = valueJson
     if (sendingJson === baselineRef.current) {
       // 保存済みの形に戻った。下書きを消す。
@@ -232,6 +246,7 @@ export function useScenarioDraft<T>({
       } catch (caught) {
         if (!isStatus(caught, 404) && !isStatus(caught, 409)) return false
       }
+      if (stale()) return false
       versionRef.current = 0
       setSavedJson(null)
       setSavedAt(null)
@@ -249,17 +264,30 @@ export function useScenarioDraft<T>({
       setSavedAt(at)
       setNow(at)
     }
+    /*
+     * 送っている間に「捨てる」が押されたら、できてしまった下書きをその版で消す。
+     * 相手（アカウント・キー）が変わっただけなら、前の相手の下書きは消さず、今の画面にも入れない。
+     */
+    const settleStale = (draft: ScenarioDraft | null) => {
+      if (draft && targetGenRef.current === targetGen && clearGenRef.current !== clearGen) {
+        void api.scenarioDrafts.delete(target.account, target.key, draft.version).catch(() => {})
+      }
+      return false
+    }
     try {
       const res = await put(versionRef.current)
+      if (stale()) return settleStale(res.success ? res.data : null)
       if (!res.success) return false
       accept(res.data)
       return true
     } catch (caught) {
+      if (stale()) return false
       if (!isStatus(caught, 409)) return false
     }
     // 409：最新を1回読む。消えていたら新しく作り直す。残っていれば競合の帯（上書きしない）。
     try {
       const latest = await api.scenarioDrafts.get(target.account, target.key)
+      if (stale()) return false
       if (latest.success) {
         const remote = toRemote<T>(latest.data)
         versionRef.current = latest.data.version
@@ -267,11 +295,13 @@ export function useScenarioDraft<T>({
         return false
       }
     } catch (caught) {
+      if (stale()) return false
       if (!isStatus(caught, 404)) return false
     }
     try {
       versionRef.current = 0
       const res = await put(0)
+      if (stale()) return settleStale(res.success ? res.data : null)
       if (!res.success) return false
       accept(res.data)
       return true
@@ -307,6 +337,7 @@ export function useScenarioDraft<T>({
 
   /** 「捨てる」・本物を保存できた・キャンセル。下書きを消す。 */
   const clear = useCallback(() => {
+    clearGenRef.current += 1
     setPending(null)
     setConflict(null)
     setSavedAt(null)

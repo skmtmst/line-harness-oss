@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性の一覧（Pencil：タグ `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`）。
+ * ★V8 タグの一覧（Pencil：タグ `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`）。
  *
  * 型（PageFrame・PageHeading）で板の頭・閲覧のみの帯・タブの段を組み、
  * 本文はタブごとに切り替える。どのタブもこの場所に一から書いた
@@ -10,8 +10,9 @@
  * 受け付ける URL と指定は今と同じ：`/tags`・`/tags?tab=fields|marks|searches`・
  * 行の詳細は `?tag=<id>`。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Eye, Plus, Upload } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -52,10 +53,10 @@ export default function TagsList({
   /** 試験用の固定表示。渡すと読みに行かない。 */
   fixture?: { items: Tag[]; groups: TagGroup[] }
 }) {
-  usePageTitle('友だち属性')
+  usePageTitle('タグ')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const rawTab = params.get('tab')
   const routeTab: TagsTabKey = TABS.some(([key]) => key === rawTab) ? (rawTab as TagsTabKey) : 'tags'
@@ -105,7 +106,7 @@ export default function TagsList({
     <PageFrame kind="list" boardId={boardId}>
       <PageHeading
         headingSize="regular"
-        title="友だち属性"
+        title="タグ"
         description="友だちに付ける印（タグ）・入力してもらう項目・対応の印・保存した条件をまとめて管理します。"
         actions={actions}
       />
@@ -124,7 +125,7 @@ export default function TagsList({
           items={TABS.filter(([key]) => tabEnabled(key)).map(([key, label]) => ({
             label,
             current: tab === key,
-            onClick: () => (fixture ? setFixtureTab(key) : router.replace(key === 'tags' ? '/tags' : `/tags?tab=${key}`)),
+            onClick: () => (fixture ? setFixtureTab(key) : samePageUrl.replace(key === 'tags' ? '/tags' : `/tags?tab=${key}`)),
           }))}
         />
       </div>

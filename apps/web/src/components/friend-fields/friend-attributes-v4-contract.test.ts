@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 const root = resolve(process.cwd(), 'src')
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
-describe('友だち属性 V4 contract', () => {
+describe('タグ V4 contract', () => {
   it('タグ作成で本人・紹介者マイルと倍率を同時に設定できる', () => {
     const editor = read('components/friend-fields/tag-editor-v4.tsx')
     const page = read('components/friend-fields/new-tag-page-v4.tsx')
@@ -159,7 +159,7 @@ describe('友だち属性 V4 contract', () => {
     expect(source).not.toContain('disabled={(field.usageCount ?? 0) > 0}')
   })
 
-  it('友だち属性ではブラウザ標準confirmを使わない', () => {
+  it('タグではブラウザ標準confirmを使わない', () => {
     const sources = [
       read('components/friend-fields/tags-page-v4.tsx'),
       read('components/friend-fields/tag-editor-v4.tsx'),

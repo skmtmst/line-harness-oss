@@ -56,8 +56,9 @@ export function BannerImageDetailV8({
   error?: string
   onClose: () => void
   onToggleFavorite: () => void
-  onDeliver: (lineAccountIds: string[]) => Promise<void>
-  onRemove: () => Promise<void>
+  /** WEB204：成功したら true。失敗したら false（窓・選択を片付けない）。 */
+  onDeliver: (lineAccountIds: string[]) => Promise<boolean>
+  onRemove: () => Promise<boolean>
   /** 生成画像だけ。取り込み画像では出さない。 */
   onRegenerate?: () => void
   /** 「参照画像にする」。プロジェクトの中から開いたときだけ渡す。 */
@@ -94,7 +95,7 @@ export function BannerImageDetailV8({
         busy={busy}
         error={error}
         designNode="B24oNg"
-        onConfirm={() => void onRemove().then(() => setConfirmRemove(false))}
+        onConfirm={() => void onRemove().then((ok) => { if (ok) setConfirmRemove(false) })}
         onCancel={() => setConfirmRemove(false)}
       />
     )
@@ -207,7 +208,7 @@ export function BannerImageDetailV8({
                 <Button
                   variant="primary"
                   disabled={busy || selected.length === 0}
-                  onClick={() => void onDeliver(selected).then(() => setSelected([]))}
+                  onClick={() => void onDeliver(selected).then((ok) => { if (ok) setSelected([]) })}
                   busy={busy}
                   busyLabel="渡しています…"
                 >

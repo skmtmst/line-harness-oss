@@ -79,7 +79,7 @@ const SAVED_VIEWS = [
 ]
 
 export default function ApprovalsTab() {
-  const { readonly, narrow, setCount, focusAffiliateId } = useAffiliateShell()
+  const { readonly, narrow, setCount, focusAffiliateId, accountId } = useAffiliateShell()
 
   const [status, setStatus] = useState<ApprovalStatus>('pending')
   const [affiliateFilter, setAffiliateFilter] = useState<string | null>(focusAffiliateId)
@@ -107,11 +107,12 @@ export default function ApprovalsTab() {
     return () => { mounted.current = false }
   }, [])
 
-  const loadItems = useCallback(async () => {
+  /* 承認・却下の後は fresh：操作より前に始まった読み込み（件数用など）を使い回さない（WEB003）。 */
+  const loadItems = useCallback(async (options: { fresh?: boolean } = {}) => {
     setLoadState('loading')
     try {
       const statuses = ['pending', 'approved', 'rejected'] as const
-      const results = await Promise.all(statuses.map((value) => listAllConversionApprovals(value)))
+      const results = await Promise.all(statuses.map((value) => listAllConversionApprovals(value, 0, { accountId, fresh: options.fresh })))
       if (!mounted.current) return
       setItems(results.flatMap((result) => result.items))
       setTruncatedStatuses(statuses.filter((_, index) => results[index].truncated))
@@ -143,7 +144,7 @@ export default function ApprovalsTab() {
     try {
       const results = await Promise.all(truncatedStatuses.map(async (value) => {
         const already = items.filter((item) => item.approvalStatus === value).length
-        const result = await listAllConversionApprovals(value, already)
+        const result = await listAllConversionApprovals(value, already, { accountId })
         return { status: value, ...result }
       }))
       setItems((current) => {
@@ -167,10 +168,10 @@ export default function ApprovalsTab() {
         ? await api.conversionApprovals.approve(eventId, expectedStatus)
         : await api.conversionApprovals.reject(eventId, expectedStatus)
       if (res.success) {
-        await loadItems()
+        await loadItems({ fresh: true })
       } else if (res.code === 'approval_conflict') {
         setActionError('ほかの人が先に判断しました。一覧を読み直しました。')
-        await loadItems()
+        await loadItems({ fresh: true })
       } else {
         setActionError(res.error ?? `${action === 'approved' ? '承認' : '却下'}できませんでした。通信を確かめて、もう一度お試しください。`)
       }
@@ -190,7 +191,7 @@ export default function ApprovalsTab() {
     setActionError(null)
     try {
       const res = await api.conversionApprovals.bulkDecide(targets.map((item) => ({ id: item.eventId, status: action, expectedStatus: item.approvalStatus })))
-      await loadItems()
+      await loadItems({ fresh: true })
       if (res.success && res.data) {
         const data = res.data
         setBulkResult({ action, ...data })
@@ -201,7 +202,7 @@ export default function ApprovalsTab() {
         setActionError(res.error ?? 'まとめて処理できませんでした')
       }
     } catch (e) {
-      await loadItems()
+      await loadItems({ fresh: true })
       setActionError(e instanceof Error ? e.message : 'まとめて処理できませんでした')
     } finally {
       setBulkConfirm(null)

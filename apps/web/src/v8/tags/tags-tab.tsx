@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性「タグ」タブ（Pencil `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`、
+ * ★V8 タグ「タグ」タブ（Pencil `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`、
  * フォルダ窓 `IjVpM`、状態の板 `U0aKD`）。
  *
  * 動き（読み込み・数の帯・絞り込み・並べ替え・★・フォルダへ移す・フォルダの
@@ -34,7 +34,8 @@ import { useRowLeaving } from '@/lib/use-row-leaving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPageBody } from '@/components/templates'
-import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
+import { FOLDER_COLORS, FOLDER_COLOR_NAMES } from '@/components/shared/folder-add-dialog'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -52,7 +53,7 @@ import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import TagPill from '@/components/shared/tag-pill'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderHandle from '@/components/shared/reorder-handle'
@@ -64,17 +65,26 @@ import {
   FOLDER_FALLBACK_COLOR,
   DeleteTagDialog,
   QUICK_FILTERS,
-  SOURCE_LABELS,
   UNGROUPED,
   cleanupKnown,
   formatDate,
   hasLinkedActions,
   isThisMonth,
   isUnused,
-  sourceLabel,
   usageLabel,
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list.module.css'
+
+/** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
+const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
+  ec: 'EC 連携',
+  line_login: 'LINE ログイン',
+  form: '回答フォーム',
+  ec_purchase: 'EC 購入',
+  manual: '手動',
+  birthday: '誕生日のきまり',
+}
+const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—')
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -155,58 +165,14 @@ function TagFolderDialog({
   }
 
   return (
-    <DetailPanel
-      open
+    <FolderEditorDialog open
       title={group ? 'フォルダを直す' : 'フォルダを追加'}
       description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
-      onClose={onClose}
-      busy={saving}
-      footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
-            キャンセル
-          </Button>
-          <Button variant="primary" type="button" onClick={() => void save()} disabled={saving || !name.trim()}>
-            {saving ? (group ? '保存中…' : '追加中…') : (group ? '保存する' : 'フォルダを作る')}
-          </Button>
-        </>
-      }
-    >
-      <label className={styles.formField}>
-        <span className={styles.formLabel}>
-          フォルダ名 <span className={styles.required}>*</span>
-        </span>
-        <input
-          type="text"
-          autoFocus
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && name.trim()) void save()
-          }}
-          placeholder="例: VIP"
-          className={styles.formInput}
-        />
-      </label>
-      <div className={styles.formField}>
-        <span className={styles.formLabel}>色</span>
-        <div className={styles.colorRow}>
-          {FOLDER_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setColor(c)}
-              aria-label={`色 ${c}`}
-              aria-pressed={color === c}
-              className={styles.colorDot}
-            >
-              <svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="14" fill={c} /></svg>
-            </button>
-          ))}
-        </div>
-      </div>
-      {error ? <p className={styles.formError} role="alert">{error}</p> : null}
-    </DetailPanel>
+      name={name} onNameChange={setName} color={color} onColorChange={(next) => setColor(next ?? FOLDER_COLORS[0])}
+      colors={FOLDER_COLORS.map((value) => ({ value, name: FOLDER_COLOR_NAMES[value] }))}
+      placeholder="例: VIP" busy={saving} error={error || undefined}
+      onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
+    />
   )
 }
 
@@ -600,8 +566,9 @@ export default function TagsTab({
 
   /* フォルダの列。数は一覧と同じものを数える。 */
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: ready ? items.length : null, color: 'var(--color-accent)', icon: <Inbox size={14} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? items.length : null, color: 'var(--color-accent)', icon: <Inbox size={14} aria-hidden="true" /> },
     ...groups.map((group, index) => ({
+      kind: 'folder' as const,
       id: group.id,
       label: group.name,
       count: ready ? items.filter((tag) => tag.groupId === group.id).length : null,
@@ -612,7 +579,7 @@ export default function TagsTab({
       onDelete: canEdit ? () => setDeletingGroup(group) : undefined,
       deleteNote: '削除しても、中のタグは未分類に残ります。',
     })),
-    { id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={14} aria-hidden="true" /> },
+    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={14} aria-hidden="true" /> },
   ]
 
   const folderSelectOptions = [
@@ -707,6 +674,7 @@ export default function TagsTab({
 
   const folderNote = (
     <>
+      {canEdit ? null : <span className={styles.viewerFolderAddSpace} aria-hidden="true" />}
       <p className={styles.folderNote}>フォルダを消しても、中のタグは未分類に残ります</p>
       {folderError ? (
         <p role="alert" className={styles.folderNote}>
@@ -831,13 +799,7 @@ export default function TagsTab({
                           <span className={styles.gripSpace} aria-hidden="true"><GripVertical className={styles.gripIcon} /></span>
                         )}
                       </span>
-                      {narrow ? (
-                        <Link href={editHref} className={styles.name} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
-                      ) : (
-                        <FolderDotName folder={group ? { name: group.name, color: group.color ?? FOLDER_FALLBACK_COLOR } : null}>
-                          <Link href={editHref} className={styles.name} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
-                        </FolderDotName>
-                      )}
+                      <TagPill name={tag.name} color={group?.color} size="sm" href={editHref} />
                       {tag.status === 'archived' ? <span className={styles.miniBadge}>保管済み</span> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
                         <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</span>

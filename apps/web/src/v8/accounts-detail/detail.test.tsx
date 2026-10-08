@@ -33,6 +33,7 @@ vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav a
 vi.mock('@/lib/session-snapshot', () => ({ readSessionSnapshot: () => ({ impersonation: null, unfamiliarAt: null, stepUpMethod: 'totp' }) }))
 
 import AccountDetailV8 from './detail'
+import { CredentialsDialog } from './dialogs'
 import AccountHandoverV8 from './handover'
 import { credentialLine, summaryLine, type AccountDetailView } from './view'
 import { countsLine, handoverPill, totalsMatch } from './handover-view'
@@ -58,12 +59,15 @@ let account: AccountDetailView = ACCOUNT
 let root: Root
 let host: HTMLDivElement
 let sent: Array<{ url: string; method: string; body: unknown; stepUp: string | null }> = []
+/** acc-1 の詳細の応答を遅らせる（読込の世代の試験）。 */
+let gateA: Promise<void> | null = null
 
 beforeEach(() => {
   role = 'owner'
   search = 'id=acc-1'
   account = ACCOUNT
   sent = []
+  gateA = null
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -86,7 +90,11 @@ beforeEach(() => {
         decisions: [{ id: 'd-1', handover_id: 'h-1', from_friend_id: 'f-a', to_friend_id: 'f-b', decision: 'link', bucket: 'review', note: null, decided_by: null, decided_at: '2026-10-01T00:00:00.000Z', sourceName: '高橋 直人', candidateName: '高橋 なおと', evidenceLabel: '電話番号が同じ' }],
       } })
     }
-    if (/\/api\/line-accounts\/acc-1$/.test(url) && method === 'GET') return json({ success: true, data: account })
+    if (/\/api\/line-accounts\/acc-1$/.test(url) && method === 'GET') {
+      if (gateA) await gateA
+      return json({ success: true, data: account })
+    }
+    if (/\/api\/line-accounts\/acc-2$/.test(url) && method === 'GET') return json({ success: true, data: { ...account, id: 'acc-2', channelId: '@nen-honten', name: '然-NEN-本店' } })
     if (/\/api\/line-accounts$/.test(url)) return json({ success: true, data: [account, { ...ACCOUNT, id: 'acc-2', name: '然-NEN-本店' }] })
     if (method !== 'GET') return json({ success: true, data: account })
     if (url.includes('/feature')) return json({ success: true, data: { features: {} } })
@@ -167,6 +175,58 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     const put = sent.find((s) => s.url.endsWith('/api/line-accounts/acc-1'))
     expect(put?.method).toBe('PUT')
     expect(put?.body).toEqual({ channelAccessToken: 'new-token' })
+  })
+
+  it('A で入れかけた資格情報を、表示が B に変わった後で B へ保存しない（WEB132）', async () => {
+    await act(async () => root.render(<AccountDetailV8 />))
+    await settle()
+    await click(buttons('差し替える')[0])
+    const inputs = [...document.querySelectorAll('[role="dialog"] input')] as HTMLInputElement[]
+    await type(inputs[0], 'secret-for-a')
+
+    search = 'id=acc-2'
+    await act(async () => root.render(<AccountDetailV8 />))
+    await settle()
+    expect(document.body.textContent).toContain('@nen-honten')
+    const leftover = buttons('本人確認して保存')[0]
+    if (leftover) await click(leftover)
+    expect(sent.filter((s) => s.method === 'PUT')).toEqual([])
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+
+    // B で開き直すと空の欄から始まる。
+    await click(buttons('差し替える')[0])
+    const fresh = [...document.querySelectorAll('[role="dialog"] input')] as HTMLInputElement[]
+    expect(fresh.map((el) => el.value)).toEqual(['', ''])
+  })
+
+  it('差し替えの窓は対象のアカウントごとに作り直し、A の入力を B へ送らない（WEB132）', async () => {
+    const accountB = { ...ACCOUNT, id: 'acc-2', name: '然-NEN-本店' }
+    await act(async () => root.render(<CredentialsDialog account={ACCOUNT} kind="messaging" onClose={() => {}} onSaved={() => {}} />))
+    await settle()
+    const inputs = [...document.querySelectorAll('[role="dialog"] input')] as HTMLInputElement[]
+    await type(inputs[0], 'secret-for-a')
+    await act(async () => root.render(<CredentialsDialog account={accountB} kind="messaging" onClose={() => {}} onSaved={() => {}} />))
+    await settle()
+    const fresh = [...document.querySelectorAll('[role="dialog"] input')] as HTMLInputElement[]
+    expect(fresh.map((el) => el.value)).toEqual(['', ''])
+    await click(buttons('本人確認して保存')[0])
+    expect(sent.filter((s) => s.method === 'PUT')).toEqual([])
+  })
+
+  it('A の遅い読込は、後から開いた B の画面を上書きしない（WEB132）', async () => {
+    let release: () => void = () => {}
+    gateA = new Promise<void>((resolve) => { release = resolve })
+    await act(async () => root.render(<AccountDetailV8 />))
+    await settle()
+    search = 'id=acc-2'
+    await act(async () => root.render(<AccountDetailV8 />))
+    await settle()
+    expect(document.body.textContent).toContain('@nen-honten')
+
+    await act(async () => { release() })
+    await settle()
+    expect(document.body.textContent).toContain('@nen-honten')
+    expect(document.body.textContent).not.toContain('@nen-test')
   })
 
   it('登録の編集は変えた欄だけ送り、オーナーはタイムゾーンも変えられる（PUT）', async () => {

@@ -12,7 +12,7 @@ import Chip from '@/components/shared/chip'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import Notice from '@/components/shared/notice'
 import Progress from '@/components/shared/progress'
-import Select from '@/components/shared/select'
+import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
 import { formatMediaSize } from './media-usage-display'
@@ -50,6 +50,7 @@ export default function MediaUploadDialog({
   accountId,
   folders,
   initialFolderId,
+  onCreateFolder,
   onClose,
   onComplete,
 }: {
@@ -57,6 +58,8 @@ export default function MediaUploadDialog({
   accountId: string | null
   folders: Folder[]
   initialFolderId: string
+  /** 入れるフォルダを選ぶ欄からその場で作る（dLffh）。閲覧のみは渡さない。 */
+  onCreateFolder?: FolderSelectCreate
   onClose: () => void
   onComplete: () => void
 }) {
@@ -344,10 +347,11 @@ export default function MediaUploadDialog({
 
         <div>
           <label htmlFor={`${inputId}-folder`} className="text-ink-secondary mb-1 block text-xs font-semibold">入れるフォルダ</label>
-          <Select
+          <FolderSelect
             aria-label="入れるフォルダ"
             value={folderId}
-            options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+            folders={folders.map(folderById)}
+            onCreate={onCreateFolder}
             onChange={setFolderId}
           />
         </div>

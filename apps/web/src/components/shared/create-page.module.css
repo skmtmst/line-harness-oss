@@ -41,27 +41,6 @@
   line-height: normal;
 }
 
-/* 戻る行は絵の「← 親へ」（13/600・操作色）。題との間は頭の gap 6。 */
-[data-theme="v8"] .crumb {
-  margin-bottom: 0;
-  font-size: 13px;
-  line-height: 20px;
-}
-
-[data-theme="v8"] .crumb a {
-  color: var(--color-action);
-  font-weight: 600;
-}
-
-[data-theme="v8"] .crumb a::before {
-  content: "← ";
-}
-
-/* 今の題は頭にそのまま出すので、絵にない「/ 今の題」は v8 で畳む。 */
-[data-theme="v8"] .crumb > span {
-  display: none;
-}
-
 /* 択一の札（ChoiceCard）は自前で button を描くので、他の部品と
  * 同じ輪郭（2px・action 色・外側に余白）をキーボードのときだけ出す。 */
 .choice:focus-visible {

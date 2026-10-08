@@ -8,9 +8,8 @@
  * 呼ぶ口：媒体の一覧・送信記録のページ（今と同じ）、断られた1件のやり直し `POST /api/ad-platforms/logs/:id/retry`（F-22・owner）。
  * BEHAVIOR.md の「広告への送信履歴」。
  */
-import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { ArrowLeft, Download, RotateCw } from 'lucide-react'
+import { Download, RotateCw } from 'lucide-react'
 import { api, type AdConversionLog } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
@@ -167,7 +166,6 @@ export default function AdHistoryV8() {
     <div className={adsStyles.board} data-design-node="p0kA3">
       <header className={adsStyles.head}>
         <div className={adsStyles.headText}>
-          <Link href="/inflow-links?tab=connections" className={adsStyles.backLink}><ArrowLeft size={14} aria-hidden="true" />広告とのつなぎへ戻る</Link>
           <h1 className={adsStyles.title}>広告への送信履歴</h1>
           <p className={adsStyles.description}>成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。</p>
         </div>

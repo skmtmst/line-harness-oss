@@ -60,6 +60,8 @@ export type RouteRow = {
   poolId: string | null
   tagId: string | null
   scenarioId: string | null
+  /** 友だちになった直後に送るテンプレート（entry_route のみ）。WEB033。 */
+  introTemplateId: string | null
   /** entry_route のみ意味を持つ（並走／上書き）。他は null。 */
   runAccountFriendAddScenarios: boolean | null
   /** 登録の有効・無効。tracked_link は true、未登録 ref は null。 */
@@ -92,6 +94,7 @@ export function buildRows(
       poolId: r.poolId,
       tagId: r.tagId,
       scenarioId: r.scenarioId,
+      introTemplateId: r.introTemplateId ?? null,
       runAccountFriendAddScenarios: r.runAccountFriendAddScenarios,
       isActive: r.isActive,
       stats: statsByRef.get(r.refCode),
@@ -111,6 +114,7 @@ export function buildRows(
       poolId: null,
       tagId: null,
       scenarioId: tl.scenarioId,
+      introTemplateId: null,
       runAccountFriendAddScenarios: null,
       isActive: true,
       stats: statsByRef.get(tl.id),
@@ -127,6 +131,7 @@ export function buildRows(
       poolId: null,
       tagId: null,
       scenarioId: null,
+      introTemplateId: null,
       runAccountFriendAddScenarios: null,
       isActive: null,
       stats: s,
@@ -151,9 +156,12 @@ export function shouldShowRow(
   return poolRoutesToAccount(row.poolId, selectedAccountId)
 }
 
-/** 友だちになっても何も起きない（タグもシナリオも無い登録済み）経路か。 */
+/**
+ * 友だちになっても何も起きない（タグもシナリオもすぐ送るテンプレートも無い登録済み）経路か。
+ * WEB033：すぐ送るテンプレートだけを設定した経路を「未設定」と数えない。
+ */
 export function isUnconfigured(row: RouteRow): boolean {
-  return !row.scenarioId && !row.tagId && row.source === 'entry_route'
+  return !row.scenarioId && !row.tagId && !row.introTemplateId && row.source === 'entry_route'
 }
 
 export type RouteFilter = 'all' | 'has-friends' | 'no-friends' | 'unconfigured'
@@ -181,13 +189,15 @@ export function sortRows(rows: RouteRow[], sort: RouteSort): RouteRow[] {
 }
 
 /** 「友だちになったら」の2行。絵の「シナリオ／タグ・同時配信なし」の並び。 */
-export function becameLines(row: RouteRow, sc: Scenario | undefined, tag: Tag | undefined): [string, string] {
+export function becameLines(row: RouteRow, sc: Scenario | undefined, tag: Tag | undefined, introTemplateName?: string | null): [string, string] {
   const first = sc ? `シナリオ「${sc.name}」` : '—'
   if (tag) {
     const suffix = row.runAccountFriendAddScenarios === false ? '・同時配信なし' : ''
     return [first, `タグ「${tag.name}」${suffix}`]
   }
   if (sc) return [first, row.runAccountFriendAddScenarios === false ? '同時配信なし' : '—']
+  // WEB033：すぐ送るテンプレートだけのときは「何も付けない」と言わない。
+  if (row.introTemplateId) return ['—', introTemplateName ? `テンプレート「${introTemplateName}」を送る` : 'テンプレートを送る']
   return ['—', '何も付けない']
 }
 

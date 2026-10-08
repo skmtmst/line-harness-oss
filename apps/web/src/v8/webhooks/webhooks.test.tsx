@@ -18,8 +18,9 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/webhooks',
   useSearchParams: () => new URLSearchParams(search),
 }))
+let accountId = 'account-a'
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', name: '本店' }, accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
+  useAccount: () => ({ selectedAccountId: accountId, selectedAccount: { id: accountId, name: accountId === 'account-a' ? '本店' : '支店' }, accounts: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '支店' }], loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
@@ -47,6 +48,7 @@ let host: HTMLDivElement
 let posted: Array<{ url: string; body: unknown }> = []
 
 beforeEach(() => {
+  accountId = 'account-a'
   role = 'owner'
   search = ''
   posted = []
@@ -168,5 +170,30 @@ describe('外部連携 V8', () => {
     expect(maskedUrl('https://crm.example.com/line/hook?token=x')).toBe('https://crm.example.com/••••')
     expect(eventLabel(['friend_add', 'tag_change'])).toBe('友だちになった・タグが付いた')
     expect(eventLabel(['friend_add', 'tag_change', 'booking_created'])).toBe('友だちになった・タグが付いた ほか1件')
+  })
+
+  // 監査 WEB-024：切り替えの返事が来る前にアカウントを移っても、仮の表示（止めた）を残さない。
+  it('切り替え中にアカウントを移り、失敗が返ったあと戻ると、サーバーの状態（動いている）を出す', async () => {
+    const base = globalThis.fetch
+    let rejectToggle: (reason: unknown) => void = () => {}
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method && init.method !== 'GET' && String(input).includes('/api/webhooks/incoming/in-1')) {
+        return new Promise((_, reject) => { rejectToggle = reject })
+      }
+      return base(input, init)
+    })
+    await render(<WebhooksIncomingV8 />)
+    const toggle = () => host.querySelector('[role="switch"]') as HTMLElement | null
+    expect(toggle()?.getAttribute('aria-checked')).toBe('true')
+    await act(async () => { toggle()!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(toggle()?.getAttribute('aria-checked')).toBe('false')
+
+    accountId = 'account-b'
+    await render(<WebhooksIncomingV8 />)
+    await act(async () => { rejectToggle(new TypeError('network')) })
+    accountId = 'account-a'
+    await render(<WebhooksIncomingV8 />)
+    await act(async () => {})
+    expect(toggle()?.getAttribute('aria-checked')).toBe('true')
   })
 })

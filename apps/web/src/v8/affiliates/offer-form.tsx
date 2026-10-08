@@ -60,13 +60,22 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
   const [terms, setTerms] = useState<OfferTermsFieldValues>(EMPTY_TERMS)
   const [termsBase, setTermsBase] = useState<ParsedOfferTerms | null>(null)
   const [termsLoaded, setTermsLoaded] = useState(!initial)
+  /* WEB207：決まりの読み込みが失敗したことを黙らない。読み直せる。 */
+  const [termsFailed, setTermsFailed] = useState(false)
+  const [termsAttempt, setTermsAttempt] = useState(0)
 
   useEffect(() => {
     if (!initial) return
     let cancelled = false
+    setTermsFailed(false)
     void api.affiliateOffers.capStatus(initial.id)
       .then((res) => {
-        if (cancelled || !res.success || !res.data) return
+        if (cancelled) return
+        if (!res.success || !res.data) {
+          setTermsLoaded(false)
+          setTermsFailed(true)
+          return
+        }
         const version = res.data.version
         const base: ParsedOfferTerms = {
           windowDays: version?.windowDays ?? 30,
@@ -88,12 +97,15 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
       })
       .catch(() => {
         // 決まりが読めなくても、名前・報酬の編集はできる。決まりの差分は送らない。
-        if (!cancelled) setTermsLoaded(false)
+        if (!cancelled) {
+          setTermsLoaded(false)
+          setTermsFailed(true)
+        }
       })
     return () => {
       cancelled = true
     }
-  }, [initial])
+  }, [initial, termsAttempt])
 
   // 選べるタグ・シナリオは「いま選んでいるLINEアカウントの有効なもの」だけに
   // 絞る（#798）。別アカウントのものを選ばせると保存時にサーバーが止める。
@@ -276,7 +288,13 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
           <p className="text-ink-faint mt-1 text-micro">承認された紹介1件ごとに紹介者へ付与します</p>
         </div>
 
-        <OfferTermsFields values={terms} onChange={setTerms} />
+        {isEdit && termsFailed ? (
+          <p className="text-ink-secondary text-xs" role="status">
+            数える期間・上限・受付の期間を読み込めませんでした。このまま保存しても、これらは変わりません。{' '}
+            <button type="button" className="font-semibold underline" onClick={() => setTermsAttempt((n) => n + 1)}>読み直す</button>
+          </p>
+        ) : null}
+        <OfferTermsFields values={terms} onChange={setTerms} disabled={isEdit && !termsLoaded} />
 
         <div>
           <label className="text-ink-secondary mb-1 block text-xs font-medium">誘導 LINE アカウント</label>

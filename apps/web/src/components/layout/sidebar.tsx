@@ -90,7 +90,7 @@ const HQ_UNAVAILABLE_DISTRIBUTION_HREFS = new Set([
 //
 // 行き先（href）は実装側の都合で決まる。設計は画面の名前しか持たないので、
 // 「設計の名前 → 実装のルート」の対応をここで引き受けている。
-// 例: 設計の「受信箱」は実装の /chats、「友だち属性」は /tags。
+// 例: 設計の「受信箱」は実装の /chats、「タグ」は /tags。
 //
 // 設計に無い画面（重複検出、プール管理など）は、対応する画面のタブとして
 // 中に入っている。サイドバーから消しても行けなくならない。
@@ -165,7 +165,7 @@ export default function Sidebar({
    */
   const isV8 = useAdminTheme() === 'v8'
   /*
-   * V2 の友だち属性モード（移行中だけの特別な形）で組を丸ごと隠すのは
+   * V2 のタグモード（移行中だけの特別な形）で組を丸ごと隠すのは
    * V8 では真似しない（MIGRATION-RISKS §1-2）。V8 では組の見出しは常に出て、
    * 中身の開閉だけが変わる。
    */
@@ -413,7 +413,7 @@ export default function Sidebar({
          */
         if (isHq && !isV8 && !HQ_TEMPLATE_DISTRIBUTION_ENABLED && HQ_UNAVAILABLE_DISTRIBUTION_HREFS.has(item.href)) return false
         if (isHq) return true
-        // 移行中のV2画面では、承認画像どおり「友だち属性」を1行だけ出す。
+        // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
         if (attrV2Mode && item.href === '/tags') return false
         if (attrV2Mode && item.href === '/conversions') return false

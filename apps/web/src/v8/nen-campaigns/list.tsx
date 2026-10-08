@@ -9,6 +9,7 @@
  * 表は「見出し 36・行 56」の同じ物差しで並べる（タブを替えても表の頭が動かない）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useRouter } from 'next/navigation'
 import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
@@ -83,6 +84,8 @@ export type NenCampaignsListProps = {
   settings: NenCampaignSetting[]
   columns: NenColumn[]
   columnsTotal: number | null
+  /** WEB231：200本より先のコラムを読む。渡されたときだけ「続きを読み込む」を出す。 */
+  onLoadMoreColumns?: () => Promise<void>
   kpis: NenKpis | null
   flowMetrics: NenFlowMetrics | null
   columnMetrics: NenColumnMetrics | null
@@ -298,6 +301,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
 type AutoFilter = '' | 'follow_up' | 'birthday' | 'off'
 
 function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings: NenCampaignSetting[]; sentByKey: Map<string, number>; pausedOnly: boolean }) {
+  const router = useRouter()
   const { autoSettings, sentByKey, pausedOnly, canEdit, kpis } = props
   const tabError = props.tabError ?? ''
   const [query, setQuery] = useState('')
@@ -341,7 +345,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
 
   const menuFor = (setting: NenCampaignSetting): ActionMenuItem[] => {
     const items: ActionMenuItem[] = []
-    if (canEdit) items.push({ id: 'edit', label: '編集', external: true, onSelect: () => { window.location.href = `/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}` } })
+    if (canEdit) items.push({ id: 'edit', label: '編集', external: true, onSelect: () => { router.push(`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`) } })
     items.push({ id: 'preview', label: '中身を見る', onSelect: () => props.onPreviewCampaign(setting.campaignKey) })
     if (canEdit) {
       items.push({ id: 'test', label: 'テスト送信', disabled: props.testing !== null, onSelect: () => props.onTestSend(setting) })
@@ -739,7 +743,12 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
           <Pager total={visible.length} page={safePage} size={pageSize} onPage={setPage} />
           {props.columnsTotal != null && props.columnsTotal > columns.length ? (
             <div className={styles.noteRow}>
-              <Notice tone="warn" message={`コラムは${formatNumber(props.columnsTotal)}本ありますが、${columns.length}本までしか読み込んでいません。探すときは検索を使ってください。`} />
+              {/* WEB231：検索は読み込んだ分の中だけで探す。続きを読み込めるようにし、検索を勧めない。 */}
+              <Notice
+                tone="warn"
+                message={`コラムは${formatNumber(props.columnsTotal)}本ありますが、${columns.length}本までしか読み込んでいません。検索・絞り込みは読み込んだ分の中で探します。`}
+                action={props.onLoadMoreColumns ? <LoadMoreColumnsButton onLoadMore={props.onLoadMoreColumns} /> : undefined}
+              />
             </div>
           ) : null}
           <p className={styles.hint}>{canEdit ? '行の「…」から この内容で予約する・複製・テスト送信。' : '行の「…」から 中身を見る。'}</p>
@@ -747,6 +756,24 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
       )}
       <SelectedColumn {...props} />
     </div>
+  )
+}
+
+/** WEB231：コラムの続きを読み込むボタン。読んでいる間は押せない。失敗は理由を出す。 */
+function LoadMoreColumnsButton({ onLoadMore }: { onLoadMore: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  return (
+    <>
+      <Button type="button" disabled={busy} busy={busy} onClick={() => {
+        setBusy(true)
+        setFailed(false)
+        void onLoadMore().catch(() => setFailed(true)).finally(() => setBusy(false))
+      }}>
+        続きを読み込む
+      </Button>
+      {failed ? <span role="alert">続きを読み込めませんでした。</span> : null}
+    </>
   )
 }
 

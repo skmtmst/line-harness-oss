@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, type InputHTMLAttributes, type ReactNode } fr
 import styles from './checkbox.module.css'
 
 /**
- * チェックボックス。Pencil ★V7 `gvjpx`「★ V7 共通 チェックボックス」。
+ * チェックボックス。Pencil ★V8 `dQCCN`・`S9U7v`「チェック/オン・オフ」。
  *
  * 一覧の選択・すぐ反映しない設定の ON/OFF に使う。すぐ反映する切替は `Toggle`。
  * 形の手本は kobra.systems の Checkbox（コードは写していない）。
@@ -14,7 +14,7 @@ import styles from './checkbox.module.css'
  * - 未選択の枠は `$ink-faint`（白地と 4.8:1）。`$hairline` は 1.4:1 で、部品の見分けに要る 3:1 に届かない
  * - `indeterminate`（一部選択）は一覧の見出しの「表示中をすべて選ぶ」に使う
  * - 文字（children）を押しても切り替わる。文字が無いときは `aria-label` を必ず渡す
- * - 動きは Pencil ★V7「チェックボックス 動き」（V7 文書 `HO3V6`）。印は一筆で描かれ、
+ * - 動きは Pencil ★V8 の動きの表 `NF3uI`。印は一筆で描かれ、
  *   外すときは描き戻さずに薄くなって消える。印の線は `pathLength=1` にして、
  *   CSS が長さを知らなくても 0→1 で描けるようにしている
  */

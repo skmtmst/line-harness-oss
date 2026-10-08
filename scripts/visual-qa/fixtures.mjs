@@ -2540,7 +2540,7 @@ export const FRIEND_MESSAGES = {
     },
     {
       id: 'msg-k2', friendId: 'friend-0', direction: 'outgoing', messageType: 'text',
-      content: 'お問い合わせありがとうございます。秋の新商品は 10月4日から発送します。定期便への追加は、このトークで『追加』と送っていただくだけで大丈夫です。', createdAt: '2026-08-19T01:20:00.000Z',
+      content: 'お問い合わせありがとうございます。秋の新商品は\n10月4日から発送します。定期便への追加は、このトークで『追加』と送っていただくだけで大丈夫です。', createdAt: '2026-08-19T01:20:00.000Z',
       broadcastId: null, scenarioStepId: null, source: 'manual', scenarioName: null, sentByStaffName: 'Kenta',
     },
     {
@@ -2629,8 +2629,32 @@ export const FRIEND_MILEAGE = {
  * 会話を開くたびに「もう一度試す」だけの画面になっていた。
  */
 export const FRIEND_DETAILS = {
+  /*
+   * 受信箱で最初に開く会話（Kyohei Yamamoto・chat-0）の右の欄（★V8 M0393 XqSvX「その人の要点」）。
+   * 無いと右の欄が「名前なし・友だち追加日は未登録・ブロック済」になり、絵と並べられない。
+   */
+  'friend-0': {
+    id: 'friend-0',
+    // 実口 GET /api/friends/:id と同じく所属アカウントを返す。無いと受信箱が「別アカウントの相手」と判断して会話を開かない(#673)。
+    lineAccountId: 'visual-qa-account',
+    displayName: 'Kyohei Yamamoto',
+    systemDisplayName: 'Kyohei Yamamoto',
+    realName: '山本 恭平',
+    pictureUrl: null,
+    isFollowing: true,
+    createdAt: '2025-08-13T15:00:00.000Z',
+    metadata: {},
+    tags: [
+      { id: 'friend-tag-teiki-proposal', name: '定期便の提案', color: '#8B938D', createdAt: '2025-08-14T00:00:00.000Z' },
+      { id: 'friend-tag-uncontracted', name: '未契約', color: '#8B938D', createdAt: '2025-08-14T00:00:00.000Z' },
+    ],
+    formSubmissions: [],
+    formSubmissionTotal: 0,
+  },
   'friend-1': {
     id: 'friend-1',
+    // 実口 GET /api/friends/:id と同じく所属アカウントを返す。無いと受信箱が「別アカウントの相手」と判断して会話を開かない(#673)。
+    lineAccountId: 'visual-qa-account',
     displayName: 'Kenta Kawano (Obama)',
     systemDisplayName: 'Kenta Kawano (Obama)',
     realName: '河野 健太',
@@ -6339,6 +6363,9 @@ export const BOOKING_CONFLICT_ALTERNATIVES = BOOKING_PROXY_CREATE.conflict.body.
 export const BOOKING_ADMIN_DETAIL = {
   booking: {
     id: 'bk-1', startsAt: '2026-09-03T00:00:00.000Z', endsAt: '2026-09-03T01:45:00.000Z', status: 'confirmed',
+    staffId: 'bs-1', menuId: 'bm-1', lockVersion: 1,
+    notificationPolicy: { send_line_confirmation: true, day_before: true, hours_before: true },
+    auditLogTotal: 0, auditLogs: [],
     customerNote: '顔まわりはふんわり仕上げてください。', internalNote: '皮膚の赤みに注意。', price: 8400,
     requestedAt: '2026-09-02T02:00:00.000Z', decidedAt: '2026-09-02T02:05:00.000Z', source: 'liff',
     createdByStaffId: 'visual-qa-owner', calendarSync: 'synced', menuName: 'トリミング（小型犬）', staffName: '佐々木',
@@ -8220,7 +8247,7 @@ const bannerImage = (n, projectId, generation, { favorite = false, delivered = [
     id: `banner-image-qa-${n}`, projectId, generationId: generation?.id ?? null,
     sequence: n, source: generation ? 'generated' : 'upload', parentImageId: null, isFavorite: favorite,
     createdBy: '高橋 直人', createdAt: created,
-    media: { id: `banner-media-qa-${n}`, filename: `banner-${n}.png`, mimeType: 'image/png', sizeBytes: 184320, width: w, height: h, url: `https://example.invalid/banners/banner-${n}.png` },
+    media: { id: `banner-media-qa-${n}`, filename: `banner-${n}.png`, mimeType: 'image/png', sizeBytes: 184320, width: w, height: h, url: mediaPreview(n % 2 ? '#f3e9dc' : '#e7f7ef') },
     generation,
     deliveredAccountIds: delivered,
   }

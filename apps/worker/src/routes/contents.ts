@@ -1,3 +1,4 @@
+import { mediaTabCounts } from '../services/tab-counts.js';
 import { Hono, type Context } from 'hono';
 import {
   getMedia,
@@ -859,6 +860,20 @@ contents.post(
     }
   },
 );
+
+contents.get('/api/media/counts', async (c) => {
+  const accountId = c.req.query('accountId')?.trim();
+  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  try {
+    return c.json({ success: true, data: await mediaTabCounts(c.env.DB, accountId) });
+  } catch (err) {
+    console.error('GET /api/media/counts error:', err);
+    return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
+  }
+});
 
 contents.get('/api/media', async (c) => {
   try {

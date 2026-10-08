@@ -161,7 +161,8 @@ export function inputTypeLabel(block: FormInputBlock): string {
   if (block.type === 'text') {
     const format = block.limit?.format
     if (format === 'time') return '時刻'
-    if (format === 'email' || format === 'tel') return 'メール・電話'
+    if (format === 'email') return 'メール'
+    if (format === 'tel') return '電話'
   }
   return INPUT_TYPE_LABEL[block.type]
 }
@@ -195,7 +196,10 @@ const input = (type: FormInputType, patch: Partial<FormInputBlock> = {}) => (cou
   return { ...block, ...patch }
 }
 
-/** 足す欄の4組（J1pdB・ijxur・ITBAB）。 */
+/**
+ * 足す欄の4組（J1pdB・ijxur・ITBAB）。
+ * メール・電話・住所・日付・時刻・ファイルは、足したときに質問文へその名前を入れておく（オーナー 2026-10-08：空のままだと何の欄か分からない）。
+ */
 export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
   { title: '選んでもらう', cards: [
     { key: 'radio', label: 'ラジオボタン', hint: '1つだけ選ぶ', make: input('radio') },
@@ -206,14 +210,16 @@ export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
   { title: '書いてもらう', cards: [
     { key: 'text', label: '1行で書く', hint: '名前・会員番号など', make: input('text') },
     { key: 'textarea', label: '自由に書く', hint: '複数行のフリーテキスト', make: input('textarea') },
-    { key: 'contact', label: 'メール・電話', hint: '形をチェックする', make: input('text', { limit: { format: 'email' } }) },
-    { key: 'address', label: '住所', hint: '郵便番号から自動で', make: input('address') },
+    // メールと電話は分ける（オーナー 2026-10-08：「メールアドレスと電話番号を分けよう」）。
+    { key: 'contact', label: 'メール', hint: 'メールの形をチェック', make: input('text', { label: 'メールアドレス', limit: { format: 'email' } }) },
+    { key: 'tel', label: '電話', hint: '番号の形をチェック', make: input('text', { label: '電話番号', limit: { format: 'tel' } }) },
+    { key: 'address', label: '住所', hint: '郵便番号から自動で', make: input('address', { label: '住所' }) },
   ] },
   { title: '日にち・予約', cards: [
-    { key: 'date', label: '日付', hint: 'カレンダーで選ぶ', make: input('date') },
-    { key: 'time', label: '時刻', hint: '時計で選ぶ', make: input('text', { limit: { format: 'time' } }) },
+    { key: 'date', label: '日付', hint: 'カレンダーで選ぶ', make: input('date', { label: '日付' }) },
+    { key: 'time', label: '時刻', hint: '時計で選ぶ', make: input('text', { label: '時刻', limit: { format: 'time' } }) },
     { key: 'booking', label: '予約を入れる', hint: '空いている枠から選ぶ', fresh: true, make: input('booking', { booking: null }) },
-    { key: 'file', label: 'ファイル', hint: '写真・書類を送る', make: input('file') },
+    { key: 'file', label: 'ファイル', hint: '写真・書類を送る', make: input('file', { label: 'ファイル' }) },
   ] },
   { title: '飾り', cards: [
     { key: 'image', label: '画像', hint: 'ロゴ・写真', make: () => makeFormBlock('image') },

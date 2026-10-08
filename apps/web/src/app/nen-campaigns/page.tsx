@@ -50,11 +50,23 @@ function isTab(value: string | null): value is NenTab {
 export default function NenCampaignsPage() {
   usePageTitle('NEN配信')
   const { selectedAccountId } = useAccount()
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
   const [tab, setTab] = useState<NenTab>('auto')
   const [settings, setSettings] = useState<NenCampaignSetting[]>([])
   const [columns, setColumns] = useState<NenColumn[]>([])
   // コラム一覧は口の既定200件で打ち切られる。全体件数を保持し、一覧へ出す（#935 N-300）。
   const [columnsTotal, setColumnsTotal] = useState<number | null>(null)
+  /* WEB231（V8）：200本より先のコラムを続けて読む。アカウントが変わったら足さない。 */
+  const loadMoreColumns = async () => {
+    if (!selectedAccountId) return
+    const accountId = selectedAccountId
+    const res = await api.nenCampaigns.columns(accountId, { offset: columns.length, limit: 200 })
+    if (!res.success) throw new Error('load_more_failed')
+    if (accountId !== selectedAccountIdRef.current) return
+    setColumns((current) => [...current, ...res.data.filter((item) => !current.some((known) => known.id === item.id))])
+    setColumnsTotal(res.pagination?.total ?? columnsTotal)
+  }
   const [friends, setFriends] = useState<FriendOption[]>([])
   const [kpis, setKpis] = useState<NenKpis | null>(null)
   const [flowMetrics, setFlowMetrics] = useState<NenFlowMetrics | null>(null)
@@ -457,33 +469,66 @@ export default function NenCampaignsPage() {
       : null
 
   /*
+   * #935 N-301: 紹介文の入力途中で画面を離れる／別コラムへ移るときの確認。
+   * v7・v8 のどちらの見た目でも同じ確認を出す（v8 にだけ無く、移動が黙って止まっていた：監査 WEB-315）。
+   */
+  const leaveDialogs = (
+    <>
+      <UnsavedLeaveDialog
+        open={leaveTarget !== null}
+        subject="入力した紹介文"
+        cancelLabel="書き続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
+      <ConfirmDialog
+        open={pendingColumnSelect !== null}
+        title="入力した紹介文が保存されていません"
+        description="このまま別のコラムへ移ると、入力した紹介文は消えます。移りますか？"
+        confirmLabel="保存せずに移る"
+        cancelLabel="書き続ける"
+        onConfirm={() => {
+          const target = pendingColumnSelect
+          setPendingColumnSelect(null)
+          if (target) setSelectedColumnId(target.id)
+        }}
+        onCancel={() => setPendingColumnSelect(null)}
+      />
+    </>
+  )
+
+  /*
    * ★V8-B：data-theme="v8" のときだけ新しいNEN配信画面
    * （src/v8/nen-campaigns/list.tsx：MuhWR・Jxmqh・Tj7n4・oqSJP）へ切り替える。v7 の見た目はそのまま。
    * 取得・保存の持ち方は変えない（page.tsx が持ったまま）。
    */
   if (theme === 'v8') {
     return (
-      <NenCampaignsV8
-        topAction={headerAction}
-        tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
-        tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
-        kpisFailed={kpis === null && (tabErrors.auto !== '' || tabErrors.columns !== '' || tabErrors.paused !== '')}
-        flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
-        friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId}
-        loading={loading} notice={notice}
-        saving={saving} testing={testing}
-        previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}
-        onToggleSetting={(setting) => void toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
-        coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
-        selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
-        columnsTotal={columnsTotal}
-        plan={plan} onPlanChange={setPlan}
-        introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
-        onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
-        onDuplicateColumn={(column) => void duplicateColumn(column)} duplicatingColumnId={duplicatingColumnId} onTestColumn={(column) => void testColumn(column)}
-        onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
-        onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
-      />
+      <>
+        <NenCampaignsV8
+          topAction={headerAction}
+          tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
+          tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
+          kpisFailed={kpis === null && (tabErrors.auto !== '' || tabErrors.columns !== '' || tabErrors.paused !== '')}
+          flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
+          friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId}
+          loading={loading} notice={notice}
+          saving={saving} testing={testing}
+          previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}
+          onToggleSetting={(setting) => void toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
+          coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
+          selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
+          columnsTotal={columnsTotal}
+          onLoadMoreColumns={loadMoreColumns}
+          plan={plan} onPlanChange={setPlan}
+          introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
+          onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
+          onDuplicateColumn={(column) => void duplicateColumn(column)} duplicatingColumnId={duplicatingColumnId} onTestColumn={(column) => void testColumn(column)}
+          onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
+          onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
+        />
+        {leaveDialogs}
+      </>
     )
   }
 
@@ -515,27 +560,7 @@ export default function NenCampaignsPage() {
         onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
         onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
       />
-      {/* #935 N-301: 紹介文の入力途中で画面を離れる／別コラムへ移るときの確認。 */}
-      <UnsavedLeaveDialog
-        open={leaveTarget !== null}
-        subject="入力した紹介文"
-        cancelLabel="書き続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
-      <ConfirmDialog
-        open={pendingColumnSelect !== null}
-        title="入力した紹介文が保存されていません"
-        description="このまま別のコラムへ移ると、入力した紹介文は消えます。移りますか？"
-        confirmLabel="保存せずに移る"
-        cancelLabel="書き続ける"
-        onConfirm={() => {
-          const target = pendingColumnSelect
-          setPendingColumnSelect(null)
-          if (target) setSelectedColumnId(target.id)
-        }}
-        onCancel={() => setPendingColumnSelect(null)}
-      />
+      {leaveDialogs}
     </>
   )
 }

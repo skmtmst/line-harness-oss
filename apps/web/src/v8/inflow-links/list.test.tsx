@@ -148,4 +148,53 @@ describe('V8 流入と計測の一覧', () => {
     expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeFalsy()
     expect(host.querySelector('[aria-label="夏のInstagram投稿をまとめて操作の対象にする"]')).toBeNull()
   })
+
+  it('WEB032: 一覧を読み直しても、遅れて届いた候補（タグ名）を捨てない', async () => {
+    let routeCalls = 0
+    let releaseTags: () => void = () => undefined
+    const tagsReady = new Promise<void>((resolve) => { releaseTags = resolve })
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/api/entry-routes') {
+        routeCalls += 1
+        if (routeCalls === 1) return new Response(JSON.stringify({ success: false, error: 'down' }), { status: 503 })
+        return json({ success: true, data: ROUTES })
+      }
+      if (url.pathname === '/api/entry-route-genres') return json({ success: true, data: [] })
+      if (url.pathname === '/api/analytics/ref-summary') return json({ success: true, data: SUMMARY })
+      if (url.pathname === '/api/tracked-links') return json({ success: true, data: [] })
+      if (url.pathname === '/api/tags') {
+        await tagsReady
+        return json({ success: true, data: [{ id: 'tag-1', name: 'インスタ札' }] })
+      }
+      return json({ success: true, data: [] })
+    })
+    await render()
+    const retry = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('もう一度'))
+    expect(retry).toBeTruthy()
+    await act(async () => { retry!.click() })
+    for (let i = 0; i < 4; i += 1) await act(async () => {})
+    await act(async () => { releaseTags() })
+    for (let i = 0; i < 6; i += 1) await act(async () => {})
+    expect(rowOf('summer-ig')?.textContent).toContain('インスタ札')
+  })
+
+  it('WEB034（対照）: オーナーにはフォルダを追加がある', async () => {
+    await render()
+    expect([...host.querySelectorAll('button')].some((el) => (el.textContent ?? '').includes('フォルダを追加'))).toBe(true)
+  })
+
+  it('WEB034: 「流入」を任された staff には作る・編集を出し、フォルダの作成は出さない', async () => {
+    role.value = 'staff'
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => (key === 'lh_staff_permissions' ? JSON.stringify(['/inflow-links']) : key === 'lh_staff_role' ? 'staff' : null),
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    })
+    await render()
+    expect(host.textContent).not.toContain('閲覧のみで見ています')
+    expect([...host.querySelectorAll('a, button')].some((el) => el.textContent?.includes('流入リンクを作る'))).toBe(true)
+    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeTruthy()
+    expect([...host.querySelectorAll('button')].some((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').includes('フォルダを追加'))).toBe(false)
+  })
 })

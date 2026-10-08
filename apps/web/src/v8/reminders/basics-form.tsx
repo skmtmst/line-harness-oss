@@ -8,6 +8,8 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import Card from '@/components/shared/card'
 import { ChoiceCardV8 } from './ui'
@@ -166,6 +168,8 @@ export function ReminderBasicsFormV8({
   onEventsReady: (events: EventListItem[], state: 'loading' | 'ready' | 'error') => void
 }) {
   const { selectedAccountId } = useAccount()
+  const staffRole = useStaffRole()
+  const canCreateFolder = staffRole === null || canManageRole(staffRole)
   const [dateFields, setDateFields] = useState<FriendField[]>([])
   const [fieldsLoadState, setFieldsLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [events, setEvents] = useState<EventListItem[]>([])
@@ -268,16 +272,18 @@ export function ReminderBasicsFormV8({
           <div className={styles.field}>
             <span className={styles.label}>フォルダ</span>
             <div className={styles.testRow}>
-              <Select
+              <FolderSelect
                 value={value.folderId}
                 onChange={(next) => patch({ folderId: next })}
                 disabled={foldersLoadState !== 'ready'}
                 aria-label="フォルダ"
                 size="full"
-                options={[
-                  { value: '', label: foldersLoadState === 'loading' ? 'フォルダを読み込み中' : foldersLoadState === 'error' ? 'フォルダを読み込めませんでした' : '未分類' },
-                  ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-                ]}
+                unfiled={{ value: '', label: foldersLoadState === 'loading' ? 'フォルダを読み込み中' : foldersLoadState === 'error' ? 'フォルダを読み込めませんでした' : '未分類' }}
+                folders={folders.map(folderById)}
+                // 一覧の左の列の「フォルダを追加」と同じ口（リマインダのフォルダは共有）。
+                onCreate={canCreateFolder
+                  ? folderCreator((name, color) => api.folders.create({ kind: 'reminder', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+                  : undefined}
               />
               {foldersLoadState === 'error' ? (
                 <Button onClick={() => setFoldersReloadToken((current) => current + 1)}>再読み込み</Button>

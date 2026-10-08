@@ -36,10 +36,10 @@ const LEGACY = browserDraftKey(['scenario-create', 'account-a', 'sc-1'])
 const V1 = '11111111-1111-4111-8111-111111111111'
 const V2 = '22222222-2222-4222-8222-222222222222'
 const V3 = '33333333-3333-4333-8333-333333333333'
-type Props = { value: string; baseline: string; active?: boolean; draftKey?: string | null }
+type Props = { value: string; baseline: string; active?: boolean; draftKey?: string | null; accountId?: string }
 let hook: ReturnType<typeof useScenarioDraft<string>> | null = null
-function Harness({ value, baseline, active = true, draftKey = KEY }: Props) {
-  hook = useScenarioDraft({ accountId: 'account-a', draftKey, scenarioId: 'sc-1', legacyKey: LEGACY, value, baseline, active })
+function Harness({ value, baseline, active = true, draftKey = KEY, accountId = 'account-a' }: Props) {
+  hook = useScenarioDraft({ accountId, draftKey, scenarioId: 'sc-1', legacyKey: LEGACY, value, baseline, active })
   return null
 }
 
@@ -221,5 +221,65 @@ describe('useScenarioDraft', () => {
     expect(newScenarioDraftKey('account-a')).toBe(first)
     forgetNewScenarioDraftKey('account-a')
     expect(newScenarioDraftKey('account-a')).not.toBe(first)
+  })
+
+  // 監査 WEB-020：切り替える前のアカウントの読みが遅れて返っても、今のアカウントの版にしない。
+  it('アカウント A の読みが B へ切り替えたあとに返っても、B の下書きは版0で作る', async () => {
+    let resolveA: (value: unknown) => void = () => {}
+    get.mockImplementation((account: string) => account === 'account-a'
+      ? new Promise((resolve) => { resolveA = resolve })
+      : notFound())
+    await render({ value: '', baseline: '', accountId: 'account-a' })
+    await render({ value: '', baseline: '', accountId: 'account-b' })
+    await advance(0)
+    await act(async () => { resolveA({ success: true, data: draft('A の入力', V1) }) })
+    await advance(0)
+    save.mockResolvedValueOnce({ success: true, data: draft('B の入力', V2) })
+    await render({ value: 'B の入力', baseline: '', accountId: 'account-b' })
+    await advance(2100)
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save).toHaveBeenLastCalledWith('account-b', KEY, expect.objectContaining({ expectedVersion: 0, content: { value: 'B の入力' } }))
+  })
+
+  // 監査 WEB-021：保存の途中で「捨てる」を押したら、遅れた 409 のあとに下書きを作り直さない。
+  it('保存中に捨てると、遅れた 409 のあと読み直しも版0での作り直しもしない', async () => {
+    save.mockResolvedValueOnce({ success: true, data: draft('春', V1) })
+    await render({ value: '', baseline: '' })
+    await advance(0)
+    await render({ value: '春', baseline: '' })
+    await advance(2100)
+    expect(save).toHaveBeenCalledTimes(1)
+
+    let rejectSecond: (reason: unknown) => void = () => {}
+    save.mockImplementationOnce(() => new Promise((_, reject) => { rejectSecond = reject }))
+    await render({ value: '春の', baseline: '' })
+    await advance(2100)
+    expect(save).toHaveBeenCalledTimes(2)
+    act(() => hook?.clear())
+    expect(del).toHaveBeenCalledWith('account-a', KEY, V1)
+    get.mockClear()
+    await act(async () => { rejectSecond(new ApiError(409, 'version_conflict', 'version_conflict')) })
+    await advance(0)
+    expect(get).not.toHaveBeenCalled()
+    expect(save).toHaveBeenCalledTimes(2)
+  })
+
+  it('保存中に捨てたあと保存が通ってしまったら、できた下書きをその版で消す', async () => {
+    save.mockResolvedValueOnce({ success: true, data: draft('春', V1) })
+    await render({ value: '', baseline: '' })
+    await advance(0)
+    await render({ value: '春', baseline: '' })
+    await advance(2100)
+
+    let resolveSecond: (value: unknown) => void = () => {}
+    save.mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve }))
+    await render({ value: '春の', baseline: '' })
+    await advance(2100)
+    act(() => hook?.clear())
+    del.mockClear()
+    await act(async () => { resolveSecond({ success: true, data: draft('春の', V2) }) })
+    await advance(0)
+    expect(del).toHaveBeenCalledWith('account-a', KEY, V2)
+    expect(hook?.label).not.toBe(AUTOSAVE_WORDS.saved('0秒前'))
   })
 })

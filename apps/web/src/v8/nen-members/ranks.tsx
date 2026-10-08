@@ -144,7 +144,7 @@ export default function RankSettingsV8({
       setComparing(false)
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced'
-        ? 'ランク設定を保存し、ECへ同期しました。友だち属性のタグも付け替えています。'
+        ? 'ランク設定を保存し、ECへ同期しました。タグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
       /* 保存の口が版の違いを 409 で返したときも、競合の帯へ（e5yBLx）。 */
@@ -308,7 +308,7 @@ export default function RankSettingsV8({
               const isBase = index === drafts.length - 1 && parseYen(row.threshold) === 0
               const label = row.name.trim() || `ランク ${index + 1}`
               return (
-                <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={row.tagName ? `友だち属性タグ：${row.tagName}・会員 ${formatNumber(row.memberCount)} 人` : undefined}>
+                <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={row.tagName ? `タグ：${row.tagName}・会員 ${formatNumber(row.memberCount)} 人` : undefined}>
                   <div className={styles.rankColName}>
                     <TextField aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} />
                   </div>
@@ -326,7 +326,7 @@ export default function RankSettingsV8({
                     {/* 行の右端は「…」（タグを開く・ランクを削除する）。1つの機能の印にしない。 */}
                     <RowActions
                       subjectName={`ランク「${label}」`}
-                      menuItems={row.tagId ? [{ id: 'tag', label: '友だち属性タグを開く', external: true, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
+                      menuItems={row.tagId ? [{ id: 'tag', label: 'タグを開く', external: true, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
                       destructiveItem={readonly ? undefined : {
                         id: 'delete',
                         label: 'ランクを削除する',
@@ -352,7 +352,7 @@ export default function RankSettingsV8({
         <section className={`${styles.card} ${styles.sideCard}`} aria-labelledby="nen-rank-sync">
           <div className={styles.cardHead}>
             <h2 id="nen-rank-sync" className={styles.cardTitle}>ECとの同期</h2>
-            <p className={styles.cardDesc}>保存すると、ランクをネットショップへ送り、友だち属性のタグも付け替えます。送れなかったときは、理由がここに出ます</p>
+            <p className={styles.cardDesc}>保存すると、ランクをネットショップへ送り、タグも付け替えます。送れなかったときは、理由がここに出ます</p>
           </div>
           <div className={styles.syncRow}>
             {rules?.syncStatus === 'synced'
@@ -423,7 +423,7 @@ export default function RankSettingsV8({
               />
             </div>
             <p className={styles.removeNote}>
-              移し先のランクは、各会員のいまの有効期限まで使います。期限のあとは通常のランク判定に戻ります。ECへ反映したあと、次の購入から還元率が変わります。友だち属性のタグも付け替えます。
+              移し先のランクは、各会員のいまの有効期限まで使います。期限のあとは通常のランク判定に戻ります。ECへ反映したあと、次の購入から還元率が変わります。タグも付け替えます。
             </p>
           </>) : null}
         </div>

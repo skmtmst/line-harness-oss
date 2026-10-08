@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -29,7 +31,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
  * 場所が無く、回答フォームとは別に持つかどうかも決まっていない。
  */
 
-function BookingStatus({ accountId, eventId }: { accountId: string; eventId: string }) {
+function BookingStatus({ accountId, eventId, refreshKey = 0 }: { accountId: string; eventId: string; refreshKey?: number }) {
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [summary, setSummary] = useState<EventBookingSummary | null>(null)
   // R81: 公開済みでも今後の枠が無ければ「終了」と出すための枠一覧。
@@ -64,7 +66,8 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
     return () => {
       cancelled = true
     }
-  }, [accountId, eventId, reloadSeq])
+    // WEB319：公開の状態を変えたら（refreshKey）、隣の札も読み直す。
+  }, [accountId, eventId, reloadSeq, refreshKey])
 
   const cells: Array<[string, string]> = [
     ['予約 / 定員', `${summary?.confirmed ?? '—'} / ${summary?.totalCapacity ?? '—'}`],
@@ -173,8 +176,11 @@ const NEXT_LIFECYCLE: Record<EventLifecycleStatus, Array<{ to: EventLifecycleSta
   cancelled: [],
 }
 
-function LifecycleSection({ accountId, eventId }: { accountId: string; eventId: string }) {
+function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string; eventId: string; onChanged?: () => void }) {
   const [lifecycle, setLifecycle] = useState<EventLifecycleStatus | null>(null)
+  /* WEB318：読めなかったことを「読み込んでいます」のまま残さない。 */
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadSeq, setLoadSeq] = useState(0)
   const [pending, setPending] = useState<{ to: EventLifecycleStatus; label: string; needsReason: boolean } | null>(null)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
@@ -183,19 +189,23 @@ function LifecycleSection({ accountId, eventId }: { accountId: string; eventId: 
 
   useEffect(() => {
     let cancelled = false
+    setLifecycle(null)
+    setLoadFailed(false)
     void eventsApi.getEvent(accountId, eventId).then(
       (detail) => {
         if (cancelled) return
         setLifecycle(detail.lifecycle_status ?? (detail.is_published === 1 ? 'published' : 'draft'))
       },
       () => {
-        if (!cancelled) setLifecycle(null)
+        if (cancelled) return
+        setLifecycle(null)
+        setLoadFailed(true)
       },
     )
     return () => {
       cancelled = true
     }
-  }, [accountId, eventId])
+  }, [accountId, eventId, loadSeq])
 
   const runSwitch = async () => {
     if (!pending || busy) return
@@ -213,6 +223,7 @@ function LifecycleSection({ accountId, eventId }: { accountId: string; eventId: 
       setLifecycle(result.lifecycle_status)
       setPending(null)
       setReason('')
+      onChanged?.()
     } catch (err) {
       const code = (err as { body?: { error?: string } }).body?.error
       setError(
@@ -246,8 +257,16 @@ function LifecycleSection({ accountId, eventId }: { accountId: string; eventId: 
           ))}
         </div>
       </div>
-      {lifecycle === null && (
+      {lifecycle === null && !loadFailed && (
         <p className="text-ink-faint mt-2 text-xs">状態を読み込んでいます…</p>
+      )}
+      {lifecycle === null && loadFailed && (
+        <Notice
+          tone="warn"
+          message="公開の状態を読み込めませんでした。"
+          action={<button className="font-semibold underline" onClick={() => setLoadSeq((n) => n + 1)}>読み直す</button>}
+          className="mt-2"
+        />
       )}
       <ConfirmDialog
         open={pending !== null}
@@ -292,6 +311,7 @@ function EditEventInner() {
   const params = useSearchParams()
   const id = params.get('id')
   const { selectedAccountId } = useAccount()
+  const [statusSeq, setStatusSeq] = useState(0)
 
   if (!id) {
     return (
@@ -307,6 +327,7 @@ function EditEventInner() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="v8-only"><PageHeading title="イベントの編集" /></div>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" data-design="Crumb" aria-label="パンくず">
@@ -335,8 +356,8 @@ function EditEventInner() {
         </p>
       ) : (
         <>
-          <BookingStatus accountId={selectedAccountId} eventId={id} />
-          <LifecycleSection accountId={selectedAccountId} eventId={id} />
+          <BookingStatus accountId={selectedAccountId} eventId={id} refreshKey={statusSeq} />
+          <LifecycleSection accountId={selectedAccountId} eventId={id} onChanged={() => setStatusSeq((n) => n + 1)} />
           <div data-design="Body">
             <EventForm accountId={selectedAccountId} eventId={id} />
           </div>

@@ -37,8 +37,9 @@ const reminder = (id: string, name: string) => ({
   plannedDeliveries: 5, failedCount: 0, nextScheduledAt: '2026-10-10 09:00',
   displayOrder: 0, createdAt: '2026-09-01 00:00', updatedAt: '2026-09-02 00:00',
 })
+let role = 'admin'
 function handler(url: URL) {
-  if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'admin' } })
+  if (url.pathname === '/api/staff/me') return response({ success: true, data: { role } })
   if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
   if (url.pathname === '/api/list-stats') {
     return response({
@@ -70,6 +71,7 @@ async function eventually(check: () => void, timeout = 3000) {
   }
 }
 beforeEach(() => {
+  role = 'admin'
   pushes.length = 0
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
@@ -120,4 +122,26 @@ test('パネルの「詳細を見る」は詳細へ進む', async () => {
   if (!open) throw new Error('no detail button')
   await act(async () => { open.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   expect(pushes).toEqual(['/reminders/detail?id=r1'])
+})
+
+// 監査 WEB-015：閲覧のみの人には、パネルにも押せない編集・複製・削除を置かない（行の「…」と同じ）。
+test('閲覧のみではパネルに編集・複製・削除を出さない。管理者には出す', async () => {
+  const panelButtons = () => [...(document.body.querySelector('[data-design-part="detail-panel"]')?.querySelectorAll('button') ?? [])]
+    .map((b) => b.textContent?.trim())
+  role = 'viewer'
+  await openFirstRow()
+  await eventually(() => {
+    if (!panelButtons().includes('詳細を見る')) throw new Error('panel not open')
+  })
+  expect(panelButtons()).not.toContain('編集する')
+  expect(panelButtons()).not.toContain('複製する')
+  expect(panelButtons()).not.toContain('削除する')
+})
+
+test('管理者のパネルには編集・複製・削除を出す', async () => {
+  await openFirstRow()
+  await eventually(() => {
+    const labels = [...(document.body.querySelector('[data-design-part="detail-panel"]')?.querySelectorAll('button') ?? [])].map((b) => b.textContent?.trim())
+    expect(labels).toEqual(expect.arrayContaining(['詳細を見る', '編集する', '複製する', '削除する']))
+  })
 })

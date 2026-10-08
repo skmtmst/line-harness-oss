@@ -10,6 +10,8 @@
  * 確認）は v7 の /booking/menus と /booking/staff/shifts と同じ。
  * テーマが v7 のときはこのファイルは読まれず、従来の見た目が出る。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { closedOn, closedRanges, closedSpan } from './lib/closed-ranges'
 import {
   memo,
   useCallback,
@@ -18,8 +20,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Check, Smartphone } from 'lucide-react'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -72,7 +73,6 @@ import {
   WEEKDAY_JP,
   AccountIcon,
   StateCard,
-  addDaysStr,
   SkeletonRows,
   Band,
   sortedMenus,
@@ -151,7 +151,7 @@ function previewRange(): { from: string; to: string } {
 export default function BookingSettingsV8({ accountId }: { accountId: string | null }) {
   usePageTitle('予約設定')
   usePageCrumbs([{ label: '予約', href: '/booking/bookings' }, { label: '予約設定' }])
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const rawTab = searchParams.get('tab')
   const tab: V8TabKey = V8_TAB_KEYS.has(rawTab ?? '') ? (rawTab as V8TabKey) : 'menus'
@@ -195,6 +195,8 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     staffName: string | null
   }>({ status: 'loading', slots: [], closedDates: [], staffName: null })
   const [closedBookingCount, setClosedBookingCount] = useState<number | null>(null)
+  /* WEB057：設定・休業日・設備を保存したら、右の写しの空き枠も取り直す。 */
+  const [previewRevision, setPreviewRevision] = useState(0)
 
   const generationRef = useRef(0)
 
@@ -286,7 +288,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
         if (!cancelled) setPreview({ status: 'error', slots: [], closedDates: [], staffName: null })
       })
     return () => { cancelled = true }
-  }, [needsPreview, accountId, firstActiveMenu?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [needsPreview, accountId, firstActiveMenu?.id, previewRevision]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---- 担当スタッフタブの行の中身（担当数・今週の勤務・カレンダー） ---- */
   useEffect(() => {
@@ -365,30 +367,16 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     () => (settings?.exceptions ?? []).filter((item) => !item.scopeKind || item.scopeKind === 'store'),
     [settings],
   )
-  const closedDates = useMemo(() => {
-    const dates = new Set<string>()
-    for (const item of storeExceptions.filter((entry) => entry.kind === 'closed')) {
-      const from = item.dateFrom || item.date || ''
-      const to = item.dateTo || item.date || from
-      if (!from) continue
-      // 長い休みも日ごとに広げる（上限31日で暴走だけ止める）。
-      for (let i = 0; i < 31; i += 1) {
-        const day = addDaysStr(from, i)
-        dates.add(day)
-        if (day >= to) break
-      }
-    }
-    return dates
-  }, [storeExceptions])
+  /* WEB056：長い休みも31日で打ち切らない。範囲で数える。 */
+  const closedRangeList = useMemo(() => closedRanges(storeExceptions), [storeExceptions])
   useEffect(() => {
-    if (tab !== 'holidays' || !accountId || closedDates.size === 0) {
+    const span = closedSpan(closedRangeList)
+    if (tab !== 'holidays' || !accountId || !span) {
       setClosedBookingCount(null)
       return
     }
     let cancelled = false
-    const sorted = [...closedDates].sort()
-    const from = sorted[0]
-    const to = sorted[sorted.length - 1]
+    const { from, to } = span
     void fetchAllPages(
       (offset) => bookingApi.listRequests(accountId, 'all', { from, to, limit: 100, offset }),
       100,
@@ -399,13 +387,13 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
         const count = requests.filter((request) => {
           if (request.status !== 'requested' && request.status !== 'confirmed') return false
           const jst = new Date(new Date(request.starts_at).getTime() + JST_OFFSET_MS).toISOString().slice(0, 10)
-          return closedDates.has(jst)
+          return closedOn(closedRangeList, jst) !== undefined
         }).length
         setClosedBookingCount(count)
       })
       .catch(() => { if (!cancelled) setClosedBookingCount(null) })
     return () => { cancelled = true }
-  }, [tab, accountId, closedDates])
+  }, [tab, accountId, closedRangeList])
 
   /* ---- 書きかけの登録と離脱確認 ---- */
   const [tabEdit, setTabEdit] = useState<V8TabEdit | null>(null)
@@ -444,14 +432,14 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
       setSwitchTarget(next)
       return
     }
-    router.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
+    samePageUrl.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
   }
   function confirmSwitch() {
     const next = switchTarget
     setSwitchTarget(null)
     if (!next) return
     tabEdit?.onReset()
-    router.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
+    samePageUrl.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
   }
 
   /*
@@ -463,14 +451,18 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
   }, [loadCore])
   const saveSettings = useCallback((next: BookingSettings) => {
     setSettings(next)
+    setPreviewRevision((n) => n + 1)
   }, [])
   const saveResource = useCallback((saved: BookingResource) => {
+    setPreviewRevision((n) => n + 1)
     setResources((current) => current?.map((item) => item.id === saved.id ? { ...item, ...saved, usage: item.usage } : item) ?? current)
   }, [])
   const createResource = useCallback((created: BookingResource) => {
+    setPreviewRevision((n) => n + 1)
     setResources((current) => [...(current ?? []), created].sort((a, b) => a.name.localeCompare(b.name, 'ja')))
   }, [])
   const deleteResource = useCallback((id: string) => {
+    setPreviewRevision((n) => n + 1)
     setResources((current) => current?.filter((item) => item.id !== id) ?? current)
   }, [])
   const retryResources = useCallback(() => {
@@ -513,7 +505,6 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     <V8TabEditContext.Provider value={registerTabEdit}>
       <div className={styles.shell} data-design-node="owaS3">
         <header className={styles.boardHead} data-design="Head">
-          <Link href="/booking/bookings" className={styles.backLink}>← 予約へ</Link>
           <h1 className={styles.headTitle}>予約設定</h1>
           <p className={styles.headNote}>お客さまの予約画面に出るメニュー・時間・ルールを決めます</p>
           <div data-design="Tabs">
@@ -617,7 +608,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
           <aside className={styles.side} data-design="Side">
             <div className={styles.sideActions}>
               <span className={styles.sidePhoneButton}>
-                <Button onClick={() => setPhoneOpen(true)}>LINEでの見え方を見る</Button>
+                <Button onClick={() => setPhoneOpen(true)}><Smartphone size={15} aria-hidden="true" />LINEでの見え方を見る</Button>
               </span>
               {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
             </div>

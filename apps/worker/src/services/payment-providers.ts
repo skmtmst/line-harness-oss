@@ -31,6 +31,8 @@ export type WebhookOutcome =
 export interface PaymentProvider {
   name: string;
   startPayment(input: PaymentStartInput): Promise<PaymentStartResult>;
+  /** 既存の決済画面を取得する。新しい決済・有効期限の延長は行わない。 */
+  getCheckoutUrl?(input: { providerPaymentId: string; idempotencyKey: string }): Promise<string | null>;
   /**
    * 相手側の状態を聞く。外へ通信できない試験時は 'unknown' を返し、
    * 知らせ（webhook）で進める。
@@ -110,6 +112,12 @@ export function createStripeTestProvider(secrets: StripeTestSecrets): PaymentPro
         checkoutUrl: `https://checkout.stripe.com/test/pay/${input.idempotencyKey}`,
         providerPaymentId: `pi_test_${input.idempotencyKey.replace(/[^A-Za-z0-9]/g, '').slice(0, 24)}`,
       };
+    },
+    async getCheckoutUrl(input) {
+      const expectedId = `pi_test_${input.idempotencyKey.replace(/[^A-Za-z0-9]/g, '').slice(0, 24)}`;
+      return input.providerPaymentId === expectedId
+        ? `https://checkout.stripe.com/test/pay/${input.idempotencyKey}`
+        : null;
     },
     async getStatus() {
       // 試験時は外を見に行かず、知らせで進める。

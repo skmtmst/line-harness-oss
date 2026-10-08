@@ -28,6 +28,12 @@ function EditWebhookPageInner() {
   const [eventTypes, setEventTypes] = useState('')
   const [maxRetries, setMaxRetries] = useState('0')
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error' | 'not-found'>('loading')
+  /*
+   * W159：いま入力欄に入っている中身が、どの送り先（とアカウント）のものか。
+   * 別の送り先へ移って読み込み中の間は、前の入力で今の送り先を保存させない。
+   */
+  const [loadedKey, setLoadedKey] = useState<string | null>(null)
+  const currentKey = `${selectedAccountId ?? ''}|${id}`
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
   /*
@@ -64,6 +70,7 @@ function EditWebhookPageInner() {
         setUrl(res.data.url)
         setEventTypes(res.data.eventTypes.join(', '))
         setMaxRetries(String(res.data.maxRetries ?? 0))
+        setLoadedKey(`${selectedAccountId}|${id}`)
         setLoadState('ready')
       })
       .catch((caught: unknown) => {
@@ -129,6 +136,7 @@ function EditWebhookPageInner() {
       successHref={() => '/webhooks'}
       validate={() => {
         if (!selectedAccountId) return 'LINEアカウントを選択してください'
+        if (loadState !== 'ready' || loadedKey !== currentKey) return '送り先の設定を読み込んでいます。読み込みが終わってから保存してください'
         if (!name.trim()) return '名前を入力してください'
         if (!/^https:\/\//.test(url.trim())) return 'URLは https:// で始めてください'
         // d23b R416: 口側と登録画面は0〜7を受け付ける。編集画面だけ狭いと、

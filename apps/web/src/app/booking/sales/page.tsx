@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import { useEffect, useState } from 'react'
 import SegmentedControl from '@/components/shared/segmented'
 import { useAccount } from '@/contexts/account-context'
@@ -159,6 +161,7 @@ export default function BookingSalesPage() {
 
   return (
     <div>
+      <div className="v8-only"><PageHeading title="予約からの売上" /></div>
       <div className={styles.head}>
         <SegmentedControl
           aria-label="集計する期間"

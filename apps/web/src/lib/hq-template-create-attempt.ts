@@ -56,7 +56,10 @@ function validAttempt(value: unknown): value is CreationAttempt {
       && (folder.parentId === null || folder.parentId === undefined || identifier(folder.parentId)) && (folder.color === null || folder.color === undefined || /^#[0-9a-f]{6}$/i.test(String(folder.color))))
   }
   if (input.type === 'template') {
-    if (!object(definition, ['schemaVersion', 'template', 'media', 'card']) || definition.schemaVersion !== 1 || !Array.isArray(definition.media) || definition.media.length > 50) return false
+    if (!object(definition, ['schemaVersion', 'template', 'media', 'card', 'asset']) || definition.schemaVersion !== 1 || !Array.isArray(definition.media) || definition.media.length > 50) return false
+    /* API-17：店と同じ6種類の素材（クーポン・リサーチ・リッチメッセージ・カード）。中身の検査はサーバーが行う。 */
+    if (definition.asset !== undefined && (!object(definition.asset, ['kind', 'payload']) || !['card_message', 'rich_message', 'coupon', 'research'].includes(String(definition.asset.kind))
+      || !definition.asset.payload || typeof definition.asset.payload !== 'object' || Array.isArray(definition.asset.payload))) return false
     const template = definition.template
     if (!object(template, ['id', 'name', 'category', 'messageType', 'messageContent', 'carouselActionsJson', 'carouselTapLimitMode', 'carouselTapLimitText', 'questionJson', 'questionStatus'])
       || !identifier(template.id) || !text(template.name, 255) || !text(template.category, 100) || !['text', 'image', 'flex', 'carousel'].includes(String(template.messageType))

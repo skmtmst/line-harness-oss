@@ -57,9 +57,19 @@ export function linkLabel(analysis: ConnectionAnalysis, entryId: string, pageId:
   const back = analysis.edges.filter((edge) => edge.fromPageId === pageId)
   const goIndex = out.findIndex((edge) => edge.targetPageId === pageId)
   const backIndex = back.findIndex((edge) => edge.targetPageId === entryId)
-  if (goIndex < 0 && backIndex < 0) return { label: 'つながりなし', both: false }
+  /*
+   * WEB220：直接のタブが無くても、別のメニューを通って行ける・戻れることがある（A→B→C→A）。
+   * 行けるか・戻れるかは、たどり着けるかの解析（reachable・cannotReturn）で決める。
+   */
+  const reachable = analysis.reachablePageIds.has(pageId)
+  const returnable = reachable && !analysis.cannotReturnPageIds.has(pageId)
+  if (goIndex < 0 && backIndex < 0) {
+    if (reachable && returnable) return { label: '別のメニュー経由で行き来', both: true }
+    if (reachable) return { label: '別のメニュー経由・戻りなし', both: false }
+    return { label: 'つながりなし', both: false }
+  }
   if (goIndex < 0) return { label: `タブ${tabLetter(backIndex)} → トップ`, both: false }
-  if (backIndex < 0) return { label: `タブ${tabLetter(goIndex + 1)} → 戻りなし`, both: false }
+  if (backIndex < 0) return { label: returnable ? `タブ${tabLetter(goIndex + 1)} → 経由して戻れる` : `タブ${tabLetter(goIndex + 1)} → 戻りなし`, both: returnable }
   return { label: `タブ${tabLetter(goIndex + 1)} ⇄ タブ${tabLetter(backIndex)}`, both: true }
 }
 
@@ -146,7 +156,8 @@ function Connections() {
   const others = pages.filter((page) => page.id !== entryId)
   const editHref = `/rich-menus/edit?id=${encodeURIComponent(group.id)}`
   const buttonsHref = `/rich-menus/edit?id=${encodeURIComponent(group.id)}&step=buttons`
-  const noReturn = others.filter((page) => !analysis.edges.some((edge) => edge.fromPageId === page.id && edge.targetPageId === entryId))
+  // WEB220：直接のタブが無くても、別のメニューを通ってトップへ戻れるなら「帰れない」と言わない。
+  const noReturn = others.filter((page) => analysis.cannotReturnPageIds.has(page.id))
   const draftTargets = group.status === 'published' ? others.filter((page) => !page.lineRichmenuId) : []
   const audienceText = group.isDefaultForAll || !group.targetingEnabled || !group.targetingCondition ? 'すべての友だち（既定）' : '条件で出し分け'
   const reach = group.monthlyStats?.uniqueAudience?.value ?? group.audienceCount ?? null

@@ -14,12 +14,13 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Check, Clock, Timer } from 'lucide-react'
+import { CalendarClock, Check, Timer } from 'lucide-react'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 import { notifyToast } from '@/components/shared/toast'
-import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
@@ -31,8 +32,8 @@ import {
   scenarioDraftKey,
   useScenarioDraft,
 } from '@/v8/autosave/use-scenario-draft'
-import Stepper from '@/components/shared/stepper'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import HelpTip from '@/components/shared/help-tip'
 import { TextField } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
@@ -42,24 +43,7 @@ import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import styles from './create.module.css'
-
-/** 選んだ方式で、同じ日の違う時刻に始めた2人がいつ受け取るか（絵の見本）。 */
-const EXAMPLES: Record<'absolute_time' | 'elapsed', { rows: Array<{ who: string; start: string; first: string; second: string }>; note: string }> = {
-  absolute_time: {
-    rows: [
-      { who: '友だち A', start: '4/1 12:00 に開始', first: '1通目 4/1 15:00', second: '2通目 4/2 20:00' },
-      { who: '友だち B', start: '4/1 14:00 に開始', first: '1通目 4/1 15:00', second: '2通目 4/2 20:00' },
-    ],
-    note: '時刻で指定は、2人とも同じ時刻に届きます',
-  },
-  elapsed: {
-    rows: [
-      { who: '友だち A', start: '4/1 12:00 に開始', first: '1通目 4/1 15:00', second: '2通目 4/2 20:00' },
-      { who: '友だち B', start: '4/1 14:00 に開始', first: '1通目 4/1 17:00', second: '2通目 4/2 22:00' },
-    ],
-    note: '経過時間で指定は、始めた時刻が2時間遅い分、届く時刻も2時間うしろにずれます',
-  },
-}
+import DeliveryModeDiagram from './delivery-mode-diagram'
 
 export default function ScenarioCreateV8() {
   usePageTitle('シナリオを作成')
@@ -194,7 +178,7 @@ export default function ScenarioCreateV8() {
   /** 名前が空のまま押したら、欄の下にも理由を出して欄へ移す（R172）。止めたとき真。 */
   const rejectEmptyName = (): boolean => {
     if (name.trim()) return false
-    setError('シナリオ名を入力してください')
+    // 上の帯には出さない：欄を赤くして欄の下に理由を出し、欄へ移す（2026-10-08 オーナー「重複している」）。
     setNameError('シナリオ名を入力してください')
     const input = nameWrapRef.current?.querySelector('input')
     if (input) {
@@ -293,6 +277,9 @@ export default function ScenarioCreateV8() {
           finishDraft()
           router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
         }
+      } catch {
+        // WEB226：通信の失敗（例外）も、方式を選んだときと同じ言葉で出す（黙って何も起きない、にしない）。
+        setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
       } finally {
         setDetailsSaving(false)
       }
@@ -367,7 +354,6 @@ export default function ScenarioCreateV8() {
 
   const locked = (Boolean(id) && !scenario) || detailsSaving || saving !== null
   const fieldsDisabled = locked || !canEdit
-  const example = EXAMPLES[selectedMode === 'elapsed' ? 'elapsed' : 'absolute_time']
   const scenarioFailure = scenarioError ? loadFailureCopy(scenarioError, 'シナリオ') : null
   const useCommonReason = scenarioError ? isForbiddenOrRateLimited(scenarioError) : false
 
@@ -377,11 +363,11 @@ export default function ScenarioCreateV8() {
       title="シナリオを作る"
       identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
       steps={(
-        <Stepper
+        <Steps
           label="シナリオ作成の進み方"
           steps={[
             // 既存の下書き（id あり）は1段目が済んでいる。新規は名前を入れたら済み。
-            { label: 'シナリオ情報', state: id || name.trim() ? 'done' : 'current' },
+            { label: 'シナリオ情報', state: id || name.trim() ? 'done' : 'current', anchor: 'scenario-step-info' },
             { label: '配信方式', state: 'current' },
             { label: '1通目を設定', state: 'todo' },
           ]}
@@ -441,7 +427,7 @@ export default function ScenarioCreateV8() {
         <ScenarioDraftConflictNotice ago={browserDraft.conflictAgo} onLoadLatest={loadLatestDraft} onOverwrite={browserDraft.overwrite} />
       </div>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="シナリオ情報">
+      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="シナリオ情報" id="scenario-step-info">
         <h2 className={styles.cardTitle}>シナリオ情報</h2>
         <div className={styles.infoRow}>
           <div className={styles.nameField} ref={nameWrapRef}>
@@ -461,7 +447,7 @@ export default function ScenarioCreateV8() {
           <div className={styles.folderField}>
             <span className={styles.fieldLabelStrong}>フォルダ</span>
             <span title={selectedFolderName} className={styles.folderSelect}>
-              <Select
+              <FolderSelect
                 value={folderId}
                 disabled={fieldsDisabled || folderState !== 'ready'}
                 onChange={(value) => {
@@ -470,11 +456,14 @@ export default function ScenarioCreateV8() {
                 }}
                 aria-label="シナリオのフォルダ"
                 size="full"
-                options={[
-                  { value: '', label: '未分類' },
+                folders={[
                   ...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : []),
-                  ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+                  ...folders.map(folderById),
                 ]}
+                // 一覧の左の列の「フォルダを追加」と同じ口（シナリオのフォルダは共有）。
+                onCreate={canEdit && !locked
+                  ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+                  : undefined}
               />
             </span>
             {folderState !== 'ready' || detailsSaving ? (
@@ -499,7 +488,7 @@ export default function ScenarioCreateV8() {
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="配信方式">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>配信方式</h2>
-          <p className={styles.cardDesc}>作ったあとは変えられません</p>
+          <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip>
         </div>
         <RadioCardGroup legend="配信方式" className={styles.modeRow}>
           <RadioCard
@@ -508,11 +497,12 @@ export default function ScenarioCreateV8() {
             checked={selectedMode === 'absolute_time'}
             onChange={() => setSelectedMode('absolute_time')}
             disabled={fieldsDisabled}
-            icon={<Clock size={16} aria-hidden="true" />}
+            icon={<CalendarClock size={16} aria-hidden="true" />}
             title="時刻で指定"
-            note="「購読開始から○日後の○時」。メルマガ・定期リマインド・朝夜の固定配信に"
-            className={styles.modeCard}
-          />
+            note="購読開始から〇日後の〇時に届きます。決まった時刻の定期配信（メルマガ・朝の配信）に"
+          >
+            <DeliveryModeDiagram mode="absolute_time" selected={selectedMode === 'absolute_time'} />
+          </RadioCard>
           <RadioCard
             name="delivery-mode"
             value="elapsed"
@@ -521,22 +511,11 @@ export default function ScenarioCreateV8() {
             disabled={fieldsDisabled}
             icon={<Timer size={16} aria-hidden="true" />}
             title="経過時間で指定"
-            note="「購読開始から○時間○分後」。買った直後・予約の直後のフォローに"
-            className={styles.modeCard}
-          />
+            note="購読開始から〇日と〇時間後に届きます。買った直後・予約直後のフォローに"
+          >
+            <DeliveryModeDiagram mode="elapsed" selected={selectedMode === 'elapsed'} />
+          </RadioCard>
         </RadioCardGroup>
-        <div className={styles.example}>
-          <p className={styles.exampleTitle}>見本：同じ日の違う時刻に購読を始めた 2 人（1通目＝当日 15:00、2通目＝翌日 20:00）</p>
-          {example.rows.map((row) => (
-            <div key={row.who} className={styles.exampleRow}>
-              <span className={styles.exampleWho}>{row.who}</span>
-              <span className={styles.exampleStart}>{row.start}</span>
-              <span className={styles.exampleAt}>{row.first}</span>
-              <span className={styles.exampleAt}>{row.second}</span>
-            </div>
-          ))}
-          <p className={styles.exampleNote}>{example.note}</p>
-        </div>
       </Card>
     </CreatePage>
   )

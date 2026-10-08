@@ -30,67 +30,8 @@ export type FieldOperator =
   | 'lte'
   | 'lt'
 
-export interface SegmentRule {
-  type:
-    | 'tag_exists'
-    | 'tag_not_exists'
-    | 'tag_all'
-    | 'tag_not_all'
-    | 'metadata_equals'
-    | 'metadata_not_equals'
-    | 'ref_code'
-    | 'is_following'
-    | 'scenario_subscribed'
-    | 'name'
-    | 'private_memo'
-    | 'status_message'
-    | 'registered_at'
-    | 'support_mark'
-    | 'is_hidden'
-    | 'friend_field'
-    | 'scenario_state'
-    | 'form_answered'
-    | 'last_reaction_at'
-    | 'reaction_state'
-    | 'score_range'
-    /**
-     * 対応状況（chats.status）。友だち一覧の「対応」絞り込みの引継ぎ用。
-     * 画面の条件ビルダーには出さない。
-     */
-    | 'chat_status'
-    /**
-     * 対応の担当者（chats.operator_id）。友だち一覧の「担当者」絞り込みの
-     * 引継ぎ用。画面の条件ビルダーには出さない。
-     */
-    | 'operator_id'
-    /**
-     * 分析画面で作った一時対象者（analytics_result_audiences）。friend ID を
-     * 条件へ埋めず audience ID だけを持ち、評価のたびに所属・期限を見直す。
-     * 画面の条件ビルダーには出さない。
-     */
-    | 'analytics_audience'
-    /**
-     * 指定した一斉配信を受け取り、その中の計測リンクを押した／押さなかった人。
-     * 配信詳細の「押していない人へ追送」で作る引き継ぎ条件。
-     * 画面の条件ビルダーには出さない。
-     */
-    | 'broadcast_link_clicked'
-    /** 内部用途: 作成時点の宛先IDを固定した配信。画面の条件ビルダーには出さない。 */
-    | 'friend_id_in'
-  value: unknown
-}
-
-export interface SegmentCondition {
-  operator: 'AND' | 'OR'
-  rules: SegmentRule[]
-  /**
-   * 入れ子のグループ。Lステップの「いずれか1つ以上を満たす必要がある条件
-   * (or条件)」にあたる。親の operator でこの結果とつなぐ。
-   *
-   * 省略できる。以前の形（rules だけ）で保存された条件がそのまま動く。
-   */
-  groups?: SegmentCondition[]
-}
+import type { SegmentCondition, SegmentRule } from '@line-crm/shared';
+export type { SegmentCondition, SegmentRule } from '@line-crm/shared';
 
 /** 名前をどの欄から探すか。 */
 const NAME_COLUMNS: Record<string, string> = {
@@ -614,8 +555,7 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
     }
 
     default: {
-      const exhaustive: never = rule.type
-      throw new Error(`Unknown segment rule type: ${exhaustive}`)
+      throw new Error(`Unknown segment rule type: ${rule.type}`)
     }
   }
   throw new Error(`Unhandled segment rule: ${String(rule.type)}`)

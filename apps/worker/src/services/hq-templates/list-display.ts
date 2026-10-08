@@ -1,3 +1,4 @@
+import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attributes.js';
 import type { HqTemplateType } from '@line-crm/db';
 import { parseTagDefinition } from './tag.js';
 import { parseMessageTemplateDefinition, referencedMedia } from './template.js';
@@ -11,6 +12,11 @@ export function templateContentSummary(type: HqTemplateType, definitionJson: str
   try {
     const input = { templateVersionId: 'list', definitionJson };
     switch (type) {
+      case 'friend_field':
+        return `友だち情報欄・${({text:'テキスト',textarea:'複数行',number:'数値',date:'日付',datetime:'日時',time:'時刻',select:'単一選択',multi_select:'複数選択',checkbox:'チェック',url:'URL',tel:'電話番号',email:'メール',image:'画像',pdf:'PDF'} as const)[parseFriendFieldDefinition(JSON.parse(definitionJson)).field.type]}`;
+      case 'mark':
+        parseMarkDefinition(JSON.parse(definitionJson));
+        return '対応マーク 1';
       case 'tag':
         // 現在のひな形は主タグ1件。付属フォルダはタグ数に含めない。
         parseTagDefinition(JSON.parse(definitionJson));
@@ -26,10 +32,27 @@ export function templateContentSummary(type: HqTemplateType, definitionJson: str
       }
       case 'template': {
         const definition = parseMessageTemplateDefinition(JSON.parse(definitionJson));
+        if(definition.asset) {
+          const {kind,payload}=definition.asset;
+          if(kind==='card_message') return `カード ${Array.isArray(payload.cards)?payload.cards.length:0}枚`;
+          if(kind==='rich_message') return `画像・面 ${Array.isArray(payload.tapAreas)?payload.tapAreas.length:0}`;
+          if(kind==='coupon') {
+            const date=String(payload.endsAt??'').match(/^\d{4}-(\d{2})-(\d{2})/);
+            return date ? `期限 ${Number(date[1])}/${date[2]}` : null;
+          }
+          return Array.isArray(payload.questions) ? `質問 ${payload.questions.length}` : null;
+        }
+        if(definition.template.questionJson) {
+          const q=JSON.parse(definition.template.questionJson);
+          return Array.isArray(q.choices)?`選択肢 ${q.choices.length}`:null;
+        }
+        if(definition.template.messageType==='carousel') {
+          const panels=JSON.parse(definition.template.messageContent);
+          return Array.isArray(panels)?`カード ${panels.length}枚`:'カルーセル';
+        }
         const parts: string[] = [];
         if (definition.card || definition.template.messageType === 'text') parts.push('本文');
         else if (definition.template.messageType === 'flex') parts.push('カード');
-        else if (definition.template.messageType === 'carousel') parts.push('カルーセル');
         const media = referencedMedia(definition);
         for (const [kind, label] of [['image', '画像'], ['video', '動画'], ['audio', '音声'], ['file', 'ファイル']] as const) {
           const count = media.filter(item => item.kind === kind).length;

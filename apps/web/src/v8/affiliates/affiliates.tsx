@@ -69,7 +69,7 @@ function AffiliatesInner() {
     void Promise.allSettled([
       api.affiliates.list(),
       api.affiliateOffers.list(),
-      listAllConversionApprovals('pending'),
+      listAllConversionApprovals('pending', 0, { accountId: selectedAccountId }),
     ]).then(([affiliates, offers, pending]) => {
       if (cancelled) return
       if (affiliates.status === 'fulfilled' && affiliates.value.success && Array.isArray(affiliates.value.data)) {

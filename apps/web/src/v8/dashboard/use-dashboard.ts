@@ -1,7 +1,8 @@
 'use client'
 
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -84,7 +85,7 @@ function useSeenOnce(): { ref: RefObject<HTMLDivElement | null>; ready: boolean 
 }
 
 export function useDashboard() {
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
 
@@ -103,8 +104,8 @@ export function useDashboard() {
     const next = new URLSearchParams(params.toString())
     mutate(next)
     const text = next.toString()
-    router.replace(text ? `/?${text}` : '/')
-  }, [params, router])
+    samePageUrl.replace(text ? `/?${text}` : '/')
+  }, [params, samePageUrl])
   const selectPeriod = useCallback((key: PeriodKey) => {
     setPeriodState(key)
     updateQuery((query) => { if (key === 'today') query.delete('period'); else query.set('period', key) })
@@ -255,7 +256,8 @@ export function useDashboard() {
       if (selectedAccountIdRef.current !== accountId) return
       const conflict = caught instanceof Error && 'status' in caught && caught.status === 409
       setPreferenceSaveError({
-        message: conflict ? '別の画面で配置が更新されました。再読み込みしてください' : 'ダッシュボードの配置を保存できませんでした',
+        /* 言葉は絵 mcOqK の 4（引き出しの下の帯）。 */
+        message: conflict ? 'ほかの人が配置を変えました。最新の配置を読み込んでから直してください。' : '配置を保存できませんでした。通信を確かめてください。',
         conflict,
       })
     } finally {
@@ -282,7 +284,7 @@ export function useDashboard() {
       closeEditor()
     } catch {
       if (selectedAccountIdRef.current === accountId) {
-        setPreferenceSaveError({ message: 'ダッシュボードの配置を初期状態へ戻せませんでした', conflict: false })
+        setPreferenceSaveError({ message: '配置を初期状態へ戻せませんでした。通信を確かめてください。', conflict: false })
       }
     } finally {
       preferenceSaveInFlight.current = false

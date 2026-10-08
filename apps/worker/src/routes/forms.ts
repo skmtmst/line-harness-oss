@@ -1304,16 +1304,18 @@ forms.put('/api/forms/:id', async (c) => {
      * 版の確認を要しない。所属は版管理の対象外で、確認を強いると一覧からの
      * 移動のたびに詳細の取得が要る。#723 の例外ではなく、中身が無い要求に
      * 対して確認する版が無いだけ。**中身の更新と一緒のときは確認を免除しない。**
-     * 先に確認してから動かす。逆にすると、409 のとき移動だけ残る。
+     * 複合保存は内容と所属を同じ条件付き UPDATE で書く。先に所属だけ
+     * 動かすと、400・422・409 のとき移動だけが残る。
      */
     const hasContentUpdate = Object.keys(body).some((key) => key !== 'folderId');
     if (hasContentUpdate && (!Number.isInteger(expectedContentRevision) || expectedContentRevision < 1)) {
       return c.json({ success: false, error: '確認した版が必要です' }, 400);
     }
 
+    let nextFolderId: string | null | undefined;
     if ('folderId' in body) {
       const rawFolderId = body.folderId;
-      const nextFolderId = rawFolderId === null || rawFolderId === '' ? null : String(rawFolderId);
+      nextFolderId = rawFolderId === null || rawFolderId === '' ? null : String(rawFolderId);
       if (nextFolderId !== null) {
         // テンプレートの `readFolderId` と同じ決まり。消えた箱・別用途の箱・
         // 別アカウントの箱は断る。**黙って未分類にしない。**
@@ -1324,10 +1326,10 @@ forms.put('/api/forms/:id', async (c) => {
           return c.json({ success: false, error: 'そのフォルダはありません' }, 422);
         }
       }
-      if (!await setFormFolder(c.env.DB, id, nextFolderId)) {
-        return c.json({ success: false, error: 'Form not found' }, 404);
-      }
       if (!hasContentUpdate) {
+        if (!await setFormFolder(c.env.DB, id, nextFolderId)) {
+          return c.json({ success: false, error: 'Form not found' }, 404);
+        }
         const moved = await getFormById(c.env.DB, id);
         if (!moved) return c.json({ success: false, error: 'Form not found' }, 404);
         return c.json({ success: true, data: serializeForm(moved) });
@@ -1336,6 +1338,7 @@ forms.put('/api/forms/:id', async (c) => {
 
     // Only include fields that were explicitly sent (avoid undefined → null conversion)
     const updates: Record<string, unknown> = {};
+    if ('folderId' in body) updates.folderId = nextFolderId;
     if (body.name !== undefined) updates.name = body.name;
     if (body.description !== undefined) updates.description = body.description;
     if (body.fields !== undefined) updates.fields = JSON.stringify(body.fields);
@@ -1951,6 +1954,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', async (c) =
         db: c.env.DB,
         formId,
         form: config,
+        expectedLineAccountId: scope.lineAccountId,
         layout,
         friendId: submission.friend_id,
         submissionData: answers,
@@ -2504,6 +2508,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
     // キーあり送信の照合材料。読み取りだけに使い、予約の書き込みは判定の後。
     let peekScope: FormSubmitClaimScope | null = null;
     let peekHash: string | null = null;
+    let resumeSavedAnswer = false;
     if (idempotencyKey) {
       const hashSource: Record<string, unknown> = { ...submissionData };
       delete hashSource._webhookVerified;
@@ -2522,6 +2527,23 @@ forms.post('/api/forms/:id/submit', async (c) => {
       };
       // 完了済みの再送は判定より先に返す(回答期限後も最初の結果のまま)。
       const peeked = await getFormSubmitClaim(c.env.DB, peekScope);
+      if (peeked && peeked.request_hash !== peekHash) {
+        return c.json({success: false, error: 'Idempotency-Key was already used with a different request', code: 'idempotency_content_mismatch', retryable: false}, 409);
+      }
+      if (peeked && peeked.status !== 'completed' && !formSubmitClaimExpired(peeked)
+        && peeked.request_hash === peekHash && peeked.submission_id) {
+        const saved = await getFormSubmissionById(c.env.DB, peeked.submission_id);
+        if (saved && saved.form_id === formId && saved.friend_id === friendId) {
+          // 同じ保存済み回答の未完工程を補う。新しい回答の枠は取らない。
+          if (saved.form_version_id) {
+            const version = await getFormVersionContent(c.env.DB, saved.form_version_id);
+            if (!version || version.form_id !== formId) throw new Error('saved_form_version_missing');
+            const {id, form_id: _formId, ...snapshot} = version;
+            form = {...form, ...snapshot, current_published_version_id: id};
+          }
+          resumeSavedAnswer = true;
+        }
+      }
       if (peeked
         && peeked.status === 'completed'
         && peeked.request_hash === peekHash
@@ -2554,11 +2576,12 @@ forms.post('/api/forms/:id/submit', async (c) => {
         friendId,
         submitCount: form.submit_count ?? 0,
         answers: submissionData,
+        resumeSavedAnswer,
       });
       if (rejected) {
         return c.json({ success: false, error: rejected }, 400);
       }
-    } else {
+    } else if (!resumeSavedAnswer) {
       const fields = JSON.parse(form.fields || '[]') as Array<{
         name: string;
         label: string;
@@ -3128,6 +3151,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
       db: c.env.DB,
       formId,
       form,
+      expectedLineAccountId: identity.lineAccountId,
       layout,
       friendId: friendId!,
       submissionData,
@@ -3200,6 +3224,7 @@ async function runFormPostEffects(input: {
     on_submit_message_content: string | null;
     on_submit_webhook_url: string | null;
   };
+  expectedLineAccountId: string;
   layout: FormLayout | null;
   friendId: string;
   submissionData: Record<string, unknown>;
@@ -3266,6 +3291,7 @@ async function runFormPostEffects(input: {
       {
         friendId,
         requestedTrackedLinkId: input.trackedLinkId,
+        expectedLineAccountId: input.expectedLineAccountId,
       },
       { getFriendById, getTrackedLinkById, getMessageTemplateById },
     );

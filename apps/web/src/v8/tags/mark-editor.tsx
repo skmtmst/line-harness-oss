@@ -13,7 +13,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Archive, Check, Pencil, Plus, Trash2, Zap } from 'lucide-react'
+import { Check, Pause, Pencil, Plus, Trash2, Zap } from 'lucide-react'
 import {
   api,
   ApiError,
@@ -96,7 +96,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const { selectedAccountId } = useAccount()
   const editing = Boolean(markId)
   usePageTitle(editing ? '対応マークを編集' : '対応マークを作る')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }, { label: '対応マーク', href: '/tags?tab=marks' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }, { label: '対応マーク', href: '/tags?tab=marks' }])
 
   const [items, setItems] = useState<MarkRow[]>([])
   /* 一覧の読み込み具合。ready になるまで保存は押せない（R510・R511）。 */
@@ -197,6 +197,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         }
         setBaseline({ name: current.name, color: current.color, displayOrder: current.displayOrder, isDefault: current.isDefault })
         setLoadState('ready')
+        // WEB090：「初めの読み込みが済んだ」は、読めて入力欄を埋めたときだけ立てる。
+        initialLoadRef.current = false
       } else if (editing) {
         setLoadMessage('対応マークが見つかりません。一覧から選び直してください。')
         setLoadState('error')
@@ -204,6 +206,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         setDisplayOrder(rows.length)
         setBaseline({ name: '要確認', color: COLORS[0].value, displayOrder: rows.length, isDefault: false })
         setLoadState('ready')
+        initialLoadRef.current = false
       } else {
         setLoadState('ready')
       }
@@ -219,7 +222,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       }
     } finally {
       if (loadSeqRef.current === seq) {
-        initialLoadRef.current = false
+        // WEB090：失敗したときは立てない（やり直しで入力欄と基準をちゃんと埋める）。
         setReloading(false)
       }
     }
@@ -404,7 +407,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       </dl>
       {editing ? (
         <p className={styles.infoNote}>
-          <Archive className={styles.wayIcon} aria-hidden="true" />
+          <Pause className={styles.wayIcon} aria-hidden="true" />
           保管すると、新しく付けられなくなります。いま付いている人は、保管の小窓で選ぶマークへ置き換わり、履歴に残ります。
         </p>
       ) : null}
@@ -426,7 +429,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         preview={aside}
         destructive={editing && selected && !hideForm ? (
           <Button type="button" variant="danger" onClick={() => void openArchive()} disabled={archiveBlockReason !== null} title={archiveBlockReason ?? undefined}>
-            <Archive size={15} aria-hidden="true" />保管する
+            <Pause size={15} aria-hidden="true" />保管する
           </Button>
         ) : undefined}
         footerActions={hideForm ? <Button href="/tags?tab=marks">一覧へ戻る</Button> : <>

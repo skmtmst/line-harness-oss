@@ -26,6 +26,8 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
+import { InsertText } from '@/components/shared/insert-text-field'
+import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
 import TargetMissing from '@/components/shared/target-missing'
 import FlexPreviewComponent from '@/components/flex-preview'
 import {
@@ -282,7 +284,7 @@ export default function TemplateDetailV8() {
 
   const editHref = template.question
     ? `/templates/questions/new?id=${encodeURIComponent(id)}`
-    : `/templates/edit?id=${encodeURIComponent(id)}`
+    : `/templates/edit?id=${encodeURIComponent(id)}${template.messageType === 'imagemap' && /"video"\s*:/.test(draftContent) ? '&kind=rich_video' : ''}`
   const folderLabel = folderName ?? (template.folderId ? template.category : '未分類')
   const insertions = insertionNames(draftContent)
   const visibleUsages = showAllUsages ? usageRows : usageRows.slice(0, USAGE_VISIBLE)
@@ -360,14 +362,14 @@ export default function TemplateDetailV8() {
           </p>
         </div>
       ) : (
-        <LinePreview accountName="然 - NEN -" note="受け取る人のLINEでの見え方です。{ } の差し込みは、送るときに受け取る人ごとの値に変わります。">
+        <LinePreview title="届き方" accountName="然 - NEN -" note="受け取る人のLINEでの見え方です。{ } の差し込みは、送るときに受け取る人ごとの値に変わります。">
           {template.messageType === 'flex' ? <FlexPreviewComponent content={draftContent} /> : (
             <div className={styles.talkRow}>
               <span className={styles.talkIcon} aria-hidden="true">然</span>
               <div className={styles.talkCol}>
                 <span className={styles.talkName}>然 - NEN -</span>
                 <div className={styles.talkBubbleRow}>
-                  <p className={styles.talkBubble}>{draftContent}</p>
+                  <p className={styles.talkBubble}>{buildTemplatePreview(draftContent, EMPTY_TEMPLATE_REFERENCES).content}</p>
                   <span className={styles.talkTime}>18:00</span>
                 </div>
               </div>
@@ -425,7 +427,7 @@ export default function TemplateDetailV8() {
               </Button>
             ) : null}
           </div>
-          <div className={styles.bodyBox}>{draftContent}</div>
+          <div className={styles.bodyBox}>{template.messageType === 'text' ? <InsertText value={draftContent} /> : draftContent}</div>
         </section>
 
         <section className={styles.card} aria-label="使っている所" ref={usageRef}>
@@ -614,7 +616,7 @@ export default function TemplateDetailV8() {
 }
 
 /** 版の差（－ 消えた行・＋ 増えた行）。同じなら「違いはありません」。 */
-function ChangeBox({ title, before, after }: { title: string; before: string; after: string }) {
+export function ChangeBox({ title, before, after }: { title: string; before: string; after: string }) {
   const changes = lineChanges(before, after)
   return (
     <div className={styles.changeBox}>
@@ -632,7 +634,7 @@ function ChangeBox({ title, before, after }: { title: string; before: string; af
  * 型の「作る」の頭（戻る・名前・説明）と左右の列。詳細には保存が無いので下の帯を置かない
  * （型の CreatePage は帯が必須で、帯があると本文が画面の高さで切られるため、枠と頭だけ型から使う）。
  */
-function DetailFrame({ title, identity, description, preview, children }: {
+export function DetailFrame({ title, identity, description, preview, children }: {
   title: string; identity: ReactNode; description: string; preview: ReactNode; children: ReactNode
 }) {
   return (

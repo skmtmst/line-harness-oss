@@ -80,7 +80,7 @@ export default function ReportTab() {
     setState('loading')
     setLoadError('')
     try {
-      const [approved, affiliatesRes] = await Promise.all([listAllConversionApprovals('approved'), api.affiliates.list()])
+      const [approved, affiliatesRes] = await Promise.all([listAllConversionApprovals('approved', 0, { accountId }), api.affiliates.list()])
       if (!affiliatesRes.success) throw new Error('紹介者を読み込めませんでした。集計は出していません。')
       if (approved.truncated) throw new Error('成果が取得の上限を超えています。全件を数えられないため、合計とCSVは出していません。')
       if (seq !== requestSeq.current) return
@@ -92,7 +92,7 @@ export default function ReportTab() {
       setState('error')
       setLoadError(caught instanceof Error ? caught.message : 'レポートを読み込めませんでした。')
     }
-  }, [])
+  }, [accountId])
 
   useEffect(() => {
     void load()
