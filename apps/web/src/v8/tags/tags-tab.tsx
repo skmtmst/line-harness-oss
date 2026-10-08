@@ -52,7 +52,7 @@ import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import TagPill from '@/components/shared/tag-pill'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderHandle from '@/components/shared/reorder-handle'
@@ -831,13 +831,7 @@ export default function TagsTab({
                           <span className={styles.gripSpace} aria-hidden="true"><GripVertical className={styles.gripIcon} /></span>
                         )}
                       </span>
-                      {narrow ? (
-                        <Link href={editHref} className={styles.name} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
-                      ) : (
-                        <FolderDotName folder={group ? { name: group.name, color: group.color ?? FOLDER_FALLBACK_COLOR } : null}>
-                          <Link href={editHref} className={styles.name} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
-                        </FolderDotName>
-                      )}
+                      <TagPill name={tag.name} color={group?.color} size="sm" href={editHref} />
                       {tag.status === 'archived' ? <span className={styles.miniBadge}>保管済み</span> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
                         <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</span>

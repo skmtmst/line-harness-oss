@@ -7,6 +7,8 @@ import { api, ApiError, type FriendUpcoming, type MileageHistoryItem, type Milea
 import { tagTextColor } from '@/lib/presentation'
 import type { FriendField, Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { TextArea } from '@/components/shared/text-field'
@@ -233,6 +235,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const effectiveStatus = localStatus !== undefined ? localStatus : chatStatus?.status
   const effectiveOperatorId = localOperatorId !== undefined ? localOperatorId : operatorId
   const effectiveNotes = localNotes !== undefined ? localNotes : chatStatus?.notes
+  const [tagToRemove, setTagToRemove] = useState<{ id: string; name: string; friendId: string } | null>(null)
   const effectiveTags = localTags ?? friend?.tags
   // 友だち・会話が切り替わったら持ち直しを捨てる。
   useEffect(() => {
@@ -240,6 +243,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     setLocalOperatorId(undefined)
     setLocalNotes(undefined)
     setLocalTags(undefined)
+    setTagToRemove(null)
   }, [friendId, chatId])
   const isV8 = useAdminTheme() === 'v8'
   const [showSettings, setShowSettings] = useState(false)
@@ -1100,7 +1104,10 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 </a>
               </div>
               <div className="flex flex-wrap gap-1">
-                {(effectiveTags ?? []).map((tag) => (
+                {(effectiveTags ?? []).map((tag) => isV8 ? (
+                  <TagPill key={tag.id} name={tag.name} color={tag.color}
+                    onRemove={friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />
+                ) : (
                   <span
                     key={tag.id}
                     className="inline-flex max-w-full items-center gap-1 rounded-mini px-2 py-0.5 text-nano font-medium"
@@ -1594,6 +1601,18 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
         , document.body) : null}
       </div>
 
+      <ConfirmDialog
+        open={isV8 && tagToRemove !== null && tagToRemove.friendId === friendId}
+        title={`『${tagToRemove?.name ?? ''}』を外しますか？`}
+        description="この友だちからタグを外します。タグそのものは消えません。"
+        confirmLabel="外す"
+        onCancel={() => setTagToRemove(null)}
+        onConfirm={() => {
+          if (!tagToRemove || tagToRemove.friendId !== friendId) return
+          removeTagById(tagToRemove.id)
+          setTagToRemove(null)
+        }}
+      />
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <DelayedSkeleton
