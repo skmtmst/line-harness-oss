@@ -83,6 +83,7 @@ zsh ~/lh-work/tools/hq/measure.sh --stop hq2
 - 計測出力：`~/lh-work/design/v8/overlay/pages-hq2/`のdelta・impl・design・overlay。1152pxとテストJSONはこの作業場所の`.measure/`（ローカル検証用、Git対象外）。
 - 土台：`ec03047312b7240dfb8c6ac6b60acd77a86747b3`。開始時と最終試験前にfetch／merge済み。競合解消なし。delta内の`9f55cb66b`は道具側の版で、この作業場所の版ではない。measure.sh末尾の土台SHAとこのブランチのコミットを参照する。
 - push・PR・統合・DB更新・配備は行わない。自分の測定サーバーhq2だけ停止した。
+- **コミット後に本線の更新を検出：** `origin/codex/development` は列車3のPR #1669、`64096e969c3e748d281b8bc3d1b2bc5e65243060`へ進んだ。この枝は自分の2コミット分ahead・132コミット分behindだった。今回の測定・試験は列車2の土台に対する結果。列車3はform-controls・RadioCard・StickyBar・Dialog・HQバナー・HQひな形等も変更しているため、統合担当が取り込み、競合確認・影響する試験・再測定を行う。古い結果だけで統合しない。このレーンでは列車3との統合を実施していない。
 
 ## 反映履歴の候補
 
