@@ -11,18 +11,18 @@ import styles from './create-parts.module.css'
 export type SummaryRow = { label: ReactNode; value: ReactNode; key?: string }
 
 /** 右の列の「設定内容」の箱（絵 K7HWG「右の箱 設定内容」）：余白16・題13/700/19・行は上下9＋下線・字12/17。 */
-export function CreateSummaryCard({ title = '設定内容', rows, children }: { title?: ReactNode; rows: SummaryRow[]; children?: ReactNode }) {
+export function CreateSummaryCard({ title = '設定内容', rows, children, description, variant }: { title?: ReactNode; rows: SummaryRow[]; children?: ReactNode; description?: ReactNode; variant?: 'link' }) {
   return (
-    <section className={styles.summary} data-part="create-summary">
-      <h2 className={styles.summaryTitle}>{title}</h2>
-      <dl className={styles.rows}>
+    <section className={styles.summary} data-part="create-summary" data-variant={variant}>
+      {description ? <div className={styles.summaryHead}><h2 className={styles.summaryTitle}>{title}</h2><p className={styles.summaryDescription}>{description}</p></div> : <h2 className={styles.summaryTitle}>{title}</h2>}
+      {rows.length > 0 ? <dl className={styles.rows}>
         {rows.map((row, i) => (
           <div key={row.key ?? i} className={styles.row}>
             <dt className={styles.rowLabel}>{row.label}</dt>
             <dd className={styles.rowValue}>{row.value}</dd>
           </div>
         ))}
-      </dl>
+      </dl> : null}
       {children}
     </section>
   )

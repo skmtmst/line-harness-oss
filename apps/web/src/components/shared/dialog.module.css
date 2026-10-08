@@ -394,3 +394,12 @@
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .panel { -webkit-font-smoothing: auto; }
+
+/* hadfk の続いた窓。呼び出し側が選んだときだけ、既定の段の帯を外す。 */
+[data-theme='v8'] .panel[data-layout='continuous'] { padding: 22px 24px; gap: 14px; }
+[data-theme='v8'] .panel[data-layout='continuous'] > .headerRow { padding: 0; align-items: center; }
+[data-theme='v8'] .panel[data-layout='continuous'] .title { font-size: 16px; font-weight: 700; line-height: 23px; }
+[data-theme='v8'] .panel[data-layout='continuous'] .description { font-size: 12px; line-height: 17px; }
+[data-theme='v8'] .panel[data-layout='continuous'] > .steps { padding: 0; border: 0; background: transparent; }
+[data-theme='v8'] .panel[data-layout='continuous'] > .content { padding: 0; }
+[data-theme='v8'] .panel[data-layout='continuous'] .actions { padding: 6px 0 0; border: 0; }
