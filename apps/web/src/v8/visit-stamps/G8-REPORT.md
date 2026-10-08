@@ -82,4 +82,3 @@ G-8 の HTML・文字の座標表・撮影対応表は確認時点で未作成�
 - 動き・共通部品・画面の境界・CSS基準・設計影響の試験：8ファイル、51件すべて成功。初回は店舗切替の試験用データが指定と違う友だちIDを返してタイムアウト。実APIと同じく指定IDを返すデータへ直し、全51件を再確認して成功。
 - 実行：`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm exec vitest run src/v8/visit-stamps src/app/visit-stamps src/components/shared/tabs-v8-indicator.react.test.tsx src/components/templates/page-templates.test.tsx src/v8/v8-boundary.test.ts src/lib/screen-css-budget.test.ts src/lib/direct-values.test.ts src/lib/design-impact.test.ts --maxWorkers=1`。
 - この報告を含むコミットのSHAは最終報告で渡す。
-
