@@ -5,6 +5,8 @@
 
 /* 戻るリンク（絵は「← テンプレートへ」を1つの文字で描く）。 */
 .back { text-decoration: none; }
+/* 統括では同じ見た目のボタンで戻る（frame の onBack）。ボタンの既定の地・枠・余白を消して文字のリンクと同じにする。 */
+button.back { appearance: none; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
 .back:hover { text-decoration: underline; }
 
 /* 競合の帯の段（NCbYn「帯の段 競合」）：頭のすぐ下・左右24・下8。 */
@@ -62,7 +64,7 @@
 }
 .bodyText[data-kind='flex'] { height: var(--tpl-te-flex-h); font-family: var(--font-mono, monospace); font-size: var(--text-caption); }
 .bodySpacer { height: var(--tpl-te-body-spacer); flex-shrink: 0; }
-.insertRow { display: flex; align-items: center; gap: var(--tpl-chip-row-gap); flex-wrap: wrap; }
+.insertRow { display: flex; align-items: center; gap: var(--tpl-te-insert-gap); flex-wrap: wrap; }
 .insertLine { display: contents; }
 .insertLabel { color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
 .insertChip {
@@ -127,7 +129,7 @@
   .sideContent { width: 100%; }
   .previewToggle { display: block; }
   .phone, .previewHead { display: none; }
-  .insertLine { display: flex; align-items: center; gap: var(--tpl-chip-row-gap); width: 100%; }
+  .insertLine { display: flex; align-items: center; gap: var(--tpl-te-insert-gap); width: 100%; }
   .insertRow { flex-direction: column; align-items: stretch; gap: var(--tpl-body-gap); }
 }
 

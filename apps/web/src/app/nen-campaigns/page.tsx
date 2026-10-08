@@ -50,11 +50,23 @@ function isTab(value: string | null): value is NenTab {
 export default function NenCampaignsPage() {
   usePageTitle('NEN配信')
   const { selectedAccountId } = useAccount()
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
   const [tab, setTab] = useState<NenTab>('auto')
   const [settings, setSettings] = useState<NenCampaignSetting[]>([])
   const [columns, setColumns] = useState<NenColumn[]>([])
   // コラム一覧は口の既定200件で打ち切られる。全体件数を保持し、一覧へ出す（#935 N-300）。
   const [columnsTotal, setColumnsTotal] = useState<number | null>(null)
+  /* WEB231（V8）：200本より先のコラムを続けて読む。アカウントが変わったら足さない。 */
+  const loadMoreColumns = async () => {
+    if (!selectedAccountId) return
+    const accountId = selectedAccountId
+    const res = await api.nenCampaigns.columns(accountId, { offset: columns.length, limit: 200 })
+    if (!res.success) throw new Error('load_more_failed')
+    if (accountId !== selectedAccountIdRef.current) return
+    setColumns((current) => [...current, ...res.data.filter((item) => !current.some((known) => known.id === item.id))])
+    setColumnsTotal(res.pagination?.total ?? columnsTotal)
+  }
   const [friends, setFriends] = useState<FriendOption[]>([])
   const [kpis, setKpis] = useState<NenKpis | null>(null)
   const [flowMetrics, setFlowMetrics] = useState<NenFlowMetrics | null>(null)
@@ -507,6 +519,7 @@ export default function NenCampaignsPage() {
           coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
           selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
           columnsTotal={columnsTotal}
+          onLoadMoreColumns={loadMoreColumns}
           plan={plan} onPlanChange={setPlan}
           introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
           onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}

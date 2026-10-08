@@ -121,16 +121,24 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
       } : undefined)
     } catch (cause) {
       /* 書き換えた分を元の sort_order へ戻す（戻せなかった分は読み直しで本当の並びを出す）。 */
+      let partial = false
       for (const { menu, version } of written.reverse()) {
         try {
           await bookingApi.updateMenu(accountId, menu.id, version, { ...menu, sort_order: menu.sort_order })
         } catch {
           /* 読み直しに任せる */
+          partial = true
         }
       }
       setOrderOverride(null)
       onReload()
-      notifyToast(bookingErrorMessage(cause, '保存'), {
+      /*
+       * WEB052：並べ替えは1件ずつの保存（一括で保存する口はまだ無い）。途中で失敗して
+       * 戻しもできなかったときは「一部だけ変わった」と知らせ、読み直した並びを見てもらう。
+       */
+      notifyToast(partial
+        ? '並びの一部だけが変わりました。読み直した並びを確かめてから、もう一度お試しください。'
+        : bookingErrorMessage(cause, '保存'), {
         actionLabel: 'もう一度',
         onAction: () => { void persistOrder(movedId, nextIds, undoable) },
       })

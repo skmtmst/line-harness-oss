@@ -273,6 +273,8 @@ function AnalyticsReportFormPage() {
   const [options, setOptions] = useState<AnalyticsReportScheduleOptions | null>(null)
   const [editing, setEditing] = useState<AnalyticsReportSchedule | null>(null)
   const [editMissing, setEditMissing] = useState(false)
+  /* WEB308：履歴の口が読めなかったことを「見つかりません」と分ける。 */
+  const [editLoadFailed, setEditLoadFailed] = useState(false)
   const [canManage, setCanManage] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -340,6 +342,7 @@ function AnalyticsReportFormPage() {
     // PUT してしまう。取り直すたびに編集状態も初期化する。
     setEditing(null)
     setEditMissing(false)
+    setEditLoadFailed(false)
     setOneTime(null)
     if (!selectedAccountId) {
       setLoading(false)
@@ -401,13 +404,17 @@ function AnalyticsReportFormPage() {
         try {
           const detail = await api.analytics.reportSchedules.runs(selectedAccountId, editId)
           if (!active) return
-          if (detail.success && detail.data.schedule.isOneTime) {
+          if (detail.success && detail.data?.schedule?.isOneTime) {
             setOneTime(detail.data)
           } else {
             setEditMissing(true)
           }
-        } catch {
-          if (active) setEditMissing(true)
+        } catch (caught) {
+          // 404 は本当に無い。それ以外（通信・一時障害）は読み直せる失敗として出す。
+          if (active) {
+            if (caught instanceof ApiError && caught.status === 404) setEditMissing(true)
+            else setEditLoadFailed(true)
+          }
         }
       }
       setLoading(false)
@@ -982,6 +989,7 @@ function AnalyticsReportFormPage() {
       />
     )
   }
+  if (editLoadFailed) return <ListState kind="error" title="定期レポートを表示できませんでした" description="通信が切れたか、サーバーが応えませんでした。もう一度読み込んでください。" onRetry={() => setReloadSeq((n) => n + 1)} />
   if (editMissing || (editing === null && editId)) return <ListState kind="error" title="定期レポートが見つかりませんでした" description="一覧から選び直してください。" />
   if (editing?.isOneTime) return <ListState kind="empty" title="1回だけ送る依頼は変更できません" description="同じ内容が必要なときは、新しく作ってください。" />
   if (!options || options.recipients.length === 0) return (

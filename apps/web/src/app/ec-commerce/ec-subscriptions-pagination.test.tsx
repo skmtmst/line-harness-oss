@@ -157,3 +157,19 @@ describe('V8 定期便の表示件数', () => {
     expect(fixture.subscriptions.mock.calls.at(-1)![0]).toMatchObject({ limit: 50, offset: 50 })
   })
 })
+
+/* 監査 ROOT32：表示条件で0件になっても、条件の切り替えが消えない。 */
+test('ROOT32: 表示条件で0件なら「条件に合う」の空と切り替えを残し、外せる', async () => {
+  fixture.subscriptions.mockImplementation(async (params: { status?: string; offset?: number; limit?: number }) =>
+    params.status ? page(0, 0, 0) : page(params.offset ?? 0, params.limit ?? 10))
+  render(<SubscriptionsPanel accountId="acc-1" />)
+  await waitFor(() => expect(screen.getByText('お客様0')).toBeTruthy())
+  const tab = screen.getAllByRole('tab').find((button) => button.textContent?.includes('休止中'))
+  expect(tab, '表示条件のタブがある').toBeTruthy()
+  await act(async () => { fireEvent.click(tab!) })
+  await waitFor(() => expect(screen.getByText('条件に合う定期便はありません')).toBeTruthy())
+  expect(screen.queryByText('定期便はまだありません')).toBeNull()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '条件を外す' })) })
+  await waitFor(() => expect(screen.getByText('お客様0')).toBeTruthy())
+  cleanup()
+})

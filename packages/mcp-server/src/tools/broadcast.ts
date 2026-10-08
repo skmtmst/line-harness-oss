@@ -46,6 +46,10 @@ export function registerBroadcast(server: McpServer): void {
         .string()
         .optional()
         .describe("LINE account ID (uses default if omitted)"),
+      confirmIrreversible: z.literal("broadcast-send").optional()
+        .describe("Explicit confirmation after reviewing recipients and content; required for immediate sending"),
+      confirmedRecipientCount: z.number().int().nonnegative().optional()
+        .describe("Recipient count reviewed for a single-operator high-volume send"),
       trackLinks: z
         .boolean()
         .default(true)
@@ -64,6 +68,8 @@ export function registerBroadcast(server: McpServer): void {
       altText,
       accountId,
       trackLinks,
+      confirmIrreversible,
+      confirmedRecipientCount,
     }) => {
       try {
         const client = getClient();
@@ -131,6 +137,7 @@ export function registerBroadcast(server: McpServer): void {
             };
           }
 
+          if (confirmIrreversible !== "broadcast-send") throw new Error("confirmIrreversible: broadcast-send is required before sending");
           // URL の短縮 (auto-track) は worker が送信時に行う (broadcast の
           // line_account_id 付きでリンクを所有させるため、ここでは変換しない。
           // 事前に変換すると draft/scheduled で trackLinks を OFF に切り替えても
@@ -149,6 +156,7 @@ export function registerBroadcast(server: McpServer): void {
             const result = await client.broadcasts.sendToSegment(
               broadcast.id,
               parsedConditions,
+              { confirmIrreversible, confirmedRecipientCount },
             );
             return {
               content: [
@@ -168,6 +176,8 @@ export function registerBroadcast(server: McpServer): void {
           }
         }
 
+        if (!scheduledAt && confirmIrreversible !== "broadcast-send") throw new Error("confirmIrreversible: broadcast-send is required before sending");
+
         // URL の短縮 (auto-track) は worker が送信時に行う (上の segment 経路と同じ理由)。
         // At this point targetType is guaranteed to be 'all' or 'tag' (segment handled above)
         const broadcast = await client.broadcasts.create({
@@ -184,7 +194,7 @@ export function registerBroadcast(server: McpServer): void {
 
         const result = scheduledAt
           ? broadcast
-          : await client.broadcasts.send(broadcast.id);
+          : await client.broadcasts.send(broadcast.id, { confirmIrreversible, confirmedRecipientCount });
 
         return {
           content: [

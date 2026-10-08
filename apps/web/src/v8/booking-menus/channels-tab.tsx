@@ -256,7 +256,19 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
     }
   }
 
+  /* WEB058：アカウントを変えたら、前のアカウントの遅い応答（一覧・重なり・カレンダー）を捨てる。 */
+  const loadGeneration = useRef(0)
+  useEffect(() => {
+    setData(null)
+    setCalendars({})
+    setConflicts([])
+    setConflictOpen(false)
+    return () => { loadGeneration.current += 1 }
+  }, [accountId])
+
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current
+    const alive = () => generation === loadGeneration.current
     setStatus('loading')
     setError('')
     try {
@@ -264,6 +276,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
         bookingChannelsApi.channels(accountId),
         bookingChannelsApi.conflicts(accountId),
       ])
+      if (!alive()) return
       if (!channelsRes.success) throw new Error(channelsRes.error)
       if (!conflictsRes.success) throw new Error(conflictsRes.error)
       setData(channelsRes.data)
@@ -279,8 +292,10 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
           return [s.staffId, ''] as const
         }
       }))
+      if (!alive()) return
       setCalendars(Object.fromEntries(details.filter(([, id]) => id)))
     } catch (e) {
+      if (!alive()) return
       setError(describeApiFailure(e, '予約経路を読み込めませんでした。'))
       setStatus('error')
     }
@@ -306,7 +321,8 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
       {firstConflict ? (
         <NoteBar tone="warn">
           予約が {conflicts.length} 件重なっています。
-          <Button size="compact" onClick={() => setConflictOpen(true)}>重なりを解消する</Button>
+          {/* WEB059：閲覧のみには、付け替え（書き込み）へ進む口を置かない。重なりの知らせは出す。 */}
+          {canEdit ? <Button size="compact" onClick={() => setConflictOpen(true)}>重なりを解消する</Button> : null}
         </NoteBar>
       ) : null}
 
@@ -419,7 +435,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
       {connectTarget ? (
         <ConnectDialog accountId={accountId} staff={connectTarget} onClose={() => setConnectTarget(null)} onDone={() => { setConnectTarget(null); void load() }} />
       ) : null}
-      {conflictOpen && firstConflict ? (
+      {canEdit && conflictOpen && firstConflict ? (
         <ConflictDialog accountId={accountId} conflict={firstConflict} staff={data.staff} onClose={() => setConflictOpen(false)} onDone={() => { setConflictOpen(false); void load() }} />
       ) : null}
     </div>
