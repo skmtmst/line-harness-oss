@@ -801,3 +801,35 @@ describe('監査 L4：満席の日から時刻の「空いたら知らせる」�
     expect(await screen.findByText('この週は空きがありません')).toBeTruthy();
   });
 });
+
+describe('監査 L10：選んだ時刻に開始の瞬間と店のタイムゾーンを持たせる', () => {
+  it('時刻を押すと startUtc・timeZone を付けて onSelect へ渡す', async () => {
+    availability.mockImplementation(async (_m: string, _s: string | undefined, from: string, to: string) => ({
+      by_staff: [
+        {
+          staff_id: 's1',
+          display_name: '担当A',
+          slots: [
+            {
+              date: '2026-10-16',
+              start: '13:00',
+              end: '14:00',
+              timeZone: 'Asia/Bangkok',
+              startUtc: '2026-10-16T13:00:00+07:00',
+              endUtc: '2026-10-16T14:00:00+07:00',
+            },
+          ].filter((x) => x.date >= from && x.date <= to),
+        },
+      ],
+      closed_dates: [],
+    }));
+    const { onSelect } = renderPicker();
+    fireEvent.click(await screen.findByRole('button', { name: '13:00' }));
+    expect(onSelect).toHaveBeenCalledWith({
+      date: '2026-10-16',
+      start: '13:00',
+      startUtc: '2026-10-16T13:00:00+07:00',
+      timeZone: 'Asia/Bangkok',
+    });
+  });
+});

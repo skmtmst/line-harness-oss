@@ -11,7 +11,11 @@ import Icon from './ui/Icon.js';
 import BottomBar from './ui/BottomBar.js';
 import Button from './ui/Button.js';
 
-export type SlotPick = { date: string; start: string };
+/**
+ * 選んだ枠。date・start は店の暦日・壁時刻（表示用）。startUtc・timeZone は
+ * 空き枠が返した開始の瞬間と店のタイムゾーンで、予約・待ちの登録はこれを送る。
+ */
+export type SlotPick = { date: string; start: string; startUtc?: string; timeZone?: string };
 
 /** 日時を選ぶ段の見せ方。'list' が週5日の並び (M2p63S)、'calendar' が月の表 (k3aJKU)。 */
 export type DateView = 'list' | 'calendar';
@@ -46,9 +50,16 @@ function monthOf(date: string): string {
   return date.slice(0, 7);
 }
 
-type AvailSlot = { date: string; start: string; remaining?: number; state?: string };
+type AvailSlot = {
+  date: string;
+  start: string;
+  remaining?: number;
+  state?: string;
+  startUtc?: string;
+  timeZone?: string;
+};
 /** 時刻の枠。open=false は埋まった枠 (灰色で出す・押せない)。 */
-export type TimeSlot = { start: string; open: boolean };
+export type TimeSlot = { start: string; open: boolean; startUtc?: string; timeZone?: string };
 
 /**
  * 空き読み出しのまとめ役（週・カレンダー共通）。
@@ -82,8 +93,15 @@ function groupSlots(
       const prev = seen.get(`${s.date}\0${s.start}`);
       if (prev) {
         prev.open ||= open;
+        prev.startUtc ??= s.startUtc;
+        prev.timeZone ??= s.timeZone;
       } else {
-        seen.set(`${s.date}\0${s.start}`, { start: s.start, open });
+        seen.set(`${s.date}\0${s.start}`, {
+          start: s.start,
+          open,
+          ...(s.startUtc ? { startUtc: s.startUtc } : {}),
+          ...(s.timeZone ? { timeZone: s.timeZone } : {}),
+        });
       }
       if (open && !limited) strictOpen.add(s.date);
       if (limited) limitedOnly.add(s.date);
@@ -189,6 +207,16 @@ function weekMark(state: DayState): string {
   return '満';
 }
 
+/** 時刻の札から選んだ枠を作る。開始の瞬間と店のタイムゾーンを持って運ぶ。 */
+function pickOf(day: string, t: TimeSlot): SlotPick {
+  return {
+    date: day,
+    start: t.start,
+    ...(t.startUtc ? { startUtc: t.startUtc } : {}),
+    ...(t.timeZone ? { timeZone: t.timeZone } : {}),
+  };
+}
+
 /**
  * 選んだ日の時刻3列 (★V8・M2p63S)。埋まった時刻は灰色で押せない。
  * 埋まった時刻には鈴の印を付ける (booking-plus 2)。鈴を押すと
@@ -221,7 +249,7 @@ function DaySlots({
               <button
                 key={t.start}
                 type="button"
-                onClick={() => onSelect({ date: day, start: t.start })}
+                onClick={() => onSelect(pickOf(day, t))}
                 disabled={!t.open}
                 aria-pressed={active}
                 className={`liff-press liff-num h-11 w-full rounded-(--liff-radius) px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
@@ -241,7 +269,7 @@ function DaySlots({
                 {timeButton}
                 <button
                   type="button"
-                  onClick={() => onWaitlist({ date: day, start: t.start })}
+                  onClick={() => onWaitlist(pickOf(day, t))}
                   aria-label={`${t.start}に空いたら知らせる`}
                   className="liff-hit liff-press absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-canvas text-liff-primary shadow outline-1 -outline-offset-1 outline-liff-line-strong focus-visible:outline-2 focus-visible:outline-ink"
                 >
@@ -833,6 +861,7 @@ export default function DateTimePicker({
                     staff={staff}
                     date={waitSlot.date}
                     start={waitSlot.start}
+                    startUtc={waitSlot.startUtc}
                     onClose={() => setWaitSlot(null)}
                   />
                 )}

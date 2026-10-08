@@ -20,7 +20,7 @@ import { api, type MenuItem, type PostalCodeCandidate, type PublicForm, type Sta
 import {
   addDays,
   formatWeekday,
-  jstStartsAtIso,
+  slotStartsAtIso,
   formatJstEventAt,
   jstToday,
   utcToJstHm,
@@ -996,7 +996,7 @@ export function BookingSlotPicker({
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staffList, setStaffList] = useState<StaffItem[]>([]);
   const [staffId, setStaffId] = useState<string>(fixedStaffId ?? '');
-  const [byDate, setByDate] = useState<Record<string, Array<{ start: string; open: boolean }>>>({});
+  const [byDate, setByDate] = useState<Record<string, Array<{ start: string; open: boolean; startUtc?: string }>>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -1047,7 +1047,7 @@ export function BookingSlotPicker({
     Promise.all(chunks.map(([from, to]) => api.availability(menuId, activeStaff, from, to)))
       .then((results) => {
         if (cancelled) return;
-        const merged: Record<string, Array<{ start: string; open: boolean }>> = {};
+        const merged: Record<string, Array<{ start: string; open: boolean; startUtc?: string }>> = {};
         for (const r of results) {
           for (const bucket of r.by_staff ?? []) {
             if (bucket.staff_id !== activeStaff) continue;
@@ -1055,7 +1055,9 @@ export function BookingSlotPicker({
               if (s.date < today || s.date > lastDay) continue;
               const open = !((s.remaining ?? 1) <= 0 || s.state === 'full' || s.state === 'closed');
               const list = (merged[s.date] ??= []);
-              if (!list.some((t) => t.start === s.start)) list.push({ start: s.start, open });
+              if (!list.some((t) => t.start === s.start)) {
+                list.push({ start: s.start, open, ...(s.startUtc ? { startUtc: s.startUtc } : {}) });
+              }
               else if (open) list.find((t) => t.start === s.start)!.open = true;
             }
           }
@@ -1167,7 +1169,8 @@ export function BookingSlotPicker({
       {selectedDate && (
         <div className="grid grid-cols-3 gap-2">
           {daySlots.map((t) => {
-            const startsAt = jstStartsAtIso(selectedDate, t.start);
+            // 空き枠が返した開始の瞬間を送る（店が日本時間以外でもずれない）。
+            const startsAt = slotStartsAtIso({ date: selectedDate, start: t.start, startUtc: t.startUtc });
             const active = picked?.startsAt === startsAt;
             return (
               <button
