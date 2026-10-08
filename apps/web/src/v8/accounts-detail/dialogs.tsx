@@ -360,8 +360,13 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
   onSaved: () => void
 }) {
   // 保存中に対象が変わって中身が消えたら、A の結果で B の窓を閉じたり読み直したりしない。
+  // 付くたびに true へ戻す。開発時の StrictMode は付ける→外す→付けるを1回ずつ多く回すので、
+  // 外すときだけ false にすると、付いているのに false が残って保存の結果と「保存中」の解除を捨てる。
   const alive = useRef(true)
-  useEffect(() => () => { alive.current = false }, [])
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
   const [secret, setSecret] = useState('')
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
