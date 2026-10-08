@@ -466,39 +466,25 @@ interface TemplatePublishKeyRecord {
  * - 公開版の更新とキー記録は `db.batch` の単一原子操作で行う。
  *   途中障害・並行要求で版だけ進むことはない(独立審査P1)。
  */
-/**
- * 466: 公開が決まった内容を版履歴へ1行足す。前の版は変えない。
- * 公開の原子操作のあとに足す。ここで落ちたら公開ごと500にし、
- * 版だけ進んだ公開を残さない（黙って履歴欠けにしない）。
- */
-async function recordPublishedVersion(
+/** 公開本体のUPDATE直後に、不変の版履歴を同じ原子操作へ入れる。 */
+function publishedVersionStatement(
   db: D1Database,
-  row: TemplateRow,
+  id: string,
   versionNumber: number,
   options: { effectiveFrom?: string; createdByStaffId?: string | null },
   now: string,
-): Promise<void> {
-  await db.prepare(
+): D1PreparedStatement {
+  return db.prepare(
     `INSERT INTO template_versions
        (id, template_id, version_number, message_type, message_content,
         carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
         question_json, question_status, effective_from, created_by_staff_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(
-    crypto.randomUUID(),
-    row.id,
-    versionNumber,
-    row.message_type,
-    row.message_content,
-    row.carousel_actions_json,
-    row.carousel_tap_limit_mode,
-    row.carousel_tap_limit_text,
-    row.question_json,
-    row.question_status,
-    options.effectiveFrom ?? now,
-    options.createdByStaffId ?? null,
-    now,
-  ).run();
+     SELECT ?, id, published_version, message_type, message_content,
+            carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
+            question_json, question_status, ?, ?, ?
+       FROM templates WHERE id = ? AND published_version = ? AND changes() = 1`,
+  ).bind(crypto.randomUUID(), options.effectiveFrom ?? now,
+    options.createdByStaffId ?? null, now, id, versionNumber);
 }
 
 export async function publishTemplate(
@@ -611,11 +597,12 @@ export async function publishTemplate(
       current.published_version,
       current.draft_revision ?? 0,
     ),
+    publishedVersionStatement(db, id, nextVersion, options, now),
   ];
   if (options.idempotencyKey) {
     /*
-     * 同じ原子操作の中で、UPDATE が1行に当たったときだけ記録する。
-     * `changes()` は直前文の更新行数。無条件 INSERT にすると、
+     * 同じ原子操作の中で、公開UPDATEと直後の版履歴INSERTが
+     * それぞれ1行に当たったときだけ記録する。無条件 INSERT にすると、
      * 同時負けの側まで記録が残り、再試行の見分けが壊れる。
      */
     publishBatch.push(
@@ -675,8 +662,6 @@ export async function publishTemplate(
   if (!next || Number(next.published_version) !== nextVersion) {
     throw new Error('TEMPLATE_VERSION_CONFLICT');
   }
-  // 466: 公開のたびに版を1行足す。前の版は変えない。
-  await recordPublishedVersion(db, next, nextVersion, options, now);
   return { row: next, published: true, replayed: false };
 }
 
