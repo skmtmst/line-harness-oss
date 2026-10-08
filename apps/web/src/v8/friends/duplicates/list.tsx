@@ -201,8 +201,8 @@ export default function DuplicatesListV8() {
                     </div>
                   ) : (
                     <div className={styles.empty}>
+                      {/* 「もう一度見直す」は右上にあるので、ここには重ねない（2026-10-08 オーナー「下を消す」）。 */}
                       <ListState kind="empty" title="重複の候補はありません" description="同じ人が別の友だちとして登録されていそうなときに、ここに出ます。" />
-                      <Button type="button" variant="secondary" onClick={() => void d.detect()}>もう一度見直す</Button>
                     </div>
                   )}
                 </td></tr>
