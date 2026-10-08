@@ -2,19 +2,6 @@
  * ★V8-B 共通アクションを作る（j2hfkS）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
  * ここは段のカード（枠1・角12・余白20・間14）、処理の行（枠1・角10・余白12・番号24）、右の列の箱（余白16・間8）だけ。
  */
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-cn-back-lh);
-}
-
-.backLink:hover {
-  text-decoration: underline;
-}
-
 .card {
   display: flex;
   flex-direction: column;
@@ -64,37 +51,11 @@
   line-height: var(--tpl-cn-label-lh);
 }
 
-.optional {
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-tg2-safety-body-size);
-  font-weight: 400;
-  line-height: var(--tpl-cn-main-lh);
-}
-
 .pickLabel {
   color: var(--color-ink);
   font-size: var(--text-caption);
   font-weight: 600;
   line-height: var(--tpl-cn-main-lh);
-}
-
-.input {
-  width: 100%;
-  min-width: 0;
-  height: var(--tpl-cn-control-h);
-  padding: var(--tpl-cn-input-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  line-height: var(--tpl-tg2-input-lh);
-}
-
-.input:focus-visible {
-  outline: var(--tpl-tag-ring) solid var(--color-action);
 }
 
 .errorBand {
@@ -126,12 +87,20 @@
   outline-color: var(--color-accent-deep);
 }
 
+.stepLine {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-field-row-gap);
+  padding: var(--tpl-cn-field-row-gap);
+}
+
 .stepRow {
   display: flex;
   align-items: center;
   gap: var(--tpl-cn-field-row-gap);
-  width: 100%;
-  padding: var(--tpl-cn-field-row-gap);
+  flex: 1;
+  min-width: 0;
+  padding: 0;
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
@@ -190,7 +159,8 @@
 .stepMoves {
   display: flex;
   justify-content: flex-end;
-  gap: var(--tpl-tg2-card-head-gap);
+  flex-shrink: 0;
+  gap: var(--tpl-cn-field-row-gap);
 }
 
 .addLinks {
@@ -267,6 +237,7 @@
   color: var(--color-ink-secondary);
   font-size: var(--tpl-tg2-safety-body-size);
   line-height: var(--tpl-cn-main-lh);
+  word-break: normal;
 }
 
 .sideLink {
@@ -274,6 +245,7 @@
   color: var(--color-action);
   font-size: var(--text-caption);
   font-weight: 600;
+  line-height: var(--tpl-cn-main-lh);
   cursor: help;
 }
 
@@ -282,4 +254,11 @@
   color: var(--color-ink);
   font-size: var(--text-caption);
   line-height: var(--tpl-tg2-aside-text-lh);
+  word-break: normal;
+}
+
+.inputError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
 }

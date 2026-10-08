@@ -1,19 +1,7 @@
 /*
  * ★V8 共通アクションの版と使われている場所（Pencil `ziSgL`）。
- * 枠・見出しは型（DetailPage）が持つ。ここは戻る道・数のマス・版の履歴・呼び出し元の表だけ。
+ * 枠・見出しは型（DetailPage）が持つ。ここは数のマス・版の履歴・呼び出し元の表だけ。
  */
-
-/* 題の上の「← 共通アクション一覧へ戻る」。 */
-.back {
-  color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-am-ver-back-lh);
-  text-decoration: none;
-}
-.back:hover {
-  text-decoration: underline;
-}
 
 .errorBand {
   display: flex;
@@ -39,8 +27,6 @@
 
 /* 4つの数のマス（枠つき・同じ幅・間 12）。 */
 .cards {
-  /* 絵のマスは下の段まで 14。型のマスの高さが 5 高いぶん詰める。 */
-  margin-bottom: calc(var(--tpl-am-ver-cards-trim) * -1);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--tpl-am-ver-card-gap);
@@ -52,7 +38,8 @@
   flex-direction: column;
   gap: var(--tpl-am-ver-history-gap);
   padding: var(--tpl-am-ver-history-pad);
-  border: 1px solid var(--color-control-border);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
   border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
@@ -83,6 +70,7 @@
   justify-content: flex-start;
   gap: var(--tpl-am-col-gap);
   min-height: var(--tpl-am-ver-row-h);
+  flex-shrink: 0;
   box-shadow: var(--shadow-row-line);
 }
 .versionRow > .pill {
