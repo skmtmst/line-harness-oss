@@ -42,6 +42,8 @@ export type DialogProps = {
    * tone（題・ボタンの色）とは独立。渡さなければ帯なし。
    */
   descriptionBand?: 'warning' | 'danger'
+  /** 入力の誤りがある欄など、開いた窓のフォーカス先。省けば従来どおり。 */
+  initialFocusId?: string
   busy?: boolean
   /** 実行ボタンを押せない形で出す（確かめのチェックが入るまで、など）。処理中の busy とは別。 */
   confirmDisabled?: boolean
@@ -92,6 +94,7 @@ export default function Dialog({
   tone = 'default',
   descriptionBand,
   busy = false,
+  initialFocusId,
   error,
   confirmLabel = '保存する',
   cancelLabel = 'キャンセル',
@@ -128,7 +131,8 @@ export default function Dialog({
     busy,
     // 主が取消の窓は、開いた直後の標的を主のボタンへ寄せる。Enter を押しても
     // 残る方が動く向きにする（×と背景は従来どおり取消）。
-    primaryAction === 'cancel' ? () => cancelRef.current : undefined,
+    initialFocusId ? () => document.getElementById(initialFocusId)
+      : primaryAction === 'cancel' ? () => cancelRef.current : undefined,
   )
   const confirmationSizeClass = confirmation && compact
     ? tone === 'destructive'
