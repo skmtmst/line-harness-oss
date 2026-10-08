@@ -21,6 +21,13 @@ import FolderPanel from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
+import { TextField } from '@/components/shared/text-field'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import type { FolderPanelRow } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -59,6 +66,17 @@ function audienceText(run: HqBroadcastRun): string {
 
 const NEW_HREF = '/hq/broadcasts/new'
 
+/** 開封・クリックの率（API-18。アカウントの合計。1つでも数えていなければ出さない）。 */
+function rateLine(targets: HqBroadcastRun['targets'], reached: number): string | null {
+  if (reached <= 0 || targets.length === 0) return null
+  if (targets.some((t) => t.openedCount == null || t.clickedCount == null)) return null
+  const pct = (n: number) => `${((n / reached) * 100).toFixed(1)}%`
+  return `開封 ${pct(targets.reduce((sum, t) => sum + (t.openedCount ?? 0), 0))}・クリック ${pct(targets.reduce((sum, t) => sum + (t.clickedCount ?? 0), 0))}`
+}
+
+/** 統括の一括配信のフォルダ（API-18。色は持たない）。 */
+type HqFolder = { id: string; name: string; revision: number; item_count: number }
+
 export default function HqBroadcastList() {
   usePageTitle('一括配信')
   const role = useStaffRole()
@@ -69,6 +87,14 @@ export default function HqBroadcastList() {
   const [status, setStatus] = useState<StatusKey>('all')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
+  /* 左の列のフォルダ（店の一斉配信と同じ。API-18 の統括のフォルダ）。読めなくても一覧は出す。 */
+  const [folders, setFolders] = useState<HqFolder[] | null>(null)
+  const [folderFilter, setFolderFilter] = useState('all')
+  const [folderDialog, setFolderDialog] = useState<{ editing: HqFolder | null } | null>(null)
+  const [folderName, setFolderName] = useState('')
+  const [deletingFolder, setDeletingFolder] = useState<HqFolder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -78,7 +104,15 @@ export default function HqBroadcastList() {
       setError(caught)
     }
   }, [])
-  useEffect(() => { void load() }, [load])
+  const loadFolders = useCallback(async () => {
+    try {
+      const res = await hqBroadcastsApi.folders()
+      setFolders(res.data)
+    } catch {
+      setFolders(null)
+    }
+  }, [])
+  useEffect(() => { void load(); void loadFolders() }, [load, loadFolders])
 
   const all = useMemo(() => runs ?? [], [runs])
   const counts = useMemo(() => {
@@ -86,11 +120,13 @@ export default function HqBroadcastList() {
     for (const run of all) { const key = statusKeyOf(run); if (key) result[key] += 1 }
     return result
   }, [all])
+  const folderIdOf = (run: HqBroadcastRun) => run.input?.folderId ?? null
+  const inFolder = useCallback((run: HqBroadcastRun) => folderFilter === 'all' || (folderFilter === 'none' ? !run.input?.folderId || !(folders ?? []).some((f) => f.id === run.input.folderId) : run.input?.folderId === folderFilter), [folderFilter, folders])
   const filtered = useMemo(() => {
     const words = query.trim().toLocaleLowerCase()
-    return all.filter((run) => (status === 'all' || statusKeyOf(run) === status)
+    return all.filter((run) => inFolder(run) && (status === 'all' || statusKeyOf(run) === status)
       && (!words || [run.title, run.input?.messageContent ?? ''].some((text) => text.toLocaleLowerCase().includes(words))))
-  }, [all, status, query])
+  }, [all, status, query, inFolder])
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
@@ -112,6 +148,51 @@ export default function HqBroadcastList() {
       <Plus size={15} aria-hidden="true" />一括配信を作る
     </Button>
   ) : null
+
+  const countIn = (id: string) => all.filter((run) => (id === 'none' ? !folderIdOf(run) || !(folders ?? []).some((f) => f.id === folderIdOf(run)) : folderIdOf(run) === id)).length
+  const folderRows: FolderPanelRow[] = [
+    { id: 'all', label: 'すべて', count: ready ? all.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    ...(folders ?? []).map((folder) => ({
+      id: folder.id,
+      label: folder.name,
+      count: ready ? countIn(folder.id) : null,
+      colorEditable: false,
+      ...(canManage ? {
+        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderDialog({ editing: folder }) },
+        onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
+      } : {}),
+    })),
+    ...(folders && folders.length > 0 ? [{ id: 'none', label: '未分類', count: ready ? countIn('none') : null }] : []),
+  ]
+  const selectFolder = (id: string) => { setFolderFilter(id); setPage(1) }
+  const saveFolder = async () => {
+    const name = folderName.trim()
+    if (!name || folderBusy || !folderDialog) return
+    setFolderBusy(true); setFolderError('')
+    try {
+      if (folderDialog.editing) await hqBroadcastsApi.updateFolder(folderDialog.editing.id, name, folderDialog.editing.revision)
+      else await hqBroadcastsApi.createFolder(name)
+      await loadFolders()
+      setFolderDialog(null)
+    } catch (caught) {
+      setFolderError(japaneseDetailOf(caught) || 'フォルダを保存できませんでした')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+  const removeFolder = async () => {
+    if (!deletingFolder || folderBusy) return
+    setFolderBusy(true); setFolderError('')
+    try {
+      await hqBroadcastsApi.deleteFolder(deletingFolder.id, deletingFolder.revision)
+      await loadFolders()
+      setDeletingFolder(null); setFolderFilter('all')
+    } catch (caught) {
+      setFolderError(japaneseDetailOf(caught) || 'フォルダを消せませんでした')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
 
   const toolbar = (
     <div className={styles.tools}>
@@ -153,8 +234,8 @@ export default function HqBroadcastList() {
         description="送るアカウントを選んで、同じ内容を一度に送れます。各店のアカウントに入らずに送れます。"
         create={{ label: '最初の一括配信を作る', href: NEW_HREF }}
         canCreate={canManage}
-        filtered={Boolean(query || status !== 'all')}
-        onClearFilters={() => { setQuery(''); setStatus('all'); setPage(1) }}
+        filtered={Boolean(query || status !== 'all' || folderFilter !== 'all')}
+        onClearFilters={() => { setQuery(''); setStatus('all'); setFolderFilter('all'); setPage(1) }}
         filteredDescription="検索や状態の札を外すと、すべて出ます"
       />
     )
@@ -184,7 +265,11 @@ export default function HqBroadcastList() {
             return (
               <Tr key={run.id} className={styles.row}>
                 <Td>
-                  <div className={styles.titleLine}><Link href={href} className={styles.cellTitle} title={run.title}>{run.title}</Link></div>
+                  <div className={styles.titleLine}>
+                    <FolderDotName folder={(() => { const folder = (folders ?? []).find((f) => f.id === folderIdOf(run)); return folder ? { name: folder.name, color: null } : null })()}>
+                      <Link href={href} className={styles.cellTitle} title={run.title}>{run.title}</Link>
+                    </FolderDotName>
+                  </div>
                   <span className={styles.cellSub}>{run.input?.messageType === 'image' ? '画像' : run.input?.messageType === 'flex' ? 'カード型' : 'テキスト'}</span>
                 </Td>
                 <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
@@ -200,7 +285,7 @@ export default function HqBroadcastList() {
                   {sent ? (
                     <>
                       <span className={styles.resultMain}>{`${formatNumber(reached)}人に届いた`}</span>
-                      {failed > 0 ? <span className={styles.cellSub}>{`失敗したアカウント ${formatNumber(failed)}`}</span> : null}
+                      {failed > 0 ? <span className={styles.cellSub}>{`失敗したアカウント ${formatNumber(failed)}`}</span> : rateLine(live, reached) ? <span className={styles.cellSub}>{rateLine(live, reached)}</span> : null}
                     </>
                   ) : <span className={styles.cellMain}>—</span>}
                 </Td>
@@ -240,14 +325,48 @@ export default function HqBroadcastList() {
           ))}
         </KpiBand>
       )}
-      folderNav={{ rows: [{ id: 'all', label: 'すべて' }], activeId: 'all', onSelect: () => {}, createAction: createButton(false) ?? undefined }}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: selectFolder, createAction: createButton(false) ?? undefined }}
       folders={(
         <FolderPanel
           createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
-          activeId="all"
-          onSelect={() => {}}
-          rows={[{ id: 'all', label: 'すべて', count: ready ? all.length : null, icon: <Inbox size={15} aria-hidden="true" /> }]}
-        />
+          activeId={folderFilter}
+          onSelect={selectFolder}
+          onAddFolder={canManage ? () => { setFolderError(''); setFolderName(''); setFolderDialog({ editing: null }) } : undefined}
+          addFolderLabel="フォルダを追加"
+          rows={folderRows}
+        >
+          {canManage ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
+          <p className={styles.note}>フォルダを消しても、入っていたものは未分類に残ります</p>
+        </FolderPanel>
+      )}
+      overlays={(
+        <>
+          <Dialog
+            open={folderDialog !== null}
+            title={folderDialog?.editing ? 'フォルダの名前を変える' : 'フォルダを追加'}
+            description="一括配信を分けてしまう箱です。消しても、中の配信は未分類に残ります。"
+            busy={folderBusy}
+            error={folderError || undefined}
+            confirmLabel={folderDialog?.editing ? '保存する' : '追加する'}
+            cancelLabel="やめる"
+            onCancel={() => { if (!folderBusy) setFolderDialog(null) }}
+            onConfirm={() => void saveFolder()}
+          >
+            <TextField aria-label="フォルダの名前" value={folderName} maxLength={100} disabled={folderBusy} placeholder="例: キャンペーン" onChange={(event) => setFolderName(event.target.value)} />
+          </Dialog>
+          <ConfirmDialog
+            open={deletingFolder !== null}
+            title={`フォルダ「${deletingFolder?.name ?? ''}」を消しますか？`}
+            description={deleteFolderDescription('一括配信', deletingFolder ? countIn(deletingFolder.id) : null)}
+            confirmLabel="フォルダを消す"
+            cancelLabel="キャンセル"
+            destructive
+            busy={folderBusy}
+            error={folderError || undefined}
+            onCancel={() => { if (!folderBusy) setDeletingFolder(null) }}
+            onConfirm={() => void removeFolder()}
+          />
+        </>
       )}
       toolbar={toolbar}
       pagination={pager}
