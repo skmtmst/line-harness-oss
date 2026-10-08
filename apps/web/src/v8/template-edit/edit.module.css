@@ -5,6 +5,8 @@
 
 /* 戻るリンク（絵は「← テンプレートへ」を1つの文字で描く）。 */
 .back { text-decoration: none; }
+/* 統括では同じ見た目のボタンで戻る（frame の onBack）。ボタンの既定の地・枠・余白を消して文字のリンクと同じにする。 */
+button.back { appearance: none; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
 .back:hover { text-decoration: underline; }
 
 /* 競合の帯の段（NCbYn「帯の段 競合」）：頭のすぐ下・左右24・下8。 */
