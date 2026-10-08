@@ -653,9 +653,11 @@
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
 .viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
 
-/* ===== 統括のひな形（src/v8/hq-templates/store-list.tsx）：店と同じ一覧に「配布先」と［アカウントへ配る］を足す。B-34：行の左右 24 ===== */
+/* ===== 統括のひな形（src/v8/hq-templates/store-list.tsx）：店と同じ一覧に「配布先」と［配る］（幅60＋左の間16）を足す。B-34：行の左右 24 ===== */
 .colHqDest { width: var(--tpl-tl-col-hq-dest); }
-.colHqActions { width: var(--tpl-tl-col-hq-actions); }
+.colHqDistribute { width: var(--tpl-tl-col-hq-distribute); }
+/* ［配る］と「…」の間は絵どおり 16（列の幅＝左の間 8＋ボタン 60＋右の間 16）。 */
+.hqTable td.hqDistributeCell { padding-right: var(--tpl-tl-hq-distribute-gap); }
 .hqTable tr > :first-child { padding-left: var(--tpl-tl-hq-row-pad-x); }
 .hqTable tr > :last-child { padding-right: var(--tpl-tl-hq-row-pad-x); }
 .hqDest { display: flex; flex-direction: column; min-width: 0; }
