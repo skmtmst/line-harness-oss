@@ -9854,6 +9854,7 @@ export const api = {
     create: (data: {
       name?: string
       code?: string
+      rewardMode?: 'none' | 'fixed' | 'rate'
       commissionRate?: number
       friendId?: string
       issueInitialLink?: boolean
@@ -9876,6 +9877,7 @@ export const api = {
         Pick<
           Affiliate,
           | 'name'
+          | 'rewardMode'
           | 'commissionRate'
           | 'isActive'
           | 'email'

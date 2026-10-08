@@ -1406,6 +1406,7 @@ export interface Affiliate {
   /** トラッキングコード (ユニーク) */
   code: string;
   /** コミッション率 (0-100) */
+  rewardMode?: 'none' | 'fixed' | 'rate';
   commissionRate: number;
   /** 有効/無効 */
   isActive: boolean;

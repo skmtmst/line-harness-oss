@@ -12,6 +12,7 @@ export interface Affiliate {
   name: string;
   code: string;
   commission_rate: number;
+  reward_mode?: 'none' | 'fixed' | 'rate' | null;
   is_active: number;
   created_at: string;
   friend_id: string | null;
@@ -104,6 +105,7 @@ export interface CreateAffiliateInput {
   name: string;
   code: string;
   commissionRate?: number;
+  rewardMode?: 'none' | 'fixed' | 'rate';
   /** Optional LINE friend UUID to bind for self-serve (LIFF) affiliates. */
   friendId?: string | null;
   /**
@@ -157,8 +159,8 @@ export async function createAffiliate(
     await db
       .prepare(
         `INSERT INTO affiliates
-           (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id, reward_mode)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -172,6 +174,7 @@ export async function createAffiliate(
         now,
         input.friendId ?? null,
         input.operationId ?? null,
+        input.rewardMode ?? ((input.commissionRate ?? 0) > 0 ? 'rate' : 'fixed'),
       )
       .run();
   } catch (err) {
@@ -191,6 +194,7 @@ export interface CreateAffiliateWithRandomCodeInput {
   lineAccountId: string;
   name: string;
   commissionRate?: number;
+  rewardMode?: 'none' | 'fixed' | 'rate';
   /** Optional LINE friend UUID to bind (enforced 1:1 by the partial UNIQUE index). */
   friendId?: string | null;
   /** See CreateAffiliateInput.operationId (#686). */
@@ -235,8 +239,8 @@ export async function createAffiliateWithRandomCode(
       await db
         .prepare(
           `INSERT INTO affiliates
-             (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id, reward_mode)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -250,6 +254,7 @@ export async function createAffiliateWithRandomCode(
           now,
           input.friendId ?? null,
           input.operationId ?? null,
+          input.rewardMode ?? ((input.commissionRate ?? 0) > 0 ? 'rate' : 'fixed'),
         )
         .run();
 
@@ -280,6 +285,7 @@ export type UpdateAffiliateInput = Partial<
     Affiliate,
     | 'name'
     | 'commission_rate'
+    | 'reward_mode'
     | 'is_active'
     | 'email'
     | 'hold_days'
@@ -297,6 +303,20 @@ export async function updateAffiliate(
   const fields: string[] = [];
   const values: unknown[] = [];
 
+  if (updates.reward_mode !== undefined || updates.commission_rate !== undefined) {
+    const current = await getAffiliateById(db, id, scope);
+    if (!current) return null;
+    // 根拠のない過去承認を現在額で再計算しない。確定額の照合が済むまで方式変更を止める。
+    const unknown = await db.prepare(`SELECT 1 AS missing FROM conversion_events ce
+      WHERE ce.affiliate_id = ? AND ce.approval_status = 'approved'
+        AND ce.approval_amount_minor IS NULL
+        AND NOT EXISTS (SELECT 1 FROM affiliate_reward_calculations calc WHERE calc.conversion_event_id = ce.id)
+        AND NOT EXISTS (SELECT 1 FROM affiliate_reward_entries entry WHERE entry.conversion_event_id = ce.id AND entry.entry_type = 'credit')
+      LIMIT 1`).bind(id).first();
+    if (unknown) throw new Error('APPROVED_REWARD_SNAPSHOT_MISSING');
+    fields.push('reward_mode = ?');
+    values.push(updates.reward_mode ?? current.reward_mode ?? ((updates.commission_rate ?? current.commission_rate) > 0 ? 'rate' : 'fixed'));
+  }
   if (updates.name !== undefined) {
     fields.push('name = ?');
     values.push(updates.name);

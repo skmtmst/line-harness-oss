@@ -89,6 +89,7 @@ function serializeAffiliate(row: {
   name: string;
   code: string;
   commission_rate: number;
+  reward_mode?: 'none' | 'fixed' | 'rate' | null;
   is_active: number;
   created_at: string;
   friend_id?: string | null;
@@ -104,6 +105,7 @@ function serializeAffiliate(row: {
     name: row.name,
     code: row.code,
     commissionRate: row.commission_rate,
+    rewardMode: row.reward_mode ?? (row.commission_rate > 0 ? 'rate' : 'fixed'),
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
     friendId: row.friend_id ?? null,
@@ -389,6 +391,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
       name?: string;
       code?: string;
       commissionRate?: number;
+      rewardMode?: 'none' | 'fixed' | 'rate';
       friendId?: string;
       issueInitialLink?: boolean;
       lineAccountId?: string;
@@ -445,6 +448,9 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
     if (!visible.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: 'Affiliate not found' }, 404);
     }
+    if (body.rewardMode !== undefined && !['none', 'fixed', 'rate'].includes(body.rewardMode)) {
+      return c.json({ success: false, error: 'rewardMode must be none, fixed or rate' }, 400);
+    }
     const rateError = commissionRateError(body.commissionRate);
     if (rateError) {
       return c.json({ success: false, error: rateError }, 400);
@@ -472,6 +478,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
           name: resolvedName,
           code,
           commissionRate: body.commissionRate,
+        rewardMode: body.rewardMode,
           operationId: operationId || undefined,
           // R525: 追加情報の保存が失敗しても稼働で残さない。
           isActive: body.isActive,
@@ -501,6 +508,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
         lineAccountId,
         name: resolvedName,
         commissionRate: body.commissionRate,
+        rewardMode: body.rewardMode,
         friendId: friendId || null,
         operationId: operationId || undefined,
         // R525: 追加情報の保存が失敗しても稼働で残さない。
@@ -562,17 +570,22 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
     const body = await c.req.json<{
       name?: string;
       commissionRate?: number;
+      rewardMode?: 'none' | 'fixed' | 'rate';
       isActive?: boolean;
     } & Record<string, unknown>>();
 
     const settlement = readAffiliateSettlement(body);
     if (!settlement.ok) return c.json({ success: false, error: settlement.error }, 400);
+    if (body.rewardMode !== undefined && !['none', 'fixed', 'rate'].includes(body.rewardMode)) {
+      return c.json({ success: false, error: 'rewardMode must be none, fixed or rate' }, 400);
+    }
     const rateError = commissionRateError(body.commissionRate);
     if (rateError) return c.json({ success: false, error: rateError }, 400);
 
     const updated = await updateAffiliate(c.env.DB, id, {
       name: body.name,
       commission_rate: body.commissionRate,
+      reward_mode: body.rewardMode,
       is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
       ...settlement.value,
     }, scope);
@@ -582,6 +595,9 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
     }
     return c.json({ success: true, data: serializeAffiliate(updated) });
   } catch (err) {
+    if (err instanceof Error && err.message === 'APPROVED_REWARD_SNAPSHOT_MISSING') {
+      return c.json({ success: false, code: err.message, error: '過去の承認額を確かめられないため、報酬方式を変更できません。過去の記録を照合してください。' }, 409);
+    }
     console.error('PUT /api/affiliates/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
