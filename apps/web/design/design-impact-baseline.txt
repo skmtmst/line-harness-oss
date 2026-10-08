@@ -751,6 +751,7 @@ shared-button-importer v8/account-new/register.tsx
 shared-button-importer v8/hq-templates/console.tsx
 shared-button-importer v8/hq-templates/detail.tsx
 shared-button-importer v8/hq-templates/store-list.tsx
+shared-button-importer v8/hq-templates/attribute-tabs.tsx
 shared-button-importer v8/hq-templates/message-form.tsx
 shared-button-importer v8/template-detail/detail.tsx
 shared-button-importer v8/tag-edit/edit.tsx
