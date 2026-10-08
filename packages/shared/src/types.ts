@@ -2604,7 +2604,7 @@ export interface HqBannerImageQuery {
 }
 export interface HqBannerImageCounts { all: number; favorite: number; delivered: number; unused: number }
 
-export interface HqTemplateFolder { id: string; name: string; revision: number }
+export interface HqTemplateFolder { id: string; name: string; revision: number; color?: string | null }
 
 export interface HqScenarioDefinition {
   schemaVersion: 1

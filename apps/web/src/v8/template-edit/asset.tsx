@@ -391,7 +391,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
             value={host ? host.folder : folder}
             onChange={host ? host.onFolderChange : setFolder}
             folders={host ? host.folders : folders.map(folderByName)}
-            colors={!host}
+            colors
             onCreate={host
               ? hostFolderCreate(host)
               : canMutate && selectedAccountId

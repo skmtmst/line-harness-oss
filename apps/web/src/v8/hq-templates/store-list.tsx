@@ -227,6 +227,7 @@ export default function HqStoreList(props: HqStoreListProps) {
     ...folders.map((folder) => ({
       id: folder.id,
       label: folder.name,
+      color: folder.color,
       count: ready ? countIn(folder.id) : null,
       colorEditable: false,
       ...(canEdit ? {
@@ -426,7 +427,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                 <NameCell
                   name={(
                     <div className={styles.dotLine}>
-                      <FolderDotName folder={folder ? { name: folder.name, color: null } : null}>
+                      <FolderDotName folder={folder ? { name: folder.name, color: folder.color } : null}>
                         {canEdit ? (
                           <button type="button" className={`${styles.cellTitle} ${styles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
                         ) : <span className={styles.cellTitle} title={row.name}>{row.name}</span>}

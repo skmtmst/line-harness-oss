@@ -14,9 +14,9 @@ export interface RichMenuCreateHost {
   onCancel: () => void
   /** owner・admin だけ保存・配るを押せる。 */
   canOperate: boolean
-  folders: Array<{ id: string; name: string }>
-  /** フォルダを選ぶ欄からその場で作る（dLffh）。呼ぶ側の種類のフォルダの口。色は受け取らない。 */
-  createFolder?: (name: string) => Promise<{ id: string; name: string }>
+  folders: Array<{ id: string; name: string; color?: string | null }>
+  /** フォルダを選ぶ欄からその場で作る（dLffh）。呼ぶ側の種類のフォルダの口。名前と色を受け取る。 */
+  createFolder?: (name: string, color: string | null) => Promise<{ id: string; name: string; color?: string | null }>
   /** ボタンの動きで選べる参照（統括のタグ・テンプレート・回答フォームのひな形。配った先の同じ名前に直す）。 */
   references: { tags: Array<{ id: string; name: string }>; templates: Array<{ id: string; name: string }>; forms: Array<{ id: string; name: string }> }
   /** 直すときに保存してある中身。新しく作るときは無い。 */

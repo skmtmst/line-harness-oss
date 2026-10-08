@@ -622,6 +622,12 @@
   --select-menu-button-pad-primary: 0 12px;
   --select-menu-panel-w: 220px;
   --select-menu-dot: 8px;
+  /* IjVpM と iBuZH：名前の横の色ボタン。 */
+  --tpl-folder-color-h: 40px;
+  --tpl-folder-name-color-gap: 10px;
+  --tpl-folder-color-compact-dot: 16px;
+  --tpl-folder-color-compact-pad: 0 8px;
+  --tpl-folder-color-compact-gap: 4px;
 }
 
 /*

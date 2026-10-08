@@ -82,7 +82,7 @@ beforeEach(() => {
           items, total: items.length, nextCursor: null,
           folderCounts: [{ name: '店頭', count: 1 }, { name: null, count: 1 }],
           summary: { rules: 1, active: 1, recentAdds: 10, captured: 8, unknownRoute: 2, delivered: 9, failed: 1 },
-          options: { routes: [], scenarios: [], tags: [], folders: [{ id: 'f1', name: '店頭' }] },
+          options: { routes: [], scenarios: [], tags: [], folders: [{ id: 'f1', name: '店頭', color: '#16a34a' }] },
         },
       })
     }
@@ -147,4 +147,11 @@ describe('友だち追加時の配信の一覧（V8）', () => {
     const menu = await openMenu('店頭QRの初回案内')
     expect(menu).toEqual(['実行結果を見る'])
   })
+})
+
+it('保存されたフォルダの色を設定名の前と左の列に表示する', async () => {
+  await act(async () => { root.render(<FriendAddListV8 />) })
+  const dot = host.querySelector('[data-folder-dot="filed"]') as HTMLElement
+  expect(dot.style.backgroundColor).toBe('#16a34a')
+  expect(host.innerHTML).toContain('#16a34a')
 })

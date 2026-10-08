@@ -34,7 +34,8 @@ import { useRowLeaving } from '@/lib/use-row-leaving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPageBody } from '@/components/templates'
-import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
+import { FOLDER_COLORS, FOLDER_COLOR_NAMES } from '@/components/shared/folder-add-dialog'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -164,58 +165,14 @@ function TagFolderDialog({
   }
 
   return (
-    <DetailPanel
-      open
+    <FolderEditorDialog open
       title={group ? 'フォルダを直す' : 'フォルダを追加'}
       description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
-      onClose={onClose}
-      busy={saving}
-      footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
-            キャンセル
-          </Button>
-          <Button variant="primary" type="button" onClick={() => void save()} disabled={saving || !name.trim()}>
-            {saving ? (group ? '保存中…' : '追加中…') : (group ? '保存する' : 'フォルダを作る')}
-          </Button>
-        </>
-      }
-    >
-      <label className={styles.formField}>
-        <span className={styles.formLabel}>
-          フォルダ名 <span className={styles.required}>*</span>
-        </span>
-        <input
-          type="text"
-          autoFocus
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && name.trim()) void save()
-          }}
-          placeholder="例: VIP"
-          className={styles.formInput}
-        />
-      </label>
-      <div className={styles.formField}>
-        <span className={styles.formLabel}>色</span>
-        <div className={styles.colorRow}>
-          {FOLDER_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setColor(c)}
-              aria-label={`色 ${c}`}
-              aria-pressed={color === c}
-              className={styles.colorDot}
-            >
-              <svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="14" fill={c} /></svg>
-            </button>
-          ))}
-        </div>
-      </div>
-      {error ? <p className={styles.formError} role="alert">{error}</p> : null}
-    </DetailPanel>
+      name={name} onNameChange={setName} color={color} onColorChange={(next) => setColor(next ?? FOLDER_COLORS[0])}
+      colors={FOLDER_COLORS.map((value) => ({ value, name: FOLDER_COLOR_NAMES[value] }))}
+      placeholder="例: VIP" busy={saving} error={error || undefined}
+      onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
+    />
   )
 }
 

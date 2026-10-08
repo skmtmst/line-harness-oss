@@ -6,7 +6,7 @@
  * 読み込み・保存・削除・クエリの切り替え（古い応答を捨てる）は今の画面（app/tags/folders/new/page.tsx）と同じ。
  * 受け付ける URL：`/tags/folders/new`（タグのフォルダを追加）・`?id=<フォルダ>`（直す・削除）・
  * `?kind=friend_field`（友だち情報欄のフォルダを追加。今の「作成する場所」の切り替えの代わり）。
- * 色は絵の9色（名前つき。色だけで見分けない）。
+ * 色は名前つきの9色を、名前の横の共通ボタンから選ぶ。
  */
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -15,7 +15,7 @@ import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import ListState from '@/components/shared/list-state'
 import TagsList from './list'
 import styles from './create.module.css'
@@ -174,18 +174,19 @@ function TagFolderPage() {
   return (
     <>
       <TagsList accountId={selectedAccountId} />
-      <Dialog
+      <FolderEditorDialog
         open
         designNode="IjVpM"
-        designWidth={560}
         designTop={300}
-        designHeaderPadding="24px 24px 0"
         title={title}
+        name={name} onNameChange={setName} color={color} onColorChange={(next) => setColor(next ?? DEFAULT_COLOR)}
+        colors={TAG_FOLDER_COLORS} maxLength={60} disabled={loadState !== 'ready'}
+        onConfirm={() => void save()}
         busy={saving}
         error={error || undefined}
         onCancel={close}
         footer={(
-          <div className={styles.dialogFooter}>
+          <>
             {editId ? (
               <Button type="button" variant="danger" disabled={saving} onClick={() => setDeleteOpen(true)}>
                 <Trash2 size={15} aria-hidden="true" />削除する
@@ -198,10 +199,10 @@ function TagFolderPage() {
                 {editId ? 'フォルダを保存する' : 'フォルダを作る'}
               </Button>
             </span>
-          </div>
+          </>
         )}
       >
-        <div className={styles.dialogBody}>
+        <>
           {loadState === 'forbidden' ? <p className={styles.fieldNote}>見る権限がありません</p> : null}
           {loadState === 'loading' ? <p className={styles.fieldNote}>読み込んでいます</p> : null}
           {loadState === 'error' ? (
@@ -210,39 +211,8 @@ function TagFolderPage() {
               <Button type="button" variant="text" onClick={loadFolder}>再読み込み</Button>
             </div>
           ) : null}
-          <label className={styles.field}>
-            <span className={styles.label}>フォルダ名</span>
-            <input
-              className={styles.input}
-              autoFocus
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="例：購入"
-              maxLength={60}
-              disabled={loadState !== 'ready'}
-            />
-          </label>
-          <div className={styles.colorField} role="group" aria-labelledby="folder-color">
-            <span className={styles.labelStrong} id="folder-color">色</span>
-            <span className={styles.colorRow}>
-              {TAG_FOLDER_COLORS.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  aria-label={item.name}
-                  title={item.name}
-                  aria-pressed={color.toLowerCase() === item.value.toLowerCase()}
-                  disabled={loadState !== 'ready'}
-                  className={styles.colorSwatch}
-                  style={{ backgroundColor: item.value }}
-                  onClick={() => setColor(item.value)}
-                />
-              ))}
-            </span>
-            <p className={styles.keyNote}>{`${TAG_FOLDER_COLORS.map((item) => item.name).join('・')}（色だけに頼らず名前でも見分けます）`}</p>
-          </div>
-        </div>
-      </Dialog>
+        </>
+      </FolderEditorDialog>
       <ConfirmDialog
         open={deleteOpen}
         title={`「${name}」を削除しますか？`}

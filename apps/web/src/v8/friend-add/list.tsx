@@ -294,17 +294,17 @@ function FriendAddList() {
 
   /*
    * 行の名前の前の丸は、左のフォルダの列と同じフォルダを名前で引く（設定はフォルダを名前で持つ）。
-   * この口はフォルダの色を返さないので、丸は色の無いフォルダの灰になる。無ければ未分類の輪。
+   * フォルダの候補から色を引く。色なしは薄い灰、フォルダなしは未分類の輪。
    */
-  const folderDotOf = (name: string | null | undefined) => (name ? { name } : null)
+  const folderDotOf = (name: string | null | undefined) => (name ? { name, color: data?.options.folders.find((folder) => folder.name === name)?.color } : null)
 
   /* フォルダ欄の件数はサーバの全ページ合計 (folderCounts)。 */
   const folders = useMemo(() => {
     const counts = new Map<string | null, number>()
     for (const entry of data?.folderCounts ?? []) counts.set(entry.name, entry.count)
-    const rows: Array<{ key: string; name: string; count: number }> = []
+    const rows: Array<{ key: string; name: string; count: number; color?: string | null }> = []
     for (const option of data?.options.folders ?? []) {
-      rows.push({ key: option.name, name: option.name, count: counts.get(option.name) ?? 0 })
+      rows.push({ key: option.name, name: option.name, color: option.color, count: counts.get(option.name) ?? 0 })
     }
     const uncategorized = counts.get(null) ?? 0
     if (uncategorized > 0 || !rows.some((row) => row.name === '未分類')) {
@@ -532,7 +532,7 @@ function FriendAddList() {
   /* 閲覧のみの人には、作る・追加・編集・削除の操作を置かない（押せない形でも出さない。オーナー 2026-10-06）。 */
   const folderRows = [
     { id: '', label: 'すべて', count: data?.total ?? items.length },
-    ...folders.map((entry) => ({ id: entry.key, label: entry.name, count: entry.count })),
+    ...folders.map((entry) => ({ id: entry.key, label: entry.name, color: entry.color, count: entry.count })),
   ]
   const createButton = canEdit ? (
     <Button variant="primary" href="/friend-add-settings?view=new" className={styles.createButton}>

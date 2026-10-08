@@ -64,3 +64,4 @@ export * from './broadcast-definition.js';
 export * from "./tab-counts";
 export * from "./audit3-api";
 export * from "./hq-friend-attribute-templates";
+export * from './folder-colors';

@@ -433,11 +433,11 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
     if (result && result.status !== 'running') setResultDialogFor(`${result.runId}:${result.status}`)
   }, [result])
   const reloadFolders = async () => setFolders(await hqTemplatesApi.folders.list())
-  /* フォルダを選ぶ欄からその場で作る（dLffh）。左の列の「フォルダを追加」と同じ口。色は持たない。 */
-  const createFolder = async (folderName: string) => {
-    const created = await hqTemplatesApi.folders.create(folderName)
+  /* フォルダを選ぶ欄からその場で作る（dLffh）。左の列の「フォルダを追加」と同じ口。名前と色を保存する。 */
+  const createFolder = async (folderName: string, color: string | null) => {
+    const created = await hqTemplatesApi.folders.create(folderName, color)
     setFolders((current) => [...current.filter((folder) => folder.id !== created.id), created])
-    return { value: created.id, label: created.name }
+    return { value: created.id, label: created.name, color: created.color }
   }
   const refreshStats = () => { void hqTemplatesApi.listStats(type).then((stats) => { if (alive.current) setListStats(stats ?? null) }).catch(() => undefined) }
   const reloadKind = async () => {
@@ -591,7 +591,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
     const host: TemplateEditHost = {
       backHref: '/hq/templates',
       description: '保存して配ると、選んだアカウントのテンプレートに新しい版として届きます',
-      folders: folders.map((folder) => ({ value: folder.id, label: folder.name })),
+      folders: folders.map((folder) => ({ value: folder.id, label: folder.name, color: folder.color })),
       folder: folderId ?? '',
       onFolderChange: (value) => setFolderId(value || null),
       createFolder: canEdit ? createFolder : undefined,
@@ -643,8 +643,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
       backHref: '/hq/rich-menus',
       onCancel: toList,
       canOperate: canEdit,
-      folders: folders.map((folder) => ({ id: folder.id, name: folder.name })),
-      createFolder: canEdit ? async (folderName) => { const created = await createFolder(folderName); return { id: created.value, name: created.label } } : undefined,
+      folders: folders.map((folder) => ({ id: folder.id, name: folder.name, color: folder.color })),
+      createFolder: canEdit ? async (folderName, color) => { const created = await createFolder(folderName, color); return { id: created.value, name: created.label, color: created.color } } : undefined,
       references: { tags: referenceOptions('tag'), templates: referenceOptions('template'), forms: referenceOptions('form') },
       initial: menuSeed,
       uploadImage: async (file, menuSize) => {
@@ -771,7 +771,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
                 {/* タグは中の「所属フォルダ」で分けるので、上のフォルダは出さない（同じ物が2つに見える・オーナー 10-08）。一覧での分けは「…」の「フォルダへ移す」。 */}
                 {type !== 'tag' ? <div className={styles.field}>
                   <span className={styles.label}>フォルダ</span>
-                  <FolderSelect aria-label="フォルダ" size="full" value={folderId ?? ''} disabled={busy || createUncertain || folderLoadFailed} onChange={(next) => setFolderId(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))} onCreate={canEdit ? createFolder : undefined} colors={false} />
+                  <FolderSelect aria-label="フォルダ" size="full" value={folderId ?? ''} disabled={busy || createUncertain || folderLoadFailed} onChange={(next) => setFolderId(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name, color: folder.color }))} onCreate={canEdit ? createFolder : undefined} />
                 </div> : null}
               </div>
               {!canonicalEditorOwnsSave && type !== 'rich_menu' ? (

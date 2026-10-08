@@ -433,7 +433,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                     value={host ? host.folder : folderId ?? ''}
                     onChange={host ? host.onFolderChange : (value) => setFolderId(value || null)}
                     folders={host ? host.folders : folders.map(folderById)}
-                    colors={!host}
+                    colors
                     onCreate={host
                       ? hostFolderCreate(host)
                       : canMutate && folderAccountId

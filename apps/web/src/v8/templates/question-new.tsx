@@ -285,7 +285,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                   setCategory(folders.find((folder) => folder.id === next)?.name ?? '未分類')
                 }}
                 folders={host ? host.folders : folders.map(folderById)}
-                colors={!host}
+                colors
                 onCreate={host
                   ? hostFolderCreate(host)
                   : canMutate && folderAccountId
