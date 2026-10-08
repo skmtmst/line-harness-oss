@@ -1,7 +1,7 @@
 'use client'
 
 import { Calendar, Clock, X } from 'lucide-react'
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import DateField, { formatLabel as formatDateLabel, parseDate } from './date-field'
 import MenuPortal from './menu-portal'
 import Select from './select'
@@ -96,10 +96,6 @@ export default function DateTimeField({
 
   // 外側を押したときの扱いは MenuPortal に任せる（箱の中の日付押しで閉じない）。
 
-  useEffect(() => {
-    if (!open) return
-    popoverRef.current?.querySelector<HTMLElement>('button, select')?.focus()
-  }, [open ])
 
   const openDialog = () => {
     if (disabled) return
@@ -207,6 +203,7 @@ export default function DateTimeField({
           align="start"
           getAnchor={() => triggerRef.current}
           onClose={() => { setOpen(false); setTimeDraft(null) }}
+          onReady={() => popoverRef.current?.querySelector<HTMLElement>('button, select')?.focus({ preventScroll: true })}
         >
         <div
           ref={popoverRef}

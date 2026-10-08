@@ -128,7 +128,6 @@ export default function TimeFieldV8({
     if (node && pendingOpenRef.current.hours) {
       pendingOpenRef.current.hours = false
       scrollToRow(node, activeHour)
-      node.focus({ preventScroll: true })
     }
   }
   const setMinuteList = (node: HTMLDivElement | null) => {
@@ -341,7 +340,8 @@ export default function TimeFieldV8({
       ) : null}
 
       {open ? (
-        <MenuPortal open={open} align="start" gap={4} getAnchor={() => fieldRef.current} onClose={() => setOpen(false)}>
+        <MenuPortal open={open} align="start" gap={4} getAnchor={() => fieldRef.current} onClose={() => setOpen(false)}
+          onReady={() => (activeColumn === 'hours' ? hourListRef : minuteListRef).current?.focus({ preventScroll: true })}>
           <div
             id={dialogId}
             role="dialog"
