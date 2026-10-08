@@ -406,4 +406,20 @@ describe('runExpirer の V6 連動', () => {
       error.mockRestore();
     }
   });
+  test('W3: OFFの200予約が先にあってもONの予約を期限切れにでき、OFFは保持する', async () => {
+    const { db, raw } = createTestD1(); seedBase(raw);
+    raw.exec(`INSERT INTO account_settings(id,line_account_id,key,value) VALUES('off', '${ACCOUNT_1}', 'feature.booking', 'false')`);
+    for (let i=0; i<200; i++) seedBooking(raw, `off-${i}`, {
+      accountId: ACCOUNT_1, friendId: 'v6ex-f1', menuId: 'v6ex-menu-1', staffId: 'v6ex-staff-1',
+      startsAt: STARTS_A, requestedAt: STALE_AT, status: 'requested',
+    });
+    seedBooking(raw, 'on', { accountId: ACCOUNT_2, friendId: 'v6ex-f2', menuId: 'v6ex-menu-2',
+      staffId: 'v6ex-staff-2', startsAt: STARTS_A, requestedAt: STALE_AT, status: 'requested' });
+    const sender = vi.fn(async () => undefined);
+    expect((await runExpirer(db, { now: NOW_V6, sender })).expired).toBe(1);
+    expect((await runExpirer(db, { now: NOW_V6, sender })).expired).toBe(0);
+    expect(raw.prepare("SELECT COUNT(*) n FROM bookings WHERE id LIKE 'off-%' AND status='requested'").get()).toEqual({ n: 200 });
+    raw.close();
+  });
+
 });

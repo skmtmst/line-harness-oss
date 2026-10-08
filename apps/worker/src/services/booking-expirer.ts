@@ -5,7 +5,7 @@ import { formatStartsAtForStore, notificationTiming } from './booking-notifier.j
 import { purgeExpiredIdempotency } from './booking-idempotency.js';
 import { REQUEST_TTL_HOURS } from './booking-types.js';
 import { cancelByTrigger } from './reminder-trigger.js';
-import { recordBookingAudit, resolveLineCredential, isOperationCapabilityStopped } from '@line-crm/db';
+import { recordBookingAudit, resolveLineCredential, isOperationCapabilityStopped, accountFeatureOffExclusionSql } from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
 
 interface StaleRow {
@@ -49,7 +49,8 @@ export async function runExpirer(
           LEFT JOIN booking_settings bs ON bs.line_account_id = b.line_account_id
         WHERE b.status = 'requested'
           AND b.requested_at < ?
-        LIMIT 200`,
+          AND NOT ${accountFeatureOffExclusionSql('b.line_account_id', 'booking')}
+        ORDER BY b.requested_at, b.id LIMIT 200`,
     )
     .bind(cutoff)
     .all<StaleRow>();
