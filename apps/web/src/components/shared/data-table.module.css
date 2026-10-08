@@ -247,5 +247,9 @@
   height: auto; padding: 0; border: 0; box-shadow: none;
 }
 [data-theme='v8'] .frame[data-table-presentation='columns'] .row {
-  height: var(--tpl-e1-close-row-h); border-bottom: 0; box-shadow: var(--shadow-row-line);
+  height: auto; min-height: var(--tpl-e1-close-row-h); border-bottom: 0; box-shadow: var(--shadow-row-line);
+}
+@container v8-page (max-width: 1099px) {
+  [data-theme='v8'] .frame[data-table-presentation='columns'] th[data-cell-collapse='narrow'],
+  [data-theme='v8'] .frame[data-table-presentation='columns'] .bodyCell[data-cell-collapse='narrow'] { display: none; }
 }

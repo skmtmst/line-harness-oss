@@ -124,7 +124,7 @@ export default function CloseTasksPage() {
         <thead>
           <TableHeadRow data-table-layout="columns">
             <Th className={styles.colSlot}>枠の日時</Th>
-            <Th className={styles.colRoute}>入った経路</Th>
+            <Th className={styles.colRoute} collapseAt="narrow">入った経路</Th>
             <Th className={styles.colMedia}>閉じる媒体</Th>
             <Th className={styles.colState}>状態</Th>
             <Th className={styles.colActions}>操作</Th>
@@ -143,7 +143,7 @@ export default function CloseTasksPage() {
                   <span className={styles.reason}>{reasonText(group)}</span>
                 </Td>
                 {/* 予約と知らせの結び付け（どの経路で入った予約か）は口がまだ無い（Codex 担当）。来たらここに経路の札。 */}
-                <Td className={styles.colRoute}><span className={styles.none} title="どの経路の予約で出た知らせかは、まだ出せません">—</span></Td>
+                <Td className={styles.colRoute} collapseAt="narrow"><span className={styles.none} title="どの経路の予約で出た知らせかは、まだ出せません">—</span></Td>
                 <Td className={styles.colMedia}>
                   <span className={styles.chips} title={group.items.map((item) => `${item.name}${item.status === 'done' ? '（閉じた）' : ''}`).join('・')}>
                     {group.items.map((item) => (
