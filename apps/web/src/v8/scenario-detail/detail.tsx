@@ -139,6 +139,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -598,7 +599,7 @@ export default function ScenarioDetailV8({
   const [stepFormNonce, setStepFormNonce] = useState(0)
   const [stepFormBaseline, setStepFormBaseline] = useState<{ nonce: number; value: { stepForm: StepFormState; kindState: MessageKindState } } | null>(null)
   /** 差し込みをカーソルの位置に入れるために、本文の入力欄を持つ。 */
-  const stepBodyRef = useRef<HTMLTextAreaElement>(null)
+  const stepBodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
 
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -1924,13 +1925,13 @@ export default function ScenarioDetailV8({
                     />
                   </div>
                 )}
-                <textarea
+                <InsertTextField
                   ref={stepBodyRef}
                   className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   rows={4}
                   placeholder="メッセージ内容を入力..."
                   value={stepForm.messageContent}
-                  onChange={(e) => setStepForm({ ...stepForm, messageContent: e.target.value })}
+                  onValueChange={(next) => setStepForm({ ...stepForm, messageContent: next })}
                 />
               </div>
             )}

@@ -21,6 +21,8 @@ import HelpTip from '@/components/shared/help-tip'
 import styles from './broadcast-form-v8.module.css'
 import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
+import BroadcastTextBubble from './broadcast-text-bubble'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import {
   MAX_BUBBLES,
   MAX_TEXT_LENGTH,
@@ -297,13 +299,13 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
   </div>
 }
 
-function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[] }) {
+function BubblePreview({ bubble, buttons = [], accountName }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[]; accountName?: string }) {
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
-  if (bubble.type === 'text') return <div className="max-w-[82%]">
+  if (bubble.type === 'text') return <BroadcastTextBubble text={text} buttons={buttons} accountName={accountName} legacy={<div className="max-w-[82%]">
     <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-label shadow-card">{text || 'テキストを入力すると表示されます'}</div>
     {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-medium" title={button.value}>{button.label || 'ボタン'}</div>)}
-  </div>
+  </div>} />
   if (bubble.type === 'sticker') {
     const st = (bubble.content.state as MessageKindState | undefined)?.sticker
     return st?.packageId && st?.stickerId
@@ -353,7 +355,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
 }) {
   const availableAssets = assets.filter((asset) => asset.kind === bubble.type)
   // 差し込みをカーソルの位置に入れるために、入力欄そのものを渡す。
-  const textRef = useRef<HTMLTextAreaElement>(null)
+  const textRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
     {/*
       吹き出しの見出し行。狭い幅では2段に折る。折らないと、種類の選択肢と
@@ -393,7 +395,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
             onChange={(next) => onChange({ ...bubble, content: { text: next.slice(0, MAX_TEXT_LENGTH) } })}
           />
         </div>
-        <textarea ref={textRef} rows={6} maxLength={MAX_TEXT_LENGTH} value={String(bubble.content.text ?? '')} onChange={(e) => onChange({ ...bubble, content: { text: e.target.value } })} placeholder="テキストを入力" className="border-hairline focus:border-accent rounded-card w-full resize-none border p-3 text-sm focus:outline-none" />
+        <InsertTextField ref={textRef} rows={6} maxLength={MAX_TEXT_LENGTH} value={String(bubble.content.text ?? '')} onValueChange={(next) => onChange({ ...bubble, content: { text: next } })} placeholder="テキストを入力" className="border-hairline focus:border-accent rounded-card w-full resize-none border p-3 text-sm focus:outline-none" />
         <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, MAX_TEXT_LENGTH) } })} className="rounded-mini border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{messageLengthLabel(String(bubble.content.text ?? '').length)}</span></div>
       </div>}
       {bubble.type === 'flex' && <div>
@@ -459,7 +461,7 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
   onMove: (direction: -1 | 1) => void
   onDelete: () => void
 }) {
-  const textRef = useRef<HTMLTextAreaElement>(null)
+  const textRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const text = String(bubble.content.text ?? '')
   const urls = [...new Set(text.match(/https?:\/\/\S+/g) ?? [])]
 
@@ -482,13 +484,13 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
           onChange={(next) => onChange({ ...bubble, content: { ...bubble.content, text: next.slice(0, MAX_TEXT_LENGTH) } })}
         />
       </div>}
-      <textarea
+      <InsertTextField
         ref={textRef}
         aria-label={`${index + 1}通目の本文`}
         rows={6}
         maxLength={MAX_TEXT_LENGTH}
         value={text}
-        onChange={(event) => onChange({ ...bubble, content: { ...bubble.content, text: event.target.value } })}
+        onValueChange={(next) => onChange({ ...bubble, content: { ...bubble.content, text: next } })}
         placeholder="テキストを入力"
         className={`border-hairline rounded-control mt-3 w-full resize-none border p-3 text-sm focus:border-accent focus:outline-none ${embedded ? 'h-30' : ''}`}
       />
@@ -2654,7 +2656,7 @@ export default function BroadcastForm({
         <div className={styles.previewHead}><h3>LINE の見え方</h3><div className={styles.deviceSwitch} role="group" aria-label="プレビューの端末"><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button></div><Button ref={previewCloseRef} className={styles.previewClose} size="compact" onClick={() => { setPreviewOpen(false); previewToggleRef.current?.focus() }}>閉じる</Button></div>
         <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
           <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={!selectedTemplate && Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
-            <div className="flex flex-col gap-3 text-ink">{selectedTemplate ? (() => { const bubble = messageTemplateToBubble(selectedTemplate); return bubble ? <BubblePreview bubble={bubble} /> : <p className="whitespace-pre-wrap break-words">{selectedTemplate.messageContent}</p> })() : bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}</div>
+            <div className="flex flex-col gap-3 text-ink">{selectedTemplate ? (() => { const bubble = messageTemplateToBubble(selectedTemplate); return bubble ? <BubblePreview bubble={bubble} accountName={selectedAccount?.name} /> : <p className="whitespace-pre-wrap break-words">{selectedTemplate.messageContent}</p> })() : bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} buttons={index === 0 ? messageButtons : []} />)}</div>
           </LinePreview>
         </div>
         <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>

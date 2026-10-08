@@ -920,7 +920,7 @@
   /* テンプレートの作る・編集（u5YC6・a1k3d・NCbYn・S6FEuB・EsYo4）。 */
   --tpl-te-band-row-pad: 0 24px 8px; --tpl-te-band-pad: 12px 16px; --tpl-te-band-gap: 12px; --tpl-te-band-text-gap: 2px; --tpl-te-band-title-lh: 20px; --tpl-te-band-desc-lh: 19px;
   --tpl-te-head-gap: 2px; --tpl-te-card-title-lh: 22px; --tpl-te-hint-lh: 18px; --tpl-te-folder-w: 220px;
-  --tpl-te-body-h: 88px; --tpl-te-flex-h: 264px; --tpl-te-body-spacer: 16px; --tpl-te-url-gap: 10px; --tpl-te-url-pad: 10px 12px;
+  --tpl-te-insert-gap: 14px; --tpl-te-body-h: 88px; --tpl-te-flex-h: 264px; --tpl-te-body-spacer: 16px; --tpl-te-url-gap: 10px; --tpl-te-url-pad: 10px 12px;
   --tpl-te-phone-shift: 0px; --tpl-te-narrow-side-pad: 16px; --tpl-te-side-w: 380px;
   --tpl-te-tilde-pad: 0px; --tpl-te-tilde-lh: 19px; --tpl-te-coupon-img-w: 160px; --tpl-te-coupon-img-h: 106px; --tpl-te-coupon-bg: #f2d6c4; --tpl-te-format-w: 200px; --tpl-te-choice-min-w: 12px; --tpl-te-choice-lh: 18px;
   --tpl-te-avatar: 34px; --tpl-te-asset-w: 200px; --tpl-te-asset-radius: 14px; --tpl-te-asset-img-h: 110px; --tpl-te-asset-pad: 8px 10px; --tpl-te-asset-sub-lh: 15px; --tpl-te-asset-action-pad: 8px 0; --tpl-te-q-remove-shift: 21px; --tpl-te-focus: 2px; --tpl-te-line-top: inset 0 1px 0 var(--color-divider);
