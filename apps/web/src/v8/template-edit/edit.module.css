@@ -64,7 +64,7 @@ button.back { appearance: none; background: none; border: 0; padding: 0; font: i
 }
 .bodyText[data-kind='flex'] { height: var(--tpl-te-flex-h); font-family: var(--font-mono, monospace); font-size: var(--text-caption); }
 .bodySpacer { height: var(--tpl-te-body-spacer); flex-shrink: 0; }
-.insertRow { display: flex; align-items: center; gap: var(--tpl-chip-row-gap); flex-wrap: wrap; }
+.insertRow { display: flex; align-items: center; gap: var(--tpl-te-insert-gap); flex-wrap: wrap; }
 .insertLine { display: contents; }
 .insertLabel { color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
 .insertChip {
@@ -129,7 +129,7 @@ button.back { appearance: none; background: none; border: 0; padding: 0; font: i
   .sideContent { width: 100%; }
   .previewToggle { display: block; }
   .phone, .previewHead { display: none; }
-  .insertLine { display: flex; align-items: center; gap: var(--tpl-chip-row-gap); width: 100%; }
+  .insertLine { display: flex; align-items: center; gap: var(--tpl-te-insert-gap); width: 100%; }
   .insertRow { flex-direction: column; align-items: stretch; gap: var(--tpl-body-gap); }
 }
 
