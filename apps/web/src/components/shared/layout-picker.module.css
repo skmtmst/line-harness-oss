@@ -1,0 +1,20 @@
+/* 案A（JeINq・EFV8l）：寸法は部品が持ち、呼ぶ画面から上書きしない。 */
+.list { display: flex; flex-wrap: wrap; gap: 8px; }
+.tile {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 8px; border-radius: var(--radius-card); background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px; cursor: pointer;
+}
+.tile[data-selected] { background: var(--color-layout-picker-selected); outline: 2px solid var(--color-accent-deep); }
+.tile:has(.input:focus-visible)::after { content: ""; position: absolute; inset: -4px; border-radius: var(--radius-card); outline: 2px solid var(--color-action); pointer-events: none; }
+.tile[data-disabled] { cursor: default; }
+.input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: inherit; z-index: 1; }
+.sample { position: relative; display: block; overflow: hidden; width: 72px; height: 48px; border-radius: var(--radius-mini, 6px); background: var(--color-layout-picker-sample); }
+.list[data-preview='compact-menu'] .sample { height: 24px; }
+.list[data-preview='message'] .sample { width: 64px; height: 64px; }
+.tile[data-selected] .sample { background: var(--color-layout-picker-sample-selected); }
+.area { position: absolute; display: flex; align-items: center; justify-content: center; outline: 2px solid var(--color-canvas); outline-offset: -1px; color: var(--color-ink-secondary); font-size: 11px; font-weight: 600; line-height: 16px; }
+.tile[data-selected] .area { color: var(--color-accent-deep); }
+.name { display: flex; align-items: center; justify-content: center; gap: 4px; color: var(--color-ink); font-size: var(--text-caption, 12px); font-weight: 500; line-height: 17px; white-space: nowrap; }
+.tile[data-selected] .name { color: var(--color-accent-deep); font-weight: 600; }
+.check { font-size: 10px; line-height: 12px; }

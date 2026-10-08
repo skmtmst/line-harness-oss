@@ -3,29 +3,6 @@
  * 外枠・箱・名前とフォルダ・右の列は edit.module.css（クーポン・リサーチと同じ）。
  */
 
-/* 面の分け方：形を6つ横に（間8）。形は幅72・見本56角・下に名前。 */
-.shapeRow { display: flex; flex-wrap: wrap; gap: var(--tpl-wa-rich-shape-gap); }
-.shape {
-  display: flex; flex-direction: column; align-items: center; gap: var(--tpl-wa-rich-shape-inner-gap);
-  width: var(--tpl-wa-rich-shape-w); padding: 0; border: 0; background: transparent; cursor: pointer;
-}
-.shape:focus-visible { outline: var(--tpl-te-focus) solid var(--color-action); outline-offset: var(--tpl-te-focus); border-radius: var(--radius-control); }
-.shapeGlyph {
-  display: flex; flex-direction: column; overflow: hidden;
-  width: var(--tpl-wa-rich-glyph); height: var(--tpl-wa-rich-glyph);
-  border-radius: var(--tpl-wa-rich-glyph-radius);
-  outline: 1px solid var(--color-hairline); outline-offset: -1px;
-  background: var(--color-surface-pearl);
-}
-.shape[aria-pressed='true'] .shapeGlyph {
-  outline: var(--tpl-wa-rich-glyph-ring) solid var(--color-accent-deep); outline-offset: calc(var(--tpl-wa-rich-glyph-ring) * -1);
-  background: var(--color-accent-soft);
-}
-.shapeGlyphRow { display: flex; flex: 1 1 0; }
-.shapeGlyphArea { flex: 1 1 0; outline: var(--tpl-wa-rich-glyph-line) solid var(--color-ink-faint); outline-offset: calc(var(--tpl-wa-rich-glyph-line) * -1); }
-.shapeLabel { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-wa-rich-label-lh); white-space: nowrap; }
-.shape[aria-pressed='true'] .shapeLabel { color: var(--color-accent-deep); font-weight: 600; }
-
 /* 画像：160角の枠（押すと登録メディア）・右に選ぶボタンと注記（間12・右の中は間8）。 */
 .imageRow { display: flex; align-items: flex-start; gap: var(--tpl-wa-rich-img-gap); width: 100%; }
 .imageBox {
