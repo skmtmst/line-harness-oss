@@ -4,6 +4,7 @@
  */
 import type { HqBroadcastPreflight, HqBroadcastRun } from '@line-crm/shared'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
+import type { InsertTokenSpec } from '@/components/shared/insert-tokens'
 
 /** 画面で見せる差し込み（店ごとに変わる）と、口へ送る書き方。 */
 export const STORE_INSERTS = [
@@ -12,6 +13,14 @@ export const STORE_INSERTS = [
   { label: '{予約ページ}', token: '{{var.reservation_url}}', help: '店の共通情報「reservation_url」' },
   { label: '{友だちの名前}', token: '{{name}}', help: '受け取る友だちの LINE の名前' },
 ] as const
+
+/** 本文の欄で札として見せる形（絵 OVCot）。札の文字・乗せたときの説明・印。 */
+export const STORE_INSERT_CHIPS: readonly InsertTokenSpec[] = [
+  { token: '{店名}', label: '店名', hint: '送る店の名前に置き換わります', icon: 'store' },
+  { token: '{店の電話番号}', label: '店の電話番号', hint: '店の共通情報「store_phone」に置き換わります', icon: 'phone' },
+  { token: '{予約ページ}', label: '予約ページ', hint: '店の共通情報「reservation_url」に置き換わります', icon: 'link' },
+  { token: '{友だちの名前}', label: '友だちの名前', hint: '受け取る友だちの LINE の名前に置き換わります', icon: 'user' },
+]
 
 /** 画面の差し込み（{店名} など）を口の書き方（{{account.name}} など）に置き換える。 */
 export function toApiContent(body: string): string {

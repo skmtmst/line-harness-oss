@@ -35,6 +35,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
 import HelpTip from '@/components/shared/help-tip'
 import SearchField from '@/components/shared/search-field'
+import InsertTextField, { InsertButton, type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -59,7 +60,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import RowMenu from './row-menu'
-import { ASSET_KIND, STORE_INSERTS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
+import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
 import { HQ_KIND_LABEL, HQ_KIND_TABS, HQ_NOT_YET, bubbleFromTemplate, carouselColumns, emptyContent, fromApiBubble, hqBubbleProblem, previewBubbleOf, bubbleFromHostContent, hostContentOfBubble, templateContentOfBubble, hqBubbleSummary, newHqBubble, notYetText, toApiBubble, type HqBubble } from './bubbles'
 import HqTemplatePicker from './template-picker'
 import CarouselV8 from '@/v8/templates/carousel'
@@ -242,7 +243,7 @@ export default function HqBroadcastCreate() {
   const setContent = (next: Record<string, unknown>, cardAsset?: boolean) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...item, content: next, cardAsset } : item)))
   /** 開いている吹き出しを、ひな形から読んだ吹き出しに置き換える。 */
   const replaceActive = (next: Bubble) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...next, id: item.id } : item)))
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   /* 統括で使える共有の素材（どの店にも属さないクーポン・リッチメッセージ）。 */
   const [assets, setAssets] = useState<BroadcastMessageAsset[] | null>(null)
   const assetId = String(active.content.assetId ?? '')
@@ -646,7 +647,7 @@ export default function HqBroadcastCreate() {
 
   const insert = (label: string) => {
     const el = bodyRef.current
-    const at = el ? el.selectionStart : body.length
+    const at = el?.selectionStart ?? body.length
     setBody((text) => `${text.slice(0, at)}${label}${text.slice(at)}`.slice(0, BODY_MAX))
     requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(at + label.length, at + label.length) })
   }
@@ -1027,13 +1028,14 @@ export default function HqBroadcastCreate() {
                         </div>
                         {kind === 'text' ? (
                           <section>
-                            <textarea
+                            <InsertTextField
                               ref={bodyRef}
                               aria-label="本文"
                               rows={6}
                               maxLength={BODY_MAX}
                               value={body}
-                              onChange={(event) => setBody(event.target.value)}
+                              onValueChange={setBody}
+                              extraTokens={STORE_INSERT_CHIPS}
                               placeholder="{店名}より：…"
                               className="border-hairline rounded-control w-full resize-none border p-3 text-sm focus:border-accent focus:outline-none"
                             />
@@ -1041,7 +1043,7 @@ export default function HqBroadcastCreate() {
                               <span className={styles.inserts}>
                                 <span className="text-ink-faint">差し込む：</span>
                                 {STORE_INSERTS.map((item) => (
-                                  <Button key={item.label} size="compact" variant="text" title={item.help} onClick={() => insert(item.label)}>{`＋ ${item.label.slice(1, -1)}`}</Button>
+                                  <InsertButton key={item.label} label={item.label.slice(1, -1)} title={item.help} onClick={() => insert(item.label)} />
                                 ))}
                               </span>
                               <span className="text-ink-faint">{`${formatNumber(body.length)} / ${formatNumber(BODY_MAX)}`}</span>
@@ -1265,7 +1267,7 @@ export default function HqBroadcastCreate() {
               <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（{予約ページ}は省いて見せています）。`}
                 empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
                 <div className="flex flex-col gap-3 text-ink">
-                  {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} /> : null))}
+                  {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} /> : null))}
                 </div>
               </LinePreview>
             </div>

@@ -267,3 +267,16 @@
 [data-theme='v8'] .phoneRoot { width: 100%; }
 [data-theme='v8'] .phoneTitle { justify-content: flex-start; font-size: var(--tpl-preview-title-size); font-weight: 600; line-height: var(--tpl-preview-title-lh); }
 [data-theme='v8'] .phone { margin-inline: auto; }
+
+/*
+ * ★V8 cfVyj（2026-10-08 描き直し・OVCot）：テキストの吹き出しは本物の LINE と同じく文字に合わせて伸び縮み。
+ * いちばん広くて186・文字13・行の高さ1.45・内側 8/12・角丸 左上6／ほか18・白・尾なし。
+ * 名前は吹き出しの上（10）、時刻は吹き出しの右下の外（9）。画像・カードの大きさは変えない（cfVyj）。
+ */
+[data-theme='v8'] .messageRow { min-width: 0; }
+[data-theme='v8'] .senderBody { flex: 0 1 auto; min-width: 0; }
+[data-theme='v8'] .bubbleRow { max-width: 100%; }
+[data-theme='v8'] .bubble { width: auto; min-height: 0; max-width: 186px; flex-shrink: 1; }
+[data-theme='v8'] .tail { display: none; }
+[data-theme='v8'] .bubbleBody { display: block; width: auto; min-height: 0; padding: 8px 12px; border-radius: var(--radius-mini) var(--radius-large) var(--radius-large) var(--radius-large); color: var(--color-ink); font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+[data-theme='v8'] .bubbleText { display: inline; }
