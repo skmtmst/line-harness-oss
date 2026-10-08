@@ -98,3 +98,25 @@
   outline: revert;
 }
 }
+
+/* V8 の段の箱（j8p3yj・r6dJFy）。指定された箱だけに効かせる。 */
+[data-theme='v8'] :is(.form, .aside, .panel) {
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  box-shadow: none;
+}
+[data-theme='v8'] .form {
+  gap: var(--tpl-cn-card-gap);
+  padding: var(--tpl-cn-card-pad);
+}
+[data-theme='v8'] .aside {
+  gap: var(--tpl-cn-side-card-gap);
+  padding: var(--tpl-side-card-pad);
+}
+[data-theme='v8'] .panel {
+  gap: var(--tpl-cn-panel-inner-gap);
+  padding: var(--tpl-cn-panel-pad);
+}

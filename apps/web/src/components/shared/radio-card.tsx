@@ -88,6 +88,8 @@ export interface RadioCardProps {
    * 渡したときだけ効き、既定の見た目は変えない。
    */
   height?: 'default' | 'short'
+  /** 横並びの小さい箱（j8p3yj）。既定のカード・行・v7 の寸法は変えない。 */
+  size?: 'default' | 'small'
 }
 
 export default function RadioCard({
@@ -105,6 +107,7 @@ export default function RadioCard({
   icon,
   variant = 'card',
   height = 'default',
+  size = 'default',
 }: RadioCardProps) {
   return (
     <label
@@ -112,6 +115,7 @@ export default function RadioCard({
         variant === 'row' ? styles.row : styles.card,
         variant === 'compact' ? styles.compact : null,
         variant === 'card' && height === 'short' ? styles.short : null,
+        variant === 'card' && size === 'small' ? styles.small : null,
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,
         invalid ? styles.invalid : null,

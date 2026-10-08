@@ -318,3 +318,13 @@
 [data-theme='v8'] .row .radio { position: static; width: 18px; height: 18px; margin: 0; }
 [data-theme='v8'] .row:active { filter: none; }
 [data-theme='v8'] .row { -webkit-font-smoothing: auto; }
+
+/* 横並びの小さい箱（j8p3yj）。指定した箱だけ、内容に合わせた高さで描く。 */
+[data-theme='v8'] .small {
+  min-height: 0;
+  padding: var(--tpl-cn-choice-pad);
+  border-radius: var(--radius-control);
+}
+[data-theme='v8'] .small .body { gap: var(--tpl-cn-choice-gap); }
+[data-theme='v8'] .small .title { font-weight: 700; line-height: var(--tpl-cn-name-lh); }
+[data-theme='v8'] .small .note { font-size: var(--text-micro); line-height: var(--tpl-cn-sub-lh); }
