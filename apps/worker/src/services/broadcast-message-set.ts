@@ -20,7 +20,7 @@ const SUPPORTED_TYPES = new Set([
   // 配信用素材（カルーセル・リッチ・クーポン・リサーチ）は、画面の保存と
   // 同じ変換（`@line-crm/shared`）で LINE の種別に直してから送る。
   // 画面では通るのに送信で断られる形にしない（監査 R144）。
-  'rich_message', 'card_message', 'coupon', 'research',
+  'rich_message', 'rich_video', 'card_message', 'coupon', 'research',
 ]);
 
 export interface BroadcastMessagePart {
@@ -204,6 +204,12 @@ function parseStoredBroadcastMessageParts(input: {
      * 直せない素材は、送信の直前で利用者への直し方とともに止める。
      * 中身の JSON を本文に落とさない（監査 R144）。
      */
+    if (type === 'rich_video') {
+      const content = record(bubble.content);
+      const error = validateImagemapMessage(content);
+      if (error || !content.video) throw new Error(error || 'リッチビデオのテンプレートを選んでください');
+      return { id, messageType: 'imagemap', messageContent: JSON.stringify(content), altText: String(content.altText ?? '') };
+    }
     if (isBroadcastAssetKind(type)) {
       const content = record(bubble.content);
       const converted = convertBroadcastAsset(
