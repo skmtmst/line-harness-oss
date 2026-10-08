@@ -235,6 +235,8 @@ export default function HqBroadcastCreate() {
   const [leaving, setLeaving] = useState(false)
   /* 下書きの依頼番号。作ったとき（または読んだ下書き）のものを、直すときもそのまま使う（口の決まり）。 */
   const requestRef = useRef('')
+  /* WEB011：requestRef を作った中身（key）。中身が同じやり直しは同じ依頼番号を使う。 */
+  const createKeyRef = useRef('')
 
   useEffect(() => {
     let current = true
@@ -454,15 +456,23 @@ export default function HqBroadcastCreate() {
         if (current && current.status === 'prepared' && requestId) {
           current = (await hqBroadcastsApi.update(current.id, { ...input, requestId, expectedVersion: current.version })).data
         } else {
-          requestRef.current = crypto.randomUUID()
+          // WEB011：応答が切れた作成のやり直しは、同じ中身なら同じ依頼番号で送る（別の下書きを作らない）。
+          if (!requestRef.current || createKeyRef.current !== key) {
+            requestRef.current = crypto.randomUUID()
+            createKeyRef.current = key
+          }
           current = (await hqBroadcastsApi.create({ ...input, requestId: requestRef.current })).data
         }
+        // WEB011：作れた・直せた下書きは、確かめ（preflight）の前にすぐ覚える。
+        // 確かめが失敗してやり直したとき、同じ下書きを新しい版で直す（重複も 409 も起こさない）。
+        setRun(current)
       }
       let list = (await hqBroadcastsApi.preflight(current.id)).data
       const blocked = list.filter((p) => p.blockedReasons.length > 0 && !p.excluded).map((p) => p.accountId)
       if (blocked.length > 0) {
         const ids = [...new Set([...list.filter((p) => p.excluded).map((p) => p.accountId), ...blocked])]
         current = (await hqBroadcastsApi.exclude(current.id, ids, current.version)).data
+        setRun(current)
         list = list.map((p) => (ids.includes(p.accountId) ? { ...p, excluded: true } : p))
       }
       setRun(current); setRunKey(key); setChecks(list); setSavedAt(new Date().toISOString())

@@ -162,6 +162,15 @@ describe('作る①（dnzqC）', () => {
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ name: '春のフォロー', deliveryMode: 'absolute_time' }))
   })
 
+  test('WEB226：「あとで決める」で作れなかった（通信の失敗）ときも、理由を出す', async () => {
+    create.mockRejectedValue(new Error('network'))
+    render(<ScenarioCreateV8 />)
+    fireEvent.change(screen.getByRole('textbox', { name: 'シナリオ名' }), { target: { value: '春のフォロー' } })
+    fireEvent.click(screen.getByRole('button', { name: /あとで決める/ }))
+    await waitFor(() => expect(screen.getByText('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')).toBeTruthy())
+    expect(push).not.toHaveBeenCalledWith(expect.stringContaining('/scenarios/first-step'))
+  })
+
   test('閲覧のみには保存の操作を置かず、帯を出す', () => {
     role = 'staff'
     render(<ScenarioCreateV8 />)

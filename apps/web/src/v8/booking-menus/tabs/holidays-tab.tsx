@@ -2,6 +2,7 @@
 
 /* ③ 休業日（KRgTQ）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
+import { closedOn, closedRanges } from '../lib/closed-ranges'
 import { useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -67,26 +68,16 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
   const [editError, setEditError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<BookingException | null>(null)
+  /* WEB055：削除の失敗は、開いている削除の確認の中に出す（閉じた編集の窓へ書かない）。 */
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const inFlightRef = useRef(false)
 
   const closedExceptions = useMemo(
     () => exceptions.filter((item) => item.kind === 'closed').sort((a, b) => (a.dateFrom || '').localeCompare(b.dateFrom || '')),
     [exceptions],
   )
-  /* 日付 → 例外。範囲の休みは日ごとに広げる。 */
-  const exceptionByDate = useMemo(() => {
-    const map = new Map<string, BookingException>()
-    for (const item of closedExceptions) {
-      const from = item.dateFrom || item.date || ''
-      const to = item.dateTo || item.date || from
-      for (let i = 0; i < 31; i += 1) {
-        const day = addDaysStr(from, i)
-        if (!day || day > to) break
-        map.set(day, item)
-      }
-    }
-    return map
-  }, [closedExceptions])
+  /* WEB056：日付 → 例外。範囲を日ごとに広げず（31日で打ち切らず）、範囲で調べる。 */
+  const ranges = useMemo(() => closedRanges(closedExceptions), [closedExceptions])
   const closedDow = new Set(closedWeekdays)
 
   /* 窓の中の書きかけがある間は離脱確認だけ（保存帯は出さない）。 */
@@ -166,8 +157,9 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
       setDeleteTarget(null)
       setEditing(null)
     } catch (cause) {
-      setEditError(exceptionFailureMessage(cause, '削除'))
-      setDeleteTarget(null)
+      setDeleteError(exceptionFailureMessage(cause, '削除'))
+      // 先に変えられていた（409）ときは、今の休業日を読み直す。確認の窓は開いたまま。
+      if (cause instanceof ApiError && cause.status === 409) onReload()
     } finally {
       inFlightRef.current = false
       setBusy(false)
@@ -212,7 +204,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
         {weeks.flat().map((date) => {
           const d = new Date(`${date}T00:00:00Z`)
           const inMonth = date.slice(0, 7) === month
-          const exception = exceptionByDate.get(date)
+          const exception = closedOn(ranges, date)
           const isRegularOff = settings.businessHoursConfigured && closedDow.has(d.getUTCDay())
           const isToday = date === today
           const mark = exception ? '臨時休業' : isRegularOff ? '定休' : null
@@ -278,7 +270,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
                   <button
                     type="button"
                     className="text-danger text-xs font-semibold"
-                    onClick={() => { setEditError(null); setDeleteTarget(item) }}
+                    onClick={() => { setEditError(null); setDeleteError(null); setDeleteTarget(item) }}
                   >
                     削除
                   </button>
@@ -332,7 +324,8 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
         confirmLabel="休業日を削除する"
         destructive
         busy={busy}
-        onCancel={() => { if (!busy) setDeleteTarget(null) }}
+        error={deleteError ?? undefined}
+        onCancel={() => { if (!busy) { setDeleteTarget(null); setDeleteError(null) } }}
         onConfirm={() => void remove()}
       />
     </div>
