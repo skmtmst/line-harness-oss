@@ -9,11 +9,16 @@ import Notice from '@/components/shared/notice'
 import { MoreAction } from '@/components/shared/row-actions'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
+import { GripHorizontal, Save } from 'lucide-react'
+import compact from './account-ordering-v8.module.css'
 
 type AccountItem = LineAccount & { displayName?: string; basicId?: string | null }
 const ACCOUNT_DRAG_TYPE = 'application/x-line-account-id'
 
-export default function AccountOrdering() {
+export default function AccountOrdering({ onClose, onSaved }: { onClose?: () => void; onSaved?: () => void } = {}) {
   const [accounts, setAccounts] = useState<AccountItem[]>([])
   const [savedParents, setSavedParents] = useState(new Map<string, string | null>())
   const [draftRootIds, setDraftRootIds] = useState<Set<string>>(() => new Set())
@@ -24,6 +29,7 @@ export default function AccountOrdering() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [closing, setClosing] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -143,7 +149,7 @@ export default function AccountOrdering() {
     const response = await api.lineAccounts.updateHierarchy(
       changed.map((item) => ({ id: item.id, parentLineAccountId: item.parentLineAccountId ?? null })),
     )
-    if (response.success) await load()
+    if (response.success) { await load(); onSaved?.() }
     else setError(response.error)
     setSaving(false)
   }
@@ -247,6 +253,54 @@ export default function AccountOrdering() {
       {children.map((child) => node(child, depth + 1))}
       {depth < 2 && <DropLine onDrop={(event) => dropOn(event, account.id)} label={depth === 0 ? 'ここへLINEアカウントをドロップすると「子」になります' : 'ここへLINEアカウントをドロップすると「孫」になります'} dragging={Boolean(draggedId)} />}
     </div>
+  }
+
+  // V8 の窓はこの共通の動きを使い、v7 の二列の編集画面はそのまま残す。
+  if (onClose) {
+    const compactNode = (account: AccountItem, depth: number): ReactNode => {
+      const parent = accounts.find((item) => item.id === account.parentLineAccountId)
+      return <div key={account.id} className={depth > 0 ? compact.child : undefined}>
+        <Card surface="inset" contentPadding="var(--tpl-acct-hierarchy-row-pad)" className={compact.row}
+          data-account-id={account.id} draggable={!saving}
+          onDragStart={(event) => startDrag(event, account.id)} onDragEnd={finishDrag}
+          onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }}
+          onDrop={(event) => dropOn(event, account.id)}>
+          <GripHorizontal size={12} aria-hidden="true" />
+          <span className={compact.name} title={account.displayName || account.name}>{account.displayName || account.name}</span>
+          <span className={compact.relationship}>{depth === 0 ? '最上位（親）' : `${parent?.displayName || parent?.name || '上位アカウント'}の${depth === 1 ? '子' : '孫'}`}</span>
+          {moveMenu(account)}
+        </Card>
+        {(childrenByParent.get(account.id) ?? []).map((child) => compactNode(child, depth + 1))}
+      </div>
+    }
+    return <>
+      <Dialog open title="LINEアカウント階層を編集" designNode="a7lUk" designWidth={600} designTop={140}
+        designHeaderPadding="24px 24px 0" designContentPadding="15px 24px 0" busy={saving} onCancel={() => { if (changed.length) setClosing(true); else onClose() }}
+        footer={<div className={compact.footer}>
+          <Button onClick={() => { cancelChanges(); onClose() }} disabled={saving}>キャンセル</Button>
+          <Button variant="primary" onClick={() => void save()} disabled={changed.length === 0 || saving} busy={saving} busyLabel="保存中…"><Save size={14} aria-hidden="true" />構成を保存する</Button>
+        </div>}>
+        <div className={compact.body}>
+          <p className={compact.description}>カードの「…」から「最上位（親）にする」「○○の子にする」を選ぶか、親にしたいカードの上へドラッグします。親・子・孫の3階層まで設定できます。</p>
+          {error ? <Notice tone="danger" message={error} /> : null}
+          {loading ? <ListState kind="loading" /> : <>
+            <div className={compact.rows} data-hierarchy-root-drop
+              onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }}
+              onDrop={(event) => dropOn(event, null)}>
+              {hierarchyRoots.map((account) => compactNode(account, 0))}
+            </div>
+            {unassigned.length > 0 ? <Card surface="inset" contentPadding="var(--tpl-acd-dlg-band-pad)" className={compact.unassigned}>
+              <p>{`未設定のLINEアカウント：${unassigned.map((account) => account.displayName || account.name).join('・')}`}</p>
+              <div className={compact.unassignedMenus}>{unassigned.map((account) => <span key={account.id} className={compact.unassignedItem}>
+                <span className={compact.name} title={account.name}>{account.name}</span>{moveMenu(account)}
+              </span>)}</div>
+            </Card> : null}
+            {!hierarchyRoots.length && !unassigned.length ? <ListState kind="empty" title="LINEアカウントがありません" /> : null}
+          </>}
+        </div>
+      </Dialog>
+      <UnsavedLeaveDialog open={closing || leaveTarget !== null} subject="アカウント構成への変更" onConfirm={() => { if (closing) { cancelChanges(); onClose() } else confirmLeave() }} onCancel={() => { setClosing(false); cancelLeave() }} />
+    </>
   }
 
   return <section className="mt-6 border-t border-hairline pt-6" aria-labelledby="account-ordering-title">

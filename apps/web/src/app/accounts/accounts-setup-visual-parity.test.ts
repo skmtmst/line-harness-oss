@@ -79,8 +79,8 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     */
     const v8ListSource = readOwnFile(join(directory, '../../v8/settings/accounts/accounts.tsx'), 'utf8')
     expect(v8ListSource.match(/<AccountOrdering\b/g) ?? []).toHaveLength(1)
-    expect(v8ListSource).toContain('{orderingOpen ? <AccountOrdering /> : null}')
-    expect(v8ListSource).toMatch(/<Dialog\s+open=\{orderingOpen\}[\s\S]*?title="並び順と親子を変える"[\s\S]*?<AccountOrdering \/>[\s\S]*?<\/Dialog>/)
+    expect(v8ListSource).toMatch(/\{orderingOpen \? <AccountOrdering\s+[\s\S]*?onClose=\{[\s\S]*?onSaved=\{[\s\S]*?\/> : null\}/)
+    expect(orderingSource).toContain('designNode="a7lUk"')
   })
 
   it('共通アカウント切替部品は確認後に管理対象を切り替える', () => {

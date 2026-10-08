@@ -24,13 +24,15 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import { TextArea } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
 import StatusBadge from '@/components/shared/status-badge'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import {
   ACCOUNT_FILTERS,
   type AccountFilter,
@@ -176,17 +178,17 @@ export default function AccountsV8() {
 
   return (
     <div className={frame.screen}>
-      <SettingsPage boardId="V7vn3" title={TITLE} description={DESCRIPTION} actions={headActions} navigation={<SettingsInnerNav inline />}>
+      <SettingsPage boardId="V7vn3" title={TITLE} description={DESCRIPTION} actions={headActions} contentLayout="wide" navigation={<SettingsInnerNav inline />}>
         {notice ? (
           <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} onClose={() => setNotice(null)} />
         ) : null}
 
-        <div className={styles.kpis} data-design="KPIs">
+        <KpiBand presentation="cards" gridClassName={styles.kpis} data-design="KPIs">
           <Kpi label="つないでいる" value={kpis?.connected} unit="アカウント" />
           <Kpi label="稼働中" value={kpis?.active} unit="件" />
           <Kpi label="接続に問題" value={kpis?.problem} unit="件" warn />
           <Kpi label="友だちの合計" value={kpis?.friends} unit="人" />
-        </div>
+        </KpiBand>
 
         <div className={styles.toolbar}>
           <SearchField
@@ -228,64 +230,59 @@ export default function AccountsV8() {
             />
           </div>
         ) : (
-          <div className={styles.table} role="table" aria-label="LINEアカウントの一覧">
-            <div className={`${styles.row} ${styles.head}`} role="row">
-              <span className={styles.colName} role="columnheader">アカウント</span>
-              <span className={styles.colConn} role="columnheader">接続状態</span>
-              <span className={styles.colHook} role="columnheader">Webhook</span>
-              <span className={styles.colFriends} role="columnheader">友だち</span>
-              <span className={styles.colDefault} role="columnheader">既定</span>
-              <span className={styles.colParent} role="columnheader">親アカウント</span>
-              <span className={styles.colMenu} role="columnheader"><span className={styles.srOnly}>操作</span></span>
-            </div>
-            {shown.map((account) => {
+          <DataTable presentation="account-list" label="LINEアカウントの一覧">
+            <thead>
+            <TableHeadRow>
+              <Th className={styles.colName}>アカウント</Th>
+              <Th className={styles.colConn}>接続状態</Th>
+              <Th className={styles.colHook}>Webhook</Th>
+              <Th className={styles.colFriends}>友だち</Th>
+              <Th className={styles.colDefault}>既定</Th>
+              <Th className={styles.colParent}>親アカウント</Th>
+              <Th className={styles.colMenu}><span className={styles.srOnly}>操作</span></Th>
+            </TableHeadRow></thead>
+            <tbody>{shown.map((account) => {
               const connection = connectionLabel(account)
               const webhook = webhookLabel(account)
               const parent = parentName(account, accounts)
               const archived = Boolean(account.archivedAt)
               const friends = archived || account.stats?.friendCount == null ? '—' : account.stats.friendCount.toLocaleString('ja-JP')
               return (
-                <div key={account.id} className={`${styles.row} ${styles.body}`} role="row">
-                  <span className={styles.colName} role="cell">
+                <Tr key={account.id} interactive>
+                  <Td className={styles.colName}><div className={styles.nameStack}>
                     <span className={styles.name} title={account.name}>{account.name}</span>
                     <span className={styles.sub}>{`チャネル ${account.channelId}`}</span>
-                  </span>
-                  <span className={styles.colConn} role="cell"><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge></span>
-                  <span className={styles.colHook} role="cell">
+                  </div></Td>
+                  <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge></Td>
+                  <Td className={styles.colHook}>
                     {archived ? <span className={styles.faint}>—</span> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}
-                  </span>
-                  <span className={`${styles.colFriends} ${friends === '—' ? styles.faint : ''}`} role="cell">{friends}</span>
-                  <span className={`${styles.colDefault} ${account.isDefault ? '' : styles.faint}`} role="cell">
+                  </Td>
+                  <Td className={`${styles.colFriends} ${friends === '—' ? styles.faint : ''}`}>{friends}</Td>
+                  <Td className={`${styles.colDefault} ${account.isDefault ? '' : styles.faint}`}>
                     {account.isDefault ? <span aria-label="既定のアカウント">★</span> : '—'}
-                  </span>
-                  <span className={`${styles.colParent} ${parent === '—' ? styles.faint : ''}`} role="cell" title={parent}>{parent}</span>
-                  <span className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
+                  </Td>
+                  <Td className={`${styles.colParent} ${parent === '—' ? styles.faint : ''}`} title={parent}>{parent}</Td>
+                  <Td className={styles.colMenu}><div className={styles.menuBox}>
                     <RowMenu
                       label={`${account.name}の操作`}
                       items={menuItems(account)}
                       open={openMenuId === account.id}
                       onOpenChange={(next) => setOpenMenuId(next ? account.id : null)}
                     />
-                  </span>
-                </div>
+                  </div></Td>
+                </Tr>
               )
-            })}
-          </div>
+            })}</tbody>
+          </DataTable>
         )}
 
         <p className={styles.footNote}>行の「…」から 詳細・接続をもう一度確かめる・既定にする・引き継ぎ（UID の移行）・アーカイブ。</p>
       </SettingsPage>
 
-      <Dialog
-        open={orderingOpen}
-        size="large"
-        title="並び順と親子を変える"
-        description="アカウントをドラッグするか、カードの「…」から移動先を選んで、親・子・孫の順に整理します。"
-        onCancel={() => { setOrderingOpen(false); void load(false) }}
-        footer={<Button variant="secondary" onClick={() => { setOrderingOpen(false); void load(false) }}>閉じる</Button>}
-      >
-        {orderingOpen ? <AccountOrdering /> : null}
-      </Dialog>
+      {orderingOpen ? <AccountOrdering
+        onClose={() => { setOrderingOpen(false); void load(false) }}
+        onSaved={() => { setOrderingOpen(false); void load(false) }}
+      /> : null}
 
       <ConfirmDialog
         open={archiveTarget !== null}
@@ -328,14 +325,8 @@ export default function AccountsV8() {
 
 /** 数の1枚：見出し・数・単位。 */
 function Kpi({ label, value, unit, warn = false }: { label: string; value: number | null | undefined; unit: string; warn?: boolean }) {
-  const text = value == null ? '—' : value.toLocaleString('ja-JP')
-  return (
-    <div className={styles.kpi}>
-      <span className={styles.kpiLabel}>{label}</span>
-      <span className={`${styles.kpiValue} ${warn && (value ?? 0) > 0 ? styles.kpiWarn : ''}`}>{text}</span>
-      <span className={styles.kpiUnit}>{unit}</span>
-    </div>
-  )
+  return <KpiCard title={label} value={value} unit={unit} detail={null} icon={null}
+    presentation="stacked" valueTone={warn && (value ?? 0) > 0 ? 'warning' : 'default'} />
 }
 
 /** アーカイブできない理由（API の blockers）を、運用者の言葉で。 */
