@@ -204,7 +204,7 @@ export function registerAccountSummary(server: McpServer): void {
             client.scenarios.list({ accountId }),
             client.broadcasts.list({ accountId }),
             client.tags.list(),
-            client.forms.list(),
+            client.forms.list({ accountId }),
           ]);
 
         const activeScenarios = scenarios.filter(

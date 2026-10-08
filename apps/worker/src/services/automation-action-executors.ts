@@ -425,7 +425,7 @@ async function sendMessageExecutor(
     content = await expandSendCommonVars(
       context.db, resolved.content,
       { kind: 'automation', id: context.action.id },
-      { lineAccountId: context.lineAccountId },
+      { lineAccountId: context.lineAccountId, messageType: resolved.type },
     );
   } catch (error) {
     const { CommonVarResolutionFailedError } = await import('./interpolation-context.js');

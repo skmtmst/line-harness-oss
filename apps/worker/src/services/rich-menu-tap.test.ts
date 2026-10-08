@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { handleRichMenuTap } from './rich-menu-tap.js';
 import type { LineClient } from '@line-crm/line-sdk';
@@ -42,5 +42,35 @@ describe('rich-menu scenario side effect', () => {
     const f = fixture();
     expect(await handleRichMenuTap(f.db, {} as LineClient, { id: 'friend', line_user_id: 'U1' }, 'area', { lineAccountId: 'other' })).toEqual({ target: null, replyTokenConsumed: false });
     expect(f.raw.prepare("SELECT COUNT(*) AS count FROM friend_scenarios WHERE friend_id='friend'").get()).toEqual({ count: 0 });
+  });
+});
+
+
+describe('W43 リッチメニューの構造本文と履歴（実SQL）', () => {
+  test.each(['valid', 'missing', 'invalid'] as const)('%s: 安全な本文だけを送信して結果を記録する', async (kind) => {
+    const f = fixture();
+    const value = '引用"\n改行\\日本語 {{var.unknown}}';
+    if (kind !== 'missing') f.raw.prepare(`INSERT INTO common_vars (id, line_account_id, name, var_key, type, value)
+      VALUES ('cv-json', 'account', '案内', 'hours', 'long_text', ?)`).run(value);
+    const content = kind === 'invalid' ? '{"text":"{{var.hours}}"' : JSON.stringify({ type: 'bubble',
+      body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '{{var.hours}}' }] } });
+    f.raw.prepare(`INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+      VALUES ('tpl-json', '案内', 'flex', ?, 'account')`).run(content);
+    f.raw.exec(`UPDATE rich_menu_areas SET intent = 'template', template_id = 'tpl-json', action_data = '{}' WHERE id = 'area'`);
+    const pushMessage = vi.fn(async (_to: string, _messages: unknown[]) => undefined);
+    await handleRichMenuTap(f.db, { pushMessage } as unknown as LineClient,
+      { id: 'friend', line_user_id: 'U1' }, 'area', { lineAccountId: 'account' });
+    const logs = f.raw.prepare(`SELECT content, message_type FROM messages_log WHERE friend_id = 'friend'`).all() as { content: string; message_type: string }[];
+    if (kind === 'valid') {
+      expect(pushMessage.mock.calls[0]?.[1][0]).toMatchObject({ type: 'flex', contents: { body: { contents: [{ text: value }] } } });
+      expect(logs).toHaveLength(1);
+      expect(logs[0].message_type).toBe('flex');
+      expect(JSON.parse(logs[0].content)).toMatchObject({ body: { contents: [{ text: value }] } });
+    } else {
+      expect(pushMessage).not.toHaveBeenCalled();
+      expect(logs).toHaveLength(0);
+    }
+    expect(f.raw.prepare(`SELECT var_key, reason FROM common_var_resolution_failures`).all())
+      .toEqual(kind === 'missing' ? [{ var_key: 'hours', reason: 'missing' }] : []);
   });
 });

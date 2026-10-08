@@ -625,7 +625,7 @@ async function executeAction(
       resolvedContent = await expandSendCommonVars(
         db, resolvedContent,
         { kind: 'automation', id: automationId ?? tplId ?? 'send_message' },
-        { lineAccountId: lineAccountId ?? null, friendId },
+        { lineAccountId: lineAccountId ?? null, friendId, messageType: resolvedType },
       );
 
       let msg: Message;
