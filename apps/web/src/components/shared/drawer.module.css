@@ -36,6 +36,8 @@
   outline: revert;
 }
 
+[data-theme='v8'] .panel[data-design-width] { width: min(var(--drawer-design-width), 100%); }
+
 .header {
   display: flex;
   flex: 0 0 auto;

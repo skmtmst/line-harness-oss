@@ -96,7 +96,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const { selectedAccountId } = useAccount()
   const editing = Boolean(markId)
   usePageTitle(editing ? '対応マークを編集' : '対応マークを作る')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }, { label: '対応マーク', href: '/tags?tab=marks' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }, { label: '対応マーク', href: '/tags?tab=marks' }])
 
   const [items, setItems] = useState<MarkRow[]>([])
   /* 一覧の読み込み具合。ready になるまで保存は押せない（R510・R511）。 */

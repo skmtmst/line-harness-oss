@@ -76,7 +76,7 @@ function rateLine(targets: HqBroadcastRun['targets'], reached: number): string |
 }
 
 /** 統括の一括配信のフォルダ（API-18。色は持たない）。 */
-type HqFolder = { id: string; name: string; revision: number; item_count: number }
+type HqFolder = { id: string; name: string; revision: number; item_count: number; color?: string | null }
 
 export default function HqBroadcastList() {
   const router = useRouter()
@@ -165,10 +165,12 @@ export default function HqBroadcastList() {
 
   const countIn = (id: string) => all.filter((run) => (id === 'none' ? !folderIdOf(run) || !(folders ?? []).some((f) => f.id === folderIdOf(run)) : folderIdOf(run) === id)).length
   const folderRows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? all.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? all.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
     ...(folders ?? []).map((folder) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
+      color: folder.color,
       count: ready ? countIn(folder.id) : null,
       colorEditable: false,
       ...(canManage ? {
@@ -176,7 +178,7 @@ export default function HqBroadcastList() {
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
-    ...(folders && folders.length > 0 ? [{ id: 'none', label: '未分類', count: ready ? countIn('none') : null }] : []),
+    ...(folders && folders.length > 0 ? [{ kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null }] : []),
   ]
   const selectFolder = (id: string) => { setFolderFilter(id); setPage(1) }
   const saveFolder = async () => {
@@ -289,7 +291,7 @@ export default function HqBroadcastList() {
               <Tr key={run.id} className={styles.row}>
                 <Td>
                   <div className={styles.titleLine}>
-                    <FolderDotName folder={(() => { const folder = (folders ?? []).find((f) => f.id === folderIdOf(run)); return folder ? { name: folder.name, color: null } : null })()}>
+                    <FolderDotName folder={(() => { const folder = (folders ?? []).find((f) => f.id === folderIdOf(run)); return folder ? { name: folder.name, color: folder.color } : null })()}>
                       <Link href={href} className={styles.cellTitle} title={run.title}>{run.title}</Link>
                     </FolderDotName>
                   </div>
@@ -338,7 +340,7 @@ export default function HqBroadcastList() {
   return (
     <ListPage
       boardId="U4Eep0"
-      headingSize="compact"
+      headingSize="regular"
       title="一括配信"
       description="選んだアカウントの友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
       stats={(

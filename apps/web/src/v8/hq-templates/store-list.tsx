@@ -2,7 +2,7 @@
 
 /*
  * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
- * 絵：テンプレート i0Ao0R（V8.pen の行「統括」）・LRc93（V8-B 版）、回答フォーム wZPua、友だち属性 DzdC3、リッチメニュー noVq4。
+ * 絵：テンプレート i0Ao0R（V8.pen の行「統括」）・LRc93（V8-B 版）、回答フォーム wZPua、タグ DzdC3、リッチメニュー noVq4。
  *
  * 店の一覧（src/v8/templates/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・種類のタブ・フォルダの列・表・ページ送り）・
  * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「配る」口だけ：
@@ -41,7 +41,8 @@ import { formatNumber } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
 import { distributedAccountsLine, templateSubLine } from './list-row'
 import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
-import styles from '../templates/list.module.css'
+import storeStyles from '../templates/list.module.css'
+import hqStyles from './store-list.module.css'
 import attributeStyles from './attribute-tabs.module.css'
 
 /** 店のテンプレートと同じ6種類（上のタブ）。 */
@@ -59,7 +60,7 @@ const KIND_LABEL: Record<TemplateKind, string> = Object.fromEntries(KIND_TABS.ma
 const WORDS: Record<TemplateType, { title: string; item: string; create: string; search: string; description: string; column: string }> = {
   template: { title: 'テンプレート', item: 'テンプレート', create: 'テンプレートを作る', search: '名前・本文・差し込みで探す', column: 'テンプレート', description: 'メッセージのひな形を作り、各 LINE アカウントへ配ります。配ったあとに直すと、配った先へ新しい版として届きます。' },
   form: { title: '回答フォーム', item: 'フォーム', create: 'フォームを作る', search: 'フォーム名・質問文', column: 'フォーム（質問の数）', description: '回答フォームのひな形を作り、各 LINE アカウントへ配ります。配ったあとに直すと、新しい版として届きます。' },
-  tag: { title: '友だち属性', item: 'タグ', create: 'タグを作る', search: 'タグ名・用途で探す', column: 'タグ', description: '友だち属性（タグ・入力してもらう項目・対応の印）のひな形を作り、各 LINE アカウントへ配ります。配った先で同じ名前・色で使えます。' },
+  tag: { title: 'タグ', item: 'タグ', create: 'タグを作る', search: 'タグ名・用途で探す', column: 'タグ', description: 'タグ（タグ・入力してもらう項目・対応の印）のひな形を作り、各 LINE アカウントへ配ります。配った先で同じ名前・色で使えます。' },
   rich_menu: { title: 'リッチメニュー', item: 'メニュー', create: 'メニューを作る', search: 'メニュー名・ボタン名', column: 'メニュー（大きさ・ボタン）', description: 'リッチメニューのひな形を作り、各 LINE アカウントへ配ります。配った先では、そのアカウントの条件で出し分けます。' },
   scenario: { title: 'シナリオ', item: 'シナリオ', create: 'シナリオを作る', search: 'シナリオ名で探す', column: 'シナリオ', description: 'シナリオのひな形を作り、停止中の下書きとして各 LINE アカウントへ配ります。' },
 }
@@ -203,7 +204,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   const bandKpis = type === 'tag' ? tagKpis : kpis
 
   const tabs = kind && onKindChange ? (
-    <div className={styles.tabsBox}>
+    <div className={storeStyles.tabsBox}>
       <Tabs
         label={`${words.title}の種類`}
         items={KIND_TABS.map((tab) => ({
@@ -223,10 +224,12 @@ export default function HqStoreList(props: HqStoreListProps) {
   )
 
   const folderRows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? rows.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? rows.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
     ...folders.map((folder) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
+      color: folder.color,
       count: ready ? countIn(folder.id) : null,
       colorEditable: false,
       ...(canEdit ? {
@@ -234,11 +237,11 @@ export default function HqStoreList(props: HqStoreListProps) {
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
-    { id: 'none', label: '未分類', count: ready ? countIn('none') : null },
+    { kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null },
   ]
   const selectFolder = (id: string) => { onFolderFilter(id); setPage(1) }
   const folderPanel = folderLoadFailed ? (
-    <p role="alert" className={styles.folderNote}>フォルダを読み込めませんでした。ページを再読み込みしてください。</p>
+    <p role="alert" className={storeStyles.folderNote}>フォルダを読み込めませんでした。ページを再読み込みしてください。</p>
   ) : (
     <FolderPanel
       activeId={folderFilter}
@@ -247,7 +250,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       addFolderLabel="フォルダを追加"
       rows={folderRows}
     >
-      <p className={styles.folderNote}>
+      <p className={storeStyles.folderNote}>
         {type === 'template' ? 'フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります' : `フォルダを消しても、中の${words.item}は未分類に残ります`}
       </p>
     </FolderPanel>
@@ -290,7 +293,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   ]
 
   const toolbar = (
-    <div className={type === 'tag' ? `${styles.wideTools} ${attributeStyles.tagTools}` : styles.wideTools}>
+    <div className={type === 'tag' ? `${storeStyles.wideTools} ${attributeStyles.tagTools}` : storeStyles.wideTools}>
       <ListToolbar
         search={{ placeholder: words.search, label: `${words.title}のひな形を検索`, value: query, onChange: (value) => { setQuery(value); setPage(1) } }}
         filters={(
@@ -308,7 +311,7 @@ export default function HqStoreList(props: HqStoreListProps) {
               ]} />
             </>
           ) : null}
-          <div role="group" aria-label="配ったかで絞り込む" className={styles.chipGroup}>
+          <div role="group" aria-label="配ったかで絞り込む" className={storeStyles.chipGroup}>
             <FilterChip selected={undistributedOnly} onChange={() => { setUndistributedOnly((value) => !value); setPage(1) }} title="まだどのアカウントへも配っていないひな形" icon={<Unlink size={13} aria-hidden="true" />}>
               未配布
             </FilterChip>
@@ -316,7 +319,7 @@ export default function HqStoreList(props: HqStoreListProps) {
           </>
         )}
         trailing={(
-          <div className={styles.perPageBox}>
+          <div className={storeStyles.perPageBox}>
             <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZE_OPTIONS} />
           </div>
         )}
@@ -327,7 +330,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   /*
    * 種類ごとの列（店の同じ機能の一覧と同じ並び）。違いは「配布先」の列だけ。
    *   テンプレート i0Ao0R：種類・公開・配布先・今月送った数・更新・［配る］・「…」
-   *   友だち属性 DzdC3：人数・付け方・配布先・［配る］・「…」（人数は API-18 の配った先で付いている友だちの合計）
+   *   タグ DzdC3：人数・付け方・配布先・［配る］・「…」（人数は API-18 の配った先で付いている友だちの合計）
    *   リッチメニュー noVq4：順・誰に出すか・状態・配布先・今月押された・［配る］・「…」（API-18 の順・誰に出すか・配った先の押された数）
    *   回答フォーム wZPua：状態・配布先・更新・［配る］・「…」
    * ［配る］の列は見出しが空の幅60（絵の「列 配る」）、「…」との間は 16。閲覧のみ（配れない人）には列ごと出さない。
@@ -339,52 +342,56 @@ export default function HqStoreList(props: HqStoreListProps) {
   const destCell = (row: HqTemplate) => {
     const destLine = distributedAccountsLine(row)
     return row.distributed_account_count === undefined ? (
-      <span className={styles.cellFaint}>—</span>
+      <span className={storeStyles.cellFaint}>—</span>
     ) : row.distributed_account_count > 0 ? (
-      <span className={styles.hqDest}>
-        <span className={styles.usageLink}>{`${formatNumber(row.distributed_account_count)} アカウント`}</span>
-        {destLine ? <span className={styles.cellSub} title={destLine}>{destLine}</span> : null}
+      <span className={storeStyles.hqDest}>
+        <span className={storeStyles.usageLink}>{`${formatNumber(row.distributed_account_count)} アカウント`}</span>
+        {destLine ? <span className={storeStyles.cellSub} title={destLine}>{destLine}</span> : null}
       </span>
     ) : (
-      <span className={styles.usageLink}>まだ配っていない</span>
+      <span className={storeStyles.usageLink}>まだ配っていない</span>
     )
   }
   const stateCell = (row: HqTemplate) => {
     const state = stateOf(row)
     return (
-      <span className={styles.publishPill} data-tone={state.tone}>
-        <span className={styles.publishDot} aria-hidden="true" />
+      <span className={storeStyles.publishPill} data-tone={state.tone}>
+        <span className={storeStyles.publishDot} aria-hidden="true" />
         {state.label}
       </span>
     )
   }
   /* 列の幅（col）と中身の箱（Td）は列ごとに書く（className を変数で渡すと見張りが読めない）。 */
   type Column = { key: string; head: string; col: ReactNode; cell: (row: HqTemplate) => ReactNode }
-  const plainTd = (key: string, text: ReactNode, title?: string) => <Td key={key} className={styles.cellPlain} title={title}>{text}</Td>
+  const plainTd = (key: string, text: ReactNode, title?: string) => <Td key={key} className={storeStyles.cellPlain} title={title}>{text}</Td>
   const boxedTd = (key: string, inner: ReactNode) => <Td key={key}>{inner}</Td>
   const columns: Column[] = type === 'template' ? [
-    { key: 'kind', head: '種類', col: <col key="kind" className={styles.colKind} />, cell: (row) => boxedTd('kind', <span className={styles.kindBadge}>{KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? 'メッセージ'}</span>) },
-    { key: 'state', head: '公開', col: <col key="state" className={styles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
-    { key: 'dest', head: '配布先', col: <col key="dest" className={styles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
-    { key: 'sent', head: '今月送った数', col: <col key="sent" className={styles.colMonthly} />, cell: (row) => plainTd('sent', sentLabel(row.this_month_sent_count), row.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : undefined) },
-    { key: 'updated', head: '更新', col: <col key="updated" className={styles.colUpdated} />, cell: (row) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },
+    { key: 'kind', head: '種類', col: <col key="kind" className={storeStyles.colKind} />, cell: (row) => boxedTd('kind', <span className={storeStyles.kindBadge}>{KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? 'メッセージ'}</span>) },
+    { key: 'state', head: '公開', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
+    { key: 'sent', head: '今月送った数', col: <col key="sent" className={storeStyles.colMonthly} />, cell: (row) => plainTd('sent', sentLabel(row.this_month_sent_count), row.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : undefined) },
+    { key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },
   ] : type === 'tag' ? [
-    { key: 'friends', head: '人数', col: <col key="friends" className={styles.colKind} />, cell: (row) => plainTd('friends', row.friend_count == null ? '—' : `${formatNumber(row.friend_count)}人`, '配った先のアカウントで、このタグが付いている友だちの合計') },
-    { key: 'method', head: '付け方', col: <col key="method" className={styles.colKind} />, cell: (row) => plainTd('method', row.assignment_method ?? '—') },
-    { key: 'dest', head: '配布先', col: <col key="dest" className={styles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
+    { key: 'friends', head: '人数', col: <col key="friends" className={storeStyles.colKind} />, cell: (row) => plainTd('friends', row.friend_count == null ? '—' : `${formatNumber(row.friend_count)}人`, '配った先のアカウントで、このタグが付いている友だちの合計') },
+    { key: 'method', head: '付け方', col: <col key="method" className={storeStyles.colKind} />, cell: (row) => plainTd('method', row.assignment_method ?? '—') },
+    { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
   ] : type === 'rich_menu' ? [
-    { key: 'audience', head: '誰に出すか', col: <col key="audience" className={styles.colPublish} />, cell: (row) => plainTd('audience', row.display_audience ?? '—', row.display_audience ?? undefined) },
-    { key: 'state', head: '状態', col: <col key="state" className={styles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
-    { key: 'dest', head: '配布先', col: <col key="dest" className={styles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
-    { key: 'taps', head: '今月押された', col: <col key="taps" className={styles.colMonthly} />, cell: (row) => plainTd('taps', row.tap_count == null ? '—' : `${formatNumber(row.tap_count)}回`, '配った先のアカウントで押された回数の合計') },
+    { key: 'audience', head: '誰に出すか', col: <col key="audience" className={storeStyles.colPublish} />, cell: (row) => plainTd('audience', row.display_audience ?? '—', row.display_audience ?? undefined) },
+    { key: 'state', head: '状態', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
+    { key: 'taps', head: '今月押された', col: <col key="taps" className={storeStyles.colMonthly} />, cell: (row) => plainTd('taps', row.tap_count == null ? '—' : `${formatNumber(row.tap_count)}回`, '配った先のアカウントで押された回数の合計') },
+  ] : type === 'form' ? [
+    { key: 'storage', head: '保存先', col: <col key="storage" className={hqStyles.colFormStorage} />, cell: () => plainTd('storage', '—', '保存先の情報は未取得です') },
+    { key: 'state', head: '状態', col: <col key="state" className={hqStyles.colFormState} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'dest', head: '配布先', col: <col key="dest" className={hqStyles.colFormDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
   ] : [
-    { key: 'state', head: '状態', col: <col key="state" className={styles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
-    { key: 'dest', head: '配布先', col: <col key="dest" className={styles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
-    { key: 'updated', head: '更新', col: <col key="updated" className={styles.colUpdated} />, cell: (row) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },
+    { key: 'state', head: '状態', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
+    { key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },
   ]
   const body = !ready ? (
-    <div className={styles.stateCard} role="status">
-      <p className={styles.stateTitle}>{busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。'}</p>
+    <div className={storeStyles.stateCard} role="status">
+      <p className={storeStyles.stateTitle}>{busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。'}</p>
     </div>
   ) : filtered.length === 0 ? (
     <EmptyList
@@ -398,20 +405,20 @@ export default function HqStoreList(props: HqStoreListProps) {
       filteredDescription="検索や「未配布」・フォルダを外すと、すべて出ます"
     />
   ) : (
-    <div className={`${styles.tableWrap} ${styles.hqTable}`}>
+    <div className={`${storeStyles.tableWrap} ${storeStyles.hqTable}`}>
       <DataTable>
         <colgroup>
-          {type === 'rich_menu' ? <col className={styles.colSelect} /> : null}
+          {type === 'rich_menu' ? <col className={storeStyles.colSelect} /> : null}
           <col />
           {columns.map((column) => column.col)}
-          {canEdit ? <col className={styles.colHqDistribute} /> : null}
-          <col className={styles.colMenu} />
+          {canEdit ? <col className={storeStyles.colHqDistribute} /> : null}
+          <col className={storeStyles.colMenu} />
         </colgroup>
         <thead>
           <TableHeadRow>
-            {type === 'rich_menu' ? <Th className={styles.headCell}>順</Th> : null}
-            <Th className={styles.headCell}>{words.column}</Th>
-            {columns.map((column) => <Th key={column.key} className={styles.headCell}>{column.head}</Th>)}
+            {type === 'rich_menu' ? <Th className={storeStyles.headCell}>順</Th> : null}
+            <Th className={storeStyles.headCell}>{words.column}</Th>
+            {columns.map((column) => <Th key={column.key} className={storeStyles.headCell}>{column.head}</Th>)}
             {canEdit ? <Th aria-label="配る" /> : null}
             <Th aria-label="操作" />
           </TableHeadRow>
@@ -421,30 +428,30 @@ export default function HqStoreList(props: HqStoreListProps) {
             const folder = folderOf(row.folder_id)
             const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
             return (
-              <Tr key={row.id} data-row-id={row.id}>
-                {type === 'rich_menu' ? <Td className={styles.cellPlain}>{rankOf.get(row.id) ?? '—'}</Td> : null}
+              <Tr key={row.id} data-row-id={row.id} density="template">
+                {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? '—'}</Td> : null}
                 <NameCell
                   name={(
-                    <div className={styles.dotLine}>
-                      <FolderDotName folder={folder ? { name: folder.name, color: null } : null}>
+                    <div className={storeStyles.dotLine}>
+                      <FolderDotName folder={folder ? { name: folder.name, color: folder.color } : null}>
                         {canEdit ? (
-                          <button type="button" className={`${styles.cellTitle} ${styles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
-                        ) : <span className={styles.cellTitle} title={row.name}>{row.name}</span>}
+                          <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
+                        ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
                       </FolderDotName>
                     </div>
                   )}
-                  sub={<span className={`${styles.cellSub} ${styles.dotIndent}`} title={sub}>{sub}</span>}
+                  sub={<span className={`${storeStyles.cellSub} ${storeStyles.dotIndent}`} title={sub}>{sub}</span>}
                 />
                 {columns.map((column) => column.cell(row))}
                 {canEdit ? (
-                  <Td className={`${styles.menuCell} ${styles.hqDistributeCell}`}>
-                    <div className={styles.menuBox}>
+                  <Td className={`${storeStyles.menuCell} ${storeStyles.hqDistributeCell}`}>
+                    <div className={storeStyles.menuBox}>
                       <RowQuickAction label="配る" ariaLabel={`${row.name}を配る`} icon={<Send aria-hidden="true" />} disabled={busy} onClick={() => onDistribute(row)} />
                     </div>
                   </Td>
                 ) : null}
-                <Td className={styles.menuCell}>
-                  <div className={`${styles.menuBox} ${styles.hqActions}`}>
+                <Td className={storeStyles.menuCell}>
+                  <div className={`${storeStyles.menuBox} ${storeStyles.hqActions}`}>
                     {canEdit ? (
                       <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} size="row" open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
                     ) : null}
@@ -460,8 +467,8 @@ export default function HqStoreList(props: HqStoreListProps) {
 
   const summary = `${formatNumber(filtered.length)}件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)}件`
   const pager = !ready || filtered.length === 0 ? null : pageCount > 1 ? (
-    <Pagination page={current} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{summary}</span>} />
-  ) : <p className={styles.pagerSolo}>{summary}</p>
+    <Pagination page={current} pageCount={pageCount} onPageChange={setPage} summary={<span className={storeStyles.pagerCount}>{summary}</span>} />
+  ) : <p className={storeStyles.pagerSolo}>{summary}</p>
 
   if (type === 'tag' && attribute.tab !== 'tags') {
     return <OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} />
@@ -475,14 +482,14 @@ export default function HqStoreList(props: HqStoreListProps) {
       description={words.description}
       tabs={type === 'tag' ? <AttributeTabs tab={attribute.tab} onSelect={(key) => { attribute.select(key); setPage(1) }} /> : tabs}
       stats={(
-        <KpiBand data-design="KPIs" className={styles.kpiStrip}>
+        <KpiBand data-design="KPIs" className={storeStyles.kpiStrip}>
           {bandKpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={<span className={styles.kpiDetailWrap}>{kpi.detail}</span>} />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={<span className={storeStyles.kpiDetailWrap}>{kpi.detail}</span>} />
           ))}
         </KpiBand>
       )}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: selectFolder, createAction: createButton(false) ?? undefined }}
-      folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
+      folders={<>{createButton(true) ?? <span className={storeStyles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
       toolbar={toolbar}
       pagination={pager}
       overlays={(

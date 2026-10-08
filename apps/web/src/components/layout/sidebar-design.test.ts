@@ -26,7 +26,7 @@ const MENU_END = '/** 区分の目印から中身を引く。 */';
 /** Pencil V6を基本に、運用中の承認済み追加機能を含めた区分と項目。 */
 const DESIGN: Array<{ section: string | null; items: string[] }> = [
   // 毎日開く4項目は、先頭の「メイン」区分にまとめる。
-  { section: 'メイン', items: ['ダッシュボード', '受信箱', '友だち', '友だち属性'] },
+  { section: 'メイン', items: ['ダッシュボード', '受信箱', '友だち', 'タグ'] },
   {
     section: '配信',
     items: [
@@ -103,7 +103,7 @@ const ROUTES: Record<string, string> = {
   ダッシュボード: '/',
   受信箱: '/chats',
   友だち: '/friends',
-  友だち属性: '/tags',
+  タグ: '/tags',
   シナリオ配信: '/scenarios',
   一斉配信: '/broadcasts',
   テンプレート: '/templates',

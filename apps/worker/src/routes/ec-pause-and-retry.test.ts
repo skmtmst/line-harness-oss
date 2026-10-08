@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { asD1 } from '../test-utils/d1-atomic.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { ecIntegrations } from './ec-integrations.js';
 import { ecCommerce } from './ec-commerce.js';
-import { processDueEcRetries } from '../services/ec-retry.js';
+import { claimEcRetryExecution, processDueEcRetries } from '../services/ec-retry.js';
 
 /*
  * EC の「止める」を本当に効かせ、落ちた受信は上限つきで回す。
@@ -233,5 +234,48 @@ describe('ECの停止と再試行 (P1-23)', () => {
     const result = await processDueEcRetries(db.db, { now: '2026-09-20T10:00:00.000Z' });
     expect(result.processed).toBe(0);
     expect(__pushMessage).toHaveBeenCalledTimes(before);
+  });
+});
+
+describe('W11 A interrupted processing recovery', () => {
+  it('rejects an old version, a fresh event, a paused connector and simultaneous second recovery', async () => {
+    db.raw.prepare(`INSERT INTO ec_events(id,source,external_event_id,event_type,line_account_id,payload,status,received_at,updated_at)
+      VALUES ('stale','eccube','stale','ec.order.confirmed','account-a',?,'processing','2026-09-20T00:00:00Z','2026-09-20T00:00:00Z')`)
+      .run(JSON.stringify(orderEvent('stale')));
+    db.raw.exec(`INSERT INTO ec_action_executions(id,event_id,line_account_id,action_type,rule_version,idempotency_key,status,version,created_at,updated_at)
+      VALUES ('stale-exec','stale','account-a','customer_notification','v1','stale-key','processing',7,'2026-09-20T00:00:00Z','2026-09-20T00:00:00Z')`);
+    const input = { executionId: 'stale-exec', eventRowId: 'stale', lineAccountId: 'account-a', expectedVersion: 7, now: '2026-09-20T10:00:00Z', staleBefore: '2026-09-20T09:30:00Z' };
+    expect(await claimEcRetryExecution(db.db, { ...input, expectedVersion: 6 })).toBeNull();
+    db.raw.exec("UPDATE ec_events SET updated_at = '2026-09-20T09:59:00Z' WHERE id='stale'");
+    expect(await claimEcRetryExecution(db.db, input)).toBeNull();
+    db.raw.exec("UPDATE ec_events SET updated_at = '2026-09-20T00:00:00Z' WHERE id='stale'; UPDATE ec_connectors SET status='paused'");
+    expect(await claimEcRetryExecution(db.db, input)).toBeNull();
+    db.raw.exec("UPDATE ec_connectors SET status='connected'");
+    expect(await Promise.all([claimEcRetryExecution(asD1(db.raw), input), claimEcRetryExecution(asD1(db.raw), input)])).toEqual([8, null]);
+    expect(db.raw.prepare("SELECT status FROM ec_events WHERE id='stale'").get()).toEqual({ status: 'failed' });
+    expect(await claimEcRetryExecution(db.db, input)).toBeNull();
+  });
+
+  it('reclaims a stale processing event once using the execution version; terminal events stay untouched', async () => {
+    for (const status of ['processing', 'processed', 'identity_pending', 'skipped']) {
+      const row = `row-${status}`;
+      db.raw.prepare(`INSERT INTO ec_events(id,source,external_event_id,event_type,line_account_id,customer_id,payload,status,received_at,updated_at)
+        VALUES (?,'eccube',?,'ec.order.confirmed','account-a','C-1',?,?,?,?)`)
+        .run(row, `evt-${status}`, JSON.stringify(orderEvent(`evt-${status}`)), status, '2026-09-20T00:00:00Z', '2026-09-20T00:00:00Z');
+      db.raw.prepare(`INSERT INTO ec_action_executions(id,event_id,line_account_id,action_type,rule_version,idempotency_key,status,version,created_at,updated_at)
+        VALUES (?,?,'account-a','customer_notification','v1',?,'processing',7,?,?)`)
+        .run(`exec-${status}`,row,`key-${status}`,'2026-09-20T00:00:00Z','2026-09-20T00:00:00Z');
+    }
+    const result = await processDueEcRetries(db.db, { now: '2026-09-20T10:00:00Z' });
+    expect(result.processed).toBe(1);
+    expect(db.raw.prepare("SELECT status FROM ec_events WHERE id='row-processing'").get()).toEqual({ status: 'processed' });
+    for (const status of ['processed','identity_pending','skipped']) {
+      expect(db.raw.prepare('SELECT status FROM ec_events WHERE id=?').get(`row-${status}`)).toEqual({ status });
+      expect(db.raw.prepare('SELECT version FROM ec_action_executions WHERE id=?').get(`exec-${status}`)).toEqual({ version: 7 });
+    }
+    const { __pushMessage: push } = await import('@line-crm/line-sdk') as unknown as { __pushMessage: ReturnType<typeof vi.fn> };
+    expect(push).toHaveBeenCalledTimes(1);
+    await processDueEcRetries(db.db, { now: '2026-09-20T10:01:00Z' });
+    expect(push).toHaveBeenCalledTimes(1);
   });
 });

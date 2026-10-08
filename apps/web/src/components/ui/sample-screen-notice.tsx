@@ -13,11 +13,11 @@ export default function SampleScreenNotice({
   backHref,
   backLabel,
 }: {
-  /** 何の見本か。例:「友だち属性の新しい並び」 */
+  /** 何の見本か。例:「タグの新しい並び」 */
   what: string
   /** 通常の業務画面への戻り先。 */
   backHref: string
-  /** 戻り先の表示名。例:「通常の友だち属性へ戻る」 */
+  /** 戻り先の表示名。例:「通常のタグへ戻る」 */
   backLabel: string
 }) {
   return (

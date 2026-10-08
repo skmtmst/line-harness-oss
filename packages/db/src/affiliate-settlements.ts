@@ -149,6 +149,7 @@ export async function resolveApprovalRewardBasis(
     .prepare(
       `SELECT ce.created_at AS recorded_at,
               a.commission_rate AS commission_rate,
+              a.reward_mode AS reward_mode,
               dad.offer_version_id AS decision_version_id,
               al.offer_id AS link_offer_id,
               off.reward_amount AS offer_reward,
@@ -167,6 +168,7 @@ export async function resolveApprovalRewardBasis(
     .first<{
       recorded_at: string;
       commission_rate: number | null;
+      reward_mode: 'none' | 'fixed' | 'rate' | null;
       decision_version_id: string | null;
       link_offer_id: string | null;
       offer_reward: number | null;
@@ -176,7 +178,8 @@ export async function resolveApprovalRewardBasis(
   if (!row) return { kind: 'legacy-live', rewardAmount: null, rewardMiles: null };
   const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
   // 率の紹介者は版で金額を決めない（率の版管理はこの正本の範囲外）。
-  if (rate > 0) {
+  if (row.reward_mode === 'none') return { kind: 'legacy-live', rewardAmount: 0, rewardMiles: 0 };
+  if (row.reward_mode === 'rate' || (row.reward_mode == null && rate > 0)) {
     return { kind: 'legacy-live', rewardAmount: row.offer_reward, rewardMiles: row.offer_miles };
   }
   // 汎用リンク（案件なし）は旧来どおり。
@@ -261,6 +264,7 @@ export async function ensureConversionRewardSnapshot(
             a.name AS affiliate_name,
             a.code AS affiliate_code,
             a.commission_rate AS commission_rate,
+            a.reward_mode AS reward_mode,
             a.tenant_id AS tenant_id,
             a.line_account_id AS affiliate_account_id,
             f.line_account_id AS friend_account_id,
@@ -296,6 +300,7 @@ export async function ensureConversionRewardSnapshot(
     affiliate_name: string;
     affiliate_code: string;
     commission_rate: number | null;
+    reward_mode: 'none' | 'fixed' | 'rate' | null;
     tenant_id: string | null;
     affiliate_account_id: string | null;
     friend_account_id: string | null;
@@ -360,7 +365,7 @@ export async function ensureConversionRewardSnapshot(
     ? row.frozen_formula
     : null;
   const liveRate = row.commission_rate === null ? 0 : Number(row.commission_rate);
-  const liveFormula: AffiliateRewardFormula = liveRate > 0 ? 'rate' : 'fixed';
+  const liveFormula: AffiliateRewardFormula = row.reward_mode === 'rate' || (row.reward_mode == null && liveRate > 0) ? 'rate' : 'fixed';
   const formula: AffiliateRewardFormula = frozenFormula ?? liveFormula;
   const rate = formula === 'rate'
     ? (row.frozen_rate === null || row.frozen_rate === undefined ? liveRate : Number(row.frozen_rate))
@@ -374,7 +379,7 @@ export async function ensureConversionRewardSnapshot(
   // 確かめ直す：記録時刻の版があれば旧額、版管理下で版が無ければ版を
   // 作らない（null で終え、締め・支払い・レポートから外す。F-23 ケース6）。
   let pricedFixedReward = 0;
-  if (formula === 'fixed') {
+  if (formula === 'fixed' && row.reward_mode !== 'none') {
     if (row.version_reward !== null && row.version_reward !== undefined) {
       pricedFixedReward = Math.round(Number(row.version_reward));
     } else if (!hasVersionTables) {

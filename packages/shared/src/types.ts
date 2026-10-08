@@ -1406,6 +1406,7 @@ export interface Affiliate {
   /** トラッキングコード (ユニーク) */
   code: string;
   /** コミッション率 (0-100) */
+  rewardMode?: 'none' | 'fixed' | 'rate';
   commissionRate: number;
   /** 有効/無効 */
   isActive: boolean;
@@ -2603,7 +2604,7 @@ export interface HqBannerImageQuery {
 }
 export interface HqBannerImageCounts { all: number; favorite: number; delivered: number; unused: number }
 
-export interface HqTemplateFolder { id: string; name: string; revision: number }
+export interface HqTemplateFolder { id: string; name: string; revision: number; color?: string | null }
 
 export interface HqScenarioDefinition {
   schemaVersion: 1

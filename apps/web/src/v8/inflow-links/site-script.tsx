@@ -22,6 +22,7 @@ import { formatNumber } from '@/lib/format'
 import { useResponseGate } from '@/lib/use-response-gate'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import HelpTip from '@/components/shared/help-tip'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -448,7 +449,7 @@ export default function SiteScriptV8() {
                   <div className={styles.pageHead} role="row">
                     <span className={styles.pageCol} role="columnheader">ページ</span>
                     <span className={styles.numCol} role="columnheader">この30日のページ表示</span>
-                    <span className={styles.numColNarrow} role="columnheader">友だち追加</span>
+                    <span className={styles.numColNarrow} role="columnheader">訪問者数<HelpTip label="訪問者数の説明">この30日にページを訪れた人数です。同じ訪問者は1人として数えます。LINEの友だち追加数は含みません。</HelpTip></span>
                   </div>
                   {pages.slice(0, 4).map((page) => (
                     <div key={`${page.host ?? ''}:${page.path}`} className={styles.pageRow} role="row">

@@ -121,6 +121,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.stubGlobal('localStorage', new MemoryStorage())
   vi.stubGlobal('sessionStorage', new MemoryStorage())
+  Object.defineProperty(window, 'localStorage', { value: new MemoryStorage(), configurable: true })
+  window.localStorage.setItem('lh_staff_role', 'owner')
   mockDefault()
   host = document.createElement('div')
   document.body.appendChild(host)

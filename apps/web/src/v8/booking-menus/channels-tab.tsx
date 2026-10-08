@@ -43,9 +43,15 @@ function formatReadAt(value: string | null): string {
 
 function formatConflictRange(conflict: BookingConflict): string {
   const starts = new Date(conflict.startsAt)
-  const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}（${'日月火水木金土'[d.getDay()]}） ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  const head = Number.isNaN(starts.getTime()) ? '' : `${conflict.staffName}さんの${fmt(starts)}`
-  return head
+  if (Number.isNaN(starts.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }).formatToParts(starts)
+  const part = (kind: Intl.DateTimeFormatPartTypes) => parts.find((value) => value.type === kind)?.value ?? ''
+  return `${conflict.staffName}さんの ${part('month')}/${part('day')}（${part('weekday')}） ${formatConflictTime(conflict.startsAt)}`
+}
+
+function formatConflictTime(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date)
 }
 
 function StaffStatusChip({ status }: { status: BookingChannelStaff['status'] }) {
@@ -191,8 +197,10 @@ export function ConflictDialog({
     <div data-design-node="DFl3Q">
       <Dialog
         open
+        designNode="DFl3Q"
+        designWidth={560}
+        designTop={200}
         title={`${formatConflictRange(conflict)}に予約が重なりました`}
-        description="重なったままにすると、どちらかのお客さまをお待たせします。空いているスタッフへ移せます。"
         confirmLabel={notify ? '移して知らせる' : '移す'}
         cancelLabel="あとで"
         busy={busy}
@@ -200,8 +208,21 @@ export function ConflictDialog({
         onConfirm={() => void move()}
         onCancel={onClose}
       >
+        {conflict.bookings?.length ? (
+          <div className={ch.detail}>
+            {conflict.bookings.map((booking, index) => (
+              <p key={booking.bookingId} className={ch.conflictBooking}>
+                {index === 0 ? '①' : '②'} {booking.sourceLabel}・{booking.customerName}さん・{booking.menuName}・{formatConflictTime(booking.startsAt)}〜{formatConflictTime(booking.endsAt)}
+              </p>
+            ))}
+          </div>
+        ) : null}
+        {conflict.reason ? <p className={ch.conflictReason}>{conflict.reason}</p> : null}
+        <p className={ch.conflictLabel}>①の予約を移す先のスタッフ</p>
         <Select
           aria-label="移す先のスタッフ"
+          size="full"
+          disabled={busy}
           value={targetId}
           onChange={setTargetId}
           options={[
@@ -209,7 +230,11 @@ export function ConflictDialog({
             ...targets.map((t) => ({ value: t.staffId, label: `${t.displayName}へ移す` })),
           ]}
         />
-        <Toggle label="移したことを、お客さまに知らせる" checked={notify} onChange={setNotify} />
+        <div className={ch.detailRow}>
+          <Toggle label="移したことを、お客さまに知らせる" checked={notify} disabled={busy} onChange={setNotify} />
+          <span className={ch.conflictReason}>移したことを、お客さまに知らせる（LINE の友だちなら LINE、そうでなければ電話の案内を出す）</span>
+        </div>
+        {conflict.guidance ? <NoteBar tone="warn">{conflict.guidance}</NoteBar> : null}
       </Dialog>
     </div>
   )

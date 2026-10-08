@@ -6,6 +6,8 @@ const setFriendFieldReminderScanCursor = vi.fn();
 const enrollFriendsInReminderOnce = vi.fn();
 
 vi.mock('@line-crm/db', () => ({
+  getOneTimeFriendFieldReminderRegistrants: async () => [],
+  friendFieldReminderTargetStatements: () => [],
   getFriendFieldReminders: (...a: unknown[]) => getFriendFieldReminders(...a),
   getFriendsWithFieldValuePage: (...a: unknown[]) => getFriendsWithFieldValuePage(...a),
   setFriendFieldReminderScanCursor: (...a: unknown[]) => setFriendFieldReminderScanCursor(...a),
@@ -266,10 +268,10 @@ describe('分割と再開', () => {
 
     expect(result).toEqual({ enrolled: 4_000, skipped: 0, scanned: 4_000, hasMore: true });
     expect(getFriendsWithFieldValuePage).toHaveBeenNthCalledWith(
-      1, db, 'field-a', 'account-a', null, 2_000,
+      1, db, 'field-a', 'account-a', null, 2_000, 'rem-a',
     );
     expect(getFriendsWithFieldValuePage).toHaveBeenNthCalledWith(
-      2, db, 'field-b', 'account-b', null, 2_000,
+      2, db, 'field-b', 'account-b', null, 2_000, 'rem-b',
     );
   });
 
@@ -312,6 +314,7 @@ describe('分割と再開', () => {
       null,
       'f-04000',
       4_000,
+      'rem-1',
     );
     expect(cursor).toBeNull();
   });

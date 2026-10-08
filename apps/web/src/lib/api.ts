@@ -1,6 +1,7 @@
 import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
 import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts, BannerGenerationCreateOptions, RichMenuGroupListOptions } from '@line-crm/shared'
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
+import type { TenantCompanyContactInfo, SaveTenantCompanyContact } from '@line-crm/shared';
 import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
 import type { BookingConflictsResponse, BookingReassignInput, BookingCustomerNotification } from '@line-crm/shared';
@@ -5761,7 +5762,7 @@ export type FriendAddRuleOptions = {
   routes: Array<{ id: string; name: string; kind: string }>
   scenarios: Array<{ id: string; name: string }>
   tags: Array<{ id: string; name: string }>
-  folders: Array<{ id: string; name: string }>
+  folders: import('@line-crm/shared').FriendAddRuleFolder[]
 }
 export type FriendAddRuleListData = {
   items: FriendAddRule[]
@@ -9044,6 +9045,11 @@ export const api = {
   operatorHistory: () => fetchApi<ApiResponse<OperatorHistoryRow[]>>('/api/hq/operator-history'),
   tenants: {
     me: () => fetchApi<ApiResponse<{ name: string }>>('/api/tenants/me'),
+    companyContact: () => fetchApi<ApiResponse<TenantCompanyContactInfo>>('/api/tenants/me/company-contact'),
+    saveCompanyContact: (body: SaveTenantCompanyContact) =>
+      fetchApi<ApiResponse<TenantCompanyContactInfo>>('/api/tenants/me/company-contact', {
+        method: 'PATCH', body: JSON.stringify(body),
+      }),
     updateName: (name: string) =>
       fetchApi<ApiResponse<{ name: string }>>('/api/tenants/me', {
         method: 'PATCH',
@@ -9051,6 +9057,13 @@ export const api = {
       }),
   },
   /** 統括の課金（★V6 36-2）。形は `apps/worker/src/routes/hq-billing.ts`。 */
+  postalCode: {
+    search: (code: string) => fetchApi<ApiResponse<{
+      status: 'invalid' | 'none' | 'matched' | 'multiple'
+      candidates: Array<{ postalCode: string; prefecture: string; city: string; town: string }>
+      readiness: { fullDataset: boolean }
+    }>>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
+  },
   hqBilling: {
     preview: (planKey: PlanKey, interval: BillingInterval = 'month') =>
       fetchApi<ApiResponse<{ planKey: PlanKey; interval: BillingInterval; afterAmountYen: number;
@@ -9854,6 +9867,7 @@ export const api = {
     create: (data: {
       name?: string
       code?: string
+      rewardMode?: 'none' | 'fixed' | 'rate'
       commissionRate?: number
       friendId?: string
       issueInitialLink?: boolean
@@ -9876,6 +9890,7 @@ export const api = {
         Pick<
           Affiliate,
           | 'name'
+          | 'rewardMode'
           | 'commissionRate'
           | 'isActive'
           | 'email'
@@ -11209,15 +11224,19 @@ export const api = {
       fetchApi<ApiResponse<FriendAddRuleConflictData>>(
         `/api/friend-add-rules/conflicts?account_id=${encodeURIComponent(accountId)}&kind=${kind}`,
       ),
-    createFolder: (accountId: string, name: string, idempotencyKey: string) =>
-      fetchApi<ApiResponse<{ id: string; name: string; createdAt: string | null }>>(
+    createFolder: (accountId: string, name: string, idempotencyKey: string, color?: string | null) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').FriendAddRuleFolder>>(
         '/api/friend-add-rules/folders',
         {
           method: 'POST',
           headers: { 'Idempotency-Key': idempotencyKey },
-          body: JSON.stringify({ accountId, name }),
+          body: JSON.stringify({ accountId, name, color }),
         },
       ),
+    updateFolder: (accountId: string, id: string, input: { name?: string; color?: string | null }) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').FriendAddRuleFolder>>(`/api/friend-add-rules/folders/${encodeURIComponent(id)}`, {
+        method: 'PATCH', body: JSON.stringify({ accountId, ...input }),
+      }),
     runs: (accountId: string, params?: {
       period?: 'all' | 'last28days' | 'today' | 'this_month' | 'last_month'
       from?: string

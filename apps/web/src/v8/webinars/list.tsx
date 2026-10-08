@@ -736,7 +736,7 @@ function WebinarList() {
     return w.folderName ? { name: w.folderName } : null
   }
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: panelGrand, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: panelGrand, icon: <Inbox size={15} aria-hidden="true" /> },
     /*
      * 絵（UyUMw）どおり「…」は選んだ行だけに出す。選んでいない行に操作を渡すと、
      * 共通のフォルダの列では「…」の箱が場所を取り、件数が左へずれる。
@@ -745,6 +745,7 @@ function WebinarList() {
     ...folders.map((folder, index) => {
       const manageable = canEdit && selectedFolder === folder.id
       return {
+        kind: 'folder' as const,
         id: folder.id,
         label: folder.name,
         count: folder.count,
@@ -756,7 +757,7 @@ function WebinarList() {
         deleteNote: '削除しても、中のウェビナーは未分類に残ります。',
       }
     }),
-    { id: UNFILED, label: '未分類', count: unfiledCount },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
   const folderSelect = (
     <Select

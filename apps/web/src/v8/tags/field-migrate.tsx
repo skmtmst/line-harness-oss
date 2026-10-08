@@ -72,7 +72,7 @@ export default function FieldMigrateV8() {
 
 function FieldMigrate() {
   usePageTitle('種類を変える')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }, { label: '友だち情報欄', href: '/tags?tab=fields' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }, { label: '友だち情報欄', href: '/tags?tab=fields' }])
   const params = useSearchParams()
   const sourceId = params.get('id') ?? ''
   const { selectedAccountId } = useAccount()

@@ -554,7 +554,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             />}
           </div>
         </div>
-        <p className={styles.chain}>つながる先：→ 回答フォーム　→ マイル　→ EC連携　→ 友だち属性</p>
+        <p className={styles.chain}>つながる先：→ 回答フォーム　→ マイル　→ EC連携　→ タグ</p>
       </section>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>

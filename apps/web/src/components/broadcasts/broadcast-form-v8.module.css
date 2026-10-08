@@ -18,7 +18,8 @@
 }
 .header { display: flex; align-items: center; gap: var(--space-24); padding: var(--space-16) var(--space-24); border-bottom: 1px solid var(--color-hairline); }
 .heading { flex-shrink: 0; }
-.heading h2 { font-size: 18px; font-weight: 600; line-height: 24px; }
+.heading h2 { font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh);   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .heading p { margin-top: var(--space-2); font-size: 12px; color: var(--color-ink-faint); }
 .heading > button { height: auto; padding: 0; font-size: 12px; color: var(--color-action); }
 .stepRail { min-width: 0; flex: 1; }

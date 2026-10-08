@@ -4,7 +4,7 @@ import { canManageSupportMarkByRole } from './support-mark-permissions'
 
 /*
  * R511: 対応マークの作成・編集は owner・admin だけが案内される。
- * staff は友だち属性の権限キーを持っていても作れない
+ * staff はタグの権限キーを持っていても作れない
  * （サーバの requireRole('owner', 'admin') と同じ条件）。
  */
 describe('R511 対応マークの操作可否', () => {

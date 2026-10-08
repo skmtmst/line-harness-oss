@@ -76,6 +76,7 @@ export default function PageHeader({
     <div
       className={[styles.header, className].filter(Boolean).join(' ')}
       data-header-size={size}
+      data-template-region="heading"
     >
       <div className={styles.heading}>
         <Breadcrumb items={breadcrumb} />

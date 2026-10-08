@@ -8,7 +8,7 @@
  *   - 店のアカウントに結びつく欄（登録メディア・タグ・シナリオ・行うこと）は出さない（配った先の ID に直せないため）
  */
 import type { ReactNode } from 'react'
-import type { TemplateImagemapUpload } from '@line-crm/shared'
+import type { TemplateImagemapUpload, MessageTemplateMediaDefinition } from '@line-crm/shared'
 
 /** 画面が組み立てて渡す中身。メッセージは形と本文、クーポン・リサーチは店と同じ形の payload。 */
 export type TemplateHostContent =
@@ -17,7 +17,7 @@ export type TemplateHostContent =
   /** 質問：店の質問テンプレートと同じ形（質問文・選択肢）。本文は前文か質問文。 */
   | { kind: 'question'; name: string; question: Record<string, unknown>; messageContent: string }
   /** カルーセル：店のカルーセルと同じ形の本文（LINE のカルーセルの列）。押したら動く選択肢は使わない。 */
-  | { kind: 'carousel'; name: string; messageContent: string; tapLimitMode: 'none' | 'once'; tapLimitText: string | null }
+  | { kind: 'carousel'; name: string; messageContent: string; tapLimitMode: 'none' | 'once'; tapLimitText: string | null; media?: MessageTemplateMediaDefinition[] }
   /** リッチメッセージ（g8d6ai）：統括の口で作った5サイズの画像（media）と、店と同じ形の payload（面と URL）。 */
   | { kind: 'rich_message'; name: string; payload: Record<string, unknown>; media: TemplateImagemapUpload['media'] }
 
@@ -29,10 +29,10 @@ export interface TemplateEditHost {
   /** フォルダの候補（value は呼ぶ側が保存に使う値。未分類は ''）。 */
   folders: Array<{ value: string; label: string; color?: string | null }>
   /**
-   * フォルダを選ぶ欄からその場で作る（dLffh）。呼ぶ側の種類のフォルダの受け口。色は受け取らない。
+   * フォルダを選ぶ欄からその場で作る（dLffh）。呼ぶ側の種類のフォルダの受け口。名前と色を受け取る。
    * 渡さないと「＋ 新しいフォルダを作る」を出さない。
    */
-  createFolder?: (name: string) => Promise<{ value: string; label: string }>
+  createFolder?: import('@/components/shared/folder-select').FolderSelectCreate
   folder: string
   onFolderChange: (value: string) => void
   /** 呼ぶ側の保存・読み込み中。 */
@@ -52,4 +52,6 @@ export interface TemplateEditHost {
   readOnly?: boolean
   /** リッチメッセージの画像を統括の置き場へ送り、LINE の5サイズを作る（API-17 の口）。 */
   uploadRichImage?: (file: File) => Promise<TemplateImagemapUpload>
+  /** カルーセルの画像はメッセージと同じ統括の口。受け取りを先に記録してからカードに入れる（R568）。 */
+  uploadCarouselImage?: (file: File) => Promise<MessageTemplateMediaDefinition>
 }

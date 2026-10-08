@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -186,6 +188,7 @@ function RecipeClone() {
 
   return (
     <div className={styles.page}>
+      <div className="v8-only"><PageHeading title="レシピを複製する" /></div>
       <nav className={styles.breadcrumb} aria-label="パンくず">
         <Link href="/recipes">レシピ</Link>
         <span aria-hidden>›</span>

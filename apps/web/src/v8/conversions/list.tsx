@@ -765,7 +765,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   /* ===== フォルダ ===== */
   /* 成果地点にはフォルダの口が無い（口が入るまで「すべて」だけ。作る・名前を変える操作は出さない）。 */
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: total, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: total, icon: <Inbox size={15} aria-hidden="true" /> },
   ]
   const folderSelect = (
     <Select

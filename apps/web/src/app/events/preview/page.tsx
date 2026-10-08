@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 /*
  * U お客様表示確認（v6-29 §5）。
  * 公開条件で申込画面を確認する。運営向けの注記は帯に1本だけ置き、
@@ -99,6 +101,7 @@ function PreviewInner({ eventId }: { eventId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="v8-only"><PageHeading title="お客様表示の確認" /></div>
       <div>
         <nav className="text-ink-faint text-xs" aria-label="パンくず">
           <Link href="/events" className="hover:underline">

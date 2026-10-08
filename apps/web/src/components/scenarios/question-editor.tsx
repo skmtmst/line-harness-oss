@@ -228,7 +228,7 @@ export function clearDeadAnswerSettings(choice: QuestionChoice): QuestionChoice 
 }
 
 /*
- * 入力欄の見た目は、他の画面（友だち属性・シナリオ編集）と同じにそろえる。
+ * 入力欄の見た目は、他の画面（タグ・シナリオ編集）と同じにそろえる。
  * この画面だけ枠や余白が違うと、同じアプリに見えない。
  */
 const inputClass =

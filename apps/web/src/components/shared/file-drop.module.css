@@ -214,3 +214,7 @@
   transition: transform var(--motion-base) var(--motion-ease-out);
 }
 }
+
+.zone[data-variant='video'] { min-height: var(--tpl-rvid-drop-h); border-width: 1px; border-color: var(--color-control-border); border-radius: var(--radius-control); }
+
+.zone[data-invalid] { border-color: var(--color-danger); }

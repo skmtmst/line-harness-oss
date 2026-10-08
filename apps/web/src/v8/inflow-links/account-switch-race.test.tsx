@@ -59,6 +59,25 @@ async function settle() {
 }
 
 describe('サイトスクリプト（WEB040）', () => {
+  it('WEB039 ページの visitors を訪問者数として表示し、説明で定義を示す', async () => {
+    handler = async (url) => {
+      if (url.pathname.includes('measurement-sites')) return json({ success: true, data: [site('sa', 'Aのサイト')] });
+      if (url.pathname.includes('summary')) return json({ success: true, data: { lastEventAt: '2026-10-08T10:00:00Z' } });
+      if (url.pathname.includes('pages')) return json({ success: true, data: [{ host: 'sa.example', path: '/shop', views: 17, visitors: 4 }] });
+      return json({ success: false, error: 'x' }, 404);
+    };
+    await act(async () => { root.render(<SiteScriptV8 />) });
+    await settle();
+    const header = [...host.querySelectorAll('[role="columnheader"]')].find((el) => el.textContent?.includes('訪問者数'));
+    expect(header).toBeTruthy();
+    expect(header?.closest('[role="table"]')?.textContent).toContain('4');
+    const help = host.querySelector('button[aria-label="訪問者数の説明"]') as HTMLButtonElement;
+    expect(help).toBeTruthy();
+    await act(async () => { help.click() });
+    expect(document.body.textContent).toContain('同じ訪問者は1人として数えます');
+    expect(document.body.textContent).toContain('LINEの友だち追加数は含みません');
+  });
+
   it('B に切り替えたあとに A のサイト一覧が届いても、B のサイトのまま', async () => {
     let releaseA: () => void = () => undefined
     handler = async (url) => {

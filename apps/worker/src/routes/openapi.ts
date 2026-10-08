@@ -7,6 +7,7 @@ import { api9Paths, api9Schemas } from './api9-openapi.js';
 import { restaurantClosurePaths } from './restaurant-closures-openapi.js';
 import { stampPaths,hqBroadcastPaths } from './proposal-e-openapi.js';
 import { Hono } from 'hono';
+import { tenantCompanyContactPaths } from './tenant-company-contact-openapi.js';
 import type { Env } from '../index.js';
 
 const openapi = new Hono<Env>();
@@ -400,6 +401,7 @@ const spec = {
   },
   paths: {
     ...tabCountPaths,
+    ...tenantCompanyContactPaths,
     ...chatAttachmentPaths,
     '/api/mileage/reward-folders': {
       get: { tags: ['Mileage'], summary: '使い道のフォルダと件数を読む', parameters: [{ name: 'accountId', in: 'query', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Folders: id, name, displayOrder, count' }, '404': { description: 'Account not found' } } },

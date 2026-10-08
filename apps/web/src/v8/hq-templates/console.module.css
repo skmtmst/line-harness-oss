@@ -165,3 +165,10 @@
 }
 /* 絵（dEvJM）は中身の最後と下の線の間が 14。窓の中身の下の余白（24）から詰める。 */
 .resultList:last-child, .resultBand { margin-bottom: var(--tpl-htn-result-summary-pull); }
+
+/* G-4：列と畳む段は一覧の型に任せる。 */
+.distributionNotice { padding: var(--tpl-htn-body-pad); padding-bottom: 0; }
+.distributionContent { display: flex; flex-direction: column; gap: var(--tpl-htn-gap); }
+.selectedTools { display: flex; align-items: center; gap: var(--tpl-htn-gap-s); min-width: 0; }
+.selectedCount { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); white-space: nowrap; }
+.table tbody tr[data-selected] { background: var(--color-success-bg); }

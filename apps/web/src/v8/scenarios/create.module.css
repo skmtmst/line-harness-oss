@@ -35,8 +35,8 @@
 }
 .cardHead {
   display: flex;
-  flex-direction: column;
-  gap: var(--tpl-sc2-head-gap);
+  align-items: center;
+  gap: var(--tpl-sc2-field-gap);
 }
 .cardTitle {
   margin: 0;
@@ -44,12 +44,6 @@
   font-size: var(--tpl-card-title-size);
   font-weight: 700;
   line-height: var(--tpl-sc2-title-lh);
-}
-.cardDesc {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-text-sm-lh);
 }
 
 /* シナリオ情報：名前（伸びる）とフォルダ（280）を横に並べる。 */
@@ -110,57 +104,9 @@
   line-height: var(--tpl-text-sm-lh);
 }
 
-/* 配信方式：2枚の選ぶカード（高さ98・間10）。 */
+/* 配信方式：図つきの共通カードを、同じ高さで横に並べる。 */
 .modeRow {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--tpl-sc2-mode-gap);
-}
-.modeCard {
-  min-height: var(--tpl-sc2-mode-h);
-}
-
-/* 見本：選んだ方式で2人がいつ受け取るか。 */
-.example {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-sc2-ex-gap);
-  width: 100%;
-}
-.exampleTitle {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-sc2-ex-lh);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.exampleRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-sc2-ex-row-gap);
-  padding: var(--tpl-sc2-ex-row-pad);
-  border-radius: var(--tpl-sc2-ex-radius);
-  background: var(--color-surface-pearl);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-sc2-ex-lh);
-  white-space: nowrap;
-}
-.exampleWho {
-  color: var(--color-ink);
-  font-weight: 700;
-}
-.exampleStart {
-  color: var(--color-ink-secondary);
-}
-.exampleAt {
-  color: var(--color-ink);
-}
-.exampleNote {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-sc2-ex-note-lh);
 }

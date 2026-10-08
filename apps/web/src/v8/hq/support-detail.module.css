@@ -239,20 +239,3 @@
 }
 
 .historyRowCurrent .historyName { font-weight: 600; }
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-hq-pill-gap);
-  padding: var(--tpl-hq-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-hq-pill-lh);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.dot { width: var(--tpl-hq-dot); height: var(--tpl-hq-dot); border-radius: var(--radius-pill); background: currentColor; }
-.pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-.pillInfo { background: var(--color-status-info-soft); color: var(--color-status-info); }
