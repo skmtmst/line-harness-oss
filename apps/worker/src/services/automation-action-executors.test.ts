@@ -368,6 +368,31 @@ describe('V6オートメーションの既存処理接続', () => {
     ).get()).toEqual({ content: '営業時間は10時から18時です' });
   });
 
+  it('W43 引用符・改行を含む共通情報のFlexを送信し実行と履歴を完了する', async () => {
+    const value = '引用"\n改行\\日本語 {{var.unknown}}';
+    testDb.raw.prepare(`INSERT INTO common_vars (id, line_account_id, name, var_key, type, value)
+      VALUES ('cv-json', 'account-1', '案内', 'hours', 'long_text', ?)`).run(value);
+    const pushMessage = vi.fn(async (_to: string, _messages: Message[], _retryKey?: string) => ({ requestId: 'accepted-json' }));
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'json-message', type: 'send_message', params: { messageType: 'flex',
+        content: JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '{{var.hours}}' }] } }),
+      }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => ({ pushMessage, linkRichMenuToUser: vi.fn(), unlinkRichMenuFromUser: vi.fn() }),
+        now: () => NOW,
+      }),
+    });
+    expect(result.status).toBe('success');
+    const message = pushMessage.mock.calls[0]?.[1][0];
+    expect(message).toMatchObject({ type: 'flex', contents: { body: { contents: [{ text: value }] } } });
+    const log = testDb.raw.prepare(`SELECT content FROM messages_log WHERE friend_id = 'friend-1'`).get() as { content: string };
+    expect(JSON.parse(log.content)).toMatchObject({ body: { contents: [{ text: value }] } });
+    expect(testDb.raw.prepare(`SELECT status, response_id FROM outbound_send_requests WHERE idempotency_key = ?`)
+      .get(pushMessage.mock.calls[0]?.[2])).toEqual({ status: 'succeeded', response_id: 'accepted-json' });
+  });
+
   it('消えた共通情報はLINEを呼ばずアクションを失敗にし、台帳へ出所を残す', async () => {
     const pushMessage = vi.fn(async () => ({ requestId: 'line-request-1' }));
     const result = await execute(testDb, {
