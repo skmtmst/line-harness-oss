@@ -9,7 +9,7 @@
 }
 
 .title {
-  font-size: var(--tpl-bks-title-size);
+  font-size: var(--tpl-bks-sales-title-size);
   font-weight: 600;
   margin: var(--tpl-bks-none);
 }
