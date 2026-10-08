@@ -818,7 +818,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   if (!friendId) return null
 
   const settingsButton = (
-    <Button variant="secondary" className={isV8 ? 'shrink-0 items-center justify-center whitespace-nowrap' : 'mr-14 v7:h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-micro text-ink-faint'} size={isV8 ? 'compact' : undefined} type="button" ref={settingsButtonRef} onClick={() => {
+    <Button variant="secondary" className={isV8 ? 'shrink-0 items-center justify-center whitespace-nowrap' : 'mr-14 v7:h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-micro text-ink-faint'} type="button" ref={settingsButtonRef} onClick={() => {
         if (!showSettings) updateSettingsPanelPos()
         setShowSettings(!showSettings)
       }} aria-expanded={showSettings}>
@@ -1634,7 +1634,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   <p className={v8.personSub}>{formatAddedDate(friend.createdAt)}</p>
                   {!friend.isFollowing ? <span className={v8.blocked}>ブロック済</span> : null}
                   <div className={v8.personActions}>
-                    <Button variant="secondary" size="compact" href={`/friends/detail?id=${friend.id}`}>
+                    <Button variant="secondary" href={`/friends/detail?id=${friend.id}`}>
                       友だち詳細
                     </Button>
                     {settingsButton}
