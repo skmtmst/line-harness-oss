@@ -59,7 +59,7 @@ import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
-import { TextArea, TextField } from '@/components/shared/text-field'
+import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
@@ -78,6 +78,14 @@ import {
 import { describeReminderDiff } from './conflict-diff'
 import { BackToReminders, ChoiceCardV8, PhoneV8, ReminderV8Stepper, SummaryCardV8, WizardFooterV8, type ReminderV8StepKey } from './ui'
 import styles from './edit.module.css'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import type { InsertTokenSpec } from '@/components/shared/insert-tokens'
+
+/** リマインダの本文で札にする差し込み（{{date}} はリマインダでは予約日時）。 */
+const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
+  { token: '{{date}}', label: '予約日時', hint: '予約日時に置き換わります', icon: 'calendar' },
+  { token: '{{meet_url}}', label: 'Google Meet の URL', hint: '予約の Google Meet の URL に置き換わります', icon: 'video' },
+]
 
 /*
  * ★V8 リマインダを作る・手順1の直し〜5と完了（src/v8 に一から書いた版）。
@@ -1085,7 +1093,7 @@ function MessagesStageV8({
   const [selectedStepId, setSelectedStepId] = useState<string | null>(settings.steps[0]?.stableStepId ?? null)
   const [fields, setFields] = useState<FriendField[]>([])
   const [phoneOpen, setPhoneOpen] = useState(false)
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const sampleBase = useRef<Date>(sampleBaseDate())
 
   useEffect(() => {
@@ -1265,15 +1273,16 @@ function MessagesStageV8({
                       onChange={(patch) => updateStep(step.stableStepId, patch)}
                     />
                     <div className={styles.bodyBox}>
-                      <TextArea
+                      <InsertTextField
                         ref={bodyRef}
                         className={styles.bodyArea}
                         value={step.messageContent}
                         maxLength={BODY_LIMIT}
                         aria-label={`${index + 1}通目の本文`}
                         placeholder="友だちに届く本文を書きます"
-                        onChange={(event) => updateStep(step.stableStepId, { messageContent: event.target.value })}
-                      />
+                        onValueChange={(next) => updateStep(step.stableStepId, { messageContent: next })}
+                        extraTokens={REMINDER_TOKENS}
+/>
                       <span className={styles.bodyGap} aria-hidden="true" />
                       <div className={styles.insertRow}>
                         <span className={styles.insertLabel}>差し込む</span>

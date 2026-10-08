@@ -57,3 +57,20 @@ it('見る権限がないときは、失敗とは分けて伝える', async () =
   render(<OrderDrawer orderId="order-1" accountId="account-1" onClose={() => undefined} onRetryAction={async () => undefined} retryingId={null} />)
   expect(await screen.findByText('この注文の状況を見る権限がありません')).toBeTruthy()
 })
+
+it('WEB193：やり直しの間に別の注文へ移ったら、前の注文を読み直して上書きしない', async () => {
+  const b = detail(false)
+  b.order = { ...b.order, id: 'order-2', orderNumber: 'B-2' }
+  fixture.orderDetail.mockImplementation(async (orderId: string) => ({ success: true, data: orderId === 'order-2' ? b : detail(true) }))
+  let finishRetry: () => void = () => undefined
+  const onRetry = vi.fn(() => new Promise<void>((resolve) => { finishRetry = resolve }))
+  const view = render(<OrderDrawer orderId="order-1" accountId="account-1" onClose={() => undefined} onRetryAction={onRetry} retryingId={null} />)
+  expect(await screen.findByText(/LINEが送信を受け付けませんでした/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度やる' }))
+  view.rerender(<OrderDrawer orderId="order-2" accountId="account-1" onClose={() => undefined} onRetryAction={onRetry} retryingId={null} />)
+  expect(await screen.findByRole('heading', { name: '注文 B-2' })).toBeTruthy()
+  finishRetry()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  expect(screen.getByRole('heading', { name: '注文 B-2' })).toBeTruthy()
+  expect(fixture.orderDetail.mock.calls.filter(([id]) => id === 'order-1')).toHaveLength(1)
+})

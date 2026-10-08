@@ -21,6 +21,8 @@ import HelpTip from '@/components/shared/help-tip'
 import styles from './broadcast-form-v8.module.css'
 import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
+import BroadcastTextBubble from './broadcast-text-bubble'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import {
   MAX_BUBBLES,
   MAX_TEXT_LENGTH,
@@ -72,6 +74,9 @@ import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
+import { useStaffRole } from '@/lib/staff-role'
+import { canEditFeature } from '@/lib/staff-capability'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
@@ -265,7 +270,11 @@ export function videoPreviewProblem(value: unknown): string | null {
   return null
 }
 
-function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: (content: Record<string, unknown>) => void }) {
+/**
+ * 画像・動画のアップロード欄。統括の一括配信（v8/hq-broadcasts）も同じ欄を使う。
+ * lineAccountId を渡すと動画の置き場をそのアカウントにする（null＝どの店にも属さない。統括）。省けば今選んでいる店。
+ */
+export function MediaUpload({ bubble, onChange, lineAccountId }: { bubble: BroadcastBubble; onChange: (content: Record<string, unknown>) => void; lineAccountId?: string | null }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const isVideo = bubble.type === 'video' || bubble.type === 'rich_video'
@@ -276,7 +285,7 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
     if (file.size > max) { setError(mediaTooLargeMessage(isVideo, file.size)); return }
     setBusy(true); setError('')
     try {
-      const res = await api.broadcastMessageAssets.upload(file)
+      const res = await api.broadcastMessageAssets.upload(file, lineAccountId)
       if (!res.success) { setError(res.error); return }
       onChange({ ...bubble.content, originalContentUrl: res.data.url, previewImageUrl: isVideo ? (bubble.content.previewImageUrl ?? '') : res.data.url })
     } catch { setError('アップロードに失敗しました。通信を確かめて、もう一度お試しください。') } finally { setBusy(false) }
@@ -294,13 +303,14 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
   </div>
 }
 
-function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[] }) {
+/** LINE の見え方の吹き出し1つ。統括の一括配信（v8/hq-broadcasts）も使う。 */
+export function BubblePreview({ bubble, buttons = [], accountName }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[]; accountName?: string }) {
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
-  if (bubble.type === 'text') return <div className="max-w-[82%]">
+  if (bubble.type === 'text') return <BroadcastTextBubble text={text} buttons={buttons} accountName={accountName} legacy={<div className="max-w-[82%]">
     <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-label shadow-card">{text || 'テキストを入力すると表示されます'}</div>
     {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-medium" title={button.value}>{button.label || 'ボタン'}</div>)}
-  </div>
+  </div>} />
   if (bubble.type === 'sticker') {
     const st = (bubble.content.state as MessageKindState | undefined)?.sticker
     return st?.packageId && st?.stickerId
@@ -350,7 +360,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
 }) {
   const availableAssets = assets.filter((asset) => asset.kind === bubble.type)
   // 差し込みをカーソルの位置に入れるために、入力欄そのものを渡す。
-  const textRef = useRef<HTMLTextAreaElement>(null)
+  const textRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
     {/*
       吹き出しの見出し行。狭い幅では2段に折る。折らないと、種類の選択肢と
@@ -390,7 +400,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
             onChange={(next) => onChange({ ...bubble, content: { text: next.slice(0, MAX_TEXT_LENGTH) } })}
           />
         </div>
-        <textarea ref={textRef} rows={6} maxLength={MAX_TEXT_LENGTH} value={String(bubble.content.text ?? '')} onChange={(e) => onChange({ ...bubble, content: { text: e.target.value } })} placeholder="テキストを入力" className="border-hairline focus:border-accent rounded-card w-full resize-none border p-3 text-sm focus:outline-none" />
+        <InsertTextField ref={textRef} rows={6} maxLength={MAX_TEXT_LENGTH} value={String(bubble.content.text ?? '')} onValueChange={(next) => onChange({ ...bubble, content: { text: next } })} placeholder="テキストを入力" className="border-hairline focus:border-accent rounded-card w-full resize-none border p-3 text-sm focus:outline-none" />
         <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, MAX_TEXT_LENGTH) } })} className="rounded-mini border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{messageLengthLabel(String(bubble.content.text ?? '').length)}</span></div>
       </div>}
       {bubble.type === 'flex' && <div>
@@ -456,7 +466,7 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
   onMove: (direction: -1 | 1) => void
   onDelete: () => void
 }) {
-  const textRef = useRef<HTMLTextAreaElement>(null)
+  const textRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const text = String(bubble.content.text ?? '')
   const urls = [...new Set(text.match(/https?:\/\/\S+/g) ?? [])]
 
@@ -479,13 +489,13 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
           onChange={(next) => onChange({ ...bubble, content: { ...bubble.content, text: next.slice(0, MAX_TEXT_LENGTH) } })}
         />
       </div>}
-      <textarea
+      <InsertTextField
         ref={textRef}
         aria-label={`${index + 1}通目の本文`}
         rows={6}
         maxLength={MAX_TEXT_LENGTH}
         value={text}
-        onChange={(event) => onChange({ ...bubble, content: { ...bubble.content, text: event.target.value } })}
+        onValueChange={(next) => onChange({ ...bubble, content: { ...bubble.content, text: next } })}
         placeholder="テキストを入力"
         className={`border-hairline rounded-control mt-3 w-full resize-none border p-3 text-sm focus:border-accent focus:outline-none ${embedded ? 'h-30' : ''}`}
       />
@@ -735,7 +745,15 @@ export default function BroadcastForm({
   const [publishedActions, setPublishedActions] = useState<Array<{ versionId: string; name: string; version: number }>>([])
   /** 分類。空なら未分類。 */
   const [folderId, setFolderId] = useState('')
-  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
+  const [folders, setFolders] = useState<Array<{ id: string; name: string; color?: string | null }>>([])
+  // フォルダを選ぶ欄からその場で作る（dLffh）。一覧の左の列の「フォルダを追加」と同じ口・同じ権限。
+  const staffRoleForFolders = useStaffRole()
+  const canCreateFolder = staffRoleForFolders === null || canEditFeature('broadcast.definition.edit')
+  const createFolder = folderCreator(
+    (name, color) => api.folders.create({ kind: 'broadcast', name, color }),
+    folderById,
+    (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]),
+  )
   /*
    * 開封数を取るか。既定は取る。
    *
@@ -986,7 +1004,7 @@ export default function BroadcastForm({
 
   useEffect(() => {
     api.folders.list('broadcast')
-      .then((res) => { if (res.success) setFolders(res.data.map((f) => ({ id: f.id, name: f.name }))) })
+      .then((res) => { if (res.success) setFolders(res.data.map((f) => ({ id: f.id, name: f.name, color: f.color }))) })
       .catch(() => undefined)
   }, [])
 
@@ -2190,7 +2208,7 @@ export default function BroadcastForm({
             <small>友だちには表示されません。一覧で見分けるための名前です</small>
           </label>
           <div className={styles.basicFields}>
-            <label><span className={styles.labelRow}>フォルダ</span><Select aria-label="フォルダ" value={folderId} onChange={setFolderId} options={[{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.id, label: f.name }))]} size="full" /></label>
+            <label><span className={styles.labelRow}>フォルダ</span><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={folders.map(folderById)} onCreate={canCreateFolder ? createFolder : undefined} size="full" /></label>
             <label><span className={styles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません</HelpTip></span><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} className={styles.textInput} placeholder="配信の目的や運用メモ" /></label>
           </div>
           <div className={styles.recentHeader}><h3>最近の配信</h3><Link href="/broadcasts">一斉配信の一覧を見る →</Link></div>
@@ -2644,7 +2662,7 @@ export default function BroadcastForm({
         <div className={styles.previewHead}><h3>LINE の見え方</h3><div className={styles.deviceSwitch} role="group" aria-label="プレビューの端末"><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button></div><Button ref={previewCloseRef} className={styles.previewClose} size="compact" onClick={() => { setPreviewOpen(false); previewToggleRef.current?.focus() }}>閉じる</Button></div>
         <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
           <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={!selectedTemplate && Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
-            <div className="flex flex-col gap-3 text-ink">{selectedTemplate ? (() => { const bubble = messageTemplateToBubble(selectedTemplate); return bubble ? <BubblePreview bubble={bubble} /> : <p className="whitespace-pre-wrap break-words">{selectedTemplate.messageContent}</p> })() : bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}</div>
+            <div className="flex flex-col gap-3 text-ink">{selectedTemplate ? (() => { const bubble = messageTemplateToBubble(selectedTemplate); return bubble ? <BubblePreview bubble={bubble} accountName={selectedAccount?.name} /> : <p className="whitespace-pre-wrap break-words">{selectedTemplate.messageContent}</p> })() : bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} buttons={index === 0 ? messageButtons : []} />)}</div>
           </LinePreview>
         </div>
         <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>

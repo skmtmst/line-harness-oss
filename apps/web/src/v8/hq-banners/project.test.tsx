@@ -16,6 +16,7 @@ const presets = vi.hoisted(() => vi.fn())
 const getProject = vi.hoisted(() => vi.fn())
 const updateProject = vi.hoisted(() => vi.fn())
 const removeImage = vi.hoisted(() => vi.fn())
+const createGeneration = vi.hoisted(() => vi.fn())
 const listAccounts = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const roleBox = vi.hoisted(() => ({ role: 'owner' as string | null }))
@@ -30,7 +31,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         ...actual.api.hqBanners,
         presets,
         usage: vi.fn(async () => ({ success: false })),
-        projects: { ...actual.api.hqBanners.projects, get: getProject, update: updateProject, list: vi.fn(async () => ({ success: true, data: [] })) },
+        projects: { ...actual.api.hqBanners.projects, get: getProject, update: updateProject, list: vi.fn(async () => ({ success: true, data: [] })), createGeneration },
         images: { ...actual.api.hqBanners.images, remove: removeImage },
       },
       lineAccounts: { ...actual.api.lineAccounts, list: listAccounts },
@@ -168,5 +169,22 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     expect(document.body.textContent).toContain('画像の詳細')
     expect(buttonNamed('一覧から外す')).toBeUndefined()
     expect(buttonNamed('同じ設定でもう一度生成')).toBeUndefined()
+  })
+
+  it('WEB205：作り始める要求が返るまでは、生成するをもう一度押せない', async () => {
+    createGeneration.mockImplementation(() => new Promise(() => undefined))
+    await act(async () => { root.render(<HqBannerProjectV8 />) })
+    await flush()
+    const line = document.querySelector('input[aria-label="テキスト 1行目"], textarea[aria-label="テキスト 1行目"]') as HTMLInputElement
+    expect(line).toBeTruthy()
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(line), 'value')!.set!.call(line, '秋の新商品')
+      line.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const start = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.includes('生成する（')) as HTMLButtonElement
+    await act(async () => { start.click() })
+    await act(async () => { start.click() })
+    expect(createGeneration).toHaveBeenCalledTimes(1)
+    expect(start.disabled).toBe(true)
   })
 })

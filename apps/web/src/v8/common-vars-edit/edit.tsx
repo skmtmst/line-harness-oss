@@ -42,6 +42,7 @@ import { CreatePage } from '@/components/templates'
 import DateField from '@/components/shared/date-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import { api, ApiError, type CommonVarDetail } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
@@ -817,14 +818,18 @@ function EditCommonVarV8Inner() {
             />
           </div>
           {canWrite ? (
-            <Select
+            <FolderSelect
               aria-label="フォルダ"
+              label="フォルダ"
               id="cv-folder"
               {...(narrow ? { size: 'full' as const } : { width: 240 })}
               value={folderId}
               onChange={(next) => { setSaved(false); setFolderId(next) }}
-              // 絵は「フォルダ：お店の情報」を1つの文で見せる。
-              options={[{ value: '', label: 'フォルダ：未分類' }, ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` }))]}
+              // 絵は「フォルダ：お店の情報」を1つの文で見せる（閉じたボタンの頭は label）。
+              folders={folders.map(folderById)}
+              onCreate={canWrite && selectedAccountId
+                ? folderCreator((name, color) => api.folders.create({ kind: 'common_var', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
+                : undefined}
             />
           ) : (
             // 閲覧のみ：選ぶ部品は置かず、選んでいるフォルダを文字で見せる。

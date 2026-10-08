@@ -26,7 +26,7 @@ import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import SegmentedControl from '@/components/shared/segmented'
-import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
@@ -58,6 +58,8 @@ import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import InsertRow from './insert-row'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
 
@@ -245,7 +247,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   }, [id, example])
 
   /* 差し込みはカーソルの位置へ入れる（今の画面と同じ）。 */
-  const contentRef = useRef<HTMLTextAreaElement | null>(null)
+  const contentRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement | null>(null)
   const insert = (token: string) => {
     const element = contentRef.current
     const start = element?.selectionStart ?? messageContent.length
@@ -444,6 +446,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   }
 
   const preview = buildTemplatePreview(messageContent, references)
+  const tokenNames = referenceTokenNames(references)
   const urls = extractMessageUrls(messageContent)
   const flexError = messageType === 'flex' ? validateFlexContent('flex', messageContent) : null
   const sendName = accountName(editorAccountId) ?? undefined
@@ -564,12 +567,18 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 </div>
                 <div className={`${styles.field} ${styles.folderField}`}>
                   <label htmlFor="te-folder" className={styles.labelSmall}>フォルダ</label>
-                  <Select
+                  <FolderSelect
                     id="te-folder"
                     aria-label="フォルダ"
                     value={host ? host.folder : folderId ?? ''}
                     onChange={host ? host.onFolderChange : (value) => updateDraft({ folderId: value || null })}
-                    options={[{ value: '', label: '未分類' }, ...(host ? host.folders : folders.map((folder) => ({ value: folder.id, label: folder.name })))]}
+                    folders={host ? host.folders : folders.map(folderById)}
+                    colors={!host}
+                    onCreate={host
+                      ? hostFolderCreate(host)
+                      : canMutate && editorAccountId
+                        ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: editorAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
+                        : undefined}
                   />
                 </div>
               </div>
@@ -584,7 +593,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 <SegmentedControl aria-label="メッセージの形" options={MESSAGE_TYPES} value={messageType} onChange={(value) => updateDraft({ messageType: value })} />
               </div>
               <div className={styles.bodyBox}>
-                <textarea
+                <InsertTextField
                   id="te-content"
                   ref={contentRef}
                   aria-label={messageType === 'text' ? '本文' : 'メッセージ内容'}
@@ -592,7 +601,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   className={styles.bodyText}
                   data-kind={messageType}
                   value={messageContent}
-                  onChange={(event) => updateDraft({ messageContent: event.target.value })}
+                  onValueChange={(next) => updateDraft({ messageContent: next })}
+                  tokenNames={tokenNames}
                   placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：{{name}}さん、こんにちは。'}
                 />
                 <span className={styles.bodySpacer} aria-hidden="true" />

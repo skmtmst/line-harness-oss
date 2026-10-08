@@ -39,13 +39,25 @@ export default function MenuVersionHistory({
   const [reverting, setReverting] = useState(false)
   const [revertError, setRevertError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
+  /*
+   * WEB051：戻すときに送る「いまの版」。開いたときの版（親の値）から始め、
+   * 読み直したら最新の版へ進める。409 のあと古い版のまま送り直して黙って失敗しない。
+   */
+  const [expectedVersion, setExpectedVersion] = useState(currentVersion)
+  useEffect(() => { setExpectedVersion(currentVersion) }, [currentVersion])
+
+  const load = useCallback(async (options?: { keepError?: boolean }) => {
     setLoadState('loading')
-    setRevertError(null)
+    // WEB051：競合の知らせは読み直しで消さない。
+    if (!options?.keepError) setRevertError(null)
     try {
       const response = await bookingApi.listMenuVersions(accountId, menuId)
       const list = Array.isArray(response.versions) ? response.versions : []
       setVersions(list)
+      const latest = list.find((v) => v.status === 'in_use')?.version_number
+        ?? list.reduce<number | null>((max, v) => (max == null || v.version_number > max ? v.version_number : max), null)
+      // 版は増えるだけ。409 で口が返した版より古い一覧が届いても戻さない。
+      if (latest != null) setExpectedVersion((known) => Math.max(known, latest))
       setSelected((current) => {
         if (current != null && list.some((v) => v.version_number === current)) return current
         return list[0]?.version_number ?? null
@@ -70,7 +82,7 @@ export default function MenuVersionHistory({
     at: version.at,
   }))
   const selectedVersion = versions.find((v) => v.version_number === selected) ?? null
-  const current = versions.find((v) => v.version_number === currentVersion)
+  const current = versions.find((v) => v.version_number === expectedVersion)
     ?? versions.find((v) => v.status === 'in_use') ?? null
 
   const doRevert = async () => {
@@ -79,14 +91,17 @@ export default function MenuVersionHistory({
     setReverting(true)
     setRevertError(null)
     try {
-      const response = await bookingApi.revertMenuVersion(accountId, menuId, selected, currentVersion)
+      const response = await bookingApi.revertMenuVersion(accountId, menuId, selected, expectedVersion)
       notifyToast(`第${selected}版の中身で新しい版（第${response.version}版）を作りました。`)
       onReverted(response.version)
       await load()
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        setRevertError('ほかの人が先に保存しました。最新の版を読み直してから、もう一度お試しください。')
-        await load()
+        // WEB051：口が返した今の版を、次に送る版にする。
+        const latest = Number((error.data as { currentVersion?: unknown } | undefined)?.currentVersion)
+        if (Number.isInteger(latest) && latest > 0) setExpectedVersion(latest)
+        setRevertError('ほかの人が先に保存しました。最新の版を読み直しました。内容を確かめてから、もう一度お試しください。')
+        await load({ keepError: true })
       } else if (error instanceof ApiError && error.status === 403) {
         setRevertError('版を戻す権限がありません。')
       } else {

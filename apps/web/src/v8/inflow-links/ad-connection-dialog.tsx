@@ -16,7 +16,8 @@ export default function AdConnectionDialog({provider,platform,accountId,onClose,
  const [values,setValues]=useState<Record<string,string>>(()=>Object.fromEntries(AD_CONNECTION_FIELDS[provider.key].map(f=>[f.key,f.secret?'':String(platform?.config[f.key]??'')]))), [busy,setBusy]=useState(false),[error,setError]=useState('')
  const persisted=useRef(platform)
  const current=useRef(true)
- useEffect(()=>()=>{current.current=false},[])
+ // 付くたびに true へ戻す（開発時の StrictMode の付ける→外す→付けるで false が残らないように）。
+ useEffect(()=>{current.current=true;return()=>{current.current=false}},[])
  async function connect() {
   if(busy)return
   const fields=AD_CONNECTION_FIELDS[provider.key]

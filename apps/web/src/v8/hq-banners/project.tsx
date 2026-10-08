@@ -227,8 +227,16 @@ function ProjectInner() {
       ? 'アーカイブ済みのプロジェクトでは生成できません。復元してからお試しください'
       : validation ?? refusal
 
+  /*
+   * WEB205：作り始める要求が返るまでは、もう一度押せない（連打で別の生成が2つ並ばない）。
+   * 同じ依頼を見分ける鍵を口に渡すのは Codex に依頼（口が鍵を受けない）。
+   */
+  const startingRef = useRef(false)
+  const [starting, setStarting] = useState(false)
   const startGeneration = async () => {
-    if (!project || blockedReason || running) return
+    if (!project || blockedReason || running || startingRef.current) return
+    startingRef.current = true
+    setStarting(true)
     setGenerationError('')
     setActionError('')
     try {
@@ -245,6 +253,9 @@ function ProjectInner() {
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '生成を始められませんでした。')
       void loadUsage()
+    } finally {
+      startingRef.current = false
+      setStarting(false)
     }
   }
 
@@ -307,21 +318,23 @@ function ProjectInner() {
     }
   }
 
-  const deliver = async (image: BannerImage, ids: string[]) => {
+  const deliver = async (image: BannerImage, ids: string[]): Promise<boolean> => {
     setModalBusy(true)
     setModalError('')
     try {
       const res = await api.hqBanners.images.deliver(image.id, ids)
       if (!res.success) throw new Error(res.error)
       replaceImage(res.data.image)
+      return true
     } catch (caught) {
       setModalError(bannerFailureMessage(caught, 'アカウントへの受け渡し'))
+      return false
     } finally {
       setModalBusy(false)
     }
   }
 
-  const removeImage = async (image: BannerImage) => {
+  const removeImage = async (image: BannerImage): Promise<boolean> => {
     setModalBusy(true)
     setModalError('')
     try {
@@ -330,8 +343,10 @@ function ProjectInner() {
       setImages((prev) => prev.filter((i) => i.id !== image.id))
       setOpenImage(null)
       setProject((p) => (p ? { ...p, imageCount: Math.max(p.imageCount - 1, 0) } : p))
+      return true
     } catch (caught) {
       setModalError(bannerFailureMessage(caught, '一覧からの削除'))
+      return false
     } finally {
       setModalBusy(false)
     }
@@ -620,7 +635,7 @@ function ProjectInner() {
               ) : (
                 <>
                   <Button onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy}>条件をクリア</Button>
-                  <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || Boolean(blockedReason)}>
+                  <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || starting || Boolean(blockedReason)} busy={starting}>
                     <Sparkles aria-hidden="true" className={styles.icon} />
                     {/* 板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。パネルの見出し `S0ay0i`「画像を生成」とは別。 */}
                     生成する（{input.count}枚）

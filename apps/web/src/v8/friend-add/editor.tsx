@@ -50,6 +50,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } from '@/components/shared/folder-select'
 import SegmentedControl from '@/components/shared/segmented'
 import { TextField } from '@/components/shared/text-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
@@ -74,6 +75,7 @@ import { describeFriendAddFailure } from './failure'
 import { addTimeWindow, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow } from './flow'
 import { resendSuppressionText } from './text'
 import styles from './editor.module.css'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
 type EditorRule = {
@@ -229,6 +231,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     stateChanged: false
   } | null>(null)
   const saveIdempotencyKey = useRef(crypto.randomUUID())
+  const folderKey = useRef(crypto.randomUUID())
   const saveInFlight = useRef(false)
   const savedSnapshot = useRef<string | null>(null)
   const loadRequestRef = useRef({ accountId: null as string | null, ruleId: null as string | null, generation: 0 })
@@ -682,6 +685,17 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
           canEdit={canEdit}
           isExisting={Boolean(ruleId)}
           nameError={fieldError?.step === 'basic' ? fieldError.message : undefined}
+          onCreateFolder={canEdit && selectedAccountId
+            ? folderCreator(
+              // 一覧の左の列と同じ口。やり直しで二重に作らないよう、作れるまで同じ鍵で送る。
+              (name) => api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current),
+              folderByName,
+              (created) => {
+                folderKey.current = crypto.randomUUID()
+                setOptions((current) => ({ ...current, folders: [...current.folders, { id: created.id, name: created.name }] }))
+              },
+            )
+            : undefined}
         />
       ) : null}
       {step === 'routes' ? (
@@ -766,13 +780,15 @@ function sharedPrefix(names: string[]) {
 
 /* ===== 作る① 基本設定（板 `wDzkc`） ===== */
 
-function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError }: {
+function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onCreateFolder }: {
   rule: EditorRule
   setRule: Dispatch<SetStateAction<EditorRule>>
   options: FriendAddRuleOptions
   canEdit: boolean
   isExisting: boolean
   nameError?: string
+  /** フォルダを選ぶ欄からその場で作る（dLffh）。閲覧のみは渡さない。 */
+  onCreateFolder?: FolderSelectCreate
 }) {
   const locked = rule.isFallback || isExisting
   const folderOptions = options.folders.some((folder) => folder.name === (rule.folderName ?? ''))
@@ -803,16 +819,15 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError }: {
           <div className={styles.field}>
             <label htmlFor="fa-folder" className={styles.label}>フォルダ</label>
             {canEdit ? (
-              <Select
+              <FolderSelect
                 id="fa-folder"
                 aria-label="フォルダ"
                 size="full"
                 value={rule.folderName ?? ''}
                 onChange={(value) => setRule((current) => ({ ...current, folderName: value || null }))}
-                options={[
-                  { value: '', label: '未分類' },
-                  ...folderOptions.map((folder) => ({ value: folder.name, label: folder.name })),
-                ]}
+                folders={folderOptions.map(folderByName)}
+                onCreate={onCreateFolder}
+                colors={false}
               />
             ) : (
               <ReadOnlyText id="fa-folder" label="フォルダ" value={rule.folderName || '未分類'} />
@@ -1030,7 +1045,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
   scenarios: FriendAddRuleOptions['scenarios']
   canEdit: boolean
 }) {
-  const messageRef = useRef<HTMLTextAreaElement | null>(null)
+  const messageRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement | null>(null)
   const insertToken = (token: string) => {
     const area = messageRef.current
     if (!area) return
@@ -1079,7 +1094,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
         </div>
         )}
         <div className={styles.bodyBox}>
-          <textarea
+          <InsertTextField
             ref={messageRef}
             aria-label="最初に送るメッセージ"
             className={styles.bodyText}
@@ -1087,7 +1102,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             maxLength={MESSAGE_LIMIT}
             value={definition.messageText}
             readOnly={!canEdit}
-            onChange={(event) => setDefinition((current) => ({ ...current, messageText: event.target.value }))}
+            onValueChange={(next) => setDefinition((current) => ({ ...current, messageText: next }))}
           />
           <div className={styles.insertRow}>
             {/* 閲覧のみ：差し込むボタンは置かない（文字数だけ見せる）。 */}

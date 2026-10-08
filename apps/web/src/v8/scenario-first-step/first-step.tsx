@@ -64,6 +64,7 @@ import styles from './first-step.module.css'
 import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
 import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 const modeLabel: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
@@ -110,7 +111,7 @@ export default function ScenarioFirstStepV8() {
   const [tags, setTags] = useState<Tag[]>([])
   const [body, setBody] = useState('')
   /** 差し込みをカーソルの位置に入れるために、入力欄そのものを持つ。 */
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   /*
    * 1通目の配信対象。Lステップの「配信対象の絞り込み」と同じ3つ。
    * どれを選んでも、保存するのは scenario_steps.target_condition_json。
@@ -714,11 +715,11 @@ export default function ScenarioFirstStepV8() {
 
             {kind === 'text' ? (
               <>
-                <textarea
+                <InsertTextField
                   id="first-step-body"
                   ref={bodyRef}
                   value={body}
-                  onChange={(e) => editBody(e.target.value)}
+                  onValueChange={(next) => editBody(next)}
                   placeholder="はじめまして。友だち追加ありがとうございます。"
                   aria-label="本文"
                   className={styles.bodyField}

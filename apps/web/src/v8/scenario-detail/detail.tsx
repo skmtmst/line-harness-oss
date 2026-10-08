@@ -122,6 +122,7 @@ import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
 import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import {
   scenarioReachBarWidth,
   scenarioReachCountLabel,
@@ -138,6 +139,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -591,13 +593,15 @@ export default function ScenarioDetailV8({
   /** 開始のきっかけ。窓の開閉と、札に出す件数。 */
   const [triggerOpen, setTriggerOpen] = useState(false)
   const [triggerCount, setTriggerCount] = useState<number | null>(null)
+  /* WEB229：開始のきっかけを保存した回数。見出しの名前・試算の鍵を取り直す。 */
+  const [triggerRevision, setTriggerRevision] = useState(0)
   /** 位置情報・動画・音声・スタンプの入力。 */
   const [kindState, setKindState] = useState<MessageKindState>(() => emptyMessageKindState())
   /** 通の入力欄を開いた回の番号。開くたびに「開いた直後の形」を比べる元として採り直す。 */
   const [stepFormNonce, setStepFormNonce] = useState(0)
   const [stepFormBaseline, setStepFormBaseline] = useState<{ nonce: number; value: { stepForm: StepFormState; kindState: MessageKindState } } | null>(null)
   /** 差し込みをカーソルの位置に入れるために、本文の入力欄を持つ。 */
-  const stepBodyRef = useRef<HTMLTextAreaElement>(null)
+  const stepBodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
 
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -749,7 +753,7 @@ export default function ScenarioDetailV8({
    * id と lineAccountId が変わらないので、鍵を見ないと古い人数が
    * 残り続ける（以前の挙動）。
    */
-  const simulationKey = scenarioSimulationKey(scenario, triggerCount)
+  const simulationKey = scenarioSimulationKey(scenario, triggerCount === null || triggerRevision === 0 ? triggerCount : `${triggerCount}:${triggerRevision}`)
   /** 今の設定に対する試算。旧鍵の結果は確定値として出さない。 */
   const simulation = simulationForKey(simulationResult, simulationKey)
   /** 設定が変わって取り直し中か（初回の取得中も true）。 */
@@ -803,7 +807,7 @@ export default function ScenarioDetailV8({
         }
       })
       .catch(() => {})
-  }, [id])
+  }, [id, triggerRevision])
 
   /*
    * ★V8: 各通の「届く日時の例」（行の時刻の下の青い行）は /preview の
@@ -1121,7 +1125,7 @@ export default function ScenarioDetailV8({
    * simulation / runs をそのまま使う（確認窓で取り直さない）。
    */
   const handleStart = async () => {
-    if (!scenario || startBusy) return
+    if (!scenario || startBusy || !startConfirmed) return
     setStartBusy(true)
     setStartError('')
     try {
@@ -1923,13 +1927,13 @@ export default function ScenarioDetailV8({
                     />
                   </div>
                 )}
-                <textarea
+                <InsertTextField
                   ref={stepBodyRef}
                   className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   rows={4}
                   placeholder="メッセージ内容を入力..."
                   value={stepForm.messageContent}
-                  onChange={(e) => setStepForm({ ...stepForm, messageContent: e.target.value })}
+                  onValueChange={(next) => setStepForm({ ...stepForm, messageContent: next })}
                 />
               </div>
             )}
@@ -2758,7 +2762,8 @@ export default function ScenarioDetailV8({
                           <StatusChip status="draft" />
                         ) : (
                           <span className={styles.statBar} aria-hidden>
-                            <span className={styles.statBarFill} style={{ width: `${reachBarWidth}%` }} />
+                            {/* WEB227：幅は scenarioReachBarWidth が「50%」の形で返す。もう一度 % を付けない。 */}
+                            <span className={styles.statBarFill} style={{ width: reachBarWidth ?? '0%' }} />
                           </span>
                         )}
                       </span>
@@ -2972,14 +2977,15 @@ export default function ScenarioDetailV8({
           </label>
           <div className="flex flex-col gap-1">
             <span className="text-ink-secondary text-xs font-semibold">置き場（フォルダ）</span>
-            <Select
+            <FolderSelect
               value={editForm.folderId}
               onChange={(value) => setEditForm({ ...editForm, folderId: value })}
               aria-label="置き場（フォルダ）"
-              options={[
-                { value: '', label: '未分類' },
-                ...folders.map((f) => ({ value: f.id, label: f.name })),
-              ]}
+              folders={folders.map(folderById)}
+              // 一覧の左の列の「フォルダを追加」と同じ口（シナリオのフォルダは共有）。
+              onCreate={canEdit
+                ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+                : undefined}
             />
             {folderState === 'error' && (
               <p className="text-status-danger text-xs">フォルダ一覧を読み込めませんでした。</p>
@@ -3027,6 +3033,8 @@ export default function ScenarioDetailV8({
         busy={startBusy}
         error={startError}
         onConfirm={preflightLoading || preflightFailed ? undefined : () => void handleStart()}
+        // WEB228：「内容と対象を確かめました」のチェックが入るまで「この内容ではじめる」を押せない。
+        confirmDisabled={!startConfirmed}
         onCancel={() => {
           if (startBusy) return
           setStartOpen(false)
@@ -3369,7 +3377,7 @@ export default function ScenarioDetailV8({
         <TriggerEditor
           scenarioId={id}
           onClose={() => setTriggerOpen(false)}
-          onChanged={setTriggerCount}
+          onChanged={(count) => { setTriggerCount(count); setTriggerRevision((n) => n + 1) }}
           audienceCondition={scenario.audienceCondition}
           activeNow={stats?.activeNow ?? null}
           lineAccountId={scenario.lineAccountId}
