@@ -14,6 +14,7 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
 import { useAccount } from '@/contexts/account-context'
 import { formatYen } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -239,7 +240,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
           </DialogField>
         </div>
         <DialogField label={editing ? '新しい価格の開始日時' : '価格の開始日時'} htmlFor="rs-menu-effective">
-          <TextField id="rs-menu-effective" type="datetime-local" value={draft.effectiveAt} onChange={(event) => setDraft({ ...draft, effectiveAt: event.target.value })} />
+          <DateTimeField id="rs-menu-effective" value={draft.effectiveAt} onChange={(next) => setDraft({ ...draft, effectiveAt: next })} />
         </DialogField>
         <DialogField label="アレルギー（カンマ区切り）" htmlFor="rs-menu-allergens">
           <TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} />

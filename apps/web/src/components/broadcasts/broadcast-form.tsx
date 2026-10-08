@@ -2549,6 +2549,7 @@ export default function BroadcastForm({
                 </label>
                 <TimeField
                   id="bc-time"
+                  size="field"
                   value={scheduledTime}
                   onChange={setScheduledTime}
                   aria-label="時刻（日本時間）"

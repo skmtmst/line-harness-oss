@@ -1153,7 +1153,7 @@ export default function HqBroadcastCreate() {
                     </div>
                     <div>
                       <label htmlFor="hq-bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">時刻（日本時間）</label>
-                      <TimeField id="hq-bc-time" value={time} onChange={setTime} aria-label="時刻（日本時間）" />
+                      <TimeField id="hq-bc-time" size="field" value={time} onChange={setTime} aria-label="時刻（日本時間）" />
                     </div>
                   </div>
                 ) : null}
