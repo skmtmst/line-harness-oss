@@ -38,9 +38,7 @@
    * 書体。管理画面は1系統だけ（#976 U080）。
    *
    * 以前は `layout.tsx` の body へ inline style で同じ並びを書いていた。
-   * スタイル属性は検査から見えにくく、友だち属性V2（下の
-   * `.friend-attributes-v2-shell`、検証用にSF系を固定する例外）と
-   * 書き方が違うので「どれが正本か」が分かりにくかった。
+   * スタイル属性は検査から見えにくく、「どれが正本か」が分かりにくかった。
    * 正本をここへ移し、body は `font-sans` で読む。
    *
    * ★V7「見た目の物差し」§3: 並びは「Inter, Noto Sans JP」。英字と数字は
@@ -716,7 +714,7 @@
   --tpl-fm2-rd-main-pad: 24px 28px; --tpl-fm2-rd-main-gap: 16px; --tpl-fm2-rd-card-pad: 20px; --tpl-fm2-rd-card-gap: 12px; --tpl-fm2-rd-card-title-size: 15px; --tpl-fm2-rd-card-title-lh: 22px; --tpl-fm2-rd-title-lh: 19px; --tpl-fm2-rd-sub-lh: 16px; --tpl-fm2-rd-step-pad: 12px 14px; --tpl-fm2-rd-step-gap: 10px; --tpl-fm2-rd-step-icon: 18px; --tpl-fm2-rd-side-w: 380px; --tpl-fm2-rd-side-pad: 24px; --tpl-fm2-rd-side-gap: 14px; --tpl-fm2-rd-box-pad: 16px; --tpl-fm2-rd-box-gap: 4px; --tpl-fm2-rd-row-pad: 9px 0; --tpl-fm2-rd-row-gap: 8px; --tpl-fm2-rd-row-line: #eceef1; --tpl-fm2-rd-actions-gap: 8px; --tpl-fm2-rd-time-lh: 13px;
   --tpl-d23-empty-pad: 72px 24px 80px; --tpl-d23-empty-gap: 10px; --tpl-d23-empty-action-gap: 6px; --tpl-d23-empty-mark: 44px; --tpl-d23-empty-mark-radius: 12px; --tpl-d23-empty-icon: 20px; --tpl-d23-empty-title: 16px; --tpl-d23-empty-title-lh: 23px; --tpl-d23-empty-desc: 13px; --tpl-d23-empty-desc-lh: 19px;
   --tpl-d23-ob-pad: 18px 20px; --tpl-d23-ob-gap: 14px; --tpl-d23-ob-radius: 12px; --tpl-d23-ob-head-gap: 12px; --tpl-d23-ob-title: 15px; --tpl-d23-ob-title-lh: 22px; --tpl-d23-ob-text: 13px; --tpl-d23-ob-text-lh: 19px; --tpl-d23-ob-bar-w: 160px; --tpl-d23-ob-bar-h: 6px; --tpl-d23-ob-bar-radius: 3px; --tpl-d23-ob-grid-gap: 8px; --tpl-d23-ob-step-pad: 10px 12px; --tpl-d23-ob-step-gap: 10px; --tpl-d23-ob-step-radius: 8px; --tpl-d23-ob-check: 18px; --tpl-d23-ob-check-size: 11px; --tpl-d23-ob-check-radius: 9px;
-  /* 飲食店 提案 E（今日のお店 hKRRF・電話予約 wEzuG・ウォークイン nNujj・枠を閉じる知らせ YMVFD・SNS 連携 y3GGTs）。 */ --tpl-e1-side: 24px; --tpl-dash-aside-wide: 360px; --tpl-drawer-narrow-w: 480px; --tpl-rs-tabs-top: 12px; --tpl-rs-tabs-body-top: 16px; --tpl-e1-section-pad: 16px 24px; --tpl-e1-band-pad: 12px 16px; --tpl-e1-side-gap: 16px; --tpl-e1-side-pad: 18px 24px; --tpl-e1-card-pad: 12px; --tpl-e1-gap-xxs: 2px; --tpl-e1-gap-xs: 4px; --tpl-e1-gap-s: 8px; --tpl-e1-gap-m: 10px; --tpl-e1-gap-l: 12px; --tpl-e1-lh-18: 18px; --tpl-e1-lh-20: 20px; --tpl-e1-lh-21: 21px; --tpl-e1-lh-24: 24px; --tpl-e1-radius-s: 5px; --tpl-e1-radius-m: 8px; --tpl-e1-radius-l: 12px; --tpl-e1-radius-pill: 999px; --tpl-e1-line-2: 2px; --tpl-e1-mark: 28px; --tpl-e1-face: 28px; --tpl-e1-route-pad: 1px 6px; --tpl-e1-chip-pad: 2px 8px;
+  /* 飲食店 提案 E（今日のお店 hKRRF・電話予約 wEzuG・ウォークイン nNujj・枠を閉じる知らせ YMVFD・SNS 連携 y3GGTs）。 */ --tpl-e1-side: 24px; --tpl-dash-aside-wide: 360px; --tpl-dash-cols: 4; --tpl-nav-icon: 16px; --tpl-nav-icon-rail: 18px; --tpl-drawer-narrow-w: 480px; --tpl-rs-tabs-top: 12px; --tpl-rs-tabs-body-top: 16px; --tpl-e1-section-pad: 16px 24px; --tpl-e1-band-pad: 12px 16px; --tpl-e1-side-gap: 16px; --tpl-e1-side-pad: 18px 24px; --tpl-e1-card-pad: 12px; --tpl-e1-gap-xxs: 2px; --tpl-e1-gap-xs: 4px; --tpl-e1-gap-s: 8px; --tpl-e1-gap-m: 10px; --tpl-e1-gap-l: 12px; --tpl-e1-lh-18: 18px; --tpl-e1-lh-20: 20px; --tpl-e1-lh-21: 21px; --tpl-e1-lh-24: 24px; --tpl-e1-radius-s: 5px; --tpl-e1-radius-m: 8px; --tpl-e1-radius-l: 12px; --tpl-e1-radius-pill: 999px; --tpl-e1-line-2: 2px; --tpl-e1-mark: 28px; --tpl-e1-face: 28px; --tpl-e1-route-pad: 1px 6px; --tpl-e1-chip-pad: 2px 8px;
   --tpl-e1-row-h: 54px; --tpl-e1-more: 36px; --tpl-e1-card-gap: 6px; --tpl-e1-friend-line: 1.5px; --tpl-e3-walkin-card-w: 160px; --tpl-e1-today-gap: 16px; --tpl-e1-col-time: 48px; --tpl-e1-col-guests: 40px; --tpl-e1-col-table: 52px; --tpl-e1-col-route: 104px; --tpl-e1-col-state: 210px; --tpl-e1-form-gap: 18px; --tpl-e1-field-gap: 6px; --tpl-e1-friend-pad: 12px; --tpl-e1-stepper-value: 48px; --tpl-e1-search-w: 280px; --tpl-e1-col-slot: 170px; --tpl-e1-col-close-route: 130px; --tpl-e1-col-close-state: 150px; --tpl-e1-col-close-actions: 300px; --tpl-e1-close-table-pad: 0 24px; --tpl-e1-close-tabs-top: 4px; --tpl-e1-close-row-h: 57px; --tpl-e1-radius-chip: 6px; --tpl-e1-sns-body-pad: 8px 24px 24px; --tpl-e1-sns-gap: 28px; --tpl-e1-sns-card-pad: 20px; --tpl-e1-sns-card-gap: 14px; --tpl-e1-sns-card-h: 320px; --tpl-e1-sns-mark: 36px; --tpl-e1-sns-mark-radius: 10px; --tpl-e1-sns-key-w: 96px; --tpl-e1-sns-links-gap: 20px; --tpl-e1-sns-face: 32px; --tpl-e1-sns-col-who: 260px; --tpl-e1-sns-col-text: 260px; --tpl-e1-sns-col-route: 180px; --tpl-e1-sns-col-last: 100px; --tpl-e1-col-state-sns: 150px; --tpl-e1-lh-16: 16px;
   /* 飲食店 提案 E-10 臨時休業・貸切（UVnvR・足す窓 nVvXy）。 */ --tpl-e10-head-title-lh: 27px; --tpl-e10-tabs-top: 18px; --tpl-e10-band-row-pad: 16px 0; --tpl-e10-cal-pad: 18px 24px 18px 0; --tpl-e10-side-pad: 18px 0 18px 24px; --tpl-e10-cal-pad-narrow: 18px 0; --tpl-e10-side-pad-narrow: 18px 0; --tpl-e10-side-w: 336px; --tpl-e10-step: 36px; --tpl-e10-gap-6: 6px; --tpl-e10-swatch: 12px; --tpl-e10-swatch-radius: 3px; --tpl-e10-cell-pad: 6px 8px; --tpl-e10-cell-h: 92px; --tpl-e10-lh-17: 17px; --tpl-e10-lh-23: 23px; --tpl-e10-side-title-size: 15px; --tpl-e10-card-pad: 12px 14px; --tpl-e10-form-gap: 16px; --tpl-e10-choice-gap: 20px; --tpl-e10-row-pad: 8px 10px; --tpl-e10-row-radius: 10px; --tpl-e10-ring: inset 0 0 0 1px var(--color-hairline); --tpl-e10-line-top: inset 0 1px 0 var(--color-hairline); --tpl-e10-line-left: inset 1px 0 0 var(--color-hairline); --tpl-e10-focus: inset 0 0 0 2px var(--color-accent);
   /* 提案 E-4 予約サイト・グルメ媒体（aSmph）・E-9 統括の一括配信（p17Qku・xOXuY）。 */ --tpl-e49-body-gap: 28px; --tpl-e49-section-gap: 10px; --tpl-e49-section-gap-tight: 6px; --tpl-e49-gap-xs: 4px; --tpl-e49-gap-s: 8px; --tpl-e49-gap-m: 10px; --tpl-e49-gap-l: 12px; --tpl-e49-lh-18: 18px; --tpl-e49-lh-20: 20px; --tpl-e49-lh-21: 21px; --tpl-e49-lh-23: 23px; --tpl-e49-head-pad: 13px 0 13px 16px; --tpl-e49-row-pad: 9px 0 9px 16px; --tpl-e49-edge: 20px; --tpl-e49-col-name: 190px; --tpl-e49-col-login: 266px; --tpl-e49-col-import: 206px; --tpl-e49-col-menu: 72px; --tpl-e49-mark: 28px; --tpl-e49-radius-m: 8px; --tpl-e49-radius-ml: 10px; --tpl-e49-radius-l: 12px; --tpl-e49-cards-gap: 16px; --tpl-e49-card-h: 210px; --tpl-e49-card-pad: 16px; --tpl-e49-control-h: 36px; --tpl-e49-url-pad: 0 12px; --tpl-e49-line-btn-h: 40px; --tpl-e49-line-btn-pad: 0 18px; --tpl-e49-code-pad: 12px; --tpl-e49-band-pad: 10px 14px; --tpl-e49-switch-pad: 10px 0; --tpl-e49-target-label-w: 200px; --tpl-e49-target-w: 320px; --tpl-e49-target-pad: 0 10px 0 12px; --tpl-e49-store-w: 220px; --tpl-e49-content-pad: 4px 24px 24px; --tpl-e49-radio-gap: 20px; --tpl-e49-chip-gap: 5px; --tpl-e49-chip-pad: 0 10px; --tpl-e49-radius-pill: 999px; --tpl-e49-radius-chip: 6px; --tpl-e49-count-gap: 16px; --tpl-e49-count-pad: 12px 16px; --tpl-e49-count-size: 22px; --tpl-e49-count-lh: 33px; --tpl-e49-field-gap: 6px; --tpl-e49-textarea-h: 120px; --tpl-e49-insert-pad: 2px 8px; --tpl-e49-time-gap: 16px; --tpl-e49-time-w: 80px; --tpl-e49-date-w: 132px; --tpl-e49-media-pad: 8px 24px 24px; --tpl-e49-code-min-h: 60px; --tpl-e49-col-people: 106px; --tpl-e49-col-quota: 156px; --tpl-e49-col-check: 216px; --tpl-e49-col-send: 126px; --tpl-e49-result-pad: 20px 24px; --tpl-e49-result-title: 18px; --tpl-e49-result-title-lh: 27px; --tpl-e49-row-h: 54px; --tpl-e49-col-result-num: 96px; --tpl-e49-col-result-fail: 86px; --tpl-e49-col-result-state: 186px; --tpl-e49-footer-z: 20; --tpl-e49-focus-ring: 2px;
@@ -981,7 +979,7 @@
   /* テンプレートの一覧（v19Ivv・L7zA7C・hEDTK・V6JFnd・Z0g3si）。 */
   --tpl-tl-note-lh: 17px; --tpl-tl-band-gap: 10px; --tpl-tl-band-after: 8px; --tpl-tl-band-pad: 10px 14px; --tpl-tl-band-lh: 20px;
   --tpl-tl-search-w: 220px; --tpl-tl-folder-w: 150px; --tpl-tl-narrow-search-w: 200px; --tpl-tl-narrow-row-gap: 8px;
-  --tpl-tl-col-select: 48px; --tpl-tl-col-kind: 88px; --tpl-tl-col-publish: 128px; --tpl-tl-col-usage: 112px; --tpl-tl-col-monthly: 104px; --tpl-tl-col-updated: 88px; --tpl-tl-col-menu: 60px;
+  --tpl-tl-col-select: 48px; --tpl-tl-col-kind: 88px; --tpl-tl-col-publish: 128px; --tpl-tl-col-usage: 112px; --tpl-tl-col-monthly: 104px; --tpl-tl-col-updated: 88px; --tpl-tl-col-menu: 60px; /* 統括のひな形（店と同じ一覧＋配る口・B-34）。 */ --tpl-tl-col-hq-dest: 184px; --tpl-tl-col-hq-actions: 212px; --tpl-tl-hq-row-pad-x: 24px; --tpl-tl-hq-actions-gap: 4px;
   --tpl-tl-row-h: 61px; --tpl-tl-row-pad-block: 11px; --tpl-tl-tab-lh: 16px; --tpl-tl-tab-pad-bottom: 12px; --tpl-tl-badge-pad: 2px 8px; --tpl-tl-badge-lh: 18px; --tpl-tl-kind-radius: 6px; --tpl-tl-pill-gap: 5px; --tpl-tl-dot: 6px; --tpl-tl-cell-lh: 17px;
   --tpl-tl-bulk-pad: 10px 24px; --tpl-tl-pager-lh: 21px; --tpl-tl-pager-pad: 10px 20px; --tpl-tl-skeleton-gap: 16px; --tpl-tl-skeleton-pad: 14px 24px; --tpl-tl-skeleton-dot: 32px; --tpl-tl-skeleton-bar: 10px;
   --tpl-tl-state-pad: 28px 24px; --tpl-tl-state-icon: 32px; --tpl-tl-usage-gap: 12px; --tpl-tl-usage-pad: 8px 0; --tpl-tl-usage-kind-w: 96px; --tpl-tl-control-h: 36px; --tpl-tl-ghost-pad: 0 14px; --tpl-tl-usage-more-pad: 6px; --tpl-tl-kind-card-pad: 14px; --tpl-tl-dialog-actions-pad: 14px 24px;
@@ -1123,6 +1121,8 @@
   --tpl-detail-head-pad-top: 20px; --tpl-detail-head-pad-side: 24px; --tpl-detail-head-pad-bottom: 16px;
   --tpl-detail-head-gap: 12px; --tpl-detail-actions-gap: 6px; --tpl-detail-tabs-pad-bottom: 12px;
   --tpl-create-content-pad-block: 24px; --tpl-create-content-pad-side: 28px; --tpl-create-content-gap: 16px;
+  /* 作成の型の口 contentSpacing='flush-top'（板の頭のすぐ下から。E-9 p17Qku：上 4・左右 24・下 24、段の間 28）。 */
+  --tpl-create-flush-pad: 4px 24px 24px; --tpl-create-flush-gap: 28px;
   --tpl-section-pad: 20px; --tpl-section-gap: 14px;
   /* 行の「…」のメニューの項目（絵 IIesG・SkY9V・C0lfUP）。 */
   --tpl-menu-item-h: 34px; --tpl-menu-item-gap: 8px; --tpl-menu-divider-margin: 0; --tpl-create-notice-pad: 12px 24px;
@@ -1419,6 +1419,7 @@
   --tpl-inbox-seg-gap: 2px;               /* 状態の切り替えの間 */
   --tpl-inbox-seg-item-pad: 5px 4px;      /* 状態の切り替え1つの内側 */
   --tpl-inbox-seg-item-radius: 8px;       /* 状態の切り替え1つの角丸 */
+  --tpl-inbox-status-count-gap: 4px;      /* 状態の名前と件数の間 */
   --tpl-inbox-row-pad: 12px 16px;         /* 会話の行の内側 */
   --tpl-inbox-row-gap: 10px;              /* 顔と文の間 */
   --tpl-inbox-row-line-gap: 2px;          /* 名前・内容・札の段の間 */
@@ -1429,6 +1430,90 @@
   --tpl-inbox-badge-pad: 1px 6px;         /* 経路の札（LINE・メール）の内側 */
   --tpl-inbox-badge-radius: 5px;          /* 経路の札の角丸 */
   --tpl-inbox-badge-lh: 17px;             /* 経路の札・担当の文字の行の高さ */
+}
+
+/*
+ * ★V8 受信箱の真ん中（会話）と右の列・書く欄・窓（M0393「1. ふだん」XqSvX と段2の
+ * 「2. 送信の設定」「4. テンプレートを選ぶ」「5. 会話の頭のメニュー」「6. 予約して送る」）。
+ * 画面側（src/v8/inbox-chat/*.module.css）は var() で読む。v7 には効かない。
+ */
+[data-theme="v8"] {
+  --tpl-inbox-tool-icon: 14px;            /* 一覧の頭の印のボタンの中の印 */
+  --tpl-inbox-tool-shadow: 0 1px 2px #1d1d1f0a; /* 書く欄の道具の薄い影 */
+  --tpl-inbox-pop-w: 320px;               /* 対応ルールの小窓の幅 */
+  --tpl-inbox-pop-pad: 14px 16px;         /* 小窓の中の余白 */
+  --tpl-inbox-pop-gap: 10px;              /* 小窓の段の間 */
+  --tpl-inbox-pop-row-pad: 6px 0;         /* 小窓の行の上下 */
+  --tpl-inbox-dot: 8px;                   /* 色の丸 */
+  --tpl-inbox-dot-sm: 7px;                /* 頭の対応状況の丸 */
+  --tpl-inbox-chead-pad: 12px 20px;       /* 会話の頭の内側 */
+  --tpl-inbox-chead-gap: 8px;             /* 会話の頭の部品の間 */
+  --tpl-inbox-chead-face: 28px;           /* 会話の頭の顔 */
+  --tpl-inbox-chead-who-min: 120px;       /* 名前の欄の下限。これより狭いと操作を次の行へ */
+  --tpl-inbox-chead-name: 15px;           /* 会話の頭の名前 */
+  --tpl-inbox-chead-name-lh: 23px;
+  --tpl-inbox-chead-sub-lh: 18px;
+  --tpl-inbox-chead-star: 34px;           /* 注目にするの四角 */
+  --tpl-inbox-chead-star-icon: 15px;
+  --tpl-inbox-chead-ctl: 36px;            /* 担当・対応状況・右の列の出し入れの高さ */
+  --tpl-inbox-chead-ctl-pad: 0 10px 0 12px;
+  --tpl-inbox-chead-ctl-icon: 14px;
+  --tpl-inbox-chead-panel-icon: 16px;
+  --tpl-inbox-menu-w: 238px;              /* 担当・対応状況のメニューの幅 */
+  --tpl-inbox-menu-pad: 6px;              /* メニューの内側 */
+  --tpl-inbox-menu-title-pad: 4px 6px 6px;/* メニューの題 */
+  --tpl-inbox-menu-row-h: 36px;           /* メニューの1行 */
+  --tpl-inbox-menu-row-pad: 0 8px;
+  --tpl-inbox-menu-face: 22px;            /* 担当者の頭文字の丸 */
+  --tpl-inbox-menu-pill-pad: 2px 8px;     /* 対応状況の札の内側 */
+  --tpl-inbox-menu-search-h: 32px;        /* 担当者名を検索 */
+  --tpl-inbox-thread-pad: 20px 24px;      /* やりとりの内側 */
+  --tpl-inbox-bubble-w: 340px;            /* 吹き出しの幅の上限 */
+  --tpl-inbox-bubble-pad: 10px 14px;      /* 吹き出しの内側 */
+  --tpl-inbox-bubble-radius: 16px;
+  --tpl-inbox-bubble-text: 13px;
+  --tpl-inbox-bubble-lh: 21px;
+  --tpl-inbox-bubble-out: var(--color-chat-outgoing); /* こちらから送った吹き出しの地 */
+  --tpl-inbox-composer-pad: 12px 20px 16px;/* 書く欄の内側 */
+  --tpl-inbox-composer-gap: 8px;
+  --tpl-inbox-composer-btn-h: 32px;       /* 書く欄の道具・予約・送信の高さ */
+  --tpl-inbox-composer-btn-pad: 0 14px;
+  --tpl-inbox-composer-btn-icon: 15px;
+  --tpl-inbox-composer-input-pad: 10px 12px;
+  --tpl-inbox-composer-input-radius: 12px;
+  --tpl-inbox-composer-input-h: 40px;     /* 書く欄の文の高さ（2行） */
+  --tpl-inbox-sendkey-pad: 12px;          /* 送信の設定の箱の内側 */
+  --tpl-inbox-sendkey-seg-pad: 3px;       /* 送るキーの切り替えの溝 */
+  --tpl-inbox-sendkey-item-pad: 4px 12px; /* 切り替え1つの内側 */
+  --tpl-inbox-sendkey-item-radius: 6px;
+  --tpl-inbox-tp-w: 640px;                /* テンプレートを選ぶ窓の幅 */
+  --tpl-inbox-tp-body-h: 340px;           /* 窓の中の高さ */
+  --tpl-inbox-tp-side-w: 170px;           /* 左のフォルダの列 */
+  --tpl-inbox-tp-side-pad: 12px 10px;
+  --tpl-inbox-tp-side-row-pad: 7px 10px;
+  --tpl-inbox-tp-list-pad: 12px 14px;
+  --tpl-inbox-tp-card-pad: 10px 12px;
+  --tpl-inbox-tp-num: 22px;               /* 続けて送るの番号の丸 */
+  --tpl-inbox-tp-band-pad: 10px 20px;     /* 続けて送る順の帯 */
+  --tpl-inbox-tp-foot-pad: 12px 20px;     /* 窓の下 */
+  --tpl-inbox-tp-head-pad: 16px 20px;     /* 窓の頭 */
+  --tpl-inbox-tp-side-indent: 22px;       /* 子のフォルダの字下げ */
+  --tpl-inbox-tp-body-max: calc(100dvh - 200px); /* 低い画面で窓が切れない */
+  --tpl-inbox-tp-card-on: 1.5px solid var(--color-accent-deep); /* 選んだカードの枠 */
+  --tpl-inbox-tp-card-on-offset: -0.75px;
+  --tpl-inbox-sch-w: 420px;               /* 予約して送るの窓の幅 */
+  --tpl-inbox-sch-box-pad: 10px 12px;     /* 送るものの箱 */
+  --tpl-inbox-sch-chip-h: 28px;           /* すぐ選ぶの札 */
+  --tpl-inbox-sch-chip-pad: 0 12px;
+  --tpl-inbox-st-progress: #b45309;       /* 対応中の札の字と点（絵の 5.） */
+  --tpl-inbox-menu-shadow: 0 8px 24px #1d1d1f1f; /* 会話の頭のメニューの影 */
+  --tpl-inbox-menu-dot: 6px;              /* 対応状況の札の中の点 */
+  --tpl-inbox-menu-check: 13px;           /* 選んでいる行の✓ */
+  --tpl-inbox-menu-search-icon: 12px;
+  --tpl-inbox-quote-line: inset 2px 0 0 var(--color-accent-deep); /* 引用元の左の線 */
+  --tpl-inbox-line-top: inset 0 1px 0 var(--color-hairline);    /* 上の線 */
+  --tpl-inbox-line-right: inset -1px 0 0 var(--color-hairline);  /* 右の線 */
+  --tpl-inbox-line-bottom-soft: inset 0 -1px 0 var(--color-divider); /* 行の間の薄い線 */
 }
 
 /*
@@ -1672,8 +1757,13 @@ html:not([data-theme="v8"]) .v8-only {
   }
 }
 
-/* 上に向かって開くメニューはトリガーの右上を起点にする。 */
-[data-design-part="action-menu"],
+/*
+ * 上に向かって開くメニューはトリガーの右上を起点にする。
+ * 「…」のメニュー（action-menu）は v7 だけ。V8 は部品（action-menu.module.css）が
+ * 押した角から開く動きを持つ。ここは層の外で、当てると部品の指定に必ず勝ってしまう
+ * （V8 で上から沈む旧い動きが走っていた。窓の dialog と同じ直し方）。
+ */
+:root:not([data-theme="v8"]) [data-design-part="action-menu"],
 [data-design-part="notification-panel"],
 aside[aria-label="フォルダ"] .shadow-lg {
   animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
@@ -1715,29 +1805,32 @@ aside[aria-label="フォルダ"] .shadow-lg {
 }
 
 /*
- * ★V8 仕上げ3回目（M10）①④：表の行は上から順に少しずつ出る。
- * 載せ替わり（タブ・絞り込み・ページ送り）や行の追加で載った行も
- * 同じ速さで出る。v8-content-in（200ms ease-out）を使い回し、
- * 1 行ずつ 40ms ずらし・4 行目以降は同時（全体 320ms 以内。
- * v7 の v7-stagger と同じ刻み）。`both` の終端が最終表示なので、
- * 動きを減らす設定では出ない代わりに正しく表示される。
- * 層の外に書く（部品の CSS Module より勝つ必要はなく、
- * 行に animation を持つ部品は今ないため）。
+ * ★V8 動きの決まり（提案 F・採用）：表の行の順番出しは、その表が最初に
+ * 中身を出したときだけ。v8-content-in（200ms ease-out）を使い回し、
+ * 1 行ずつ 40ms ずらし・4 行目以降は同時（全体 320ms 以内）。
+ *
+ * - 最初の順番出しが終わると、共通部品 RowEntranceSettle（外枠に1つ）が
+ *   tbody に data-rows-settled を付ける。その後の更新（読み直し・行の追加・
+ *   タブや絞り込みの載せ替え）では行を出し直さない。
+ * - 消える行（data-leaving）には当てない。`both` の保持値（opacity:1）が
+ *   部品の「消える行は薄く」（data-table.module.css）に勝ち、消えずに残っていた。
+ * - 動きを減らす設定では当てない（最初から最終表示）。
+ * 層の外に書く（手組みの表の行にも同じ動きを付けるため）。
  */
 @media (prefers-reduced-motion: no-preference) {
-  [data-theme="v8"] tbody > tr {
+  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:not([data-leaving="true"]) {
     animation: v8-content-in var(--motion-base) var(--motion-ease-out) both;
   }
 
-  [data-theme="v8"] tbody > tr:nth-child(2) {
+  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:nth-child(2) {
     animation-delay: var(--motion-stagger);
   }
 
-  [data-theme="v8"] tbody > tr:nth-child(3) {
+  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:nth-child(3) {
     animation-delay: calc(var(--motion-stagger) * 2);
   }
 
-  [data-theme="v8"] tbody > tr:nth-child(n + 4) {
+  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:nth-child(n + 4) {
     animation-delay: calc(var(--motion-stagger) * 3);
   }
 }
@@ -2002,6 +2095,16 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   }
 
   /*
+   * ★V8 複数行の入力欄の決まり（2026-10-08 共通部品の1本化）：縦にだけ手で広げられ、
+   * 横には広げられない。共通の TextArea（text-field.tsx）は部品の中で持つ。ここは
+   * 画面に直接書いた <textarea> の既定（ブラウザの既定は縦横どちらも広がる both）。
+   * base 層なので、画面が自分で resize を決めた欄（中身に合わせて伸びる欄など）はそちらが勝つ。
+   */
+  [data-theme='v8'] textarea {
+    resize: vertical;
+  }
+
+  /*
    * #673 押した感触。★V7 仕上げ §2「押した」にそろえて、沈む動きは
    * 上の `scale` 規定（0.98倍・motion-instant）に一本化した。
    * ここに残すのは色と影のなめらか化だけ。
@@ -2112,26 +2215,6 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   textarea:focus-visible {
     outline: 2px solid var(--color-action);
     outline-offset: 2px;
-  }
-}
-
-/*
- * 友だち属性V2は、Pen.devの1920px画像をそのまま検証する移行面。
- * 旧画面のNoto Sans JPと256pxサイドバーを継承すると、本文だけ合わせても
- * 全体座標と文字幅がずれるため、この画面に限って設計値を固定する。
- *
- * 共通の書体は `--font-sans`（@theme）が正本。ここは画像比較の基準を
- * 維持するための意図的な例外なので、統一対象から外す（#976 U080）。
- */
-.friend-attributes-v2-shell {
-  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-  color: #1d1d1f;
-}
-
-@media (min-width: 1280px) {
-  .friend-attributes-v2-shell > aside {
-    width: 260px !important;
-    flex: 0 0 260px;
   }
 }
 

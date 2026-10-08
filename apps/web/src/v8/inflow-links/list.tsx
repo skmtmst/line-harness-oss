@@ -21,7 +21,6 @@ import {
   Inbox,
   Link2,
   Megaphone,
-  MoreHorizontal,
   Plus,
   UserPlus,
   Users,
@@ -41,7 +40,6 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import Checkbox from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -52,7 +50,8 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import BulkBar from '@/components/shared/bulk-bar'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -772,23 +771,12 @@ export default function InflowListV8({
                           </Button>
                         )}
                         {menuItems.length > 0 ? (
-                          <>
-                            <IconButton
-                              title={menuLabel}
-                              aria-label={menuLabel}
-                              aria-haspopup="menu"
-                              aria-expanded={openMenuRefCode === r.refCode}
-                              onClick={() => setOpenMenuRefCode((current) => (current === r.refCode ? null : r.refCode))}
-                            >
-                              <MoreHorizontal size={16} aria-hidden="true" />
-                            </IconButton>
-                            <ActionMenu
-                              open={openMenuRefCode === r.refCode}
-                              onClose={() => setOpenMenuRefCode(null)}
-                              ariaLabel={menuLabel}
-                              items={menuItems}
-                            />
-                          </>
+                          <RowMenu
+                            label={menuLabel}
+                            items={menuItems}
+                            open={openMenuRefCode === r.refCode}
+                            onOpenChange={(next) => setOpenMenuRefCode(next ? r.refCode : null)}
+                          />
                         ) : null}
                       </div>
                     </Td>
@@ -1020,21 +1008,11 @@ function TileMenu({
   const label = `「${title}」のほかの操作`
   return (
     <span className={styles.tileMenu}>
-      <button
-        type="button"
+      <RowMenu
         className={styles.tileMenuButton}
-        title={label}
-        aria-label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => onOpenChange(open ? null : id)}
-      >
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </button>
-      <ActionMenu
+        label={label}
         open={open}
-        onClose={() => onOpenChange(null)}
-        ariaLabel={label}
+        onOpenChange={(next) => onOpenChange(next ? id : null)}
         items={items.map((item) => ({ ...item, onSelect: () => { onOpenChange(null); item.onSelect() } }))}
       />
     </span>

@@ -1,24 +1,63 @@
 'use client'
 
 /*
- * ★V8 統括 一括配信の一覧（提案 E-9 の入口。絵は作る p17Qku と結果 xOXuY だけなので、一覧は型どおりの最小の形）。
- * 1行＝1回の一括配信。名前・状態・店の数・送る日時。行を押すと詳細（送った結果）へ。動きは BEHAVIOR.md。
+ * ★V8 統括 一括配信の一覧（絵 U4Eep0・V8.pen の行「統括」。2026-10-08 オーナー：店の一斉配信とほぼ同じ画面）。
+ *
+ * 店の一斉配信の一覧（src/v8/broadcasts/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・札・表・ページ送り）・
+ * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「送るアカウント」だけ：
+ *   - 配信条件の列は「N アカウント」と、誰に送るか（友だち全員／タグ）
+ *   - 結果の列はアカウントの合計（届いた人数・失敗したアカウント）
+ * 1行＝1回の一括配信。行を押すと詳細（送った結果）へ。動きは BEHAVIOR.md。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { AlertCircle, CalendarClock, FilePen, Inbox, List, Plus, Send } from 'lucide-react'
 import type { HqBroadcastRun } from '@line-crm/shared'
-import { ListPage } from '@/components/templates/list-page'
+import { ListPage, ListPagePagination } from '@/components/templates/list-page'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
+import FilterChip from '@/components/shared/filter-chip'
+import FolderPanel from '@/components/shared/folder-panel'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { RowActions } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { formatNumber } from '@/lib/format'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { jpDateTime, runBadge, sendTotals } from './model'
-import styles from './list.module.css'
+import { failedCount, jpDateTime, runBadge, sendTotals } from './model'
+import styles from '../broadcasts/list.module.css'
+
+type StatusKey = 'all' | 'scheduled' | 'draft' | 'sent' | 'error'
+const STATUS_CHIPS: { key: StatusKey; label: string; icon: typeof List }[] = [
+  { key: 'all', label: 'すべて', icon: List },
+  { key: 'scheduled', label: '予約中', icon: CalendarClock },
+  { key: 'draft', label: '下書き', icon: FilePen },
+  { key: 'sent', label: '送信済み', icon: Send },
+  { key: 'error', label: 'エラー', icon: AlertCircle },
+]
+
+/** 一覧の札と同じ分け方（runBadge の言葉から）。 */
+function statusKeyOf(run: HqBroadcastRun): Exclude<StatusKey, 'all'> | null {
+  const label = runBadge(run).label
+  if (label === '下書き') return 'draft'
+  if (label === '予約中' || label === '送っています') return 'scheduled'
+  if (label === '送信済み' || label === '一部失敗') return 'sent'
+  if (label === '失敗あり') return 'error'
+  return null
+}
+
+function audienceText(run: HqBroadcastRun): string {
+  return run.input?.audience?.kind === 'tag' ? `タグ：${run.input.audience.tagName}` : '友だち全員'
+}
+
+const NEW_HREF = '/hq/broadcasts/new'
 
 export default function HqBroadcastList() {
   usePageTitle('一括配信')
@@ -26,6 +65,10 @@ export default function HqBroadcastList() {
   const canManage = role === null || canManageRole(role)
   const [runs, setRuns] = useState<HqBroadcastRun[] | null>(null)
   const [error, setError] = useState<unknown>(null)
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState<StatusKey>('all')
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
 
   const load = useCallback(async () => {
     try {
@@ -37,16 +80,82 @@ export default function HqBroadcastList() {
   }, [])
   useEffect(() => { void load() }, [load])
 
+  const all = useMemo(() => runs ?? [], [runs])
+  const counts = useMemo(() => {
+    const result: Record<StatusKey, number> = { all: all.length, scheduled: 0, draft: 0, sent: 0, error: 0 }
+    for (const run of all) { const key = statusKeyOf(run); if (key) result[key] += 1 }
+    return result
+  }, [all])
+  const filtered = useMemo(() => {
+    const words = query.trim().toLocaleLowerCase()
+    return all.filter((run) => (status === 'all' || statusKeyOf(run) === status)
+      && (!words || [run.title, run.input?.messageContent ?? ''].some((text) => text.toLocaleLowerCase().includes(words))))
+  }, [all, status, query])
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const current = Math.min(page, pageCount)
+  const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
+
+  /* 数の帯（一括配信の記録から数えられるもの）。 */
+  const ready = runs !== null
+  const sentRuns = all.filter((run) => statusKeyOf(run) === 'sent')
+  const delivered = sentRuns.reduce((sum, run) => sum + run.targets.filter((t) => !t.excluded).reduce((s, t) => s + t.successCount, 0), 0)
+  const failedStores = all.reduce((sum, run) => sum + run.targets.filter((t) => !t.excluded && (t.status === 'failed' || failedCount(t) > 0)).length, 0)
+  const kpis = [
+    { key: 'scheduled', title: '予約中', icon: CalendarClock, value: ready ? counts.scheduled : null, unit: '件', detail: ready ? `下書き ${formatNumber(counts.draft)}件` : '—' },
+    { key: 'sent', title: '送った配信', icon: Send, value: ready ? counts.sent : null, unit: '件', detail: ready ? `${formatNumber(delivered)}人に届いた` : '—' },
+    { key: 'error', title: 'エラー', icon: AlertCircle, value: ready ? counts.error : null, unit: '件', detail: ready ? `失敗したアカウント ${formatNumber(failedStores)}件` : '—' },
+    { key: 'all', title: '一括配信', icon: Inbox, value: ready ? all.length : null, unit: '件', detail: '各店の一斉配信にも「統括から」で出ます' },
+  ]
+
+  const createButton = (full: boolean) => canManage ? (
+    <Button variant="primary" href={NEW_HREF} className={full ? 'v8-folder-create w-full' : undefined}>
+      <Plus size={15} aria-hidden="true" />一括配信を作る
+    </Button>
+  ) : null
+
+  const toolbar = (
+    <div className={styles.tools}>
+      <div className={styles.toolRow}>
+        <div className={styles.searchBox}>
+          <SearchField aria-label="タイトル・内容で探す" placeholder="タイトル・内容で探す" value={query} onChange={(value) => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />
+        </div>
+      </div>
+      <div className={styles.toolRow}>
+        <div className={styles.chips} role="group" aria-label="状態で絞る">
+          {STATUS_CHIPS.map((chip) => (
+            <FilterChip key={chip.key} selected={status === chip.key} onChange={() => { setStatus(chip.key); setPage(1) }} icon={<chip.icon size={13} aria-hidden="true" />}>
+              {`${chip.label} ${formatNumber(counts[chip.key])}`}
+            </FilterChip>
+          ))}
+        </div>
+        <span className={styles.spacer} aria-hidden="true" />
+        <div className={styles.pageSizeBox}>
+          <Select
+            aria-label="表示件数"
+            size="page-size"
+            value={String(pageSize)}
+            onChange={(value) => { setPageSize(Number(value) || 20); setPage(1) }}
+            options={[{ value: '10', label: '10件表示' }, { value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }]}
+          />
+        </div>
+      </div>
+    </div>
+  )
+
   let content
   if (error && !runs) content = <ListState kind="error" error={error} onRetry={() => void load()} />
   else if (!runs) content = <ListState kind="loading" />
-  else if (runs.length === 0) {
+  else if (filtered.length === 0) {
     content = (
-      <ListState
-        kind="empty"
+      <EmptyList
+        icon={<Send aria-hidden="true" />}
         title="一括配信はまだありません"
-        description="アカウントのタグか店を選んで、同じ内容を一度に送れます。各店のアカウントに入らずに送れます。"
-        action={canManage ? <Button variant="primary" href="/hq/broadcasts/new"><Plus size={15} aria-hidden="true" />一括配信を作る</Button> : undefined}
+        description="送るアカウントを選んで、同じ内容を一度に送れます。各店のアカウントに入らずに送れます。"
+        create={{ label: '最初の一括配信を作る', href: NEW_HREF }}
+        canCreate={canManage}
+        filtered={Boolean(query || status !== 'all')}
+        onClearFilters={() => { setQuery(''); setStatus('all'); setPage(1) }}
+        filteredDescription="検索や状態の札を外すと、すべて出ます"
       />
     )
   } else {
@@ -54,30 +163,54 @@ export default function HqBroadcastList() {
       <DataTable className={styles.table} data-design="hq-broadcasts">
         <thead>
           <TableHeadRow>
-            <Th>配信</Th>
-            <Th className={styles.colState}>状態</Th>
-            <Th className={styles.colStores}>店</Th>
-            <Th className={styles.colAt}>送る日時</Th>
+            <Th className={styles.colTitle}>タイトル・内容</Th>
+            <Th className={styles.colStatus}>状態</Th>
+            <Th className={styles.colAudience}>配信条件</Th>
+            <Th className={styles.colDate}>配信日時</Th>
+            <Th className={styles.colResultWide}>結果</Th>
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
         <tbody>
-          {runs.map((run) => {
+          {shown.map((run) => {
             const badge = runBadge(run)
             const totals = sendTotals(run.targets)
+            const live = run.targets.filter((t) => !t.excluded)
             const href = `/hq/broadcasts/detail?id=${encodeURIComponent(run.id)}`
-            const stores = run.status === 'prepared' ? `${totals.sendStores}店（外す ${totals.skipStores}店）` : `${run.targets.filter((t) => !t.excluded).length}店`
+            const stores = run.status === 'prepared' ? `${formatNumber(totals.sendStores)} アカウント（外す ${formatNumber(totals.skipStores)}）` : `${formatNumber(live.length)} アカウント`
+            const reached = live.reduce((sum, t) => sum + t.successCount, 0)
+            const failed = live.filter((t) => t.status === 'failed' || failedCount(t) > 0).length
+            const sent = statusKeyOf(run) === 'sent' || statusKeyOf(run) === 'error'
             return (
-              <Tr key={run.id}>
-                <Td><Link href={href} className={styles.title} title={run.title}>{run.title}</Link></Td>
-                <Td className={styles.colState}><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
-                <Td className={styles.colStores}><span className={styles.sub}>{stores}</span></Td>
-                <Td className={styles.colAt}><span className={styles.sub}>{run.scheduledAt ? jpDateTime(run.scheduledAt) : 'すぐ送る'}</span></Td>
+              <Tr key={run.id} className={styles.row}>
+                <Td>
+                  <div className={styles.titleLine}><Link href={href} className={styles.cellTitle} title={run.title}>{run.title}</Link></div>
+                  <span className={styles.cellSub}>{run.input?.messageType === 'image' ? '画像' : run.input?.messageType === 'flex' ? 'カード型' : 'テキスト'}</span>
+                </Td>
+                <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
+                <Td>
+                  <span className={styles.cellMain} title={stores}>{stores}</span>
+                  <span className={styles.cellSub}>{audienceText(run)}</span>
+                </Td>
+                <Td>
+                  <span className={styles.cellMain}>{run.scheduledAt ? jpDateTime(run.scheduledAt) : run.status === 'prepared' ? '未設定' : 'すぐ送った'}</span>
+                  {statusKeyOf(run) === 'scheduled' && run.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
+                </Td>
+                <Td>
+                  {sent ? (
+                    <>
+                      <span className={styles.resultMain}>{`${formatNumber(reached)}人に届いた`}</span>
+                      {failed > 0 ? <span className={styles.cellSub}>{`失敗したアカウント ${formatNumber(failed)}`}</span> : null}
+                    </>
+                  ) : <span className={styles.cellMain}>—</span>}
+                </Td>
                 <Td className={styles.colMenu}>
-                  <RowActions subjectName={run.title} menuItems={[
-                    { id: 'open', label: run.status === 'prepared' ? '確かめて送る' : '送った結果を見る', onSelect: () => { window.location.href = href } },
-                    ...(run.status === 'prepared' && canManage ? [{ id: 'edit', label: '下書きを直す', onSelect: () => { window.location.href = `/hq/broadcasts/new?id=${encodeURIComponent(run.id)}` } }] : []),
-                  ]} />
+                  <div className={styles.menuBox}>
+                    <RowActions subjectName={run.title} menuItems={[
+                      { id: 'open', label: run.status === 'prepared' ? '確かめて送る' : '送った結果を見る', onSelect: () => { window.location.href = href } },
+                      ...(run.status === 'prepared' && canManage ? [{ id: 'edit', label: '下書きを直す', onSelect: () => { window.location.href = `${NEW_HREF}?id=${encodeURIComponent(run.id)}` } }] : []),
+                    ]} />
+                  </div>
                 </Td>
               </Tr>
             )
@@ -87,12 +220,37 @@ export default function HqBroadcastList() {
     )
   }
 
+  const pager = runs && filtered.length > 0 ? (
+    <ListPagePagination>
+      <span className={styles.pagerCount}>{pageCount > 1 ? `${formatNumber(filtered.length)}件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)}件` : `${formatNumber(filtered.length)}件`}</span>
+      {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="一括配信のページ送り" /> : null}
+    </ListPagePagination>
+  ) : null
+
   return (
     <ListPage
+      boardId="U4Eep0"
       headingSize="compact"
       title="一括配信"
-      help="選んだアカウント（店）に同じ内容を一度に送った記録です。店の一斉配信の一覧にも「統括から」の印つきで出ます（店では変えられません）。"
-      actions={canManage ? <Button variant="primary" href="/hq/broadcasts/new"><Plus size={15} aria-hidden="true" />一括配信を作る</Button> : undefined}
+      description="選んだアカウントの友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
+      stats={(
+        <KpiBand>
+          {kpis.map((kpi) => (
+            <KpiCard key={kpi.key} presentation="band" density="compact" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
+          ))}
+        </KpiBand>
+      )}
+      folderNav={{ rows: [{ id: 'all', label: 'すべて' }], activeId: 'all', onSelect: () => {}, createAction: createButton(false) ?? undefined }}
+      folders={(
+        <FolderPanel
+          createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
+          activeId="all"
+          onSelect={() => {}}
+          rows={[{ id: 'all', label: 'すべて', count: ready ? all.length : null, icon: <Inbox size={15} aria-hidden="true" /> }]}
+        />
+      )}
+      toolbar={toolbar}
+      pagination={pager}
     >
       {content}
     </ListPage>

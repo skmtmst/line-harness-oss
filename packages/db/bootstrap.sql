@@ -3445,11 +3445,17 @@ CREATE TABLE hq_broadcast_audit (
  actor_id TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT(datetime('now'))
 );
 
+CREATE TABLE hq_broadcast_folders (
+ id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), name TEXT NOT NULL,
+ revision INTEGER NOT NULL DEFAULT 1, archived_at TEXT,
+ created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE hq_broadcast_runs (
  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), request_id TEXT NOT NULL, actor_id TEXT NOT NULL,
  input_json TEXT NOT NULL CHECK(json_valid(input_json)), status TEXT NOT NULL DEFAULT 'prepared' CHECK(status IN ('prepared','scheduled','stopped','cancelled')),
  version INTEGER NOT NULL DEFAULT 1, scheduled_at TEXT, dispatch_token TEXT,
- created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), UNIQUE(tenant_id,request_id)
+ created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), approval_json TEXT CHECK(approval_json IS NULL OR json_valid(approval_json)), UNIQUE(tenant_id,request_id)
 );
 
 CREATE TABLE hq_broadcast_targets (
@@ -3972,7 +3978,7 @@ CREATE TABLE line_accounts (
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT, inactive_reason TEXT
   CHECK (inactive_reason IS NULL OR inactive_reason IN ('manual', 'ban_detected', 'credential_invalid')), inactive_reason_detail TEXT, inactivated_at TEXT, login_channel_secret_encrypted TEXT, last_webhook_received_at TEXT, webhook_silence_exempt INTEGER NOT NULL DEFAULT 0
-  CHECK (webhook_silence_exempt IN (0, 1)));
+  CHECK (webhook_silence_exempt IN (0, 1)), folder_id TEXT REFERENCES line_account_tags(id) ON DELETE SET NULL);
 
 CREATE TABLE line_message_unsends (
   line_message_account_key TEXT NOT NULL,
@@ -8997,6 +9003,8 @@ CREATE INDEX idx_handover_decisions_handover
 
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
+CREATE UNIQUE INDEX idx_hq_broadcast_folder_name ON hq_broadcast_folders(tenant_id,name) WHERE archived_at IS NULL;
+
 CREATE UNIQUE INDEX idx_hq_folder_name ON hq_template_folders(tenant_id, name) WHERE archived_at IS NULL;
 
 CREATE INDEX idx_hq_support_messages_request
@@ -9107,6 +9115,8 @@ CREATE INDEX idx_line_accounts_archived
 
 CREATE INDEX idx_line_accounts_display_order
   ON line_accounts (display_order, created_at);
+
+CREATE INDEX idx_line_accounts_folder ON line_accounts(folder_id);
 
 CREATE UNIQUE INDEX idx_line_accounts_liff_id_unique
   ON line_accounts(liff_id);
@@ -10387,6 +10397,18 @@ WHEN NOT EXISTS (
     AND archived_at IS NULL
 )
 BEGIN SELECT RAISE(ABORT, 'ACCOUNT_TAG_SCOPE_INVALID'); END;
+
+CREATE TRIGGER line_accounts_folder_scope_insert BEFORE INSERT ON line_accounts
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM line_account_tags WHERE id=NEW.folder_id
+    AND tenant_id=COALESCE(NEW.tenant_id,'00000000-0000-4000-8000-000000000001')
+) BEGIN SELECT RAISE(ABORT,'ACCOUNT_FOLDER_SCOPE_INVALID'); END;
+
+CREATE TRIGGER line_accounts_folder_scope_update BEFORE UPDATE OF folder_id,tenant_id ON line_accounts
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM line_account_tags WHERE id=NEW.folder_id
+    AND tenant_id=COALESCE(NEW.tenant_id,'00000000-0000-4000-8000-000000000001')
+) BEGIN SELECT RAISE(ABORT,'ACCOUNT_FOLDER_SCOPE_INVALID'); END;
 
 CREATE TRIGGER messages_search_invalidate AFTER UPDATE OF content,unsent_at,delivery_type ON messages_log
 WHEN OLD.content IS NOT NEW.content OR OLD.unsent_at IS NOT NEW.unsent_at OR OLD.delivery_type IS NOT NEW.delivery_type

@@ -39,6 +39,17 @@ export interface AssetPayloadInput {
   instructions?: unknown;
   title?: unknown;
   lottery?: unknown;
+  questions?: unknown;
+  imageMediaId?: unknown;
+  imageMediaKind?: unknown;
+  imagemapImages?: unknown;
+  visibility?: unknown;
+  lotteryRate?: unknown;
+  winnerLimit?: unknown;
+  useActions?: unknown;
+  targetTagId?: unknown;
+  showProgress?: unknown;
+  showResult?: unknown;
 }
 
 export interface ConvertedAssetMessage {
@@ -103,6 +114,17 @@ export function validateAssetPayload(kind: BroadcastAssetKind, payload: AssetPay
     return null;
   }
   if (kind === 'coupon') return couponPayloadError(payload);
+  if (payload.questions !== undefined) {
+    if(!Array.isArray(payload.questions) || payload.questions.length<1 || payload.questions.length>10) return '質問は1〜10問で設定してください';
+    for(const item of payload.questions) {
+      if(!item || typeof item!=='object') return '質問の内容を確認してください';
+      const q=item as Record<string,unknown>;
+      if(!text(q.text) || !['single','multiple','free'].includes(String(q.format)) || typeof q.required!=='boolean') return '質問文・答え方・必須の指定を確認してください';
+      if(q.format!=='free' && (!Array.isArray(q.choices) || q.choices.length<1 || q.choices.length>13 || q.choices.some(choice=>!text(choice)))) return '選択肢は1〜13件で設定してください';
+    }
+    // 質問のみでも店のリサーチとして保存できる。
+    return null;
+  }
   if (!text(payload.description) && !text(payload.actionUrl)) {
     return `${KIND_LABEL[kind]}の内容またはリンク先を入力してください`;
   }

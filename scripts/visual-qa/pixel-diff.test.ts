@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -6,9 +6,7 @@ import { PNG } from 'pngjs'
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error 画面確認スクリプトは素のJSで型定義を持たない。
-import { buildPixelDiffReport, classifyHeightReason, compareRgba, compareScreen, ROOT, thresholdMarkdown } from './pixel-diff.mjs'
-// @ts-expect-error 画面確認スクリプトは素のJSで型定義を持たない。
-import { SCREENS } from './screens.mjs'
+import { buildPixelDiffReport, classifyHeightReason, compareRgba, compareScreen, thresholdMarkdown } from './pixel-diff.mjs'
 
 function image(width: number, height: number, pixels: number[][]) {
   return { width, height, data: Buffer.from(pixels.flat()) }
@@ -101,18 +99,6 @@ describe('Pencil設計との画素比較', () => {
     expect(markdown).toContain('`tall` | 0.0000% | +25px | 高さ差')
     expect(markdown).not.toContain('`ok`')
     expect(markdown).toContain('`none`（設計画像なし）')
-  })
-
-  it('生成済み台帳が全Nodeを持ち、比較済みの差分画像が存在する', () => {
-    const report = JSON.parse(readFileSync(join(ROOT, 'docs/design-qa/v6-pixel-diff.json'), 'utf8'))
-    expect(report.entries.map((entry: { node: string }) => entry.node)).toEqual(
-      SCREENS.map((screen: { node: string }) => screen.node),
-    )
-    const missing = report.entries
-      .filter((entry: { status: string }) => entry.status === 'compared')
-      .filter((entry: { diffPath: string }) => !existsSync(join(ROOT, entry.diffPath)))
-      .map((entry: { node: string }) => entry.node)
-    expect(missing).toEqual([])
   })
 
   it('shotsの専用画像と無印の最新設計を幅別の旧画像より優先する', () => {

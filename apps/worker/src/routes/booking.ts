@@ -15,6 +15,7 @@ import { processVisitStampQueue } from '../services/visit-stamps.js';
 // scheduled_at / decided_at / expires_at) are written from the Worker.
 
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
+import type { BookingHistoryItem, BookingHistoryResponse } from '@line-crm/shared';
 import {
   createBookingCustomer,
   getBookingCustomer,
@@ -51,6 +52,7 @@ import {
 } from '@line-crm/db';
 import { parseBookingStaffInput, BOOKING_SETTINGS_KEY, BOOKING_STAFF_OWN_KEY, BOOKING_MENUS_KEY } from '@line-crm/shared';
 import type { Env } from '../index.js';
+import type { BookingCustomerNotification } from '@line-crm/shared';
 import { requireRole, requirePermission, hasStaffPermission } from '../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt, rescheduleByTrigger } from '../services/reminder-trigger.js';
 import { cancelMeetConsultation, registerMeetConsultation } from '../services/meet-consultation-reminders.js';
@@ -1726,6 +1728,7 @@ booking.get('/api/liff/booking/me', async (c) => {
   const upcoming = await c.env.DB
     .prepare(
       `SELECT b.id, b.starts_at, b.status, b.customer_note,
+              b.lock_version, b.menu_id, b.staff_id,
               m.name AS menu_name,
               s.display_name AS staff_name, s.profile_image_url
          FROM bookings b
@@ -1737,11 +1740,11 @@ booking.get('/api/liff/booking/me', async (c) => {
         ORDER BY b.starts_at ASC`,
     )
     .bind(friendId, accountId, new Date().toISOString())
-    .all();
+    .all<BookingHistoryItem>();
 
   const past = await c.env.DB
     .prepare(
-      `SELECT b.id, b.starts_at, b.status,
+      `SELECT b.id, b.starts_at, b.status, b.lock_version, b.menu_id, b.staff_id,
               m.name AS menu_name,
               s.display_name AS staff_name, s.profile_image_url
          FROM bookings b
@@ -1753,9 +1756,9 @@ booking.get('/api/liff/booking/me', async (c) => {
         LIMIT 50`,
     )
     .bind(friendId, accountId, new Date().toISOString())
-    .all();
+    .all<BookingHistoryItem>();
 
-  return c.json({ upcoming: upcoming.results, past: past.results });
+  return c.json({ upcoming: upcoming.results, past: past.results } satisfies BookingHistoryResponse);
 });
 
 // ================================================================
@@ -2345,9 +2348,10 @@ booking.put('/api/booking/admin/channels/settings', requirePermission(BOOKING_SE
   return c.json({ success: true, data: { autoAssign: body.autoAssign } });
 });
 
-booking.get('/api/booking/admin/conflicts', async (c) => {
+booking.get('/api/booking/admin/conflicts', requireRole('owner', 'admin', 'staff'), requirePermission('/booking/bookings'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  c.header('Cache-Control', 'no-store');
   return c.json({ success: true, data: { conflicts: await listBookingConflicts(c.env.DB, accountId), notifyConflicts:(await getBookingSyncRules(c.env.DB,accountId)).notifyConflicts } });
 });
 
@@ -5121,16 +5125,26 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
 
 booking.patch('/api/booking/admin/bookings/:id', requireRole('owner', 'admin', 'staff'), (c) => updateAdminBooking(c));
 
-booking.post('/api/booking/admin/bookings/:id/reassign', requireRole('owner', 'admin', 'staff'), async (c) => {
+booking.post('/api/booking/admin/bookings/:id/reassign', requireRole('owner', 'admin', 'staff'), requirePermission('/booking/bookings'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const body = await c.req.json<{ staffId?: unknown; notifyCustomer?: unknown }>().catch(() => null);
   if (!body || typeof body.staffId !== 'string' || !body.staffId.trim() || typeof body.notifyCustomer !== 'boolean') return c.json({ error: 'invalid_reassign' }, 400);
-  const row = await c.env.DB.prepare('SELECT lock_version,starts_at,staff_id FROM bookings WHERE id=? AND line_account_id=?').bind(c.req.param('id'),accountId).first<{ lock_version: number; starts_at: string; staff_id: string }>();
+  const row = await c.env.DB.prepare('SELECT lock_version,starts_at,staff_id,friend_id FROM bookings WHERE id=? AND line_account_id=?').bind(c.req.param('id'),accountId).first<{ lock_version: number; starts_at: string; staff_id: string; friend_id: string | null }>();
   if (!row) return c.json({ error: 'booking_not_found' }, 404);
   // 移動APIでは必ず今の空き判定を通す。過去の実績修正は通常の変更口へ。
   if (Date.parse(row.starts_at) < Date.now() || row.staff_id === body.staffId.trim()) return c.json({ error: 'slot_not_available' }, 409);
-  return updateAdminBooking(c, { lock_version: row.lock_version, staff_id: body.staffId.trim(), send_change_notification: body.notifyCustomer });
+  const response = await updateAdminBooking(c, { lock_version: row.lock_version, staff_id: body.staffId.trim(), send_change_notification: body.notifyCustomer });
+  if (!response.ok) return response;
+  const result = await response.json() as { change_notification: string };
+  const customerNotification: BookingCustomerNotification = {
+    channel: row.friend_id ? 'line' : 'phone',
+    status: !body.notifyCustomer ? 'not_requested' : !row.friend_id ? 'action_required'
+      : result.change_notification === 'queued' ? 'queued' : 'sending_stopped',
+    guidance: body.notifyCustomer && !row.friend_id
+      ? 'LINEにつながっていないお客さまです。担当が変わったことを電話でお知らせしてください。' : null,
+  };
+  return c.json({ ...result, customerNotification });
 });
 
 /**

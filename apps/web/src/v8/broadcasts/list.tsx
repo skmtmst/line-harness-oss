@@ -27,7 +27,6 @@ import {
   List as ListIcon,
   Lock,
   MailOpen,
-  MoreHorizontal,
   Plus,
   Send,
   SendHorizontal,
@@ -35,6 +34,7 @@ import {
 } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
+import { loadFailureNotice } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -46,6 +46,7 @@ import { FolderDotName } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
@@ -69,6 +70,8 @@ import styles from './list.module.css'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
+// 検索APIがないため100件ずつ取得。上限超過は不完全な結果を出さず、条件を絞るよう案内する。
+const SEARCH_LIMIT = 10_000
 const EDIT_KEY = 'broadcast.definition.edit'
 
 /**
@@ -323,18 +326,44 @@ export default function BroadcastListV8() {
     setLoading(true)
     setError('')
     setForbidden(false)
+    let searchError: string | undefined
+    const stopSearch = (message: string): never => {
+      searchError = message
+      throw new Error(message)
+    }
     try {
       const chip = STATUS_CHIPS.find((item) => item.key === statusFilter)
-      const res = await api.broadcasts.list({
+      const searching = titleQuery.trim() !== ''
+      const params = {
         accountId: selectedAccountId || undefined,
-        limit: pageSize,
-        cursor,
+        limit: searching ? 100 : pageSize,
+        cursor: searching ? 0 : cursor,
         displayStatus: chip && chip.query !== '' ? chip.query : undefined,
         folderId: folderFilter === UNFILED ? 'unfiled' : folderFilter || undefined,
         sort: sortKey,
         from: dateFrom || undefined,
         to: dateTo || undefined,
-      })
+      }
+      const res = await api.broadcasts.list(params)
+      if (searching && res.success) {
+        if ((res.pagination?.total ?? res.data.length) > SEARCH_LIMIT) {
+          stopSearch('検索できる上限は10,000件です。状態・フォルダ・配信日で絞ってから検索してください。')
+        }
+        const rows = [...res.data]
+        let nextCursor = res.pagination?.nextCursor
+        const seen = new Set<string>()
+        while (nextCursor != null) {
+          if (seq !== loadSeqRef.current) return
+          if (seen.has(nextCursor) || rows.length >= SEARCH_LIMIT) stopSearch('検索結果を読み込めませんでした。条件を絞ってから再試行してください。')
+          seen.add(nextCursor)
+          const next = await api.broadcasts.list({ ...params, cursor: Number(nextCursor) })
+          if (!next.success) throw new Error(next.error)
+          rows.push(...next.data)
+          if (rows.length > SEARCH_LIMIT) stopSearch('検索できる上限は10,000件です。条件を絞ってください。')
+          nextCursor = next.pagination?.nextCursor
+        }
+        res.data = rows
+      }
       if (seq !== loadSeqRef.current) return
       if (res.success) {
         setBroadcasts(res.data)
@@ -347,11 +376,11 @@ export default function BroadcastListV8() {
     } catch (err) {
       if (seq !== loadSeqRef.current) return
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
-      else setError('データの読み込みに失敗しました。もう一度お試しください。')
+      else setError(searchError || loadFailureNotice(err, '一斉配信'))
     } finally {
       if (seq === loadSeqRef.current) setLoading(false)
     }
-  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, dateFrom, dateTo])
+  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, dateFrom, dateTo, titleQuery])
   /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
   useListScrollMemory(!loading)
 
@@ -380,7 +409,7 @@ export default function BroadcastListV8() {
 
   const goPage = (next: number) => {
     setPage(next)
-    void loadList((next - 1) * pageSize)
+    if (!titleQuery.trim()) void loadList((next - 1) * pageSize)
   }
 
   /* 今月の送信枠（ダッシュボードの口から quota を借りる）。 */
@@ -439,17 +468,13 @@ export default function BroadcastListV8() {
     setSavedViewId(id)
     const filters = view.filters
     const legacyStatuses = Array.isArray(filters.statuses) ? filters.statuses : []
-    const legacyStatus = legacyStatuses.includes('scheduled')
-      ? 'scheduled'
-      : legacyStatuses.includes('draft')
-        ? 'draft'
-        : null
+    const legacyStatus = STATUS_CHIPS.find(chip => legacyStatuses.includes(chip.key)
+      || (chip.key === 'error' && legacyStatuses.some(status => status === 'failed' || status === 'partial_failed')))?.key
     setTitleQuery(typeof filters.titleQuery === 'string' ? filters.titleQuery : '')
-    setStatusFilter(
-      filters.statusFilter === 'scheduled' || filters.statusFilter === 'draft'
-        ? (filters.statusFilter as StatusChipKey)
-        : legacyStatus ?? 'all',
-    )
+    setStatusFilter(STATUS_CHIPS.some(chip => chip.key === filters.statusFilter)
+      ? filters.statusFilter as StatusChipKey : legacyStatus ?? 'all')
+    setPageSize(filters.pageSize === 10 ? 10 : view.pageSize)
+    setSortKey(view.sortKey === 'oldest' ? 'oldest' : 'newest')
     setDateFrom(typeof filters.dateFrom === 'string' ? filters.dateFrom : '')
     setDateTo(typeof filters.dateTo === 'string' ? filters.dateTo : '')
     setFolderFilter(typeof filters.folderFilter === 'string' ? filters.folderFilter : '')
@@ -462,9 +487,9 @@ export default function BroadcastListV8() {
     try {
       const res = await api.broadcasts.savedViews.create(selectedAccountId, {
         name: savedViewName.trim(),
-        filters: { titleQuery, statusFilter, dateFrom, dateTo, folderFilter },
-        sortKey: 'scheduled',
-        pageSize: 20,
+        filters: { titleQuery, statusFilter, dateFrom, dateTo, folderFilter, pageSize },
+        sortKey,
+        pageSize: (pageSize === 10 ? 20 : pageSize) as BroadcastSavedView['pageSize'],
       })
       if (!res.success) throw new Error(res.error)
       setSavedViews((current) => [...current, res.data])
@@ -540,7 +565,7 @@ export default function BroadcastListV8() {
   const getScenarioName = (scenarioId: string) => scenarios.find((s) => s.id === scenarioId)?.name ?? null
 
   /* タイトル・内容は手元で絞る。フォルダも手元で当て直す（移動の重ねをすぐ表へ出すため）。 */
-  const visibleBroadcasts = broadcasts.filter((b) => {
+  const matchingBroadcasts = broadcasts.filter((b) => {
     if (deferredDelete.isHidden(b.id)) return false
     if (folderFilter === UNFILED && b.folderId) return false
     if (folderFilter && folderFilter !== UNFILED && b.folderId !== folderFilter) return false
@@ -548,6 +573,12 @@ export default function BroadcastListV8() {
     if (query && !`${b.title} ${b.messageContent}`.toLowerCase().includes(query)) return false
     return true
   })
+
+  const searching = titleQuery.trim() !== ''
+  const visibleBroadcasts = searching
+    ? matchingBroadcasts.slice((page - 1) * pageSize, page * pageSize)
+    : matchingBroadcasts
+  const resultTotal = searching ? matchingBroadcasts.length : listTotal
 
   const filterActive = statusFilter !== 'all' || folderFilter !== '' || titleQuery.trim() !== ''
     || dateFrom !== '' || dateTo !== '' || savedViewId !== ''
@@ -615,7 +646,7 @@ export default function BroadcastListV8() {
     },
   ]
 
-  const pageCount = listTotal == null ? 1 : Math.max(1, Math.ceil(listTotal / pageSize))
+  const pageCount = resultTotal == null ? 1 : Math.max(1, Math.ceil(resultTotal / pageSize))
   const rangeFirst = visibleBroadcasts.length === 0 ? 0 : (page - 1) * pageSize + 1
   const rangeLast = (page - 1) * pageSize + visibleBroadcasts.length
 
@@ -870,6 +901,7 @@ export default function BroadcastListV8() {
           { value: '10', label: '10件表示' },
           { value: '20', label: '20件表示' },
           { value: '50', label: '50件表示' },
+          ...(pageSize === 100 ? [{ value: '100', label: '100件表示' }] : []),
         ]}
       />
     </div>
@@ -986,7 +1018,7 @@ export default function BroadcastListV8() {
   ) : forbidden ? (
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', '見るには権限が要ります。オーナーか管理者に追加を依頼してください。', null, true)
   ) : error ? (
-    stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', null,
+    stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', error,
       <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度試す</Button>, true)
   ) : visibleBroadcasts.length === 0 ? (
     /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない（2026-10-06 オーナー決定）。 */
@@ -1077,33 +1109,27 @@ export default function BroadcastListV8() {
                 {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                 {canEdit ? <div className={styles.menuBox}>
                   <ContextMenu label={menuLabel} items={rowContextItems(broadcast)}>
-                    <button
-                      type="button"
+                    <RowMenu
                       className={styles.menuButton}
-                      aria-label={menuLabel}
-                      aria-haspopup="menu"
-                      aria-expanded={openMenuId === broadcast.id}
-                      title={menuLabel}
-                      onClick={() => {
-                        setMenuMoveFor(null)
-                        setOpenMenuId((current) => (current === broadcast.id ? null : broadcast.id))
+                      label={menuLabel}
+                      items={rowMenuItems(broadcast)}
+                      open={openMenuId === broadcast.id}
+                      onOpenChange={(next) => {
+                        /* 開く：サブメニュー（フォルダへ移す）を戻してから開く。 */
+                        if (next) {
+                          setMenuMoveFor(null)
+                          setOpenMenuId(broadcast.id)
+                          return
+                        }
+                        /* 閉じる：サブメニューへの切り替え・戻る では開いたままにする。 */
+                        if (keepMenuOpenRef.current) {
+                          keepMenuOpenRef.current = false
+                          return
+                        }
+                        setOpenMenuId(null)
                       }}
-                    >
-                      <MoreHorizontal size={14} aria-hidden="true" />
-                    </button>
+                    />
                   </ContextMenu>
-                  <ActionMenu
-                    open={openMenuId === broadcast.id}
-                    onClose={() => {
-                      if (keepMenuOpenRef.current) {
-                        keepMenuOpenRef.current = false
-                        return
-                      }
-                      setOpenMenuId(null)
-                    }}
-                    ariaLabel={menuLabel}
-                    items={rowMenuItems(broadcast)}
-                  />
                 </div> : null}
               </Td>
             </Tr>
@@ -1113,12 +1139,12 @@ export default function BroadcastListV8() {
     </DataTable>
   )
 
-  const pager = !loading && !error && !forbidden && visibleBroadcasts.length > 0 ? (
+  const pager = !loading && !error && !forbidden && (resultTotal !== null || visibleBroadcasts.length > 0) ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
         {pageCount > 1
-          ? `${formatNumber(listTotal ?? visibleBroadcasts.length)}件中 ${rangeFirst}〜${rangeLast}件`
-          : `${formatNumber(listTotal ?? visibleBroadcasts.length)}件`}
+          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)}件中 ${rangeFirst}〜${rangeLast}件`
+          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)}件`}
       </span>
       {pageCount > 1 ? (
         <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り" />

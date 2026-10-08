@@ -4,7 +4,7 @@
  * ★V8 統括のアカウント（ホーム）（Pencil `JKjsE`。カードの「設定」で開く窓が `HMpVx`）。
  *
  * v7 の画面（app/hq/page.tsx と account-browser-v8.tsx）と読み書きの口・失敗時の扱いは同じ。
- * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左のタグの列（型のフォルダの列＋共通 FolderPanel）・
+ * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左のフォルダの列（型のフォルダの列＋共通 FolderPanel。2026-10-08 タグ→フォルダ・API-17）・
  * 数のカード4枚・探す欄と状態の札・カード／表の切り替え・並び・件数・アカウントのカード・件数と注。
  */
 import { CircleDot, Inbox, LogIn, Plus, RotateCcw, Settings, Star, MessageCircle } from 'lucide-react'
@@ -30,7 +30,8 @@ import { classifyApiFailure, loadFailureNotice } from '@/components/shared/api-e
 import { usePageTitle } from '@/components/shell/page-chrome'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import PlatformNotices from '@/components/hq/platform-notices'
-import { api, fetchApi, type LineAccountTag } from '@/lib/api'
+import { api, fetchApi } from '@/lib/api'
+import type { Folder } from '@line-crm/shared'
 import { resolveStoreReturnPath } from '@/lib/hq-navigation'
 import { formatNumber } from '@/lib/format'
 import { useStaffRole } from '@/lib/staff-role'
@@ -43,8 +44,8 @@ import styles from './home.module.css'
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
 
-/** 「タグなし」を表す印。空文字は「すべて」なので別の値にする。 */
-const UNTAGGED = '__untagged__'
+/** 「未分類」を表す印。空文字は「すべて」なので別の値にする。 */
+const UNFILED = '__none__'
 const ALL = '__all__'
 
 const STATUS_FILTERS: { value: StatusFilter; label: string; icon: React.ReactNode }[] = [
@@ -62,8 +63,8 @@ const SORT_OPTIONS = [
 
 const PAGE_SIZES = [10, 20, 50]
 
-/** タグの色（追加の窓で選ぶ）。値はテーマの色の名前。 */
-const TAG_COLORS = [
+/** フォルダの色（追加・色を変える窓で選ぶ）。値はテーマの色の名前。 */
+const FOLDER_COLORS = [
   { value: '', label: 'なし' },
   { value: '--color-status-info', label: '青' },
   { value: '--color-accent-deep', label: '緑' },
@@ -120,18 +121,20 @@ export default function HqHomeV8() {
 
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
-  const [tag, setTag] = useState<string>(ALL)
+  const [folder, setFolder] = useState<string>(ALL)
   const [view, setView] = useState<View>('cards')
   const [sort, setSort] = useState('friends')
   const [size, setSize] = useState(20)
   const [page, setPage] = useState(1)
-  const [tags, setTags] = useState<LineAccountTag[]>([])
-  const [tagDialog, setTagDialog] = useState(false)
-  const [tagName, setTagName] = useState('')
-  const [tagColor, setTagColor] = useState('')
-  const [deleteTag, setDeleteTag] = useState<LineAccountTag | null>(null)
-  const [tagError, setTagError] = useState('')
-  const [tagSaving, setTagSaving] = useState(false)
+  const [folders, setFolders] = useState<(Folder & { itemCount?: number })[]>([])
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
+  /* フォルダの追加・名前と色を変える窓（同じ窓。editing があれば変える）。 */
+  const [folderDialog, setFolderDialog] = useState<{ editing: Folder | null } | null>(null)
+  const [folderName, setFolderName] = useState('')
+  const [folderColor, setFolderColor] = useState('')
+  const [deleteFolder, setDeleteFolder] = useState<Folder | null>(null)
+  const [folderError, setFolderError] = useState('')
+  const [folderSaving, setFolderSaving] = useState(false)
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -140,12 +143,15 @@ export default function HqHomeV8() {
     setAccounts(accountResponse.data as AccountWithStats[])
   }, [])
 
-  const loadTags = useCallback(async () => {
+  const loadFolders = useCallback(async () => {
     try {
-      const res = await api.lineAccountTags.list()
-      if (res.success && Array.isArray(res.data)) setTags(res.data)
+      const res = await api.lineAccountFolders.list()
+      if (res.success && Array.isArray(res.data?.folders)) {
+        setFolders([...res.data.folders].sort((a, b) => a.displayOrder - b.displayOrder))
+        setUnfiledCount(typeof res.data.unclassifiedCount === 'number' ? res.data.unclassifiedCount : null)
+      }
     } catch {
-      // タグが読めなくても一覧は出す
+      // フォルダが読めなくても一覧は出す
     }
   }, [])
 
@@ -158,16 +164,16 @@ export default function HqHomeV8() {
   }, [load, reloadKey])
 
   useEffect(() => {
-    void loadTags()
+    void loadFolders()
     let cancelled = false
     void api.tenants.me().then((res) => {
       if (!cancelled && res.success) setTenantName(res.data.name ?? '')
     }).catch(() => {})
     return () => { cancelled = true }
-  }, [loadTags])
+  }, [loadFolders])
 
   const reloadAfterSave = async () => {
-    await Promise.all([load(), refreshAccounts(), loadTags()])
+    await Promise.all([load(), refreshAccounts(), loadFolders()])
   }
 
   const refreshConnectionInfo = async () => {
@@ -220,21 +226,26 @@ export default function HqHomeV8() {
     warnings: sum.warnings + (!isArchived(account) && account.connection?.status === 'warn' ? 1 : 0),
   }), { friends: 0, messages: 0, warnings: 0 }), [accounts])
 
-  const tagCounts = useMemo(() => {
+  /* 所属は1つ（API-17 の folderId）。サーバーの数が無いときは手元で数える。 */
+  const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
+  const folderCounts = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const account of accounts) for (const t of account.tags ?? []) counts.set(t.id, (counts.get(t.id) ?? 0) + 1)
+    for (const account of accounts) {
+      const id = folderOf(account)
+      if (id) counts.set(id, (counts.get(id) ?? 0) + 1)
+    }
     return counts
-  }, [accounts])
-  const untaggedCount = useMemo(() => accounts.filter((account) => (account.tags ?? []).length === 0).length, [accounts])
+  }, [accounts, folderOf])
+  const localUnfiled = useMemo(() => accounts.filter((account) => !isArchived(account) && !folderOf(account)).length, [accounts, folderOf])
 
   const filtered = useMemo(() => {
     const words = query.trim().toLocaleLowerCase()
     const list = accounts.filter((account) => {
       if (!matchesStatus(account, status)) return false
-      if (tag === UNTAGGED && (account.tags ?? []).length > 0) return false
-      if (tag !== ALL && tag !== UNTAGGED && !(account.tags ?? []).some((t) => t.id === tag)) return false
+      if (folder === UNFILED && folderOf(account)) return false
+      if (folder !== ALL && folder !== UNFILED && folderOf(account) !== folder) return false
       if (!words) return true
-      const hay = [account.name, account.displayName, account.basicId, account.channelId, ...(account.tags ?? []).map((t) => t.name)]
+      const hay = [account.name, account.displayName, account.basicId, account.channelId, folders.find((item) => item.id === folderOf(account))?.name]
       return hay.some((text) => text?.toLocaleLowerCase().includes(words))
     })
     return [...list].sort((a, b) =>
@@ -244,7 +255,7 @@ export default function HqHomeV8() {
           ? a.displayOrder - b.displayOrder
           : (b.stats?.friendCount ?? 0) - (a.stats?.friendCount ?? 0),
     )
-  }, [accounts, status, tag, query, sort])
+  }, [accounts, status, folder, folderOf, folders, query, sort])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / size))
   const current = Math.min(page, pageCount)
@@ -257,55 +268,86 @@ export default function HqHomeV8() {
     return found ? (found.displayName || found.name) : null
   }
 
-  const createTag = async () => {
-    const name = tagName.trim()
-    if (!name || tagSaving) return
-    setTagSaving(true)
-    setTagError('')
+  const colorValue = (token: string) => (token ? getComputedStyle(document.documentElement).getPropertyValue(token).trim() || null : null)
+
+  const openFolderDialog = (editing: Folder | null) => {
+    setFolderName(editing?.name ?? '')
+    setFolderColor(editing ? (FOLDER_COLORS.find((item) => item.value && colorValue(item.value)?.toLowerCase() === editing.color?.toLowerCase())?.value ?? '') : '')
+    setFolderError('')
+    setFolderDialog({ editing })
+  }
+
+  /* フォルダを足す／名前と色を変える（API-17：POST・PATCH /api/line-account-folders）。 */
+  const saveFolder = async () => {
+    const name = folderName.trim()
+    if (!name || folderSaving || !folderDialog) return
+    setFolderSaving(true)
+    setFolderError('')
     try {
-      const color = tagColor ? getComputedStyle(document.documentElement).getPropertyValue(tagColor).trim() : null
-      const res = await api.lineAccountTags.create({ name, color })
+      const color = colorValue(folderColor)
+      const res = folderDialog.editing
+        ? await api.lineAccountFolders.update(folderDialog.editing.id, { name, color })
+        : await api.lineAccountFolders.create({ name, color })
       if (!res.success) throw new Error(res.error)
-      setTagName('')
-      setTagDialog(false)
-      await loadTags()
+      setFolderDialog(null)
+      await loadFolders()
       void reloadAfterSave()
     } catch (caught) {
-      setTagError(caught instanceof Error ? caught.message : 'タグを追加できませんでした')
+      setFolderError(caught instanceof Error ? caught.message : 'フォルダを保存できませんでした')
     } finally {
-      setTagSaving(false)
+      setFolderSaving(false)
     }
   }
 
-  const removeTag = async (target: LineAccountTag) => {
-    if (tagSaving) return
-    setTagSaving(true)
-    setTagError('')
+  /* 並べ替える：隣と表示順を入れ替える。 */
+  const moveFolder = async (index: number, delta: -1 | 1) => {
+    const a = folders[index]
+    const b = folders[index + delta]
+    if (!a || !b || folderSaving) return
+    setFolderSaving(true)
     try {
-      const response = await api.lineAccountTags.remove(target.id)
+      await api.lineAccountFolders.update(a.id, { displayOrder: b.displayOrder === a.displayOrder ? index + delta : b.displayOrder })
+      await api.lineAccountFolders.update(b.id, { displayOrder: b.displayOrder === a.displayOrder ? index : a.displayOrder })
+    } catch {
+      // 並びが変わらなかったときは読み直した結果を見せる
+    } finally {
+      setFolderSaving(false)
+      await loadFolders()
+    }
+  }
+
+  /* 消す：中のアカウントは消えず未分類へ（API-17 の DELETE）。 */
+  const removeFolder = async (target: Folder) => {
+    if (folderSaving) return
+    setFolderSaving(true)
+    setFolderError('')
+    try {
+      const response = await api.lineAccountFolders.remove(target.id)
       if (!response.success) throw new Error(response.error)
-      setDeleteTag(null)
-      if (tag === target.id) setTag(ALL)
-      await loadTags()
+      setDeleteFolder(null)
+      if (folder === target.id) setFolder(ALL)
+      await loadFolders()
       void reloadAfterSave()
     } catch (caught) {
-      setTagError(caught instanceof Error ? caught.message : 'タグを消せませんでした')
+      setFolderError(caught instanceof Error ? caught.message : 'フォルダを消せませんでした')
     } finally {
-      setTagSaving(false)
+      setFolderSaving(false)
     }
   }
 
   const folderRows: FolderPanelRow[] = [
     { id: ALL, label: 'すべて', count: accounts.length, icon: <Inbox size={15} aria-hidden="true" /> },
-    ...tags.map((t) => ({
-      id: t.id,
-      label: t.name,
-      count: tagCounts.get(t.id) ?? 0,
-      color: t.color,
-      onDelete: canManage ? () => { setTagError(''); setDeleteTag(t) } : undefined,
-      deleteNote: 'タグを消しても、アカウントは消えません。',
+    ...folders.map((f, index) => ({
+      id: f.id,
+      label: f.name,
+      count: typeof f.itemCount === 'number' ? f.itemCount : (folderCounts.get(f.id) ?? 0),
+      color: f.color,
+      onEdit: canManage ? () => openFolderDialog(f) : undefined,
+      onMoveUp: canManage && index > 0 ? () => void moveFolder(index, -1) : undefined,
+      onMoveDown: canManage && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
+      onDelete: canManage ? () => { setFolderError(''); setDeleteFolder(f) } : undefined,
     })),
-    { id: UNTAGGED, label: 'タグなし', count: untaggedCount },
+    { id: UNFILED, label: '未分類', count: unfiledCount ?? localUnfiled },
   ]
 
   const createAccount = canManage ? (
@@ -313,20 +355,20 @@ export default function HqHomeV8() {
       <Plus aria-hidden="true" className={styles.buttonIcon} />アカウントを登録
     </Button>
   ) : null
-  const selectTag = (id: string) => { setTag(id); resetPage() }
-  const folders = (
+  const selectFolder = (id: string) => { setFolder(id); resetPage() }
+  const folderColumn = (
     <div className={styles.folderBox}>
       <FolderPanel
-        /* 閲覧のみで登録ボタンを隠したときも、その場所は空けておく（下のタグの列が上へ詰まらない。絵 VtJQ6）。 */
+        /* 閲覧のみで登録ボタンを隠したときも、その場所は空けておく（下のフォルダの列が上へ詰まらない。絵 VtJQ6）。 */
         createAction={createAccount ?? <span className={styles.createSpace} aria-hidden="true" />}
-        heading="タグ"
+        heading="フォルダ"
         rows={folderRows}
-        activeId={tag}
-        onSelect={selectTag}
-        onAddFolder={canManage ? () => { setTagName(''); setTagColor(''); setTagError(''); setTagDialog(true) } : undefined}
-        addFolderLabel="タグを追加"
+        activeId={folder}
+        onSelect={selectFolder}
+        onAddFolder={canManage ? () => openFolderDialog(null) : undefined}
+        addFolderLabel="フォルダを追加"
       >
-        <p className={styles.folderNote}>タグを消しても、アカウントは消えません</p>
+        <p className={styles.folderNote}>フォルダを消しても、アカウントは消えません</p>
       </FolderPanel>
     </div>
   )
@@ -361,6 +403,12 @@ export default function HqHomeV8() {
     )
   }
 
+  const folderDotOf = (account: AccountWithStats) => {
+    const id = folderOf(account)
+    const found = id ? folders.find((item) => item.id === id) ?? (account as { folder?: Folder | null }).folder ?? null : null
+    return found ? { name: found.name, color: found.color } : null
+  }
+
   const metaOf = (account: AccountWithStats) => {
     const parent = nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId)
     return [accountHandle(account), parent ? `親：${parent}` : null, `権限者 ${formatNumber(account.stats?.staffCount ?? 0)} 人`].filter(Boolean).join(' ・ ')
@@ -388,17 +436,17 @@ export default function HqHomeV8() {
   ) : (
     <>
       <div className={styles.cards} data-design="KPIs">
-        <StatCard label="アカウント" value={formatNumber(accounts.length)} sub="件" />
-        <StatCard label="友だち合計" value={formatNumber(totals.friends)} sub="人・全アカウントの合計" />
-        <StatCard label="今月の配信" value={formatNumber(totals.messages)} sub="通" />
-        <StatCard label="接続に問題" value={formatNumber(totals.warnings)} sub="件" warn />
+        <StatCard label="アカウント" value={formatNumber(accounts.length)} unit="件" />
+        <StatCard label="友だち合計" value={formatNumber(totals.friends)} unit="人" title="全アカウントの合計" />
+        <StatCard label="今月の配信" value={formatNumber(totals.messages)} unit="通" />
+        <StatCard label="接続に問題" value={formatNumber(totals.warnings)} unit="件" warn />
       </div>
 
       <div className={styles.tools}>
         <div className={styles.searchBox}>
           <SearchField
-            aria-label="アカウント名・LINE ID・タグで探す"
-            placeholder="アカウント名・LINE ID・タグで探す"
+            aria-label="名前・LINE ID・フォルダで探す"
+            placeholder="名前・LINE ID・フォルダで探す"
             value={query}
             onChange={(value) => { setQuery(value); resetPage() }}
             onClear={() => { setQuery(''); resetPage() }}
@@ -453,19 +501,15 @@ export default function HqHomeV8() {
                 <div className={styles.cardHead}>
                   <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <div className={styles.cardName}>
-                    {/* 絵 `JKjsE`：名前の前に左の列（タグ）の色の丸。付けたタグが無ければ色の無い輪。 */}
+                    {/* 絵 `JKjsE`：名前の前に左の列（フォルダ）の色の丸。未分類は色の無い輪。 */}
                     <p className={styles.name} title={name}>
-                      <FolderDotName folder={(account.tags ?? [])[0] ? { name: (account.tags ?? [])[0].name, color: (account.tags ?? [])[0].color } : null}>{name}</FolderDotName>
+                      <FolderDotName folder={folderDotOf(account)}>{name}</FolderDotName>
                     </p>
-                    <p className={styles.meta}>{metaOf(account)}</p>
+                    {/* B-31：名前の下は1行で省略し、全文は title。 */}
+                    <p className={styles.meta} title={metaOf(account)}>{metaOf(account)}</p>
                   </div>
                   <span className={state.tone === 'ok' ? `${styles.pill} ${styles.pill_ok}` : state.tone === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_idle}`}><span className={styles.dot} aria-hidden="true" />{state.label}</span>
                 </div>
-                {(account.tags ?? []).length > 0 ? (
-                  <ul className={styles.tags} aria-label="付けたタグ">
-                    {(account.tags ?? []).map((t) => <li key={t.id} className={styles.tag}>{t.name}</li>)}
-                  </ul>
-                ) : null}
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
                     <dt>友だち</dt>
@@ -476,8 +520,6 @@ export default function HqHomeV8() {
                     <dd>{`${formatNumber(account.stats?.messagesThisMonth ?? 0)} 通`}</dd>
                   </div>
                 </dl>
-                {/* 絵 JKjsE の「すき間（ボタンを下にそろえる）」。 */}
-                <span className={styles.cardGap} aria-hidden="true" />
                 {cardActions(account)}
                 {warned ? (() => {
                   /* 要確認の理由を、引っかかった確認ごとの言葉で1行に。長ければ省略し title で全文。 */
@@ -530,7 +572,7 @@ export default function HqHomeV8() {
         <span className={styles.range}>
           {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)}件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)}件`}
         </span>
-        <p className={styles.footNote}>カードの「設定」から、タグの付け外し・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。</p>
+        <p className={styles.footNote}>カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。</p>
         {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="アカウントのページ送り" /> : null}
       </div>
     </>
@@ -541,9 +583,9 @@ export default function HqHomeV8() {
       boardId="JKjsE"
       title="統括のアカウント"
       description={`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}
-      folders={folders}
+      folders={folderColumn}
       folderInset
-      folderNav={{ rows: folderRows, activeId: tag, onSelect: selectTag, createAction: createAccount, label: 'タグ' }}
+      folderNav={{ rows: folderRows, activeId: folder, onSelect: selectFolder, createAction: createAccount, label: 'フォルダ' }}
     >
       <div className={styles.body}>
         <PlatformNotices />
@@ -589,49 +631,52 @@ export default function HqHomeV8() {
       ) : null}
 
       <Dialog
-        open={tagDialog}
-        title="タグを追加"
-        description="付けたタグで左の列から絞り込めます。タグを消しても、アカウントは消えません。"
-        onCancel={() => setTagDialog(false)}
+        open={folderDialog !== null}
+        title={folderDialog?.editing ? 'フォルダの名前と色を変える' : 'フォルダを追加'}
+        description="アカウントは1つのフォルダに入ります。フォルダを消しても、アカウントは消えません。"
+        onCancel={() => { if (!folderSaving) setFolderDialog(null) }}
         designNode="JKjsE"
-        busy={tagSaving}
-        error={tagError || undefined}
-        confirmLabel="追加する"
+        busy={folderSaving}
+        error={folderError || undefined}
+        confirmLabel={folderDialog?.editing ? '保存する' : '追加する'}
         cancelLabel="やめる"
-        onConfirm={() => void createTag()}
+        onConfirm={() => void saveFolder()}
       >
         <div className={styles.dialogFields}>
-          <label htmlFor="hq-account-tag-name" className={styles.dialogLabel}>タグの名前</label>
-          <TextField id="hq-account-tag-name" value={tagName} maxLength={100} disabled={tagSaving} placeholder="例: 渋谷エリア" onChange={(event) => setTagName(event.target.value)} className={styles.full} />
-          <label htmlFor="hq-account-tag-color" className={styles.dialogLabel}>色</label>
-          <Select id="hq-account-tag-color" aria-label="タグの色" value={tagColor} onChange={setTagColor} disabled={tagSaving} options={TAG_COLORS} />
+          <label htmlFor="hq-account-folder-name" className={styles.dialogLabel}>フォルダの名前</label>
+          <TextField id="hq-account-folder-name" value={folderName} maxLength={100} disabled={folderSaving} placeholder="例: 渋谷エリア" onChange={(event) => setFolderName(event.target.value)} className={styles.full} />
+          <label htmlFor="hq-account-folder-color" className={styles.dialogLabel}>色</label>
+          <Select id="hq-account-folder-color" aria-label="フォルダの色" value={folderColor} onChange={setFolderColor} disabled={folderSaving} options={FOLDER_COLORS} />
         </div>
       </Dialog>
 
-      {deleteTag ? (
+      {deleteFolder ? (
         <ConfirmDialog
           open
-          title={`タグ「${deleteTag.name}」を消しますか？`}
-          description="タグを消しても、アカウントは消えません。付けていたアカウントからタグが外れます。"
-          confirmLabel="消す"
+          title={`フォルダ「${deleteFolder.name}」を消しますか？`}
+          description={`中のアカウント ${formatNumber(folderCounts.get(deleteFolder.id) ?? 0)} 件は消えずに「未分類」へ移ります。消したフォルダは元に戻せません。`}
+          confirmLabel="フォルダを消す"
+          cancelLabel="キャンセル"
           destructive
-          busy={tagSaving}
-          error={tagError || undefined}
-          onConfirm={() => void removeTag(deleteTag)}
-          onCancel={() => { if (!tagSaving) setDeleteTag(null) }}
+          busy={folderSaving}
+          error={folderError || undefined}
+          onConfirm={() => void removeFolder(deleteFolder)}
+          onCancel={() => { if (!folderSaving) setDeleteFolder(null) }}
         />
       ) : null}
     </ListPage>
   )
 }
 
-/** 数のカード（統括は角丸のカード4枚。題・数・単位の3段）。 */
-function StatCard({ label, value, sub, warn = false }: { label: string; value: string; sub: string; warn?: boolean }) {
+/** 数のカード（統括は角丸のカード4枚。題と、数の横に単位の2段。B-33）。 */
+function StatCard({ label, value, unit, title, warn = false }: { label: string; value: string; unit: string; title?: string; warn?: boolean }) {
   return (
-    <div className={styles.stat4}>
+    <div className={styles.stat4} title={title}>
       <span className={styles.statLabel}>{label}</span>
-      <span className={warn ? `${styles.statValue} ${styles.statWarn}` : styles.statValue}>{value}</span>
-      <span className={styles.statSub}>{sub}</span>
+      <span className={styles.statLine}>
+        <span className={warn ? `${styles.statValue} ${styles.statWarn}` : styles.statValue}>{value}</span>
+        <span className={styles.statSub}>{unit}</span>
+      </span>
     </div>
   )
 }

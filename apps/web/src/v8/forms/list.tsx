@@ -21,7 +21,6 @@ import {
   IdCard,
   Inbox,
   Link2,
-  MoreHorizontal,
   Percent,
   Plus,
   TriangleAlert,
@@ -39,7 +38,6 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -56,7 +54,8 @@ import DetailPanel from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -1366,19 +1365,13 @@ export default function FormsListV8() {
                     <Td className={styles.menuCell}>
                       {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。 */}
                       <div className={styles.menuBox}>
-                        <IconButton
+                        <RowMenu
                           title={`「${name}」のその他の操作（編集・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除）`}
-                          aria-label={`「${name}」のその他の操作`}
-                          aria-expanded={openMenuId === form.id}
-                          onClick={() => setOpenMenuId((current) => (current === form.id ? null : form.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
-                        <ActionMenu
-                          open={openMenuId === form.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={`「${name}」の操作`}
+                          label={`「${name}」のその他の操作`}
+                          menuLabel={`「${name}」の操作`}
                           items={rowMenuItems(form)}
+                          open={openMenuId === form.id}
+                          onOpenChange={(next) => setOpenMenuId(next ? form.id : null)}
                         />
                       </div>
                     </Td>

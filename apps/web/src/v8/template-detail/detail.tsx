@@ -13,14 +13,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, CircleAlert, Copy, ExternalLink, GitCompare, List, MoreHorizontal, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
+import { ArrowLeft, CircleAlert, Copy, ExternalLink, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
 import { validateFlexContent } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -78,8 +79,6 @@ export default function TemplateDetailV8() {
   const [deleteError, setDeleteError] = useState('')
   const [duplicating, setDuplicating] = useState(false)
   const [duplicateError, setDuplicateError] = useState('')
-  const [menuOpen, setMenuOpen] = useState(false)
-  const moreRef = useRef<HTMLButtonElement>(null)
   const usageRef = useRef<HTMLElement>(null)
 
   /* N-144：編集・公開・削除の口は owner/admin だけ。閲覧のみには押せない操作を置かない（隠す）。 */
@@ -339,10 +338,7 @@ export default function TemplateDetailV8() {
               複製する
             </Button>
           ) : null}
-          <button ref={moreRef} type="button" className={styles.moreButton} aria-label="そのほかの操作" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
-            <MoreHorizontal size={16} aria-hidden="true" />
-          </button>
-          <ActionMenu open={menuOpen} onClose={() => setMenuOpen(false)} anchorRef={moreRef} ariaLabel={`テンプレート「${template.name}」の操作`} items={menuItems} />
+          <RowMenu className={styles.moreButton} label="そのほかの操作" menuLabel={`テンプレート「${template.name}」の操作`} items={menuItems} />
         </div>
       ) : null}
       {duplicateError ? <p className={styles.errorText} role="alert">{duplicateError}</p> : null}
@@ -636,7 +632,7 @@ function ChangeBox({ title, before, after }: { title: string; before: string; af
  * 型の「作る」の頭（戻る・名前・説明）と左右の列。詳細には保存が無いので下の帯を置かない
  * （型の CreatePage は帯が必須で、帯があると本文が画面の高さで切られるため、枠と頭だけ型から使う）。
  */
-function DetailFrame({ title, identity, description, preview, children }: {
+export function DetailFrame({ title, identity, description, preview, children }: {
   title: string; identity: ReactNode; description: string; preview: ReactNode; children: ReactNode
 }) {
   return (

@@ -13,11 +13,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, CalendarClock, Filter, Info, MoreHorizontal, Send, Users } from 'lucide-react'
+import { AlertCircle, CalendarClock, Filter, Info, Send, Users } from 'lucide-react'
 import type { SavedSearch, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
 import { ListPageBody } from '@/components/templates'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -401,22 +402,12 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 </Td>
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
-                    <button
-                      type="button"
+                    <RowMenu
                       className={styles.menuButton}
-                      aria-label={`保存した検索「${search.name}」の操作`}
-                      aria-haspopup="menu"
-                      aria-expanded={openMenuId === search.id}
-                      title={`保存した検索「${search.name}」の操作`}
-                      onClick={() => setOpenMenuId((current) => (current === search.id ? null : search.id))}
-                    >
-                      <MoreHorizontal className={styles.menuIcon} aria-hidden="true" />
-                    </button>
-                    <ActionMenu
-                      open={openMenuId === search.id}
-                      onClose={() => setOpenMenuId(null)}
-                      ariaLabel={`保存した検索「${search.name}」の操作`}
+                      label={`保存した検索「${search.name}」の操作`}
                       items={rowMenuItems(search)}
+                      open={openMenuId === search.id}
+                      onOpenChange={(next) => setOpenMenuId(next ? search.id : null)}
                     />
                   </span>
                 </Td>

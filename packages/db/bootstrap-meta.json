@@ -549,7 +549,9 @@
     "604_auto_reply_unmatched_settings.sql",
     "605_restaurant_screen_api_additions.sql",
     "606_restaurant_liff_details.sql",
-    "607_conversation_search_content.sql"
+    "607_conversation_search_content.sql",
+    "608_line_account_folders.sql",
+    "609_hq_broadcast_authoring.sql"
   ],
-  "migrationCount": 550
+  "migrationCount": 552
 }

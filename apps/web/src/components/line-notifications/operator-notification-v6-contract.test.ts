@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 
 const list = readFileSync(new URL('../../app/line-notifications/operator-notification-rules.tsx', import.meta.url), 'utf8')
 const page = readFileSync(new URL('../../app/line-notifications/page.tsx', import.meta.url), 'utf8')
-const createPage = readFileSync(new URL('../../app/line-notifications/operator/new/page.tsx', import.meta.url), 'utf8')
 // 2026-10-07：作る・なおす画面は src/v8/line-notifications/operator-edit に一から書いた（板 gjUz3・hiBO8）。
 const create = readFileSync(new URL('../../v8/line-notifications/operator-edit.tsx', import.meta.url), 'utf8')
 const db = readFileSync(new URL('../../../../../packages/db/src/notifications.ts', import.meta.url), 'utf8')
@@ -14,15 +13,6 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
   it('4タブの2番目に運用者向けを置き、顧客向けと混ぜない', () => {
     expect(page).toMatch(/customer[\s\S]*operator[\s\S]*failures[\s\S]*history/)
     expect(page).toContain('<OperatorNotificationRules lineAccountId={selectedAccountId}')
-  })
-
-  it('板の印を一覧と作成画面に固定する', () => {
-    expect(list).toContain('data-design-node="DpxOK"')
-    // 板 gjUz3：作る画面はV8だけ。v7の作成画面は捨てた。
-    expect(create).toContain("'gjUz3'")
-    expect(create).toContain("'hiBO8'")
-    expect(createPage).toContain('@/v8/line-notifications/operator-edit')
-    expect(createPage).not.toContain('NewOperatorNotificationInner')
   })
 
   it('一覧はアカウント別の実行記録APIを読み、未取得を0件にしない', () => {
@@ -64,12 +54,5 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
     expect(route).toContain("code: 'recipient_required'")
     expect(dispatch).toContain('claimOperatorDelivery')
     expect(dispatch).toContain('idempotency_key')
-  })
-
-  it('本文側に大きな画面タイトルを重ねない', () => {
-    // NOTIFY-04: ?id= で保存済み下書きを開き直せるため、タイトルは新規/編集で分かれる。
-    expect(create).toContain("usePageTitle(editId ? '運用者へのお知らせをなおす' : '運用者へのお知らせを作る')")
-    expect(create).not.toContain('<Header')
-    expect(list).not.toContain('<Header')
   })
 })

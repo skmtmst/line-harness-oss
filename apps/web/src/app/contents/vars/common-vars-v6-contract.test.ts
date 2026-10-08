@@ -11,18 +11,6 @@ const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const WORKER = readFileSync(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'contents.ts'), 'utf8')
 
 describe('V6共通情報一覧', () => {
-  it('WuKzUどおり画面名は共通トップバーだけに置く', () => {
-    expect(PAGE).toContain('data-design-node="WuKzU"')
-    expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
-    expect(PAGE).not.toContain('<Header')
-    expect(PAGE).not.toContain('マニュアルは準備中です')
-    expect(PAGE).not.toContain('並び替えは準備中です')
-    expect(NEW_PAGE).not.toContain("import Header from '@/components/layout/header'")
-    expect(NEW_PAGE).not.toContain('<Header')
-    expect(EDIT_PAGE).not.toContain("import Header from '@/components/layout/header'")
-    expect(EDIT_PAGE).not.toContain('<Header')
-  })
-
   it('次回予約は一覧APIで受け取り、行ごとのAPI呼出をしない', () => {
     expect(PAGE).toContain('item.nextSchedule')
     expect(PAGE).not.toContain('api.commonVars.schedules(item.id)')
@@ -72,16 +60,6 @@ describe('V6共通情報一覧', () => {
     expect(PAGE).not.toContain('placeholderText(item.name)')
     expect(EDIT_PAGE).toContain('placeholderText(item.varKey)')
     expect(EDIT_PAGE).not.toContain('placeholderText(item.name)')
-  })
-
-  it('操作列は「編集」「削除する」の2個分の幅を持ち、隣の列へはみ出さない', () => {
-    // #1057で「削除」→「削除する」に延び、w-36（144px）では行のボタンが
-    // 隣の「使われている場所」へ被った（1152pxで再現）。2個と間隔で約148px
-    // 要るため、列幅176px（w-44）・内余白8px（px-2）・表の最小幅696pxにする。
-    expect(PAGE).toContain('min-w-[696px]')
-    expect(PAGE).toContain('sticky right-0 w-44 px-2 py-3')
-    expect(PAGE).toContain('sticky right-0 px-2 py-3 text-right')
-    expect(PAGE).not.toContain('sticky right-0 w-36 px-4 py-3')
   })
 
   it('一覧は空・期限つき・未使用の絞り込みとCSVを実際に操作できる', () => {

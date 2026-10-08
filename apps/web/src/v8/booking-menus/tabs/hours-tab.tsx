@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -13,7 +13,7 @@ import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
 import { TimeField } from '@/components/shared/date-time-field'
 import Toggle from '@/components/shared/toggle'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import { notifyToast } from '@/components/shared/toast'
 import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from '@/lib/api'
 import { slotReasonLabel } from '../lib/slot-reason'
@@ -293,7 +293,6 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
   onSaved: (resource: BookingResource) => void
   onDeleted: (id: string) => void
 }) {
-  const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -368,23 +367,13 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
       <span className={styles.equipType}>{resource.type}</span>
       <span className={styles.equipCap}>{resource.capacity}</span>
       <span className={styles.colMenu}>
-        {menuItems.length > 0 ? (
-          <>
-            <MoreAction
-              label={`「${resource.name}」のそのほかの操作`}
-              aria-expanded={open}
-              onClick={() => setOpen((current) => !current)}
-              className={styles.rowMenuButton}
-            />
-            <ActionMenu
-              open={open}
-              inline
-              ariaLabel={`「${resource.name}」の操作`}
-              onClose={() => setOpen(false)}
-              items={menuItems}
-            />
-          </>
-        ) : null}
+        <RowMenu
+          appearance="plain"
+          className={styles.rowMenuButton}
+          label={`「${resource.name}」のそのほかの操作`}
+          menuLabel={`「${resource.name}」の操作`}
+          items={menuItems}
+        />
       </span>
       {error ? <p className="text-danger w-full text-xs" role="alert">{error}</p> : null}
       <ResourceDialog

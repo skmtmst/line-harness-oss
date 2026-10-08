@@ -73,7 +73,8 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
   it('破壊的操作は区切りの後・赤で必ず最後に置く', () => {
     const src = read('row-actions.tsx')
     expect(src).toContain("tone: 'danger'")
-    expect(src).toContain('dividerBefore: menuItems.length > 0')
+    // 並べ替えと区切りは「…」の部品（RowMenu の orderRowMenuItems）が持つ。動きは row-menu.react.test.tsx。
+    expect(src).toContain('items={orderRowMenuItems(items)}')
     // destructiveItem を menuItems の後ろへ連結する（途中に挟まない）。
     expect(src).toContain('[...menuItems, { ...destructiveItem')
   })

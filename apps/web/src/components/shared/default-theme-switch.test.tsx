@@ -31,7 +31,7 @@ function runBoot(htmlTheme: 'v7' | 'v8', stored: string | null) {
 
 describe('開いたときの既定', () => {
   it('既定が V8 の環境は、描画前のスクリプトを出さない（記憶の v7 を読まない）', () => {
-    expect(layout).toMatch(/const ADMIN_THEME_LOCKED = ADMIN_THEME === 'v8'/)
+    expect(layout).toMatch(/const ADMIN_THEME_LOCKED = adminThemeLocked\(\)/)
     expect(layout).toMatch(/const THEME_BOOT = ADMIN_THEME_LOCKED\s*\?\s*''/)
     expect(layout).toMatch(/\{THEME_BOOT \? <script/)
   })

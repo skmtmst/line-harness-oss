@@ -136,7 +136,6 @@ const BASELINE: Record<string, number> = {
   'app/webinars/edit/comments-v8.tsx': 1,
   'components/events/event-form.tsx': 5,
   'components/events/event-wizard.tsx': 5,
-  'components/friend-attributes-v2/tag-list-v2.tsx': 1,
   'components/friend-fields/edit-tag-page-v4.tsx': 1,
   'components/friend-fields/field-list.tsx': 1,
   'components/friend-fields/new-tag-page-v4.tsx': 1,

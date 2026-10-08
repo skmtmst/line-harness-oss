@@ -7,13 +7,12 @@
  * 口・保存前の確かめ・同時編集（409）の扱いは app/webinars/edit/cta-v8.tsx と同じ（BEHAVIOR.md）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GitCompare, MoreHorizontal, Play, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
+import { GitCompare, Play, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
-import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import IconButton from '@/components/shared/icon-button'
+import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -287,10 +286,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
               </button>
               {readOnly ? null : (
                 <div className={form.menuBox}>
-                  <IconButton aria-label={`カード${index + 1}の操作`} title={`カード${index + 1}の操作`} aria-haspopup="menu" aria-expanded={menuOpen === index} disabled={busy} onClick={() => setMenuOpen((open) => (open === index ? null : index))}>
-                    <MoreHorizontal size={16} aria-hidden="true" />
-                  </IconButton>
-                  <ActionMenu open={menuOpen === index} onClose={() => setMenuOpen(null)} ariaLabel={`カード${index + 1}の操作`} items={[
+                  <RowMenu label={`カード${index + 1}の操作`} triggerProps={{ disabled: busy }} open={menuOpen === index} onOpenChange={(next) => setMenuOpen(next ? index : null)} items={[
                     { id: 'copy', label: '複製する', onSelect: () => { setMenuOpen(null); setCtas((prev) => (prev ? [...prev.slice(0, index + 1), { ...prev[index] }, ...prev.slice(index + 1)] : prev)); setTimes((prev) => [...prev.slice(0, index + 1), prev[index], ...prev.slice(index + 1)]) } },
                     { id: 'delete', label: '消す', tone: 'danger', onSelect: () => { setMenuOpen(null); setCtas((prev) => (prev ? prev.filter((_, j) => j !== index) : prev)); setTimes((prev) => prev.filter((_, j) => j !== index)); setSelected(0) } },
                   ]} />

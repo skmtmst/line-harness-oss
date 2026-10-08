@@ -383,7 +383,6 @@ shared-button-importer components/forms/action-editor.tsx
 shared-button-importer components/forms/choice-table.tsx
 shared-button-importer components/forms/hq-form-definition-editor.tsx
 shared-button-importer components/forms/options-dialog.tsx
-shared-button-importer components/friend-attributes-v2/tag-list-v2.tsx
 shared-button-importer components/friend-fields/edit-tag-page-v4.tsx
 shared-button-importer components/friend-fields/mark-list.tsx
 shared-button-importer components/friend-fields/saved-search-list.tsx
@@ -557,6 +556,8 @@ shared-button-importer v8/hq/notice-line-dialog.tsx
 shared-button-importer v8/hq/settings.tsx
 shared-button-importer v8/hq/support-detail.tsx
 shared-button-importer v8/hq/support.tsx
+shared-button-importer v8/inbox-chat/rules-popover.tsx
+shared-button-importer v8/inbox-chat/template-picker-view.tsx
 shared-button-importer v8/affiliates/frame.tsx
 shared-button-importer v8/affiliates/parts.tsx
 shared-button-importer v8/affiliates/affiliators.tsx
@@ -745,6 +746,8 @@ shared-button-importer v8/accounts-detail/dialogs.tsx
 shared-button-importer v8/accounts-detail/handover.tsx
 shared-button-importer v8/account-new/register.tsx
 shared-button-importer v8/hq-templates/console.tsx
+shared-button-importer v8/hq-templates/detail.tsx
+shared-button-importer v8/hq-templates/store-list.tsx
 shared-button-importer v8/hq-templates/message-form.tsx
 shared-button-importer v8/template-detail/detail.tsx
 shared-button-importer v8/tag-edit/edit.tsx

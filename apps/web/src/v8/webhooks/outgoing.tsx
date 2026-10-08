@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bookmark, Inbox, LayoutTemplate, MoreHorizontal, Pause, Play, Plus, Send } from 'lucide-react'
+import { Bookmark, Inbox, LayoutTemplate, Pause, Play, Plus, Send } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -27,7 +27,7 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
+import { RowMenu } from '@/components/shared/row-actions'
 import EmptyList from '@/components/shared/empty-list'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
@@ -138,6 +138,7 @@ export default function WebhooksOutgoingV8() {
   const [rotateTarget, setRotateTarget] = useState<{ id: string; name: string; activate: boolean; accountId: string } | null>(null)
   const [rotateSecret, setRotateSecret] = useState('')
   const [rotateError, setRotateError] = useState('')
+  const [rotating, setRotating] = useState(false)
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
 
   /* フォルダの箱（kind=webhook）。送り先をフォルダへ入れる口はまだ無い（BEHAVIOR.md）。 */
@@ -297,6 +298,7 @@ export default function WebhooksOutgoingV8() {
 
   /* ===== 合言葉（秘密の鍵）を作り直す ===== */
   const runRotate = async (stepUpToken?: string) => {
+    if (rotating) return
     setRotateError('')
     const accountId = selectedAccountId
     if (!rotateTarget) return
@@ -310,6 +312,7 @@ export default function WebhooksOutgoingV8() {
       setRotateError(`合言葉は${MIN_SECRET_LENGTH}文字以上にしてください`)
       return
     }
+    setRotating(true)
     try {
       const res = await api.webhooks.outgoing.update(
         rotateTarget.id, accountId,
@@ -333,6 +336,8 @@ export default function WebhooksOutgoingV8() {
       setRotateError(describeApiFailure(caught, 'シークレットの更新', {
         forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
       }))
+    } finally {
+      setRotating(false)
     }
   }
 
@@ -609,19 +614,11 @@ export default function WebhooksOutgoingV8() {
                       <Td className={styles.colOpsNarrow}>
                         {/* 狭い幅は「…」だけ（中身を見る・やり直すも中に入れる。絵 AsfFB の下の説明のとおり）。 */}
                         <div className={styles.opsBox}>
-                          <IconButton
-                            aria-haspopup="menu"
-                            aria-expanded={menuId === item.id}
-                            aria-label={`「${item.name}」の操作`}
+                          <RowMenu
+                            label={`「${item.name}」の操作`}
                             title="操作"
-                            onClick={() => setMenuId((current) => (current === item.id ? null : item.id))}
-                          >
-                            <MoreHorizontal size={16} aria-hidden="true" />
-                          </IconButton>
-                          <ActionMenu
                             open={menuId === item.id}
-                            onClose={() => setMenuId(null)}
-                            ariaLabel={`「${item.name}」の操作`}
+                            onOpenChange={(next) => setMenuId(next ? item.id : null)}
                             items={[
                               { id: 'view', label: '中身を見る', onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } },
                               ...(item.deliverySummary.canRetry && canManage
@@ -797,6 +794,7 @@ export default function WebhooksOutgoingV8() {
         />
         <Dialog
           open={rotateTarget !== null}
+          busy={rotating}
           title={rotateTarget ? `「${rotateTarget.name}」の鍵を${rotateTarget.activate ? '設定して動かす' : '作り直す'}` : ''}
           description="新しい鍵（合言葉）を設定します。保存したあとは二度と全部は表示されません。前の鍵は24時間だけ使えるので、相手側の切り替え中も送信は止まりません。"
           error={rotateError || undefined}

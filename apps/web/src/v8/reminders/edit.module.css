@@ -174,7 +174,9 @@
 }
 .stepCard[data-open] { outline: var(--tpl-rm-open-outline) solid var(--color-accent-deep); outline-offset: var(--tpl-rm-open-offset); }
 .stepHead { display: flex; align-items: center; gap: var(--tpl-label-tag-gap); }
-.grip { flex: none; color: var(--color-ink-faint); }
+.grip { flex: none; display: inline-flex; align-items: center; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); cursor: grab; }
+.grip:active { cursor: grabbing; }
+.grip:focus-visible { outline: var(--tpl-htn-line-2) solid var(--color-action); outline-offset: var(--tpl-htn-line-2); border-radius: var(--radius-icon); }
 .stepNum {
   display: inline-flex;
   align-items: center;

@@ -166,7 +166,6 @@ describe('共通部品の影響範囲', () => {
       // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
       'app/webinars/edit/participants-v8.tsx',
       'app/webinars/list-v8.tsx',
-      'components/friend-attributes-v2/tag-list-v2.tsx',
       'components/friend-fields/tags-page-v4.tsx',
       'components/friends/friend-list-table.tsx',
       'components/line-notifications/notification-run-list.tsx',
@@ -231,6 +230,9 @@ describe('共通部品の影響範囲', () => {
       'v8/booking-menus/tabs/staff-tab.tsx',
       // ★V8 統括のアカウント（JKjsE）。新しい置き場（src/v8）に一から書いた。
       'v8/hq/home.tsx',
+      // ★V8 統括のひな形の一覧・一括配信の一覧（i0Ao0R・U4Eep0）。店の一覧と同じ形で表の下にページ送り（2026-10-08）。
+      'v8/hq-templates/store-list.tsx',
+      'v8/hq-broadcasts/list.tsx',
       // ★V8 成果とアフィリエイト（nJlxX・h7dmB・OylSV・aINnz）。src/v8 に一から書いた。
       'v8/affiliates/affiliators.tsx',
       'v8/affiliates/offers.tsx',

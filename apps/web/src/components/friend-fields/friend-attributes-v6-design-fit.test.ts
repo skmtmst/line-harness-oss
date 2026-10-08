@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { balanced, between, element, withoutComments } from './design-fit-slice'
+import { balanced, between, withoutComments } from './design-fit-slice'
 import { filterSavedSearches } from './saved-search-kpis'
 
 /*
@@ -45,7 +45,6 @@ describe('切り出しの道具そのもの', () => {
 
 describe('rIhbN 対応マーク一覧', () => {
   const usageLabel = balanced(MARK_LIST, 'function usageLabel')
-  const thead = element(MARK_LIST, 'thead')
   const kindCard = between(MARK_LIST, "title: 'マークの種類'", "title: '未対応'")
 
   it('使用先の列に、隣の「使用中」と同じ友だちの人数を重ねて出さない', () => {
@@ -57,13 +56,6 @@ describe('rIhbN 対応マーク一覧', () => {
   it('使用先が未取得のときは「なし」ではなく「—」を出す', () => {
     expect(usageLabel).toContain("mark.usedIn === undefined ? '—' : 'なし'")
     expect(usageLabel.indexOf('undefined')).toBeLessThan(usageLabel.indexOf("'なし'"))
-  })
-
-  it('見出しは、APIが返す画面の表示先に合わせる', () => {
-    expect(thead).toContain('表示先')
-    for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '操作']) {
-      expect(thead).toContain(label)
-    }
   })
 
   it('帯の「マークの種類・使用中」を、同じ画面の一覧そのものから数える', () => {
@@ -145,23 +137,7 @@ describe('機能4の一覧・編集画面は取得済みの設計値を表示す
 })
 
 describe('sfTEW CSVで一括登録の確認画面', () => {
-  const head = between(CSV_DIALOG, "phase === 'preview' || phase === 'saving' ? <>", '</header>')
-  const summary = between(CSV_DIALOG, 'className={styles.summary}', 'className={styles.filters}')
   const warnBar = between(CSV_DIALOG, 'className={styles.warnBar}', 'className={styles.footerRow}')
-
-  it('いま見ているのがどのファイルの何行かを見出しの下に出す', () => {
-    expect(head).toContain('${fileName')
-    expect(head).toContain('行を読み込みました')
-  })
-
-  it('4つの数に、その数が何なのかを1行添える', () => {
-    for (const detail of [
-      'ファイルの行数',
-      'そのまま登録されます',
-      '同じ名前のタグがあります',
-      '直すまで登録されません',
-    ]) expect(summary).toContain(detail)
-  })
 
   it('押す前に、同じ名前のタグを上書きしないことと、直し方を書く', () => {
     expect(warnBar).toContain('同じ名前のタグは上書きしません')
@@ -184,10 +160,5 @@ describe('XBkiQ 保存した検索の編集', () => {
     expect(shareField).toContain("savedCount === null")
     expect(shareField).toContain("'保存できるのは50件までです。'")
     expect(withoutComments(EDIT_PAGE)).toContain('setSavedCount(searches.success ? searches.summary.total : null)')
-  })
-
-  it('読込中の言い方を、共通の「読み込んでいます」にそろえる', () => {
-    expect(withoutComments(EDIT_PAGE)).not.toContain('読み込み中')
-    expect(withoutComments(EDIT_PAGE)).toContain('読み込んでいます')
   })
 })

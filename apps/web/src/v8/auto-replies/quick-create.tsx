@@ -16,6 +16,8 @@ import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import { api, describeSaveFailure } from '@/lib/api'
 import type { AutoReplyConflict, AutoReplyDraftInput } from '@line-crm/shared'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './quick-create.module.css'
 
 /* 1欄ぶんの確かめ。文は「何をすれば直るか」を1文で書く。 */
@@ -55,11 +57,15 @@ export default function QuickCreateV8({
   const [phase, setPhase] = useState<Phase>('editing')
   const [overlaps, setOverlaps] = useState<AutoReplyConflict[]>([])
   const draftIdRef = useRef<string | null>(null)
+  const savedInputRef = useRef('')
+  const draftVersionRef = useRef<number | null>(null)
+  const savingRef = useRef(false)
   const acknowledgedRef = useRef<string[]>([])
   const draftKeyRef = useRef<string>(crypto.randomUUID())
   const publishKeyRef = useRef<string>(crypto.randomUUID())
 
   const saving = phase === 'saving'
+  const guard = useUnsavedGuard({ dirty: keywords.length > 0 || draft !== '' || reply !== '', busy: saving, onDiscard: onClose })
 
   const addKeyword = (value: string) => {
     const word = value.trim()
@@ -131,7 +137,7 @@ export default function QuickCreateV8({
   }
 
   const save = async () => {
-    if (saving) return
+    if (savingRef.current) return
     const keywordMessage = validateKeywords(keywords)
     const replyMessage = validateReply(reply)
     setKeywordError(keywordMessage ?? '')
@@ -141,40 +147,57 @@ export default function QuickCreateV8({
       setSaveError('上のバーでLINE公式アカウントを選んでください')
       return
     }
+    savingRef.current = true
     setPhase('saving')
     setSaveError('')
     try {
+      const input = buildInput(keywords, reply)
+      const snapshot = JSON.stringify(input)
       let id = draftIdRef.current
-      let acknowledged = acknowledgedRef.current
+      const changed = snapshot !== savedInputRef.current
       if (!id) {
-        const created = await api.autoReplies.createDraft(
-          buildInput(keywords, reply),
-          draftKeyRef.current,
-        )
+        const created = await api.autoReplies.createDraft(input, draftKeyRef.current)
         if (!created.success) throw new Error(created.error || '下書きを作れませんでした')
         id = created.data.autoReplyId
         draftIdRef.current = id
-        const found = await api.autoReplies.conflicts(id).catch(() => null)
-        const list = found?.success ? found.data.conflicts : []
-        acknowledged = list.map((conflict) => conflict.autoReplyId)
-        acknowledgedRef.current = acknowledged
-        if (list.length > 0) {
-          setOverlaps(list)
-          setPhase('confirming')
-          return
-        }
+        draftVersionRef.current = created.data.versionNumber
+        savedInputRef.current = snapshot
+      } else if (changed) {
+        if (draftVersionRef.current === null) throw new Error('下書きの更新番号を確認できませんでした')
+        const updated = await api.autoReplies.saveDraft(id, { ...input, expectedVersion: draftVersionRef.current })
+        if (!updated.success) throw new Error(updated.error || '下書きを更新できませんでした')
+        draftVersionRef.current = updated.data.versionNumber
+        savedInputRef.current = snapshot
+        publishKeyRef.current = crypto.randomUUID()
       }
+      // 通信失敗を「重なりなし」と扱わず、公開の直前にも最新の重なりを確認する。
+      const found = await api.autoReplies.conflicts(id)
+      if (!found.success) throw new Error(found.error || '重なりを確認できませんでした')
+      const list = found.data.conflicts
+      const acknowledged = list.map(conflict => conflict.autoReplyId)
+      const newConflicts = acknowledged.some(conflictId => !acknowledgedRef.current.includes(conflictId))
+      setOverlaps(list)
+      if (list.length > 0 && (changed || newConflicts)) {
+        acknowledgedRef.current = acknowledged
+        setPhase('confirming')
+        return
+      }
+      acknowledgedRef.current = acknowledged
       await publish(id, acknowledged)
       publishKeyRef.current = crypto.randomUUID()
+      guard.disarm()
       onCreated()
       onClose()
     } catch (cause) {
       setSaveError(cause instanceof Error ? cause.message : describeSaveFailure(cause))
       setPhase(draftIdRef.current ? 'confirming' : 'editing')
+    } finally {
+      savingRef.current = false
     }
   }
 
   return (
+    <>
     <Dialog
       open
       confirmation
@@ -276,5 +299,7 @@ export default function QuickCreateV8({
         ) : null}
       </div>
     </Dialog>
+    <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+    </>
   )
 }

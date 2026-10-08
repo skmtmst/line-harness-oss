@@ -9,11 +9,10 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useEffect, useState } from 'react'
-import { Calculator, Download, Eye, History, MoreHorizontal, PawPrint, Sparkles } from 'lucide-react'
+import { Calculator, Download, Eye, History, PawPrint, Sparkles } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import ActionMenu from '@/components/shared/action-menu'
-import IconButton from '@/components/shared/icon-button'
+import { RowMenu } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -156,10 +155,7 @@ function KpiMenu({ title, busy, onExport }: { title: string; busy: boolean; onEx
   const [open, setOpen] = useState(false)
   return (
     <span className={styles.kpiMenu}>
-      <IconButton className={styles.kpiMenuButton} aria-label={`${title}のメニュー`} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </IconButton>
-      <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel={`${title}のメニュー`} items={[{ id: 'csv', label: 'CSV で書き出す', disabled: busy, onSelect: () => { setOpen(false); onExport() } }]} />
+      <RowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={[{ id: 'csv', label: 'CSV で書き出す', disabled: busy, onSelect: () => { setOpen(false); onExport() } }]} />
     </span>
   )
 }

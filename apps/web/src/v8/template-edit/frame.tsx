@@ -21,6 +21,7 @@ export function TemplateEditFrame({
   side,
   footerActions,
   status,
+  backHref = '/templates',
 }: {
   boardId: string
   title: string
@@ -32,11 +33,13 @@ export function TemplateEditFrame({
   footerActions?: ReactNode
   /** 下の帯の左の文（下書きの自動保存の状態）。 */
   status?: ReactNode
+  /** 「← テンプレートへ」の行き先（統括のテンプレートから使うときは /hq/templates）。 */
+  backHref?: string
 }) {
   return (
     <PageFrame kind="create" boardId={boardId} hasFooter={Boolean(footerActions)}>
       <PageHeading
-        identity={<Link href="/templates" className={styles.back}>← テンプレートへ</Link>}
+        identity={<Link href={backHref} className={styles.back}>← テンプレートへ</Link>}
         title={title}
         description={description}
       />

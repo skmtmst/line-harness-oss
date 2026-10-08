@@ -10,6 +10,8 @@ import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '
 import TemplatePicker from '@/components/chats/template-picker'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ConversationHead from '@/v8/inbox-chat/conversation-head'
 import { formatDateTime } from '@/lib/format'
 import Button from '@/components/shared/button'
 
@@ -110,6 +112,7 @@ export default function EmailThread({
   onChanged,
   customerInfoOpen = false,
   onOpenCustomerInfo,
+  onCloseCustomerInfo,
 }: {
   threadId: string
   /** スマホでメール一覧へ戻る。LINEのトークと同じ位置に出す。 */
@@ -118,7 +121,10 @@ export default function EmailThread({
   onChanged?: () => void
   customerInfoOpen?: boolean
   onOpenCustomerInfo?: () => void
+  /** ★V8：会話の頭の「右の列の出し入れ」で閉じる口。 */
+  onCloseCustomerInfo?: () => void
 }) {
+  const isV8 = useAdminTheme() === 'v8'
   const [detail, setDetail] = useState<EmailDetail | null>(null)
   const [reply, setReply] = useState('')
   /*
@@ -578,6 +584,28 @@ export default function EmailThread({
 
   return (
     <>
+      {isV8 ? (
+        /*
+         * ★V8：LINE の会話と同じ頭（ConversationHead）。名前の下に「メール・件名」。
+         * 対応状況・担当は1つだけ選ぶメニュー（四角のチェックは使わない。オーナー指摘）。
+         */
+        <ConversationHead
+          name={detail.thread.customer_name || detail.thread.customer_email}
+          sub={`メール・${detail.thread.subject}`}
+          subTitle={`${detail.thread.customer_email} ・ メール ・ ${detail.thread.subject}`}
+          onBack={onBack}
+          operator={{
+            value: detail.thread.assigned_staff_id ?? 'unassigned',
+            operators,
+            onChange: (next) => { void updateAssignee(next === 'unassigned' ? null : next) },
+          }}
+          status={{ value: detail.thread.status, onChange: (next) => void updateStatus(next) }}
+          panel={onOpenCustomerInfo ? {
+            open: customerInfoOpen,
+            onToggle: () => (customerInfoOpen ? onCloseCustomerInfo?.() : onOpenCustomerInfo()),
+          } : undefined}
+        />
+      ) : (
       <EmailThreadHeader>
         <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
           <EmailThreadBackButton onBack={onBack} />
@@ -642,6 +670,7 @@ export default function EmailThread({
           )}
         </div>
       </EmailThreadHeader>
+      )}
 
       <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto bg-canvas-sunken p-4">
         {/*

@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarRange, CircleDot, Download, History, MoreHorizontal, Plus, TrendingDown, TrendingUp, Undo2 } from 'lucide-react'
+import { CalendarRange, CircleDot, Download, History, Plus, TrendingDown, TrendingUp, Undo2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import {
   ApiError,
@@ -22,11 +22,10 @@ import {
 } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -386,18 +385,10 @@ export default function HistoryTab() {
                       <Button href={friendHref}>友だちを見る</Button>
                     )}
                     <div className={styles.menuBox}>
-                      <IconButton
-                        aria-label={`${viewName(item)}の明細の操作`}
-                        title={`${viewName(item)}の明細の操作`}
-                        aria-expanded={menuId === item.id}
-                        onClick={() => setMenuId((current) => (current === item.id ? null : item.id))}
-                      >
-                        <MoreHorizontal size={16} aria-hidden="true" />
-                      </IconButton>
-                      <ActionMenu
+                      <RowMenu
+                        label={`${viewName(item)}の明細の操作`}
                         open={menuId === item.id}
-                        ariaLabel={`${viewName(item)}の明細の操作`}
-                        onClose={() => setMenuId(null)}
+                        onOpenChange={(next) => setMenuId(next ? item.id : null)}
                         items={[
                           ...(pending ? [{ id: 'void', label: '取り消す', onSelect: () => openPending('void', item) }] : []),
                           { id: 'friend', label: '友だちを見る', external: true, onSelect: () => router.push(friendHref) },

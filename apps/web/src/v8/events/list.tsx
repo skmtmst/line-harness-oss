@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bookmark, CalendarClock, CalendarX, Eye, Hourglass, MoreHorizontal, Plus, TrendingDown, TriangleAlert, Users } from 'lucide-react'
+import { Bookmark, CalendarClock, CalendarX, Eye, Hourglass, Plus, TrendingDown, TriangleAlert, Users } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, eventsApi, fetchApi, type EventListItem, type EventListSummary } from '@/lib/api'
 import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
@@ -22,7 +22,6 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
@@ -33,12 +32,14 @@ import HelpTip from '@/components/shared/help-tip'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
@@ -136,6 +137,18 @@ export default function EventsListV8() {
       setFoldersError(true)
     }
   }, [selectedAccountId])
+
+  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
+  const folderActions = useFolderRowActions({
+    kind: 'event',
+    folders,
+    accountId: selectedAccountId ?? null,
+    enabled: canEdit,
+    itemLabel: 'イベント',
+    countOf: (id) => folders.find((f) => f.id === id)?.itemCount ?? null,
+    onChanged: () => loadFolders(),
+    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
+  })
 
   useEffect(() => {
     void loadFolders()
@@ -309,7 +322,7 @@ export default function EventsListV8() {
 
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: loadStatus === 'ready' && !folderFilter ? listTotal : null },
-    ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
+    ...folders.map((folder, index) => ({ ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
     { id: UNFILED, label: '未分類', count: unfiledCount },
   ]
 
@@ -539,14 +552,12 @@ export default function EventsListV8() {
                   </Td>
                   <Td className={styles.menuCell}>
                     <span className={styles.menuBox}>
-                      <IconButton
-                        aria-label={`${e.name}の操作`}
-                        title={`${e.name}の操作`}
-                        onClick={() => setOpenMenuId((now) => (now === e.id ? null : e.id))}
-                      >
-                        <MoreHorizontal />
-                      </IconButton>
-                      <ActionMenu open={openMenuId === e.id} ariaLabel={`${e.name}の操作`} onClose={() => setOpenMenuId(null)} items={menuItems} />
+                      <RowMenu
+                        label={`${e.name}の操作`}
+                        items={menuItems}
+                        open={openMenuId === e.id}
+                        onOpenChange={(next) => setOpenMenuId(next ? e.id : null)}
+                      />
                     </span>
                   </Td>
                 </Tr>
@@ -575,6 +586,7 @@ export default function EventsListV8() {
 
   const overlays = (
     <>
+      {folderActions.dialogs}
       {folderDialogOpen && selectedAccountId ? (
         <FolderAddDialog
           kind="event"

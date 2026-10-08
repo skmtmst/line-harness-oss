@@ -1,13 +1,16 @@
 'use client'
 
-import { useRef, useState, type ButtonHTMLAttributes, type ReactNode, type RefObject } from 'react'
+import { MoreHorizontal } from 'lucide-react'
+import { useRef, useState, type ButtonHTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
+import IconButton from './icon-button'
+import ReorderHandle from './reorder-handle'
 import styles from './row-actions.module.css'
 
 type Base = { className?: string } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'>
 
-function IconButton({
+function RowIconButton({
   label,
   tone,
   grip,
@@ -36,20 +39,12 @@ function IconButton({
  * 並び替えハンドル。Pencil V5 の `K65Uhe`。★V5 で75回。
  *
  * **行の先頭に置く。** 右の操作列に混ぜない。
+ *
+ * 中身は共通の並び替え部品（./reorder-handle）の `icon` の見た目。
+ * 新しい画面は ReorderHandle と useReorder を直接使う（ドラッグ・上下キー・「…」を1つにする）。
  */
 export function DragHandle({ label = '並び替える', ...rest }: Base & { label?: string }) {
-  return (
-    <IconButton label={label} grip {...rest}>
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-        <circle cx="9" cy="6" r="1.6" />
-        <circle cx="15" cy="6" r="1.6" />
-        <circle cx="9" cy="12" r="1.6" />
-        <circle cx="15" cy="12" r="1.6" />
-        <circle cx="9" cy="18" r="1.6" />
-        <circle cx="15" cy="18" r="1.6" />
-      </svg>
-    </IconButton>
-  )
+  return <ReorderHandle look="icon" label={label} ariaLabel={label} title={label} {...rest} />
 }
 
 /**
@@ -59,11 +54,11 @@ export function DragHandle({ label = '並び替える', ...rest }: Base & { labe
  */
 export function DeleteAction({ label = '削除する', ...rest }: Base & { label?: string }) {
   return (
-    <IconButton label={label} tone="danger" {...rest}>
+    <RowIconButton label={label} tone="danger" {...rest}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
         <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-    </IconButton>
+    </RowIconButton>
   )
 }
 
@@ -72,13 +67,124 @@ export function DeleteAction({ label = '削除する', ...rest }: Base & { label
  */
 export function MoreAction({ label = 'そのほかの操作', buttonRef, ...rest }: Base & { label?: string; buttonRef?: RefObject<HTMLButtonElement | null> }) {
   return (
-    <IconButton label={label} buttonRef={buttonRef} {...rest}>
+    <RowIconButton label={label} buttonRef={buttonRef} {...rest}>
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
         <circle cx="5" cy="12" r="1.8" />
         <circle cx="12" cy="12" r="1.8" />
         <circle cx="19" cy="12" r="1.8" />
       </svg>
-    </IconButton>
+    </RowIconButton>
+  )
+}
+
+/* ------------------------------------------------------------- 「…」 */
+
+/**
+ * 危ない操作（tone: 'danger'）を最後へ集め、最初の1つの前に区切りを入れる。
+ * 「危険な操作は赤字で区切りの下」は部品の中で決める（画面ごとに並べない）。
+ */
+export function orderRowMenuItems(items: ActionMenuItem[]): ActionMenuItem[] {
+  const safe = items.filter((item) => item.tone !== 'danger')
+  const danger = items.filter((item) => item.tone === 'danger')
+  return [
+    ...safe,
+    ...danger.map((item, index) => ({ ...item, dividerBefore: index === 0 ? safe.length > 0 : false })),
+  ]
+}
+
+type RowMenuTriggerProps = Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  'aria-expanded' | 'aria-haspopup' | 'aria-label' | 'children' | 'className' | 'onClick' | 'type'
+> & {
+  [key: `data-${string}`]: string | undefined
+}
+
+export type RowMenuProps = {
+  /** 「…」の中の項目。危ない操作（tone: 'danger'）は部品が最後・区切りの下へ回す。 */
+  items: ActionMenuItem[]
+  /** 「…」ボタンの読み上げ名（例：「春のセールの操作」）。 */
+  label: string
+  /** メニューの読み上げ名。省略時は label。 */
+  menuLabel?: string
+  /** メニューの下に出す補足（例：閲覧専用の理由）。 */
+  note?: string
+  /**
+   * 開いているか（画面が持つとき）。右クリックの ContextMenu と同じ行の
+   * 「…」を1つの状態で開け閉めするときなどに渡す。渡さなければ部品が持つ。
+   */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /**
+   * 見た目。'box' は ★V8 の行の「…」（KspUx の印ボタン＋横の3点）。
+   * 'plain' は枠の無い V5 の「…」（RowActions・v7 の一覧）。
+   */
+  appearance?: 'box' | 'plain'
+  /** 「…」ボタンの大きさなど、画面の絵に合わせる class。 */
+  className?: string
+  /** 「…」ボタンの title。省略時は label。 */
+  title?: string
+  /** 「…」ボタンへ渡す追加属性（撮影入口の data-qa-open・disabled など）。 */
+  triggerProps?: RowMenuTriggerProps
+}
+
+/**
+ * 行の右端の「…」（★V8 hnuY9 その他操作メニュー）。全部の画面がこれを使う。
+ *
+ * 部品の中で決めていること：
+ * - 押した「…」から開く（位置の基準は押したボタン。下に場所が無ければ上へ）
+ * - Esc・外を押す・Tab で閉じ、閉じたら「…」へ戻る。矢印・Home・End で項目を移る
+ * - 「…」と項目の押下は行（tr の詳細へ行く押下など）へ伝えない
+ * - 危ない操作は赤字で、区切りの下・最後
+ */
+export function RowMenu({
+  items,
+  label,
+  menuLabel,
+  note,
+  open: openProp,
+  onOpenChange,
+  appearance = 'box',
+  className,
+  title,
+  triggerProps,
+}: RowMenuProps) {
+  const [openState, setOpenState] = useState(false)
+  const open = openProp ?? openState
+  const setOpen = (next: boolean) => {
+    if (openProp === undefined) setOpenState(next)
+    onOpenChange?.(next)
+  }
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  if (items.length === 0) return null
+  const toggle = (event: MouseEvent<HTMLButtonElement>) => {
+    /* R13: 「…」自体の押下も行の詳細遷移へ伝えない。 */
+    event.stopPropagation()
+    setOpen(!open)
+  }
+  const common = {
+    ...triggerProps,
+    'aria-haspopup': 'menu' as const,
+    'aria-expanded': open,
+    onClick: toggle,
+  }
+  return (
+    <>
+      {appearance === 'plain' ? (
+        <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} />
+      ) : (
+        <IconButton {...common} ref={triggerRef} aria-label={label} title={title ?? label} className={className} data-row-menu="">
+          <MoreHorizontal size={16} aria-hidden="true" />
+        </IconButton>
+      )}
+      <ActionMenu
+        open={open}
+        ariaLabel={menuLabel ?? label}
+        onClose={() => setOpen(false)}
+        items={orderRowMenuItems(items)}
+        note={note}
+        anchorRef={triggerRef}
+      />
+    </>
   )
 }
 
@@ -155,34 +261,22 @@ export function RowActions({
   menuButtonProps,
   className,
 }: RowActionsProps) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const moreRef = useRef<HTMLButtonElement>(null)
   const items: ActionMenuItem[] = destructiveItem
-    ? [...menuItems, { ...destructiveItem, tone: 'danger', dividerBefore: menuItems.length > 0 }]
+    ? [...menuItems, { ...destructiveItem, tone: 'danger' }]
     : menuItems
   return (
     <span className={[styles.rowActions, className].filter(Boolean).join(' ')}>
       {detail ? <RowActionButton action={detail} defaultLabel="詳細" /> : null}
       {edit ? <RowActionButton action={edit} defaultLabel="編集" /> : null}
       {items.length > 0 ? (
-        <>
-          <MoreAction
-            {...menuButtonProps}
-            buttonRef={moreRef}
-            label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
-            aria-expanded={menuOpen}
-            /* R13: 「…」自体の押下も行の詳細遷移へ伝えない。 */
-            onClick={(event) => { event.stopPropagation(); setMenuOpen((open) => !open) }}
-          />
-          <ActionMenu
-            open={menuOpen}
-            ariaLabel={subjectName ? `${subjectName}の操作` : '操作'}
-            onClose={() => setMenuOpen(false)}
-            items={items}
-            note={menuNote}
-            anchorRef={moreRef}
-          />
-        </>
+        <RowMenu
+          appearance="plain"
+          items={items}
+          label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
+          menuLabel={subjectName ? `${subjectName}の操作` : '操作'}
+          note={menuNote}
+          triggerProps={menuButtonProps}
+        />
       ) : (
         /*
          * 「⋯」が無い行（送信済みなど）でも同じ幅の場所を取る。

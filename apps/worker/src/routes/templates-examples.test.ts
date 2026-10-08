@@ -75,6 +75,18 @@ describe('F5 見本4件', () => {
     expect(mocks.getTemplateById).not.toHaveBeenCalled();
   });
 
+  it('各見本に内容に対応する種類を返す', async () => {
+    const res = await app().request('/api/templates/examples', {}, bindings);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Array<{ id: string; messageType: string }> };
+    expect(body.data.map(({ id, messageType }) => ({ id, messageType }))).toEqual([
+      { id: 'template-example-business-hours', messageType: 'text' },
+      { id: 'template-example-campaign', messageType: 'rich_message' },
+      { id: 'template-example-booking', messageType: 'text' },
+      { id: 'template-example-thanks-coupon', messageType: 'coupon' },
+    ]);
+  });
+
   it('固定routeが/:idより先で、examplesをID扱いしない', async () => {
     mocks.getTemplateById.mockResolvedValue(null);
     const res = await app().request('/api/templates/examples', {}, bindings);

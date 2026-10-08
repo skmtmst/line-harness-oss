@@ -348,6 +348,7 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['GET', '/api/capabilities'],
   ['GET', '/api/line-accounts'],
   ['GET', '/api/line-accounts/summary'],
+  ['GET', '/api/line-account-folders'],
   // 殻の表示に要る最小boolean。管理用の機能設定GETは owner/admin 専用。
   ['GET', '/api/settings/features/visibility'],
   // 共通アップローダ。受信箱の 1 対 1 返信など staff の付与機能から使う。

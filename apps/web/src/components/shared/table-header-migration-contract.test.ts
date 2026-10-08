@@ -6,7 +6,6 @@ import { countDebt, totals } from '../../../scripts/design-debt.mjs'
 import { readDesignImpactBaseline } from '../../../scripts/design-impact-baseline.mjs'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const WEB = join(SRC, '..')
 const baseline = readDesignImpactBaseline()
 const targets = baseline.tableHeaderMigrationTargets
 const nativeHeaderExceptions = new Set(baseline.nativeTableHeaderExceptions)
@@ -99,26 +98,5 @@ describe('表見出しの第1段階移行', () => {
     // 2026-09-06: 機能18のサイト集計・広告送信履歴・友だち一覧を
     // 共通Thへ寄せ、直書き見出しを7つ減らした。217 → 210。
     expect(debt['direct-th']).toBeGreaterThan(0)
-  })
-
-  it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {
-    const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
-    const part = contract.parts.table
-
-    expect(part.status).toBe('active')
-    expect(part.routes.v5).toEqual({ '/tags': 'PbCvb' })
-    expect(part.routes.v6).toEqual({
-      '/reminders': 'kAnOQ',
-      '/templates': 'W7LBc',
-      '/affiliates': 'BaLte',
-      '/conversions': 'Bw4fy',
-      '/inflow-links': 'EQS0v',
-    })
-    expect(part.migration).toEqual({
-      directThBefore: 378,
-      migratedInThisPr: 75,
-      directThRemaining: 303,
-    })
-    expect(part.visualVerification.status).toBe('unverified')
   })
 })

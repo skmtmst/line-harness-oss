@@ -162,3 +162,27 @@ describe('V8-B プールを作る（D0AOyx）', () => {
     expect(v8tsx).not.toContain('準備中')
   })
 })
+
+it('未保存の入力があればキャンセル前に確認し、編集を続けると入力を残す', async () => {
+  window.history.replaceState(null, '', '/pools/new')
+  await renderV8()
+  await setInput('#pl-name', '入力途中のプール')
+  const cancel = [...document.querySelectorAll('a')].find(a => a.textContent === 'キャンセル')!
+  await act(async () => { cancel.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })) })
+  await flush()
+  expect(document.body.textContent).toContain('保存せずに移る')
+  const stay = [...document.querySelectorAll('button')].find(b => b.textContent === '編集を続ける')!
+  await act(async () => stay.click())
+  expect((document.querySelector('#pl-name') as HTMLInputElement).value).toBe('入力途中のプール')
+  expect(routerPush).not.toHaveBeenCalled()
+})
+it('保存成功後は離脱確認を解除して一覧へ進む', async () => {
+  poolsCreate.mockResolvedValue({ success: true, data: { id: 'p1' } })
+  await renderV8()
+  await setInput('#pl-name', '渋谷'); await setInput('#pl-slug', 'shibuya')
+  await act(async () => { (document.querySelector('button[form="pool-create-form"]') as HTMLButtonElement).click() })
+  expect(routerPush).toHaveBeenCalledTimes(1)
+  const event = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(event)
+  expect(event.defaultPrevented).toBe(false)
+})

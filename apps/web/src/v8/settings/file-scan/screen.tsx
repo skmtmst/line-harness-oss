@@ -8,10 +8,10 @@
  * 行の右端は「使えるように戻す」＋「…」（中の「削除する」）。
  */
 import { useState } from 'react'
-import { Info, MoreHorizontal, Pencil, RotateCcw, Trash2 } from 'lucide-react'
+import { Info, Pencil, RotateCcw, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import SearchField from '@/components/shared/search-field'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -265,20 +265,12 @@ export default function FileScanScreen() {
                   ) : null}
                   {item.status === 'quarantined' || item.status === 'rejected' ? (
                     <span className={styles.menuBox}>
-                      <IconButton
+                      <RowMenu
                         className={styles.more}
-                        title={`${item.filename}のその他操作`}
-                        aria-label={`${item.filename}のその他操作`}
-                        aria-expanded={openMenuId === item.id}
-                        onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
-                      >
-                        <MoreHorizontal size={16} aria-hidden="true" />
-                      </IconButton>
-                      <ActionMenu
-                        open={openMenuId === item.id}
-                        onClose={() => setOpenMenuId(null)}
-                        ariaLabel={`${item.filename}のその他操作`}
+                        label={`${item.filename}のその他操作`}
                         items={menuItems(item)}
+                        open={openMenuId === item.id}
+                        onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                       />
                     </span>
                   ) : (

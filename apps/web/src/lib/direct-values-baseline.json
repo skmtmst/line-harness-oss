@@ -59,11 +59,6 @@
     "radius": 0,
     "shadow": 0
   },
-  "app/visual-qa/v7-progress-filedrop/page.tsx": {
-    "color": 1,
-    "radius": 0,
-    "shadow": 0
-  },
   "app/visual-qa/v8-parts/page.tsx": {
     "color": 2,
     "radius": 0,
@@ -83,11 +78,6 @@
     "color": 6,
     "radius": 2,
     "shadow": 1
-  },
-  "components/friend-attributes-v2/tag-list-v2.tsx": {
-    "color": 7,
-    "radius": 0,
-    "shadow": 0
   },
   "components/friend-fields/support-mark-editor.tsx": {
     "color": 6,

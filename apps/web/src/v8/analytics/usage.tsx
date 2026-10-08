@@ -8,12 +8,11 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Boxes, Clock, LayoutGrid, MoreHorizontal, RefreshCw, Zap } from 'lucide-react'
+import { Boxes, Clock, LayoutGrid, RefreshCw, Zap } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -51,11 +50,9 @@ function referenceHealthText(metric: AnalyticsMetric<number>): string {
 const canTidyUsage = (item: Category) => item.unused.value !== null && item.unused.value > 0
 
 function TidyMenu({ item }: { item: Category }) {
-  const [open, setOpen] = useState(false)
   const router = useRouter()
   return <span className={styles.rowMenu}>
-    <IconButton className={styles.rowMenuButton} aria-label={`${item.label}の操作`} aria-expanded={open} onClick={() => setOpen((value) => !value)}><MoreHorizontal size={16} aria-hidden="true" /></IconButton>
-    <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel={`${item.label}の操作`} items={[{ id: 'tidy', label: '片づける', onSelect: () => router.push(item.href) }]} />
+    <RowMenu className={styles.rowMenuButton} label={`${item.label}の操作`} items={[{ id: 'tidy', label: '片づける', onSelect: () => router.push(item.href) }]} />
   </span>
 }
 

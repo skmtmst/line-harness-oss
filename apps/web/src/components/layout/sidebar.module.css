@@ -414,6 +414,9 @@
 /* 外側の絵は展開16px・畳んだ18px。組の境目は1pxの線を置く。 */
 [data-theme="v8"] .item { line-height: 21px; }
 [data-theme="v8"] .item > svg { width: 16px; height: 16px; flex-shrink: 0; }
+/* 絵の印は 16（lucide）。v7 の線画（18）には当てない。 */
+[data-theme="v8"] .v8NavIcon { display: block; width: var(--tpl-nav-icon); height: var(--tpl-nav-icon); }
+[data-theme="v8"] [data-collapsed] .v8NavIcon { width: var(--tpl-nav-icon-rail); height: var(--tpl-nav-icon-rail); }
 [data-theme="v8"] [data-collapsed] .item > svg { width: 18px; height: 18px; }
 [data-theme="v8"] .section + .section { margin-top: 1px; }
 [data-theme="v8"] [data-collapsed] .section + .section::before {

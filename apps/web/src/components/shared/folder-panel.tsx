@@ -3,7 +3,8 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
-import { Ellipsis, FolderOpen, FolderPlus } from 'lucide-react'
+import { ArrowDown, ArrowUp, Ellipsis, FolderOpen, FolderPlus, Palette, Pencil, Trash2 } from 'lucide-react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import styles from './folder-panel.module.css'
 
 /** テンプレート一覧を正とする、全画面共通のフォルダ欄幅。 */
@@ -49,6 +50,8 @@ export interface FolderPanelRow {
    * 直したいときに作り直すしかなかった。
    */
   onEdit?: () => void
+  /** 色を持たないフォルダ（統括のひな形の分類など）は false。「色を変える」を出さない。 */
+  colorEditable?: boolean
   /**
    * 並び順を動かす。**端の行には渡さない**（押せない口を置かない）。
    * 設計 `CzndJ` の「並び順を上へ／下へ」。
@@ -77,24 +80,36 @@ export interface FolderPanelRow {
 function folderMenuItems(
   row: FolderPanelRow,
   runAction: (action: (() => void) | undefined) => void,
+  v8 = false,
 ): ActionMenuItem[] {
+  /*
+   * ★V8（V8.pen 共通部品4 の H・nH0fZ、B-35 2026-10-08）：言葉は 名前を変える・色を変える・並べ替える・消す。
+   * 印を左に付ける。並べ替えは隣と入れ替える口なので、上へ・下へを括弧で添える。v7 は今までの言葉のまま。
+   */
+  const label = v8
+    ? { rename: '名前を変える', color: '色を変える', up: '並べ替える（上へ）', down: '並べ替える（下へ）', remove: '消す' }
+    : { rename: '名前を変更', color: '色を変える', up: '並び順を上へ', down: '並び順を下へ', remove: 'フォルダを削除' }
+  const icon = (node: ReactNode) => (v8 ? node : undefined)
   const items: ActionMenuItem[] = []
   if (row.onEdit) {
     items.push(
-      { id: `${row.id}-rename`, label: '名前を変更', onSelect: () => runAction(row.onEdit) },
-      { id: `${row.id}-color`, label: '色を変える', onSelect: () => runAction(row.onEdit) },
+      { id: `${row.id}-rename`, label: label.rename, icon: icon(<Pencil size={14} aria-hidden="true" />), onSelect: () => runAction(row.onEdit) },
     )
+    if (row.colorEditable !== false) {
+      items.push({ id: `${row.id}-color`, label: label.color, icon: icon(<Palette size={14} aria-hidden="true" />), onSelect: () => runAction(row.onEdit) })
+    }
   }
   if (row.onMoveUp) {
-    items.push({ id: `${row.id}-up`, label: '並び順を上へ', onSelect: () => runAction(row.onMoveUp) })
+    items.push({ id: `${row.id}-up`, label: label.up, icon: icon(<ArrowUp size={14} aria-hidden="true" />), onSelect: () => runAction(row.onMoveUp) })
   }
   if (row.onMoveDown) {
-    items.push({ id: `${row.id}-down`, label: '並び順を下へ', onSelect: () => runAction(row.onMoveDown) })
+    items.push({ id: `${row.id}-down`, label: label.down, icon: icon(<ArrowDown size={14} aria-hidden="true" />), onSelect: () => runAction(row.onMoveDown) })
   }
   if (row.onDelete) {
     items.push({
       id: `${row.id}-delete`,
-      label: 'フォルダを削除',
+      label: label.remove,
+      icon: icon(<Trash2 size={14} aria-hidden="true" />),
       tone: 'danger',
       dividerBefore: items.length > 0,
       onSelect: () => runAction(row.onDelete),
@@ -141,6 +156,7 @@ export default function FolderPanel({
   children?: ReactNode
 }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const v8 = useAdminTheme() === 'v8'
   const runAction = (action: (() => void) | undefined) => {
     setOpenMenuId(null)
     action?.()
@@ -239,8 +255,8 @@ export default function FolderPanel({
                     open={openMenuId === row.id}
                     onClose={() => setOpenMenuId(null)}
                     ariaLabel={`フォルダ「${row.label}」の操作`}
-                    note={row.deleteNote}
-                    items={folderMenuItems(row, runAction)}
+                    note={v8 ? undefined : row.deleteNote}
+                    items={folderMenuItems(row, runAction, v8)}
                   />
                 </div>
               )}

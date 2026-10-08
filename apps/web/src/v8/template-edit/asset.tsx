@@ -21,6 +21,7 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu from '@/components/shared/action-menu'
+import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import Combobox from '@/components/shared/combobox'
 import DateTimeField from '@/components/shared/date-time-field'
 import LinePreview from '@/components/shared/line-preview'
@@ -33,6 +34,7 @@ import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
 import { TemplateEditFrame } from './frame'
+import type { TemplateEditHost } from './host'
 import MediaPickerDialog from './media-picker'
 import styles from './edit.module.css'
 
@@ -60,6 +62,33 @@ const visualQuestions = (): ResearchQuestion[] => [
   { key: 'vq-3', text: '改善してほしいところがあれば教えてください', format: 'free', required: false, choices: [] },
 ]
 
+/** 保存してある payload（クーポン・リサーチ）を欄の値に戻す。統括の編集で使う（host.initialContent）。 */
+export function assetInitial(payload: Record<string, unknown>) {
+  const str = (value: unknown) => (typeof value === 'string' ? value : '')
+  const num = (value: unknown, fallback: string) => (typeof value === 'number' && Number.isFinite(value) ? String(value) : fallback)
+  const questions = Array.isArray(payload.questions)
+    ? payload.questions.flatMap((item): ResearchQuestion[] => {
+      if (!item || typeof item !== 'object') return []
+      const q = item as Record<string, unknown>
+      const format: ResearchFormat = q.format === 'multiple' || q.format === 'free' ? q.format : 'single'
+      return [{ key: crypto.randomUUID(), text: str(q.text), format, required: q.required !== false, choices: Array.isArray(q.choices) ? q.choices.map(str) : [] }]
+    })
+    : []
+  return {
+    description: str(payload.description),
+    couponTitle: str(payload.title),
+    imageUrl: str(payload.imageUrl),
+    couponOnce: payload.oncePerFriend === false ? 'unlimited' as const : 'once' as const,
+    couponVisibility: payload.visibility === 'link' ? 'link' as const : 'friends' as const,
+    lottery: payload.lottery === true,
+    lotteryRate: num(payload.lotteryRate, '20'),
+    winnerLimit: num(payload.winnerLimit, '500'),
+    startsAt: str(payload.startsAt),
+    endsAt: str(payload.endsAt),
+    questions,
+  }
+}
+
 /** `2026-08-01T00:00` → `8/1`（見本の札に出す短い日付）。 */
 function shortDate(value: string): string {
   const m = /^\d{4}-(\d{2})-(\d{2})/.exec(value)
@@ -71,39 +100,45 @@ export function couponPeriodLine(startsAt: string, endsAt: string, once: boolean
   return `${period}・${once ? '1人1回' : '何回でも'}`
 }
 
-export default function TemplateAssetEditor({ kind, visual = false }: { kind: AssetKind; visual?: boolean }) {
+/**
+ * `host` を渡すと、統括のテンプレートの入口から同じ画面を使う（host.ts）。保存は呼ぶ側、主ボタンは［保存して配る］、
+ * 店のアカウントに結びつく欄（登録メディア・行うこと・答えてもらう人）は出さない。
+ */
+export default function TemplateAssetEditor({ kind, visual = false, host }: { kind: AssetKind; visual?: boolean; host?: TemplateEditHost }) {
   const meta = META[kind]
   const router = useRouter()
   const role = useStaffRole()
-  const canMutate = role === null || canManageRole(role)
+  const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
   const { selectedAccountId, accounts } = useAccount()
-  usePageTitle(meta.heading)
+  usePageTitle(host ? 'テンプレート' : meta.heading)
   const actionOptions = useActionOptions()
 
-  const [name, setName] = useState(visual ? (kind === 'coupon' ? '夏の20%オフ' : '定期便のご満足度') : '')
+  /* 統括の編集：保存してある payload から欄を埋める（同じ形で保存し直す）。 */
+  const init = host?.initialContent && host.initialContent.kind === kind && 'payload' in host.initialContent ? { name: host.initialContent.name, ...assetInitial(host.initialContent.payload) } : null
+  const [name, setName] = useState(init ? init.name : visual ? (kind === 'coupon' ? '夏の20%オフ' : '定期便のご満足度') : '')
   const [folder, setFolder] = useState(visual ? meta.folder : '')
   const [folders, setFolders] = useState<Folder[]>([])
-  const [description, setDescription] = useState(visual ? (kind === 'coupon' ? '会計時にこの画面をご提示ください。他の割引との併用はできません。' : 'いつもありがとうございます。3問だけ聞かせてください。') : '')
+  const [description, setDescription] = useState(init ? init.description : visual ? (kind === 'coupon' ? '会計時にこの画面をご提示ください。他の割引との併用はできません。' : 'いつもありがとうございます。3問だけ聞かせてください。') : '')
   // クーポン
-  const [couponTitle, setCouponTitle] = useState(visual && kind === 'coupon' ? '夏の20%オフ' : '')
-  const [imageUrl, setImageUrl] = useState('')
+  const [couponTitle, setCouponTitle] = useState(init ? init.couponTitle : visual && kind === 'coupon' ? '夏の20%オフ' : '')
+  const [imageUrl, setImageUrl] = useState(init ? init.imageUrl : '')
   const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(null)
   const [imageOpen, setImageOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [couponOnce, setCouponOnce] = useState<'once' | 'unlimited'>('once')
-  const [couponVisibility, setCouponVisibility] = useState<'friends' | 'link'>('friends')
-  const [lottery, setLottery] = useState(false)
-  const [lotteryRate, setLotteryRate] = useState('20')
-  const [winnerLimit, setWinnerLimit] = useState('500')
-  const [couponStartsAt, setCouponStartsAt] = useState(visual ? '2026-08-01T00:00' : '')
-  const [couponEndsAt, setCouponEndsAt] = useState(visual ? '2026-08-31T23:59' : '')
+  const [couponOnce, setCouponOnce] = useState<'once' | 'unlimited'>(init ? init.couponOnce : 'once')
+  const [couponVisibility, setCouponVisibility] = useState<'friends' | 'link'>(init ? init.couponVisibility : 'friends')
+  const [lottery, setLottery] = useState(init ? init.lottery : false)
+  const [lotteryRate, setLotteryRate] = useState(init ? init.lotteryRate : '20')
+  const [winnerLimit, setWinnerLimit] = useState(init ? init.winnerLimit : '500')
+  const [couponStartsAt, setCouponStartsAt] = useState(init ? init.startsAt : visual ? '2026-08-01T00:00' : '')
+  const [couponEndsAt, setCouponEndsAt] = useState(init ? init.endsAt : visual ? '2026-08-31T23:59' : '')
   const [couponUseActions, setCouponUseActions] = useState<InlineAction[]>([])
   // リサーチ
-  const [researchStartsAt, setResearchStartsAt] = useState(visual ? '2026-10-01T10:00' : '')
-  const [researchEndsAt, setResearchEndsAt] = useState(visual ? '2026-10-15T23:59' : '')
+  const [researchStartsAt, setResearchStartsAt] = useState(init ? init.startsAt : visual ? '2026-10-01T10:00' : '')
+  const [researchEndsAt, setResearchEndsAt] = useState(init ? init.endsAt : visual ? '2026-10-15T23:59' : '')
   const [targetTagId, setTargetTagId] = useState('')
-  const [questions, setQuestions] = useState<ResearchQuestion[]>(() => (visual ? visualQuestions() : [newQuestion()]))
+  const [questions, setQuestions] = useState<ResearchQuestion[]>(() => (init?.questions.length ? init.questions : visual ? visualQuestions() : [newQuestion()]))
   const [answerActions, setAnswerActions] = useState<InlineAction[]>([])
   const [orderMenu, setOrderMenu] = useState<string | null>(null)
   const orderAnchor = useRef<HTMLButtonElement | null>(null)
@@ -114,14 +149,17 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
+    if (host) return
     setPickedMedia(null)
     setImageUrl('')
+    // 統括では上のバーのアカウントに結びつかない（編集で読み込んだ画像を消さない）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
 
   /* フォルダはアカウントの置き場一覧から選ぶ（保存値はフォルダ名のまま。今と同じ）。 */
   useEffect(() => {
     setFolders([])
-    if (!selectedAccountId) return
+    if (!selectedAccountId || host) return
     let cancelled = false
     void api.folders.list('template', selectedAccountId)
       .then((res) => { if (!cancelled && res.success) setFolders(res.data) })
@@ -139,14 +177,20 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
 
   const updateQuestion = (index: number, patch: Partial<ResearchQuestion>) =>
     setQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)))
-  const moveQuestion = (index: number, delta: -1 | 1) =>
-    setQuestions((prev) => {
-      const to = index + delta
-      if (to < 0 || to >= prev.length) return prev
-      const next = [...prev]
-      ;[next[index], next[to]] = [next[to], next[index]]
-      return next
-    })
+  /*
+   * 質問の並べ替え（共通の並び替え）。つまみのドラッグ・上下キー・つまみを押して出る
+   * 「上へ／下へ」は同じ入口を通る（押して出す並べ替えは、ドラッグできない人の代わりの操作）。
+   */
+  const questionOrder = useReorder({
+    items: questions,
+    idOf: (question) => question.key,
+    disabledReason: questions.length < 2 ? '質問が1つのときは並び替えできません' : null,
+    onReorder: ({ ids }) => setQuestions((prev) => {
+      const byKey = new Map(prev.map((q) => [q.key, q]))
+      const next = ids.map((key) => byKey.get(key)).filter((q): q is ResearchQuestion => Boolean(q))
+      return next.length === prev.length ? next : prev
+    }),
+  })
 
   /** 保存値を組み立てる。足りないときは理由を返す（今の画面と同じ決まり）。 */
   const buildPayload = (): { payload: Record<string, unknown> } | { error: string } => {
@@ -202,6 +246,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
   }
 
   const save = async (): Promise<boolean> => {
+    if (host) return false
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
     if (!name.trim()) { setError(`${meta.title}名を入力してください。`); return false }
     const built = buildPayload()
@@ -230,10 +275,22 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
     }
   }
 
+  /* 統括の入口：中身を組み立てて呼ぶ側へ渡す（保存・配る・失敗の知らせは呼ぶ側）。 */
+  const hostSave = (distribute: boolean) => {
+    if (!host) return
+    if (!name.trim()) { setError(`${meta.title}名を入力してください。`); return }
+    const built = buildPayload()
+    if ('error' in built) { setError(built.error); return }
+    setError('')
+    setClean(snapshot)
+    host.onSave({ kind, name: name.trim(), payload: built.payload }, distribute)
+  }
   const onSaveDraft = async () => {
+    if (host) { hostSave(false); return }
     if (await save()) notifyToast('下書きを保存しました')
   }
   const onPublish = async () => {
+    if (host) { hostSave(true); return }
     setPublishing(true)
     try {
       if (await save()) {
@@ -245,9 +302,9 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
     }
   }
 
-  const sendName = accounts.find((account) => account.id === selectedAccountId)?.name ?? '公式アカウント'
+  const sendName = host ? '公式アカウント' : accounts.find((account) => account.id === selectedAccountId)?.name ?? '公式アカウント'
   const blocked = saved ? '保存しました。一覧へ戻ってください。' : null
-  const busy = saving || publishing
+  const busy = saving || publishing || Boolean(host?.busy)
   const imageSet = /^https?:\/\//.test(imageUrl.trim())
 
   const sideCard = kind === 'coupon' ? (
@@ -330,9 +387,9 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
           <Select
             id={`te-${kind}-folder`}
             aria-label="フォルダ"
-            value={folder}
-            onChange={setFolder}
-            options={[{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.name, label: f.name }))]}
+            value={host ? host.folder : folder}
+            onChange={host ? host.onFolderChange : setFolder}
+            options={host ? [{ value: '', label: '未分類' }, ...host.folders] : [{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.name, label: f.name }))]}
           />
         </div>
       </div>
@@ -345,6 +402,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         boardId={meta.board}
         title={meta.heading}
         description={meta.lead}
+        backHref={host?.backHref}
         side={(
           <>
             <div className={styles.previewToggle}>
@@ -357,17 +415,18 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         )}
         footerActions={(
           <>
-            <Button href="/templates">キャンセル</Button>
+            {host ? <Button type="button" onClick={host.onCancel}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={saving && !publishing} busyLabel="保存中…">
               下書きを保存
             </Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={publishing} busyLabel="保存中…">
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
               <Send size={15} aria-hidden="true" />
-              保存して公開
+              {host ? host.primaryLabel ?? '保存して配る' : '保存して公開'}
             </Button>
           </>
         )}
       >
+        {host?.notice}
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
         {saved ? <p role="status" className={styles.readonly}>保存しました。一覧へ戻ると、{meta.title}の一覧に出ています。</p> : null}
         {nameCard}
@@ -461,12 +520,14 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               )}
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>使われたときに行うこと</h2>
-              </div>
-              <InlineActionRowsV8 actions={couponUseActions} onChange={setCouponUseActions} {...actionOptions} />
-            </Card>
+            {host ? null : (
+              <Card padding="none" layout="vertical" className={styles.card}>
+                <div className={styles.cardHead}>
+                  <h2 className={styles.cardTitle}>使われたときに行うこと</h2>
+                </div>
+                <InlineActionRowsV8 actions={couponUseActions} onChange={setCouponUseActions} {...actionOptions} />
+              </Card>
+            )}
           </>
         ) : (
           <>
@@ -495,20 +556,22 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>質問（上から順に出ます）</h2>
               </div>
-              {questions.map((question, index) => (
-                <section key={question.key} className={styles.question} aria-label={`問 ${index + 1}`}>
+              {questionOrder.shown.map((question, index) => (
+                <section key={question.key} className={styles.question} aria-label={`問 ${index + 1}`} {...questionOrder.rowProps(question.key)}>
                   <div className={styles.toggleRow}>
-                    <button
-                      type="button"
+                    <ReorderHandle
+                      look="bare"
                       className={styles.grip}
-                      aria-label={`問 ${index + 1} の並びを変える`}
+                      label={`問 ${index + 1}`}
+                      ariaLabel={`問 ${index + 1} の並びを変える。ドラッグ・上下キー・押して上へ／下へ`}
                       aria-haspopup="menu"
                       aria-expanded={orderMenu === question.key}
-                      disabled={questions.length < 2}
                       onClick={(event) => { orderAnchor.current = event.currentTarget; setOrderMenu(orderMenu === question.key ? null : question.key) }}
+                      {...questionOrder.handle(question.key)}
+                      {...questionOrder.handleProps(question.key)}
                     >
                       <GripVertical size={14} aria-hidden="true" />
-                    </button>
+                    </ReorderHandle>
                     <span className={styles.questionNo}>問 {index + 1}</span>
                     <span className={styles.spacer} />
                     <span className={styles.toggleLabelSmall}>必ず答えてもらう</span>
@@ -583,6 +646,8 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               </div>
             </Card>
 
+            {host ? null : (
+            <>
             <Card padding="none" layout="vertical" className={styles.card}>
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>答え終わったときに行うこと</h2>
@@ -603,6 +668,8 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                 options={actionOptions.tags.map((tag) => ({ value: tag.id, label: tag.name }))}
               />
             </Card>
+            </>
+            )}
           </>
         )}
       </TemplateEditFrame>
@@ -612,13 +679,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         anchorRef={orderAnchor}
         ariaLabel="質問の並びを変える"
         onClose={() => setOrderMenu(null)}
-        items={(() => {
-          const index = questions.findIndex((q) => q.key === orderMenu)
-          return [
-            { id: 'up', label: '上へ', disabled: index <= 0, onSelect: () => { moveQuestion(index, -1); setOrderMenu(null) } },
-            { id: 'down', label: '下へ', disabled: index < 0 || index >= questions.length - 1, onSelect: () => { moveQuestion(index, 1); setOrderMenu(null) } },
-          ]
-        })()}
+        items={orderMenu ? questionOrder.menuItems(orderMenu, () => setOrderMenu(null)).map((item) => ({ ...item, id: item.id === 'move-up' ? 'up' : 'down', disabledReason: undefined })) : []}
       />
 
       <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
@@ -633,7 +694,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         onCancel={() => setImageOpen(false)}
       >
         <div className={styles.imageDialog}>
-          <Button type="button" onClick={() => setPickerOpen(true)}>登録メディアから選ぶ</Button>
+          {host ? null : <Button type="button" onClick={() => setPickerOpen(true)}>登録メディアから選ぶ</Button>}
           {pickedMedia ? <p className={styles.hint}>選択中：{pickedMedia.filename}</p> : null}
           <TextField
             value={imageUrl}

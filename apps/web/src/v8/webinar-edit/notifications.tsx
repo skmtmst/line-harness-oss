@@ -9,14 +9,13 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { MoreHorizontal, Plus, Send } from 'lucide-react'
+import { Plus, Send } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
-import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
-import IconButton from '@/components/shared/icon-button'
+import { RowMenu } from '@/components/shared/row-actions'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -344,13 +343,10 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
                   <span className={`${styles.rowText} ${styles.afterText}`} title={text}>{text}</span>
                   {readOnly ? null : (
                     <div className={form.menuBox}>
-                      <IconButton aria-label={menuLabel} title={menuLabel} aria-haspopup="menu" aria-expanded={menuOpen === trigger.key} onClick={() => setMenuOpen((current) => (current === trigger.key ? null : trigger.key))}>
-                        <MoreHorizontal size={16} aria-hidden="true" />
-                      </IconButton>
-                      <ActionMenu
+                      <RowMenu
+                        label={menuLabel}
                         open={menuOpen === trigger.key}
-                        onClose={() => setMenuOpen(null)}
-                        ariaLabel={menuLabel}
+                        onOpenChange={(next) => setMenuOpen(next ? trigger.key : null)}
                         items={[{ id: 'edit', label: '動きを変える', onSelect: () => { setMenuOpen(null); setActionsOpen(trigger.key) } }]}
                       />
                     </div>

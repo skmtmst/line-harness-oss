@@ -51,6 +51,7 @@ vi.mock('@/lib/api', () => ({
 vi.mock('@/lib/logout', () => ({ logoutAndGoToLogin: fixture.logout }))
 
 import { SidebarAccountMenu, sidebarAccountRows } from './account-menu'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -131,6 +132,27 @@ describe('★V8 左下の自分とメニュー', () => {
     expect(fixture.clearSelectedAccountId).toHaveBeenCalledTimes(1)
     expect(fixture.push).toHaveBeenCalledWith('/hq')
     await waitFor(() => expect(view.queryByRole('menu')).toBeNull())
+  })
+
+  it('書きかけで統括へ戻ると、アカウント解除と移動を両方確認まで止める', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    function Editor() {
+      const guard = useUnsavedGuard({ dirty: true })
+      return <><SidebarAccountMenu hq={false} />{guard.leaveTarget && <button onClick={guard.confirmLeave}>保存せずに移る</button>}</>
+    }
+    try {
+      const view = render(<Editor />)
+      await act(async () => { await Promise.resolve() })
+      await openMenu(view)
+      fireEvent.click(view.getByRole('menuitem', { name: '統括に戻る' }))
+      expect(fixture.clearSelectedAccountId).not.toHaveBeenCalled()
+      expect(fixture.push).not.toHaveBeenCalled()
+      fireEvent.click(view.getByRole('button', { name: '保存せずに移る' }))
+      expect(fixture.clearSelectedAccountId).toHaveBeenCalledTimes(1)
+      expect(fixture.push).toHaveBeenCalledWith('/hq')
+    } finally {
+      delete document.documentElement.dataset.theme
+    }
   })
 
   it('統括の画面：メンバー／請求／お問い合わせ／ログアウト（統括に戻るは出さない）', async () => {

@@ -7,10 +7,9 @@
  * 呼ぶ口・世代の守り・失敗の言い分け・CSV は今の画面（SavedAnalyticsTab）と同じ。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, MoreHorizontal, Plus } from 'lucide-react'
+import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
@@ -74,11 +73,9 @@ function latestPill(item: SavedAnalyticsSummary) {
 
 /** 定期レポートの行の「…」：内容を変える（作る画面を開く）。 */
 function ScheduleMenu({ schedule }: { schedule: AnalyticsReportSchedule }) {
-  const [open, setOpen] = useState(false)
   const router = useRouter()
   return <span className={styles.rowMenu}>
-    <IconButton className={styles.rowMenuButton} aria-label={`定期レポート「${schedule.name}」の操作`} aria-expanded={open} onClick={() => setOpen((value) => !value)}><MoreHorizontal size={16} aria-hidden="true" /></IconButton>
-    <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel={`定期レポート「${schedule.name}」の操作`} items={[{ id: 'edit', label: '内容を変える', onSelect: () => router.push(`/analytics/reports/new?id=${schedule.id}`) }]} />
+    <RowMenu className={styles.rowMenuButton} label={`定期レポート「${schedule.name}」の操作`} items={[{ id: 'edit', label: '内容を変える', onSelect: () => router.push(`/analytics/reports/new?id=${schedule.id}`) }]} />
   </span>
 }
 

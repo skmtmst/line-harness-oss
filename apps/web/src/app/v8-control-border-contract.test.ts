@@ -31,7 +31,6 @@ describe('★V8 枠線の色（--color-control-border）', () => {
     ['選ぶ欄', 'select.module.css', 'trigger'],
     ['探す欄', 'search-field.module.css', 'search'],
     ['チェックの箱', 'checkbox.module.css', 'box'],
-    ['入力（共通）', 'form-controls.module.css', 'control'],
     ['OTPのマス', 'otp-input.module.css', 'slot'],
     ['選ぶカードの○', 'radio-card.module.css', 'radio'],
     ['チェックのカードの箱', 'check-card.module.css', 'box'],

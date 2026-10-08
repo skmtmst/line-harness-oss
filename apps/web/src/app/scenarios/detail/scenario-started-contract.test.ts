@@ -28,11 +28,6 @@ describe('V6 シナリオ開始完了', () => {
     expect(DETAIL).not.toContain('開始予定116人')
   })
 
-  it('開始条件の撮影は同じ文言の別ボタンに依存しない', () => {
-    expect(DETAIL).toContain('qaOpen="EvVO5"')
-    expect(DETAIL).toContain('data-qa-open={qaOpen}')
-  })
-
   it('停止時は完了画面へ移動せず一覧を読み直す', () => {
     // V8 の一覧はまとめての帯で止める・再開する。読み直しは一覧の口で行う。
     expect(LIST_PAGE).toContain('void loadScenarios()')

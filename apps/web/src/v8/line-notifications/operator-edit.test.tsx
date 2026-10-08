@@ -140,3 +140,27 @@ test('きっかけの写しは正本と同じ（ずれると公開しても届�
   expect(EVENT_OPTIONS).toEqual(OPERATOR_EVENT_OPTIONS)
   for (const option of EVENT_OPTIONS) expect(eventPlaceLabel(option.value)).not.toBe('管理画面')
 })
+
+test('お知らせの公開中は窓の×・Esc・戻って直すを止める', async () => {
+  search.value = ''
+  const previousFetch = globalThis.fetch
+  let resolve!: (value: Response) => void
+  vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith('/publish')
+    ? new Promise<Response>(r => { resolve = r }) : previousFetch(input, init))
+  await render()
+  await act(async () => {
+    const publish = [...host!.querySelectorAll('button')].find(b => b.textContent?.includes('運用者へのお知らせを公開'))!
+    publish.click()
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+  })
+  await act(async () => {
+    const send = [...document.querySelectorAll('button')].find(b => b.textContent?.includes('公開して 2 人'))!
+    send.click()
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+  })
+  const dialog = document.querySelector('[data-design-node="sDXNy"]')!
+  expect(dialog.querySelector('button[aria-label="閉じる"]')?.hasAttribute('disabled')).toBe(true)
+  await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+  expect(document.querySelector('[data-design-node="sDXNy"]')).toBeTruthy()
+  await act(async () => resolve(json({ success: true, data: rule })))
+})

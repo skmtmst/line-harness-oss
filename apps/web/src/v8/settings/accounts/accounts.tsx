@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowUpDown, CircleDot, MoreHorizontal, Plus, Star } from 'lucide-react'
+import { ArrowUpDown, CircleDot, Plus, Star } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -20,13 +20,13 @@ import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import AccountOrdering from '@/components/accounts/account-ordering'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import { TextArea } from '@/components/shared/form-controls'
-import IconButton from '@/components/shared/icon-button'
+import { TextArea } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
@@ -260,19 +260,11 @@ export default function AccountsV8() {
                   </span>
                   <span className={`${styles.colParent} ${parent === '—' ? styles.faint : ''}`} role="cell" title={parent}>{parent}</span>
                   <span className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
-                    <IconButton
-                      aria-label={`${account.name}の操作`}
-                      aria-haspopup="menu"
-                      aria-expanded={openMenuId === account.id}
-                      onClick={() => setOpenMenuId(openMenuId === account.id ? null : account.id)}
-                    >
-                      <MoreHorizontal aria-hidden="true" size={16} />
-                    </IconButton>
-                    <ActionMenu
-                      open={openMenuId === account.id}
-                      onClose={() => setOpenMenuId(null)}
-                      ariaLabel={`${account.name}の操作`}
+                    <RowMenu
+                      label={`${account.name}の操作`}
                       items={menuItems(account)}
+                      open={openMenuId === account.id}
+                      onOpenChange={(next) => setOpenMenuId(next ? account.id : null)}
                     />
                   </span>
                 </div>

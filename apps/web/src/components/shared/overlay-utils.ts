@@ -1,6 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type RefObject } from 'react'
+
+export const OverlayDepthContext = createContext(0)
+const activeOverlays = new Map<object, { depth: number; order: number }>()
+let overlayOrder = 0
+let originalOverflow = ''
 
 const FOCUSABLE = [
   'a[href]',
@@ -22,6 +27,8 @@ export function useOverlayFocus(
    */
   initialFocus?: () => HTMLElement | null,
 ): RefObject<HTMLDivElement | null> {
+  const depth = useContext(OverlayDepthContext)
+  const identity = useRef<object>({})
   const containerRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
   const initialFocusRef = useRef(initialFocus)
@@ -33,6 +40,15 @@ export function useOverlayFocus(
 
   useEffect(() => {
     if (!open) return
+    const key = identity.current
+    const order = ++overlayOrder
+    if (activeOverlays.size === 0) originalOverflow = document.body.style.overflow
+    activeOverlays.set(key, { depth, order })
+    const isTop = () => {
+      if (document.documentElement?.dataset?.theme !== 'v8') return true
+      const top = [...activeOverlays.entries()].sort((a, b) => b[1].depth - a[1].depth || b[1].order - a[1].order)[0]
+      return top?.[0] === key
+    }
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -46,9 +62,12 @@ export function useOverlayFocus(
     const focusable = () =>
       Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
     // 初回フォーカスの予約は cleanup で取消せるようにしておく。
-    const initialFocusFrame = requestAnimationFrame(() => (initialFocusRef.current?.() ?? focusable()[0])?.focus())
+    const initialFocusFrame = requestAnimationFrame(() => {
+      if (isTop()) (initialFocusRef.current?.() ?? focusable()[0])?.focus()
+    })
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (!isTop()) return
       if (event.key === 'Escape' && !closeDisabled) {
         event.preventDefault()
         onCloseRef.current()
@@ -76,10 +95,14 @@ export function useOverlayFocus(
     return () => {
       cancelAnimationFrame(initialFocusFrame)
       document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = previousOverflow
-      previous?.focus()
+      const restoreFocus = isTop()
+      activeOverlays.delete(key)
+      if (document.documentElement?.dataset?.theme !== 'v8' || activeOverlays.size === 0) {
+        document.body.style.overflow = document.documentElement?.dataset?.theme === 'v8' ? originalOverflow : previousOverflow
+      }
+      if (restoreFocus) previous?.focus()
     }
-  }, [closeDisabled, open])
+  }, [closeDisabled, open, depth])
 
   return containerRef
 }
