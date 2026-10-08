@@ -604,6 +604,8 @@ export default function HqHomeV8() {
             setSettingsAccount(null)
           }}
           onShowDetails={() => { setEditingAccount(settingsAccount); setSettingsAccount(null) }}
+          canCreateFolder={canManage}
+          onFolderCreated={() => void loadFolders()}
         />
       ) : null}
       {archiveTarget?.mode === 'archive' ? (

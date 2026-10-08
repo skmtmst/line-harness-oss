@@ -26,7 +26,7 @@ import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import SegmentedControl from '@/components/shared/segmented'
-import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
@@ -563,12 +563,18 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 </div>
                 <div className={`${styles.field} ${styles.folderField}`}>
                   <label htmlFor="te-folder" className={styles.labelSmall}>フォルダ</label>
-                  <Select
+                  <FolderSelect
                     id="te-folder"
                     aria-label="フォルダ"
                     value={host ? host.folder : folderId ?? ''}
                     onChange={host ? host.onFolderChange : (value) => updateDraft({ folderId: value || null })}
-                    options={[{ value: '', label: '未分類' }, ...(host ? host.folders : folders.map((folder) => ({ value: folder.id, label: folder.name })))]}
+                    folders={host ? host.folders : folders.map(folderById)}
+                    colors={!host}
+                    onCreate={host
+                      ? hostFolderCreate(host)
+                      : canMutate && editorAccountId
+                        ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: editorAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
+                        : undefined}
                   />
                 </div>
               </div>

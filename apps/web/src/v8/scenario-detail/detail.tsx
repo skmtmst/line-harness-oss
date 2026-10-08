@@ -122,6 +122,7 @@ import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
 import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
 import Select from '@/components/shared/select'
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import {
   scenarioReachBarWidth,
   scenarioReachCountLabel,
@@ -2972,14 +2973,15 @@ export default function ScenarioDetailV8({
           </label>
           <div className="flex flex-col gap-1">
             <span className="text-ink-secondary text-xs font-semibold">置き場（フォルダ）</span>
-            <Select
+            <FolderSelect
               value={editForm.folderId}
               onChange={(value) => setEditForm({ ...editForm, folderId: value })}
               aria-label="置き場（フォルダ）"
-              options={[
-                { value: '', label: '未分類' },
-                ...folders.map((f) => ({ value: f.id, label: f.name })),
-              ]}
+              folders={folders.map(folderById)}
+              // 一覧の左の列の「フォルダを追加」と同じ口（シナリオのフォルダは共有）。
+              onCreate={canEdit
+                ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+                : undefined}
             />
             {folderState === 'error' && (
               <p className="text-status-danger text-xs">フォルダ一覧を読み込めませんでした。</p>
