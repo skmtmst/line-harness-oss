@@ -46,6 +46,7 @@ export default function BulkOpWizard({
       open={open}
       designNode="hadfk"
       designWidth={640}
+      layout="continuous"
       title="成果をまとめて操作"
       description="対象を確認してから操作を選んでください"
       onCancel={onClose}
@@ -76,6 +77,7 @@ export default function BulkOpWizard({
       </div>
       <RadioCardGroup legend="操作の選択" className={styles.bulkChoices}>
         <RadioCard
+          variant="form"
           name="bulk-op-choice"
           value="approved"
           checked={choice === 'approved'}
@@ -85,6 +87,7 @@ export default function BulkOpWizard({
           note="次の締めで報酬に入ります"
         />
         <RadioCard
+          variant="form"
           name="bulk-op-choice"
           value="rejected"
           checked={choice === 'rejected'}

@@ -3,17 +3,6 @@
  * 枠・見出し・左右の分け・下の帯は作る型（CreatePage）が持つ。ここは段（カード）の中身だけ。
  * 寸法は globals.css の --tpl-af-cr-*。
  */
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-af-stack-gap);
-  width: fit-content;
-  color: var(--color-action);
-  font-size: var(--text-label);
-  text-decoration: none;
-}
-.backLink:hover { text-decoration: underline; }
-
 /* 段（白・薄い枠・角丸12・中20・間14）。枠は外へ場所を取らない線。 */
 .card {
   display: flex;
@@ -134,104 +123,10 @@
   gap: var(--tpl-af-cr-rail-gap);
   width: 100%;
 }
-.sideCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-af-ops-gap);
-  padding: var(--tpl-af-cr-side-pad);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-}
-.sideTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 700;
-  line-height: normal;
-}
-.sideNote {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: normal;
-}
 .sideList {
   margin: 0;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   line-height: var(--tpl-af-cr-list-lh);
-}
-.kvList { margin: 0; }
-.kvRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-toolbar-gap);
-  padding: var(--tpl-af-cr-kv-pad);
-}
-.kvRow dt {
-  flex-shrink: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-}
-.kvRow dd {
-  flex: 1 1 0;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 700;
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 紹介コードの重なり（Gqve5 の帯の形：黄の地・題と説明・右に操作）。 */
-.conflict {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-af-cr-grid-gap);
-  padding: var(--tpl-af-cr-conflict-pad);
-  border-radius: var(--radius-card);
-  background: var(--color-status-warn-soft);
-}
-.conflictIcon { flex-shrink: 0; color: var(--color-status-warn-deep); }
-.conflictText {
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  gap: var(--tpl-af-dr-kpi-gap);
-  min-width: 0;
-}
-.conflictTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 700;
-  line-height: normal;
-}
-.conflictNote {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: normal;
-}
-
-/* 報酬の決め方の3枚（絵：中 12/10・角10・題 13/600・説明 11・間 4）。小さい箱（compact）の丸なしの形を使い、寸法だけこの画面で当てる。 */
-:global([data-theme='v8']) .choiceGrid .choiceCard {
-  gap: var(--tpl-af-stack-gap);
-  padding: var(--tpl-af-cr-choice-pad);
-  border-radius: var(--radius-control);
-}
-:global([data-theme='v8']) .choiceGrid .choiceCard > span { gap: var(--tpl-af-cr-choice-gap); }
-:global([data-theme='v8']) .choiceGrid .choiceCard strong {
-  font-size: var(--text-label);
-  line-height: var(--tpl-af-cr-choice-title-lh);
-}
-:global([data-theme='v8']) .choiceGrid .choiceCard small {
-  font-size: var(--text-micro);
-  line-height: var(--tpl-af-cr-choice-note-lh);
 }
 .friendPicker[hidden] { display: none; }

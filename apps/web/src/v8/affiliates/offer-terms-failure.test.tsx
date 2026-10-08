@@ -5,7 +5,7 @@
  * - 210：複製は決まりも写す（読めなければ複製しない）
  */
 import React from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ capStatus: vi.fn(), create: vi.fn(), approvalsFull: false }))
@@ -50,6 +50,28 @@ import OffersTab from './offers'
 afterEach(() => { cleanup(); vi.clearAllMocks(); net.approvalsFull = false })
 
 const offer = { id: 'of-1', name: '紹介A', description: null, rewardAmount: 1000, rewardMiles: 0, lineAccountId: null, tagId: null, scenarioId: null, isActive: true }
+
+test('案件の入力の誤りは欄に一度だけ出し、保存せずその欄へ移る', async () => {
+  render(<OfferFormModal accounts={[]} tags={[]} scenarios={[]} onClose={() => undefined} onSaved={() => undefined} />)
+  const name = screen.getByLabelText(/案件名/) as HTMLInputElement
+  const scroll = vi.fn()
+  name.scrollIntoView = scroll
+  fireEvent.click(screen.getByRole('button', { name: '作成' }))
+  await waitFor(() => expect(document.activeElement).toBe(name))
+  expect(name.getAttribute('aria-invalid')).toBe('true')
+  expect(screen.getAllByText('案件名は必須です')).toHaveLength(1)
+  expect(scroll).toHaveBeenCalledWith({ block: 'center' })
+  expect(net.create).not.toHaveBeenCalled()
+
+  fireEvent.input(name, { target: { value: '紹介B' } })
+  const windowDays = screen.getByLabelText('数える期間（日）') as HTMLInputElement
+  fireEvent.change(windowDays, { target: { value: '0' } })
+  fireEvent.click(screen.getByRole('button', { name: '作成' }))
+  await waitFor(() => expect(document.activeElement).toBe(windowDays))
+  expect(windowDays.getAttribute('aria-invalid')).toBe('true')
+  expect(name.getAttribute('aria-invalid')).not.toBe('true')
+  expect(net.create).not.toHaveBeenCalled()
+})
 
 test('207：決まりが読めなかったら知らせ、決まりの欄は触れない', async () => {
   net.capStatus.mockRejectedValue(new Error('down'))

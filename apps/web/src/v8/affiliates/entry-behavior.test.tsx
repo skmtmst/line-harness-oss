@@ -125,16 +125,34 @@ describe('アフィリエイターを作る（今の入口 /affiliates/new）', 
   const fillName = (value: string) => fireEvent.change(screen.getByLabelText(/名前（表示名）/), { target: { value } })
   const fillCode = (value: string) => fireEvent.change(screen.getByRole('textbox', { name: /紹介コード（/ }), { target: { value } })
 
-  it('紹介コードの重なりで競合の帯が出て、入力が残る', async () => {
+  it('紹介コードの重なりは欄に一度だけ出て、入力を残して欄へ移る', async () => {
+    const scroll = vi.fn()
     render(<NewAffiliatePage />)
     fillName('ペットライフ編集部')
     fillCode('petlife2026')
+    const code = screen.getByRole('textbox', { name: /紹介コード（/ }) as HTMLInputElement
+    code.scrollIntoView = scroll
     fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
-    await screen.findByText('この紹介コードは、ほかの人が先に登録しました')
-    expect(screen.getByText(/入力は残っています/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: /一覧で確かめる/ })).toBeTruthy()
+    await waitFor(() => expect(code.getAttribute('aria-invalid')).toBe('true'))
+    await waitFor(() => expect(document.activeElement).toBe(code))
+    expect(scroll).toHaveBeenCalledWith({ block: 'center' })
+    expect(screen.getAllByText('この紹介コードは既に使われています。別のコードを入力してください。')).toHaveLength(1)
+    expect(screen.queryByText('この紹介コードは、ほかの人が先に登録しました')).toBeNull()
     expect((screen.getByLabelText(/名前（表示名）/) as HTMLInputElement).value).toBe('ペットライフ編集部')
+    expect(code.value).toBe('petlife2026')
     expect(push).not.toHaveBeenCalled()
+  })
+
+  it('未入力と不正な紹介コードは欄で知らせ、最初の誤りへ移り、登録を呼ばない', async () => {
+    render(<NewAffiliatePage />)
+    fillCode('bad!')
+    fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
+    const name = screen.getByLabelText(/名前（表示名）/)
+    await waitFor(() => expect(document.activeElement).toBe(name))
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByRole('textbox', { name: /紹介コード（/ }).getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getAllByText('名前・屋号を入力してください')).toHaveLength(1)
+    expect(create).not.toHaveBeenCalled()
   })
 
   it('HTTP の失敗として返る重なりでも入力を残して直し方を示す', async () => {
