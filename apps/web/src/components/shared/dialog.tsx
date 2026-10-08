@@ -43,6 +43,8 @@ export type DialogProps = {
    */
   descriptionBand?: 'warning' | 'danger'
   busy?: boolean
+  /** 実行ボタンを押せない形で出す（確かめのチェックが入るまで、など）。処理中の busy とは別。 */
+  confirmDisabled?: boolean
   error?: string
   confirmLabel?: string
   cancelLabel?: string
@@ -93,6 +95,7 @@ export default function Dialog({
   error,
   confirmLabel = '保存する',
   cancelLabel = 'キャンセル',
+  confirmDisabled = false,
   onConfirm,
   onCancel,
   children,
@@ -222,7 +225,7 @@ export default function Dialog({
             variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             className={styles.designButton}
             onClick={onConfirm}
-            disabled={busy} busy={busy} busyLabel="処理中…">
+            disabled={busy || confirmDisabled} busy={busy} busyLabel="処理中…">
             {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
             {confirmLabel}
           </Button>

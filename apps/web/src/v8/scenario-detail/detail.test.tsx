@@ -18,6 +18,7 @@ vi.hoisted(() => {
 
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const updateScenario = vi.hoisted(() => vi.fn())
+const triggerList = vi.hoisted(() => vi.fn(async () => ({ success: true, data: [{ id: 't1', kind: 'friend_add', tagId: null }] })))
 const getScenario = vi.hoisted(() => vi.fn())
 
 const scenario = vi.hoisted(() => ({
@@ -65,7 +66,7 @@ vi.mock('@/lib/api', () => ({
         success: true,
         data: { steps: [], subscriptions: [], testSends: [], quota: { remaining: null, state: 'unlimited' } },
       })),
-      triggers: { list: vi.fn(async () => ({ success: true, data: [{ id: 't1', kind: 'friend_add', tagId: null }] })) },
+      triggers: { list: triggerList },
       actions: { list: vi.fn(async () => ({ success: true, data: [] })) },
       preview: vi.fn(async () => ({ success: true, data: { steps: [] } })),
     },
@@ -85,6 +86,14 @@ vi.mock('@/components/scenarios/scenario-reference-data', () => ({
     tags: vi.fn(async () => ({ success: true, data: [] })),
     invalidateScenario: vi.fn(),
   },
+}))
+
+vi.mock('@/components/scenarios/trigger-editor', () => ({
+  default: ({ onChanged, onClose }: { onChanged?: (count: number) => void; onClose: () => void }) => (
+    <div role="dialog" aria-label="開始のきっかけ（試験）">
+      <button type="button" onClick={() => { onChanged?.(1); onClose() }}>きっかけを保存（試験）</button>
+    </div>
+  ),
 }))
 
 vi.mock('next/link', () => ({
@@ -225,4 +234,38 @@ it('名前の保存中は×・閉じる・Escを止め、入力を残す', async
   expect((within(dialog).getByLabelText('シナリオ名') as HTMLInputElement).value).toBe('変更した名前')
   expect(screen.getByRole('dialog', { name: '名前・説明・置き場を変える' })).toBeTruthy()
   await act(async () => { finish({ success: true, data: { id: 'sc-1' } }); await Promise.resolve() })
+})
+
+describe('監査 WEB227/228', () => {
+  it('WEB227：到達の帯の幅は「50%」で、「50%%」にしない', async () => {
+    const { scenarioReferenceData } = await import('@/components/scenarios/scenario-reference-data')
+    vi.mocked(scenarioReferenceData.stats).mockResolvedValue({
+      success: true,
+      data: { enrolledTotal: 10, activeNow: 2, completed: 3, paused: 0, steps: [{ stepOrder: 1, reachedCount: 5, reachRate: 0.5 }] },
+    } as never)
+    await render()
+    await waitFor(() => expect(host.querySelector('[class*="statBarFill"]')).toBeTruthy())
+    const fill = host.querySelector<HTMLElement>('[class*="statBarFill"]')!
+    expect(fill.style.width).toBe('50%')
+  })
+
+  it('WEB228：「内容と対象を確かめました」にチェックを入れるまで「この内容ではじめる」を押せない', async () => {
+    const { scenarioReferenceData } = await import('@/components/scenarios/scenario-reference-data')
+    vi.mocked(scenarioReferenceData.scenario).mockResolvedValue({ success: true, data: { ...scenario, isActive: false } } as never)
+    await render()
+    fireEvent.click(screen.getByRole('button', { name: /配信を再開する/ }))
+    const start = await screen.findByRole('button', { name: 'この内容ではじめる' })
+    await waitFor(() => expect((start as HTMLButtonElement).disabled).toBe(true))
+    fireEvent.click(start)
+    expect(updateScenario).not.toHaveBeenCalledWith('sc-1', { isActive: true })
+  })
+})
+
+it('WEB229：開始のきっかけを保存したら、見出しのきっかけの名前を読み直す（同じ数でも）', async () => {
+  await render()
+  expect(host.textContent).toContain('友だち追加のとき')
+  triggerList.mockResolvedValue({ success: true, data: [{ id: 't2', kind: 'form_answer', tagId: null }] })
+  fireEvent.click(screen.getByRole('button', { name: /設定を変える/ }))
+  fireEvent.click(await screen.findByRole('button', { name: 'きっかけを保存（試験）' }))
+  await waitFor(() => expect(host.textContent).toContain('フォームに答えたとき'))
 })
