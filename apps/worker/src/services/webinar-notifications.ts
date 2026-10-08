@@ -2,8 +2,6 @@ import {
   activeTenantLineAccountSql,
   isOperationCapabilityStopped,
   resolveLineCredential,
-  reserveWebinarSeat,
-  releaseWebinarSeat,
   jstNow,
 } from '@line-crm/db';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
@@ -355,51 +353,62 @@ export async function registerWebinarSession(
     return { registration: existing, created: false, rescheduled: false };
   }
 
-  // N: 開催回の定員は申込の時に条件付き更新で確保する。満員なら既存の
-  // 申込に手を付けず断る（先に席を取り、取れたら古い席を空ける）。
-  if ((await reserveWebinarSeat(db, webinarId, sessionStartAt)) === 'full') {
-    throw new Error('session_full');
-  }
-
+  // 席数と申込を同じ原子的batchで確定する。後から同じ申込を見た
+  // 再送は既存行を返し、席の二重確保をしない。古い回も実申込数で照合する。
   const nowIso = now.toISOString();
-  if (existing) {
-    await db.prepare(
-      `UPDATE webinar_registrations
-          SET status='cancelled', cancelled_at=?
-        WHERE id=? AND status='active'`,
-    ).bind(nowIso, existing.id).run();
-    await db.prepare(
-      `UPDATE webinar_notification_jobs
-          SET status='cancelled', cancelled_at=?, updated_at=?
-        WHERE registration_id=? AND status IN ('queued','retry_wait')`,
-    ).bind(nowIso, nowIso, existing.id).run();
-    await releaseWebinarSeat(db, webinarId, existing.session_start_at);
-  }
-
-  const previous = await db.prepare(
-    `SELECT * FROM webinar_registrations
-      WHERE webinar_id=? AND friend_id=? AND session_start_at=?`,
-  ).bind(webinarId, friendId, sessionStartAt).first<RegistrationRow>();
-  const registrationId = previous?.id ?? crypto.randomUUID();
-  if (previous) {
-    await db.prepare(
-      `UPDATE webinar_registrations
-          SET status='active', cancelled_at=NULL, notified_at=NULL
-        WHERE id=?`,
-    ).bind(registrationId).run();
-  } else {
-    await db.prepare(
+  const registrationId = crypto.randomUUID();
+  const committed = await db.batch([
+    db.prepare(
       `INSERT INTO webinar_registrations
          (id, webinar_id, friend_id, session_start_at, notified_at, created_at, status, cancelled_at)
-       VALUES (?, ?, ?, ?, NULL, ?, 'active', NULL)`,
-    ).bind(registrationId, webinarId, friendId, sessionStartAt, nowIso).run();
-  }
-  const registration = (await db.prepare(
-    'SELECT * FROM webinar_registrations WHERE id=?',
-  ).bind(registrationId).first<RegistrationRow>())!;
+       SELECT ?, ?, ?, ?, NULL, ?, 'active', NULL
+        WHERE NOT EXISTS (
+          SELECT 1 FROM webinar_sessions s
+           WHERE s.webinar_id = ? AND s.session_start_at = ?
+             AND (s.state = 'closed' OR (s.capacity IS NOT NULL AND
+               (SELECT COUNT(*) FROM webinar_registrations r
+                 WHERE r.webinar_id=s.webinar_id AND r.session_start_at=s.session_start_at
+                   AND r.status='active') >= s.capacity))
+        )
+       ON CONFLICT(webinar_id, friend_id, session_start_at) DO UPDATE SET
+         status='active', cancelled_at=NULL, notified_at=NULL
+       WHERE webinar_registrations.status != 'active'`,
+    ).bind(registrationId, webinarId, friendId, sessionStartAt, nowIso, webinarId, sessionStartAt),
+    db.prepare(
+      `UPDATE webinar_registrations SET status='cancelled', cancelled_at=?
+        WHERE id=? AND status='active' AND session_start_at != ?
+          AND EXISTS (SELECT 1 FROM webinar_registrations target
+            WHERE target.webinar_id=? AND target.friend_id=? AND target.session_start_at=?
+              AND target.status='active')`,
+    ).bind(nowIso, existing?.id ?? '', sessionStartAt, webinarId, friendId, sessionStartAt),
+    db.prepare(
+      `UPDATE webinar_notification_jobs SET status='cancelled', cancelled_at=?, updated_at=?
+        WHERE registration_id=? AND status IN ('queued','retry_wait')
+          AND EXISTS (SELECT 1 FROM webinar_registrations old
+            WHERE old.id=webinar_notification_jobs.registration_id AND old.status='cancelled')`,
+    ).bind(nowIso, nowIso, existing?.id ?? ''),
+    db.prepare(
+      `UPDATE webinar_sessions SET
+         reserved_count=(SELECT COUNT(*) FROM webinar_registrations r
+           WHERE r.webinar_id=webinar_sessions.webinar_id AND r.session_start_at=webinar_sessions.session_start_at
+             AND r.status='active'),
+         state=CASE WHEN state='closed' THEN 'closed'
+           WHEN capacity IS NOT NULL AND (SELECT COUNT(*) FROM webinar_registrations r
+             WHERE r.webinar_id=webinar_sessions.webinar_id AND r.session_start_at=webinar_sessions.session_start_at
+               AND r.status='active') >= capacity THEN 'full' ELSE 'open' END,
+         updated_at=?
+       WHERE webinar_id=? AND session_start_at IN (?,?)`,
+    ).bind(nowIso, webinarId, sessionStartAt, existing?.session_start_at ?? sessionStartAt),
+    db.prepare(`SELECT * FROM webinar_registrations
+      WHERE webinar_id=? AND friend_id=? AND session_start_at=? AND status='active'`)
+      .bind(webinarId, friendId, sessionStartAt),
+  ]);
+  const registration = committed[4]?.results?.[0] as RegistrationRow | undefined;
+  if (!registration) throw new Error('session_full');
+  const created = Number(committed[0]?.meta?.changes ?? 0) > 0;
   const settings = await getWebinarNotificationSettings(db, webinarId);
   if (settings) await enqueueJobsForRegistration(db, registration, settings, nowEpoch);
-  return { registration, created: true, rescheduled: Boolean(existing) };
+  return { registration, created, rescheduled: Number(committed[1]?.meta?.changes ?? 0) > 0 };
 }
 
 export async function enqueueWebinarCompletedNotification(
