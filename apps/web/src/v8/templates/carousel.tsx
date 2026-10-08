@@ -17,7 +17,7 @@
 import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronDown, Copy, ImageIcon, Info, Plus, Send, Trash2 } from 'lucide-react'
+import { CalendarCheck, CalendarPlus, ChevronDown, ClipboardList, Copy, ExternalLink, ImageIcon, Info, MessageSquare, Plus, Send, Trash2, Zap, type LucideIcon } from 'lucide-react'
 import type { Folder, MediaItem } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
@@ -109,20 +109,20 @@ function hostCarouselInitial(host: TemplateEditHost | undefined) {
 }
 
 /** 「押したら」の候補（絵 JkLOF の順）。店だけのもの・LIFF が要るものは出し分ける。 */
-const CHOICE_KINDS: Array<{ value: ChoiceKind; label: string }> = [
-  { value: 'uri', label: 'URLを開く' },
-  { value: 'message', label: 'テキストを送る' },
-  { value: 'form', label: '回答フォームを開く' },
-  { value: 'booking', label: '予約ページを開く' },
-  { value: 'booking_history', label: '予約履歴を開く' },
-  { value: 'action', label: '動きを実行する' },
+const CHOICE_KINDS: Array<{ value: ChoiceKind; label: string; icon: LucideIcon }> = [
+  { value: 'uri', label: 'URLを開く', icon: ExternalLink },
+  { value: 'message', label: 'テキストを送る', icon: MessageSquare },
+  { value: 'form', label: '回答フォームを開く', icon: ClipboardList },
+  { value: 'booking', label: '予約ページを開く', icon: CalendarPlus },
+  { value: 'booking_history', label: '予約履歴を開く', icon: CalendarCheck },
+  { value: 'action', label: '動きを実行する', icon: Zap },
 ]
 
 /**
  * 出す「押したら」。統括は URLを開く・テキストを送るだけ（配った先の LIFF ID・回答フォームに付け替えられないため）。
  * 店は LIFF が無ければ回答フォーム・予約・予約履歴を出さない（出す＝使える）。いま選んでいる種類は消さない（読み込んだ古い保存を壊さない）。
  */
-export function choiceKindOptions(opts: { host: boolean; hasLiff: boolean; current?: ChoiceKind }): Array<{ value: ChoiceKind; label: string }> {
+export function choiceKindOptions(opts: { host: boolean; hasLiff: boolean; current?: ChoiceKind }): Array<{ value: ChoiceKind; label: string; icon: LucideIcon }> {
   return CHOICE_KINDS.filter((item) => {
     if (item.value === opts.current) return true
     if (opts.host) return item.value === 'uri' || item.value === 'message'
@@ -513,7 +513,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                     <div key={ai} className={own.buttonRow}>
                       <input className={`${styles.input} ${own.colLabel}`} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} />
                       <span className={own.colKind}>
-                        <Select size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`} value={action.kind} onChange={(value) => setAction({ kind: value as ChoiceKind })} options={choiceKindOptions({ host: Boolean(host), hasLiff: Boolean(liffId), current: action.kind })} />
+                        <Select size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`} value={action.kind} onChange={(value) => setAction({ kind: value as ChoiceKind })} options={choiceKindOptions({ host: Boolean(host), hasLiff: Boolean(liffId), current: action.kind }).map(({ value, label, icon: Icon }) => ({ value, label, leading: <Icon className={own.kindIcon} /> }))} />
                       </span>
                       {action.kind === 'uri' ? (
                         <input className={`${styles.input} ${own.colBody}`} type="url" value={action.uri} placeholder="https://example.com" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}のURL`} onChange={(event) => setAction({ uri: event.target.value })} />

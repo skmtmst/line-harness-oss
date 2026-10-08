@@ -137,6 +137,13 @@
   min-width: 0;
 }
 
+/* 「押したら」の開いた中身の行の先頭の印（絵 JkLOF：14px・灰）。 */
+.kindIcon {
+  width: var(--select-menu-check);
+  height: var(--select-menu-check);
+  color: var(--color-ink-secondary);
+}
+
 /* 「予約ページを開く」「予約履歴を開く」の中身：入れる欄は無く、開く先の1行だけ。 */
 .fixedBody {
   display: flex;
