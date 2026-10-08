@@ -10,6 +10,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const hq = vi.hoisted(() => ({
   list: vi.fn(), create: vi.fn(), update: vi.fn(), get: vi.fn(), preflight: vi.fn(), exclude: vi.fn(), send: vi.fn(), stop: vi.fn(), cancel: vi.fn(), retry: vi.fn(),
+  /* API-18：フォルダ・承認・テスト送信。承認が要らない（人数が少ない）ときの返事。 */
+  folders: vi.fn(async () => ({ success: true, data: [] })),
+  approvalCandidates: vi.fn(async () => ({ success: true, data: [] })),
+  approval: vi.fn(async () => ({ success: true, data: { approval: { status: 'none', requestedByStaffId: null, requestedAt: null, approverStaffId: null, note: null, decidedByStaffId: null, decidedAt: null, rejectReason: null, confirmedCount: null }, gate: { required: false, recipientCount: 0, threshold: 1000, singleOperator: false, operatorCount: 2 }, viewer: { isApprover: false, canApprove: false, isRequester: false } } })),
+  testSend: vi.fn(),
 }))
 const accounts = vi.hoisted(() => vi.fn())
 const folders = vi.hoisted(() => vi.fn())
@@ -24,7 +29,7 @@ vi.mock('@/lib/hq-broadcasts-api', () => ({ hqBroadcastsApi: hq }))
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { listByKind: vi.fn(async () => []), get: vi.fn() } }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
-  return { ...actual, api: { ...actual.api, lineAccounts: { list: accounts }, lineAccountFolders: { list: folders }, tags: { list: tagList }, broadcastMessageAssets: { list: assets } } }
+  return { ...actual, api: { ...actual.api, lineAccounts: { list: accounts }, lineAccountFolders: { list: folders }, tags: { list: tagList }, broadcastMessageAssets: { list: assets }, scenarios: { list: async () => ({ success: true, data: [] }) }, segmentPresets: { list: async () => ({ success: true, data: [] }) } } }
 })
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
@@ -96,6 +101,42 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     fireEvent.click(await screen.findByRole('button', { name: '予約する' }))
     await waitFor(() => expect(hq.send).toHaveBeenCalledWith('run-1', 2))
     expect(push).toHaveBeenCalledWith('/hq/broadcasts/detail?id=run-1')
+  })
+
+  it('API-18：フォルダ・社内メモ・シナリオ購読中・除くタグ・2つの吹き出しを口へ送る', async () => {
+    hq.folders.mockResolvedValue({ success: true, data: [{ id: 'bf-1', name: 'キャンペーン', revision: 1, item_count: 0 }] })
+    render(<HqBroadcastCreate />)
+    fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '1月の限定メニュー' } })
+    await waitFor(() => expect(hq.folders).toHaveBeenCalled())
+    fireEvent.change(screen.getByLabelText('社内メモ'), { target: { value: '関東だけ' } })
+    fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: /銀座店/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /シナリオ購読中の全員に配信する/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'メッセージ設定へ' }))
+    fireEvent.change(screen.getByLabelText('本文'), { target: { value: '1通目' } })
+    fireEvent.click(screen.getByRole('button', { name: /メッセージを追加する/ }))
+    fireEvent.change(screen.getByLabelText('本文'), { target: { value: '2通目' } })
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+    await waitFor(() => expect(hq.create).toHaveBeenCalled())
+    const input = hq.create.mock.calls[0][0]
+    expect(input.internalMemo).toBe('関東だけ')
+    expect(input.targetType).toBe('segment')
+    expect(input.segmentConditions).toEqual({ operator: 'AND', rules: [{ type: 'scenario_subscribed', value: '' }] })
+    const bubbles = JSON.parse(input.messageBubblesJson)
+    expect(bubbles.map((b: { content: { text: string } }) => b.content.text)).toEqual(['1通目', '2通目'])
+  })
+
+  it('API-18：承認が要るときは送らず［承認を依頼する］（別の担当者を選んで頼む）', async () => {
+    hq.approval.mockResolvedValue({ success: true, data: { approval: { status: 'none', requestedByStaffId: null, requestedAt: null, approverStaffId: null, note: null, decidedByStaffId: null, decidedAt: null, rejectReason: null, confirmedCount: null }, gate: { required: true, recipientCount: 6120, threshold: 1000, singleOperator: false, operatorCount: 2 }, viewer: { isApprover: false, canApprove: false, isRequester: false } } })
+    hq.approvalCandidates.mockResolvedValue({ success: true, data: [{ id: 's-2', name: '佐々木', role: 'admin', canApprove: true }] })
+    render(<HqBroadcastCreate />)
+    await fillToConfirm()
+    await screen.findByText('送る：1アカウント・6,120人')
+    fireEvent.click(await screen.findByRole('button', { name: '承認を依頼する' }))
+    expect(await screen.findByText(/もう1人の承認が要ります/)).toBeTruthy()
+    expect(await screen.findByText('承認をお願いする人')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '予約する' })).toBeNull()
+    expect(hq.send).not.toHaveBeenCalled()
   })
 
   it('入れていない所があると口を呼ばず、その欄のある段へ移るボタンを出す', async () => {

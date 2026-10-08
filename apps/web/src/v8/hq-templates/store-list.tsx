@@ -16,7 +16,7 @@ import {
   ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2,
   MessageSquare, Pencil, Plus, Send, Ticket, Trash2, Unlink, Users,
 } from 'lucide-react'
-import type { HqTemplateFolder, TemplateKind } from '@line-crm/shared'
+import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -75,9 +75,25 @@ function monthDay(iso: string): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'long', day: 'numeric' }).format(date)
 }
 
-/** 公開の札（店と同じ3つの色）。統括では「配ったか」で決める：配った＝配布中、まだ＝下書きだけ。 */
-function stateOf(row: HqTemplate): { label: string; tone: 'live' | 'draft' } {
-  return (row.distributed_account_count ?? 0) > 0 ? { label: '配布中', tone: 'live' } : { label: '下書きだけ', tone: 'draft' }
+/**
+ * 公開の札（店と同じ3つ：公開中／未公開の変更／下書きだけ。絵 i0Ao0R）。統括では「配ったか」で決める：
+ * 配った先がいまの版を持っている＝公開中、直したあと配っていない先がある（API-18 の outdated_account_count）＝未公開の変更、まだ配っていない＝下書きだけ。
+ */
+export function stateOf(row: HqTemplate): { label: string; tone: 'live' | 'changes' | 'draft' } {
+  if ((row.distributed_account_count ?? 0) === 0) return { label: '下書きだけ', tone: 'draft' }
+  if ((row.outdated_account_count ?? 0) > 0) return { label: '未公開の変更', tone: 'changes' }
+  return { label: '公開中', tone: 'live' }
+}
+
+/** 合計（API-18）。1つでも数えていない行があれば null（「—」）。 */
+function sumOrNull(values: Array<number | null | undefined>): number | null {
+  if (values.some((value) => value == null)) return null
+  return values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+}
+
+/** 今月送った数（API-18）。取れない種類（別資産のクーポン等）は null＝「—」。0 は「0通」。 */
+export function sentLabel(count: number | null | undefined): string {
+  return count == null ? '—' : `${formatNumber(count)}通`
 }
 
 export interface HqStoreListProps {
@@ -88,6 +104,8 @@ export interface HqStoreListProps {
   canEdit: boolean
   /** 配る先になるアカウントの数（数の帯の「全 N アカウントのうち」）。 */
   accountTotal: number
+  /** 一覧の集計（API-18：今月送った数・新しい版を未配布のひな形の数）。取れなければ null。 */
+  stats?: HqTemplateListStats | null
   /** 6種類のタブ（テンプレートだけ）。 */
   kind?: TemplateKind
   kindCounts?: Partial<Record<TemplateKind, number>> | null
@@ -112,7 +130,7 @@ export interface HqStoreListProps {
 
 export default function HqStoreList(props: HqStoreListProps) {
   const {
-    type, rows, ready, busy, canEdit, accountTotal, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
+    type, rows, ready, busy, canEdit, accountTotal, stats, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
     onAddFolder, onRenameFolder, onDeleteFolder, onCreate, onEdit, onOpen, onDistribute, onDuplicate, onRemove, notices, overlays,
   } = props
   const words = WORDS[type]
@@ -144,15 +162,25 @@ export default function HqStoreList(props: HqStoreListProps) {
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
 
-  /* 数の帯：ひな形・配ったアカウント・配ったひな形・まだ配っていない（統括の一覧で数えられるもの）。 */
+  /*
+   * 数の帯（絵 i0Ao0R・wZPua）：ひな形（下書き N件＝まだ配っていない）・配ったアカウント・今月送った数（テンプレートだけ。
+   * ほかの種類は配ったひな形）・新しい版を未配布（API-18。直したあと配っていない先があるひな形の数）。
+   */
   const distributed = rows.filter((row) => (row.distributed_account_count ?? 0) > 0).length
   const accountNames = new Set(rows.flatMap((row) => row.distributed_account_names ?? []))
   const namesComplete = rows.every((row) => (row.distributed_account_more ?? 0) === 0)
+  const outdated = stats ? stats.outdatedTemplateCount : rows.filter((row) => (row.outdated_account_count ?? 0) > 0).length
   const kpis = [
-    { key: 'templates', title: 'ひな形', icon: FileText, value: ready ? rows.length : null, unit: '件', detail: ready ? `まだ配っていない ${rows.length - distributed}件` : '—' },
+    { key: 'templates', title: 'ひな形', icon: FileText, value: ready ? rows.length : null, unit: '件', detail: ready ? `下書き ${rows.length - distributed}件` : '—' },
     { key: 'accounts', title: '配ったアカウント', icon: Link2, value: ready && namesComplete ? accountNames.size : null, unit: '件', detail: ready ? (namesComplete ? `全 ${formatNumber(accountTotal)} アカウントのうち` : '数え切れないアカウントがあります') : '—' },
-    { key: 'distributed', title: '配ったひな形', icon: Send, value: ready ? distributed : null, unit: '件', detail: ready ? '1つ以上のアカウントへ配った' : '—' },
-    { key: 'undistributed', title: 'まだ配っていない', icon: Users, value: ready ? rows.length - distributed : null, unit: '件', detail: ready ? '配布先が無いひな形' : '—' },
+    type === 'rich_menu'
+      ? { key: 'taps', title: '今月押された', icon: Send, value: ready ? sumOrNull(rows.map((row) => row.tap_count)) : null, unit: '回', detail: ready ? '配った先でボタンが押された回数' : '—' }
+      : type === 'tag'
+      ? { key: 'friends', title: '付けている友だち', icon: Users, value: ready ? sumOrNull(rows.map((row) => row.friend_count)) : null, unit: '人', detail: ready ? '配った先の合計' : '—' }
+      : type === 'template'
+      ? { key: 'sent', title: '今月送った数', icon: Send, value: ready && stats ? stats.thisMonthSentCount : null, unit: '通', detail: ready ? '配った先の合計' : '—' }
+      : { key: 'distributed', title: '配ったひな形', icon: Send, value: ready ? distributed : null, unit: '件', detail: ready ? '1つ以上のアカウントへ配った' : '—' },
+    { key: 'outdated', title: '新しい版を未配布', icon: Users, value: ready ? outdated : null, unit: '件', detail: ready ? '直したあと配っていない' : '—' },
   ]
 
   const tabs = kind && onKindChange ? (
@@ -262,7 +290,64 @@ export default function HqStoreList(props: HqStoreListProps) {
     </div>
   )
 
-  const showKind = type === 'template'
+  /*
+   * 種類ごとの列（店の同じ機能の一覧と同じ並び）。違いは「配布先」の列だけ。
+   *   テンプレート i0Ao0R：種類・公開・配布先・今月送った数・更新・「…」（［アカウントへ配る］は「…」の中）
+   *   友だち属性 DzdC3：人数・付け方・配布先・「…」（人数は API-18 の配った先で付いている友だちの合計）
+   *   リッチメニュー noVq4：順・誰に出すか・状態・配布先・今月押された・「…」（API-18 の順・誰に出すか・配った先の押された数）
+   *   回答フォーム wZPua：状態・配布先・更新・［アカウントへ配る］と「…」
+   */
+  const rowButton = type === 'form' || type === 'scenario'
+  const rankOf = new Map(type === 'rich_menu'
+    ? [...rows].sort((a, b) => (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'ja')).map((row, index) => [row.id, index + 1] as const)
+    : [])
+  const ordered = type === 'rich_menu' ? [...shown].sort((a, b) => (rankOf.get(a.id) ?? 0) - (rankOf.get(b.id) ?? 0)) : shown
+  const destCell = (row: HqTemplate) => {
+    const destLine = distributedAccountsLine(row)
+    return row.distributed_account_count === undefined ? (
+      <span className={styles.cellFaint}>—</span>
+    ) : row.distributed_account_count > 0 ? (
+      <span className={styles.hqDest}>
+        <span className={styles.usageLink}>{`${formatNumber(row.distributed_account_count)} アカウント`}</span>
+        {destLine ? <span className={styles.cellSub} title={destLine}>{destLine}</span> : null}
+      </span>
+    ) : (
+      <span className={styles.usageLink}>まだ配っていない</span>
+    )
+  }
+  const stateCell = (row: HqTemplate) => {
+    const state = stateOf(row)
+    return (
+      <span className={styles.publishPill} data-tone={state.tone}>
+        <span className={styles.publishDot} aria-hidden="true" />
+        {state.label}
+      </span>
+    )
+  }
+  /* 列の幅（col）と中身の箱（Td）は列ごとに書く（className を変数で渡すと見張りが読めない）。 */
+  type Column = { key: string; head: string; col: ReactNode; cell: (row: HqTemplate) => ReactNode }
+  const plainTd = (key: string, text: ReactNode, title?: string) => <Td key={key} className={styles.cellPlain} title={title}>{text}</Td>
+  const boxedTd = (key: string, inner: ReactNode) => <Td key={key}>{inner}</Td>
+  const columns: Column[] = type === 'template' ? [
+    { key: 'kind', head: '種類', col: <col key="kind" className={styles.colKind} />, cell: (row) => boxedTd('kind', <span className={styles.kindBadge}>{KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? 'メッセージ'}</span>) },
+    { key: 'state', head: '公開', col: <col key="state" className={styles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'dest', head: '配布先', col: <col key="dest" className={styles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
+    { key: 'sent', head: '今月送った数', col: <col key="sent" className={styles.colMonthly} />, cell: (row) => plainTd('sent', sentLabel(row.this_month_sent_count), row.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : undefined) },
+    { key: 'updated', head: '更新', col: <col key="updated" className={styles.colUpdated} />, cell: (row) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },
+  ] : type === 'tag' ? [
+    { key: 'friends', head: '人数', col: <col key="friends" className={styles.colKind} />, cell: (row) => plainTd('friends', row.friend_count == null ? '—' : `${formatNumber(row.friend_count)}人`, '配った先のアカウントで、このタグが付いている友だちの合計') },
+    { key: 'method', head: '付け方', col: <col key="method" className={styles.colKind} />, cell: (row) => plainTd('method', row.assignment_method ?? '—') },
+    { key: 'dest', head: '配布先', col: <col key="dest" className={styles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
+  ] : type === 'rich_menu' ? [
+    { key: 'audience', head: '誰に出すか', col: <col key="audience" className={styles.colPublish} />, cell: (row) => plainTd('audience', row.display_audience ?? '—', row.display_audience ?? undefined) },
+    { key: 'state', head: '状態', col: <col key="state" className={styles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'dest', head: '配布先', col: <col key="dest" className={styles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
+    { key: 'taps', head: '今月押された', col: <col key="taps" className={styles.colMonthly} />, cell: (row) => plainTd('taps', row.tap_count == null ? '—' : `${formatNumber(row.tap_count)}回`, '配った先のアカウントで押された回数の合計') },
+  ] : [
+    { key: 'state', head: '状態', col: <col key="state" className={styles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'dest', head: '配布先', col: <col key="dest" className={styles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
+    { key: 'updated', head: '更新', col: <col key="updated" className={styles.colUpdated} />, cell: (row) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },
+  ]
   const body = !ready ? (
     <div className={styles.stateCard} role="status">
       <p className={styles.stateTitle}>{busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。'}</p>
@@ -282,31 +367,26 @@ export default function HqStoreList(props: HqStoreListProps) {
     <div className={`${styles.tableWrap} ${styles.hqTable}`}>
       <DataTable>
         <colgroup>
+          {type === 'rich_menu' ? <col className={styles.colSelect} /> : null}
           <col />
-          {showKind ? <col className={styles.colKind} /> : null}
-          <col className={styles.colPublish} />
-          <col className={styles.colHqDest} />
-          <col className={styles.colUpdated} />
-          <col className={styles.colHqActions} />
+          {columns.map((column) => column.col)}
+          <col className={rowButton ? styles.colHqActions : styles.colMenu} />
         </colgroup>
         <thead>
           <TableHeadRow>
+            {type === 'rich_menu' ? <Th className={styles.headCell}>順</Th> : null}
             <Th className={styles.headCell}>{words.column}</Th>
-            {showKind ? <Th className={styles.headCell}>種類</Th> : null}
-            <Th className={styles.headCell}>状態</Th>
-            <Th className={styles.headCell}>配布先</Th>
-            <Th className={styles.headCell}>更新</Th>
+            {columns.map((column) => <Th key={column.key} className={styles.headCell}>{column.head}</Th>)}
             <Th aria-label="操作" />
           </TableHeadRow>
         </thead>
         <tbody>
-          {shown.map((row) => {
+          {ordered.map((row) => {
             const folder = folderOf(row.folder_id)
             const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
-            const state = stateOf(row)
-            const destLine = distributedAccountsLine(row)
             return (
               <Tr key={row.id} data-row-id={row.id}>
+                {type === 'rich_menu' ? <Td className={styles.cellPlain}>{rankOf.get(row.id) ?? '—'}</Td> : null}
                 <NameCell
                   name={(
                     <div className={styles.dotLine}>
@@ -319,35 +399,16 @@ export default function HqStoreList(props: HqStoreListProps) {
                   )}
                   sub={<span className={`${styles.cellSub} ${styles.dotIndent}`} title={sub}>{sub}</span>}
                 />
-                {showKind ? (
-                  <Td><span className={styles.kindBadge}>{KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? 'メッセージ'}</span></Td>
-                ) : null}
-                <Td>
-                  <span className={styles.publishPill} data-tone={state.tone}>
-                    <span className={styles.publishDot} aria-hidden="true" />
-                    {state.label}
-                  </span>
-                </Td>
-                <Td>
-                  {row.distributed_account_count === undefined ? (
-                    <span className={styles.cellFaint}>—</span>
-                  ) : row.distributed_account_count > 0 ? (
-                    <span className={styles.hqDest}>
-                      <span className={styles.usageLink}>{`${formatNumber(row.distributed_account_count)} アカウント`}</span>
-                      {destLine ? <span className={styles.cellSub} title={destLine}>{destLine}</span> : null}
-                    </span>
-                  ) : (
-                    <span className={styles.usageLink}>まだ配っていない</span>
-                  )}
-                </Td>
-                <Td className={styles.cellPlain} title={row.updated_at}>{monthDay(row.updated_at)}</Td>
+                {columns.map((column) => column.cell(row))}
                 <Td className={styles.menuCell}>
                   <div className={`${styles.menuBox} ${styles.hqActions}`}>
                     {canEdit ? (
                       <>
-                        <Button type="button" variant="text" disabled={busy} onClick={() => onDistribute(row)} aria-label={`${row.name}をアカウントへ配る`}>
-                          <Send size={14} aria-hidden="true" />アカウントへ配る
-                        </Button>
+                        {rowButton ? (
+                          <Button type="button" variant="text" disabled={busy} onClick={() => onDistribute(row)} aria-label={`${row.name}をアカウントへ配る`}>
+                            <Send size={14} aria-hidden="true" />アカウントへ配る
+                          </Button>
+                        ) : null}
                         <RowMenu label={`${words.item}「${row.name}」の操作`} items={rowMenu(row)} open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
                       </>
                     ) : null}

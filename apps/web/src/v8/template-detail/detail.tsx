@@ -614,7 +614,7 @@ export default function TemplateDetailV8() {
 }
 
 /** 版の差（－ 消えた行・＋ 増えた行）。同じなら「違いはありません」。 */
-function ChangeBox({ title, before, after }: { title: string; before: string; after: string }) {
+export function ChangeBox({ title, before, after }: { title: string; before: string; after: string }) {
   const changes = lineChanges(before, after)
   return (
     <div className={styles.changeBox}>

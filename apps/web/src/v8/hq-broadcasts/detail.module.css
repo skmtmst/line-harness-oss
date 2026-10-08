@@ -98,6 +98,25 @@
   width: var(--tpl-e49-col-menu);
 }
 
+/* API-18：アカウントごとの開いた・押した・反応。列が増えたぶん状態の列を詰める。 */
+.colMetric {
+  width: var(--tpl-hq18-col-metric);
+}
+
+.table:has(.colMetric) .colState {
+  width: var(--tpl-hq18-col-state);
+}
+
+/* 宛先のタブのアカウント選び。 */
+.accountPick {
+  flex: 0 0 var(--tpl-hq18-account-pick-w);
+  min-width: 0;
+}
+
+.accountPick :global(*) {
+  max-width: 100%;
+}
+
 .store {
   display: block;
   overflow: hidden;
@@ -181,6 +200,7 @@
 @container v8-page (max-width: 1099px) {
   .colNum,
   .colFail,
+  .colMetric,
   .colState {
     width: auto;
   }
