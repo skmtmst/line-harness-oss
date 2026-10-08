@@ -7,7 +7,8 @@
 ## 受け付ける URL と指定
 - `/hq/broadcasts/new?tag=<アカウントのタグの id>`：そのタグの付いたアカウントを選んだ状態から始める（昔の入口）。`?folder=<フォルダの id>`：その札で絞った状態から始める。`?step=`：段（店の一斉配信と同じ値）。
 - `/hq/broadcasts/new?id=<下書きの id>`：下書きを読み（`GET /:id` の `input`）、宛先・中身・時刻を戻して直す。送った（予約した）配信は「直せません」の案内と［詳細を見る］。
-- `/hq/broadcasts/detail?id=<一括配信の id>`。
+- `/hq/broadcasts/new?copy=<一括配信の id>`：その一括配信の配信名・中身・送るアカウント・対象を写して新しく作る（詳細の［複製して作る］）。
+- `/hq/broadcasts/detail?id=<一括配信の id>&tab=overview|recipients|activity`。
 
 ## 口（API-7 の hq-broadcasts。`lib/hq-broadcasts-api.ts`）
 - 作る `POST /api/hq/broadcasts`（requestId・title・messageType・messageContent・messageBubblesJson（素材のとき）・accountIds または accountTagIds・excludedAccountIds・audience=all・scheduledAt）。
@@ -42,5 +43,13 @@
 ## 店側の一斉配信の一覧（l3RQH）
 - 統括から来た配信（口の `fromHeadquarters`）は名前の横に「統括から」の札と鍵。「…」は見る・複製するだけ（編集・フォルダ移動・削除を出さない。口も 403）。右の詳細の窓も編集を続ける・削除を出さない。
 
+## API-18 でつないだもの（2026-10-08）
+- 一覧：左の列のフォルダ（`folders`・追加・名前を変える・消す。中身は未分類へ）。行の名前の前にフォルダの丸。
+- ①：フォルダ（`folderId`）・社内メモ（`internalMemo`）。
+- ②：配信対象は店と同じ4つ。シナリオ購読中（`targetType: segment` と `scenario_subscribed`＝シナリオの名前・空ならどれか）、タグ（`audience.tagName`）、詳細条件（店と同じ ConditionBuilder に名前の候補を渡す。友だち情報・対応マーク・回答フォーム等は選ばせない）、保存した条件（`savedSearchId`＝名前）、除くタグ（`excludedTagIds`＝名前）。候補は選んだアカウントごとに読み、同じ名前でまとめる。
+- ③：吹き出しは5つまで（テキスト・クーポン・リッチメッセージ）。2つ以上は `messageBubblesJson`、テキスト1つは今までどおり本文だけ。
+- ⑤：承認（`approval`・`approvalCandidates`・`requestApproval`・`approve`（本人確認 broadcast.approval）・`reject`・`cancelApproval`）。2人以上の運用は主ボタンが［承認を依頼する］→承認されるまで送れない、1人運用は送るときに人数を入れる（`confirmedRecipientCount`）。テストを送る（`testSend`・アカウントを選ぶ）は右の列。
+- 詳細：開いた・押した・反応（アカウントの合計。1つでも取れていなければ「—」）、アカウント別の表に同じ列、CSV（`export.csv`）、［複製して作る］（`/hq/broadcasts/new?copy=<id>`）、タブ 概要・宛先（アカウントを選んで50人ずつ）・記録（?tab=、履歴を積まない）。下書きはテスト送信・承認も。
+
 ## 今の口で出せないもの（API 待ち・Codex）
-- 店の一斉配信にある欄のうち、統括の口に無いもの：フォルダ・社内メモ（①）、シナリオ購読中・詳細条件・除くタグ・保存した条件・この1週間に送った人を除く（②）、複数の吹き出し・画像など（③）、分散して送る・配信後のアクション（④）、テスト送信・承認（右の列・⑤）。出す＝使えるの決まりで置いていない。
+- この1週間に送った人を除く（店も未対応）、分散して送る・配信後のアクション（④・配布先の店で決める）、画像・動画などの吹き出し、詳細条件の友だち情報・対応マーク・回答フォーム履歴・担当者・クリック履歴、一覧の「承認待ち」の札（一覧の口に承認の状態が無い）、詳細の反応（リンクごと）・流入経路・ブロック数。

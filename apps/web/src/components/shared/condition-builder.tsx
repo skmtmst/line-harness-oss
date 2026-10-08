@@ -121,9 +121,14 @@ export interface ConditionBuilderProps {
    * 分からなくなる。
    */
   showCount?: boolean
+  /**
+   * 候補を呼ぶ側から渡す（統括の一括配信：複数のアカウントのタグ・シナリオを名前でまとめたもの）。
+   * 渡したときは今のアカウントの候補を読まず、kinds の種類だけを足せる。友だち情報・対応マークの候補は空。
+   */
+  options?: { tags: Option[]; scenarios: Option[]; kinds?: readonly string[] }
 }
 
-export default function ConditionBuilder({ value, onChange, label, showCount = true }: ConditionBuilderProps) {
+export default function ConditionBuilder({ value, onChange, label, showCount = true, options }: ConditionBuilderProps) {
   const { selectedAccountId } = useAccount()
   // 対応マーク・友だち情報は任意機能。オフのaccountでは条件の選択肢ごと出さない。
   const featureVisibility = useFeatureVisibility(selectedAccountId)
@@ -140,6 +145,13 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
 
   useEffect(() => {
     let cancelled = false
+    if (options) {
+      setTags(options.tags)
+      setScenarios(options.scenarios)
+      setFields([])
+      setMarks([])
+      return () => { cancelled = true }
+    }
     if (!selectedAccountId) {
       setMarks([])
       return () => { cancelled = true }
@@ -172,7 +184,9 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId, fieldsEnabled, marksEnabled])
+    // 渡された候補は中身が変わったときだけ入れ直す。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId, fieldsEnabled, marksEnabled, options ? JSON.stringify(options) : ''])
 
   /*
    * 該当件数。条件を書きながら人数が見えないと、絞りすぎ・絞り足りないに
@@ -284,7 +298,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
   const kindButtons = (groupIndex: number | null) => (
     <div className="mt-2 max-w-md">
       <KindPicker
-        kinds={RULE_KINDS.filter((kind) => !kind.feature || featureVisibility.enabled(kind.feature))}
+        kinds={RULE_KINDS.filter((kind) => (options?.kinds ? options.kinds.includes(kind.type) : !kind.feature || featureVisibility.enabled(kind.feature)))}
         onPick={(kind) => addRule(kind, groupIndex)}
       />
     </div>

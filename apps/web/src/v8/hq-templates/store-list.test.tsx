@@ -65,11 +65,41 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.textContent).toContain('まだ配っていない')
   })
 
-  it('行の［アカウントへ配る］でその行を配る', async () => {
-    const h = await render()
+  it('回答フォームは行の［アカウントへ配る］でその行を配る（wZPua）', async () => {
+    const h = await render({ type: 'form', kind: undefined })
     const button = buttons().find((b) => b.getAttribute('aria-label') === '秋の新商品をアカウントへ配る')
     await act(async () => { button!.click() })
     expect(h.onDistribute).toHaveBeenCalledWith(ROWS[0])
+  })
+
+  it('テンプレートは行の「…」から配る。公開の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
+    const rows = [
+      { ...ROWS[0], outdated_account_count: 1, this_month_sent_count: 1860 },
+      { ...ROWS[1], this_month_sent_count: null },
+      { ...row('t-3', '予約の受付', 1), outdated_account_count: 0, this_month_sent_count: 0 },
+    ]
+    const h = await render({ rows, stats: { thisMonthSentCount: 1860, outdatedTemplateCount: 1 } })
+    expect(buttons().some((b) => b.getAttribute('aria-label') === '秋の新商品をアカウントへ配る')).toBe(false)
+    expect(host.textContent).toContain('未公開の変更')
+    expect(host.textContent).toContain('下書きだけ')
+    expect(host.textContent).toContain('公開中')
+    expect(host.textContent).toContain('1,860通')
+    expect(host.textContent).toContain('0通')
+    expect(host.textContent).toContain('新しい版を未配布')
+    const menu = buttons().find((b) => b.getAttribute('aria-label') === 'テンプレート「秋の新商品」の操作')
+    await act(async () => { menu!.click() })
+    const item = [...document.querySelectorAll('[role="menuitem"], button')].find((el) => el.textContent?.trim() === 'アカウントへ配る')
+    await act(async () => { (item as HTMLElement).click() })
+    expect(h.onDistribute).toHaveBeenCalledWith(rows[0])
+  })
+
+  it('友だち属性は人数・付け方、リッチメニューは順・誰に出すか・今月押されたを出す（DzdC3・noVq4）', async () => {
+    await render({ type: 'tag', kind: undefined, rows: [{ ...ROWS[0], template_type: 'tag', friend_count: 64, assignment_method: '手動・自動' }] })
+    expect(host.textContent).toContain('64人')
+    expect(host.textContent).toContain('手動・自動')
+    await render({ type: 'rich_menu', kind: undefined, rows: [{ ...ROWS[0], template_type: 'rich_menu', display_order: 0, display_audience: '全員', tap_count: 3210 }] })
+    expect(host.textContent).toContain('全員')
+    expect(host.textContent).toContain('3,210回')
   })
 
   it('上のタブで種類を替える（店と同じ6種類）', async () => {
