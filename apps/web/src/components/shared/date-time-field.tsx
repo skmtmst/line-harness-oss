@@ -35,6 +35,7 @@ import styles from './date-time-field.module.css'
 export default function DateTimeField({
   value,
   defaultValue = '',
+  size = 'default',
   onChange,
   min,
   max,
@@ -53,6 +54,8 @@ export default function DateTimeField({
 }: {
   value?: string
   defaultValue?: string
+  /** 36pxの欄と並べる場合。既定は日付と同じ40px。 */
+  size?: 'default' | 'compact'
   onChange?: (value: string) => void
   min?: string
   max?: string
@@ -137,7 +140,7 @@ export default function DateTimeField({
         <input
           id={fieldId}
           readOnly
-          className={dateStyles.field}
+          className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined].filter(Boolean).join(' ')}
           data-readonly=""
           value={parsed ? formatDateTimeLabel(parsed) : ''}
           placeholder="—"
@@ -157,7 +160,7 @@ export default function DateTimeField({
         ref={triggerRef}
         id={fieldId}
         type="button"
-        className={dateStyles.field}
+        className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined].filter(Boolean).join(' ')}
         disabled={disabled}
         data-invalid={invalid || undefined}
         aria-required={required || undefined}

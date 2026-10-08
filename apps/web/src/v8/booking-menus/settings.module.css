@@ -58,8 +58,8 @@
 .headNote {
   margin: 0;
   color: var(--color-ink-faint);
-  font-size: var(--tpl-bm-12);
-  line-height: 1.6;
+  font-size: var(--tpl-bm-13);
+  line-height: var(--tpl-bm-19);
 }
 
 /* タブ行は頭の下に張り付く（下線が板の頭の線に重なる）。 */
@@ -348,7 +348,7 @@
 }
 
 .menuRow {
-  height: var(--tpl-bm-84);
+  height: calc(var(--tpl-bm-84) + var(--tpl-bm-6));
   box-shadow: var(--shadow-row-line);
 }
 
@@ -433,19 +433,6 @@
   text-decoration: underline;
 }
 
-/* 分類の札。 */
-.tagChip {
-  flex-shrink: 0;
-  padding: var(--tpl-bm-2) var(--tpl-bm-8);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: calc(var(--tpl-bm-1) * -1);
-  border-radius: var(--radius-mini);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bm-12);
-  line-height: var(--tpl-bm-18);
-  white-space: nowrap;
-}
-
 .menuDesc {
   margin: 0;
   overflow: hidden;
@@ -462,11 +449,13 @@
 }
 
 .colPrice {
+  line-height: var(--tpl-bm-17);
   width: var(--tpl-bm-72);
   flex-shrink: 0;
 }
 
 .colStaff {
+  line-height: var(--tpl-bm-17);
   width: var(--tpl-bm-110);
   flex-shrink: 0;
   min-width: 0;
@@ -1181,6 +1170,8 @@
 }
 
 .staffColStatus {
+  display: flex;
+  align-items: center;
   width: var(--tpl-bk2-staff-col-status);
   flex-shrink: 0;
 }

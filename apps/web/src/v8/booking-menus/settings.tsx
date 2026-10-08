@@ -222,36 +222,37 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     setClosedBookingCount(null)
     setPreview((current) => ({ ...current, status: 'loading' }))
 
-    const [menusResult, settingsResult, staffResult] = await Promise.allSettled([
-      bookingApi.listMenus(accountId),
-      bookingApi.getSettings(accountId),
-      bookingApi.listStaff(accountId),
+    // 一覧・設定・担当者は、それぞれの返答だけで表示する（DEEP-26）。
+    await Promise.all([
+      bookingApi.listMenus(accountId).then((response) => {
+        if (!alive()) return
+        setMenus(response.menus)
+        setMenusStatus('ready')
+      }).catch((error: unknown) => {
+        if (!alive()) return
+        setMenusStatus('error')
+        setMenusError(bookingErrorMessage(error, '読み込み'))
+      }),
+      bookingApi.getSettings(accountId).then((response) => {
+        if (!alive()) return
+        if (!response.success) throw new Error('settings_unavailable')
+        setSettings(response.data)
+        setSettingsStatus('ready')
+      }).catch((error: unknown) => {
+        if (!alive()) return
+        setSettingsStatus('error')
+        setSettingsError(bookingRulesErrorMessage(error, '読み込み'))
+      }),
+      bookingApi.listStaff(accountId).then((response) => {
+        if (!alive()) return
+        setStaff(response.staff)
+        setStaffStatus('ready')
+      }).catch((error: unknown) => {
+        if (!alive()) return
+        setStaffStatus('error')
+        setStaffError(bookingErrorMessage(error, '読み込み'))
+      }),
     ])
-    if (!alive()) return
-    if (menusResult.status === 'fulfilled') {
-      setMenus(menusResult.value.menus)
-      setMenusStatus('ready')
-    } else {
-      setMenusStatus('error')
-      setMenusError(bookingErrorMessage(menusResult.reason, '読み込み'))
-    }
-    if (settingsResult.status === 'fulfilled' && settingsResult.value.success) {
-      setSettings(settingsResult.value.data)
-      setSettingsStatus('ready')
-    } else {
-      setSettingsStatus('error')
-      setSettingsError(bookingRulesErrorMessage(
-        settingsResult.status === 'rejected' ? settingsResult.reason : null,
-        '読み込み',
-      ))
-    }
-    if (staffResult.status === 'fulfilled') {
-      setStaff(staffResult.value.staff)
-      setStaffStatus('ready')
-    } else {
-      setStaffStatus('error')
-      setStaffError(bookingErrorMessage(staffResult.reason, '読み込み'))
-    }
   }, [accountId])
 
   useEffect(() => {
