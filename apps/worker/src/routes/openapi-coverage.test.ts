@@ -137,6 +137,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/media/counts',
   'GET /api/conversions/approvals/counts',
   'PUT /api/booking/admin/menus/order',
+  'GET /api/tenants/me/company-contact',
+  'PATCH /api/tenants/me/company-contact',
   'GET /api/hq/templates/attribute-kind-counts',
   'GET /api/hq/templates/{id}/versions',
   'GET /api/hq/templates/{id}/versions/compare',
