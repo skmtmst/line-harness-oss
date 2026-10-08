@@ -36,6 +36,8 @@ export interface ListPageBodyProps {
   folderWidth?: number
   /** 表以外の配布内容も一覧の道具列と同じ左右余白へ収める。 */
   contentInset?: boolean
+  /** 窓の本文（左寄せの flex）でも、一覧の幅を窓いっぱいに広げる。 */
+  fillWidth?: boolean
   toolbar?: ReactNode
   children: ReactNode
   pagination?: ReactNode
@@ -47,10 +49,10 @@ export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   tabs?: ReactNode
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, toolbar, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, toolbar, children, pagination, overlays }: ListPageBodyProps) {
   const navs = folderNav ? (Array.isArray(folderNav) ? folderNav : [folderNav]) : []
   const collapsed = collapsedFolders ?? (folders && navs.length > 0 ? navs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
-  return <div className={styles.listBody}>
+  return <div className={styles.listBody} style={fillWidth ? { width: '100%' } : undefined}>
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     <div className={styles.split} data-template-region="body">
       {folders ? <aside className={styles.folders} data-template-region="folders" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}

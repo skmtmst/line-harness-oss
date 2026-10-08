@@ -260,6 +260,7 @@ export interface TagEditHost {
   initialValues: TagEditorValues
   title: string
   saveLabel?: string
+  onSaveDraft?: (values: TagEditorValues) => void
   description: string
   notice?: ReactNode
   preview: (values: TagEditorValues) => ReactNode
@@ -462,7 +463,7 @@ export function TagEditForm({
           <>
             <Button onClick={onCancel}>キャンセル</Button>
             {/* 閲覧のみには押せない操作を置かない（隠す）。 */}
-            {readOnly ? null : host ? <Button disabled={saving || !name.trim()} onClick={() => host.onSaveAnother(values)}><Copy size={14} aria-hidden="true" />保存して続けて作る</Button> : <Button href={`/tags/new?copy=${tag.id}`}><Copy size={14} aria-hidden="true" />複製して作る</Button>}
+            {readOnly ? null : host?.onSaveDraft ? <Button disabled={saving || !name.trim()} onClick={() => host.onSaveDraft?.(values)}>下書きを保存</Button> : host ? <Button disabled={saving || !name.trim()} onClick={() => host.onSaveAnother(values)}><Copy size={14} aria-hidden="true" />保存して続けて作る</Button> : <Button href={`/tags/new?copy=${tag.id}`}><Copy size={14} aria-hidden="true" />複製して作る</Button>}
             {readOnly ? null : (
               <Button variant="primary" onClick={conflict ? onCompare : requestSave} busy={saving} disabled={Boolean(host) && !name.trim()}>
                 {conflict ? <GitCompare size={14} aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}

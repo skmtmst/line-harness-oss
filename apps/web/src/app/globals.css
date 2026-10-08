@@ -774,6 +774,9 @@
   --tpl-htn-check-row-h: 46px; --tpl-htn-check-pad: 0 16px; --tpl-htn-import-pad: 16px 16px 12px; --tpl-htn-import-gap: 2px; --tpl-htn-done-gap: 14px; --tpl-htn-progress-h: 6px;
   --tpl-htn-footer-pad: 14px 0 0; --tpl-htn-result-gap: 12px; --tpl-htn-result-row-h: 36px; --tpl-htn-result-label-w: 208px; --tpl-htn-result-badge-w: 120px; --tpl-htn-ack-pad: 4px 0 0; --tpl-htn-result-pull-top: -14px; --tpl-htn-result-pull-bottom: -15px; --tpl-htn-dialog-footer-pad: 14px 24px;
   --tpl-htn-radius-s: 8px; --tpl-htn-empty-pad: 28px 16px; --tpl-htn-folder-gap: 2px; --tpl-htn-folder-item-pad: 6px 10px; --tpl-htn-dot: 8px; --tpl-htn-search-w: 260px; --tpl-htn-bulk-w: 220px; --tpl-htn-mode-w: 150px;
+  /* G-3：保存後の配り先選択。 */
+  --tpl-hq-save-row-h: 44px; --tpl-hq-save-row-pad: 8px 12px; --tpl-hq-save-footer-pad: 12px 24px;
+  --tpl-hq-save-picked-bg: color-mix(in srgb, var(--color-success-bg) 40%, var(--color-canvas));
   --tpl-htn-col-ref: 164px; --tpl-htn-col-date: 124px; --tpl-htn-col-dest: 174px; --tpl-htn-col-actions: 253px; --tpl-htn-col-check: 51px; --tpl-htn-col-item: 194px; --tpl-htn-col-version: 154px; --tpl-htn-col-mode: 183px;
   --tpl-htn-head-pad: 0 7px; --tpl-htn-head-h: 34px; --tpl-htn-preview-card-tail: 34px; --tpl-htn-row-h: 56px; --tpl-htn-cell-pad: 0 7px; --tpl-htn-edge: 16px; --tpl-htn-sub-gap: 2px;
   --tpl-htn-edit-gap: 20px; --tpl-htn-textarea-h: 72px; --tpl-htn-textarea-pad: 8px 10px; --tpl-htn-seg-gap: 2px; --tpl-htn-seg-pad: 3px; --tpl-htn-seg-item-pad: 5px 14px 6px;

@@ -11,7 +11,7 @@ import Button from '@/components/shared/button'
 import styles from './tag-editor.module.css'
 
 /** 店のV8編集フォームの入力・並べ替え・マイルと、統括の保存先をつなぐ。店のAPIは呼ばない。 */
-export default function HqTagEditorV8({ definition, editing, saving, readOnly = false, conflict = false, error, notice, onReloadLatest, onCancel, onSave }: {
+export default function HqTagEditorV8({ definition, editing, saving, readOnly = false, conflict = false, error, notice, onReloadLatest, onCancel, onSave, onSaveDraft }: {
   definition: TagDefinition
   editing: boolean
   saving: boolean
@@ -21,6 +21,7 @@ export default function HqTagEditorV8({ definition, editing, saving, readOnly = 
   error?: string
   notice?: string
   onCancel: () => void
+  onSaveDraft?: (definition: TagDefinition) => Promise<void>
   onSave: (definition: TagDefinition, andAnother?: boolean) => Promise<void>
 }) {
   const initialValues = hqTagDefinitionToEditor(definition)
@@ -62,7 +63,8 @@ export default function HqTagEditorV8({ definition, editing, saving, readOnly = 
     retroactiveReference={false} initialActions={initialValues.actions} saving={saving} error={conflict ? '' : error ?? ''}
     onCancel={onCancel} onDelete={() => undefined} onSave={(values) => save(values)}
     host={{ initialValues, title: editing ? 'タグのひな形を編集' : 'タグのひな形を作る',
-      saveLabel: editing ? '変更を保存する' : 'タグを作る',
+      saveLabel: onSaveDraft ? '保存する' : editing ? '変更を保存する' : 'タグを作る',
+      onSaveDraft: onSaveDraft ? (values) => { void onSaveDraft(hqTagEditorToDefinition(definition, values)) } : undefined,
       notice: conflict && error ? <Notice tone="warn" message={error} action={onReloadLatest ? <Button disabled={saving} onClick={onReloadLatest}>最新の内容を読み込む</Button> : undefined} /> : undefined,
       description: notice ?? '保存したひな形は、一覧の［配る］で各 LINE アカウントへ配ります。',
       preview, onSaveAnother: (values) => { void save(values, true) }, allowedActionTypes: ['テキスト送信', 'マイル付与'] }}

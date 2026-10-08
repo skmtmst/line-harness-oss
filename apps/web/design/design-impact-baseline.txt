@@ -757,3 +757,4 @@ shared-button-importer v8/tag-edit/edit.tsx
 shared-button-importer v8/tag-edit/search-edit.tsx
 shared-button-importer v8/rich-menu-edit/detail.tsx
 shared-button-importer v8/affiliate-offer-new/create.tsx
+shared-button-importer v8/hq-templates/saved-distribution-dialog.tsx
