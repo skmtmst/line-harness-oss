@@ -21,6 +21,7 @@ import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
 import Toggle from '@/components/shared/toggle'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -491,10 +492,10 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             </Field>
             <div className={styles.fieldPair}>
               <Field label="期間 はじめ" htmlFor="gb-post-start" input grow>
-                <TextField id="gb-post-start" type="datetime-local" value={form.start} onChange={(e) => set({ start: e.target.value })} disabled={!editable} />
+                <DateTimeField id="gb-post-start" value={form.start} onChange={(next) => set({ start: next })} disabled={!editable} />
               </Field>
               <Field label="期間 おわり" htmlFor="gb-post-end" input grow>
-                <TextField id="gb-post-end" type="datetime-local" value={form.end} onChange={(e) => set({ end: e.target.value })} disabled={!editable} />
+                <DateTimeField id="gb-post-end" value={form.end} onChange={(next) => set({ end: next })} disabled={!editable} />
               </Field>
             </div>
           </div>
