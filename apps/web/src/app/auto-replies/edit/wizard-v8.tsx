@@ -104,6 +104,7 @@ import { inEvaluationOrder, PRIORITY_MAX, PRIORITY_MIN, type OrderedRule } from 
 import { canPublish, conflictTone, publishGates } from '@/app/auto-replies/publish/publish-flow'
 import AutoReplyInsertChips, { insertedLabels } from './insert-chips'
 import styles from './wizard-v8.module.css'
+import InsertTextField from '@/components/shared/insert-text-field'
 
 /*
  * ★V8 自動応答の作成・編集・有効化。
@@ -1969,12 +1970,12 @@ function AutoReplyWizardV8Inner() {
 
                 {form.mode === 'inline-text' && (
                   <div className={styles.bodyBox}>
-                    <textarea
+                    <InsertTextField
                       id="wiz-content"
                       aria-label="返す文"
                       className={styles.bodyText}
                       value={form.responseContent}
-                      onChange={(e) => patch({ responseContent: e.target.value })}
+                      onValueChange={(next) => patch({ responseContent: next })}
                       placeholder="例：予約の変更を承りました。担当者が確認次第ご連絡します。"
                       maxLength={5000}
                       rows={2}
