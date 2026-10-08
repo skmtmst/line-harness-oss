@@ -379,6 +379,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         title="リッチメッセージを作る"
         description="1枚の画像を面に分けて、押した面ごとに動く"
         backHref={host?.backHref}
+        onBack={host?.onCancel}
         side={(
           <>
             <div className={styles.previewToggle}>

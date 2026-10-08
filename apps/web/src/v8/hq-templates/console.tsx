@@ -757,10 +757,11 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
                 {!canonicalEditorOwnsSave && type !== 'rich_menu' ? (
                   <label className={styles.field}><span className={styles.label}>ひな形の名前</span><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={(event) => setName(event.target.value)} /></label>
                 ) : null}
-                <div className={styles.field}>
+                {/* タグは中の「所属フォルダ」で分けるので、上のフォルダは出さない（同じ物が2つに見える・オーナー 10-08）。一覧での分けは「…」の「フォルダへ移す」。 */}
+                {type !== 'tag' ? <div className={styles.field}>
                   <span className={styles.label}>フォルダ</span>
                   <FolderSelect aria-label="フォルダ" size="full" value={folderId ?? ''} disabled={busy || createUncertain || folderLoadFailed} onChange={(next) => setFolderId(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))} onCreate={canEdit ? createFolder : undefined} colors={false} />
-                </div>
+                </div> : null}
               </div>
               {!canonicalEditorOwnsSave && type !== 'rich_menu' ? (
                 <label className={styles.field}><span className={styles.label}>説明</span><textarea className={styles.textarea} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={(event) => setDescription(event.target.value)} /></label>

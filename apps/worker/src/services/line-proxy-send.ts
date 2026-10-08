@@ -44,8 +44,8 @@ export async function pushViaHarnessProxy(
     response.status === 409 && Boolean(response.headers.get('x-line-accepted-request-id'));
   if (response.ok || alreadyAccepted) {
     return {
-      requestId: response.headers.get('x-line-request-id')
-        ?? response.headers.get('x-line-accepted-request-id'),
+      requestId: response.headers.get('x-line-accepted-request-id')
+        ?? response.headers.get('x-line-request-id'),
     };
   }
 

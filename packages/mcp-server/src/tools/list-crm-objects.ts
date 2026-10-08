@@ -32,7 +32,7 @@ export function registerListCrmObjects(server: McpServer): void {
             items = await client.scenarios.list({ accountId });
             break;
           case "forms":
-            items = await client.forms.list();
+            items = await client.forms.list({ accountId });
             break;
           case "tags":
             items = await client.tags.list();
