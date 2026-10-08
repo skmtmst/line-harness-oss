@@ -18,6 +18,8 @@ const updateProject = vi.hoisted(() => vi.fn())
 const removeImage = vi.hoisted(() => vi.fn())
 const createGeneration = vi.hoisted(() => vi.fn())
 const listAccounts = vi.hoisted(() => vi.fn())
+const deliverImage = vi.hoisted(() => vi.fn())
+const listFolders = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const roleBox = vi.hoisted(() => ({ role: 'owner' as string | null }))
 
@@ -32,8 +34,9 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         presets,
         usage: vi.fn(async () => ({ success: false })),
         projects: { ...actual.api.hqBanners.projects, get: getProject, update: updateProject, list: vi.fn(async () => ({ success: true, data: [] })), createGeneration },
-        images: { ...actual.api.hqBanners.images, remove: removeImage },
+        images: { ...actual.api.hqBanners.images, remove: removeImage, deliver: deliverImage },
       },
+      lineAccountFolders: { ...actual.api.lineAccountFolders, list: listFolders },
       lineAccounts: { ...actual.api.lineAccounts, list: listAccounts },
     },
   }
@@ -91,6 +94,8 @@ beforeEach(() => {
   updateProject.mockImplementation(async (_id: string, patch: Record<string, unknown>) => ({ success: true, data: { id: 'p1', name: '秋のキャンペーン', description: null, isFavorite: false, archivedAt: patch.archived ? '2026-10-06T10:00:00+09:00' : null, imageCount: 2, runningCount: 0, createdBy: null, createdAt: '', updatedAt: '' } }))
   removeImage.mockResolvedValue({ success: true, data: null })
   listAccounts.mockResolvedValue({ success: true, data: [] })
+  listFolders.mockResolvedValue({ success: true, data: { folders: [] } })
+  deliverImage.mockReset()
   push.mockReset()
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -119,10 +124,95 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     expect(host.textContent).toContain('一斉配信の上の写真・10月。右で用途とテキストを決めて生成し')
     expect(host.textContent).toContain('すべて 2')
     expect(host.textContent).toContain('お気に入り 1')
-    expect(host.textContent).toContain('アカウントへ渡し済み 1')
+    expect(host.textContent).toContain('配布済み 1')
     expect(host.textContent).toContain('リッチメッセージ・1:1')
     // 下の帯のボタンは板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。
     expect(buttonNamed('生成する（1枚）') ?? buttonNamed('生成する（4枚）')).toBeTruthy()
+  })
+
+  it('絞り込みで見えている画像だけまとめて選び、画像を押すと詳細へ進む', async () => {
+    act(() => { root.render(<HqBannerProjectV8 />) })
+    await flush()
+    expect(buttonNamed('2 枚をアカウントへ配る')).toBeUndefined()
+    act(() => { buttonNamed('お気に入り 1')!.click() })
+    await flush()
+    const all = host.querySelector('input[type="checkbox"]') as HTMLInputElement
+    act(() => all.click())
+    await flush()
+    expect(buttonNamed('1 枚をアカウントへ配る')).toBeTruthy()
+    expect(host.querySelector('[aria-label="画像 1 を選ぶ"]')?.closest('article')?.dataset.selected).toBe('true')
+    act(() => { buttonNamed('すべて 2')!.click() })
+    await flush()
+    expect((host.querySelector('[aria-label="画像 2 を選ぶ"]') as HTMLInputElement).checked).toBe(false)
+    expect((host.querySelector('input[type="checkbox"]') as HTMLInputElement).indeterminate).toBe(true)
+    act(() => { (host.querySelector('[aria-label="画像 1 を開く"]') as HTMLButtonElement).click() })
+    await flush()
+    expect(document.body.textContent).toContain('画像の詳細')
+  })
+
+  it('共通の配る窓でフォルダを選び、途中の失敗があっても残りを配り、失敗分だけ再試行する', async () => {
+    listAccounts.mockResolvedValue({ success: true, data: [
+      { id: 'a1', name: '銀座店', folderId: 'f1' },
+      { id: 'a2', name: '新宿店', folderId: null },
+      { id: 'a3', name: '閉店', archivedAt: '2026-10-01', folderId: 'f1' },
+    ] })
+    listFolders.mockResolvedValue({ success: true, data: { folders: [{ id: 'f1', name: '東京', color: 'green', displayOrder: 0 }] } })
+    deliverImage.mockImplementation(async (id: string) => id === 'img-1'
+      ? { success: false, error: '通信できませんでした' }
+      : { success: true, data: { image: image(2, { deliveredAccountIds: ['a1'] }), deliveries: [] } })
+    act(() => { root.render(<HqBannerProjectV8 />) })
+    await flush()
+    act(() => { (host.querySelector('input[type="checkbox"]') as HTMLInputElement).click() })
+    await flush()
+    act(() => { buttonNamed('2 枚をアカウントへ配る')!.click() })
+    await flush()
+    expect(document.body.textContent).toContain('2枚の画像をアカウントへ配る')
+    expect(document.body.textContent).not.toContain('閉店')
+    expect(deliverImage).not.toHaveBeenCalled()
+    act(() => { (document.querySelector('[aria-label="東京をまとめて選ぶ"]') as HTMLInputElement).click() })
+    await flush()
+    act(() => { buttonNamed('1 アカウントへ配る')!.click() })
+    await flush()
+    expect(deliverImage.mock.calls).toEqual([['img-1', ['a1']], ['img-2', ['a1']]])
+    expect(document.body.textContent).toContain('2枚中 1枚を1アカウントへ配りました')
+    expect(document.body.textContent).toContain('失敗 1枚')
+    expect((host.querySelector('[aria-label="画像 1 を選ぶ"]') as HTMLInputElement).checked).toBe(true)
+    expect((host.querySelector('[aria-label="画像 2 を選ぶ"]') as HTMLInputElement).checked).toBe(false)
+    deliverImage.mockResolvedValue({ success: true, data: { image: image(1, { deliveredAccountIds: ['a1'] }), deliveries: [] } })
+    act(() => { buttonNamed('1 アカウントへ配る')!.click() })
+    await flush()
+    expect(deliverImage.mock.calls).toEqual([['img-1', ['a1']], ['img-2', ['a1']], ['img-1', ['a1']]])
+    expect(document.body.textContent).toContain('1枚中 1枚を1アカウントへ配りました')
+    expect((buttonNamed('1 アカウントへ配る') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('配布中は二重送信と閉じる操作を止め、あとではAPIを呼ばず選択を保つ', async () => {
+    listAccounts.mockResolvedValue({ success: true, data: [{ id: 'a1', name: '銀座店', folderId: null }] })
+    let finish!: (result: unknown) => void
+    deliverImage.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    act(() => { root.render(<HqBannerProjectV8 />) })
+    await flush()
+    act(() => { (host.querySelector('[aria-label="画像 2 を選ぶ"]') as HTMLInputElement).click() })
+    await flush()
+    act(() => { buttonNamed('1 枚をアカウントへ配る')!.click() })
+    await flush()
+    act(() => { buttonNamed('あとで')!.click() })
+    await flush()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(deliverImage).not.toHaveBeenCalled()
+    act(() => { buttonNamed('1 枚をアカウントへ配る')!.click() })
+    await flush()
+    act(() => { (document.querySelector('[aria-label="銀座店"]') as HTMLInputElement).click() })
+    await flush()
+    const send = buttonNamed('1 アカウントへ配る') as HTMLButtonElement
+    act(() => { send.click(); send.click() })
+    await flush()
+    expect(deliverImage).toHaveBeenCalledTimes(1)
+    expect((buttonNamed('あとで') as HTMLButtonElement).disabled).toBe(true)
+    expect(document.body.textContent).toContain('1枚中 1枚目を配っています')
+    await act(async () => finish({ success: true, data: { image: image(2, { deliveredAccountIds: ['a1'] }), deliveries: [] } }))
+    await flush()
+    expect(document.body.textContent).toContain('1枚中 1枚を1アカウントへ配りました')
   })
 
   it('アーカイブは確かめてから行い、一覧へ戻る', async () => {
@@ -163,6 +253,7 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     expect(buttonNamed('画像を取り込む')).toBeUndefined()
     expect(buttonNamed('アーカイブ')).toBeUndefined()
     expect(host.querySelector('[aria-label="画像を生成"]')).toBeNull()
+    expect(host.querySelector('input[type="checkbox"]')).toBeNull()
     expect(host.querySelector('[aria-label="お気に入りにする"]')).toBeNull()
     act(() => { (host.querySelector('[aria-label="画像 1 を開く"]') as HTMLButtonElement).click() })
     await flush()
