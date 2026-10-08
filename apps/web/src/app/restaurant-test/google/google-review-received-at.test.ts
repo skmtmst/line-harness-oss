@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { reviewReceivedAt } from './google-format'
+import { reviewReceivedAt } from '@/v8/restaurant/google/format'
 
-const page = readFileSync(new URL('./google-business.tsx', import.meta.url), 'utf8')
+const page = readFileSync(new URL('../../../v8/restaurant/google/reviews.tsx', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../../../lib/restaurant-google-api.ts', import.meta.url), 'utf8')
 
 describe('口コミの受信日時', () => {
@@ -22,8 +22,7 @@ describe('口コミの受信日時', () => {
   })
 
   it('一覧・下書き・公開確認のどの日時も受信日時の計算を通す', () => {
-    expect(page).toContain('{formatDateTime(reviewReceivedAt(review))}')
-    expect(page).toContain('{formatDate(reviewReceivedAt(review))}')
+    expect(page).toContain('formatShortStamp(reviewReceivedAt(review))')
     // createTime を直接出す箇所を残さない。
     expect(page).not.toContain('formatDateTime(review.createTime)')
     expect(page).not.toContain('formatDate(review.createTime)')
