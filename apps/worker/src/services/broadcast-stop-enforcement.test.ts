@@ -722,3 +722,25 @@ describe('停止と再送の件数（全経路）', () => {
     expect(broadcastRow(raw).status).toBe('sent');
   });
 });
+
+it('タグ配信は非表示・ブロック中・別店の相手を送らず、事前人数と一致する', async () => {
+  const { db, raw } = createTestD1();
+  try {
+    seedAccount(raw);
+    insertFriend(raw, 'shown', { line_account_id: 'acc1' });
+    insertFriend(raw, 'hidden', { line_account_id: 'acc1', is_hidden: 1 });
+    insertFriend(raw, 'blocked', { line_account_id: 'acc1', is_following: 0 });
+    insertFriend(raw, 'other', { line_account_id: 'other-account' });
+    raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES('target','Target','acc1'); INSERT INTO friend_tags(friend_id,tag_id) SELECT id,'target' FROM friends;");
+    raw.exec("INSERT INTO broadcasts(id,title,message_type,message_content,target_type,target_tag_id,status,track_links,line_account_id) VALUES('hidden-check','Check','text','Hello','tag','target','draft',0,'acc1')");
+    const { countAudience } = await import('./broadcast-preflight.js');
+    const counted = await countAudience(db, { targetType: 'tag', targetTagId: 'target', lineAccountId: 'acc1' });
+    const { client, sentUserIds } = makeLineClient();
+    await processBroadcastSend(db, client, 'hidden-check');
+    expect(sentUserIds()).toEqual(['Ushown']);
+    expect(sentUserIds().length).toBe(counted.total);
+    expect(counted.hiddenExcluded).toBe(1);
+    expect(raw.prepare("SELECT total_count,success_count FROM broadcasts WHERE id='hidden-check'").get())
+      .toEqual({ total_count: 1, success_count: 1 });
+  } finally { raw.close(); }
+});

@@ -148,6 +148,7 @@ describe('POST /api/conversions/approvals/bulk (R354)', () => {
       'aff-1',
       '案件X',
       1000,
+      expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
     );
     expect(dbMocks.markApprovalNotified).toHaveBeenCalledTimes(1);
   });

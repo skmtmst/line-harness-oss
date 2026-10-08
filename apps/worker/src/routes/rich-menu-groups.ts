@@ -1,3 +1,4 @@
+import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../services/rich-menu-group-input.js';
 import { Hono, type Context } from 'hono';
 import {
   getRichMenuGroups,
@@ -1246,7 +1247,6 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
     const imageByGroupId = new Map<string, { key: string; contentType: string | null }>();
     const shapeByGroupId = new Map<string, { pageCount: number; areaCount: number }>();
     if (pageItems.length > 0) {
-      const placeholders = pageItems.map(() => '?').join(',');
       const result = await c.env.DB
         .prepare(
           `SELECT
@@ -1265,9 +1265,9 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
               (SELECT p2.id FROM rich_menu_pages p2 WHERE p2.group_id = g.id ORDER BY p2.order_index LIMIT 1)
             )) AS default_area_count
            FROM rich_menu_groups g
-          WHERE g.id IN (${placeholders})`,
+          WHERE g.account_id = ? AND g.id IN (SELECT value FROM json_each(?))`,
         )
-        .bind(...pageItems.map((g) => g.id))
+        .bind(accountId, JSON.stringify(pageItems.map((g) => g.id)))
         .all<{
           group_id: string;
           image_r2_key: string | null;
@@ -2279,31 +2279,16 @@ async function buildPublishGroupInput(
   latestGroup: RichMenuGroupWithPages,
   account: { liff_id?: string | null },
 ): Promise<GroupInput> {
-  const trackedLinkUrls = await resolveTrackedLinkUrls(
+  return assembleRichMenuGroupInput(
     c.env.DB,
-    () => resolveTrackedLinkBaseUrl(c.env.DB, c.env.WORKER_URL || new URL(c.req.url).origin),
-    latestGroup,
+    richMenuLiveToSnapshot(latestGroup),
+    account,
+    {
+      fallbackGroupId: latestGroup.id,
+      workerBaseUrl: c.env.WORKER_URL || new URL(c.req.url).origin,
+      liffUrl: c.env.LIFF_URL,
+    },
   );
-  const formBaseUrl = account.liff_id ? `https://liff.line.me/${account.liff_id}` : (c.env.LIFF_URL ?? null);
-  return {
-    id: latestGroup.id,
-    size: latestGroup.size,
-    chatBarText: latestGroup.chat_bar_text,
-    isDefaultForAll: latestGroup.is_default_for_all === 1,
-    defaultOpen: latestGroup.default_open === 1,
-    formBaseUrl,
-    pages: latestGroup.pages.map((p) => ({
-      id: p.id, orderIndex: p.order_index, name: p.name,
-      imageR2Key: p.image_r2_key, imageContentType: p.image_content_type, lineRichMenuId: p.line_richmenu_id,
-      areas: p.areas.map((a) => ({
-        id: a.id,
-        bounds: { x: a.bounds_x, y: a.bounds_y, width: a.bounds_width, height: a.bounds_height },
-        actionType: a.action_type, actionData: a.actionData, intent: a.intent, label: a.label,
-        tagIds: a.tagIds, scoreChange: a.score_change, templateId: a.template_id, formId: a.form_id,
-        trackedLinkUrl: a.tracked_link_id ? (trackedLinkUrls.get(a.tracked_link_id) ?? null) : null,
-      })),
-    })),
-  };
 }
 
 /** K-1「公開の進み」の段の名前。設計 K-1 の4段。 */

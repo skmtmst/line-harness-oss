@@ -853,8 +853,8 @@ export async function importMileageRewardCodes(
          FROM mileage_reward_codes c
          JOIN mileage_reward_versions v ON v.id = c.reward_version_id
          JOIN mileage_rewards r ON r.id = v.reward_id
-        WHERE r.line_account_id = ? AND c.code_fingerprint IN (${chunk.map(() => '?').join(', ')})`,
-    ).bind(input.lineAccountId, ...chunk.map((code) => code.fingerprint))
+        WHERE r.line_account_id = ? AND c.code_fingerprint IN (SELECT value FROM json_each(?))`,
+    ).bind(input.lineAccountId, JSON.stringify(chunk.map((code) => code.fingerprint)))
       .all<{ fingerprint: string }>();
     for (const row of rows.results) existing.add(row.fingerprint);
   }
