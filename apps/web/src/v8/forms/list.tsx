@@ -1002,8 +1002,9 @@ export default function FormsListV8() {
 
   /* ===== フォルダの列 ===== */
   const folderRows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: loading || loadError ? null : folderTotal },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: loading || loadError ? null : folderTotal },
     ...folders.map((folder, index) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
       count: folder.itemCount ?? null,
@@ -1014,7 +1015,7 @@ export default function FormsListV8() {
       onDelete: canManageFolders ? () => void openFolderDelete(folder) : undefined,
       deleteNote: '削除しても、中のフォームは未分類に残ります。',
     })),
-    { id: UNFILED_VALUE, label: '未分類', count: loading || loadError ? null : unfiledCount },
+    { kind: 'unfiled' as const, id: UNFILED_VALUE, label: '未分類', count: loading || loadError ? null : unfiledCount },
   ]
 
   const folderSelectOptions = [

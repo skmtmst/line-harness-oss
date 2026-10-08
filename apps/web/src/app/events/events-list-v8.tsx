@@ -593,14 +593,15 @@ export default function EventsListV8() {
             onAddFolder={() => { closeDetail(); setFolderDialogOpen(true) }}
             addFolderNote="フォルダを消しても、中のイベントは未分類に残ります"
             rows={[
-              { id: '', label: 'すべて', count: listTotal },
+              { kind: 'all' as const, id: '', label: 'すべて', count: listTotal },
               ...folders.map((folder) => ({
+                kind: 'folder' as const,
                 id: folder.id,
                 label: folder.name,
                 count: folder.itemCount ?? null,
                 color: folder.color,
               })),
-              { id: UNFILED, label: '未分類', count: unfiledCount },
+              { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
             ]}
           >
             {foldersError && (items.length > 0 || loadStatus !== 'ready') ? (

@@ -269,10 +269,10 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
 
   const ready = status === 'ready' && !archivedMode
   const rows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? projects.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    { id: 'favorite', label: 'お気に入り', count: ready ? projects.filter((p) => p.isFavorite).length : null, color: 'var(--color-status-info)' },
-    { id: 'running', label: '生成中', count: ready ? projects.filter((p) => p.runningCount > 0).length : null, color: 'var(--color-accent)' },
-    { id: 'archived', label: 'アーカイブ', count: archivedCount, color: 'var(--color-status-warn)' },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? projects.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'folder' as const, id: 'favorite', label: 'お気に入り', count: ready ? projects.filter((p) => p.isFavorite).length : null, color: 'var(--color-status-info)' },
+    { kind: 'folder' as const, id: 'running', label: '生成中', count: ready ? projects.filter((p) => p.runningCount > 0).length : null, color: 'var(--color-accent)' },
+    { kind: 'folder' as const, id: 'archived', label: 'アーカイブ', count: archivedCount, color: 'var(--color-status-warn)' },
   ]
 
   const createProject = canManage ? (
@@ -564,10 +564,10 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
 
   const ready = status === 'ready'
   const rows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? counts?.all ?? images.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    { id: 'favorite', label: 'お気に入り', count: ready ? counts?.favorite ?? null : null, color: 'var(--color-status-info)' },
-    { id: 'delivered', label: '渡し済み', count: ready ? counts?.delivered ?? null : null, color: 'var(--color-accent)' },
-    { id: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null, color: 'var(--color-status-warn)' },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? counts?.all ?? images.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'folder' as const, id: 'favorite', label: 'お気に入り', count: ready ? counts?.favorite ?? null : null, color: 'var(--color-status-info)' },
+    { kind: 'folder' as const, id: 'delivered', label: '渡し済み', count: ready ? counts?.delivered ?? null : null, color: 'var(--color-accent)' },
+    { kind: 'folder' as const, id: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null, color: 'var(--color-status-warn)' },
   ]
 
   const uploadImage = canManage ? (

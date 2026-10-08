@@ -204,8 +204,9 @@ export default function HqStoreList(props: HqStoreListProps) {
   )
 
   const folderRows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? rows.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? rows.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
     ...folders.map((folder) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
       count: ready ? countIn(folder.id) : null,
@@ -215,7 +216,7 @@ export default function HqStoreList(props: HqStoreListProps) {
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
-    { id: 'none', label: '未分類', count: ready ? countIn('none') : null },
+    { kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null },
   ]
   const selectFolder = (id: string) => { onFolderFilter(id); setPage(1) }
   const folderPanel = folderLoadFailed ? (

@@ -396,7 +396,7 @@ export default function OffersTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={FOLDERS.map((item) => ({ id: item.key, label: item.label, count: ready ? offers.filter(item.match).length : null, color: item.color }))}
+      rows={FOLDERS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: ready ? offers.filter(item.match).length : null, color: item.color }))}
       activeId={folder}
       onSelect={(id) => resetPage(() => { setSaved(''); setFolder(id as FolderKey) })}
       addFolderNote={<p className={styles.stateDesc}>成果が出たときの動きで分けた見え方です</p>}

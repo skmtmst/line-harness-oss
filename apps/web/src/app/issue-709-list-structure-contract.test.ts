@@ -64,13 +64,15 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
     // R602補足: 未取得・読込中・取得失敗の総数は不明なので出さない
     // （null は数を出さない約束。偽ゼロにしない）。
     // 出どころは絞り込み前の総数（folderTotal）のまま変えない。
-    expect(src).toContain("{ id: 'all', label: 'すべて', count: loading || loadError ? null : folderTotal }")
+    expect(src).toContain("kind: 'all'")
+    expect(src).toContain("id: 'all', label: 'すべて', count: loading || loadError ? null : folderTotal }")
     expect(src).not.toContain('`${folderTotal} 件`')
   })
 
   it('R12: リマインダは見出しの総数を「すべて」の行と重ねて出さない', () => {
     const src = read('reminders/list-v8.tsx')
-    expect(src).toContain("{ id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' }")
+    expect(src).toContain("kind: 'all'")
+    expect(src).toContain("id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' }")
     expect(src).not.toContain('`${listTotal}件`')
   })
 })

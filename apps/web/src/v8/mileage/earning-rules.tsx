@@ -569,7 +569,7 @@ export default function EarningRulesTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={FOLDERS.map((item) => ({ id: item.key, label: item.label, count: folderCounts.get(item.key) ?? 0, color: item.color }))}
+      rows={FOLDERS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: folderCounts.get(item.key) ?? 0, color: item.color }))}
       activeId={folder}
       onSelect={(id) => resetPage(() => setFolder(id as FolderKey))}
       addFolderNote="フォルダを消しても、中の経路は未分類に残ります"

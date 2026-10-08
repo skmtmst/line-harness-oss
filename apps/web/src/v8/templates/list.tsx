@@ -867,8 +867,9 @@ export default function TemplatesListV8() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
   const folderRows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? tabItems.length : null },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? tabItems.length : null },
     ...folders.map((folder, index) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
       count: folder.itemCount ?? null,
@@ -880,7 +881,7 @@ export default function TemplatesListV8() {
       onDelete: canMutateTemplates ? () => setDeletingFolder(folder) : undefined,
       deleteNote: '削除しても、中のテンプレートは未分類に残ります。',
     })),
-    { id: 'unfiled', label: '未分類', count: ready ? unfiledCount : null },
+    { kind: 'unfiled' as const, id: 'unfiled', label: '未分類', count: ready ? unfiledCount : null },
   ]
   const folderSelectOptions = [
     { value: 'all', label: 'フォルダ：すべて' },

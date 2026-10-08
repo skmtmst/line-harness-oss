@@ -545,6 +545,7 @@ export default function V8RewardsTab({
           <FolderPanel
             heading="フォルダ"
             rows={FOLDERS.map((key) => ({
+              kind: key === 'すべて' ? 'all' as const : key === '未分類' ? 'unfiled' as const : 'folder' as const,
               id: key,
               label: key,
               count: folderCounts.get(key) ?? 0,

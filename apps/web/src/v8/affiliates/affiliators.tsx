@@ -416,7 +416,7 @@ export default function AffiliatorsTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={GROUPS.map((item) => ({ id: item.key, label: item.label, count: ready ? groupCount(item.key) : null, color: item.color }))}
+      rows={GROUPS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: ready ? groupCount(item.key) : null, color: item.color }))}
       activeId={group}
       onSelect={(id) => resetPage(() => { setSaved(''); setGroup(id as GroupKey) })}
       addFolderNote={<p className={styles.stateDesc}>報酬の決め方で分けた見え方です</p>}

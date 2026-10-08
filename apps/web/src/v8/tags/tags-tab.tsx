@@ -600,8 +600,9 @@ export default function TagsTab({
 
   /* フォルダの列。数は一覧と同じものを数える。 */
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: ready ? items.length : null, color: 'var(--color-accent)', icon: <Inbox size={14} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? items.length : null, color: 'var(--color-accent)', icon: <Inbox size={14} aria-hidden="true" /> },
     ...groups.map((group, index) => ({
+      kind: 'folder' as const,
       id: group.id,
       label: group.name,
       count: ready ? items.filter((tag) => tag.groupId === group.id).length : null,
@@ -612,7 +613,7 @@ export default function TagsTab({
       onDelete: canEdit ? () => setDeletingGroup(group) : undefined,
       deleteNote: '削除しても、中のタグは未分類に残ります。',
     })),
-    { id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={14} aria-hidden="true" /> },
+    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={14} aria-hidden="true" /> },
   ]
 
   const folderSelectOptions = [

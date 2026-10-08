@@ -913,9 +913,10 @@ function CommonVarsListV8Inner() {
   ]
 
   const folderRows = [
-    { id: '', label: 'すべて', count: listFailed ? null : items.length },
-    { id: UNGROUPED, label: '未分類', count: unfiledCount },
+    { kind: 'all' as const, id: '', label: 'すべて', count: listFailed ? null : items.length },
+    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: unfiledCount },
     ...folders.map((folder) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
       count: folder.itemCount ?? null,
