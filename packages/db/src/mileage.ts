@@ -1,3 +1,4 @@
+import type { MileageHistoryTypeFilter } from '@line-crm/shared';
 import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
 import { matchesCondition, parseCondition, type SegmentCondition } from './segment-conditions.js';
 import { dbTableExists, jstNow } from './utils.js';
@@ -2926,6 +2927,7 @@ export async function getMileageAdminHistory(
      * 名前で探して100件から拾うと、同名が多いと本人がこぼれた。
      */
     friendId?: string;
+    entryTypes?: MileageHistoryTypeFilter['entryTypes'];
     entryType?: MileageEntryType;
     status?: MileageEntryStatus;
     mode?: 'automatic' | 'manual';
@@ -2998,6 +3000,10 @@ export async function getMileageAdminHistory(
   if (options.entryType) {
     where.push('lr.entry_type = ?');
     filters.push(options.entryType);
+  }
+  if (options.entryTypes?.length) {
+    where.push(`lr.entry_type IN (SELECT value FROM json_each(?))`);
+    filters.push(JSON.stringify(options.entryTypes));
   }
   if (options.status) {
     where.push('lr.status = ?');

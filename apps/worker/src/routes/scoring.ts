@@ -846,6 +846,11 @@ scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), asyn
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     const entryTypeValue = c.req.query('entryType');
+    const entryTypesValue = c.req.query('entryTypes');
+    const entryTypes = entryTypesValue?.split(',');
+    if (entryTypes && (!entryTypes.length || entryTypes.some((value) => !MILEAGE_ENTRY_TYPES.has(value as MileageEntryType)))) {
+      return c.json({ success: false, error: 'entryTypes is invalid' }, 400);
+    }
     const statusValue = c.req.query('status');
     const modeValue = c.req.query('mode');
     const fromValue = c.req.query('from')?.trim();
@@ -873,6 +878,7 @@ scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), asyn
       search: c.req.query('search') || '',
       // V6R-CX-e: 友だち詳細は、その人（名寄せした複数アカウント）の履歴だけを取る。
       friendId: c.req.query('friendId')?.trim() || undefined,
+      ...(entryTypes ? { entryTypes: entryTypes as MileageEntryType[] } : {}),
       entryType: entryTypeValue as MileageEntryType | undefined,
       status: statusValue as MileageEntryStatus | undefined,
       mode: modeValue as 'automatic' | 'manual' | undefined,
