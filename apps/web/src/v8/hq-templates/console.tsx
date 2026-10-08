@@ -58,6 +58,7 @@ import { HqRichMenuCompatibilityError, hqRichMenuDefinitionFromSeed, hqRichMenuS
 import type { RichMenuDefinition } from '@/lib/hq-templates-api'
 import HqAccountPicker from './account-picker'
 import HqStoreList from './store-list'
+import HqTagEditorV8 from './tag-editor'
 import HqTemplateDetail, { inUseVersionOf } from './detail'
 import styles from './console.module.css'
 
@@ -727,6 +728,12 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
   }
 
   /* ───── 作る・編集（X4JcOf：前回の保存の再確認・カード型・カルーセル・質問・リッチメッセージ） ───── */
+  if (stage === 'edit' && type === 'tag' && 'tag' in definition && !createUncertain) {
+    return <HqTagEditorV8 key={formKey} definition={definition} editing={Boolean(detail)} saving={busy} readOnly={!canEdit}
+      conflict={conflict} onReloadLatest={detail ? () => { void open(detail.template.id, 'edit') } : undefined}
+      error={error} onCancel={toList} onSave={async (next, another) => { await saveCanonicalDefinition(next, another) }} />
+  }
+
   if (stage === 'edit') {
     const uncertainNotice = createUncertain ? <Notice tone="warn" message="前回の保存結果がまだ確定していません。重複を防ぐため入力を固定しています。同じ依頼を再確認し、保存済みならその結果を読み込みます。" /> : null
     const footer = createUncertain
