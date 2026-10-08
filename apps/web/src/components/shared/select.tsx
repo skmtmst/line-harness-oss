@@ -6,7 +6,7 @@ import type { KeyboardEvent, ReactNode } from 'react'
 import { isImeComposing } from './ime'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import MenuPortal from './menu-portal'
-import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuOption, SelectMenuSpacer, splitOptionHeads } from './select-menu'
+import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption, SelectMenuSpacer, splitOptionHeads } from './select-menu'
 import styles from './select.module.css'
 
 export interface SelectOption {
@@ -15,6 +15,21 @@ export interface SelectOption {
   disabled?: boolean
   /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。v7 では出さない。 */
   leading?: ReactNode
+}
+
+/** 「＋ 〇〇」を押した後の板に渡すもの。 */
+export interface SelectCreateContext {
+  /** 一覧へ戻る（［やめる］・Esc）。 */
+  back: () => void
+  /** 作ったものを選んで閉じる。 */
+  finish: (value: string) => void
+}
+
+export interface SelectCreateAction {
+  /** 一覧の下の行の文（「新しいフォルダを作る」）。 */
+  label: string
+  /** 押した後、同じ板に出す中身（iBuZH）。 */
+  render: (context: SelectCreateContext) => ReactNode
 }
 
 export interface SelectProps {
@@ -45,6 +60,13 @@ export interface SelectProps {
    * 渡さなければ出ない。
    */
   icon?: ReactNode
+  /**
+   * ★V8 だけ：開いた中身の一番下に区切りと「＋ 〇〇」を置き、押すと同じ板で作れるようにする
+   * （dLffh・iBuZH。ふつうは FolderSelect が渡す）。渡さなければ出ない（閲覧のみ・権限なし）。
+   */
+  createAction?: SelectCreateAction
+  /** ★V8 の開いた中身の上の小さな見出し（label・選択肢の頭から出ないとき。dLffh の「フォルダ」）。 */
+  menuHeading?: string
 }
 
 /*
@@ -75,6 +97,8 @@ export default function Select({
   value,
   width,
   treatment = 'box',
+  createAction,
+  menuHeading,
 }: SelectProps) {
   const generatedId = useId()
   const buttonId = id ?? `${generatedId}-button`
@@ -82,6 +106,9 @@ export default function Select({
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(defaultOpen)
+  // 'create' は「＋ 〇〇」を押した後（同じ板で名前を入れている）。閉じたら一覧へ戻す。
+  const [mode, setMode] = useState<'list' | 'create'>('list')
+  const menuRef = useRef<HTMLDivElement>(null)
   const enabledOptions = options.filter((option) => !option.disabled)
   const selectedIndex = Math.max(0, enabledOptions.findIndex((option) => option.value === value))
   const [activeIndex, setActiveIndex] = useState(selectedIndex)
@@ -157,6 +184,26 @@ export default function Select({
   }, [disabled])
 
   useEffect(() => {
+    if (!open) setMode('list')
+  }, [open])
+
+  const hasCreate = Boolean(createAction) && v8
+  // キーボードで動く行の数。「＋ 〇〇」は使える候補の後ろの1行。
+  const rowCount = enabledOptions.length + (hasCreate ? 1 : 0)
+  const createActive = hasCreate && activeIndex === enabledOptions.length
+  const startCreate = () => setMode('create')
+  const backToList = () => {
+    // 焦点を先にボタンへ戻す（入力欄が消えて焦点が迷子になり閉じるのを防ぐ）。
+    triggerRef.current?.focus()
+    setMode('list')
+  }
+  const finishCreate = (next: string) => {
+    onChange(next)
+    triggerRef.current?.focus()
+    setOpen(false)
+  }
+
+  useEffect(() => {
     setActiveIndex(selectedIndex)
   }, [selectedIndex])
 
@@ -167,8 +214,8 @@ export default function Select({
   }
 
   const move = (direction: 1 | -1) => {
-    if (enabledOptions.length === 0) return
-    setActiveIndex((current) => (current + direction + enabledOptions.length) % enabledOptions.length)
+    if (rowCount === 0) return
+    setActiveIndex((current) => (current + direction + rowCount) % rowCount)
   }
 
   const onButtonKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -182,7 +229,8 @@ export default function Select({
     }
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
-      if (open && enabledOptions[activeIndex]) choose(enabledOptions[activeIndex])
+      if (open && createActive) startCreate()
+      else if (open && enabledOptions[activeIndex]) choose(enabledOptions[activeIndex])
       else setOpen(true)
       return
     }
@@ -206,7 +254,13 @@ export default function Select({
         .join(' ')}
       style={width ? { width: `${width}px`, minWidth: `${width}px` } : undefined}
       onBlur={(event) => {
-        if (!rootRef.current?.contains(event.relatedTarget)) setOpen(false)
+        const next = event.relatedTarget as Node | null
+        if (rootRef.current?.contains(next)) return
+        // 板の中（「名前を入れる」の欄）へ焦点が移ったときは閉じない。
+        if (next && menuRef.current?.contains(next)) return
+        // 板の中で焦点が外れただけ（入れ替わり）。外を押したときは器が閉じる。
+        if (!next && menuRef.current?.contains(event.target as Node)) return
+        setOpen(false)
       }}
       data-design-node={open ? 'Gfsb4' : size === 'page-size' ? 'niGPF' : 'rpot9'}
     >
@@ -250,8 +304,24 @@ export default function Select({
           onClose={() => setOpen(false)}
           listboxId={listboxId}
           labelledBy={buttonId}
-          heading={heads.heading}
+          heading={heads.heading ?? menuHeading}
           listRef={setListEl}
+          innerRef={menuRef}
+          onEscape={mode === 'create' ? backToList : undefined}
+          onPanelBlur={(event) => {
+            const next = event.relatedTarget as Node | null
+            if (!next || menuRef.current?.contains(next) || rootRef.current?.contains(next)) return
+            setOpen(false)
+          }}
+          panel={hasCreate && mode === 'create' && createAction ? createAction.render({ back: backToList, finish: finishCreate }) : undefined}
+          footer={hasCreate && createAction ? (
+            <SelectMenuAction
+              label={createAction.label}
+              active={createActive}
+              onHover={() => setActiveIndex(enabledOptions.length)}
+              onSelect={startCreate}
+            />
+          ) : undefined}
         >
           {windowStart > 0 ? <SelectMenuSpacer rows={windowStart} /> : null}
           {options.slice(windowStart, windowEnd).map((option, offset) => {
