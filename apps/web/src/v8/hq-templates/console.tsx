@@ -20,6 +20,8 @@ import { ArrowLeft, Check, Plus, RotateCw, Search, Send } from 'lucide-react'
 import { templateKind, type HqTemplateFolder, type HqTemplateListStats, type HqTemplateReceivedVersion, type HqTemplateVersionDisplay, type TemplateKind } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { ListPageBody } from '@/components/templates/list-page'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -57,6 +59,7 @@ import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { HqRichMenuCompatibilityError, hqRichMenuDefinitionFromSeed, hqRichMenuSeedFromDefinition } from '@/lib/hq-rich-menu-create'
 import type { RichMenuDefinition } from '@/lib/hq-templates-api'
 import HqAccountPicker from './account-picker'
+import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, useDistributionFolders, ALL_ACCOUNTS } from './distribution-accounts'
 import HqStoreList from './store-list'
 import HqTagEditorV8 from './tag-editor'
 import HqTemplateDetail, { inUseVersionOf } from './detail'
@@ -115,6 +118,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
   const [definition, setDefinition] = useState<TemplateDefinition>(() => freshDefinition(type))
   const [selected, setSelected] = useState<string[]>([])
   const [search, setSearch] = useState('')
+  const [accountFolder, setAccountFolder] = useState(ALL_ACCOUNTS)
+  const accountFolders = useDistributionFolders(stage === 'accounts' || stage === 'duplicates' || stage === 'result')
   /* テンプレートの6種類（店と同じ上のタブ・API-17）。タブを替えたらその種類だけ読む。 */
   const [kind, setKind] = useState<TemplateKind>('message')
   const [kindRows, setKindRows] = useState<HqTemplate[] | null>(null)
@@ -273,7 +278,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
     sessionUploads.current = []
     const loaded = await hqTemplatesApi.get(id)
     if (!alive.current) return
-    loadDetailIntoForm(loaded); setSelected([]); setTextOverrides({}); setSearch(''); setPreflight(null); setChoices({}); setBulkMode(''); setStage(next)
+    loadDetailIntoForm(loaded); setSelected([]); setTextOverrides({}); setSearch(''); setAccountFolder(ALL_ACCOUNTS); setPreflight(null); setChoices({}); setBulkMode(''); setStage(next)
   })
   const startCreate = () => {
     createAttempt.current = null; sessionUploads.current = []; setMenuTargets([])
@@ -452,7 +457,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
   const expiry = preflight ? Date.parse(preflight.expiresAt) : NaN
   const expired = !Number.isFinite(expiry) || expiry <= now
   const resolutions = preflight ? resolvedItems(preflight, choices) : null
-  const shownAccounts = accounts.filter((account) => account.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+  const shownAccounts = accountsInFolder(accounts, accountFolder, accountFolders.membership).filter((account) => account.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+  const accountFolderRows = distributionFolderRows({ accounts, ...accountFolders, selected, onChange: setSelected, disabled: busy || stage !== 'accounts' })
   const done = result && result.status !== 'running'
   const failures = result ? failedStores(result) : []
   const successes = result?.stores.filter((store) => store.status === 'succeeded') ?? []
@@ -564,7 +570,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
         }}
         onBack={toList}
         onEdit={() => setStage('edit')}
-        onDistribute={() => { setSelected([]); setTextOverrides({}); setSearch(''); setPreflight(null); setChoices({}); setBulkMode(''); setStage('accounts') }}
+        onDistribute={() => { setSelected([]); setTextOverrides({}); setSearch(''); setAccountFolder(ALL_ACCOUNTS); setPreflight(null); setChoices({}); setBulkMode(''); setStage('accounts') }}
         onDuplicate={() => void perform(async () => {
           const requestId = crypto.randomUUID()
           await hqTemplatesApi.duplicate(detail.template.id, `${detail.template.name}のコピー`, detail.template.revision, requestId)
@@ -831,7 +837,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
     /* 絵（meBRB）：ひな形と同じ版が配布先にあれば「版 2（最新）」。 */
     return main?.duplicate ? (main.expectedRevision != null ? `版 ${main.expectedRevision}${detail && main.expectedRevision === detail.template.revision ? '（最新）' : ''}` : '配布済み') : '未配布'
   }
-  const rowsForTable = stage === 'accounts' ? shownAccounts : accounts.filter((account) => selected.includes(account.id) || shownAccounts.includes(account))
+  const rowsForTable = shownAccounts
   const targetIds = stage === 'accounts' ? selected : preflight?.stores.map((store) => store.accountId) ?? selected
   const finished = successes.length + failures.length
   const progressTotal = result?.stores.length ?? targetIds.length
@@ -844,14 +850,23 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
 
   return (
     <PageFrame kind="wizard" boardId={stage === 'result' ? 'dEvJM' : 'meBRB'}>
-      <PageHeading title={pageTitle} description="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。一括設定のあと、必要な項目だけアカウントごとに変えられます。" />
-      <div className={styles.body}>
-        {notices}
-        <div className={styles.toolbar}>
+      <PageHeading title={pageTitle} help="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。一括設定のあと、必要な項目だけアカウントごとに変えられます。" />
+      {error || message ? <div className={styles.distributionNotice}>{notices}</div> : null}
+      <ListPageBody
+        contentInset
+        folders={<DistributionFolderPanel rows={accountFolderRows} activeId={accountFolder} onSelect={setAccountFolder} failed={accountFolders.failed} />}
+        collapsedFolders={<>
+          <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))} />
+          {accountFolderRows.find((row) => row.id === accountFolder)?.trailing}
+        </>}
+        toolbar={<div className={styles.toolbar}>
+          <span className={styles.selectedTools}>
+            <strong className={styles.selectedCount}>{`選んだ ${selected.length} アカウント`}</strong>
           <label className={styles.search} data-size="account">
             <Search size={14} aria-hidden="true" />
             <input aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={(event) => setSearch(event.target.value)} />
           </label>
+          </span>
           <span className={styles.bulkPick}>
             <Select
               aria-label="一括の配布方法"
@@ -862,13 +877,18 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
               options={[{ value: '', label: '一括の配布方法：選ぶ' }, { value: 'overwrite', label: '一括の配布方法：上書き' }, { value: 'alias', label: '一括の配布方法：別名で作る' }]}
             />
           </span>
-        </div>
+        </div>}
+      >
+        <div className={styles.distributionContent}>
         <div className={styles.tableBox}>
           <table className={styles.table} data-kind="distribute">
             <colgroup><col className={styles.colCheck} /><col /><col className={styles.colItem} /><col className={styles.colVersion} /><col className={styles.colMode} /></colgroup>
             <thead><tr>
-              {/* 絵（meBRB）の頭の1列目は空。まとめて選ぶ箱は置かない（行ごとに選ぶ）。 */}
-              <Th><span className={styles.srOnly}>選ぶ</span></Th>
+              {/* G-4：表示中をまとめて選ぶ。一部選択は横棒。 */}
+              <Th><Checkbox aria-label="表示中のアカウントをすべて選ぶ" checked={shownAccounts.length > 0 && shownAccounts.every((account) => selected.includes(account.id))}
+                indeterminate={shownAccounts.some((account) => selected.includes(account.id)) && !shownAccounts.every((account) => selected.includes(account.id))}
+                disabled={busy || stage !== 'accounts' || shownAccounts.length === 0}
+                onCheckedChange={(checked) => setSelected((current) => checked ? [...new Set([...current, ...shownAccounts.map((account) => account.id)])] : current.filter((id) => !shownAccounts.some((account) => account.id === id)))} /></Th>
               <Th>アカウント</Th><Th>項目</Th><Th>配布先の版</Th><Th>配布方法</Th>
             </tr></thead>
             <tbody>
@@ -879,11 +899,11 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
                 const mode = storeMode(account.id)
                 const allowed = store ? [...new Set(store.items.filter((item) => item.duplicate).flatMap((item) => item.allowedModes))] : []
                 return [
-                  <tr key={account.id}>
+                  <tr key={account.id} data-selected={on || undefined}>
                     <td><Checkbox id={`hq-dist-${account.id}`} aria-label={account.name} checked={on} disabled={busy || stage !== 'accounts'} onCheckedChange={(checked) => setSelected((current) => checked ? [...current, account.id] : current.filter((id) => id !== account.id))} /></td>
                     <td>
                       <label className={styles.nameLabel} htmlFor={`hq-dist-${account.id}`}>
-                        <span className={styles.name} title={account.name}>{account.name}</span>
+                        <FolderDotName folder={accountFolders.membership?.get(account.id)?.folder}><span className={styles.name} title={account.name}>{account.name}</span></FolderDotName>
                         <span className={styles.sub}>{on ? (stage === 'result' ? progressLabel(account.id) || '配る' : '配る') : '配らない'}</span>
                       </label>
                     </td>
@@ -943,6 +963,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
             {result && done ? <p className={styles.note}>{`新規 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.created, 0))}件・上書き ${formatNumber(successes.reduce((sum, s) => sum + s.counts.overwritten, 0))}件・別名 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.aliased, 0))}件`}</p> : null}
           </section>
         ) : null}
+        </div>
+      </ListPageBody>
         <div className={styles.footer}>
           {stage === 'accounts' ? <>
             <Button disabled={busy} onClick={toList}>キャンセル</Button>
@@ -958,7 +980,6 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
             {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))}>{`失敗${failures.length}アカウントを再確認`}</Button> : null}
           </>}
         </div>
-      </div>
       <Dialog
         open={Boolean(result && done && resultDialogFor === `${result.runId}:${result.status}`)}
         designWidth={640}

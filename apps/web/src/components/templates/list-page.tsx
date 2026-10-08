@@ -34,6 +34,8 @@ export interface ListPageBodyProps {
   folderInset?: boolean
   /** 指定した板だけ、余白を含めた外寸にする。既定の列幅は変えない。 */
   folderWidth?: number
+  /** 表以外の配布内容も一覧の道具列と同じ左右余白へ収める。 */
+  contentInset?: boolean
   toolbar?: ReactNode
   children: ReactNode
   pagination?: ReactNode
@@ -45,7 +47,7 @@ export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   tabs?: ReactNode
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, toolbar, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, toolbar, children, pagination, overlays }: ListPageBodyProps) {
   const navs = folderNav ? (Array.isArray(folderNav) ? folderNav : [folderNav]) : []
   const collapsed = collapsedFolders ?? (folders && navs.length > 0 ? navs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
   return <div className={styles.listBody}>
@@ -56,7 +58,7 @@ export function ListPageBody({ stats, folders, collapsedFolders, folderNav, fold
         {toolbar || collapsed ? <div className={styles.toolbar} data-template-region="toolbar" data-collapsed-only={toolbar ? undefined : ''}>
           {collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders">{collapsed}</div> : null}{toolbar}
         </div> : null}
-        <div className={styles.content} data-template-region="content">{children}</div>
+        <div className={styles.content} data-template-region="content" data-content-inset={contentInset || undefined}>{children}</div>
         {pagination ? <div className={styles.pagination} data-template-region="pagination">{pagination}</div> : null}
       </div>
     </div>{overlays}
