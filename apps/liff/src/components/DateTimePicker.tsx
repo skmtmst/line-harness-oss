@@ -533,6 +533,9 @@ export default function DateTimePicker({
     weekDays.push(d);
   }
   const weekHasOpen = weekDays.some((d) => weekByDate?.[d]?.some((t) => t.open));
+  // 満席の日がある週は日の並びを出す（満席の日を押すと時刻の鈴＝空いたら知らせるへ進める）。
+  const weekHasFull = weekDays.some((d) => weekFull[d]);
+  const weekShowsStrip = weekHasOpen || weekHasFull;
   const calHasSlots = Object.values(calByDate).some((times) => times.some((t) => t.open));
   const monthLoaded = loadedMonths.includes(month);
   useEffect(() => {
@@ -707,7 +710,7 @@ export default function DateTimePicker({
           <LoadErrorView onRetry={retryWeek} />
         ) : weekLoading || !weekByDate || !loadedWins.has(winStart) ? (
           <LoadingView />
-        ) : !weekHasOpen ? (
+        ) : !weekShowsStrip ? (
           // ★V8 (ADutg)：印・題・本文・ボタンを 12 ずつ空け、画面の真ん中の高さに置く。
           <div className="flex flex-col items-center gap-3 px-2 pt-16 text-center" data-design-node="ADutg">
             <span className="text-liff-idle" aria-hidden="true">
@@ -756,6 +759,8 @@ export default function DateTimePicker({
                   const open = state === 'open';
                   // 残りわずかの日も押せる (金の印だけ付ける)。
                   const selectable = open || state === 'few';
+                  // 満席の日も押せる。時刻は灰色で予約できず、鈴から「空いたら知らせる」だけ選べる。
+                  const pressable = selectable || state === 'full';
                   const active = d === listDay;
                   return (
                     <button
@@ -765,7 +770,7 @@ export default function DateTimePicker({
                         userPickedDayRef.current = true;
                         setListDay(d);
                       }}
-                      disabled={!selectable}
+                      disabled={!pressable}
                       aria-pressed={active}
                       aria-label={dayStateLabel(d, state)}
                       title={dayStateLabel(d, state)}
@@ -911,6 +916,8 @@ export default function DateTimePicker({
                     const dayNum = Number(d.slice(8, 10));
                     // 残りわずかの日も押せる (金の点だけ付ける)。
                     const selectable = state === 'open' || state === 'few';
+                    // 満席の日も押せる（週の時刻へ移ると、鈴から空いたら知らせるを登録できる）。
+                    const pressable = selectable || state === 'full';
                     const active = d === calDay;
                     return (
                       <button
@@ -920,7 +927,7 @@ export default function DateTimePicker({
                           userPickedDayRef.current = true;
                           setCalDay(d);
                         }}
-                        disabled={!selectable}
+                        disabled={!pressable}
                         aria-pressed={active}
                         aria-label={dayStateLabel(d, state)}
                         className={`liff-press flex h-11 flex-col items-center justify-center gap-0.5 rounded-(--liff-radius) focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
@@ -973,7 +980,7 @@ export default function DateTimePicker({
       )}
       {/* 下の操作の帯 (週: 選んだ時間で確かめる / カレンダー: その日の週へ)。
           空きの無い週は帯を出さず、中身の中に次の手を置く。 */}
-      {view === 'calendar' || (weekByDate && !weekFailed && weekHasOpen) ? bar : null}
+      {view === 'calendar' || (weekByDate && !weekFailed && weekShowsStrip) ? bar : null}
       {/* 帯の分の余白 */}
       <div className="pb-40" aria-hidden="true" />
     </div>
