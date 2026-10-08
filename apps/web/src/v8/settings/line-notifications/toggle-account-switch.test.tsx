@@ -4,7 +4,7 @@
  * 前のアカウントのお知らせの確かめを残さない（確定で今のアカウントへ書かない）。
  */
 import React from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -54,4 +54,33 @@ test('確かめを開いたまま B に移ったら、A の確かめは閉じる
   view.rerender(<Screen />)
   await screen.findByRole('switch', { name: 'B の注文のお知らせを出す・止める' })
   expect(screen.queryByText(/「A の注文」のお知らせを止めますか/)).toBeNull()
+})
+
+
+test.each(['下書きを保存する', '顧客へのお知らせを公開'])('%sの前に空の見出しへ移り、書き込みを止める', async (actionLabel) => {
+  fx.account = 'account-a'
+  vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
+  const writes = vi.fn()
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input))
+    if (init?.method && init.method !== 'GET') writes()
+    if (url.pathname === '/api/ec-commerce/settings') return json({ success: true, data: [setting('注文')] })
+    if (url.pathname === '/api/ec-commerce/overview') return json({ success: true, data: { total: 0, processed: 0, identityPending: 0, failed: 0, skipped: 0, last24h: 0, lastReceivedAt: null, byType: [], subscriptions: 0 } })
+    if (url.pathname === '/api/line-notifications/customer-definitions') return json({ success: true, data: [{
+      id: 'definition-1', lineAccountId: fx.account, key: 'order', name: '注文', category: 'order',
+      sourceEventType: 'ec.order.confirmed', status: 'published', draft: { title: '注文の見出し' },
+      currentVersionId: 'version-1', currentVersionNumber: 1, transactionalOnly: true, version: 1, updatedAt: '2026-10-01T00:00:00Z',
+    }] })
+    if (url.pathname.includes('/operator-rules')) return json({ success: true, data: { items: [], summary: { total: 0, published: 0, stopped: 0, missingRecipients: 0, recipients: 0, acceptedToday: 0, excludedToday: 0 } } })
+    return json({ success: true, data: [] })
+  })
+  render(<Screen />)
+  fireEvent.click(await screen.findByRole('button', { name: '注文の見出しの内容を編集' }))
+  const title = screen.getByLabelText('通知の見出し') as HTMLInputElement
+  fireEvent.change(title, { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: actionLabel, exact: true }))
+  expect(document.activeElement).toBe(title)
+  expect(title.getAttribute('aria-invalid')).toBe('true')
+  expect(screen.getAllByText('通知の見出しを入力してください。')).toHaveLength(1)
+  expect(writes).not.toHaveBeenCalled()
 })
