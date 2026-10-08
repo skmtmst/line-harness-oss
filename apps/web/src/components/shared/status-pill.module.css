@@ -1,0 +1,47 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 1px 7px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: 18px;
+  vertical-align: middle;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-faint);
+}
+.dot[data-tone='info'] { background: var(--color-status-info); }
+.dot[data-tone='warning'] { background: var(--color-status-warn-deep); }
+.dot[data-tone='success'] { background: var(--color-success); }
+.dot[data-tone='danger'] { background: var(--color-danger); }
+.dot[data-tone='neutral'] { background: var(--color-ink-faint); }
+.name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 単一選択の操作は Select に任せ、札の外形だけを共通にする。 */
+[data-theme='v8'] .pill.control {
+  height: 32px;
+  gap: 6px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  box-shadow: none;
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+[data-theme='v8'] .pill.control:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+}

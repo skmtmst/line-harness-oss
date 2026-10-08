@@ -820,9 +820,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           <Button onClick={() => void save(false)} disabled={hostBusy} busy={hostBusy} busyLabel="保存中…" title="ひな形を保存（配った先は変わりません）">
             下書きを保存
           </Button>
-          <Button variant="primary" onClick={() => void save(true)} disabled={hostBusy} title="保存して、アカウントへ配る画面へ進みます">
-            <Upload size={15} aria-hidden="true" />
-            保存して配る
+          <Button variant="primary" onClick={() => void save(true)} disabled={hostBusy} title="保存したあとに、配るアカウントを選べます">
+            保存する
           </Button>
         </>
       )}

@@ -311,7 +311,7 @@ function hqTemplateDefinitionHtn(row) {
   if (row.template_type === 'rich_menu') {
     const labels = ['予約する', 'お知らせ', 'クーポン', '会員証', 'よくある質問', 'お問い合わせ']
     const areas = labels.map((label, i) => ({
-      id: `visual-area-${i + 1}`, bounds: { x: (i % 3) * 833, y: Math.floor(i / 3) * 843, width: i % 3 === 1 ? 834 : 833, height: 843 },
+      id: `visual-area-${i + 1}`, bounds: { x: Math.round((i % 3) * 2500 / 3), y: Math.floor(i / 3) * 843, width: Math.round(2500 / 3), height: 843 },
       ...(i === 0 ? { actionType: 'uri', actionData: { uri: 'https://nen.example/booking' }, intent: 'url' } : i < 3 ? { actionType: 'uri', actionData: { uri: 'https://nen.example/news' }, intent: 'url' } : { actionType: 'message', actionData: { text: label }, intent: 'text' }),
       label,
     }))
@@ -2461,6 +2461,11 @@ const RAW = {
   '/api/booking/admin/availability': BOOKING_AVAILABILITY,
   '/api/booking/admin/resources': { success: true, data: { resources: BOOKING_RESOURCES } },
   '/api/booking/admin/menus': { menus: BOOKING_MENUS },
+  '/api/booking/admin/sales-summary': { success: true, data: {
+    from: '2026-10-01', to: '2026-10-31',
+    total: { bookings: 0, confirmed: 0, revenue: 0, cancelRate: 0, noshowRate: 0, cancelled: 0, noshow: 0 },
+    menus: [], weekdays: [], previous: { revenue: 0, bookings: 0, cancelRate: 0, noshowRate: 0 }, revenueSource: 'menu',
+  } },
   /* 予約経路の連携（V8 予約設定 ZyDd6）。口は `{success,data}` で包む。無いと設定の「予約経路」タブが落ちていた。 */
   '/api/booking/admin/channels': { success: true, data: BOOKING_CHANNELS },
   '/api/booking/admin/conflicts': { success: true, data: { conflicts: [] } },
@@ -3525,6 +3530,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   /* 統括の名前（絵 `JKjsE` の説明・`K7HYu` の欄）。 */
   if (method === 'GET' && pathname === '/api/tenants/me') return { success: true, data: { name: '然 -NEN- 本部' } }
+  if (method === 'GET' && pathname === '/api/tenants/me/company-contact') return { success: true, data: {
+    legalCompanyName: 'Shed Products株式会社', postalCode: '1500001', address: '東京都渋谷区神宮前1-2-3',
+    building: null, phone: '03-1234-5678', contactName: '山田 太郎', contactEmail: 'yamada@shed.example', invoiceAddressee: null, revision: 0,
+  } }
+  if (method === 'GET' && pathname === '/api/postal-code/search') return { success: true, data: {
+    status: 'matched', candidates: [{postalCode: '1500001', prefecture: '東京都', city: '渋谷区', town: '神宮前'}], readiness: {fullDataset: true},
+  } }
   if (pathname === '/api/line-accounts') {
     /*
       `webhook` を付ける。無いと接続状態カードが「確認中」のままで、
@@ -4699,6 +4711,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null, tenantId: 'visual-tenant-1' } }
   }
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
+  if (method === 'GET' && pathname === '/api/webhooks/outgoing/owh-slack-order') {
+    return { success: true, data: OUTGOING_WEBHOOKS[0] }
+  }
   // 外部連携の API 接続（板 ralAc・UkZLi）。止めた鍵は一覧に出ないので、使っている2本だけ。
   if (pathname === '/api/webhooks/api-tokens') return { success: true, data: VISUAL_QA_API_TOKENS }
   const incomingUnmatched = /^\/api\/webhooks\/incoming\/([^/]+)\/unmatched$/.exec(pathname)
@@ -6323,7 +6338,7 @@ const server = createServer((req, res) => {
     return
   }
 
-  if (method === 'GET' && url.pathname.startsWith('/api/rich-menu-images/')) {
+  if (method === 'GET' && (url.pathname.startsWith('/api/rich-menu-images/') || url.pathname === '/images/hq-templates/visual-tenant-1/menu-member.png')) {
     // 6面が見分けられる撮影専用画像。1px画像ではキャンバスが黒く見え、
     // 画像本体を取得できたか判定できないため、実際の比率に近いPNGを返す。
     const png = Buffer.from('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', 'base64')

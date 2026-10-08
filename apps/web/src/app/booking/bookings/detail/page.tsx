@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -894,6 +896,7 @@ function BookingDetailInner() {
 
   return (
     <div className="flex flex-col gap-4" data-design-node="If9Mh">
+      <div className="v8-only"><PageHeading title={detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細'} /></div>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {showBodyCrumb ? (
         <nav className="text-ink-faint text-xs" aria-label="パンくず">

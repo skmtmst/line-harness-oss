@@ -206,6 +206,7 @@ export default function CreateAffiliateV8() {
         const res = await api.affiliates.create({
           name: name.trim(),
           code: code.trim() || undefined,
+          rewardMode: payoutKind === 'per_conversion' ? 'fixed' : payoutKind,
           commissionRate: payoutKind === 'rate' && commissionRate.trim() ? Number(commissionRate) : undefined,
           friendId: friendId || undefined,
           issueInitialLink: true,
@@ -237,6 +238,7 @@ export default function CreateAffiliateV8() {
     try {
       const update = await api.affiliates.update(affiliateId, {
         name: name.trim(),
+        rewardMode: payoutKind === 'per_conversion' ? 'fixed' : payoutKind,
         commissionRate: payoutKind === 'rate' && commissionRate.trim() ? Number(commissionRate) : undefined,
         email: email.trim() || null,
         holdDays: holdDays.trim() ? Number(holdDays) : null,

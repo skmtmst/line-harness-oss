@@ -62,7 +62,7 @@ function FieldSummary({ title, field, kind }: { title: string; field: FriendFiel
 
 export default function FieldMigrateV8() {
   usePageTitle('友だち情報欄を移行')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }, { label: '友だち情報欄', href: '/tags?tab=fields' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }, { label: '友だち情報欄', href: '/tags?tab=fields' }])
   const params = useSearchParams()
   const sourceId = params.get('id') ?? ''
   const { selectedAccountId } = useAccount()

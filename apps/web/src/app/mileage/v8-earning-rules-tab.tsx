@@ -581,6 +581,7 @@ export default function V8EarningRulesTab({
           <FolderPanel
             heading="フォルダ"
             rows={FOLDERS.map((item) => ({
+              kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const,
               id: item.key,
               label: item.label,
               count: folderCounts.get(item.key) ?? 0,

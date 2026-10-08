@@ -258,7 +258,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           <>
             <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy} busy={publishing || Boolean(host?.busy)}><Send size={15} aria-hidden="true" />{host ? host.primaryLabel ?? '保存して配る' : '保存して公開'}</Button>
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={15} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
         )}
       >
@@ -285,7 +285,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                   setCategory(folders.find((folder) => folder.id === next)?.name ?? '未分類')
                 }}
                 folders={host ? host.folders : folders.map(folderById)}
-                colors={!host}
+                colors
                 onCreate={host
                   ? hostFolderCreate(host)
                   : canMutate && folderAccountId

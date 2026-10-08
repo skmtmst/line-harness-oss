@@ -58,6 +58,8 @@ export interface RadioCardProps {
   title: string
   /** 補足。選ぶと何が起きるか（実行を伴う選択ならその動作）を書く。 */
   note?: ReactNode
+  /** 説明の下に置く図など。省略時は既存のカードの形を保つ。 */
+  children?: ReactNode
   disabled?: boolean
   /**
    * 選べない理由。disabled のときは必ず併記する。
@@ -97,6 +99,7 @@ export default function RadioCard({
   onChange,
   title,
   note,
+  children,
   disabled = false,
   disabledReason,
   invalid = false,
@@ -136,6 +139,7 @@ export default function RadioCard({
         {note ? <small className={styles.note} title={typeof note === 'string' ? note : undefined}>{note}</small> : null}
         {disabled && disabledReason ? <small className={styles.reason}>{disabledReason}</small> : null}
       </span>
+      {children}
     </label>
   )
 }

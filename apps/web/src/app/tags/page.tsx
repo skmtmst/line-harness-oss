@@ -7,7 +7,7 @@ import { useAccount } from '@/contexts/account-context'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
- * 友だち属性（4タブ）の入口。
+ * タグ（4タブ）の入口。
  *
  * 見た目テーマが v8 のときだけ新しい一覧（`src/v8/tags/list.tsx`）を出す。
  * タグ以外のタブの本文（友だち情報欄・対応マーク・保存した検索）は今の V8 のものを渡す。

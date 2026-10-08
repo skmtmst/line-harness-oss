@@ -30,10 +30,12 @@ export interface CreatePageProps extends PageHeadingProps {
   /** 右の列の地。`'plain'` は地の色を敷かない（E-9 p17Qku）。渡さなければ表の頭と同じ地。 */
   previewSurface?: 'plain'
   footerActions: ReactNode
+  /** 枠のある下部の帯を描く板だけで使う。StickyBar の既定は変えない。 */
+  footerOutlined?: boolean
   destructive?: ReactNode
   status?: ReactNode
 }
-export function CreatePage({ boardId, standalone, children, preview, previewToggle, previewCompactWhenNarrow, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, destructive, status, ...heading }: CreatePageProps) {
+export function CreatePage({ boardId, standalone, children, preview, previewToggle, previewCompactWhenNarrow, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
   return <PageFrame kind="create" boardId={boardId} standalone={standalone} hasFooter>
     <PageHeading {...heading} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
@@ -43,6 +45,6 @@ export function CreatePage({ boardId, standalone, children, preview, previewTogg
       <div className={styles.createContent} data-template-region="content" data-content-spacing={contentSpacing}>{children}</div>
       {preview ? <aside className={styles.preview} data-template-region="preview" data-preview-narrow={previewCompactWhenNarrow ? 'compact' : undefined} data-content-spacing={contentSpacing} data-preview-surface={previewSurface}><div className={styles.previewContent}>{preview}</div></aside> : null}
     </div>
-    <div className={styles.footer} data-template-region="footer"><StickyBar actions={footerActions} destructive={destructive} status={status} /></div>
+    <div className={styles.footer} data-template-region="footer"><StickyBar actions={footerActions} outlined={footerOutlined} destructive={destructive} status={status} /></div>
   </PageFrame>
 }

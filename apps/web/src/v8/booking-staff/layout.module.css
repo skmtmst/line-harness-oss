@@ -34,9 +34,10 @@
 .title {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--tpl-bks-title-size);
-  font-weight: 700;
-  line-height: var(--tpl-bks-title-lh);
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .desc {

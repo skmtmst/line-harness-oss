@@ -2623,23 +2623,109 @@ export async function getFriendsWithFieldValuePage(
   lineAccountId: string | null,
   afterFriendId: string | null,
   limit: number,
+  reminderId?: string,
 ): Promise<Array<{ friend_id: string; value: string }>> {
   if (!Number.isInteger(limit) || limit < 1) return [];
-  const rows = await db
-    .prepare(
-      `SELECT v.friend_id AS friend_id, v.value AS value
-         FROM friend_field_values v
-         JOIN friends f ON f.id = v.friend_id
-        WHERE v.field_id = ?
-          AND v.value IS NOT NULL AND v.value != ''
-          AND f.is_following = 1
-          AND (? IS NULL OR f.line_account_id = ?)
-          AND (? IS NULL OR v.friend_id > ?)
-        ORDER BY v.friend_id ASC
-        LIMIT ?`,
-    )
-    .bind(fieldId, lineAccountId, lineAccountId, afterFriendId, afterFriendId, limit)
+  const rows = await db.prepare(`SELECT f.id AS friend_id, COALESCE(v.value, '') AS value
+    FROM friends f LEFT JOIN friend_field_values v ON v.friend_id = f.id AND v.field_id = ?
+    WHERE f.is_following = 1
+      AND (? IS NULL OR f.line_account_id = ?)
+      AND (? IS NULL OR f.id > ?)
+      AND ((v.value IS NOT NULL AND v.value != '') OR EXISTS (
+        SELECT 1 FROM friend_reminders fr WHERE fr.friend_id = f.id AND fr.reminder_id = ? AND fr.status = 'active'
+      ))
+    ORDER BY f.id ASC LIMIT ?`)
+    .bind(fieldId, lineAccountId, lineAccountId, afterFriendId, afterFriendId, reminderId ?? null, limit)
     .all<{ friend_id: string; value: string }>();
+  return rows.results ?? [];
+}
+
+/** 情報欄の保存と同じ原子的 batch に入れる、未送信予定の取り消しと基準日の更新。 */
+export function friendFieldReminderTargetStatements(
+  db: D1Database,
+  changes: Array<{ friendId: string; fieldId: string; value: string | null }>,
+  now: string,
+): D1PreparedStatement[] {
+  if (!changes.length) return [];
+  const targets = changes.map(change => {
+    const day = /^(\d{4}-\d{2}-\d{2})(?:$|T)/.exec(change.value?.trim() ?? '')?.[1];
+    const date = day ? new Date(`${day}T00:00:00Z`) : null;
+    const valid = date && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === day;
+    return { friendId: change.friendId, fieldId: change.fieldId, value: change.value, targetDate: valid ? `${day}T00:00:00+09:00` : null };
+  });
+  const cte = `WITH changed AS (
+    SELECT DISTINCT json_extract(value,'$.friendId') AS friend_id, json_extract(value,'$.fieldId') AS field_id,
+      json_extract(value,'$.targetDate') AS target_date, json_extract(value,'$.value') AS field_value FROM json_each(?)
+  ), affected AS (
+    SELECT fr.id, changed.target_date FROM friend_reminders fr
+      JOIN reminders r ON r.id = fr.reminder_id
+      JOIN friends f ON f.id = fr.friend_id AND (r.line_account_id IS NULL OR r.line_account_id = f.line_account_id)
+      LEFT JOIN reminder_versions rv ON rv.id = fr.reminder_version_id
+      JOIN changed ON changed.friend_id = fr.friend_id
+        AND changed.field_id = COALESCE(json_extract(rv.settings_snapshot,'$.triggerFieldId'),r.trigger_field_id)
+      LEFT JOIN friend_field_values actual ON actual.friend_id = fr.friend_id AND actual.field_id = changed.field_id
+    WHERE COALESCE(actual.value, '') = COALESCE(changed.field_value, '') AND fr.status = 'active'
+      AND COALESCE(json_extract(rv.settings_snapshot,'$.triggerType'),r.trigger_type) = 'friend_field'
+      AND COALESCE(json_extract(rv.settings_snapshot,'$.repeatYearly'),r.repeat_yearly) = 0
+      AND (changed.target_date IS NULL OR changed.target_date != fr.target_date)
+  )`;
+  const json = JSON.stringify(targets);
+  return [
+    // 新しい登録を作るので、A→B→A の日付変更でも旧 cancelled 行を再利用しない。
+    db.prepare(`${cte} INSERT INTO friend_reminders
+      (id,friend_id,reminder_id,reminder_version_id,template_version_snapshot,target_date,status,source_kind,source_id,timezone,created_at,updated_at)
+      SELECT 'ffr-replan:' || lower(hex(randomblob(16))),fr.friend_id,fr.reminder_id,fr.reminder_version_id,
+        fr.template_version_snapshot,a.target_date,'active','friend_field_replan',fr.id,fr.timezone,?,?
+      FROM affected a JOIN friend_reminders fr ON fr.id = a.id WHERE a.target_date IS NOT NULL`)
+      .bind(json,now,now),
+    // 送信履歴の元行はそのまま残す。新登録にも済んだ工程の印を引き継ぎ、再送を防ぐ。
+    db.prepare(`${cte} INSERT OR IGNORE INTO friend_reminder_deliveries(id,friend_reminder_id,reminder_step_id,delivered_at)
+      SELECT 'ffr-carried:' || next.id || ':' || done.reminder_step_id,next.id,done.reminder_step_id,done.delivered_at
+      FROM affected a JOIN friend_reminders next ON next.source_kind='friend_field_replan' AND next.source_id=a.id
+        AND next.target_date=a.target_date AND next.created_at=?
+      JOIN (
+        SELECT friend_reminder_id,reminder_step_id,MIN(delivered_at) AS delivered_at FROM (
+          SELECT friend_reminder_id,reminder_step_id,delivered_at FROM friend_reminder_deliveries
+          UNION ALL SELECT run.friend_reminder_id,run.reminder_step_id,COALESCE(run.completed_at,run.updated_at)
+            FROM reminder_delivery_runs run WHERE run.status='succeeded'
+              AND NOT EXISTS (SELECT 1 FROM friend_reminder_deliveries prior
+                WHERE prior.friend_reminder_id=run.friend_reminder_id AND prior.reminder_step_id=run.reminder_step_id)
+        ) GROUP BY friend_reminder_id,reminder_step_id
+      ) done ON done.friend_reminder_id=a.id`)
+      .bind(json,now),
+    db.prepare(`${cte} UPDATE reminder_delivery_runs
+      SET status = 'cancelled', completed_at = ?, updated_at = ?, next_retry_at = NULL, lease_expires_at = NULL
+      WHERE friend_reminder_id IN (SELECT id FROM affected) AND status IN ('queued','retry_wait','claimed')`)
+      .bind(json,now,now),
+    db.prepare(`${cte} UPDATE friend_reminders
+      SET status = 'cancelled',
+        cancel_reason = CASE WHEN (SELECT target_date FROM affected WHERE affected.id = friend_reminders.id) IS NULL
+          THEN 'friend_field_baseline_removed_or_invalid' ELSE 'friend_field_baseline_changed' END,
+        lock_version = lock_version + 1, updated_at = ?
+      WHERE id IN (SELECT id FROM affected)`)
+      .bind(json,now),
+  ];
+}
+
+/** 日付が消えた登録も読む。開始時に固定した公開版の欄・繰り返し方を使用する。 */
+export async function getOneTimeFriendFieldReminderRegistrants(
+  db: D1Database,
+  reminderId: string,
+  friendIds: string[],
+): Promise<Array<FriendReminderRow & { field_id: string; field_value: string | null }>> {
+  if (!friendIds.length) return [];
+  const rows = await db.prepare(`SELECT fr.*, v.value AS field_value, COALESCE(json_extract(rv.settings_snapshot, '$.triggerFieldId'), r.trigger_field_id) AS field_id
+    FROM friend_reminders fr
+    JOIN reminders r ON r.id = fr.reminder_id
+    JOIN friends f ON f.id = fr.friend_id AND (r.line_account_id IS NULL OR f.line_account_id = r.line_account_id)
+    LEFT JOIN reminder_versions rv ON rv.id = fr.reminder_version_id
+    LEFT JOIN friend_field_values v ON v.friend_id = fr.friend_id
+      AND v.field_id = COALESCE(json_extract(rv.settings_snapshot, '$.triggerFieldId'), r.trigger_field_id)
+    WHERE fr.reminder_id = ?
+      AND fr.friend_id IN (SELECT value FROM json_each(?))
+      AND COALESCE(json_extract(rv.settings_snapshot, '$.triggerType'), r.trigger_type) = 'friend_field'
+      AND COALESCE(json_extract(rv.settings_snapshot, '$.repeatYearly'), r.repeat_yearly) = 0
+    ORDER BY fr.id`).bind(reminderId, JSON.stringify(friendIds)).all<FriendReminderRow & { field_id: string; field_value: string | null }>();
   return rows.results ?? [];
 }
 

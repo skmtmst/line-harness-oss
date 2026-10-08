@@ -693,11 +693,11 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
           onCreateFolder={canEdit && selectedAccountId
             ? folderCreator(
               // 一覧の左の列と同じ口。やり直しで二重に作らないよう、作れるまで同じ鍵で送る。
-              (name) => api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current),
+              (name, color) => api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current, color),
               folderByName,
               (created) => {
                 folderKey.current = crypto.randomUUID()
-                setOptions((current) => ({ ...current, folders: [...current.folders, { id: created.id, name: created.name }] }))
+                setOptions((current) => ({ ...current, folders: [...current.folders, { id: created.id, name: created.name, color: created.color }] }))
               },
             )
             : undefined}
@@ -832,7 +832,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
                 onChange={(value) => setRule((current) => ({ ...current, folderName: value || null }))}
                 folders={folderOptions.map(folderByName)}
                 onCreate={onCreateFolder}
-                colors={false}
+
               />
             ) : (
               <ReadOnlyText id="fa-folder" label="フォルダ" value={rule.folderName || '未分類'} />

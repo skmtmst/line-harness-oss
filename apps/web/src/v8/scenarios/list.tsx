@@ -683,14 +683,14 @@ export default function ScenariosListV8() {
       : 0
 
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: overallTotal },
-    ...folders.map((f, index) => ({ ...folderActions.rowActions(f, index),
+    { kind: 'all' as const, id: '', label: 'すべて', count: overallTotal },
+    ...folders.map((f, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(f, index),
       id: f.id,
       label: f.name,
       count: f.itemCount ?? null,
       color: f.color,
     })),
-    { id: UNFILED, label: '未分類', count: unfiledCount },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
 
   const folderSelectOptions = [

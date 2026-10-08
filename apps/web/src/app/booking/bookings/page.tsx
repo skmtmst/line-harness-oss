@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -850,6 +852,7 @@ export default function BookingsPage() {
 
   const pageHead = (
     <>
+      <div className="v8-only"><PageHeading title="予約管理" /></div>
       <div data-design="Toolbar" className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" aria-label="パンくず">
           <span>予約</span>

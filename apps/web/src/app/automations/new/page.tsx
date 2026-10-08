@@ -2518,7 +2518,7 @@ function NewAutomationPageV7() {
 
           <FeatureLinkCard
             items={[
-              { label: '友だち属性', note: '付けるタグはここで作ります', href: '/tags' },
+              { label: 'タグ', note: '付けるタグはここで作ります', href: '/tags' },
               { label: 'テンプレート', note: '送る文面の型を用意できます', href: '/templates' },
               { label: '共通アクション', note: '同じ処理を使い回せます', href: '/common-actions' },
             ]}

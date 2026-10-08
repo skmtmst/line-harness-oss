@@ -55,7 +55,7 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
    *
    * 要件書 `v6-02-inbox-requirements-draft.md:77`
    *   「V6画面の『対応マーク』は、実装時に『対応状況』へ変更する。
-   *     友だち属性の対応マークは右パネル内の別項目として表示する。」
+   *     タグの対応マークは右パネル内の別項目として表示する。」
    *
    * 見分け方は API の形。`chatStatus` / `status` が
    * unread・in_progress・on_hold・resolved を取るものは**対応状況**。

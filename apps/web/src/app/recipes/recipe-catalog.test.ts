@@ -43,15 +43,15 @@ describe('レシピは設計の3本', () => {
     ])
   })
 
-  it('どのレシピにも友だち属性が要る', () => {
+  it('どのレシピにもタグが要る', () => {
     for (const recipe of RECIPES) {
-      expect(recipe.requirements.some((r) => r.label === '友だち属性')).toBe(true)
+      expect(recipe.requirements.some((r) => r.label === 'タグ')).toBe(true)
     }
   })
 })
 
 describe('必要な機能', () => {
-  it('APIの機能キーを設計の表示名へ変え、切れない友だち属性を補う', () => {
+  it('APIの機能キーを設計の表示名へ変え、切れないタグを補う', () => {
     const recipe = {
       id: 'signup-7day-follow', name: '案内', purpose: '案内', creates: 'タグ', version: 1,
       origin: 'builtin' as const, requiredFeatures: ['friend_add_routing', 'scenarios'],
@@ -59,7 +59,7 @@ describe('必要な機能', () => {
       itemCount: 16, cloneCount: 12,
     }
     expect(apiRecipeRequirements(recipe).map((item) => [item.label, item.on])).toEqual([
-      ['友だち属性', true],
+      ['タグ', true],
       ['友だち追加時の配信', true],
       ['シナリオ配信', false],
     ])
@@ -68,11 +68,11 @@ describe('必要な機能', () => {
   })
 
   /*
-    **鍵の無い機能を「オフ」と読まない。** 友だち属性のように切れない機能は、
+    **鍵の無い機能を「オフ」と読まない。** タグのように切れない機能は、
     機能設定に行が無い。行が無いことをオフと読むと、どのレシピも使えなくなる。
   */
   it('切れない機能はいつでもオン', () => {
-    expect(requirementIsOn({ label: '友だち属性', feature: null }, {})).toBe(true)
+    expect(requirementIsOn({ label: 'タグ', feature: null }, {})).toBe(true)
   })
 
   it('全部オンなら足りないものは無い', () => {

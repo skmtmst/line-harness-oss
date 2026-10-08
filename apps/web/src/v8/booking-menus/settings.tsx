@@ -608,7 +608,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
           <aside className={styles.side} data-design="Side">
             <div className={styles.sideActions}>
               <span className={styles.sidePhoneButton}>
-                <Button onClick={() => setPhoneOpen(true)}>LINEでの見え方を見る</Button>
+                <Button onClick={() => setPhoneOpen(true)}><Smartphone size={15} aria-hidden="true" />LINEでの見え方を見る</Button>
               </span>
               {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
             </div>

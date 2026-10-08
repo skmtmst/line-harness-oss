@@ -1158,8 +1158,9 @@ export default function MediaLibraryListV8() {
               // 入れると「すべて0・未分類2」のように母集団が混ざる。
               // m26m: 一覧が読めていない（初回・失敗・別アカウント切替直後）の
               // total=0 は偽ゼロなので数えない（null は数を出さない約束）。
-              { id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null },
+              { kind: 'all' as const, id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null },
               ...folders.map((folder) => ({
+                kind: 'folder' as const,
                 id: folder.id,
                 label: folder.name,
                 // #721: フォルダ件数はAPI(itemCount)をそのまま出す。kind=media
@@ -1173,7 +1174,7 @@ export default function MediaLibraryListV8() {
                 onDelete: canManageMedia ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
                 deleteNote: '削除しても、中のメディアは未分類に残ります。',
               })),
-              { id: UNGROUPED, label: '未分類', count: unfiledCount },
+              { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: unfiledCount },
             ]}
           >
             {folderFailure ? (

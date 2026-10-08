@@ -797,14 +797,14 @@ export default function RichMenusListV8() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal },
-    ...folders.map((f, index) => ({ ...folderActions.rowActions(f, index),
+    { kind: 'all' as const, id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal },
+    ...folders.map((f, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(f, index),
       id: f.id,
       label: f.name,
       count: groupFacets?.folderCounts[f.id] ?? 0,
       color: f.color,
     })),
-    { id: UNFILED, label: '未分類', count: groupFacets?.folderCounts[UNFILED] ?? 0 },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: groupFacets?.folderCounts[UNFILED] ?? 0 },
   ]
   const folderSelectOptions = [
     { value: '', label: 'フォルダ：すべて' },

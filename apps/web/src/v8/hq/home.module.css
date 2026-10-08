@@ -114,6 +114,7 @@
   flex-direction: column;
   gap: var(--tpl-hq-form-gap);
   min-width: 0;
+  height: var(--tpl-hql-home-card-h);
   padding: var(--tpl-hq-home-account-pad);
   border-radius: var(--radius-card);
   outline: 1px solid var(--color-hairline);
@@ -123,10 +124,8 @@
 
 .cardWarn { outline-color: var(--color-status-warn-deep); }
 /*
- * 絵 JKjsE（2026-10-08 B-31）：高さは固定せず中身の高さ。同じ段のカードだけ、いちばん高いカードに
- * そろえる（grid の行の stretch）。名前の下は1行なので、ボタンは同じ段で同じ位置に並ぶ。
- * ボタンの下は余白18。要確認の行はボタンの下に入り、その下にも余白18（はみ出さない）。
- * 段の中で低いカードは、下に余白が増える（高い方に合わせ、ボタンは下へ押さない）。
+ * JKjsE の書き出しは高さ206。通常カードの操作は下へ寄せ、要確認のカードは
+ * 下に確認の行を置く。狭い板では中身に合わせた高さに戻し、はみ出しを防ぐ。
  */
 
 .cardHead {
@@ -134,6 +133,7 @@
   align-items: center;
   gap: var(--tpl-hq-attach-gap);
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .logo {
@@ -176,7 +176,10 @@
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-hq-small-lh);
@@ -187,6 +190,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--tpl-hq-form-gap);
   margin: 0;
+  flex-shrink: 0;
 }
 
 .stat { display: flex; flex-direction: column; gap: var(--tpl-hq-nav-gap); min-width: 0; }
@@ -197,6 +201,13 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-hq-plan-head-gap);
+  margin-top: var(--tpl-hq-body-gap);
+  flex-shrink: 0;
+}
+.card:not(.cardWarn) .cardButtons { margin-top: auto; }
+@container v8-page (max-width: 1099px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card { height: auto; min-height: var(--tpl-hql-home-card-h); }
 }
 
 .grow { flex: 1; min-width: 0; }

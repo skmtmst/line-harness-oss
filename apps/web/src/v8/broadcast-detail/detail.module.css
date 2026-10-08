@@ -34,9 +34,9 @@
   min-width: 0;
   overflow: hidden;
   color: var(--color-ink);
-  font-size: var(--tpl-bd-title-size);
-  font-weight: 600;
-  line-height: var(--tpl-bd-title-lh);
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

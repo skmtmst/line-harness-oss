@@ -975,15 +975,15 @@ export default function AutoRepliesListV8() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: rules.length, icon: <Inbox size={15} aria-hidden="true" /> },
-    ...folders.map((f, index) => ({ ...folderActions.rowActions(f, index),
+    { kind: 'all' as const, id: '', label: 'すべて', count: rules.length, icon: <Inbox size={15} aria-hidden="true" /> },
+    ...folders.map((f, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(f, index),
       id: f.id,
       label: f.name,
       // フォルダ件数は API(itemCount) をそのまま出す。来ないときは null（出さない）。
       count: f.itemCount ?? null,
       color: f.color,
     })),
-    { id: UNFILED, label: '未分類', count: unfiledCount },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
   const folderSelectOptions = [
     { value: '', label: 'フォルダ：すべて' },

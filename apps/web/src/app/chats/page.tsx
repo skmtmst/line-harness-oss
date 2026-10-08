@@ -1,5 +1,7 @@
 'use client'
 
+import { PageTitle } from '@/components/templates/page-frame'
+
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton'
 import Avatar from '@/components/shared/avatar'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -2739,7 +2741,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         className={`relative flex flex-wrap items-center gap-1.5 border-b border-hairline p-3 ${styles.headTop}`}
         aria-label="受信箱のクイック絞り込み"
       >
-        <div className={`flex w-full items-center gap-2 ${styles.titleRow}`}><h2 className="mr-auto text-lg font-semibold">受信箱</h2>
+        <div className={`flex w-full items-center gap-2 ${styles.titleRow}`}><PageTitle className="mr-auto text-lg font-semibold">受信箱</PageTitle>
         {/*
           設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
           右から420pxのパネルが出る（`bXyEA`）。
@@ -4513,7 +4515,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               aria-modal={wideInfoPanel ? undefined : true}
               aria-label="顧客情報"
               tabIndex={-1}
-              className={`h-full max-w-full shrink-0 overflow-hidden bg-canvas focus:outline-none ${wideInfoPanel ? `relative z-auto w-[260px] ${isV8 ? '' : 'border-l border-hairline'}` : 'fixed inset-y-0 right-0 z-[70] w-[340px] shadow-overlay'}`}
+              className={`${styles.infoPanel} h-full max-w-full shrink-0 overflow-hidden bg-canvas focus:outline-none ${wideInfoPanel ? `relative z-auto w-[260px] ${isV8 ? '' : 'border-l border-hairline'}` : 'fixed inset-y-0 right-0 z-[70] w-[340px] shadow-overlay'}`}
             >
             {/*
               重なりの中にも閉じるボタンを置く。上部のボタンだけだと、

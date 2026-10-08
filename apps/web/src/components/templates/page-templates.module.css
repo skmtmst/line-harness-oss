@@ -17,8 +17,9 @@
 :global([data-theme='v8']) .headingText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
 :global([data-theme='v8']) .titleRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
 :global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
+:global([data-theme='v8']) .pageTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
 :global([data-theme='v8']) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
-/* 部品どおりの小さい見出し（EnlYo：題20/27・間2・説明13/20）。compact を渡した画面だけが使う。regular は既定（22/32）と同じ。 */
+/* compact は間2・説明13/20を維持し、題は標準と同じ22/700/32。 */
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .headingText { gap: var(--tpl-compact-gap); }
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .title { font-size: var(--tpl-compact-title-size); font-weight: var(--tpl-compact-title-weight); line-height: var(--tpl-compact-title-lh); }
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-compact-desc-lh); }
@@ -31,6 +32,7 @@
 :global([data-theme='v8']) .main { min-width: 0; flex: 1; }
 :global([data-theme='v8']) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global([data-theme='v8']) .content { min-width: 0; }
+:global([data-theme='v8']) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
 :global([data-theme='v8']) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
 :global([data-theme='v8']) .folders { width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: 2px; }
 /*
@@ -214,3 +216,20 @@
 :global([data-theme='v8']) [data-page-template='create'] .heading > .headingText > .description { flex-basis: 100%; order: 3; }
 :global([data-theme='v8']) [data-page-template='create'] .heading > .crumbs { flex-basis: 100%; order: 4; }
 :global([data-theme='v8']) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-top-gap); }
+
+/* 詳細の説明とタブの間を詰める板（回答フォーム）。指定した詳細だけに効く。 */
+:global([data-theme='v8']) [data-page-template='detail'] .heading[data-bottom-spacing='compact'] {
+  padding-bottom: calc(var(--tpl-detail-head-pad-bottom) - var(--tpl-head-gap));
+}
+
+/* 回答などの本文と補助欄を組む口。既存の詳細には使わない限り効かない。 */
+.detailColumns { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-ev-fr-rail-w); align-items: start; gap: var(--tpl-ev-fr-col-gap); margin-right: var(--tpl-ev-bk-pull-side); }
+.detailColumnMain { display: flex; flex-direction: column; gap: var(--tpl-wh-check-gap); min-width: 0; }
+.detailColumnAside { min-width: 0; min-height: 100%; padding-left: var(--tpl-ev-fr-rail-pad); border-left: 1px solid var(--color-hairline); }
+.detailColumnToggle { display: none; }
+@container v8-page (max-width: 1099px) {
+  .detailColumns { grid-template-columns: minmax(0, 1fr); margin-right: 0; gap: var(--tpl-body-pad); }
+  .detailColumnToggle { display: block; }
+  .detailColumnAside { display: none; min-height: 0; padding-left: 0; border-left: 0; }
+  .detailColumnAside[data-expanded] { display: block; }
+}

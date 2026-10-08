@@ -1,0 +1,6 @@
+/* 枠・段・余白はテンプレートの型を使う。ここは動画の吹き出しだけ。 */
+.bubble { width: var(--tpl-rvid-preview-w); overflow: hidden; border-radius: var(--tpl-te-asset-radius); background: var(--color-canvas); }
+.video { display: flex; align-items: center; justify-content: center; height: var(--tpl-rvid-preview-h); background: var(--color-ink); color: var(--color-canvas); }
+.video video { width: 100%; height: 100%; object-fit: contain; }
+.play { display: flex; align-items: center; justify-content: center; width: var(--tpl-rvid-play-size); height: var(--tpl-rvid-play-size); border-radius: var(--radius-pill); background: var(--color-hairline); color: var(--color-ink); }
+.action { display: block; padding: var(--tpl-rvid-label-pad); text-align: center; color: var(--color-accent-deep); font-size: var(--text-label); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

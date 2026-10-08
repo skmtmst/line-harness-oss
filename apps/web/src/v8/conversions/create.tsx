@@ -66,7 +66,7 @@ const TRIGGER_CHOICES: TriggerChoice[] = [
   { value: 'booking', label: '予約が確定した', note: '予約管理', eventType: 'reservation_confirmed', measureMethod: 'webhook' },
   { value: 'page', label: 'ページを見た', note: 'サイトスクリプト', eventType: 'url_reach', measureMethod: 'url_reach' },
   { value: 'video', label: '動画を見終えた', note: 'ウェビナー', eventType: 'webinar_completed', measureMethod: 'webhook' },
-  { value: 'tag', label: 'タグが付いた', note: '友だち属性', eventType: 'tag_added', measureMethod: 'webhook' },
+  { value: 'tag', label: 'タグが付いた', note: 'タグ', eventType: 'tag_added', measureMethod: 'webhook' },
 ]
 
 const VALUE_MODE_LABELS: Record<ConversionValueMode, string> = {

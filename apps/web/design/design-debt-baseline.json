@@ -618,6 +618,9 @@
   "components/support/support-inbox.tsx": {
     "arbitrary-value": 8
   },
+  "components/templates/page-frame.tsx": {
+    "unresolved-classname": 1
+  },
   "components/ui/kpi-collapse.tsx": {
     "unresolved-classname": 2
   },

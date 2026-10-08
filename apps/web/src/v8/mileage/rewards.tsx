@@ -516,7 +516,7 @@ export default function RewardsTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={FOLDERS.map((key) => ({ id: key, label: key, count: folderCounts.get(key) ?? 0 }))}
+      rows={FOLDERS.map((key) => ({ kind: key === 'すべて' ? 'all' as const : key === '未分類' ? 'unfiled' as const : 'folder' as const, id: key, label: key, count: folderCounts.get(key) ?? 0 }))}
       activeId={folder}
       onSelect={(id) => { setPage(1); setFolder(id as Folder) }}
       addFolderNote="フォルダを消しても、中の経路は未分類に残ります"

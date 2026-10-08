@@ -11,6 +11,8 @@
 /* スタッフが多いときは表の中だけ横に送る（画面全体を横スクロールさせない）。 */
 .matrixWrap {
   overflow-x: auto;
+  /* 絵は36の升と12の行間。実表の48の升に含まれる、最後の下半分の行間を除く。 */
+  margin-bottom: calc(var(--tpl-bm-6) * -1);
 }
 
 .matrix {
@@ -118,7 +120,8 @@
 
 .overrideCard {
   padding: var(--tpl-bm-16);
-  border: 1px solid var(--color-hairline);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
@@ -128,7 +131,7 @@
   color: var(--color-ink);
   font-size: var(--tpl-bm-14);
   font-weight: 700;
-  line-height: 1.5;
+  line-height: var(--tpl-bm-20);
 }
 
 .overrideFields {
@@ -151,6 +154,7 @@
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 500;
+  line-height: var(--tpl-bm-20);
 }
 
 .unitField {
@@ -233,8 +237,9 @@
   border-radius: var(--radius-pill);
   background: var(--color-status-warn-soft);
   color: var(--color-status-warn-deep);
-  font-size: var(--tpl-bm-11);
+  font-size: var(--tpl-bm-12);
   font-weight: 600;
+  line-height: var(--tpl-bm-18);
   white-space: nowrap;
 }
 
@@ -248,6 +253,7 @@
 .legendCaption {
   color: var(--color-ink-faint);
   font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
 }
 
 /* ===== 下の帯（保存）：板ではボタンが真ん中 ===== */

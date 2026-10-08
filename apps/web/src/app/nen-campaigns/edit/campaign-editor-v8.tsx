@@ -426,7 +426,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
               <Button type="button" variant="secondary" onClick={addMileageAction}>回答後に200マイル付ける</Button>
             )}
             {formIssueMessage ? <p className={styles.errorText} role="alert">{formIssueMessage}。フォームを外して選び直してください。</p> : null}
-            <p className={styles.linkLine}>つながる先：→ 回答フォーム → マイル → EC連携 → 友だち属性</p>
+            <p className={styles.linkLine}>つながる先：→ 回答フォーム → マイル → EC連携 → タグ</p>
           </section>
         </div>
 

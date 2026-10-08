@@ -14,6 +14,8 @@ import { Check, Copy, PauseCircle, X } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
+import { TextField } from '@/components/shared/text-field'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -567,9 +569,11 @@ function SettlementEditor({
   affiliate,
   onSaved,
 }: {
-  affiliate: { id: string; email?: string | null; holdDays?: number | null; payoutCycle?: string | null; notifyOnConversion?: boolean }
+  affiliate: { id: string; rewardMode?: 'none' | 'fixed' | 'rate'; commissionRate: number; email?: string | null; holdDays?: number | null; payoutCycle?: string | null; notifyOnConversion?: boolean }
   onSaved: () => void
 }) {
+  const [rewardMode, setRewardMode] = useState<'none' | 'fixed' | 'rate'>(affiliate.rewardMode ?? (affiliate.commissionRate > 0 ? 'rate' : 'fixed'))
+  const [rate, setRate] = useState(String(affiliate.commissionRate))
   const [email, setEmail] = useState(affiliate.email ?? '')
   const [holdDays, setHoldDays] = useState(affiliate.holdDays == null ? '' : String(affiliate.holdDays))
   const [payoutCycle, setPayoutCycle] = useState(affiliate.payoutCycle ?? '')
@@ -582,6 +586,8 @@ function SettlementEditor({
     setError(null)
     try {
       const res = await api.affiliates.update(affiliate.id, {
+        rewardMode,
+        commissionRate: rewardMode === 'rate' ? Number(rate) : 0,
         email: email.trim() || null,
         holdDays: holdDays.trim() === '' ? null : Number(holdDays),
         payoutCycle: payoutCycle.trim() || null,
@@ -604,6 +610,12 @@ function SettlementEditor({
     <section className={styles.card} aria-label="支払いの取り決め">
       <h3 className={styles.cardTitle}>支払いの取り決め</h3>
       <div className={styles.fields}>
+        <Select aria-label="報酬の方式" value={rewardMode} onChange={(value) => setRewardMode(value as typeof rewardMode)} options={[
+          { value: 'none', label: '報酬なし（計測のみ）' },
+          { value: 'fixed', label: '成果1件ごとに定額' },
+          { value: 'rate', label: '売上に対する割合' },
+        ]} />
+        {rewardMode === 'rate' ? <TextField aria-label="報酬の割合（%）" type="number" min={0} max={100} step="0.1" value={rate} onChange={(e) => setRate(e.target.value)} /> : null}
         <label className={styles.field}>
           <span>連絡先</span>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="partner@example.com" className={styles.input} />

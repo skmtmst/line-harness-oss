@@ -21,7 +21,7 @@ function Content() {
    */
   if (theme === 'v8') return <HqTemplatesV8 type={type} DefinitionEditor={TemplateDefinitionEditor} />
   const config = type === 'scenario' ? { label: 'シナリオ', target: 'scenarios' as const } : type === 'tag'
-    ? { label: '友だち属性', target: 'tags' as const }
+    ? { label: 'タグ', target: 'tags' as const }
     : type === 'rich_menu'
       ? { label: 'リッチメニュー', target: 'rich-menus' as const }
       : type === 'form'

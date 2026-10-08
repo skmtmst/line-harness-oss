@@ -73,7 +73,7 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
     { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : '—', help: '予約した人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
     { key: 'viewers', title: '参加', icon: LogIn, value: summary?.viewers ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.viewers, summary.reservations)}` : '—', help: '入場した人の数です。予約せず直接入場した人も含みます。' },
     { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `参加の ${percent(summary.completed, summary.viewers)}` : '—', help: '動画の9割以上を実際に見た人です。' },
-    { key: 'forms', title: 'フォーム送信', icon: Send, value: summary?.formSubmissions ?? null, unit: '件', detail: summary ? `CTA を押した ${formatNumber(summary.ctaClicks)} 人のうち` : '—', help: 'フォームを送信した件数です。各段の人数差は、同じ人が順番に進んだ割合を表すものではありません。' },
+    { key: 'forms', title: 'フォーム送信', icon: Send, value: summary?.formSubmissions ?? null, unit: '人', detail: summary ? `CTA を押した ${formatNumber(summary.ctaClicks)} 人のうち` : '—', help: 'フォームを送信した人の数です。同じ人が複数回送信しても1人に数えます。各段の人数差は、同じ人が順番に進んだ割合を表すものではありません。' },
   ]
 
   return (

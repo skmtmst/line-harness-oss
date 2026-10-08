@@ -8,6 +8,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { Steps } from '@/components/templates/steps'
+import { PageHeading } from '@/components/templates/page-frame'
 import { STEPS, type PaneKey, type StepKey } from './helpers'
 import styles from './chrome.module.css'
 
@@ -41,13 +42,7 @@ export function DetailHead({
 }) {
   return (
     <>
-      <header className={styles.head} data-template-region="heading">
-        <div className={styles.headText}>
-          <h2 className={styles.title} title={title}>{title}</h2>
-          <p className={styles.subtitle}>{subtitle}</p>
-        </div>
-        {actions ? <div className={styles.headActions}>{actions}</div> : null}
-      </header>
+      <PageHeading title={title} description={subtitle} actions={actions} />
       <div className={styles.tabsRow}>
         <nav className={styles.tabs} aria-label="設定・参加者・分析・コメント演出" data-wc-tabs="true">
           {DETAIL_TABS.map((tab) => {

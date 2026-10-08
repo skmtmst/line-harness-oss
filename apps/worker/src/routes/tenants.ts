@@ -1,4 +1,6 @@
 import { Hono, type Context } from 'hono';
+import { getTenantCompanyContact, saveTenantCompanyContact } from '@line-crm/db';
+import { parseTenantCompanyContact } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -55,6 +57,32 @@ function forbidden(c: Context<Env>) {
 
 /** Read-only migration diagnostics. This route never returns LINE credentials. */
 export const tenants = new Hono<Env>();
+
+/** 会社・連絡先は統括の管理者だけに返す。汎用の名前の口には含めない。 */
+tenants.get('/api/tenants/me/company-contact', requireRole('owner', 'admin'), async c => {
+  const tenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
+  const data = await getTenantCompanyContact(dbFor(c.env), tenantId);
+  return data ? c.json({ success: true, data })
+    : c.json({ success: false, error: '統括が見つかりません' }, 404);
+});
+
+tenants.patch('/api/tenants/me/company-contact', requireRole('owner', 'admin'), async c => {
+  const staff = c.get('staff')!;
+  if (staff.readOnly) return c.json({ success: false, error: '閲覧のみの権限では保存できません' }, 403);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const parsed = parseTenantCompanyContact(body);
+  if (parsed.error) return c.json({ success: false, error: parsed.error }, 400);
+  const revision = body?.expectedRevision;
+  if (typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 0) {
+    return c.json({ success: false, error: '最新版を読み込んでから保存してください' }, 400);
+  }
+  const db = dbFor(c.env), tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+  if (!await getTenantCompanyContact(db, tenantId)) return c.json({ success: false, error: '統括が見つかりません' }, 404);
+  const data = await saveTenantCompanyContact(db, tenantId, staff.id, staff.role as 'owner' | 'admin', parsed.data!, revision);
+  if (!data) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が変更しました。入力を控えて、最新版を読み直してください。' }, 409);
+  c.set('auditRecorded', true);
+  return c.json({ success: true, data });
+});
 
 tenants.post('/api/tenants', async (c) => {
   if (!(await canManageTenants(c))) return forbidden(c);

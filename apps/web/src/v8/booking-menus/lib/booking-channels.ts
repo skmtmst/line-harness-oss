@@ -1,5 +1,6 @@
 import { fetchApi } from '@/lib/api'
-import type { ApiResponse } from '@line-crm/shared'
+import type { ApiResponse, BookingConflict } from '@line-crm/shared'
+export type { BookingConflict } from '@line-crm/shared'
 
 /**
  * 予約の経路の連携と重なり（★V8-B ZyDd6・DFl3Q）。
@@ -26,19 +27,6 @@ export interface BookingChannelsData {
   staff: BookingChannelStaff[]
   autoAssign: boolean
   channels: BookingChannel[]
-}
-
-export interface BookingConflict {
-  staffId: string
-  staffName: string
-  bookingId: string
-  otherBookingId: string
-  startsAt: string
-  endsAt: string
-  otherStartsAt: string
-  otherEndsAt: string
-  version: number
-  otherVersion: number
 }
 
 export interface BookingCalendarConnection {

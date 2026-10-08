@@ -533,8 +533,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               busy={publishing || Boolean(host?.busy)}
               busyLabel={host ? '保存中…' : '公開中…'}
             >
-              {conflict ? <GitCompare size={15} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />}
-              {conflict ? '比べてから保存' : host ? host.primaryLabel ?? '保存して配る' : '保存して公開'}
+              {conflict ? <GitCompare size={15} aria-hidden="true" /> : host ? null : <Send size={15} aria-hidden="true" />}
+              {conflict ? '比べてから保存' : host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
           </>
         )}
@@ -567,7 +567,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                     value={host ? host.folder : folderId ?? ''}
                     onChange={host ? host.onFolderChange : (value) => updateDraft({ folderId: value || null })}
                     folders={host ? host.folders : folders.map(folderById)}
-                    colors={!host}
+                    colors
                     onCreate={host
                       ? hostFolderCreate(host)
                       : canMutate && editorAccountId

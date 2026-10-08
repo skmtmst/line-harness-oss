@@ -1,5 +1,6 @@
 'use client'
 
+import StatusPill from '@/components/shared/status-pill'
 import Link from 'next/link'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Bell, Send, TriangleAlert, UserPlus } from 'lucide-react'
@@ -40,7 +41,7 @@ export function Tag({ children, tone = 'warning' }: { children: ReactNode; tone?
 
 /** 鍵と値の1行。`href` があれば行ごと押せる（その状態で絞った一覧へ）。 */
 export function KeyValue({ label, value, tone = 'default', dot, href, title }: {
-  label: string
+  label: ReactNode
   value: ReactNode
   tone?: 'default' | 'danger' | 'success' | 'faint'
   dot?: 'success' | 'danger' | 'warning' | 'faint'
@@ -50,7 +51,7 @@ export function KeyValue({ label, value, tone = 'default', dot, href, title }: {
   const body = (
     <>
       {dot ? <span className={dot === 'success' ? `${styles.dot} ${styles.dot_success}` : dot === 'danger' ? `${styles.dot} ${styles.dot_danger}` : dot === 'warning' ? `${styles.dot} ${styles.dot_warning}` : styles.dot} aria-hidden="true" /> : null}
-      <span className={styles.kvKey} title={label}>{label}</span>
+      <span className={styles.kvKey} title={typeof label === 'string' ? label : undefined}>{label}</span>
       <span className={styles.kvValue}>{value}</span>
     </>
   )
@@ -197,11 +198,10 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
       {rows.map((row) => (
         <KeyValue
           key={row.label}
-          label={row.label}
+          label={<StatusPill tone={row.dot === 'faint' ? 'neutral' : row.dot}>{row.label}</StatusPill>}
           value={row.value === null ? '—' : `${formatNumber(row.value)}件`}
           tone={row.label === '未対応' && (row.value ?? 0) > 0 ? 'danger' : 'default'}
           href={row.href}
-          dot={row.dot}
           title={`${row.label}で絞った受信箱を開く`}
         />
       ))}

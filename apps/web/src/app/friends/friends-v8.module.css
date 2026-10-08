@@ -34,9 +34,10 @@
 .headTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.4;
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .headDescription {

@@ -67,10 +67,20 @@ function asD1(sqlite: Database.Database, injected: { current: Inject }) {
         const result = statement.run(...params);
         return { success: true, meta: { changes: result.changes }, results: [] } as T;
       },
+      // 本物の D1 の batch と同じく、1つの取引でまとめて流す（W7 の欄の書き込みと予定の入れ直し）。
+      __batchRun() {
+        if (statement.reader) return { success: true, meta: {}, results: statement.all(...params) };
+        const result = statement.run(...params);
+        return { success: true, meta: { changes: result.changes }, results: [] };
+      },
     } as unknown as D1PreparedStatement);
     return bound([]);
   }
-  return { prepare } as unknown as D1Database;
+  async function batch(statements: D1PreparedStatement[]) {
+    const run = sqlite.transaction(() => statements.map((statement) => (statement as unknown as { __batchRun: () => unknown }).__batchRun()));
+    return run();
+  }
+  return { prepare, batch } as unknown as D1Database;
 }
 
 const pushCalls: Array<{ to: string; messages: unknown[]; retryKey: string }> = [];

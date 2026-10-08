@@ -1,4 +1,4 @@
-# 友だち属性：タグの編集・保存した検索の編集の動き（BEHAVIOR.md）
+# タグ：タグの編集・保存した検索の編集の動き（BEHAVIOR.md）
 
 板：タグの編集 `Qat9s`・競合 `xn95q`（閲覧のみ `fkGUR`）／保存した検索の編集 `AqDWN`。
 写し元：`app/tags/edit-tag-page-v8.tsx`・`tag-editor-v8.tsx`（タグ）、`app/tags/search-editor-v8.tsx`（保存した検索）、`app/tags/edit/tag-conflict-diff.ts`・`app/tags/searches/edit/reference-options.ts` を写した（src/v8 から @/app は読まない）。共通部品（components/friend-fields の ArchivedTagEditor・DeleteDialog・ActionDrawer・RetroactiveDialog など）はそのまま使う。入口 `app/tags/edit/page.tsx`・`app/tags/searches/edit/page.tsx` の V8 の import だけ差し替えた。v7 は触らない。

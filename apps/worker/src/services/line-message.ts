@@ -59,7 +59,7 @@ export function buildMessage(messageType: string, messageContent: string, altTex
     const payload = JSON.parse(messageContent);
     const error = validateImagemapMessage(payload);
     if (error) throw new Error(error);
-    return { type: 'imagemap', baseUrl: payload.baseUrl, baseSize: payload.baseSize, actions: payload.actions, altText: altText || payload.altText || 'リッチメッセージ' };
+    return { type: 'imagemap', baseUrl: payload.baseUrl, baseSize: payload.baseSize, actions: payload.actions, ...(payload.video ? {video: payload.video} : {}), altText: altText || payload.altText || 'リッチメッセージ' };
   }
   if (messageType === 'text') {
     return { type: 'text', text: messageContent };
