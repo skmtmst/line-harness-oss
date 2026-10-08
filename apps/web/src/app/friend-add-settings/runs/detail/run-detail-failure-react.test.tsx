@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /* eslint-disable @typescript-eslint/no-explicit-any -- 実DOMと失敗応答を最小mockで対照する */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -9,7 +10,7 @@ const apiMocks = vi.hoisted(() => ({ runDetail: vi.fn(), retryRun: vi.fn() }))
 vi.mock('next/link', () => ({ default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a> }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(state.params) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.accountId, loading: false }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {}, usePageTitle: () => undefined }))
 vi.mock('@/components/shared/button', () => ({ default: ({ children, ...props }: any) => <button {...props}>{children}</button> }))
 vi.mock('@/components/shared/status-badge', () => ({ default: ({ children }: { children: React.ReactNode }) => <span data-badge>{children}</span> }))
 vi.mock('@/lib/api', () => ({ api: { friendAddRules: apiMocks } }))
@@ -68,7 +69,7 @@ async function render() {
 }
 
 function retryButton(): HTMLButtonElement | undefined {
-  return Array.from(host.querySelectorAll('button')).find((button) => button.textContent?.includes('だけ再試行')) as HTMLButtonElement | undefined
+  return Array.from(host.querySelectorAll('button')).find((button) => button.textContent?.includes('失敗した処理をもう一度')) as HTMLButtonElement | undefined
 }
 
 async function clickRetry() {

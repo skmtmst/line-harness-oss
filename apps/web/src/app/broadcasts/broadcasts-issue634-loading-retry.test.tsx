@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /*
  * #634: 一斉配信の読込表示と、失敗表示からの再読み込み。
  *
@@ -44,6 +45,7 @@ vi.mock('@/lib/api', () => {
   return {
     ApiError,
     api: {
+    dashboard: { overview: vi.fn().mockResolvedValue({ success: true, data: { delivery: { quotaLimit: 100, quotaUsed: 0 } } }) },
       broadcasts: {
         list: fixture.broadcastsList,
         savedViews: { list: fixture.savedViewsList },
@@ -102,24 +104,24 @@ describe('#634 一斉配信の読込表示と再読み込み', () => {
 
     // 応答を保留しているあいだ、ほかの一覧と同じ読込文言が出る。
     // ★V7 `x63W5x`：件数（KPI）も「読み込んでいます」なので複数ある。
-    await waitFor(() => expect(screen.getAllByText('読み込んでいます').length).toBeGreaterThan(0))
+    await waitFor(() => expect(screen.getAllByLabelText('読み込んでいます').length).toBeGreaterThan(0))
 
     slow.resolve({ success: true, data: [] })
-    await waitFor(() => expect(screen.getByText('まだ配信がありません')).toBeTruthy())
-    expect(screen.queryByText('読み込んでいます')).toBeNull()
+    await waitFor(() => expect(screen.getByText('まだ一斉配信がありません')).toBeTruthy())
+    expect(screen.queryByLabelText('読み込んでいます')).toBeNull()
   })
 
-  it('失敗表示の「もう一度読み込む」で一覧を取り直す', async () => {
+  it('失敗表示の「もう一度試す」で一覧を取り直す', async () => {
     fixture.broadcastsList
       .mockResolvedValueOnce({ success: false, error: '失敗' })
       .mockResolvedValueOnce({ success: true, data: [broadcast] })
 
     render(<BroadcastsPage />)
 
-    await waitFor(() => expect(screen.getByText('表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('一斉配信を読み込めませんでした')).toBeTruthy())
 
-    // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度試す」1つ。
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }))
 
     await waitFor(() => expect(fixture.broadcastsList).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByText('8月キャンペーンのお知らせ')).toBeTruthy())
@@ -131,11 +133,11 @@ describe('#634 一斉配信の読込表示と再読み込み', () => {
 
     render(<BroadcastsPage />)
 
-    await waitFor(() => expect(screen.getByText('表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('一斉配信を読み込めませんでした')).toBeTruthy())
 
     // ★V7 `x63W5x`：失敗は1画面に1つ。一覧本体も失敗しているときは
     // 一覧の1枚へまとめ、フォルダ欄の小さい読み直しは出さない。
-    expect(screen.getAllByRole('button', { name: 'もう一度読み込む' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'もう一度試す' })).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'もう一度' })).toBeNull()
     expect(screen.queryByText(/フォルダを読み込めませんでした/)).toBeNull()
   })

@@ -233,3 +233,5 @@
   .detailColumnAside { display: none; min-height: 0; padding-left: 0; border-left: 0; }
   .detailColumnAside[data-expanded] { display: block; }
 }
+
+:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-spacing='compact'] > .steps { margin-top: var(--tpl-steps-compact-top-gap); }

@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', selectedAccount: null, loading: false, accounts: [{ id: 'account-1' }] }) }))
 /*
  * R527: 作成・編集のURLを直接開いた見るだけ（staff）にも保存の入口を出さない。
  * owner には出す。実マウントと文字契約で固定する。
  */
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { join as sourceJoin } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -73,7 +75,7 @@ describe('R527 編集URLの出し分け（役割×操作）', () => {
     await flush()
     expect(host.querySelector('[data-design="Steps"]')).toBeNull()
     expect(host.textContent).toContain(
-      '自動応答の作成・変更はオーナーと管理者だけができます',
+      '作成と変更はオーナーと管理者だけができます',
     )
   })
 
@@ -83,7 +85,7 @@ describe('R527 編集URLの出し分け（役割×操作）', () => {
     await flush()
     expect(host.querySelector('[data-design="Steps"]')).not.toBeNull()
     expect(host.textContent).not.toContain(
-      '自動応答の作成・変更はオーナーと管理者だけができます',
+      '作成と変更はオーナーと管理者だけができます',
     )
   })
 })
@@ -92,8 +94,8 @@ describe('R527 編集URLの出し分け（役割×操作）', () => {
  * 直しを戻すと赤くなる文字契約。実マウントの試験が本命で、
  * こちらは分岐の削除・無条件表示への戻しを見張る。
  */
-const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const HERE = __dirname
+const PAGE = readFileSync(sourceJoin(__dirname, 'wizard-v8.tsx'), 'utf8')
 
 describe('R527 編集URLの出し分け契約', () => {
   it('変更の可否は共通の出し分けで決める', () => {
@@ -103,8 +105,8 @@ describe('R527 編集URLの出し分け契約', () => {
   })
 
   it('手順と編集窓が canManage で守られている', () => {
-    expect(PAGE).toContain(') : draft && canManage ? (')
-    expect(PAGE).toContain('{error && canManage && (')
-    expect(PAGE).toContain('自動応答の作成・変更はオーナーと管理者だけができます')
+    expect(PAGE).toContain('if (!canManage)')
+    expect(PAGE).toContain('kind="forbidden"')
+    expect(PAGE).toContain('作成と変更はオーナーと管理者だけができます')
   })
 })

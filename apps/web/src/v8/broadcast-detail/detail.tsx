@@ -556,9 +556,10 @@ function DeliveryRail({ broadcast, approvalInvolved: withApproval }: { broadcast
   return (
     <ol className={styles.rail} aria-label="配信の状態">
       {steps.map((step, index) => {
-        const state = index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'todo'
+        const finished = displayStatus === 'sent' && index === currentIndex
+        const state = index < currentIndex || finished ? 'done' : index === currentIndex ? 'current' : 'todo'
         return (
-          <li key={step.key} className={styles.railItem} data-state={state} data-kind="delivery">
+          <li key={step.key} className={styles.railItem} data-state={state} data-finished={finished || undefined} data-kind="delivery">
             {index > 0 ? <span className={styles.railLine} data-done={index <= currentIndex || undefined} aria-hidden="true" /> : null}
             <span className={styles.railStep}>
               <span className={styles.railMark} aria-hidden="true">{state === 'done' ? <Check size={11} strokeWidth={3} /> : null}</span>
@@ -665,6 +666,7 @@ function Overview({
         </section>
       ) : null}
 
+      {broadcast.status !== 'draft' ? <>
       <h3 className={styles.secTitle}>{isSent ? '配信結果' : '送信の進み具合'}</h3>
       {broadcast.status === 'sending' ? (
         <Progress
@@ -784,6 +786,7 @@ function Overview({
           </p>
         </section>
       )}
+      </> : null}
     </>
   )
 }

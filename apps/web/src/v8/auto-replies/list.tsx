@@ -582,15 +582,16 @@ export default function AutoRepliesListV8() {
     const reloadIfSameAccount = () => {
       if (selectedAccountIdRef.current === requestAccountId) void load()
     }
-    const sendToggle = (targetKind: 'stop' | 'resume', targetReasonOf: (id: string) => string | null) => {
+    const sendToggle = (targetKind: 'stop' | 'resume', targetReasonOf: (id: string) => string | null, requestKeys = new Map<string, string>()) => {
       applyOptimistic(targetKind === 'resume', targetReasonOf)
       void (async () => {
         let failed = 0
         let forbidden = false
         for (const id of ids) {
           try {
+            if (!requestKeys.has(id)) requestKeys.set(id, crypto.randomUUID())
             const result = targetKind === 'stop'
-              ? await api.autoReplies.stop(id, { reason: targetReasonOf(id) }, crypto.randomUUID())
+              ? await api.autoReplies.stop(id, { reason: targetReasonOf(id) }, requestKeys.get(id)!)
               : await api.autoReplies.update(id, { isActive: true })
             if (!result.success) failed += 1
           } catch (error) {
@@ -604,7 +605,7 @@ export default function AutoRepliesListV8() {
           notifyToast(failedMessage(targetKind, forbidden), {
             tone: 'error',
             actionLabel: 'もう一度',
-            onAction: () => sendToggle(targetKind, targetReasonOf),
+            onAction: () => sendToggle(targetKind, targetReasonOf, requestKeys),
           })
           return
         }
@@ -725,8 +726,10 @@ export default function AutoRepliesListV8() {
    * コピーは必ず「停止中」で作る（AUTOREPLY-08：動かすのは別の操作）。
    * 元ルールが残っているあいだだけ確認窓を出す（stale guard）。
    */
+  const duplicateKeyRef = useRef(crypto.randomUUID())
+  useEffect(() => { duplicateKeyRef.current = crypto.randomUUID() }, [duplicateTarget?.id])
   const runDuplicate = async () => {
-    if (!duplicateTarget) return
+    if (!duplicateTarget || duplicating) return
     setDuplicating(true)
     setDuplicateError('')
     const source = duplicateTarget
@@ -757,7 +760,7 @@ export default function AutoRepliesListV8() {
         keywordMatchMode: source.keywordMatchMode === 'all' ? 'all' : 'any',
         folderId: source.folderId,
         internalMemo: source.internalMemo,
-      })
+      }, duplicateKeyRef.current)
       if (!result.success) {
         setDuplicateError('複製できませんでした。状態を読み直してからお試しください。')
         return
@@ -1690,6 +1693,11 @@ export default function AutoRepliesListV8() {
         confirmLabel={pendingToggle?.kind === 'resume' ? '再開する' : '止める'}
         confirmIcon={pendingToggle?.kind === 'stop' ? <Pause size={16} aria-hidden="true" /> : undefined}
         designNode="i8F12"
+        designLayout="stacked"
+        designWidth={600}
+        designTop={280}
+        footerAlign="center"
+        titleIcon={false}
         error={toggleError}
         onCancel={() => {
           setToggleError('')
@@ -1736,6 +1744,9 @@ export default function AutoRepliesListV8() {
         busy={deleting}
         error={deleteError}
         designNode="u8sKN"
+        designLayout="stacked"
+        designWidth={600}
+        designTop={280}
         onCancel={() => {
           if (deleting) return
           setDeleteError('')

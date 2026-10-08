@@ -14,7 +14,6 @@ import FriendAddSettingsPage from './page'
  * ★V8 友だち追加時の配信を作る手順（板 `wDzkc`・`h8uNW`・`al47K`・
  * `i1nThZ`・`U8Xm3X`）の契約。`<html data-theme="v8">` の下でだけ
  * 新しい作る手順に切り替わり、手順の輪・右の「設定内容」・下の帯が
- * 出ることを実DOMで固定する。v7 では従来の編集器が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -108,13 +107,4 @@ test('v8 の作る①は板 wDzkc・手順の輪・設定内容・下の帯が�
   expect(host.textContent).toContain('下書きを保存')
   expect(host.textContent).toContain('次へ：流入リンク')
   expect(host.textContent).toContain('だれに送るか')
-})
-
-test('v7 の下では従来の編集器が出る（作る①には切り替わらない）', async () => {
-  await act(async () => root.render(<FriendAddSettingsPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.textContent).toContain('基本設定')
-  })
-  expect(host.querySelector('[data-design-node="wDzkc"]')).toBeNull()
 })

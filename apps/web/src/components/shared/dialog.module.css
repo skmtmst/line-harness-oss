@@ -395,3 +395,17 @@
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .panel { -webkit-font-smoothing: auto; }
+
+/* 個別の板が指定した短い確認窓。既定の段の余白は変えない。 */
+[data-theme='v8'] .panel[data-design-layout='stacked'] { padding: 24px; gap: 14px; }
+[data-theme='v8'] .panel[data-design-layout='stacked'] > .headerRow { padding: 0; align-items: center; }
+[data-theme='v8'] .panel[data-design-layout='stacked'] .title { font-size: 17px; line-height: 26px; font-weight: 700; }
+[data-theme='v8'] .panel[data-design-layout='stacked'] > .description { margin: 0; width: 100%; line-height: 22px; }
+[data-theme='v8'] .panel[data-design-layout='stacked'] > .content { padding: 0; align-items: stretch; }
+[data-theme='v8'] .panel[data-design-layout='stacked'] .actions { padding: 0; border: 0; }
+[data-theme='v8'] .panel[data-confirm-first] .actions > button:last-child { order: -1; }
+
+[data-theme='v8'] .panel[data-design-layout='stacked'] .close { width: 28px; height: 28px; min-height: 0; padding: 0; }
+
+[data-theme='v8'] .panel[data-footer-align='start'] .actions { justify-content: flex-start; }
+[data-theme='v8'] .panel[data-design-footer-gap] .actions { gap: var(--dialog-footer-gap); }

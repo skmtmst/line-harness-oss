@@ -116,6 +116,13 @@ async function renderPage() {
     root.render(<AutoReplyRunsPage />)
   })
   await flush()
+  await openRunMenu()
+}
+
+async function openRunMenu(index = 0) {
+  const more = container.querySelectorAll<HTMLButtonElement>('button[aria-label$="記録の操作"]')[index]
+  await act(async () => { more.click() })
+  await flush()
 }
 
 afterEach(() => {
@@ -133,7 +140,7 @@ beforeEach(() => {
 })
 
 function retryButtons(): HTMLButtonElement[] {
-  return Array.from(container.querySelectorAll('button'))
+  return Array.from(document.querySelectorAll('[role="menu"] button'))
     .filter((button) => /もう一度実行|実行しています/.test(button.textContent ?? ''))
 }
 
@@ -145,6 +152,9 @@ describe('自動応答・実行結果の再実行（N-081）', () => {
     ]))
     await renderPage()
     expect(retryButtons()).toHaveLength(1)
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    await openRunMenu(1)
+    expect(retryButtons()).toHaveLength(0)
   })
 
   it('押すと再実行の口を呼び、成功したら一覧を読み直す', async () => {
@@ -185,6 +195,7 @@ describe('自動応答・実行結果の再実行（N-081）', () => {
       button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(retryRunMock).toHaveBeenCalledTimes(1)
+    await openRunMenu()
     expect(retryButtons()[0].disabled).toBe(true)
 
     await act(async () => {

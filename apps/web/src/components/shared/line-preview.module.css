@@ -291,3 +291,10 @@
 
 /* 専用の受け口を使う画面だけ。トークの下で画像の高さを保つ。 */
 .richMenu { flex-shrink: 0; }
+
+/* 友だちが送った側のプレビュー。指定したメッセージだけ右・緑にする。 */
+[data-theme='v8'] .outgoingRow { display: flex; justify-content: flex-end; align-items: flex-end; gap: 4px; width: 100%; }
+[data-theme='v8'] .outgoingBubble { max-width: 186px; padding: 8px 12px; border-radius: var(--v8-line-bubble-out-radius); background: var(--v8-line-bubble-out); color: var(--color-ink); font-size: 11.5px; line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+[data-theme='v8'] .messageRow[data-density='compact'] .bubble { max-width: var(--v8-line-bubble-preview-w); }
+[data-theme='v8'] .messageRow[data-density='compact'] .bubbleBody { font-size: 11.5px; line-height: 18px; }

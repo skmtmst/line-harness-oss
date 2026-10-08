@@ -125,7 +125,8 @@
   font-weight: 600;
 }
 /* 手順②（絵 A0pDt）だけ：欄の題と中身の間 8・題の行 20。①（K7HWG）は 6 のまま。 */
-.stepTrigger .label { line-height: var(--tpl-chip-label-lh); }
+.stepTrigger .label { font-size: var(--text-label); line-height: var(--tpl-chip-label-lh); }
+.stepTrigger .kwField .label { font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
 /* 言葉の欄：題のすぐ下に札と足す欄（絵の行は高さ36で中央そろえ）。 */
 .stepTrigger .kwField { gap: var(--tpl-compact-gap); }
 .labelOptional {
@@ -585,7 +586,7 @@
 }
 .doneRow > dt { flex: 1 1 auto; color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
 .doneRow > dd { min-width: 0; margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.doneActions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--tpl-body-gap); padding-top: var(--tpl-body-gap); }
+.doneActions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--tpl-body-gap); padding-top: var(--tpl-compact-gap); }
 
 /* トグルの行（細かい決まり）。 */
 /* 絵 rfhIf「細かい決まり」：行は線なし・間12・右に操作。 */
@@ -811,3 +812,9 @@
 .conflictBandSlot {
   margin: var(--tpl-ar-ed-band-mt) 0 var(--tpl-ar-ed-band-mb);
 }
+
+.starterSection { gap: var(--tpl-ar-starter-gap); }
+
+.fieldError { margin: 0; color: var(--color-status-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+.kwInput:has([aria-invalid='true']) { outline-color: var(--color-danger); }
+.toggleNum[aria-invalid='true'] { outline: var(--tpl-bd-focus) solid var(--color-danger); }

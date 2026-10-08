@@ -119,7 +119,7 @@ describe('broadcasts/reserved の対象なし案内（R582）', () => {
     render(<Page />)
     await screen.findByText('予約結果を表示できませんでした')
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
-    await waitFor(() => expect(screen.getByText('8月キャンペーンのお知らせ')).toBeTruthy())
+    await waitFor(() => expect(screen.getAllByText('8月キャンペーンのお知らせ')[0]).toBeTruthy())
     expect(apiMocks.get).toHaveBeenCalledTimes(2)
   })
 })

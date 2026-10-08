@@ -126,3 +126,8 @@
 :root:not([data-theme='v8']) .legacyTextarea {
   resize: none;
 }
+
+.errorFrame { display: contents; }
+.errorFrame[data-invalid] { display: block; outline: 1px solid var(--color-danger); outline-offset: 2px; border-radius: var(--radius-control); }
+
+[data-theme='v8'] .field[data-spacing='section'] { gap: var(--tpl-section-gap); }

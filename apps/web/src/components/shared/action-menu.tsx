@@ -221,7 +221,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
   if (inline) return menu
   return (
     <>
-      <span ref={anchorMarkRef} aria-hidden="true" className={styles.anchor} />
+      {anchorRef ? null : <span ref={anchorMarkRef} aria-hidden="true" className={styles.anchor} />}
       <MenuPortal open={open} getAnchor={getAnchor} onClose={onClose}>
         {menu}
       </MenuPortal>

@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 /*
  * 対応表の `/scenarios/new`。
- * - v7：作る①の正本 `/scenarios/mode` へ送る（`?id=` があれば引き継ぐ）。
  * - ★V8：送らずに、この URL で作る①（src/v8/scenarios/create.tsx・dnzqC）をそのまま出す。
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -29,18 +28,6 @@ afterEach(() => {
 })
 
 describe('/scenarios/new', () => {
-  test('v7：開いたら置き換えで /scenarios/mode へ送る', async () => {
-    const { default: Page } = await import('./page')
-    render(<Page />)
-    expect(replace).toHaveBeenCalledWith('/scenarios/mode')
-  })
-
-  test('v7：?id= は送り先へ引き継ぐ', async () => {
-    search = 'id=sc-1'
-    const { default: Page } = await import('./page')
-    render(<Page />)
-    expect(replace).toHaveBeenCalledWith('/scenarios/mode?id=sc-1')
-  })
 
   test('★V8：送らずに作る①をこの URL で出す', async () => {
     document.documentElement.dataset.theme = 'v8'

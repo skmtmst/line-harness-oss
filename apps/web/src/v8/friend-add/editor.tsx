@@ -349,6 +349,13 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   }
   const [fieldError, setFieldError] = useState<{ step: Step; message: string } | null>(null)
   useEffect(() => { setFieldError(null) }, [rule, definition])
+  useEffect(() => {
+    if (!fieldError) return
+    const selector = fieldError.step === 'basic' ? '#fa-name' : fieldError.step === 'routes' ? '[aria-label="どの流入リンクから来た人に送るか"] input[type="checkbox"]' : null
+    const field = selector ? document.querySelector<HTMLElement>(selector) : null
+    field?.focus()
+    field?.scrollIntoView?.({ block: 'center' })
+  }, [fieldError])
 
   const save = async (nextStep?: Step): Promise<string | null> => {
     if (saveInFlight.current) return null
@@ -1103,7 +1110,6 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             ref={messageRef}
             aria-label="最初に送るメッセージ"
             className={styles.bodyText}
-            rows={2}
             maxLength={MESSAGE_LIMIT}
             value={definition.messageText}
             readOnly={!canEdit}

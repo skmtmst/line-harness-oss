@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowRight, ChevronLeft } from 'lucide-react'
@@ -28,7 +28,7 @@ import {
   ReminderBasicsFormV8,
   type BasicsValue,
   type ReminderTemplateV8,
-} from '../basics-form-v8'
+} from '@/v8/reminders/basics-form'
 import { SummaryCardV8, WizardFooterV8, ReminderV8Stepper } from '../wizard-v8-ui'
 import styles from '../wizard-v8.module.css'
 import { humanizeErrorText } from '@/components/shared/human-error-text'
@@ -54,6 +54,15 @@ export default function NewReminderV8() {
   const [eventsState, setEventsState] = useState<'loading' | 'ready' | 'error'>('ready')
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
   const [error, setError] = useState('')
+  const [fieldError, setFieldError] = useState<{ key: 'name' | 'triggerFieldId' | 'triggerEventId'; message: string } | null>(null)
+  useEffect(() => { setFieldError(null) }, [value])
+  useEffect(() => {
+    if (!fieldError) return
+    const label = fieldError.key === 'name' ? '#v8-reminder-name' : fieldError.key === 'triggerFieldId' ? '[aria-label="基準日に使う情報欄"]' : '[aria-label="基準日にするイベント"]'
+    const field = document.querySelector<HTMLElement>(label)
+    field?.focus()
+    field?.scrollIntoView?.({ block: 'center' })
+  }, [fieldError])
   // 一度保存したら下書きの id を持ち、続けて押したときは上書き保存にする。
   const [savedId, setSavedId] = useState<string | null>(null)
   /*
@@ -172,7 +181,10 @@ export default function NewReminderV8() {
   async function save({ silent = false }: { silent?: boolean } = {}): Promise<string | null> {
     const message = validate()
     if (message) {
-      if (!silent) setError(message)
+      if (!silent) {
+        if (accountLoading || !selectedAccountId) setError(message)
+        else { setError(''); setFieldError({ key: !value.name.trim() ? 'name' : value.triggerType === 'friend_field' ? 'triggerFieldId' : 'triggerEventId', message }) }
+      }
       return null
     }
     if (!silent) {
@@ -334,6 +346,7 @@ export default function NewReminderV8() {
       ) : error ? <Notice tone="danger" message={error} /> : null}
 
           <ReminderBasicsFormV8
+            fieldError={fieldError}
             value={value}
             onChange={handleChange}
             appliedTemplateId={appliedTemplateId}

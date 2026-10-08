@@ -146,6 +146,7 @@ export const reminderTemplatesV8: ReminderTemplateV8[] = [
 
 export function ReminderBasicsFormV8({
   value,
+  fieldError,
   onChange,
   appliedTemplateId,
   onRequestTemplate,
@@ -155,6 +156,7 @@ export function ReminderBasicsFormV8({
   onEventsReady,
 }: {
   value: BasicsValue
+  fieldError?: { key: 'name' | 'triggerFieldId' | 'triggerEventId'; message: string } | null
   onChange: (next: BasicsValue) => void
   /** 適用中のひな形。手で起点を選び直したら外れる。 */
   appliedTemplateId: string | null
@@ -263,11 +265,14 @@ export function ReminderBasicsFormV8({
             <label className={styles.label} htmlFor="v8-reminder-name">リマインダ名（60文字まで）</label>
             <TextField
               id="v8-reminder-name"
+              invalid={fieldError?.key === 'name'}
+              aria-describedby={fieldError?.key === 'name' ? 'v8-reminder-name-error' : undefined}
               value={value.name}
               maxLength={60}
               placeholder="例：予約前日のご案内"
               onChange={(event) => patch({ name: event.target.value })}
             />
+            {fieldError?.key === 'name' ? <p id="v8-reminder-name-error" className={styles.fieldError} role="alert">{fieldError.message}</p> : null}
           </div>
           <div className={styles.field}>
             <span className={styles.label}>フォルダ</span>
@@ -345,6 +350,7 @@ export function ReminderBasicsFormV8({
             <span className={styles.label}>基準日に使う情報欄</span>
             <div className={styles.testRow}>
               <Select
+                error={fieldError?.key === 'triggerFieldId' ? fieldError.message : undefined}
                 value={value.triggerFieldId}
                 onChange={(next) => patch({ triggerFieldId: next })}
                 disabled={fieldsLoadState !== 'ready'}
@@ -389,6 +395,7 @@ export function ReminderBasicsFormV8({
             <span className={styles.label}>基準日にするイベント</span>
             <div className={styles.testRow}>
               <Select
+                error={fieldError?.key === 'triggerEventId' ? fieldError.message : undefined}
                 value={value.triggerEventId}
                 onChange={(next) => patch({ triggerEventId: next })}
                 disabled={eventsLoadState !== 'ready'}

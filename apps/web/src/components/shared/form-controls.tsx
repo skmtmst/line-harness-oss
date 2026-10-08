@@ -45,6 +45,8 @@ export function Field({
   optional,
   note,
   error,
+  errorFrame = false,
+  spacing,
   help,
   helpLabel,
   helpHref,
@@ -57,6 +59,10 @@ export function Field({
   optional?: boolean
   note?: ReactNode
   error?: ReactNode
+  /** 複合入力を1つの欄として確かめる画面だけ、誤りの枠を付ける。 */
+  errorFrame?: boolean
+  /** カード内の入力と操作を、型の段の間隔で並べる。 */
+  spacing?: 'section'
   /**
    * 言葉の意味・単位・いつ時点の値か。ラベルのすぐ右の「？」へ入れる
    * （★V7・§2-1b）。必須の印・入力の直し方・失敗は入れない。
@@ -101,13 +107,14 @@ export function Field({
     <FieldContext.Provider value={{ controlId: htmlFor, describedBy, invalid: Boolean(shownError), required: Boolean(required) }}>
     <div
       className={styles.field}
+      data-spacing={spacing}
       data-field-quiet={quiet && error ? '' : undefined}
       onInput={error ? () => { if (!quiet) setQuiet(true) } : undefined}
       onBlur={quiet ? () => setQuiet(false) : undefined}
     >
       {/* 「？」は label の外に置く。中に入れるとラベルがボタンを指してしまい、
           入力欄との結びつき（htmlFor・読み上げ）が壊れる。 */}
-      <div className={styles.labelRow}>
+      {label ? <div className={styles.labelRow}>
         <label htmlFor={htmlFor} className={styles.label}>
           {label}
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
@@ -121,8 +128,8 @@ export function Field({
             {helpHref ? <a href={helpHref} className={styles.helpLink}>くわしく</a> : null}
           </HelpTip>
         ) : null}
-      </div>
-      {children}
+      </div> : null}
+      {errorFrame ? <div className={styles.errorFrame} data-invalid={Boolean(shownError) || undefined} role="group" aria-invalid={Boolean(shownError) || undefined} aria-describedby={describedBy}>{children}</div> : children}
       {shownError ? <p id={errorId} className={styles.error} role="alert">{shownError}</p> : null}
       {showNote ? <p id={noteId} className={styles.note}>{note}</p> : null}
       {count ? (

@@ -97,13 +97,13 @@
 /* 下書きの進み（型の共通部品 Steps）。説明の行の下。 */
 .draftSteps {
   min-width: 0;
-  padding-top: var(--tpl-bd-rail-pad-top);
+  padding-top: 0;
 }
 
 /* 進みの帯（送るまでの段階）：丸18・丸と字の間5・線20・間8。 */
 .rail {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--tpl-bd-rail-gap);
   margin: 0;
@@ -769,3 +769,14 @@ a.railStep:hover .railLabel {
   /* 絵は字の途中で折る（全体の言葉のまとまりで折ると3行になる）。 */
   word-break: normal;
 }
+
+.side > .secTitle { font-size: var(--tpl-bd-side-title-size); line-height: var(--tpl-bd-side-title-lh); }
+
+.head:has(.rail) { padding-bottom: var(--tpl-bd-delivery-head-bottom); }
+.conflictWrap { padding-top: var(--tpl-body-gap); }
+
+.head:has(.rail) ~ .split .side { padding-top: var(--tpl-section-pad); }
+
+.railItem[data-finished] .railMark { background: var(--color-ink); }
+.railItem[data-finished] .railStep { color: var(--color-ink); font-weight: 700; }
+.railItem[data-state='current'] .railMark { background: var(--color-ink); box-shadow: none; }

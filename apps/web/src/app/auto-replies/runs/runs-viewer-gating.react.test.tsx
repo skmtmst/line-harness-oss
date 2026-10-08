@@ -6,6 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { join as sourceJoin } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -126,10 +127,10 @@ describe('R530 実行結果の出し分け（役割×操作）', () => {
     expect(buttonLabels().some((label) => label.includes('もう一度実行'))).toBe(false)
     expect(buttonLabels().some((label) => label.includes('一時停止'))).toBe(false)
     expect(container.textContent).toContain(
-      '実行結果の再実行・一時停止はオーナーと管理者だけができます',
+      '再実行・一時停止はオーナーと管理者だけができます',
     )
     // 読み取り（確認・書き出し・設定への移動）は残す。
-    expect(container.textContent).toContain('最近の実行')
+    expect(container.querySelector('[aria-label="実行の記録"]')).not.toBeNull()
     expect(buttonLabels().some((label) => label.includes('CSVで書き出す'))).toBe(true)
   })
 
@@ -137,10 +138,12 @@ describe('R530 実行結果の出し分け（役割×操作）', () => {
     staffMeMock.mockResolvedValue({ success: true, data: { role: 'owner' } })
     await renderPage()
 
-    expect(buttonLabels().some((label) => label.includes('もう一度実行'))).toBe(true)
+    const more = container.querySelector<HTMLButtonElement>('button[aria-label$="記録の操作"]')!
+    await act(async () => { more.click() })
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain('もう一度実行')
     expect(buttonLabels().some((label) => label.includes('一時停止'))).toBe(true)
     expect(container.textContent).not.toContain(
-      '実行結果の再実行・一時停止はオーナーと管理者だけができます',
+      '再実行・一時停止はオーナーと管理者だけができます',
     )
   })
 })
@@ -149,8 +152,8 @@ describe('R530 実行結果の出し分け（役割×操作）', () => {
  * 直しを戻すと赤くなる文字契約。実マウントの試験が本命で、
  * こちらは分岐の削除・無条件表示への戻しを見張る。
  */
-const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const HERE = __dirname
+const PAGE = readFileSync(sourceJoin(__dirname, '../../../v8/auto-replies/runs.tsx'), 'utf8')
 
 describe('R530 実行結果の出し分け契約', () => {
   it('変更の可否は共通の出し分けで決め、手元の保存値で決めない', () => {
@@ -161,8 +164,8 @@ describe('R530 実行結果の出し分け契約', () => {
   })
 
   it('再実行・一時停止が canManage で守られ、403 は権限の説明になる', () => {
-    expect(PAGE).toContain('{item.canRetry && canManage ? (')
+    expect(PAGE).toContain('if (canManage && item.canRetry)')
     expect(PAGE).toContain('再実行する権限がありません')
-    expect(PAGE).toContain('実行結果の再実行・一時停止はオーナーと管理者だけができます')
+    expect(PAGE).toContain('再実行・一時停止はオーナーと管理者だけができます')
   })
 })

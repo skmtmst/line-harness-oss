@@ -621,7 +621,7 @@ function FriendAddRunsInner() {
             </div>
             <div className={styles.kvRow}>
               <dt>最後に送った</dt>
-              <dd>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : '—'}</dd>
+              <dd title={summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : undefined}>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : '—'}</dd>
             </div>
           </dl>
           <div className={styles.boxFoot}>

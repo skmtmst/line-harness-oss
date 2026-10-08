@@ -245,7 +245,7 @@ function FriendAddRunDetailInner() {
   const talkHref = !detail.friend.redacted ? `/chats?friend=${encodeURIComponent(detail.friend.id)}` : null
   const settingsHref = detail.rule ? `/friend-add-settings?view=edit&id=${encodeURIComponent(detail.rule.id)}` : null
 
-  const bandTitle = failedActions.length > 0
+  const bandTitle = deliveryUnknown ? '送達不明・要確認（自動では送り直しません）' : failedActions.length > 0
     ? `${firstFailed + (messageSent ? 2 : 1)}つ目の処理を完了できませんでした`
     : routingAction(detail.status, detail.errorCode)
   const bandNote = failedActions.length > 0
@@ -320,7 +320,8 @@ function FriendAddRunDetailInner() {
                 )
               })}
             </ol>
-            {!messageSent && actionRuns.length === 0 ? <p className={styles.cardSub}>行った処理はありません。</p> : null}
+            {detail.status === 'suppressed' && !deliveryUnknown ? <p className={styles.cardSub}>配信なし</p> : null}
+            {actionRuns.length === 0 ? <p className={styles.cardSub}>追加の処理はありません。</p> : null}
           </section>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
         </div>
