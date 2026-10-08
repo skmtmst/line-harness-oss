@@ -1,5 +1,5 @@
 /** Conservatively classify exactly one supported SQLite statement, never a SQL prefix. */
-function classifySingleStatement(sql: string): { readOnly: boolean; sql: string } {
+export function classifySingleStatement(sql: string): { readOnly: boolean; sql: string } {
   const unsupported = () => { throw new Error('incoming_receipt_unsupported_sql'); };
   if (sql.includes('\0')) unsupported();
   let keyword = '';
