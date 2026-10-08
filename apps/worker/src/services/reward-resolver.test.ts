@@ -70,6 +70,7 @@ describe('resolveRewardTemplate', () => {
     });
     const result = await resolveRewardTemplate(fakeDb, {
       friendId: 'f1',
+      expectedLineAccountId: 'account-a',
       requestedTrackedLinkId: 'link-b',
     }, deps);
     expect(result).toEqual(tplB);
@@ -84,6 +85,7 @@ describe('resolveRewardTemplate', () => {
     });
     const result = await resolveRewardTemplate(fakeDb, {
       friendId: 'f1',
+      expectedLineAccountId: 'account-a',
       requestedTrackedLinkId: 'link-missing',
     }, deps);
     expect(result).toEqual(tplA);
@@ -98,6 +100,7 @@ describe('resolveRewardTemplate', () => {
     });
     const result = await resolveRewardTemplate(fakeDb, {
       friendId: 'f1',
+      expectedLineAccountId: 'account-a',
       requestedTrackedLinkId: 'link-noreward',
     }, deps);
     expect(result).toBeNull();
@@ -112,6 +115,7 @@ describe('resolveRewardTemplate', () => {
     });
     const result = await resolveRewardTemplate(fakeDb, {
       friendId: 'f1',
+      expectedLineAccountId: 'account-a',
       requestedTrackedLinkId: null,
     }, deps);
     expect(result).toBeNull();
@@ -125,6 +129,7 @@ describe('resolveRewardTemplate', () => {
     });
     const result = await resolveRewardTemplate(fakeDb, {
       friendId: 'f1',
+      expectedLineAccountId: 'account-a',
       requestedTrackedLinkId: null,
     }, deps);
     expect(result).toEqual(tplA);
