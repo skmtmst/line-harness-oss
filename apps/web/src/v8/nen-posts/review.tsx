@@ -1500,6 +1500,7 @@ function DetailV8({
       assetStatus={detailAssetStatus}
       derivatives={detailDerivatives}
       assetsFailed={detailAssetsFailed}
+      onReloadPhoto={() => { if (photoId) void openDetail(photoId) }}
       onReloadAssets={() => { if (photoId) void refreshDetailAssets(photoId) }}
       assetProcessing={assetProcessing}
       rotationSaving={rotationSaving}

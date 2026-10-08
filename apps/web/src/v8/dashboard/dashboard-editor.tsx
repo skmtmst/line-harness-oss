@@ -75,7 +75,8 @@ export const KEYBOARD_HINT = '持ち上げるには Space を押し、上下の�
 
 const labelOf = (id: unknown) => CARD_DEFINITION_MAP.get(id as DashboardCardId)?.label ?? String(id)
 
-function CardRow({ item, definition, canMoveUp, canMoveDown, onMove, onToggle }: {
+function CardRow({ item, definition, canMoveUp, canMoveDown, onMove, onToggle, saving }: {
+  saving: boolean
   item: DashboardPreferenceItem
   definition: CardDefinition
   canMoveUp: boolean
@@ -83,7 +84,7 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, onMove, onToggle }:
   onMove: (direction: 'up' | 'down') => void
   onToggle: () => void
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled: saving })
   return (
     <div
       ref={setNodeRef}
@@ -95,6 +96,7 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, onMove, onToggle }:
       <ReorderHandle
         {...attributes}
         {...listeners}
+        locked={saving}
         label={definition.label}
         ariaLabel={`${definition.label}をドラッグして並べ替え`}
         className={styles.grip}
@@ -106,14 +108,14 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, onMove, onToggle }:
         <span className={styles.where} title={definition.description}>{definition.description}</span>
       </div>
       <div role="group" aria-label={`${definition.label}の順番`} className={styles.moves}>
-        <IconButton size="small" aria-label={`${definition.label}を1つ上へ移動`} disabled={!canMoveUp} onClick={() => onMove('up')}>
+        <IconButton size="small" aria-label={`${definition.label}を1つ上へ移動`} disabled={saving || !canMoveUp} onClick={() => onMove('up')}>
           <ChevronUp aria-hidden="true" />
         </IconButton>
-        <IconButton size="small" aria-label={`${definition.label}を1つ下へ移動`} disabled={!canMoveDown} onClick={() => onMove('down')}>
+        <IconButton size="small" aria-label={`${definition.label}を1つ下へ移動`} disabled={saving || !canMoveDown} onClick={() => onMove('down')}>
           <ChevronDown aria-hidden="true" />
         </IconButton>
       </div>
-      <Toggle checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} />
+      <Toggle disabled={saving} checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} />
     </div>
   )
 }
@@ -228,6 +230,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
   }, [open])
 
   const toggle = (group: DashboardGroup, id: DashboardCardId) => {
+    if (saving) return
     const before = draft[group]
     const next = toggleDashboardItem(before, id, group === 'today' ? TODAY_TASK_LIMIT : undefined)
     setDraft({ ...draft, [group]: next })
@@ -250,6 +253,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
 
   const handleDragEnd = (group: DashboardGroup, event: DragEndEvent) => {
     setKeyboardDrag(false)
+    if (saving) return
     const { active, over } = event
     if (!over || active.id === over.id) return
     setDraft((current) => ({
@@ -260,6 +264,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
 
   /* 上下ボタンの移動。端では何もしない。結果は日本語で読み上げる。 */
   const handleMove = (group: DashboardGroup, id: DashboardCardId, direction: 'up' | 'down') => {
+    if (saving) return
     const next = moveDashboardItem(draft[group], id, direction)
     if (next === draft[group]) return
     setDraft({ ...draft, [group]: next })
@@ -398,6 +403,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
                         return (
                           <CardRow
                             key={item.id}
+                            saving={saving}
                             item={item}
                             definition={definition}
                             canMoveUp={index > 0}

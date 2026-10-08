@@ -87,7 +87,7 @@ export default function GettingStartedV8() {
 
   return (
     <div className={frame.screen}>
-      <SettingsPage
+      <SettingsPage layout="accounts"
         boardId="xuJ7D"
         title="はじめの設定"
         description="musubo を使いはじめるまでの6つの手順です。上から順に進めると、最初の1通が届くまでたどり着けます。"

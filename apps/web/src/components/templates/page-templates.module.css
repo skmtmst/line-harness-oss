@@ -241,3 +241,17 @@
   :global([data-theme='v8']) .listBody[data-dialog-layout] .folders { display: none; }
   :global([data-theme='v8']) .listBody[data-dialog-layout] .collapsedFolders { display: flex; }
 }
+
+/* B-40: 設定の板の違いは SettingsPage.layout から選ぶ。 */
+:global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings { gap: 0; }
+:global([data-theme='v8']) .frame[data-template-layout='accounts'] .settingsContent { max-width: none; padding: var(--tpl-sa-content-pad); gap: var(--tpl-sa-gap); }
+:global([data-theme='v8']) .frame[data-template-layout='account-detail'] .settingsContent { max-width: none; padding: var(--tpl-acd-pad); gap: var(--tpl-acd-stack-gap); }
+:global([data-theme='v8']) .frame[data-template-layout='account-handover'] .settingsContent { max-width: none; padding: var(--tpl-acd-pad); gap: var(--tpl-acd-gap); }
+:global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) { --tpl-setnav-w: var(--tpl-sb-nav-w); --tpl-settings-gap: 0px; }
+:global([data-theme='v8']) .frame[data-template-layout='wide-nav'] { --tpl-head-gap: var(--tpl-sb-head-gap); --tpl-head-pad-bottom: var(--tpl-sb-head-pad-bottom); --tpl-desc-size: var(--tpl-sb-desc-size); --tpl-desc-lh: var(--tpl-sb-desc-lh); }
+:global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) .settingsContent { max-width: none; }
+:global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) .settings { flex-direction: row; gap: 0px; }
+:global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) .settingsNav { width: auto; flex-direction: column; }
+:global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) > .footer { margin-inline: var(--tpl-sb-footer-side); }
+:global([data-theme='v8']) .frame[data-template-layout='narrow-nav'] { --tpl-setnav-w: var(--tpl-sb-nav-w-narrow); --tpl-settings-content-pad-block: var(--tpl-sb-narrow-pad-top) var(--tpl-sb-narrow-pad-bottom); --tpl-settings-content-pad-side: var(--tpl-sb-narrow-pad-side); --tpl-settings-content-gap: var(--tpl-sb-narrow-gap); }
+:global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) :global([data-settings-nav='inline'] li > ul) { --tpl-setnav-item-pad: var(--tpl-st2-setnav-child-pad); }

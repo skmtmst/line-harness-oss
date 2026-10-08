@@ -49,8 +49,8 @@ export function PageHeading({ title, description, help, actions, crumbs, steps, 
   </header>
 }
 
-export function PageFrame({ kind, children, boardId, standalone = false, hasFooter = false }: {
-  kind: string; children: ReactNode; boardId?: string; standalone?: boolean; hasFooter?: boolean
+export function PageFrame({ kind, children, boardId, layout, standalone = false, hasFooter = false }: {
+  kind: string; children: ReactNode; boardId?: string; layout?: string; standalone?: boolean; hasFooter?: boolean
 }) {
-  return <div className={styles.frame} data-page-template={kind} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
+  return <div className={styles.frame} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
 }

@@ -96,7 +96,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                 folder.count,
                 folder.depth,
               ))}
-              {sideRow('none', '未分類', <Folder aria-hidden="true" className={styles.tpSideIcon} />, side.noneCount)}
+              {sideRow('none', '未分類', <FolderOpen aria-hidden="true" className={styles.tpSideIcon} />, side.noneCount)}
             </nav>
             <div className={styles.tpList}>
               <SearchField

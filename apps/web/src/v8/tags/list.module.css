@@ -240,21 +240,7 @@
   text-decoration: underline;
 }
 
-.miniBadge {
-  flex-shrink: 0;
-  padding: 0 var(--tpl-tag-name-gap);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-tag-note-size);
-  font-weight: 500;
-  line-height: var(--tpl-row-sub-lh);
-  white-space: nowrap;
-}
 
-.miniBadgeWarn {
-  color: var(--color-warning);
-}
 
 .sub {
   margin: var(--tpl-tag-sub-gap) 0 0;
@@ -312,26 +298,7 @@
 }
 
 /* 行の「…」（共通の RowMenu）。絵は 28 なので、共通の印ボタン（36）より強く当てる。 */
-.menuAnchor > button.menuButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-tag-menu-btn);
-  height: var(--tpl-tag-menu-btn);
-  flex: 0 0 var(--tpl-tag-menu-btn);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-}
 
-.menuAnchor > button.menuButton:hover {
-  background: var(--color-canvas-sunken);
-}
 
 .menuIcon {
   width: var(--tpl-tag-ro-icon);

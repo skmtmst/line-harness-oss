@@ -62,12 +62,7 @@ describe('作成の型の余白の口', () => {
  * どれも設定の型（SettingsPage）の中身の幅・余白を絵に広げるもので、型の口に移すのは
  * 寸法を絵と照合してから（V8 移行の報告の一覧）。直したらここから消す。
  */
-const KNOWN_REGION_OVERRIDES = [
-  'src/v8/accounts-detail/detail.module.css',
-  'src/v8/accounts-detail/handover.module.css',
-  'src/v8/settings/sa-frame.module.css',
-  'src/v8/settings/sb-frame/settings-screen.module.css',
-]
+const KNOWN_REGION_OVERRIDES: string[] = []
 
 describe('画面の CSS が型の欄を書き換える所は増やさない', () => {
   it('src/v8 の CSS で [data-template-region] を選ぶ所は既知の一覧だけ', () => {
