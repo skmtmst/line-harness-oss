@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { Search } from 'lucide-react'
 import type { HqTemplateReceivedVersion } from '@line-crm/shared'
 import Checkbox from '@/components/shared/checkbox'
@@ -10,7 +11,8 @@ import Select from '@/components/shared/select'
 import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, type useDistributionFolders } from './distribution-accounts'
 import styles from './saved-distribution-dialog.module.css'
 
-export default function DistributionAccountPicker({ accounts, folders, selected, onChange, filter, onFilter, search = '', onSearch = () => {}, received = null, receivedFailed = false, busy, compact = false }: {
+export default function DistributionAccountPicker({ accounts, folders, selected, onChange, filter, onFilter, search = '', onSearch = () => {}, received = null, receivedFailed = false, busy, compact = false, accountState, notice }: {
+  accountState?: (accountId: string) => ReactNode; notice?: ReactNode
   accounts: Array<{ id: string; name: string }>
   folders: ReturnType<typeof useDistributionFolders>
   selected: string[]; onChange: (ids: string[]) => void
@@ -44,14 +46,15 @@ export default function DistributionAccountPicker({ accounts, folders, selected,
             <label className={styles.name} htmlFor={`hq-saved-${account.id}`} title={account.name}><FolderDotName folder={folders.membership?.get(account.id)?.folder}>{account.name}</FolderDotName></label>
             {compact ? <span className={styles.pending}>{folders.membership?.get(account.id)?.folder?.name ?? (folders.membership?.has(account.id) ? '未分類' : '—')}</span> : <>
             <span className={styles.state}>
-              {version != null ? <span className={styles.overwrite}>配ると上書き</span> : null}
-              {received === null ? <span className={styles.pending}>{receivedFailed ? '配布状況を確認できません' : '配布状況を確認中…'}</span> : <StatusBadge size="compact" tone={version != null ? 'info' : 'neutral'}>{version != null ? `版 ${version} を配布済み` : '未配布'}</StatusBadge>}
+              {accountState ? accountState(account.id) : <>{version != null ? <span className={styles.overwrite}>配ると上書き</span> : null}
+              {received === null ? <span className={styles.pending}>{receivedFailed ? '配布状況を確認できません' : '配布状況を確認中…'}</span> : <StatusBadge size="compact" tone={version != null ? 'info' : 'neutral'}>{version != null ? `版 ${version} を配布済み` : '未配布'}</StatusBadge>}</>}
             </span></>}
 
           </div>
         })}
         {visible.length === 0 ? <p className={styles.empty}>該当するアカウントがありません。</p> : null}
       </div>
+      {notice}
       {!compact ? <p className={styles.count} aria-live="polite">{`選んだ ${selected.length} アカウント`}</p> : null}
     </ListPageBody>
   )
