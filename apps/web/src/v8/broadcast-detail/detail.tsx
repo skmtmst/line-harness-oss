@@ -48,6 +48,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
 import { ApprovalRequestFields } from '@/components/broadcasts/broadcast-approval'
 import { PageFrame } from '@/components/templates/page-frame'
+import { Steps } from '@/components/templates'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { formatNumber } from '@/lib/format'
 import BroadcastPhone from './phone'
@@ -509,34 +510,28 @@ function approvalRowText(status: string | null, approval: BroadcastDetailProps['
 }
 
 /**
- * 下書きの進みの帯：作るときの5手順（`draft_step` で現在地）。
+ * 下書きの進み：作るときの5手順（`draft_step` で現在地）。型の共通部品 Steps（Fa8ED）で題と説明のすぐ下に1行。
  * 済んだ手順を押すとその手順の作成画面へ戻る（閲覧のみは押せる形にしない）。
  */
 function DraftStepRail({ broadcastId, draftStep, canEdit }: { broadcastId: string; draftStep: string | null | undefined; canEdit: boolean }) {
+  const router = useRouter()
   const currentIndex = Math.max(0, CREATION_STEPS.findIndex((step) => step.key === draftStep))
   return (
-    <ol className={styles.rail} aria-label="作成の進み">
-      {CREATION_STEPS.map((step, index) => {
-        const state = index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'todo'
-        const label = `${step.order} ${step.label}`
-        return (
-          <li key={step.key} className={styles.railItem} data-state={state}>
-            {index > 0 ? <span className={styles.railLine} data-done={index <= currentIndex || undefined} aria-hidden="true" /> : null}
-            {state === 'done' && canEdit ? (
-              <Link href={`/broadcasts/new?draft=${encodeURIComponent(broadcastId)}&step=${step.key}`} className={styles.railStep}>
-                <span className={styles.railMark} aria-hidden="true"><Check size={11} strokeWidth={3} /></span>
-                <span className={styles.railLabel}>{label}</span>
-              </Link>
-            ) : (
-              <span className={styles.railStep}>
-                <span className={styles.railMark} aria-hidden="true">{state === 'done' ? <Check size={11} strokeWidth={3} /> : null}</span>
-                <span className={styles.railLabel} aria-current={state === 'current' ? 'step' : undefined}>{label}</span>
-              </span>
-            )}
-          </li>
-        )
-      })}
-    </ol>
+    <div className={styles.draftSteps}>
+      <Steps
+        label="作成の進み"
+        currentKey={CREATION_STEPS[currentIndex]?.key}
+        steps={CREATION_STEPS.map((step, index) => ({
+          key: step.key,
+          label: step.label,
+          order: step.order,
+          state: index < currentIndex ? 'done' as const : 'todo' as const,
+          onSelect: canEdit && index < currentIndex
+            ? () => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcastId)}&step=${step.key}`)
+            : undefined,
+        }))}
+      />
+    </div>
   )
 }
 

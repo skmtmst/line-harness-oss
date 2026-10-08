@@ -23,7 +23,6 @@
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .title { font-size: var(--tpl-compact-title-size); font-weight: var(--tpl-compact-title-weight); line-height: var(--tpl-compact-title-lh); }
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-compact-desc-lh); }
 :global([data-theme='v8']) .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
-:global([data-theme='v8']) .steps { min-width: 0; display: flex; align-items: center; gap: 14px; }
 :global([data-theme='v8']) .tabs { padding: 0 24px; flex-shrink: 0; }
 :global([data-theme='v8']) .stats { border-block: 1px solid var(--color-hairline); flex-shrink: 0; }
 :global([data-theme='v8']) .notice { padding: 0 24px 16px; }
@@ -69,11 +68,8 @@
 :global([data-theme='v8']) .preview[data-preview-surface='plain'] { background: transparent; }
 :global([data-theme='v8']) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); border-bottom: 1px solid var(--color-hairline); flex-wrap: wrap; }
 :global([data-theme='v8']) [data-page-template='detail'] .heading { padding: var(--tpl-detail-head-pad-top) var(--tpl-detail-head-pad-side) var(--tpl-detail-head-pad-bottom); gap: var(--tpl-detail-head-gap); flex-wrap: wrap; }
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .identity,
+:global([data-theme='v8']) [data-page-template='create'] .heading > .identity,
 :global([data-theme='v8']) [data-page-template='detail'] .heading > .identity { flex-basis: 100%; }
-/* 作る型の手順は題と説明の下の行。FU2aU の同行版は stepsPlacement="inline" で残す。 */
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { flex-basis: 100%; order: 3; margin-inline: 0; }
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 2; margin-left: auto; }
 /*
  * 来た道の案内（crumbs）は題と説明の下の行で、操作のボタンと同じ行の左。
  * 承認済み ★BG-B `qIp42`：`HLq5w`「プロジェクト一覧」`Y5UR7`（プロジェクト名）が y=100、
@@ -83,9 +79,6 @@
 :global([data-theme='v8']) [data-page-template='list'] .heading[data-has-crumbs] > .headingText { flex-basis: 100%; }
 :global([data-theme='v8']) [data-page-template='list'] .heading > .crumbs { flex: 1; min-width: 0; order: 2; }
 :global([data-theme='v8']) [data-page-template='list'] .heading[data-has-crumbs] > .actions { order: 3; margin-left: auto; }
-:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] { flex-wrap: nowrap; }
-:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .steps { flex-basis: auto; order: 0; margin-inline: auto; }
-:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .actions { order: 0; margin-left: 0; }
 :global([data-theme='v8']) .footer { position: sticky; bottom: 12px; z-index: 20; margin: 12px var(--tpl-fx4-footer-inset); } /* 採用 A-1 浮いた下の帯（オーナー 2026-10-04）。左右は絵の下の帯（left 12）に合わせる */
 :global([data-theme='v8']) .detailSummary { width: 320px; padding: 20px 24px; border-right: 1px solid var(--color-hairline); flex-shrink: 0; }
 :global([data-theme='v8']) .detailContent { padding: 20px 28px; display: flex; flex-direction: column; gap: var(--tpl-detail-content-gap); flex: 1; min-width: 0; }
@@ -135,10 +128,6 @@
 :global([data-theme='v8']) .heading[data-heading-size='large'] .headingText { gap: var(--tpl-head-gap); }
 :global([data-theme='v8']) .heading[data-heading-size='large'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
 :global([data-theme='v8']) .dashboardRow { flex-shrink: 0; }
-
-@container v8-page (min-width: 1100px) {
-  :global([data-theme='v8']) [data-page-template='create'] > .heading[data-steps-placement='inline'][data-has-steps] { flex-wrap: nowrap; }
-}
 
 :global([data-theme='v8']) .dashboardColumns .dashboardCell { display: flex; flex-direction: column; gap: 8px; }
 
@@ -215,22 +204,19 @@
 :global([data-theme='v8']) [data-page-template='detail'] .heading { row-gap: var(--tpl-detail-head-row-gap); }
 :global([data-theme='v8']) [data-page-template='detail'] .headingText { gap: var(--tpl-detail-title-gap); }
 :global([data-theme='v8']) [data-page-template='detail'] .description { font-size: var(--tpl-detail-desc-size); line-height: var(--tpl-detail-desc-lh); }
-/* ★V8 作る型の手順の帯（Pencil A0pDt「作る手順」：高さ20・丸20・字12/17・丸と字の間6・線24・間8）。部品 Stepper の v7 の枠・余白を型の中だけ外す（司令塔 2026-10-05）。 */
-:global([data-theme='v8']) .steps :global([data-part='stepper']) { margin: 0; padding: 0; border: 0; border-radius: var(--radius-none); background: transparent; }
-:global([data-theme='v8']) .steps :global([data-part='stepper']) > ol { column-gap: var(--tpl-steps-gap); row-gap: 4px; }
-:global([data-theme='v8']) .steps :global([data-part='stepper']) li { flex: 0 0 auto; gap: var(--tpl-steps-gap); }
-:global([data-theme='v8']) .steps :global([data-part='stepper']) li > span:not([aria-hidden]), :global([data-theme='v8']) .steps :global([data-part='stepper']) li > button { gap: var(--tpl-steps-dot-gap); }
-:global([data-theme='v8']) .steps :global([data-part='stepper']) li > span:not([aria-hidden]) > span:first-child, :global([data-theme='v8']) .steps :global([data-part='stepper']) li > button > span:first-child { width: var(--tpl-steps-dot); height: var(--tpl-steps-dot); font-size: 11px; }
-:global([data-theme='v8']) .steps :global([data-part='stepper']) li span span { font-size: var(--tpl-steps-text-size); line-height: var(--tpl-steps-text-lh); }
-:global([data-theme='v8']) [data-page-template='create'] .steps { min-height: 0; }
-/* 戻れる（済んだ）手順はボタン。共通のボタンの最小の高さ32が付くと帯が下がるので外す（A0pDt 以降の手順で +6 ずれていた）。 */
-:global([data-theme='v8']) .steps :global([data-part='stepper']) li > button { min-height: 0; padding: 0; line-height: var(--tpl-steps-text-lh); }
-:global([data-theme='v8']) .steps :global([data-part='stepper']) li > button > span:not(:first-child) { font-size: var(--tpl-steps-text-size); line-height: var(--tpl-steps-text-lh); }
+/*
+ * ★V8 手順（共通部品 Fa8ED・決まり q1xNMz 2026-10-08）：作る型では題 → 説明 → 手順の順。手順は題と説明のすぐ下・左寄せ・1行で、
+ * 横いっぱいに広げない（部品 Steps が中身の幅）。題の行の右は操作（actions）だけ。
+ */
+:global([data-theme='v8']) .steps { min-width: 0; }
+/* どの型でも手順は頭の最後の行（題と説明の下）。作る型は下で並びを決め直す。 */
+:global([data-theme='v8']) .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-head-gap); }
 /* ★V8 フォルダの列：上の「作る」ボタンの下からフォルダの題まで18（apLqS フォルダの列：間2＋14＋2） */
 :global([data-theme='v8']) .folders > :global(a) + * , :global([data-theme='v8']) .folders > :global(button) + * { margin-top: 16px; }
-/* ★V8 作る型の頭の並び（A0pDt・K7HWG：戻る → 題 → 手順の帯 → 説明の行 12px）。題の下に説明を出さず、手順の帯の下へ（司令塔 2026-10-06） */
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText { display: contents; }
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .titleRow { flex-basis: 100%; order: 1; }
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { order: 2; }
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .description { flex-basis: 100%; order: 3; }
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 1; }
+/* ★V8 作る型の頭の並び（q1xNMz）：戻る → 題（右に操作）→ 説明 → 手順。 */
+:global([data-theme='v8']) [data-page-template='create'] .heading > .headingText { display: contents; }
+:global([data-theme='v8']) [data-page-template='create'] .heading > .headingText > .titleRow { flex: 1 1 0; order: 1; }
+:global([data-theme='v8']) [data-page-template='create'] .heading > .actions { order: 1; margin-left: auto; }
+:global([data-theme='v8']) [data-page-template='create'] .heading > .headingText > .description { flex-basis: 100%; order: 3; }
+:global([data-theme='v8']) [data-page-template='create'] .heading > .crumbs { flex-basis: 100%; order: 4; }
+:global([data-theme='v8']) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-top-gap); }

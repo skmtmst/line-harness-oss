@@ -18,6 +18,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -370,12 +371,8 @@ export default function AccountHandoverV8() {
   if (!handover) {
     return frame(`乗り換え（${account.name}）`, '引き継ぎコードで両方のアカウントをつなぎます。コードを出すだけ・読むだけでは何も変わりません。', (
       <>
+        <HandoverSteps current={1} />
         {viewerBand}
-        <ol className={styles.pills}>
-          {HANDOVER_PILLS.map((label, index) => (
-            <li key={label} className={styles.pill} data-state={index === 0 ? 'current' : 'todo'}>{index + 1} {label}</li>
-          ))}
-        </ol>
         <div className={styles.duo}>
           <section className={styles.card}>
             <h3 className={styles.cardTitle}>このアカウントから移す</h3>
@@ -415,14 +412,8 @@ export default function AccountHandoverV8() {
 
   return frame(`乗り換え（${account.name} → ${destination?.name ?? '—'}）`, '引き継ぎコードで両方のアカウントをつなぎました。「要確認」を全部決めるまで本実行できません。', (
     <>
+      <HandoverSteps current={pill} />
       {viewerBand}
-      <ol className={styles.pills} aria-label="乗り換えの段">
-        {HANDOVER_PILLS.map((label, index) => {
-          const order = index + 1
-          const state = order === pill ? 'current' : order < pill ? 'done' : 'todo'
-          return <li key={label} className={styles.pill} data-state={state} aria-current={state === 'current' ? 'step' : undefined}>{order} {label}</li>
-        })}
-      </ol>
 
       <div className={styles.duo}>
         <section className={styles.box}>
@@ -619,4 +610,19 @@ export default function AccountHandoverV8() {
       />
     </>
   ))
+}
+
+/** 乗り換えの段（型の共通部品 Steps・Fa8ED）。題と説明のすぐ下・左寄せ・1行。段は押せない。 */
+function HandoverSteps({ current }: { current: number }) {
+  return (
+    <Steps
+      label="乗り換えの段"
+      currentKey={String(current)}
+      steps={HANDOVER_PILLS.map((label, index) => ({
+        key: String(index + 1),
+        label,
+        state: index + 1 < current ? 'done' as const : 'todo' as const,
+      }))}
+    />
+  )
 }

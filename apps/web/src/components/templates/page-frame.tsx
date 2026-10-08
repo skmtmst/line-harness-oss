@@ -12,14 +12,16 @@ export interface PageHeadingProps {
   actions?: ReactNode
   /** 題と説明の下の行に置く、来た道の案内（★BG-B `qIp42` の `HLq5w`・`Y5UR7`）。 */
   crumbs?: ReactNode
+  /**
+   * 手順。型の共通部品 `<Steps>`（Fa8ED）を渡す。置き場所は1つだけ：題と説明のすぐ下・左寄せ・1行
+   * （決まりの板 q1xNMz・2026-10-08 オーナー）。題の行の右には操作（actions）だけを置く。
+   */
   steps?: ReactNode
-  /** 作る型の手順の置き方。既定は題と説明の下の行。FU2aU の同行版は 'inline'。 */
-  stepsPlacement?: 'below' | 'inline'
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, description, help, identity, actions, crumbs, steps, headingSize, stepsPlacement = 'below' }: PageHeadingProps) {
-  return <header className={styles.heading} data-template-region="heading" data-heading-size={headingSize} data-has-steps={!!steps || undefined} data-has-crumbs={!!crumbs || undefined} data-steps-placement={stepsPlacement}>
+export function PageHeading({ title, description, help, identity, actions, crumbs, steps, headingSize }: PageHeadingProps) {
+  return <header className={styles.heading} data-template-region="heading" data-heading-size={headingSize} data-has-steps={!!steps || undefined} data-has-crumbs={!!crumbs || undefined}>
     {identity ? <div className={styles.identity}>{identity}</div> : null}
     <div className={styles.headingText}>
       <div className={styles.titleRow}><h2 className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</h2>
@@ -28,7 +30,7 @@ export function PageHeading({ title, description, help, identity, actions, crumb
       {description ? <div className={styles.description}>{description}</div> : null}
     </div>
     {crumbs ? <div className={styles.crumbs} data-template-region="crumbs">{crumbs}</div> : null}
-    {steps ? <div className={styles.steps}>{steps}</div> : null}
+    {steps ? <div className={styles.steps} data-template-region="steps">{steps}</div> : null}
     {actions ? <div className={styles.actions}>{actions}</div> : null}
   </header>
 }

@@ -2,6 +2,7 @@
 
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 /*
  * ★V8 リッチメニューを作る（作る①〜④のウィザード）。
  *
@@ -51,7 +52,6 @@ import { RowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import SectionHeader from '@/components/shared/section-header'
-import Stepper from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -1666,7 +1666,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           <button type="button" className={styles.backLink} onClick={host.onCancel}>← リッチメニューへ</button>
         ) : <Link href="/rich-menus" className={styles.backLink}>
           ← リッチメニューへ
-        </Link>} steps={<Stepper label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />}  preview={renderRail()} previewCompactWhenNarrow footerActions={
+        </Link>} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />}  preview={renderRail()} previewCompactWhenNarrow footerActions={
           host ? (
             <>
               <Button type="button" onClick={host.onCancel} disabled={busy}>キャンセル</Button>

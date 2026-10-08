@@ -39,8 +39,9 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
-import Stepper, { type StepperStep } from '@/components/shared/stepper'
+import type { StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import CheckCard from '@/components/shared/check-card'
@@ -620,7 +621,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       identity={
         <Link href="/friend-add-settings" className={styles.backLink}>← 友だち追加時の配信へ</Link>
       }
-      steps={<Stepper label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
+      steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
       description={<>
         {step === 'basic'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'

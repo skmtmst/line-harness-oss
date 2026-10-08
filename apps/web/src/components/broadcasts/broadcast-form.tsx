@@ -73,6 +73,8 @@ import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
+import { Steps } from '@/components/templates'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -813,6 +815,8 @@ export default function BroadcastForm({
     schedule: '一斉配信を作成・送信設定',
     confirm: '一斉配信を作成・最終確認',
   }
+  /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（v7 はこれまでの帯）。 */
+  const v8 = useAdminTheme() === 'v8'
   usePageTitle(
     preflightDialogOpen
       ? '一斉配信の配信前チェック'
@@ -2099,13 +2103,16 @@ export default function BroadcastForm({
   }
 
   return <div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
-    <header className={styles.header}>
+    <header className={styles.header} data-steps-below={v8 || undefined}>
       <div className={styles.heading}>
         <Button variant="secondary" className={styles.textButton} size="compact" onClick={() => guarded(onCancel)}>← 一斉配信一覧</Button>
         <h2>一斉配信を作る</h2>
         <p aria-live="polite">{draftStatusLabel || '下書き・未保存'}</p>
       </div>
-      <div className={styles.stepRail}><BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} /></div>
+      {/* ★V8：手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。v7 はこれまでの帯のまま。 */}
+      {v8
+        ? <div className={styles.stepsBelow}><Steps label="配信作成の進み" steps={steps} currentKey={currentStep ?? undefined} /></div>
+        : <div className={styles.stepRail}><BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} /></div>}
       <Button ref={previewToggleRef} aria-expanded={previewOpen} aria-controls="broadcast-line-preview" className={styles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button>
     </header>
     {/*

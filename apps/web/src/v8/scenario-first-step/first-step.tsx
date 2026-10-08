@@ -41,7 +41,7 @@ import { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-co
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 import { pruneCondition } from '@/lib/segment-condition'
 import { CreatePage } from '@/components/templates'
-import Stepper from '@/components/shared/stepper'
+import { Steps } from '@/components/templates/steps'
 import Select from '@/components/shared/select'
 import SegmentedControl from '@/components/shared/segmented'
 import Button from '@/components/shared/button'
@@ -543,11 +543,12 @@ export default function ScenarioFirstStepV8() {
       title="1通目を設定"
       identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
       steps={(
-        <Stepper
+        <Steps
           label="シナリオ作成の進み方"
           steps={[
-            { label: 'シナリオ情報', state: 'done' },
-            { label: '配信方式', state: 'done' },
+            /* 済みの段を押すと、同じ下書きのシナリオ情報・配信方式（/scenarios/new?id=…）へ戻る。 */
+            { label: 'シナリオ情報', state: 'done', onSelect: id ? () => router.push(`/scenarios/new?id=${encodeURIComponent(id)}`) : undefined },
+            { label: '配信方式', state: 'done', onSelect: id ? () => router.push(`/scenarios/new?id=${encodeURIComponent(id)}`) : undefined },
             { label: '1通目を設定', state: 'current' },
           ]}
         />
