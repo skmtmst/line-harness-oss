@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { readUiSource } from '../../scripts/test-ui-source.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -70,8 +71,8 @@ const V8_SECTIONS: Record<string, string[]> = {
   // ★V8 タグの作る画面（d9xoI・w9zY5・GobMd）は src/v8/tags に一から書き、型（CreatePage）が節を持つ。
   // 残る印は v7 の画面（同じ page.tsx の中）のもの。
   '/tags/new': [],
-  '/tags/fields/new': ['Basic', 'Immutable', 'Value'],
-  '/tags/fields/migrate': ['Fields', 'Preview', 'Result', 'Usage'],
+  '/tags/fields/new': [],
+  '/tags/fields/migrate': [],
 }
 const V8_COPY: Record<string, Record<string, string>> = {
   '/hq/members': { '担当アカウントの割り当て': '担当範囲' },
@@ -141,6 +142,12 @@ function importedFiles(file: string, source: string): string[] {
  */
 function readWithParts(route: string): string {
   const start = join(route === '/' ? APP : join(APP, route), 'page.tsx');
+  // V8への移行済み画面では、参照されないV7部品の型importを骨格に混ぜない。
+  if (['/', '/friends', '/tags', '/tags/fields/new', '/tags/fields/migrate', '/friends/detail'].includes(route)) {
+    const extras = route === '/' ? ['components/dashboard/qr-dialog.tsx']
+      : route === '/friends' ? ['components/shared/pagination.tsx'] : [];
+    return [readUiSource(start), ...extras.map((file) => readUiSource(join(SRC, file)))].join('\n');
+  }
   const seen = new Set<string>();
   let frontier = [start];
   let combined = '';

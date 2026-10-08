@@ -131,7 +131,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
       <div className={styles.body}>
         <div className={styles.group}>
           <p className={styles.label}>送るもの</p>
-          <div className={styles.textBox}>
+          <div>
             <TextArea
               density="compact"
               aria-label="送るもの"

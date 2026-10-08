@@ -155,7 +155,8 @@ describe('フィルターバー統一（監査6 #668）', () => {
 
   it('チャットの担当者ラベルはドロップダウン内の1つだけ', () => {
     const source = read('../../app/chats/page.tsx')
-    expect(source).toContain('OperatorDropdown')
+    expect(source).toContain('aria-label="担当者で絞り込む"')
+    expect(source).toContain('options={buildOperatorRows(operators, true).map')
     expect(source).not.toContain('>担当者</span>')
   })
 })

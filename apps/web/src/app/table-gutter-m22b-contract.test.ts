@@ -102,13 +102,15 @@ describe('m22b 表の左右の余白（文字だけのセルを包む）', () =>
     expect(body).toContain('<span className="block truncate">{row.accountName}</span>')
   })
 
-  it('/friends/migrations：日付を包む', () => {
-    const body = read('app', 'friends', 'migrations', 'page.tsx')
-    expect(body).toContain('<span className="block">{formatDateTime(job.created_at)')
+  it('/friends/migrations：V8の表は左右のセル余白を設計値で保つ', () => {
+    const css = read('v8', 'friends', 'migrations', 'migrations.module.css')
+    expect(css).toMatch(/\.table thead th\.th:first-child[^{]*\{[^}]*padding-left: var\(--tpl-fr-cell-inset\)/)
+    expect(css).toMatch(/\.table td\.td:last-child[^{]*\{[^}]*padding-right: var\(--tpl-fr-cell-inset\)/)
   })
 
-  it('/friends/identity-candidates：採用する値を包む', () => {
-    const body = read('app', 'friends', 'identity-candidates', 'page.tsx')
-    expect(body).toContain('<Td className="pr-5"><span>判定時に選択</span></Td>')
+  it('/friends/identity-candidates：V8の表は左右のセル余白を設計値で保つ', () => {
+    const css = read('v8', 'friends', 'compare', 'compare.module.css')
+    expect(css).toMatch(/\.table thead th\.th:first-child[^{]*\{[^}]*padding-left: var\(--tpl-fr-cell-inset\)/)
+    expect(css).toMatch(/\.table td\.td:last-child[^{]*\{[^}]*padding-right: var\(--tpl-fr-cell-inset\)/)
   })
 })

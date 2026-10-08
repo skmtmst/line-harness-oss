@@ -97,13 +97,12 @@ describe('#673 B. 触った感触', () => {
 
 describe('#673 指標カードのスケルトン', () => {
   it('ダッシュボードの指標カードも骨組みの口を持つ', () => {
-    const page = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-    // LiveDataCard / TodayTaskCard / SendQuotaCard が loading を受け取り、
-    // 読込中は「—」ではなく animate-pulse の骨組みを出す。
-    expect(page).toMatch(/function LiveDataCard[\s\S]*?loading = false/)
-    expect(page).toMatch(/aria-busy=\{loading \|\| undefined\}/)
-    // ★V7 仕上げ §3: 骨組みは共有の Skeleton/DelayedSkeleton（0.3秒遅延・0.4秒最低表示）。
-    expect(page).toContain('DelayedSkeleton')
-    expect(page).toContain('Skeleton')
+    const page = readFileSync(join(SRC, 'v8/dashboard/dashboard.tsx'), 'utf8')
+    const sections = readFileSync(join(SRC, 'v8/dashboard/sections.tsx'), 'utf8')
+    const card = readFileSync(join(SRC, 'components/shared/kpi-card.tsx'), 'utf8')
+    expect(page).toContain("loading={d.pendingDetailState === 'loading'}")
+    expect(sections).toContain('DelayedSkeleton')
+    expect(sections).toContain('Skeleton')
+    expect(card).toContain('aria-busy={loading || undefined}')
   })
 })
