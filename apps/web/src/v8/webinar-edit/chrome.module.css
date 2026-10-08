@@ -13,43 +13,6 @@
 }
 .back:hover { text-decoration: underline; }
 
-/* 板の頭：上20・横24・下12。戻る・題・説明は縦に4ずつ。操作は右で縦の真ん中。 */
-.head {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-wc-head-gap);
-  padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom);
-}
-.headText {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--tpl-head-gap);
-  min-width: 0;
-}
-.title {
-  margin: 0;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--tpl-title-size);
-  font-weight: var(--tpl-title-weight);
-  line-height: var(--tpl-title-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.subtitle {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-desc-size);
-  line-height: var(--tpl-desc-lh);
-}
-.headActions {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--tpl-wc-head-gap);
-}
-
 /* タブ：横24の中で下に1pxの線。字 13/19・字の下10・選んだタブは墨の2px。 */
 .tabsRow {
   padding: 0 var(--tpl-head-pad-side);

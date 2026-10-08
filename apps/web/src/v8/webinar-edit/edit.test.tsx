@@ -151,10 +151,39 @@ describe('V8 ウェビナーの編集', () => {
     expect(tabs?.textContent).toContain('参加者 124')
     expect(tabs?.querySelector('[aria-current="page"]')?.textContent).toBe('参加者 124')
     expect(host.textContent).toContain('視聴完了 71')
+    expect(host.textContent).toContain('平均離脱時間 —')
+    expect(host.textContent).not.toContain('平均 6分で離脱')
     expect(host.textContent).toContain('見ていない・見逃し案内の対象')
     const chat = host.querySelector('a[href="/chats?friend=f-1"]')
     expect(chat?.textContent).toContain('チャットを見る')
     expect(buttonText('CSV で書き出す')).toBeTruthy()
+  })
+
+  it('分析のフォーム送信はAPIの重複を除いた人数として帯と棒の両方に表示する', async () => {
+    nav.search = 'id=webinar-1&pane=analytics'
+    await render(<WebinarEditV8 />)
+    const funnel = host.querySelector('#webinar-analytics-funnel')
+    const row = [...(funnel?.querySelectorAll('li') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
+    expect(row?.textContent).toContain('9 人')
+    const stats = host.querySelector('[data-template-region="stats"]')
+    expect(stats?.textContent).toContain('フォーム送信?9人')
+    expect(stats?.textContent).not.toContain('フォーム送信?9件')
+  })
+
+  it('コメントの見え方は開始前2件で埋めず、開始後の最初のコメントも出す', async () => {
+    comments = [
+      { atSeconds: -30, authorName: 'さくら', body: '音声きこえます' },
+      { atSeconds: -60, authorName: '田中', body: 'こんばんは' },
+      { atSeconds: 45, authorName: 'まさ', body: 'わかりやすい！' },
+    ]
+    nav.search = 'id=webinar-1&pane=comments'
+    await render(<WebinarEditV8 />)
+    const preview = host.querySelector('aside[aria-labelledby="webinar-comments-preview"]')
+    expect(preview?.textContent).toContain('まさ：わかりやすい！')
+    expect(preview?.textContent).toContain('田中：こんばんは')
+    expect(preview?.textContent).not.toContain('さくら：音声きこえます')
+    // 狭い幅で開く欄にも同じ見本を渡す。
+    expect(host.querySelector('details')?.textContent).toContain('まさ：わかりやすい！')
   })
 
   it('作る手順の段（④通知）：5段の帯から別の段へ移れる', async () => {
