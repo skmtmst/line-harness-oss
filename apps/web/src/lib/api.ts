@@ -1,4 +1,4 @@
-import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter } from '@line-crm/shared'
+import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary } from '@line-crm/shared'
 import { CHAT_FILE_TYPES } from '@line-crm/shared';
 import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
 import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
@@ -3464,6 +3464,7 @@ export type MileageAdminHistoryItem = {
   occurredAt: string
 }
 export type MileageAdminHistory = {
+  friendSummary?: MileageFriendHistorySummary
   items: MileageAdminHistoryItem[]
   pagination: { total: number; limit: number; offset: number }
   summary: {
@@ -12193,6 +12194,7 @@ export const api = {
       search?: string
       /** V6R-CX-e: この友だちと同じ人の履歴だけ。 */
       friendId?: string
+      kind?: MileageHistoryKind
       entryTypes?: MileageHistoryTypeFilter['entryTypes']
       entryType?: MileageHistoryItem['entryType']
       status?: MileageHistoryItem['status']
@@ -12205,6 +12207,7 @@ export const api = {
       const query = new URLSearchParams({ accountId: params.accountId })
       if (params.search) query.set('search', params.search)
       if (params.friendId) query.set('friendId', params.friendId)
+      if (params.kind) query.set('kind', params.kind)
       if (params.entryTypes?.length) query.set('entryTypes', params.entryTypes.join(','))
       if (params.entryType) query.set('entryType', params.entryType)
       if (params.status) query.set('status', params.status)

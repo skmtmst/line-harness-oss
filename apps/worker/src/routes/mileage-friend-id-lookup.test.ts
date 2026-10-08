@@ -80,3 +80,27 @@ describe('WEB074 type filtering before pagination', () => {
     expect([...first.items,...next.items].every(row => row.entryType !== 'grant')).toBe(true);
   });
 });
+
+
+describe('WEB075 paginated personal ledger and full personal metrics', () => {
+  it('counts all 105 grants beyond the page and searches reasons for the selected friend only', async () => {
+    friend('me','同名'); friend('other','同名');
+    const thisMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0,7) + '-01T00:00:00Z';
+    for (let i=0;i<105;i++) {
+      grant(`me-${i}`,'me',null,2);
+      fixture.raw.prepare('UPDATE mileage_ledger SET occurred_at=?,reason=?,status=? WHERE id=?')
+        .run(thisMonth,'本人の購入',i === 0 ? 'pending' : 'available',`me-${i}`);
+    }
+    grant('other-grant','other',null,999);
+    grant('used','me',null,-3);
+    fixture.raw.prepare("UPDATE mileage_ledger SET entry_type='spend',reason='交換' WHERE id='used'").run();
+    const opts = { accountId: 'acc', friendId: 'me', visibleAccountIds: ['acc'], limit: 2 };
+    const result = await getMileageAdminHistory(fixture.db, { ...opts, kind: 'earned', search: '本人の購入', offset: 100 });
+    expect(result.items).toHaveLength(2);
+    expect(result.pagination.total).toBe(105);
+    expect(result.friendSummary).toMatchObject({ scope: 'visible_accounts', counts: { all: 106, earned: 105, spent: 1, voided: 0 }, pendingCount: 1, earnedThisMonth: 210, earnedCountThisMonth: 105 });
+    const spent = await getMileageAdminHistory(fixture.db, { ...opts, kind: 'spent' });
+    expect(spent.items.map(row=>row.id)).toEqual(['used']);
+    expect(spent.friendSummary).toEqual(result.friendSummary);
+  });
+});

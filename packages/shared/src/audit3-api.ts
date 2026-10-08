@@ -5,3 +5,14 @@ export interface BookingMenuReorderResponse { ok: true; versions: Array<{ id: st
 
 export type MileageLedgerEntryType = 'grant' | 'reversal' | 'spend' | 'expiration' | 'adjustment';
 export interface MileageHistoryTypeFilter { entryTypes?: MileageLedgerEntryType[] }
+
+export type MileageHistoryKind = 'earned' | 'spent' | 'voided';
+export interface MileageFriendHistorySummary {
+  /** Metrics cover this person's ledger in the operator's visible accounts, independent of page/search. */
+  scope: 'visible_accounts';
+  counts: { all: number; earned: number; spent: number; voided: number };
+  pendingCount: number;
+  monthFrom: string;
+  earnedThisMonth: number;
+  earnedCountThisMonth: number;
+}

@@ -845,6 +845,10 @@ scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), asyn
     if (!accountScope.allowedAccountIds.includes(accountId)) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
+    const kind = c.req.query('kind');
+    if (kind && !['earned', 'spent', 'voided'].includes(kind)) {
+      return c.json({ success: false, error: 'kind is invalid' }, 400);
+    }
     const entryTypeValue = c.req.query('entryType');
     const entryTypesValue = c.req.query('entryTypes');
     const entryTypes = entryTypesValue?.split(',');
@@ -873,6 +877,7 @@ scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), asyn
     const requestedLimit = Number(c.req.query('limit') || 50);
     const requestedOffset = Number(c.req.query('offset') || 0);
     const historyInput = {
+      ...(kind ? { kind: kind as 'earned' | 'spent' | 'voided' } : {}),
       accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
       search: c.req.query('search') || '',
