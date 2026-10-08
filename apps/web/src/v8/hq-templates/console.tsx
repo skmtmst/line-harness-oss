@@ -62,6 +62,8 @@ import HqTemplateDetail, { inUseVersionOf } from './detail'
 import styles from './console.module.css'
 
 const PAGE_TITLES: Record<TemplateType, string> = { tag: '友だち属性', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
+/** 一覧の段の住所（上の帯のパンくずの行き先）。シナリオのひな形はテンプレートの住所の中にある。 */
+const LIST_HREFS: Record<TemplateType, string> = { tag: '/hq/friend-attributes', template: '/hq/templates', rich_menu: '/hq/rich-menus', form: '/hq/form-submissions', scenario: '/hq/templates?type=scenario' }
 const EDIT_TITLES: Record<TemplateType, string> = { tag: 'タグのひな形', template: 'メッセージのひな形', rich_menu: 'リッチメニューのひな形', form: '回答フォームのひな形', scenario: 'シナリオのひな形' }
 const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る' }
 
@@ -169,8 +171,16 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
   /* 絵（meBRB の進み具合・dEvJM の窓の後ろ）：配っている間も結果のあとも題は「アカウントへ配る：名前」のまま。 */
   const pageTitle = stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : `アカウントへ配る：${detail?.template.name ?? ''}`
   /* 絵（HfK0O・u5MM7）：店の作る・編集の画面を使うときは、上の帯は「ホーム › テンプレート／回答フォーム」だけ。 */
-  usePageTitle(stage === 'list' || (stage === 'edit' && !createUncertain && (type === 'form' || type === 'template' || (type === 'rich_menu' && Boolean(RichMenuCreate)))) ? PAGE_TITLES[type] : stage === 'edit' ? `${PAGE_TITLES[type]} › ${editTitle}` : PAGE_TITLES[type])
-  usePageCrumbs([{ label: 'ホーム', href: '/' }])
+  /*
+   * 一覧の段より先（詳細・作る・配る）は、上の帯のパンくずに一覧（テンプレートなど）を置き、押したら一覧の段へ戻す。
+   * 同じ URL のまま段だけ替えるので、リンクではなく段の切り替えで戻す（板の頭の「← テンプレートへ」は
+   * 2026-10-08 に無くした。#1625 の「同じ URL へのリンクでは戻れない」もこれで扱う）。
+   */
+  const toListRef = useRef<() => void>(() => {})
+  usePageTitle(stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : stage === 'detail' ? (detail?.template.name ?? PAGE_TITLES[type]) : pageTitle)
+  usePageCrumbs(stage === 'list'
+    ? [{ label: 'ホーム', href: '/' }]
+    : [{ label: PAGE_TITLES[type], href: LIST_HREFS[type], onSelect: () => toListRef.current() }])
 
   useEffect(() => {
     alive.current = true
@@ -245,6 +255,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor, RichMenuCreate }
     createAttempt.current = null; setStage('list'); setSearch(''); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false)
     window.history.replaceState(null, '', window.location.pathname + window.location.search)
   }
+  toListRef.current = toList
   const reloadCatalog = () => {
     setCatalogFailed(false)
     void hqTemplatesApi.list().then(
