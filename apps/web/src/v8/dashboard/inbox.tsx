@@ -9,6 +9,8 @@ import SectionHeader from './head'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { formatTime } from '@/lib/format'
+import { RetryLabel } from '@/components/shared/retry-label'
+import { Loading } from './sections'
 import styles from './dashboard.module.css'
 
 /*
@@ -118,7 +120,7 @@ export function InboxSection({ onSummaryChange }: {
       {loadFailure && summary ? (
         <p role="status" className={styles.stale}>
           {`最新の状態に更新できませんでした。${lastSuccessAt ? `最終更新 ${formatTime(lastSuccessAt)} の内容を表示しています。` : ''}`}
-          <button type="button" className={styles.inlineButton} onClick={() => void load()}>もう一度読み込む</button>
+          <button type="button" className={styles.inlineButton} onClick={() => void load()}><RetryLabel /></button>
         </p>
       ) : null}
       {loadFailure === 'forbidden' && !summary ? (
@@ -126,10 +128,10 @@ export function InboxSection({ onSummaryChange }: {
       ) : loadFailure && !summary ? (
         <p className={styles.empty}>
           {`データを${STATE_TEXT.error}。`}
-          <button type="button" className={styles.inlineButton} onClick={() => void load()}>もう一度読み込む</button>
+          <button type="button" className={styles.inlineButton} onClick={() => void load()}><RetryLabel /></button>
         </p>
       ) : loading && !summary ? (
-        <p className={styles.empty}>{`${STATE_TEXT.loading}…`}</p>
+        <Loading label="対応が必要な受信" />
       ) : !summary || summary.total === 0 ? (
         <p className={styles.empty}>返信を待っている問い合わせはありません。</p>
       ) : (

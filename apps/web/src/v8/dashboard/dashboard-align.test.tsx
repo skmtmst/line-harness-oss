@@ -158,3 +158,49 @@ describe('ダッシュボード編集の表示の切り替え', () => {
     expect(document.querySelector('input[aria-label="写真審査を非表示にする"]')).not.toBeNull()
   })
 })
+
+describe('狭い幅でも題を「…」で切らない（1280・1152）', () => {
+  const dashCss = readFileSync(join(__dirname, 'dashboard.module.css'), 'utf8')
+  const headerCss = readFileSync(join(__dirname, '../../components/shared/section-header.module.css'), 'utf8')
+
+  it('ダッシュボードの段の題は行き先を次の行へ回せる（入るときは1行のまま）', async () => {
+    const { default: Head } = await import('./head')
+    const { container } = render(<Head title="現在の対応状況" href="/chats" linkLabel="受信箱を見る" />)
+    expect(container.querySelector('[data-wrap]')).not.toBeNull()
+    expect(headerCss).toMatch(/\.root\[data-wrap\] \{\s*flex-wrap: wrap;/)
+  })
+
+  it('右の列の余白は狭い板で詰め、1152 の板では題の箱の高さを中身に合わせる', () => {
+    expect(dashCss).toMatch(/@container v8-page \(max-width: 1099px\) \{\s*\.asideBlock \{ padding: var\(--tpl-db-aside-pad-narrow\); \}/)
+    expect(dashCss).toMatch(/@container v8-page \(max-width: 959px\) \{\s*\.head \{ height: auto; min-height: var\(--tpl-db-head-h\); \}/)
+  })
+
+  it('数のマスの「…」は絵の 16px（部品の 36px の箱を受けない）', () => {
+    expect(dashCss).toMatch(/\.cellMenu\.cellMenu \{[^}]*flex-basis: var\(--tpl-db-menu\);/)
+  })
+
+  it('送信枠の数字は比例幅、グラフの日付は棒の真ん中', () => {
+    expect(dashCss).toMatch(/\.quotaNum \{[^}]*font-variant-numeric: normal;/)
+    expect(dashCss).toMatch(/\.day, \.dayLatest \{[^}]*text-align: center;/)
+  })
+})
+
+describe('概要が取れないとき・やり直しの言葉', () => {
+  it('送信枠は骨組みのまま待たせず「読み込めませんでした」と「もう一度試す」', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    const { SendQuota } = await import('./sections')
+    const onRetry = vi.fn()
+    render(<SendQuota overviewFailed delivery={null} metric={undefined} onRetry={onRetry} />)
+    expect(screen.getByText(/データを読み込めませんでした/)).toBeTruthy()
+    expect(screen.queryByLabelText('送信枠を読み込んでいます')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
+  it('概要が取れないとき送信枠以外の段も骨組みを出し続けない（data なし・読み込み終わり・失敗あり）', () => {
+    const src = readFileSync(join(__dirname, 'dashboard.tsx'), 'utf8')
+    expect(src).toContain("const overviewFailed = !data && !d.loading && d.error !== ''")
+    expect(src).toContain('const unavailable = (key: Parameters<typeof d.sectionAvailable>[0]) => overviewFailed || (data && !d.sectionAvailable(key))')
+    expect(src).toContain('if (!data && !overviewFailed) return null')
+  })
+})
