@@ -99,6 +99,27 @@ afterEach(() => {
 })
 
 describe('V8 流入リンクを作る', () => {
+  it('入力が不足すると最初の欄へ移り、欄ごとの理由を出し、発行しない', async () => {
+    await mount()
+    const scroll = vi.fn()
+    const name = document.getElementById('ir-name') as HTMLInputElement
+    name.scrollIntoView = scroll
+    fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
+    await flush()
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(name)
+    expect(scroll).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
+    expect(screen.getByText('リンク名を入力してください').id).toBe(name.getAttribute('aria-describedby'))
+    expect(screen.getAllByRole('alert')).toHaveLength(2)
+    expect(posted).toHaveLength(0)
+    fireEvent.change(name, { target: { value: 'autumn' } })
+    await flush()
+    expect(name.getAttribute('aria-invalid')).toBe('false')
+    fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
+    await flush()
+    expect(posted).toHaveLength(1)
+  })
+
   it('?name=・?ref= で名前と見分けるための文字を入れて開き、見本の URL を出す', async () => {
     query.value = 'name=夏のInstagram投稿&ref=summer-ig'
     await mount()
