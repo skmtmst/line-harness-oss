@@ -206,6 +206,31 @@ describe('runExpirer の V6 連動', () => {
     ).get(sourceId) as { id: string; status: string; cancel_reason: string | null };
   }
 
+  test('W3: OFFの古い予約200件があっても別アカウントの期限切れを処理する', async () => {
+    const { db, raw } = createTestD1({ foreignKeys: true });
+    try {
+      seedBase(raw);
+      raw.prepare(`INSERT INTO account_settings (id,line_account_id,key,value)
+        VALUES ('off', ?, 'feature.booking', 'false')`).run(ACCOUNT_1);
+      for (let i = 0; i < 200; i++) {
+        seedBooking(raw, `a-off-${String(i).padStart(3, '0')}`, {
+          accountId: ACCOUNT_1, friendId: 'v6ex-f1', menuId: 'v6ex-menu-1',
+          staffId: 'v6ex-staff-1', startsAt: STARTS_A, requestedAt: STALE_AT, status: 'requested',
+        });
+      }
+      seedBooking(raw, 'z-on', {
+        accountId: ACCOUNT_2, friendId: 'v6ex-f2', menuId: 'v6ex-menu-2',
+        staffId: 'v6ex-staff-2', startsAt: STARTS_A, requestedAt: STALE_AT, status: 'requested',
+      });
+      const sender = vi.fn().mockResolvedValue(undefined);
+      expect(await runExpirer(db, { now: NOW_V6, sender })).toMatchObject({ expired: 1 });
+      expect(raw.prepare(`SELECT COUNT(*) AS n FROM bookings WHERE status='requested'`).get()).toEqual({ n: 200 });
+      expect(raw.prepare(`SELECT status FROM bookings WHERE id='z-on'`).get()).toEqual({ status: 'expired' });
+      expect(sender).toHaveBeenCalledTimes(1);
+      expect(await runExpirer(db, { now: NOW_V6, sender })).toMatchObject({ expired: 0 });
+    } finally { raw.close(); }
+  });
+
   test('未送信だけ止め、送信済み履歴を残す。再実行は無変更', async () => {
     const { db, raw } = createTestD1();
     seedBase(raw);

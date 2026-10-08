@@ -868,6 +868,40 @@ describe('webinar notification jobs', () => {
 });
 
 describe('webinar session capacity and missed window (N)', () => {
+  test('W10: 同じ人の並行申込が後から既存行を見ても席数を増やさない', async () => {
+    const { db, raw } = createTestD1({ foreignKeys: true });
+    try {
+      seedBase(raw);
+      const { setWebinarSessionCapacity } = await import('@line-crm/db');
+      await setWebinarSessionCapacity(db, 'webinar-1', SESSION, 2);
+      let read!: () => void;
+      let release!: () => void;
+      const readDone = new Promise<void>((resolve) => { read = resolve; });
+      const resume = new Promise<void>((resolve) => { release = resolve; });
+      // 2本目（列車で統合）の実装は事前の読み取りを持たず、1回の batch で確定する。
+      // 後から来た申込の batch を先の申込が終わるまで止め、同じ競合を再現する。
+      const delayed = {
+        ...db,
+        prepare: (sql: string) => db.prepare(sql),
+        async batch(statements: D1PreparedStatement[]) {
+          read();
+          await resume;
+          return db.batch(statements);
+        },
+      } as D1Database;
+      const second = registerWebinarSession(delayed, 'webinar-1', 'friend-1', SESSION, NOW);
+      await readDone;
+      const first = await registerWebinarSession(db, 'webinar-1', 'friend-1', SESSION, NOW);
+      release();
+      expect((await second).registration.id).toBe(first.registration.id);
+      expect(raw.prepare(`SELECT reserved_count,state FROM webinar_sessions WHERE webinar_id='webinar-1'`).get())
+        .toEqual({ reserved_count: 1, state: 'open' });
+      expect(raw.prepare(`SELECT COUNT(*) AS n FROM webinar_registrations WHERE status='active'`).get()).toEqual({ n: 1 });
+      await registerWebinarSession(db, 'webinar-1', 'friend-1', SESSION + 3600, NOW);
+      expect(raw.prepare(`SELECT reserved_count FROM webinar_sessions WHERE session_start_at=?`).get(SESSION)).toEqual({ reserved_count: 0 });
+    } finally { raw.close(); }
+  });
+
   test('定員いっぱいの開催回への申込は session_full で断る', async () => {
     const { db, raw } = createTestD1();
     seedBase(raw);
