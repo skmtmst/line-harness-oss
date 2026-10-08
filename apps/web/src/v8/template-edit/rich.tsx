@@ -422,7 +422,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                 value={host ? host.folder : folder}
                 onChange={host ? host.onFolderChange : setFolder}
                 folders={host ? host.folders : folders.map(folderByName)}
-                colors={!host}
+                colors
                 onCreate={host
                   ? hostFolderCreate(host)
                   : canMutate && selectedAccountId

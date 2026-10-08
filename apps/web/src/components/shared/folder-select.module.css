@@ -36,6 +36,8 @@
 .field {
   box-sizing: border-box;
   width: 100%;
+  min-width: 0;
+  flex: 1;
   height: var(--select-menu-field-h);
   padding: var(--select-menu-field-pad);
   border: 1px solid var(--color-control-border);
@@ -59,7 +61,34 @@
   border-color: var(--color-danger);
 }
 
+.nameRow { display: flex; align-items: center; gap: var(--select-menu-swatch-gap); }
+.colorPicker { position: relative; flex: none; }
+.colorButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--select-menu-swatch-gap);
+  height: var(--select-menu-field-h);
+  min-height: 0;
+  padding: var(--select-menu-button-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--select-menu-item-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.colorButton:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
 .swatches {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + var(--select-menu-swatch-gap));
+  right: 0;
+  width: max-content;
+  padding: var(--select-menu-panel-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--select-menu-item-radius);
+  background: var(--color-canvas);
+  box-shadow: var(--select-menu-shadow);
   display: flex;
   align-items: center;
   gap: var(--select-menu-swatch-gap);

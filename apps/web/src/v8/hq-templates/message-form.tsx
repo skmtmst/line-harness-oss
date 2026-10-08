@@ -45,7 +45,7 @@ export interface MessageFormProps {
   folderId: string | null
   onFolderChange: (id: string | null) => void
   /** フォルダを選ぶ欄からその場で作る（dLffh）。閲覧のみは渡さない。 */
-  onCreateFolder?: (name: string) => Promise<{ value: string; label: string }>
+  onCreateFolder?: import('@/components/shared/folder-select').FolderSelectCreate
   folderLoadFailed: boolean
   disabled: boolean
   catalogFailed: boolean
@@ -122,7 +122,7 @@ export default function MessageForm({
               ))}
             </div>
             <span className={styles.folderPick}>
-              <FolderSelect aria-label="フォルダ" label="フォルダ" value={folderId ?? ''} disabled={disabled || folderLoadFailed} onChange={(next) => onFolderChange(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))} onCreate={onCreateFolder} colors={false} />
+              <FolderSelect aria-label="フォルダ" label="フォルダ" value={folderId ?? ''} disabled={disabled || folderLoadFailed} onChange={(next) => onFolderChange(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name, color: folder.color }))} onCreate={onCreateFolder} />
             </span>
           </div>
         </div>

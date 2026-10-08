@@ -58,6 +58,14 @@ afterEach(() => {
 const buttons = () => [...document.querySelectorAll('button')]
 
 describe('統括のひな形の一覧（店と同じ形）', () => {
+  it('フォルダの保存色を左の列と名前の前に表示する', async () => {
+    await render({ folders: [{ id: 'f-1', name: 'お問い合わせ', revision: 1, color: '#8b5cf6' }] })
+    const dot = host.querySelector('[data-folder-dot="filed"]') as HTMLElement
+    expect(dot.style.backgroundColor).toBe('#8b5cf6')
+    expect(dot.getAttribute('aria-label')).toBe('フォルダ：お問い合わせ')
+    expect(host.innerHTML).toContain('#8b5cf6')
+  })
+
   it('配布先の列に配ったアカウントの数、配っていない行は「まだ配っていない」', async () => {
     await render()
     expect(host.textContent).toContain('2 アカウント')

@@ -1899,12 +1899,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             <Field label="フォルダ">
               <FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId}
                 folders={folders.map(folderById)} size="full"
-                colors={!host}
+                colors
                 onCreate={!canOperate
                   ? undefined
                   : host
                     ? (host.createFolder
-                      ? folderCreator(async (name) => ({ success: true as const, data: await host.createFolder!(name) }), folderById, (created) => setFolders((current) => [...current, created as Folder]))
+                      ? folderCreator(async (name, color) => ({ success: true as const, data: await host.createFolder!(name, color) }), folderById, (created) => setFolders((current) => [...current, created as Folder]))
                       : undefined)
                     // 一覧の左の列の「フォルダを追加」と同じ口（リッチメニューのフォルダは共有）。
                     : folderCreator((name, color) => api.folders.create({ kind: 'rich_menu', name, color }), folderById, (created) => setFolders((current) => [...current, created]))} />

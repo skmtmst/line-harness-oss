@@ -75,7 +75,7 @@ function rateLine(targets: HqBroadcastRun['targets'], reached: number): string |
 }
 
 /** 統括の一括配信のフォルダ（API-18。色は持たない）。 */
-type HqFolder = { id: string; name: string; revision: number; item_count: number }
+type HqFolder = { id: string; name: string; revision: number; item_count: number; color?: string | null }
 
 export default function HqBroadcastList() {
   usePageTitle('一括配信')
@@ -155,6 +155,7 @@ export default function HqBroadcastList() {
     ...(folders ?? []).map((folder) => ({
       id: folder.id,
       label: folder.name,
+      color: folder.color,
       count: ready ? countIn(folder.id) : null,
       colorEditable: false,
       ...(canManage ? {
@@ -266,7 +267,7 @@ export default function HqBroadcastList() {
               <Tr key={run.id} className={styles.row}>
                 <Td>
                   <div className={styles.titleLine}>
-                    <FolderDotName folder={(() => { const folder = (folders ?? []).find((f) => f.id === folderIdOf(run)); return folder ? { name: folder.name, color: null } : null })()}>
+                    <FolderDotName folder={(() => { const folder = (folders ?? []).find((f) => f.id === folderIdOf(run)); return folder ? { name: folder.name, color: folder.color } : null })()}>
                       <Link href={href} className={styles.cellTitle} title={run.title}>{run.title}</Link>
                     </FolderDotName>
                   </div>
