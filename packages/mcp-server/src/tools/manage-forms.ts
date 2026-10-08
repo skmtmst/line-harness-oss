@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { UpdateFormInput } from "@line-harness/sdk";
 import { getClient } from "../client.js";
 
 export function registerManageForms(server: McpServer): void {
@@ -8,7 +9,11 @@ export function registerManageForms(server: McpServer): void {
     "フォームの管理操作。list: 一覧、get: 詳細、update: 更新、delete: 削除。作成は create_form ツールを使用。",
     {
       action: z.enum(["list", "get", "update", "delete"]).describe("Action to perform"),
+      accountId: z.string().optional().describe("LINE account ID (uses default if omitted)"),
+      expectedRevision: z.number().int().positive().optional().describe("Observed form revision, required for deletion"),
       formId: z.string().optional().describe("Form ID (required for get, update, delete)"),
+      expectedContentRevision: z.number().int().positive().optional().describe("Observed content revision, required for content updates"),
+      folderId: z.string().nullable().optional().describe("Move to this folder; null means unfiled. Folder-only moves do not require a content revision"),
       name: z.string().optional().describe("Form name (for update)"),
       description: z.string().nullable().optional().describe("Form description (for update)"),
       fields: z.string().optional().describe("JSON string of form fields array (for update)"),
@@ -22,20 +27,29 @@ export function registerManageForms(server: McpServer): void {
       ogDescription: z.string().nullable().optional().describe("OGP description override for the form's LIFF page preview, or null to clear (for update)"),
       ogImageUrl: z.string().nullable().optional().describe("OGP image URL override for the form's LIFF page preview, or null to clear (for update)"),
     },
-    async ({ action, formId, name, description, fields, onSubmitTagId, onSubmitScenarioId, onSubmitMessageType, onSubmitMessageContent, saveToMetadata, isActive, ogTitle, ogDescription, ogImageUrl }) => {
+    async ({ action, formId, accountId, expectedRevision, name, description, fields, onSubmitTagId, onSubmitScenarioId, onSubmitMessageType, onSubmitMessageContent, saveToMetadata, isActive, ogTitle, ogDescription, ogImageUrl, expectedContentRevision, folderId }) => {
       try {
         const client = getClient();
         if (action === "list") {
-          const forms = await client.forms.list();
+          const forms = await client.forms.list({ accountId });
           return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, forms }, null, 2) }] };
         }
         if (!formId) throw new Error("formId is required for this action");
         if (action === "get") {
-          const form = await client.forms.get(formId);
+          const form = await client.forms.get(formId, { accountId });
           return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, form }, null, 2) }] };
         }
         if (action === "update") {
-          const input: Record<string, unknown> = {};
+          const hasContent = [name, description, fields, onSubmitTagId, onSubmitScenarioId,
+            onSubmitMessageType, onSubmitMessageContent, saveToMetadata, isActive, ogTitle, ogDescription, ogImageUrl]
+            .some((value) => value !== undefined);
+          if (!hasContent && folderId !== undefined && expectedContentRevision === undefined) {
+            const form = await client.forms.update(formId, { folderId }, { accountId });
+            return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, form }, null, 2) }] };
+          }
+          if (expectedContentRevision === undefined) throw new Error("expectedContentRevision is required for content updates");
+          const input: Extract<UpdateFormInput, { expectedContentRevision: number }> = { expectedContentRevision };
+          if (folderId !== undefined) input.folderId = folderId;
           if (name !== undefined) input.name = name;
           if (description !== undefined) input.description = description;
           if (fields !== undefined) input.fields = JSON.parse(fields);
@@ -48,11 +62,12 @@ export function registerManageForms(server: McpServer): void {
           if (ogTitle !== undefined) input.ogTitle = ogTitle;
           if (ogDescription !== undefined) input.ogDescription = ogDescription;
           if (ogImageUrl !== undefined) input.ogImageUrl = ogImageUrl;
-          const form = await client.forms.update(formId, input);
+          const form = await client.forms.update(formId, input, { accountId });
           return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, form }, null, 2) }] };
         }
         if (action === "delete") {
-          await client.forms.delete(formId);
+          if (expectedRevision === undefined) throw new Error("expectedRevision is required for deletion");
+          await client.forms.delete(formId, { accountId, expectedRevision });
           return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, deleted: formId }, null, 2) }] };
         }
         throw new Error(`Unknown action: ${action}`);

@@ -131,3 +131,20 @@ describe('V8 統括のメンバーの窓', () => {
     expect(body.isActive).toBe(false)
   })
 })
+
+describe('V8 統括のメンバーの表の列（絵 r4ARpV・2026-10-08）', () => {
+  it('名前の列は 160 で守り、伸び縮みするのはメールアドレスだけ', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const css = readFileSync(resolve(__dirname, 'members.module.css'), 'utf8')
+    const globals = readFileSync(resolve(__dirname, '../../app/globals.css'), 'utf8')
+    const columns = css.match(/\.head,\s*\.row\s*\{[^}]*grid-template-columns:\s*([^;]+);/)?.[1].trim().split(/\s+(?![^(]*\))/)
+    expect(columns).toEqual([
+      'var(--tpl-hq-col-name)', 'minmax(0, 1fr)', 'var(--tpl-hq-col-role)', 'var(--tpl-hq-col-scope)',
+      'var(--tpl-hq-col-state)', 'var(--tpl-hq-col-login)', 'var(--tpl-hq-col-action)',
+    ])
+    const value = (name: string) => globals.match(new RegExp(`--tpl-hq-col-${name}:\\s*([^;]+);`))?.[1]
+    expect([value('name'), value('role'), value('scope'), value('state'), value('login'), value('action')])
+      .toEqual(['160px', '80px', '110px', '80px', '90px', '80px'])
+  })
+})

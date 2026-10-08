@@ -148,7 +148,7 @@ export async function handleRichMenuTap(
         content = await expandSendCommonVars(
           db, tpl.message_content,
           { kind: 'rich_menu_tap', id: target.templateId },
-          { lineAccountId, friendId: friend.id },
+          { lineAccountId, friendId: friend.id, messageType: tpl.message_type },
         );
       }
       const message = tpl

@@ -3,13 +3,18 @@
 import { ArrowUpDown, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
+import { isImeComposing } from './ime'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import MenuPortal from './menu-portal'
+import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuOption, SelectMenuSpacer, splitOptionHeads } from './select-menu'
 import styles from './select.module.css'
 
 export interface SelectOption {
   value: string
   label: string
   disabled?: boolean
+  /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。v7 では出さない。 */
+  leading?: ReactNode
 }
 
 export interface SelectProps {
@@ -50,7 +55,7 @@ export interface SelectProps {
  * キーボードで動かした先が描かれていなければ、そこまでスクロールしてから描く。
  */
 const WINDOW_THRESHOLD = 100
-const OPTION_HEIGHT = 38
+const OPTION_HEIGHT_V7 = 38
 const WINDOW_OVERSCAN = 12
 
 /** Pencil V5 `rpot9` / `Gfsb4` を正本にした単一選択。 */
@@ -88,6 +93,13 @@ export default function Select({
     return map
   }, [enabledOptions])
   const windowed = options.length > WINDOW_THRESHOLD
+  /*
+   * ★V8 は開いた中身を共通部品 select-menu（StFE7）で描く（2026-10-08 B-45）。
+   * 選択肢の「並び：」などの頭は外して上の見出しにし、閉じたボタンは今のまま。
+   */
+  const v8 = useAdminTheme() === 'v8'
+  const OPTION_HEIGHT = v8 ? SELECT_MENU_ROW_STRIDE : OPTION_HEIGHT_V7
+  const heads = useMemo(() => splitOptionHeads(options, label), [options, label])
   // 一覧は器（MenuPortal）が後から描くので、ref ではなく描かれた時に受け取る。
   const [listEl, setListEl] = useState<HTMLUListElement | null>(null)
   const [scrollWindow, setScrollWindow] = useState({ top: 0, height: 0 })
@@ -160,6 +172,8 @@ export default function Select({
   }
 
   const onButtonKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    // 日本語の変換中のキー（確定の Enter・候補の上下）は選ぶ欄で使わない。
+    if (isImeComposing(event)) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       if (!open) setOpen(true)
@@ -229,7 +243,40 @@ export default function Select({
           <ChevronDown className={styles.chevron} aria-hidden="true" />
         )}
       </button>
-      {open ? (
+      {open && v8 ? (
+        <SelectMenu
+          open={open}
+          getAnchor={() => triggerRef.current}
+          onClose={() => setOpen(false)}
+          listboxId={listboxId}
+          labelledBy={buttonId}
+          heading={heads.heading}
+          listRef={setListEl}
+        >
+          {windowStart > 0 ? <SelectMenuSpacer rows={windowStart} /> : null}
+          {options.slice(windowStart, windowEnd).map((option, offset) => {
+            const optionIndex = enabledIndexOf.get(option.value) ?? -1
+            return (
+              <SelectMenuOption
+                key={option.value}
+                label={heads.labelOf(option)}
+                leading={option.leading}
+                selected={option.value === value}
+                active={optionIndex >= 0 && optionIndex === activeIndex}
+                disabled={option.disabled}
+                setSize={windowed ? options.length : undefined}
+                posInSet={windowed ? windowStart + offset + 1 : undefined}
+                onHover={() => {
+                  if (optionIndex >= 0) setActiveIndex(optionIndex)
+                }}
+                onSelect={() => choose(option)}
+              />
+            )
+          })}
+          {windowEnd < options.length ? <SelectMenuSpacer rows={options.length - windowEnd} /> : null}
+        </SelectMenu>
+      ) : null}
+      {open && !v8 ? (
         <MenuPortal
           open={open}
           align="start"

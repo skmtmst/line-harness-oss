@@ -199,7 +199,7 @@
 :global([data-theme='v8']) .identity, :global([data-theme='v8']) .identity * { line-height: var(--tpl-identity-lh); }
 :global([data-theme='v8']) .identity { display: flex; align-items: center; }
 /* 戻るリンクは青の太字（絵 K7HWG・A0pDt・loVfW ほか「← 〇〇へ」#0b63ce/600）。 */
-:global([data-theme='v8']) .identity > a { color: var(--tpl-identity-color); font-weight: var(--tpl-identity-weight); }
+:global([data-theme='v8']) .identity > a, :global([data-theme='v8']) .identity > button { color: var(--tpl-identity-color); font-weight: var(--tpl-identity-weight); }
 :global([data-theme='v8']) [data-page-template='create'] .heading { row-gap: var(--tpl-create-head-row-gap); }
 :global([data-theme='v8']) [data-page-template='detail'] .heading { row-gap: var(--tpl-detail-head-row-gap); }
 :global([data-theme='v8']) [data-page-template='detail'] .headingText { gap: var(--tpl-detail-title-gap); }

@@ -200,6 +200,45 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+describe('W12 特典の参照先（実DB・回答API）', () => {
+  for (const source of ['ref', 'first-touch'] as const) {
+    for (const account of ['account-a', 'account-b', null]) {
+      test(`${source}: 所属 ${account ?? '共有'} の特典を回答アカウントと照合する`, async () => {
+        sqlite.exec(`
+          INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+          VALUES ('account-b', 'ch-b', 'B', 'tok-b', 'sec-b', 'tenant-1');
+          INSERT INTO message_templates (id, name, message_type, message_content)
+          VALUES ('reward', '特典', 'text', 'リンク特典');
+          INSERT INTO forms (id, name, fields, layout, save_to_metadata, is_active, on_submit_message_type, on_submit_message_content)
+          VALUES ('form-reward', 'R', '[]', '${TEXT_LAYOUT}', 0, 1, 'text', 'フォーム返信');
+          INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-reward', 'account-a');
+        `);
+        sqlite.prepare(`INSERT INTO tracked_links (id, name, original_url, reward_template_id, line_account_id)
+          VALUES ('reward-link', '入口', 'https://example.test', 'reward', ?)` ).run(account);
+        if (source === 'first-touch') {
+          sqlite.exec(`UPDATE friends SET first_tracked_link_id = 'reward-link' WHERE id = 'friend-1'`);
+        }
+        const request = submitRequest('form-reward', { full_name: '山田', pet: '犬' }, KEY, 'user-1');
+        const response = await app().fetch(new Request(request, {
+          body: JSON.stringify({ data: { full_name: '山田', pet: '犬' },
+            ...(source === 'ref' ? { trackedLinkId: 'reward-link' } : {}) }),
+        }), env());
+        expect(response.status).toBe(201);
+        expect(pushCalls[0]?.messages).toEqual([{ type: 'text', text: account === 'account-b' ? 'フォーム返信' : 'リンク特典' }]);
+        expect(count('form_submissions')).toBe(1);
+        expect(claimStatus(KEY, 'friend-1')).toBe('completed');
+        const repeat = await app().fetch(new Request(`https://worker.example.test/api/forms/form-reward/submit`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer user-1', 'Idempotency-Key': KEY },
+          body: JSON.stringify({ data: { full_name: '山田', pet: '犬' },
+            ...(source === 'ref' ? { trackedLinkId: 'reward-link' } : {}) }),
+        }), env());
+        expect(repeat.status).toBe(200);
+        expect(pushCalls).toHaveLength(1);
+      });
+    }
+  }
+});
+
 describe('フォーム回答の冪等化(実DB)', () => {
   // Deliberately do not wrap these two probes with scope.run: the test itself
   // stands in for afterEach after Vitest has stopped awaiting the original body.
