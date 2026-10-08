@@ -14,7 +14,7 @@
 .pair {
   display: flex;
   gap: var(--tpl-e78-row-gap);
-  align-items: flex-start;
+  align-items: stretch;
   min-width: 0;
 }
 
@@ -30,7 +30,7 @@
 }
 
 .cardTall {
-  min-height: var(--tpl-e78-card-h);
+  min-height: var(--tpl-stamp-card-min-h);
 }
 
 .cardRules {
@@ -181,7 +181,8 @@
 
 .slots {
   display: grid;
-  grid-template-columns: repeat(5, var(--tpl-e78-slot));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  justify-items: center;
   gap: var(--tpl-e78-slot-gap);
 }
 
@@ -189,20 +190,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--tpl-e78-slot);
-  height: var(--tpl-e78-slot);
+  width: var(--tpl-stamp-slot);
+  height: var(--tpl-stamp-slot);
   border-radius: var(--tpl-e78-pill);
-  background: var(--color-canvas);
-  box-shadow: var(--tpl-e78-ring);
-  color: var(--color-ink-faint);
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  box-shadow: var(--tpl-stamp-slot-ring);
+  color: inherit;
   font-size: var(--tpl-e78-sub-size);
   line-height: var(--tpl-e78-sub-lh);
   font-weight: 600;
 }
 
 .slotDone {
-  background: var(--color-accent-deep);
-  color: var(--color-canvas);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
 }
 
 .slotReward {
@@ -459,4 +460,37 @@
   align-items: center;
   justify-content: center;
   gap: var(--tpl-e78-row-gap);
+}
+
+.appearance { display: flex; align-items: center; gap: var(--tpl-stamp-appearance-gap); min-width: 0; }
+.imageThumb { width: var(--tpl-stamp-image-w); height: var(--tpl-stamp-image-h); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: var(--tpl-e78-radius-xs); box-shadow: var(--tpl-e78-ring); background: var(--color-surface-pearl); color: var(--color-ink-faint); overflow: hidden; }
+.imageThumb img { width: 100%; height: 100%; object-fit: cover; }
+.colorField { display: flex; flex-direction: column; gap: var(--tpl-e78-field-gap); padding-left: var(--tpl-stamp-appearance-gap); border-left: 1px solid var(--color-hairline); min-width: 0; }
+.colorSwatch { display: block; width: var(--tpl-stamp-hours-w); height: var(--tpl-e78-chip-h); border-radius: var(--tpl-e78-radius-xs); }
+.expiryRow { display: flex; align-items: flex-end; gap: var(--tpl-e78-step-gap); min-width: 0; }
+.expiryRow > .field:first-child { width: min(var(--tpl-stamp-expiry-slot-w), 26%); }
+.expiryLength { width: min(var(--tpl-stamp-expiry-length-w), 23%); }
+.expiryRow :global(*) { max-width: 100%; }
+.hoursRow { display: flex; align-items: center; gap: var(--tpl-e78-step-gap); }
+.hoursRow > input, .receiptRow > input { width: var(--tpl-stamp-hours-w); }
+.receiptRow { display: flex; align-items: center; gap: var(--tpl-e78-step-gap); padding: var(--tpl-e78-switch-pad); }
+.counter { align-self: flex-end; color: var(--color-ink-faint); font-size: var(--tpl-e78-sub-size); line-height: var(--tpl-e78-sub-lh); }
+.customerCard { position: relative; width: var(--tpl-stamp-card-w); max-width: 100%; border-radius: var(--tpl-e78-radius); overflow: hidden; }
+.cardImage { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.customerCardContent { position: relative; display: flex; flex-direction: column; gap: var(--tpl-stamp-card-gap); padding: var(--tpl-stamp-card-pad); }
+.cardTitle { display: flex; align-items: center; gap: var(--tpl-e78-step-gap); font-size: var(--tpl-e78-name-size); line-height: var(--tpl-e78-name-lh); font-weight: 600; }
+.cardTitle > span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cardTitle > span:last-child { white-space: nowrap; font-size: var(--tpl-e78-sub-size); }
+.cardInstructions { margin: 0; font-size: var(--tpl-e78-sub-size); line-height: var(--tpl-e78-sub-lh); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cardExpiry { font-size: var(--tpl-e78-tiny-size); line-height: var(--tpl-e78-tiny-lh); }
+@container v8-page (max-width: 1099px) {
+  .appearance { flex-wrap: wrap; }
+  .hoursRow { flex-wrap: wrap; }
+  .paperRow { flex-direction: column; }
+  .side { width: 100%; }
+  .colWhy { width: 22%; }
+  .colActor { width: 18%; }
+  .colWhen { width: 16%; }
+  .colCount { width: 17%; }
+
 }

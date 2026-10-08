@@ -37,6 +37,11 @@ export function OptionalBadge() {
   return <span className={styles.optional}>任意</span>
 }
 
+/** 複数の操作を横に並べる欄でも、共通の誤りの文を使う。 */
+export function FieldError({ id, children }: { id: string; children: ReactNode }) {
+  return children ? <p id={id} className={styles.error} role="alert">{children}</p> : null
+}
+
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */
 export function Field({
   label,

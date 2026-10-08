@@ -2691,6 +2691,9 @@ const VISIT_STAMP_CARD = {
   id: 'vs-card-1', name: '然 来店スタンプカード', accountIds: ['visual-qa-account'], active: true, version: 3, expectedVersion: 3,
   settings: {
     mode: 'amount', amountUnit: 1000, maxPerVisit: 3, firstVisitBonus: 1, expiryMonths: 6, timezone: 'Asia/Tokyo',
+    expiryBasis: 'last_visit', expiryReminder: 'week_before', completion: 'next_card', nextCardId: 'vs-card-gold',
+    backgroundColor: '#7b4a2e', receiptBonus: 1, stampInterval: { mode: 'same_day' },
+    instructions: '1回のご来店で1個たまります。10個で デザート1品プレゼント。',
     /* API-10：マスの数・重ねる順番・重ねたときの上限は別に持つ。 */
     slotCount: 10, stackingOrder: 'bonus_then_multipliers', maxStackedStamps: 5,
     multipliers: [{ multiplier: 2, weekdays: [2], startMinute: 1020, endMinute: 1140, from: '2025-12-31T15:00:00.000Z', to: '2026-03-31T15:00:00.000Z' }],
@@ -2726,7 +2729,7 @@ const VISIT_STAMP_ENTRIES = [
   vsEntry('vse-7', 'visit', 1, null, '来店', '2026-01-08T10:00:00.000Z'),
 ]
 function visitStampRead(pathname, query) {
-  if (pathname === '/api/visit-stamps/cards') return { success: true, data: [VISIT_STAMP_CARD] }
+  if (pathname === '/api/visit-stamps/cards') return { success: true, data: [VISIT_STAMP_CARD, { ...VISIT_STAMP_CARD, id: 'vs-card-gold', name: 'ゴールドカード', settings: { ...VISIT_STAMP_CARD.settings, completion: 'repeat', nextCardId: null } }] }
   if (pathname === '/api/visit-stamps/paper-requests') return { success: true, data: VISIT_STAMP_PAPER }
   if (pathname === '/api/visit-stamps/entries') {
     const page = Math.max(1, Number(query.get('page') ?? 1)), pageSize = Math.min(200, Math.max(1, Number(query.get('pageSize') ?? 50)))

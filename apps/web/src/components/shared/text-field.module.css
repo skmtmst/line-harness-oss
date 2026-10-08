@@ -106,3 +106,6 @@
   resize: vertical;
   max-width: 100%;
 }
+
+/* 2行の説明用。指定した欄だけを小さくする。 */
+[data-theme='v8'] .multiCompact { min-height: var(--tpl-textarea-compact-h); padding: var(--tpl-e78-pair-gap); line-height: var(--tpl-e78-name-lh); }
