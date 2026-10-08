@@ -211,19 +211,19 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
       onCancel={() => setDetailTarget(null)}
       footer={detailTarget ? (
         <div className="flex justify-end gap-2">
-          {detailTarget.state === 'draft' ? (
+          {canReverse && detailTarget.state === 'draft' ? (
             <Button
               variant="primary"
               disabled={publishing}
               onClick={() => void publishDraft(detailTarget)} busy={publishing} busyLabel="公開しています">計測をはじめる（公開）
             </Button>
           ) : null}
-          {detailTarget.status !== 'stopped' ? (
+          {canReverse && detailTarget.status !== 'stopped' ? (
             <Button onClick={() => openEdit(detailTarget)}>
               編集
             </Button>
           ) : null}
-          {detailTarget.status !== 'stopped' ? (
+          {canReverse && detailTarget.status !== 'stopped' ? (
             <Button onClick={() => void openStop(detailTarget)}>
               停止・削除する
             </Button>
@@ -363,7 +363,7 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
                     : '受け口は動いています。鍵は発行済みです。'
                   : 'まだ鍵を発行していません。発行すると連携先へ渡す鍵が一度だけ表示されます。'}
               </p>
-              <div className="mt-2 flex flex-wrap gap-2">
+              {canReverse ? <div className="mt-2 flex flex-wrap gap-2">
                 <Button
                   disabled={ingestBusy !== '' || detailTarget.state !== 'active'}
                   onClick={() => void issueIngest(detailTarget)}
@@ -378,7 +378,7 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
                     {detailTarget.ingest.disabledAt ? '受け口を再開する' : '受け口を止める'}
                   </Button>
                 ) : null}
-              </div>
+              </div> : null}
               {issuedSecret ? (
                 <Notice tone="info" className="mt-2">
                   新しい鍵: <code className="break-all">{issuedSecret}</code><br />

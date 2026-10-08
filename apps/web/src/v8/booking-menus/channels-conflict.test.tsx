@@ -50,3 +50,12 @@ it('連携済みなら未連携の案内を出さず、失敗した移動は同�
   expect(net.reassign).toHaveBeenLastCalledWith('a', 'b1', { staffId: 's2', notifyCustomer: true })
   expect(done).toHaveBeenCalledTimes(1)
 })
+it('WEB-059: 閲覧のみも重なった予約を読めるが移動操作と入力を隠す', () => {
+  render(<ConflictDialog accountId="a" conflict={conflict} staff={staff} canEdit={false} onClose={() => {}} onDone={() => {}} />)
+  expect(screen.getByText(/① LINE（musubo）・山田さん/)).toBeTruthy()
+  expect(screen.getByText(conflict.reason!)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '移して知らせる' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '移す先のスタッフ' })).toBeNull()
+  expect(screen.queryByRole('switch')).toBeNull()
+  expect(net.reassign).not.toHaveBeenCalled()
+})
