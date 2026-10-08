@@ -1000,9 +1000,12 @@ export async function getFormSubmissionsByFriend(
   const safeLimit = boundedListLimit(limit, 10);
   const result = await db
     .prepare(
-      `SELECT fs.*, f.name AS form_name, f.fields AS form_fields
+      `SELECT fs.*,
+              CASE WHEN fs.form_version_id IS NULL THEN f.name ELSE v.name END AS form_name,
+              CASE WHEN fs.form_version_id IS NULL THEN f.fields ELSE v.fields END AS form_fields
        FROM form_submissions fs
        JOIN forms f ON f.id = fs.form_id
+       LEFT JOIN form_versions v ON v.id = fs.form_version_id AND v.form_id = fs.form_id
        WHERE fs.friend_id = ? AND fs.is_test = 0
        ORDER BY fs.created_at DESC
        LIMIT ?`,
@@ -1054,9 +1057,12 @@ export async function getFormSubmissionsByFriendCursor(
   }
   const result = await db
     .prepare(
-      `SELECT fs.*, f.name AS form_name, f.fields AS form_fields
+      `SELECT fs.*,
+              CASE WHEN fs.form_version_id IS NULL THEN f.name ELSE v.name END AS form_name,
+              CASE WHEN fs.form_version_id IS NULL THEN f.fields ELSE v.fields END AS form_fields
        FROM form_submissions fs
        JOIN forms f ON f.id = fs.form_id
+       LEFT JOIN form_versions v ON v.id = fs.form_version_id AND v.form_id = fs.form_id
        WHERE fs.friend_id = ? AND fs.is_test = 0${cursorClause}
        ORDER BY fs.created_at DESC, fs.id DESC
        LIMIT ?`,
