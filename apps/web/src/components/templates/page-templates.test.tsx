@@ -5,6 +5,15 @@ import { CreatePage, ListPage, SettingsPage } from './index'
 
 afterEach(cleanup)
 describe('V8 の型へ渡す操作', () => {
+  it('本文幅の保存口を選んだ画面だけ本文内に置き、既存の配置は保つ', () => {
+    const { container, rerender } = render(<SettingsPage title="設定" navigation="目次" saveActions={<button>保存</button>}>内容</SettingsPage>)
+    const content = () => container.querySelector('[data-template-region="content"]')!
+    expect(content().querySelector('[data-template-region="footer"]')).toBeNull()
+    rerender(<SettingsPage title="設定" navigation="目次" savePlacement="content" saveActions={<button>保存</button>}>内容</SettingsPage>)
+    expect(content().querySelector('[data-template-region="footer"]')).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: '保存' })).toHaveLength(1)
+  })
+
   it('設定の変更があるときだけ保存口を出し、渡された処理を実行する', () => {
     const save = vi.fn()
     const { rerender } = render(<SettingsPage title="設定" navigation={<a href="#delivery">配信</a>}><section id="delivery">配信設定</section></SettingsPage>)

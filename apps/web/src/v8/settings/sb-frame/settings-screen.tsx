@@ -23,6 +23,7 @@ export function SbSettingsScreen({
   children,
   saveActions,
   saveStatus,
+  savePlacement,
   layout = 'wide-nav',
 }: {
   /**
@@ -39,6 +40,7 @@ export function SbSettingsScreen({
   children: ReactNode
   saveActions?: ReactNode
   saveStatus?: ReactNode
+  savePlacement?: 'content'
 }) {
   return (
     <SettingsPage
@@ -49,6 +51,7 @@ export function SbSettingsScreen({
       navigation={<SettingsInnerNav inline />}
       saveActions={saveActions}
       saveStatus={saveStatus}
+      savePlacement={savePlacement}
     >
       <div className={styles.screen} data-sb-settings-screen="" data-sb-layout={layout}>{children}</div>
     </SettingsPage>
