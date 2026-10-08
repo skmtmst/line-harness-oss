@@ -68,11 +68,11 @@ export function distributionFolderRows({ accounts, folders, membership, selected
   ] : [])]
 }
 
-export function DistributionFolderPanel({ rows, activeId, onSelect, failed, compact }: {
-  rows: FolderPanelRow[]; activeId: string; onSelect: (id: string) => void; failed: boolean; compact?: boolean
+export function DistributionFolderPanel({ rows, activeId, onSelect, failed, compact, hideHeading }: {
+  rows: FolderPanelRow[]; activeId: string; onSelect: (id: string) => void; failed: boolean; compact?: boolean; hideHeading?: boolean
 }) {
   return <>
-    <FolderPanel heading={compact ? 'フォルダ' : 'アカウントのフォルダ'} headingHelp="フォルダごとに選べます。" rows={rows} activeId={activeId} onSelect={onSelect} />
+    <FolderPanel showHeading={!hideHeading} heading={compact ? 'フォルダ' : 'アカウントのフォルダ'} headingHelp="フォルダごとに選べます。" rows={rows} activeId={activeId} onSelect={onSelect} />
     {failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。ページを再読み込みしてください。" /> : null}
   </>
 }

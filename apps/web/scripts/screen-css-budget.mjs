@@ -65,9 +65,9 @@ export function screenFiles(dir) {
   return out.sort()
 }
 
-export function countScreenCss() {
+export function countScreenCss(src = SRC) {
   const counts = {}
-  for (const file of screenFiles()) {
+  for (const file of [join(src, 'app'), join(src, 'v8')].flatMap(dir => screenFiles(dir))) {
     const source = stripComments(readFileSync(file, 'utf8'))
     const entry = {
       spacing: countAll(source, SPACING_CSS),
@@ -75,7 +75,7 @@ export function countScreenCss() {
       font: countAll(source, FONT_CSS),
     }
     if (entry.spacing + entry.height + entry.font > 0) {
-      counts[relative(SRC, file)] = entry
+      counts[relative(src, file)] = entry
     }
   }
   return counts

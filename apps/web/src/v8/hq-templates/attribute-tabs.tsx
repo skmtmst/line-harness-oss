@@ -1,13 +1,12 @@
 'use client'
 
 /*
- * ★V8 統括の友だち属性の上のタブ（絵 DzdC3・y0sapC・Qgjmc。店の友だち属性 src/v8/tags/list.tsx と同じ4つ）。
+ * ★V8 統括のタグの上のタブ（絵 DzdC3・y0sapC・Qgjmc。店のタグ src/v8/tags/list.tsx と同じ4つ）。
  *   タグ（統括のタグのひな形の一覧）・友だち情報欄・対応マーク・保存した検索。
  * 受け付ける URL は店と同じ `?tab=fields|marks|searches`（無い・違う値はタグ）。切り替えは履歴を積まない（replace）。
  *
- * 友だち情報欄・対応マークのひな形の受け口（API）はまだ無い（Codex が作っている）。受け口が来るまでは、
- * タブの中に「いまどこで作るか」を1行で出し、各アカウントの友だち属性へ入る口を置く。
- * 受け口が来たら、ここの OtherTabPanel をそのタブの一覧に置き換える（タブ・URL はそのまま使う）。
+ * 友だち情報欄・対応マークは console の分岐で店の共通画面へ接続する。
+ * 保存した検索だけはアカウントごとの機能として入口を残す。
  */
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -32,7 +31,7 @@ export function attributeTabOf(raw: string | null): AttributeTabKey {
 }
 
 /**
- * 今のタブ（?tab=）と切り替え。友だち属性の画面のときだけ意味を持つ。
+ * 今のタブ（?tab=）と切り替え。タグの画面のときだけ意味を持つ。
  * この一覧はリッチメニュー・回答フォームの入口（Suspense の無いページ）からも出るので、useSearchParams は使わず
  * 開いたときの URL を読む（戻る・進むでも読み直す）。
  */
@@ -43,13 +42,16 @@ export function useAttributeTab(path: string): { tab: AttributeTabKey; select: (
     const read = () => setTab(attributeTabOf(new URLSearchParams(window.location.search).get('tab')))
     read()
     window.addEventListener('popstate', read)
-    return () => window.removeEventListener('popstate', read)
+    window.addEventListener('hq-attribute-tab', read)
+    return () => { window.removeEventListener('popstate', read); window.removeEventListener('hq-attribute-tab', read) }
   }, [])
   const select = (key: AttributeTabKey) => {
     setTab(key)
     const query = new URLSearchParams(window.location.search)
     if (key === 'tags') query.delete('tab'); else query.set('tab', key)
     const rest = query.toString()
+    window.history.replaceState(window.history.state, '', rest ? `${path}?${rest}` : path)
+    window.dispatchEvent(new Event('hq-attribute-tab'))
     router.replace(rest ? `${path}?${rest}` : path, { scroll: false })
   }
   return { tab, select }
@@ -59,7 +61,7 @@ export function AttributeTabs({ tab, onSelect }: { tab: AttributeTabKey; onSelec
   return (
     <div className={styles.tabsBox}>
       <Tabs
-        label="友だち属性の種類"
+        label="タグの種類"
         items={ATTRIBUTE_TABS.map(([key, label]) => ({ label, current: tab === key, onClick: () => onSelect(key) }))}
       />
     </div>
@@ -68,9 +70,9 @@ export function AttributeTabs({ tab, onSelect }: { tab: AttributeTabKey; onSelec
 
 /** 統括ではまだ一覧の無いタブの1行（「準備中」とは言わず、いまどこで作るかを言う）。 */
 export const OTHER_TAB_LINE: Record<Exclude<AttributeTabKey, 'tags'>, string> = {
-  fields: '友だち情報欄は、いまは各アカウントの友だち属性で作ります。統括から配れるようになると、ここに一覧が出ます。',
-  marks: '対応マークは、いまは各アカウントの友だち属性で作ります。統括から配れるようになると、ここに一覧が出ます。',
-  searches: '保存した検索は、アカウントごとに友だちの絞り込みを残すものです。各アカウントの友だち属性で作ります。',
+  fields: '友だち情報欄は、いまは各アカウントのタグで作ります。統括から配れるようになると、ここに一覧が出ます。',
+  marks: '対応マークは、いまは各アカウントのタグで作ります。統括から配れるようになると、ここに一覧が出ます。',
+  searches: '保存した検索は、アカウントごとに友だちの絞り込みを残すものです。各アカウントのタグで作ります。',
 }
 
 export function OtherTabPanel({ tab, title, description, onSelect }: {

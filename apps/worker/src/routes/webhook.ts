@@ -1,3 +1,6 @@
+import {stableWebhookStepId} from '../services/incoming-webhook-receipts.js';
+import { workflowLineClient } from '../services/workflow-line-client.js';
+import type { WorkflowExecution } from '../services/workflow-execution.js';
 import { redeemCoupon } from '../services/coupon-redemption.js';
 import { Hono } from 'hono';
 import { verifySignature, LineClient } from '@line-crm/line-sdk';
@@ -279,11 +282,12 @@ webhook.post('/webhook', async (c) => {
     db,
     events: body.events,
     lineAccountId: matchedAccountId,
-    handle: async (event) => {
+    handle: async (event, execution) => {
+      const ownedClient=workflowLineClient(lineClient,execution);
       if (matchedTenantStatus !== 'active') {
         return handleStoppedTenantEvent(
-          db,
-          lineClient,
+          execution.mutationDb('stopped_tenant'),
+          ownedClient,
           event,
           matchedAccountId,
           lineMessageAccountKey,
@@ -291,10 +295,10 @@ webhook.post('/webhook', async (c) => {
       }
       // 契約者専用LINE（★V6 37-7）: 6 桁の確認コードなら権限者の紐づけとして受ける。
       // 対象アカウント以外・コード以外は何もしないので、店舗のアカウントには影響しない。
-      if (await handleNoticeLinkCode(c.env, db, lineClient, event, matchedAccountId)) return;
+      if (await handleNoticeLinkCode(c.env, execution.mutationDb('notice_code'), ownedClient, event, matchedAccountId)) return;
       return handleEvent(
-      db,
-      lineClient,
+      execution.db,
+      ownedClient,
       event,
       channelAccessToken,
       matchedAccountId,
@@ -306,6 +310,7 @@ webhook.post('/webhook', async (c) => {
         ? { baseUrl: c.env.NEN_EC_BASE_URL, secret: c.env.ECCUBE_WEBHOOK_SECRET }
         : undefined,
       c.env,
+      execution,
       );
     },
   });
@@ -462,7 +467,9 @@ async function handleEvent(
   r2?: R2Bucket,
   ecommerce?: { baseUrl: string; secret: string },
   operatorMailEnv?: Env['Bindings'],
+  execution?: WorkflowExecution,
 ): Promise<void> {
+  const replay=<T>(key:string,work:()=>Promise<T>):Promise<T>=>execution?execution.step(key,work):work();
   if (event.type === 'unsend') {
     await recordLineMessageUnsend(db, {
       lineMessageAccountKey,
@@ -486,7 +493,7 @@ async function handleEvent(
     });
 
     // プロフィール取得 & 友だち登録/更新
-    let profile;
+    let profile: Awaited<ReturnType<LineClient['getProfile']>> | undefined;
     try {
       profile = await lineClient.getProfile(userId);
     } catch (err) {
@@ -495,13 +502,13 @@ async function handleEvent(
 
     let friend: Friend;
     try {
-      friend = await upsertFriend(db, {
+      friend = execution ? await execution.step('friend',async()=>{ return upsertFriend(execution?.mutationDb('friend') ?? db, {
         lineUserId: userId,
         lineAccountId,
         displayName: profile?.displayName ?? null,
         pictureUrl: profile?.pictureUrl ?? null,
         statusMessage: profile?.statusMessage ?? null,
-      });
+      }); }) : await upsertFriend(db,{lineUserId:userId,lineAccountId,displayName:profile?.displayName ?? null,pictureUrl:profile?.pictureUrl ?? null,statusMessage:profile?.statusMessage ?? null});
     } catch (err) {
       if (!isFriendScopeConflict(err)) throw err;
       // 同一 line_user_id が別アカウント所有。friend 行なしではフォロー処理を
@@ -552,7 +559,7 @@ async function handleEvent(
     // 新規・再フォローのどちらでも、最初の友だち登録マイルを同じキーで非同期投入する。
     // first_followed_at を使うため再フォローやWebhook再送では二重加算されない。
     const firstFollowedAt = friend.first_followed_at ?? friend.created_at;
-    await awardActivityMileage(db, {
+    await replay('awardActivityMileage:2',()=>awardActivityMileage(execution?.mutationDb('awardActivityMileage:2') ?? db, {
       eventType: 'friend_registered',
       source: 'line_relationship',
       sourceEventId: `${friend.id}:friend_registered:${firstFollowedAt}`,
@@ -560,7 +567,7 @@ async function handleEvent(
       subjectKey: friend.id,
       metadata: { lineAccountId },
       occurredAt: firstFollowedAt,
-    });
+    }));
 
     // Resolve referral link (entry_route) for this friend.
     // /auth/callback (OAuth path) writes friends.ref_code in parallel with
@@ -1145,7 +1152,7 @@ async function handleEvent(
     }
 
     // イベントバス発火: friend_add（replyToken は Step 0 で使用済みの可能性あり）
-    await fireEvent(db, 'friend_add', {
+    await replay('fireEvent:4',()=>fireEvent(db, 'friend_add', {
       sourceEventId: event.webhookEventId,
       sourceKind: 'line_webhook',
       occurredAt: new Date(event.timestamp).toISOString(),
@@ -1155,7 +1162,7 @@ async function handleEvent(
         friendKind,
         attributionStatus: currentAttribution ? 'captured' : 'unavailable',
       },
-    }, lineAccessToken, lineAccountId);
+    }, lineAccessToken, lineAccountId, execution));
     return;
   }
 
@@ -1166,17 +1173,17 @@ async function handleEvent(
 
     const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
     await updateFriendFollowStatus(db, userId, false, lineAccountId);
-    await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+    await replay('recordWebhookAnalyticsEvent:2',()=>recordWebhookAnalyticsEvent(execution?.mutationDb('recordWebhookAnalyticsEvent:2') ?? db, lineAccountId, event, {
       friendId: friend?.id,
       eventType: 'friend_unfollow',
-    });
+    }));
     if (friend) {
-      await fireEvent(db, 'friend_unfollow', {
+      await replay('fireEvent:3',()=>fireEvent(db, 'friend_unfollow', {
         sourceEventId: event.webhookEventId,
         sourceKind: 'line_webhook',
         occurredAt: new Date(event.timestamp).toISOString(),
         friendId: friend.id,
-      }, lineAccessToken, lineAccountId);
+      }, lineAccessToken, lineAccountId, execution));
     }
     return;
   }
@@ -1220,11 +1227,11 @@ async function handleEvent(
      */
     const carouselTap = parseCarouselPostbackData(rawPostbackData);
     if (carouselTap) {
-      await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+      await replay('recordWebhookAnalyticsEvent:1',()=>recordWebhookAnalyticsEvent(execution?.mutationDb('recordWebhookAnalyticsEvent:1') ?? db, lineAccountId, event, {
         friendId: friend.id,
         eventType: 'postback_received',
         dimensions: { matched: true },
-      });
+      }));
       try {
         const result = await handleCarouselTap(db, lineClient, friend, carouselTap, {
           lineAccountId,
@@ -1246,11 +1253,11 @@ async function handleEvent(
     let tapLabel: string | null = null;
     if (tap) {
       try {
-        const tapResult = await handleRichMenuTap(db, lineClient, friend, tap.areaId, {
+        const tapResult = await replay('handleRichMenuTap:0',()=>handleRichMenuTap(execution?.mutationDb('handleRichMenuTap:0') ?? db, lineClient, friend, tap.areaId, {
           lineAccountId,
           replyToken: postbackReplyToken,
           sourceEventId: event.webhookEventId,
-        });
+        }));
         if (tapResult.replyTokenConsumed) postbackReplyToken = undefined;
         tapLabel = tapResult.target?.label ?? null;
       } catch (err) {
@@ -1276,22 +1283,21 @@ async function handleEvent(
      */
     const questionHit = parseQuestionPostback(postbackData);
     if (questionHit) {
-      const answered = await handleQuestionAnswer(
-        db,
+      const answered = await replay('handleQuestionAnswer:0',()=>handleQuestionAnswer(execution?.db ?? db,
         lineClient,
         friend,
         { ...questionHit, lineAccountId },
         postbackReplyToken,
-      );
+      ));
       if (answered.handled) {
-        await fireEvent(db, 'postback_received', {
+        await replay('fireEvent:2',()=>fireEvent(db, 'postback_received', {
           sourceEventId: event.webhookEventId,
           sourceKind: 'line_webhook',
           occurredAt: new Date(event.timestamp).toISOString(),
           friendId: friend.id,
           eventData: { text: postbackData, matched: true },
           replyToken: answered.replyTokenConsumed ? undefined : postbackReplyToken,
-        }, lineAccessToken, lineAccountId);
+        }, lineAccessToken, lineAccountId, execution));
         return;
       }
     }
@@ -1300,15 +1306,16 @@ async function handleEvent(
     // 利用者が "コスト比較" などのアクションを起こした事実を chat 履歴で可視化する。
     // delivery_type='push' は厳密には push ではないが、incoming/non-test として
     // 既存 chat list / 詳細 SQL のフィルタを通すための妥当な値 (auto_reply text 同様)。
-    let postbackIncomingLogId: string | null = crypto.randomUUID();
+    let postbackIncomingLogId: string | null = null;
     try {
-      await db
-        .prepare(
-          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at, line_event_at)
-           VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?, ?)`,
-        )
-        .bind(postbackIncomingLogId, friend.id, postbackLogText, lineAccountId ?? null, jstNow(), toJstString(new Date(event.timestamp)))
-        .run();
+      postbackIncomingLogId=await replay('incoming_postback_log',async()=>{
+        const id=await stableWebhookStepId(event.webhookEventId,'incoming-postback');
+        await (execution?.mutationDb('incoming_postback_log') ?? db)
+          .prepare(`INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at, line_event_at)
+            VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?, ?)`)
+          .bind(id,friend.id,postbackLogText,lineAccountId ?? null,jstNow(),toJstString(new Date(event.timestamp))).run();
+        return id;
+      });
     } catch (err) {
       postbackIncomingLogId = null;
       logWebhookStepFailure('incoming_postback_log', err, lineAccountId, event);
@@ -1342,7 +1349,7 @@ async function handleEvent(
     // メニュータップで誤発火し、条件側に source を見る術がないため。
     // なお upsertChatOnMessage は呼ばない: メニュータップは自発メッセージでは
     // ないので、未対応 inbox を汚さないのが正しい (テキスト経路との意図的な差分)。
-    await fireEvent(db, 'postback_received', {
+    await replay('fireEvent:1',()=>fireEvent(db, 'postback_received', {
       sourceEventId: event.webhookEventId,
       sourceKind: 'line_webhook',
       occurredAt: new Date(event.timestamp).toISOString(),
@@ -1350,7 +1357,7 @@ async function handleEvent(
       // data が無いボタンでも、ボタン名でオートメーションを組めるようにする。
       eventData: { text: postbackData || tapLabel || '', matched: postbackMatched },
       replyToken: postbackReplyTokenConsumed ? undefined : postbackReplyToken,
-    }, lineAccessToken, lineAccountId);
+    }, lineAccessToken, lineAccountId, execution));
 
     return;
   }
@@ -1428,13 +1435,13 @@ async function handleEvent(
     // 別webhook IDで同じmessageが再送された場合と、先に取消済みの場合は
     // マイル・自動応答・未読化などの副作用を繰り返さない。
     if (!recorded.inserted || recorded.isUnsent) return;
-    await awardActivityMileage(db, {
+    await replay('awardActivityMileage:1',()=>awardActivityMileage(execution?.mutationDb('awardActivityMileage:1') ?? db, {
       eventType: 'message_received',
       source: 'line',
       sourceEventId: logId,
       friendId: friend.id,
       metadata: { messageType: msg.type },
-    });
+    }));
     // 自動応答の評価へ渡す。重複抑止・停止中除外・別アカウント分離は
     // 既存の matchAndReply が担う。replyToken はメッセージイベントに付く。
     const { matched: nonTextMatched } = await matchAndReply(
@@ -1462,11 +1469,11 @@ async function handleEvent(
     if (!nonTextMatched) {
       await upsertChatOnMessage(db, friend.id, toJstString(new Date(event.timestamp)));
     }
-    await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+    await replay('recordWebhookAnalyticsEvent:0',()=>recordWebhookAnalyticsEvent(execution?.mutationDb('recordWebhookAnalyticsEvent:0') ?? db, lineAccountId, event, {
       friendId: friend.id,
       eventType: 'message_received',
       dimensions: { messageType: msg.type, matched: nonTextMatched },
-    });
+    }));
     return;
   }
 
@@ -1499,14 +1506,14 @@ async function handleEvent(
     });
     if (!recorded.inserted || recorded.isUnsent) return;
 
-    await awardActivityMileage(db, {
+    await replay('awardActivityMileage:0',()=>awardActivityMileage(execution?.mutationDb('awardActivityMileage:0') ?? db, {
       eventType: 'message_received',
       source: 'line',
       sourceEventId: logId,
       friendId: friend.id,
       metadata: { messageType: 'text' },
       occurredAt: now,
-    });
+    }));
 
     // Cross-account trigger: send message from another account via UUID
     if (incomingText === '体験を完了する' && lineAccountId) {
@@ -1592,14 +1599,14 @@ async function handleEvent(
 
     // イベントバス発火: message_received
     // Pass replyToken only when auto_reply didn't actually consume it
-    await fireEvent(db, 'message_received', {
+    await replay('fireEvent:0',()=>fireEvent(db, 'message_received', {
       sourceEventId: event.webhookEventId,
       sourceKind: 'line_webhook',
       occurredAt: new Date(event.timestamp).toISOString(),
       friendId: friend.id,
       eventData: { text: incomingText, matched },
       replyToken: replyTokenConsumed ? undefined : event.replyToken,
-    }, lineAccessToken, lineAccountId);
+    }, lineAccessToken, lineAccountId, execution));
 
     return;
   }

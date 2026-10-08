@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import AffiliatesTabV8 from './v8-affiliates-tab'
+import AffiliatesPage from './page'
 
 const calls = vi.hoisted(() => ({
   list: vi.fn(), allReport: vi.fn(), approvals: vi.fn(),
@@ -19,9 +19,14 @@ vi.mock('@/lib/api', () => ({
       settlementPreview: calls.settlementPreview,
     },
     accountSettings: { getLinkBaseUrl: calls.linkBaseUrl },
+    affiliateOffers: { list: async () => ({ success: true, data: [] }) },
+    conversionApprovals: { list: async () => ({ success: true, data: [] }) },
   },
   ApiError: class extends Error { status?: number },
 }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1' }) }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
@@ -45,8 +50,8 @@ async function renderTab() {
   calls.allReport.mockResolvedValue({ success: true, data: [] })
   calls.settlementPreview.mockRejectedValue(new Error('no settlement'))
   calls.linkBaseUrl.mockResolvedValue({ success: false })
-  render(<AffiliatesTabV8 accountId="acc-1" canEdit registerHeaderActions={() => {}} />)
-  await waitFor(() => expect(screen.getByText(/全\s*25件/)).toBeTruthy())
+  render(<AffiliatesPage />)
+  await waitFor(() => expect(screen.getByText('25人中 1〜20人')).toBeTruthy())
 }
 
 describe('V8 アフィリエイター一覧の件数とページ送り', () => {

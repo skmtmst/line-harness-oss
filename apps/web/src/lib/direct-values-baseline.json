@@ -334,6 +334,21 @@
     "radius": 0,
     "shadow": 0
   },
+  "v8/tags/mark-basic-fields.tsx": {
+    "color": 6,
+    "radius": 0,
+    "shadow": 0
+  },
+  "v8/hq-templates/attributes.tsx": {
+    "color": 3,
+    "radius": 0,
+    "shadow": 0
+  },
+  "v8/hq-templates/attribute-model.ts": {
+    "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
   "v8/tags/mark-editor.tsx": {
     "color": 6,
     "radius": 0,

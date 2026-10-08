@@ -8,6 +8,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   overflow?: 'visible' | 'hidden'
   padding?: 'none' | 'compact' | 'default' | 'roomy' | 'spacious'
   corner?: 'card' | 'segment'
+  /** V8 の入力の段・右の箱・一覧の小窓。既定のカードは変えない。 */
+  variant?: 'default' | 'form' | 'aside' | 'panel'
 }
 
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
@@ -19,12 +21,14 @@ export default function Card({
   overflow = 'visible',
   padding = 'none',
   corner = 'card',
+  variant = 'default',
   ...props
 }: CardProps) {
   const classes = [
     styles.card,
     corner === 'segment' ? styles.segment : null,
     frame === 'inset' ? styles.inset : null,
+    variant !== 'default' ? styles[variant] : null,
     layout === 'vertical' ? styles.vertical : null,
     overflow === 'hidden' ? styles.overflowHidden : null,
     padding === 'compact' ? styles.paddingCompact : null,

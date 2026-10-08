@@ -147,7 +147,7 @@ function breakOnceOn(useDb: D1Database, needle: string, error: Error): { db: D1D
               throw error;
             };
             // RETURNING を使う文は first で走るので、両方を壊す。
-            return { ...bound, run: fail, first: fail };
+            return { ...bound, run: fail, first: fail, all: fail };
           },
         };
       };

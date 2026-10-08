@@ -3,6 +3,7 @@
 // より前の過去リードを一斉送信しない。LINE送信は必ずHarnessプロキシ経由。
 
 import {
+  ensureWorkflowStep, claimWorkflowStep, finishWorkflowStep, failWorkflowStep, releaseWorkflowStep,
   getFriendById,
   getLineAccountById,
   isOperationCapabilityStopped,
@@ -154,7 +155,10 @@ async function candidates(
        AND NOT EXISTS (
          SELECT 1 FROM webinar_followups wf
          WHERE wf.webinar_id = w.id AND wf.friend_id = c.friend_id
-           AND wf.kind = ? AND wf.status = 'sent'
+           AND wf.kind = ? AND (wf.status = 'sent' OR EXISTS (SELECT 1 FROM workflow_steps ws
+             WHERE ws.process_kind='webinar_followup' AND ws.subject_id=wf.id AND ws.step_key='send'
+               AND (ws.status IN ('exhausted','unknown') OR ws.next_attempt_at>${Date.now()}
+                 OR (ws.status='running' AND ws.lease_expires_at>${Date.now()}))))
        )
        AND EXISTS (
          SELECT 1 FROM webinar_ctas wc
@@ -222,7 +226,10 @@ async function journeyCandidates(
          AND NOT EXISTS (
            SELECT 1 FROM webinar_journey_followups jf
            WHERE jf.webinar_id = p.webinar_id AND jf.friend_id = p.friend_id
-             AND jf.kind = ?
+             AND jf.kind = ? AND (jf.status IN ('sent','skipped') OR EXISTS (SELECT 1 FROM workflow_steps ws
+               WHERE ws.process_kind='webinar_followup' AND ws.subject_id=jf.id AND ws.step_key='send'
+                 AND (ws.status IN ('exhausted','unknown') OR ws.next_attempt_at>${Date.now()}
+                   OR (ws.status='running' AND ws.lease_expires_at>${Date.now()}))))
          )
        ORDER BY datetime(p.opened_at) ASC
        LIMIT 50`,
@@ -271,7 +278,10 @@ async function journeyCandidates(
          AND NOT EXISTS (
            SELECT 1 FROM webinar_journey_followups jf
            WHERE jf.webinar_id = m.webinar_id AND jf.friend_id = m.friend_id
-             AND jf.kind = ?
+             AND jf.kind = ? AND (jf.status IN ('sent','skipped') OR EXISTS (SELECT 1 FROM workflow_steps ws
+               WHERE ws.process_kind='webinar_followup' AND ws.subject_id=jf.id AND ws.step_key='send'
+                 AND (ws.status IN ('exhausted','unknown') OR ws.next_attempt_at>${Date.now()}
+                   OR (ws.status='running' AND ws.lease_expires_at>${Date.now()}))))
          )
        ORDER BY m.missed_session_at ASC
        LIMIT 50`,
@@ -322,7 +332,10 @@ async function journeyCandidates(
        AND NOT EXISTS (
          SELECT 1 FROM webinar_journey_followups jf
          WHERE jf.webinar_id = s.webinar_id AND jf.friend_id = s.friend_id
-           AND jf.kind = ?
+           AND jf.kind = ? AND (jf.status IN ('sent','skipped') OR EXISTS (SELECT 1 FROM workflow_steps ws
+               WHERE ws.process_kind='webinar_followup' AND ws.subject_id=jf.id AND ws.step_key='send'
+                 AND (ws.status IN ('exhausted','unknown') OR ws.next_attempt_at>${Date.now()}
+                   OR (ws.status='running' AND ws.lease_expires_at>${Date.now()}))))
        )
        ${needsFirstFollowup}
      ORDER BY datetime(s.submitted_at) ASC
@@ -407,143 +420,81 @@ export async function processWebinarFollowups(
   );
   let sent = 0;
   let failed = 0;
-  for (const { candidate, kind } of due) {
-    const followup = await getOrCreateFollowup(db, candidate, kind);
-    if (followup.last_error === 'tenant_suspended') continue;
+  const deliver = async (candidate: Candidate | JourneyCandidate, kind: FollowupKind | WebinarJourneyFollowupKind,
+    journey: boolean): Promise<void> => {
+    const table = journey ? 'webinar_journey_followups' : 'webinar_followups';
+    // Stop/feature gates precede row creation; stopping never consumes a delivery.
+    if (candidate.account_id && !await featureJobCanRun(db,{accountId:candidate.account_id,featureId:'webinars',job: 'webinar followups'})) return;
+    if (candidate.account_id && await isOperationCapabilityStopped(db,candidate.account_id,'reminder_dispatch')) return;
+    const followup = journey
+      ? await getOrCreateJourneyFollowup(db,candidate as JourneyCandidate,kind as WebinarJourneyFollowupKind)
+      : await getOrCreateFollowup(db,candidate as Candidate,kind as FollowupKind);
+    if (followup.status==='sent' || followup.status==='skipped' || followup.last_error==='tenant_suspended') return;
     if (candidate.account_id && isStoppedTenantStatus(tenantStatusByAccount.get(candidate.account_id))) {
-      await db.prepare(
-        `UPDATE webinar_followups
-            SET status='failed', last_error='tenant_suspended', updated_at=?
-          WHERE id=? AND status!='sent'`,
-      ).bind(jstNow(), followup.id).run();
-      continue;
+      await db.prepare(`UPDATE ${table} SET status=?,last_error='tenant_suspended',updated_at=? WHERE id=? AND status!='sent'`)
+        .bind(journey?'skipped':'failed',jstNow(),followup.id).run();
+      return;
     }
-    // 機能オフ中は追跡行を作らず送らない。期限後も再オンで安全に再開する。
-    if (candidate.account_id && !await featureJobCanRun(db, { accountId: candidate.account_id, featureId: 'webinars', job: 'webinar followups' })) {
-      continue;
+    const friend = await getFriendById(db,candidate.friend_id);
+    if (!friend?.is_following) {
+      await db.prepare(`UPDATE ${table} SET status=?,last_error='not_following',updated_at=? WHERE id=? AND status!='sent'`)
+        .bind(journey?'skipped':'failed',jstNow(),followup.id).run();
+      return;
     }
-    // 緊急停止 (#1050): reminder_dispatch 停止中も追跡行を作らず送らない。
-    if (candidate.account_id &&
-        await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
-      continue;
-    }
-    if (followup.status === 'sent') continue;
+    const ref={scopeId:`line:${candidate.account_id ?? 'default'}`,processKind:'webinar_followup',subjectId:followup.id,stepKey:'send'};
+    let owner: string | null=null;
     try {
-      const friend = await getFriendById(db, candidate.friend_id);
-      if (!friend?.is_following) {
-        // Candidate selection and delivery are separate operations. A friend can
-        // block the account between them, so consume the row as a terminal
-        // non-delivery instead of leaving it pending forever. If they follow
-        // again later, candidates() can select this failed row for a retry.
-        const skippedAt = jstNow();
-        await db.prepare(
-          `UPDATE webinar_followups
-           SET status = 'failed', last_error = 'not_following', updated_at = ? WHERE id = ?`,
-        ).bind(skippedAt, followup.id).run();
-        continue;
+      const delivery=await deliveryConfig(db,candidate.account_id,options);
+      if(!delivery.liffId) throw new Error('configuration_missing');
+      const text=journey
+        ? buildJourneyFollowupText(kind as WebinarJourneyFollowupKind,(candidate as JourneyCandidate).title,
+            webinarPickerUrl(delivery.liffId,candidate.slug),(candidate as JourneyCandidate).booking_url)
+        : buildCtaFollowupText(kind as FollowupKind,formUrl(delivery.liffId,(candidate as Candidate).form_id));
+      const snapshot=await ensureWorkflowStep(db,ref,{input:{to:friend.line_user_id,text},retryKey:followup.retry_key,maxAttempts:5});
+      // Configuration failures have no wire request yet. Freeze it before the first external call.
+      await db.prepare(`UPDATE workflow_steps SET input_json=? WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=?
+        AND input_json IS NULL AND status IN ('pending','failed')`).bind(JSON.stringify({to:friend.line_user_id,text}),ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey).run();
+      if(snapshot.status==='succeeded') {
+        await db.prepare(`UPDATE ${table} SET status='sent',sent_at=?,last_error=NULL,updated_at=? WHERE id=? AND status IN ('pending','failed')`)
+          .bind(jstNow(),jstNow(),followup.id).run();return;
       }
-      const delivery = await deliveryConfig(db, candidate.account_id, options);
-      if (!delivery.liffId) throw new Error('LIFF ID not configured');
-      // 送信直前にも緊急停止を確かめる (#1050)。停止中は pending のまま残し、
-      // 次の tick で再送対象になる。
-      if (candidate.account_id &&
-          await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
-        continue;
+      const lease=await claimWorkflowStep(db,ref);
+      if(!lease) return;
+      owner=lease.lease_owner!;
+      if(candidate.account_id && await isOperationCapabilityStopped(db,candidate.account_id,'reminder_dispatch')) {
+        await releaseWorkflowStep(db,ref,owner);return;
       }
-      const url = formUrl(delivery.liffId, candidate.form_id);
-      const text = buildCtaFollowupText(kind, url);
-      await pushViaHarnessProxy(
-        options.proxyBaseUrl,
-        delivery.accessToken,
-        friend.line_user_id,
-        [{ type: 'text', text }],
-        followup.retry_key,
-        options.proxyDispatch,
-        'reminder_dispatch',
-      );
-      await db.prepare(
-        `UPDATE webinar_followups
-         SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ?`,
-      ).bind(jstNow(), jstNow(), followup.id).run();
+      if(lease.attempt_count>1 && Date.now()-lease.first_attempt_at!>=23*3600_000) {
+        await failWorkflowStep(db,ref,owner,{unknown:true,code:'delivery_unknown'});return;
+      }
+      const input=JSON.parse(lease.input_json!);
+      await pushViaHarnessProxy(options.proxyBaseUrl,delivery.accessToken,input.to,[{type:'text',text:input.text}],
+        lease.retry_key,options.proxyDispatch,'reminder_dispatch');
+      await finishWorkflowStep(db,ref,owner,{result:{accepted:true},statements:[
+        db.prepare(`UPDATE ${table} SET status='sent',sent_at=?,last_error=NULL,updated_at=? WHERE id=? AND status IN ('pending','failed')`)
+          .bind(jstNow(),jstNow(),followup.id),
+      ]});
       sent++;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      await db.prepare(
-        `UPDATE webinar_followups
-         SET status = 'failed', last_error = ?, updated_at = ? WHERE id = ?`,
-      ).bind(message.slice(0, 500), jstNow(), followup.id).run();
-      console.error('webinar followup error:', candidate.webinar_id, candidate.friend_id, kind, err);
+    } catch(err) {
+      // Configuration failures also use the same bounded schedule, without persisting exception bodies.
+      if(!owner) {
+        await ensureWorkflowStep(db,ref,{retryKey:followup.retry_key,maxAttempts:5});
+        owner=(await claimWorkflowStep(db,ref))?.lease_owner ?? null;
+      }
+      if(!owner) return;
+      const status=(err as {status?:number})?.status;
+      const lease=await db.prepare(`SELECT attempt_count FROM workflow_steps WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=? AND lease_owner=?`)
+        .bind(ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey,owner).first<{attempt_count:number}>();
+      await failWorkflowStep(db,ref,owner,{code:'delivery_failed',permanent:!!status && status>=400 && status<500 && status!==429,
+        delayMs:Math.min(3600_000,60_000*2**Math.max(0,(lease?.attempt_count ?? 1)-1))});
+      await db.prepare(`UPDATE ${table} SET status='failed',last_error='delivery_failed',updated_at=? WHERE id=? AND status!='sent'
+        AND EXISTS(SELECT 1 FROM workflow_steps WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=?
+          AND attempt_count=? AND status IN ('failed','exhausted'))`)
+        .bind(jstNow(),followup.id,ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey,lease?.attempt_count ?? -1).run();
       failed++;
     }
-  }
-
-  for (const { candidate, kind } of journeyDue) {
-    const followup = await getOrCreateJourneyFollowup(db, candidate, kind);
-    if (followup.last_error === 'tenant_suspended') continue;
-    if (candidate.account_id && isStoppedTenantStatus(tenantStatusByAccount.get(candidate.account_id))) {
-      await db.prepare(
-        `UPDATE webinar_journey_followups
-            SET status='skipped', last_error='tenant_suspended', updated_at=?
-          WHERE id=? AND status NOT IN ('sent','skipped')`,
-      ).bind(jstNow(), followup.id).run();
-      continue;
-    }
-    // 緊急停止 (#1050): reminder_dispatch 停止中は追跡行を作らず送らない。
-    if (candidate.account_id &&
-        await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
-      continue;
-    }
-    if (followup.status === 'sent' || followup.status === 'skipped') continue;
-    try {
-      const friend = await getFriendById(db, candidate.friend_id);
-      if (!friend?.is_following) {
-        await db.prepare(
-          `UPDATE webinar_journey_followups
-           SET status = 'skipped', last_error = 'not_following', updated_at = ? WHERE id = ?`,
-        ).bind(jstNow(), followup.id).run();
-        continue;
-      }
-      const delivery = await deliveryConfig(db, candidate.account_id, options);
-      if (!delivery.liffId) throw new Error('LIFF ID not configured');
-      // 送信直前にも緊急停止を確かめる (#1050)。停止中は pending のまま残す。
-      if (candidate.account_id &&
-          await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
-        continue;
-      }
-      const pickerUrl = webinarPickerUrl(delivery.liffId, candidate.slug);
-      const text = buildJourneyFollowupText(
-        kind, candidate.title, pickerUrl, candidate.booking_url,
-      );
-      await pushViaHarnessProxy(
-        options.proxyBaseUrl,
-        delivery.accessToken,
-        friend.line_user_id,
-        [{ type: 'text', text }],
-        followup.retry_key,
-        options.proxyDispatch,
-        'reminder_dispatch',
-      );
-      const sentAt = jstNow();
-      await db.prepare(
-        `UPDATE webinar_journey_followups
-         SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ?`,
-      ).bind(sentAt, sentAt, followup.id).run();
-      sent++;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      await db.prepare(
-        `UPDATE webinar_journey_followups
-         SET status = 'failed', last_error = ?, updated_at = ? WHERE id = ?`,
-      ).bind(message.slice(0, 500), jstNow(), followup.id).run();
-      console.error(
-        'webinar journey followup error:',
-        candidate.webinar_id,
-        candidate.friend_id,
-        kind,
-        err,
-      );
-      failed++;
-    }
-  }
-  return { sent, failed };
+  };
+  for (const {candidate,kind} of due) await deliver(candidate,kind,false);
+  for (const {candidate,kind} of journeyDue) await deliver(candidate,kind,true);
+  return {sent,failed};
 }

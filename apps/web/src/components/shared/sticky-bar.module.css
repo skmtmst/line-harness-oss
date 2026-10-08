@@ -134,4 +134,18 @@
     justify-content: flex-end;
   }
 }
+/* 左の一覧と右の作る欄が独立した操作を持つ板用。既定の帯は変えない。 */
+[data-theme='v8'] .bar.splitBar.outlined { border: 0; background: transparent; }
+.bar.splitBar { grid-template-columns: minmax(0, 1fr) var(--sticky-trailing-width); gap: 0; padding: 0; }
+.splitLead:empty { padding: 0; }
+.splitLead:not(:empty) { background: var(--color-canvas); border: 1px solid var(--color-hairline); border-right: 0; border-radius: var(--radius-card) 0 0 var(--radius-card); }
+.splitLead { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 12px 24px; }
+.splitTrailing { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 16px; min-width: 0; border: 1px solid var(--color-hairline); border-radius: var(--radius-none) var(--radius-card) var(--radius-card) var(--radius-none); background: var(--color-canvas); }
+.splitTrailing .info { flex-shrink: 0; }
+.splitTrailing .actions { flex-wrap: nowrap; justify-content: flex-end; }
+@media (max-width: 1151px) {
+  .bar.splitBar { grid-template-columns: minmax(0, 1fr); }
+  .splitLead:not(:empty) { border-right: 1px solid var(--color-hairline); border-radius: var(--radius-card); }
+  .splitTrailing { border-radius: var(--radius-card); justify-content: flex-end; flex-wrap: wrap; }
+}
 }
