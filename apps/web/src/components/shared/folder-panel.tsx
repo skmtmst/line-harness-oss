@@ -3,6 +3,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
+import HelpTip from './help-tip'
 import { ArrowDown, ArrowUp, Ellipsis, FolderOpen, FolderPlus, Palette, Pencil, Trash2 } from 'lucide-react'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import styles from './folder-panel.module.css'
@@ -43,6 +44,8 @@ export interface FolderPanelRow {
   color?: string | null
   /** V8 の分類の印。「すべて」などは呼び出し側が渡す。 */
   icon?: ReactNode
+  /** フォルダ全体の選択など、行の右に置く操作。 */
+  trailing?: ReactNode
   /**
    * 直せる行だけ渡す。「すべて」「未分類」は直せない。
    *
@@ -124,6 +127,7 @@ export default function FolderPanel({
   onSelect,
   total,
   heading = 'フォルダ',
+  headingHelp,
   onAddFolder,
   addFolderLabel = 'フォルダを追加する',
   addFolderDisabled = false,
@@ -145,6 +149,7 @@ export default function FolderPanel({
   total?: string
   /** 予約管理の「メニュー」など、分類の呼び名が異なる画面で使う。 */
   heading?: string
+  headingHelp?: ReactNode
   /** 一覧の下に置く追加操作。道具列へ重複して置かない。 */
   onAddFolder?: () => void
   addFolderLabel?: string
@@ -167,7 +172,8 @@ export default function FolderPanel({
     <aside aria-label="フォルダ" className={`${styles.panel} v7:bg-canvas v7:rounded-card v7:border-hairline v7:h-fit overflow-visible v7:border`}>
       {createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : null}
       <div className={`${styles.heading} v7:border-hairline flex items-center justify-between v7:border-b v7:px-4 v7:py-3`}>
-        <p className="v7:text-ink v7:text-sm font-semibold">{heading}</p>
+        {headingHelp ? <p className="v7:text-ink v7:text-sm font-semibold">{heading}<HelpTip label={`${heading}の説明`}>{headingHelp}</HelpTip></p>
+          : <p className="v7:text-ink v7:text-sm font-semibold">{heading}</p>}
         {total === undefined ? null : <span className="text-ink-faint v7:text-xs v7:tabular-nums">{total}</span>}
       </div>
       <nav className={`${styles.rows} v7:p-2`}>
@@ -228,7 +234,8 @@ export default function FolderPanel({
                   並べると、選択との押し間違いが増え、短い名前も狭くなる。 */}
               {/* I3L41O：選んだ行には絵どおり「…」の場所を取る。操作なしの
                   選んだ行（すべて・未分類）は空きの場所取りを置く。 */}
-              {isActive && !hasActions ? (
+              {row.trailing}
+              {isActive && !hasActions && !row.trailing ? (
                 <div className={styles.menuSlot} aria-hidden="true" />
               ) : null}
               {hasActions && (

@@ -426,8 +426,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               下書きを保存
             </Button>
             <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
-              <Send size={15} aria-hidden="true" />
-              {host ? host.primaryLabel ?? '保存して配る' : '保存して公開'}
+              {host ? null : <Send size={15} aria-hidden="true" />}
+              {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
           </>
         )}

@@ -86,13 +86,17 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     })
   }
 
-  it('テンプレートは行の「…」の中からも配れる（文字は「配る」）。公開の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
+  it('テンプレートは行の［配る］と「…」の両方から配る。公開の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
     const rows = [
       { ...ROWS[0], outdated_account_count: 1, this_month_sent_count: 1860 },
       { ...ROWS[1], this_month_sent_count: null },
       { ...row('t-3', '予約の受付', 1), outdated_account_count: 0, this_month_sent_count: 0 },
     ]
     const h = await render({ rows, stats: { thisMonthSentCount: 1860, outdatedTemplateCount: 1 } })
+    const distribute = buttons().find((b) => b.getAttribute('aria-label') === '秋の新商品を配る')!
+    await act(async () => { distribute.click() })
+    expect(h.onDistribute).toHaveBeenCalledWith(rows[0])
+    h.onDistribute.mockClear()
     expect(host.textContent).toContain('未公開の変更')
     expect(host.textContent).toContain('下書きだけ')
     expect(host.textContent).toContain('公開中')
