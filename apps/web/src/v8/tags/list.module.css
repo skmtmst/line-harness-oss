@@ -157,6 +157,10 @@
 .row {
   cursor: pointer;
 }
+/* 1152 の板は1行61。札が28高でも行を押し広げない余白。 */
+@container v8-page (max-width: 1099px) {
+  .row > td { height: var(--tpl-tag-narrow-row-h); padding-block: 0; }
+}
 
 .starButton {
   display: inline-flex;

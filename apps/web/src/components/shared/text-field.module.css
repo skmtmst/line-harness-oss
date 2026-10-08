@@ -53,6 +53,12 @@
   line-height: 1.7; /* lineHeight: 1.7 */
   resize: vertical;
 }
+.multi[data-density='compact'] {
+  font-size: var(--text-label);
+  line-height: var(--tpl-compact-textarea-lh);
+  padding: var(--tpl-compact-textarea-pad);
+  min-height: var(--tpl-compact-textarea-h);
+}
 
 /* 入力が正しくないとき。枠を赤くするだけで、文字色は変えない。 */
 .invalid {

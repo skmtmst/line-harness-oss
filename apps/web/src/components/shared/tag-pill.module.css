@@ -27,6 +27,16 @@
   --tag-pill-pad: 4px 10px;
   --tag-pill-gap: 6px;
 }
+/* 要点の欄（JCDRm・eovoG）の小さい札。通常と表用の寸法は保つ。 */
+.pill[data-size='xs'] {
+  --tag-pill-font: var(--tpl-tag-compact-font);
+  --tag-pill-dot: var(--tpl-tag-compact-dot);
+  --tag-pill-pad: var(--tpl-tag-compact-pad);
+  --tag-pill-gap: var(--tpl-tag-compact-gap);
+}
+@container v8-page (max-width: 1099px) {
+  .pill[data-compact-narrow] { --tag-pill-pad: var(--tpl-tag-table-compact-pad); }
+}
 .dot {
   width: var(--tag-pill-dot);
   height: var(--tag-pill-dot);

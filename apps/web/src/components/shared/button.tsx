@@ -21,7 +21,7 @@ type CommonProps = {
    * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
    * `standard` のままにする。
    */
-  size?: 'standard' | 'field' | 'compact'
+  size?: 'standard' | 'field' | 'compact' | 'inline'
   className?: string
   children: ReactNode
 }

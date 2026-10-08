@@ -130,7 +130,7 @@ export default function OverviewTab({
           <GroupHead title="タグ" action={perms.editSupport ? <Link className={styles.groupLink} href={inbox}>編集</Link> : null} />
           <div className={styles.tags}>
             {friend.tags?.length
-              ? friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} />)
+              ? friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)
               : <span className={`${styles.memo} ${styles.faint}`}>タグはありません</span>}
             {perms.editSupport ? <Link className={`${styles.tag} ${styles.tagAdd}`} href={inbox}>＋ 追加</Link> : null}
           </div>
@@ -247,7 +247,8 @@ export default function OverviewTab({
             unit=""
             loading={upcomingStatus === 'loading' || upcomingStatus === 'idle'}
             valueText={upcoming?.nextBooking && !upcoming.nextBookingError ? formatDay(upcoming.nextBooking.startsAt).replace(/（.）$/, '') : undefined}
-            detail={bookingFailed ? '読み込めませんでした' : upcoming && !upcoming.nextBooking ? '予定なし' : ''}
+            detail={bookingFailed ? '読み込めませんでした' : upcoming?.nextBooking ? '' : upcoming ? '予定なし' : ''}
+            help={upcoming?.nextBooking && !bookingFailed ? `${upcoming.nextBooking.title}・${formatDay(upcoming.nextBooking.startsAt)}` : undefined}
             onRetry={bookingFailed ? () => void data.loadUpcoming() : undefined}
           />
         </KpiBand>

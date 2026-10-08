@@ -538,6 +538,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const canEditChat = Boolean(chatId)
   const statusButtonRef = useRef<HTMLDivElement | null>(null)
   const tagSearchRef = useRef<HTMLInputElement | null>(null)
+  const [tagPickerOpen, setTagPickerOpen] = useState(false)
+  useEffect(() => { setTagPickerOpen(false) }, [friendId])
   const memoAreaRef = useRef<HTMLTextAreaElement | null>(null)
 
   /*
@@ -789,7 +791,10 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       const key = event.key.toLowerCase()
       if (key === 't') {
         event.preventDefault()
-        ;(tagSearchRef.current ?? document.getElementById('inbox-panel-tag'))?.focus()
+        if (isV8) {
+          setTagPickerOpen(true)
+          requestAnimationFrame(() => document.getElementById('inbox-panel-tag')?.focus())
+        } else tagSearchRef.current?.focus()
       } else if (key === 'm') {
         event.preventDefault()
         memoAreaRef.current?.focus()
@@ -800,7 +805,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  }, [isV8])
 
   /*
    * 友だち情報（metadata）のキーを、画面に出す項目名へ写す対応表。
@@ -844,25 +849,29 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               </div>
             ) : null}
 
+            {isV8 ? <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} ${v8.profileSection}`}>
+              <h4>プロフィール</h4>
+              <p>{friend.displayName}・{formatAddedDate(friend.createdAt)}</p>
+            </div> : null}
             {/*
               名前（設計 `友だち詳細` の「名前」）。
               LINEの表示名と、こちらで付けた本名は別物。取り違えると
               別人に送ってしまうので、両方を並べて出す。
             */}
-            <div style={sectionStyle('names')} className={`${sectionVisibility('names')} space-y-2 px-5 py-4`}>
+            <div style={sectionStyle('names')} className={`${sectionVisibility('names')} space-y-2 px-5 py-4 ${isV8 ? v8.basicSection : ''}`}>
               <h4 className="text-ink mb-2 text-xs font-bold">基本情報</h4>
               <div className="flex justify-between items-center gap-2">
                 <span className="text-micro text-ink-faint shrink-0">本名</span>
                 <ExpandableText value={friend.realName} className="text-xs text-ink-secondary v8:text-label" />
               </div>
-              <div className="flex justify-between items-center gap-2">
+              {(!isV8 || (friend.systemDisplayName && friend.systemDisplayName !== friend.displayName)) ? <div className="flex justify-between items-center gap-2">
                 <span className="text-micro text-ink-faint shrink-0">システム表示名</span>
                 <ExpandableText value={friend.systemDisplayName} className="text-xs text-ink-secondary v8:text-label" />
-              </div>
-              <div className="flex items-center justify-between gap-2">
+              </div> : null}
+              {!isV8 ? <div className="flex items-center justify-between gap-2">
                 <span className="shrink-0 text-micro text-ink-faint">登録日</span>
                 <span className="truncate text-xs text-ink-secondary v8:text-label">{formatDate(friend.createdAt)}</span>
-              </div>
+              </div> : null}
             </div>
 
             {/* Harness Mileage — canonical user identity across LINE accounts */}
@@ -1097,16 +1106,16 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
             </div>
 
             {/* ③タグ（×で外す・＋で探して付ける・↑↓Enter・新しいタグも作れる）。 */}
-            <div style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4`}>
+            <div style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4 ${isV8 ? v8.tagsSection : ''}`}>
               <div className="mb-1.5 flex items-center justify-between">
                 <h4 className="text-ink text-xs font-bold">タグ（Tキー）</h4>
-                <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
+                {isV8 && friendId ? <Button variant="text" size="inline" aria-expanded={tagPickerOpen} aria-controls="inbox-panel-tag-picker" onClick={() => setTagPickerOpen((value) => !value)}>＋ 追加</Button> : <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
                   すべて見る
-                </a>
+                </a>}
               </div>
               <div className="flex flex-wrap gap-1">
                 {(effectiveTags ?? []).map((tag) => isV8 ? (
-                  <TagPill key={tag.id} name={tag.name} color={tag.color}
+                  <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs"
                     onRemove={friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />
                 ) : (
                   <span
@@ -1136,7 +1145,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               ) : null}
               {friendId && isV8 ? (
                 /* ★V8 B-26：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
-                <div className={v8.editField}>
+                <div id="inbox-panel-tag-picker" hidden={!tagPickerOpen} className={v8.editField}>
                   <Combobox
                     id="inbox-panel-tag"
                     aria-label="タグを探して付ける"
@@ -1664,7 +1673,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   <div className={v8.summaryRow}>
                     <dt>タグ</dt>
                     <dd title={(effectiveTags ?? []).map((t) => t.name).join('・')}>
-                      {(effectiveTags ?? []).length > 0 ? (effectiveTags ?? []).map((t) => t.name).join('・') : <span className={v8.empty}>なし</span>}
+                      {(effectiveTags ?? []).length > 0 ? (effectiveTags ?? []).map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />) : <span className={v8.empty}>なし</span>}
                     </dd>
                   </div>
                   <div className={v8.summaryRow}>
