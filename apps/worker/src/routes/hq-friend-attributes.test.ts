@@ -97,7 +97,7 @@ test.each(['changed','race','expired'])('mark %s destination rejects writes and 
   const original=sql.db.batch.bind(sql.db);let injected=false;
   sql.db.batch=async statements=>{if(!injected){injected=true;mutate();}return original(statements)};
  }
- const r=await distribute(template.id,p);expect(r.status,JSON.stringify(r.body)).toBe(200);expect(r.body.data.stores[0].status).toBe('version_conflict');
+ const r=await distribute(template.id,p);expect(r.status,JSON.stringify(r.body)).toBe(200);expect(r.body.data.stores[0]).toMatchObject({status:'version_conflict',code:'VERSION_CONFLICT',reason:'配布先で編集がありました。もう一度確認してください'});
  expect(sql.raw.prepare("SELECT count(*) n FROM support_marks WHERE name='相談中'").get()).toEqual({n:0});expect(sql.raw.pragma('foreign_key_check')).toEqual([]);
 });
 test('foreign target and account ownership race cannot write; decisions validated before claim',async()=>{
@@ -111,7 +111,7 @@ test('global field key conflicts offer explicit alias and never touch another st
  const {template}=await create('friend_field',fieldDefinition);
  expect((await distribute(template.id,await preflight(template.id))).body.data.stores[0].status).toBe('succeeded');
  const before=sql.raw.prepare("SELECT * FROM friend_fields WHERE field_key='pet_name'").get();
- const p=await preflight(template.id,['b']);expect(p.stores[0].items[0]).toMatchObject({allowedModes:['alias'],reason:'FIELD_KEY_IN_USE',targetId:null});
+ const p=await preflight(template.id,['b']);expect(p.stores[0].items[0]).toMatchObject({allowedModes:['alias'],code:'FIELD_KEY_IN_USE',targetId:null});
  expect((await distribute(template.id,p,'overwrite')).status).toBe(409);
  const alias=await distribute(template.id,p,'alias');expect(alias.body.data.stores[0]).toMatchObject({status:'succeeded',counts:{aliased:1}});
  const rows=sql.raw.prepare('SELECT f.field_key,s.line_account_id FROM friend_fields f JOIN friend_field_scopes s ON s.field_id=f.id ORDER BY f.field_key').all();expect(rows).toEqual([{field_key:'pet_name',line_account_id:'a'},{field_key:'pet_name_2',line_account_id:'b'}]);

@@ -8,7 +8,7 @@ import { targetDistributionVersion } from './distribution-display.js';
 const LEGACY_TENANT='00000000-0000-4000-8000-000000000001';
 export const isFriendAttributeType=(type:string):type is HqFriendAttributeType=>type==='friend_field'||type==='mark';
 type Selection={accountId:string;sourceId:string;mode:HqFriendAttributeMode};
-type Item={sourceId:string;itemKind:string;name:string;targetId:string|null;expectedRevision:string|null;duplicate:boolean;allowedModes:HqFriendAttributeMode[];reason?:string|null};
+type Item={sourceId:string;itemKind:string;name:string;targetId:string|null;expectedRevision:string|null;duplicate:boolean;allowedModes:HqFriendAttributeMode[];reason?:string|null;code?:string|null};
 type ScopedRow=Record<string,any> & {id:string;name:string;line_account_id:string|null};
 type State={fields:ScopedRow[];marks:ScopedRow[];folders:ScopedRow[];keys:{field_key:string}[]};
 // Include complete definitions and global key occupancy, never customer values.
@@ -48,7 +48,7 @@ function inspect(type:HqFriendAttributeType,definition:HqFriendFieldDefinition|H
   const keyOccupied=s.keys.some(k=>k.field_key===def.field.fieldKey);
   const writable=row&&row.line_account_id!==null&&row.status==='active'&&!row.ec_is_master&&row.type===def.field.type&&row.field_key===def.field.fieldKey;
   items.push({sourceId:'friend_field',itemKind:'friend_field',name:def.field.name,targetId:row?.id??null,expectedRevision:row?`${row.updated_at}:${row.version}`:null,duplicate:!!row||keyOccupied,
-   allowedModes:row?[...(writable?['overwrite' as const]:[]),'alias','skip']:keyOccupied?['alias']:['create'],reason:!row&&keyOccupied?'FIELD_KEY_IN_USE':row&&!writable?'FIELD_REQUIRES_ALIAS':null});
+   allowedModes:row?[...(writable?['overwrite' as const]:[]),'alias','skip']:keyOccupied?['alias']:['create'],code:!row&&keyOccupied?'FIELD_KEY_IN_USE':row&&!writable?'FIELD_REQUIRES_ALIAS':null,reason:!row&&keyOccupied?'差し込み名が使われています。別名で追加してください':row&&!writable?'種類・差し込み名・編集権限が異なります。別名で追加するか飛ばしてください':null});
  }else{
   const def=definition as HqMarkDefinition,matches=s.marks.filter(row=>normalizeScopedTagName(row.name)===normalizeScopedTagName(def.mark.name));
   if(matches.length>1)throw new HqTemplateError('AMBIGUOUS_MARK',409);const row=matches[0];
@@ -128,7 +128,7 @@ export async function friendAttributeResult(db:D1Database,auth:HqTemplateAuthori
   const root=await db.prepare("SELECT COALESCE(friend_attribute_mode,resolution_mode) mode FROM hq_template_preflight_resolutions WHERE preflight_id=? AND tenant_id=? AND item_kind IN ('friend_field','mark')").bind(p.id,auth.tenantId).first<{mode:HqFriendAttributeMode}>();
   const counts={created:0,overwritten:0,aliased:0,skipped:0};
   if(row?.status==='succeeded'&&root){const key={create:'created',overwrite:'overwritten',alias:'aliased',skip:'skipped'} as const;counts[key[root.mode]]=1;}
-  stores.push({accountId:p.target_account_id,status:row?.status??'pending',reason:row?.error_code??null,createdName:row?.created_name??null,counts});
+  stores.push({accountId:p.target_account_id,status:row?.status??'pending',reason:row?.status==='version_conflict'?'配布先で編集がありました。もう一度確認してください':row?.status==='failed'?'配布できませんでした。もう一度確認してから実行してください':null,code:row?.error_code??null,createdName:row?.created_name??null,counts});
  }
  return {runId,status:run.status,stores};
 }

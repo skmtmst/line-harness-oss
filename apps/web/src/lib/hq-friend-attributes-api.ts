@@ -3,7 +3,7 @@ import { requestHqTemplate, hqTemplatesApi, fetchHqTemplateVersions, compareHqTe
 import { fetchApi } from './api';
 export interface HqAttributePreflightItem {
   sourceId: string; itemKind: string; name: string; targetId: string | null; expectedRevision: string | null;
-  duplicate: boolean; allowedModes: HqFriendAttributeMode[]; reason?: string | null;
+  duplicate: boolean; allowedModes: HqFriendAttributeMode[]; reason?: string | null; code?: string | null;
 }
 export interface HqAttributePreflight {
   preflightId: string; expiresAt: string;
@@ -12,7 +12,7 @@ export interface HqAttributePreflight {
 export interface HqAttributeResolution { accountId: string; sourceId: string; mode: HqFriendAttributeMode }
 export interface HqAttributeDistributionResult {
   runId: string; status: 'running'|'completed'|'partial'|'failed';
-  stores: ({ accountId: string; status: 'pending'|'staged'|'succeeded'|'failed'|'version_conflict'|'unsupported'; reason: string|null;
+  stores: ({ accountId: string; status: 'pending'|'staged'|'succeeded'|'failed'|'version_conflict'|'unsupported'; reason: string|null; code?: string|null;
     counts: { created: number; overwritten: number; aliased: number; skipped?: number } } & HqTemplateResultDisplay)[];
 }
 const path = (id: string) => `/${encodeURIComponent(id)}`;
