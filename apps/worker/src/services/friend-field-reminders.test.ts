@@ -180,7 +180,7 @@ describe('processFriendFieldReminders', () => {
       expect(result.enrolled).toBe(1);
     });
 
-    it('今日でなければ立てない', async () => {
+    it('未来の日付も前もって立てる', async () => {
       getFriendFieldReminders.mockResolvedValue([reminder({ repeat_yearly: 0 })]);
       getFriendsWithFieldValuePage.mockResolvedValue([
         { friend_id: 'f-1', value: '2026-05-03' },
@@ -188,7 +188,7 @@ describe('processFriendFieldReminders', () => {
 
       const result = await processFriendFieldReminders(db, jst('2026-05-02T00:05'));
 
-      expect(result).toEqual({ enrolled: 0, skipped: 1, scanned: 1, hasMore: false });
+      expect(result).toEqual({ enrolled: 1, skipped: 0, scanned: 1, hasMore: false });
     });
   });
 

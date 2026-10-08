@@ -4,7 +4,7 @@ import {
   setFriendFieldReminderScanCursor,
   enrollFriendsInReminderOnce,
 } from '@line-crm/db';
-import { nextAnniversary, isSameJstDay, toJstParts } from '@line-crm/shared';
+import { nextAnniversary, toJstParts } from '@line-crm/shared';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { getReminderTargetCondition } from './reminder-trigger.js';
 import { matchesCondition } from './segment-query.js';
@@ -25,6 +25,15 @@ import { matchesCondition } from './segment-query.js';
  * 過去の日付で入っているので、年ごと比べると一度も当たらない。月日だけを見て
  * 「次に来るその日」を出す。
  */
+function futureOneTimeDate(value: string, now: Date): string | null {
+  const match = /^(\d{4}-\d{2}-\d{2})(?:$|T)/.exec(value.trim());
+  if (!match) return null;
+  const date = match[1];
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return null;
+  return date >= toJstParts(now).date ? date : null;
+}
+
 export async function processFriendFieldReminders(
   db: D1Database,
   now: Date = new Date(),
@@ -71,13 +80,11 @@ export async function processFriendFieldReminders(
       const targetCondition = await getReminderTargetCondition(db, reminder.id);
 
       for (const friend of friends) {
-        // 毎年くり返すなら「次に来るその日」、くり返さないなら「その日が今日か」。
+        // 毎年くり返すなら「次に来るその日」、くり返さないなら「今日以降の実在する日付」。
         // 2月29日は設定者が選んだ平年の扱い（2/28・3/1・送らない）に従う（419）。
         const targetDate = reminder.repeat_yearly === 1
           ? nextAnniversary(friend.value, now, reminder.leap_year_policy)
-          : isSameJstDay(friend.value, now)
-            ? toJstParts(now).date
-            : null;
+          : futureOneTimeDate(friend.value, now);
         if (!targetDate) {
           skipped++;
           continue;
