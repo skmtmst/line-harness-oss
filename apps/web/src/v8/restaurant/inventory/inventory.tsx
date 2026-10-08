@@ -64,7 +64,7 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog }: {
   } else if (!selectedAccountId || !ctx.selectedStoreId) {
     body = <ListState kind="empty" title="店舗を選んでください" description={tab === 'channels' ? '予約経路を見たい店舗を選んでください。' : '休業日・貸切を見たい店舗を選んでください。'} />
   } else if (tab === 'channels') {
-    body = <ChannelsBoard accountId={selectedAccountId} storeId={ctx.selectedStoreId} date={today} canEdit={canEdit} />
+    body = <ChannelsBoard accountId={selectedAccountId} storeId={ctx.selectedStoreId} date={today} canEdit={canEdit} timezone={ctx.store?.timezone} />
   } else {
     body = (
       <ClosuresBoard

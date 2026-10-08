@@ -71,9 +71,10 @@ function channelStatus(channel: RestaurantChannel): { value: string; label: stri
 const accountQuery = (accountId: string, storeId: string) =>
   `account_id=${encodeURIComponent(accountId)}&storeId=${encodeURIComponent(storeId)}`
 
-export default function ChannelsBoard({ accountId, storeId, date, canEdit }: {
+export default function ChannelsBoard({ accountId, storeId, date, canEdit, timezone }: {
   accountId: string
   storeId: string
+  timezone?: string
   /** 店舗の今日（YYYY-MM-DD）。「今日の取り込み」の見出しに使う。 */
   date: string
   canEdit: boolean
@@ -225,7 +226,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit }: {
                 <Td>{preparing && channel.receiveMethod === 'email_forward' ? 'メール転送（未設定）' : METHOD_LABEL[channel.receiveMethod]}</Td>
                 <Td><Status value={state.value} label={state.label} /></Td>
                 <Td align="right">{preparing || channel.todayCount === null ? '—' : `${channel.todayCount}件`}</Td>
-                <Td>{preparing ? '—' : formatAt(channel.lastReceivedAt)}</Td>
+                <Td>{preparing ? '—' : formatAt(channel.lastReceivedAt, timezone)}</Td>
                 <Td align="right">{preparing || channel.receiveMethod === 'manual' ? '—' : channel.unreadableCount ?? '—'}</Td>
                 <Td>
                   {channel.receiveMethod === 'manual' ? (
@@ -251,7 +252,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit }: {
             <div key={mail.id} className={styles.unreadRow}>
               <div className={styles.unreadMain}>
                 <p className={styles.channelName}>{`${mail.mediaName ?? mail.mediaCode ?? '媒体不明'}の予約メール`}</p>
-                <p className={styles.channelSub}>{`${formatAt(mail.receivedAt)} 受信・${mail.reason ?? '読めなかった理由は分かりません'}`}</p>
+                <p className={styles.channelSub}>{`${formatAt(mail.receivedAt, timezone)} 受信・${mail.reason ?? '読めなかった理由は分かりません'}`}</p>
               </div>
               <Button onClick={() => setDetail(mail)}>詳しく見る</Button>
               <Button variant="primary" onClick={() => { setDraft({ customerName: '', guestCount: '2', startsAt: '' }); setFieldErrors({}); setImportError(''); setImporting(mail) }}>手で直して取り込む</Button>
@@ -285,7 +286,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit }: {
         {detail ? (
           <dl className={styles.detailList}>
             <dt>媒体</dt><dd>{detail.mediaName ?? detail.mediaCode ?? '媒体不明'}</dd>
-            <dt>受信</dt><dd>{formatAt(detail.receivedAt)}</dd>
+            <dt>受信</dt><dd>{formatAt(detail.receivedAt, timezone)}</dd>
             <dt>読めなかった理由</dt><dd>{detail.reason ?? '分かりません'}</dd>
           </dl>
         ) : null}

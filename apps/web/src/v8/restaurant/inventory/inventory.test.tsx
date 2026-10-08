@@ -19,7 +19,14 @@ vi.mock('@/lib/api', async (load) => ({ ...(await load<typeof import('@/lib/api'
 import { ApiError } from '@/lib/api'
 import InventoryPage from './inventory'
 import { joinTableCodes } from './format'
-import { at, snapshotOf, tables } from '../booking-kit/test-data'
+import { snapshotOf, tables } from '../booking-kit/test-data'
+
+const at = (dayOffset: number, hour: number, minute = 0) => {
+  const today = new Date()
+  today.setDate(today.getDate() + dayOffset)
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(today)
+  return new Date(`${day}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`).toISOString()
+}
 
 const slot = (id: string, hour: number, occupied: string[], seats: number, over: Record<string, unknown> = {}) => ({
   id, store_id: 'store-1', starts_at: at(0, hour), slot_minutes: 30, total_capacity: 20, ota_capacity: 8, line_capacity: 6, walk_in_capacity: 6,

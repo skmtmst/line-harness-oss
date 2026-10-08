@@ -356,7 +356,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
           <>
             <p className={styles.stopLead}>{`この卓には、これから先の予約が ${upcoming.length} 件あります。`}</p>
             <ul className={styles.stopList}>
-              {upcoming.map((item) => <li key={item.id}>{reservationLine(item)}</li>)}
+              {upcoming.map((item) => <li key={item.id}>{reservationLine(item, store?.timezone)}</li>)}
             </ul>
             <DialogField label="この予約をどうしますか" kind="select">
               <Select

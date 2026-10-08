@@ -31,9 +31,13 @@ export function pickMoveTarget(
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
 /** 「10/3（土）19:00 山田 花子 4名」 */
-export function reservationLine(item: RestaurantReservation): string {
+export function reservationLine(item: RestaurantReservation, timezone?: string): string {
   const date = new Date(item.starts_at)
   if (Number.isNaN(date.getTime())) return `${item.customer_name} ${item.guest_count}名`
+  if (timezone) {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('ja-JP', { timeZone: timezone, month: 'numeric', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).map(({ type, value }) => [type, value]))
+    return `${Number(parts.month)}/${Number(parts.day)}（${parts.weekday}）${Number(parts.hour)}:${parts.minute} ${item.customer_name} ${item.guest_count}名`
+  }
   const time = `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
   return `${date.getMonth() + 1}/${date.getDate()}（${WEEKDAY[date.getDay()]}）${time} ${item.customer_name} ${item.guest_count}名`
 }

@@ -6,10 +6,16 @@ import type { RestaurantTable } from '@/lib/restaurant-test-api'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
-export function slotTimeLabel(startsAt: string): string {
+function dateParts(date: Date, timezone?: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date)
+  return Object.fromEntries(parts.map(({ type, value }) => [type, value]))
+}
+
+export function slotTimeLabel(startsAt: string, timezone?: string): string {
   const date = new Date(startsAt)
   if (Number.isNaN(date.getTime())) return '—'
-  return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
+  const parts = dateParts(date, timezone)
+  return `${Number(parts.hour)}:${parts.minute}`
 }
 
 /** 「10/2・金」 */
@@ -29,19 +35,21 @@ export function dayLabelParen(ymd: string): string {
 }
 
 /** 「10/2 18:42」 */
-export function formatAt(value: string | null): string {
+export function formatAt(value: string | null, timezone?: string): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  const parts = dateParts(date, timezone)
+  return `${Number(parts.month)}/${Number(parts.day)} ${parts.hour.padStart(2, '0')}:${parts.minute}`
 }
 
 /** 「14:02」 */
-export function formatTime(value: string | null | undefined): string {
+export function formatTime(value: string | null | undefined, timezone?: string): string {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
+  const parts = dateParts(date, timezone)
+  return `${Number(parts.hour)}:${parts.minute}`
 }
 
 /** 「中川 由美」→「中川さん」 */

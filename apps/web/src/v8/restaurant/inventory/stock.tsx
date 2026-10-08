@@ -172,7 +172,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
     const occupied = [...occupiedOf(row)].map((id) => tableById.get(id)).filter((item): item is RestaurantTable => Boolean(item))
     const seats = row.occupied_seats ?? overlapping.reduce((sum, item) => sum + item.guest_count, 0)
     const free = row.freeSeats ?? Math.max(0, totalSeats - seats)
-    return { row, time: slotTimeLabel(row.starts_at), seats, tables: occupied, free, ratio: totalSeats > 0 ? seats / totalSeats : 0 }
+    return { row, time: slotTimeLabel(row.starts_at, store?.timezone), seats, tables: occupied, free, ratio: totalSeats > 0 ? seats / totalSeats : 0 }
   })
 
   const [selectedId, setSelectedId] = useState('')
@@ -252,7 +252,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
       ...(changedDays.length > 0 ? [`${changedDays.map((weekday) => `${WEEKDAY_LABEL[weekday]}曜`).join('・')}の開ける時間`] : []),
       ...(allocChanged ? ['配分'] : []),
     ].join('と') || '保存した内容'
-    setConflict({ who: sanName(who), at: formatTime(at), scope, attemptedAlloc, attemptedHours })
+    setConflict({ who: sanName(who), at: formatTime(at, store?.timezone), scope, attemptedAlloc, attemptedHours })
   }
 
   /* 下の帯の保存：配分（全部の時間帯）→ 開ける時間。どちらかで 409 なら競合の帯。 */
