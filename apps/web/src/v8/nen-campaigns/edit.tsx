@@ -33,6 +33,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { formatNumber } from '@/lib/format'
 import { formatCampaignTiming } from './display'
 import styles from './form.module.css'
+import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 /** きっかけの短い言い方（配信フローの札・日数の選ぶ欄）。 */
 const TRIGGER_SHORT: Record<string, string> = {
@@ -101,7 +102,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const [testing, setTesting] = useState(false)
   const [pendingCount, setPendingCount] = useState<number | null>(null)
   const [insertOpen, setInsertOpen] = useState(false)
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const { selectedAccountId, selectedAccount } = useAccount()
   const staffRole = useStaffRole()
   const canEdit = staffRole === null || canManageRole(staffRole)
@@ -484,13 +485,13 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             <span className={styles.labelNote}>差し込み：友だち情報欄「ペットの名前」・注文の「商品名」</span>
             {canEdit ? <button type="button" className={styles.labelAside} aria-expanded={insertOpen} onClick={() => setInsertOpen((current) => !current)}>{insertOpen ? '差し込みを閉じる' : '差し込む'}</button> : null}
           </span>
-          <textarea
+          <InsertTextField
             id="nen-edit-body"
             ref={bodyRef}
             rows={3}
             value={merged.bodyText}
             readOnly={!canEdit}
-            onChange={(event) => setDraft((previous) => ({ ...previous, bodyText: event.target.value }))}
+            onValueChange={(next) => setDraft((previous) => ({ ...previous, bodyText: next }))}
             aria-label="配信本文"
             className={styles.textarea}
           />
