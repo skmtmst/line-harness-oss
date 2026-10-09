@@ -6,13 +6,6 @@
 
 /* フォルダの列：作るボタンは列の幅いっぱい。 */
 .createWide { width: 100%; }
-.folderNote {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-rml-main-lh);
-  word-break: normal;
-}
 
 /* 数の帯の数字は字の幅どおり（絵どおり。全体の既定は等幅）。 */
 .kpis [data-kpi-number] { font-variant-numeric: proportional-nums; }

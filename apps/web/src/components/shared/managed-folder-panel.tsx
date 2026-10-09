@@ -128,6 +128,15 @@ export function managedFolderOptions(kind: string | null, folders: Folder[], { a
   ]
 }
 
+/** 畳んだ板の folderNav（ListPage の型）に渡す行。並びは列と同じ。 */
+export function managedFolderNavRows(kind: string | null, folders: Folder[], { allId = 'all', unfiledId = 'unfiled' }: { allId?: string; unfiledId?: string } = {}) {
+  return [
+    { id: allId, label: 'すべて' },
+    ...(kind ? folders.map((folder) => ({ id: folder.id, label: folder.name })) : []),
+    ...(kind ? [{ id: unfiledId, label: '未分類' }] : []),
+  ]
+}
+
 /** 行の名前の前の丸に渡すフォルダ。未分類・見つからないフォルダは null（色の無い輪）。 */
 export function folderDotFor(folders: Folder[], folderId: string | null | undefined) {
   if (!folderId) return null
