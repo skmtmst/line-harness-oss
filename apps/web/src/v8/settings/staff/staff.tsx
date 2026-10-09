@@ -1,5 +1,6 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Eye, UserPlus, X } from 'lucide-react'
@@ -757,9 +758,9 @@ function StaffPageHost() {
   const [accountNames, setAccountNames] = useState<Record<string, string>>({})
   const [me, setMe] = useState<StaffMember | null>(null)
   const [audits, setAudits] = useState<AuditEventItem[]>([])
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [roleFilter, setRoleFilter] = useState<AccessRoleBundle | 'all'>('all')
-  const [statusFilter, setStatusFilter] = useState<'active' | 'suspended' | 'all'>('active')
+  const [statusFilter, setStatusFilter] = useListUrlValue<'active' | 'suspended' | 'all'>('statusFilter', 'active')
   const [sort, setSort] = useState('recent')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

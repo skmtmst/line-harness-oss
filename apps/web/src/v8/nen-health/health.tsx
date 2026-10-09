@@ -9,6 +9,7 @@
  * 健康日記はお客さまがマイページで付けるので、ここに変える操作は無い（閲覧のみでも同じ画面）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -61,7 +62,7 @@ export default function HealthV8({
 }) {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const [kpis, setKpis] = useState<NenHealthKpis | null>(null)
-  const [filters, setFilters] = useState<HealthFilters>(EMPTY_FILTERS)
+  const [filters, setFilters] = useListUrlJsonValue<HealthFilters>('filters', EMPTY_FILTERS)
 
   /*
    * 「30日のまとめ」は対象スナップショットとして持つ（今の画面の DEEP-23 と同じ）。

@@ -158,7 +158,7 @@ export default function RewardsTab() {
   const [testBusyId, setTestBusyId] = useState<string | null>(null)
   const [duplicateId, setDuplicateId] = useState<string | null>(null)
   const [menuNotice, setMenuNotice] = useState('')
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
   const [search, setSearch] = useListUrlValue('q', '')
   const [folder, setFolder] = useListUrlValue<Folder>('folder', 'すべて')
   const [publishedOnly, setPublishedOnly] = useState(false)
@@ -250,7 +250,7 @@ export default function RewardsTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 

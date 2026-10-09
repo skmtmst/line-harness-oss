@@ -163,14 +163,14 @@ export default function FriendsListV8() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useListUrlValue('page', 1)
   const [pageSize, setPageSize] = useListUrlValue<PageSize>('pageSize', 20)
-  const [selectedTagId, setSelectedTagId] = useState(directTagId)
-  const [searchInput, setSearchInput] = useState(directQuery)
-  const [searchSubmitted, setSearchSubmitted] = useState(directQuery)
-  const [sortMode, setSortMode] = useState<SortMode>('recent')
-  const [responseFilter, setResponseFilter] = useState<ResponseFilter>('all')
-  const [operatorId, setOperatorId] = useState('')
-  const [scenarioId, setScenarioId] = useState('')
-  const [attentionOnly, setAttentionOnly] = useState(false)
+  const [selectedTagId, setSelectedTagId] = useListUrlValue('tag', '')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [searchSubmitted, setSearchSubmitted] = useListUrlValue('q', '')
+  const [sortMode, setSortMode] = useListUrlValue<SortMode>('sortMode', 'recent')
+  const [responseFilter, setResponseFilter] = useListUrlValue<ResponseFilter>('responseFilter', 'all')
+  const [operatorId, setOperatorId] = useListUrlValue('operatorId', '')
+  const [scenarioId, setScenarioId] = useListUrlValue('scenarioId', '')
+  const [attentionOnly, setAttentionOnly] = useListUrlValue('attentionOnly', false)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [refreshing, setRefreshing] = useState(false)
   const [optionsFailed, setOptionsFailed] = useState(false)
@@ -234,7 +234,7 @@ export default function FriendsListV8() {
   const restoredRef = useRef<string | null>(null)
   const [restoredAccount, setRestoredAccount] = useState<string | null>(null)
   const restored = !accountLoading && Boolean(selectedAccountId) && restoredAccount === selectedAccountId
-  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directTagId !== '' || directQuery !== ''
+  const hasExplicitUrlFilters = ['q', 'tag', 'sortMode', 'responseFilter', 'operatorId', 'scenarioId', 'attentionOnly', 'page', 'pageSize'].some((key) => searchParams.has(key)) || hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directTagId !== '' || directQuery !== ''
   useEffect(() => {
     if (accountLoading || !selectedAccountId || restoredRef.current === selectedAccountId) return
     restoredRef.current = selectedAccountId

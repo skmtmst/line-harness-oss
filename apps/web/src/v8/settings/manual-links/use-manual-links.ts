@@ -2,6 +2,7 @@
 
 /* app/settings/manual-links/use-manual-links.ts から写した（src/v8 は @/app を読めない）。動きは同じ。 */
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { ApiError, api, type ManualLink } from '@/lib/api'
@@ -28,8 +29,8 @@ export function useManualLinks() {
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editingUrl, setEditingUrl] = useState('')
   const [saving, setSaving] = useState(false)
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<StatusFilter>('all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<StatusFilter>('filter', 'all')
   /** 「確かめる」「保存」の失敗。無言にせず、やり直しの手がかりと一緒に残す。 */
   const [actionError, setActionError] = useState('')
 

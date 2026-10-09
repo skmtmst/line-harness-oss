@@ -13,6 +13,7 @@
  * タグ・リッチメニュー・回答フォーム・シナリオのひな形の中身は、入口（app/hq/templates/page.tsx）
  * が今の編集部品を `DefinitionEditor` として渡す（src/v8 から @/app を読まないため）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useRouter } from 'next/navigation'
@@ -145,7 +146,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [definition, setDefinition] = useState<TemplateDefinition>(() => freshDefinition(type))
   const editBaseline = useRef(JSON.stringify({ name, description, definition, folderId }))
   const [selected, setSelected] = useState<string[]>([])
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [accountFolder, setAccountFolder] = useState(ALL_ACCOUNTS)
   const accountFolders = useDistributionFolders(stage === 'accounts' || stage === 'duplicates' || stage === 'result' || stage === 'saved' || folderDistribution !== null)
   /* テンプレートの6種類（店と同じ上のタブ・API-17）。タブを替えたらその種類だけ読む。 */

@@ -136,7 +136,7 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     act(() => { submit.click() })
     await flush()
     expect(createProject).toHaveBeenCalledWith({ name: '新しい案件', description: null })
-    expect(push).toHaveBeenCalledWith('/hq/banners/project?id=p9')
+    expect(push).toHaveBeenCalledWith('/hq/banners?highlight=p9')
   })
 
   it('星を押すとお気に入りを切り替える', async () => {

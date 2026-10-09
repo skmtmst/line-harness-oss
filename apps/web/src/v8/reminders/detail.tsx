@@ -6,6 +6,7 @@
  * 枠は型（PageFrame）。頭の中にタブを持つ形（絵の「板の頭」）は型の頭に無いので、ここで組む。
  * 読む口・操作は今の画面（app/reminders/detail/detail-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -740,7 +741,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [items, setItems] = useState<ReminderDeliveryRun[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   const stepNameByNumber = useMemo(() => Object.fromEntries(steps.map((step) => [step.stepNumber, stepLabel(step)])), [steps])
 
@@ -823,9 +824,9 @@ const RUN_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
 
 function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string; canManage: boolean; initialStatus: '' | ReminderDeliveryRunStatus }) {
   const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>(initialStatus)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [items, setItems] = useState<ReminderDeliveryRun[]>([])
   const [total, setTotal] = useState(0)
@@ -964,10 +965,10 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
   const [error, setError] = useState('')
   const [actioningId, setActioningId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<RegistrantFilter>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<RegistrantFilter>('filter', 'all')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   const load = useCallback(async () => {
     setLoading(true)

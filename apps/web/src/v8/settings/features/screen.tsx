@@ -8,6 +8,7 @@
  * use-feature-settings.ts（写し）に1つだけ置く。見た目だけを型（SettingsPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpDown, Check, ChevronDown, ChevronRight, Eye, GitCompare, Lock, RefreshCw, RotateCcw, Save, TriangleAlert } from 'lucide-react'
@@ -339,7 +340,7 @@ export default function FeatureSettingsScreen() {
   const staffRole = useStaffRole()
   const canManage = staffRole ? canManageRole(staffRole) : true
 
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [compareOpen, setCompareOpen] = useState(false)
   const [reorderOpen, setReorderOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<Set<string> | null>(null)

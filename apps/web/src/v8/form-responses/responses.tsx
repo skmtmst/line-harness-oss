@@ -6,6 +6,7 @@
  * 型（DetailPage）の頭とタブに、左の本文（まとめ／表）と右の列（フォームを編集・CSV・絞り込み・回答の詳細）をはめる。
  * 読み込み・検索・CSV・後処理のやり直しは今の作り（src/app/form-submissions/responses/page.tsx）と同じ口と同じ文。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -142,13 +143,13 @@ function Responses() {
   const [items, setItems] = useState<Submission[]>([])
   const [summary, setSummary] = useState<FormSubmissionSummary | null>(null)
   const [total, setTotal] = useState<number | null>(null)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [formMissing, setFormMissing] = useState(false)
   const [formForbidden, setFormForbidden] = useState(false)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   /* 絵（v0SbYR）は「まとめて見る」が先頭。 */
   const [view, setView] = useState<'rows' | 'summary'>('summary')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -215,7 +216,7 @@ function Responses() {
       return
     }
     if (!selectedAccountId || !formId) return
-    const timer = setTimeout(() => { void load(1, pageSize, query) }, 300)
+    const timer = setTimeout(() => { void load(1, pageSize, query) }, 0)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])

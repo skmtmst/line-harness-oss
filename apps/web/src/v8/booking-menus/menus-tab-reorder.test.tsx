@@ -59,6 +59,7 @@ function Harness({ canEdit = true }: { canEdit?: boolean }) {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/")
   server = [
     { id: 'a', name: 'カット', sort_order: 10, version: 1 },
     { id: 'b', name: 'カラー', sort_order: 20, version: 1 },

@@ -84,7 +84,7 @@ export default function BalancesTab() {
   const [decreasedMiles, setDecreasedMiles] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
   const [search, setSearch] = useListUrlValue('q', '')
   const [offset, setOffset] = useState(0)
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
@@ -174,7 +174,7 @@ export default function BalancesTab() {
     const timer = window.setTimeout(() => {
       setOffset(0)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 

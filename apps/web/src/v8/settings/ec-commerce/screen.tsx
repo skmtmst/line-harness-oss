@@ -170,7 +170,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
   const [recordsSlot, setRecordsSlot] = useState<AccountBound<ImportRecords>>(() => pendingFor(accountId, EMPTY_RECORDS))
   const [pageSlot, setPageSlot] = useState<{ accountId: string | null; page: number }>({ accountId, page: 1 })
   const [query, setQuery] = useListUrlValue('q', '')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useListUrlValue('q', '')
   const [status, setStatus] = useState<ActionTab>('all')
   const [sort, setSort] = useListUrlValue<'newest' | 'oldest'>('sort', 'newest')
   const [retryingSlot, setRetryingSlot] = useState<{ accountId: string | null; id: string | null }>({ accountId, id: null })

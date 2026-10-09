@@ -2,6 +2,7 @@
 
 /* ⑤ 担当スタッフ（VLEaj）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useState } from 'react'
 import Link from 'next/link'
 import { ListChecks, Plus } from 'lucide-react'
@@ -51,7 +52,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   const [pauseTarget, setPauseTarget] = useState<BookingStaff | null>(null)
   const [pausing, setPausing] = useState(false)
   const [pauseError, setPauseError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   const pageCount = Math.max(1, Math.ceil(staff.length / STAFF_PAGE_SIZE))
   const safePage = Math.min(page, pageCount)

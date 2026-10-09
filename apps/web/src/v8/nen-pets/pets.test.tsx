@@ -75,7 +75,7 @@ async function render(tab: PetTab) {
   await settle()
 }
 const buttons = () => Array.from(document.querySelectorAll('button'))
-const byText = (text: string) => buttons().find((b) => b.textContent?.trim() === text)
+const byText = (text: string) => [...document.querySelectorAll<HTMLButtonElement>('button,a')].find((b) => b.textContent?.trim() === text)
 const byLabel = (label: string) => buttons().find((b) => b.getAttribute('aria-label') === label)
 async function click(target: Element | undefined) {
   expect(target).toBeTruthy()
@@ -86,6 +86,7 @@ const listCalls = () => fetchApi.mock.calls.filter(([path]) => String(path).star
 
 describe('V8 マイペット（src/v8/nen-pets）', () => {
   beforeEach(() => {
+    window.history.replaceState(null, "", "/")
     document.documentElement.dataset.theme = 'v8'
     role.value = 'owner'
     fetchApi.mockReset()

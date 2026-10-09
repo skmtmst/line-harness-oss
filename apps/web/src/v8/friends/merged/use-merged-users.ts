@@ -8,6 +8,7 @@
  * v7 の画面と ★V8 の画面（`users-v8.tsx`）が同じ口を使う。
  * 絞り込み・ページ・再計算・CSV はここでだけ変える。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
@@ -25,8 +26,8 @@ export interface UsersAccountOption {
 export function useMergedUsers() {
   const [rows, setRows] = useState<UserRowData[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSizeState] = useState<number>(USERS_PAGE_SIZE)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSizeState] = useListUrlValue<number>('pageSize', USERS_PAGE_SIZE)
   const setPageSize = useCallback((size: number) => {
     setPageSizeState(size)
     setPage(1)

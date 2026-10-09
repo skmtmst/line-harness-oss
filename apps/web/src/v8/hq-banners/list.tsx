@@ -9,6 +9,7 @@
  * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
  * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CircleDot, Folder, Gauge, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
@@ -183,7 +184,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   const [thumbnails, setThumbnails] = useState<Record<string, BannerImage[]>>({})
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [view, setView] = useState<ProjectView>('all')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [sort, setSort] = useState<ProjectSort>('updated')
   const [actionError, setActionError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -488,7 +489,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [view, setView] = useState<LibraryView>('all')
   const [shape, setShape] = useState<ShapeFilter | null>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   /** ページごとの「この日時より前」。1ページ目は null。 */
   const [cursors, setCursors] = useState<Array<string | null>>([null])
   const [nextBefore, setNextBefore] = useState<string | null>(null)

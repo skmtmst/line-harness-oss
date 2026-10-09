@@ -7,6 +7,7 @@
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左のフォルダの列（型のフォルダの列＋共通 FolderPanel。2026-10-08 タグ→フォルダ・API-17）・
  * 数のカード4枚・探す欄と状態の札・カード／表の切り替え・並び・件数・アカウントのカード・件数と注。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { CircleDot, Inbox, LogIn, Plus, RotateCcw, Settings, Star, MessageCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -111,13 +112,13 @@ export default function HqHomeV8() {
   const [connectionProgress, setConnectionProgress] = useState('')
   const [connectionResult, setConnectionResult] = useState('')
 
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [folder, setFolder] = useState<string>(ALL)
   const [view, setView] = useState<View>('cards')
   const [sort, setSort] = useState('friends')
   const [size, setSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [folders, setFolders] = useState<(Folder & { itemCount?: number })[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   /* フォルダの追加・名前と色を変える窓（同じ窓。editing があれば変える）。 */

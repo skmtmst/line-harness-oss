@@ -146,7 +146,7 @@ export default function ScoreTab() {
   const [overview, setOverview] = useState<ActionScoreOverview | null>(null)
   const [filter, setFilter] = useListUrlValue<ActionScoreFilter>('filter', 'all')
   const [sort, setSort] = useListUrlValue<ActionScoreSort>('sort', 'score_desc')
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
   const [search, setSearch] = useListUrlValue('q', '')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)

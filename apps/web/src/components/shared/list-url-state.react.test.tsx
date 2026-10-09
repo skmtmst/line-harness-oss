@@ -217,3 +217,33 @@ it('B-12: スクロール直後に詳細へ移っても最後の位置を覚え�
   expect(window.sessionStorage.getItem('lh:list-scroll:/scenarios')).toBe('615')
   vi.useRealTimers()
 })
+
+it('複数の絞り込み条件をURLへ残し、読み直しても同じ条件で開く', async () => {
+  const { useListUrlJsonValue } = await import('./list-url-state')
+  function Filters() {
+    const [filters, setFilters] = useListUrlJsonValue<string[]>('filters', [])
+    return <><output>{filters.join(',') || 'すべて'}</output><button onClick={() => setFilters(['未承認', '公開中'])}>絞る</button></>
+  }
+  const first = render(<Filters />)
+  await act(async () => { screen.getByRole('button', { name: '絞る' }).click() })
+  flushListUrlState()
+  expect(JSON.parse(new URLSearchParams(window.location.search).get('filters')!)).toEqual(['未承認', '公開中'])
+  first.unmount()
+  render(<Filters />)
+  expect(screen.getByText('未承認,公開中')).toBeTruthy()
+})
+
+it('内部のページ番号が0からでもURLは1から数え、絞り込み変更で先頭へ戻る', async () => {
+  const { useListUrlValue } = await import('./list-url-state')
+  function Page() {
+    const [page, setPage] = useListUrlValue('page', 0)
+    const [, setQuery] = useListUrlValue('q', '')
+    return <><output>{`内部${page}`}</output><button onClick={() => setPage(2)}>3ページ目</button><button onClick={() => setQuery('名前')}>絞る</button></>
+  }
+  render(<Page />)
+  await act(async () => { screen.getByRole('button', { name: '3ページ目' }).click() })
+  flushListUrlState()
+  expect(new URLSearchParams(window.location.search).get('page')).toBe('3')
+  await act(async () => { screen.getByRole('button', { name: '絞る' }).click() })
+  expect(screen.getByText('内部0')).toBeTruthy()
+})

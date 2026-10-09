@@ -88,7 +88,7 @@ export default function HistoryTab() {
   const [pendingReason, setPendingReason] = useState('')
   const [pendingBusy, setPendingBusy] = useState(false)
   const [pendingError, setPendingError] = useState('')
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
   const [search, setSearch] = useListUrlValue('q', '')
   const [grantedOnly, setGrantedOnly] = useState(false)
   const [spentOnly, setSpentOnly] = useState(false)
@@ -155,7 +155,7 @@ export default function HistoryTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 

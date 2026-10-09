@@ -8,6 +8,7 @@
  * データの口（pets・feeding・saveFeeding・updatePet・CSV）は今の画面と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useEffect, useState } from 'react'
 import { Calculator, Download, Eye, History, PawPrint, Sparkles } from 'lucide-react'
@@ -49,7 +50,7 @@ export default function PetsV8({
   const [kpis, setKpis] = useState<NenPetKpis | null>(null)
   const [kpisFailed, setKpisFailed] = useState(false)
   /** 一覧の絞り込み。CSV も同じ条件で書き出す（今の画面と同じ）。 */
-  const [query, setQuery] = useState<PetsQuery>(EMPTY_QUERY)
+  const [query, setQuery] = useListUrlJsonValue<PetsQuery>('query', EMPTY_QUERY)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState(false)
 

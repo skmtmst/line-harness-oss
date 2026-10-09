@@ -6,6 +6,7 @@
  * 端末からの画像のアップロードは、入口の page.tsx が渡す道具（mediaUpload）で行う
  * （src/v8 から @/app を読まないため）。渡されないときは登録メディアから選ぶだけ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, RefreshCw, Send } from 'lucide-react'
 import type { InstagramConnectionStatus, MediaItem } from '@line-crm/shared'
@@ -108,9 +109,9 @@ function instagramFact(ig: NonNullable<GooglePost['instagram']>): string {
 }
 
 export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav }) {
-  const [filter, setFilter] = useState<GooglePostFilter>('all')
+  const [filter, setFilter] = useListUrlValue<GooglePostFilter>('filter', 'all')
   const [kind, setKind] = useState<'all' | GooglePostKind>('all')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [data, setData] = useState<GooglePostListData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')

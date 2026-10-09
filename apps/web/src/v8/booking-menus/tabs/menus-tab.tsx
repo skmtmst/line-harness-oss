@@ -1,5 +1,6 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import TagPill from '@/components/shared/tag-pill'
 
 /* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
@@ -43,8 +44,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   onReload: () => void
 }) {
   const router = useRouter()
-  const [query, setQuery] = useState('')
-  const [page, setPage] = useState(1)
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [page, setPage] = useListUrlValue('page', 1)
   const [historyTarget, setHistoryTarget] = useState<BookingMenu | null>(null)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)

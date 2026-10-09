@@ -4,6 +4,7 @@
  * ★V8-B 会員一覧（AOWoJ）。今の V8 の会員一覧（app/nen/members/members-v8.tsx の MembersTabV8）を
  * 写した。検索・よく使う札・並び・件数・ページ送り・行の「…」は今と同じ口・同じ指定。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
@@ -40,15 +41,15 @@ export default function MembersListV8({
   const router = useRouter()
   const [status, setStatus] = useState<ListStatus>('loading')
   const [data, setData] = useState<NenMemberListData | null>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   /** よく使う札：○○以上（上位2ランク）・ペットあり・EC未連携。 */
   const [chipTopRanks, setChipTopRanks] = useState(false)
   const [chipPet, setChipPet] = useState(false)
   const [chipUnlinked, setChipUnlinked] = useState(false)
   const [rank, setRank] = useState('')
   const [sort, setSort] = useState<NenMemberSort>('annual_desc')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
   const requestRef = useRef(0)
 
   /*

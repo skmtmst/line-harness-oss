@@ -12,6 +12,7 @@
  * 色2つ・参照画像1枚」の古い形で、2026-10-06 のオーナーの決定（切り替えと切り抜きを置かない・出力サイズの小箱・
  * 色4つ・参照画像3枚・強調）と食い違うため、決定どおりの今のパネルを残した。参照画像を選ぶ窓（承認済み ★BG-C）も同じ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
 import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Send, Sparkles, Star, Upload, X } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -91,7 +92,7 @@ function ProjectInner() {
   const [accountsFailed, setAccountsFailed] = useState(false)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [input, setInput] = useState<BannerGenerationInput>(EMPTY_GENERATION_INPUT)
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useListUrlValue<Filter>('filter', 'all')
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [distributionOpen, setDistributionOpen] = useState(false)
   const [distributionAccounts, setDistributionAccounts] = useState<string[]>([])

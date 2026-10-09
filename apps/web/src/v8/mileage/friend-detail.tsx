@@ -114,7 +114,7 @@ function FriendDetailInner() {
   const [pendingError, setPendingError] = useState('')
   const [notificationRetryId, setNotificationRetryId] = useState<string | null>(null)
   const [notificationRetryError, setNotificationRetryError] = useState('')
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
   const [search, setSearch] = useListUrlValue('q', '')
   const [kindFilter, setKindFilter] = useState<'all' | Kind>('all')
   const [period, setPeriod] = useListUrlValue('period', 'all')

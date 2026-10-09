@@ -177,7 +177,7 @@ export default function EarningRulesTab() {
   const [friendTotal, setFriendTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
   const [search, setSearch] = useListUrlValue('q', '')
   const [folder, setFolder] = useListUrlValue<FolderKey>('folder', 'all')
   const [activeOnly, setActiveOnly] = useState(false)

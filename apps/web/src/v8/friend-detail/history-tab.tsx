@@ -4,6 +4,7 @@
  * 履歴タブ（Q5F2QE の 3.）。全部の出来事を時系列で、日ごとに区切って並べる。
  * 受信・送信・システム通知の切り替えは、読んだ行の中で絞る（口は今と同じ1本）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Fragment, useState } from 'react'
 import Link from 'next/link'
 import { CalendarDays, ClipboardList, MailOpen, MessageCircle, Send, ShoppingBag, Tag as TagIcon, Workflow } from 'lucide-react'
@@ -43,7 +44,7 @@ function typeIcon(type: string) {
 }
 
 export default function HistoryTab({ friend, friendId, data }: { friend: FriendDetail; friendId: string; data: FriendDetailState }) {
-  const [filter, setFilter] = useState<TimelineFilter>('all')
+  const [filter, setFilter] = useListUrlValue<TimelineFilter>('filter', 'all')
   const { historyItems, historyStatus, historyNextCursor, historyLoadingMore, historyMoreError } = data
   const rows = historyItems.filter((item) => matchesTimelineFilter(item, filter))
   const complete = !historyNextCursor

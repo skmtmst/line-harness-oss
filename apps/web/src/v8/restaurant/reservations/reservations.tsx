@@ -7,6 +7,7 @@
  * 今日は時間×卓、今週・今月・一覧は予約タイムラインの表。電話の予約は作る型の画面に切り替わる。
  * 口・絞り込み・送る形は今の画面（app/restaurant-test/v8/reservations.tsx）と同じ。動きは BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Lock, Plus } from 'lucide-react'
 import SegmentedControl from '@/components/shared/segmented'
@@ -324,7 +325,7 @@ export default function ReservationsPage() {
   const [day, setDay] = useState<Date>(() => new Date())
   const [period, setPeriod] = useState('upcoming')
   const [status, setStatus] = useState('all')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [source, setSource] = useState('all')
   const [phone, setPhone] = useState<PhonePreset | null>(null)
 

@@ -11,6 +11,7 @@
  * フォルダの列：アフィリエイターを分けて保存する口は無いので、報酬の決め方で
  * 分けた見え方の切り替えとして持つ（保存しない）。
  */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -115,7 +116,7 @@ export default function AffiliatorsTab() {
 
   /* ===== 見せ方 ===== */
   const [query, setQuery] = useListUrlValue('q', '')
-  const [filters, setFilters] = useState<FilterKey[]>([])
+  const [filters, setFilters] = useListUrlJsonValue<FilterKey[]>('filters', [])
   const [group, setGroup] = useState<GroupKey>('all')
   const [sort, setSort] = useListUrlValue<SortKey>('sort', 'conversions')
   const [saved, setSaved] = useState('')

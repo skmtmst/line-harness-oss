@@ -2,6 +2,7 @@
 
 /* app/settings/file-scan/use-file-scan.ts から写した（src/v8 は @/app を読めない）。動きは同じ。 */
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useDeferredValue, useEffect, useState } from 'react'
 import { ApiError, api, type FileScanConfig, type FileScanItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -21,12 +22,12 @@ export function useFileScan() {
   const [phase, setPhase] = useState<FileScanPhase>('loading')
   const [items, setItems] = useState<FileScanItem[]>([])
   const [total, setTotal] = useState(0)
-  const [statusFilter, setStatusFilter] = useState('quarantined')
+  const [statusFilter, setStatusFilter] = useListUrlValue('statusFilter', 'quarantined')
   /** 板 `PfA4o` の札の件数。検索語を含めた今の条件での総数。 */
   const [counts, setCounts] = useState({ quarantined: 0, pending: 0, released: 0 })
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const deferredQuery = useDeferredValue(query)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [actionError, setActionError] = useState('')
   const [actionDone, setActionDone] = useState('')
   const [releaseTarget, setReleaseTarget] = useState<FileScanItem | null>(null)

@@ -10,6 +10,7 @@
  * フォルダの列：案件をフォルダへ入れる口は無いので、成果が出たときの動き
  * （タグ・シナリオ・マイル）で分けた見え方の切り替えとして持つ（保存しない）。
  */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -99,7 +100,7 @@ export default function OffersTab() {
   const [monthlyState, setMonthlyState] = useState<LoadState>('loading')
 
   const [query, setQuery] = useListUrlValue('q', '')
-  const [filters, setFilters] = useState<FilterKey[]>([])
+  const [filters, setFilters] = useListUrlJsonValue<FilterKey[]>('filters', [])
   const [folder, setFolder] = useListUrlValue<FolderKey>('folder', 'all')
   const [sort, setSort] = useListUrlValue<'newest' | 'name' | 'reward'>('sort', 'newest')
   const [saved, setSaved] = useState('')
