@@ -74,12 +74,12 @@ test('215：保存のあとの読み直しが失敗したら知らせ、読み�
 })
 
 
-test('アカウントのフォルダは名前の横から色を選び、色なしはnull、選んだ色はそのまま送る', async () => {
+test('アカウントのフォルダは名前の横から色を選び、新しいフォルダは緑から始まり、選んだ色はそのまま送る', async () => {
   render(<HqHomeV8 />)
   await screen.findAllByText('銀座店')
   fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
   const input = screen.getByRole('textbox', { name: 'フォルダの名前' })
-  const colorButton = screen.getByRole('button', { name: 'フォルダの色：色なし' })
+  const colorButton = screen.getByRole('button', { name: 'フォルダの色：緑' })
   expect(input.closest('[data-folder-name-color]')!.contains(colorButton)).toBe(true)
   fireEvent.change(input, { target: { value: '九州' } })
   fireEvent.click(colorButton)
@@ -90,7 +90,7 @@ test('アカウントのフォルダは名前の横から色を選び、色な�
   fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
   fireEvent.change(screen.getByRole('textbox', { name: 'フォルダの名前' }), { target: { value: '沖縄' } })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '追加する' })) })
-  expect(api.lineAccountFolders.create).toHaveBeenCalledWith({ name: '沖縄', color: null })
+  expect(api.lineAccountFolders.create).toHaveBeenCalledWith({ name: '沖縄', color: '#16a34a' })
 })
 
 
@@ -100,7 +100,9 @@ test('フォルダの「色を変える」から既存色を変えて保存し�
   fireEvent.click(screen.getByRole('button', { name: 'フォルダ「関西」の操作' }))
   fireEvent.click(screen.getByRole('menuitem', { name: '色を変える' }))
   expect(screen.getByRole('textbox', { name: 'フォルダの名前' }).getAttribute('value')).toBe('関西')
-  fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：色なし' }))
+  /* 色の無いフォルダは自動の色から始まる（色なしは選べない・2026-10-09 オーナー） */
+  fireEvent.click(screen.getByRole('button', { name: /^フォルダの色：/ }))
+  expect(screen.queryByRole('radio', { name: '色なし' })).toBeNull()
   fireEvent.click(screen.getByRole('radio', { name: '赤' }))
   vi.mocked(api.lineAccountFolders.list).mockResolvedValue({ success: true, data: { folders: [{ id: 'f1', kind: 'line_account', name: '関西', parentId: null, color: '#ef4444', displayOrder: 1, createdAt: '', updatedAt: '' }], total: 1, unclassifiedCount: 1 } })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })

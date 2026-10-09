@@ -59,4 +59,28 @@ describe('統括の V8 タグ編集と保存先', () => {
     fireEvent.click(screen.getByRole('button', { name: '最新の内容を読み込む' }))
     expect(reload).toHaveBeenCalledTimes(1)
   })
+
+  it('所属フォルダは統括のフォルダ（左の列と同じ）から選べ、その場で作れる。選んだフォルダはひな形にも入れる', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    const save = vi.fn<(definition: TagDefinition, another?: boolean) => Promise<void>>().mockResolvedValue(undefined)
+    const create = vi.fn(async (name: string, color: string | null) => ({ value: 'new', label: name, color }))
+    render(<HqTagEditorV8 definition={{ ...definition, tag: { name: '定期', folderId: null }, folders: [] }}
+      folders={[{ id: 'f-test', name: 'テスト', revision: 1, color: null }, { id: 'f-test1', name: 'テスト1', revision: 1, color: '#ef4444' }]}
+      onCreateFolder={create} editing={false} saving={false} onCancel={() => {}} onSave={save} />)
+    fireEvent.click(screen.getByRole('button', { name: /所属フォルダ/ }))
+    expect(await screen.findByText('テスト')).toBeTruthy()
+    expect(screen.getByText('テスト1')).toBeTruthy()
+    expect(screen.getByText('新しいフォルダを作る')).toBeTruthy()
+    fireEvent.click(screen.getByText('テスト1'))
+    fireEvent.click(screen.getByRole('button', { name: 'タグを作る' }))
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    expect(save.mock.calls[0][0].tag.folderId).toBe('f-test1')
+    expect(save.mock.calls[0][0].folders).toEqual([{ id: 'f-test1', name: 'テスト1', color: '#ef4444' }])
+  })
+
+  it('閲覧のみでは所属フォルダの欄から作れない', () => {
+    document.documentElement.dataset.theme = 'v8'
+    render(<HqTagEditorV8 definition={definition} folders={[{ id: 'f-test', name: 'テスト', revision: 1 }]} onCreateFolder={vi.fn()} readOnly editing={false} saving={false} onCancel={() => {}} onSave={vi.fn(async () => {})} />)
+    expect(screen.queryByText('新しいフォルダを作る')).toBeNull()
+  })
 })

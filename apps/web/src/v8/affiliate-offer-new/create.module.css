@@ -19,8 +19,9 @@
   display: flex; flex-direction: column; gap: var(--tpl-wa-af-card-gap);
   padding: var(--tpl-wa-af-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  outline: 1px solid var(--card-edge); outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .cardHead { display: flex; flex-direction: column; gap: var(--tpl-wa-af-head-gap); }
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-wa-af-title-lh); }
@@ -52,8 +53,9 @@
   display: flex; flex-direction: column; gap: var(--tpl-wa-af-side-gap); align-self: stretch;
   padding: var(--tpl-wa-af-side-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  outline: 1px solid var(--card-edge); outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .sideTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-wa-af-side-title-size); font-weight: 700; line-height: var(--tpl-wa-af-side-title-lh); }
 .sideNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-wa-af-side-note-lh); }

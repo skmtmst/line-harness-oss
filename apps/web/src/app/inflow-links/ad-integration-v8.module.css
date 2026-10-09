@@ -73,10 +73,11 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 0;
   padding: 0;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
   list-style: none;
+  box-shadow: var(--card-shadow);
 }
 
 .kpi {
@@ -137,10 +138,11 @@
 
 /* 段のカード。 */
 .card {
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
   padding: 16px;
+  box-shadow: var(--card-shadow);
 }
 
 .cardHead {
@@ -180,9 +182,10 @@
   gap: 8px;
   min-width: 0;
   padding: 12px 14px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .providerNameRow {
@@ -220,9 +223,10 @@
 .stepCard {
   min-width: 0;
   padding: 12px 14px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas-sunken);
+  box-shadow: var(--card-shadow);
 }
 
 .stepTitle {
@@ -324,9 +328,10 @@
 .tableWrap {
   margin-top: 12px;
   overflow-x: auto;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .table {
