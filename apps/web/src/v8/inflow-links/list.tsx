@@ -825,11 +825,7 @@ export default function InflowListV8({
             </tbody>
           </DataTable>
         </div>
-        <p className={styles.footNote}>
-          {readonly
-            ? '行の「…」から QRコードを表示・URLをコピーできます。'
-            : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}
-        </p>
+
         <BulkBar count={selectedRouteIds.size} hint="まとめて操作できるのは登録済みの経路だけです">
           <Button onClick={() => setBulkAction('pause')}>まとめて止める</Button>
           <Button onClick={() => setBulkAction('resume')}>まとめて再開する</Button>
@@ -850,6 +846,9 @@ export default function InflowListV8({
 
   return (
     <ListPage
+      help={readonly
+            ? '行の「…」から QRコードを表示・URLをコピーできます。'
+            : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}
       boardId="xbHxg"
       headingSize="regular"
       title="流入と計測"

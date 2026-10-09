@@ -3,7 +3,7 @@
 
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 /*
  * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：
@@ -1463,11 +1463,6 @@ export default function AutoRepliesListV8() {
           </Button>
         </div>
       ) : null}
-
-      <p className={styles.footNote}>
-        □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。
-      </p>
-
     </>
   )
 
@@ -1537,10 +1532,9 @@ export default function AutoRepliesListV8() {
               </div>
   )
   const savedBox = (
-              <div className={styles.savedBox}>
-              <Bookmark size={14} aria-hidden="true" className={styles.savedIcon} />
               <Select
                 aria-label="よく使う絞り込み"
+                icon={<Bookmark size={14} aria-hidden="true" />}
                 value={savedFilter}
                 onChange={(value) => {
                   if (value === 'toggle-zero') setZeroThisMonthOnly(!zeroThisMonthOnly)
@@ -1554,7 +1548,6 @@ export default function AutoRepliesListV8() {
                   ...((conflictCount ?? 0) > 0 || conflictOnly ? [{ value: 'toggle-conflict', label: conflictOnly ? '重なりの絞り込みを外す' : '重なりありで絞り込む' }] : []),
                 ]}
               />
-              </div>
   )
   const perPageBox = (
               <div data-per-page-select>
@@ -1627,7 +1620,7 @@ export default function AutoRepliesListV8() {
       <div className={styles.narrowRow}>
         {filterChips}
         {sortBox}
-        <div className={styles.savedIconOnly} title="よく使う絞り込み">{savedBox}</div>
+        <ListToolbarOptional compact label="よく使う絞り込み">{savedBox}</ListToolbarOptional>
       </div>
     </div>
   )
@@ -1635,7 +1628,7 @@ export default function AutoRepliesListV8() {
   return (
     <ListPage boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
         自動応答
-      </>} description={<>
+      </>} help="□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。" description={<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
       </>}
       stats={<>
@@ -1891,7 +1884,7 @@ export default function AutoRepliesListV8() {
             trailing={<>
               {/* 絵 uE9gf：「並び：評価順」（合格したリマインダ一覧と同じ並びの部品）→ 印つきの「よく使う絞り込み」→ 件数。 */}
               {sortBox}
-              {savedBox}
+              <ListToolbarOptional label="よく使う絞り込み">{savedBox}</ListToolbarOptional>
               {perPageBox}
             </>}
           />

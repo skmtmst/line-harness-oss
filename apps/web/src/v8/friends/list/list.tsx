@@ -534,7 +534,7 @@ export default function FriendsListV8() {
   ] as const
 
   const statsBand = (
-    <KpiBand className={styles.kpiBand} data-design="V8FriendKpis">
+    <KpiBand data-design="V8FriendKpis">
       {kpis.map((kpi) => (
         <KpiCard
           key={kpi.key}

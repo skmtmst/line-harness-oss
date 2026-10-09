@@ -195,7 +195,7 @@ export function overviewBandCells(args: {
 
 export function WebhookBand({ cells }: { cells: BandCell[] }) {
   return (
-    <div className={styles.stats}>
+    <div>
     <KpiBand aria-label="外部連携の数の帯">
       {cells.map((cell) => (
         <KpiCard

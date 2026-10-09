@@ -315,6 +315,7 @@ export default function WebhooksApiTokensV8() {
 
   return (
     <ListPage
+      help="行の「…」から止める。止めても、すでに付けたタグは残ります。"
       boardId="ralAc"
       headingSize="regular"
       title="外部連携"
@@ -574,7 +575,6 @@ export default function WebhooksApiTokensV8() {
                 })}
               </div>
             </ContextMenu>
-            <p className={styles.footNote}>行の「…」から止める。止めても、すでに付けたタグは残ります。</p>
           </>
         ) : null}
       </div>

@@ -18,11 +18,8 @@
   line-height: var(--tpl-tabs-text-lh);
 }
 
-/* 数の帯。 */
-:global([data-theme='v8']) .band[data-kpi-presentation='band'] {
-  border-block-width: 0;
-  box-shadow: var(--tpl-nph-band-top-line);
-}
+/* 数の帯の境目は共通の型と帯に任せる。画面側で線・影を重ねない。 */
+
 .kpiMenu {
   display: inline-flex;
   align-items: center;

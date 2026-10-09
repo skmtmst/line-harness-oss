@@ -954,7 +954,6 @@ function WebinarList() {
             </tbody>
           </DataTable>
         </div>
-        <p className={styles.footNote}>行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。</p>
       </>
     )
   }
@@ -972,6 +971,7 @@ function WebinarList() {
 
   return (
     <ListPage
+      help="行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"
       boardId="UyUMw"
       headingSize="regular"
       title="ウェビナー"

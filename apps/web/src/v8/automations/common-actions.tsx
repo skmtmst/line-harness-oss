@@ -359,11 +359,6 @@ export default function CommonActionsV8() {
             </tbody>
           </DataTable>
         </div>
-        <p className={styles.footNote}>
-          {canEdit
-            ? '行の「…」から 版と使われている場所を見る・下書きの中身を編集・複製・保管。'
-            : '行の「…」から 版と使われている場所を見る。'}
-        </p>
       </>
     )
   }
@@ -383,6 +378,9 @@ export default function CommonActionsV8() {
 
   return (
     <ListPage
+      help={canEdit
+            ? '行の「…」から 版と使われている場所を見る・下書きの中身を編集・複製・保管。'
+            : '行の「…」から 版と使われている場所を見る。'}
       boardId="LnGNw"
       headingSize="regular"
       title="オートメーション"

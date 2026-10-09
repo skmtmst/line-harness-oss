@@ -111,7 +111,7 @@ export default function PetsV8({
           <span>閲覧のみで見ています。ペットの情報や主食を変える操作は管理者に頼んでください。</span>
         </div>
       ) : null}
-      <KpiBand data-design="KPIs" className={styles.band} aria-label="ペットの数の帯">
+      <KpiBand data-design="KPIs" aria-label="ペットの数の帯">
         <KpiCard presentation="band" title="登録ペット" icon={<History size={13} aria-hidden="true" />} menu={menu('登録ペット')} value={pending ? null : kpis.total} unit="匹" loading={pending && !kpisFailed} detail={pending ? missing : `犬 ${kpis.dogs}・猫 ${kpis.cats}・その他 ${Math.max(0, kpis.total - kpis.dogs - kpis.cats)}`} />
         <KpiCard presentation="band" title="今月の新規" icon={<Sparkles size={13} aria-hidden="true" />} menu={menu('今月の新規')} value={pending ? null : kpis.newThisMonth} unit="匹" loading={pending && !kpisFailed} detail="1日から今日まで" />
         <KpiCard presentation="band" title="目安を出せる" icon={<Calculator size={13} aria-hidden="true" />} menu={menu('目安を出せる')} value={pending ? null : kpis.computable} unit="匹" loading={pending && !kpisFailed} detail="犬・猫で体重と主食がそろっている" />

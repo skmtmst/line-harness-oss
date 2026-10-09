@@ -229,7 +229,9 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   return (
     <PageFrame kind="list" boardId="uNsEy">
       <DetailHead {...chrome} current="participants" actions={csvButton} />
-      <ListPageBody
+      <ListPageBody listHelp={<> 名前から友だちの詳細、「チャットを見る」からトークを開きます。
+            {rule ? ` 視聴完了＝動画の9割（${fmtSec(rule.completionThresholdSeconds)}）以上を見た人。` : ''}
+            {measurement?.state === 'unavailable' ? ` ${measurement.reason}。個人の分類は「計測外」になります。` : ''} </>}
         stats={<>
           {analyticsState === 'error' ? (
             <div className={styles.statsNotice}>
@@ -274,11 +276,6 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
               <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="参加者一覧のページ送り" />
             </ListPagePagination>
           ) : null}
-          <p className={styles.footNote}>
-            名前から友だちの詳細、「チャットを見る」からトークを開きます。
-            {rule ? ` 視聴完了＝動画の9割（${fmtSec(rule.completionThresholdSeconds)}）以上を見た人。` : ''}
-            {measurement?.state === 'unavailable' ? ` ${measurement.reason}。個人の分類は「計測外」になります。` : ''}
-          </p>
         </>}
       >
         {body}

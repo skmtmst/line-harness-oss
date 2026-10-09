@@ -342,16 +342,14 @@ export default function ReportTab() {
   ) : (
     <>
       {table}
-      <p className={styles.footNote}>
-        {view === 'affiliate'
-          ? '行を押すと、その人の成果の明細（いつ・どの案件・いくら）を開きます。CSV は今の期間・今の並びで書き出します。'
-          : '案件ごとの成果・売上・報酬です。CSV は今の期間・今の並びで書き出します。'}
-      </p>
     </>
   )
 
   return (
     <AffiliateFrame
+      help={view === 'affiliate'
+          ? '行を押すと、その人の成果の明細（いつ・どの案件・いくら）を開きます。CSV は今の期間・今の並びで書き出します。'
+          : '案件ごとの成果・売上・報酬です。CSV は今の期間・今の並びで書き出します。'}
       actions={<Button onClick={exportCsv} disabled={!ready || shown.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
       stats={stats}
       toolbar={toolbar}

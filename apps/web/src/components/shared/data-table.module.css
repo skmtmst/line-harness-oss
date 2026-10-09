@@ -112,6 +112,7 @@
 [data-theme='v8'] .frame {
   border: 0;
   border-radius: 0;
+  --color-divider: var(--color-hairline);
 }
 
 /*

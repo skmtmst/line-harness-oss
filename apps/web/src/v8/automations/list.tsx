@@ -564,11 +564,6 @@ export default function AutomationListV8() {
             </tbody>
           </DataTable>
         </div>
-        <p className={styles.footNote}>
-          {canEdit
-            ? '行の「…」から 編集・複製・1人で試す・止める・動いた記録を見る・削除。'
-            : '行の「…」から 動いた記録を見る。'}
-        </p>
       </>
     )
   }
@@ -584,6 +579,9 @@ export default function AutomationListV8() {
 
   return (
     <ListPage
+      help={canEdit
+            ? '行の「…」から 編集・複製・1人で試す・止める・動いた記録を見る・削除。'
+            : '行の「…」から 動いた記録を見る。'}
       boardId={narrow ? 'En14p' : viewerOnly ? 'nH9L8' : 'LWQXd'}
       headingSize="regular"
       title="オートメーション"

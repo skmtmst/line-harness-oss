@@ -1,5 +1,7 @@
 'use client'
 
+import HelpTip from '@/components/shared/help-tip'
+
 /*
  * ★V8 Googleビジネス 口コミ（一覧 `j0Wcg`・返信を作る `x9HIR`・公開の確認 `xSudF`）。
  * 口（一覧・絞り込み・並び・同期・下書き作成・保存・公開）は今の画面と同じ。
@@ -144,6 +146,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         <Stat size="small" label="Google経由の予約" value="—" note="この30日" help="予約の連携サービスと結ぶと数えます。いまは取れないので「—」です。" />
       </StatRow>
       <div className={styles.toolbar}>
+        <HelpTip label="一覧の操作の説明">返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</HelpTip>
         <span className={styles.search}>
           <SearchField placeholder="口コミを探す" aria-label="口コミを探す" value={search} onChange={setSearch} onClear={() => setSearch('')} />
         </span>
@@ -209,7 +212,6 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
       {list && pageCount > 1 ? (
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${list.total}件 ・ 新着と未返信は別に管理`} />
       ) : null}
-      <p className={styles.footNote}>返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</p>
     </>
   )
 }

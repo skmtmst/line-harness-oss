@@ -18,12 +18,7 @@
   line-height: var(--tpl-tabs-text-lh);
 }
 
-/* 数の帯（絵：タブの直下・高さ115。上の線は場所を取らない内側の影。下の線は型の段が持つ）。 */
-:global([data-theme='v8']) .band[data-kpi-presentation='band'] {
-  border-block-width: 0;
-  box-shadow: var(--tpl-nc-band-top-line);
-}
-
+/* 数の帯の境目は共通の型と帯に任せる。画面側で線・影を重ねない。 */
 /* 閲覧のみの帯（数の帯の上）。 */
 .viewerBand {
   display: flex;

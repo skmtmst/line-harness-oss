@@ -884,7 +884,6 @@ export default function EarningRulesTab() {
   ) : (
     <>
       {table}
-      <p className={styles.footNote}>行の「…」から 編集・止める・複製・この決めごとの履歴を見る。</p>
     </>
   )
 
@@ -899,6 +898,7 @@ export default function EarningRulesTab() {
 
   return (
     <MileageFrame
+      help="行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
           <Download size={15} aria-hidden="true" /> CSV で書き出す

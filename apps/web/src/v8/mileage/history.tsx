@@ -435,12 +435,12 @@ export default function HistoryTab() {
         </span>
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading} /> : null}
       </div>
-      <p className={styles.footNoteFlush}>行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。</p>
     </>
   ) : undefined
 
   return (
     <MileageFrame
+      help="行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。"
       actions={<div className={styles.headActions}>
         <Button onClick={exportCsv} disabled={!canExport}>
           <Download size={15} aria-hidden="true" /> CSV で書き出す

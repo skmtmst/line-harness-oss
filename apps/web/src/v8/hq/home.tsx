@@ -578,7 +578,7 @@ export default function HqHomeV8() {
         <span className={styles.range}>
           {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)}件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)}件`}
         </span>
-        <p className={styles.footNote}>カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。</p>
+
         {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="アカウントのページ送り" /> : null}
       </div>
     </>
@@ -588,6 +588,7 @@ export default function HqHomeV8() {
     <ListPage
       boardId="JKjsE"
       title="統括のアカウント"
+      help="カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"
       description={`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}
       folders={folderColumn}
       folderInset

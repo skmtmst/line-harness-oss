@@ -32,9 +32,6 @@
   white-space: nowrap;
 }
 
-/* 数の帯：上の線はタブの線が持つ（二重にしない）。 */
-:global([data-theme='v8']) .kpiBand[data-kpi-strip][data-kpi-presentation='band'] { border-block-width: 0; }
-
 .delta {
   display: inline-flex;
   align-items: center;

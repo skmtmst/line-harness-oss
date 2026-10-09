@@ -250,7 +250,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
           <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
         </div>
       ) : null}
-      <KpiBand data-design="KPIs" className={styles.band}>
+      <KpiBand data-design="KPIs">
         <KpiCard presentation="band" title="自動配信" icon={<History size={13} aria-hidden="true" />} help="注文・発送・誕生日などのきっかけで送る配信の数です。" value={settings.length === 0 && loading ? null : autoSettings.length} unit="件" detail={settings.length === 0 && loading ? kpiMissing : `動いている ${enabledCount}・止めている ${pausedCount}`} />
         <KpiCard presentation="band" title="今月送った" icon={<CircleHelp size={13} aria-hidden="true" />} help="今月（日本時間の月初から）送った通数です。" value={kpis?.sentThisMonth ?? null} unit={kpis?.sentThisMonth == null ? '' : '通'} detail={sentDiff == null ? kpiMissing : `先月より ${sentDiff >= 0 ? '+' : ''}${formatNumber(sentDiff)}`} />
         <KpiCard presentation="band" title={tab === 'history' ? '取得不可' : '開封（コラムを開いた割合）'} icon={<CircleHelp size={13} aria-hidden="true" />} help={tab === 'history' ? '配信ごとの開封は LINE から取れません。数はコラムの記事を開いた割合です。' : 'コラムの記事を開いた割合です。自動配信は LINE から一人ずつの開封を取れません。'} value={kpis?.openRate ?? null} unit={kpis?.openRate == null ? '' : '%'} detail={kpis ? openDetail : kpiMissing} />
