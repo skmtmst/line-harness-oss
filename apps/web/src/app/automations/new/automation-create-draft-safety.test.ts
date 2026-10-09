@@ -7,7 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { selectOptionIn } from '../../../test-utils/select-helpers'
 
 /**
- * ルールを作る（★V6 `Rv8Jv`）の実挙動試験（#679）。
+ * ルールを作る（★V8 `M4torY`）の実挙動試験（#679）。
  *
  * Next.js で本物の画面を描き、ブラウザ操作で N-357〜N-359 を再現する。
  * ソース文字列ではなく、**画面から送られたリクエストと画面に出た文字**で判定する。
@@ -470,20 +470,21 @@ async function preparePageIn(context: BrowserContext, options: { storedDrafts?: 
 async function settle(page: Page, describe: () => string, path = '/automations/new'): Promise<void> {
   await page.goto(`${webOrigin}${path}`, { waitUntil: 'domcontentloaded' })
   await waitUntil(
-    () => page.locator('#au-name').isVisible({ timeout: 200 }).catch(() => false),
+    () => page.locator('#v8-rule-name').isVisible({ timeout: 200 }).catch(() => false),
     () => `入力欄が表示されませんでした（URL: ${page.url()}、${describe()}）`,
   )
+  expect(await page.locator('html').getAttribute('data-theme')).toBe('v8')
   // 再開（?draft=）の読み込み中は保存できないので、押せるようになるまで待つ。
   await waitUntil(
-    () => page.getByRole('button', { name: '下書きを保存する' }).isEnabled({ timeout: 200 }).catch(() => false),
+    () => page.getByRole('button', { name: '下書きを保存', exact: true }).isEnabled({ timeout: 200 }).catch(() => false),
     () => `保存ボタンが使える状態になりませんでした（URL: ${page.url()}、${describe()}）`,
   )
   if (path.includes('?draft=')) {
     // 押せる瞬間と読み込み完了の間に隙間があるので、再開の完了も明示的に待つ。
-    await page.getByText('保存した下書きを読み込みました。続きを直せます。').waitFor()
+    await page.getByText('保存した下書きを読み込みました。続きを直せます。').last().waitFor()
   }
   await page.waitForTimeout(500)
-  if (new URL(page.url()).pathname !== '/automations/new' || !(await page.locator('#au-name').isVisible())) {
+  if (new URL(page.url()).pathname !== '/automations/new' || !(await page.locator('#v8-rule-name').isVisible())) {
     throw new Error(`画面が安定しませんでした（URL: ${page.url()}、${describe()}、本文: ${(await page.locator('body').innerText()).slice(0, 1_000)}）`)
   }
 }
@@ -492,8 +493,9 @@ async function openPage(options: {
   storedDrafts?: StoredDrafts
   slowCreate?: boolean
   slowTest?: boolean
+  knownDrafts?: MockDraft[]
 } = {}): Promise<{ page: Page; api: MockApi }> {
-  const context = await browser.newContext()
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   contexts.add(context)
   const page = await preparePageIn(context, options)
   const api = await attachApiMock(page, options)
@@ -505,7 +507,7 @@ async function openWorkerPage(
   options: { slowTest?: boolean; beforeTest?: (worker: WorkerHarness) => void } = {},
 ): Promise<{ page: Page; context: BrowserContext; worker: WorkerHarness }> {
   const worker = await startWorker(options)
-  const context = await browser.newContext()
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   contexts.add(context)
   const page = await preparePageIn(context)
   await attachWorkerApi(page, worker, {
@@ -529,29 +531,70 @@ async function openSecondTab(context: BrowserContext, worker: WorkerHarness, sto
  * 共通 Select（button＋listbox の自前実装）を選ぶ操作は、共有の
  * `selectOptionIn`（`src/test-utils/select-helpers.ts`）へ寄せる。
  * Playwright の `selectOption` は素の `<select>` 専用なので使わない。
- * なお上部の LINEアカウント切り替えは素の `<select>` のままなので、
- * あちらは `selectOption` のまま使う。
+ * V8の上部のアカウント切り替えも、見えているボタンと一覧から操作する。
  */
+async function requestAccountSwitch(page: Page, accountId: string) {
+  const name = accountId === ACCOUNT_A ? '店舗A' : '店舗B'
+  await page.getByRole('button', { name: 'アカウントを切り替える' }).click()
+  await page.getByRole('menu', { name: 'LINEアカウントの切り替え' })
+    .getByRole('menuitemradio', { name, exact: true }).click()
+}
+
+async function switchAccount(page: Page, accountId: string) {
+  await requestAccountSwitch(page, accountId)
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('lh_selected_account'))).toBe(accountId)
+}
+
+/** V8は行の「…」から中身を直す窓を開く。入力を隠したまま保存しない。 */
+async function editFirstAction(page: Page) {
+  await page.getByRole('button', { name: /^1つめのすること「.+」の操作$/ }).click()
+  await page.getByRole('menuitem', { name: '中身を直す' }).click()
+  const dialog = page.getByRole('dialog', { name: '1つめのすること', exact: true })
+  await dialog.waitFor()
+  return dialog
+}
+
+async function closeActionEditor(page: Page) {
+  // V8の窓はEscでも入力を保ったまま閉じる。
+  await page.keyboard.press('Escape')
+  await page.getByRole('dialog', { name: '1つめのすること', exact: true }).waitFor({ state: 'hidden' })
+}
+
 async function fillTagRule(page: Page, name: string) {
-  await page.locator('#au-name').fill(name)
-  const current = await page.getByLabel('自動化で付けるタグ').innerText().catch(() => '')
+  await page.locator('#v8-rule-name').fill(name)
+  const dialog = await editFirstAction(page)
+  const current = await dialog.getByLabel('自動化で付けるタグ').innerText()
   if (!current.includes('VIP')) {
     await selectOptionIn(page, '自動化で付けるタグ', 'VIP')
   }
+  await closeActionEditor(page)
 }
 
 async function fillMessageRule(page: Page, name: string, message: string) {
-  await page.locator('#au-name').fill(name)
-  const current = await page.getByLabel('すること').innerText().catch(() => '')
+  await page.locator('#v8-rule-name').fill(name)
+  const dialog = await editFirstAction(page)
+  const current = await dialog.getByLabel('すること', { exact: true }).innerText()
   if (!current.includes('メッセージを送る')) {
-    await selectOptionIn(page, 'すること', 'メッセージを送る')
+    await dialog.getByLabel('すること', { exact: true }).click()
+    // 選択候補は窓の外の共通ポータルへ出る。
+    await page.getByRole('listbox').getByRole('button', { name: 'メッセージを送る', exact: true }).click()
   }
-  await page.locator('textarea').fill(message)
+  await dialog.getByLabel('送る文面').fill(message)
+  await closeActionEditor(page)
 }
 
 async function saveDraft(page: Page) {
-  await page.getByRole('button', { name: '下書きを保存する' }).click()
-  await page.getByText('下書きに保存しました。見込み人数を確認して、1人で試せます。').waitFor()
+  const accountId = await page.evaluate(() => localStorage.getItem('lh_selected_account'))
+  // 前回の保存通知ではなく、この操作の更新応答が返ったことを待つ。
+  await Promise.all([
+    page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'PUT' && url.pathname.startsWith('/api/automation-drafts/')
+        && url.searchParams.get('account_id') === accountId && response.ok()
+    }),
+    page.getByRole('button', { name: '下書きを保存', exact: true }).click(),
+  ])
+  await page.getByText('下書きに保存しました。見込み人数を確認して、1人で試せます。').last().waitFor()
 }
 
 async function storedDraftsOf(page: Page): Promise<StoredDrafts> {
@@ -560,18 +603,18 @@ async function storedDraftsOf(page: Page): Promise<StoredDrafts> {
 
 async function openTestConfirmation(page: Page, friendId: string) {
   await page.getByLabel('1人テストの友だちID').fill(friendId)
-  await page.getByRole('button', { name: '1人で試す' }).click()
+  await page.getByRole('button', { name: '1人で試す', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '1人テストの確認' })
   await dialog.waitFor()
   return dialog
 }
 
-describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
+describe('V8 ルールを作る（M4torY）の誤操作防止（#679）', () => {
   it('遅い新規保存を連打しても1件だけ作り、再読込・戻るでも同じ下書きを更新する', async () => {
     const { page, api } = await openPage({ slowCreate: true })
     await fillTagRule(page, '来店後フォロー')
 
-    const save = page.getByRole('button', { name: '下書きを保存する' })
+    const save = page.getByRole('button', { name: '下書きを保存', exact: true })
     await save.evaluate((element) => {
       const button = element as HTMLButtonElement
       button.click()
@@ -580,7 +623,7 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     await waitUntil(() => api.createCalls.length === 1, '新規下書きAPIが呼ばれませんでした')
     expect(await save.isDisabled()).toBe(true)
     api.releaseCreate()
-    await page.getByText('下書きに保存しました。見込み人数を確認して、1人で試せます。').waitFor()
+    await page.getByText('下書きに保存しました。見込み人数を確認して、1人で試せます。').last().waitFor()
     expect(api.createCalls).toHaveLength(1)
     expect(api.updateCalls).toHaveLength(1)
     expect(api.updateCalls[0]?.pathname).toBe('/api/automation-drafts/draft-account-a-1')
@@ -589,18 +632,18 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
 
     // 保存後はURLに `?draft=` が載る。再読込はその番号で再開し、同じ下書きを更新する。
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await page.locator('#au-name').waitFor()
-    await page.getByText('保存した下書きを読み込みました。続きを直せます。').waitFor()
+    await page.locator('#v8-rule-name').waitFor()
+    await page.getByText('保存した下書きを読み込みました。続きを直せます。').last().waitFor()
     await fillTagRule(page, '再読込後の更新')
     await saveDraft(page)
     expect(api.createCalls).toHaveLength(1)
     expect(api.updateCalls).toHaveLength(2)
 
-    await page.getByRole('button', { name: 'キャンセル' }).click()
+    await page.getByRole('link', { name: 'キャンセル', exact: true }).click()
     await page.waitForURL(`${webOrigin}/automations`)
     await page.goBack({ waitUntil: 'domcontentloaded' })
-    await page.locator('#au-name').waitFor()
-    await page.getByText('保存した下書きを読み込みました。続きを直せます。').waitFor()
+    await page.locator('#v8-rule-name').waitFor()
+    await page.getByText('保存した下書きを読み込みました。続きを直せます。').last().waitFor()
     await fillTagRule(page, '戻った後の更新')
     await saveDraft(page)
     expect(api.createCalls).toHaveLength(1)
@@ -621,10 +664,10 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     expect(firstKey).toEqual(expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/))
 
     // 一覧へ戻って、もう一度素の /automations/new へ。前の下書き番号はURLに載らない。
-    await page.getByRole('button', { name: 'キャンセル' }).click()
+    await page.getByRole('link', { name: 'キャンセル', exact: true }).click()
     await page.waitForURL(`${webOrigin}/automations`)
     await page.goto(`${webOrigin}/automations/new`, { waitUntil: 'domcontentloaded' })
-    await page.locator('#au-name').waitFor()
+    await page.locator('#v8-rule-name').waitFor()
     await fillTagRule(page, '二つ目のルール')
     await saveDraft(page)
 
@@ -636,7 +679,7 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     expect(api.updateCalls.at(-1)?.pathname).toBe('/api/automation-drafts/draft-account-a-2')
   }, 60_000)
 
-  it('遅延保存中に店舗を往復しても、既存下書きと新規下書きを取り違えない', async () => {
+  it('遅延保存中の切替を止め、保存後に店舗を往復しても下書きを取り違えない', async () => {
     const { page, api } = await openPage({
       storedDrafts: { [ACCOUNT_A]: { id: 'existing-a', draftVersionId: 'existing-version-a' } },
       knownDrafts: [{
@@ -657,30 +700,33 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
      * 「保存した下書きを開く」で明示して初めて existing-a の再開になる。
      */
     await page.getByRole('button', { name: '保存した下書きを開く' }).click()
-    await page.getByText('保存した下書きを読み込みました。続きを直せます。').waitFor()
-    expect(await page.locator('#au-name').inputValue()).toBe('既存Aの下書き')
+    await page.getByText('保存した下書きを読み込みました。続きを直せます。').last().waitFor()
+    expect(await page.locator('#v8-rule-name').inputValue()).toBe('既存Aの下書き')
 
-    await page.getByLabel('LINEアカウント').selectOption(ACCOUNT_B)
+    await switchAccount(page, ACCOUNT_B)
     await page.waitForTimeout(50)
     await fillTagRule(page, '遅延中の新規B')
-    await page.getByRole('button', { name: '下書きを保存する' }).click()
+    await page.getByRole('button', { name: '下書きを保存', exact: true }).click()
     await waitUntil(() => api.createCalls.length === 1, '店舗Bの新規下書きAPIが呼ばれませんでした')
 
-    // Bの保存応答を待たずAへ戻す。遅いBの応答をAの状態へ混ぜてはいけない。
-    await page.getByLabel('LINEアカウント').selectOption(ACCOUNT_A)
+    // V8は保存中の店舗切替を止める。Bの応答をAへ混ぜない。
+    await requestAccountSwitch(page, ACCOUNT_A)
+    expect(await page.evaluate(() => localStorage.getItem('lh_selected_account'))).toBe(ACCOUNT_B)
+    expect(await page.getByRole('button', { name: '下書きを保存', exact: true }).isDisabled()).toBe(true)
     api.releaseCreate()
     await waitUntil(() => api.updateCalls.some((call) => call.pathname === '/api/automation-drafts/draft-account-b-1'), '店舗Bの保存が終わりませんでした')
-    await waitUntil(() => page.getByRole('button', { name: '下書きを保存する' }).isEnabled({ timeout: 200 }).catch(() => false), '保存中の状態が終わりませんでした')
+    await waitUntil(() => page.getByRole('button', { name: '下書きを保存', exact: true }).isEnabled({ timeout: 200 }).catch(() => false), '保存中の状態が終わりませんでした')
 
+    await switchAccount(page, ACCOUNT_A)
     await page.getByLabel('1人テストの友だちID').fill('friend-a')
-    expect(await page.getByRole('button', { name: '1人で試す' }).isEnabled()).toBe(true)
+    expect(await page.getByRole('button', { name: '1人で試す', exact: true }).isEnabled()).toBe(true)
     await fillTagRule(page, '既存Aを更新')
     await saveDraft(page)
     expect(api.createCalls).toHaveLength(1)
     expect(api.updateCalls.at(-1)?.pathname).toBe('/api/automation-drafts/existing-a')
 
     // Bへ戻っても、遅延保存で作ったBの下書きを再利用する。
-    await page.getByLabel('LINEアカウント').selectOption(ACCOUNT_B)
+    await switchAccount(page, ACCOUNT_B)
     await page.waitForTimeout(50)
     await fillTagRule(page, 'Bへ戻って更新')
     await saveDraft(page)
@@ -694,7 +740,7 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     await saveDraft(page)
 
     // 保存後の未保存編集は、実際に送られる確認内容へ混ぜない。
-    await page.locator('textarea').fill('まだ保存していない文面')
+    await fillMessageRule(page, '予約返信', 'まだ保存していない文面')
     const dialog = await openTestConfirmation(page, 'friend-001')
     expect(api.testCalls).toHaveLength(0)
 
@@ -724,14 +770,13 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
       operationKey: expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/),
     })
     api.releaseTest()
-    await page.getByText('1人テストを受け付けました（受け付け済み）。結果は下の実行から確認できます。').waitFor()
+    await page.getByText('1人テストを受け付けました（受け付け済み）。結果は下の実行から確認できます。').last().waitFor()
     expect(api.testCalls).toHaveLength(1)
   }, 60_000)
 
   it('タグきっかけは、付いたとき・外れたときを画面操作で選べる説明になっている', async () => {
-    const { page } = await openPage()
-    await page.getByRole('button', { name: 'タグが付いた・外れたとき' }).click()
-    await page.getByText('選んだタグが付いたとき・外れたときに動きます。下でどちらかを選びます。').waitFor()
+    const { page, api } = await openPage()
+    await page.getByRole('radio', { name: /タグが付いた・外れたとき/ }).check()
     const action = page.getByLabel('付いたとき・外れたとき')
     await action.click()
     const listbox = page.getByRole('listbox')
@@ -739,10 +784,16 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     expect(await listbox.getByRole('option').allTextContents()).toEqual(['付いたとき', '外れたとき'])
     await listbox.getByRole('button', { name: '外れたとき' }).click()
     await expect.poll(async () => action.innerText(), { timeout: 10_000 }).toContain('外れたとき')
+    await selectOptionIn(page, 'きっかけのタグ', 'VIP')
+    await fillTagRule(page, 'タグが外れたときのルール')
+    await saveDraft(page)
+    expect(api.updateCalls.at(-1)?.body).toMatchObject({
+      eventType: 'tag_change', triggerConfig: { tagId: 'tag-vip', action: 'remove' },
+    })
   }, 60_000)
 })
 
-describe('V6 ルールを作る（Rv8Jv）を本物のWorkerに繋いだときの1人テスト（#679）', () => {
+describe('V8 ルールを作る（M4torY）を本物のWorkerに繋いだときの1人テスト（#679）', () => {
   it('別タブが下書きを書き換えたら、確認したときの中身と違うので送らない', async () => {
     const { page, context, worker } = await openWorkerPage()
     await fillMessageRule(page, '予約返信', '最初の文面です。')
@@ -770,7 +821,7 @@ describe('V6 ルールを作る（Rv8Jv）を本物のWorkerに繋いだとき�
     expect(JSON.stringify(afterOther.actions)).toContain('別タブが書き換えた文面です。')
 
     await dialog.getByRole('button', { name: 'この内容で送る' }).click()
-    await page.getByText('確認したあとに下書きが変わりました。送っていません。もう一度、送る内容を確認してください').waitFor()
+    await page.getByText('確認したあとに下書きが変わりました。送っていません。もう一度、送る内容を確認してください').last().waitFor()
     expect(worker.testCalls).toHaveLength(0)
     expect(await page.getByRole('dialog', { name: '1人テストの確認' }).count()).toBe(0)
 
@@ -778,7 +829,7 @@ describe('V6 ルールを作る（Rv8Jv）を本物のWorkerに繋いだとき�
     const retried = await openTestConfirmation(page, FRIEND_A)
     expect(await retried.innerText()).toContain('メッセージ「別タブが書き換えた文面です。」')
     await retried.getByRole('button', { name: 'この内容で送る' }).click()
-    await page.getByText('1人テストを受け付けました（', { exact: false }).waitFor()
+    await page.getByText('1人テストを受け付けました（', { exact: false }).last().waitFor()
     expect(worker.testCalls).toHaveLength(1)
     const retriedRevision = (await storedDraftsOf(page))[ACCOUNT_A]?.draftVersionId
     expect(versionRowId(retriedRevision as string)).toBe(afterOther.versionId)
@@ -819,7 +870,7 @@ describe('V6 ルールを作る（Rv8Jv）を本物のWorkerに繋いだとき�
     expect(await dialog.innerText()).toContain('メッセージ「確認したときの文面です。」')
 
     await dialog.getByRole('button', { name: 'この内容で送る' }).click()
-    await page.getByText('確認したあとに下書きが変わりました', { exact: false }).waitFor()
+    await page.getByText('確認したあとに下書きが変わりました', { exact: false }).last().waitFor()
 
     // 割り込みは実際に入っている（試験が空振りしていない）。
     expect(interrupted).toBe(true)
@@ -833,28 +884,31 @@ describe('V6 ルールを作る（Rv8Jv）を本物のWorkerに繋いだとき�
     expect(await page.getByRole('dialog', { name: '1人テストの確認' }).count()).toBe(0)
   }, 90_000)
 
-  it('1人テストの返事を待つ間に店舗を替えても、前の店の成否を次の店へ残さない', async () => {
+  it('1人テストの応答中は店舗切替を止め、切替後は前の店の成否を残さない', async () => {
     const { page, worker } = await openWorkerPage({ slowTest: true })
     await fillMessageRule(page, '予約返信', '店舗Aの文面です。')
     await saveDraft(page)
 
-    // 成功する1人テストを送り、返事を待つ間に店舗Bへ移る。
+    // 成功する1人テストを送り、返事を待つ間の店舗切替が止まることを確かめる。
     const dialog = await openTestConfirmation(page, FRIEND_A)
     await dialog.getByRole('button', { name: 'この内容で送る' }).click()
     await waitUntil(() => worker.testCalls.length === 1, '1人テストAPIが呼ばれませんでした')
 
-    await page.getByLabel('LINEアカウント').selectOption(ACCOUNT_B)
-    await waitUntil(
-      async () => (await page.getByRole('dialog', { name: '1人テストの確認' }).count()) === 0,
-      '店舗を替えても確認が残っています',
-    )
+    await requestAccountSwitch(page, ACCOUNT_B)
+    expect(await page.evaluate(() => localStorage.getItem('lh_selected_account'))).toBe(ACCOUNT_A)
+    expect(await dialog.isVisible()).toBe(true)
     worker.releaseTest()
-    await page.waitForTimeout(1_000)
+    await page.getByText('1人テストを受け付けました', { exact: false }).last().waitFor()
+    // V8の知らせは画面をまたいで残る。Aで受け取った知らせを閉じてからBへ移る。
+    while (await page.getByRole('button', { name: '知らせを閉じる' }).count()) {
+      await page.getByRole('button', { name: '知らせを閉じる' }).first().click()
+    }
+    await switchAccount(page, ACCOUNT_B)
 
-    expect(await page.getByText('1人テストを受け付けました', { exact: false }).count()).toBe(0)
+    await expect.poll(() => page.getByText('1人テストを受け付けました', { exact: false }).count()).toBe(0)
     expect(await page.getByRole('dialog', { name: '1人テストの確認' }).count()).toBe(0)
     // 店舗Bには、店舗Aの下書きも見込み人数も引き継がない。
-    expect(await page.getByRole('button', { name: '1人で試す' }).isDisabled()).toBe(true)
+    expect(await page.getByRole('button', { name: '1人で試す', exact: true }).isDisabled()).toBe(true)
 
     // 失敗する1人テスト（この店にいない友だち）でも、返事を店舗Bへ残さない。
     const failing = await openWorkerPage({ slowTest: true })
@@ -864,15 +918,17 @@ describe('V6 ルールを作る（Rv8Jv）を本物のWorkerに繋いだとき�
     await failingDialog.getByRole('button', { name: 'この内容で送る' }).click()
     await waitUntil(() => failing.worker.testCalls.length === 1, '失敗させる1人テストが呼ばれませんでした')
 
-    await failing.page.getByLabel('LINEアカウント').selectOption(ACCOUNT_B)
+    await requestAccountSwitch(failing.page, ACCOUNT_B)
+    expect(await failing.page.evaluate(() => localStorage.getItem('lh_selected_account'))).toBe(ACCOUNT_A)
     failing.worker.releaseTest()
-    await failing.page.waitForTimeout(1_000)
-    expect(await failing.page.getByText('テストする友だちが見つかりません', { exact: false }).count()).toBe(0)
+    await failing.page.getByText('テストする友だちが見つかりません', { exact: false }).last().waitFor()
+    await switchAccount(failing.page, ACCOUNT_B)
+    await expect.poll(() => failing.page.getByText('テストする友だちが見つかりません', { exact: false }).count()).toBe(0)
     expect(await failing.page.getByText('1人テストを受け付けました', { exact: false }).count()).toBe(0)
 
     // 店舗Aへ戻しても、前の返事は残っていない。
-    await failing.page.getByLabel('LINEアカウント').selectOption(ACCOUNT_A)
+    await switchAccount(failing.page, ACCOUNT_A)
     await failing.page.waitForTimeout(500)
-    expect(await failing.page.getByText('テストする友だちが見つかりません', { exact: false }).count()).toBe(0)
+    await expect.poll(() => failing.page.getByText('テストする友だちが見つかりません', { exact: false }).count()).toBe(0)
   }, 120_000)
 })
