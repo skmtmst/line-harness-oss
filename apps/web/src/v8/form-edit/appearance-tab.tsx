@@ -6,7 +6,7 @@
  * 色と書体の決まり（文字と背景の差 4.5:1）は今までのデザイン設定と同じ。
  */
 import { useState } from 'react'
-import { Image as ImageIcon, Sparkles, Link2 } from 'lucide-react'
+import { Sparkles, Link2 } from 'lucide-react'
 import {
   FORM_THEME_DEFAULT,
   formThemeContrastError,
@@ -25,6 +25,8 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
+import MediaSlot from '@/components/shared/media-slot'
+import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import { ogImageUrlError } from './model'
 import styles from './edit.module.css'
 
@@ -174,13 +176,16 @@ export function AppearanceTab(props: Props) {
         {props.portable ? null : <div className={styles.subBox}>
           <h3 className={styles.subTitle}>背景とリンクの見え方</h3>
           <div className={styles.tight}>
-            <span className={styles.inlineButtons}>
-              <Button onClick={() => setPickerFor('background')}>
-                <ImageIcon size={15} aria-hidden="true" />
-                {theme.backgroundImageUrl ? '背景の画像を選び直す' : '背景の画像を選ぶ'}
-              </Button>
-              {theme.backgroundImageUrl ? <Button variant="text" onClick={() => patchTheme({ backgroundImageUrl: null })}>画像を外す</Button> : null}
-            </span>
+            <MediaSlot
+              size="compact"
+              title="背景の画像を追加"
+              previewAlt="背景の画像"
+              value={theme.backgroundImageUrl || null}
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              upload={props.accountId ? async (file, progress) => (await uploadToMediaLibrary(file, props.accountId as string, 'image', progress)).url : undefined}
+              onChange={(url) => patchTheme({ backgroundImageUrl: url })}
+              onMediaPick={() => setPickerFor('background')}
+            />
             <button type="button" className={styles.selectLike} onClick={() => setLinkOpen(true)} aria-haspopup="dialog">
               <span>{`リンクの見え方：${linkSummary}`}</span>
               <Link2 size={14} aria-hidden="true" />
@@ -230,16 +235,20 @@ export function AppearanceTab(props: Props) {
             <TextArea id="fe-og-desc" rows={3} maxLength={200} value={props.ogDescription} onChange={(e) => props.onChangeOgDescription(e.target.value)} />
           </div>
           <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="fe-og-image">カードの画像URL</label>
-            <TextField id="fe-og-image" type="url" inputMode="url" placeholder="https://" value={props.ogImageUrl} invalid={Boolean(ogImageError)} onChange={(e) => props.onChangeOgImageUrl(e.target.value)} />
-            {ogImageError ? <p role="alert" className={styles.fieldError}>{ogImageError}</p> : null}
+            <span className={styles.fieldLabel}>カードの画像</span>
+            <MediaSlot
+              size="compact"
+              title="カードの画像を追加"
+              previewAlt="カードの画像"
+              value={props.ogImageUrl || null}
+              accept="image/jpeg,image/png"
+              error={ogImageError || undefined}
+              upload={props.accountId ? async (file, progress) => (await uploadToMediaLibrary(file, props.accountId as string, 'image', progress)).url : undefined}
+              onChange={(url) => props.onChangeOgImageUrl(url ?? '')}
+              onMediaPick={() => setPickerFor('ogImage')}
+              urlEntry={{ value: props.ogImageUrl, onChange: props.onChangeOgImageUrl, label: 'カードの画像URL', placeholder: 'https://', open: Boolean(ogImageError) }}
+            />
           </div>
-          <span>
-            <Button onClick={() => setPickerFor('ogImage')}>
-              <ImageIcon size={15} aria-hidden="true" />
-              登録メディアから選ぶ
-            </Button>
-          </span>
         </div>
       </Dialog>
 

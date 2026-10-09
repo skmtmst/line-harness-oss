@@ -28,6 +28,8 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
+import MediaSlot from '@/components/shared/media-slot'
+import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import styles from './edit.module.css'
 
 type Props = {
@@ -493,19 +495,21 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
       return (
         <>
           <div className={styles.decoRow}>
-            <Labeled label="画像のURL" htmlFor={id}>
-              <TextField id={id} type="url" placeholder="https://..." value={block.mediaUrl} onChange={(e) => patch({ mediaUrl: e.target.value } as Partial<FormBlock>)} />
-            </Labeled>
+            <MediaSlot
+              size="compact"
+              title="画像を追加"
+              previewAlt="フォームの画像"
+              value={block.mediaUrl || null}
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              upload={accountId ? async (file, progress) => (await uploadToMediaLibrary(file, accountId, 'image', progress)).url : undefined}
+              onChange={(url) => patch({ mediaUrl: url ?? '' } as Partial<FormBlock>)}
+              onMediaPick={() => setPicking(true)}
+              urlEntry={{ value: block.mediaUrl, onChange: (url) => patch({ mediaUrl: url } as Partial<FormBlock>), label: '画像のURL', placeholder: 'https://...' }}
+            />
             <Labeled label="押したときに開くURL（任意）" htmlFor={`${id}-link`}>
               <TextField id={`${id}-link`} type="url" value={block.linkUrl ?? ''} onChange={(e) => patch({ linkUrl: e.target.value } as Partial<FormBlock>)} />
             </Labeled>
           </div>
-          <span>
-            <Button onClick={() => setPicking(true)}>
-              <ImageIcon size={15} aria-hidden="true" />
-              登録メディアから選ぶ
-            </Button>
-          </span>
           <MediaPickerDialog
             open={picking}
             accountId={accountId}
