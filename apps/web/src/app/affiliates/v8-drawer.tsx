@@ -31,6 +31,7 @@ import {
   type ReportV2,
 } from './tabs'
 import './list-v8.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const JOURNEY_PAGE_SIZE = 30
 
@@ -261,7 +262,7 @@ export default function AffiliateDrawerV8({
                     <div className="af-list-drawerKpi">
                       <p>振込先</p>
                       <p style={{ color: settlement.bankProfileRegistered ? 'var(--color-success)' : 'var(--color-warning)' }}>
-                        {settlement.bankProfileRegistered ? '登録済み' : '未登録'}
+                        {settlement.bankProfileRegistered ? '登録済み' : emptyValue('unconfigured')}
                       </p>
                     </div>
                   </div>
@@ -418,7 +419,7 @@ export default function AffiliateDrawerV8({
                             return (
                               <tr key={j.friendId} style={isDup ? { background: 'var(--color-status-warn-soft)' } : undefined}>
                                 <td>{isDup ? '⚠ ' : ''}{personNameText(j.displayName)}</td>
-                                <td style={{ color: 'var(--color-info)', fontFamily: 'monospace', fontSize: 12 }}>{j.refCode ?? '—'}</td>
+                                <td style={{ color: 'var(--color-info)', fontFamily: 'monospace', fontSize: 12 }}>{j.refCode ?? emptyValue('unknown')}</td>
                                 <td className="af-list-numRight">{formatNumber(j.conversionCount)}</td>
                                 <td style={{ color: 'var(--color-ink-faint)', fontSize: 12 }}>{formatDate(j.addedAt)}</td>
                               </tr>

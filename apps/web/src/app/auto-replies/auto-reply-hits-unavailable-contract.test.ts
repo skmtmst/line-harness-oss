@@ -49,12 +49,12 @@ describe('一覧の帯と行（設計 8-1 `cmDfJ`）', () => {
   })
 
   it('行のヒット数を 0 で埋めない', () => {
-    expect(PAGE).toContain("{r.hits?.period ?? '—'}")
+    expect(PAGE).toContain("{r.hits?.period ?? emptyValue('unknown')}")
     expect(PAGE).toContain("r.hits?.total")
     expect(PAGE).not.toContain("{r.hits?.period ?? 0}")
   })
 
   it('累計の副題にも、未取得のときは数を出さない', () => {
-    expect(PAGE).toContain("累計 ${totalHits === null ? '—' : formatNumber(totalHits)}回")
+    expect(PAGE).toContain("累計 ${totalHits === null ? emptyValue('unknown') : formatNumber(totalHits)}回")
   })
 })

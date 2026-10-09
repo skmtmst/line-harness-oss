@@ -37,6 +37,7 @@ import { formatDateTime, formatYenNullable, listAllConversionApprovals } from '.
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
 import './list-v8.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
@@ -323,8 +324,8 @@ export default function ApprovalsTabV8({
       personNameText(item.friendName),
       item.affiliateName ?? '名前を読み込めませんでした',
       item.lineAccountName ?? 'アカウント未設定',
-      item.offerName ?? '未設定',
-      item.conversionPointName ?? '未設定',
+      item.offerName ?? emptyValue('unconfigured'),
+      item.conversionPointName ?? emptyValue('unconfigured'),
       item.orderNumber ?? '',
       item.value ?? '',
       approvalReviewReasons(item).join('・') || '問題なし',
@@ -549,7 +550,7 @@ export default function ApprovalsTabV8({
                       <td><span className="af-list-cellMain">{item.affiliateName ?? '名前を読み込めませんでした'}</span></td>
                       <td><span className="af-list-cellMain" style={{ color: 'var(--color-ink-secondary)' }}>{item.lineAccountName ?? 'アカウント未設定'}</span></td>
                       <td>
-                        <span className="af-list-cellMain">{item.offerName ?? '未設定'}</span>
+                        <span className="af-list-cellMain">{item.offerName ?? emptyValue('unconfigured')}</span>
                         <span className="af-list-cellSub">{item.conversionPointName ?? '成果地点は未設定'}</span>
                         <span className="af-list-cellSub">成果額 {formatYenNullable(item.value)}</span>
                       </td>

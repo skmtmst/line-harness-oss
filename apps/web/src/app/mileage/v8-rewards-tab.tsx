@@ -44,6 +44,7 @@ import { formatNumber } from '@/lib/format'
 import { V8CreateButton } from './mileage-v8'
 import styles from './mileage-v8.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
   coupon: 'クーポン',
@@ -486,12 +487,12 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>使い道</span>
           </div>
           <p className={styles.kpiValue}>
-            {status !== 'ready' ? '—' : formatMileageNumber(rewards.length)}
+            {status !== 'ready' ? emptyValue('unknown') : formatMileageNumber(rewards.length)}
             <span className={styles.kpiUnit}> 件</span>
           </p>
           <p className={styles.kpiSub}>
             {status !== 'ready'
-              ? '—'
+              ? emptyValue('unknown')
               : `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}`}
           </p>
         </div>
@@ -501,11 +502,11 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>今月 交換</span>
           </div>
           <p className={styles.kpiValue}>
-            {status !== 'ready' ? '—' : formatMileageNumber(exchangedCount ?? 0)}
+            {status !== 'ready' ? emptyValue('unknown') : formatMileageNumber(exchangedCount ?? 0)}
             <span className={styles.kpiUnit}> 件</span>
           </p>
           <p className={styles.kpiSub}>
-            {status !== 'ready' ? '—' : `${formatMileageNumber(redeemedMiles ?? 0)} マイル`}
+            {status !== 'ready' ? emptyValue('unknown') : `${formatMileageNumber(redeemedMiles ?? 0)} マイル`}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -514,10 +515,10 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>いちばん人気</span>
           </div>
           <p className={styles.kpiValue} style={{ fontSize: 20 }} title={popularName ?? undefined}>
-            {status !== 'ready' ? '—' : (popularName ?? '—')}
+            {status !== 'ready' ? emptyValue('unknown') : (popularName ?? emptyValue('unknown'))}
           </p>
           <p className={styles.kpiSub}>
-            {status !== 'ready' ? '—' : popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません'}
+            {status !== 'ready' ? emptyValue('unknown') : popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません'}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -526,7 +527,7 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>渡せなかった</span>
           </div>
           <p className={styles.kpiValue}>
-            {redemptionsLoad === 'loading' ? '—' : formatMileageNumber(failedTotal)}
+            {redemptionsLoad === 'loading' ? emptyValue('unknown') : formatMileageNumber(failedTotal)}
             <span className={styles.kpiUnit}> 件</span>
           </p>
           <p className={styles.kpiSub}>

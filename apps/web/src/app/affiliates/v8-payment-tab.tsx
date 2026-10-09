@@ -37,6 +37,7 @@ import {
 } from './payment-tab'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
 import './list-v8.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
 
@@ -476,9 +477,7 @@ export default function PaymentTabV8({
                           </>
                         ) : (
                           <span className={`af-list-statusBadge af-list-statusDanger`}>
-                            <span className="af-list-statusDot" aria-hidden="true" />
-                            未登録
-                          </span>
+                            <span className="af-list-statusDot" aria-hidden="true" />{emptyValue('unconfigured')}</span>
                         )}
                       </td>
                       <td>

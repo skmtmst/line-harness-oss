@@ -48,6 +48,7 @@ import { formatNumber } from '@/lib/format'
 import styles from './mileage-v8.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function viewName(item: MileageAdminHistoryItem) {
   return item.displayName || '名前未取得'
@@ -266,11 +267,11 @@ export default function V8HistoryTab({
             <span className={styles.kpiLabel}>今月の動き</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || error || total === null ? '—' : formatNumber(total)}
+            {loading || error || total === null ? emptyValue('unknown') : formatNumber(total)}
             <span className={styles.kpiUnit}> 件</span>
           </p>
           <p className={styles.kpiSub}>
-            {loading || error ? '—' : `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}`}
+            {loading || error ? emptyValue('unknown') : `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}`}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -278,14 +279,14 @@ export default function V8HistoryTab({
             <span className={styles.kpiIcon}><TrendingUp size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>付けた</span>
           </div>
-          <p className={styles.kpiValue}>{loading || error ? '—' : formatNumber(amountOf('grant'))}</p>
+          <p className={styles.kpiValue}>{loading || error ? emptyValue('unknown') : formatNumber(amountOf('grant'))}</p>
         </div>
         <div className={styles.kpi}>
           <div className={styles.kpiTop}>
             <span className={styles.kpiIcon}><TrendingDown size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>使った</span>
           </div>
-          <p className={styles.kpiValue}>{loading || error ? '—' : formatNumber(Math.abs(amountOf('spend')))}</p>
+          <p className={styles.kpiValue}>{loading || error ? emptyValue('unknown') : formatNumber(Math.abs(amountOf('spend')))}</p>
           <p className={styles.kpiSub}>交換 {formatNumber(countOf('spend'))}件</p>
         </div>
         <div className={styles.kpi}>
@@ -294,7 +295,7 @@ export default function V8HistoryTab({
             <span className={styles.kpiLabel}>取り消し</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || error ? '—' : formatNumber(reversalCount)}
+            {loading || error ? emptyValue('unknown') : formatNumber(reversalCount)}
             <span className={styles.kpiUnit}> 件</span>
           </p>
           <p className={styles.kpiSub}>注文の取り消しで引いた</p>
@@ -436,7 +437,7 @@ export default function V8HistoryTab({
                     </td>
                     <td>
                       <span className={styles.num}>
-                        {item.balanceAfter === null ? '—' : formatNumber(item.balanceAfter)}
+                        {item.balanceAfter === null ? emptyValue('unknown') : formatNumber(item.balanceAfter)}
                       </span>
                     </td>
                     <td>

@@ -42,6 +42,9 @@ import { formatMileageNumber } from '../../mileage-display'
 import { formatNumber } from '@/lib/format'
 import formStyles from './v8-create-form.module.css'
 import { Field } from '@/components/shared/form-controls'
+import NumberInput from '@/components/shared/number-field'
+import { PageHeading } from '@/components/templates/page-frame'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const DAILY_CAPS = [
   ['', '制限なし'],
@@ -437,16 +440,16 @@ export default function V8EarningRuleNew() {
             <dl className={formStyles.trialRows}>
               <div className={formStyles.trialRow}>
                 <dt>当てはまる人</dt>
-                <dd>{trialBusy ? '数えています…' : trial ? `${formatNumber(trial.matchedFriends)}人` : '—'}</dd>
+                <dd>{trialBusy ? '数えています…' : trial ? `${formatNumber(trial.matchedFriends)}人` : emptyValue('unknown')}</dd>
               </div>
               <div className={formStyles.trialRow}>
                 <dt>付くマイル</dt>
-                <dd>{trialBusy ? '数えています…' : trial ? formatMileageNumber(trial.estimatedTotalMiles) : '—'}</dd>
+                <dd>{trialBusy ? '数えています…' : trial ? formatMileageNumber(trial.estimatedTotalMiles) : emptyValue('unknown')}</dd>
               </div>
               <div className={formStyles.trialRow}>
                 <dt>1人あたり</dt>
                 <dd>
-                  {validAmount ? formatMileageNumber(value) : '—'}
+                  {validAmount ? formatMileageNumber(value) : emptyValue('unknown')}
                   {dailyCap ? `（1日${dailyCap}回まで）` : ''}
                 </dd>
               </div>

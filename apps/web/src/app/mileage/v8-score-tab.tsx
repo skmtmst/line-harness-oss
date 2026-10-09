@@ -55,6 +55,8 @@ import { csvCell } from '@/lib/presentation'
 import { actionScoreAdjustmentErrorMessage } from './action-score-adjustment-dialog'
 import styles from './mileage-v8.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import NumberInput from '@/components/shared/number-field'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -427,7 +429,7 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>点が高い（{formatMileageNumber(highMin)}点〜）</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError ? '—' : formatMileageNumber(summary?.high ?? 0)}
+            {loading || loadError ? emptyValue('unknown') : formatMileageNumber(summary?.high ?? 0)}
             <span className={styles.kpiUnit}> 人</span>
           </p>
           <p className={styles.kpiSub}>よく動く</p>
@@ -438,7 +440,7 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>中くらい（{formatMileageNumber(normalMin)}〜{formatMileageNumber(highMin - 1)}点）</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError ? '—' : formatMileageNumber(summary?.normal ?? 0)}
+            {loading || loadError ? emptyValue('unknown') : formatMileageNumber(summary?.normal ?? 0)}
             <span className={styles.kpiUnit}> 人</span>
           </p>
           <p className={styles.kpiSub}>ふつう</p>
@@ -449,7 +451,7 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>低い（〜{formatMileageNumber(normalMin - 1)}点）</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError ? '—' : formatMileageNumber(summary?.low ?? 0)}
+            {loading || loadError ? emptyValue('unknown') : formatMileageNumber(summary?.low ?? 0)}
             <span className={styles.kpiUnit}> 人</span>
           </p>
           <p className={styles.kpiSub}>しばらく動いていない</p>
@@ -460,10 +462,10 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>公開中のルール</span>
           </div>
           <p className={styles.kpiValue}>
-            {rulesLoading ? '—' : publishedVersionNo === null ? 'なし' : `版 ${formatMileageNumber(publishedVersionNo)}`}
+            {rulesLoading ? emptyValue('unknown') : publishedVersionNo === null ? emptyValue('none') : `版 ${formatMileageNumber(publishedVersionNo)}`}
           </p>
           <p className={styles.kpiSub}>
-            {rulesLoading ? '—' : hasDraftChanges ? '下書きに変更あり' : '下書きとの差はありません'}
+            {rulesLoading ? emptyValue('unknown') : hasDraftChanges ? '下書きに変更あり' : '下書きとの差はありません'}
           </p>
         </div>
       </div>
@@ -494,7 +496,7 @@ export default function V8ScoreTab({
             key={item.key}
             selected={filter === item.key}
             onChange={() => { setPage(1); setFilter(item.key) }}
-            count={item.count === undefined ? '—' : formatMileageNumber(item.count)}
+            count={item.count === undefined ? emptyValue('unknown') : formatMileageNumber(item.count)}
           >
             {item.label}
           </FilterChip>
@@ -585,7 +587,7 @@ export default function V8ScoreTab({
                     <span className={styles.num}>
                       {typeof item.change30d === 'number' && Number.isFinite(item.change30d)
                         ? formatMileageChange(item.change30d)
-                        : '—'}
+                        : emptyValue('unknown')}
                     </span>
                   </td>
                   <td>
@@ -1067,11 +1069,11 @@ function V8ScoreAdjustDialog({
         </div>
         <div className={styles.deltaCell}>
           <p className={styles.deltaLabel}>変更量</p>
-          <p className={styles.deltaValue}>{validAmount ? `${delta > 0 ? '+' : ''}${formatMileageNumber(delta)} 点` : '—'}</p>
+          <p className={styles.deltaValue}>{validAmount ? `${delta > 0 ? '+' : ''}${formatMileageNumber(delta)} 点` : emptyValue('unknown')}</p>
         </div>
         <div className={styles.deltaCell}>
           <p className={styles.deltaLabel}>変更後</p>
-          <p className={styles.deltaValue}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : '—'}</p>
+          <p className={styles.deltaValue}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : emptyValue('unknown')}</p>
         </div>
       </div>
 
@@ -1152,7 +1154,7 @@ function V8ScoreHistoryDialog({
         <div>
           <p className={styles.dlgPersonName}>{friendName}</p>
           <p className={styles.dlgPersonSub}>
-            いま {detail?.currentScore != null || currentScore != null ? formatMileageNumber(detail?.currentScore ?? currentScore!) : '—'}点・{bandName(band, highMin, normalMin)}
+            いま {detail?.currentScore != null || currentScore != null ? formatMileageNumber(detail?.currentScore ?? currentScore!) : emptyValue('unknown')}点・{bandName(band, highMin, normalMin)}
           </p>
         </div>
       </div>
@@ -1184,7 +1186,7 @@ function V8ScoreHistoryDialog({
                     {item.scoreChange > 0 ? `+${formatMileageNumber(item.scoreChange)}` : `${formatMileageNumber(item.scoreChange)}`}
                   </span>
                 </td>
-                <td><span className={styles.num}>{item.scoreAfter === null ? '—' : formatMileageNumber(item.scoreAfter)}</span></td>
+                <td><span className={styles.num}>{item.scoreAfter === null ? emptyValue('unknown') : formatMileageNumber(item.scoreAfter)}</span></td>
               </tr>
             ))}
           </tbody>

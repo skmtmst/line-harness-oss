@@ -27,7 +27,7 @@ describe('#640 省略表示の全文確認（title）', () => {
   it('/auto-replies V8: 応答数・長い条件・連動内容に全文確認を残す', () => {
     expect(AUTO_REPLIES).toContain('title={`今月 ${r.hits?.period')
     expect(AUTO_REPLIES).toContain('title={label}')
-    expect(AUTO_REPLIES).toContain("title={actions.join('・') || 'なし'}")
+    expect(AUTO_REPLIES).toContain("title={actions.join('・') || emptyValue('none')}")
   })
 
   it('/friend-add-settings V8: 設定名・経路・送るものに全文確認を残す', () => {

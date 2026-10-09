@@ -38,6 +38,9 @@ import {
 } from '../rule-fields'
 import formStyles from '../new/v8-create-form.module.css'
 import { Field } from '@/components/shared/form-controls'
+import NumberInput from '@/components/shared/number-field'
+import { PageHeading } from '@/components/templates/page-frame'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'missing'
 
@@ -378,7 +381,7 @@ function EditInner() {
           <section className={formStyles.card} aria-label="この設定だとこう貯まります">
             <h2 className={formStyles.cardTitle}>この設定だとこう貯まります</h2>
             <p className={formStyles.hint}>
-              行動した本人に <strong>{validAmount ? value : '—'}マイル</strong> を付与します。
+              行動した本人に <strong>{validAmount ? value : emptyValue('unknown')}マイル</strong> を付与します。
               {initialStatus === 'pending' ? '確定するまで使えません。' : ''}
             </p>
           </section>

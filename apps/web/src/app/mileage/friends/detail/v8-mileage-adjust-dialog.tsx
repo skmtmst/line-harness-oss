@@ -23,6 +23,8 @@ import { ApiError, api, type MileageAdjustmentPolicy } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { mileageAdjustmentErrorMessage } from './mileage-adjustment-dialog'
 import styles from '../../mileage-v8.module.css'
+import NumberInput from '@/components/shared/number-field'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Direction = 'increase' | 'decrease' | 'zero'
 type ReasonCategory = 'customer_support' | 'order_correction' | 'grant_correction' | 'campaign' | 'other'
@@ -429,12 +431,12 @@ export default function V8MileageAdjustDialog({
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更量</p>
               <p className={styles.deltaValue}>
-                {valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : '—'}
+                {valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : emptyValue('unknown')}
               </p>
             </div>
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更後の残高</p>
-              <p className={styles.deltaValue}>{valid ? formatNumber(balanceAfter) : '—'}</p>
+              <p className={styles.deltaValue}>{valid ? formatNumber(balanceAfter) : emptyValue('unknown')}</p>
             </div>
           </div>
 

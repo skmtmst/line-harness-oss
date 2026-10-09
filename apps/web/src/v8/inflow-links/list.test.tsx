@@ -131,7 +131,7 @@ describe('V8 流入と計測の一覧', () => {
 
   it('未登録の ref の行は「登録する」、登録済みは「編集」', async () => {
     await render()
-    expect(rowOf('mail-sign')?.textContent).toContain('未登録')
+    expect(rowOf('mail-sign')?.textContent).toContain('未設定')
     expect(rowOf('mail-sign')?.textContent).toContain('登録する')
     expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeTruthy()
   })

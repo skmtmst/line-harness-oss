@@ -61,6 +61,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { V8CreateButton } from './mileage-v8'
 import styles from './mileage-v8.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const EVENT_LABELS: Record<string, string> = {
   friend_added: '友だち追加',
@@ -529,11 +530,11 @@ export default function V8EarningRulesTab({
             <span className={styles.kpiLabel}>たまる決めごと</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError ? '—' : formatMileageNumber(rules.length)}
+            {loading || loadError ? emptyValue('unknown') : formatMileageNumber(rules.length)}
             <span className={styles.kpiUnit}> 件</span>
           </p>
           <p className={styles.kpiSub}>
-            {loading || loadError ? '—' : `動いている ${formatMileageNumber(activeRules.length)}・止めている ${formatMileageNumber(rules.length - activeRules.length)}`}
+            {loading || loadError ? emptyValue('unknown') : `動いている ${formatMileageNumber(activeRules.length)}・止めている ${formatMileageNumber(rules.length - activeRules.length)}`}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -541,9 +542,9 @@ export default function V8EarningRulesTab({
             <span className={styles.kpiIcon}><Coins size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>今月 付けたマイル</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(grantedMiles ?? 0)}</p>
+          <p className={styles.kpiValue}>{loading || loadError ? emptyValue('unknown') : formatMileageNumber(grantedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>
-            {loading || loadError ? '—' : `${formatMileageNumber(grantedCount ?? 0)}人に`}
+            {loading || loadError ? emptyValue('unknown') : `${formatMileageNumber(grantedCount ?? 0)}人に`}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -551,9 +552,9 @@ export default function V8EarningRulesTab({
             <span className={styles.kpiIcon}><Gift size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>今月 使われたマイル</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(spentMiles ?? 0)}</p>
+          <p className={styles.kpiValue}>{loading || loadError ? emptyValue('unknown') : formatMileageNumber(spentMiles ?? 0)}</p>
           <p className={styles.kpiSub}>
-            {loading || loadError ? '—' : `交換 ${formatMileageNumber(spentCount ?? 0)}件`}
+            {loading || loadError ? emptyValue('unknown') : `交換 ${formatMileageNumber(spentCount ?? 0)}件`}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -561,9 +562,9 @@ export default function V8EarningRulesTab({
             <span className={styles.kpiIcon}><Wallet size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>残高の合計</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(balanceTotal ?? 0)}</p>
+          <p className={styles.kpiValue}>{loading || loadError ? emptyValue('unknown') : formatMileageNumber(balanceTotal ?? 0)}</p>
           <p className={styles.kpiSub}>
-            {loading || loadError ? '—' : `友だち ${formatMileageNumber(friendTotal ?? 0)}人`}
+            {loading || loadError ? emptyValue('unknown') : `友だち ${formatMileageNumber(friendTotal ?? 0)}人`}
           </p>
         </div>
       </div>

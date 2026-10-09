@@ -41,6 +41,9 @@ import {
 } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import formStyles from '../../earning-rules/new/v8-create-form.module.css'
+import NumberInput from '@/components/shared/number-field'
+import { PageHeading } from '@/components/templates/page-frame'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type CommonActionOption = { id: string; label: string }
 
@@ -498,7 +501,7 @@ function RewardEditorInner() {
                 <dd />
               </div>
               <div className={formStyles.trialRow}>
-                <dt>{Number.isInteger(requiredMiles) && requiredMiles > 0 ? `${formatNumber(requiredMiles)} マイルで交換` : '—'}</dt>
+                <dt>{Number.isInteger(requiredMiles) && requiredMiles > 0 ? `${formatNumber(requiredMiles)} マイルで交換` : emptyValue('unknown')}</dt>
                 <dd />
               </div>
               <p className={formStyles.hint}>

@@ -37,6 +37,7 @@ import { confirmedThisMonth, confirmedTotals, confirmedValue, confirmedUnit, con
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
 import './list-v8.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function formatYen(n: number): string {
   return `¥${formatNumber(Math.round(n))}`
@@ -431,7 +432,7 @@ export default function OffersTabV8({
                           </span>
                         </td>
                         <td className="af-list-numRight">
-                          <strong>{offer.rewardAmount != null ? formatYen(offer.rewardAmount) : '—'}</strong>
+                          <strong>{offer.rewardAmount != null ? formatYen(offer.rewardAmount) : emptyValue('unknown')}</strong>
                           {offer.rewardMiles > 0 ? (
                             <span className="af-list-cellSub">＋{formatNumber(offer.rewardMiles)}マイル</span>
                           ) : null}

@@ -28,7 +28,7 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
   it('送信枠は、使用数か残りかが分かる形で書く', () => {
     expect(CODE, '数字だけで向きが分からない').not.toMatch(/\$\{remaining\.toLocaleString\('ja-JP'\)\} \/ \$\{limit/)
     expect(CODE).toContain('LINE公式 残り')
-    expect(CODE).toContain("remaining === null ? '—' : formatNumber(remaining)")
+    expect(CODE).toContain("remaining === null ? emptyValue('unknown') : formatNumber(remaining)")
     expect(CODE).toContain('/ ${formatNumber(limit)}通')
   })
 
