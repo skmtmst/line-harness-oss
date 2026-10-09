@@ -143,6 +143,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -2318,12 +2319,12 @@ export default function ScenarioDetailV8({
   return (
     <PageFrame kind="detail" boardId={conflict ? 'kz2B6' : scenario.isActive ? 'PMLkX' : 'ARuZ4'} hasFooter>
       {/* 板の頭：題＋状態の札＋鉛筆・説明の1行。右に操作（配信結果・下見・まとめてテスト・その他）。 */}
-      <header className={styles.head} data-design="Head">
-        <div className={styles.headText}>
-          <div className={styles.titleRow}>
-            <h1 className={styles.title} title={scenario.name}>{scenario.name}</h1>
-            <StatusChip status={scenario.isActive ? 'running' : 'paused'} />
-            {canEdit ? (
+      <PageHeading title={scenario.name}
+        crumbs={<><p className={styles.meta}>
+            {`フォルダ：${scenarioFolderName}・配信方式：${modeLabel}（作ったあとは変えられません）・${(scenario.allowConcurrent ?? true) ? '同時購読を許可中' : '同時に1つだけ'}`}
+          </p></>}
+        titleAccessory={<><StatusChip status={scenario.isActive ? 'running' : 'paused'} /></>}
+        actions={<>{canEdit ? (
               <button
                 type="button"
                 className={styles.iconButton}
@@ -2333,18 +2334,10 @@ export default function ScenarioDetailV8({
               >
                 <Pencil aria-hidden />
               </button>
-            ) : null}
-          </div>
-          <p className={styles.meta}>
-            {`フォルダ：${scenarioFolderName}・配信方式：${modeLabel}（作ったあとは変えられません）・${(scenario.allowConcurrent ?? true) ? '同時購読を許可中' : '同時に1つだけ'}`}
-          </p>
-        </div>
-        <div className={styles.headActions}>
-          <Button variant="secondary" href={`/scenarios/results?id=${id}`}>
+            ) : null}<Button variant="secondary" href={`/scenarios/results?id=${id}`}>
             <BarChart3 aria-hidden />
             配信結果を見る
-          </Button>
-          <Button
+          </Button><Button
             variant="secondary"
             onClick={() => setPreviewOpen(true)}
             disabled={sortedSteps.length === 0}
@@ -2352,8 +2345,7 @@ export default function ScenarioDetailV8({
           >
             <Eye aria-hidden />
             まとめて下見
-          </Button>
-          {canEdit ? (
+          </Button>{canEdit ? (
             <Button
               variant="secondary"
               onClick={() => setTestSend({ stepId: null, label: 'すべての通' })}
@@ -2363,8 +2355,7 @@ export default function ScenarioDetailV8({
               <Send aria-hidden />
               まとめてテストを送る
             </Button>
-          ) : null}
-          {canEdit ? (
+          ) : null}{canEdit ? (
             <span className={styles.menuBox}>
               <RowMenu
                 appearance="plain"
@@ -2393,9 +2384,7 @@ export default function ScenarioDetailV8({
                 ]}
               />
             </span>
-          ) : null}
-        </div>
-      </header>
+          ) : null}</>} />
 
       {/* 競合（kz2B6）：ほかの人の保存と食い違った。板の頭のすぐ下に、幅いっぱいで出す。 */}
       {conflict && (

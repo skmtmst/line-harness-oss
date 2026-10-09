@@ -125,7 +125,7 @@ function MembersInner() {
 
   return (
     <div data-design-node="IqL2Z" className="flex flex-col gap-4">
-      <PageHeader breadcrumb={[{ label: '専用機能' }, { label: '会員' }]} title="会員" description="" />
+      <PageHeader breadcrumb={[{ label: '専用機能' }, { label: '会員' }]} title="会員" help="" />
       <div data-design="Tabs" data-design-node="AG3tX">
         {/* U091: 右にはみ出すタブへ届くよう、横スクロール＋端の送りボタン付き。 */}
         <ScrollableTabs

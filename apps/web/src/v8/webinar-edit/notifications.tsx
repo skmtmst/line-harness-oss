@@ -302,7 +302,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
-      description="いつ LINE で知らせるかと、見た人・見なかった人に何をするかを決めます。"
+      help="いつ LINE で知らせるかと、見た人・見なかった人に何をするかを決めます。"
       footerActions={chrome.footerActions}
       status={chrome.status}
       preview={<>

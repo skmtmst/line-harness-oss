@@ -544,7 +544,7 @@ function ConversionCreate() {
     <CreatePage
       boardId="j8p3yj"
       title="成果地点を作る"
-      description="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
+      help="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
       /* 競合の帯は型の notice に渡し、入力欄と右の列の上に置く。 */
       notice={conflictBand}
       preview={viewerOnly ? undefined : previewColumn}

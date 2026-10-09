@@ -576,7 +576,7 @@ export default function ScenarioFirstStepV8() {
           ]}
         />
       )}
-      description={`配信方式：${modeLabel[mode]}・シナリオ：${scenario?.name ?? '読み込み中'}`}
+      help={`配信方式：${modeLabel[mode]}・シナリオ：${scenario?.name ?? '読み込み中'}`}
       preview={preview}
       status={saving ? '保存しています' : browserDraft.label ?? undefined}
       footerActions={(

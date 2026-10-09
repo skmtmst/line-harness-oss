@@ -560,7 +560,7 @@ function ProjectInner() {
   ) : undefined
 
   return (
-    <ListPage boardId={boardId} title={project.name} description={description} actions={actions}
+    <ListPage boardId={boardId} title={project.name} help={description} actions={actions}
       crumbs={<Breadcrumb appearance="banner" items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />}>
       <div className={styles.body}>
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}

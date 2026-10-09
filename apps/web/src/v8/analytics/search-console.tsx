@@ -123,7 +123,7 @@ export default function SearchConsoleV8() {
   return <ListPage
     boardId="h1G4d"
     title="Search Console"
-    description={<span className={styles.description}>Google の検索から、どのキーワード・どのページで人が来たかを見ます。サイトスクリプトとつなぐと、検索から友だち追加までを結べます。</span>}
+    help={<span className={styles.description}>Google の検索から、どのキーワード・どのページで人が来たかを見ます。サイトスクリプトとつなぐと、検索から友だち追加までを結べます。</span>}
     actions={<Button variant="secondary" onClick={exportCsv} disabled={!data || loading}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>}
   >
     {loading ? <div className={styles.body} data-gap="tab"><DelayedSkeleton loading skeleton={<Skeleton className="block h-36 w-full rounded-card" />} /></div>

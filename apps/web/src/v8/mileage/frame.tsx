@@ -112,11 +112,11 @@ export function MileageFrame({ help, actions, stats, folders, collapsedFolders, 
       : MILEAGE_TABS.find((item) => item.key === tab)?.board
   return (
     <ListPage
-      help={help}
+      help={<>{"行動でマイルがたまり、クーポン・特典と交換できます。"}{help}</>}
       boardId={board}
       headingSize="regular"
       title="マイル"
-      description="行動でマイルがたまり、クーポン・特典と交換できます。"
+
       actions={actions}
       tabs={
         <div className={styles.tabsBox}>

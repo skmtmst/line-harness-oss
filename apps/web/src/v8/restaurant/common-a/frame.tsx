@@ -63,7 +63,7 @@ export function RestaurantPage({ boardId, title, description, picker, children }
 }) {
   return (
     <PageFrame kind="list" boardId={boardId}>
-      <PageHeading title={title} description={description} actions={picker} />
+      <PageHeading title={title} help={description} actions={picker} />
       <div className={styles.body}>{children}</div>
     </PageFrame>
   )

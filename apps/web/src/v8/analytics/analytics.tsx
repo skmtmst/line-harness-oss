@@ -133,7 +133,7 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
     <ListPage
       boardId={board}
       title="分析"
-      description={<span className={styles.description}>友だちの増減・配信の反応・経路と成果を、期間を決めて見ます。気になる見かたは保存して、レポートで毎週届けられます。</span>}
+      help={<span className={styles.description}>友だちの増減・配信の反応・経路と成果を、期間を決めて見ます。気になる見かたは保存して、レポートで毎週届けられます。</span>}
       actions={actions}
       tabs={tabs}
     >

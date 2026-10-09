@@ -960,11 +960,11 @@ function WebinarList() {
 
   return (
     <ListPage
-      help="行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"
+      help={<>{"録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。"}{"行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"}</>}
       boardId="UyUMw"
       headingSize="regular"
       title="ウェビナー"
-      description="録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。"
+
       actions={
         <Button
           onClick={() => void exportCsv()}

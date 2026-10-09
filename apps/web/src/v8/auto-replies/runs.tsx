@@ -400,7 +400,7 @@ export default function AutoReplyRunsV8() {
     <DetailPage
       boardId="nWmLg"
       title={`実行結果：${data?.rule.name ?? '自動応答'}`}
-      description="いつ・誰に・何を返したか、失敗した処理を見ます。"
+      help="いつ・誰に・何を返したか、失敗した処理を見ます。"
       identity={<Link href="/auto-replies" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />自動応答へ</Link>}
       actions={<div className={styles.headActions}>
         {canManage ? (

@@ -257,7 +257,7 @@ export default function AccountDetailV8() {
       <SettingsPage layout="account-detail"
         boardId="ihjfd"
         title={account.name}
-        description={summaryLine(account, parent?.name ?? null)}
+        help={summaryLine(account, parent?.name ?? null)}
         actions={headActions}
         navigation={<SettingsInnerNav inline />}
       >

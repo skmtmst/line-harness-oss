@@ -240,7 +240,7 @@ export default function AutomationTemplatesV8() {
       boardId="c7dxp"
       headingSize="regular"
       title="オートメーション"
-      description={AUTOMATIONS_DESCRIPTION}
+      help={AUTOMATIONS_DESCRIPTION}
       actions={canEdit
         ? <Button href={automationTabHref('templates')}><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button>
         : null}

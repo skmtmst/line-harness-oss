@@ -153,7 +153,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
       actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
-      description="管理名と公開ページの基本、開催形式を決めます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。"
+      help="管理名と公開ページの基本、開催形式を決めます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。"
       footerActions={chrome.footerActions}
       status={chrome.status}
       preview={<BasicPreview

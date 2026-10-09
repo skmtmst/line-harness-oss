@@ -361,7 +361,7 @@ function FriendAddPublish() {
           }))}
         />
       )}
-      description={`名前：${rule.name}・いまは${statusLabel}です`}
+      help={`名前：${rule.name}・いまは${statusLabel}です`}
       preview={preview}
       status={busy ? '有効にしています' : undefined}
       footerActions={canEdit ? (

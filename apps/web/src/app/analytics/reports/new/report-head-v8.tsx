@@ -17,7 +17,7 @@ export default function ReportHeadV8({ editing }: { editing: boolean }) {
   const showBack = useAdminTheme() !== 'v8'
   if (!showBack) return <div data-page-template="create"><PageHeading
     title={editing ? '定期レポートを直す' : 'レポートを作る'}
-    description="見たい数をまとめて、決まった曜日・時刻に LINE やメールで届けます。数が急に動いたときだけ知らせることもできます。"
+    help="見たい数をまとめて、決まった曜日・時刻に LINE やメールで届けます。数が急に動いたときだけ知らせることもできます。"
   /></div>
   return (
     <div className="report-v8-head">

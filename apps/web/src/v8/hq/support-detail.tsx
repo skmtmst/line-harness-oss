@@ -187,7 +187,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
     : '問い合わせの内容と運営からの返事を確認します。'
 
   return (
-    <ListPage boardId="OhguS" title={title} description={description} folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}>
+    <ListPage boardId="OhguS" title={title} help={description} folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}>
       <div className={styles.body}>
         <div className={styles.main}>
           {idMissing ? (

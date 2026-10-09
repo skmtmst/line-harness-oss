@@ -86,7 +86,7 @@ export function OtherTabPanel({ tab, title, description, onSelect }: {
       boardId={tab === 'fields' ? 'y0sapC' : tab === 'marks' ? 'Qgjmc' : undefined}
       headingSize="regular"
       title={title}
-      description={description}
+      help={description}
       tabs={<AttributeTabs tab={tab} onSelect={onSelect} />}
     >
       <div className={styles.stateCard} role="status">

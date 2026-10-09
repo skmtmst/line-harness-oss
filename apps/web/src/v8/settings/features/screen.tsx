@@ -427,7 +427,7 @@ export default function FeatureSettingsScreen() {
     <SbSettingsScreen
       boardId="ywFJT"
       title={TITLE}
-      description={conflictBand ? <>{DESCRIPTION}<span className={styles.conflictSlot}>{conflictBand}</span></> : DESCRIPTION}
+      help={DESCRIPTION}
       saveActions={ready && canManage ? (
         <>
           <Button
@@ -462,6 +462,7 @@ export default function FeatureSettingsScreen() {
         </span>
       ) : undefined}
     >
+      {conflictBand}
       {!canManage && (
         <div className={styles.viewerBand} role="status">
           <Eye className={styles.bandIcon} aria-hidden="true" />

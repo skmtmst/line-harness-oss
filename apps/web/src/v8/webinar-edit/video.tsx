@@ -258,7 +258,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
-      description={scheduled
+      help={scheduled
         ? '日時指定配信：開催回ごとに日時と定員を決めます。動画は準備（変換など）が済んでから公開できます。'
         : '動画と、見られる期間を決めます。見終わったかどうかの決め方もここで決めます。'}
       footerActions={chrome.footerActions}

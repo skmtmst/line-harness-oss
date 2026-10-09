@@ -467,7 +467,7 @@ function FieldMigrate() {
     <CreatePage
       boardId="GobMd"
       title={`「${source.name}」の種類を変える`}
-      description={`今の種類：${FIELD_TYPE_WORDS[source.type]}・${usage}`}
+      help={`今の種類：${FIELD_TYPE_WORDS[source.type]}・${usage}`}
       identity={back}
       status={status}
       footerActions={<>

@@ -902,7 +902,7 @@ export default function FriendsListV8() {
       boardId="x6QsVz"
       headingSize="compact"
       title="友だち"
-      description="LINE でつながっている人の一覧です。タグと対応の状態で絞り込めます。"
+      help="LINE でつながっている人の一覧です。タグと対応の状態で絞り込めます。"
       actions={headActions}
       tabs={(
         <>

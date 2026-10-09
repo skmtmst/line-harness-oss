@@ -497,7 +497,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       boardId={boardNode(view, status, canEdit)}
       headingSize="regular"
       title="投稿"
-      description="お客さまが送ってくれたペットの写真を確かめて、公式サイトに載せるかを決めます。"
+      help="お客さまが送ってくれたペットの写真を確かめて、公式サイトに載せるかを決めます。"
       actions={<Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}><History size={15} aria-hidden="true" />版の履歴を見る</Button>}
       tabs={
         <div className={styles.tabs} data-design-node="photo-tabs-v8">

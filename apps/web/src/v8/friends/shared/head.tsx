@@ -1,3 +1,4 @@
+import { PageHeading } from '@/components/templates/page-frame'
 'use client'
 
 /*
@@ -9,7 +10,6 @@
  */
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { Info } from 'lucide-react'
 import { FRIENDS_TABS, FRIENDS_TAB_NOTES, type FriendsTabKey } from './nav'
 import styles from './head.module.css'
 
@@ -52,16 +52,6 @@ export function FriendsSectionHead({
 }) {
   const noteText = note === undefined ? FRIENDS_TAB_NOTES[current] : note
   return (
-    <header className={styles.head} data-template-region="heading">
-      <h2 className={styles.title}>{title}</h2>
-      <p className={styles.description}>{description}</p>
-      {tabs ? <FriendsTabs current={current} line={false} action={action} /> : null}
-      {noteText ? (
-        <p className={styles.note}>
-          <Info aria-hidden="true" className={styles.noteIcon} />
-          <span>{noteText}</span>
-        </p>
-      ) : null}
-    </header>
+    <PageHeading title={title} help={<>{description}{noteText}</>} tabs={tabs ? <FriendsTabs current={current} line={false} action={action} /> : undefined} />
   )
 }

@@ -191,7 +191,7 @@ function Connections() {
     <CreatePage
       boardId="wxIQ7"
       title={`切替のつながり：${group.name}`}
-      description="タブで行き来できるメニューの関係"
+      help="タブで行き来できるメニューの関係"
       identity={<Link href="/rich-menus" className={styles.backLink}>← リッチメニューへ</Link>}
       preview={aside}
       footerActions={<>

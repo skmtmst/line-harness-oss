@@ -133,7 +133,7 @@ function NewInner() {
         title="ウェビナーを作る"
         identity={<BackLink />}
         steps={<WizardSteps current="basic" stateOf={(key) => (key === 'basic' ? 'current' : 'todo')} />}
-        description="管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。"
+        help="管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。"
         status="下書き（まだ誰にも公開されません）"
         footerActions={<>
           <Button href="/webinars">キャンセル</Button>

@@ -150,7 +150,7 @@ async function render() {
       await Promise.resolve()
     })
   }
-  await screen.findByRole('heading', { level: 1, name: '新規登録7日間フォロー' })
+  await screen.findByRole('heading', { level: 2, name: '新規登録7日間フォロー' })
 }
 
 beforeEach(() => {

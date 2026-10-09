@@ -19,6 +19,7 @@ import BroadcastPhone from './phone'
 import { CancelReservationDialog } from './detail'
 import { formatBroadcastDateTime, formatShortDateTime } from './display'
 import styles from './reserved.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type AudienceEstimate = {
   audienceCount: number
@@ -90,18 +91,12 @@ export default function Reserved({
 
   return (
     <PageFrame kind="detail" boardId="cdZBf CRtK8">
-      <header className={styles.head}>
-        <div className={styles.titleRow}>
-          <h2 className={styles.title} title={broadcast.title}>{broadcast.title}</h2>
-          <span className={styles.badge}>
+      <PageHeading title={broadcast.title}
+        help={<>{`${scheduledLabel} に、${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`}へ送ります。開始の前までは確かめる・取り消すができます。`}</>}
+        titleAccessory={<><span className={styles.badge}>
             <span className={styles.dot} aria-hidden="true" />
             予約中
-          </span>
-        </div>
-        <p className={styles.desc}>
-          {`${scheduledLabel} に、${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`}へ送ります。開始の前までは確かめる・取り消すができます。`}
-        </p>
-      </header>
+          </span></>} />
 
       <div className={styles.split}>
         <div className={styles.main}>

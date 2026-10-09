@@ -33,6 +33,7 @@ import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
 import layout from './layout.module.css'
 import styles from './staff-new.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /** 一度に見せるメニューの数。残りは「ほかのメニュー」で開く（1行に収める）。 */
 const MENU_FOLD = 4
@@ -317,10 +318,8 @@ export default function StaffNewV8() {
 
   return (
     <div ref={formRef} className={layout.shell} data-design-node="CcA4k">
-      <header className={layout.head} data-design="Head">
-        <h1 className={layout.title}>予約スタッフを登録</h1>
-        <p className={layout.desc}>お客さまが予約するときに指名できる担当者を登録します。</p>
-      </header>
+      <PageHeading title={<>予約スタッフを登録</>}
+        help={<>お客さまが予約するときに指名できる担当者を登録します。</>} />
 
       <div className={layout.body} data-design="Body">
         <div className={layout.main}>

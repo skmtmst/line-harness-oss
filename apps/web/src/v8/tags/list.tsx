@@ -107,7 +107,7 @@ export default function TagsList({
       <PageHeading
         headingSize="regular"
         title="タグ"
-        description="友だちに付ける印（タグ）・入力してもらう項目・対応の印・保存した条件をまとめて管理します。"
+        help="友だちに付ける印（タグ）・入力してもらう項目・対応の印・保存した条件をまとめて管理します。"
         actions={actions}
       />
 

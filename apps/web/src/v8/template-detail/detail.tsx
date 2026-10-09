@@ -639,7 +639,7 @@ export function DetailFrame({ title, identity, description, preview, children }:
 }) {
   return (
     <PageFrame kind="create">
-      <PageHeading title={title} identity={identity} description={description} />
+      <PageHeading title={title} identity={identity} help={description} />
       <div className={styles.split}>
         <div className={styles.content}>{children}</div>
         <aside className={styles.aside}>{preview}</aside>

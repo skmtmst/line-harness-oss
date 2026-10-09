@@ -173,7 +173,7 @@ function BillingInner() {
   const invoiceUnreachable = invoiceError instanceof ApiError && invoiceError.status === 502
 
   const frame = (body: React.ReactNode) => (
-    <ListPage boardId="JB8V1" title={TITLE} description={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}>
+    <ListPage boardId="JB8V1" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}>
       <div className={styles.body}>{body}</div>
     </ListPage>
   )

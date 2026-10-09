@@ -903,7 +903,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       </>
     return (
       <PageFrame kind="wizard" boardId="X4JcOf">
-        <PageHeading title={type === 'template' ? editTitle : editTitle} description="保存したひな形は、一覧の「配る」で各 LINE アカウントへ配ります。" />
+        <PageHeading title={type === 'template' ? editTitle : editTitle} help="保存したひな形は、一覧の「配る」で各 LINE アカウントへ配ります。" />
         <div className={styles.body}>
           {notices}
           {type === 'template' && 'template' in definition ? (

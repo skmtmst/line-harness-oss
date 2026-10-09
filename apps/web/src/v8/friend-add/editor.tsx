@@ -681,7 +681,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       boardId={step === 'routes' && narrow ? 'xHpkS' : conflict ? 'h5rm8t' : STEPS[currentIndex].node}
       title="初回案内を作る"
       steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
-      description={<>
+      help={<>
         {step === 'basic'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'
           : `名前：${rule.name || '（未入力）'}・いまは${statusLabel}です`}

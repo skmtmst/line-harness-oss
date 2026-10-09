@@ -189,7 +189,7 @@ type StageFrame = {
   title: string
   identity: ReactNode
   steps: ReactNode
-  description: ReactNode
+  help: ReactNode
   /** 頭の線の下に板の幅で置く帯（競合 k32cn）。 */
   notice?: ReactNode
   noticeSpacing?: 'band'
@@ -533,7 +533,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     title: 'リマインダを作る',
     identity: <BackToReminders />,
     steps: <ReminderV8Stepper current={currentKey} reminderId={reminderId} />,
-    description: (
+    help: (
       <>
         {v8stage === 'basics'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'

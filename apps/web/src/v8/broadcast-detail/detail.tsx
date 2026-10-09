@@ -62,6 +62,7 @@ import {
   rateText,
 } from './display'
 import styles from './detail.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
@@ -255,22 +256,16 @@ export default function BroadcastDetail({
 
   return (
     <PageFrame kind="detail" boardId="cgiGB pNiUk F3X1Mo Q28Gb dK1aE wfHIE tPm3e">
-      <header className={styles.head}>
-        <div className={styles.name}>
-          <div className={styles.titleRow}>
-            <h2 className={styles.title} title={broadcast.title}>{broadcast.title}</h2>
-            <span className={styles.badge} data-tone={BADGE_TONE[displayStatus]}>
+      <PageHeading title={broadcast.title}
+        crumbs={<><p className={styles.meta}>{metaLine(broadcast, audienceLabel)}</p></>}
+        steps={<>{isDraft
+            ? <DraftStepRail broadcastId={broadcast.id} draftStep={broadcast.draftStep} canEdit={canEdit} />
+            : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} />}</>}
+        titleAccessory={<><span className={styles.badge} data-tone={BADGE_TONE[displayStatus]}>
               <span className={styles.dot} aria-hidden="true" />
               {statusLabel}
-            </span>
-          </div>
-          <p className={styles.meta}>{metaLine(broadcast, audienceLabel)}</p>
-          {isDraft
-            ? <DraftStepRail broadcastId={broadcast.id} draftStep={broadcast.draftStep} canEdit={canEdit} />
-            : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} />}
-        </div>
-        <div className={styles.actions}>
-          {canEdit ? (
+            </span></>}
+        actions={<>{canEdit ? (
             <>
               <RowMenu
                 className={styles.iconButton}
@@ -278,38 +273,30 @@ export default function BroadcastDetail({
                 items={menuItems}
               />
             </>
-          ) : null}
-          {/* CSV は見るだけの操作。閲覧のみにも出す。 */}
-          <Button size="field" onClick={onExportCsv}>
+          ) : null}{/* CSV は見るだけの操作。閲覧のみにも出す。 */}<Button size="field" onClick={onExportCsv}>
             <Download aria-hidden="true" />
             CSVで書き出す
-          </Button>
-          {canEdit && !isSent && broadcast.status !== 'sending' ? (
+          </Button>{canEdit && !isSent && broadcast.status !== 'sending' ? (
             <Button size="field" onClick={() => void sendTest()} disabled={testing} busy={testing} busyLabel="テスト送信中…">
               <Send aria-hidden="true" />
               テストを送る
             </Button>
-          ) : null}
-          {canEdit && isDraft ? (
+          ) : null}{canEdit && isDraft ? (
             <Button size="field" variant="primary" href={`${editHref}&step=${resumeStep.key}`}>
               <Pencil aria-hidden="true" />
               {resumeStep.order} {resumeStep.label}から続ける
             </Button>
-          ) : null}
-          {canEdit && isScheduled ? (
+          ) : null}{canEdit && isScheduled ? (
             <Button size="field" href={editHref}>
               <Pencil aria-hidden="true" />
               編集を続ける
             </Button>
-          ) : null}
-          {canEdit && isSent ? (
+          ) : null}{canEdit && isSent ? (
             <Button size="field" variant="primary" href={duplicateHref}>
               <Copy aria-hidden="true" />
               複製して作る
             </Button>
-          ) : null}
-        </div>
-      </header>
+          ) : null}</>} />
 
       {conflict ? (
         <div className={styles.conflictWrap} data-design-node="Q28Gb">

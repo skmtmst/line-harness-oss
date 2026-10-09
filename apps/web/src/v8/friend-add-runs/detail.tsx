@@ -257,7 +257,7 @@ function FriendAddRunDetailInner() {
     <PageFrame kind="detail" boardId="N43uVX">
       <PageHeading
         title={`${displayName}さんの友だち追加`}
-        description={`${jstTitleDate(detail.receivedAt)} に追加・${friendKindLabel}`}
+        help={`${jstTitleDate(detail.receivedAt)} に追加・${friendKindLabel}`}
       />
       <div className={styles.split}>
         <div className={styles.main}>

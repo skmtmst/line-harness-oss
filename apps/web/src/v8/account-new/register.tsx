@@ -428,7 +428,7 @@ export default function AccountRegisterV8() {
     <PageFrame kind="wizard" boardId={shownStep.node}>
       <PageHeading
         title="LINEアカウントを登録"
-        description={shownStep.lead}
+        help={shownStep.lead}
         steps={(
           <Steps
             label="登録の進捗"

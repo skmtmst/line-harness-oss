@@ -49,6 +49,7 @@ import MenuVersionHistory from './menu-version-history'
 import { LiffPhoneMenuStep } from './liff-phone'
 import shell from './settings.module.css'
 import styles from './menu-form.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -780,12 +781,8 @@ export default function MenuFormV8() {
 
   return (
     <div ref={formRef} className={shell.shell} data-design-node="QqER7">
-      <header className={styles.head} data-design="Head">
-        <h1 className={shell.headTitle}>{editTarget ? '予約メニューを直す' : '予約メニューを作る'}</h1>
-        <p className={shell.headNote}>
-          {editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}
-        </p>
-      </header>
+      <PageHeading title={editTarget ? '予約メニューを直す' : '予約メニューを作る'}
+        help={<>{editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}</>} />
 
       {conflict && (
         <div ref={conflictRef} className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">

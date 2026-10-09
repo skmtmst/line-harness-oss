@@ -85,7 +85,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
       <CreatePage
         boardId="hmr2P"
         title="変更の確認"
-        description={description}
+        help={description}
         footerActions={<Button href="/events">一覧へ戻る</Button>}
       >
         {!selectedAccountId ? (
@@ -205,7 +205,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
     <CreatePage
       boardId="hmr2P"
       title={`変更の確認：${event.name}`}
-      description={description}
+      help={description}
       preview={side}
       footerActions={(
         <>

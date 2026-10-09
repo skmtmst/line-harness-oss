@@ -221,7 +221,7 @@ function OneTimeResultView({ accountId, schedule, runs, canManage, onRetryDone }
       <PageHeader
         breadcrumb={[{ label: '分析', href: '/analytics' }, { label: '1回送信の結果' }]}
         title="1回送信の結果"
-        description=""
+        help=""
       />
       <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
         <h2 className="truncate text-lg font-semibold" title={schedule.name}>{schedule.name}</h2>

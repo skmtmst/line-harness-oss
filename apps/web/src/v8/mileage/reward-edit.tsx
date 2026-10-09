@@ -375,7 +375,7 @@ function RewardEditorInner() {
     <CreatePage
       boardId="L2Bzp"
       title="使い道を作る"
-      description="マイルと交換できる特典を決めます。出すと、お客さまの LINE（マイルの画面）に並びます。"
+      help="マイルと交換できる特典を決めます。出すと、お客さまの LINE（マイルの画面）に並びます。"
       preview={preview}
       footerActions={<>
         <Button variant="secondary" href="/mileage?tab=rewards">キャンセル</Button>

@@ -228,7 +228,7 @@ function TodayStore() {
       boardId="hKRRF"
       headingSize="compact"
       title="今日のお店"
-      description={d.store ? headDescription(d.hours, d.updatedAt) : undefined}
+      help={d.store ? headDescription(d.hours, d.updatedAt) : undefined}
       actions={actions}
       tabs={<StoreTabs current="dashboard" flush />}
     >

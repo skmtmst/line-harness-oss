@@ -239,7 +239,7 @@ export default function StoreNewV8() {
     <PageFrame kind="list" boardId={step === STEP.TERMS ? 'ao15G' : step === STEP.BASICS ? 'faGn4' : undefined}>
       <PageHeading
         title="店舗を追加"
-        description={`LINEへ接続し、店舗を登録します。ステップ ${step} / 5`}
+        help={`LINEへ接続し、店舗を登録します。ステップ ${step} / 5`}
         steps={(
           <Steps
             label="店舗を追加する手順"

@@ -402,7 +402,7 @@ function OperationPageHeader({ description, action }: { description: string; act
     <PageHeader
       breadcrumb={[{ label: '設定' }, { label: '運用状態' }]}
       title="運用状態"
-      description={description}
+      help={description}
       actions={action}
     />
   )

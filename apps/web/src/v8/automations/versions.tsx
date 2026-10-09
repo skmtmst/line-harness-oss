@@ -10,7 +10,7 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { BookOpen, GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
+import { GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
 import { api, ApiError, type CommonActionDetail, type CommonActionStep, type CommonActionSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -90,7 +90,6 @@ function VersionsInner() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'オートメーション', href: '/automations' }])
   const canManage = useAutomationManage()
   const canEdit = canManage !== false
-  const manualHref = useManualHref('/common-actions/versions')
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -228,9 +227,8 @@ function VersionsInner() {
       boardId="ziSgL"
       headingSize="regular"
       title={`${detail.name}（版と使われている場所）`}
-      description="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。"
+      help="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。"
       actions={<>
-        {manualHref ? <Button href={manualHref}><BookOpen size={15} aria-hidden="true" />マニュアル</Button> : null}
         {canEdit && draft ? (
           <Button href={editHref}><Pencil size={15} aria-hidden="true" />下書きの中身を編集</Button>
         ) : canEdit && published ? (

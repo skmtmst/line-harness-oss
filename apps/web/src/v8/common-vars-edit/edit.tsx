@@ -1065,7 +1065,7 @@ function EditCommonVarV8Inner() {
     <CreatePage
       boardId={narrow ? 'C67dE' : 'AYc6O'}
       title={item?.name ?? '共通情報を編集'}
-      description={item ? (
+      help={item ? (
         <>
           {`${placeholderText(item.varKey)}・${typeLabel}・${stateLabel}・${usageTotal === null ? '—' : `${formatNumber(usageTotal)}か所で使っています`}`}
           {/* 競合の帯（板 `piWhz`）。頭の下に横いっぱい。入力は残したまま、誰の保存かを見せる。 */}

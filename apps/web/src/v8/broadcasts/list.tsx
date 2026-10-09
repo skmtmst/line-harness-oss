@@ -1163,7 +1163,7 @@ export default function BroadcastListV8() {
       boardId={boardId}
       headingSize="compact"
       title="一斉配信"
-      description="友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
+      help="友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
       stats={<>
         {canEdit ? null : (
           <div className={styles.viewerBand} role="status">

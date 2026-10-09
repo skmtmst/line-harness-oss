@@ -98,7 +98,7 @@ export default function MembersV8({
     <ListPage
       boardId={BOARD_NODE[tab]}
       title="会員"
-      description="ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。"
+      help="ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。"
       actions={accountId ? <CsvExportButton accountId={accountId} /> : null}
       tabs={tabs}
       stats={accountId ? <MembersKpiBand kpis={kpis} ranks={ranks} loading={status === 'loading' && !settings} accountId={accountId} /> : undefined}

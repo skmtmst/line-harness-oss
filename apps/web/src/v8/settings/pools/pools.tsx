@@ -85,7 +85,7 @@ export default function PoolsV8() {
   if (featureOff) {
     return (
       <div className={frame.screen}>
-        <SettingsPage layout="accounts" boardId="u3iab3" title={TITLE} description={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
+        <SettingsPage layout="accounts" boardId="u3iab3" title={TITLE} help={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
           <FeatureDisabledScreen featureId="multi_store_hierarchy" />
         </SettingsPage>
       </div>
@@ -106,7 +106,7 @@ export default function PoolsV8() {
       <SettingsPage layout="accounts"
         boardId="u3iab3"
         title={TITLE}
-        description={DESCRIPTION}
+        help={DESCRIPTION}
         actions={canManage && !isEmpty ? createButton : undefined}
         navigation={<SettingsInnerNav inline />}
       >

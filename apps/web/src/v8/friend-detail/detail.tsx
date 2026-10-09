@@ -41,6 +41,7 @@ import ActionsTab from './actions-tab'
 import MilesTab from './miles-tab'
 import RichMenuTab from './rich-menu-tab'
 import styles from './detail.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /** タブ10個（並びと URL の値は今の画面と同じ）。 */
 export const FRIEND_DETAIL_TABS = [
@@ -141,16 +142,9 @@ function FriendDetailV8Inner() {
 
   return (
     <PageFrame kind="detail" boardId="Q5F2QE">
-      <header className={styles.head}>
-        <Avatar name={friend?.displayName} src={friend?.pictureUrl} size={52} />
-        <div className={styles.nameBlock}>
-          <div className={styles.nameRow}>
-            <h2 className={styles.name} title={friend?.displayName}>{friend?.displayName ?? '友だち詳細'}</h2>
-            {status ? <StatusPill tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusPill> : friend ? <span className={styles.faint}>やり取りなし</span> : null}
-          </div>
-          <p className={styles.sub} title={subtitle}>{subtitle}</p>
-        </div>
-        <span className={styles.menuAnchor}>
+      <PageHeading title={friend?.displayName ?? '友だち詳細'}
+        help={<>{subtitle}</>}
+        actions={<><Avatar name={friend?.displayName} src={friend?.pictureUrl} size={52} />{status ? <StatusPill tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusPill> : friend ? <span className={styles.faint}>やり取りなし</span> : null}<span className={styles.menuAnchor}>
           <RowMenu
             className={styles.square}
             label="その他の操作"
@@ -159,8 +153,7 @@ function FriendDetailV8Inner() {
             open={moreMenuOpen}
             onOpenChange={(next) => { setMoreMenuOpen(next); setActionMenuOpen(false) }}
           />
-        </span>
-        <span className={styles.menuAnchor}>
+        </span><span className={styles.menuAnchor}>
           <Button
             aria-haspopup="menu"
             aria-expanded={actionMenuOpen}
@@ -169,9 +162,7 @@ function FriendDetailV8Inner() {
             <Zap aria-hidden />個別操作
           </Button>
           <ActionMenu open={actionMenuOpen} items={primaryActions} ariaLabel="この友だちへの個別操作" onClose={() => setActionMenuOpen(false)} />
-        </span>
-        <Button href={inbox} variant="primary"><MessageCircle aria-hidden />受信箱で開く</Button>
-      </header>
+        </span><Button href={inbox} variant="primary"><MessageCircle aria-hidden />受信箱で開く</Button></>} />
 
       {perms.viewOnly ? (
         <div className={styles.band}>

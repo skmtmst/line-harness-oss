@@ -117,11 +117,11 @@ export function AffiliateFrame({ help, actions, stats, folders, folderNav, toolb
       : AFFILIATE_TABS.find((item) => item.key === tab)?.board
   return (
     <ListPage
-      help={help}
+      help={<>{"紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。"}{help}</>}
       boardId={board}
       headingSize="regular"
       title="成果とアフィリエイト"
-      description="紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。"
+
       actions={actions}
       tabs={
         <div className={styles.tabsBox}>

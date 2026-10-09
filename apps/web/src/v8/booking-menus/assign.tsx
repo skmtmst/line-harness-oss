@@ -42,6 +42,7 @@ import {
 import { menuPriceLabel } from './lib/menu-price'
 import shell from './settings.module.css'
 import styles from './assign.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
 const V8_TABS = [
@@ -324,13 +325,11 @@ export default function AssignMatrixV8() {
 
   return (
     <div className={shell.shell} data-design-node="ooufy">
-      <header className={shell.boardHead} data-design="Head">
-        <h1 className={shell.headTitle}>担当メニューをまとめて決める</h1>
-        <p className={shell.headNote} role="status" aria-live="polite">
+      <PageHeading title={<>担当メニューをまとめて決める</>}
+        crumbs={<><p className={shell.headNote} role="status" aria-live="polite">
           {dirty ? '未保存の変更があります' : 'メニューごとに、予約を受けられるスタッフを決めます'}
-        </p>
-        <div data-design="Tabs">
-          <Tabs
+        </p></>}
+        tabs={<><Tabs
             label="予約設定のタブ"
             items={V8_TABS.map((item) => ({
               label: item.label,
@@ -341,9 +340,7 @@ export default function AssignMatrixV8() {
                   ? '/booking/menus'
                   : `/booking/menus?tab=${item.key}`,
             }))}
-          />
-        </div>
-      </header>
+          /></>} />
 
       <div className={shell.body} data-design="Body">
         <div className={shell.main}>

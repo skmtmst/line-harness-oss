@@ -253,7 +253,7 @@ export function CommonActionNew() {
     <CreatePage
       boardId="j2hfkS"
       title="共通アクションを作る"
-      description="いくつもの所から呼び出せる「処理のまとまり」を作ります。ここでは下書きを保存し、公開は版の画面から行います。使う所はいまの版のまま。使う所ごとに新しい版へ更新します。"
+      help="いくつもの所から呼び出せる「処理のまとまり」を作ります。ここでは下書きを保存し、公開は版の画面から行います。使う所はいまの版のまま。使う所ごとに新しい版へ更新します。"
       preview={aside}
       footerActions={<>
         <Button href="/common-actions">キャンセル</Button>

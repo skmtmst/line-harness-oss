@@ -24,6 +24,7 @@ import MergedDeliveryDialog from '@/components/merged-person/merged-delivery-dia
 import MergedProfileDialog from '@/components/merged-person/merged-profile-dialog'
 import { useMergedPerson } from '@/components/merged-person/use-merged-person'
 import styles from './person.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /** 9/30（日本時間）。 */
 function shortDate(iso: string): string {
@@ -43,10 +44,8 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
   const canManage = staffRole === null || canManageRole(staffRole)
 
   const head = (title: string, description: string) => (
-    <header className={styles.head}>
-      <h2 className={styles.title}>{title}</h2>
-      <p className={styles.description}>{description}</p>
-    </header>
+    <PageHeading title={title}
+        help={<>{description}</>} />
   )
 
   if (m.phase !== 'ready' || !m.person) {

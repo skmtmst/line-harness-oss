@@ -324,7 +324,7 @@ export default function AccountHandoverV8() {
 
   const frame = (title: string, description: string | undefined, children: ReactNode) => (
     <div className={styles.screen}>
-      <SettingsPage layout="account-handover" boardId="x2dSNv" title={title} description={description} navigation={<SettingsInnerNav inline />}>
+      <SettingsPage layout="account-handover" boardId="x2dSNv" title={title} help={description} navigation={<SettingsInnerNav inline />}>
         {children}
       </SettingsPage>
       {stepUpPrompt}

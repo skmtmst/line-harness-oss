@@ -129,7 +129,7 @@ export default function PoolCreateV8() {
       boardId="D0AOyx"
       layout="narrow-nav"
       title={TITLE}
-      description={DESCRIPTION}
+      help={DESCRIPTION}
       savePlacement="content"
       saveActions={(
         <>

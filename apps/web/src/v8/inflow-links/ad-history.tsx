@@ -24,6 +24,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { AD_LOG_PAGE_SIZE, adDateTime, adLogStatus, adPlatformLabel, useAdLogs } from './ad-shared'
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'すべての状態' },
@@ -164,13 +165,9 @@ export default function AdHistoryV8() {
 
   return (
     <div className={adsStyles.board} data-design-node="p0kA3">
-      <header className={adsStyles.head}>
-        <div className={adsStyles.headText}>
-          <h1 className={adsStyles.title}>広告への送信履歴</h1>
-          <p className={adsStyles.description}>成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。</p>
-        </div>
-        <Button onClick={exportLogs} disabled={visible.length === 0}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
-      </header>
+      <PageHeading title={<>広告への送信履歴</>}
+        help={<>成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。</>}
+        actions={<><Button onClick={exportLogs} disabled={visible.length === 0}><Download size={15} aria-hidden="true" />CSVで書き出す</Button></>} />
       <div className={adsStyles.body}>
         <div className={styles.tools}>
           <span className={styles.searchBox}>

@@ -366,7 +366,7 @@ export default function HqBroadcastList() {
       boardId="U4Eep0"
       headingSize="regular"
       title="一括配信"
-      description="選んだアカウントの友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
+      help="選んだアカウントの友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
       stats={(
         <KpiBand>
           {kpis.map((kpi) => (

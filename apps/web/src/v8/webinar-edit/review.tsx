@@ -138,7 +138,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
       actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
-      description="すべての段がそろうと公開できます。公開すると、申込ページと LINE の案内が使えるようになります。"
+      help="すべての段がそろうと公開できます。公開すると、申込ページと LINE の案内が使えるようになります。"
       footerActions={chrome.footerActions}
       status={chrome.status}
       preview={<>

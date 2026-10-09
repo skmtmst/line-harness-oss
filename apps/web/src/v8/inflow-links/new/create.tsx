@@ -373,7 +373,7 @@ function InflowCreate() {
     <CreatePage
       boardId="KMaMk"
       title="流入リンクを作る"
-      description="発行すると URL と QR コードができます。友だちになった人を、この経路で数えます。"
+      help="発行すると URL と QR コードができます。友だちになった人を、この経路で数えます。"
       /* 競合の帯（vWJEm）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
       notice={conflictBand}
       preview={preview}

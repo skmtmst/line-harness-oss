@@ -428,8 +428,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       <CreatePage
         boardId="ulq9Y"
         title={editing ? (selected?.name ?? '対応マークを編集') : '対応マークを作る'}
-        description={description}
-        help={<AttributeKindGuide current="mark" />}
+
+        help={<>{description}{<AttributeKindGuide current="mark" />}</>}
         identity={back}
         preview={aside}
         destructive={editing && selected && !hideForm ? (

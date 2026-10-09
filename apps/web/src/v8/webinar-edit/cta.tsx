@@ -263,7 +263,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
-      description="動画の途中や終わりに出すカードと、申込に使う回答フォームを決めます。"
+      help="動画の途中や終わりに出すカードと、申込に使う回答フォームを決めます。"
       /* 競合の間は「下書きを保存」を「比べてから保存」に替える（押すと違いを比べる窓。絵 pvimJ）。 */
       footerActions={conflict && chrome.footerWithDraft
         ? chrome.footerWithDraft(<Button disabled={busy} busy={reading} onClick={() => void readLatest()}>比べてから保存</Button>)

@@ -844,13 +844,13 @@ export default function InflowListV8({
 
   return (
     <ListPage
-      help={readonly
+      help={<>{"QRコード・URLごとに、どこから友だちになったかを数えます。友だちになったときに、タグ・メッセージ・シナリオを自動で動かせます。"}{readonly
             ? '行の「…」から QRコードを表示・URLをコピーできます。'
-            : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}
+            : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}</>}
       boardId="xbHxg"
       headingSize="regular"
       title="流入と計測"
-      description="QRコード・URLごとに、どこから友だちになったかを数えます。友だちになったときに、タグ・メッセージ・シナリオを自動で動かせます。"
+
       actions={<div className={styles.headActions}>
         <Button href="/inflow-links?tab=connections"><Megaphone size={15} aria-hidden="true" />広告とのつなぎ</Button>
         {/* #859: site_tracking が切れているときは口を出さない。直 URL はホスト側の停止画面が出す。 */}

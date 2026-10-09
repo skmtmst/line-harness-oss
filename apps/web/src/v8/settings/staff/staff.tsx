@@ -1078,7 +1078,7 @@ function StaffPageHost() {
     <PageFrame kind="settings" boardId={administrator ? 'nku0f' : 'A35Gh'}>
       <PageHeading
         title="ログインユーザー"
-        description="管理画面に入る人と、その人ができることを決めます（管理者の設定はここ）"
+        help="管理画面に入る人と、その人ができることを決めます（管理者の設定はここ）"
         tabs={<Tabs size="compact" label="ログインユーザーの切り替え" items={STAFF_TAB_KEYS.map((item) => ({ label: item.label, href: `/staff?tab=${item.key}`, current: tab === item.key }))} />}
       />
       {viewer ? (

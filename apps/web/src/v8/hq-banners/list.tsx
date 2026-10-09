@@ -352,7 +352,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     <ListPage
       boardId="B9ZAr"
       title="バナー生成"
-      description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
+      help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => setView('all'), createAction: createProject }}
     >
@@ -680,7 +680,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     <ListPage
       boardId="W5Wxr"
       title="バナー生成"
-      description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
+      help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => selectView('all'), createAction: uploadImage }}
     >

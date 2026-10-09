@@ -308,7 +308,7 @@ export default function EarningRuleCreateV8() {
     <CreatePage
       boardId={conflict ? 'BnrQp' : 'ctLwT'}
       title="たまる決めごとを作る"
-      description="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
+      help="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
       notice={conflictBand}
       preview={preview}
       footerActions={(

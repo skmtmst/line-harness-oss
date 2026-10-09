@@ -426,7 +426,7 @@ export default function NewCommonVarV8() {
     <CreatePage
       boardId="p82v9"
       title="共通情報を作る"
-      description="保存しただけでは差し込まれません。公開すると使えるようになります"
+      help="保存しただけでは差し込まれません。公開すると使えるようになります"
       identity={<Link href="/contents/vars" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />共通情報へ</Link>}
       preview={preview}
       footerActions={(

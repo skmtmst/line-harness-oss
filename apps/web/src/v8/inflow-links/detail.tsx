@@ -431,7 +431,7 @@ function InflowDetailContent() {
     <DetailPage
       boardId="Q5le3"
       title={route?.name ?? '読み込み中…'}
-      description={route ? `${route.genre || '未分類'}・${url}・${accountName}・作った日 ${createdDate}` : undefined}
+      help={route ? `${route.genre || '未分類'}・${url}・${accountName}・作った日 ${createdDate}` : undefined}
       identity={back}
       actions={route ? (
         <div className={styles.headActions}>

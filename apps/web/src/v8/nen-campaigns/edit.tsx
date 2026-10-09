@@ -382,7 +382,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     <CreatePage
       boardId="w5pwG"
       title={`${setting.label}（配信を直す）`}
-      description={`${timing}。保存した新しい中身は次のきっかけから使われ、すでに配信待ちの分は予約したときの中身のまま届きます。`}
+      help={`${timing}。保存した新しい中身は次のきっかけから使われ、すでに配信待ちの分は予約したときの中身のまま届きます。`}
       preview={previewOpen ? undefined : preview}
       hidePreviewWhenNarrow
       previewToggle={<Button type="button" onClick={() => setPreviewOpen(true)}>プレビューを見る</Button>}

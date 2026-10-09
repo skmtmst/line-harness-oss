@@ -95,7 +95,7 @@ export default function EmergencyScreen({
       boardId={tab === 'health' ? 'Y4LkX1' : tab === 'history' ? 'I2V65v' : 'OHwbU'}
       layout="narrow-nav"
       title="運用状態"
-      description={description}
+      help={description}
       actions={actions}
     >
       <Tabs size="compact" spacing="settings" label="運用状態の中の切り替え" items={TABS.map((item) => ({ label: item.label, href: TAB_HREF[item.key], current: tab === item.key }))} />

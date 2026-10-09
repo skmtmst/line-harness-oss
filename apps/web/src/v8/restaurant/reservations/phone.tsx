@@ -275,7 +275,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
       <CreatePage
         boardId="rm92Y"
         title="電話の予約を入れる"
-        description="電話・店頭で受けた予約を台帳に入れます。空いている卓は自動で選びます。枠だけ押さえることもできます。"
+        help="電話・店頭で受けた予約を台帳に入れます。空いている卓は自動で選びます。枠だけ押さえることもできます。"
         tabs={<StoreTabs current="reservations" flush />}
         preview={preview}
         footerActions={(

@@ -23,6 +23,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { adMappingReturns, groupAdMappings, useAdLogs, type AdMappingRow } from './ad-shared'
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const STEPS = [
   { title: 'クリックの目印を持ち帰る', text: '広告から中継リンクを通った人の目印を残します。中継リンクを通らないと広告と結びつきません。' },
@@ -174,13 +175,9 @@ export default function AdConnectionsV8() {
 
   return (
     <div className={adsStyles.board} data-design-node="FDBsG">
-      <header className={adsStyles.head}>
-        <div className={adsStyles.headText}>
-          <h1 className={adsStyles.title}>広告とのつなぎ</h1>
-          <p className={adsStyles.description}>LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。</p>
-        </div>
-        <Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button>
-      </header>
+      <PageHeading title={<>広告とのつなぎ</>}
+        help={<>LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。</>}
+        actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>} />
       <div className={adsStyles.body}>
         {readonly ? (
           <p className={adsStyles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作は管理者に頼んでください。</p>

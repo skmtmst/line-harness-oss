@@ -34,7 +34,7 @@ export default function HqSettingsV8() {
   const canEdit = role === 'owner' || role === 'admin'
 
   return (
-    <ListPage boardId="K7HYu" title={TITLE} description={DESCRIPTION} folders={<HqSettingsNavV8 active="info" />} folderNav={settingsNav}>
+    <ListPage boardId="K7HYu" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="info" />} folderNav={settingsNav}>
       <div className={styles.body}>
         {role && !canEdit ? <Notice tone="info">閲覧のみで見ています。統括名の変更と会社・連絡先の登録は管理者だけができます。</Notice> : null}
         <TenantNameCard canEdit={canEdit} />

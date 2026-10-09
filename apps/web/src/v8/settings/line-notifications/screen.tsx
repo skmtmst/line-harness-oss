@@ -1205,7 +1205,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
     </> : undefined}
     title="LINE通知"
-    description="注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。"
+    help="注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。"
   >
     {expandedSetting === null ? <Tabs label="LINE通知の中の切り替え" size="notification" items={tabsWithCounts.map(item => ({ label: item.label, href: tabHref[item.key], current: tab === item.key }))} /> : null}
     {/*

@@ -451,7 +451,7 @@ function Responses() {
       tabSpacing="compact"
       identity={<Link href="/form-submissions" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />回答フォームへ</Link>}
       title={`集まった回答：${form.name}`}
-      description={headLine}
+      help={headLine}
       tabs={(
         <Tabs
           className={styles.tabsPlain}

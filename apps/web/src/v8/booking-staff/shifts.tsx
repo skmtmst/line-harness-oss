@@ -43,6 +43,7 @@ import ListState from '@/components/shared/list-state'
 import { PhoneDatetimeStep } from './phone'
 import layout from './layout.module.css'
 import styles from './shifts.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -213,12 +214,10 @@ function StoreHoursRedirect() {
 
 function Head({ self, title }: { self: boolean; title?: string }) {
   return (
-    <header className={layout.head} data-design="Head">
-      <h1 className={layout.title}>{title ?? (self ? '自分の勤務' : '勤務とシフト')}</h1>
-      <p className={layout.desc}>{self
+    <PageHeading title={title ?? (self ? '自分の勤務' : '勤務とシフト')}
+        help={<>{self
         ? 'あなたの出勤・休憩・この日だけのシフトと、Google カレンダーのつながりを決めます。ほかの人の勤務は管理者だけが開けます。'
-        : '担当スタッフの出勤・休憩・この日だけのシフトと、Google カレンダーのつながりを決めます。'}</p>
-    </header>
+        : '担当スタッフの出勤・休憩・この日だけのシフトと、Google カレンダーのつながりを決めます。'}</>} />
   )
 }
 
@@ -292,10 +291,8 @@ function OwnShiftEntry() {
   }, [samePageUrl, selectedAccountId, attempt])
 
   const head = (
-    <header className={layout.head}>
-      <h1 className={layout.title}>自分の勤務</h1>
-      <p className={layout.desc}>あなたの出勤・休憩・この日だけのシフトを決めます。</p>
-    </header>
+    <PageHeading title={<>自分の勤務</>}
+        help={<>あなたの出勤・休憩・この日だけのシフトを決めます。</>} />
   )
 
   if (resolved === 'error') {

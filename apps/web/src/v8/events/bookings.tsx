@@ -416,7 +416,7 @@ function Bookings({ eventId }: { eventId: string }) {
     <DetailPage
       boardId="Mu8qW"
       title={title}
-      description={(
+      help={(
         <span className={styles.subLine}>
           {subLine ? <span>{subLine}</span> : null}
         </span>

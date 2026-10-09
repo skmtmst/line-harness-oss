@@ -1240,7 +1240,7 @@ function AutoReplyWizardV8Inner() {
       <PageFrame kind="create" boardId={DONE_DESIGN_NODE}>
         <PageHeading
           title="ルールを作る"
-          description={`ルール名：${published!.name}`}
+          help={`ルール名：${published!.name}`}
           identity={<Link href="/auto-replies" className={styles.backLink}>
             <ArrowLeft size={14} aria-hidden="true" />
             自動応答へ
@@ -1497,7 +1497,7 @@ function AutoReplyWizardV8Inner() {
   )
 
   return (
-    <CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={<>{autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'}</>} description={<>
+    <CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={<>{autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'}</>} help={<>
           {step === 'basic' ? (
             'いまは停止中として作ります。最後の「確認」で有効にします。'
           ) : (

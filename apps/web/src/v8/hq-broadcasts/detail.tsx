@@ -35,6 +35,7 @@ import styles from './detail.module.css'
 import detailStyles from '../broadcast-detail/detail.module.css'
 import BroadcastPhone from '../broadcast-detail/phone'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const n = (value: number) => value.toLocaleString('ja-JP')
 /** 開いた・押した・反応（API-18）。店の計測がまだ取れていない（null）は「—」。 */
@@ -500,16 +501,9 @@ export default function HqBroadcastDetail() {
   return (
     <>
       <PageFrame kind="detail" boardId="M2tJM xOXuY">
-        <header className={detailStyles.head}>
-          <div className={detailStyles.name}>
-            <div className={detailStyles.titleRow}>
-              <h2 className={detailStyles.title} title={run?.title}>{run?.title ?? '一括配信'}</h2>
-              {badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : null}
-            </div>
-            {run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : null}
-            {run ? <HqDeliveryRail run={run} approvalPending={approval.state?.approval.status === 'pending'} /> : null}
-          </div>
-          {run ? (
+        <PageHeading title={run?.title ?? '一括配信'}
+        steps={<>{run ? <HqDeliveryRail run={run} approvalPending={approval.state?.approval.status === 'pending'} /> : null}</>}
+        actions={<>{badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : null}{run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : null}{run ? (
             <div className={detailStyles.actions}>
               {/* CSV は見るだけの操作。閲覧のみにも出す。 */}
               <Button size="field" onClick={() => void exportCsv()} busy={exporting} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
@@ -517,8 +511,7 @@ export default function HqBroadcastDetail() {
                 <Button size="field" variant="primary" href={`/hq/broadcasts/new?copy=${encodeURIComponent(run.id)}`}><Copy size={15} aria-hidden="true" />複製して作る</Button>
               ) : null}
             </div>
-          ) : null}
-          {canManage && run ? (
+          ) : null}{canManage && run ? (
             <div className={detailStyles.actions}>
               {run.status === 'prepared' || (live && run.status !== 'stopped') ? (
                 <Button size="field" variant="danger" onClick={() => setAsk({ kind: 'cancel' })}><Ban size={15} aria-hidden="true" />取り消す</Button>
@@ -542,8 +535,7 @@ export default function HqBroadcastDetail() {
                 )
               ) : null}
             </div>
-          ) : null}
-        </header>
+          ) : null}</>} />
         {run ? (
           <div className={detailStyles.tabs}>
             <Tabs

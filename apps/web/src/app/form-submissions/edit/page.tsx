@@ -931,7 +931,7 @@ function FormEditInner() {
           <PageHeader
             breadcrumb={[{ label: '回答フォーム', href: '/form-submissions' }, { label: name || 'フォーム名未設定' }]}
             title={name || 'フォーム名未設定'}
-            description="中身・答え終わったあと・受付と見た目を整えます。"
+            help="中身・答え終わったあと・受付と見た目を整えます。"
           />
           {dirty && publishedVersionId && (
             <p className="text-ink-secondary mt-1 text-xs">下書き・公開中の版と違うところがあります</p>

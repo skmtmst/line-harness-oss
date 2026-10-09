@@ -1294,7 +1294,7 @@ export default function RichMenusListV8() {
       boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}
       headingSize="regular"
       title="リッチメニュー"
-      description="トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。"
+      help="トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。"
       actions={
         <Button
           type="button"

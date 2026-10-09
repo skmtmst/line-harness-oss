@@ -440,7 +440,7 @@ function OperatorEditInner() {
 
   return (
     <PageFrame kind="settings" boardId={editId ? 'hiBO8' : 'gjUz3'}>
-      <PageHeading title={title} description={description} />
+      <PageHeading title={title} help={description} />
 
       <div className={styles.body}>
         <SettingsInnerNav inline />

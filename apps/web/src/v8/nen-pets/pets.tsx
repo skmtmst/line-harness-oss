@@ -122,7 +122,7 @@ export default function PetsV8({
       boardId={BOARD[tab]}
       headingSize="regular"
       title="マイペット"
-      description="お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。"
+      help="お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。"
       actions={accountId ? (
         <Button type="button" onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
           <Download size={15} aria-hidden="true" />CSV で書き出す

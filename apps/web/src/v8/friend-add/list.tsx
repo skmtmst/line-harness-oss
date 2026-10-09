@@ -807,11 +807,11 @@ function FriendAddList() {
 
   return (
     <ListPage
-      help={ORDER_NOTE}
+      help={<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}</>}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
       title="友だち追加時の配信"
-      description="友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"
+
       actions={
         <Button href="/friend-add-settings/runs">
           <Activity size={15} aria-hidden="true" />実行結果を見る

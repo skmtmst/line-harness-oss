@@ -270,7 +270,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   return (
     <div className={styles.page} data-design-node="hKr8f">
       <PageFrame kind="create">
-        <PageHeading title={group.name} identity={backLink} description={head} />
+        <PageHeading title={group.name} identity={backLink} help={head} />
         <div className={styles.split}>
           <div className={styles.content}>
             {failed ? (

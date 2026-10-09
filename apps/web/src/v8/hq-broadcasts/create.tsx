@@ -71,6 +71,7 @@ import { hostDefinition } from '@/v8/hq-templates/console'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import styles from './create.module.css'
 import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type Store = BroadcastAccount
 /** 配信対象（店の一斉配信と同じ4つ。名前は店の口と同じ：詳細条件は advanced）。 */
@@ -766,11 +767,7 @@ export default function HqBroadcastCreate() {
   if (!canManage) {
     return (
       <div className={formStyles.root}>
-        <header className={formStyles.header}>
-          <div className={formStyles.heading}>
-            <h2>一括配信を作る</h2>
-          </div>
-        </header>
+        <PageHeading title={<>一括配信を作る</>} />
         <div className={formStyles.input}>
           <Notice tone="info">一括配信を作れるのは、統括全体の編集権限がある人（オーナー・管理者）だけです。</Notice>
         </div>
@@ -784,15 +781,10 @@ export default function HqBroadcastCreate() {
   return (
     <>
       <MessageComposerPage active={step === 'message'}><div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
-        <header className={formStyles.header} data-steps-below="">
-          <div className={formStyles.heading}>
-            <h2>一括配信を作る</h2>
-            <p aria-live="polite">{draftLabel}</p>
-          </div>
-          {/* 手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。 */}
-          <div className={formStyles.stepsBelow}><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></div>
-          <Button aria-expanded={previewOpen} aria-controls="hq-broadcast-line-preview" className={formStyles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button>
-        </header>
+        <PageHeading title={<>一括配信を作る</>}
+        crumbs={<><p aria-live="polite">{draftLabel}</p></>}
+        steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></>}
+        actions={<>{/* 手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。 */}<Button aria-expanded={previewOpen} aria-controls="hq-broadcast-line-preview" className={formStyles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button></>} />
         {error ? (
           <Notice
             tone="danger"

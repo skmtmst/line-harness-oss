@@ -377,7 +377,7 @@ export default function DashboardV8() {
       boardId="WQmep"
       headingSize="compact"
       title={greeting(d.staffName)}
-      description={headline(data?.asOf, d.displayedHealthRisk)}
+      help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
         <SegmentedControl<PeriodKey>
           aria-label="集計の期間"

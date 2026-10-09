@@ -1097,7 +1097,7 @@ export default function MediaLibraryListV8() {
       boardId="O7hUt7"
       headingSize="regular"
       title="登録メディア一覧"
-      description="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
+      help="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
       tabs={!canManageMedia ? (
         <p className={styles.roBand} role="note">
           <Eye size={16} aria-hidden="true" />

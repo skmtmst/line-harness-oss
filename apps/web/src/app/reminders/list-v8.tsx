@@ -1167,7 +1167,7 @@ export default function RemindersListV8() {
 
   return (
     <PageFrame kind="list" boardId={narrow ? 'Iffil' : 'apLqS'}>
-      <PageHeading headingSize="regular" title={<>リマインダ</>} description={<>
+      <PageHeading headingSize="regular" title={<>リマインダ</>} help={<>
             予約日時・誕生日・契約終了日などの「基準日」を決めて、その前や後に自動で送ります。
           </>}  />
 

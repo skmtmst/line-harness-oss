@@ -59,6 +59,7 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import SheetDialog from './sheet-dialog'
 import styles from './detail.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
@@ -485,10 +486,9 @@ function ReminderDetailV8() {
 
   return (
     <PageFrame kind="detail" boardId={tab === 'registrants' ? 'loVfW' : 'rbAig'}>
-      <header className={styles.head} data-template-region="heading">
-        <h1 className={styles.title} title={data.reminder.name}>{data.reminder.name}</h1>
-        <p className={styles.meta}>{meta}</p>
-        <Tabs
+      <PageHeading title={data.reminder.name}
+        crumbs={<><p className={styles.meta}>{meta}</p></>}
+        tabs={<><Tabs
           label="リマインダの詳細"
           items={[
             { label: '概要', current: tab === 'overview', onClick: () => selectTab('overview') },
@@ -496,8 +496,7 @@ function ReminderDetailV8() {
             { label: '実行結果', current: tab === 'runs', onClick: () => selectTab('runs') },
             { label: '登録者', current: tab === 'registrants', onClick: () => selectTab('registrants') },
           ]}
-        />
-      </header>
+        /></>} />
 
       <div className={styles.split}>
         <div className={styles.main}>

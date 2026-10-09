@@ -578,11 +578,11 @@ export default function AutomationRunsV8() {
 
   return (
     <ListPage
-      help="行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"
+      help={<>{AUTOMATIONS_DESCRIPTION}{"行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"}</>}
       boardId="g98F9"
       headingSize="regular"
       title="オートメーション"
-      description={AUTOMATIONS_DESCRIPTION}
+
       actions={canExport
         ? <Button onClick={downloadRunsCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…" title="いまの検索・絞り込みの行が出ます（5,000件まで）"><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
         : undefined}

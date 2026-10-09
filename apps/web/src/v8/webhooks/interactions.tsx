@@ -398,11 +398,11 @@ export default function WebhooksInteractionsV8() {
 
   return (
     <ListPage
-      help="行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"
+      help={<>{WEBHOOKS_DESCRIPTION}{"行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"}</>}
       boardId="Uv9AA"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+
       tabs={<WebhookTabs active="interactions" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {!isOwner && !canRetry ? <ViewerBand /> : null}

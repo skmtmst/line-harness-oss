@@ -30,6 +30,7 @@ import { useIdentityReview } from '@/components/identity/identity-review'
 import { canSubmitDecision } from '@/components/identity/identity-view'
 import { CONFIDENCE_WORD, STATUS_WORD, slashDateTime } from '../duplicates/words'
 import styles from './compare.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const STRENGTH_WORD = { strong: '決め手', medium: '手がかり', weak: '参考' } as const
 const ATTRIBUTE_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }
@@ -117,12 +118,8 @@ function CompareInner() {
 
   return (
     <PageFrame kind="detail" boardId="fcg2D">
-      <header className={styles.head}>
-        <h2 className={styles.title}>{detail ? `${detail.left.label} ↔ ${detail.right.label}` : '重複候補を比べて決める'}</h2>
-        <p className={styles.description}>
-          {detail ? `確からしさ：${CONFIDENCE_WORD[detail.confidence.label]}${decisive ? `・根拠：${decisive.label}` : ''}` : '同じ人かどうかを、根拠を見て決めます'}
-        </p>
-      </header>
+      <PageHeading title={detail ? `${detail.left.label} ↔ ${detail.right.label}` : '重複候補を比べて決める'}
+        help={<>{detail ? `確からしさ：${CONFIDENCE_WORD[detail.confidence.label]}${decisive ? `・根拠：${decisive.label}` : ''}` : '同じ人かどうかを、根拠を見て決めます'}</>} />
 
       <div className={styles.body}>
         <IdentityStateBlock
