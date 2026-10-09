@@ -42,6 +42,7 @@ import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
+import StatusPill from '@/components/shared/status-pill'
 import TruncatedText from '@/components/shared/truncated-text'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
@@ -518,7 +519,7 @@ export default function HqHomeV8() {
                     {/* B-31：名前の下は1行で省略し、全文は title。 */}
                     <p className={styles.meta} title={metaOf(account)}>{metaOf(account)}</p>
                   </div>
-                  <span className={state.tone === 'ok' ? `${styles.pill} ${styles.pill_ok}` : state.tone === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_idle}`}><span className={styles.dot} aria-hidden="true" />{state.label}</span>
+                  <StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill>
                 </div>
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
@@ -564,7 +565,7 @@ export default function HqHomeV8() {
                     <span className={styles.meta}>{metaOf(account)}</span>
                   </span>
                 </span>
-                <span role="cell"><span className={state.tone === 'ok' ? `${styles.pill} ${styles.pill_ok}` : state.tone === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_idle}`}><span className={styles.dot} aria-hidden="true" />{state.label}</span></span>
+                <span role="cell"><StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill></span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.friendCount ?? 0)}</span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.messagesThisMonth ?? 0)}</span>
                 <span role="cell">{cardActions(account)}</span>

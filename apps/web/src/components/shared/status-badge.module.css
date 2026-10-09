@@ -110,18 +110,20 @@
 
 /* B-152・仕上げ4 */
 [data-theme='v8'] .badge:not(.annotation) {
-  --status-dot: var(--polish-status-neutral-dot);
-  --status-bg: var(--polish-status-neutral-bg);
-  --status-ink: var(--polish-status-neutral-ink);
   gap: var(--polish-status-gap); padding: var(--polish-status-pad);
   border: 0; border-radius: var(--radius-pill);
-  background: var(--status-bg); color: var(--status-ink);
+  background: var(--polish-status-neutral-bg); color: var(--polish-status-neutral-ink);
   font-size: var(--polish-text-support); font-weight: 600; line-height: 1.5;
   max-width: 100%; min-width: 0;
 }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='success'] { --status-dot: var(--polish-status-success-dot); --status-bg: var(--polish-status-success-bg); --status-ink: var(--polish-status-success-ink); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='warning'] { --status-dot: var(--polish-status-warning-dot); --status-bg: var(--polish-status-warning-bg); --status-ink: var(--polish-status-warning-ink); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='danger'] { --status-dot: var(--polish-status-danger-dot); --status-bg: var(--polish-status-danger-bg); --status-ink: var(--polish-status-danger-ink); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='info'] { --status-dot: var(--polish-status-info-dot); --status-bg: var(--polish-status-info-bg); --status-ink: var(--polish-status-info-ink); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='neutral'] { --status-dot: var(--polish-status-neutral-dot); --status-bg: var(--polish-status-neutral-bg); --status-ink: var(--polish-status-neutral-ink); }
-[data-theme='v8'] .badge:not(.annotation)::before { background: var(--status-dot); width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); }
+[data-theme='v8'] .badge:not(.annotation)[data-tone='success'] { background: var(--polish-status-success-bg); color: var(--polish-status-success-ink); }
+[data-theme='v8'] .badge:not(.annotation)[data-tone='success']::before { background: var(--polish-status-success-dot); }
+[data-theme='v8'] .badge:not(.annotation)[data-tone='warning'] { background: var(--polish-status-warning-bg); color: var(--polish-status-warning-ink); }
+[data-theme='v8'] .badge:not(.annotation)[data-tone='warning']::before { background: var(--polish-status-warning-dot); }
+[data-theme='v8'] .badge:not(.annotation)[data-tone='danger'] { background: var(--polish-status-danger-bg); color: var(--polish-status-danger-ink); }
+[data-theme='v8'] .badge:not(.annotation)[data-tone='danger']::before { background: var(--polish-status-danger-dot); }
+[data-theme='v8'] .badge:not(.annotation)[data-tone='info'] { background: var(--polish-status-info-bg); color: var(--polish-status-info-ink); }
+[data-theme='v8'] .badge:not(.annotation)[data-tone='info']::before { background: var(--polish-status-info-dot); }
+[data-theme='v8'] .badge:not(.annotation)[data-tone='neutral'] { background: var(--polish-status-neutral-bg); color: var(--polish-status-neutral-ink); }
+[data-theme='v8'] .badge:not(.annotation)[data-tone='neutral']::before { background: var(--polish-status-neutral-dot); }
+[data-theme='v8'] .badge:not(.annotation)::before { background: var(--polish-status-neutral-dot); width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); }
