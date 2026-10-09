@@ -174,10 +174,31 @@ export interface FormInputBlock {
   dateStyle?: "calendar" | "ymd";
   /** 入力された日付を起点にリマインダを動かす */
   reminder?: { reminderId: string; time: string } | null;
-  /** ファイルの種類。いまは画像だけ */
-  fileKind?: "image";
+  /** ファイルの種類。未設定の既存ブロックは写真。 */
+  fileKind?: "image" | "pdf" | "identity";
+  fileKinds?: ("image" | "pdf" | "identity")[];
+  fileBothSides?: boolean;
+  fileMaxCount?: number;
   /** type = 'booking' のときの「予約を入れる」の設定 */
   booking?: FormBookingConfig | null;
+}
+
+/** A block accepting identity documents protects every attachment at the strictest level. */
+export function formFileKinds(block: FormInputBlock): ("image" | "pdf" | "identity")[] {
+  return block.fileKinds ?? [block.fileKind ?? "image"];
+}
+export function formFileKind(block: FormInputBlock): "image" | "pdf" | "identity" {
+  const kinds = formFileKinds(block);
+  return kinds.includes("identity") ? "identity" : kinds.includes("image") ? "image" : "pdf";
+}
+
+export interface FormFileAnswer {
+  fileId: string;
+  kind?: "image" | "pdf" | "identity";
+  side?: "single" | "front" | "back";
+  filename?: string;
+  mimeType?: string;
+  state?: "ready" | "pending" | "restricted" | "expired";
 }
 
 /** 飾りのブロック（入力欄ではないもの）。 */
@@ -1068,6 +1089,12 @@ export function validateAnswer(
   }
 
   if (block.type === "file") {
+    if (Array.isArray(value)) {
+      const max = formFileKind(block) === "identity" && block.fileBothSides ? 2 : Math.min(10, Math.max(1, block.fileMaxCount ?? 1));
+      if (value.length > max || value.some(v => !v || typeof v !== "object" || typeof v.fileId !== "string" || !/^[0-9a-f-]{36}$/i.test(v.fileId))) return `${block.label} の添付を確認してください`;
+      if (value.length && formFileKind(block) === "identity" && block.fileBothSides && value.length !== 2) return `${block.label} の表と裏を送ってください`;
+      return null;
+    }
     // 回答に入るのは、預けた画像のURL。中身そのものは入らない。
     // 別の場所を指すURLを書き込まれても困るので、こちらが返す形だけを通す。
     if (!/^https?:\/\/[^\s]+\/images\/form-uploads\//.test(String(value))) {
@@ -1212,6 +1239,12 @@ export function validateFormDefinition(layout: FormLayout): string | null {
           return `回答データの見出し「${block.name}」が重複しています`;
         }
         seenNames.add(block.name);
+        if (block.type === "file") {
+          if (block.fileKinds !== undefined && (!Array.isArray(block.fileKinds) || !block.fileKinds.length || block.fileKinds.some(kind => !["image", "pdf", "identity"].includes(kind)))) return `${at}で受け取る種類を1つ以上選んでください`;
+          if (block.fileKind && !["image", "pdf", "identity"].includes(block.fileKind)) return `${at}のファイルの種類を選んでください`;
+          if (block.fileMaxCount !== undefined && (!Number.isInteger(block.fileMaxCount) || block.fileMaxCount < 1 || block.fileMaxCount > 10)) return `${at}の枚数の上限は1〜10枚です`;
+          if (block.fileBothSides !== undefined && typeof block.fileBothSides !== "boolean") return `${at}の表と裏の設定を確認してください`;
+        }
 
         if (hasChoices(block)) {
           const choices = block.choices ?? [];

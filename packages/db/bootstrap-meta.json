@@ -563,7 +563,8 @@
     "618_hq_banner_folders.sql",
     "619_hq_folder_display_order.sql",
     "620_migrate_private_memo_to_chat_notes.sql",
+    "621_form_submission_files.sql",
     "622_hq_delivery_templates.sql"
   ],
-  "migrationCount": 564
+  "migrationCount": 565
 }

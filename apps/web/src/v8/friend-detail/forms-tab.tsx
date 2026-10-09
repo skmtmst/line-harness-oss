@@ -5,16 +5,15 @@
  * 項目名は回答時点の質問定義（fields の label）で出し、定義に無いキーは
  * 「（現在は使われていない項目）」を添える（FRIEND-24）。
  */
-import { formAnswerText } from '@/lib/form-answer'
 import { ClipboardList } from 'lucide-react'
 import Button from '@/components/shared/button'
+import FormFileAttachments from '@/components/shared/form-file-attachments'
 import ListRange from '@/components/ui/list-range'
 import { formatDateTime } from '@/lib/format'
 import type { FriendDetailState } from './use-friend-detail'
 import styles from './detail.module.css'
 import { DetailLoading } from '@/components/templates/detail-page'
 
-const renderValue = formAnswerText
 
 export default function FormsTab({ data }: { data: FriendDetailState }) {
   const { submissions, submissionsStatus, submissionsTotal, submissionsNextCursor, submissionsLoadingMore, submissionsMoreError } = data
@@ -53,12 +52,12 @@ export default function FormsTab({ data }: { data: FriendDetailState }) {
             </div>
             <dl className={styles.answers}>
               {keys.map((k) => (
-                <div key={k} className={styles.answer}><dt>{labelByName.get(k)}</dt><dd>{renderValue(s.data[k])}</dd></div>
+                <div key={k} className={styles.answer}><dt>{labelByName.get(k)}</dt><dd><FormFileAttachments value={s.data[k]} /></dd></div>
               ))}
               {orphans.map((k) => (
                 <div key={k} className={styles.answer}>
                   <dt title={`項目キー: ${k}`}>{k}<span className={styles.orphan}>（現在は使われていない項目）</span></dt>
-                  <dd>{renderValue(s.data[k])}</dd>
+                  <dd><FormFileAttachments value={s.data[k]} /></dd>
                 </div>
               ))}
             </dl>

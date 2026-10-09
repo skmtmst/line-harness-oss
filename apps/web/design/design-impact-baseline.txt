@@ -751,3 +751,6 @@ shared-button-importer v8/template-edit/frame.tsx
 shared-button-importer components/shared/bulk-bar.tsx
 
 shared-button-importer components/shared/list-state.tsx
+
+shared-button-importer components/shared/form-file-attachments.tsx
+shared-button-importer components/shared/form-document-retention.tsx

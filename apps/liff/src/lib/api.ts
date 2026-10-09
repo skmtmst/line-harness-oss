@@ -548,10 +548,10 @@ export const api = {
     }
     return { status: res.status, body: parsed };
   },
-  /** 回答に添付する画像を預ける。返ってきたURLを回答に入れる */
-  uploadFormFile: (id: string, file: File, testToken?: string) =>
-    postBinary<{ success: true; data: { key: string; url: string; mimeType: string; size: number } }>(
-      `/api/forms/${id}/files${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`,
+  /** 回答の添付を預ける。新しい質問は添付ID、従来の質問はURLを返す。 */
+  uploadFormFile: (id: string, file: File, testToken?: string, blockId?: string, side = 'single') =>
+    postBinary<{ success: true; data: { key?: string; url?: string; mimeType?: string; size?: number; file?: import('@line-crm/shared').FormFileAnswer; scanStatus?: string } }>(
+      `/api/forms/${id}/files?${new URLSearchParams({ ...(testToken ? { test_token: testToken } : {}), ...(blockId ? { block_id: blockId, side, filename: file.name } : {}) })}`,
       file,
     ),
   /**

@@ -145,6 +145,8 @@ export default function Form() {
    */
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   /** 送信中のファイル欄。二重に押させないため欄ごとに持つ */
+  const filePreviewUrls = useRef(new Set<string>());
+  useEffect(() => () => { filePreviewUrls.current.forEach(url => URL.revokeObjectURL(url)); }, []);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -169,7 +171,10 @@ export default function Form() {
           try {
             const latest = await api.getMyLatestFormAnswer(id);
             if (!cancelled && latest?.answers) {
-              setAnswers((prev) => ({ ...prev, ...latest.answers }));
+              const restored = { ...latest.answers };
+              // A document belongs to one answer. Restore other inputs; reselect attachments.
+              collectInputs(data.layout).filter(block => block.type === 'file').forEach(block => { delete restored[block.name]; });
+              setAnswers((prev) => ({ ...prev, ...restored }));
             }
           } catch {
             // 前回の回答は無くても入力はできる
@@ -237,22 +242,31 @@ export default function Form() {
   };
 
   /**
-   * 画像を預けて、回答にはURLを入れる。
+   * ファイルを預けて、回答には添付のIDを入れる。
    *
    * 中身をそのまま回答データに入れない。回答は D1 に JSON で入るので、
    * 画像を base64 で持たせると1件で数MBになり、一覧を開くだけで重くなる。
    */
-  const uploadFile = async (name: string, file: File) => {
+  const uploadFile = async (name: string, file: File, side: 'single' | 'front' | 'back' = 'single') => {
     if (!id) return;
     setError(null);
     setUploading((prev) => ({ ...prev, [name]: true }));
     try {
-      const res = await api.uploadFormFile(id, file, testToken ?? undefined);
-      setValue(name, res.data.url);
+      if (!layout) return;
+      const block = collectInputs(layout).find(b => b.name === name);
+      if (!block) return;
+      const res = await api.uploadFormFile(id, file, testToken ?? undefined, block.id, side);
+      if (res.data.file) {
+        const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
+        if (previewUrl) filePreviewUrls.current.add(previewUrl);
+        const entry = { ...res.data.file, previewUrl };
+        setAnswers(previous => ({ ...previous, [name]: [...(Array.isArray(previous[name]) ? previous[name] as import('@line-crm/shared').FormFileAnswer[] : []), entry] }));
+      } else if (res.data.url) setValue(name, res.data.url);
+      else throw new Error('document_upload_response_missing');
       clearFieldError(name);
     } catch (err) {
       logFailure('form-upload', err);
-      setError('画像を送れませんでした。もう一度お試しください。');
+      setError('ファイルを送れませんでした。形式と容量を確認して、もう一度お試しください。');
     } finally {
       setUploading((prev) => ({ ...prev, [name]: false }));
     }
@@ -373,7 +387,7 @@ export default function Form() {
     let current = key;
     for (let i = 0; i < 6; i += 1) {
       const attempt = await api.submitForm(id!, {
-        data: answers,
+        data: Object.fromEntries(Object.entries(answers).map(([name, value]) => [name, Array.isArray(value) ? value.map(v => v && typeof v === 'object' && 'fileId' in v ? { fileId: v.fileId } : v) : value])),
         trackedLinkId: search.get('ref') ?? undefined,
       }, current, testToken ?? undefined);
       const decision = decideFormSubmitStep(attempt);
@@ -635,7 +649,7 @@ export default function Form() {
 
           {conflict && (
             <div>
-              <Button variant="secondary" onClick={resendWithFreshKey} disabled={sending}>
+              <Button variant="secondary" onClick={resendWithFreshKey} disabled={sending || Object.values(uploading).some(Boolean)}>
                 {conflict.code === 'idempotency_expired' ? 'もう一度送る' : '別の回答として送り直す'}
               </Button>
             </div>
@@ -650,8 +664,7 @@ export default function Form() {
         <Button variant="primary"
           type="button"
           onClick={() => (isLast ? submit() : goNext())}
-          disabled={sending}
-
+          disabled={sending || Object.values(uploading).some(Boolean)}
           style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
         >
           {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
@@ -1029,7 +1042,7 @@ function BlockView({
   answers: Answers;
   onChange: (name: string, value: unknown) => void;
   onToggle: (name: string, label: string) => void;
-  onUpload: (name: string, file: File) => void;
+  onUpload: (name: string, file: File, side?: 'single' | 'front' | 'back') => void;
   uploading: boolean;
   error: string | null;
   errorColor: string;
@@ -1302,8 +1315,11 @@ function BlockView({
 
         {block.type === 'file' && (
           <div>
-            <FormFileControl label={block.label} uploading={uploading} onUpload={(file) => onUpload(block.name, file)} />
-            {text && (
+            <FormFileControl label={block.label} kind={block.fileKind} kinds={block.fileKinds} bothSides={block.fileBothSides} maxCount={block.fileMaxCount}
+              files={Array.isArray(value) ? value as import('@line-crm/shared').FormFileAnswer[] : []}
+              uploading={uploading} onUpload={(file, side) => onUpload(block.name, file, side)}
+              onRemove={fileId => { const next = (Array.isArray(value) ? value : []).filter(v => v.fileId !== fileId); const removed = (Array.isArray(value) ? value : []).find(v => v.fileId === fileId); if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl); onChange(block.name, next); }} />
+            {!Array.isArray(value) && text && (
               <div className="mt-2">
                 <img src={text} alt="送った画像" className="max-h-40 rounded-lg" />
                 <Button variant="text"

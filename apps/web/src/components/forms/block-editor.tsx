@@ -21,6 +21,7 @@ import type {
 } from '@line-crm/shared'
 import { newBlockId, PREFECTURES } from '@line-crm/shared'
 import ChoiceTable from './choice-table'
+import FormFileSettings from '@/components/shared/form-file-settings'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { describeInputUpdates } from './form-update-summary'
@@ -319,20 +320,7 @@ export default function BlockEditor({
                   </label>
                 )}
 
-                {block.type === 'file' && (
-                  <label>
-                    <span className="text-ink-secondary mb-1 block text-xs font-medium">
-                      受け取るもの
-                    </span>
-                    <Select
-                      aria-label="受け取るもの"
-                      value="image"
-                      disabled
-                      onChange={() => {}}
-                      options={[{ value: 'image', label: '画像' }]}
-                    />
-                  </label>
-                )}
+                {block.type === 'file' && <FormFileSettings block={block} onChange={patchInput} />}
 
                 {block.type === 'booking' && (
                   <div className="flex-1 space-y-3" data-design-node="ijxur">

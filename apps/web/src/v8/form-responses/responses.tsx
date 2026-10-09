@@ -26,6 +26,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { DetailPage, DetailColumns } from '@/components/templates'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
+import FormFileAttachments from '@/components/shared/form-file-attachments'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import TargetMissing from '@/components/shared/target-missing'
@@ -64,6 +65,7 @@ const MAX_EXPORT_ROWS = 5000
 const EXPORT_PAGE_LIMIT = 200
 
 function valueText(value: unknown, block?: InputBlock): string {
+  if (Array.isArray(value) && value.some(v => v && typeof v === 'object' && 'fileId' in v)) return value.map(v => v && typeof v === 'object' && 'fileId' in v ? v.state === 'expired' ? '期限で消しました' : v.state === 'restricted' ? '見る権限がありません' : v.filename || '書類' : formAnswerText(v)).join('、')
   return formAnswerText(value, block) || '—'
 }
 function normalizedSubmission(item: Submission): Submission {
@@ -79,7 +81,7 @@ function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labe
   const lines = [header.map(csvCell).join(',')]
   for (const row of rows) {
     const data = row.data as Record<string, unknown>
-    lines.push([row.id, row.friendName ?? '不明', formatDateTime(row.createdAt), ...fieldKeys.map((key) => formAnswerText(data[key], blocks.find(block => block.name === key || block.id === key)))].map(csvCell).join(','))
+    lines.push([row.id, row.friendName ?? '不明', formatDateTime(row.createdAt), ...fieldKeys.map((key) => valueText(data[key], blocks.find(block => block.name === key || block.id === key)))].map(csvCell).join(','))
   }
   const url = URL.createObjectURL(new Blob([`﻿${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' }))
   const anchor = document.createElement('a')
@@ -389,7 +391,7 @@ function Responses() {
               return (
                 <div key={key} className={styles.detailRow}>
                   <dt title={labels[key] ?? key}>{labels[key] ?? key}</dt>
-                  <dd title={value}>{blockByKey(key)?.type === 'rating' && value !== '—' ? `★${value}` : value}</dd>
+                  <dd title={value}>{blockByKey(key)?.type === 'rating' && value !== '—' ? `★${value}` : <FormFileAttachments value={(selected.data as Record<string, unknown>)[key]} block={blockByKey(key)} />}</dd>
                 </div>
               )
             })}

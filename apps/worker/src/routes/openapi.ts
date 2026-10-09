@@ -1,4 +1,5 @@
 import { archiveRestorePaths } from './archive-restore-openapi.js';
+import { formDocumentPaths } from './form-documents-openapi.js';
 import { folderUpgradePaths } from './folder-upgrade-openapi.js';
 import {auditstepsPaths} from './auditsteps-openapi.js';
 import { tabCountPaths } from './tab-counts-openapi.js';
@@ -405,6 +406,7 @@ const spec = {
   paths: {
     ...folderUpgradePaths,
     ...archiveRestorePaths,
+    ...formDocumentPaths,
     ...tabCountPaths,
     ...tenantCompanyContactPaths,
     ...chatAttachmentPaths,
