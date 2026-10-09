@@ -17,6 +17,8 @@ export interface SelectOption {
   disabled?: boolean
   /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。v7 では出さない。 */
   leading?: ReactNode
+  /** ★V8 の開いた中身で名前の下に出す1行の説明（「押したら」YPzmo）。候補が多く間引く一覧では出さない。 */
+  description?: string
   /** 対応状況の札の地・文字・点に使う色。treatment='pill' のときだけ適用する。 */
   tone?: StatusBadgeTone
 }
@@ -353,6 +355,7 @@ export default function Select({
                 key={option.value}
                 label={heads.labelOf(option)}
                 leading={option.leading}
+                description={windowed ? undefined : option.description}
                 selected={option.value === value}
                 active={optionIndex >= 0 && optionIndex === activeIndex}
                 disabled={option.disabled}

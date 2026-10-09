@@ -624,6 +624,19 @@
   --select-menu-item-size: 13px;
   --select-menu-item-line: 18px;
   --select-menu-check: 14px;
+  /* 名前の下の1行の説明（YPzmo）。 */
+  --select-menu-desc-size: 11px;
+  --select-menu-desc-line: 16px;
+  --select-menu-desc-gap: 2px;
+  /* 「押したら」の共通の欄（components/shared/tap-action-field・YPzmo）。 */
+  --tap-action-kind-w: 200px;
+  --tap-action-gap: 8px;
+  --tap-action-row-h: 40px;
+  --tap-action-pad: 0 6px 0 12px;
+  --tap-action-icon: 15px;
+  --tap-action-note-pad: 8px 12px;
+  --tap-action-option-pad: 8px 10px;
+  --tap-action-list-max-h: 320px;
   --select-menu-enter: 150ms;
   --select-menu-enter-scale: 0.97;
   /* 同じ板で「新しいフォルダ」の名前を入れる（iBuZH）。内側 10・間 8・欄 32・色の見本 18（間 6）・ボタン 28。 */
