@@ -28,9 +28,7 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from './media-picker'
-import TapActionField from '@/components/shared/tap-action-field'
-import { tapLiffIdOf, useTapActionAccount, useTapActionSources } from '@/components/shared/use-tap-action-sources'
-import { tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, type TapActionKind } from '@/lib/tap-actions'
+import UriTapActionField from '@/components/shared/uri-tap-action-field'
 import styles from './edit.module.css'
 
 type Props = {
@@ -460,32 +458,12 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
   )
 }
 
-/*
- * リンクのボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。保存は今のまま開く URL の文字だけ。
- * 予約・回答フォーム・予約履歴・来店スタンプはアカウントの LIFF の URL にする。テキストを送るは、
- * 回答フォームの画面のボタンでは送れないので出さない。
- */
-const FORM_LINK_KINDS: readonly TapActionKind[] = ['uri', 'booking', 'form', 'booking_history', 'visit_stamp']
+/* リンクのボタンの押したら（共通の欄・YPzmo・B-129）。保存は今のまま開く URL の文字だけ。 */
 function ButtonTapField({ id, url, accountId, onChange }: { id: string; url: string; accountId: string | null; onChange: (url: string) => void }) {
-  const liffId = tapLiffIdOf(useTapActionAccount(), accountId)
-  const sources = useTapActionSources(accountId)
-  const value = tapActionFromSavedUri(url)
   return (
     <div className={`${styles.field} ${styles.decoTap}`} id={`${id}-url`}>
       <span className={styles.fieldLabel}>押したら</span>
-      <TapActionField
-        name="このボタン"
-        value={value}
-        onChange={(patch) => {
-          const kind = patch.kind ?? value.kind
-          if (kind === 'uri') { onChange(patch.uri ?? (patch.kind !== undefined ? '' : url)); return }
-          if (tapActionNeedsLiff(kind)) onChange(tapActionLiffUrl(liffId || '{{liff_id}}', kind, patch.refId ?? (patch.kind !== undefined ? '' : value.refId)))
-        }}
-        kinds={FORM_LINK_KINDS}
-        hasLiff={Boolean(liffId)}
-        liffSettingsHref={accountId ? `/accounts/detail?id=${encodeURIComponent(accountId)}` : '/accounts'}
-        sources={sources}
-      />
+      <UriTapActionField name="このボタン" url={url} accountId={accountId} onChange={onChange} />
     </div>
   )
 }

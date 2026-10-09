@@ -90,6 +90,8 @@ export interface TapActionFieldProps {
   layout?: 'row' | 'stack'
   /** テキストを送るの文字数の上限（LINE の決まりは画面ごとに違う）。 */
   textMax?: number
+  /** URL の欄の薄い字（既定 https://example.com）。 */
+  uriPlaceholder?: string
   /** 押したらのプルダウンの読み上げ名（既定「〇〇を押したら」）。幅は持たない（呼び出し側の箱で決める）。 */
   kindLabel?: string
 }
@@ -107,7 +109,7 @@ function kindOptionsOf(kinds: readonly TapActionKind[], extras: readonly TapActi
 export default function TapActionField({
   name, value, onChange, kinds = TAP_ACTION_KINDS, extraKinds = [], renderBody,
   scope = 'shop', hasLiff, liffSettingsHref = '/accounts', readOnly = false, sources,
-  layout = 'row', textMax, kindLabel,
+  layout = 'row', textMax, kindLabel, uriPlaceholder = 'https://example.com',
 }: TapActionFieldProps) {
   const options = useMemo(() => kindOptionsOf(kinds, extraKinds, value.kind), [kinds, extraKinds, value.kind])
   const current = options.find((option) => option.value === value.kind)
@@ -154,7 +156,7 @@ export default function TapActionField({
   } else if (def.kind === 'uri') {
     body = readOnly
       ? <span className={styles.readBody} title={value.uri}>{value.uri || '—'}</span>
-      : <TextField type="url" value={value.uri} placeholder="https://example.com" aria-label={`${name}のURL`} onChange={(event) => onChange({ uri: event.target.value })} />
+      : <TextField type="url" value={value.uri} placeholder={uriPlaceholder} aria-label={`${name}のURL`} onChange={(event) => onChange({ uri: event.target.value })} />
   } else if (def.kind === 'message') {
     const over = textMax !== undefined && [...value.text].length > textMax
     body = readOnly

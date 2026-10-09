@@ -26,6 +26,7 @@ import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Notice from '@/components/shared/notice'
+import UriTapActionField from '@/components/shared/uri-tap-action-field'
 import {
   ApiError,
   api,
@@ -603,7 +604,8 @@ function CustomerNotificationEditor({
           <h2 className="font-bold text-ink">ボタン</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block text-sm font-semibold text-ink-secondary">ボタンの文字<input value={setting.buttonLabel} maxLength={20} onChange={(event) => onChange({ buttonLabel: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 font-normal" /></label>
-            <label className="block text-sm font-semibold text-ink-secondary">押したときに開く先<input value={setting.buttonUrl} placeholder="注文情報のURLを使う場合は空欄" onChange={(event) => onChange({ buttonUrl: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 font-normal" /></label>
+            {/* 押したら（共通の欄・YPzmo・B-129）。保存は今のまま開く URL の文字（空欄＝注文情報の URL）。 */}
+            <div className="block text-sm font-semibold text-ink-secondary sm:col-span-2">押したときに開く先<div className="mt-1.5 font-normal"><UriTapActionField name="通知のボタン" kindLabel="押したときに開く先" url={setting.buttonUrl} uriPlaceholder="注文情報のURLを使う場合は空欄" onChange={(buttonUrl) => onChange({ buttonUrl })} /></div></div>
           </div>
           <label className="mt-3 block text-sm font-semibold text-ink-secondary">カード画像URL<input value={setting.imageUrl} placeholder="未設定の場合はロゴ中心のカード" onChange={(event) => onChange({ imageUrl: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 font-normal" /></label>
         </section>
