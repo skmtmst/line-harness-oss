@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { ApiError } from '@/lib/api'
 import { BILLING_UNREACHABLE, billingFailureMessage } from './failure-message'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/hq/billing.tsx', import.meta.url), 'utf8')
 
 /**
  * M023：Stripe への輸送失敗は内部文を出さず、決済サービスの案内にする。

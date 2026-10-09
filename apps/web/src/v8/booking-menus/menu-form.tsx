@@ -171,7 +171,16 @@ export default function MenuFormV8() {
   const [saving, setSaving] = useState<null | 'draft' | 'publish' | 'conflict'>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   /* 欄を離れたときに出す1欄ずつの直し方（文は保存時と同じ）。 */
-  const [fieldErrors, setFieldErrors] = useState<{ name?: string; duration?: string; buffer?: string }>({})
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; duration?: string; buffer?: string; staff?: string }>({})
+  const formRef = useRef<HTMLDivElement>(null)
+  const focusInvalid = useRef(false)
+  useEffect(() => {
+    if (!focusInvalid.current) return
+    focusInvalid.current = false
+    const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')
+    field?.focus(); field?.scrollIntoView?.({ block: 'center' })
+  }, [fieldErrors])
+
   const [conflict, setConflict] = useState<{ name: string; author: string | null; at: string | null; version: number } | null>(null)
   const [comparing, setComparing] = useState(false)
   /** 作成済みなのに後工程が残っている（DEEP-16）。再押しても作り直さない。 */
@@ -400,7 +409,7 @@ export default function MenuFormV8() {
       windowDays || cutoffHours || cancelDeadlineHours || intakeQuestion ||
       assigned.size > 0 || autoTagId || resourceIds.size > 0
     ))
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
+  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty })
 
   usePageTitle(editTarget ? '予約メニューを直す' : '予約メニューを作る')
   usePageCrumbs([
@@ -466,35 +475,33 @@ export default function MenuFormV8() {
       const bulk = await bookingApi.listStaffMenusBulk(selectedAccountId!)
       for (const entry of bulk.staff) matrixByStaff.set(entry.staff_id, entry.matrix)
     } catch {
-      await Promise.all(
-        staffIds.map(async (staffId) => {
-          try {
-            const { matrix } = await bookingApi.getStaffMenus(selectedAccountId!, staffId)
-            matrixByStaff.set(staffId, matrix)
-          } catch {
-            failed.push(staffId)
-          }
-        }),
-      )
+      // 一括取得が失敗したときも、各担当の取得から続けられる。
     }
+    await Promise.all(staffIds.filter((id) => !matrixByStaff.has(id)).map(async (staffId) => {
+      try {
+        const { matrix } = await bookingApi.getStaffMenus(selectedAccountId!, staffId)
+        matrixByStaff.set(staffId, matrix)
+      } catch {
+        failed.push(staffId)
+      }
+    }))
     await Promise.all(
       staffIds.filter((id) => !failed.includes(id)).map(async (staffId) => {
         try {
           const matrix = matrixByStaff.get(staffId) ?? []
-          const known = matrix.some((row) => row.menu_id === menuId)
+          const rows = matrix.some((row) => row.menu_id === menuId)
+            ? matrix
+            : [...matrix, { menu_id: menuId, is_offered: 1, override_duration_minutes: null, override_price: null }]
           await bookingApi.putStaffMenus(
             selectedAccountId!,
             staffId,
-            matrix.map((row) => ({
+            rows.map((row) => ({
               menu_id: row.menu_id,
               is_offered: row.menu_id === menuId ? true : Boolean(row.is_offered),
               override_duration_minutes: row.override_duration_minutes ?? null,
               override_price: row.override_price ?? null,
             })),
           )
-          if (!known) {
-            /* 行列に無いメニュー行は Worker 側が足す。ここでは送るだけ。 */
-          }
         } catch {
           failed.push(staffId)
         }
@@ -591,14 +598,17 @@ export default function MenuFormV8() {
     setSaveError(null)
     const validationError = validate()
     if (validationError) {
-      setSaveError(validationError)
+      focusInvalid.current = true
       const nameError = bookingMenuNameError(name)
       const durationError = bookingMenuDurationError(durationMinutes)
       const bufferError = bookingMenuBufferError(bufferAfterMinutes)
+      const staffError = staffStatus === 'ready' && assignedIds.length === 0 ? '担当できる人を1人以上選んでください。' : null
+      setSaveError(nameError || durationError || bufferError || staffError ? null : validationError)
       setFieldErrors({
         ...(nameError !== null ? { name: nameError } : {}),
         ...(durationError !== null ? { duration: durationError } : {}),
         ...(bufferError !== null ? { buffer: bufferError } : {}),
+        ...(staffError ? { staff: staffError } : {}),
       })
       return
     }
@@ -726,7 +736,7 @@ export default function MenuFormV8() {
 
   if (!canEdit) {
     return (
-      <div className={shell.shell} data-design-node="QqER7">
+      <div ref={formRef} className={shell.shell} data-design-node="QqER7">
         <div className="mx-auto max-w-2xl p-6">
           <ListState
             kind="error"
@@ -748,7 +758,7 @@ export default function MenuFormV8() {
   }
   if (editId && editStatus === 'error') {
     return (
-      <div className={shell.shell} data-design-node="QqER7">
+      <div ref={formRef} className={shell.shell} data-design-node="QqER7">
         <div className="p-10">
           <ListState kind="error" description={editError ?? '読み込めませんでした。'} onRetry={() => void loadAll()} />
         </div>
@@ -769,7 +779,7 @@ export default function MenuFormV8() {
   )
 
   return (
-    <div className={shell.shell} data-design-node="QqER7">
+    <div ref={formRef} className={shell.shell} data-design-node="QqER7">
       <header className={styles.head} data-design="Head">
         <h1 className={shell.headTitle}>{editTarget ? '予約メニューを直す' : '予約メニューを作る'}</h1>
         <p className={shell.headNote}>
@@ -949,7 +959,7 @@ export default function MenuFormV8() {
               </p>
             ) : (
               <>
-                <div className={styles.staffRow}>
+                <div className={styles.staffRow} role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
                   {staff.filter((person) => person.is_active).map((person) => {
                     const on = assigned.has(person.id)
                     // 絵 QqER7：トリマーは名前だけ、それ以外は（役割）を付ける。
@@ -969,6 +979,7 @@ export default function MenuFormV8() {
                     )
                   })}
                 </div>
+                {fieldErrors.staff && assigned.size === 0 ? <p className={styles.fieldError} role="alert">{fieldErrors.staff}</p> : null}
                 <div className={styles.toggleLine}>
                   <span className={styles.toggleLineLabel}>「指名なし」でも受ける</span>
                   <Toggle
@@ -1213,7 +1224,7 @@ export default function MenuFormV8() {
           status={conflict ? 'ほかの人の変更を確かめてから保存してください' : undefined}
           actions={(
             <>
-              <Button onClick={() => router.push('/booking/menus')}>キャンセル</Button>
+              <Button onClick={() => guarded(() => router.push('/booking/menus'))}>キャンセル</Button>
               {!editTarget && (
                 <Button
                   disabled={saving !== null}

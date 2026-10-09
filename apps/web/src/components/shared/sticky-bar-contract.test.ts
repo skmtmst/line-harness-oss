@@ -242,12 +242,11 @@ describe('下部追従バーの並びを部品で固定する', () => {
     expect(CSS).toMatch(/\[data-theme='v8'\] \.bar \{/)
   })
 
-  it('同じ板の2画面（v7・V8 のバナーのプロジェクト）が札を渡している', () => {
+  it('バナーのプロジェクト（V8）が札を渡している', () => {
+    // v7 の入口（app/hq/banners/project/page.tsx）は 2026-10-09 の V7 削除で V8 を出すだけになったので、V8 だけを見る。
     const v8Page = fs.readFileSync(path.join(SRC, 'v8/hq-banners/project.tsx'), 'utf8')
-    const v7Page = fs.readFileSync(path.join(SRC, 'app/hq/banners/project/page.tsx'), 'utf8')
     for (const [name, source] of [
       ['V8', v8Page],
-      ['v7', v7Page],
     ] as const) {
       const call = source.slice(source.indexOf('<StickyBar'))
       expect(call.slice(0, call.indexOf('/>')), `${name} が outlined を渡していない`).toMatch(

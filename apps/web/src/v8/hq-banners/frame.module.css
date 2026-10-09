@@ -34,6 +34,7 @@
   color: var(--color-ink);
 }
 
+.overlay[data-kind='reference'] { --tpl-hb-top-reference: 16px; }
 .overlay[data-kind='detail'] .panel { gap: var(--tpl-hb-detail-gap); }
 .overlay[data-kind='detail'] .head { margin-bottom: var(--tpl-hb-detail-head-push); }
 .panel:focus-visible { outline: revert; }
@@ -54,10 +55,15 @@
   border-top: 1px solid var(--color-hairline);
 }
 
+.overlay[data-kind='confirm'] .panel { padding-bottom: var(--tpl-hb-confirm-panel-pad-bottom); }
+.overlay[data-kind='confirm'] .actions { padding-top: var(--tpl-hb-actions-pad-top); }
 .actionsSplit { justify-content: flex-start; }
-.overlay[data-kind='confirm'] .actions { padding-top: var(--tpl-hb-actions-pad-confirm); }
-.overlay[data-kind='detail'] .actions { padding-top: var(--tpl-hb-detail-foot-pad); }
+.overlay[data-kind='detail'] .actions { padding-top: var(--tpl-hb-actions-pad-top); }
 
 @media (max-width: 767px) {
   .overlay { padding-top: var(--tpl-hb-dialog-edge); }
 }
+
+/* UcBQ5：12枚の一覧と操作の間は、窓の残りの高さを空ける。 */
+.overlay[data-kind='reference'] .panel { min-height: var(--tpl-hb-reference-min-h); }
+.overlay[data-kind='reference'] .actions { margin-top: auto; }

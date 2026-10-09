@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import HqSupportDetailPage from './page'
 
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string } & Record<string, unknown>) => <a href={href} {...rest}>{children}</a> }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(window.location.search),  useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},  usePageTitle: () => {} }))
 
 /**
  * API の中身が欠けていても問い合わせ詳細の画面全体が落ちないこと。
@@ -64,6 +64,6 @@ describe('中身が欠けたお問い合わせ詳細', () => {
     expect(text).toContain('これまでの問い合わせを読み込めませんでした。')
     // 画面全体の失敗表示にはしない。
     expect(text).not.toContain('お問い合わせを読み込めませんでした')
-    expect(host.querySelector('[data-design-node="Nt0UH"]')).not.toBeNull()
+    expect(host.querySelector('textarea')).not.toBeNull()
   })
 })

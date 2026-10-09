@@ -200,8 +200,8 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-bks-row-gap);
-  min-height: var(--tpl-bks-exc-row-h);
-  padding: var(--tpl-bks-exc-row-pad);
+  min-height: calc(var(--tpl-bks-exc-row-h) - var(--tpl-bm-2));
+  padding: var(--tpl-bm-8) 0 calc(var(--tpl-bm-8) - var(--tpl-bm-1));
 }
 
 .exDate {

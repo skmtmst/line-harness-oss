@@ -332,4 +332,61 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     expect(container.textContent).not.toContain('書きかけの入力を戻しました')
     accountId.value = 'account-ny'
   })
+  it('WEB303：電話客作成後の予約失敗から入力へ戻っても再確認できる', async () => {
+    api.createProxyBooking.mockRejectedValueOnce(new Error('network'))
+    seedDraft()
+    await mount(); await flush()
+    const click = async (text: string) => { await act(async () => { all('button').find((b) => b.textContent?.includes(text))!.click() }); await flush() }
+    await click('予約内容を確認する')
+    await click('この内容で予約を入れる')
+    await click('入力に戻る')
+    await click('予約内容を確認する')
+    expect(all('button').some((b) => b.textContent?.includes('この内容で予約を入れる'))).toBe(true)
+  })
+  it('WEB304：復元した電話客の名前を直したら新しい入力で確定する', async () => {
+    seedDraft({ customer: { id: 'old', line_account_id: 'account-ny', display_name: '山田 花子', phone_last4: '5678', pet_name: 'ポチ', is_line_linked: false } })
+    await mount(); await flush()
+    await act(async () => { setValue(byLabel('電話客の名前'), '山田 次郎') })
+    await act(async () => { all('button').find((b) => b.textContent?.includes('予約内容を確認する'))!.click() }); await flush()
+    await act(async () => { all('button').find((b) => b.textContent?.includes('この内容で予約を入れる'))!.click() }); await flush()
+    expect(api.createCustomer).toHaveBeenCalledWith('account-ny', expect.objectContaining({ display_name: '山田 次郎' }), expect.any(String))
+  })
+  it('WEB305：別の担当の候補を選んだら、空き枠の確認後も候補の時刻を残す', async () => {
+    api.listMenuStaff.mockResolvedValue({ staff: [
+      { id: 'staff-ny', display_name: '担当NY', duration_minutes: 60 },
+      { id: 'staff-other', display_name: '別の担当', duration_minutes: 60 },
+    ] })
+    let first = true
+    api.getAvailability.mockImplementation(async (_a: string, query: { staffId: string }) => {
+      if (query.staffId === 'staff-other') return { by_staff: [{ staff_id: 'staff-other', slots: [slot(NY_1000)] }] }
+      if (first) { first = false; return availability([slot(NY_1000)]) }
+      return availability([])
+    })
+    api.getAlternatives.mockResolvedValue({ conflict: { from: NY_1000, to: slot(NY_1000).endUtc, count: 1, source: 'internal_booking' }, nearbySlots: [], alternateStaff: [{ staffId: 'staff-other', displayName: '別の担当', slot: slot(NY_1000) }] })
+    seedDraft(); await mount(); await flush()
+    await act(async () => { all('button').find((b) => b.textContent?.includes('予約内容を確認する'))!.click() }); await flush()
+    await act(async () => { all('button').find((b) => b.textContent?.includes('この担当に変える'))!.click() }); await flush()
+    expect(valueOf(byLabel('スタッフ'))).toBe('staff-other')
+    expect(valueOf(byLabel('空いている時間'))).toBe('10:00')
+  })
+  it('WEB306：未連携の電話客へ自動通知が届くとは案内しない', async () => {
+    seedDraft()
+    api.createProxyBooking.mockResolvedValue({ booking_id: 'booking-1', status: 'confirmed', calendar_sync: 'not_configured', line_notification: 'not_linked', reminders: [], operations: [], customer_context: null })
+    await mount(); await flush()
+    await act(async () => { all('button').find((b) => b.textContent?.includes('予約内容を確認する'))!.click() }); await flush()
+    await act(async () => { all('button').find((b) => b.textContent?.includes('この内容で予約を入れる'))!.click() }); await flush()
+    expect(container.textContent).not.toContain('お知らせはリマインダから自動で届きます')
+  })
+  it('WEB307：アカウントを変えたら古いメニュー応答を捨てる', async () => {
+    accountId.value = 'account-ny'
+    let resolveOld!: (value: unknown) => void
+    api.listMenus.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve }))
+    await mount(); await flush()
+    accountId.value = 'account-bb'
+    await act(async () => { root.render(React.createElement(NewProxyBookingPage)) }); await flush()
+    await act(async () => { resolveOld({ menus: [{ id: 'old', name: '旧アカウントのメニュー', is_active: 1 }] }) }); await flush()
+    expect(container.textContent).not.toContain('旧アカウントのメニュー')
+    accountId.value = 'account-ny'
+  })
+
 })
