@@ -12,7 +12,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePag
 vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { context: mocks.context } }))
 vi.mock('@/lib/hq-friend-attributes-api', () => ({ hqFriendAttributesApi: { list: mocks.list, get: mocks.get, create: mocks.create, update: mocks.update, remove: mocks.remove, listStats: mocks.stats, folders: { list: mocks.folders, create: mocks.createFolder, update: mocks.updateFolder }, accounts: mocks.accounts, receivedVersions: mocks.received, preflight: mocks.preflight, distribute: mocks.distribute, result: mocks.result } }))
-vi.mock('./distribution-accounts', () => ({ useDistributionFolders: () => ({ folders: [], membership: new Map(), failed: false }), distributionFolderRows: () => [], accountsInFolder: (rows: unknown[]) => rows, DistributionFolderPanel: () => null }))
+vi.mock('./distribution-accounts', () => ({ ALL_ACCOUNTS: 'all', useDistributionFolders: () => ({ folders: [], membership: new Map(), failed: false }), distributionFolderRows: () => [], accountsInFolder: (rows: unknown[]) => rows, DistributionFolderPanel: () => null }))
 const field: HqFriendAttributeDetail = { template: { id: 'field-one', name: '愛犬のお名前', description: null, template_type: 'friend_field', folder_id: null, revision: 3, updated_at: '2026-10-08' }, definition: { schemaVersion: 1, field: { name: '愛犬のお名前', fieldKey: 'dog_name', type: 'text', displayOrder: 0 }, folders: [] } }
 const mark: HqFriendAttributeDetail = { template: { id: 'mark-one', name: '未対応', description: null, template_type: 'mark', revision: 4, updated_at: '2026-10-08' }, definition: { schemaVersion: 1, mark: { name: '未対応', color: '#EF4B55', isDefault: true, displayOrder: 0 } } }
 beforeEach(() => {
@@ -118,4 +118,27 @@ it('統括の情報欄のフォルダも保存色を読み、色の保存に失�
   fireEvent.click(dialog.getByRole('button', { name: '保存する' }))
   await waitFor(() => expect(mocks.updateFolder).toHaveBeenLastCalledWith('f1', '基本情報', 2, '#ec4899'))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+})
+
+
+it('情報欄のフォルダをその場で作ると、選んだ色を統括のAPIと閉じた欄へ渡す', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  const folder = { id: 'f-new', name: '新しい分類', color: '#ef4444', revision: 1 }
+  mocks.createFolder.mockResolvedValue(folder)
+  render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)
+  await screen.findByText('愛犬のお名前')
+  fireEvent.click(screen.getAllByRole('button', { name: '項目を作る' })[0])
+  const trigger = screen.getByRole('button', { name: '友だち情報欄のフォルダ' })
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: folder.name } })
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：青' }))
+  fireEvent.click(screen.getByRole('radio', { name: '赤' }))
+  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  await waitFor(() => expect(mocks.createFolder).toHaveBeenCalledWith(folder.name, folder.color))
+  await waitFor(() => expect(trigger.textContent).toBe(folder.name))
+  const expected = document.createElement('span')
+  expected.style.backgroundColor = folder.color
+  expect(trigger.querySelector<HTMLElement>('[data-folder-dot]')!.style.backgroundColor).toBe(expected.style.backgroundColor)
+  delete document.documentElement.dataset.theme
 })

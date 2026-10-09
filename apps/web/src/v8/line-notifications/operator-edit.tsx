@@ -56,6 +56,8 @@ import {
   readConditions,
 } from './operator-words'
 import styles from './operator-edit.module.css'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError } from '@/components/shared/form-controls'
 
 function OperatorEditInner() {
   const editId = useSearchParams().get('id')
@@ -78,8 +80,6 @@ function OperatorEditInner() {
   const [eventType, setEventType] = useState(DEFAULT_EVENT_TYPE)
   const [threshold, setThreshold] = useState('one')
   const [importance, setImportance] = useState('normal')
-  const nameRef = useRef<HTMLInputElement>(null)
-  const [nameError, setNameError] = useState('')
   const [recipientsFieldError, setRecipientsFieldError] = useState('')
   const [name, setName] = useState('新しい予約が入りました')
   const [loadedName, setLoadedName] = useState<string | null>(null)
@@ -290,6 +290,11 @@ function OperatorEditInner() {
     busy: saving || publishing,
   })
 
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。受け取る人の読み込みの失敗は帯のまま。 */
+  const fields = useFormErrors()
+  fields.define('name', 'お知らせの名前', () => (name.trim() ? null : 'お知らせの名前を入力してください。'))
+  /* 受け取るスタッフは、宛先のチームの欄（operator-recipient-team）が赤くなって理由を出す（列車9 の形のまま）。 */
+
   const saveDraft = async (): Promise<string | null> => {
     // 読み込み中に保存すると、未復元の項目が初期値で上書きされる。
     if (saving || ruleLoading) return null
@@ -297,11 +302,8 @@ function OperatorEditInner() {
       setError('LINEアカウントを選択してください。')
       return null
     }
-    if (!name.trim()) {
+    if (fields.submit().length > 0) {
       setError('')
-      setNameError('お知らせの名前を入力してください。')
-      nameRef.current?.focus()
-      nameRef.current?.scrollIntoView?.({ block: 'center' })
       return null
     }
     if (recipientIds.length === 0) {
@@ -319,7 +321,6 @@ function OperatorEditInner() {
       }
       return null
     }
-    setNameError('')
     setRecipientsFieldError('')
     setSaving(true)
     setError('')
@@ -491,16 +492,19 @@ function OperatorEditInner() {
             </>}
           >
               <FormSection id="operator-when-heading" title="どんなときに知らせるか">
-                <FormField htmlFor="operator-name" label="お知らせの名前" error={nameError}>
+                <FormField htmlFor="operator-name" label="お知らせの名前">
                   <TextField
-                    ref={nameRef}
                     id="operator-name"
                     value={name}
-                    onChange={(event) => { setName(event.target.value); setNameError('') }}
+                    onChange={(event) => setName(event.target.value)}
                     placeholder="新しい予約が入りました"
                     maxLength={80}
                     readOnly={!canWrite}
+                    {...fields.bind('name')}
+                    invalid={fields.invalid('name')}
+                    aria-describedby={fields.invalid('name') ? 'operator-name-error' : undefined}
                   />
+                  <FieldError id="operator-name-error">{fields.error('name')}</FieldError>
                 </FormField>
                 <div className={styles.pair}>
                   <Field id="operator-event" label="きっかけ" value={eventType} onChange={setEventType} options={[...EVENT_OPTIONS]} readOnly={!canWrite} />

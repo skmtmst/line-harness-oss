@@ -79,7 +79,7 @@ export interface DistributionResult {
   } & import('@line-crm/shared').HqTemplateResultDisplay)[]
 }
 export class HqTemplatesApiError extends Error {
-  constructor(message: string, public readonly status?: number, public readonly responseReceived = false, public readonly requestNotApplied = false) {
+  constructor(message: string, public readonly status?: number, public readonly responseReceived = false, public readonly requestNotApplied = false, public readonly code?: string) {
     super(message)
     this.name = 'HqTemplatesApiError'
   }
@@ -98,7 +98,7 @@ async function request<T>(path: string, method = 'GET', body?: unknown, headers?
     const message = result.code === 'UNSUPPORTED'
       ? 'この種類のひな形は未対応です（UNSUPPORTED）。'
       : '入力内容を確認してください。'
-    throw new HqTemplatesApiError(message, 422, true)
+    throw new HqTemplatesApiError(message, 422, true, false, result.code)
   }
   return result.data
   } catch (error) {
@@ -119,7 +119,8 @@ async function request<T>(path: string, method = 'GET', body?: unknown, headers?
     // HTTP is not proof that creation failed. Only known rejection statuses prove
     // this request did not apply; a previous ambiguous attempt remains ambiguous.
     const requestNotApplied = error instanceof ApiError && [400, 401, 403, 404, 405, 409, 422, 428].includes(error.status)
-    throw new HqTemplatesApiError(message, detail.status, error instanceof ApiError, requestNotApplied)
+    // 理由の符号（VERSION_CONFLICT など）は画面が言い分けに使う（フォルダの窓・2026-10-09）。
+    throw new HqTemplatesApiError(message, detail.status, error instanceof ApiError, requestNotApplied, detail.code)
   }
 }
 const idPath = (id: string) => `/${encodeURIComponent(id)}`
@@ -169,6 +170,7 @@ export const hqTemplatesApi = {
    */
   list: (type?: TemplateType) => request<HqTemplateListItem[]>(type ? `?type=${type}` : ''),
   folders: {
+    swapOrder: (id:string,withId:string,expectedRevision:number,withExpectedRevision:number) => request<{swapped:[string,string]}>(`/folders/${encodeURIComponent(id)}/swap-order`,'POST',{withId,expectedRevision,withExpectedRevision}),
     list: () => request<import('@line-crm/shared').HqTemplateFolder[]>('/folders'),
     create: (name: string, color?: string | null) => request<import('@line-crm/shared').HqTemplateFolder>('/folders', 'POST', { name, color }),
     update: (id: string, name: string, expectedRevision: number, color?: string | null) => request<import('@line-crm/shared').HqTemplateFolder>(`/folders/${encodeURIComponent(id)}`, 'PATCH', { name, expectedRevision, color }),

@@ -11,6 +11,7 @@ import {
 } from '@line-crm/shared'
 import type { FormDeleteImpact } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
+import { tapActionLiffUrl } from '@/lib/tap-actions'
 
 export interface UsedByAccount {
   id: string
@@ -139,7 +140,8 @@ export function sortForms(forms: Form[], sort: FormSort): Form[] {
 /** 配っている公開URL（LIFF）。アカウントの liffId が無いと作れない。 */
 export function formAnswerUrl(liffId: string | null | undefined, formId: string): string | null {
   if (!liffId) return null
-  return `https://liff.line.me/${liffId}/?page=form&id=${encodeURIComponent(formId)}`
+  // 回答フォームの LIFF の URL は lib/tap-actions.ts の1か所で組み立てる（押したらの欄と同じ形）。
+  return tapActionLiffUrl(liffId, 'form', formId)
 }
 
 /** 「保存先」列。`友だち情報 3・タグ 2` の形。何も保存しないときは —。 */

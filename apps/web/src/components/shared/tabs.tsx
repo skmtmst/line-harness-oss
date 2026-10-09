@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { ErrorCountBadge } from './error-count-badge'
 import styles from './tabs.module.css'
 
 export interface TabItem {
@@ -15,6 +16,8 @@ export interface TabItem {
   count?: number
   /** 確認待ちなど、注意して見る件数を丸い札で示す。 */
   countTone?: 'warning'
+  /** このタブの中の直す欄の数（B-139）。1以上で赤い丸を出す。`useFormErrors().countIn()` を渡す。 */
+  errorCount?: number
   /** いま開いているタブ。 */
   current?: boolean
   disabled?: boolean
@@ -86,7 +89,7 @@ export function Tabs({
   const itemsRef = useRef<HTMLSpanElement>(null)
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
   const currentKey = items.findIndex((item) => item.current)
-  const itemWidthsKey = JSON.stringify(items.map(({ label, count, countTone }) => [label, count, countTone]))
+  const itemWidthsKey = JSON.stringify(items.map(({ label, count, countTone, errorCount }) => [label, count, countTone, errorCount]))
   useLayoutEffect(() => {
     const measure = () => {
       if (typeof document === 'undefined' || document.documentElement?.dataset?.theme !== 'v8') {
@@ -150,12 +153,13 @@ export function Tabs({
   )
 }
 
-function Tab({ id, controls, label, href, count, countTone, current, disabled, onClick, tabIndex }: TabItem & { tabIndex: number }) {
+function Tab({ id, controls, label, href, count, countTone, errorCount, current, disabled, onClick, tabIndex }: TabItem & { tabIndex: number }) {
   const classes = [styles.tab, current && styles.current].filter(Boolean).join(' ')
   const body: ReactNode = (
     <>
       {label}
       {count === undefined ? null : <span className={styles.count} data-tone={countTone}>{count}</span>}
+      {errorCount ? <ErrorCountBadge count={errorCount} label={label} /> : null}
     </>
   )
   /*

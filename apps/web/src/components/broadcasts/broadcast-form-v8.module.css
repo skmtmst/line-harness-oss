@@ -158,3 +158,5 @@
 .root[data-step='message'] .previewSummary h3 { line-height: 18px; }
 .root[data-step='message'] .previewActions { margin-top: -7px; }
 .root[data-step='message'] .deviceSwitch button { padding-left: 14px; padding-right: 14px; }
+/* 動画の枠とプレビュー画像の小さい枠を横に並べる（MediaSlot・Z7vd2）。 */
+.mediaRow { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-slot-w-compact); gap: var(--tpl-slot-row-gap); align-items: start; }

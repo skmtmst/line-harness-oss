@@ -11,7 +11,7 @@ import { FileText } from 'lucide-react'
 import type { Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
-import ActionMenu from '@/components/shared/action-menu'
+import { EntityKindDialog } from '@/components/shared/entity-picker-sources'
 import Button from '@/components/shared/button'
 import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
@@ -145,25 +145,16 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
             <Button
               ref={templateAnchor}
               type="button"
-              aria-haspopup="menu"
-              aria-expanded={templateMenuOpen}
+              aria-haspopup="dialog"
               disabled={templates.length === 0}
               title={templates.length === 0 ? '文のテンプレートがありません' : undefined}
               onClick={() => setTemplateMenuOpen((value) => !value)}
             >
               <FileText size={15} aria-hidden="true" />テンプレートを選択
             </Button>
-            <ActionMenu
-              open={templateMenuOpen}
-              anchorRef={templateAnchor}
-              ariaLabel="テンプレートを選ぶ"
-              onClose={() => setTemplateMenuOpen(false)}
-              items={templates.map((template) => ({
-                id: template.id,
-                label: template.name,
-                onSelect: () => { setContent(template.messageContent); setTemplateMenuOpen(false) },
-              }))}
-            />
+            {templateMenuOpen ? <EntityKindDialog kind="template" options={templates} confirmLabel="この文を入れる"
+              onCancel={() => setTemplateMenuOpen(false)}
+              onConfirm={(id) => { const picked = templates.find((template) => template.id === id); if (picked) setContent(picked.messageContent); setTemplateMenuOpen(false) }} /> : null}
           </div>
         </div>
         <div className={styles.group}>

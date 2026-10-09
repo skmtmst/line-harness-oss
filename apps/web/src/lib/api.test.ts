@@ -1961,3 +1961,31 @@ describe('応答の合図は呼出元のアカウントを保持する', () => {
     ]);
   });
 });
+
+describe('フォルダAPIの追加呼び口',()=>{
+ it('バナーの種類・色・版を送り、所属の未分類を明示できる',async()=>{
+  const fetchSpy=vi.fn(async(_url:string|URL|Request,_init?:RequestInit)=>new Response(JSON.stringify({success:true,data:[]}),{status:200,headers:{'content-type':'application/json'}}));vi.stubGlobal('fetch',fetchSpy);
+  await api.hqBanners.folders.list('image');
+  await api.hqBanners.folders.create({kind:'image',name:'素材',color:'#3b82f6'});
+  await api.hqBanners.folders.update('f/1',{kind:'image',color:null,expectedRevision:2});
+  await api.hqBanners.folders.swapOrder('f/1','f/2','image',3,4);
+  await api.hqBanners.folders.delete('f/1','image',4);
+  await api.hqBanners.images.list({folderId:null});
+  expect(fetchSpy.mock.calls.map(([url])=>url)).toEqual([
+   'https://worker.example.com/api/hq/banners/folders?kind=image','https://worker.example.com/api/hq/banners/folders',
+   'https://worker.example.com/api/hq/banners/folders/f%2F1','https://worker.example.com/api/hq/banners/folders/f%2F1/swap-order',
+   'https://worker.example.com/api/hq/banners/folders/f%2F1','https://worker.example.com/api/hq/banners/images?folderId=__none__',
+  ]);
+  expect(JSON.parse(fetchSpy.mock.calls[3][1]!.body as string)).toEqual({kind:'image',withId:'f/2',expectedRevision:3,withExpectedRevision:4});
+ });
+ it('店の共通口は種類と店・版を送り、既存の特典口も残す',async()=>{
+  const fetchSpy=vi.fn(async(_url:string|URL|Request,_init?:RequestInit)=>new Response(JSON.stringify({success:true,data:[]}),{status:200,headers:{'content-type':'application/json'}}));vi.stubGlobal('fetch',fetchSpy);
+  for(const kind of ['affiliate','affiliate_offer','mileage_reward','friend_add_rule'])await api.folders.list(kind,'a/1');
+  await api.folders.swapOrder('f/1','f/2','a/1',2,3);await api.folders.delete('f/1','a/1',4);
+  await api.mileage.rewardFolders('a/1');
+  expect(fetchSpy.mock.calls.slice(0,4).map(([url])=>url)).toEqual(['affiliate','affiliate_offer','mileage_reward','friend_add_rule'].map(kind=>`https://worker.example.com/api/folders?kind=${kind}&account_id=a%2F1`));
+  expect(JSON.parse(fetchSpy.mock.calls[4][1]!.body as string)).toEqual({withId:'f/2',accountId:'a/1',expectedRevision:2,withExpectedRevision:3});
+  expect(fetchSpy.mock.calls[5][0]).toBe('https://worker.example.com/api/folders/f%2F1?account_id=a%2F1&expectedRevision=4');
+  expect(fetchSpy.mock.calls[6][0]).toBe('https://worker.example.com/api/mileage/reward-folders?accountId=a%2F1');
+ });
+});

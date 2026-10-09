@@ -13,7 +13,7 @@ import type { BroadcastApprovalState, HqBroadcastRun } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+import { HqAccountSelectField } from '@/components/shared/hq-account-picker'
 import { notifyToast } from '@/components/shared/toast'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import StepUpPrompt from '@/components/step-up-prompt'
@@ -240,7 +240,7 @@ export function HqTestSendDialog({
       onConfirm={chosen ? () => void send() : undefined}
     >
       {accounts.length === 0 ? <p className="text-ink-faint text-xs">先に送るアカウントを選んでください。</p> : (
-        <Select aria-label="テストを送るアカウント" size="full" value={chosen} onChange={setAccountId} options={accounts.map((account) => ({ value: account.id, label: account.name }))} />
+        <HqAccountSelectField label="テストを送るアカウント" accounts={accounts} value={chosen} onChange={setAccountId} disabled={busy} />
       )}
     </ConfirmDialog>
   )

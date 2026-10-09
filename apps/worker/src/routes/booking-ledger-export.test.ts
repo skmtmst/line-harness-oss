@@ -390,6 +390,20 @@ describe('GET /api/booking/admin/bookings.csv (N-397)', () => {
 });
 
 describe('GET /o の予約履歴URL通過 (N-396)', () => {
+  test.each([
+    ['page=visit-stamps&card=card-1', 'visit-stamps', 'card', 'card-1'],
+    ['page=visit-stamps', 'visit-stamps', 'card', null],
+    ['page=salon-book&menu_id=menu-1', 'salon-book', 'menu_id', 'menu-1'],
+    ['page=salon-book&menu_id=x%26admin%3D1', 'salon-book', 'menu_id', null],
+    ['page=event&card=card-1&menu_id=menu-1', 'event', 'card', null],
+  ])('選んだメニュー・カードを対象ページにだけ通す: %s', async (query, page, key, expected) => {
+    const res = await rootApp.request(`/o?liffId=1234-abcdef&${query}`, { headers: { 'user-agent': 'Mozilla/5.0 (Macintosh)' } }, { DB: {} } as never, execCtx);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    const target = new URL(decodeURIComponent(html.match(/\/api\/qr\?size=240x240&data=([^"&]+)/)![1]));
+    expect(target.searchParams.get('page')).toBe(page);
+    expect(target.searchParams.get(key)).toBe(expected);
+  });
   test('salon-book の view=history だけを LIFF 宛URLへ通す', async () => {
     // desktop UA でQRページを返す。QRの data パラメータに転送先が丸ごと入る。
     const res = await rootApp.request(

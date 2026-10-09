@@ -442,7 +442,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       )}
 
       {/* main card */}
-      <div className="bg-canvas rounded-control shadow-card border border-hairline overflow-hidden">
+      <div className="bg-canvas rounded-control shadow-card-surface border border-hairline overflow-hidden">
         {/* tab nav */}
         <div className="flex border-b border-hairline">
           {TABS.map((t) => {
@@ -603,6 +603,7 @@ function OverviewTab({
           value={draft.image_url ? { mode: 'url', url: draft.image_url } : null}
           onChange={(v) => update('image_url', v?.mode === 'url' ? v.url : null)}
           label="イベント画像"
+          title="イベント画像を追加"
         />
       </div>
       <div>

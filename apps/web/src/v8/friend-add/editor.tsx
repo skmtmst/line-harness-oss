@@ -54,6 +54,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } from '@/components/shared/folder-select'
 import SegmentedControl from '@/components/shared/segmented'
 import { TextField } from '@/components/shared/text-field'
@@ -366,7 +367,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         ? '#fa-name'
         : fieldError.step === 'routes'
           ? '[data-friend-add-routes] input[type=checkbox]'
-          : '#fa-scenario, #fa-returning-scenario')
+          : '#fa-scenario button[aria-haspopup], #fa-returning-scenario button[aria-haspopup]')
       field?.focus()
       field?.scrollIntoView({ block: 'center' })
     })
@@ -1194,16 +1195,12 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
           </div>
         </div>
         {scenarioError && canEdit ? (
-          <Select
-            id="fa-scenario"
-            aria-label="実際に配信するシナリオ"
-            label="実際に配信するシナリオ"
-            size="full"
-            value={definition.scenarioId ?? ''}
-            error={scenarioError}
-            onChange={(value) => setDefinition((current) => ({ ...current, scenarioId: value || null }))}
-            options={[{ value: '', label: '選んでください' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
-          />
+          <div className={styles.field}>
+            <span className={styles.label}>実際に配信するシナリオ</span>
+            <ScenarioPicker id="fa-scenario" label="実際に配信するシナリオ" scenarios={scenarios} error={scenarioError}
+              value={definition.scenarioId ?? ''}
+              onChange={(value) => setDefinition((current) => ({ ...current, scenarioId: value || null }))} />
+          </div>
         ) : null}
       </Card>
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="いつ送るか">
@@ -1320,6 +1317,22 @@ const START_POSITIONS = [
 ] as const
 
 /** 閲覧のみ：選ぶ部品（RadioCard・Select・つまみ・曜日の札）の代わりに、選んでいる値を読み取りだけの欄で見せる。 */
+/** シナリオを選ぶ欄（選ぶ窓）。誤りは欄の下に出す。保存する値は今と同じ ID（空は ''）。 */
+function ScenarioPicker({ id, label, scenarios, value, error, onChange }: {
+  id: string
+  label: string
+  scenarios: FriendAddRuleOptions['scenarios']
+  value: string
+  error?: string
+  onChange: (value: string) => void
+}) {
+  return <>
+    <EntityKindField kind="scenario" id={id} label={label} options={scenarios} value={value} invalid={Boolean(error)}
+      placeholder="（選んでください）" onChange={onChange} />
+    {error ? <span id={`${id}-error`} className={styles.fieldError} role="alert">{error}</span> : null}
+  </>
+}
+
 function ReadOnlyText({ id, label, value }: { id?: string; label: string; value: string }) {
   return <TextField id={id} aria-label={label} value={value} readOnly aria-readonly="true" title={value} />
 }
@@ -1359,17 +1372,11 @@ function ReturningMessage({ definition, setDefinition, scenarios, canEdit, scena
         )}
         {mode === 'other' || scenarioError ? (
           <div className={styles.field}>
-            <label htmlFor="fa-returning-scenario" className={styles.label}>始めるシナリオ</label>
+            <span className={styles.label}>始めるシナリオ</span>
             {canEdit ? (
-              <Select
-                id="fa-returning-scenario"
-                aria-label="始めるシナリオ"
-                size="full"
-                error={scenarioError}
+              <ScenarioPicker id="fa-returning-scenario" label="始めるシナリオ" scenarios={scenarios} error={scenarioError}
                 value={definition.scenarioId ?? ''}
-                onChange={(value) => setDefinition((current) => ({ ...current, scenarioId: value || null }))}
-                options={[{ value: '', label: '選んでください' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
-              />
+                onChange={(value) => setDefinition((current) => ({ ...current, scenarioId: value || null }))} />
             ) : (
               <ReadOnlyText id="fa-returning-scenario" label="始めるシナリオ" value={scenarios.find((scenario) => scenario.id === definition.scenarioId)?.name ?? '選んでいません'} />
             )}
@@ -1471,13 +1478,7 @@ function ActionsStep({ definition, setDefinition, options, canEdit }: {
             />
           </div>
           <div className={styles.actionSelect}>
-            <Select
-              aria-label="足す操作の対象"
-              size="full"
-              value={target}
-              onChange={setTarget}
-              options={[{ value: '', label: '選んでください' }, ...targets.map((item) => ({ value: item.id, label: item.name }))]}
-            />
+            <EntityKindField kind={source} label="足す操作の対象" options={targets} value={target} onChange={setTarget} />
           </div>
           <Button type="button" disabled={!target} onClick={addAction}>
             <Plus size={15} aria-hidden="true" />足す

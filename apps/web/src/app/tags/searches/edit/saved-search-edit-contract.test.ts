@@ -11,15 +11,17 @@ describe('保存した検索の条件編集', () => {
     expect(PAGE).toContain('api.scenarios.list({ accountId: selectedAccountId })')
     expect(PAGE).toContain('api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true })')
     expect(PAGE).toContain('marks.map((mark) => ({ value: mark.id, label: mark.name }))')
-    expect(PAGE).toContain('scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))')
+    // シナリオは選ぶ窓（候補の行をそのまま渡す）。
+    expect(PAGE).toContain('kind="scenario"')
+    expect(PAGE).toContain('options={scenarios}')
     expect(PAGE).toContain('fields.map((field) => ({ value: field.fieldKey, label: field.name }))')
   })
 
   it('参照先を取得できない状態と0件を同じ言葉にしない', () => {
     expect(PAGE).toContain("'対応マークを読み込めませんでした'")
     expect(PAGE).toContain("'対応マークがありません'")
-    expect(PAGE).toContain("'シナリオを読み込めませんでした'")
-    expect(PAGE).toContain("'シナリオがありません'")
+    expect(PAGE).toContain("'（シナリオを読み込めませんでした）'")
+    expect(PAGE).toContain("'（シナリオがありません）'")
     expect(PAGE).toContain("'友だち情報を読み込めませんでした'")
     expect(PAGE).toContain("'友だち情報がありません'")
   })

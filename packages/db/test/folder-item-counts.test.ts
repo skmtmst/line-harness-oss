@@ -216,10 +216,10 @@ describe('FOLDER_ITEM_COUNT_TABLES(#631)', () => {
     }
   })
 
-  it('対応表は統一パターンの12種別ちょうど。新しい種別が増減したらこの試験が気づく', () => {
+  it('対応表は統一パターンの16種別ちょうど。新しい種別が増減したらこの試験が気づく', () => {
     // F-13（582）で自動化・共通アクション・成果に folder_id 列ができ、件数を数えるようになった。
     expect(Object.keys(FOLDER_ITEM_COUNT_TABLES).sort()).toEqual(
-      ['auto_reply', 'automation', 'broadcast', 'common_action', 'common_var', 'conversion', 'media', 'reminder', 'rich_menu', 'scenario', 'tag', 'template'].sort(),
+      ['affiliate', 'affiliate_offer', 'mileage_reward', 'friend_add_rule', 'auto_reply', 'automation', 'broadcast', 'common_action', 'common_var', 'conversion', 'media', 'reminder', 'rich_menu', 'scenario', 'tag', 'template'].sort(),
     )
   })
 

@@ -928,14 +928,14 @@ function MileagePageInner() {
                           {rule.publishedVersion == null ? '下書きの内容を見る' : '公開版の中身を見る'}
                         </summary>
                         {rule.publishedVersion == null ? (
-                          <p className="mt-1 rounded-control border border-hairline bg-canvas p-2 shadow-card">
+                          <p className="mt-1 rounded-control border border-hairline bg-canvas p-2 shadow-card-surface">
                             {rule.draft.name}・{ruleEventLabel(rule.draft.eventType, EVENT_LABELS)}・{formatMileageNumber(rule.draft.amount)}マイル
                             <span className="mt-1 block text-ink-faint">
                               下書き v{rule.draftVersion}・{formatMileageDate(rule.draftUpdatedAt)} に保存・まだ公開版はありません
                             </span>
                           </p>
                         ) : (
-                          <p className="mt-1 rounded-control border border-hairline bg-canvas p-2 shadow-card" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatMileageNumber(rule.published.amount)}マイル`}>
+                          <p className="mt-1 rounded-control border border-hairline bg-canvas p-2 shadow-card-surface" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatMileageNumber(rule.published.amount)}マイル`}>
                             公開版 v{rule.publishedVersion}・{rule.published.name}・{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}・{formatMileageNumber(rule.published.amount)}マイル
                             <span className="mt-1 block text-ink-faint">{formatMileageDate(rule.published.updatedAt)} に反映</span>
                           </p>

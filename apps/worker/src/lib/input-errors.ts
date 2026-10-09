@@ -78,6 +78,14 @@ export function inputShapeErrors(body: Record<string, unknown>, shape: InputShap
 /** 旧来の error に入っていた機械コードは code に残し、本文は人向けの文にする。 */
 function inputErrorMessage(code: string): string {
   const messages: Record<string, string> = {
+    INVALID_INPUT: '入力内容の形式を確認してください',
+    INVALID_FOLDER_KIND: 'フォルダの種類を確認してください',
+    INVALID_FOLDER_NAME: 'フォルダ名は1〜100文字で入力してください',
+    INVALID_FOLDER_COLOR: 'フォルダの色を確認してください',
+    INVALID_FOLDER_ORDER: '入れ替えるフォルダと版の番号を確認してください',
+    INVALID_REVISION: '読み込んだ版の番号を指定してください',
+    INVALID_FOLDER: '利用できるフォルダを選んでください',
+    account_required: 'LINE公式アカウントを選んでください',
     missing_account_id: 'LINE公式アカウントを選んでください',
     account_id_required: 'LINE公式アカウントを選んでください',
     invalid_starts_at: '開始日時の形式を確認してください',
@@ -114,4 +122,26 @@ function inputErrorMessage(code: string): string {
     dst_gap: '夏時間への切り替えで存在しない時刻です。別の時刻を選んでください',
   };
   return messages[code] ?? '入力内容を確認してください';
+}
+
+/** フォルダの口で使うJSONの鍵を、DB側の共通エラーへ対応させる。 */
+export function folderInputError(
+  c: Context,
+  failure: { code: string; status: ContentfulStatusCode },
+  versionKeys: readonly [string, string] = ['expectedRevision', 'withExpectedRevision'],
+) {
+  const keys: Record<string, string[]> = {
+    INVALID_INPUT: [], INVALID_FOLDER_KIND: ['kind'], INVALID_FOLDER_NAME: ['name'],
+    INVALID_FOLDER_COLOR: ['color'], INVALID_REVISION: [versionKeys[0]], INVALID_FOLDER: ['folderId'],
+  };
+  let affected = keys[failure.code] ?? [];
+  if (failure.code === 'INVALID_FOLDER_ORDER') {
+    const body = c.get('validatedInputBody') as Record<string, unknown> | undefined;
+    affected = body ? [
+      ...(typeof body.withId !== 'string' || !body.withId || body.withId === c.req.param('id') ? ['withId'] : []),
+      ...versionKeys.filter(key => !Number.isSafeInteger(body[key])),
+    ] : ['withId', ...versionKeys];
+    if (!affected.length) affected = ['withId'];
+  }
+  return inputError(c, { success: false, error: failure.code }, failure.status, affected);
 }

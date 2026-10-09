@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import type { Folder } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { useHqAccountFolders, type HqAccountMembership } from '@/components/shared/hq-account-picker'
 import Checkbox from '@/components/shared/checkbox'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDot } from '@/components/shared/folder-dot'
@@ -10,32 +9,10 @@ import Notice from '@/components/shared/notice'
 
 export const ALL_ACCOUNTS = 'all'
 const UNFILED = 'none'
-type AccountMembership = { folderId: string | null; folder: Folder | null }
+type AccountMembership = HqAccountMembership
 
-/** 統括のアカウント一覧と同じ口。配れるアカウントの集合は呼ぶ側の権限付きAPIを使う。 */
-export function useDistributionFolders(enabled: boolean) {
-  const [folders, setFolders] = useState<Folder[]>([])
-  const [membership, setMembership] = useState<Map<string, AccountMembership> | null>(null)
-  const [failed, setFailed] = useState(false)
-  useEffect(() => {
-    if (!enabled) return
-    let current = true
-    setFailed(false)
-    void Promise.all([api.lineAccounts.list(), api.lineAccountFolders.list()]).then(([accounts, response]) => {
-      if (!accounts.success || !response.success) throw new Error('アカウントのフォルダを読み込めませんでした。')
-      if (!current) return
-      const rows = [...response.data.folders].sort((a, b) => a.displayOrder - b.displayOrder)
-      const byId = new Map(rows.map((folder) => [folder.id, folder]))
-      setFolders(rows)
-      setMembership(new Map(accounts.data.map((account) => [account.id, {
-        folderId: account.folderId ?? null,
-        folder: account.folderId ? byId.get(account.folderId) ?? account.folder ?? null : null,
-      }])))
-    }).catch(() => { if (current) { setFailed(true); setMembership(null) } })
-    return () => { current = false }
-  }, [enabled])
-  return { folders, membership, failed }
-}
+/** 統括のアカウント一覧と同じ口。配れるアカウントの集合は呼ぶ側の権限付きAPIを使う（共通の選ぶ窓と同じ読み込み）。 */
+export const useDistributionFolders = useHqAccountFolders
 
 export function accountsInFolder<T extends { id: string }>(accounts: T[], filter: string, membership: Map<string, AccountMembership> | null): T[] {
   if (filter === ALL_ACCOUNTS) return accounts
@@ -58,7 +35,7 @@ export function distributionFolderRows({ accounts, folders, membership, selected
     return {
       id, label, count: ids.length,
       icon: id === ALL_ACCOUNTS ? undefined : <FolderDot folder={folder} />,
-      trailing: <Checkbox aria-label={`${label}をまとめて選ぶ`} checked={ids.length > 0 && count === ids.length}
+      leading: <Checkbox aria-label={`${label}をまとめて選ぶ`} checked={ids.length > 0 && count === ids.length}
         indeterminate={count > 0 && count < ids.length} disabled={disabled || ids.length === 0}
         onCheckedChange={(checked) => onChange(checked ? [...new Set([...selected, ...ids])] : selected.filter((accountId) => !ids.includes(accountId)))} />,
     }

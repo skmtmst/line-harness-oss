@@ -8,6 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -398,18 +399,19 @@ export function ReminderBasicsFormV8({
           <div className={styles.field}>
             <span className={styles.label}>基準日にするイベント</span>
             <div className={styles.testRow}>
-              <Select
-                error={fieldError?.key === 'triggerEventId' ? fieldError.message : undefined}
-                value={value.triggerEventId}
-                onChange={(next) => patch({ triggerEventId: next })}
-                disabled={eventsLoadState !== 'ready'}
-                aria-label="基準日にするイベント"
-                size="full"
-                options={[
-                  { value: '', label: eventsLoadState === 'loading' || eventsLoadState === 'idle' ? 'イベントを読み込み中' : eventsLoadState === 'error' ? 'イベントを読み込めませんでした' : '選んでください' },
-                  ...events.map((event) => ({ value: event.id, label: event.name })),
-                ]}
-              />
+              <div className="min-w-0 flex-1">
+                <EntityKindField
+                  kind="event"
+                  label="基準日にするイベント"
+                  options={events}
+                  value={value.triggerEventId}
+                  onChange={(next) => patch({ triggerEventId: next })}
+                  disabled={eventsLoadState !== 'ready'}
+                  invalid={fieldError?.key === 'triggerEventId'}
+                  placeholder={eventsLoadState === 'loading' || eventsLoadState === 'idle' ? '（イベントを読み込み中）' : eventsLoadState === 'error' ? '（イベントを読み込めませんでした）' : '（選んでください）'}
+                />
+                {fieldError?.key === 'triggerEventId' ? <p className={styles.fieldError} role="alert">{fieldError.message}</p> : null}
+              </div>
               {eventsLoadState === 'error' ? <Button onClick={() => setEventsLoadState('idle')}>再読み込み</Button> : null}
             </div>
             <p className={styles.fieldNote}>このイベントへの予約の開始日時を起点にします</p>

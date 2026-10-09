@@ -795,6 +795,23 @@ describe('POST /api/rich-menu-groups', () => {
 
 // ----- PATCH /api/rich-menu-groups/:groupId -----
 
+describe('押したら6つの保存API', () => {
+  const choices = [
+    { intent: 'url', actionData: { uri: 'https://example.com' }, actionType: 'uri' },
+    { intent: 'text', actionData: { text: '予約したい' }, actionType: 'message' },
+    { intent: 'booking', actionData: { menuId: 'menu-1' }, actionType: 'uri' },
+    { intent: 'form', formId: 'form-1', actionData: {}, actionType: 'uri' },
+    { intent: 'booking_history', actionData: {}, actionType: 'uri' },
+    { intent: 'visit_stamp', actionData: { cardId: 'card-1' }, actionType: 'uri' },
+  ];
+  test.each(choices)('既存のDB種類で保存し、選択先を落とさない: $intent', async choice => {
+    dbMocks.createRichMenuGroup.mockResolvedValue({ id: 'new', account_id: 'a', name: '案内', chat_bar_text: '開く', size: 'large', default_page_id: null, is_default_for_all: 0, status: 'draft', created_at: '', updated_at: '', pages: [] });
+    const response = await setupApp().request('/api/rich-menu-groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accountId: 'a', name: '案内', chatBarText: '開く', size: 'large', pages: [{ name: '案内', orderIndex: 0, areas: [{ boundsX: 0, boundsY: 0, boundsWidth: 100, boundsHeight: 100, ...choice }] }] }) });
+    expect(response.status).toBe(200);
+    expect(dbMocks.createRichMenuGroup).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ pages: [expect.objectContaining({ areas: [expect.objectContaining(choice)] })] }));
+  });
+});
+
 describe('PATCH /api/rich-menu-groups/:groupId', () => {
   test('404 when group missing', async () => {
     dbMocks.getRichMenuGroupById.mockResolvedValue(null);

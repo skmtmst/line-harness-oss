@@ -36,10 +36,12 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
@@ -252,7 +254,9 @@ function ConditionControls({
       {condition.kind === 'tag' ? (
         <>
           <Select aria-label="タグの比較" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'includes', label: 'を含む' }, { value: 'excludes', label: 'を含まない' }]} width={120} />
-          <Select aria-label="タグ" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className={styles.grow} />
+          <div className={styles.grow}>
+            <EntityKindField kind="tag" label="タグ" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={tags} />
+          </div>
         </>
       ) : condition.kind === 'field' ? (
         <>
@@ -313,19 +317,17 @@ function ConditionControls({
           className={styles.grow}
         />
       ) : condition.kind === 'scenario' ? (
-        <Select
-          aria-label="シナリオ"
-          value={rawValue}
-          disabled={referenceErrors.scenarios}
-          onChange={(value) => onChange({ ...condition, value })}
-          options={optionsWithCurrent(
-            scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
-            rawValue,
-            '選択済みのシナリオ',
-            referenceErrors.scenarios ? 'シナリオを読み込めませんでした' : scenarios.length ? 'シナリオを選ぶ' : 'シナリオがありません',
-          )}
-          className={styles.grow}
-        />
+        <div className={styles.grow}>
+          <EntityKindField
+            kind="scenario"
+            label="シナリオ"
+            value={rawValue}
+            disabled={referenceErrors.scenarios}
+            placeholder={referenceErrors.scenarios ? '（シナリオを読み込めませんでした）' : scenarios.length ? undefined : '（シナリオがありません）'}
+            onChange={(value) => onChange({ ...condition, value })}
+            options={scenarios}
+          />
+        </div>
       ) : condition.kind === 'following' ? (
         <Select aria-label="友だち状態" value={condition.value === false ? 'false' : 'true'} onChange={(value) => onChange({ ...condition, value: value === 'true' })} options={[{ value: 'true', label: '友だち中' }, { value: 'false', label: 'ブロック済み' }]} className={styles.grow} />
       ) : condition.kind === 'chat_status' ? (
@@ -339,19 +341,17 @@ function ConditionControls({
             options={[{ value: 'eq', label: '次の担当' }, { value: 'ne', label: '次以外' }]}
             width={120}
           />
-          <Select
-            aria-label="担当"
-            value={rawValue}
-            disabled={referenceErrors.operators}
-            onChange={(value) => onChange({ ...condition, value })}
-            options={optionsWithCurrent(
-              operators.map((operator) => ({ value: operator.id, label: operator.name })),
-              rawValue,
-              '選択済みの担当者',
-              referenceErrors.operators ? '担当者を読み込めませんでした' : operators.length ? '担当者を選ぶ' : '担当者がいません',
-            )}
-            className={styles.grow}
-          />
+          <div className={styles.grow}>
+            <EntityKindField
+              kind="staff"
+              label="担当"
+              value={rawValue}
+              disabled={referenceErrors.operators}
+              placeholder={referenceErrors.operators ? '（担当者を読み込めませんでした）' : operators.length ? '（担当者を選ぶ）' : '（担当者がいません）'}
+              onChange={(value) => onChange({ ...condition, value })}
+              options={operators}
+            />
+          </div>
         </>
       ) : condition.kind === 'form' ? (
         <>
@@ -477,6 +477,7 @@ function ConditionRow({
 }
 
 export default function SavedSearchEditV8() {
+  const staffRole = useStaffRole()
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -870,6 +871,8 @@ export default function SavedSearchEditV8() {
       </p>
     </div>
   )
+
+  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
 
   return (
     <div className={styles.page}>

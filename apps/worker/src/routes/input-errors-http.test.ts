@@ -14,6 +14,11 @@ import { lineAccountTags } from './line-account-tags.js';
 import { hqTemplates } from './hq-templates.js';
 import { hqBroadcasts } from './hq-broadcasts.js';
 import { broadcastMessageAssets } from './broadcast-message-assets.js';
+import { hqBanners } from './hq-banners.js';
+import { instagram } from './instagram.js';
+import { friendAttributes } from './friend-attributes.js';
+import { affiliates } from './affiliates.js';
+import { affiliateOffers } from './affiliate-offers.js';
 import booking from './booking.js';
 
 let fixture: SqliteD1;
@@ -31,7 +36,7 @@ beforeEach(() => {
   });
   // 本番と同じ順で実ルートを組み合わせる。入力不備で保存されないことも確認する。
   for (const route of [templates, tags, broadcasts, scenarios, forms, richMenuGroups,
-    messageTemplates, lineAccountTags, hqTemplates, hqBroadcasts, broadcastMessageAssets, booking]) app.route('/', route);
+    messageTemplates, lineAccountTags, hqTemplates, hqBroadcasts, broadcastMessageAssets, hqBanners, instagram, friendAttributes, affiliates, affiliateOffers, booking]) app.route('/', route);
 });
 afterEach(() => fixture.raw.close());
 const request = (path: string, body: unknown, method = 'POST') => app.request(path, {
@@ -77,10 +82,40 @@ describe('B-154 欄ごとの入力エラーを実HTTPで返す', () => {
     ['/api/hq/templates', { requestId: 'field-test-2', type: 'tag', name: '試験', definition: {} }, 'definition', 400],
     ['/api/hq/templates/id/preflight', { accountIds: 'invalid' }, 'accountIds', 400],
     ['/api/hq/broadcasts/folders', { name: '試験', color: 'invalid' }, 'color', 422],
+    ['/api/hq/banners/folders', { kind: 'project', name: '試験', color: 'invalid' }, 'color', 422],
+    ['/api/hq/banners/folders', { kind: 'invalid', name: '試験' }, 'kind', 422],
+    ['/api/hq/banners/folders', { kind: 'project', name: '' }, 'name', 422],
+    ['/api/hq/banners/folders/id/swap-order', { kind: 'project', withId: 'next', expectedRevision: 1 }, 'withExpectedRevision', 422],
+    ['/api/hq/templates/folders/id/swap-order', { withId: 'next', expectedRevision: 1 }, 'withExpectedRevision', 422],
+    ['/api/hq/broadcasts/folders/id/swap-order', { withId: 'next', expectedVersion: 1 }, 'withExpectedVersion', 422],
+    ['/api/hq/templates/folders/id/swap-order', { withId: 1, expectedRevision: 1, withExpectedRevision: 1 }, 'withId', 400],
+    ['/api/instagram/oauth/start', {}, 'lineAccountId', 400],
+    ['/api/affiliates', { name: '試験', lineAccountId: 'shop', folderId: 123 }, 'folderId', 400],
+    ['/api/affiliate-offers', { name: '試験', lineAccountId: 'shop', folderId: 123 }, 'folderId', 400],
+    ['/api/affiliates', { name: '試験', lineAccountId: 'shop', folderId: 'missing' }, 'folderId', 422],
+    ['/api/affiliate-offers', { name: '試験', lineAccountId: 'shop', rewardAmount: 0, folderId: 'missing' }, 'folderId', 422],
+    ['/api/rich-menu-groups', { accountId: 'shop', name: '試験', chatBarText: '開く', size: 'large',
+      pages: [{ name: '面', orderIndex: 0, areas: [{ boundsX: 0, boundsY: 0, boundsWidth: 100, boundsHeight: 100,
+        actionType: 'uri', intent: 'booking', actionData: { menuId: 'bad/id' } }] }] }, 'pages', 400],
   ])('%s: 不正な値を該当欄へ返す', async (path, body, key, status) => {
     const response = await request(path, body);
     expect(response.status).toBe(status);
     expect(await response.json()).toMatchObject({ error: expect.any(String), fields: { [key]: expect.any(String) } });
+  });
+  it.each(['templates', 'broadcasts', 'banners'])('%s: 並べ替えの正しい入力欄を誤りにしない', async type => {
+    const body = type === 'broadcasts' ? { withId: 'next', expectedVersion: 1 } : { withId: 'next', expectedRevision: 1, ...(type === 'banners' ? { kind: 'project' } : {}) };
+    const key = type === 'broadcasts' ? 'withExpectedVersion' : 'withExpectedRevision';
+    const response = await request(`/api/hq/${type}/folders/id/swap-order`, body);
+    expect(response.status).toBe(422);
+    const payload = await response.json<{ fields: Record<string, string> }>();
+    expect(Object.keys(payload.fields)).toEqual([key]);
+  });
+  it('店のフォルダの不正な版で保存済みの名前を変えない', async () => {
+    fixture.raw.prepare("INSERT INTO folders(id,kind,name,account_id) VALUES('folder','affiliate','保存済み','shop')").run();
+    const response = await request('/api/folders/folder', { name: '変更', expectedRevision: 'invalid' }, 'PATCH');
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ fields: { expectedRevision: expect.any(String) } });
+    expect(fixture.raw.prepare("SELECT name FROM folders WHERE id='folder'").get()).toEqual({ name: '保存済み' });
   });
   it('テンプレートの編集も欄別の理由を返し、保存済みの本文を壊さない', async () => {
     const created = await request('/api/templates', { accountId: 'shop', name: '保存済み', messageType: 'text', messageContent: '元の本文' });

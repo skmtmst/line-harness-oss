@@ -435,6 +435,12 @@ function parseAreaInput(raw: unknown): Parsed<RichMenuAreaInput> {
       return { field: 'pages', ok: false, error: `area.${key} must be non-empty string when present` };
     }
   }
+  for (const key of ['menuId', 'cardId']) {
+    const selected = (r.actionData as Record<string, unknown>)[key];
+    if (selected !== undefined && (typeof selected !== 'string' || (selected !== '' && !/^[A-Za-z0-9_-]{1,128}$/.test(selected)))) {
+      return { field: 'pages', ok: false, error: `area.actionData.${key} must be a valid identifier` };
+    }
+  }
   // intent が来ているなら、DB へ載せる種類は intent から決め直す。
   // 画面が送ってくる actionType とずれていると、publish の途中で
   // 「切り替え先の解決」などが素通りして LINE 側が 400 を返す。
@@ -3608,7 +3614,7 @@ richMenuGroups.post(
           () => resolveTrackedLinkBaseUrl(c.env.DB, c.env.WORKER_URL || new URL(c.req.url).origin),
           group,
         );
-        const formBaseUrl = account.liff_id ? `https://liff.line.me/${account.liff_id}` : (c.env.LIFF_URL ?? null);
+        const formBaseUrl = account.liff_id ? `https://liff.line.me/${account.liff_id}` : null;
         const groupInput: GroupInput = {
           id: group.id,
           size: group.size,

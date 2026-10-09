@@ -213,6 +213,8 @@ export default function FieldEdit() {
     )
   }
 
+  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+
   const notices = (
     <>
       {/* 応答消失後の再試行で、送った内容が保存済みと分かった（R517）。 */}

@@ -1,0 +1,294 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * 画像・動画・ファイルを入れる所。Pencil ★V8 採用案 Z7vd2（B-128）。
+ *
+ *   空        地 #f7f8fa（--color-slot-bg）、線 1px $hairline、角丸 12。印・題・説明・制限は真ん中
+ *   ドラッグ中  線と印が青（$action）、地は薄い青（$action-soft）
+ *   取り込み中  回る印と「アップロード中… 62%」
+ *   入った     画像を枠いっぱいに。右上に［差し替える］［消す］
+ *   失敗      赤い線と理由1行（$status-danger）
+ *   小さい所   compact：高さ 140・文字を減らす
+ *   大きさは状態が変わっても変えない
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-slot-gap);
+  min-width: 0;
+}
+
+.frame {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tpl-slot-h);
+  padding: var(--tpl-slot-pad);
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-slot-bg);
+  color: var(--color-ink-faint);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.frame[data-size='compact'] {
+  min-height: var(--tpl-slot-h-compact);
+  padding: var(--tpl-slot-pad-compact);
+}
+
+.frame[data-state='drag'] {
+  border-color: var(--color-action);
+  background: var(--color-action-soft);
+}
+
+.frame[data-state='error'] {
+  border-color: var(--color-status-danger);
+}
+
+.frame[data-state='filled'] {
+  padding: 0;
+  cursor: default;
+}
+
+.frame:not([data-file]),
+.frame[data-state='busy'],
+.frame[data-readonly],
+.frame[data-disabled] {
+  cursor: default;
+}
+
+.frame[data-disabled] {
+  opacity: var(--tpl-slot-disabled-opacity);
+}
+
+.frame:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-slot-gap);
+  max-width: 100%;
+  text-align: center;
+}
+
+/* 題のボタン：見た目は枠の中身そのまま。キーボード・読み上げの入口。 */
+.hit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-slot-gap);
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: inherit;
+}
+
+.hit:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 4px;
+}
+
+.icon {
+  width: var(--tpl-slot-icon);
+  height: var(--tpl-slot-icon);
+  margin-bottom: var(--tpl-slot-icon-gap);
+  color: var(--color-ink-faint);
+  stroke-width: 1.75;
+}
+
+.frame[data-size='compact'] .icon {
+  width: var(--tpl-slot-icon-compact);
+  height: var(--tpl-slot-icon-compact);
+  margin-bottom: var(--tpl-slot-gap);
+}
+
+.frame[data-state='drag'] .icon {
+  color: var(--color-action);
+}
+
+.frame[data-state='error'] .icon {
+  color: var(--color-status-danger);
+}
+
+.title {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-slot-title);
+  font-weight: 700;
+  line-height: var(--tpl-slot-lh);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.frame[data-size='compact'] .title {
+  font-size: var(--tpl-slot-title-compact);
+}
+
+.desc,
+.reason,
+.fileName {
+  font-size: var(--tpl-slot-desc);
+  line-height: var(--tpl-slot-lh);
+}
+
+.desc {
+  color: var(--color-ink-faint);
+}
+
+.frame[data-size='compact'] .desc,
+.frame[data-size='compact'] .reason {
+  font-size: var(--tpl-slot-desc-compact);
+}
+
+.reason {
+  color: var(--color-status-danger);
+  overflow-wrap: anywhere;
+}
+
+.fileName {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--tpl-slot-links-gap);
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font: inherit;
+  font-size: var(--tpl-slot-desc);
+  font-weight: 700;
+  line-height: var(--tpl-slot-lh);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+  border-radius: var(--radius-mini);
+}
+
+.link:disabled {
+  cursor: default;
+  opacity: var(--tpl-slot-disabled-opacity);
+}
+
+.preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview[data-fit='contain'] {
+  object-fit: contain;
+}
+
+.actions {
+  position: absolute;
+  top: var(--tpl-slot-pill-inset);
+  right: var(--tpl-slot-pill-inset);
+  display: flex;
+  gap: var(--tpl-slot-pill-gap);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-slot-pill-h);
+  padding: var(--tpl-slot-pill-pad);
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-slot-pill-shadow);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--tpl-slot-desc);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pill:hover {
+  background: var(--color-shell);
+}
+
+.pill:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.pill:disabled {
+  cursor: default;
+  opacity: var(--tpl-slot-disabled-opacity);
+}
+
+.filledError {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: var(--tpl-slot-gap) var(--tpl-slot-pad-compact);
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+  font-size: var(--tpl-slot-desc);
+  line-height: var(--tpl-slot-lh);
+}
+
+.spin {
+  width: var(--tpl-slot-icon);
+  height: var(--tpl-slot-icon);
+  margin-bottom: var(--tpl-slot-icon-gap);
+  color: var(--color-ink-faint);
+  animation: media-slot-spin var(--tpl-slot-spin) linear infinite;
+}
+
+.frame[data-size='compact'] .spin {
+  width: var(--tpl-slot-icon-compact);
+  height: var(--tpl-slot-icon-compact);
+  margin-bottom: var(--tpl-slot-gap);
+}
+
+@keyframes media-slot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 本物の file input は出さない。開くのは枠・題のボタン・［差し替える］からの click。 */
+.input {
+  display: none;
+}
+}

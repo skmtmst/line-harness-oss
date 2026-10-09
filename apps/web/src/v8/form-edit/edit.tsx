@@ -66,6 +66,8 @@ import {
 import { ContentTab } from './content-tab'
 import { AfterTab } from './after-tab'
 import { AppearanceTab } from './appearance-tab'
+import { FormEditAttemptContext } from './field-issues'
+import { focusFieldById } from '@/lib/use-form-errors'
 import { FormPhone } from './phone'
 import styles from './edit.module.css'
 
@@ -97,6 +99,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   hostRef.current = host
   const { selectedAccount, selectedAccountId } = useAccount()
   const narrow = useNarrowViewport()
+  const role = useStaffRole()
+  const canEdit = host ? !host.readOnly : canManageRole(role)
+  const readOnly = host ? Boolean(host.readOnly) : role !== null && !canEdit
 
   /* 友だちに配るURL。LIFF のURLにパスを足すと、LIFFアプリの同じパスへ転送される。 */
   const liffId = selectedAccount?.liffId ?? null
@@ -118,6 +123,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [layout, setLayoutState] = useState<FormLayout>(() => host?.initial.layout ?? emptyLayout())
   const [page, setPage] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
+  /* 保存を押したか（B-139）。押したあとだけ、欄の赤とタブの赤い印を出す。 */
+  const [attempted, setAttempted] = useState(false)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
   const [loading, setLoading] = useState(!host)
   const [saving, setSaving] = useState(false)
@@ -360,6 +367,12 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* ---------------- ページとブロック ---------------- */
 
   const blocks = useMemo(() => layout.sections[page]?.blocks ?? [], [layout, page])
+  /* タブの札の赤い印（B-139）。保存を押したあとだけ、そのタブの直す欄の数を出す。 */
+  const tabErrors: Record<EditTab, number> = attempted ? {
+    content: layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input' && !b.label.trim()).length, 0),
+    after: 0,
+    appearance: (name.trim() ? 0 : 1) + (ogImageUrlError(ogImageUrl) ? 1 : 0) + (formThemeContrastError(normalizeFormTheme(layout.options?.theme)) ? 1 : 0),
+  } : { content: 0, after: 0, appearance: 0 }
   const setBlocks = (next: FormBlock[]) =>
     setLayout((prev) => ({ ...prev, sections: prev.sections.map((s, i) => (i === page ? { ...s, blocks: next } : s)) }))
 
@@ -504,10 +517,20 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* ---------------- 保存・公開 ---------------- */
 
   /** 保存を断る理由（無ければ null）。自動保存の「通せる形か」にも同じものを使う。 */
-  const saveProblem = (publishAfter: boolean): { message: string; name?: boolean } | null => {
+  /*
+   * 保存を断る理由と、直す欄の場所（B-139）。tab と target があれば、そのタブを開いて欄へ移り、
+   * 欄の真下に理由を出す（inline）。欄に結び付かないものだけ上の帯に出す。
+   */
+  type SaveProblem = { message: string; name?: boolean; tab?: EditTab; target?: string; page?: number; blockId?: string; inline?: boolean }
+  const saveProblem = (publishAfter: boolean): SaveProblem | null => {
     if (!host && !selectedAccountId) return { message: 'LINE公式アカウントを選んでください' }
-    if (!name.trim()) return { message: 'フォーム名を入力してください', name: true }
+    if (!name.trim()) return { message: 'フォーム名を入力してください', name: true, tab: 'appearance', target: 'fe-name', inline: true }
     const allBlocks = layout.header.concat(layout.sections.flatMap((s) => s.blocks))
+    const untitledPage = layout.sections.findIndex((s) => s.blocks.some((b) => b.kind === 'input' && !b.label.trim()))
+    if (untitledPage >= 0) {
+      const block = layout.sections[untitledPage].blocks.find((b) => b.kind === 'input' && !b.label.trim())!
+      return { message: 'タイトルが空のブロックがあります', tab: 'content', page: untitledPage, blockId: block.id, target: `fe-q-${block.id}`, inline: true }
+    }
     if (allBlocks.find((b) => b.kind === 'input' && !b.label.trim())) return { message: 'タイトルが空のブロックがあります' }
     // 回答キーが重なると片方の答えが消える。保存の直前にも止める。
     const seenNames = new Set<string>()
@@ -521,10 +544,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     const layoutError = validateFormLayoutForSave(layout)
     if (layoutError) return { message: layoutError }
     const ogImageError = ogImageUrlError(ogImageUrl)
-    if (ogImageError) return { message: ogImageError }
+    if (ogImageError) return { message: ogImageError, tab: 'appearance', target: 'fe-og-image', inline: true }
     // 文字と背景の差が 4.5:1 未満の組み合わせは保存できない（保存APIも同じ検査をする）。
     const contrastError = formThemeContrastError(normalizeFormTheme(layout.options?.theme))
-    if (contrastError) return { message: contrastError }
+    if (contrastError) return { message: contrastError, tab: 'appearance', target: 'fe-colors', inline: true }
     // 公開に進むときだけ、公開前の検査（分岐の循環・消えた行き先など）を通す。
     if (publishAfter) {
       const publishError = validateFormForPublish(layout)
@@ -550,11 +573,20 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
    * 競合（409）だけは自動でも帯を出す（このまま書くと相手の変更が消えるため）。
    */
   const save = async (publishAfter = false, { silent = false }: { silent?: boolean } = {}): Promise<boolean> => {
+    if (!canEdit) return false
     const problem = saveProblem(publishAfter)
     if (problem) {
       if (silent) return false
-      setError(problem.message)
+      setAttempted(true)
       setNameError(problem.name ? problem.message : null)
+      /* 欄に結び付く誤りは、そのタブ・ページ・ブロックを開いて欄へ移り、欄の真下に出す（B-139）。 */
+      setError(problem.inline ? '' : problem.message)
+      if (problem.tab) {
+        if (problem.tab !== editTab) changeTab(problem.tab)
+        if (problem.page !== undefined) setPage(problem.page)
+        if (problem.blockId) setSelectedBlockId(problem.blockId)
+        if (problem.target) focusFieldById(problem.target)
+      }
       return false
     }
     if (!silent) setNameError(null)
@@ -682,11 +714,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
    * 入力が止まって2秒で下書きへ静かに保存する（一斉配信と同じ）。保存先は
    * 下書きなので、公開中の内容は変わらない。閲覧のみの人には動かさない。
    */
-  const role = useStaffRole()
   const autosave = useDraftAutosave({
     fingerprint: currentSnapshot,
     dirty,
-    active: !host && (role === null || canManageRole(role)),
+    active: !host && canEdit,
     enabled: formLoaded && !loading && !conflict && saveProblem(false) === null,
     paused: leaveTarget !== null || saving || showPublish,
     save: () => save(false, { silent: true }),
@@ -694,7 +725,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   /* 公開前の試し：試し合言葉を取って試しURLを作る。試しは保存済みの下書きに出る。 */
   const startTest = async () => {
-    if (!selectedAccountId || testBusy) return
+    if (!canEdit || !selectedAccountId || testBusy) return
     setTestBusy(true)
     setTestError('')
     try {
@@ -790,13 +821,15 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
               </Button>
             </div>
             <p className={styles.urlNote}>友だちに配るURLです。LINEの中で開きます。</p>
-            <div className={styles.urlTest}>
-              <Button onClick={() => void startTest()} disabled={testBusy} busy={testBusy} busyLabel="用意しています..." title="保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入りません">
-                <FlaskConical size={15} aria-hidden="true" />
-                <span className={styles.testWide}>公開前に試す（試しのURLを作る）</span>
-                <span className={styles.testNarrow}>公開前に試す</span>
-              </Button>
-            </div>
+            {canEdit ? (
+              <div className={styles.urlTest}>
+                <Button onClick={() => void startTest()} disabled={testBusy} busy={testBusy} busyLabel="用意しています..." title="保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入りません">
+                  <FlaskConical size={15} aria-hidden="true" />
+                  <span className={styles.testWide}>公開前に試す（試しのURLを作る）</span>
+                  <span className={styles.testNarrow}>公開前に試す</span>
+                </Button>
+              </div>
+            ) : null}
             {testError ? <p role="alert" className={styles.urlError}>{testError}</p> : null}
             {testUrl ? (
               <a href={testUrl} target="_blank" rel="noreferrer" className={styles.urlLink}>試しのURLを開く</a>
@@ -829,24 +862,28 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   ) : (
     <>
       <Button href="/form-submissions">キャンセル</Button>
-      <Button onClick={() => void save(false).then((ok) => { if (ok) autosave.markSaved() })} disabled={saving} busy={saving} busyLabel="保存中…" title="フォームを保存（公開中の内容は変わりません）">
-        下書きを保存
-      </Button>
-      {conflict ? (
-        <Button variant="primary" onClick={() => void saveConflict.compare()} disabled={saveConflict.compareBusy || saving}>
-          比べてから保存
-        </Button>
-      ) : (
-        <Button variant="primary" onClick={() => setShowPublish(true)} disabled={saving}>
-          <Upload size={15} aria-hidden="true" />
-          この版を公開
-        </Button>
-      )}
+      {canEdit ? (
+        <>
+          <Button onClick={() => void save(false).then((ok) => { if (ok) autosave.markSaved() })} disabled={saving} busy={saving} busyLabel="保存中…" title="フォームを保存（公開中の内容は変わりません）">
+            下書きを保存
+          </Button>
+          {conflict ? (
+            <Button variant="primary" onClick={() => void saveConflict.compare()} disabled={saveConflict.compareBusy || saving}>
+              比べてから保存
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => setShowPublish(true)} disabled={saving}>
+              <Upload size={15} aria-hidden="true" />
+              この版を公開
+            </Button>
+          )}
+        </>
+      ) : null}
     </>
   )
 
   /* 競合の帯（J1pdB）。左右の列の上に横いっぱいで出す。型の「狭い板の切り替え」の置き場を借りる。 */
-  const conflictBand = conflict ? (
+  const conflictBand = canEdit && conflict ? (
     <div className={styles.bandSlot} data-fe-band>
       <SaveConflictBand
         designNode="J1pdB"
@@ -885,9 +922,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         <div className={styles.tabs}>
           {/* 型は説明をタブの下へ置くので、絵どおり題の下・タブの上に出すためここに置く。 */}
           <p className={styles.status}>{statusLine}</p>
-          <Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, onClick: () => changeTab(t.key) }))} />
+          <Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, errorCount: tabErrors[t.key], onClick: () => changeTab(t.key) }))} />
         </div>
       )}
+      notice={readOnly ? <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /> : undefined}
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}
@@ -895,6 +933,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
         : dirty ? '保存していない変更があります' : undefined}
     >
+      <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>
         {host?.notice}
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
@@ -903,6 +942,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           <p className={styles.loading}>読み込み中...</p>
         ) : editTab === 'content' ? (
           <ContentTab
+            readOnly={!canEdit}
             layout={layout}
             page={page}
             blocks={blocks}
@@ -924,9 +964,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onRemoveBlock={removeBlock}
           />
         ) : editTab === 'after' ? (
-          <AfterTab options={layout.options} refs={refs} onSubmitTagId={onSubmitTagId} onChangeOptions={patchOptions} onChangeSubmitTag={setOnSubmitTagId} />
+          <AfterTab readOnly={!canEdit} options={layout.options} refs={refs} onSubmitTagId={onSubmitTagId} onChangeOptions={patchOptions} onChangeSubmitTag={setOnSubmitTagId} />
         ) : (
           <AppearanceTab
+            readOnly={!canEdit}
             options={layout.options}
             accountId={host ? null : selectedAccountId}
             portable={Boolean(host)}
@@ -948,11 +989,12 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           />
         )}
       </div>
+      </FormEditAttemptContext.Provider>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="フォームへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
 
       <Dialog
-        open={showPublish}
+        open={canEdit && showPublish}
         title="この版を公開する"
         designHeaderPadding="var(--tpl-fm2-dialog-head-pad)"
         busy={saving}
@@ -1010,7 +1052,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       </Dialog>
 
       <SaveConflictCompareDialog
-        open={saveConflict.compareOpen}
+        open={canEdit && saveConflict.compareOpen}
         busy={saveConflict.compareBusy}
         error={saveConflict.compareError}
         {...(saveConflict.latest

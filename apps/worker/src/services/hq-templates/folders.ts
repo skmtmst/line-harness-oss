@@ -7,7 +7,7 @@ function folderAudit(db: D1Database, auth: HqTemplateAuthority, id: string, acti
   return db.prepare(`INSERT INTO audit_events(id,tenant_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result) VALUES (?,?,'business',?,?,?,'hq_template_folder',?,'success')`).bind(crypto.randomUUID(), auth.tenantId, auth.actorId, auth.role, `hq_template.folder_${action}`, id);
 }
 export async function listTemplateFolders(db: D1Database, auth: HqTemplateAuthority) {
-  return (await db.prepare('SELECT id,name,revision,color FROM hq_template_folders WHERE tenant_id=? AND archived_at IS NULL ORDER BY name,id').bind(auth.tenantId).all<HqTemplateFolder>()).results;
+  return (await db.prepare('SELECT id,name,revision,color,display_order AS displayOrder FROM hq_template_folders WHERE tenant_id=? AND archived_at IS NULL ORDER BY display_order,name,id').bind(auth.tenantId).all<HqTemplateFolder>()).results;
 }
 export async function saveTemplateFolder(db: D1Database, auth: HqTemplateAuthority, input: Record<string, unknown>, id?: string) {
   if (input.color !== undefined && !isFolderSelectColor(input.color)) throw new HqTemplateError('INVALID_FOLDER_COLOR', 422);
@@ -23,7 +23,7 @@ export async function saveTemplateFolder(db: D1Database, auth: HqTemplateAuthori
       db.prepare("UPDATE hq_template_folders SET name=?,color=CASE WHEN ? THEN ? ELSE color END,revision=revision+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND tenant_id=?").bind(name,input.color !== undefined ? 1 : 0,input.color ?? null,id,auth.tenantId),
       folderAudit(db,auth,id,'updated'),
     ]);
-    else await db.batch([db.prepare('INSERT INTO hq_template_folders(id,tenant_id,name,color) VALUES (?,?,?,?)').bind(folderId,auth.tenantId,name,input.color ?? null),folderAudit(db,auth,folderId,'created')]);
+    else await db.batch([db.prepare('INSERT INTO hq_template_folders(id,tenant_id,name,color,display_order) SELECT ?,?,?,?,COALESCE(MAX(display_order),-1)+1 FROM hq_template_folders WHERE tenant_id=? AND archived_at IS NULL').bind(folderId,auth.tenantId,name,input.color ?? null,auth.tenantId),folderAudit(db,auth,folderId,'created')]);
   } catch (e) { if (e instanceof HqTemplateError) throw e; if (String(e).includes('CONFLICT') || String(e).includes('malformed JSON')) throw new HqTemplateError('VERSION_CONFLICT',409); if (String(e).includes('UNIQUE')) throw new HqTemplateError('FOLDER_NAME_CONFLICT',409); throw e; }
   return (await listTemplateFolders(db,auth)).find(f => f.id === folderId)!;
 }

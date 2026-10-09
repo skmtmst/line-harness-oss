@@ -53,9 +53,9 @@ describe('V6 シナリオ編集の契約', () => {
   })
 
   it('一覧のフォルダ追加を既存の共通ダイアログへ接続する', () => {
-    expect(LIST).toContain("import FolderAddDialog from '@/components/shared/folder-add-dialog'")
-    expect(LIST).toContain('() => setFolderDialogOpen(true)')
-    expect(LIST).toContain('kind="scenario"')
+    // 追加・「…」の窓は共通のフォルダの列（ManagedFolderPanel → FolderAddDialog）が持つ（B-136）。
+    expect(LIST).toContain("import ManagedFolderPanel from '@/components/shared/managed-folder-panel'")
+    expect(LIST).toMatch(/<ManagedFolderPanel[\s\S]*?kind="scenario"[\s\S]*?canManage=\{canEdit\}/)
     expect(LIST).not.toContain('title="準備中です"\n          className="border-hairline text-ink-faint rounded-control border px-4')
   })
 

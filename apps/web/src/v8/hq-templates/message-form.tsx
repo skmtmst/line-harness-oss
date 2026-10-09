@@ -8,7 +8,7 @@
  * 保存済みの画像・カルーセルは、形を切り替えずに共通の MessageTemplateEditor で編集する。
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ImageIcon, Plus, X } from 'lucide-react'
+import { PlayCircle, Plus } from 'lucide-react'
 import type { HqMessageCard, HqMessageReference, HqTemplateFolder } from '@line-crm/shared'
 import { hqTemplatesApi, type MessageTemplateDefinition } from '@/lib/hq-templates-api'
 import { withMessageCard, withUploadedImage } from '@/lib/hq-template-authoring'
@@ -16,17 +16,38 @@ import { EMPTY_TEMPLATE_REFERENCES, LEGACY_MESSAGE_NOTICE, MessageTemplateEditor
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+import MediaSlot from '@/components/shared/media-slot'
+import TapActionField from '@/components/shared/tap-action-field'
+import type { TapActionKind, TapActionValue } from '@/lib/tap-actions'
+import { EntityPickerField } from '@/components/shared/entity-picker'
+import { ENTITY_KINDS } from '@/components/shared/entity-picker-sources'
 import FolderSelect from '@/components/shared/folder-select'
+import { FieldError } from '@/components/shared/form-controls'
+import type { FormErrors } from '@/lib/use-form-errors'
 import { decodeImageSize, type TemplateMedia } from './definition'
 import styles from './console.module.css'
 
-const ACTIONS: Array<{ value: HqMessageCard['buttons'][number]['action']; label: string }> = [
-  { value: 'url', label: 'URL を開く' },
-  { value: 'message', label: 'メッセージを送る' },
-  { value: 'form', label: '回答フォームを開く' },
-  { value: 'scenario', label: 'シナリオを始める' },
-]
+/*
+ * ボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。保存の形（HqMessageCard の action・value）は今のまま。
+ * 予約・予約履歴・来店スタンプは、統括カードの型（shared/hq-message-card.ts）と配る口が持てないので出さない
+ * （要る API：action に booking・booking_history・visit_stamp を足し、配るときに各店の LIFF の URL に置き換える）。
+ */
+type CardAction = HqMessageCard['buttons'][number]['action']
+const CARD_TAP_KINDS: readonly TapActionKind[] = ['uri', 'message', 'form']
+const SCENARIO_KIND = [{ value: 'scenario', label: 'シナリオを始める', description: '作ってあるシナリオを始める', icon: PlayCircle }] as const
+const TAP_OF: Record<CardAction, string> = {
+  url: 'uri', message: 'message', form: 'form', scenario: 'scenario',
+  booking: 'booking', booking_history: 'booking_history', visit_stamp: 'visit_stamp',
+}
+const ACTION_OF: Record<string, CardAction> = { uri: 'url', message: 'message', form: 'form', scenario: 'scenario' }
+function cardTapValue(button: HqMessageCard['buttons'][number]): TapActionValue {
+  return {
+    kind: TAP_OF[button.action],
+    uri: button.action === 'url' ? button.value : '',
+    text: button.action === 'message' ? button.value : '',
+    refId: button.action === 'form' || button.action === 'scenario' ? button.value : '',
+  }
+}
 
 export interface MessageFormProps {
   name: string
@@ -46,11 +67,26 @@ export interface MessageFormProps {
   onReceipt?: (media: TemplateMedia) => void
   /** 下に出す「前回の保存を再確認」などの知らせ。 */
   notice?: ReactNode
+  /** 保存で落ちた欄（B-139）。呼ぶ側の useFormErrors を渡すと、名前・本文・ボタンを欄ごとに検査して知らせる。 */
+  fields?: FormErrors
+}
+
+/** カードのボタン1つの誤り（packages/shared の parseHqMessageCard と同じ決まり）。欄の真下に出す。 */
+function cardButtonProblem(button: HqMessageCard['buttons'][number]): string | null {
+  if (!button.label.trim()) return 'ボタンの文字を入力してください'
+  if (!button.value.trim()) return button.action === 'form' ? '回答フォームを選んでください' : button.action === 'scenario' ? 'シナリオを選んでください' : button.action === 'message' ? '送る文を入力してください' : 'URLを入力してください'
+  if (button.action === 'url') {
+    try {
+      const url = new URL(button.value)
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return 'http か https の URL を入力してください'
+    } catch { return '正しい URL を入力してください' }
+  }
+  return null
 }
 
 export default function MessageForm({
   name, onNameChange, value, onChange, folders, folderId, onFolderChange, onCreateFolder, folderLoadFailed,
-  disabled, catalogFailed, onReloadCatalog, onBusyChange, onReceipt, notice,
+  disabled, catalogFailed, onReloadCatalog, onBusyChange, onReceipt, notice, fields,
 }: MessageFormProps) {
   const current = value.template
   const [targetDate, setTargetDate] = useState('')
@@ -71,6 +107,11 @@ export default function MessageForm({
     return () => { alive = false }
   }, [])
 
+  fields?.define('name', 'ひな形の名前', () => (name.trim() ? null : 'ひな形の名前を入力してください'))
+  fields?.define('body', '配信する本文', () => ((usesCard ? card.body : current.messageContent).trim() ? null : '配信する本文を入力してください'))
+  if (usesCard && card.format === 'flex') card.buttons.forEach((button, index) => fields?.define(`button-${button.id}`, `ボタン${index + 1}`, () => cardButtonProblem(button)))
+  const bindField = (key: string, id: string) => (fields ? { ...fields.bind(key), 'aria-invalid': fields.invalid(key) || undefined, 'aria-describedby': fields.invalid(key) ? `${id}-error` : undefined } : {})
+
   const updateCard = (next: HqMessageCard) => onChange(withMessageCard(value, next))
   const updateButton = (id: string, patch: Partial<HqMessageCard['buttons'][number]>) => updateCard({ ...card, buttons: card.buttons.map((button) => button.id === id ? { ...button, ...patch } : button) })
   const image = value.media.find((item) => item.id === card.imageMediaId) ?? value.media[0]
@@ -86,7 +127,8 @@ export default function MessageForm({
         <div className={styles.twoCol}>
           <label className={styles.field}>
             <span className={styles.label}>ひな形の名前</span>
-            <input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} />
+            <input aria-label="ひな形の名前" {...bindField('name', 'hq-msg-name')} className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} />
+            <FieldError id="hq-msg-name-error">{fields?.error('name')}</FieldError>
           </label>
           <label className={styles.field}>
             <span className={styles.label}>分類 <small className={styles.optional}>任意</small></span>
@@ -103,12 +145,15 @@ export default function MessageForm({
           {card.format === 'flex' && (
             <div className={styles.field}>
               <span className={styles.smallLabel}>画像 <small className={styles.optional}>PNG・JPEG、1件8 MiB以下</small></span>
-              <div className={styles.imageBox}>
-                {image?.publicUrl ? <span className={styles.thumb} role="img" aria-label={image.filename} style={{ backgroundImage: `url(${JSON.stringify(image.publicUrl)})` }} /> : <span className={styles.thumb} aria-hidden="true" />}
-                <span className={styles.imageName}>{image ? `${image.filename} ・ ${image.width ?? '—'}×${image.height ?? '—'}` : 'まだ画像がありません'}</span>
-                {card.imageMediaId ? <Button size="compact" variant="text" disabled={disabled} onClick={() => { const { imageMediaId: _removed, ...next } = card; updateCard(next) }}><X size={14} aria-hidden="true" />画像を外す</Button> : null}
-                <ImagePick disabled={disabled} onBusyChange={onBusyChange} onReceipt={onReceipt} onUploaded={(media) => { const next = withUploadedImage(value, media); onChange(withMessageCard(next, { ...card, imageMediaId: media.id })) }} />
-              </div>
+              <ImagePick
+                value={image?.publicUrl ?? null}
+                disabled={disabled}
+                onBusyChange={onBusyChange}
+                onReceipt={onReceipt}
+                onRemove={card.imageMediaId ? () => { const { imageMediaId: _removed, ...next } = card; updateCard(next) } : undefined}
+                onUploaded={(media) => { const next = withUploadedImage(value, media); onChange(withMessageCard(next, { ...card, imageMediaId: media.id })) }}
+              />
+              {image ? <span className={styles.imageName}>{`${image.filename} ・ ${image.width ?? '—'}×${image.height ?? '—'}`}</span> : null}
             </div>
           )}
           <label className={styles.field}>
@@ -117,61 +162,66 @@ export default function MessageForm({
           </label>
           <label className={styles.field}>
             <span className={styles.smallLabel}>本文</span>
-            <textarea className={styles.textarea} aria-label="配信する本文" maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={(event) => updateCard({ ...card, body: event.target.value })} />
+            <textarea className={styles.textarea} aria-label="配信する本文" {...bindField('body', 'hq-msg-body')} maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={(event) => updateCard({ ...card, body: event.target.value })} />
+            <FieldError id="hq-msg-body-error">{fields?.error('body')}</FieldError>
           </label>
           {card.format === 'flex' && (
             <div className={styles.buttonsBox}>
               <span className={styles.smallLabel}>ボタン <small className={styles.optional}>最大 3 つ</small></span>
               {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => void loadReferences()}>参照先を再読み込み</Button>} />}
               {card.buttons.map((button, index) => (
-                <div key={button.id} className={styles.buttonEdit}>
-                  <div className={styles.twoCol}>
-                    <label className={styles.field}>
+                <div key={button.id} className={styles.buttonEdit} {...(fields ? fields.bind(`button-${button.id}`) : {})} aria-describedby={fields?.invalid(`button-${button.id}`) ? `hq-msg-button-${button.id}-error` : undefined}>
+                  <label className={styles.field}>
+                    <span className={styles.labelRow}>
                       <span className={styles.label}>ボタンの文字</span>
-                      <input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} />
-                    </label>
-                    <div className={styles.field}>
-                      <span className={styles.smallLabel}>押したとき</span>
-                      <Select aria-label={`ボタン${index + 1}を押したとき`} size="full" disabled={disabled} value={button.action} onChange={(next) => updateButton(button.id, { action: next as typeof button.action, value: '' })} options={ACTIONS} />
-                    </div>
+                      {disabled ? null : <button type="button" className={styles.textButton} onClick={() => updateCard({ ...card, buttons: card.buttons.filter((row) => row.id !== button.id) })}>{`ボタン${index + 1}を外す`}</button>}
+                    </span>
+                    <input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} />
+                  </label>
+                  <div className={styles.field}>
+                    <span className={styles.smallLabel}>押したとき</span>
+                    <TapActionField
+                      name={`ボタン${index + 1}`}
+                      kindLabel={`ボタン${index + 1}を押したとき`}
+                      value={cardTapValue(button)}
+                      onChange={(patch) => {
+                        if (patch.kind !== undefined) { updateButton(button.id, { action: ACTION_OF[patch.kind] ?? 'url', value: '' }); return }
+                        const next = patch.uri ?? patch.text ?? patch.refId
+                        if (next !== undefined) updateButton(button.id, { value: next })
+                      }}
+                      kinds={CARD_TAP_KINDS}
+                      extraKinds={SCENARIO_KIND}
+                      scope="hq"
+                      hasLiff
+                      readOnly={disabled}
+                      textMax={300}
+                      sources={referenceError ? {} : { form: references.filter((row) => row.kind === 'form').map((row) => ({ id: row.id, name: `${row.name}（${row.accountName}）` })) }}
+                      renderBody={(kind) => kind !== 'scenario' ? undefined : (
+                        /* 統括の参照先はアカウントをまたぐので、店のフォルダは読まず行を直接渡す（選ぶ窓 dJZ7Q）。 */
+                        <EntityPickerField
+                          label={`ボタン${index + 1}の参照先`}
+                          noun={ENTITY_KINDS.scenario.noun}
+                          icon={ENTITY_KINDS.scenario.icon}
+                          disabled={disabled || Boolean(referenceError)}
+                          items={references.filter((row) => row.kind === 'scenario').map((row) => ({ id: row.id, name: row.name, meta: row.accountName, keywords: row.accountName }))}
+                          value={button.value}
+                          onChange={(next) => updateButton(button.id, { value: next })}
+                        />
+                      )}
+                    />
                   </div>
-                  {button.action === 'form' || button.action === 'scenario' ? (
-                    <div className={styles.field}>
-                      <span className={styles.labelRow}>
-                        <span className={styles.label}>参照先</span>
-                        <button type="button" className={styles.textButton} disabled={disabled} onClick={() => updateCard({ ...card, buttons: card.buttons.filter((row) => row.id !== button.id) })}>{`ボタン${index + 1}を外す`}</button>
-                      </span>
-                      <Select
-                        aria-label={`ボタン${index + 1}の参照先`} size="full"
-                        disabled={disabled || Boolean(referenceError)}
-                        value={button.value}
-                        onChange={(next) => updateButton(button.id, { value: next })}
-                        options={[
-                          { value: '', label: '選択してください' },
-                          ...(button.value && !references.some((row) => row.kind === button.action && row.id === button.value) ? [{ value: button.value, label: '保存済みの参照先（候補を確認してください）' }] : []),
-                          ...references.filter((row) => row.kind === button.action).map((row) => ({ value: row.id, label: `${row.name}（${row.accountName}）` })),
-                        ]}
-                      />
-                    </div>
-                  ) : (
-                    <div className={styles.field}>
-                      <span className={styles.labelRow}>
-                        <label className={styles.label} htmlFor={`hq-button-value-${button.id}`}>{button.action === 'url' ? 'タップ先URL' : '送るメッセージ'}</label>
-                        <button type="button" className={styles.textButton} disabled={disabled} onClick={() => updateCard({ ...card, buttons: card.buttons.filter((row) => row.id !== button.id) })}>{`ボタン${index + 1}を外す`}</button>
-                      </span>
-                      <input id={`hq-button-value-${button.id}`} className={styles.input} aria-label={`ボタン${index + 1}の内容`} maxLength={button.action === 'message' ? 300 : 2000} disabled={disabled} value={button.value} onChange={(event) => updateButton(button.id, { value: event.target.value })} />
-                    </div>
-                  )}
+                  <FieldError id={`hq-msg-button-${button.id}-error`}>{fields?.error(`button-${button.id}`)}</FieldError>
                 </div>
               ))}
               <span className={styles.addButtonRow}>
                 <Button disabled={disabled || card.buttons.length >= 3} onClick={() => updateCard({ ...card, buttons: [...card.buttons, { id: crypto.randomUUID(), label: '', action: 'url', value: '' }] })}><Plus size={15} aria-hidden="true" />ボタンを足す</Button>
               </span>
-              <p className={styles.note}>押したときは URL を開く・メッセージを送る・回答フォームを開く・シナリオを始める から選べます</p>
+              <p className={styles.note}>押したときは URLを開く・テキストを送る・回答フォーム・シナリオを始める から選べます</p>
               <p className={styles.noteStrong}>タグ・回答フォームがあるかは、アカウントへ配る前の確認で調べます（ない所は配る前に知らせます）。</p>
             </div>
           )}
         </> : (
+          <div {...(fields ? fields.bind('body') : {})}>
           <MessageTemplateEditor
             value={{ messageType: current.messageType, messageContent: current.messageContent }}
             onChange={(next) => onChange({ ...value, template: { ...current, messageType: next.messageType as MessageTemplateDefinition['template']['messageType'], messageContent: next.messageContent } })}
@@ -190,6 +240,8 @@ export default function MessageForm({
               </>
             )}
           />
+          <FieldError id="hq-msg-body-error">{fields?.error('body')}</FieldError>
+          </div>
         )}
         {notice}
       </section>
@@ -219,10 +271,9 @@ export default function MessageForm({
 }
 
 /** 画像を選んで送る。R568：今の大きさで採用できない画像は送る前に止め、受け取りを先に残す。 */
-function ImagePick({ disabled, onUploaded, onBusyChange, onReceipt }: { disabled: boolean; onUploaded: (media: TemplateMedia) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: TemplateMedia) => void }) {
+function ImagePick({ value = null, disabled, onUploaded, onBusyChange, onReceipt, onRemove }: { value?: string | null; disabled: boolean; onUploaded: (media: TemplateMedia) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: TemplateMedia) => void; onRemove?: () => void }) {
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
-  const input = useRef<HTMLInputElement>(null)
   const alive = useRef(true)
   const locked = useRef(false)
   useEffect(() => { alive.current = true; return () => { alive.current = false; onBusyChange?.(false) } }, [onBusyChange])
@@ -241,10 +292,16 @@ function ImagePick({ disabled, onUploaded, onBusyChange, onReceipt }: { disabled
     }
   }
   return (
-    <span className={styles.imagePick}>
-      <input ref={input} className={styles.fileInput} aria-label="メッセージ画像を選ぶ" type="file" accept="image/png,image/jpeg" disabled={disabled || uploading} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void upload(file) }} />
-      <Button disabled={disabled || uploading} busy={uploading} busyLabel="画像を登録しています…" onClick={() => input.current?.click()}><ImageIcon size={15} aria-hidden="true" />メッセージ画像を選ぶ</Button>
-      {error && <span role="alert" className={styles.fieldError}>{error}</span>}
-    </span>
+    <MediaSlot
+      title="画像を追加"
+      value={value}
+      accept="image/png,image/jpeg"
+      limitText="1ファイル8MiB以内・PNG・JPEG"
+      busy={uploading}
+      error={error}
+      disabled={disabled}
+      onFile={(file) => void upload(file)}
+      onRemove={onRemove}
+    />
   )
 }

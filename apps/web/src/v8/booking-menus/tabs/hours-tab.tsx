@@ -8,7 +8,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -50,6 +50,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
   const [draft, setDraft] = useState<BusinessHoursDay[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [badHours, setBadHours] = useState<{ weekday: number; index: number; parts: Array<'start' | 'end' | 'capacity'> } | null>(null)
   const [addingResource, setAddingResource] = useState(false)
   const inFlightRef = useRef(false)
 
@@ -75,15 +76,32 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
       ? { ...day, intervals: update(day.intervals) }
       : day) ?? current)
     setSaveError(null)
+    setBadHours(null)
   }
+
+  const isBad = (weekday: number, index: number, part: 'start' | 'end' | 'capacity') => Boolean(badHours && badHours.weekday === weekday && badHours.index === index && badHours.parts.includes(part))
 
   async function submit() {
     if (!settings || !draft || inFlightRef.current) return
     const validationError = validateBusinessHours(draft)
     if (validationError) {
-      setSaveError(validationError)
+      setSaveError(validationError.message)
+      /* 落ちた区間の欄を赤くして移る（B-139）。理由の文は表の下に出す。 */
+      setBadHours(validationError.at ?? null)
+      const at = validationError.at
+      const dayLabel = at ? DAYS.find((day) => day.weekday === at.weekday)?.label : undefined
+      if (at && dayLabel) {
+        const part = at.parts[at.parts.length - 1]
+        const target = `${dayLabel}の${part === 'start' ? '開始時刻' : part === 'end' ? '終了時刻' : '同時受付数'}（${at.index + 1}区間目）`
+        requestAnimationFrame(() => {
+          const el = Array.from(document.querySelectorAll<HTMLElement>('[aria-label]')).find((node) => node.getAttribute('aria-label') === target)
+          el?.scrollIntoView?.({ block: 'center' })
+          el?.focus({ preventScroll: true })
+        })
+      }
       return
     }
+    setBadHours(null)
     inFlightRef.current = true
     setSaving(true)
     setSaveError(null)
@@ -183,6 +201,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                   {intervals.map((interval, index) => (
                   <div key={index} className={styles.intervalLine}>
                     <TimeField
+                      invalid={isBad(weekday, index, 'start')}
                       aria-label={`${label}の開始時刻（${index + 1}区間目）`}
                       value={interval.start}
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, start: value } : entry))}
@@ -191,6 +210,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                     />
                     <span className={styles.intervalTilde}>〜</span>
                     <TimeField
+                      invalid={isBad(weekday, index, 'end')}
                       aria-label={`${label}の終了時刻（${index + 1}区間目）`}
                       value={interval.end}
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, end: value } : entry))}
@@ -200,6 +220,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                     <span className={styles.sameTimeLabel}>同時</span>
                     <input
                       aria-label={`${label}の同時受付数（${index + 1}区間目）`}
+                      aria-invalid={isBad(weekday, index, 'capacity') || undefined}
                       type="number"
                       min={1}
                       max={1000}
@@ -492,6 +513,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
   const [time, setTime] = useState('')
   const [staffId, setStaffId] = useState('')
   const [staffOptions, setStaffOptions] = useState<BookingStaff[]>([])
+  const staffRows = useMemo(() => staffOptions.map((person) => ({ id: person.id, name: person.display_name })), [staffOptions])
   const [checking, setChecking] = useState(false)
   const [checkError, setCheckError] = useState<string | null>(null)
   const [result, setResult] = useState<BookingSlotCheckResult | null>(null)
@@ -555,14 +577,14 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
         <HelpTip label="空きを確かめるの説明">お客さまの画面と同じ条件で、その日時に受けられるか確かめます。確かめても予約は作られません。</HelpTip>
       </div>
       <div className={styles.checkGrid}>
-        <Select size="full"
-          aria-label="確かめるメニュー"
+        <EntityKindField
+          kind="booking_menu"
+          label="確かめるメニュー"
+          options={activeMenus}
           value={menuId}
           onChange={(value) => { setMenuId(value); changeCriteria() }}
-          options={[
-            ...(activeMenus.length === 0 ? [{ value: '', label: '受付中のメニューがありません' }] : []),
-            ...activeMenus.map((menu) => ({ value: menu.id, label: menu.name })),
-          ]}
+          placeholder={activeMenus.length === 0 ? '（受付中のメニューがありません）' : '（メニューを選ぶ）'}
+          meta={() => undefined}
         />
         <label className={styles.fieldLabel}>
           日付
@@ -572,14 +594,15 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
           開始時刻
           <TimeField aria-label="確かめる開始時刻" size="field" value={time} onChange={(value) => { setTime(value); changeCriteria() }} className="mt-1" />
         </label>
-        <Select size="full"
-          aria-label="確かめる担当"
+        <EntityKindField
+          kind="staff"
+          label="確かめる担当"
+          options={staffRows}
           value={staffId}
           onChange={(value) => { setStaffId(value); changeCriteria() }}
-          options={[
-            { value: '', label: '担当：指名なし' },
-            ...staffOptions.map((person) => ({ value: person.id, label: `担当：${person.display_name}` })),
-          ]}
+          clearable
+          placeholder="（担当：指名なし）"
+          meta={() => undefined}
         />
       </div>
       <div className={styles.checkAction}>
@@ -614,23 +637,27 @@ function initialBusinessHours(settings: BookingSettings): BusinessHoursDay[] {
 }
 
 // v7 /booking/staff/shifts の BusinessHoursEditor と同じ検査。
-function validateBusinessHours(days: BusinessHoursDay[]): string | null {
+/** 営業時間の誤りと、その欄（曜日・何区間目・どの欄）。欄が無い誤りは場所なし（B-139）。 */
+type HoursProblem = { message: string; at?: { weekday: number; index: number; parts: Array<'start' | 'end' | 'capacity'> } }
+
+function validateBusinessHours(days: BusinessHoursDay[]): HoursProblem | null {
   const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
   for (const day of days) {
-    if (day.intervals.length > 8) return '1曜日の営業時間は8区間までです。'
+    if (day.intervals.length > 8) return { message: '1曜日の営業時間は8区間までです。' }
     const sorted = [...day.intervals].sort((a, b) => a.start.localeCompare(b.start))
+    const at = (interval: (typeof sorted)[number], parts: Array<'start' | 'end' | 'capacity'>) => ({ weekday: day.weekday, index: day.intervals.indexOf(interval), parts })
     for (const interval of sorted) {
       if (!timePattern.test(interval.start) || !timePattern.test(interval.end) || interval.start >= interval.end) {
-        return '営業時間は日ごとに分けて入力してください。終了は同じ日の開始より後にし、24:00は使えません。'
+        return { message: '営業時間は日ごとに分けて入力してください。終了は同じ日の開始より後にし、24:00は使えません。', at: at(interval, ['start', 'end']) }
       }
       const capacity = Number(interval.capacity)
       if (!Number.isInteger(capacity) || capacity < 1 || capacity > 1000) {
-        return '同時に受け付ける数は1〜1000件で入力してください。'
+        return { message: '同時に受け付ける数は1〜1000件で入力してください。', at: at(interval, ['capacity']) }
       }
     }
     for (let index = 1; index < sorted.length; index += 1) {
       if (sorted[index - 1].end > sorted[index].start) {
-        return '同じ曜日の営業時間は重ならないように入力してください。'
+        return { message: '同じ曜日の営業時間は重ならないように入力してください。', at: at(sorted[index], ['start']) }
       }
     }
   }

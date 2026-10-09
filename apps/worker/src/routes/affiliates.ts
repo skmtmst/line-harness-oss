@@ -1,4 +1,5 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { FolderAssignmentError } from '@line-crm/db';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getAffiliates,
@@ -86,6 +87,7 @@ function commissionRateError(value: unknown): string | null {
 function serializeAffiliate(row: {
   id: string;
   tenant_id?: string;
+  folder_id?: string | null;
   line_account_id?: string | null;
   name: string;
   code: string;
@@ -101,6 +103,7 @@ function serializeAffiliate(row: {
 }) {
   return {
     id: row.id,
+    folderId: row.folder_id ?? null,
     tenantId: row.tenant_id ?? null,
     lineAccountId: row.line_account_id ?? null,
     name: row.name,
@@ -385,11 +388,12 @@ affiliates.get('/api/affiliates/:id', async (c) => {
 //        - OSS back-compat. `code` must be >= 4 chars, alphanumeric only.
 const CODE_RE = /^[A-Za-z0-9]{4,}$/;
 
-affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"code":["string"],"rewardMode":["string"],"friendId":["string"],"issueInitialLink":["boolean"],"lineAccountId":["string"],"operationId":["string"],"isActive":["boolean"]}), async (c) => {
+affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBoundary({"folderId":["string","null"],"name":["string"],"code":["string"],"rewardMode":["string"],"friendId":["string"],"issueInitialLink":["boolean"],"lineAccountId":["string"],"operationId":["string"],"isActive":["boolean"]}), async (c) => {
   auditLog(c, 'affiliate.create', { kind: 'affiliate' });
   try {
     const body = await c.req.json<{
       name?: string;
+      folderId?: string | null;
       code?: string;
       commissionRate?: number;
       rewardMode?: 'none' | 'fixed' | 'rate';
@@ -469,6 +473,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
       try {
         const item = await createAffiliate(c.env.DB, {
           tenantId: scope.tenantId,
+          folderId: body.folderId,
           lineAccountId,
           name: resolvedName,
           code,
@@ -500,6 +505,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
     try {
       item = await createAffiliateWithRandomCode(c.env.DB, {
         tenantId: scope.tenantId,
+        folderId: body.folderId,
         lineAccountId,
         name: resolvedName,
         commissionRate: body.commissionRate,
@@ -551,19 +557,21 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
       201,
     );
   } catch (err) {
+    if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
     console.error('POST /api/affiliates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
 // PUT /api/affiliates/:id - update
-affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"rewardMode":["string"],"isActive":["boolean"]}), async (c) => {
+affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), inputJsonBoundary({"folderId":["string","null"],"name":["string"],"rewardMode":["string"],"isActive":["boolean"]}), async (c) => {
   auditLog(c, 'affiliate.update', { kind: 'affiliate', id: c.req.param('id') });
   try {
     const id = c.req.param('id');
     const { scope } = await getAffiliateScope(c);
     const body = await c.req.json<{
       name?: string;
+      folderId?: string | null;
       commissionRate?: number;
       rewardMode?: 'none' | 'fixed' | 'rate';
       isActive?: boolean;
@@ -579,6 +587,7 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), inputJsonBo
 
     const updated = await updateAffiliate(c.env.DB, id, {
       name: body.name,
+      folder_id: body.folderId,
       commission_rate: body.commissionRate,
       reward_mode: body.rewardMode,
       is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
@@ -593,6 +602,7 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), inputJsonBo
     if (err instanceof Error && err.message === 'APPROVED_REWARD_SNAPSHOT_MISSING') {
       return c.json({ success: false, code: err.message, error: '過去の承認額を確かめられないため、報酬方式を変更できません。過去の記録を照合してください。' }, 409);
     }
+    if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
     console.error('PUT /api/affiliates/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

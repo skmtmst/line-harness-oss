@@ -25,12 +25,19 @@ import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import Toggle from '@/components/shared/toggle'
 import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
-import MediaPickerDialog from './media-picker'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
+import MediaSlot from '@/components/shared/media-slot'
+import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
+import UriTapActionField from '@/components/shared/uri-tap-action-field'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFormEditAttempted } from './field-issues'
 import styles from './edit.module.css'
 
 type Props = {
+  readOnly?: boolean
   layout: FormLayout
   page: number
   blocks: FormBlock[]
@@ -67,7 +74,7 @@ export function ContentTab(props: Props) {
             <h2 id="fe-pages-title" className={styles.cardTitle}>ページ</h2>
             <p className={styles.cardNote}>ページごとに「次へ」で進みます</p>
           </span>
-          <RowActions
+          {props.readOnly ? null : <RowActions
             subjectName={`ページ「${section?.name ?? ''}」`}
             menuItems={[
               { id: 'rename', label: '名前を変える', onSelect: () => setRenaming(section?.name ?? '') },
@@ -78,7 +85,7 @@ export function ContentTab(props: Props) {
               label: 'このページを消す',
               onSelect: () => setRemoving(true),
             } : undefined}
-          />
+          />}
         </div>
         <div className={styles.pageChips}>
           {layout.sections.map((s, index) => (
@@ -93,10 +100,10 @@ export function ContentTab(props: Props) {
               {index + 1} {s.name}
             </button>
           ))}
-          <Button variant="text" onClick={props.onAddPage}>
+          {props.readOnly ? null : <Button variant="text" onClick={props.onAddPage}>
             <Plus size={15} aria-hidden="true" />
             ページを足す
-          </Button>
+          </Button>}
         </div>
       </section>
 
@@ -109,25 +116,32 @@ export function ContentTab(props: Props) {
           <p className={styles.emptyBlocks}>下の「ブロックを足す」から作ってください</p>
         ) : (
           blocks.map((block, index) =>
-            block.id === props.selectedBlockId ? (
+            props.readOnly ? (
+              <div key={block.id} className={styles.blockRow}>
+                <span className={styles.blockText}>
+                  <span className={styles.blockTitle}>{blockTitleLine(block)}</span>
+                  <span className={styles.blockKind}>{blockKindLine(block)}</span>
+                </span>
+              </div>
+            ) : block.id === props.selectedBlockId ? (
               <OpenBlock key={block.id} block={block} index={index} {...props} />
             ) : (
               <BlockRow key={block.id} block={block} index={index} {...props} />
             ),
           )
         )}
-        <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />
+        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
       </section>
 
       <RenameDialog
-        value={renaming}
+        value={props.readOnly ? null : renaming}
         onCancel={() => setRenaming(null)}
         onSave={(next) => {
           if (props.onRenamePage(page, next)) setRenaming(null)
         }}
       />
       <Dialog
-        open={removing}
+        open={!props.readOnly && removing}
         title="このページを消す"
         description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0}個を消します。この操作は元に戻せません。`}
         confirmLabel="消す"
@@ -288,10 +302,13 @@ function Labeled({ label, htmlFor, children }: { label: string; htmlFor?: string
 function InputFields({ block, refs, patch }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void }) {
   const set = (next: Partial<FormInputBlock>) => patch(next as Partial<FormBlock>)
   const labelId = `fe-q-${block.id}`
+  /* 保存を押したあと、質問文が空なら欄を赤くして真下に理由を出す（B-139）。 */
+  const labelError = useFormEditAttempted() && !block.label.trim() ? '質問文を入れてください' : null
   return (
     <>
       <Labeled label="質問文" htmlFor={labelId}>
-        <TextField id={labelId} value={block.label} placeholder="質問の文" onChange={(e) => set({ label: e.target.value })} />
+        <TextField id={labelId} value={block.label} placeholder="質問の文" invalid={Boolean(labelError)} aria-describedby={labelError ? `${labelId}-error` : undefined} onChange={(e) => set({ label: e.target.value })} />
+        <FieldError id={`${labelId}-error`}>{labelError}</FieldError>
       </Labeled>
       {['text', 'textarea', 'address', 'date'].includes(block.type) ? (
         <Labeled label="参考の文字（入力欄の中に薄く出る）" htmlFor={`${labelId}-placeholder`}>
@@ -406,24 +423,28 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
     <>
       <div className={styles.bookingRow}>
         <Labeled label="メニュー">
-          <Select
-            aria-label="メニュー"
-            size="full"
+          <EntityKindField
+            kind="booking_menu"
+            label="メニュー"
+            options={menus}
             value={booking?.menuId ?? ''}
             onChange={(menuId) => setBooking({ menuId, staffId: null })}
-            options={[
-              { value: '', label: menus.length ? 'メニューを選ぶ' : 'メニューがありません' },
-              ...menus.map((m) => ({ value: m.id, label: `${m.name}・${m.durationMinutes}分` })),
-            ]}
+            placeholder={menus.length ? '（メニューを選ぶ）' : '（メニューがありません）'}
+            meta={(row) => {
+              const menu = menus.find((m) => m.id === row.id)
+              return menu ? `${menu.durationMinutes}分` : undefined
+            }}
           />
         </Labeled>
         <Labeled label="担当">
-          <Select
-            aria-label="担当"
-            size="full"
+          <EntityKindField
+            kind="staff"
+            label="担当"
+            options={staff}
             value={booking?.staffId ?? ''}
             onChange={(staffId) => setBooking({ staffId: staffId || null })}
-            options={[{ value: '', label: 'だれでも' }, ...staff.map((s) => ({ value: s.id, label: s.name }))]}
+            clearable
+            placeholder="（だれでも）"
           />
         </Labeled>
         <Labeled label="選べる期間">
@@ -457,6 +478,16 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
   )
 }
 
+/* リンクのボタンの押したら（共通の欄・YPzmo・B-129）。保存は今のまま開く URL の文字だけ。 */
+function ButtonTapField({ id, url, accountId, onChange }: { id: string; url: string; accountId: string | null; onChange: (url: string) => void }) {
+  return (
+    <div className={`${styles.field} ${styles.decoTap}`} id={`${id}-url`}>
+      <span className={styles.fieldLabel}>押したら</span>
+      <UriTapActionField name="このボタン" url={url} accountId={accountId} onChange={onChange} />
+    </div>
+  )
+}
+
 function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (next: Partial<FormBlock>) => void; accountId: string | null }) {
   const [picking, setPicking] = useState(false)
   const id = `fe-deco-${block.id}`
@@ -484,28 +515,28 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
           <Labeled label="ボタンの文字" htmlFor={id}>
             <TextField id={id} value={block.label} onChange={(e) => patch({ label: e.target.value } as Partial<FormBlock>)} />
           </Labeled>
-          <Labeled label="開くURL" htmlFor={`${id}-url`}>
-            <TextField id={`${id}-url`} type="url" placeholder="https://..." value={block.url} onChange={(e) => patch({ url: e.target.value } as Partial<FormBlock>)} />
-          </Labeled>
+          <ButtonTapField id={id} url={block.url} accountId={accountId} onChange={(url) => patch({ url } as Partial<FormBlock>)} />
         </div>
       )
     case 'image':
       return (
         <>
           <div className={styles.decoRow}>
-            <Labeled label="画像のURL" htmlFor={id}>
-              <TextField id={id} type="url" placeholder="https://..." value={block.mediaUrl} onChange={(e) => patch({ mediaUrl: e.target.value } as Partial<FormBlock>)} />
-            </Labeled>
+            <MediaSlot
+              size="compact"
+              title="画像を追加"
+              previewAlt="フォームの画像"
+              value={block.mediaUrl || null}
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              upload={accountId ? async (file, progress) => (await uploadToMediaLibrary(file, accountId, 'image', progress)).url : undefined}
+              onChange={(url) => patch({ mediaUrl: url ?? '' } as Partial<FormBlock>)}
+              onMediaPick={() => setPicking(true)}
+              urlEntry={{ value: block.mediaUrl, onChange: (url) => patch({ mediaUrl: url } as Partial<FormBlock>), label: '画像のURL', placeholder: 'https://...' }}
+            />
             <Labeled label="押したときに開くURL（任意）" htmlFor={`${id}-link`}>
               <TextField id={`${id}-link`} type="url" value={block.linkUrl ?? ''} onChange={(e) => patch({ linkUrl: e.target.value } as Partial<FormBlock>)} />
             </Labeled>
           </div>
-          <span>
-            <Button onClick={() => setPicking(true)}>
-              <ImageIcon size={15} aria-hidden="true" />
-              登録メディアから選ぶ
-            </Button>
-          </span>
           <MediaPickerDialog
             open={picking}
             accountId={accountId}

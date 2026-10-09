@@ -10,15 +10,16 @@
  * 静的書き出しのため動的セグメントは使わず `?id=` で受ける（v7 と同じ）。
  */
 import StatusPill from '@/components/shared/status-pill'
-import { ImagePlus, Paperclip, Send, X } from 'lucide-react'
+import { Paperclip, Send, X } from 'lucide-react'
 import Link from 'next/link'
-import { Suspense, useCallback, useEffect, useId, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useId, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import type { StaffMember } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import MediaSlot from '@/components/shared/media-slot'
 import TargetMissing from '@/components/shared/target-missing'
 import { TextArea } from '@/components/shared/text-field'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -73,7 +74,6 @@ function HqSupportDetailByQuery() {
 function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   const settingsNav = useHqSettingsFolderNav('contact')
   const uid = useId()
-  const fileRef = useRef<HTMLInputElement>(null)
   /* U099: `undefined` はまだ URL を読んでいない、`null` は URL に id が無い。 */
   const [id, setId] = useState<string | null | undefined>(undefined)
   const [detail, setDetail] = useState<HqSupportDetail | null>(null)
@@ -142,7 +142,6 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
     } catch {
       setError('画像を読み取れませんでした')
     } finally {
-      if (fileRef.current) fileRef.current.value = ''
     }
   }
 
@@ -224,15 +223,6 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   disabled={sending}
                   className={styles.textarea}
                 />
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/png,image/jpeg"
-                  className={styles.hiddenInput}
-                  tabIndex={-1}
-                  aria-hidden="true"
-                  onChange={(event) => void addFile(event.target.files?.[0])}
-                />
                 {attachments.length > 0 ? (
                   <ul className={styles.thumbs}>
                     {attachments.map((a, i) => (
@@ -246,12 +236,19 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                     ))}
                   </ul>
                 ) : null}
+                {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
+                <div className={styles.attachSlot}>
+                  <MediaSlot
+                    size="compact"
+                    title="画像を添える"
+                    accept="image/png,image/jpeg"
+                    limitText={`PNG・JPEG、1枚 5MB まで（${SUPPORT_ATTACHMENT_MAX}枚まで）`}
+                    disabled={sending}
+                    onFile={(file) => void addFile(file)}
+                  />
+                </div>
+              ) : null}
                 <div className={styles.composeRow}>
-                  {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
-                    <Button onClick={() => fileRef.current?.click()} disabled={sending} title={`PNG・JPEG、5MBまで、${SUPPORT_ATTACHMENT_MAX}枚まで`}>
-                      <ImagePlus aria-hidden="true" className={styles.buttonIcon} />画像を添える
-                    </Button>
-                  ) : null}
                   <span className={styles.spacer} />
                   <span className={styles.sendNote}>{blocked && body ? <span className={styles.warn}>{blocked}</span> : SEND_NOTE}</span>
                   <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked) || !detail} busy={sending} busyLabel="送信中…">

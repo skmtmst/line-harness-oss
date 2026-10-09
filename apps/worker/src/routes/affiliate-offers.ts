@@ -1,4 +1,5 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { FolderAssignmentError, readFolderAssignment } from '@line-crm/db';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -45,6 +46,7 @@ async function requireVisibleAffiliateOffer(c: Context<Env>, next: () => Promise
 function serializeOffer(row: AffiliateOffer) {
   return {
     id: row.id,
+    folderId: row.folder_id ?? null,
     name: row.name,
     description: row.description,
     rewardAmount: row.reward_amount,
@@ -147,11 +149,12 @@ affiliateOffers.get('/api/affiliate-offers/:id', async (c) => {
 });
 
 // POST /api/affiliate-offers - create
-affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), inputJsonBoundary({folderId:['string','null']}), async (c) => {
   auditLog(c, 'affiliate.offer.create', { kind: 'affiliate_offer' });
   try {
     const body = await c.req
       .json<{
+        folderId?: string | null;
         name?: string;
         description?: string | null;
         rewardAmount?: number;
@@ -213,6 +216,7 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), inp
     const offer = await createAffiliateOffer(c.env.DB, {
       name,
       description: body.description ?? null,
+      folderId: body.folderId,
       rewardAmount: body.rewardAmount,
       rewardMiles: body.rewardMiles,
       lineAccountId,
@@ -243,18 +247,20 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), inp
     }
     return c.json({ success: true, data: serializeOffer(offer) }, 201);
   } catch (err) {
+    if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
     console.error('POST /api/affiliate-offers error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
 // PUT /api/affiliate-offers/:id - update
-affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), inputJsonBoundary({folderId:['string','null']}), async (c) => {
   auditLog(c, 'affiliate.offer.update', { kind: 'affiliate_offer', id: c.req.param('id') });
   try {
     const id = c.req.param('id');
     const body = await c.req
       .json<{
+        folderId?: string | null;
         name?: string;
         description?: string | null;
         rewardAmount?: number;
@@ -314,6 +320,8 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
       return inputError(c, { success: false, error: refError }, 400, ["lineAccountId","tagId","scenarioId"]);
     }
 
+    await readFolderAssignment(c.env.DB,'affiliate_offer',effectiveAccountId,body.folderId===undefined?existing.folder_id:body.folderId);
+
     // 報酬・期間・上限・受付の変更は、決まりの新しい版として残す(#823)。
     // 版を先に作り、失敗したら案件の値も変えない。版が無い昔の案件は、
     // この保存で初版が生まれる。
@@ -337,6 +345,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     const updated = await updateAffiliateOffer(c.env.DB, id, {
       name: body.name !== undefined ? body.name.trim() : undefined,
       description: body.description,
+      folder_id: body.folderId,
       reward_amount: body.rewardAmount,
       reward_miles: body.rewardMiles,
       line_account_id: body.lineAccountId,
@@ -350,6 +359,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     }
     return c.json({ success: true, data: serializeOffer(updated) });
   } catch (err) {
+    if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
     console.error('PUT /api/affiliate-offers/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

@@ -6,7 +6,7 @@
  * 色と書体の決まり（文字と背景の差 4.5:1）は今までのデザイン設定と同じ。
  */
 import { useState } from 'react'
-import { Image as ImageIcon, Sparkles, Link2 } from 'lucide-react'
+import { Sparkles, Link2 } from 'lucide-react'
 import {
   FORM_THEME_DEFAULT,
   formThemeContrastError,
@@ -24,7 +24,9 @@ import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
-import MediaPickerDialog from './media-picker'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
+import MediaSlot from '@/components/shared/media-slot'
+import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import { ogImageUrlError } from './model'
 import styles from './edit.module.css'
 
@@ -41,6 +43,7 @@ const FONT_LABEL: Record<FormFontFamily, string> = { sans: 'ゴシック', serif
 const RADIUS_LABEL: Record<FormCornerRadius, string> = { none: '角ばった', medium: 'やや丸い', round: '丸い' }
 
 type Props = {
+  readOnly?: boolean
   options: FormOptions
   accountId: string | null
   /** 統括のひな形（host.ts）：背景の画像・リンクの見え方は置き場が無い（配った先で決める）。 */
@@ -69,6 +72,35 @@ export function AppearanceTab(props: Props) {
   const deadlineOn = options.deadline?.enabled ?? false
   const ogImageError = ogImageUrlError(props.ogImageUrl)
   const linkSummary = [props.ogTitle.trim() ? '見出し' : null, props.ogDescription.trim() ? '説明' : null, props.ogImageUrl.trim() ? '画像' : null].filter(Boolean).join('・') || '自動で作る'
+
+  if (props.readOnly) {
+    const rows = [
+      ['受付の開始', '公開したときから'],
+      ['受付の終了', deadlineOn ? options.deadline?.endsAt || '期限なし' : '期限なし'],
+      ['1人1回だけ答えられる', options.oncePerFriend?.enabled ? 'オン' : 'オフ'],
+      ['答えの数の上限', options.totalLimit?.enabled ? String(options.totalLimit.max ?? '—') : '制限なし'],
+      ['前回の答えを最初から入れておく', options.restorePrevious ? 'オン' : 'オフ'],
+      ['送る前に確認の画面', options.confirmDialog?.enabled ? 'オン' : 'オフ'],
+      ['期限を過ぎた人に出す文', options.deadline?.message || '受付は終了しました'],
+      ['ページの題名', options.pageTitle || '回答フォーム'],
+      ['書体', FONT_LABEL[theme.fontFamily]],
+      ['角の丸み', RADIUS_LABEL[theme.cornerRadius]],
+      ...COLOR_ROLES.map(({ key, label }) => [label, theme[key]]),
+      ['背景の画像', theme.backgroundImageUrl || 'なし'],
+      ['カードの見出し', props.ogTitle || '自動で作る'],
+      ['カードの説明', props.ogDescription || '自動で作る'],
+      ['カードの画像', props.ogImageUrl || '自動で作る'],
+      ['前へ', options.prevLabel || '前へ'],
+      ['次へ', options.nextLabel || '次へ'],
+      ['送る', options.submitLabel || '送信する'],
+      ['フォーム名', props.name],
+      ['覚え書き', props.description || 'なし'],
+    ]
+    return <section className={styles.card}>
+      <h2 className={styles.cardTitle}>受付と見た目</h2>
+      <dl>{rows.map(([label, value]) => <div className={styles.field} key={label}><dt className={styles.fieldLabel}>{label}</dt><dd>{value}</dd></div>)}</dl>
+    </section>
+  }
 
   return (
     <>
@@ -135,7 +167,7 @@ export function AppearanceTab(props: Props) {
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>色と文字</h3>
           <p className={styles.fieldLabelPlain}>色（5つの役割）</p>
-          <div className={styles.wells}>
+          <div id="fe-colors" className={styles.wells}>
             {COLOR_ROLES.map((role) => (
               <span key={role.key} className={styles.well}>
                 <ColorWell value={theme[role.key]} allowAlpha={false} allowClear={false} label={`${role.label}の色`} onChange={(color) => color && patchTheme({ [role.key]: color.slice(0, 7).toLowerCase() })} />
@@ -174,13 +206,16 @@ export function AppearanceTab(props: Props) {
         {props.portable ? null : <div className={styles.subBox}>
           <h3 className={styles.subTitle}>背景とリンクの見え方</h3>
           <div className={styles.tight}>
-            <span className={styles.inlineButtons}>
-              <Button onClick={() => setPickerFor('background')}>
-                <ImageIcon size={15} aria-hidden="true" />
-                {theme.backgroundImageUrl ? '背景の画像を選び直す' : '背景の画像を選ぶ'}
-              </Button>
-              {theme.backgroundImageUrl ? <Button variant="text" onClick={() => patchTheme({ backgroundImageUrl: null })}>画像を外す</Button> : null}
-            </span>
+            <MediaSlot
+              size="compact"
+              title="背景の画像を追加"
+              previewAlt="背景の画像"
+              value={theme.backgroundImageUrl || null}
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              upload={props.accountId ? async (file, progress) => (await uploadToMediaLibrary(file, props.accountId as string, 'image', progress)).url : undefined}
+              onChange={(url) => patchTheme({ backgroundImageUrl: url })}
+              onMediaPick={() => setPickerFor('background')}
+            />
             <button type="button" className={styles.selectLike} onClick={() => setLinkOpen(true)} aria-haspopup="dialog">
               <span>{`リンクの見え方：${linkSummary}`}</span>
               <Link2 size={14} aria-hidden="true" />
@@ -230,16 +265,20 @@ export function AppearanceTab(props: Props) {
             <TextArea id="fe-og-desc" rows={3} maxLength={200} value={props.ogDescription} onChange={(e) => props.onChangeOgDescription(e.target.value)} />
           </div>
           <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="fe-og-image">カードの画像URL</label>
-            <TextField id="fe-og-image" type="url" inputMode="url" placeholder="https://" value={props.ogImageUrl} invalid={Boolean(ogImageError)} onChange={(e) => props.onChangeOgImageUrl(e.target.value)} />
-            {ogImageError ? <p role="alert" className={styles.fieldError}>{ogImageError}</p> : null}
+            <span className={styles.fieldLabel}>カードの画像</span>
+            <MediaSlot
+              size="compact"
+              title="カードの画像を追加"
+              previewAlt="カードの画像"
+              value={props.ogImageUrl || null}
+              accept="image/jpeg,image/png"
+              error={ogImageError || undefined}
+              upload={props.accountId ? async (file, progress) => (await uploadToMediaLibrary(file, props.accountId as string, 'image', progress)).url : undefined}
+              onChange={(url) => props.onChangeOgImageUrl(url ?? '')}
+              onMediaPick={() => setPickerFor('ogImage')}
+              urlEntry={{ id: 'fe-og-image', value: props.ogImageUrl, onChange: props.onChangeOgImageUrl, label: 'カードの画像URL', placeholder: 'https://', open: Boolean(ogImageError) }}
+            />
           </div>
-          <span>
-            <Button onClick={() => setPickerFor('ogImage')}>
-              <ImageIcon size={15} aria-hidden="true" />
-              登録メディアから選ぶ
-            </Button>
-          </span>
         </div>
       </Dialog>
 

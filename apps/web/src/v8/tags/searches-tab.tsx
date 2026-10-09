@@ -327,7 +327,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       <Filter className={styles.stateIcon} aria-hidden="true" />
       <p className={styles.stateTitle}>まだ保存した検索はありません</p>
       <p className={styles.stateDesc}>友だち一覧で条件を絞り、「この条件を保存」を押すとここに追加されます。</p>
-      <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button>
+      {canEdit ? <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button> : null}
     </div>
   ) : ready && visible.length === 0 ? (
     <div className={styles.stateCard}>

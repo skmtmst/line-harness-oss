@@ -8,8 +8,10 @@ import { OverlayDepthContext, useOverlayFocus } from './overlay-utils'
 import styles from './source-picker-dialog.module.css'
 
 /** テンプレート・アカウントを選ぶ窓の共通の外側。大きさと頭、焦点、閉じ方を揃える。 */
-export default function SelectionDialog({ title, description, search, initialFocusRef, busy = false, error, designNode, footer, children, onCancel }: {
-  title: string; description: string; search: ReactNode
+export default function SelectionDialog({ title, description, search, initialFocusRef, busy = false, error, designNode, footer, children, onCancel, size = 'wide' }: {
+  title: string; description?: string; search?: ReactNode
+  /** wide：一括配信の①（EpTBB）。picker：作ってあるもの・配るアカウントを選ぶ窓（dJZ7Q）。 */
+  size?: 'wide' | 'picker' | 'picker-narrow'
   initialFocusRef?: RefObject<HTMLInputElement | null>
   busy?: boolean; error?: string; designNode?: string
   footer: ReactNode; children: ReactNode; onCancel: () => void
@@ -21,9 +23,9 @@ export default function SelectionDialog({ title, description, search, initialFoc
   useEffect(() => setMounted(true), [])
   return <OverlayDepthContext.Provider value={depth + 1}>{mounted ? createPortal(
     <div className={styles.overlay} onMouseDown={(event) => { if (!busy && event.target === event.currentTarget) onCancel() }}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`} aria-busy={busy || undefined} tabIndex={-1} className={styles.panel} data-design-node={designNode}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={description ? `${id}-description` : undefined} aria-busy={busy || undefined} tabIndex={-1} className={styles.panel} data-size={size === 'wide' ? undefined : size} data-design-node={designNode}>
         <header className={styles.header}>
-          <div className={styles.heading}><h2 id={`${id}-title`}>{title}</h2><p id={`${id}-description`}>{description}</p></div>
+          <div className={styles.heading}><h2 id={`${id}-title`}>{title}</h2>{description ? <p id={`${id}-description`}>{description}</p> : null}</div>
           {search}
           <IconButton aria-label="閉じる" title="閉じる" disabled={busy} onClick={onCancel}><X size={18} aria-hidden /></IconButton>
         </header>

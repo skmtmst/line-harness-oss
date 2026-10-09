@@ -8,6 +8,7 @@
  * 中身（帯・入力欄・下の操作）はここで並べる。保存の口・本人確認の流れは今の画面
  * （app/accounts/detail・components/accounts/account-edit-modal）と同じ。
  */
+import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Check, ShieldCheck } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
@@ -20,6 +21,7 @@ import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
+import { useFormErrors } from '@/lib/use-form-errors'
 import StepUpPrompt, { isStepUpRequired, stepUpFailureMessage, type StepUpRequest } from '@/components/step-up-prompt'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import { ARCHIVE_BLOCKER_MESSAGES, parseCount, type AccountDetailView } from './view'
@@ -502,37 +504,33 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
   const [iconUrl, setIconUrl] = useState(account.iconUrl ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
-  const ids = { name: useId(), tz: useId(), login: useId(), liff: useId(), og: useId(), ogDesc: useId(), ogImage: useId(), cap: useId(), warn: useId(), icon: useId() }
+  const ids = { name: useId(), tz: useId(), login: useId(), liff: useId(), og: useId(), ogDesc: useId(), cap: useId(), warn: useId() }
 
-  useInvalidFocus(fieldErrors, ids)
 
   const close = () => {
     if (!busy) onClose()
   }
 
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  const fields = useFormErrors()
+  fields.define('name', 'アカウント名', () => (name.trim() ? null : 'アカウント名を入れてください。'))
+  fields.define('cap', '友だちの上限', () => (Number.isNaN(parseCount(capacity)) ? '数字で入れてください。' : null))
+  fields.define('warn', '警告を出す人数', () => {
+    const capacityNext = parseCount(capacity)
+    const warnNext = parseCount(warnAt)
+    if (Number.isNaN(warnNext)) return '数字で入れてください。'
+    return capacityNext !== null && !Number.isNaN(capacityNext) && warnNext !== null && warnNext > capacityNext ? '警告を出す人数は上限以下にしてください。上限を超える値は鳴りません。' : null
+  })
+  const fieldProps = (key: string) => ({ ...fields.bind(key), invalid: fields.invalid(key) })
+
   const save = async (stepUpToken?: string) => {
-    if (!name.trim()) {
-      setFieldErrors({ name: 'アカウント名を入れてください。' })
+    if (fields.submit().length > 0) {
       setError('')
       return
     }
     const capacityNext = parseCount(capacity)
     const warnNext = parseCount(warnAt)
-    if (Number.isNaN(capacityNext) || Number.isNaN(warnNext)) {
-      setFieldErrors({
-        ...(Number.isNaN(capacityNext) ? { cap: '友だちの上限は数字で入れてください。' } : {}),
-        ...(Number.isNaN(warnNext) ? { warn: '警告を出す人数は数字で入れてください。' } : {}),
-      })
-      setError('')
-      return
-    }
-    if (capacityNext !== null && warnNext !== null && warnNext > capacityNext) {
-      setFieldErrors({ warn: '警告を出す人数は上限以下にしてください。上限を超える値は鳴りません。' })
-      setError('')
-      return
-    }
     const payload: Parameters<typeof api.lineAccounts.update>[1] = {}
     if (name.trim() !== account.name) payload.name = name.trim()
     if (canEditTimezone && timezone.trim() !== initialTimezone) payload.timezone = timezone.trim()
@@ -589,8 +587,8 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         </>}
       >
         <div className={styles.pair}>
-          <Field label="アカウント名" htmlFor={ids.name} error={fieldErrors.name}>
-            <TextField id={ids.name} required maxLength={100} value={name} onChange={(event) => { setName(event.target.value); setFieldErrors((current) => { const next = { ...current }; delete next.name; return next }) } } disabled={busy} />
+          <Field label="アカウント名" htmlFor={ids.name} error={fields.error('name')}>
+            <TextField {...fieldProps('name')} id={ids.name} required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} />
           </Field>
           {canEditTimezone ? (
             <div className={styles.narrow}>
@@ -622,22 +620,34 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
             <Field label="共有したときの説明" htmlFor={ids.ogDesc}>
               <TextField id={ids.ogDesc} value={ogDescription} onChange={(event) => setOgDescription(event.target.value)} disabled={busy} />
             </Field>
-            <Field label="共有したときの画像のURL" htmlFor={ids.ogImage}>
-              <TextField id={ids.ogImage} type="url" value={ogImageUrl} onChange={(event) => setOgImageUrl(event.target.value)} disabled={busy} />
-            </Field>
+            <ImageUploader
+              mode="url"
+              size="compact"
+              label="共有したときの画像"
+              title="共有したときの画像を追加"
+              disabled={busy}
+              value={ogImageUrl ? { mode: 'url', url: ogImageUrl } : null}
+              onChange={(next) => setOgImageUrl(next?.mode === 'url' ? next.url : '')}
+            />
           </>
         ) : null}
         <div className={styles.pair}>
-          <Field label="友だちの上限" htmlFor={ids.cap} error={fieldErrors.cap}>
-            <TextField id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => { setCapacity(event.target.value); setFieldErrors((current) => { const next = { ...current }; delete next.cap; return next }) } } disabled={busy} />
+          <Field label="友だちの上限" htmlFor={ids.cap} error={fields.error('cap')}>
+            <TextField {...fieldProps('cap')} id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} />
           </Field>
-          <Field label="警告を出す人数" htmlFor={ids.warn} error={fieldErrors.warn}>
-            <TextField id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => { setWarnAt(event.target.value); setFieldErrors((current) => { const next = { ...current }; delete next.warn; return next }) } } disabled={busy} />
+          <Field label="警告を出す人数" htmlFor={ids.warn} error={fields.error('warn')}>
+            <TextField {...fieldProps('warn')} id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
           </Field>
         </div>
-        <Field label="アイコンのURL" htmlFor={ids.icon}>
-          <TextField id={ids.icon} type="url" placeholder="https://example.com/icon.png" value={iconUrl} onChange={(event) => setIconUrl(event.target.value)} disabled={busy} />
-        </Field>
+        <ImageUploader
+          mode="url"
+          size="compact"
+          label="アイコン"
+          title="アイコンを追加"
+          disabled={busy}
+          value={iconUrl ? { mode: 'url', url: iconUrl } : null}
+          onChange={(next) => setIconUrl(next?.mode === 'url' ? next.url : '')}
+        />
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}

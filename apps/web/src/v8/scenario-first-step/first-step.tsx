@@ -43,6 +43,7 @@ import { pruneCondition } from '@/lib/segment-condition'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { Field } from '@/components/shared/form-controls'
 import { TimeField } from '@/components/shared/date-time-field'
 import SegmentedControl from '@/components/shared/segmented'
@@ -771,12 +772,12 @@ export default function ScenarioFirstStepV8() {
             ) : null}
             {kind === 'image' ? (
               <div className={styles.kindBody}>
-                <ImageUploader mode="line-image" value={image} onChange={editImage} label="送る画像" />
+                <ImageUploader mode="line-image" value={image} onChange={editImage} label="送る画像" title="送る画像を追加" />
               </div>
             ) : null}
             {kind === 'question' ? <QuestionEditor value={question} onChange={editQuestion} /> : null}
             {kind === 'location' || kind === 'video' || kind === 'audio' || kind === 'sticker' ? (
-              <MessageKindFields kind={kind} value={kindState} onChange={editKindState} />
+              <MessageKindFields kind={kind} value={kindState} onChange={editKindState} mediaAccountId={scenario?.lineAccountId ?? selectedAccountId} />
             ) : null}
             {/* カルーセルはテンプレートを指す形で持つ。この画面では組み立てない。 */}
             {kind === 'carousel' ? <CarouselPicker value={templateId} onChange={editTemplateId} /> : null}
@@ -784,24 +785,18 @@ export default function ScenarioFirstStepV8() {
         ) : (
           <div className={styles.inlineField}>
             <span className={styles.inlineLabel}>テンプレート</span>
-            <Select
-              value={templateId}
-              onChange={(value) => editTemplateId(value)}
-              error={contentError || undefined}
-              aria-label="配信するテンプレート"
-              size="full"
-              options={[
-                { value: '', label: '選んでください' },
-                ...templates.map((template) => ({
-                  value: template.id,
-                  label: `${template.name}（${
-                    { text: 'テキスト', image: 'リッチメッセージ', flex: 'カードタイプ', carousel: 'カルーセル' }[
-                      template.messageType as 'text' | 'image' | 'flex' | 'carousel'
-                    ] ?? template.messageType
-                  }）`,
-                })),
-              ]}
-            />
+            <div className="w-full min-w-0">
+              <EntityKindField
+                kind="template"
+                label="配信するテンプレート"
+                options={templates}
+                accountId={scenario?.lineAccountId ?? undefined}
+                value={templateId}
+                onChange={(value) => editTemplateId(value)}
+                invalid={Boolean(contentError)}
+              />
+              {contentError ? <p className={styles.fieldError} role="alert">{contentError}</p> : null}
+            </div>
             <span className={styles.cardDesc}>テンプレートを直すと、この通の中身も一緒に変わります。</span>
           </div>
         )}

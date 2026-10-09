@@ -87,6 +87,7 @@ export default function OgEditor({
         </label>
         <ImageUploader
           mode="url"
+          title="共有したときの画像を追加"
           value={value.ogImageUrl ? { mode: 'url', url: value.ogImageUrl } : null}
           onChange={(v) =>
             set('ogImageUrl', v?.mode === 'url' ? v.url : null)

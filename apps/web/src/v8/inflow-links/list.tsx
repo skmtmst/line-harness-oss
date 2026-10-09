@@ -493,8 +493,9 @@ export default function InflowListV8({
       // entry_route_genres に color 欄がない。追加はオーナーの migration 承認待ち。
       colorEditable: false,
       count: accountRows.filter((row) => row.genre === genre.name).length,
-      // 名前の変更は選んだフォルダの「…」から（選んでいない行に「…」の箱を出すと件数が左へずれる）。
-      ...(canManageFolders && !genre.id.startsWith('legacy-') && selectedGenre === genre.name
+      // 名前の変更は各フォルダの「…」から（ほかの一覧と同じ・B-136）。
+      // 消す・並べ替え・色はフォルダの口（entry-route-genres）に無いので出さない（押せない口を置かない）。
+      ...(canManageFolders && !genre.id.startsWith('legacy-')
         ? { onEdit: () => setEditingGenre(genre) }
         : {}),
     })),

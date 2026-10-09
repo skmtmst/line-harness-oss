@@ -53,6 +53,10 @@ vi.mock('@/lib/api', () => ({
         ? Promise.resolve({ success: false, error: '登録できませんでした' })
         : Promise.resolve({ success: true, data: { uploadSessionId: 'upload-1', status: 'verified', mediaId: 'media-new' } }),
     },
+    /* この試験は画像の添付だけを見る。Instagram は未設定にして同時投稿の区画を出さない。 */
+    instagram: {
+      connection: () => Promise.resolve({ success: true, data: { state: 'unconfigured', connection: null } }),
+    },
   },
 }))
 
@@ -87,7 +91,7 @@ async function render() {
     await settle()
   })
   await act(async () => {
-    const choose = [...container.querySelectorAll('button')].find((button) => button.textContent?.includes('画像を選ぶ'))
+    const choose = [...container.querySelectorAll('button')].find((button) => button.textContent?.includes('登録メディアから選ぶ'))
     choose!.click()
     await settle()
   })
@@ -121,10 +125,10 @@ afterEach(async () => {
 })
 
 describe('投稿画像の端末アップロード', () => {
-  it('「端末からアップロード」ボタンと隠しファイル入力がある', async () => {
+  it('画像を入れる所（ドラッグ＆ドロップ・クリック）と隠しファイル入力がある', async () => {
     await render()
     const text = container.textContent ?? ''
-    expect(text).toContain('端末からアップロード')
+    expect(text).toContain('ドラッグ＆ドロップ')
     expect(text).toContain('登録メディアの画像')
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')
     expect(input).not.toBeNull()
@@ -139,7 +143,7 @@ describe('投稿画像の端末アップロード', () => {
     expect(fixture.prepared[0]).toMatchObject({ filename: 'photo.png', mimeType: 'image/png' })
 
     expect(container.textContent).toContain('photo.png・4:3')
-    expect(container.textContent).toContain('画像を外す')
+    expect([...container.querySelectorAll('button')].some((button) => button.textContent === '消す')).toBe(true)
   })
 
   it('登録に失敗したらエラー文を出し、画像は選ばれたままにしない', async () => {

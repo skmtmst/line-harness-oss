@@ -12,6 +12,8 @@ import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { MAX_BUBBLES, MAX_TEXT_LENGTH, messageLengthLabel } from '@/components/broadcasts/message-limits'
 import MessageKindFields, { emptyMessageKindState, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'
 import ComposerMedia from './message-composer-media'
+import { ErrorCountBadge } from './error-count-badge'
+import { FieldError } from './form-controls'
 import styles from './message-composer.module.css'
 import { PageFrame } from '@/components/templates/page-frame'
 
@@ -52,6 +54,12 @@ export interface MessageComposerProps {
   extraFields?: (index: number, bubble: BroadcastBubble) => ReactNode
   busy?: boolean
   onBusyChange?: (busy: boolean) => void
+  /**
+   * 保存で落ちた吹き出しの理由（B-139）。吹き出しごと。あると中身の下に理由、頭の右に赤い丸を出す。
+   * `bubbleFieldProps` で欄の誤り（useFormErrors().bind）を中身の枠に結び、1つ目の吹き出しへ移れるようにする。
+   */
+  bubbleErrors?: ReadonlyArray<string | null | undefined>
+  bubbleFieldProps?: (index: number) => { ref?: (el: HTMLElement | null) => void; onBlur?: () => void }
 }
 
 function ComposerText({ bubble, index, onChange, inserts, extraTokens }: Pick<MessageComposerProps, 'inserts' | 'extraTokens'> & { bubble: BroadcastBubble; index: number; onChange: (next: BroadcastBubble) => void }) {
@@ -83,7 +91,7 @@ export default function MessageComposer(props: MessageComposerProps) {
       const KindIcon = KIND_ICONS[bubble.type] ?? MessageSquare
       return <Card key={bubble.id} className={styles.bubble} overflow="hidden" aria-label={`${index + 1}通目の吹き出し`}>
         <div className={styles.header}>
-          <span className={styles.number}>{index + 1}</span><span className={styles.kind}><KindIcon size={12} aria-hidden />{composerLabel(bubble.type)}</span><span className={styles.summary} title={composerSummary(bubble)}>{composerSummary(bubble)}</span>
+          <span className={styles.number}>{index + 1}</span><span className={styles.kind}><KindIcon size={12} aria-hidden />{composerLabel(bubble.type)}</span><span className={styles.summary} title={composerSummary(bubble)}>{composerSummary(bubble)}</span><ErrorCountBadge count={props.bubbleErrors?.[index] ? 1 : 0} label={`${index + 1}通目`} />
           <div className={styles.controls}><IconButton size="row" aria-label={`${index + 1}通目を上へ移動`} disabled={busy || index === 0} onClick={() => onMove(index, -1)}><ArrowUp size={14} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を下へ移動`} disabled={busy || index === bubbles.length - 1} onClick={() => onMove(index, 1)}><ArrowDown size={14} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を削除する`} disabled={busy || bubbles.length === 1} onClick={() => onDelete(index)}><Trash2 size={14} aria-hidden /></IconButton></div>
         </div>
         <div className={styles.tabs} role="tablist" aria-label={`${index + 1}通目のメッセージ形式`} onKeyDown={(event) => {
@@ -97,7 +105,7 @@ export default function MessageComposer(props: MessageComposerProps) {
         }}>
           {COMPOSER_TYPES.map(([type, label]) => <button key={type} type="button" role="tab" tabIndex={activeType === type ? 0 : -1} aria-selected={activeType === type} aria-disabled={Boolean(unavailable[type]) || busy} title={unavailable[type]} onClick={() => { if (type !== bubble.type && !busy && !unavailable[type] && type !== 'intro') onChange(index, { id: bubble.id, type: type as BroadcastBubbleType, content: ['audio', 'sticker', 'location'].includes(type) ? { state: emptyMessageKindState() } : {} }) }}>{label}</button>)}
         </div>
-        <div className={styles.content}>
+        <div className={styles.content} {...props.bubbleFieldProps?.(index)} data-invalid={props.bubbleErrors?.[index] ? '' : undefined} aria-describedby={props.bubbleErrors?.[index] ? `composer-bubble-${bubble.id}-error` : undefined}>
           {reason ? <p role="note">{reason}</p> : bubble.type === 'text' ? <ComposerText bubble={bubble} index={index} onChange={(next) => onChange(index, next)} inserts={props.inserts} extraTokens={props.extraTokens} />
             : ['image', 'video', 'audio'].includes(bubble.type) ? <ComposerMedia key={`${bubble.id}-${bubble.type}-${accountId}`} bubble={bubble} accountId={accountId} disabled={busy} onBusyChange={props.onBusyChange} onChange={(content) => onChange(index, { ...bubble, content })} />
             : bubble.type === 'sticker' || bubble.type === 'location' ? <MessageKindFields kind={bubble.type as MessageKind} value={(bubble.content.state as MessageKindState) ?? emptyMessageKindState()} onChange={(state) => onChange(index, { ...bubble, content: { ...bubble.content, state } })} composer />
@@ -109,6 +117,7 @@ export default function MessageComposer(props: MessageComposerProps) {
                 <div className={styles.choices}><Card className={styles.choice}><div className={styles.choiceHeading}><FileText size={16} aria-hidden /><strong>テンプレートから選ぶ</strong></div><p>{`作ってある${composerLabel(bubble.type)}を選んで入れます。入れたあとで、この配信の分だけ直せます。`}</p><Button size="composer" disabled={busy} onClick={() => onPickTemplate(index, bubble.type as ComposerKind)}><FileText size={14} aria-hidden />テンプレートから選ぶ</Button></Card><Card className={styles.choice}><div className={styles.choiceHeading}><Plus size={16} aria-hidden /><strong>ここで作る</strong></div><p>{`テンプレートの${composerLabel(bubble.type)}と同じ編集画面が開きます。作ったものがこの吹き出しに入ります。`}</p><Button size="composer" variant="primary" disabled={busy} onClick={() => onCompose(index, bubble.type as 'carousel' | 'rich_message' | 'rich_video')}><Plus size={14} aria-hidden />ここで作る</Button></Card></div>
               </> : props.extraFields?.(index, bubble)}
           {bubble.type === 'text' ? props.extraFields?.(index, bubble) : null}
+          <FieldError id={`composer-bubble-${bubble.id}-error`}>{props.bubbleErrors?.[index]}</FieldError>
         </div>
       </Card>
     })}

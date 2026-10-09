@@ -51,9 +51,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import Notice from '@/components/shared/notice'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { useFolderRowActions } from '@/components/shared/folder-row-actions'
+import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -221,7 +219,6 @@ export default function RichMenusListV8() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [applyTo, setApplyTo] = useState<RichMenuGroupListItem | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
-  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   /*
    * 検索語・フォルダ・絞り込み・並び順・件数・ページは URL に置く（動きの点検 5 番）。
    * 詳細・編集へ行って「戻る」と同じ一覧に戻る。絞り込みを変えたらページは 1 へ
@@ -432,17 +429,6 @@ export default function RichMenusListV8() {
     }
   }, [selectedAccount?.id])
 
-  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
-  const folderActions = useFolderRowActions({
-    kind: 'rich_menu',
-    folders,
-    accountId: selectedAccount?.id ?? null,
-    enabled: canEdit,
-    itemLabel: 'リッチメニュー',
-    countOf: (id) => groupFacets?.folderCounts[id] ?? null,
-    onChanged: () => loadFolders(),
-    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
-  })
 
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => { void loadTapStats() }, [loadTapStats])
@@ -796,16 +782,7 @@ export default function RichMenusListV8() {
     const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
     return folder ? { name: folder.name, color: folder.color } : null
   }
-  const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal },
-    ...folders.map((f, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(f, index),
-      id: f.id,
-      label: f.name,
-      count: groupFacets?.folderCounts[f.id] ?? 0,
-      color: f.color,
-    })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: groupFacets?.folderCounts[UNFILED] ?? 0 },
-  ]
+  const folderRows = managedFolderNavRows('rich_menu', folders, { allId: '', unfiledId: UNFILED })
   const folderSelectOptions = [
     { value: '', label: 'フォルダ：すべて' },
     ...folders.map((f) => ({ value: f.id, label: f.name })),
@@ -826,19 +803,26 @@ export default function RichMenusListV8() {
   ) : null
 
   const folderPanel = (
-    <FolderPanel
+    <ManagedFolderPanel
+      kind="rich_menu"
+      accountId={selectedAccount?.id ?? null}
+      folders={folders}
+      onChanged={loadFolders}
+      canManage={canEdit}
+      itemLabel="メニュー"
       createAction={createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
       activeId={folderFilter}
       onSelect={(id) => {
         setFolderFilter(id)
         setPage(1)
       }}
-      onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
-      addFolderLabel="フォルダを追加"
-      rows={folderRows}
-    >
-      <p className={styles.folderNote}>フォルダを消しても、中のメニューは未分類に残ります</p>
-    </FolderPanel>
+      allId=""
+      unfiledId={UNFILED}
+      allCount={groupFacets?.total ?? groupTotal}
+      unfiledCount={groupFacets?.folderCounts[UNFILED] ?? 0}
+      countOf={(f) => groupFacets?.folderCounts[f.id] ?? 0}
+      placeholder="例: 01_会員向け"
+    />
   )
 
   const folderSelect = (
@@ -1385,16 +1369,6 @@ export default function RichMenusListV8() {
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={listPager}
       overlays={<>
-        {folderActions.dialogs}
-        {folderDialogOpen ? (
-          <FolderAddDialog
-            kind="rich_menu"
-            note="メニューを分けてしまう箱です。消しても、入っていたメニューは未分類として残ります。"
-            placeholder="例: 01_会員向け"
-            onClose={() => setFolderDialogOpen(false)}
-            onAdded={() => void loadFolders()}
-          />
-        ) : null}
 
         {/* 「LINE上にあるメニュー」の作業画面。 */}
         {showExternal && selectedAccount ? (

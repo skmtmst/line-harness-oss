@@ -38,10 +38,8 @@ import {
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import { FolderDot, type FolderDotFolder } from '@/components/shared/folder-dot'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import BulkBar from '@/components/shared/bulk-bar'
@@ -178,15 +176,10 @@ export default function MediaLibraryListV8() {
   const [folderFailure, setFolderFailure] = useState<unknown>(null)
   const [folderReloading, setFolderReloading] = useState(false)
   const [folderFilter, setFolderFilter] = useState('')
-  const [addingFolder, setAddingFolder] = useState(false)
   /*
-    R37: フォルダの名前変更・削除を FolderPanel の「…」へ接続する。
+    R37: フォルダの名前・色・並べ替え・削除は共通のフォルダの列（ManagedFolderPanel）の「…」から。
     追加だけあって直し・消しが無いと、整理し直す手段が無い。
   */
-  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
-  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
-  const [folderBusy, setFolderBusy] = useState(false)
-  const [folderError, setFolderError] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
   /* 札の操作は「…」へ集める。行末にボタンは1つも置かない。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -634,26 +627,6 @@ export default function MediaLibraryListV8() {
       setRenameError('名前の変更に失敗しました。もう一度お試しください。')
     } finally {
       setRenamingBusy(false)
-    }
-  }
-
-  async function removeFolder() {
-    if (!deletingFolder || !selectedAccountId || folderBusy) return
-    const accountAtRequest = selectedAccountId
-    setFolderBusy(true)
-    setFolderError('')
-    try {
-      const response = await api.folders.delete(deletingFolder.id, accountAtRequest)
-      if (!response.success) throw new Error(response.error)
-      if (accountAtRequest !== latestAccountRef.current) return
-      setDeletingFolder(null)
-      if (folderFilter === deletingFolder.id) setFolderFilter('')
-      void load()
-      void loadFolders()
-    } catch {
-      if (accountAtRequest === latestAccountRef.current) setFolderError('フォルダを削除できませんでした。')
-    } finally {
-      setFolderBusy(false)
     }
   }
 
@@ -1115,11 +1088,6 @@ export default function MediaLibraryListV8() {
       // 数える計算は、黙って別の母集団にすり替わるため廃止。
       count: folder.itemCount ?? null,
       color: folder.color,
-      // R37: 名前変更・削除を「…」へ接続する。権限の無い人には
-      // 押して失敗する口を見せない。
-      onEdit: canManageMedia ? () => setEditingFolder(folder) : undefined,
-      onDelete: canManageMedia ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
-      deleteNote: '削除しても、中のメディアは未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: unfiledCount },
   ]
@@ -1155,13 +1123,26 @@ export default function MediaLibraryListV8() {
       folders={(
         <>
           {uploadButton}
-          <FolderPanel
-            /* m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム #m18k と同じ形）。絞り込み後の件数は一覧側の ListRange に出す。 */
+          {/*
+            共通のフォルダの列（種類 media・B-136）。m18s: 見出しの総数は「すべて」の行と同じ数なので出さない。
+            閲覧のみ：フォルダを追加・「…」は置かない（理由は上の閲覧のみの帯で伝える。2026-10-06 オーナー決定）。
+            名前・色・並べ替え・消すは「…」から。消すと中身は未分類へ移るので、一覧も読み直す。
+          */}
+          <ManagedFolderPanel
+            kind="media"
+            accountId={selectedAccountId}
+            folders={folders}
+            onChanged={() => Promise.all([load(), loadFolders()]).then(() => undefined)}
+            canManage={canManageMedia && Boolean(selectedAccountId)}
+            itemLabel="メディア"
             activeId={folderFilter}
             onSelect={selectFolder}
-            /* 閲覧のみ：フォルダを追加は置かない（理由は上の閲覧のみの帯で伝える。2026-10-06 オーナー決定）。 */
-            onAddFolder={canManageMedia ? () => setAddingFolder(true) : undefined}
-            rows={mediaFolderRows}
+            allId=""
+            unfiledId={UNGROUPED}
+            allCount={mediaFolderRows[0].count}
+            unfiledCount={unfiledCount}
+            onAdded={(created) => setFolderFilter(created.id)}
+            placeholder="例: 01_商品写真"
           >
             {folderFailure ? (
               <div role="alert">
@@ -1177,9 +1158,7 @@ export default function MediaLibraryListV8() {
                 )}
               </div>
             ) : null}
-            {folderError ? <p role="alert">{folderError}</p> : null}
-            <p>フォルダを消しても、中のメディアは未分類に残ります。</p>
-          </FolderPanel>
+          </ManagedFolderPanel>
         </>
       )}
       folderNav={{ rows: mediaFolderRows, activeId: folderFilter, onSelect: selectFolder, createAction: uploadButton }}
@@ -1340,10 +1319,6 @@ export default function MediaLibraryListV8() {
       )}
       overlays={(
         <>
-          {addingFolder && selectedAccountId ? <FolderAddDialog kind="media" accountId={selectedAccountId}
-            note="メディアを分けてしまう箱です。消しても、中のメディアは未分類に残ります。"
-            onClose={() => setAddingFolder(false)}
-            onAdded={(created) => { if (created) setFolderFilter(created.id); void loadFolders() }} /> : null}
       {/*
         1件ずつの削除確認（設計 `YfTfJ`）。**消せないときは「削除しますか？」と
         聞かない。** 聞いてから断るより、最初から消せないと言うほうが短い。
@@ -1598,35 +1573,6 @@ export default function MediaLibraryListV8() {
         }}
       />
 
-      {editingFolder && (
-        <FolderAddDialog
-          kind="media"
-          folder={editingFolder}
-          accountId={selectedAccountId}
-          note="メディアを分けてしまう箱です。削除しても、中のメディアは未分類に残ります。"
-          placeholder="例: 01_商品写真"
-          onClose={() => setEditingFolder(null)}
-          onAdded={() => { setEditingFolder(null); void load(); void loadFolders() }}
-        />
-      )}
-
-      {/*
-        R37: 消す前に、中身がどうなるかを本文で読ませる。
-        「中身は未分類に戻ります」の確認を ConfirmDialog で行う。
-      */}
-      <ConfirmDialog
-        open={deletingFolder !== null}
-        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
-        description={deletingFolder?.itemCount != null
-          ? `削除しても、中のメディアは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder.itemCount}件です。`
-          : '削除しても、中のメディアは未分類に残ります。'}
-        confirmLabel="削除する"
-        destructive
-        busy={folderBusy}
-        error={folderError || undefined}
-        onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
-        onConfirm={() => void removeFolder()}
-      />
 
       {preview && (
         <MediaPreviewOverlay

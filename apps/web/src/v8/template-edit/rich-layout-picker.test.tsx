@@ -12,25 +12,23 @@ vi.mock('@/lib/api', () => ({ api: { folders: { list: async () => ({ success: tr
 beforeEach(() => document.documentElement.setAttribute('data-theme', 'v8'))
 afterEach(() => { cleanup(); document.documentElement.removeAttribute('data-theme') })
 
-const areaRows = () => screen.getByRole('heading', { name: '押した面ごとの動き' }).parentElement!.parentElement!
+/* 採用案 Wmch0：面は右の一覧（記号＋場所の名前）。 */
+const areaRows = () => within(screen.getByRole('list', { name: '面の一覧' })).getAllByRole('button').map((row) => `${row.children[0].textContent}${row.children[1].textContent}`)
 it('6形の順を保ち、キーで形を変えると見本と同じA・Bの設定行になる', () => {
   render(<TemplateRichEditor />)
   const group = screen.getByRole('radiogroup', { name: '面の分け方' })
   expect(within(group).getAllByRole('radio').map((input) => input.getAttribute('aria-label'))).toEqual([
     '1面（面 A）', '上下2面（面 A・B）', '左右2面（面 A・B）', '上1・下2（面 A・B・C）', '4面（面 A・B・C・D）', '6面（面 A・B・C・D・E・F）',
   ])
-  expect(within(areaRows()).getByText('C 右下')).toBeTruthy()
+  expect(areaRows()).toEqual(['A上', 'B左下', 'C右下'])
   const one = within(group).getByRole('radio', { name: '1面（面 A）' })
   fireEvent.click(one)
-  expect(within(areaRows()).getByText('A 全体')).toBeTruthy()
-  expect(within(areaRows()).queryByText(/^B /)).toBeNull()
+  expect(areaRows()).toEqual(['A全体'])
   fireEvent.keyDown(one, { key: 'ArrowRight' })
   const two = within(group).getByRole('radio', { name: '上下2面（面 A・B）' }) as HTMLInputElement
   expect(two.checked).toBe(true)
   expect(two.parentElement?.textContent).toBe('AB✓上下2面')
-  expect(within(areaRows()).getByText('A 上')).toBeTruthy()
-  expect(within(areaRows()).getByText('B 下')).toBeTruthy()
-  expect(within(areaRows()).queryByText(/^C /)).toBeNull()
+  expect(areaRows()).toEqual(['A上', 'B下'])
 })
 it('設定済みのBが消える形は確認してから変え、取り消すと元の形と設定を保つ', async () => {
   render(<TemplateRichEditor visual />)
@@ -40,9 +38,25 @@ it('設定済みのBが消える形は確認してから変え、取り消すと
   expect((screen.getByRole('radio', { name: '上下2面（面 A・B）' }) as HTMLInputElement).checked).toBe(true)
   fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  expect(within(areaRows()).getByText('B 下')).toBeTruthy()
+  expect(areaRows()).toEqual(['A上', 'B下'])
   fireEvent.click(screen.getByRole('radio', { name: '1面（面 A）' }))
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /変える|変更/ }))
   expect((screen.getByRole('radio', { name: '1面（面 A）' }) as HTMLInputElement).checked).toBe(true)
-  expect(within(areaRows()).queryByText(/^B /)).toBeNull()
+  expect(areaRows()).toEqual(['A全体'])
+})
+
+it('画像の上の面か右の一覧で選んだ面だけ、下で動きを決める（採用案 Wmch0）', () => {
+  render(<TemplateRichEditor visual />)
+  /* 見本：A は URL、B は動き。最初は A を選んでいる。 */
+  const rows = within(screen.getByRole('list', { name: '面の一覧' })).getAllByRole('button')
+  expect(rows.map((row) => row.getAttribute('aria-pressed'))).toEqual(['true', 'false'])
+  expect(rows[0].textContent).toContain('https://nen.example/summer')
+  expect((screen.getByLabelText('面 A のURL') as HTMLInputElement).value).toBe('https://nen.example/summer')
+  expect(screen.queryByRole('group', { name: '面 B' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '面 B「下」を選ぶ' }))
+  expect(screen.getByRole('group', { name: '面 B' })).toBeTruthy()
+  expect(screen.queryByLabelText('面 A のURL')).toBeNull()
+  fireEvent.click(rows[0])
+  fireEvent.change(screen.getByLabelText('面 A のURL'), { target: { value: 'https://nen.example/autumn' } })
+  expect(within(screen.getByRole('list', { name: '面の一覧' })).getAllByRole('button')[0].textContent).toContain('https://nen.example/autumn')
 })
