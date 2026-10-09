@@ -492,9 +492,19 @@ async function writeDestinations(
     columns.push('system_display_name = ?');
     values.push(text);
   }
-  if (dest.note) {
-    columns.push('private_memo = ?');
-    values.push(text);
+  if (dest.note && text !== '') {
+    // 受信箱の既存メモを残して回答を追記する。担当・対応状況・受信日時は動かさない。
+    await trackDestinationWrite(stats, 1, async () => {
+      const now = jstNow();
+      await db.prepare(`INSERT INTO chats (id, friend_id, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(friend_id) DO UPDATE SET
+          notes = CASE WHEN COALESCE(TRIM(chats.notes), '') = '' THEN excluded.notes
+            ELSE chats.notes || char(10) || excluded.notes END,
+          updated_at = excluded.updated_at, revision = chats.revision + 1`)
+        .bind(crypto.randomUUID(), friendId, text, now, now).run();
+      return true;
+    });
   }
   if (columns.length === 0 || text === '') return;
 

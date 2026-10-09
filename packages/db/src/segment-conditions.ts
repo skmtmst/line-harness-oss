@@ -370,7 +370,7 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
       const text = asString(rule.value, 'private_memo')
       if (text === '') throw new Error('private_memo rule requires a non-empty value')
       bindings.push(`%${text}%`)
-      return { sql: `f.private_memo LIKE ?`, bindings }
+      return { sql: `EXISTS (SELECT 1 FROM chats memo_chat WHERE memo_chat.friend_id = f.id AND memo_chat.notes LIKE ?)`, bindings }
     }
 
     case 'status_message': {

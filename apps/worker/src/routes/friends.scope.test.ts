@@ -202,7 +202,7 @@ describe('A-8 friends tenant scope', () => {
     );
     expect(response.status).toBe(200);
     const sql = prepared.map((entry) => entry.sql).join('\n');
-    expect(sql).toContain('f.private_memo LIKE ?');
+    expect(sql).toContain('(SELECT memo_chat.notes FROM chats memo_chat WHERE memo_chat.friend_id = f.id) LIKE ?');
     expect(sql).toContain('event_bookings');
     expect(sql).toContain('friend_reminders');
     expect(sql).toContain(' OR ');

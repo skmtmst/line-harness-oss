@@ -60,7 +60,7 @@ export interface FormDestinations {
   realName?: boolean;
   /** friends.display_name（システム表示名）に入れる */
   displayName?: boolean;
-  /** friends.note（個別メモ）に追記する */
+  /** 受信箱のメモ（chats.notes）に追記する */
   note?: boolean;
 }
 
