@@ -502,7 +502,8 @@
 }
 :root {
   --polish-status-weight: 600;
-  --polish-overlay-rgb: 0 0 0;
+  --polish-overlay-ink: #000;
+  --polish-overlay-range: 100%;
   --polish-overlay-idle: 0;
   --polish-enabled-opacity: 1;
   --polish-hover-opacity: 0.04;
@@ -2895,7 +2896,7 @@ html[data-theme='v8'] :is(button, a, input, textarea, select, [tabindex], [role=
 @property --polish-overlay-strength { syntax: '<number>'; inherits: false; initial-value: 0; }
 html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']) {
   --polish-overlay-strength: var(--polish-overlay-idle);
-  background-image: linear-gradient(rgb(var(--polish-overlay-rgb) / var(--polish-overlay-strength)), rgb(var(--polish-overlay-rgb) / var(--polish-overlay-strength)));
+  background-image: linear-gradient(color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent), color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent));
   transition-property: background-color, color, border-color, outline-color, box-shadow, transform, filter, opacity, --polish-overlay-strength;
   transition-duration: var(--polish-interaction-duration);
 }

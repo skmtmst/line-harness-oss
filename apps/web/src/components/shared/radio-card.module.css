@@ -357,7 +357,7 @@ html[data-theme='v8'] .card:is(.compact, .row, .form, .small) .note { font-size:
 /* B-152⑦：箱も120msの地・青い輪・押せない濃さを使う。 */
 [data-theme='v8'] .card, [data-theme='v8'] .card.row {
   --polish-overlay-strength: var(--polish-overlay-idle);
-  background-image: linear-gradient(rgb(var(--polish-overlay-rgb) / var(--polish-overlay-strength)), rgb(var(--polish-overlay-rgb) / var(--polish-overlay-strength)));
+  background-image: linear-gradient(color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent), color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent));
   transition-property: background-color, border-color, outline-color, opacity, --polish-overlay-strength;
   transition-duration: var(--polish-interaction-duration);
 }
