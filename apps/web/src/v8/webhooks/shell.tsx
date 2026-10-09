@@ -14,6 +14,7 @@ import { Eye, Inbox, ListChecks, Send, TriangleAlert } from 'lucide-react'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { api, type OutgoingWebhookOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Notice from '@/components/shared/notice'
 import { Tabs } from '@/components/shared/tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -51,8 +52,8 @@ export function WebhookTabs({ active, outgoingCount, incomingCount }: {
     { key: 'notify', label: `見本 ${SAMPLE_COUNT}` },
   ]
   return (
-    <div className={styles.tabs}>
     <Tabs
+      size="short"
       label="外部連携の種類"
       items={items.map((item) => ({
         label: item.label,
@@ -60,7 +61,6 @@ export function WebhookTabs({ active, outgoingCount, incomingCount }: {
         current: item.key === active,
       }))}
     />
-    </div>
   )
 }
 
@@ -195,8 +195,7 @@ export function overviewBandCells(args: {
 
 export function WebhookBand({ cells }: { cells: BandCell[] }) {
   return (
-    <div>
-    <KpiBand aria-label="外部連携の数の帯">
+    <KpiBand border="inset-top" aria-label="外部連携の数の帯">
       {cells.map((cell) => (
         <KpiCard
           key={cell.key}
@@ -209,7 +208,6 @@ export function WebhookBand({ cells }: { cells: BandCell[] }) {
         />
       ))}
     </KpiBand>
-    </div>
   )
 }
 
@@ -217,10 +215,7 @@ export function WebhookBand({ cells }: { cells: BandCell[] }) {
 export function ViewerBand() {
   return (
     <div className={styles.viewerRow}>
-      <div className={styles.viewerBand} role="status">
-        <Eye size={16} aria-hidden="true" />
-        <span>閲覧のみで見ています。変える操作は統括に頼んでください。</span>
-      </div>
+      <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作は統括に頼んでください。</Notice>
     </div>
   )
 }

@@ -5,8 +5,11 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   children: ReactNode
   frame?: 'raised' | 'inset'
   layout?: 'block' | 'vertical'
-  /** 設定の箱は16の余白・10の間。 */
-  spacing?: 'settings'
+  /**
+   * 設定の箱。'settings' は16の余白・10の間（EC設定）。
+   * 'integration'（外部連携の設定）・'preview'（見本）は枠と内側の間を持つ。指定したカードだけ。
+   */
+  spacing?: 'settings' | 'integration' | 'preview'
   overflow?: 'visible' | 'hidden'
   padding?: 'none' | 'compact' | 'default' | 'roomy' | 'spacious'
   corner?: 'card' | 'segment'
@@ -48,6 +51,8 @@ export default function Card({
     padding === 'default' ? styles.paddingDefault : null,
     padding === 'roomy' ? styles.paddingRoomy : null,
     padding === 'spacious' ? styles.paddingSpacious : null,
+    spacing === 'integration' || spacing === 'preview' ? styles.spacedInset : null,
+    spacing === 'integration' || spacing === 'preview' ? styles[spacing] : null,
     className,
   ]
     .filter(Boolean)

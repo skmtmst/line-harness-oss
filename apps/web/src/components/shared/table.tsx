@@ -46,6 +46,10 @@ export type ThProps = Omit<
   truncate?: boolean
   /** 白い板が狭いときだけ、補助列を畳む。見出しと本文で揃える。 */
   collapseAt?: 'narrow'
+  /** 列の余った幅をこのセルに割り当てる。 */
+  grow?: boolean
+  /** 文字の先頭を名前のフォルダ印に揃える。 */
+  inset?: string
   /**
    * 定義・分母・単位・言葉の意味。見出しのすぐ右の「？」へ入れる
    * （★V7・§2-1b）。表の下の注はここへ移し、2回書かない。
@@ -68,6 +72,8 @@ export function Th({
   helpHref,
   truncate,
   collapseAt,
+  grow,
+  inset,
   ...cellProps
 }: ThProps) {
   const classes = [
@@ -83,7 +89,7 @@ export function Th({
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
 
   return (
-    <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} {...cellProps}>
+    <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
       {truncate ? <span className={styles.truncated} title={typeof children === 'string' ? children : undefined}>{children}</span> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
@@ -108,6 +114,8 @@ export function DataTable({
   density,
   columns,
   label,
+  columnLayout,
+  'aria-label': ariaLabel,
 }: {
   children: ReactNode
   className?: string
@@ -119,12 +127,26 @@ export function DataTable({
   /** 列の幅を持つ設定一覧。共通の枠・セル・行で描く。 */
   columns?: string
   label?: string
+  'aria-label'?: string
+  /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
+  columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string }
 }) {
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <div className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} style={columns ? { '--table-columns': columns } as CSSProperties : undefined}>
-      <table className={shell.table} data-design={dataDesign} aria-label={label}>{children}</table>
+    <div className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} style={columns || columnLayout ? ({
+      ...(columns ? { '--table-columns': columns } : {}),
+      ...(columnLayout ? {
+        '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
+        '--table-column-gap': columnLayout.gap, '--table-column-padding': columnLayout.padding,
+        '--table-number-inset': columnLayout.numberInset ?? '0px', '--table-name-inset': columnLayout.nameInset ?? '0px',
+        '--table-head-padding': columnLayout.headPadding ?? columnLayout.padding,
+        '--table-head-radius': columnLayout.headRadius ?? '0px', '--table-row-gap': columnLayout.rowGap ?? '0px',
+        '--table-head-text-size': columnLayout.headTextSize ?? 'var(--text-caption)',
+        '--table-body-text-size': columnLayout.bodyTextSize ?? 'var(--text-label)',
+      } : {}),
+    } as CSSProperties) : undefined}>
+      <table className={shell.table} data-design={dataDesign} aria-label={label ?? ariaLabel}>{children}</table>
     </div>
   )
 }
@@ -175,17 +197,18 @@ export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'ch
   align?: 'left' | 'right' | 'center'
   className?: string
   collapseAt?: 'narrow'
+  grow?: boolean
 }
 
 /** 標準一覧の本文セル。 */
-export function Td({ children, align = 'left', className, collapseAt, ...cellProps }: TdProps) {
+export function Td({ children, align = 'left', className, collapseAt, grow, ...cellProps }: TdProps) {
   const classes = [
     shell.bodyCell,
     align === 'right' && styles.right,
     align === 'center' && styles.center,
     className,
   ].filter(Boolean).join(' ')
-  return <td className={classes} data-align={align} data-cell-collapse={collapseAt} {...cellProps}>{children}</td>
+  return <td className={classes} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
 }
 
 /** 名前・副題・注記を同じ列にまとめる先頭セル。 */

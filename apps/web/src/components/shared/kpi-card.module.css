@@ -351,3 +351,6 @@
 [data-theme='v8'] .card[data-kpi-density='mini'] .label { color: var(--color-ink-secondary); font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
 [data-theme='v8'] .card[data-kpi-density='mini'] .number { font-family: var(--font-sans); font-size: var(--tpl-rest3-ec-mini-num); line-height: var(--tpl-rest3-ec-mini-num-lh); letter-spacing: 0; }
 [data-theme='v8'] .card[data-kpi-density='mini'] .detail { display: none; }
+[data-theme='v8'] .strip[data-kpi-presentation='band'][data-kpi-border='inset-top'] {
+  border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
+}

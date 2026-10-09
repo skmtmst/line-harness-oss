@@ -27,6 +27,8 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
+import { TextField } from '@/components/shared/text-field'
 import { RowMenu } from '@/components/shared/row-actions'
 import EmptyList from '@/components/shared/empty-list'
 import Notice from '@/components/shared/notice'
@@ -552,22 +554,22 @@ export default function WebhooksOutgoingV8() {
           }}
         >
         <div className={styles.tableWrap}>
-          <DataTable className={`${styles.table} ${narrow ? styles.tableNarrow : ''}`}>
+          <DataTable columnLayout={{ headHeight: 'var(--tpl-wh-head-h)', rowHeight: narrow ? 'var(--tpl-af2-wh-narrow-row-h)' : 'var(--tpl-wh-row-h)', gap: narrow ? '0px' : 'var(--tpl-wh-col-gap)', padding: narrow ? 'var(--tpl-wh-narrow-column-pad)' : 'var(--tpl-wh-row-pad)', numberInset: 'var(--tpl-wh-num-pad-end)', nameInset: narrow ? 'var(--tpl-af2-wh-name-end)' : undefined }}>
             <thead>
               {narrow ? (
                 /* 1152 の絵 AsfFB：送り先・今月送った・状態・操作の4列。 */
-                <TableHeadRow className={styles.headRow} data-table-layout="columns">
-                  <Th className={`${styles.colName} ${styles.nameHead}`}>送り先（送るタイミング → URL）</Th>
+                <TableHeadRow data-table-layout="columns">
+                  <Th grow inset="var(--tpl-folder-dot-indent)" className={styles.colName}>送り先（送るタイミング → URL）</Th>
                   <Th className={styles.colMonth}>今月送った</Th>
                   <Th className={styles.colStateNarrow}>状態</Th>
                   <Th className={styles.colOpsNarrow}>操作</Th>
                 </TableHeadRow>
               ) : (
-              <TableHeadRow className={styles.headRow} data-table-layout="columns">
-                <Th className={styles.colName}>つなぎ先</Th>
+              <TableHeadRow data-table-layout="columns">
+                <Th grow className={styles.colName}>つなぎ先</Th>
                 <Th className={styles.colWhen}>いつ送るか</Th>
                 <Th className={styles.colPayload}>送るもの</Th>
-                <Th className={styles.colCount}>この30日</Th>
+                <Th align="right" className={styles.colCount}>この30日</Th>
                 <Th className={styles.colState}>ようす</Th>
                 <Th className={styles.colOps}>操作</Th>
               </TableHeadRow>
@@ -599,8 +601,8 @@ export default function WebhooksOutgoingV8() {
                     ? `失敗 ${formatNumber(item.deliverySummary.failed)}`
                     : completedAt ? `最後 ${shortDateTime(completedAt)}` : null
                   return (
-                    <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
-                      <Td className={styles.colName}>
+                    <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
+                      <Td grow className={styles.colName}>
                         {nameNode}
                         <span className={`${styles.sub} ${styles.nameSub}`} title={`${when} → ${item.url}`}>{target}</span>
                       </Td>
@@ -609,10 +611,7 @@ export default function WebhooksOutgoingV8() {
                         {countSub ? <span className={styles.numSub}>{countSub}</span> : null}
                       </Td>
                       <Td className={styles.colStateNarrow}>
-                        <span className={styles.pill} data-tone={tone}>
-                          <span className={styles.pillDot} aria-hidden="true" />
-                          {stateWord}
-                        </span>
+                        <StatusBadge tone={tone === 'active' ? 'success' : tone}>{stateWord}</StatusBadge>
                       </Td>
                       <Td className={styles.colOpsNarrow}>
                         {/* 狭い幅は「…」だけ（中身を見る・やり直すも中に入れる。絵 AsfFB の下の説明のとおり）。 */}
@@ -637,8 +636,8 @@ export default function WebhooksOutgoingV8() {
                   )
                 }
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
-                    <Td className={styles.colName}>
+                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
+                    <Td grow className={styles.colName}>
                       {/* 送り先はまだフォルダへ入れられない（全件が未分類）ので、丸は未分類の輪。 */}
                       <FolderDotName folder={null}>
                         {canManage ? (
@@ -651,7 +650,7 @@ export default function WebhooksOutgoingV8() {
                     </Td>
                     <Td className={styles.colWhen}><span className={styles.cellText} title={when}>{when}</span></Td>
                     <Td className={styles.colPayload}><span className={styles.cellText} title={payload}>{payload}</span></Td>
-                    <Td className={styles.colCount}>
+                    <Td align="right" className={styles.colCount}>
                       <span className={styles.num}>{formatNumber(item.deliverySummary.total)}回</span>
                       <span className={styles.numSub}>
                         {item.deliverySummary.failed > 0
@@ -660,10 +659,7 @@ export default function WebhooksOutgoingV8() {
                       </span>
                     </Td>
                     <Td className={styles.colState}>
-                      <span className={styles.pill} data-tone={tone}>
-                        <span className={styles.pillDot} aria-hidden="true" />
-                        {stateWord}
-                      </span>
+                      <StatusBadge tone={tone === 'active' ? 'success' : tone}>{stateWord}</StatusBadge>
                       {completedAt
                         ? <span className={styles.sub}>最終 {shortDateTime(completedAt)}</span>
                         : item.isActive && !toggling ? <span className={styles.sub}>まだ送っていません</span> : null}
@@ -807,10 +803,9 @@ export default function WebhooksOutgoingV8() {
           confirmLabel="保存する"
         >
           <div className={styles.secretRow}>
-            <input
+            <TextField
               value={rotateSecret}
               onChange={(event) => setRotateSecret(event.target.value)}
-              className={styles.secretInput}
               placeholder="ランダムな英数字32文字以上"
               aria-label="新しい鍵"
               minLength={MIN_SECRET_LENGTH}
