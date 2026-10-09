@@ -2,10 +2,11 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
 // 実ブラウザではV8のガードが保存・送信中の切替を止める。
 // それとは別に、Provider側の選択が変わった場合も遅い応答を他店へ混ぜない。
-// V8本体と保存・送信の判断は差し替えない。Selectだけ素の選ぶ欄へ置く。
+// V8本体と保存・送信の判断、タグの選ぶ窓は差し替えない。種類のSelectだけ素の欄へ置く。
 const account = vi.hoisted(() => ({ id: 'account-1' }))
 const routerPush = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({
@@ -121,7 +122,7 @@ async function fillTagRule(name: string) {
   fireEvent.click(screen.getByRole('button', { name: /^1つめのすること「.+」の操作$/ }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '中身を直す' }))
   const dialog = await screen.findByRole('dialog', { name: '1つめのすること', exact: true })
-  fireEvent.change(within(dialog).getByLabelText('自動化で付けるタグ'), { target: { value: 'tag-1' } })
+  await pickEntity('自動化で付けるタグ', 'VIP')
   fireEvent.keyDown(dialog, { key: 'Escape' })
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '1つめのすること', exact: true })).toBeNull())
 }

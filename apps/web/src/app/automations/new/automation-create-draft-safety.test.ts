@@ -4,7 +4,6 @@ import { createServer } from 'node:net'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium, type Browser, type BrowserContext, type Page, type Route } from '@playwright/test'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { selectOptionIn } from '../../../test-utils/select-helpers'
 
 /**
  * ルールを作る（★V8 `M4torY`）の実挙動試験（#679）。
@@ -528,9 +527,8 @@ async function openSecondTab(context: BrowserContext, worker: WorkerHarness, sto
 // ========== 画面操作 ==========
 
 /*
- * 共通 Select（button＋listbox の自前実装）を選ぶ操作は、共有の
- * `selectOptionIn`（`src/test-utils/select-helpers.ts`）へ寄せる。
- * Playwright の `selectOption` は素の `<select>` 専用なので使わない。
+ * タグは共通の選ぶ窓で候補を仮選択し、［選ぶ］で確定する（B-155）。
+ * 付いたとき・外れたときの種類だけは共通 Select の一覧から選ぶ。
  * V8の上部のアカウント切り替えも、見えているボタンと一覧から操作する。
  */
 async function requestAccountSwitch(page: Page, accountId: string) {
@@ -560,12 +558,20 @@ async function closeActionEditor(page: Page) {
   await page.getByRole('dialog', { name: '1つめのすること', exact: true }).waitFor({ state: 'hidden' })
 }
 
+async function pickTag(page: Page, label: string) {
+  await page.getByRole('button', { name: new RegExp(`^${label}：(選ぶ|変える)$`) }).click()
+  const picker = page.getByRole('dialog', { name: 'タグを選ぶ', exact: true })
+  await picker.getByRole('radio', { name: 'VIP', exact: true }).check()
+  await picker.getByRole('button', { name: '選ぶ', exact: true }).click()
+  await picker.waitFor({ state: 'hidden' })
+}
+
 async function fillTagRule(page: Page, name: string) {
   await page.locator('#v8-rule-name').fill(name)
   const dialog = await editFirstAction(page)
   const current = await dialog.getByLabel('自動化で付けるタグ').innerText()
   if (!current.includes('VIP')) {
-    await selectOptionIn(page, '自動化で付けるタグ', 'VIP')
+    await pickTag(page, '自動化で付けるタグ')
   }
   await closeActionEditor(page)
 }
@@ -784,7 +790,7 @@ describe('V8 ルールを作る（M4torY）の誤操作防止（#679）', () => 
     expect(await listbox.getByRole('option').allTextContents()).toEqual(['付いたとき', '外れたとき'])
     await listbox.getByRole('button', { name: '外れたとき' }).click()
     await expect.poll(async () => action.innerText(), { timeout: 10_000 }).toContain('外れたとき')
-    await selectOptionIn(page, 'きっかけのタグ', 'VIP')
+    await pickTag(page, 'きっかけのタグ')
     await fillTagRule(page, 'タグが外れたときのルール')
     await saveDraft(page)
     expect(api.updateCalls.at(-1)?.body).toMatchObject({
