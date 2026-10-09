@@ -553,6 +553,7 @@
     "608_line_account_folders.sql",
     "609_hq_broadcast_authoring.sql",
     "610_booking_reminder_request_snapshot.sql",
+    "611_instagram_cross_post.sql",
     "612_hq_friend_attribute_templates.sql",
     "613_folder_colors.sql",
     "614_tenant_company_contact.sql",
@@ -562,5 +563,5 @@
     "618_hq_banner_folders.sql",
     "619_hq_folder_display_order.sql"
   ],
-  "migrationCount": 561
+  "migrationCount": 562
 }
