@@ -155,7 +155,7 @@
 
 /*
  * ★V8「チェック」（dQCCN・S9U7v）：箱・印・色は v7 と同じ。
- * 違うのは文字（13px）と、オフの箱の枠色（control-border）。
+ * 違うのは文字（13px）と、オフの箱の枠色（choice-border）。
  * 選んだ・誤りの枠色は details 度が高い規則が勝つので変わらない。
  */
 [data-theme='v8'] .label {
@@ -163,7 +163,7 @@
 }
 
 [data-theme='v8'] .box {
-  border-color: var(--color-control-border);
+  border-color: var(--color-choice-border);
 }
 
 /*

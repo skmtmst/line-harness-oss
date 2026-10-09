@@ -580,9 +580,8 @@
  *   text-lh  1.4→1.5  部品の文字の行の高さ（Pencil の部品は全部 1.5。
  *     部品側は `line-height: var(--text-lh, 1.4)` と書き、v7 は
  *     既定値 1.4 が効いて1画素も変わらない）
- *   control-border  操作する部品の枠の色（入力・選ぶ・検索・チェック・
- *     ラジオ・トグルのオフ・OTP・色を選ぶ・カードの中の印）。カードや
- *     表・外側の板の枠は hairline のまま（control-border は #c9ced6、絵の変数）
+ *   control-border  B-150 案1：入力・選ぶ・検索・副ボタン・絞り込みの札の黒12%の枠。
+ *     control-shadow は黒6%の薄い影。チェック・ラジオ・トグルは別変数で保つ。
  *   status-warn-soft  注意の薄い地は #fff7e6 → #fdf3e1（夕13・TOKENS）
  *   track  #1d1d1f0a  進みの棒・切り替えの溝の地（夕13・TOKENS）
  *   border-soft  #1d1d1f14  ダイアログ・ふきだしなど重なる物の縁（同上）
@@ -679,7 +678,10 @@
   --radius-control: 10px;
   --radius-panel: 16px;
   --text-lh: 1.5;
-  --color-control-border: #c9ced6; /* 絵の control-border。濃い #868e98 はオーナーが却下 */
+  --color-control-border: rgba(29, 29, 31, 0.12);
+  --control-shadow: 0 1px 2px rgba(29, 29, 31, 0.06);
+  --color-choice-border: #c9ced6;
+  --color-toggle-locked: #dadde2;
   --color-status-warn-soft: #fdf3e1;
   --color-track: #1d1d1f0a;
   --color-border-soft: #1d1d1f14;
@@ -1212,7 +1214,7 @@
   --tpl-nm-tab-h: 27.5px; --tpl-nm-kpi-label-lh: 18px; --tpl-nm-band-top-line: inset 0 1px 0 var(--color-hairline); --tpl-nm-ro-row-pad: 12px 24px; --tpl-nm-kpi-more: 16px; --tpl-nm-body-pad: 16px 24px 24px; --tpl-nm-rail-w: 300px; --tpl-nm-col-gap: 16px; --tpl-nm-left-gap: 12px; --tpl-nm-adopted-gap: 14px; --tpl-nm-tools-gap: 8px; --tpl-nm-search-w: 240px; --tpl-nm-search-wide-w: 280px; --tpl-nm-seg-pad: 3px; --tpl-nm-seg-item-pad: 4px 12px;
   --tpl-nm-card-gap: 12px; --tpl-nm-card-pad: 12px; --tpl-nm-card-inner-gap: 10px; --tpl-nm-card-adopted-inner-gap: 8px; --tpl-nm-card-adopted-w: 276px; --tpl-nm-card-radius: 12px; --tpl-nm-card-line: inset 0 0 0 1px var(--color-hairline); --tpl-nm-card-line-selected: inset 0 0 0 2px var(--color-accent-deep); --tpl-nm-photo-h: 200px; --tpl-nm-photo-adopted-h: 150px; --tpl-nm-photo-radius: 10px; --tpl-nm-pick-offset: 8px; --tpl-nm-pick-pad: 2px 8px 2px 6px;
   --tpl-nm-name-size: 13px; --tpl-nm-name-lh: 19px; --tpl-nm-row-size: 12px; --tpl-nm-row-lh: 17px; --tpl-nm-small-size: 11px; --tpl-nm-small-lh: 16px; --tpl-nm-chip-gap: 6px; --tpl-nm-action-gap: 8px; --tpl-nm-action-h: 36px; --tpl-nm-reason-pad: 6px 8px; --tpl-nm-rail-pad: 16px; --tpl-nm-rail-gap: 8px; --tpl-nm-rail-title-size: 14px; --tpl-nm-rail-title-lh: 20px;
-  --tpl-nm-dlg-gap: 14px; --tpl-nm-dlg-head-pad: 24px 24px 0; --tpl-nm-dlg-title-lh: 26px; --tpl-nm-dlg-title-gap: 4px; --tpl-nm-dlg-body-pad: 14px 24px 0; --tpl-nm-dlg-foot-margin: 14px 24px 0; --tpl-nm-dlg-foot-pad: 14px 0 24px; --tpl-nm-dlg-photo-pad: 10px 12px; --tpl-nm-dlg-photo-gap: 2px; --tpl-nm-dlg-thumb: 44px; --tpl-nm-field-gap: 6px; --tpl-nm-radio: 18px; --tpl-nm-radio-off: inset 0 0 0 1.5px var(--color-control-border); --tpl-nm-radio-on: inset 0 0 0 5px var(--color-accent-deep); --tpl-nm-pill-lh: 20px; --tpl-nm-textarea-h: 56px; --tpl-nm-textarea-pad: 10px 12px; --tpl-nm-textarea-lh: 19px; --tpl-nm-bubble-pad: 8px 11px; --tpl-nm-bubble-radius: 14px; --tpl-nm-bubble-lh: 18px;
+  --tpl-nm-dlg-gap: 14px; --tpl-nm-dlg-head-pad: 24px 24px 0; --tpl-nm-dlg-title-lh: 26px; --tpl-nm-dlg-title-gap: 4px; --tpl-nm-dlg-body-pad: 14px 24px 0; --tpl-nm-dlg-foot-margin: 14px 24px 0; --tpl-nm-dlg-foot-pad: 14px 0 24px; --tpl-nm-dlg-photo-pad: 10px 12px; --tpl-nm-dlg-photo-gap: 2px; --tpl-nm-dlg-thumb: 44px; --tpl-nm-field-gap: 6px; --tpl-nm-radio: 18px; --tpl-nm-radio-off: inset 0 0 0 1.5px var(--color-choice-border); --tpl-nm-radio-on: inset 0 0 0 5px var(--color-accent-deep); --tpl-nm-pill-lh: 20px; --tpl-nm-textarea-h: 56px; --tpl-nm-textarea-pad: 10px 12px; --tpl-nm-textarea-lh: 19px; --tpl-nm-bubble-pad: 8px 11px; --tpl-nm-bubble-radius: 14px; --tpl-nm-bubble-lh: 18px;
   --tpl-nm-hist-pad: 9px 14px; --tpl-nm-hist-cell-pad: 9px 6px; --tpl-nm-hist-edge: 14px; --tpl-nm-hist-head-h: 34px; --tpl-nm-hist-col-v: 56px; --tpl-nm-hist-col-date: 102px; --tpl-nm-hist-col-by: 92px; --tpl-nm-hist-col-ops: 150px; --tpl-nm-pub-rail-w: 190px; --tpl-nm-pub-col-photo: 68px; --tpl-nm-pub-col-ops: 160px; --tpl-nm-pub-thumb: 56px;
   /* シナリオ配信の一覧（axFrW・wjfLe・X0QrW0・Al4Ek）。 */
   --tpl-scn-col-select: 48px; --tpl-scn-col-grip: 30px; --tpl-scn-col-name: 608px; --tpl-scn-col-count: 146px; --tpl-scn-col-state: 96px; --tpl-scn-col-menu: 60px;
@@ -1373,7 +1375,7 @@
   --tpl-tg2-card-head-gap: 2px; --tpl-tg2-input-lh: 21px; --tpl-tg2-select-w: 320px; --tpl-tg2-ways-gap: 10px; --tpl-tg2-way-pad: 14px; --tpl-tg2-aside-gap: 14px; --tpl-tg2-aside-title-lh: 23px; --tpl-tg2-aside-text-lh: 19px;
   --tpl-tg2-side-gap: 12px; --tpl-tg2-side-pad: 16px; --tpl-tg2-side-title-size: 14px; --tpl-tg2-chip-h: 36px; --tpl-tg2-chip-pad: 0 10px; --tpl-tg2-chip-icon: 13px; --tpl-tg2-chip-lh: 18px;
   --tpl-tg2-option-gap: 8px; --tpl-tg2-default-w: 280px; --tpl-tg2-place-pad: 8px 0; --tpl-tg2-place-name-w: 110px; --tpl-tg2-key-w: 200px; --tpl-tg2-key-gap: 8px; --tpl-tg2-note-lh: 16px;
-  --tpl-tg2-type-card-h: 98px; --tpl-tg2-type-card-gap: 8px; --tpl-tg2-type-radio: 16px; --tpl-tg2-radio-off: inset 0 0 0 1.5px var(--color-control-border); --tpl-tg2-radio-on: inset 0 0 0 5px var(--color-accent-deep); --tpl-tg2-ring-thin: 1.5px; --tpl-tg2-label-lh: 19px;
+  --tpl-tg2-type-card-h: 98px; --tpl-tg2-type-card-gap: 8px; --tpl-tg2-type-radio: 16px; --tpl-tg2-radio-off: inset 0 0 0 1.5px var(--color-choice-border); --tpl-tg2-radio-on: inset 0 0 0 5px var(--color-accent-deep); --tpl-tg2-ring-thin: 1.5px; --tpl-tg2-label-lh: 19px;
   --tpl-tg2-swatch: 28px; --tpl-tg2-swatch-gap: 10px; --tpl-tg2-swatch-ring: 2px; --tpl-tg2-rule-pad: 0 12px; --tpl-tg2-rule-h: 48px; --tpl-tg2-rule-icon: 14px; --tpl-tg2-icon-btn: 28px; --tpl-tg2-info-band-pad: 10px 14px; --tpl-tg2-info-band-lh: 20px; --tpl-tg2-sample-pad: 10px 14px; --tpl-tg2-sample-count-w: 26px; --tpl-tg2-sample-row-pad-bottom: 9px; --tpl-tg2-dialog-body-gap: 16px; --tpl-tg2-dialog-body-pull-bottom: -8px; --tpl-tg2-dialog-footer-pad: 0 24px 24px;
   --tpl-tg2-step-no: 24px;
   --tpl-tg2-map-pad: 12px 0; --tpl-tg2-menu-w: 170px; --tpl-tg2-menu-image-h: 80px; --tpl-tg2-link-w: 96px; --tpl-tg2-link-icon-w: 28px; --tpl-tg2-link-icon-h: 16px; --tpl-tg2-warn-pad: 10px 12px; --tpl-tg2-check-pad: 9px 0; --tpl-tg2-box-gap: 4px;
