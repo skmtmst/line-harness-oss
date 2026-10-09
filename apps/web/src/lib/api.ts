@@ -1,3 +1,4 @@
+import { getFeatureDisabledContext } from './feature-disabled-context'
 import type {QuestionAnswerRecovery,ResumeQuestionAnswerRequest,ResumeQuestionAnswerResponse} from '@line-crm/shared';
 import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
 import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts, BannerGenerationCreateOptions, RichMenuGroupListOptions } from '@line-crm/shared'
@@ -2491,6 +2492,7 @@ export type ApiAccountEventDetail = {
   /** 呼び出した時点の対象。未指定・複数店舗のときは null。 */
   accountId: string | null
   accountIds?: string[]
+  featureContext?: import('./feature-disabled-context').FeatureDisabledContext
 }
 export type FeatureDisabledEventDetail = Partial<ApiAccountEventDetail> & {
   featureId?: string
@@ -2725,6 +2727,11 @@ export function shouldAnnounceFeatureDisabled(status: number, code: string | und
 
 /** 応答待ちの間に画面が切り替わっても、呼出元のアカウントを保持する。 */
 function apiAccountContext(path: string, options?: FetchApiOptions): ApiAccountEventDetail {
+  const featureContext = getFeatureDisabledContext()
+  return { ...resolveApiAccountContext(path, options), ...(featureContext ? { featureContext } : {}) }
+}
+
+function resolveApiAccountContext(path: string, options?: FetchApiOptions): ApiAccountEventDetail {
   const accountKeys = ['account_id', 'accountId', 'line_account_id', 'lineAccountId']
   const valid = (value: unknown): value is string => typeof value === 'string'
     && value.trim().length > 0 && value.length <= 256

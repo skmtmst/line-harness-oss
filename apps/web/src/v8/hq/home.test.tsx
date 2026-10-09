@@ -81,6 +81,11 @@ async function render() {
 }
 
 describe('統括のアカウント', () => {
+  it('B-46：カードの入口は短い「入る」にし、読み上げにはアカウント名を残す', async () => {
+    await render()
+    const enter = container.querySelector('button[aria-label="然 -NEN- TEST へ入る"]')!
+    expect(enter.textContent).toBe('入る')
+  })
   it('LINE ID の @ を二重にしない', async () => {
     await render()
     const card = container.querySelector('article')!

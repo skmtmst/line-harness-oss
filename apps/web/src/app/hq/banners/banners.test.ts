@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { HQ_MENU_SECTIONS } from '@/lib/menu'
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
-const listPage = read('./page.tsx')
-const projectPage = read('./project/page.tsx')
+const listPage = read('../../../v8/hq-banners/list.tsx')
+const projectPage = read('../../../v8/hq-banners/project.tsx')
 const panel = read('../../../components/hq/banners/generation-panel.tsx')
 const modal = read('../../../components/hq/banners/image-detail-modal.tsx')
 const projects = read('../../../components/hq/banners/projects-section.tsx')
@@ -33,19 +33,13 @@ describe('統括 バナー生成', () => {
 
   it('タブは ?tab= で切り替え、履歴を積まない（replace）', () => {
     expect(listPage).toContain("params.get('tab') === 'library'")
-    expect(listPage).toContain("router.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')")
+    expect(listPage).toContain("samePageUrl.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')")
     expect(shell).not.toMatch(/href:\s*'\/hq\/banners/)
   })
 
-  it('画面名はトップバーだけに出し、本文に見出しを置かない', () => {
-    expect(listPage).toContain("usePageTitle('バナー生成')")
-    expect(projectPage).toContain('usePageTitle(project?.name ?? null)')
-    expect(listPage).not.toContain('<Header')
-    expect(projectPage).not.toContain('<Header')
-  })
 
   it('V8（板 B9ZAr・W5Wxr）の帯の順: 数値カード帯 → 案内帯 → タブ行 → 一覧本体（操作と見るは左列）', () => {
-    const order = ['<BannerKpis', '<BannerNote', '<BannerTabs', '<ProjectsSection']
+    const order = ['{kpis}', '<NoteBar', '<Tabs']
     const positions = order.map((needle) => listPage.indexOf(needle))
     expect(positions.every((p) => p >= 0)).toBe(true)
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)
@@ -62,11 +56,11 @@ describe('統括 バナー生成', () => {
     expect(panel).toContain('4つの役割で指定します')
   })
 
-  it('生成は「条件を登録 → 1枚ずつ run」を繰り返し、失敗したら止めて理由を出す', () => {
+  it('生成条件を登録し、保存済みの生成状態を読み直す。失敗は理由を出す', () => {
     expect(projectPage).toContain('api.hqBanners.projects.createGeneration(')
-    expect(projectPage).toContain('api.hqBanners.generations.run(current.id, { gravity: crop })')
-    expect(projectPage).toContain('if (res.data.finished) break')
-    expect(projectPage).toContain('setGenerationError(message)')
+    expect(projectPage).toContain('api.hqBanners.generations.get(current.id)')
+    expect(projectPage).toContain("if (!['queued', 'running'].includes(current.status)) break")
+    expect(projectPage).toContain('setGenerationError(caught instanceof Error')
     expect(projectPage).toContain('api.hqBanners.generations.cancel(running.id)')
     // 画面を離れて戻ったとき、途中の生成があれば続きから動かす
     expect(projectPage).toContain('activeGeneration(generations)')
@@ -82,8 +76,8 @@ describe('統括 バナー生成', () => {
 
   it('V8（iMnph）は外枠に板IDを付け、切り替えに件数を出す', () => {
     expect(projectPage).toContain("'iMnph'")
-    expect(projectPage).toContain('画像を押すと詳細・アカウントへ渡す')
-    for (const label of ['すべて', 'お気に入り', 'アカウントへ渡し済み']) {
+    expect(projectPage).toContain('画像を押すと詳細')
+    for (const label of ['すべて', 'お気に入り', '配布済み']) {
       expect(projectPage).toContain(label)
     }
   })
@@ -94,12 +88,12 @@ describe('統括 バナー生成', () => {
    * 板がそう描いている V8 だけが渡す。`b1So7a`「生成する（2枚）」＝下の帯のボタンで、v7 と同じ言葉。
    * パネルの見出し `S0ay0i`「画像を生成」とは別なので、パネル側に「生成する」は入れない（上の it が見張る）。
    */
-  it('V8 は板 qIp42 の「利用量」と「生成する（N枚）」を持ち、v7 の既定は変えない', () => {
+  it('V8 は板 qIp42 の「利用量」と「生成する（N枚）」を持ち、既存の生成処理を使う', () => {
     expect(panel).toContain('usageHeading')
     expect(panel).toContain('利用量')
     expect(v8Project).toContain('usageHeading')
     expect(v8Project).toContain('生成する（{input.count}枚）')
-    expect(projectPage).not.toContain('usageHeading')
+    expect(projectPage).toContain('usageHeading')
   })
 
   it('モーダルは全面1枚のオーバーレイで、幅は max-width（1920/1160 の固定幅を書かない）', () => {

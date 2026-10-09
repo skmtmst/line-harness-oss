@@ -19,6 +19,7 @@ export default function SegmentedControl<T extends string>({
   className,
   size = 'medium',
   disabled = false,
+  equalWidth = false,
 }: {
   options: { value: T; label: string }[]
   value: T
@@ -37,6 +38,8 @@ export default function SegmentedControl<T extends string>({
   size?: 'medium' | 'small' | 'compact' | 'panel' | 'timing'
   /** 操作を止める（生成中など）。項目すべてを押せなくする。 */
   disabled?: boolean
+  /** 選択肢を器の幅へ均等に並べる（統括の生成枚数）。 */
+  equalWidth?: boolean
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -73,6 +76,7 @@ export default function SegmentedControl<T extends string>({
       aria-label={ariaLabel}
       className={[styles.root, className].filter(Boolean).join(' ')}
       data-size={size}
+      data-equal-width={equalWidth || undefined}
       onKeyDown={onKeyDown}
     >
       <span

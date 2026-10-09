@@ -131,7 +131,7 @@ export function useFullWidthPage(enabled = true) {
  * v7 では描かれないので、渡しても v7 の見た目は変わらない。
  * 画面を離れたら既定（アカウント名）へ戻す。
  */
-export function usePageCrumbs(crumbs: PageCrumb[] | null) {
+export function usePageCrumbs(crumbs: PageCrumb[] | null, enabled = true) {
   const store = useContext(PageChromeContext)
   const setCrumbs = store?.setCrumbs
   // 呼び出し側は描き出すたびに新しい配列を作る。中身が同じなら
@@ -139,11 +139,12 @@ export function usePageCrumbs(crumbs: PageCrumb[] | null) {
   const serialized = JSON.stringify(crumbs)
 
   useEffect(() => {
-    if (!setCrumbs) return
+    // 統括などに埋め込まれた編集部品では、パンくずの登録も解除も親に任せる。
+    if (!setCrumbs || !enabled) return
     setCrumbs(crumbs)
     return () => setCrumbs(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serialized, setCrumbs])
+  }, [serialized, setCrumbs, enabled])
 }
 
 /**

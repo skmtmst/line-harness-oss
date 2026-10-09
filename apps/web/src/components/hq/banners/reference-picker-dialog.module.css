@@ -1,0 +1,7 @@
+@layer components {
+/* UcBQ5：名前は12px、寸法は11px、2行の間は4px。 */
+.tile { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.tile:disabled { opacity: 0.5; }
+.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); font-weight: 600; line-height: normal; color: var(--color-ink); }
+.size { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro); font-variant-numeric: tabular-nums; line-height: normal; color: var(--color-ink-faint); }
+}
