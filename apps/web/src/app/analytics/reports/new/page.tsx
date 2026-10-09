@@ -311,8 +311,14 @@ function AnalyticsReportFormPage() {
   // なおすときは読み直すまで基準なし。作るときは初期値が基準。
   const [baseline, setBaseline] = useState<string | null>(editId ? null : NEW_BASELINE)
   useEffect(() => {
+    setName('週次まとめ'); setSections(['friends', 'reactions', 'routes', 'usage'])
+    setSavedAnalysisIds([]); setCadence('weekly'); setWeekday('1'); setMonthDay('1')
+    setSendTime('09:00'); setPeriodDays('7'); setStaffIds([]); setEmails([])
+    setDashboardEnabled(true); setEmailEnabled(false); setLineEnabled(false); setAlertsEnabled(true)
+    setAlertDrafts(defaultAlertDrafts(true)); setExtraAlertRules([])
+    setSavedOpen(false); setRecipientsOpen(false); setChannelsOpen(false)
     setBaseline(editId ? null : NEW_BASELINE)
-  }, [editId])
+  }, [selectedAccountId, editId])
 
   useEffect(() => {
     let active = true
