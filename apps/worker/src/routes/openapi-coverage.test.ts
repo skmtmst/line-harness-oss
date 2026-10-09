@@ -987,7 +987,6 @@ const ALLOWLIST = new Set<string>([
   'POST /api/liff/friend-add-intent',
   'POST /api/liff/link',
   'POST /api/liff/mileage/rewards/{id}/redeem',
-  'POST /api/liff/nen/consultations',
   'POST /api/liff/nen/health-logs',
   'POST /api/liff/nen/pets',
   'POST /api/liff/nen/pets/{id}/photo',
@@ -1184,7 +1183,6 @@ const ALLOWLIST = new Set<string>([
 
   // 機能「photo_review」の管理画面用API（OpenAPI未記載・順次記載）（24件）
   'GET /api/nen-members/care-flags',
-  'GET /api/nen-members/consultations',
   'GET /api/nen-members/friends/{friendId}',
   'GET /api/nen-members/overview',
   'GET /api/nen-members/photos',
