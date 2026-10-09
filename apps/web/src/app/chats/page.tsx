@@ -38,6 +38,7 @@ import { useAccount } from '@/contexts/account-context'
 import TemplatePicker from '@/components/chats/template-picker'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
+import FriendInfoSidebarBoundary from '@/components/chats/friend-info-sidebar-boundary'
 import ChatThreadWindow from '@/components/chats/chat-thread-window'
 import ChatSearchBar from '@/v8/inbox-search/chat-search-bar'
 import searchStyles from '@/v8/inbox-search/chat-search-bar.module.css'
@@ -4164,6 +4165,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 )
               })()
             ) : (
+            // 右の列が落ちても、会話と一覧は使えるままにする。
+            <FriendInfoSidebarBoundary resetKey={activeFriendId}>
             <FriendInfoSidebar
               friendId={activeFriendId}
               accountId={selectedAccountId ?? undefined}
@@ -4186,6 +4189,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   : undefined
               }
             />
+            </FriendInfoSidebarBoundary>
             )}
             </aside>
           </>
