@@ -669,7 +669,13 @@
   --color-layout-picker-selected: #e8f5ec;
   /* controls レーン：書き出しHTMLの線・成功・浮く色選びの値。 */
   --color-controls-swatch-line: #1d1d1f1f;
-  --shadow-controls-primary: 0 1px 2px #087a3e40, 0 1px 0 #ffffff26;
+  --shadow-controls-primary: var(--shadow-primary-action);
+  --shadow-primary-action: 0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08);
+  --color-primary-border: #06612f;
+  --radius-primary-action: 8px;
+  --tpl-folder-create-h: 32px;
+  --tpl-folder-create-pad: 0 12px;
+  --tpl-folder-create-space-col-h: 45px;
   --shadow-controls-toggle: 0 1px 2px #1d1d1f33;
   /* 表の行の下の線を行の内側に描く（線を含めて1行の高さ。data-table）。@theme に置くと CSS Modules だけが読む値は消えるので、ここ。 */
   --shadow-row-line: inset 0 -1px 0 var(--color-hairline);
@@ -2688,7 +2694,7 @@ select:not([multiple]):not(.appearance-none) {
   [data-theme="v8"] #main-content { margin-left: 0; border: 0; outline: 1px solid var(--color-board-line); outline-offset: -0.5px; }
 }
 
-[data-theme="v8"] { --color-status-warn-deep: #94600a; --shadow-primary-action: 0 1px 2px #087a3e40, 0 1px 0 #ffffff26; }
+[data-theme="v8"] { --color-status-warn-deep: #94600a; }
 [data-theme="v8"] aside[aria-label="フォルダ"] { box-shadow: none; }
 
 [data-theme="v8"] { --shadow-frozen-column: 6px 0 12px #1d1d1f14; --color-scroll-thumb: #1d1d1f40; --gradient-scroll-edge: linear-gradient(-90deg, #1d1d1f00 0%, #1d1d1f14 100%); }

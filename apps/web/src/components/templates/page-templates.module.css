@@ -50,7 +50,7 @@
 :global([data-theme='v8']) .folders:has(> [data-folder-fit]) { align-self: flex-start; }
 /* 型が組む畳んだ段（folderNav）。作るボタンは列の幅いっぱいにせず中身の幅。選ぶ欄は 1152 の板（Iffil・L7zA7C）の幅。 */
 :global([data-theme='v8']) .collapsedCreate { display: flex; flex-shrink: 0; }
-:global([data-theme='v8']) .collapsedCreate > * { width: auto; }
+:global([data-theme='v8']) .collapsedCreate > * { width: fit-content; height: var(--tpl-folder-create-h); min-height: 0; padding: var(--tpl-folder-create-pad); }
 :global([data-theme='v8']) .collapsedSelect { display: block; flex-shrink: 0; width: var(--tpl-narrow-folder-w); }
 :global([data-theme='v8']) .collapsedSelect > :global(*) { width: 100%; min-width: 0; }
 /* 道具を渡さない画面で、広い板に空の段を出さない。 */
@@ -215,6 +215,15 @@
 :global([data-theme='v8']) .steps { min-width: 0; }
 /* どの型でも手順は頭の最後の行（題と説明の下）。作る型は下で並びを決め直す。 */
 :global([data-theme='v8']) .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-head-gap); }
+/* B-151：列の先頭へ直接渡された作る操作も、FolderPanel と同じ形。 */
+:global([data-theme='v8']) .folders > :global(a):first-child,
+:global([data-theme='v8']) .folders > :global(button):first-child {
+  width: fit-content; max-width: 100%; align-self: flex-start;
+  height: var(--tpl-folder-create-h); min-height: 0; padding: var(--tpl-folder-create-pad);
+}
+:global([data-theme='v8']) .folders > :global([aria-hidden='true']):first-child {
+  height: var(--tpl-folder-create-space-col-h);
+}
 /* ★V8 フォルダの列：上の「作る」ボタンの下からフォルダの題まで18（apLqS フォルダの列：間2＋14＋2） */
 :global([data-theme='v8']) .folders > :global(a) + * , :global([data-theme='v8']) .folders > :global(button) + * { margin-top: 16px; }
 /* ★V8 作る型の頭の並び（q1xNMz）：題（右に操作）→ 説明 → 手順。 */
