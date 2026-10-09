@@ -51,7 +51,7 @@ export default function ProjectCard({
   return (
     <article
       data-design-node="iDZtt"
-      className="flex flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-card"
+      className="flex flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface"
     >
       <button
         type="button"

@@ -873,7 +873,7 @@ export default function TagsTab({
           hasNext={activeTagIndex >= 0 && activeTagIndex < visible.length - 1}
           onPrev={activeTagIndex > 0 ? () => setActiveTagId(visible[activeTagIndex - 1].id) : undefined}
           onNext={activeTagIndex >= 0 && activeTagIndex < visible.length - 1 ? () => setActiveTagId(visible[activeTagIndex + 1].id) : undefined}
-          footer={activeTag ? (
+          footer={activeTag && canEdit ? (
             <>
               <Button href={`/tags/edit?id=${activeTag.id}`}>編集する</Button>
               <Button href={`/tags/new?copy=${activeTag.id}`}>複製して作る</Button>

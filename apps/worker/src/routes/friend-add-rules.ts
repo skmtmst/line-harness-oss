@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import {
   archiveFriendAddRule,
   createFriendAddRuleDraft,
+  deleteFriendAddRuleFolder,
   ensureFriendAddFallbackRules,
   getFriendAddRule,
   getFriendByLineUserIdForAccount,
@@ -1086,14 +1087,37 @@ friendAddRules.patch('/api/friend-add-rules/folders/:id', requireRole('owner', '
     if (!folder) return c.json({ success: false, error: 'フォルダが見つかりません' }, 404);
     const name = body.name === undefined ? folder.name : body.name.trim();
     await c.env.DB.batch([
-      c.env.DB.prepare("UPDATE friend_add_rules SET folder_name=?,lock_version=lock_version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE line_account_id=? AND folder_name=(SELECT name FROM friend_add_rule_folders WHERE id=? AND line_account_id=?) AND folder_name<>?").bind(name, accountId, id, accountId, name),
       c.env.DB.prepare("UPDATE friend_add_rule_folders SET name=?,color=CASE WHEN ? THEN ? ELSE color END,updated_at=strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE id=? AND line_account_id=?").bind(name, body.color !== undefined ? 1 : 0, body.color ?? null, id, accountId),
+      c.env.DB.prepare("UPDATE friend_add_rules SET folder_name=?,lock_version=lock_version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE line_account_id=? AND folder_name=(SELECT name FROM friend_add_rule_folders WHERE id=? AND line_account_id=?) AND folder_name<>?").bind(name, accountId, id, accountId, name),
     ]);
     const updated = await c.env.DB.prepare('SELECT id,name,color FROM friend_add_rule_folders WHERE id=? AND line_account_id=?').bind(id, accountId).first();
     return c.json({ success: true, data: updated });
   } catch (error) {
     if (error instanceof Error && /unique/i.test(error.message)) return c.json({ success: false, error: '同じ名前のフォルダがあります' }, 409);
     return c.json({ success: false, error: 'フォルダを変更できませんでした' }, 500);
+  }
+});
+
+friendAddRules.delete('/api/friend-add-rules/folders/:id', requireRole('owner', 'admin'), async (c) => {
+  const text = await c.req.text();
+  let body: { accountId?: string } | null;
+  try { body = text.trim() ? JSON.parse(text) : null; }
+  catch { return c.json({ success: false, error: '入力を確認してください' }, 400); }
+  if (body !== null && (typeof body !== 'object' || Array.isArray(body) || (body.accountId !== undefined && typeof body.accountId !== 'string'))) {
+    return c.json({ success: false, error: '入力を確認してください' }, 400);
+  }
+  const accountId = accountIdFrom(c, body ?? undefined);
+  if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
+  try {
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    const id = c.req.param('id');
+    const result = await deleteFriendAddRuleFolder(c.env.DB, { lineAccountId: accountId, folderId: id });
+    if (result === 'not_found') return c.json({ success: false, error: 'フォルダが見つかりません' }, 404);
+    if (result === 'conflict') return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'フォルダが更新されました。読み直してください' }, 409);
+    return c.json({ success: true, data: { id, deleted: true } satisfies import('@line-crm/shared').FriendAddRuleFolderDeleteResult });
+  } catch (error) {
+    console.error('DELETE /api/friend-add-rules/folders/:id error:', error);
+    return c.json({ success: false, error: 'フォルダを削除できませんでした' }, 500);
   }
 });
 

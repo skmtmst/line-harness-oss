@@ -108,6 +108,16 @@ describe('V8 タグ タグの一覧', () => {
     expect(screen.queryAllByRole('button', { name: /^タグ「.+」の操作$/ })).toHaveLength(0)
   })
 
+  it.each(['staff', 'owner', 'admin'])('タグの詳細の編集・複製は権限で隠す（%s）', async (staffRole) => {
+    role.value = staffRole
+    await render(<TagsList fixture={fixture} />)
+    await act(async () => { fireEvent.click(container.querySelector('tbody tr')!) })
+    expect(screen.getByRole('dialog', { name: fixture.items[0].name })).toBeTruthy()
+    for (const name of ['編集する', '複製して作る']) {
+      expect(screen.queryByRole('link', { name }) !== null).toBe(staffRole !== 'staff')
+    }
+  })
+
   it('「よく使う絞り込み」に星を出さず、残った未使用の絞り込みは動く', async () => {
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelectorAll('tbody tr').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
@@ -125,6 +135,14 @@ describe('V8 タグ タグの一覧', () => {
     await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '対応マーク' })) })
     expect(container.querySelector('[data-design-node="vKDj5"]')).not.toBeNull()
     expect(screen.getByText('対応マークを読み込めませんでした')).toBeTruthy()
+  })
+
+  it('保存した検索のタブでは閲覧のみの作成リンクを隠し、検索の閲覧は保つ', async () => {
+    role.value = 'staff'
+    await render(<TagsList fixture={fixture} />)
+    await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '保存した検索' })) })
+    expect(screen.queryByRole('link', { name: '友だち一覧で条件を作る' })).toBeNull()
+    expect(screen.getByPlaceholderText('条件名で探す')).toBeTruthy()
   })
 
   it('連動は絵の書き方（本人+10・1.2倍 他1）', () => {

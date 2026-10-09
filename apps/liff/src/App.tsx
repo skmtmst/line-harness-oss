@@ -1,3 +1,4 @@
+import { liffActionFromUrl } from '@line-crm/shared';
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import LoadingView from './components/LoadingView.js';
@@ -31,6 +32,14 @@ export default function App() {
         <EventWaitlistOffer token={waitlistToken} />
       </Suspense>
     );
+  }
+
+  const action = liffActionFromUrl(`https://liff.line.me/entry/${location.search}`);
+  if (location.pathname === '/' && action) {
+    const pathname = action.kind === 'visit_stamp' ? '/visit-stamps'
+      : action.kind === 'form' ? `/forms/${encodeURIComponent(action.formId)}`
+      : action.kind === 'booking_history' ? '/booking/history' : '/booking';
+    return <Navigate to={{ pathname, search: location.search }} replace />;
   }
 
   return (

@@ -1,3 +1,4 @@
+import { folderUpgradePaths } from './folder-upgrade-openapi.js';
 import {auditstepsPaths} from './auditsteps-openapi.js';
 import { tabCountPaths } from './tab-counts-openapi.js';
 import { audit3Paths } from './audit3-openapi.js';
@@ -401,6 +402,7 @@ const spec = {
     },
   },
   paths: {
+    ...folderUpgradePaths,
     ...tabCountPaths,
     ...tenantCompanyContactPaths,
     ...chatAttachmentPaths,
