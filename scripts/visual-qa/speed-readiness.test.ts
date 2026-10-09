@@ -65,7 +65,7 @@ describe('WEB236 速度検査の成立条件', () => {
   it.each(['error', 'timeout'])('mainが出ても読込%sなら速度値にしない', async state => {
     const page = {
       addInitScript: async () => {},
-      goto: async (_url: string, options: { waitUntil: string }) => { expect(options.waitUntil).toBe('domcontentloaded') },
+      goto: async (_url: string, options: { waitUntil: string }) => { expect(options.waitUntil).toBe('networkidle') },
       locator: () => ({ first: () => ({ waitFor: async () => {}, count: async () => 0 }) }),
       waitForFunction: async () => { if (state === 'timeout') throw new Error('timeout'); return { jsonValue: async () => 'error' } },
       evaluate: async (fn: () => unknown) => String(fn).includes('jsBytes') ? { jsBytes: 0, longTaskMs: 0 } : null,

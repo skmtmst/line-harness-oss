@@ -14,4 +14,3 @@ export function screenReady({ route, expectedRows = null }) {
   }
   return true
 }
-
