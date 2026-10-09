@@ -524,7 +524,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             previewAlt={form.mediaFilename ?? '投稿の画像'}
             value={form.mediaSourceUrl}
             accept={mediaUpload?.accept}
-            limitText="4:3推奨・1枚まで"
+            help="4:3推奨・1枚まで"
             readOnly={!editable}
             disabled={busy !== null}
             busy={upload.busy}

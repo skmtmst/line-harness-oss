@@ -222,7 +222,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
               value={filePreview}
               fit="contain"
               accept={BANNER_UPLOAD_ACCEPT.join(',')}
-              limitText={`1ファイル${BANNER_UPLOAD_MAX_BYTES / 1024 / 1024}メガバイト以内・PNG・JPEG・WebP`}
+              help={`1ファイル${BANNER_UPLOAD_MAX_BYTES / 1024 / 1024}メガバイト以内・PNG・JPEG・WebP`}
               busy={uploading}
               onFile={(next) => pickFile(next)}
               onRemove={() => setFile(null)}

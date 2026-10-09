@@ -634,7 +634,7 @@ function CustomerNotificationEditor({
               previewAlt="カード画像"
               value={setting.imageUrl || null}
               accept="image/jpeg,image/png"
-              limitText="1ファイル10メガバイト以内・JPEG・PNG"
+
               maxBytes={10 * 1024 * 1024}
               upload={uploadImageFile}
               onChange={(url) => onChange({ imageUrl: url ?? '' })}

@@ -224,7 +224,7 @@ export default function ColumnNew() {
             previewAlt="コラムの画像"
             value={draft.imageUrl || null}
             accept="image/jpeg,image/png"
-            limitText="1ファイル10メガバイト以内・JPEG・PNG"
+
             maxBytes={10 * 1024 * 1024}
             error={errorFor('imageUrl') || undefined}
             upload={uploadImageFile}

@@ -241,7 +241,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                     size="compact"
                     title="画像を添える"
                     accept="image/png,image/jpeg"
-                    limitText={`PNG・JPEG、1枚 5MB まで（${SUPPORT_ATTACHMENT_MAX}枚まで）`}
+                    maxBytes={5 * 1024 * 1024} help={`${SUPPORT_ATTACHMENT_MAX}枚まで`}
                     disabled={sending}
                     onFile={(file) => void addFile(file)}
                   />

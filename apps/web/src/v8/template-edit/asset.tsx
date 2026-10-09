@@ -471,7 +471,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     previewAlt="クーポンの画像"
                     value={imageSet ? imageUrl.trim() : null}
                     accept="image/jpeg,image/png"
-                    limitText="任意・1029 × 1029px"
+                    help="1029 × 1029px"
                     upload={!host && selectedAccountId ? async (file, progress) => {
                       const result = await uploadToMediaLibrary(file, selectedAccountId, 'image', progress)
                       setPickedMedia(result.item)

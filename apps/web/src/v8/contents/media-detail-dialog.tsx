@@ -468,7 +468,7 @@ export default function MediaDetailDialog({
                 kind={item.kind}
                 title={`新しい${item.kind === 'image' ? '画像' : item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}を追加`}
                 accept={mediaAcceptForKind(item.kind)}
-                limitText="いまのメディアと同じ種類"
+                help="いまのメディアと同じ種類"
                 busy={versionPhase === 'uploading'}
                 progress={versionPhase === 'uploading' ? versionProgress : undefined}
                 onFile={(file) => chooseVersionFile(file)}

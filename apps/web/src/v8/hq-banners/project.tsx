@@ -19,6 +19,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import MediaSlot from '@/components/shared/media-slot'
 import { RowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -526,18 +527,9 @@ function ProjectInner() {
         { id: 'distribute-project', label: 'このプロジェクトの画像を配る', icon: <Send size={15} aria-hidden="true" />, emphasis: true,
           onSelect: () => { setSelectedImages(images.map((image) => image.id)); openDistribution() } },
       ]} /> : null}
-      <Button onClick={() => fileRef.current?.click()} disabled={busy || archived || uploading} busy={uploading} busyLabel="取り込み中…">
-        <Upload aria-hidden="true" className={styles.icon} />画像を取り込む
-      </Button>
-      <input
-        ref={fileRef}
-        type="file"
-        accept={BANNER_UPLOAD_ACCEPT.join(',')}
-        className={styles.hiddenInput}
-        tabIndex={-1}
-        aria-hidden="true"
-        onChange={(event) => { void takeIn(event.target.files?.[0]); event.target.value = '' }}
-      />
+      <MediaSlot title="画像を取り込む" accept={BANNER_UPLOAD_ACCEPT.join(',')} fileInputRef={fileRef} busy={uploading} disabled={busy || archived}
+        renderTrigger={(choose) => <Button onClick={choose} disabled={busy || archived || uploading} busy={uploading} busyLabel="取り込み中…"><Upload aria-hidden="true" className={styles.icon} />画像を取り込む</Button>}
+        onFile={(file) => { void takeIn(file) }} />
       <Button onClick={() => void patchProject('お気に入り', { isFavorite: !project.isFavorite })} disabled={busy}>
         <Star aria-hidden="true" className={project.isFavorite ? styles.starOn : styles.icon} />{project.isFavorite ? 'お気に入りから外す' : 'お気に入り'}
       </Button>

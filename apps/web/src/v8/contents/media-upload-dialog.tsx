@@ -9,7 +9,8 @@ import type { Folder } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
-import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
+import { AttachmentRow } from '@/components/shared/file-drop'
+import MediaSlot from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
 import Progress from '@/components/shared/progress'
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
@@ -208,13 +209,11 @@ export default function MediaUploadDialog({
         </div>
   )}>{}
         <div className="space-y-4 p-6">
-        <FileDropzone
+        <MediaSlot kind="file"
           title="ここにファイルをドラッグ、または押して選ぶ"
-          hint="いちどに20件まで"
+          help="いちどに20件まで"
           accept={MEDIA_ACCEPT}
-          multiple
           busy={busy}
-          busyTitle="登録しています…"
           onFiles={stage}
         />
 

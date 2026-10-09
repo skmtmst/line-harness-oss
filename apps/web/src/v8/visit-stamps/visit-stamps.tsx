@@ -431,7 +431,7 @@ function VisitStampsScreen() {
                         previewAlt="背景画像"
                         value={settings.backgroundImageUrl || null}
                         accept="image/jpeg,image/png"
-                        limitText="JPG・PNG　3MBまで・任意"
+                        maxBytes={3 * 1024 * 1024}
                         busy={imageBusy}
                         readOnly={ro}
                         onFile={(file) => void uploadImage(file)}

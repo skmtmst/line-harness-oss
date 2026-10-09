@@ -2098,7 +2098,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               previewAlt={image ? `選択中の画像: ${image.name}` : undefined}
               value={image?.src ?? null}
               accept="image/png,image/jpeg"
-              limitText="PNG・JPEG・1MB まで"
+              maxBytes={1 * 1024 * 1024}
               aspectRatio={`${dims.width} / ${dims.height}`}
               disabled={!canPick || busy}
               removable={Boolean(image?.removable)}
@@ -2149,7 +2149,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           previewAlt={image ? `タブ${index + 1}の画像: ${image.name}` : undefined}
           value={image?.src ?? null}
           accept="image/png,image/jpeg"
-          limitText="1MB まで"
+          maxBytes={1 * 1024 * 1024}
           aspectRatio={`${dims.width} / ${dims.height}`}
           disabled={!canPick}
           removable={Boolean(image?.removable)}
