@@ -76,3 +76,29 @@ describe('たまる決めごとの編集（W156）', () => {
     expect(input?.value).toBe('Bのルール')
   })
 })
+
+describe('B-139 欄で知らせて移る', () => {
+  it('ルール名を消し、付与マイルを0にして保存すると、口を呼ばず2つの欄が赤くなり、ルール名の欄へ移る', async () => {
+    const { api } = await import('@/lib/api')
+    const saveDraft = vi.spyOn(api.mileage, 'saveEarningRuleDraft')
+    await view.render(<V8EarningRuleEdit />)
+    await settle()
+    fixture.pending[fixture.pending.length - 1].resolve(listOf(rule('rule-a', 'Aのルール')))
+    await settle()
+    const { fireEvent } = await import('@testing-library/react')
+    const name = view.host.querySelector<HTMLInputElement>('input[aria-label="ルール名"]')!
+    const amount = view.host.querySelector<HTMLInputElement>('input[aria-label="付与マイル"]')!
+    fireEvent.change(name, { target: { value: '' } })
+    fireEvent.change(amount, { target: { value: '0' } })
+    await settle()
+    const save = Array.from(view.host.querySelectorAll('button')).find((b) => b.textContent?.includes('下書きを保存'))!
+    fireEvent.click(save)
+    await settle()
+    await new Promise((r) => requestAnimationFrame(r))
+    expect(saveDraft).not.toHaveBeenCalled()
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(view.host.querySelector('#er-name-error')?.textContent).toBe('ルール名を入力してください')
+    expect(view.host.querySelector('#er-amount-error')?.textContent).toBe('付与マイルは1以上の整数で入力してください')
+    expect(document.activeElement).toBe(name)
+  })
+})
