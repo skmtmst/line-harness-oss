@@ -59,6 +59,7 @@
 作成だけ済んだあとのやり直しは作り直さない）、公開（使用先があれば確認の窓 cuR8I・409 は止める）、押せる回数、離れる確認。組み立てと保存は carousel-core の写し。
 - 受け付ける URL：`/templates/carousel`・`?id=`・`?visual=1`（見本の3枚で開く。撮影用。見本は絵の3枚にした）
 - ボタンの「押したら」（絵 JkLOF・2026-10-08）：URLを開く（uri）／テキストを送る（message・300文字まで）／回答フォームを開く・予約ページを開く・予約履歴を開く（uri：`https://liff.line.me/<アカウントの LIFF ID>/?page=form&id=<フォーム>`・`?page=salon-book`・`?page=salon-book&view=history`）／動きを実行する（postback・店だけ）。
+- 2026-10-09（B-129・YPzmo）：押したらは共通の欄 `components/shared/tap-action-field`。店は6つ（URL・テキスト・予約・回答フォーム・予約履歴・来店スタンプ）＋動きを実行する。LIFF が無くても6つとも選べ、LIFF の要る動きは中身の欄に案内（保存の前にも止める）。予約は予約メニュー（任意 `&menu=<ID>`）、来店スタンプは `?page=visit-stamps`（任意 `&card=<ID>`）。どちらも仮の形で、URL の組み立ては `lib/tap-actions.ts` の1か所。統括は今のまま URL・テキストだけ。
   LIFF のページは保存の時点でアカウントの LIFF ID を入れて作る（`{{liff_id}}` は一斉配信でしか置き換わらず、シナリオ・自動応答・受信箱などでは置き換わらないため）。LIFF の無いアカウントでは3つを出さず、理由を1行で書く。
   読み込みは uri の URL から種類に戻す（LIFF のページでなければ URL のまま）。古い保存（uri・postback）はそのまま読める。回答フォームの候補は `api.forms.list(アカウント)` の受け付け中のもの。
   統括（host）は URLを開く・テキストを送るだけ（配った先で LIFF ID・回答フォームの ID を付け替える口がまだ無い）。

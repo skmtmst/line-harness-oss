@@ -17,7 +17,7 @@
 import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CalendarCheck, CalendarPlus, ChevronDown, ClipboardList, Copy, ExternalLink, ImageIcon, MessageSquare, Plus, Send, Trash2, TriangleAlert, Zap, type LucideIcon } from 'lucide-react'
+import { ChevronDown, Copy, ImageIcon, Plus, Send, Trash2, TriangleAlert, Zap } from 'lucide-react'
 import type { Folder, MediaItem, MessageTemplateMediaDefinition } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
@@ -30,7 +30,9 @@ import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+import TapActionField from '@/components/shared/tap-action-field'
+import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
+import { TAP_ACTION_KINDS, isTapActionKind, type TapActionKind } from '@/lib/tap-actions'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -46,7 +48,7 @@ import te from '../template-edit/edit.module.css'
 import {
   MAX_ACTIONS, MAX_COLUMNS, TEXT_MAX_WITH_IMAGE, TEXT_MAX_WITHOUT_IMAGE, TITLE_MAX,
   MESSAGE_TEXT_MAX, buildCarouselContent, carouselChoiceProblems, carouselSnapshot, choiceFromUri, emptyChoice, emptyPanel,
-  needsLiff, saveCarousel, visualPanels, type ChoiceKind, type Panel,
+  saveCarousel, visualPanels, type ChoiceKind, type Panel,
 } from './carousel-core'
 import styles from './question-new.module.css'
 import own from './carousel.module.css'
@@ -111,31 +113,23 @@ function hostCarouselInitial(host: TemplateEditHost | undefined) {
   }
 }
 
-/** 「押したら」の候補（絵 JkLOF の順）。店だけのもの・LIFF が要るものは出し分ける。 */
-const CHOICE_KINDS: Array<{ value: ChoiceKind; label: string; icon: LucideIcon }> = [
-  { value: 'uri', label: 'URLを開く', icon: ExternalLink },
-  { value: 'message', label: 'テキストを送る', icon: MessageSquare },
-  { value: 'form', label: '回答フォームを開く', icon: ClipboardList },
-  { value: 'booking', label: '予約ページを開く', icon: CalendarPlus },
-  { value: 'booking_history', label: '予約履歴を開く', icon: CalendarCheck },
-  { value: 'action', label: '動きを実行する', icon: Zap },
-]
-
-/**
- * 出す「押したら」。統括は URLを開く・テキストを送るだけ（配った先の LIFF ID・回答フォームに付け替えられないため）。
- * 店は LIFF が無ければ回答フォーム・予約・予約履歴を出さない（出す＝使える）。いま選んでいる種類は消さない（読み込んだ古い保存を壊さない）。
+/*
+ * 「押したら」は共通の欄（TapActionField・YPzmo）。店は6つ＋「動きを実行する」、LIFF が無くても6つとも出し、
+ * LIFF の要る動きを選ぶと中身の欄に案内が出る（保存の前にも carouselChoiceProblems で止める）。
+ * 統括は URL を開く・テキストを送るだけ（配った先で LIFF ID・回答フォームの ID を付け替える口がまだ無いため。
+ * 口ができたら HOST_CHOICE_KINDS を6つにする）。
  */
-export function choiceKindOptions(opts: { host: boolean; hasLiff: boolean; current?: ChoiceKind }): Array<{ value: ChoiceKind; label: string; icon: LucideIcon }> {
-  return CHOICE_KINDS.filter((item) => {
-    if (item.value === opts.current) return true
-    if (opts.host) return item.value === 'uri' || item.value === 'message'
-    if (needsLiff(item.value)) return opts.hasLiff
-    return true
-  })
+const HOST_CHOICE_KINDS: readonly TapActionKind[] = ['uri', 'message']
+const ACTION_EXTRA_KIND = [{ value: 'action', label: '動きを実行する', description: 'タグを付ける・シナリオを始めるなど', icon: Zap }] as const
+
+/** 出す「押したら」（並びは絵の順・いま選んでいる種類は消さない）。 */
+export function choiceKindOptions(opts: { host: boolean; current?: ChoiceKind }): ChoiceKind[] {
+  const kinds: ChoiceKind[] = opts.host ? [...HOST_CHOICE_KINDS] : [...TAP_ACTION_KINDS, 'action']
+  return opts.current && !kinds.includes(opts.current) ? [...kinds, opts.current] : kinds
 }
 
 /** 統括で保存できない「押したら」。 */
-const HOST_ALLOWED: ChoiceKind[] = ['uri', 'message']
+const HOST_ALLOWED: readonly ChoiceKind[] = HOST_CHOICE_KINDS
 
 function Carousel({ host }: { host?: TemplateEditHost }) {
   const router = useRouter()
@@ -181,16 +175,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const folderAccountId = id ? templateAccountId : selectedAccountId
   /* 回答フォーム・予約・予約履歴の URL に入れる LIFF ID（テンプレートのアカウントのもの）。統括は使わない。 */
   const liffId = host ? null : (accounts.find((account) => account.id === folderAccountId)?.liffId ?? null) || null
-  const [forms, setForms] = useState<Array<{ id: string; name: string; isActive: boolean }>>([])
-  useEffect(() => {
-    setForms([])
-    if (!folderAccountId || host || !liffId) return
-    let cancelled = false
-    void api.forms.list(folderAccountId).then((res) => {
-      if (!cancelled && res.success) setForms(res.data)
-    }).catch(() => {})
-    return () => { cancelled = true }
-  }, [folderAccountId, host, liffId])
+  /* 押したらの中身で選ぶ回答フォーム・予約メニュー・スタンプカード（店だけ）。 */
+  const tapSources = useTapActionSources(host ? null : folderAccountId)
   useEffect(() => {
     setFolders([])
     if (!folderAccountId || host) return
@@ -326,17 +312,6 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   }
   const onSaveDraft = async () => { if (host) { hostSave(false); return } if (await saveNow()) { disarm(); router.push('/templates') } }
   const onPublish = async () => { if (host) { hostSave(true); return } const savedId = await saveNow(); if (savedId) await publishSaved(savedId) }
-
-  /* 回答フォームの候補：受け付け中のフォーム。選んであるのが一覧に無い・止めてあるときも消さずに出す。 */
-  const formOptions = (current: string) => {
-    const active = forms.filter((form) => form.isActive)
-    const options = [{ value: '', label: '回答フォームを選ぶ', disabled: true }, ...active.map((form) => ({ value: form.id, label: form.name }))]
-    if (current && !active.some((form) => form.id === current)) {
-      const stopped = forms.find((form) => form.id === current)
-      options.push({ value: current, label: stopped ? `${stopped.name}（受け付けを止めています）` : '見つからない回答フォーム' })
-    }
-    return options
-  }
 
   const panel = panels[selected] ?? panels[0]
   const selectedIndex = panels[selected] ? selected : 0
@@ -537,25 +512,31 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   return (
                     <div key={ai} className={own.buttonRow}>
                       <input className={`${styles.input} ${own.colLabel}`} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} />
-                      <span className={own.colKind}>
-                        <Select size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`} value={action.kind} onChange={(value) => setAction({ kind: value as ChoiceKind })} options={choiceKindOptions({ host: Boolean(host), hasLiff: Boolean(liffId), current: action.kind }).map(({ value, label, icon: Icon }) => ({ value, label, leading: <Icon className={own.kindIcon} /> }))} />
-                      </span>
-                      {action.kind === 'uri' ? (
-                        <input className={`${styles.input} ${own.colBody}`} type="url" value={action.uri} placeholder="https://example.com" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}のURL`} onChange={(event) => setAction({ uri: event.target.value })} />
-                      ) : action.kind === 'message' ? (
-                        <input className={`${styles.input} ${own.colBody}`} value={action.text} placeholder={`押した人が送る文（${MESSAGE_TEXT_MAX}文字まで）`} aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の送る文`} aria-invalid={[...action.text].length > MESSAGE_TEXT_MAX || undefined} title={action.text || undefined} onChange={(event) => setAction({ text: event.target.value })} />
-                      ) : action.kind === 'form' ? (
-                        <span className={own.colBody}>
-                          <Select size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の回答フォーム`} value={action.formId} onChange={(value) => setAction({ formId: value })} options={formOptions(action.formId)} />
-                        </span>
-                      ) : action.kind === 'booking' || action.kind === 'booking_history' ? (
-                        <span className={`${own.colBody} ${own.fixedBody}`}>{action.kind === 'booking' ? 'このアカウントの予約ページを開きます' : 'このアカウントの予約履歴を開きます'}</span>
-                      ) : (
-                        <button type="button" className={`${styles.pick} ${own.colBody}`} onClick={() => setActionsFor(ai)} title="押されたときの動きを決める">
-                          <span className={styles.pickText}>{inlineActionsText(action.actions, actionOptions.tags)}</span>
-                          <ChevronDown className={styles.pickIcon} aria-hidden="true" />
-                        </button>
-                      )}
+                      <TapActionField
+                        className={own.colTap}
+                        name={`カード${selectedIndex + 1}のボタン${ai + 1}`}
+                        kindLabel={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`}
+                        value={{ kind: action.kind, uri: action.uri, text: action.text, refId: action.formId }}
+                        onChange={(patch) => setAction({
+                          ...(patch.kind !== undefined ? { kind: patch.kind as ChoiceKind } : {}),
+                          ...(patch.uri !== undefined ? { uri: patch.uri } : {}),
+                          ...(patch.text !== undefined ? { text: patch.text } : {}),
+                          ...(patch.refId !== undefined ? { formId: patch.refId } : {}),
+                        })}
+                        kinds={choiceKindOptions({ host: Boolean(host), current: action.kind }).filter(isTapActionKind)}
+                        extraKinds={host ? [] : ACTION_EXTRA_KIND}
+                        renderExtraBody={() => (
+                          <button type="button" className={`${styles.pick} ${own.colBody}`} onClick={() => setActionsFor(ai)} title="押されたときの動きを決める">
+                            <span className={styles.pickText}>{inlineActionsText(action.actions, actionOptions.tags)}</span>
+                            <ChevronDown className={styles.pickIcon} aria-hidden="true" />
+                          </button>
+                        )}
+                        scope={host ? 'hq' : 'shop'}
+                        hasLiff={Boolean(liffId)}
+                        liffSettingsHref={folderAccountId ? `/accounts/detail?id=${encodeURIComponent(folderAccountId)}` : '/accounts'}
+                        sources={tapSources}
+                        textMax={MESSAGE_TEXT_MAX}
+                      />
                       {panel.actions.length > 1 ? (
                         <button type="button" className={own.iconButton} aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} title="このボタンを外す" onClick={() => update(selectedIndex, { actions: panel.actions.filter((_, j) => j !== ai) })}>
                           <Trash2 className={own.icon} aria-hidden="true" />
@@ -564,9 +545,6 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                     </div>
                   )
                 })}
-                {!host && !liffId && !loading ? (
-                  <p className={own.liffNote}>回答フォーム・予約ページ・予約履歴は、このアカウントに LIFF を登録すると選べます。</p>
-                ) : null}
                 <div className={own.toolRow}>
                   <Button type="button" variant="text" disabled={panel.actions.length >= MAX_ACTIONS} onClick={() => update(selectedIndex, { actions: [...panel.actions, emptyChoice()] })}><Plus size={15} aria-hidden="true" />ボタンを足す</Button>
                   <span className={own.spacer} />

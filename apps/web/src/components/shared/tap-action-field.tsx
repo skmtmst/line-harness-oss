@@ -56,6 +56,8 @@ export interface TapActionSourceItem {
   name: string
   /** 名前の横の小さな補足（「10個で1杯サービス」など）。 */
   note?: string
+  /** 新しくは選べない（受け付けを止めた回答フォームなど）。選んであるときは名前と補足を出す。 */
+  disabled?: boolean
 }
 
 export type TapActionSources = Partial<Record<'form' | 'booking' | 'visit_stamp', TapActionSourceItem[]>>
@@ -218,7 +220,7 @@ export function TapTargetPicker({ noun, required, emptyLabel, items, initialId, 
   const listId = useId()
   const [chosen, setChosen] = useState(initialId)
   const [query, setQuery] = useState('')
-  const rows = (items ?? []).filter((item) => item.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+  const rows = (items ?? []).filter((item) => !item.disabled || item.id === initialId).filter((item) => item.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
   const row = (id: string, label: string, note?: string) => (
     <li key={id || '__none__'}>
       <button type="button" className={styles.option} aria-pressed={chosen === id} onClick={() => setChosen(id)} onDoubleClick={() => onConfirm(id)}>
