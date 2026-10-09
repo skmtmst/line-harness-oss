@@ -287,7 +287,7 @@ export default function FieldEditor({
           <p className={styles.sideNote}>{`「${FIELD_TYPE_WORDS.select}」「${FIELD_TYPE_WORDS.multi_select}」のときは選択肢を並べます。`}</p>
           <div className={styles.optionStack}>
             {optionRows.map((value, index) => (
-              <Field label="選択肢"><TextField
+              <Field key={index} label="選択肢"><TextField
                   ref={index === 0 ? (element) => { validationRefs.current.options = element } : undefined}
                   invalid={index === 0 && validationTarget === 'options' && Boolean(validationError)}
                   aria-describedby={index === 0 && validationTarget === 'options' && validationError ? 'ff-error-options' : undefined}
