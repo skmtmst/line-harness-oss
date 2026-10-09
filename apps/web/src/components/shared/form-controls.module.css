@@ -142,3 +142,6 @@
 [data-theme='v8'] .field[data-spacing='section'] { gap: var(--tpl-section-gap); }
 [data-theme='v8'] .field[data-field-size='compact'] .label { font-size: var(--tpl-rest3-ec-small); line-height: var(--tpl-rest3-ec-label-lh); }
 [data-theme='v8'] .field[data-field-size='compact'] :is(.note, .error) { margin-top: 0; font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
+
+/* B-152・仕上げ1：ラベルと欄 */
+[data-theme='v8'] .labelRow { margin-bottom: var(--polish-space-row); }

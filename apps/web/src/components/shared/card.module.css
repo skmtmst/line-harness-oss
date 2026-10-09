@@ -177,3 +177,9 @@
 [data-theme='v8'] .paddingCompact { padding: var(--tpl-nc-side-pad); }
 [data-theme='v8'] .spacingTight { gap: var(--tpl-nc-field-gap); }
 [data-theme='v8'] .spacingControls { gap: var(--tpl-toolbar-gap); }
+
+/* B-152・仕上げ1 */
+[data-theme='v8'] .paddingDefault, [data-theme='v8'] .paddingCompact { padding: var(--polish-space-card); }
+[data-theme='v8'] .paddingRoomy, [data-theme='v8'] .paddingSpacious { padding: var(--polish-space-section); }
+[data-theme='v8'] .header { padding-inline: var(--polish-space-card); gap: var(--polish-space-field); }
+[data-theme='v8'] .gapTight { gap: var(--polish-space-row); }
