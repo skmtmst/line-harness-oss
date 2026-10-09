@@ -56,6 +56,9 @@
 }
 .fieldInput { height: var(--tpl-chip-h); }
 .fieldArea { padding-block: var(--tpl-body-gap); resize: vertical; }
+/* 保存で落ちた欄（B-139）。枠を危険の色にする。 */
+.fieldInput[aria-invalid='true'],
+.fieldArea[aria-invalid='true'] { outline-color: var(--color-danger); }
 .fieldHint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-text-sm-lh); }
 .fieldError { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
 .selectBox { min-width: 0; }
