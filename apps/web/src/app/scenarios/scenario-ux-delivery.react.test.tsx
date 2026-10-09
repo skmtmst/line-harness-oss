@@ -48,6 +48,12 @@ beforeEach(() => {
     if (url.pathname === '/api/scenarios' || url.pathname === '/api/scenarios/') {
       return response({ success: true, data: { items: listItems, total: listItems.length, limit: 20, sort: [] } })
     }
+    if (url.pathname.startsWith('/api/scenarios/') && init?.method === 'PUT') {
+      const id = url.pathname.split('/').pop()
+      const patch = JSON.parse(String(init.body))
+      listItems = listItems.map((row: any) => row.id === id ? { ...row, ...patch } : row)
+      return response({ success: true, data: {} })
+    }
     if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
     if (url.pathname === '/api/list-stats') return response({ success: false, error: 'not needed' })
     if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'owner' } })
@@ -115,6 +121,12 @@ test('読み込み中は出来上がりと同じ形の骨組みを出す', async
     calls.push({ method: init?.method ?? 'GET', path: url.pathname })
     if (url.pathname === '/api/scenarios' || url.pathname === '/api/scenarios/') {
       return new Promise(() => undefined) as unknown as Response
+    }
+    if (url.pathname.startsWith('/api/scenarios/') && init?.method === 'PUT') {
+      const id = url.pathname.split('/').pop()
+      const patch = JSON.parse(String(init.body))
+      listItems = listItems.map((row: any) => row.id === id ? { ...row, ...patch } : row)
+      return response({ success: true, data: {} })
     }
     if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
     return response({ success: false, error: 'not needed' })
