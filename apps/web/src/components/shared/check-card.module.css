@@ -167,7 +167,7 @@
 [data-theme='v8'] .card { padding: var(--polish-space-card); gap: var(--polish-space-field); }
 
 /* B-152②：役割ごとの文字の段。 */
-[data-theme='v8'] .title, html[data-theme='v8'] .card:is(.compact, .row) .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
+[data-theme='v8'] .title, html[data-theme='v8'] .card:is(.compact, .row) .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
 [data-theme='v8'] .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); }
 
 /* B-152・仕上げ7：誤りのある欄もキーボードの輪は青。 */
