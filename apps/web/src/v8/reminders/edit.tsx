@@ -548,7 +548,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     : null
 
   return (
-    <>
+    <fieldset disabled={busy} className="contents">
       {v8stage === 'basics' ? (
         <BasicsStageV8
           frame={frame}
@@ -689,7 +689,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
           )
         })()}
       </ConfirmDialog>
-    </>
+    </fieldset>
   )
 }
 

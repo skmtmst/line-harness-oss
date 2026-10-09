@@ -17,6 +17,7 @@ const draftStore = vi.hoisted(() => ({
   draft: null as null | Record<string, unknown>,
   conflict: false,
   saved: [] as Array<Record<string, unknown>>,
+  wait: null as Promise<void> | null,
 }))
 
 vi.mock('next/link', () => ({
@@ -57,6 +58,7 @@ vi.mock('@/lib/api', () => {
       reminders: {
         getDraft: vi.fn(async () => ({ success: true, data: draftStore.draft })),
         saveDraft: vi.fn(async (_id: string, settings: Record<string, unknown>) => {
+          if (draftStore.wait) await draftStore.wait
           if (draftStore.conflict) throw new ApiError(409, 'VERSION_CONFLICT')
           draftStore.saved.push(settings)
           draftStore.draft = { ...(draftStore.draft ?? {}), settings, versionId: 'v2', updatedAt: '2026-10-01T00:00:00Z' }
@@ -295,4 +297,15 @@ describe('V8 リマインダの下書き自動保存（一斉配信と同じ形�
     await wait(5000)
     expect(draftStore.saved).toHaveLength(0)
   })
+})
+
+it('WEB-087：手動保存中は追加編集を止める', async () => {
+  await render('basics')
+  let release!: () => void
+  draftStore.wait = new Promise(resolve => { release = resolve })
+  const name = host.querySelector('#v8-reminder-name') as HTMLInputElement
+  await act(async () => { const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!; setter.call(name, '保存する名前'); name.dispatchEvent(new Event('input', { bubbles: true })) })
+  await act(async () => buttonByText('下書きを保存')!.click())
+  expect(name.closest('fieldset')?.disabled).toBe(true)
+  await act(async () => release()); draftStore.wait = null
 })
