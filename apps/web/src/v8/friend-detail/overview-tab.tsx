@@ -109,7 +109,7 @@ export default function OverviewTab({
           />
           <dl className={styles.kvList}>
             <Kv label="本名">{realName || <span className={styles.faint}>未登録</span>}</Kv>
-            <Kv label="システム表示名">{friend.displayName || <span className={styles.faint}>未登録</span>}</Kv>
+            <Kv label="システム表示名">{friend.systemDisplayName || <span className={styles.faint}>未登録</span>}</Kv>
           </dl>
         </section>
 
