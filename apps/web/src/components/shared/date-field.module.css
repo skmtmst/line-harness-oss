@@ -307,4 +307,6 @@
   cursor: not-allowed;
   opacity: 0.4;
 }
+[data-theme='v8'] .field[data-size='compact'] { height: 36px; }
+
 }

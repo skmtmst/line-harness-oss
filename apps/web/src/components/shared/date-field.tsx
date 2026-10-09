@@ -24,6 +24,7 @@ export default function DateField({
   max,
   disabled = false,
   invalid = false,
+  size = 'standard',
   placeholder = '日付を選ぶ',
   id,
   name,
@@ -38,6 +39,7 @@ export default function DateField({
   max?: string
   disabled?: boolean
   invalid?: boolean
+  size?: 'standard' | 'compact'
   placeholder?: string
   id?: string
   name?: string
@@ -153,6 +155,7 @@ export default function DateField({
         id={fieldId}
         type="button"
         className={styles.field}
+        data-size={size}
         disabled={disabled}
         data-invalid={invalid || undefined}
         // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。

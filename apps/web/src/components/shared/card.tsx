@@ -3,9 +3,11 @@ import styles from './card.module.css'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   children: ReactNode
+  frame?: 'raised' | 'inset'
   layout?: 'block' | 'vertical'
   overflow?: 'visible' | 'hidden'
-  padding?: 'none' | 'default' | 'roomy' | 'spacious'
+  padding?: 'none' | 'compact' | 'default' | 'roomy' | 'spacious'
+  corner?: 'card' | 'segment'
   /** V8 の入力の段・右の箱・一覧の小窓。既定のカードは変えない。 */
   variant?: 'default' | 'form' | 'aside' | 'panel'
 }
@@ -14,17 +16,22 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
 export default function Card({
   children,
   className,
+  frame = 'raised',
   layout = 'block',
   overflow = 'visible',
   padding = 'none',
+  corner = 'card',
   variant = 'default',
   ...props
 }: CardProps) {
   const classes = [
     styles.card,
+    corner === 'segment' ? styles.segment : null,
+    frame === 'inset' ? styles.inset : null,
     variant !== 'default' ? styles[variant] : null,
     layout === 'vertical' ? styles.vertical : null,
     overflow === 'hidden' ? styles.overflowHidden : null,
+    padding === 'compact' ? styles.paddingCompact : null,
     padding === 'default' ? styles.paddingDefault : null,
     padding === 'roomy' ? styles.paddingRoomy : null,
     padding === 'spacious' ? styles.paddingSpacious : null,

@@ -48,6 +48,8 @@ export function Field({
   htmlFor,
   required,
   optional,
+  labelHidden = false,
+  labelSize = 'standard',
   note,
   error,
   help,
@@ -61,6 +63,9 @@ export function Field({
   required?: boolean
   /** 任意の入力欄。既存の OptionalBadge をラベルの横に置く。 */
   optional?: boolean
+  /** 探す欄など自身に読み上げ名がある欄では、視覚上のラベル行を省く。 */
+  labelHidden?: boolean
+  labelSize?: 'standard' | 'compact'
   note?: ReactNode
   error?: ReactNode
   /**
@@ -107,13 +112,14 @@ export function Field({
     <FieldContext.Provider value={{ controlId: htmlFor, describedBy, invalid: Boolean(shownError), required: Boolean(required) }}>
     <div
       className={styles.field}
+      data-label-size={labelSize}
       data-field-quiet={quiet && error ? '' : undefined}
       onInput={error ? () => { if (!quiet) setQuiet(true) } : undefined}
       onBlur={quiet ? () => setQuiet(false) : undefined}
     >
       {/* 「？」は label の外に置く。中に入れるとラベルがボタンを指してしまい、
           入力欄との結びつき（htmlFor・読み上げ）が壊れる。 */}
-      {label ? <div className={styles.labelRow}>
+      {label && !labelHidden ? <div className={styles.labelRow}>
         <label htmlFor={htmlFor} className={styles.label}>
           {label}
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には

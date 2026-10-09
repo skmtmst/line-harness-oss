@@ -122,6 +122,8 @@
 }
 }
 
+[data-theme='v8'] .field[data-label-size='compact'] .label { font-size: var(--text-caption); font-weight: 600; line-height: 17px; }
+
 /* v7 の複数行（TextArea の包み）は元どおり大きさ固定。正本の層の外の resize: vertical より強くするため層の外に置く。 */
 :root:not([data-theme='v8']) .legacyTextarea {
   resize: none;

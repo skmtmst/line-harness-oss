@@ -14,11 +14,14 @@ export default function StatusBadge({
   helpLabel,
   helpHref,
   dot = true,
+  surface = 'tinted',
   ...props
 }: Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
   children: ReactNode
   tone?: StatusBadgeTone
-  size?: 'default' | 'compact'
+  size?: 'default' | 'compact' | 'micro'
+  /** 選んだ顧客の連携情報（rm92Y）だけ白地にする。 */
+  surface?: 'tinted' | 'white'
   /**
    * 札の意味（例：審査中・保留・期限切れの違い）。札のすぐ右の「？」へ入れる
    * （★V7・§2-1b）。札の列が並ぶ表では、見出しの「？」にまとめるのも可。
@@ -34,13 +37,13 @@ export default function StatusBadge({
    */
   dot?: boolean
 }) {
-  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : null, dot ? null : styles.noDot, className]
+  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : size === 'micro' ? styles.micro : null, dot ? null : styles.noDot, className]
     .filter(Boolean)
     .join(' ')
   const hasHelp = help !== undefined && help !== null
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この状態')
   return (
-    <span className={classes} data-design-node="xRvDB" {...props}>
+    <span className={classes} data-design-node="xRvDB" data-surface={surface} {...props}>
       {children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
