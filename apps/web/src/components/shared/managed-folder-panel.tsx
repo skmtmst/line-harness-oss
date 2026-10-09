@@ -55,7 +55,7 @@ export function useManagedFolders(kind: string | null, accountId?: string | null
     try {
       const res = await api.folders.list(kind, accountId ?? undefined)
       if (request !== requestRef.current) return
-      if (res.success) {
+      if (res.success && Array.isArray(res.data)) {
         setFolders(res.data)
         setUnfiledCount(typeof res.unfiledCount === 'number' ? res.unfiledCount : null)
       } else {
@@ -114,6 +114,25 @@ export interface ManagedFolderPanelProps {
   children?: ReactNode
   /** 選ぶ窓の中など、行の選択だけにするとき。 */
   disabled?: boolean
+}
+
+/**
+ * 畳んだ幅のフォルダの選ぶ欄の中身（列と同じ並び：すべて→各フォルダ→未分類）。
+ * kind が null の一覧は「すべて」だけ。
+ */
+export function managedFolderOptions(kind: string | null, folders: Folder[], { allId = 'all', unfiledId = 'unfiled' }: { allId?: string; unfiledId?: string } = {}) {
+  return [
+    { value: allId, label: 'フォルダ：すべて' },
+    ...(kind ? folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` })) : []),
+    ...(kind ? [{ value: unfiledId, label: 'フォルダ：未分類' }] : []),
+  ]
+}
+
+/** 行の名前の前の丸に渡すフォルダ。未分類・見つからないフォルダは null（色の無い輪）。 */
+export function folderDotFor(folders: Folder[], folderId: string | null | undefined) {
+  if (!folderId) return null
+  const folder = folders.find((f) => f.id === folderId)
+  return folder ? { name: folder.name, color: folder.color } : null
 }
 
 export function managedFolderNote(itemLabel: string) {
