@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import shell from './data-table.module.css'
@@ -5,6 +7,8 @@ import { loadFailureCopy } from './api-error-message'
 import HelpTip from './help-tip'
 import { FailureTitle, RetryLabel } from './retry-label'
 import styles from './table.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { DelayedSkeleton, ListSkeleton } from './skeleton'
 import presentationStyles from './table-presentation.module.css'
 
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
@@ -329,6 +333,8 @@ export function TableStateRow({
   retryLabel?: string
   error?: unknown
 }) {
+  const v8 = useAdminTheme() === 'v8'
+  if (kind === 'loading' && v8) return <tr><td colSpan={colSpan} aria-busy="true" aria-label={title ?? TABLE_STATE_TEXT.loading.title}><DelayedSkeleton loading skeleton={<ListSkeleton columns={colSpan} />} /></td></tr>
   const text = TABLE_STATE_TEXT[kind]
   const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面') : null
   return (

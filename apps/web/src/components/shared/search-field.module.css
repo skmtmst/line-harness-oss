@@ -172,3 +172,6 @@ html[data-theme='v8'] .search:has(.input:focus-visible) { outline: var(--polish-
 html[data-theme='v8'] .search .input:focus-visible { outline: none; }
 html[data-theme='v8'] .disabled { opacity: var(--polish-disabled-opacity); }
 html[data-theme='v8'] .disabled .input:disabled { opacity: 1; }
+
+/* B-152・仕上げ8：検索の読み込みは aria-busy で伝え、回る印は保存ボタンだけにする。 */
+[data-theme='v8'] .loadingIcon { display: none; animation: none; }

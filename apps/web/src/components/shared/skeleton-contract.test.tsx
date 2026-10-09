@@ -31,6 +31,7 @@ const SCENARIOS_PAGE = readFileSync(join(HERE, '../../v8/scenarios/list.tsx'), '
 const SERVER_LIST = readFileSync(join(HERE, '../../lib/use-server-list.ts'), 'utf8')
 
 import { CardsSkeleton, DelayedSkeleton, Skeleton, StatTilesSkeleton, TableSkeleton } from './skeleton'
+import ListState from './list-state'
 import { RefreshCover } from './refresh-cover'
 
 let host: HTMLDivElement
@@ -190,5 +191,23 @@ describe('形の決まった骨組みの組み合わせ（V8「サクサク感�
     const tiles = document.createElement('div')
     tiles.innerHTML = renderToStaticMarkup(<StatTilesSkeleton count={4} />)
     expect(tiles.querySelectorAll('[data-skeleton]')).toHaveLength(8)
+  })
+})
+
+
+describe('B-152 一覧の読み込み', () => {
+  it('V8 は300msまで場所だけ確保し、その後4行の骨格を出す', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    try {
+      await act(async () => { root.render(<ListState kind="loading" />) })
+      await tick(299)
+      expect(host.querySelector('[data-skeleton-reserve]')).not.toBeNull()
+      await tick(1)
+      expect(host.querySelector('[data-skeleton-reserve]')).toBeNull()
+      expect(host.querySelectorAll('[data-skeleton]')).toHaveLength(12)
+      expect(host.querySelector('[aria-busy="true"]')).not.toBeNull()
+      await act(async () => { root.render(<ListState kind="empty" />) })
+      expect(host.querySelector('[aria-busy="true"]')).toBeNull()
+    } finally { delete document.documentElement.dataset.theme }
   })
 })

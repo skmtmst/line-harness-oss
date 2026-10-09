@@ -1,9 +1,13 @@
+'use client'
+
 import React from 'react'
 import type { ReactNode } from 'react'
 import { Inbox, Loader, Lock } from 'lucide-react'
 import TargetMissing from './target-missing'
 import { loadFailureCopy } from './api-error-message'
 import styles from './list-state.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { DelayedSkeleton, ListSkeleton } from './skeleton'
 
 /**
  * 一覧に中身を出せないときの1枚。
@@ -79,7 +83,9 @@ export default function ListState({
   'data-design': dataDesign,
   error,
   icon,
+  loadingShape = 'list',
 }: {
+  loadingShape?: 'list' | 'cards'
   kind: ListStateKind
   /** 空の表示で、その機能の印を渡す。 */
   icon?: ReactNode
@@ -105,6 +111,9 @@ export default function ListState({
    */
   error?: unknown
 }) {
+  const v8 = useAdminTheme() === 'v8'
+  if (kind === 'loading' && v8) return <div data-list-state="loading" data-design={dataDesign} className={className} aria-busy="true" aria-label={title ?? PRESETS.loading.title}><DelayedSkeleton loading skeleton={<ListSkeleton shape={loadingShape} />} /></div>
+
   const preset = kind === 'empty' ? EMPTY_PRESETS[emptyPreset] : PRESETS[kind]
 
   // 失敗の1枚は TargetMissing の error と同じ中身を使う（★V7 `x63W5x`）。

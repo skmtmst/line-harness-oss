@@ -467,6 +467,13 @@
 /* B-152・仕上げ4：状態の札（5色） */
 /* B-152・仕上げ5：印 */
 /* B-152・仕上げ7：操作の反応 */
+/* B-152・仕上げ8：読み込み中 */
+:root {
+  --polish-skeleton-bg: #1d1d1f0f;
+  --polish-skeleton-radius: 5px;
+  --polish-skeleton-height: 10px;
+  --polish-loading-delay: 300ms;
+}
 :root {
   --polish-hover: rgb(29 29 31 / 0.04);
   --polish-active: rgb(29 29 31 / 0.08);
@@ -2877,3 +2884,5 @@ html[data-theme='v8'] :is(button, [role='button'], [role='tab'], [role='menuitem
   background-image: linear-gradient(var(--polish-active), var(--polish-active));
 }
 html[data-theme='v8'] :is(button, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-disabled-opacity); }
+
+[data-theme='v8'] [data-skeleton] { background: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); background-image: none; animation: none; }
