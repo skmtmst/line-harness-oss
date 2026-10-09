@@ -141,3 +141,6 @@
 
 [data-theme='v8'] .root[data-size='sticker'] { height: var(--seg-timing-h); max-width: 100%; gap: 0; }
 [data-theme='v8'] .root[data-size='sticker'] .item { padding: var(--tpl-msg-composer-sticker-switch-pad); font-size: var(--text-label); line-height: var(--tpl-msg-composer-text-lh); white-space: nowrap; }
+
+/* B-152②：役割ごとの文字の段。 */
+[data-theme='v8'] .item, [data-theme='v8'] .selected, html[data-theme='v8'] .root[data-size] .item, html[data-theme='v8'] .root[data-appearance] .selected { font-weight: var(--polish-weight-body); }

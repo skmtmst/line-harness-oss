@@ -62,7 +62,8 @@ describe('globals.css の変数の書き直し', () => {
 
   it('予約スタッフの題と予約からの売上の題は別の名前で、どちらもページの題の値（22px）を読む', () => {
     const css = fs.readFileSync(GLOBALS, 'utf8')
-    expect(css).toMatch(/--tpl-title-size:\s*22px/)
+    expect(css).toMatch(/--polish-text-page:\s*22px/)
+    expect(css).toMatch(/--tpl-title-size:\s*var\(--polish-text-page\)/)
     expect(css).toMatch(/--tpl-bks-title-size:\s*var\(--tpl-title-size\)/)
     expect(css).toMatch(/--tpl-bks-sales-title-size:\s*var\(--tpl-title-size\)/)
     const sales = fs.readFileSync(path.join(__dirname, 'booking/sales/sales-v8.module.css'), 'utf8')
