@@ -31,6 +31,8 @@ import { TextField } from '@/components/shared/text-field'
 import { notifyToast } from '@/components/shared/toast'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import TapActionField from '@/components/shared/tap-action-field'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFormErrors } from '@/lib/use-form-errors'
 import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
 import { TAP_ACTION_KINDS, tapActionDef, tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, tapActionProblem, type TapActionKind } from '@/lib/tap-actions'
 import { TemplateEditFrame } from './frame'
@@ -264,9 +266,24 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     setPendingShape(null)
   }
 
+  /*
+   * 保存で落ちた欄（B-139）：名前・画像・面ごとの押したら。帯ではなく欄を赤くして真下に理由を出し、
+   * 別の面なら その面を選んでから移る。面の一覧には直す欄の数の赤い丸。
+   */
+  const fields = useFormErrors()
+  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'リッチメッセージ名を入力してください'))
+  fields.define('image', '画像', () => (hqHost ? (uploaded ? null : '画像を選んでください') : imageUrl.trim() ? null : '画像を設定してください'))
+  shapeDef.areas.forEach((area) => {
+    fields.define(`area-${area.label}`, `面 ${area.label} の押したら`, () => {
+      const draft = areas[area.label]
+      if (!draft || draft.kind === 'none') return null
+      return tapActionProblem(draft, { where: 'この面', hasLiff: Boolean(liffId), textMax: RICH_MESSAGE_TEXT_MAX })
+    }, { reveal: () => setSelectedLabel(area.label), group: `area-${area.label}` })
+  })
+
   const save = async (): Promise<boolean> => {
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
-    if (!name.trim()) { setError('リッチメッセージ名を入力してください。'); return false }
+    if (fields.submit().length > 0) { setError(''); return false }
     const built = buildRichPayload({ imageUrl, pickedMedia, shape: shapeDef, areas, liffId })
     if ('error' in built) { setError(built.error); return false }
     setSaving(true)
@@ -295,8 +312,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   /* 統括：中身を組み立てて呼ぶ側へ渡す（保存・配るは呼ぶ側）。 */
   const hostSave = async (distribute: boolean) => {
     if (!host || busy) return
-    if (!name.trim()) { setError('リッチメッセージ名を入力してください。'); return }
-    if (hqHost && !uploaded) { setError('画像を選んでください。'); return }
+    if (fields.submit().length > 0) { setError(''); return }
     const built = buildRichPayload({ imageUrl, pickedMedia: hqHost ? null : pickedMedia, shape: shapeDef, areas, liffId })
     if ('error' in built) { setError(built.error); return }
     const { imageMediaId: _id, imageMediaKind: _kind, ...rest } = built.payload
@@ -442,7 +458,8 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
           <div className={styles.pair}>
             <div className={`${styles.field} ${styles.grow}`}>
               <label htmlFor="te-rich-name" className={styles.label}>テンプレート名</label>
-              <TextField id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" />
+              <TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} />
+              <FieldError id="te-rich-name-error">{fields.error('name')}</FieldError>
             </div>
             <div className={`${styles.field} ${styles.folderField}`}>
               <label htmlFor="te-rich-folder" className={styles.labelSmall}>フォルダ</label>
@@ -480,8 +497,9 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <p className={styles.cardNote}>1040 × 1040px（正方形）がおすすめ</p>
           </div>
           <div className={rich.imageRow}>
-            <div className={rich.imageBox}>
+            <div className={rich.imageBox} {...fields.bind('image')}>
               <MediaSlot
+                error={fields.error('image') ?? undefined}
                 size="compact"
                 aspectRatio="1 / 1"
                 title="画像を追加"
@@ -532,6 +550,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
               id: area.label,
               name: areaPlace(area, shapeDef.areas),
               summary: areaSummary(areas[area.label]),
+              errorCount: fields.countIn(`area-${area.label}`),
               x: area.x,
               y: area.y,
               width: area.width,
@@ -551,7 +570,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                   </div>
                   <div className={rich.areaRow} role="group" aria-label={`面 ${area.label}`}>
                     <span className={rich.areaChip} data-unset={draft.kind === 'none' || undefined}>{`${area.label} ${areaPlace(area, shapeDef.areas)}`}</span>
-                    <div className={rich.areaTap}>
+                    <div className={rich.areaTap} {...fields.bind(`area-${area.label}`)} aria-describedby={fields.invalid(`area-${area.label}`) ? 'te-rich-area-error' : undefined}>
                       <TapActionField
                         name={`面 ${area.label} `}
                         kindLabel={`面 ${area.label} を押したら`}
@@ -569,6 +588,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                       />
                     </div>
                   </div>
+                  <FieldError id="te-rich-area-error">{fields.error(`area-${area.label}`)}</FieldError>
                 </div>
               )
             })()}

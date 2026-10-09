@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { ErrorCountBadge } from './error-count-badge'
 import styles from './tap-area-editor.module.css'
 
 /*
@@ -21,6 +22,8 @@ export interface TapAreaItem {
   name: string
   /** 動きの要約。空・null は「未設定」。 */
   summary?: string | null
+  /** 保存で落ちた、この面の直す欄の数（B-139）。1 以上で行の右に赤い丸。 */
+  errorCount?: number
   /** 画像の上の位置（％・左上が 0）。`canvas` を渡すときは使わない。 */
   x?: number
   y?: number
@@ -124,6 +127,7 @@ export default function TapAreaEditor({
                       <span className={styles.letter} aria-hidden="true">{tapAreaLetter(index)}</span>
                       <span className={styles.name}>{item.name}</span>
                       {summary ? <span className={styles.summary}>{summary}</span> : <span className={styles.unset}>未設定</span>}
+                      <ErrorCountBadge count={item.errorCount ?? 0} label={`面 ${item.name}`} />
                     </button>
                   </li>
                 )
