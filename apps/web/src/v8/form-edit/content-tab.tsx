@@ -379,7 +379,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
           value={current}
           onChange={(value) => {
             const rest = (block.destinations?.friendFieldIds ?? []).slice(1)
-            set({ destinations: { ...block.destinations, friendFieldIds: value ? [value, ...rest.filter((id) => id !== value)] : rest } })
+            set({ destinations: value ? { ...block.destinations, friendFieldIds: [value, ...rest.filter((id) => id !== value)] } : { friendFieldIds: [] } })
           }}
           options={options}
         />
