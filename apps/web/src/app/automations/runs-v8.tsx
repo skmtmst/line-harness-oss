@@ -455,8 +455,8 @@ export function V8RunsTab({
 
       <div className={styles.toolbar}>
         <TextField
-          aria-label="友だちの名前・オートメーションの名前で検索"
-          placeholder="友だちの名前・オートメーションの名前で検索"
+          aria-label="友だちの名前・オートメーションの名前で探す"
+          placeholder="友だちの名前・オートメーションの名前で探す"
           value={query}
           onChange={(event) => changeQuery(event.target.value)}
           className={styles.toolsSearch}

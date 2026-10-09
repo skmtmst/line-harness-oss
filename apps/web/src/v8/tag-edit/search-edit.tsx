@@ -189,17 +189,11 @@ function DateRangeEditor({
     <div className={styles.grow}>
       <div className={styles.dateRow}>
         <Select aria-label="日付の比べ方" value={op} onChange={setOp} options={[{ value: 'between', label: '期間' }, { value: 'after', label: '以降' }, { value: 'before', label: '以前' }]} width={120} />
-        <label className={styles.dateLabel}>
-          {op === 'before' ? '終了日' : '開始日'}
-          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} />
-        </label>
+        <Field label={<>{op === 'before' ? '終了日' : '開始日'}</>}><DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} /></Field>
         {op === 'between' ? (
           <>
             <span className={styles.dateDash} aria-hidden="true">〜</span>
-            <label className={styles.dateLabel}>
-              終了日
-              <DateField aria-label="終了日" value={to} onChange={setTo} />
-            </label>
+            <Field label="終了日"><DateField aria-label="終了日" value={to} onChange={setTo} /></Field>
           </>
         ) : null}
       </div>
@@ -896,16 +890,9 @@ export default function SavedSearchEditV8() {
         {error ? <Notice tone="danger" message={error} /> : null}
         <section className={styles.card} aria-label="名前と共有">
           <h2 className={styles.cardTitle}>名前と共有</h2>
-          <label className={styles.field}>
-            <span className={styles.labelStrong}>条件名</span>
-            <Field error={nameError}><TextField ref={nameRef} value={name} maxLength={80} onChange={(event) => { setName(event.target.value); setNameError('') }} aria-label="条件名" /></Field>
-            {/* IDEA-04：同名の検索がすでにあるとき、保存する前に知らせる。 */}
-            <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.labelStrong}>説明</span>
-            <TextField value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} />
-          </label>
+          <Field label="条件名"><Field error={nameError}><TextField ref={nameRef} value={name} maxLength={80} onChange={(event) => { setName(event.target.value); setNameError('') }} aria-label="条件名" /></Field>
+<DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" /></Field>
+          <Field label="説明"><TextField value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} /></Field>
           <div className={styles.field}>
             <span className={styles.labelRow}>
               <span className={styles.label}>共有</span>

@@ -37,6 +37,7 @@ import {
 } from './shell'
 import { shortDateTime } from './words'
 import styles from './sheets.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -397,12 +398,12 @@ export default function WebhooksSheetsV8() {
         )}
         {showTargetForm && canManage && connStatus !== 'expired' ? (
           <form onSubmit={handleSaveTarget} className={styles.targetForm}>
-            <label className={styles.fieldLabel} htmlFor="wh-sheets-target">スプレッドシートのURLまたはID</label>
+
             <p className={styles.cardNote}>
               共有設定で「{connection?.googleAccountEmail ?? '接続したGoogleアカウント'}」に編集権限を付けたシートを指定してください。指定したシート内に「友だち」「フォーム回答」のタブを自動で作ります。
             </p>
             <div className={styles.targetRow}>
-              <TextField id="wh-sheets-target" value={targetInput} onChange={(event) => setTargetInput(event.target.value)}  placeholder="https://docs.google.com/spreadsheets/d/…" required />
+              <Field label="スプレッドシートのURLまたはID" htmlFor="wh-sheets-target"><TextField id="wh-sheets-target" value={targetInput} onChange={(event) => setTargetInput(event.target.value)}  placeholder="https://docs.google.com/spreadsheets/d/…" required /></Field>
               <Button type="submit" variant="primary" disabled={busy !== null} busy={busy === 'target'} busyLabel="確認しています…">保存する</Button>
             </div>
           </form>

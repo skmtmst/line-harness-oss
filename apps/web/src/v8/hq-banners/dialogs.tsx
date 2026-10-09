@@ -16,6 +16,7 @@ import { api } from '@/lib/api'
 import { readFileAsBase64, type BannerProject } from '@/lib/hq-banners'
 import BannerDialogFrame from './frame'
 import styles from './dialogs.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /** 取り込める画像（API と同じ）。 */
 export const BANNER_UPLOAD_ACCEPT = ['image/png', 'image/jpeg', 'image/webp']
@@ -78,34 +79,31 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
       )}
     >
         <form className={styles.form} onSubmit={(event) => { event.preventDefault(); submit() }}>
-          <div className={styles.field}>
-            <label htmlFor={`${uid}-name`} className={styles.label}>プロジェクト名</label>
-            <TextField
+          <div className={styles.field}><Field label="プロジェクト名" htmlFor={`${uid}-name`}><TextField
               id={`${uid}-name`}
               value={name}
               maxLength={100}
               autoFocus
               disabled={busy}
-              placeholder="例: 春の感謝祭 2周年"
+              placeholder="例：春の感謝祭 2周年"
               onChange={(event) => setName(event.target.value)}
               className={styles.full}
-            />
-          </div>
+            /></Field></div>
           <div className={styles.field}>
             <div className={styles.labelRow}>
-              <label htmlFor={`${uid}-description`} className={styles.labelSmall}>説明</label>
-              <span className={styles.optional}>任意</span>
+
+
             </div>
-            <TextArea
+            <Field label="説明" htmlFor={`${uid}-description`}><TextArea
               id={`${uid}-description`}
               rows={2}
               value={description}
               maxLength={500}
               disabled={busy}
-              placeholder="例: 餃子・生ビールのキャンペーン告知"
+              placeholder="例：餃子・生ビールのキャンペーン告知"
               onChange={(event) => setDescription(event.target.value)}
               className={`${styles.full} ${styles.textarea}`}
-            />
+            /></Field>
           </div>
         </form>
     </BannerDialogFrame>
@@ -207,9 +205,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
           <p className={styles.note}>まずプロジェクトを作ってください。画像はプロジェクトの中に入ります。</p>
         ) : (
           <>
-            <div className={styles.field}>
-              <label htmlFor={`${uid}-project`} className={styles.label}>入れるプロジェクト</label>
-              <div className={styles.full}>
+            <div className={styles.field}><Field label="入れるプロジェクト" htmlFor={`${uid}-project`}><div className={styles.full}>
                 <Select
                   aria-label="入れるプロジェクト"
                   size="full"
@@ -219,8 +215,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
                   onChange={setProjectId}
                   options={projects.map((p) => ({ value: p.id, label: p.name }))}
                 />
-              </div>
-            </div>
+              </div></Field></div>
             <MediaSlot
               title="画像を追加"
               previewAlt={file?.name}

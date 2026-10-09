@@ -25,6 +25,7 @@ import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
 import { jstShort } from './shared'
 import styles from './bookings.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /** 予約・申込の状態の見え方。色だけに頼らず、必ず文字で言う。 */
 type ChipTone = 'warning' | 'success' | 'info' | 'neutral' | 'danger'
@@ -634,9 +635,7 @@ function Bookings({ eventId }: { eventId: string }) {
             <h2 className={styles.cardTitle} id="ev-bk-broadcast">お知らせを送る</h2>
             <p className={styles.cardNote}>この回の申込者へ LINE でまとめて送ります（送ったお知らせは取り消せません）</p>
           </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="ev-bk-message">申込者へ送るメッセージ</label>
-            <div className={styles.broadcastRow}>
+          <div className={styles.field}><Field label="申込者へ送るメッセージ" htmlFor="ev-bk-message"><div className={styles.broadcastRow}>
               <input
                 id="ev-bk-message"
                 value={broadcastMessage}
@@ -647,8 +646,7 @@ function Bookings({ eventId }: { eventId: string }) {
               <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="確かめています…">
                 送る
               </Button>
-            </div>
-          </div>
+            </div></Field></div>
           {broadcastError ? <p className={styles.error} role="alert">{broadcastError}</p> : null}
         </section>
       ) : null}
@@ -687,15 +685,12 @@ function Bookings({ eventId }: { eventId: string }) {
         }}
       >
         {rejectApplicant ? (
-          <label className={styles.dialogLabel}>
-            断る理由（任意・内部メモ）
-            <textarea
+          <Field label="断る理由（・内部メモ）"><textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={2}
               className={styles.textarea}
-            />
-          </label>
+            /></Field>
         ) : null}
       </ConfirmDialog>
 
@@ -770,15 +765,12 @@ function Bookings({ eventId }: { eventId: string }) {
                 </Button>
               </div>
             ) : null}
-            <label className={styles.dialogLabel}>
-              理由（必須・記録に残ります）
-              <textarea
+            <Field label="理由（・記録に残ります）" required><textarea
                 value={waitlistReason}
                 onChange={(e) => setWaitlistReason(e.target.value)}
                 rows={2}
                 className={styles.textarea}
-              />
-            </label>
+              /></Field>
           </>
         ) : null}
       </ConfirmDialog>

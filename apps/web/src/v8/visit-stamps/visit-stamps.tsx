@@ -49,6 +49,7 @@ import {
 } from './display'
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs'
 import styles from './visit-stamps.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type PaperRow = { id: string; card_id?: string; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
 type FriendLite = { id: string; displayName?: string | null; metadata?: Record<string, unknown> | null }
@@ -417,11 +418,8 @@ function VisitStampsScreen() {
                   { id: 'stores', label: '押せる店を選ぶ', onSelect: () => setStoresOpen(true) },
                   { id: 'pin', label: '店員の暗証番号', onSelect: () => { setDialogError(''); setPinOpen(true) } },
                 ]} /> : undefined} help="カードの名前・マスの数・期限と、何個で何を渡すか（特典）を決めます。マスの数と特典の個数は別々に決めます（特典はマスの数以下）。特典を使うと、その個数だけスタンプが減ります。">① カードの設定</SectionTitle>
-                <label className={styles.field}>
-                  <span className={styles.label}>カードの名前</span>
-                  <TextField {...fieldProps('name')} value={name} onChange={(e) => { setIssue(null); setName(e.target.value) }} readOnly={ro} maxLength={100} />
-                  {fieldError('name')}
-                </label>
+                <Field label="カードの名前"><TextField {...fieldProps('name')} value={name} onChange={(e) => { setIssue(null); setName(e.target.value) }} readOnly={ro} maxLength={100} />
+{fieldError('name')}</Field>
                 <div className={styles.field}>
                   <span className={styles.label}>カードの見た目 <HelpTip label="カードの見た目の説明">画像があるときは画像を使います。色は文字の下地です。</HelpTip></span>
                   <div className={styles.appearance}>
@@ -490,12 +488,9 @@ function VisitStampsScreen() {
                 {ro || settings.rewards.length >= 20 ? null : (
                   <span className={styles.addLine}><Button variant="text" onClick={() => setRewardEdit('new')}><Plus size={15} aria-hidden="true" />特典を足す</Button></span>
                 )}
-                <label className={styles.field}>
-                  <span className={styles.label}>使い方の説明（お客さまに見える）</span>
-                  <TextArea {...fieldProps('instructions')} compact aria-label="使い方の説明" rows={2} readOnly={ro} value={settings.instructions ?? ''} onChange={e => { if([...e.target.value].length <= 500) set({ instructions: e.target.value }) }} />
-                  {fieldError('instructions')}
-                  <span className={styles.counter}>{`${[...(settings.instructions ?? '')].length} / 500`}</span>
-                </label>
+                <Field label="使い方の説明（お客さまに見える）"><TextArea {...fieldProps('instructions')} compact aria-label="使い方の説明" rows={2} readOnly={ro} value={settings.instructions ?? ''} onChange={e => { if([...e.target.value].length <= 500) set({ instructions: e.target.value }) }} />
+{fieldError('instructions')}
+<span className={styles.counter}>{`${[...(settings.instructions ?? '')].length} / 500`}</span></Field>
                 <div className={styles.preview} aria-label="お客さまの見え方">
                   <span className={styles.previewLabel}>お客さまの見え方</span>
                   <div className={styles.customerCard} style={{ backgroundColor: cardColor, color: visitStampDarkInk(cardColor) ? 'var(--color-ink)' : 'var(--color-canvas)' }}>
@@ -525,18 +520,12 @@ function VisitStampsScreen() {
                 </div>
                 {settings.mode === 'amount' ? (
                   <div className={`${styles.row2} ${styles.amount}`}>
-                    <label className={styles.field}>
-                      <span className={styles.label}>何円ごとに 1個</span>
-                      <TextField {...fieldProps('amountUnit')} value={`${settings.amountUnit.toLocaleString('ja-JP')} 円`} readOnly={ro} inputMode="numeric"
+                    <Field label="何円ごとに 1個"><TextField {...fieldProps('amountUnit')} value={`${settings.amountUnit.toLocaleString('ja-JP')} 円`} readOnly={ro} inputMode="numeric"
                         onChange={(e) => { const n = Number(e.target.value.replace(/[^\d]/g, '')); set({ amountUnit: Number.isFinite(n) ? n : 0 }) }} />
-                      {fieldError('amountUnit')}
-                    </label>
-                    <label className={styles.field}>
-                      <span className={styles.label}>1回の上限</span>
-                      <TextField {...fieldProps('maxPerVisit')} value={`${settings.maxPerVisit} 個`} readOnly={ro} inputMode="numeric"
+{fieldError('amountUnit')}</Field>
+                    <Field label="1回の上限"><TextField {...fieldProps('maxPerVisit')} value={`${settings.maxPerVisit} 個`} readOnly={ro} inputMode="numeric"
                         onChange={(e) => { const n = Number(e.target.value.replace(/[^\d]/g, '')); set({ maxPerVisit: Number.isFinite(n) ? n : 0 }) }} />
-                      {fieldError('maxPerVisit')}
-                    </label>
+{fieldError('maxPerVisit')}</Field>
                   </div>
                 ) : null}
                 <div className={styles.field}>
@@ -581,10 +570,8 @@ function VisitStampsScreen() {
                   </span>
                   {ro ? null : <RowActions subjectName="会員ランクの倍率" menuItems={[{ id: 'edit', label: 'ランクと倍率を変える', onSelect: () => setRankOpen(true) }]} />}
                 </div>
-                <label className={styles.receiptRow}>
-                  <span className={styles.texts}><span className={styles.name}>カードを受け取った時のボーナス</span><span className={styles.sub}>友だちがカードを受け取った時に押す数（0〜50）</span></span>
-                  <span>＋</span><TextField {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} /><span>個</span>
-                </label>
+                <Field label="カードを受け取った時のボーナス友だちがカードを受け取った時に押す数（0〜50）＋"><TextField {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} />
+<span>個</span></Field>
                 {fieldError('receiptBonus')}
                 <div className={styles.row2}>
                   <div className={styles.field}>
@@ -741,10 +728,7 @@ function VisitStampsScreen() {
                         <span className={styles.label}>理由</span>
                         <Select aria-label="理由" size="full" value={reason} onChange={(v) => setReason(v as ManualReason)} options={MANUAL_REASONS.map((r) => ({ value: r.value, label: r.label }))} />
                       </div>
-                      <label className={styles.field}>
-                        <span className={styles.label}>メモ<span className={styles.optional}>任意</span></span>
-                        <TextField value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={200} placeholder="例：レシートを確認済み" />
-                      </label>
+                      <Field label="メモ"><TextField value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={200} placeholder="例：レシートを確認済み" /></Field>
                       <span className={styles.addLine}>
                         <Button disabled={!friendId || busy === 'grant'} onClick={() => void grant()} title={friendId ? undefined : '先に友だちを選んでください'}><Stamp size={15} aria-hidden="true" />押印を足す</Button>
                       </span>

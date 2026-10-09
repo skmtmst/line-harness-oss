@@ -7,6 +7,7 @@
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
  * （型のフォルダの列）・問い合わせのカード・これまでの問い合わせの表。
  */
+import { Field as SharedField } from '@/components/shared/form-controls'
 import StatusPill from '@/components/shared/status-pill'
 import { CheckCircle2, Plus, X } from 'lucide-react'
 import Link from 'next/link'
@@ -357,11 +358,6 @@ export default function HqSupportV8() {
   )
 }
 
-function Field({ label, htmlFor, tone, children }: { label: string; htmlFor: string; tone?: 'large'; children: ReactNode }) {
-  return (
-    <div className={styles.field}>
-      <label htmlFor={htmlFor} className={tone === 'large' ? styles.labelLarge : styles.label}>{label}</label>
-      {children}
-    </div>
-  )
+function Field({ label, htmlFor, children }: { label: string; htmlFor: string; tone?: 'large'; children: ReactNode }) {
+  return <SharedField label={label} htmlFor={htmlFor}>{children}</SharedField>
 }

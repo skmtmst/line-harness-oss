@@ -1189,7 +1189,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                       type="text"
                       value={dayAddMemo}
                       onChange={(e) => setDayAddMemo(e.target.value)}
-                      placeholder="理由（任意・例: 研修のため）"
+                      placeholder="理由（任意・例：研修のため）"
                       aria-label="休みの理由"
                       className={styles.input}
                     />
@@ -1250,7 +1250,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                         setCalendarInput(event.target.value)
                       }
                     }}
-                    placeholder="例: example@example.invalid"
+                    placeholder="例：example@example.invalid"
                     className={styles.input}
                   />
                 </label>

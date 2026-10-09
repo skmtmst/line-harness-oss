@@ -72,6 +72,7 @@ import { freshDefinition } from '@/lib/hq-template-authoring'
 import styles from './create.module.css'
 import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer'
 import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
 
 type Store = BroadcastAccount
 /** 配信対象（店の一斉配信と同じ4つ。名前は店の口と同じ：詳細条件は advanced）。 */
@@ -826,15 +827,12 @@ export default function HqBroadcastCreate() {
                 {method === 'duplicate' ? copiedRun ? (
                   <SourcePickerSelection buttonRef={basicPickerTrigger} item={broadcastPickerItem(copiedRun)} folders={hqFolders} onChange={() => setBasicPicker('duplicate')} />
                 ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('duplicate')}>過去の配信を選ぶ</Button> : null}
-                <label className={formStyles.nameField}>
-                  <span className={formStyles.labelRow}><span className="text-ink text-sm font-bold">配信名<RequiredBadge /></span><span className="text-xs text-ink-faint">{title.trim().length} / {TITLE_MAX}文字</span></span>
-                  <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} />
-                  <small>友だちには表示されません。一覧で見分けるための名前です</small>
-                </label>
+                <Field label="配信名" required count={{ value: title.trim().length, max: TITLE_MAX }}><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} />
+<small>友だちには表示されません。一覧で見分けるための名前です</small></Field>
                 {/* 店の一斉配信と同じフォルダ・社内メモ（統括の一括配信のフォルダ。API-18） */}
                 <div className={formStyles.basicFields}>
-                  <label><span className={formStyles.labelRow}>フォルダ</span><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name, color: f.color }))} onCreate={canManage ? createHqFolder : undefined} size="full" /></label>
-                  <label><span className={formStyles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません。各アカウントの配信にも同じメモが残ります</HelpTip></span><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} maxLength={10000} className={formStyles.textInput} placeholder="友だちには表示されません" /></label>
+                  <Field label="フォルダ"><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name, color: f.color }))} onCreate={canManage ? createHqFolder : undefined} size="full" /></Field>
+                  <Field label="社内メモ" help={<>友だちには表示されません。各アカウントの配信にも同じメモが残ります</>}><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} maxLength={10000} className={formStyles.textInput} placeholder="友だちには表示されません" /></Field>
                 </div>
                 <div className={formStyles.recentHeader}><h3>最近の配信</h3><Link href="/hq/broadcasts">一括配信の一覧を見る →</Link></div>
                 <div className={formStyles.recentList}>
@@ -984,14 +982,8 @@ export default function HqBroadcastCreate() {
                 </RadioCardGroup>
                 {when === 'later' ? (
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label htmlFor="hq-bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">送る日</label>
-                      <DateField id="hq-bc-date" value={date} onChange={setDate} aria-label="送る日" />
-                    </div>
-                    <div>
-                      <label htmlFor="hq-bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">時刻（日本時間）</label>
-                      <TimeField id="hq-bc-time" size="field" value={time} onChange={setTime} aria-label="時刻（日本時間）" />
-                    </div>
+                    <div><Field label="送る日" htmlFor="hq-bc-date"><DateField id="hq-bc-date" value={date} onChange={setDate} aria-label="送る日" /></Field></div>
+                    <div><Field label="時刻（日本時間）" htmlFor="hq-bc-time"><TimeField id="hq-bc-time" size="field" value={time} onChange={setTime} aria-label="時刻（日本時間）" /></Field></div>
                   </div>
                 ) : null}
                 <div className={formStyles.quota}>
@@ -1208,10 +1200,7 @@ export default function HqBroadcastCreate() {
         onConfirm={() => void saveAsTemplate()}
         onCancel={() => setSaveTplOpen(false)}
       >
-        <label className={formStyles.nameField}>
-          <span className={formStyles.labelRow}>テンプレートの名前<RequiredBadge /></span>
-          <input value={saveTplName} onChange={(event) => setSaveTplName(event.target.value)} className={formStyles.textInput} aria-label="テンプレートの名前" maxLength={100} />
-        </label>
+        <Field label="テンプレートの名前" required><input value={saveTplName} onChange={(event) => setSaveTplName(event.target.value)} className={formStyles.textInput} aria-label="テンプレートの名前" maxLength={100} /></Field>
       </Dialog>
       <Dialog
         open={conditionOpen}

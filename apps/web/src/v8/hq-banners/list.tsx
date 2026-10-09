@@ -690,8 +690,8 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
         <div className={styles.tools}>
           <div className={styles.librarySearch}>
             <SearchField
-              placeholder="テキスト・指示で検索"
-              aria-label="テキスト・指示で検索"
+              placeholder="テキスト・指示で探す"
+              aria-label="テキスト・指示で探す"
               value={query}
               onChange={(value) => { setQuery(value); resetPage() }}
               onClear={() => { setQuery(''); resetPage() }}

@@ -147,7 +147,7 @@ function TagFolderDialog({
           onKeyDown={(event) => {
             if (event.key === 'Enter' && name.trim()) void save()
           }}
-          placeholder="例: VIP"
+          placeholder="例：VIP"
           className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
         />
       </label>
@@ -643,8 +643,8 @@ export default function TagsTabV8({
             </div>
             <div className={styles.searchWrap}>
               <SearchField
-                aria-label="タグ名・用途で検索"
-                placeholder="タグ名・用途で検索"
+                aria-label="タグ名・用途で探す"
+                placeholder="タグ名・用途で探す"
                 value={query}
                 onChange={setQuery}
                 onClear={() => setQuery('')}

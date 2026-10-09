@@ -521,11 +521,11 @@ export default function AccountRegisterV8() {
             <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acct-basic-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="基本情報" data-design-node="GwKE2" data-step="3">
               <h2 className={styles.panelTitle}>基本情報</h2>
               <div className={styles.basicGrid}>
-                <label className={styles.label} htmlFor="v8-display-name">表示名</label>
-                <label className={styles.label} htmlFor="v8-line-id">LINE ID</label>
+
+
                 <span aria-hidden="true" />
-                <TextField id="v8-display-name" value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "v8-display-name-error" : undefined} />
-                <TextField id="v8-line-id" value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly />
+                <Field label="表示名" htmlFor="v8-display-name"><TextField id="v8-display-name" value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "v8-display-name-error" : undefined} /></Field>
+                <Field label="LINE ID" htmlFor="v8-line-id"><TextField id="v8-line-id" value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly /></Field>
                 <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…"><Download size={15} aria-hidden="true" />LINEから取得</Button>
               </div>
               {fieldErrors.name && <p id="v8-display-name-error" role="alert" className={styles.fieldError}>{fieldErrors.name}</p>}
@@ -556,7 +556,7 @@ export default function AccountRegisterV8() {
                 <div className={styles.moreBox}>
                   <div className={styles.twoCol}>
                     <div className={styles.field}><span className={styles.label}>親アカウント</span><Select aria-label="親アカウント" value={form.parentId} onChange={(value) => update('parentId', value)} options={[{ value: '', label: '親なし' }, ...parents.map((a) => ({ value: a.id, label: a.name }))]} /></div>
-                    <div className={styles.field}><label className={styles.label} htmlFor="v8-existing-liff">既存のLIFF ID（任意）</label><TextField id="v8-existing-liff" value={form.liffId} onChange={(event) => update('liffId', event.target.value)} placeholder="未入力なら自動で用意します" /></div>
+                    <div className={styles.field}><Field label="既存のLIFF ID" htmlFor="v8-existing-liff"><TextField id="v8-existing-liff" value={form.liffId} onChange={(event) => update('liffId', event.target.value)} placeholder="未入力なら自動で用意します" /></Field></div>
                   </div>
                   <fieldset className={styles.fieldset}>
                     <legend className={styles.label}>このアカウントを担当範囲に追加する人</legend>

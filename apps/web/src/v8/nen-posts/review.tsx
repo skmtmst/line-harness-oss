@@ -39,6 +39,7 @@ import { mileStatusLabel, reviewVersionOf, text } from './text'
 import { PhotoReviewDetail } from './detail'
 import PhotoPolicyHistoryV8 from './policy-history'
 import styles from './review.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type PhotoView = 'list' | 'detail' | 'publications'
@@ -581,11 +582,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
                 <Radio key={reason.value} name="photo-reject-reason" checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError(''); setReasonFieldError('') }}>{reason.label}</Radio>
               ))}
             </div>
-            <label className={styles.fieldLabel}>
-              投稿者に届く補足（直せます）
-              <TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError(''); setReasonFieldError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} />
-          <FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError>
-            </label>
+            <Field label="投稿者に届く補足（直せます）"><TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError(''); setReasonFieldError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} />
+<FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError></Field>
           </Dialog>
 
           <Dialog open={Boolean(publicationCandidate)} title="公式サイトに掲載しますか？"
@@ -1001,11 +999,8 @@ function RejectDialogV8({
             <Radio key={reason.value} name="photo-reject-reason" checked={reasonCode === reason.value} onChange={() => { onReasonCode(reason.value); onReasonNote(reason.value === 'other' ? '' : reason.message) }}>{reason.label}</Radio>
           ))}
         </div>
-        <label className={styles.fieldLabel}>
-          お客様に届く補足（直せます）
-          <TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} aria-label="お客様に届く補足" value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
-          <FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError>
-        </label>
+        <Field label="お客様に届く補足（直せます）"><TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} aria-label="お客様に届く補足" value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
+<FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError></Field>
         {/* 絵に無い「次の投稿は人が見る」は、同じ行の右に小さく置く（行を増やさない）。 */}
         <div className={styles.checkLine}>
           <Checkbox checked={resubmitInvite} onCheckedChange={onResubmitInvite}>もう一度 送ってもらえるようお願いする</Checkbox>

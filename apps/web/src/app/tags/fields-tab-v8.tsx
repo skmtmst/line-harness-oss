@@ -418,8 +418,8 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
             </div>
             <div className={styles.searchWrap}>
               <SearchField
-                aria-label="項目名で検索"
-                placeholder="項目名で検索"
+                aria-label="項目名で探す"
+                placeholder="項目名で探す"
                 value={query}
                 onChange={setQuery}
                 onClear={() => setQuery('')}
@@ -674,7 +674,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
           folder={folderDialog === 'new' ? undefined : folderDialog}
           accountId={accountId}
           note="項目を分けてしまう箱です。消しても、入っていた項目は未分類として残ります。"
-          placeholder="例: 基本情報"
+          placeholder="例：基本情報"
           onClose={() => setFolderDialog(null)}
           onAdded={() => { setFolderDialog(null); void loadFolders() }}
         />

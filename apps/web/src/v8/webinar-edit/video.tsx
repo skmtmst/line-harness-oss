@@ -35,6 +35,7 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './video.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -318,17 +319,11 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         <section className={form.card} aria-labelledby="webinar-period-title">
           <div className={form.cardHead}><h2 id="webinar-period-title" className={form.cardTitle}>公開期間</h2></div>
           <div className={form.pair}>
-            <div className={form.field}>
-              <label className={form.label} htmlFor="webinar-period-start">公開の開始</label>
-              <DateTimeField id="webinar-period-start" value={startsAt} readOnly={readOnly} onChange={setStartsAt} />
-            </div>
-            <div className={form.field}>
-              <label className={form.label} htmlFor="webinar-period-end">公開の終了<span className={form.optional}>任意</span></label>
-              {noEnd
+            <div className={form.field}><Field label="公開の開始" htmlFor="webinar-period-start"><DateTimeField id="webinar-period-start" value={startsAt} readOnly={readOnly} onChange={setStartsAt} /></Field></div>
+            <div className={form.field}><Field label="公開の終了" htmlFor="webinar-period-end">{noEnd
                 ? <TextField id="webinar-period-end" value="なし（いつでも）" readOnly onFocus={() => { if (!readOnly) setNoEnd(false) }} />
                 : <DateTimeField id="webinar-period-end" value={endsAt} readOnly={readOnly} onChange={setEndsAt} />}
-              {!readOnly && !noEnd ? <Checkbox checked={noEnd} onCheckedChange={setNoEnd}>終わりを決めない（いつでも見られる）</Checkbox> : null}
-            </div>
+{!readOnly && !noEnd ? <Checkbox checked={noEnd} onCheckedChange={setNoEnd}>終わりを決めない（いつでも見られる）</Checkbox> : null}</Field></div>
           </div>
           {periodError ? <Notice tone="danger">{periodError}</Notice> : null}
         </section>
@@ -376,17 +371,11 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       <section className={form.card} aria-labelledby="webinar-count-title">
         <div className={form.cardHead}><h2 id="webinar-count-title" className={form.cardTitle}>視聴の数え方</h2></div>
         <div className={form.pair}>
-          <div className={form.field}>
-            <label className={form.labelSmall} htmlFor="webinar-completion">視聴完了とみなす</label>
-            <TextField id="webinar-completion" readOnly value="90%以上見たら視聴完了（変えられません）" title="視聴完了の決め方はサーバーが決めています（動画の9割以上）" />
-          </div>
-          <div className={form.field}>
-            <label className={form.labelSmall} htmlFor="webinar-policy">結果が取れないとき</label>
-            {readOnly
+          <div className={form.field}><Field label="視聴完了とみなす" htmlFor="webinar-completion"><TextField id="webinar-completion" readOnly value="90%以上見たら視聴完了（変えられません）" title="視聴完了の決め方はサーバーが決めています（動画の9割以上）" /></Field></div>
+          <div className={form.field}><Field label="結果が取れないとき" htmlFor="webinar-policy">{readOnly
               ? <ReadValue label="結果が取れないとき">{policy === 'escalate' ? '担当へ上げる' : '翌日に取り直す'}</ReadValue>
               : <Select id="webinar-policy" aria-label="結果が取れないとき" size="full" value={policy} disabled={policyBusy} onChange={(value) => void savePolicy(value as 'escalate' | 'retry_next_day')} options={[{ value: 'retry_next_day', label: '翌日に取り直す' }, { value: 'escalate', label: '担当へ上げる' }]} />}
-            {policyError ? <p className={form.fieldError} role="alert">{policyError}</p> : null}
-          </div>
+{policyError ? <p className={form.fieldError} role="alert">{policyError}</p> : null}</Field></div>
         </div>
       </section>
 
@@ -524,11 +513,14 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
             ))}
           </div>
         ) : null}
-        {mode === 'one' && kind === 'once' ? <div className={form.field}><label htmlFor="wd-rule-date" className={form.labelSmall}>日付</label><input id="wd-rule-date" type="date" className={styles.dateInput} value={date} aria-invalid={dateErrors.date ? true : undefined} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(event) => { setDate(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></div> : null}
+        {mode === 'one' && kind === 'once' ? <div className={form.field}><Field label="日付" htmlFor="wd-rule-date"><input id="wd-rule-date" type="date" className={styles.dateInput} value={date} aria-invalid={dateErrors.date ? true : undefined} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(event) => { setDate(event.target.value); setDateErrors({}) }} />
+<FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></Field></div> : null}
         {mode === 'bulk' ? (
           <div className={form.pair}>
-            <div className={form.field}><label htmlFor="wd-rule-from" className={form.labelSmall}>始まり</label><input id="wd-rule-from" type="date" className={styles.dateInput} value={from} aria-invalid={dateErrors.from ? true : undefined} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(event) => { setFrom(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></div>
-            <div className={form.field}><label htmlFor="wd-rule-to" className={form.labelSmall}>終わり</label><input id="wd-rule-to" type="date" className={styles.dateInput} value={to} aria-invalid={dateErrors.to ? true : undefined} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(event) => { setTo(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></div>
+            <div className={form.field}><Field label="始まり" htmlFor="wd-rule-from"><input id="wd-rule-from" type="date" className={styles.dateInput} value={from} aria-invalid={dateErrors.from ? true : undefined} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(event) => { setFrom(event.target.value); setDateErrors({}) }} />
+<FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></Field></div>
+            <div className={form.field}><Field label="終わり" htmlFor="wd-rule-to"><input id="wd-rule-to" type="date" className={styles.dateInput} value={to} aria-invalid={dateErrors.to ? true : undefined} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(event) => { setTo(event.target.value); setDateErrors({}) }} />
+<FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></Field></div>
           </div>
         ) : null}
         <div className={form.field}><span className={form.labelSmall} id="webinar-schedule-time-label">時刻</span><TimeField aria-labelledby="webinar-schedule-time-label" value={time} onChange={setTime} /></div>
@@ -600,7 +592,8 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
           ...(media ?? []).map((item) => ({ value: item.id, label: item.filename })),
           ...(choice && choice !== EXTERNAL && media && !media.some((item) => item.id === choice) ? [{ value: choice, label: '今の動画' }] : []),
         ]} />
-        <div className={form.field}><label htmlFor="wd-minutes" className={form.labelSmall}>動画の長さ（分）</label><TextField id="wd-minutes" inputMode="numeric" value={minutes} invalid={Boolean(minutesError)} aria-describedby={minutesError ? 'wd-minutes-error' : undefined} onChange={(event) => { setMinutes(event.target.value); setMinutesError('') }} /><FieldError id="wd-minutes-error">{minutesError}</FieldError></div>
+        <div className={form.field}><Field label="動画の長さ（分）" htmlFor="wd-minutes"><TextField id="wd-minutes" inputMode="numeric" value={minutes} invalid={Boolean(minutesError)} aria-describedby={minutesError ? 'wd-minutes-error' : undefined} onChange={(event) => { setMinutes(event.target.value); setMinutesError('') }} />
+<FieldError id="wd-minutes-error">{minutesError}</FieldError></Field></div>
         {nexts.length > 0 ? (
           <div className={form.field}>
             <span className={form.labelSmall}>動画の準備（検査・変換・配信の形・表紙を通した動画だけ公開できます）</span>

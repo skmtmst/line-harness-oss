@@ -53,6 +53,7 @@ import { mileagePaginationTotal } from './display'
 import styles from './mileage.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
+import { Field } from '@/components/shared/form-controls'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -940,9 +941,7 @@ export function ScoreAdjustDialog({
           </div>
         </div>
 
-        <div className={styles.dlgGroup}>
-          <label className={styles.dlgFieldLabel} htmlFor="ml-score-amount">点数</label>
-          <input
+        <div className={styles.dlgGroup}><Field label="点数" htmlFor="ml-score-amount"><input
             id="ml-score-amount"
             className={styles.dlgInput}
             inputMode="numeric"
@@ -952,12 +951,9 @@ export function ScoreAdjustDialog({
             aria-invalid={fields.invalid('amount') || undefined}
             aria-describedby={fields.invalid('amount') ? 'ml-score-amount-error' : undefined}
           />
-          <FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError>
-        </div>
+<FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></div>
 
-        <div className={styles.dlgGroup}>
-          <label className={styles.dlgCaption} htmlFor="ml-score-reason">理由</label>
-          <textarea
+        <div className={styles.dlgGroup}><Field label="理由" htmlFor="ml-score-reason"><textarea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}
@@ -967,8 +963,7 @@ export function ScoreAdjustDialog({
             aria-invalid={fields.invalid('reason') || undefined}
             aria-describedby={fields.invalid('reason') ? 'ml-score-reason-error' : undefined}
           />
-          <FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError>
-        </div>
+<FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError></Field></div>
 
         <p className={styles.dlgCaption}>この変更で起きること</p>
         <div className={styles.delta3}>

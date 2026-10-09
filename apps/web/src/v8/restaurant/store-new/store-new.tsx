@@ -22,6 +22,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import { Field as SharedField } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import TermsBody from './terms-body'
 import { canSubmitTerms, formatAgreedAt, hasReadTerms, initialWizardStep, STEP } from './terms-state'
@@ -49,16 +50,7 @@ function Field({ label, required, help, error, children }: { label: string; requ
   const field = isValidElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean; 'aria-required'?: boolean }>(children)
     ? cloneElement(children, { id: inputId, 'aria-describedby': describedBy, 'aria-required': required || undefined, ...(error ? { 'aria-invalid': true as const } : null) })
     : children
-  return (
-    <div className={styles.fieldBlock}>
-      <div className={styles.field}>
-        <label htmlFor={inputId} className={styles.label}>{label}</label>
-        {field}
-      </div>
-      {help ? <p id={helpId} className={styles.help}>{help}</p> : null}
-      {error ? <p id={errorId} role="alert" className={styles.error}>{error}</p> : null}
-    </div>
-  )
+  return <SharedField label={label} htmlFor={inputId} required={required} help={help}>{field}{error ? <p id={errorId} role="alert" className={styles.error}>{error}</p> : null}</SharedField>
 }
 
 /** マニュアルへの道。URL が決まるまで（空文字）は押せない形で出す（今の画面は出さなかった）。 */

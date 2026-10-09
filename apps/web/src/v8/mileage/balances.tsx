@@ -42,6 +42,7 @@ import {
 import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 function dateOnlyDaysAgo(days: number) {
   const date = new Date()
@@ -552,16 +553,13 @@ export default function BalancesTab() {
           onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}
           onConfirm={() => { if (rejectTarget) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
         >
-          <label className={styles.fieldLabel}>
-            差し戻す理由
-            <textarea
+          <Field label="差し戻す理由"><textarea
               className={styles.textarea}
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}
               placeholder="例：調整の根拠となる資料を確認できませんでした"
               rows={3}
-            />
-          </label>
+            /></Field>
         </Dialog>
       }
     >

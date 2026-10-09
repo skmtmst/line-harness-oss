@@ -132,11 +132,11 @@ export default function DuplicatesV8() {
         <div className={styles.searchWrap}>
           <SearchField
             className="w-full"
-            aria-label="名前・メール・電話で検索"
+            aria-label="名前・メール・電話で探す"
             value={d.query}
             onChange={d.setQuery}
             onClear={() => d.setQuery('')}
-            placeholder="名前・メール・電話で検索"
+            placeholder="名前・メール・電話で探す"
           />
         </div>
         <div className={styles.selectWrap}>

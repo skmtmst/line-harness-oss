@@ -452,16 +452,13 @@ export function ConversionReversalDialog(props: ConversionReversalDialogProps) {
       onConfirm={() => void submitReversal()}
       onCancel={() => setReversalTarget(null)}
     >
-      <label className="block">
-        <span className="text-ink text-xs font-semibold">理由</span>
-        <TextField
+      <Field label="理由"><TextField
           className="mt-1"
           value={reversalReason}
           maxLength={500}
-          placeholder="例: 重複して届いた成果だったため"
+          placeholder="例：重複して届いた成果だったため"
           onChange={(e) => setReversalReason(e.target.value)}
-        />
-      </label>
+        /></Field>
     </Dialog>
     </>
   )
@@ -537,9 +534,7 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             </Field>
           ) : null}
           {/* 起点に金額が無いものは注文の金額を出さない。選択肢は対応表が持つ(作成と同じ)。 */}
-          <label className="block">
-            <span className="text-ink-faint text-xs">金額の決め方</span>
-            <Select
+          <Field label="金額の決め方"><Select
               id="cv-edit-value-mode"
               error={editFieldIssue?.field === 'cv-edit-value-mode' ? editFieldIssue.message : undefined}
               aria-label="金額の決め方"
@@ -553,12 +548,11 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
                 setEditValueModeNotice(null)
               }}
             />
-            {editValueModeNotice ? (
+{editValueModeNotice ? (
               <span className="text-warning mt-1 block text-xs" role="status">
                 {editValueModeNotice}
               </span>
-            ) : null}
-          </label>
+            ) : null}</Field>
           {editForm.valueMode === 'fixed' ? (
             <Field label="1件あたりの金額" htmlFor="cv-edit-value" error={editFieldIssue?.field === 'cv-edit-value' ? editFieldIssue.message : undefined}>
               <TextField
@@ -569,15 +563,12 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
               />
             </Field>
           ) : null}
-          <label className="block">
-            <span className="text-ink-faint text-xs">同じ人を何回数えるか</span>
-            <Select
+          <Field label="同じ人を何回数えるか"><Select
               aria-label="同じ人を何回数えるか"
               value={editForm.deduplicationMode}
               options={DEDUP_OPTIONS}
               onChange={(value) => setEditForm({ ...editForm, deduplicationMode: value as EditForm['deduplicationMode'] })}
-            />
-          </label>
+            /></Field>
           {editForm.deduplicationMode === 'window' ? (
             <Field label="数えない日数（1〜365）" htmlFor="cv-edit-window" error={editFieldIssue?.field === 'cv-edit-window' ? editFieldIssue.message : undefined}>
               <TextField
@@ -588,15 +579,12 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
               />
             </Field>
           ) : null}
-          <label className="block">
-            <span className="text-ink-faint text-xs">取り消しの扱い</span>
-            <Select
+          <Field label="取り消しの扱い"><Select
               aria-label="取り消しの扱い"
               value={editForm.reversalPolicy}
               options={REVERSAL_OPTIONS}
               onChange={(value) => setEditForm({ ...editForm, reversalPolicy: value as EditForm['reversalPolicy'] })}
-            />
-          </label>
+            /></Field>
           {/* R281: 友だち追加からの計測期間も編集できる。空欄は既定の90日。 */}
           <Field
             label="友だち追加からの計測期間（日）"

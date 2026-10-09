@@ -35,6 +35,7 @@ import styles from './create.module.css'
 
 import { tagNameProblem } from './tag-name'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { Field } from '@/components/shared/form-controls'
 export { tagNameProblem } from './tag-name'
 
 export default function TagCreateV8() {
@@ -226,9 +227,7 @@ function TagCreate() {
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle} id="tag-new-basic">基本</h2>
           </div>
-          <label className={styles.field}>
-            <span className={styles.label}>タグ名</span>
-            <TextField
+          <Field label="タグ名"><TextField
               ref={nameRef}
               aria-label="タグ名"
               invalid={Boolean(nameError)}
@@ -239,9 +238,8 @@ function TagCreate() {
               aria-required="true"
               onChange={(event) => { setName(event.target.value); setNameError('') }}
             />
-            {nameError ? <p id="tag-name-error" className={styles.fieldError} role="alert">{nameError}</p> : null}
-            <DuplicateNameNote duplicates={duplicates} kindLabel="タグ" />
-          </label>
+{nameError ? <p id="tag-name-error" className={styles.fieldError} role="alert">{nameError}</p> : null}
+<DuplicateNameNote duplicates={duplicates} kindLabel="タグ" /></Field>
           <div className={styles.field}>
             <span className={styles.label} id="tag-new-folder">所属フォルダ</span>
             <span className={styles.selectBox}>

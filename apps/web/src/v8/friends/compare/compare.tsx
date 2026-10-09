@@ -31,6 +31,7 @@ import { canSubmitDecision } from '@/components/identity/identity-view'
 import { CONFIDENCE_WORD, STATUS_WORD, slashDateTime } from '../duplicates/words'
 import styles from './compare.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
 
 const STRENGTH_WORD = { strong: '決め手', medium: '手がかり', weak: '参考' } as const
 const ATTRIBUTE_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }
@@ -195,16 +196,15 @@ function CompareInner() {
 
               {panelOpen ? (
                 <div className={styles.pair}>
-                  <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide">
-                    <p id="compare-decide" className={styles.panelTitle}>「この2件を判定する」の小窓</p>
-                    <div className={styles.radios} role="radiogroup" aria-label="判定">
+                  <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide"><Field label={<>判定の理由（必須）</>} htmlFor="compare-reason"><p id="compare-decide" className={styles.panelTitle}>「この2件を判定する」の小窓</p>
+<div className={styles.radios} role="radiogroup" aria-label="判定">
                       {DECISIONS.map((item) => (
                         <Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} onChange={() => setDecision(item.value)}>
                           {item.label}
                         </Radio>
                       ))}
                     </div>
-                    {decision === 'linked' ? (
+{decision === 'linked' ? (
                       <>
                         <p className={styles.fieldBox}>過去の扱い：これまでの履歴を1人分にまとめる</p>
                         <p className={styles.fieldBox}>{selectionSummary}</p>
@@ -221,22 +221,20 @@ function CompareInner() {
                         </div>
                       </>
                     ) : null}
-                    <label className={styles.fieldLabel} htmlFor="compare-reason">判定の理由（必須）</label>
-                    <TextField
+<TextField
                       id="compare-reason"
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
                       placeholder={decisive ? `${decisive.label}` : '何を見てそう判断したか'}
                     />
-                    {review.decideError ? <p className={styles.error} role="alert">{review.decideError}</p> : null}
-                    {!ready && reason.trim() !== '' && decision === 'linked' && !linkedReady ? (
+{review.decideError ? <p className={styles.error} role="alert">{review.decideError}</p> : null}
+{!ready && reason.trim() !== '' && decision === 'linked' && !linkedReady ? (
                       <p className={styles.note} role="status">3つの確認をそろえると判定できます。</p>
                     ) : null}
-                    <div className={styles.panelActions}>
+<div className={styles.panelActions}>
                       <Button type="button" variant="secondary" onClick={() => setPanelOpen(false)} disabled={review.deciding}>キャンセル</Button>
                       <Button type="button" variant="primary" onClick={submit} disabled={!ready} busy={review.deciding} busyLabel="処理中…">判定する</Button>
-                    </div>
-                  </div>
+                    </div></Field></div>
                   <div className={styles.historyCard}>
                     <p className={styles.panelTitle}>判定の履歴</p>
                     <ul className={styles.lines}>

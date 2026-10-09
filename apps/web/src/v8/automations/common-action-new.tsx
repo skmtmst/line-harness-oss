@@ -276,10 +276,7 @@ export function CommonActionNew() {
         <Field label="名前" htmlFor="ca-name" error={inputError?.target === 'ca-name' ? inputError.message : undefined}>
           <TextField id="ca-name" value={name} maxLength={120} placeholder="例：購入のお礼" onChange={(event) => { setName(event.target.value); if (inputError?.target === 'ca-name') setInputError(null) }} />
         </Field>
-        <label className={styles.field}>
-          <span className={styles.label}>説明<OptionalBadge /></span>
-          <TextField value={description} maxLength={200} placeholder="使う場面や目的を書きます" onChange={(event) => setDescription(event.target.value)} />
-        </label>
+        <Field label="説明"><TextField value={description} maxLength={200} placeholder="使う場面や目的を書きます" onChange={(event) => setDescription(event.target.value)} /></Field>
       </section>
 
       <section className={styles.card} aria-labelledby="ca-steps">

@@ -821,7 +821,7 @@ export default function RichMenusListV8() {
       allCount={groupFacets?.total ?? groupTotal}
       unfiledCount={groupFacets?.folderCounts[UNFILED] ?? 0}
       countOf={(f) => groupFacets?.folderCounts[f.id] ?? 0}
-      placeholder="例: 01_会員向け"
+      placeholder="例：01_会員向け"
     />
   )
 
@@ -895,7 +895,7 @@ export default function RichMenusListV8() {
         <div className={styles.narrowSearch}>
           <SearchField
             placeholder="メニュー名・ボタン名"
-            aria-label="メニュー名・ボタン名で検索"
+            aria-label="メニュー名・ボタン名で探す"
             value={query}
             onChange={(value) => {
               setQuery(clampSearchQuery(value))
@@ -918,7 +918,7 @@ export default function RichMenusListV8() {
       <ListToolbar
         search={{
           placeholder: 'メニュー名・ボタン名',
-          label: 'メニュー名・ボタン名で検索',
+          label: 'メニュー名・ボタン名で探す',
           width: 200,
           value: query,
           onChange: (value) => {

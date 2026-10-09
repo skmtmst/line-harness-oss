@@ -247,16 +247,16 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
     >
       <div className="space-y-4" ref={formRef} onInput={() => setFieldErrors({})}>
         <Field label="案件名" htmlFor={nameId} error={fieldErrors.name} required>
-          <TextField id={nameId} value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 無料体験申込" />
+          <TextField id={nameId} value={name} onChange={(event) => setName(event.target.value)} placeholder="例：無料体験申込" />
         </Field>
         <Field label="説明" htmlFor={descriptionId}>
           <TextArea id={descriptionId} value={description} onChange={(event) => setDescription(event.target.value)} rows={2} placeholder="案件の説明（任意）" />
         </Field>
         <Field label="報酬額（円）" htmlFor={rewardAmountId} error={fieldErrors.rewardAmount}>
-          <TextField id={rewardAmountId} type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="例: 3000" />
+          <TextField id={rewardAmountId} type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="例：3000" />
         </Field>
         <Field label="成果承認時の付与マイル" htmlFor={rewardMilesId} error={fieldErrors.rewardMiles} note="承認された紹介1件ごとに紹介者へ付与します">
-          <TextField id={rewardMilesId} type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="例: 500" />
+          <TextField id={rewardMilesId} type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="例：500" />
         </Field>
 
         {isEdit && termsFailed ? (
@@ -267,17 +267,14 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
         ) : null}
         <OfferTermsFields errors={fieldErrors} values={terms} onChange={setTerms} disabled={isEdit && !termsLoaded} />
 
-        <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">誘導 LINE アカウント</label>
-          <Select
+        <div><Field label="誘導 LINE アカウント"><Select
             aria-label="誘導 LINE アカウント"
             value={lineAccountId}
             onChange={(value) => setLineAccountId(value)}
             options={[{ value: '', label: '— 選択しない —' }, ...accounts.map((acc) => ({ value: acc.id, label: acc.name }))]}
             className="w-full"
             size="full"
-          />
-        </div>
+          /></Field></div>
 
         <div>
           <span className="text-ink-secondary mb-1 block text-xs font-medium">タグ</span>

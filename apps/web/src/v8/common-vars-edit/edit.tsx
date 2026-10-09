@@ -80,6 +80,7 @@ import {
 import { formatNumber } from '@/lib/format'
 import styles from './edit.module.css'
 import { focusFieldById } from '@/lib/use-form-errors'
+import { Field } from '@/components/shared/form-controls'
 
 /** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
 export function scheduleStamp(value: string): string {
@@ -798,9 +799,7 @@ function EditCommonVarV8Inner() {
       <section className={styles.sideCard} aria-labelledby="cv-edit-name-heading">
         <h2 id="cv-edit-name-heading" className={styles.sideTitle}>名前とフォルダ</h2>
         <div className={styles.sideFields}>
-          <div className={styles.field}>
-            <label htmlFor="cv-name" className={styles.fieldLabelStrong}>名前</label>
-            <input
+          <div className={styles.field}><Field label="名前" htmlFor="cv-name"><input
               id="cv-name"
               type="text"
               maxLength={200}
@@ -811,8 +810,7 @@ function EditCommonVarV8Inner() {
               aria-invalid={nameFieldError ? true : undefined}
               aria-describedby={nameFieldError ? 'cv-name-error' : undefined}
             />
-            {nameFieldError ? <p id="cv-name-error" className={styles.fieldError} role="alert">{nameFieldError}</p> : null}
-          </div>
+{nameFieldError ? <p id="cv-name-error" className={styles.fieldError} role="alert">{nameFieldError}</p> : null}</Field></div>
           {canWrite ? (
             <FolderSelect
               aria-label="フォルダ"
@@ -850,19 +848,13 @@ function EditCommonVarV8Inner() {
       <section className={`${styles.sideCard} ${styles.periodCard}`} aria-labelledby="cv-edit-period-heading">
         <h2 id="cv-edit-period-heading" className={styles.sideTitle}>使える期間</h2>
         <div className={styles.sideFields}>
-          <div className={styles.field}>
-            <label htmlFor="cv-valid-from" className={styles.fieldLabelStrong}>始まり</label>
-            {canWrite
+          <div className={styles.field}><Field label="始まり" htmlFor="cv-valid-from">{canWrite
               ? <DateTimeField id="cv-valid-from" value={validFrom} placeholder="指定なし" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidFrom(v); setPeriodFieldError('') }} />
-              : <ReadOnlyValue id="cv-valid-from" value={readOnlyDate(validFrom)} />}
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="cv-valid-until" className={styles.fieldLabelStrong}>終わり</label>
-            {canWrite
+              : <ReadOnlyValue id="cv-valid-from" value={readOnlyDate(validFrom)} />}</Field></div>
+          <div className={styles.field}><Field label="終わり" htmlFor="cv-valid-until">{canWrite
               ? <DateTimeField id="cv-valid-until" value={validUntil} placeholder="指定なし" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidUntil(v); setPeriodFieldError('') }} />
               : <ReadOnlyValue id="cv-valid-until" value={readOnlyDate(validUntil)} />}
-            {periodFieldError ? <p className={styles.fieldError} role="alert">{periodFieldError}</p> : null}
-          </div>
+{periodFieldError ? <p className={styles.fieldError} role="alert">{periodFieldError}</p> : null}</Field></div>
         </div>
         <div className={styles.sideFields}>
           {canWrite ? (
@@ -878,9 +870,7 @@ function EditCommonVarV8Inner() {
             <ReadOnlyValue id="cv-expiry-behavior" label="期間外の動き" value={expiryBehavior === 'fallback' ? '期間外の動き：代わりの値を出す' : '期間外の動き：配信を止める'} />
           )}
           {expiryBehavior === 'fallback' && (
-            <div className={styles.field}>
-              <label htmlFor="cv-fallback-value" className={styles.fieldLabelStrong}>代わりの値</label>
-              {!canWrite && (item.type === 'boolean' || (item.type as string) === 'date' || (item.type as string) === 'datetime') ? (
+            <div className={styles.field}><Field label="代わりの値" htmlFor="cv-fallback-value">{!canWrite && (item.type === 'boolean' || (item.type as string) === 'date' || (item.type as string) === 'datetime') ? (
                 <ReadOnlyValue id="cv-fallback-value" label="代わりの値" value={(item.type as string) === 'boolean' ? (fallbackValue || '未選択') : readOnlyDate(fallbackValue)} />
               ) : item.type === 'boolean' ? (
                 <Select
@@ -905,17 +895,14 @@ function EditCommonVarV8Inner() {
                   readOnly={!canWrite}
                 />
               )}
-              {fallbackFieldError ? <p className={styles.fieldError} role="alert">{fallbackFieldError}</p> : null}
-            </div>
+{fallbackFieldError ? <p className={styles.fieldError} role="alert">{fallbackFieldError}</p> : null}</Field></div>
           )}
         </div>
       </section>
 
       <section className={styles.sideCard} aria-labelledby="cv-edit-memo-heading">
         <h2 id="cv-edit-memo-heading" className={styles.sideTitle}>社内メモ</h2>
-        <div className={styles.field}>
-          <label htmlFor="cv-memo" className={styles.fieldLabelStrong}>メモ（お客さまには出ません）</label>
-          <input
+        <div className={styles.field}><Field label="メモ（お客さまには出ません）" htmlFor="cv-memo"><input
             id="cv-memo"
             type="text"
             value={memo}
@@ -924,8 +911,7 @@ function EditCommonVarV8Inner() {
             placeholder="店舗ごとに違うときは店舗の共通情報へ"
             className={styles.fieldInput}
             readOnly={!canWrite}
-          />
-        </div>
+          /></Field></div>
       </section>
     </div>
   ) : null
@@ -1146,21 +1132,16 @@ function EditCommonVarV8Inner() {
               <h2 id="cv-edit-value-heading" className={styles.cardTitle}>中身を変える</h2>
             </div>
             <div className={styles.valueRow}>
-              <div className={styles.field}>
-                <label htmlFor="cv-current" className={styles.fieldLabelStrong}>いまの中身</label>
-                <input
+              <div className={styles.field}><Field label="いまの中身" htmlFor="cv-current"><input
                   id="cv-current"
                   type="text"
                   value={item.value || '（空）'}
                   readOnly
                   aria-readonly="true"
                   className={styles.fieldInput}
-                />
-              </div>
+                /></Field></div>
               <span className={styles.valueArrow} aria-hidden="true"><ArrowRight size={18} /></span>
-              <div className={styles.field}>
-                <label htmlFor="cv-value" className={styles.fieldLabelStrong}>新しい中身</label>
-                {!canWrite && (item.type === 'boolean' || (item.type as string) === 'date' || (item.type as string) === 'datetime') ? (
+              <div className={styles.field}><Field label="新しい中身" htmlFor="cv-value">{!canWrite && (item.type === 'boolean' || (item.type as string) === 'date' || (item.type as string) === 'datetime') ? (
                   // 閲覧のみ：選ぶ部品は置かず、中身を文字で見せる。
                   <ReadOnlyValue id="cv-value" label="新しい中身" value={item.type === 'boolean' ? value : readOnlyDate(value)} />
                 ) : item.type === 'boolean' ? (
@@ -1182,15 +1163,10 @@ function EditCommonVarV8Inner() {
                     aria-label="新しい中身"
                     readOnly={!canWrite}
                   />
-                )}
-              </div>
+                )}</Field></div>
             </div>
             {valueFieldError ? <p className={styles.fieldError} role="alert">{valueFieldError}</p> : null}
-            <div className={styles.field}>
-              <label htmlFor="cv-change-reason" className={styles.fieldLabelStrong}>
-                変える理由（記録に残ります）
-              </label>
-              <input
+            <div className={styles.field}><Field label="変える理由（記録に残ります）" htmlFor="cv-change-reason"><input
                 id="cv-change-reason"
                 type="text"
                 value={changeReason}
@@ -1201,8 +1177,7 @@ function EditCommonVarV8Inner() {
                 aria-label="変える理由（記録に残ります）"
                 readOnly={!canWrite}
               />
-              {reasonFieldError ? <p className={styles.fieldError} role="alert">{reasonFieldError}</p> : null}
-            </div>
+{reasonFieldError ? <p className={styles.fieldError} role="alert">{reasonFieldError}</p> : null}</Field></div>
           </section>
 
           <section className={styles.card} aria-labelledby="cv-edit-impact-heading">
@@ -1270,20 +1245,17 @@ function EditCommonVarV8Inner() {
           </div>
         }
       >
-        <label className={styles.field}>
-          <span className={styles.fieldLabelStrong}>
+        <Field label={<><span className={styles.fieldLabelStrong}>
             {statusAction === 'stop' ? '止める理由（記録に残ります）'
               : statusAction === 'resume' ? '再開する理由（記録に残ります）'
                 : '公開する理由（記録に残ります）'}
-          </span>
-          <input
+          </span></>}><input
             value={statusReason}
             onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
             maxLength={200}
             placeholder={statusAction === 'stop' ? '例：キャンペーンが終わったため' : '例：新しい期間の案内を始めるため'}
             className={styles.fieldInput}
-          />
-        </label>
+          /></Field>
       </Dialog>
 
       {/* 削除の確認。使われているものは消さず、一覧の窓（`xxKtW`）へ導く。 */}
@@ -1321,17 +1293,12 @@ function EditCommonVarV8Inner() {
                   ? `いま${deleteImpact.blockingTotal}か所で使われています。一覧の削除の窓から差し替えてください。`
                   : '使っている設定はありません。'}
               </p>
-              <label className={styles.field}>
-                <span className={styles.fieldLabelStrong}>
-                  消した理由 <span className={styles.required}>必須</span>
-                </span>
-                <input
+              <Field label="消した理由" required><input
                   value={deleteReason}
                   onChange={(event) => setDeleteReason(event.target.value)}
                   placeholder="例：店舗情報の変更のため"
                   className={styles.fieldInput}
-                />
-              </label>
+                /></Field>
             </>
           ) : null}
         </div>
@@ -1359,30 +1326,22 @@ function EditCommonVarV8Inner() {
         {draft ? (
           <div className={styles.dialogBody}>
             <div className={styles.dialogPair}>
-              <div className={styles.field}>
-                <label htmlFor="sc-date" className={styles.fieldLabelStrong}>開始日</label>
-                <DateField
+              <div className={styles.field}><Field label="開始日" htmlFor="sc-date"><DateField
                   id="sc-date"
                   value={draft.date}
                   min={jstNowLocalInput().date}
                   invalid={Boolean(scheduleDateError)}
                   onChange={(v) => { setDraft({ ...draft, date: v }); setScheduleDateError('') }}
                 />
-                {scheduleDateError ? <p className={styles.fieldError} role="alert">{scheduleDateError}</p> : null}
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="sc-time" className={styles.fieldLabelStrong}>開始時刻</label>
-                <TimeField
+{scheduleDateError ? <p className={styles.fieldError} role="alert">{scheduleDateError}</p> : null}</Field></div>
+              <div className={styles.field}><Field label="開始時刻" htmlFor="sc-time"><TimeField
                   id="sc-time"
                   size="field"
                   value={draft.time}
                   onChange={(v) => setDraft({ ...draft, time: v })}
-                />
-              </div>
+                /></Field></div>
             </div>
-            <div className={styles.field}>
-              <label htmlFor="sc-value" className={styles.fieldLabelStrong}>更新後の値</label>
-              {item?.type === 'boolean' ? (
+            <div className={styles.field}><Field label="更新後の値" htmlFor="sc-value">{item?.type === 'boolean' ? (
                 <Select size="full" aria-label="更新後の値" id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
               ) : (item?.type as string) === 'date' ? (
                 <DateField id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} />
@@ -1397,8 +1356,7 @@ function EditCommonVarV8Inner() {
                   className={styles.fieldInput}
                 />
               )}
-              {scheduleFieldError ? <p className={styles.fieldError}>{scheduleFieldError}</p> : null}
-            </div>
+{scheduleFieldError ? <p className={styles.fieldError}>{scheduleFieldError}</p> : null}</Field></div>
           </div>
         ) : null}
       </Dialog>

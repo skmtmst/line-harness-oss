@@ -1603,7 +1603,7 @@ export default function TemplatesListV8() {
           kind="template"
           accountId={selectedAccountId}
           note="テンプレートを分けてしまう箱です。削除しても、中のテンプレートは未分類に残ります。"
-          placeholder="例: 01_定期便"
+          placeholder="例：01_定期便"
           onClose={() => setFolderDialogOpen(false)}
           onAdded={() => { setFolderDialogOpen(false); void loadFolders() }}
         />
@@ -1615,7 +1615,7 @@ export default function TemplatesListV8() {
           folder={editingFolder}
           accountId={selectedAccountId}
           note="テンプレートを分けてしまう箱です。削除しても、中のテンプレートは未分類に残ります。"
-          placeholder="例: 01_定期便"
+          placeholder="例：01_定期便"
           onClose={() => setEditingFolder(null)}
           onAdded={() => { setEditingFolder(null); void loadFolders() }}
         />

@@ -25,6 +25,7 @@ import { formatNumber } from '@/lib/format'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { parseYen, yen, type LoadStatus, type SavedHandler } from './parts'
 import styles from './members.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type MilestoneDraft = { id: string | null; threshold: number; title: string; benefit: string | null; notify: boolean; reachedCount: number }
 
@@ -215,16 +216,10 @@ export default function LifetimeV8({
       >
         {editing ? (
           <div className={styles.editBody}>
-            <label className={styles.removeField}>
-              <span className={styles.removeLabel}>節目（累計の金額）</span>
-              <TextField {...fields.bind('milestone-threshold')} inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} />
-              <FieldError id="milestone-threshold-error">{fields.error('milestone-threshold')}</FieldError>
-            </label>
-            <label className={styles.removeField}>
-              <span className={styles.removeLabel}>称号</span>
-              <TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} />
-              <FieldError id="milestone-title-error">{fields.error('milestone-title')}</FieldError>
-            </label>
+            <Field label="節目（累計の金額）"><TextField {...fields.bind('milestone-threshold')} inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} />
+<FieldError id="milestone-threshold-error">{fields.error('milestone-threshold')}</FieldError></Field>
+            <Field label="称号"><TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} />
+<FieldError id="milestone-title-error">{fields.error('milestone-title')}</FieldError></Field>
             <div className={styles.editToggle}>
               <Toggle checked={editing.notify} onChange={(checked) => setEditing({ ...editing, notify: checked })} label={editing.notify ? '到達したら LINE で通知する' : '到達しても通知しない'} />
             </div>

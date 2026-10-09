@@ -39,6 +39,7 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './notifications.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const SETTINGS_KEYS = [
   'registrationEnabled', 'dayBeforeEnabled', 'dayBeforeTime',
@@ -357,18 +358,12 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
             })}
           </ul>
         )}
-        <div className={form.field}>
-          <label className={form.label} htmlFor="webinar-action-message">視聴完了のメッセージ</label>
-          <TextField id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} readOnly={readOnly} disabled={saving} onChange={(event) => setTemplateBody(event.target.value)} />
-        </div>
-        <div className={form.field}>
-          <label className={form.labelSmall} htmlFor="webinar-missing-policy">結果が取れないとき</label>
-          <div className={styles.policy}>
+        <div className={form.field}><Field label="視聴完了のメッセージ" htmlFor="webinar-action-message"><TextField id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} readOnly={readOnly} disabled={saving} onChange={(event) => setTemplateBody(event.target.value)} /></Field></div>
+        <div className={form.field}><Field label="結果が取れないとき" htmlFor="webinar-missing-policy"><div className={styles.policy}>
             {readOnly
               ? <ReadValue label="視聴結果を取得できない場合">{policy === 'escalate' ? '要対応へ追加' : '翌日に取り直す'}</ReadValue>
               : <Select id="webinar-missing-policy" aria-label="視聴結果を取得できない場合" size="full" value={policy} disabled={saving} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に取り直す' }]} />}
-          </div>
-        </div>
+          </div></Field></div>
         {readOnly ? null : <div><Button onClick={() => setActionsOpen('completed')}><Plus size={15} aria-hidden="true" />条件を足す</Button></div>}
       </section>
       {error ? <Notice tone="danger">{error}</Notice> : null}

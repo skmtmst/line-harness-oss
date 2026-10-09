@@ -23,6 +23,7 @@ import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { KpiMenu, StatePill, shortDay } from './common'
 import styles from './analytics.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const RANGES = [7, 28, 90] as const
 type RangeDays = typeof RANGES[number]
@@ -145,9 +146,7 @@ export default function SearchConsoleV8() {
         </KpiBand>
         <div className={styles.body} data-gap="tab">
           <div className={styles.controls} data-gap="narrow">
-            <label className={styles.field} data-w="property"><span className={styles.fieldLabel}>対象プロパティ</span>
-              <Select id="search-property" aria-label="対象プロパティ" size="full" value={data.siteUrl} disabled onChange={() => {}} options={[{ value: data.siteUrl, label: data.siteUrl }]} />
-            </label>
+            <Field label="対象プロパティ"><Select id="search-property" aria-label="対象プロパティ" size="full" value={data.siteUrl} disabled onChange={() => {}} options={[{ value: data.siteUrl, label: data.siteUrl }]} /></Field>
             <span className={styles.pillSlot}><StatePill tone="ok">連携中</StatePill></span>
             {periodControl}
             <span className={styles.spacer} />

@@ -43,6 +43,7 @@ import EditRouteModal from './edit-route-dialog'
 import QrDialog from './qr-dialog'
 import RefOrdersPanel, { type RefOrdersResult } from './ref-orders'
 import styles from './detail.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 interface MessageTemplate {
   id: string
@@ -819,17 +820,14 @@ function InflowDetailContent() {
               </div>
             ) : null}
             {deleteChoice === 'delete' ? (
-              <label className={styles.deleteField}>
-                <span className={styles.deleteChoiceTitle}>{`完全削除するには「${route.name}」と入力`}</span>
-                <input
+              <Field label={<><span className={styles.deleteChoiceTitle}>{`完全削除するには「${route.name}」と入力`}</span></>}><input
                   value={deleteConfirmationName}
                   disabled={deleting}
                   onChange={(event) => setDeleteConfirmationName(event.target.value)}
                   autoComplete="off"
                   className={styles.fieldInput}
                 />
-                <span className={styles.note}>空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</span>
-              </label>
+<span className={styles.note}>空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</span></Field>
             ) : null}
           </div>
         </Dialog>

@@ -37,6 +37,7 @@ import { TemplateEditFrame } from '../template-edit/frame'
 import type { TemplateEditHost } from '../template-edit/host'
 import te from '../template-edit/edit.module.css'
 import styles from './question-new.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const MAX_CHOICES = 4
 
@@ -275,10 +276,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         <section className={styles.card} aria-labelledby="q-name">
           <h2 className={styles.cardTitle} id="q-name">名前とフォルダ</h2>
           <div className={styles.row}>
-            <label className={`${styles.field} ${styles.grow}`}>
-              <span className={styles.label}>テンプレート名</span>
-              <input {...fields.bind('name')} className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'q-name-error' : undefined} onChange={(event) => setName(event.target.value)} />
-            </label>
+            <Field label="テンプレート名"><input {...fields.bind('name')} className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'q-name-error' : undefined} onChange={(event) => setName(event.target.value)} /></Field>
             <FieldError id="q-name-error">{fields.error('name')}</FieldError>
             <div className={`${styles.field} ${styles.folder}`}>
               <span className={styles.pickLabel}>フォルダ</span>
@@ -306,14 +304,8 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
 
         <section className={styles.card} aria-labelledby="q-question">
           <h2 className={styles.cardTitle} id="q-question">質問</h2>
-          <label className={styles.field}>
-            <span className={styles.label}>前文（空なら送らない）<span className={styles.optional}>任意</span></span>
-            <input className={styles.input} value={question.intro ?? ''} maxLength={4500} placeholder="いつもありがとうございます。" onChange={(event) => setQuestion((current) => ({ ...current, intro: event.target.value }))} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.label}>質問文（160文字まで）</span>
-            <input {...fields.bind('text')} className={styles.input} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} />
-          </label>
+          <Field label="前文（空なら送らない）"><input className={styles.input} value={question.intro ?? ''} maxLength={4500} placeholder="いつもありがとうございます。" onChange={(event) => setQuestion((current) => ({ ...current, intro: event.target.value }))} /></Field>
+          <Field label="質問文（160文字まで）"><input {...fields.bind('text')} className={styles.input} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} /></Field>
           <FieldError id="q-text-error">{fields.error('text')}</FieldError>
           <div className={styles.inline}>
             <span className={styles.pickLabel} id="q-mode">答え方</span>
@@ -337,10 +329,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                   <span className={styles.choiceNo}>{`選択肢 ${index + 1}`}</span>
                   <Button type="button" variant="text" disabled={question.choices.length <= 1} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を消す`}><Trash2 size={14} aria-hidden="true" />消す</Button>
                 </div>
-                <label className={styles.field}>
-                  <span className={styles.label}>ボタンの文字（20文字まで）</span>
-                  <input {...fields.bind(`choice-${index}`)} className={styles.input} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} />
-                </label>
+                <Field label="ボタンの文字（20文字まで）"><input {...fields.bind(`choice-${index}`)} className={styles.input} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} /></Field>
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
                 {host ? null : <div className={styles.inline}>
                   <span className={styles.smallLabel}>押されたら</span>
@@ -349,10 +338,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                     <ChevronDown className={styles.pickIcon} aria-hidden="true" />
                   </button>
                 </div>}
-                <label className={styles.field}>
-                  <span className={styles.label}>押したときの返信<span className={styles.optional}>任意</span></span>
-                  <input className={styles.input} value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} />
-                </label>
+                <Field label="押したときの返信"><input className={styles.input} value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} /></Field>
               </div>
             ))}
           </div>

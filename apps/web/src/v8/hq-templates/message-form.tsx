@@ -26,6 +26,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import type { FormErrors } from '@/lib/use-form-errors'
 import { decodeImageSize, type TemplateMedia } from './definition'
 import styles from './console.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /*
  * ボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。保存の形（HqMessageCard の action・value）は今のまま。
@@ -122,15 +123,9 @@ export default function MessageForm({
         {current.messageType === 'flex' || current.messageType === 'image' ? <Notice tone="warn" message={LEGACY_MESSAGE_NOTICE} /> : null}
         <h2 className={styles.editTitle}>ひな形の中身</h2>
         <div className={styles.twoCol}>
-          <label className={styles.field}>
-            <span className={styles.label}>ひな形の名前</span>
-            <input aria-label="ひな形の名前" {...bindField('name', 'hq-msg-name')} className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} />
-            <FieldError id="hq-msg-name-error">{fields?.error('name')}</FieldError>
-          </label>
-          <label className={styles.field}>
-            <span className={styles.label}>分類 <small className={styles.optional}>任意</small></span>
-            <input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} />
-          </label>
+          <Field label="ひな形の名前"><input aria-label="ひな形の名前" {...bindField('name', 'hq-msg-name')} className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} />
+<FieldError id="hq-msg-name-error">{fields?.error('name')}</FieldError></Field>
+          <Field label="分類"><input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} /></Field>
         </div>
         <div className={styles.field}>
           <span className={styles.folderPick}>
@@ -153,28 +148,16 @@ export default function MessageForm({
               {image ? <span className={styles.imageName}>{`${image.filename} ・ ${image.width ?? '—'}×${image.height ?? '—'}`}</span> : null}
             </div>
           )}
-          <label className={styles.field}>
-            <span className={styles.label}>タイトル</span>
-            <input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={(event) => updateCard({ ...card, title: event.target.value })} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.smallLabel}>本文</span>
-            <textarea className={styles.textarea} aria-label="配信する本文" {...bindField('body', 'hq-msg-body')} maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={(event) => updateCard({ ...card, body: event.target.value })} />
-            <FieldError id="hq-msg-body-error">{fields?.error('body')}</FieldError>
-          </label>
+          <Field label="タイトル"><input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={(event) => updateCard({ ...card, title: event.target.value })} /></Field>
+          <Field label="本文"><textarea className={styles.textarea} aria-label="配信する本文" {...bindField('body', 'hq-msg-body')} maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={(event) => updateCard({ ...card, body: event.target.value })} />
+<FieldError id="hq-msg-body-error">{fields?.error('body')}</FieldError></Field>
           {card.format === 'flex' && (
             <div className={styles.buttonsBox}>
               <span className={styles.smallLabel}>ボタン <small className={styles.optional}>最大 3 つ</small></span>
               {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => void loadReferences()}>参照先を再読み込み</Button>} />}
               {card.buttons.map((button, index) => (
                 <div key={button.id} className={styles.buttonEdit} {...(fields ? fields.bind(`button-${button.id}`) : {})} aria-describedby={fields?.invalid(`button-${button.id}`) ? `hq-msg-button-${button.id}-error` : undefined}>
-                  <label className={styles.field}>
-                    <span className={styles.labelRow}>
-                      <span className={styles.label}>ボタンの文字</span>
-                      {disabled ? null : <button type="button" className={styles.textButton} onClick={() => updateCard({ ...card, buttons: card.buttons.filter((row) => row.id !== button.id) })}>{`ボタン${index + 1}を外す`}</button>}
-                    </span>
-                    <input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} />
-                  </label>
+                  <Field label="ボタンの文字"><input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></Field>
                   <div className={styles.field}>
                     <span className={styles.smallLabel}>押したとき</span>
                     <TapActionField

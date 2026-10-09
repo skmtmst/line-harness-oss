@@ -44,6 +44,7 @@ import { PhoneDatetimeStep } from './phone'
 import layout from './layout.module.css'
 import styles from './shifts.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -1226,7 +1227,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                       {timeBox('この日の終わり', dayAddEnd, setDayAddEnd)}
                     </>
                   ) : (
-                    <input type="text" value={dayAddMemo} onChange={(e) => setDayAddMemo(e.target.value)} placeholder="理由（任意・例: 研修のため）" aria-label="休みの理由" className={`${layout.input} ${styles.memo}`} />
+                    <input type="text" value={dayAddMemo} onChange={(e) => setDayAddMemo(e.target.value)} placeholder="理由（任意・例：研修のため）" aria-label="休みの理由" className={`${layout.input} ${styles.memo}`} />
                   )}
                   <Button variant="primary" onClick={() => void addDayEntry()} disabled={dayAddBusy || savingShift} busy={dayAddBusy}>足す</Button>
                 </div>
@@ -1248,10 +1249,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                   <span className={layout.label}>開始日</span>
                   <span className={styles.dateBox}><DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} /></span>
                 </div>
-                <div className={layout.field}>
-                  <label htmlFor="bks-weeks" className={layout.label}>週の数（1〜12）</label>
-                  <input id="bks-weeks" aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={layout.input} />
-                </div>
+                <div className={layout.field}><Field label="週の数（1〜12）" htmlFor="bks-weeks"><input id="bks-weeks" aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={layout.input} /></Field></div>
                 {canEdit ? (
                   <Button variant="primary" onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">
                     <CalendarPlus className={styles.btnIcon} aria-hidden="true" />作る
@@ -1270,9 +1268,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                 : '予定がある時間は、予約枠から自動で外れます。LINE で入った予約は、このカレンダーに書き込みます。ほかの予約サービスがこのカレンダーへ書き出せば、そちらの予約でも自動で枠が埋まります。'}</p>
               {!serviceConfigured ? <p className={layout.warnBand} role="status">Googleの接続設定がまだなのでつなげません。管理者に連絡してください。</p> : null}
               <div className={styles.calRow}>
-                <div className={`${layout.field} ${styles.calField}`}>
-                  <label htmlFor="bks-cal-id" className={layout.label}>カレンダーの ID</label>
-                  <input
+                <div className={`${layout.field} ${styles.calField}`}><Field label="カレンダーの ID" htmlFor="bks-cal-id"><input
                     id="bks-cal-id"
                     aria-label="カレンダーのID"
                     value={calendarId ? (calendarInput || calendarId) : calendarInput}
@@ -1280,11 +1276,10 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                       if (calendarId) setCalendarId(null)
                       setCalendarInput(event.target.value)
                     }}
-                    placeholder="例: example@example.invalid"
+                    placeholder="例：example@example.invalid"
                     readOnly={!canEdit}
                     className={layout.input}
-                  />
-                </div>
+                  /></Field></div>
                 {calendarId ? <span className={styles.pill} data-tone="on"><span className={styles.pillDot} aria-hidden="true" />つながっている</span> : null}
               </div>
               {calendarId ? (

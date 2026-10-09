@@ -113,7 +113,7 @@ export function FriendMultiSelect({
           invalid={Boolean(error)}
           aria-describedby={error ? 'au-friend-error' : undefined}
           aria-label="友だちを名前で探す"
-          placeholder={accountId ? '名前で探して選ぶ（例: やま）' : '先にLINEアカウントを選んでください'}
+          placeholder={accountId ? '名前で探して選ぶ（例：やま）' : '先にLINEアカウントを選んでください'}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           disabled={!accountId}

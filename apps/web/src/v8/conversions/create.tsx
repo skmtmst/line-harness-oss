@@ -704,9 +704,7 @@ function ConversionCreate() {
           <h2 className={styles.cardTitle} id="cv-new-exclusion">数えない条件</h2>
           <p className={styles.cardNote}>任意。テスト用の注文などを除きます</p>
         </div>
-        <label className={styles.field}>
-          <span className={styles.labelRow}><span className={styles.label}>メモ</span><span className={styles.optional}>任意</span></span>
-          <TextField
+        <Field label="メモ"><TextField
             id="cv-memo"
             aria-label="数えない条件のメモ"
             invalid={fieldIssue?.field === 'cv-memo'}
@@ -715,8 +713,7 @@ function ConversionCreate() {
             maxLength={500}
             placeholder="例：テスト用の注文は条件で除いています"
             onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-memo' ? null : current); setExclusionMemo(event.target.value) }}
-          />
-        </label>
+          /></Field>
         {fieldIssue?.field === 'cv-memo' ? <p id="cv-memo-error" className={styles.fieldError} role="alert">{fieldIssue.message}</p> : null}
         <div id="cv-exclusion-fields" aria-invalid={fieldIssue?.field === 'cv-exclusion-fields' || undefined}>
           <Field label="除く条件" error={fieldIssue?.field === 'cv-exclusion-fields' ? fieldIssue.message : undefined}>

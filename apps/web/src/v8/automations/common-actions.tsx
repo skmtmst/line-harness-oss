@@ -418,7 +418,7 @@ export default function CommonActionsV8() {
           allCount={ready ? summary.total : null}
           unfiledCount={ready ? summary.total : null}
           countOf={() => null}
-          placeholder="例: 購入・予約"
+          placeholder="例：購入・予約"
         />
       </>}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}

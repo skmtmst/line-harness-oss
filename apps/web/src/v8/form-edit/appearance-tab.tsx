@@ -29,6 +29,7 @@ import MediaSlot from '@/components/shared/media-slot'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import { ogImageUrlError } from './model'
 import styles from './edit.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type ColorKey = keyof Pick<FormTheme, 'main' | 'sub' | 'accent' | 'error' | 'text'>
 const COLOR_ROLES: { key: ColorKey; label: string }[] = [
@@ -105,17 +106,14 @@ export function AppearanceTab(props: Props) {
           />
         </div>
         {options.totalLimit?.enabled ? (
-          <div className={styles.limitRow}>
-            <label className={styles.fieldLabel} htmlFor="fe-total-limit">締め切る件数</label>
-            <TextField
+          <div className={styles.limitRow}><Field label="締め切る件数" htmlFor="fe-total-limit"><TextField
               id="fe-total-limit"
               type="number"
               min={1}
               className={styles.limitInput}
               value={String(options.totalLimit?.max ?? 300)}
               onChange={(e) => onChangeOptions({ totalLimit: { ...options.totalLimit, enabled: true, max: Math.max(1, Number(e.target.value) || 1) } })}
-            />
-          </div>
+            /></Field></div>
         ) : null}
       </section>
 
@@ -124,14 +122,8 @@ export function AppearanceTab(props: Props) {
           <h3 className={styles.subTitle}>受付のきまり（つづき）</h3>
           <Checkbox checked={options.restorePrevious ?? false} onCheckedChange={(restorePrevious) => onChangeOptions({ restorePrevious })}>前回の答えを最初から入れておく</Checkbox>
           <Checkbox checked={options.confirmDialog?.enabled ?? false} onCheckedChange={(enabled) => onChangeOptions({ confirmDialog: { ...options.confirmDialog, enabled } })}>送る前に確認の画面を出す</Checkbox>
-          <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="fe-deadline-message">期限を過ぎた人に出す文</label>
-            <TextField id="fe-deadline-message" value={options.deadline?.message ?? ''} placeholder="受付は終了しました" onChange={(e) => onChangeOptions({ deadline: { ...options.deadline, enabled: options.deadline?.enabled ?? false, message: e.target.value } })} />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="fe-page-title">ページの題名（LINE の上に出る）</label>
-            <TextField id="fe-page-title" value={options.pageTitle ?? ''} placeholder="回答フォーム" onChange={(e) => onChangeOptions({ pageTitle: e.target.value || null })} />
-          </div>
+          <div className={styles.field}><Field label="期限を過ぎた人に出す文" htmlFor="fe-deadline-message"><TextField id="fe-deadline-message" value={options.deadline?.message ?? ''} placeholder="受付は終了しました" onChange={(e) => onChangeOptions({ deadline: { ...options.deadline, enabled: options.deadline?.enabled ?? false, message: e.target.value } })} /></Field></div>
+          <div className={styles.field}><Field label="ページの題名（LINE の上に出る）" htmlFor="fe-page-title"><TextField id="fe-page-title" value={options.pageTitle ?? ''} placeholder="回答フォーム" onChange={(e) => onChangeOptions({ pageTitle: e.target.value || null })} /></Field></div>
         </div>
 
         <div className={styles.subBox}>
@@ -213,27 +205,15 @@ export function AppearanceTab(props: Props) {
           <h2 id="fe-about-title" className={styles.cardTitle}>フォームのこと</h2>
           <p className={styles.cardNote}>名前は一覧と題に出ます。覚え書きはお客さまには出ません。</p>
         </div>
-        <div className={styles.field}>
-          <label className={styles.fieldLabel} htmlFor="fe-name">フォーム名</label>
-          <TextField id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onChange={(e) => props.onChangeName(e.target.value)} />
-          {props.nameError ? <p role="alert" className={styles.fieldError}>{props.nameError}</p> : null}
-        </div>
-        <div className={styles.field}>
-          <label className={styles.fieldLabel} htmlFor="fe-desc">覚え書き</label>
-          <TextArea id="fe-desc" rows={2} value={props.description} onChange={(e) => props.onChangeDescription(e.target.value)} />
-        </div>
+        <div className={styles.field}><Field label="フォーム名" htmlFor="fe-name"><TextField id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onChange={(e) => props.onChangeName(e.target.value)} />
+{props.nameError ? <p role="alert" className={styles.fieldError}>{props.nameError}</p> : null}</Field></div>
+        <div className={styles.field}><Field label="覚え書き" htmlFor="fe-desc"><TextArea id="fe-desc" rows={2} value={props.description} onChange={(e) => props.onChangeDescription(e.target.value)} /></Field></div>
       </section>
 
       <Dialog open={linkOpen} title="リンクの見え方" description="LINEやSNSにこのフォームのURLを貼ったときに出るカードです。空のままなら自動で作ります。" confirmLabel="閉じる" onConfirm={() => setLinkOpen(false)} onCancel={() => setLinkOpen(false)}>
         <div className={styles.dialogFields}>
-          <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="fe-og-title">カードの見出し</label>
-            <TextField id="fe-og-title" maxLength={80} value={props.ogTitle} onChange={(e) => props.onChangeOgTitle(e.target.value)} />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="fe-og-desc">カードの説明</label>
-            <TextArea id="fe-og-desc" rows={3} maxLength={200} value={props.ogDescription} onChange={(e) => props.onChangeOgDescription(e.target.value)} />
-          </div>
+          <div className={styles.field}><Field label="カードの見出し" htmlFor="fe-og-title"><TextField id="fe-og-title" maxLength={80} value={props.ogTitle} onChange={(e) => props.onChangeOgTitle(e.target.value)} /></Field></div>
+          <div className={styles.field}><Field label="カードの説明" htmlFor="fe-og-desc"><TextArea id="fe-og-desc" rows={3} maxLength={200} value={props.ogDescription} onChange={(e) => props.onChangeOgDescription(e.target.value)} /></Field></div>
           <div className={styles.field}>
             <span className={styles.fieldLabel}>カードの画像</span>
             <MediaSlot

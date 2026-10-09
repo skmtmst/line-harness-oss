@@ -13,6 +13,7 @@ import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { loadOperators } from '@/lib/operators-cache'
 import type { PanelStatus } from './use-friend-detail'
 import styles from './detail.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 export function useSupportEditor(friendId: string, onSaved: (notice: string) => void, onConflict: (message: string) => void, accountId: string | null = null) {
   const scopeRef = useRef({ friendId, accountId })
@@ -130,9 +131,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
       onCancel={() => setOpen(false)}
     >
       <div className={styles.dialogBody} data-support-editor>
-        <label className={styles.dialogLabel}>
-          対応状況
-          <Select
+        <Field label="対応状況"><Select
             size="full"
             value={status}
             disabled={busy}
@@ -144,19 +143,15 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
               { value: 'on_hold', label: '保留' },
               { value: 'resolved', label: '対応済み' },
             ]}
-          />
-        </label>
-        <label className={styles.dialogLabel}>
-          担当者
-          <Select
+          /></Field>
+        <Field label="担当者"><Select
             size="full"
             value={operatorId}
             disabled={busy}
             onChange={(value) => setOperatorId(value)}
             aria-label="担当者を変える"
             options={[{ value: '', label: '未割り当て' }, ...operators.map((o) => ({ value: o.id, label: o.name }))]}
-          />
-        </label>
+          /></Field>
       </div>
     </Dialog>
   )

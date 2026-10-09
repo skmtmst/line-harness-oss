@@ -25,6 +25,7 @@ import MergedProfileDialog from '@/components/merged-person/merged-profile-dialo
 import { useMergedPerson } from '@/components/merged-person/use-merged-person'
 import styles from './person.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
 
 /** 9/30（日本時間）。 */
 function shortDate(iso: string): string {
@@ -241,10 +242,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
         )}
       >
         <p className={styles.small}>{`解除する友だち：${m.unlinkTarget?.displayName ?? ''}`}</p>
-        <label className={styles.reasonLabel}>
-          <span>解除する理由<RequiredBadge /></span>
-          <TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" />
-        </label>
+        <Field label="解除する理由" required><TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" /></Field>
       </Dialog>
     </PageFrame>
   )

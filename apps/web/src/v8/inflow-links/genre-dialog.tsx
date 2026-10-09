@@ -80,7 +80,7 @@ export default function GenreDialog({
           if (event.key === 'Enter' && !isImeComposing(event)) void save()
         }}
         maxLength={80}
-        placeholder="例: A店"
+        placeholder="例：A店"
       />
       </Field>
     </Dialog>

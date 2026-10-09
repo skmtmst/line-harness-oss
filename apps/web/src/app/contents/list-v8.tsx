@@ -1224,7 +1224,7 @@ export default function MediaLibraryListV8() {
           />
           <ListToolbar
             search={{
-              placeholder: 'ファイル名で検索',
+              placeholder: 'ファイル名で探す',
               value: query,
               onChange: (value) => {
                 setQuery(value)
@@ -1743,7 +1743,7 @@ export default function MediaLibraryListV8() {
           folder={editingFolder}
           accountId={selectedAccountId}
           note="メディアを分けてしまう箱です。削除しても、中のメディアは未分類に残ります。"
-          placeholder="例: 01_商品写真"
+          placeholder="例：01_商品写真"
           onClose={() => setEditingFolder(null)}
           onAdded={() => { setEditingFolder(null); void load() }}
         />

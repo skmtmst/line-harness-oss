@@ -20,6 +20,7 @@ import type { AccountWithStats } from '@/contexts/account-context'
 import head from './dialog-head.module.css'
 import styles from './account-dialogs.module.css'
 import { FALLBACK_REASON, connectionReasons, lineHandle } from './connection-reasons'
+import { Field } from '@/components/shared/form-controls'
 
 /** 絵 `HMpVx` の窓の幅と上からの位置（px）。 */
 const SETTINGS_WIDTH = 560
@@ -143,9 +144,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
       }
     >
       <div className={head.head}>
-        <div className={styles.field}>
-          <label htmlFor="hq-account-settings-name" className={styles.labelLarge}>名前</label>
-          <TextField
+        <div className={styles.field}><Field label="名前" htmlFor="hq-account-settings-name"><TextField
             id="hq-account-settings-name"
             value={name}
             maxLength={100}
@@ -155,11 +154,8 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
             aria-describedby={nameError ? 'hq-account-settings-name-error' : undefined}
             className={styles.full}
           />
-          {nameError ? <p id="hq-account-settings-name-error" className={styles.error} role="alert">{nameError}</p> : null}
-        </div>
-        <div className={styles.field}>
-          <label htmlFor="hq-account-settings-parent" className={styles.label}>親アカウント</label>
-          <Select
+{nameError ? <p id="hq-account-settings-name-error" className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
+        <div className={styles.field}><Field label="親アカウント" htmlFor="hq-account-settings-parent"><Select
             id="hq-account-settings-parent"
             aria-label="親アカウント"
             size="full"
@@ -171,11 +167,8 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
               { value: 'none', label: 'なしにする' },
               ...accounts.filter((item) => item.id !== account.id && item.id !== currentParent).map((item) => ({ value: item.id, label: item.displayName || item.name })),
             ]}
-          />
-        </div>
-        <div className={styles.field}>
-          <label htmlFor="hq-account-folder" className={styles.label}>フォルダ</label>
-          <FolderSelect
+          /></Field></div>
+        <div className={styles.field}><Field label="フォルダ" htmlFor="hq-account-folder"><FolderSelect
             id="hq-account-folder"
             aria-label="フォルダ"
             size="full"
@@ -190,8 +183,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
               })
               : undefined}
           />
-          <p className={styles.note}>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</p>
-        </div>
+<p className={styles.note}>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</p></Field></div>
         {!archived && account.connection?.status === 'warn' ? (
           /* 要確認のときだけ：引っかかった確認ごとの理由（URL は折り返して全文）。 */
           <div className={styles.field}>
@@ -271,9 +263,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
     >
       <div className={head.head}>
         <p className={styles.lead}>一覧から外します。送受信は止まり、友だちと履歴は残ります。あとで「戻す」で戻せます（オーナーのみ）。</p>
-        <div className={styles.field}>
-          <label htmlFor="hq-account-archive-reason" className={styles.labelLarge}>アーカイブの理由（任意）</label>
-          <TextField
+        <div className={styles.field}><Field label="アーカイブの理由" htmlFor="hq-account-archive-reason"><TextField
             id="hq-account-archive-reason"
             value={reason}
             maxLength={200}
@@ -281,8 +271,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
             placeholder="例：テスト用。使わなくなったため"
             onChange={(event) => setReason(event.target.value)}
             className={styles.full}
-          />
-        </div>
+          /></Field></div>
         <div className={styles.field}>
           <span className={styles.stepLabel}>本人確認（認証アプリの6桁）</span>
           <OtpInput visualLabel="認証コード（6桁）" label="認証コード" value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void archive(entered)} invalid={Boolean(error)} busy={busy} />

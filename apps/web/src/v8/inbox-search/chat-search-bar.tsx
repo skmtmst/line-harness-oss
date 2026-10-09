@@ -10,6 +10,7 @@ import { ChevronDown, ChevronUp, Search, X } from 'lucide-react'
 import IconButton from '@/components/shared/icon-button'
 import { CHAT_SEARCH_MAX_CHARS, type ChatSearch } from './use-chat-search'
 import styles from './chat-search-bar.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 export function chatSearchCountText(search: Pick<ChatSearch, 'query' | 'status' | 'total' | 'index'>): string {
   if (!search.query.trim()) return ''
@@ -48,9 +49,7 @@ export default function ChatSearchBar({ search, focusSeq = 0, busy = false }: {
 
   return (
     <div className={styles.band} role="search" aria-label="会話の中を探す" data-design-node="f64Ok">
-      <label className={styles.field}>
-        <Search aria-hidden="true" className={styles.fieldIcon} />
-        <input
+      <Field label={<><Search aria-hidden="true" className={styles.fieldIcon} /></>}><input
           ref={inputRef}
           type="search"
           className={styles.input}
@@ -60,8 +59,7 @@ export default function ChatSearchBar({ search, focusSeq = 0, busy = false }: {
           aria-label="会話の中を探す"
           onChange={(event) => search.setQuery(event.target.value)}
           onKeyDown={onKeyDown}
-        />
-      </label>
+        /></Field>
       <span className={styles.count} role="status" aria-live="polite">{count}</span>
       <IconButton
         className={styles.button}

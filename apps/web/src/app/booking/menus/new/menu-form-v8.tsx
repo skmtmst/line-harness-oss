@@ -801,7 +801,7 @@ export default function MenuFormV8() {
                   onBlur={() => {
                     setFieldErrors((previous) => ({ ...previous, name: bookingMenuNameError(name) ?? undefined }))
                   }}
-                  placeholder="例: トリミング（小型犬）"
+                  placeholder="例：トリミング（小型犬）"
                   aria-invalid={fieldErrors.name !== undefined}
                 />
                 {fieldErrors.name !== undefined ? (
@@ -831,7 +831,7 @@ export default function MenuFormV8() {
                     type="text"
                     value={categoryNew}
                     onChange={(e) => setCategoryNew(e.target.value)}
-                    placeholder="新しい分類の名前（例: トリミング）"
+                    placeholder="新しい分類の名前（例：トリミング）"
                     aria-label="新しい分類の名前"
                   />
                 )}
@@ -843,7 +843,7 @@ export default function MenuFormV8() {
                   type="text"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="例: シャンプー・カット・爪切り"
+                  placeholder="例：シャンプー・カット・爪切り"
                 />
               </label>
             </div>
@@ -1134,7 +1134,7 @@ export default function MenuFormV8() {
                     type="text"
                     value={intakeQuestion}
                     onChange={(e) => setIntakeQuestion(e.target.value)}
-                    placeholder="例: 気になるところ・アレルギーがあれば教えてください"
+                    placeholder="例：気になるところ・アレルギーがあれば教えてください"
                     maxLength={200}
                   />
                 </label>

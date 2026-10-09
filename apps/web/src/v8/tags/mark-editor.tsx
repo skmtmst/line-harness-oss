@@ -502,14 +502,9 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                 </>
               ) : createRule ? (
                 <div className={styles.ruleForm}>
-                  <label className={styles.field}>
-                    <span className={styles.label}>きっかけ</span>
-                    <Select aria-label="きっかけ" value={ruleEvent} onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)} options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))} size="full" />
-                  </label>
+                  <Field label="きっかけ"><Select aria-label="きっかけ" value={ruleEvent} onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)} options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))} size="full" /></Field>
                   <p className={styles.fieldNote}>{`→ 「${name || 'このマーク'}」に変える`}</p>
-                  <label className={styles.field}>
-                    <span className={styles.label}>手動で変更した直後の保護</span>
-                    <Select
+                  <Field label="手動で変更した直後の保護"><Select
                       aria-label="手動変更の保護時間"
                       value={String(ruleProtectionMinutes)}
                       onChange={(value) => setRuleProtectionMinutes(Number(value))}
@@ -520,8 +515,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                         { value: '1440', label: '1日は手動の変更を守る' },
                       ]}
                       size="full"
-                    />
-                  </label>
+                    /></Field>
                   <Checkbox checked={ruleActive} onCheckedChange={setRuleActive}>このきまりを有効にして登録する</Checkbox>
                   <span><Button type="button" onClick={() => setCreateRule(false)}>きまりを外す</Button></span>
                 </div>

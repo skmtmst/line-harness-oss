@@ -476,15 +476,12 @@ function WebhooksCreateV8Inner() {
               </div>
             ) : null}
             {detailsOpen ? (
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="wh-new-incoming">受け取った知らせも送る（受け取り口の種類。カンマで区切る）</label>
-                <TextField
+              <div className={styles.field}><Field label="受け取った知らせも送る（受け取り口の種類。カンマで区切る）" htmlFor="wh-new-incoming"><TextField
                   id="wh-new-incoming"
                   value={incomingSources}
                   onChange={(event) => setIncomingSources(event.target.value)}
-                  placeholder="例: form, booking"
-                />
-              </div>
+                  placeholder="例：form, booking"
+                /></Field></div>
             ) : null}
           </>
         ) : null}

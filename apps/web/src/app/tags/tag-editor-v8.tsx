@@ -293,7 +293,7 @@ export default function TagEditorV8({
                 </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>タグ名 <RequiredBadge /></span>
-                  <input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={styles.input} />
+                  <input value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期購入者" className={styles.input} />
                   <DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" />
                 </label>
               </div>

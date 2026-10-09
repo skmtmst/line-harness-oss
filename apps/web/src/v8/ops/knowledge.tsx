@@ -115,7 +115,7 @@ export default function OpsKnowledgeV8() {
 
         <div className={styles.tools}>
           <div className={styles.search}>
-            <SearchField value={q} onChange={(value) => { setQ(value); setOffset(0) }} placeholder="タイトル・質問・キーワードで検索" aria-label="タイトル・質問・キーワードで検索" />
+            <SearchField value={q} onChange={(value) => { setQ(value); setOffset(0) }} placeholder="タイトル・質問・キーワードで探す" aria-label="タイトル・質問・キーワードで探す" />
           </div>
           <div className={styles.select}>
             <Select aria-label="種類" value={kind} onChange={(value) => { setKind(value); setOffset(0) }} options={[{ value: '', label: '種類：すべて' }, ...KNOWLEDGE_KINDS]} />

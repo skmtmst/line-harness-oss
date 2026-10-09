@@ -35,6 +35,7 @@ import {
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support-detail.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -212,9 +213,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                 ))}
               </ol>
 
-              <div className={styles.compose}>
-                <label htmlFor={`${uid}-body`} className={styles.composeTitle}>続きを送る</label>
-                <TextArea
+              <div className={styles.compose}><Field label="続きを送る" htmlFor={`${uid}-body`}><TextArea
                   id={`${uid}-body`}
                   value={body}
                   onChange={(event) => { setBody(event.target.value); setNotice('') }}
@@ -223,7 +222,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   disabled={sending}
                   className={styles.textarea}
                 />
-                {attachments.length > 0 ? (
+{attachments.length > 0 ? (
                   <ul className={styles.thumbs}>
                     {attachments.map((a, i) => (
                       <li key={`${a.name}-${i}`} className={styles.thumb}>
@@ -236,7 +235,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                     ))}
                   </ul>
                 ) : null}
-                {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
+{attachments.length < SUPPORT_ATTACHMENT_MAX ? (
                 <div className={styles.attachSlot}>
                   <MediaSlot
                     size="compact"
@@ -248,16 +247,15 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   />
                 </div>
               ) : null}
-                <div className={styles.composeRow}>
+<div className={styles.composeRow}>
                   <span className={styles.spacer} />
                   <span className={styles.sendNote}>{blocked && body ? <span className={styles.warn}>{blocked}</span> : SEND_NOTE}</span>
                   <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked) || !detail} busy={sending} busyLabel="送信中…">
                     <Send aria-hidden="true" className={styles.buttonIcon} />送る
                   </Button>
                 </div>
-                {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-                {error ? <p className={styles.error} role="alert">{error}</p> : null}
-              </div>
+{notice ? <p className={styles.notice} role="status">{notice}</p> : null}
+{error ? <p className={styles.error} role="alert">{error}</p> : null}</Field></div>
             </>
           )}
         </div>

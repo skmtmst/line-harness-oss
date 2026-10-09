@@ -30,6 +30,7 @@ import { TimeField } from '@/components/shared/date-time-field'
 import ApplicationPreview from './application-preview'
 import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso, todayJst } from './shared'
 import styles from './create.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const PER_FRIEND_OPTIONS = [
   { value: NONE, label: '制限なし' },
@@ -244,9 +245,7 @@ function EventsCreateV8Inner() {
 
       <section className={styles.card} aria-labelledby="ev-new-body">
         <h2 className={styles.cardTitle} id="ev-new-body">イベントの中身</h2>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="ev-new-name">イベント名</label>
-          <TextField
+        <div className={styles.field}><Field label="イベント名" htmlFor="ev-new-name" required><TextField
             id="ev-new-name"
             value={draft.name}
             maxLength={255}
@@ -259,34 +258,27 @@ function EventsCreateV8Inner() {
               clearFieldError('ev-new-name')
             }}
           />
-          {fieldErrors['ev-new-name'] ? <p id="ev-new-name-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-name']}</p> : null}
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="ev-new-desc">説明</label>
-          <TextField
+{fieldErrors['ev-new-name'] ? <p id="ev-new-name-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-name']}</p> : null}</Field></div>
+        <div className={styles.field}><Field label="説明" htmlFor="ev-new-desc"><TextField
             id="ev-new-desc"
             value={draft.description ?? ''}
             maxLength={20000}
             placeholder="開催趣旨・注意事項・持ち物など"
             onChange={(event) => update('description', event.target.value || null)}
-          />
-        </div>
+          /></Field></div>
         <div className={styles.pair}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="ev-new-venue">場所</label>
-            <TextField
+          <div className={styles.field}><Field label="場所" htmlFor="ev-new-venue"><TextField
               id="ev-new-venue"
               value={draft.venue_name ?? ''}
               placeholder="渋谷ベース 3F"
               onChange={(event) => update('venue_name', event.target.value || null)}
-            />
-          </div>
+            /></Field></div>
           <div className={styles.field}>
             <span className={styles.labelRow}>
-              <label className={styles.label} htmlFor="ev-new-url">オンラインの URL</label>
-              <span className={styles.optional}>任意</span>
+
+
             </span>
-            <TextField
+            <Field label="オンラインの URL" htmlFor="ev-new-url"><TextField
               id="ev-new-url"
               type="url"
               value={draft.venue_url ?? ''}
@@ -294,7 +286,7 @@ function EventsCreateV8Inner() {
               aria-invalid={Boolean(fieldErrors['ev-new-url']) || undefined}
               aria-describedby={fieldErrors['ev-new-url'] ? 'ev-new-url-error' : undefined}
               onChange={(event) => { update('venue_url', event.target.value || null); clearFieldError('ev-new-url') }}
-            />
+            /></Field>
             {fieldErrors['ev-new-url'] ? <p id="ev-new-url-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-url']}</p> : null}
           </div>
         </div>
@@ -330,11 +322,8 @@ function EventsCreateV8Inner() {
           <p className={styles.cardNote}>あとから回を足せます（中身を見る → 回を足す）</p>
         </div>
         <div className={`${styles.pair} ${styles.datePair}`}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="ev-new-date">日付</label>
-            <DateField id="ev-new-date" value={date} invalid={Boolean(fieldErrors['ev-new-date'])} aria-describedby={fieldErrors['ev-new-date'] ? 'ev-new-date-error' : undefined} onChange={(value) => { setDate(value); clearFieldError('ev-new-date') }} />
-            {fieldErrors['ev-new-date'] ? <p id="ev-new-date-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-date']}</p> : null}
-          </div>
+          <div className={styles.field}><Field label="日付" htmlFor="ev-new-date"><DateField id="ev-new-date" value={date} invalid={Boolean(fieldErrors['ev-new-date'])} aria-describedby={fieldErrors['ev-new-date'] ? 'ev-new-date-error' : undefined} onChange={(value) => { setDate(value); clearFieldError('ev-new-date') }} />
+{fieldErrors['ev-new-date'] ? <p id="ev-new-date-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-date']}</p> : null}</Field></div>
           <div className={styles.field}>
             <span className={styles.label} id="ev-new-time-label">開始</span>
             <div className={styles.timeRow} role="group" aria-labelledby="ev-new-time-label">
@@ -346,9 +335,7 @@ function EventsCreateV8Inner() {
           </div>
         </div>
         <div className={styles.pair}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="ev-new-cap">定員</label>
-            <TextField
+          <div className={styles.field}><Field label="定員" htmlFor="ev-new-cap"><TextField
               id="ev-new-cap"
               inputMode="numeric"
               value={capacity}
@@ -357,8 +344,7 @@ function EventsCreateV8Inner() {
               aria-describedby={fieldErrors['ev-new-cap'] ? 'ev-new-cap-error' : undefined}
               onChange={(event) => { setCapacity(event.target.value.replace(/[^0-9]/g, '')); clearFieldError('ev-new-cap') }}
             />
-            {fieldErrors['ev-new-cap'] ? <p id="ev-new-cap-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-cap']}</p> : null}
-          </div>
+{fieldErrors['ev-new-cap'] ? <p id="ev-new-cap-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-cap']}</p> : null}</Field></div>
           <div className={styles.field}>
             <span className={styles.pickLabel}>1人あたりの予約回数</span>
             <Select

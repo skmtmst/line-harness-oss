@@ -469,7 +469,7 @@ export default function AutomationRunsV8() {
       </div>
       {notice ? <div className={styles.noticeRow}><Notice tone="info" role="status">{notice}</Notice></div> : null}
       <ListToolbar
-        search={{ placeholder: '友だち・ルールの名前で探す', label: '友だちの名前・オートメーションの名前で検索', width: 240, value: query, onChange: changeQuery }}
+        search={{ placeholder: '友だち・ルールの名前で探す', label: '友だちの名前・オートメーションの名前で探す', width: 240, value: query, onChange: changeQuery }}
         filters={filterChips}
         trailing={<>{savedBox}<PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} /></>}
       />

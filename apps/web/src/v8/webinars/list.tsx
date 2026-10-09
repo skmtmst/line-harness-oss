@@ -294,7 +294,7 @@ function FolderForm({
   return <FolderEditorDialog open title={folder ? 'フォルダを直す' : 'フォルダを追加'}
     description="ウェビナーを分けてしまう箱です。消しても、中のウェビナーは未分類に残ります。"
     name={name} onNameChange={setName} color={color} onColorChange={setColor}
-    busy={busy} error={error || undefined} placeholder="例: 商品説明"
+    busy={busy} error={error || undefined} placeholder="例：商品説明"
     onCancel={onCancel} onConfirm={() => onSave(name.trim(), color)} confirmLabel={folder ? '保存する' : '追加する'} />
 }
 

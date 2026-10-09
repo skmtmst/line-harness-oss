@@ -42,6 +42,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import styles from './edit.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 export type AssetKind = 'coupon' | 'research'
 
@@ -403,14 +404,9 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         <h2 className={styles.cardTitle}>名前とフォルダ</h2>
       </div>
       <div className={styles.pair}>
-        <div className={`${styles.field} ${styles.grow}`}>
-          <label htmlFor={`te-${kind}-name`} className={styles.label}>テンプレート名</label>
-          <TextField {...fieldProps('name', `te-${kind}-name`)} id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" />
-          <FieldError id={`te-${kind}-name-error`}>{fields.error('name')}</FieldError>
-        </div>
-        <div className={`${styles.field} ${styles.folderField}`}>
-          <label htmlFor={`te-${kind}-folder`} className={styles.labelSmall}>フォルダ</label>
-          <FolderSelect
+        <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor={`te-${kind}-name`}><TextField {...fieldProps('name', `te-${kind}-name`)} id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" />
+<FieldError id={`te-${kind}-name-error`}>{fields.error('name')}</FieldError></Field></div>
+        <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor={`te-${kind}-folder`}><FolderSelect
             id={`te-${kind}-folder`}
             aria-label="フォルダ"
             value={host ? host.folder : folder}
@@ -422,8 +418,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               : canMutate && selectedAccountId
                 ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
                 : undefined}
-          />
-        </div>
+          /></Field></div>
       </div>
     </Card>
   )
@@ -489,14 +484,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                   {pickedMedia ? <p className={styles.hint}>選択中：{pickedMedia.filename}</p> : null}
                 </div>
                 <div className={styles.couponFields}>
-                  <div className={styles.field}>
-                    <label htmlFor="te-coupon-title" className={styles.label}>クーポン名</label>
-                    <TextField id="te-coupon-title" value={couponTitle} onChange={(event) => setCouponTitle(event.target.value)} placeholder={name || '例：夏の20%オフ'} />
-                  </div>
-                  <div className={styles.field}>
-                    <label htmlFor="te-coupon-desc" className={styles.label}>使うときの説明</label>
-                    <TextField id="te-coupon-desc" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：会計時にこの画面をご提示ください。" />
-                  </div>
+                  <div className={styles.field}><Field label="クーポン名" htmlFor="te-coupon-title"><TextField id="te-coupon-title" value={couponTitle} onChange={(event) => setCouponTitle(event.target.value)} placeholder={name || '例：夏の20%オフ'} /></Field></div>
+                  <div className={styles.field}><Field label="使うときの説明" htmlFor="te-coupon-desc"><TextField id="te-coupon-desc" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：会計時にこの画面をご提示ください。" /></Field></div>
                 </div>
               </div>
             </Card>
@@ -507,17 +496,11 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 <p className={styles.cardNote}>この管理画面の時刻（日本時間）で入ります</p>
               </div>
               <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}>
-                  <label htmlFor="te-coupon-start" className={styles.label}>開始</label>
-                  <span {...fields.bind('start')}><DateTimeField className={styles.dateBox} id="te-coupon-start" value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" required invalid={fields.invalid('start')} aria-describedby={fields.invalid('start') ? 'te-coupon-start-error' : undefined} /></span>
-                  <FieldError id="te-coupon-start-error">{fields.error('start')}</FieldError>
-                </div>
+                <div className={`${styles.field} ${styles.grow}`}><Field label="開始" htmlFor="te-coupon-start"><span {...fields.bind('start')}><DateTimeField className={styles.dateBox} id="te-coupon-start" value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" required invalid={fields.invalid('start')} aria-describedby={fields.invalid('start') ? 'te-coupon-start-error' : undefined} /></span>
+<FieldError id="te-coupon-start-error">{fields.error('start')}</FieldError></Field></div>
                 <span className={styles.tilde} aria-hidden="true">〜</span>
-                <div className={`${styles.field} ${styles.grow}`}>
-                  <label htmlFor="te-coupon-end" className={styles.label}>終了</label>
-                  <span {...fields.bind('end')}><DateTimeField className={styles.dateBox} id="te-coupon-end" value={couponEndsAt} onChange={setCouponEndsAt} aria-label="使える期間の終了" required invalid={fields.invalid('end')} aria-describedby={fields.invalid('end') ? 'te-coupon-end-error' : undefined} /></span>
-                  <FieldError id="te-coupon-end-error">{fields.error('end')}</FieldError>
-                </div>
+                <div className={`${styles.field} ${styles.grow}`}><Field label="終了" htmlFor="te-coupon-end"><span {...fields.bind('end')}><DateTimeField className={styles.dateBox} id="te-coupon-end" value={couponEndsAt} onChange={setCouponEndsAt} aria-label="使える期間の終了" required invalid={fields.invalid('end')} aria-describedby={fields.invalid('end') ? 'te-coupon-end-error' : undefined} /></span>
+<FieldError id="te-coupon-end-error">{fields.error('end')}</FieldError></Field></div>
               </div>
               <div className={styles.typeRow}>
                 <span className={styles.labelSmall}>1人が使える回数</span>
@@ -550,16 +533,10 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               </div>
               {lottery ? (
                 <div className={styles.pair}>
-                  <div className={`${styles.field} ${styles.grow}`}>
-                    <label htmlFor="te-lottery-rate" className={styles.label}>当たる確率（%）</label>
-                    <TextField {...fieldProps('rate', 'te-lottery-rate')} id="te-lottery-rate" type="number" min={1} max={100} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} />
-                    <FieldError id="te-lottery-rate-error">{fields.error('rate')}</FieldError>
-                  </div>
-                  <div className={`${styles.field} ${styles.grow}`}>
-                    <label htmlFor="te-winner-limit" className={styles.label}>当選人数の上限（人）</label>
-                    <TextField {...fieldProps('limit', 'te-winner-limit')} id="te-winner-limit" type="number" min={1} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} />
-                    <FieldError id="te-winner-limit-error">{fields.error('limit')}</FieldError>
-                  </div>
+                  <div className={`${styles.field} ${styles.grow}`}><Field label="当たる確率（%）" htmlFor="te-lottery-rate"><TextField {...fieldProps('rate', 'te-lottery-rate')} id="te-lottery-rate" type="number" min={1} max={100} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} />
+<FieldError id="te-lottery-rate-error">{fields.error('rate')}</FieldError></Field></div>
+                  <div className={`${styles.field} ${styles.grow}`}><Field label="当選人数の上限（人）" htmlFor="te-winner-limit"><TextField {...fieldProps('limit', 'te-winner-limit')} id="te-winner-limit" type="number" min={1} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} />
+<FieldError id="te-winner-limit-error">{fields.error('limit')}</FieldError></Field></div>
                 </div>
               ) : (
                 <p className={styles.cardNote}>抽選しないときは、受け取った人全員に配ります。</p>
@@ -582,20 +559,11 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 <h2 className={styles.cardTitle}>受付</h2>
               </div>
               <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}>
-                  <label htmlFor="te-research-start" className={styles.label}>受付の開始</label>
-                  <DateTimeField className={styles.dateBox} id="te-research-start" value={researchStartsAt} onChange={setResearchStartsAt} aria-label="受付の開始" />
-                </div>
+                <div className={`${styles.field} ${styles.grow}`}><Field label="受付の開始" htmlFor="te-research-start"><DateTimeField className={styles.dateBox} id="te-research-start" value={researchStartsAt} onChange={setResearchStartsAt} aria-label="受付の開始" /></Field></div>
                 <span className={styles.tilde} aria-hidden="true">〜</span>
-                <div className={`${styles.field} ${styles.grow}`}>
-                  <label htmlFor="te-research-end" className={styles.label}>受付の終了</label>
-                  <DateTimeField className={styles.dateBox} id="te-research-end" value={researchEndsAt} onChange={setResearchEndsAt} aria-label="受付の終了" />
-                </div>
+                <div className={`${styles.field} ${styles.grow}`}><Field label="受付の終了" htmlFor="te-research-end"><DateTimeField className={styles.dateBox} id="te-research-end" value={researchEndsAt} onChange={setResearchEndsAt} aria-label="受付の終了" /></Field></div>
               </div>
-              <div className={styles.field}>
-                <label htmlFor="te-research-greeting" className={styles.label}>はじめのあいさつ</label>
-                <TextField id="te-research-greeting" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：いつもありがとうございます。3問だけ聞かせてください。" />
-              </div>
+              <div className={styles.field}><Field label="はじめのあいさつ" htmlFor="te-research-greeting"><TextField id="te-research-greeting" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：いつもありがとうございます。3問だけ聞かせてください。" /></Field></div>
             </Card>
 
             <Card padding="none" layout="vertical" className={styles.card}>
@@ -634,15 +602,9 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     </button>
                   </div>
                   <div className={styles.pair}>
-                    <div className={`${styles.field} ${styles.grow}`}>
-                      <label htmlFor={`te-q-${question.key}`} className={styles.label}>質問文</label>
-                      <TextField {...fieldProps(`q-${question.key}`, `te-q-${question.key}`)} id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" />
-                      <FieldError id={`te-q-${question.key}-error`}>{fields.error(`q-${question.key}`)}</FieldError>
-                    </div>
-                    <div className={`${styles.field} ${styles.formatField}`}>
-                      <label htmlFor={`te-qf-${question.key}`} className={styles.labelSmall}>答え方</label>
-                      <Select id={`te-qf-${question.key}`} aria-label={`問 ${index + 1} の答え方`} value={question.format} onChange={(value) => updateQuestion(index, { format: value as ResearchFormat })} options={FORMAT_OPTIONS} />
-                    </div>
+                    <div className={`${styles.field} ${styles.grow}`}><Field label="質問文" htmlFor={`te-q-${question.key}`}><TextField {...fieldProps(`q-${question.key}`, `te-q-${question.key}`)} id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" />
+<FieldError id={`te-q-${question.key}-error`}>{fields.error(`q-${question.key}`)}</FieldError></Field></div>
+                    <div className={`${styles.field} ${styles.formatField}`}><Field label="答え方" htmlFor={`te-qf-${question.key}`}><Select id={`te-qf-${question.key}`} aria-label={`問 ${index + 1} の答え方`} value={question.format} onChange={(value) => updateQuestion(index, { format: value as ResearchFormat })} options={FORMAT_OPTIONS} /></Field></div>
                   </div>
                   {question.format !== 'free' ? (
                     <>

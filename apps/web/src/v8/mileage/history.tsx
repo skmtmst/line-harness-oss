@@ -43,6 +43,7 @@ import {
 import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 function viewName(item: MileageAdminHistoryItem) {
   return item.displayName || '名前未取得'
@@ -471,16 +472,13 @@ export default function HistoryTab() {
           onCancel={() => { if (!pendingBusy) setPendingAction(null) }}
           onConfirm={() => void runPendingAction()}
         >
-          <label className={styles.fieldLabel}>
-            理由（必須）
-            <textarea
+          <Field label="理由" required><textarea
               className={styles.textarea}
               value={pendingReason}
               onChange={(event) => setPendingReason(event.target.value)}
               placeholder={pendingAction?.kind === 'confirm' ? '例：入金を確認しました' : '例：予約がキャンセルされました'}
               rows={3}
-            />
-          </label>
+            /></Field>
         </Dialog>
       }
     >

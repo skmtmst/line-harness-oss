@@ -890,10 +890,7 @@ export default function WebhooksIncomingV8() {
           busy={testBusy}
           confirmLabel="試す"
         >
-          <label className={styles.formField}>
-            <span className={styles.fieldLabel}>届いたつもりのJSON</span>
-            <TextArea value={testJson} onChange={(event) => setTestJson(event.target.value)} placeholder='{"friendId": "…"}' />
-          </label>
+          <Field label="届いたつもりのJSON"><TextArea value={testJson} onChange={(event) => setTestJson(event.target.value)} placeholder='{"friendId": "…"}' /></Field>
           {testError ? <p className={styles.fieldError} role="alert">{testError}</p> : null}
           {testResult ? (
             <div className={styles.form}>

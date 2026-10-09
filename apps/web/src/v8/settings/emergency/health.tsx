@@ -30,6 +30,7 @@ import { onlyWhenVisible } from '@/lib/visible-polling'
 // 全文（release-log.json）ではなく要約を読む（V6R-S3-a）。
 import releaseLog from '@/generated/release-log-summary.json'
 import styles from './screen.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type ReleaseSummary = { version: string; released: string | null }
 
@@ -235,16 +236,13 @@ function OpenAlerts({
                 ) : null}
               </div>
               {openNoteId === alert.id && alert.status === 'open' ? (
-                <label className={styles.noteField} htmlFor={`operation-alert-note-${alert.id}`}>
-                  受領メモ（任意）。「受領を記録する」で記録します。
-                  <input
+                <Field label="受領メモ。「受領を記録する」で記録します。" htmlFor={`operation-alert-note-${alert.id}`}><input
                     id={`operation-alert-note-${alert.id}`}
                     value={notes[alert.id] ?? ''}
                     maxLength={500}
                     onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))}
                     disabled={busy}
-                  />
-                </label>
+                  /></Field>
               ) : null}
             </div>
           )

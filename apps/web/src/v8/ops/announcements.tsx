@@ -35,6 +35,7 @@ import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './announcements.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /**
  * 運営のお知らせ配信 V8（絵 `tQ2MJ`・送る前の確認 `TJUUl`）。
@@ -322,16 +323,10 @@ export default function OpsAnnouncementsV8() {
             <h2 className={parts.panelTitle}>{editingId ? 'お知らせを直す' : '作成'}</h2>
             {formError && !confirmSend ? <p role="alert" className={parts.alert}>{formError}</p> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
-            <div className={styles.field}>
-              <label htmlFor="ann-subject" className={styles.label}>件名</label>
-              <TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} />
-              <FieldError id="ann-subject-error">{fields.error('subject')}</FieldError>
-            </div>
-            <div className={styles.field}>
-              <label htmlFor="ann-body" className={styles.smallLabel}>本文</label>
-              <TextArea {...fields.bind('body')} id="ann-body" invalid={fields.invalid('body')} aria-describedby={describedBy('body')} rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} />
-              <FieldError id="ann-body-error">{fields.error('body')}</FieldError>
-            </div>
+            <div className={styles.field}><Field label="件名" htmlFor="ann-subject"><TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} />
+<FieldError id="ann-subject-error">{fields.error('subject')}</FieldError></Field></div>
+            <div className={styles.field}><Field label="本文" htmlFor="ann-body"><TextArea {...fields.bind('body')} id="ann-body" invalid={fields.invalid('body')} aria-describedby={describedBy('body')} rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} />
+<FieldError id="ann-body-error">{fields.error('body')}</FieldError></Field></div>
             <fieldset className={styles.field} {...fields.bind('audience')} aria-invalid={fields.invalid('audience') || undefined} aria-describedby={describedBy('audience')}>
               <legend className={`${styles.smallLabel} ${styles.legend}`}>
                 宛先

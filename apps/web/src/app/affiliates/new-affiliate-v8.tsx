@@ -407,7 +407,7 @@ export function NewAffiliateV8() {
                     }}
                   >
                     <TextField
-                      aria-label="友だちの名前で検索"
+                      aria-label="友だちの名前で探す"
                       value={friendSearchInput}
                       onChange={(event) => setFriendSearchInput(event.target.value)}
                       placeholder="友だちの名前で探す"

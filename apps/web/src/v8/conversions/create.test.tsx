@@ -122,7 +122,7 @@ describe('V8 成果地点を作る', () => {
     expect(scroll).toHaveBeenCalledWith({ block: 'center' })
     const error = screen.getByRole('alert')
     expect(error.textContent).toBe('成果地点の名前を入力してください')
-    expect(nameInput().getAttribute('aria-describedby')).toBe(error.id)
+    expect(nameInput().getAttribute('aria-describedby')?.split(/\s+/)).toContain(error.id)
     expect(error.closest('[data-template-region="content"]')).toBeTruthy()
     expect(screen.getAllByText('成果地点の名前を入力してください')).toHaveLength(1)
     expect(posted).toHaveLength(0)

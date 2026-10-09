@@ -73,6 +73,7 @@ import HqStoreList from './store-list'
 import HqTagEditorV8 from './tag-editor'
 import HqTemplateDetail, { inUseVersionOf } from './detail'
 import styles from './console.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const PAGE_TITLES: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
 /** 一覧の段の住所（上の帯のパンくずの行き先）。シナリオのひな形はテンプレートの住所の中にある。 */
@@ -930,7 +931,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             <section className={styles.editPanel} aria-label="ひな形の中身">
               <div className={styles.twoCol}>
                 {(createUncertain || !canonicalEditorOwnsSave) && type !== 'rich_menu' ? (
-                  <label className={styles.field}><span className={styles.label}>ひな形の名前</span><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={(event) => setName(event.target.value)} /></label>
+                  <Field label="ひな形の名前"><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={(event) => setName(event.target.value)} /></Field>
                 ) : null}
                 {/* タグは中の「所属フォルダ」で分けるので、上のフォルダは出さない（同じ物が2つに見える・オーナー 10-08）。一覧での分けは「…」の「フォルダへ移す」。 */}
                 {type !== 'tag' ? <div className={styles.field}>
@@ -939,7 +940,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                 </div> : null}
               </div>
               {(createUncertain || !canonicalEditorOwnsSave) && type !== 'rich_menu' ? (
-                <label className={styles.field}><span className={styles.label}>説明</span><textarea className={styles.textarea} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={(event) => setDescription(event.target.value)} /></label>
+                <Field label="説明"><textarea className={styles.textarea} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={(event) => setDescription(event.target.value)} /></Field>
               ) : null}
               {catalogFailed ? <Notice tone="warn" message="参照先の候補を読み込めませんでした。タグ・テンプレート・回答フォームは選べません。" action={<Button onClick={reloadCatalog}>もう一度読み込む</Button>} /> : null}
               {canonicalEditorOwnsSave && createUncertain ? uncertainNotice : DefinitionEditor ? (
@@ -1019,10 +1020,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         toolbar={<div className={styles.toolbar}>
           <span className={styles.selectedTools}>
             <strong className={styles.selectedCount}>{`選んだ ${selected.length} アカウント`}</strong>
-          <label className={styles.search} data-size="account">
-            <Search size={14} aria-hidden="true" />
-            <input aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={(event) => setSearch(event.target.value)} />
-          </label>
+          <Field label={<><Search size={14} aria-hidden="true" /></>}><input aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={(event) => setSearch(event.target.value)} /></Field>
           </span>
           <span className={styles.bulkPick}>
             <Select
@@ -1086,9 +1084,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   </tr>,
                   overrideOpen === account.id && on && textMessage && stage === 'accounts' ? (
                     <tr key={`${account.id}-text`} className={styles.subRow}><td /><td colSpan={4}>
-                      <label className={styles.field}><span className={styles.label}>{`${account.name}に配る本文`}</span>
-                        <textarea aria-label={`${account.name}に配る本文`} className={styles.textarea} disabled={busy} maxLength={5000} value={textOverrides[account.id] ?? ('template' in definition ? definition.template.messageContent : '')} onChange={(event) => setTextOverrides((current) => ({ ...current, [account.id]: event.target.value }))} />
-                      </label>
+                      <Field label={<><span className={styles.label}>{`${account.name}に配る本文`}</span></>}><textarea aria-label={`${account.name}に配る本文`} className={styles.textarea} disabled={busy} maxLength={5000} value={textOverrides[account.id] ?? ('template' in definition ? definition.template.messageContent : '')} onChange={(event) => setTextOverrides((current) => ({ ...current, [account.id]: event.target.value }))} /></Field>
                     </td></tr>
                   ) : null,
                   ...extraItems.map((item) => (

@@ -23,6 +23,7 @@ import {
   type AffiliateSettlementPreview,
 } from '@/lib/api'
 import { formatDay, formatNumber } from '@/lib/format'
+import { Field } from '@/components/shared/form-controls'
 
 type LoadPhase = 'loading' | 'ready' | 'empty' | 'error'
 
@@ -165,16 +166,13 @@ export function AffiliateArchiveDialog({
             ))}
           </RadioCardGroup>
 
-          <label className="text-ink block text-sm font-semibold">
-              確認のため「{target?.name}」と打ってください
-              <input
+          <Field label="確認のため「」と打ってください"><input
                 type="text"
                 value={confirmationName}
                 onChange={(event) => setConfirmationName(event.target.value)}
                 className="border-hairline rounded-control mt-2 w-full border px-3 py-2 font-normal"
                 autoComplete="off"
-              />
-          </label>
+              /></Field>
         </div>
       ) : (
         <ListState kind="empty" title="確認できる情報がありません" />

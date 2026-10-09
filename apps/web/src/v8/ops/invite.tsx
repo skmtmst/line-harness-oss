@@ -13,6 +13,7 @@ import { authRequest, passwordError } from '@/lib/auth-email'
 import { ApiError } from '@/lib/api'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 import styles from './auth.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type Check = { email: string; name: string; needsPassword: boolean }
 
@@ -130,27 +131,15 @@ export default function OpsInviteV8() {
           <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>
             {error ? <Notice tone="danger" message={error} /> : null}
             {usedInvite && error ? <Button href="/ops/login" className={styles.wide}>運営のログインへ</Button> : null}
-            <div className={styles.field}>
-              <label htmlFor="ops-invite-email" className={styles.label}>メールアドレス</label>
-              <TextField id="ops-invite-email" type="email" value={check?.email ?? ''} readOnly />
-            </div>
+            <div className={styles.field}><Field label="メールアドレス" htmlFor="ops-invite-email"><TextField id="ops-invite-email" type="email" value={check?.email ?? ''} readOnly /></Field></div>
             {check?.needsPassword ? (
               <>
-                <div className={styles.field}>
-                  <label htmlFor="ops-invite-name" className={styles.label}>名前</label>
-                  <TextField id="ops-invite-name" value={name} onChange={(event) => setName(event.target.value)} invalid={Boolean(nameMessage)} aria-describedby={nameMessage ? 'ops-invite-name-error' : undefined} autoComplete="name" placeholder="山田 花子" />
-                  {fieldError('ops-invite-name-error', nameMessage)}
-                </div>
-                <div className={styles.field}>
-                  <label htmlFor="ops-invite-password" className={styles.label}>パスワード（8文字以上）</label>
-                  <PasswordField id="ops-invite-password" value={password} onChange={setPassword} invalid={Boolean(passwordMessage)} autoComplete="new-password" />
-                  {fieldError('ops-invite-password-error', passwordMessage)}
-                </div>
-                <div className={styles.field}>
-                  <label htmlFor="ops-invite-confirm" className={styles.label}>パスワード（確認）</label>
-                  <PasswordField id="ops-invite-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(confirmMessage)} autoComplete="new-password" />
-                  {fieldError('ops-invite-confirm-error', confirmMessage)}
-                </div>
+                <div className={styles.field}><Field label="名前" htmlFor="ops-invite-name"><TextField id="ops-invite-name" value={name} onChange={(event) => setName(event.target.value)} invalid={Boolean(nameMessage)} aria-describedby={nameMessage ? 'ops-invite-name-error' : undefined} autoComplete="name" placeholder="山田 花子" />
+{fieldError('ops-invite-name-error', nameMessage)}</Field></div>
+                <div className={styles.field}><Field label={<>パスワード（8文字以上）</>} htmlFor="ops-invite-password"><PasswordField id="ops-invite-password" value={password} onChange={setPassword} invalid={Boolean(passwordMessage)} autoComplete="new-password" />
+{fieldError('ops-invite-password-error', passwordMessage)}</Field></div>
+                <div className={styles.field}><Field label={<>パスワード（確認）</>} htmlFor="ops-invite-confirm"><PasswordField id="ops-invite-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(confirmMessage)} autoComplete="new-password" />
+{fieldError('ops-invite-confirm-error', confirmMessage)}</Field></div>
               </>
             ) : null}
             <Button type="submit" variant="primary" disabled={busy} className={styles.wide} busy={busy} busyLabel="進めています…">

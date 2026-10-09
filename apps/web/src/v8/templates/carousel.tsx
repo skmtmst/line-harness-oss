@@ -55,6 +55,7 @@ import {
 } from './carousel-core'
 import styles from './question-new.module.css'
 import own from './carousel.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /** 札の名前：タイトルの（）書きを外した短い名前（絵：「夏の定番セット（送料込み）」→「夏の定番セット」）。 */
 export function chipName(title: string): string {
@@ -447,11 +448,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
             {inline ? null : <section className={styles.card} aria-labelledby="cr-name">
               <h2 className={styles.cardTitle} id="cr-name">名前とフォルダ</h2>
               <div className={styles.row}>
-                <div className={`${styles.field} ${styles.grow}`}>
-                  <label className={styles.label} htmlFor="cr-name-input">テンプレート名</label>
-                  <input {...fields.bind('name')} id="cr-name-input" className={styles.input} value={name} placeholder="例：夏の定番5点" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'cr-name-input-error' : undefined} onChange={(event) => setName(event.target.value)} />
-                  <FieldError id="cr-name-input-error">{fields.error('name')}</FieldError>
-                </div>
+                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="cr-name-input"><input {...fields.bind('name')} id="cr-name-input" className={styles.input} value={name} placeholder="例：夏の定番5点" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'cr-name-input-error' : undefined} onChange={(event) => setName(event.target.value)} />
+<FieldError id="cr-name-input-error">{fields.error('name')}</FieldError></Field></div>
                 <div className={`${styles.field} ${styles.folder}`}>
                   <span className={styles.pickLabel}>フォルダ</span>
                   <FolderSelect
@@ -530,26 +528,17 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   <FieldError id="cr-image-error">{fields.error(`card-${selectedIndex}-image`)}</FieldError>
                   </div>
                   <div className={own.textCol}>
-                    <div className={styles.field}>
-                      <label className={styles.label} htmlFor="cr-title">{`タイトル（${TITLE_MAX}文字まで）`}</label>
-                      <input {...fields.bind(`card-${selectedIndex}-title`)} id="cr-title" className={styles.input} value={panel.title} aria-invalid={fields.invalid(`card-${selectedIndex}-title`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-title`) ? 'cr-title-error' : undefined} onChange={(event) => update(selectedIndex, { title: event.target.value })} />
-                      <FieldError id="cr-title-error">{fields.error(`card-${selectedIndex}-title`)}</FieldError>
-                    </div>
-                    <div className={styles.field}>
-                      <label className={styles.label} htmlFor="cr-text">{panel.title.trim() || panel.thumbnailImageUrl.trim() ? `本文（タイトルか画像があると${TEXT_MAX_WITH_IMAGE}文字まで）` : `本文（${TEXT_MAX_WITHOUT_IMAGE}文字まで）`}</label>
-                      <input {...fields.bind(`card-${selectedIndex}-text`)} id="cr-text" className={styles.input} value={panel.text} aria-invalid={fields.invalid(`card-${selectedIndex}-text`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-text`) ? 'cr-text-error' : undefined} onChange={(event) => update(selectedIndex, { text: event.target.value })} />
-                      <FieldError id="cr-text-error">{fields.error(`card-${selectedIndex}-text`)}</FieldError>
-                    </div>
+                    <div className={styles.field}><Field label={<>{`タイトル（${TITLE_MAX}文字まで）`}</>} htmlFor="cr-title"><input {...fields.bind(`card-${selectedIndex}-title`)} id="cr-title" className={styles.input} value={panel.title} aria-invalid={fields.invalid(`card-${selectedIndex}-title`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-title`) ? 'cr-title-error' : undefined} onChange={(event) => update(selectedIndex, { title: event.target.value })} />
+<FieldError id="cr-title-error">{fields.error(`card-${selectedIndex}-title`)}</FieldError></Field></div>
+                    <div className={styles.field}><Field label={<>{panel.title.trim() || panel.thumbnailImageUrl.trim() ? `本文（タイトルか画像があると${TEXT_MAX_WITH_IMAGE}文字まで）` : `本文（${TEXT_MAX_WITHOUT_IMAGE}文字まで）`}</>} htmlFor="cr-text"><input {...fields.bind(`card-${selectedIndex}-text`)} id="cr-text" className={styles.input} value={panel.text} aria-invalid={fields.invalid(`card-${selectedIndex}-text`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-text`) ? 'cr-text-error' : undefined} onChange={(event) => update(selectedIndex, { text: event.target.value })} />
+<FieldError id="cr-text-error">{fields.error(`card-${selectedIndex}-text`)}</FieldError></Field></div>
                     {[...panel.title].length > TITLE_MAX || [...panel.text].length > textMaxFor(panel) ? (
                       <p className={own.over} role="alert">{`タイトル ${[...panel.title].length} / ${TITLE_MAX}・本文 ${[...panel.text].length} / ${textMaxFor(panel)} 文字。多すぎる分を減らしてください。`}</p>
                     ) : null}
                   </div>
                 </div>
                 {urlOpen ? (
-                  <label className={styles.field}>
-                    <span className={styles.label}>画像の URL</span>
-                    <input className={styles.input} type="url" value={panel.thumbnailImageUrl} placeholder="https://example.com/a.png" onChange={(event) => update(selectedIndex, { thumbnailImageUrl: event.target.value })} />
-                  </label>
+                  <Field label="画像の URL"><input className={styles.input} type="url" value={panel.thumbnailImageUrl} placeholder="https://example.com/a.png" onChange={(event) => update(selectedIndex, { thumbnailImageUrl: event.target.value })} /></Field>
                 ) : null}
 
                 <span className={styles.pickLabel}>{`ボタン（最大 ${MAX_ACTIONS} つ）`}</span>
@@ -621,10 +610,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                 <button type="button" role="radio" aria-checked={tapLimitMode === 'once'} className={styles.segButton} onClick={() => setTapLimitMode('once')}>1人につき1回だけ</button>
               </div>
               {tapLimitMode === 'once' ? (
-                <label className={styles.field}>
-                  <span className={styles.label}>2回目に押されたときの返事<span className={styles.optional}>空なら何も返さない</span></span>
-                  <input className={styles.input} value={tapLimitText} placeholder="例：こちらはすでに受け付けています。" onChange={(event) => setTapLimitText(event.target.value)} />
-                </label>
+                <Field label="2回目に押されたときの返事空なら何も返さない"><input className={styles.input} value={tapLimitText} placeholder="例：こちらはすでに受け付けています。" onChange={(event) => setTapLimitText(event.target.value)} /></Field>
               ) : null}
             </section>}
           </>

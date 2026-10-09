@@ -85,6 +85,7 @@ import {
   type FormSort,
 } from './model'
 import styles from './list.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const VIEWER_NOTE = '閲覧のみで見ています。変える操作は管理者に頼んでください。'
 
@@ -1050,7 +1051,7 @@ export default function FormsListV8() {
         )}
         <div className={styles.narrowSearch}>
           <SearchField
-            aria-label="フォーム名・質問文で検索"
+            aria-label="フォーム名・質問文で探す"
             placeholder="フォーム名・質問文"
             value={query}
             onChange={onSearch}
@@ -1072,7 +1073,7 @@ export default function FormsListV8() {
       <ListToolbar
         search={{
           placeholder: 'フォーム名・質問文',
-          label: 'フォーム名・質問文で検索',
+          label: 'フォーム名・質問文で探す',
           value: query,
           onChange: onSearch,
         }}
@@ -1463,17 +1464,14 @@ export default function FormsListV8() {
             </div>
           )}
         >
-          <label className={styles.panelField}>
-            <span className={styles.panelLabel}>複製の名前</span>
-            <input
+          <Field label="複製の名前"><input
               value={duplicateName}
               onChange={(event) => setDuplicateName(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void duplicateForm()
               }}
               className={styles.panelInput}
-            />
-          </label>
+            /></Field>
           {duplicateError ? <p className={styles.alertText} role="alert">{duplicateError}</p> : null}
         </DetailPanel>
       ) : null}
@@ -1673,17 +1671,14 @@ export default function FormsListV8() {
           </div>
         )}
       >
-        <label className={styles.panelField}>
-          <span className={styles.panelLabel}>フォーム名</span>
-          <input
+        <Field label="フォーム名"><input
             type="text"
             value={renameName}
             onChange={(e) => setRenameName(e.target.value)}
             disabled={renaming}
             maxLength={100}
             className={styles.panelInput}
-          />
-        </label>
+          /></Field>
         {renameError ? <p className={styles.alertText} role="alert">{renameError}</p> : null}
       </Dialog>
     </>

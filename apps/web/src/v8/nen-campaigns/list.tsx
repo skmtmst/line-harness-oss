@@ -564,27 +564,15 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
             <span>切ると、誕生日のメッセージだけが届きます</span>
           </div>
         </div>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>特典の名前</span>
-          <TextField value={coupon.benefitLabel} maxLength={40} onChange={(event) => onChange({ ...coupon, benefitLabel: event.target.value })} />
-        </label>
+        <Field label="特典の名前"><TextField value={coupon.benefitLabel} maxLength={40} onChange={(event) => onChange({ ...coupon, benefitLabel: event.target.value })} /></Field>
         <div className={styles.fieldPair}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>割引額（円）</span>
-            <TextField {...fields.bind('coupon-discount')} type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
-            <FieldError id="coupon-discount-error">{fields.error('coupon-discount')}</FieldError>
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>使える日数</span>
-            <TextField {...fields.bind('coupon-days')} type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
-            <FieldError id="coupon-days-error">{fields.error('coupon-days')}</FieldError>
-          </label>
+          <Field label="割引額（円）"><TextField {...fields.bind('coupon-discount')} type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
+<FieldError id="coupon-discount-error">{fields.error('coupon-discount')}</FieldError></Field>
+          <Field label="使える日数"><TextField {...fields.bind('coupon-days')} type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
+<FieldError id="coupon-days-error">{fields.error('coupon-days')}</FieldError></Field>
         </div>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>コードの頭の文字（10文字まで・大文字）</span>
-          <TextField {...fields.bind('coupon-prefix')} value={coupon.codePrefix} maxLength={10} title="半角大文字・数字・- で3〜10文字" onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />
-            <FieldError id="coupon-prefix-error">{fields.error('coupon-prefix')}</FieldError>
-        </label>
+        <Field label="コードの頭の文字（10文字まで・大文字）"><TextField {...fields.bind('coupon-prefix')} value={coupon.codePrefix} maxLength={10} title="半角大文字・数字・- で3〜10文字" onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />
+<FieldError id="coupon-prefix-error">{fields.error('coupon-prefix')}</FieldError></Field>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>2月29日生まれの子への平年の扱い</span>
           <Select
@@ -979,13 +967,10 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                             <span className={styles.sampleText}>{deliveryDetail.content.bodyText || deliveryDetail.content.reason}</span>
                             {deliveryDetail.content.buttonLabel ? <span className={styles.sampleText}>▶ {deliveryDetail.content.buttonLabel}</span> : null}
                             {retryable ? (
-                              <label className={styles.field}>
-                                <span className={styles.fieldLabel}>再送する理由（500文字まで）</span>
-                                <TextArea value={reasons[delivery.id] ?? ''} rows={3} maxLength={500} autoFocus={retryFocusId === delivery.id} onChange={(event) => setReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} />
-                                <span className={styles.buttonRow}>
+                              <Field label="再送する理由（500文字まで）"><TextArea value={reasons[delivery.id] ?? ''} rows={3} maxLength={500} autoFocus={retryFocusId === delivery.id} onChange={(event) => setReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} />
+<span className={styles.buttonRow}>
                                   <Button type="button" variant="primary" disabled={!(reasons[delivery.id] ?? '').trim()} onClick={() => props.onRetryDelivery(delivery.id, delivery.version, reasons[delivery.id] ?? '')}>再送待ちへ戻す</Button>
-                                </span>
-                              </label>
+                                </span></Field>
                             ) : delivery.status === 'skipped' ? (
                               <span className={styles.muted}>{skippedNoRetryNote[delivery.unmetReasonCode ?? ''] ?? 'この記録は再送できません。'}</span>
                             ) : null}

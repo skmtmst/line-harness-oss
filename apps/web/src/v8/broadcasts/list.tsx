@@ -1233,7 +1233,7 @@ export default function BroadcastListV8() {
           <FolderAddDialog
             kind="broadcast"
             note="配信を分けてしまう箱です。消しても、入っていた配信は未分類として残ります。"
-            placeholder="例: 01_キャンペーン"
+            placeholder="例：01_キャンペーン"
             onClose={() => setFolderDialogOpen(false)}
             onAdded={() => void loadFolders()}
           />
@@ -1243,7 +1243,7 @@ export default function BroadcastListV8() {
             kind="broadcast"
             folder={editingFolder}
             note="配信を分けてしまう箱です。削除しても、中の配信は未分類に残ります。"
-            placeholder="例: 01_キャンペーン"
+            placeholder="例：01_キャンペーン"
             onClose={() => setEditingFolder(null)}
             onAdded={() => { setEditingFolder(null); void loadFolders() }}
           />

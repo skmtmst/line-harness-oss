@@ -25,6 +25,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './quick-send.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { Field } from '@/components/shared/form-controls'
 
 /** 承認を頼む境目（絵の文どおり）。 */
 /** 「名前」を押して入る文字。送るときに友だちの名前へ置き換わる形（{{name}}）。 */
@@ -269,9 +270,7 @@ export default function QuickSendV8({
         </div>
       )}
     >
-      <div className={styles.body}>
-        <label className={styles.label} htmlFor="quick-send-v8-text">本文</label>
-        <InsertTextField
+      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text"><InsertTextField
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}
@@ -280,15 +279,14 @@ export default function QuickSendV8({
           disabled={busy || pending}
           onValueChange={(next) => setText(next)}
         />
-        <div className={styles.metaRow}>
+<div className={styles.metaRow}>
           <span className={styles.meta}>差し込む：</span>
           <button type="button" className={styles.insert} disabled={busy || pending} onClick={insertName}>名前</button>
           <span className={styles.spacer} aria-hidden="true" />
           <span className={styles.meta}>{`${formatNumber(text.length)} / ${formatNumber(TEXT_LIMIT)}`}</span>
         </div>
-
-        <p className={styles.label} id="quick-send-v8-target">送る相手</p>
-        <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-target">
+<p className={styles.label} id="quick-send-v8-target">送る相手</p>
+<div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-target">
           {([['all', '友だち全員'], ['tag', 'タグで絞る']] as const).map(([value, label]) => (
             <button key={value} type="button" role="radio" disabled={busy || pending} aria-checked={target === value} className={styles.chip} onClick={() => setTarget(value)}>
               {label}
@@ -300,9 +298,8 @@ export default function QuickSendV8({
             </div>
           ) : null}
         </div>
-
-        <p className={styles.label} id="quick-send-v8-when">いつ</p>
-        <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-when">
+<p className={styles.label} id="quick-send-v8-when">いつ</p>
+<div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-when">
           {([['now', '今すぐ'], ['scheduled', '日時を決める']] as const).map(([value, label]) => (
             <button key={value} type="button" role="radio" disabled={busy || pending} aria-checked={when === value} className={styles.chip} onClick={() => setWhen(value)}>
               {label}
@@ -314,8 +311,7 @@ export default function QuickSendV8({
             </div>
           ) : null}
         </div>
-
-        <div className={styles.estimateBox}>
+<div className={styles.estimateBox}>
           <div className={styles.estimate} aria-live="polite">
             <Users size={16} aria-hidden="true" className={styles.estimateIcon} />
             <span>
@@ -336,8 +332,7 @@ export default function QuickSendV8({
               <p className={styles.approvalNote}>1人で運用しているときは、人数を確かめるチェックだけで送れます。</p>
             </div>
           ) : null}
-        </div>
-      </div>
+        </div></Field></div>
     </Dialog>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </>

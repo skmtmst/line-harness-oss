@@ -87,7 +87,7 @@ export function basicsBaseSummary(value: BasicsValue, fields: FriendField[], eve
 /*
  * #996 DEEP-06/07: ひな形。選んだときだけ用途に合う基準日・タイミング・
  * 本文をまとめて入れる。fieldNameMatch は friend_field 起点のとき、
- * 候補の名前に含まれていればその情報欄を自動で選ぶ目印（例: 「誕生日」）。
+ * 候補の名前に含まれていればその情報欄を自動で選ぶ目印（例：「誕生日」）。
  */
 export interface ReminderTemplateV8 {
   id: string

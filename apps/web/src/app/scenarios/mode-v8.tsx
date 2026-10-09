@@ -358,7 +358,7 @@ export default function ScenarioModeV8() {
               disabled={disabled}
               onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
               onBlur={() => void saveDetails()}
-              placeholder="例: 友だち追加ウェルカム"
+              placeholder="例：友だち追加ウェルカム"
               invalid={Boolean(nameError)}
               aria-describedby={nameError ? 'scenario-name-error' : undefined}
             />

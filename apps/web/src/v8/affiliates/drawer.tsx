@@ -603,7 +603,7 @@ function SettlementEditor({
           <TextField id="af-settlement-hold" ref={holdRef} type="number" min={0} max={365} value={holdDays} onChange={(event) => { setHoldDays(event.target.value); setFieldErrors((old) => ({ ...old, hold: undefined })) }} placeholder="なし" />
         </Field>
         <Field label="支払いサイクル" htmlFor="af-settlement-cycle">
-          <TextField id="af-settlement-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例: 月末締め翌月末払い" maxLength={100} />
+          <TextField id="af-settlement-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め翌月末払い" maxLength={100} />
         </Field>
       </div>
       <Checkbox checked={notify} onCheckedChange={setNotify}>成果が出たときに本人へ知らせる</Checkbox>

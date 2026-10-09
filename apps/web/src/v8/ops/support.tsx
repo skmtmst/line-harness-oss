@@ -30,6 +30,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './support.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /**
  * 運営のお問い合わせ V8（絵 `P0jhqO`・代わりに起票 `Izau1`）。
@@ -550,16 +551,10 @@ export default function OpsSupportV8() {
               </div>
             </div>
           </div>
-          <div className={styles.field}>
-            <label htmlFor="sup-subject" className={styles.label}>件名</label>
-            <TextField {...createFields.bind('subject')} id="sup-subject" invalid={createFields.invalid('subject')} aria-describedby={createFields.invalid('subject') ? 'sup-subject-error' : undefined} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：電話で受けた配信の相談" maxLength={120} aria-label="件名" />
-            <FieldError id="sup-subject-error">{createFields.error('subject')}</FieldError>
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="sup-body" className={styles.smallLabel}>内容</label>
-            <TextArea {...createFields.bind('body')} id="sup-body" invalid={createFields.invalid('body')} aria-describedby={createFields.invalid('body') ? 'sup-body-error' : undefined} className={styles.createBody} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} aria-label="内容" />
-            <FieldError id="sup-body-error">{createFields.error('body')}</FieldError>
-          </div>
+          <div className={styles.field}><Field label="件名" htmlFor="sup-subject"><TextField {...createFields.bind('subject')} id="sup-subject" invalid={createFields.invalid('subject')} aria-describedby={createFields.invalid('subject') ? 'sup-subject-error' : undefined} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：電話で受けた配信の相談" maxLength={120} aria-label="件名" />
+<FieldError id="sup-subject-error">{createFields.error('subject')}</FieldError></Field></div>
+          <div className={styles.field}><Field label="内容" htmlFor="sup-body"><TextArea {...createFields.bind('body')} id="sup-body" invalid={createFields.invalid('body')} aria-describedby={createFields.invalid('body') ? 'sup-body-error' : undefined} className={styles.createBody} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} aria-label="内容" />
+<FieldError id="sup-body-error">{createFields.error('body')}</FieldError></Field></div>
           <p className={parts.dialogNote}>電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。</p>
         </div>
       </Dialog>

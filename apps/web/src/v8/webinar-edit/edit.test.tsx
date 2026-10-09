@@ -147,6 +147,7 @@ describe('V8 ウェビナーの編集', () => {
     nav.search = 'id=webinar-1&pane=participants'
     await render(<WebinarEditV8 />)
     expect(host.textContent).toContain('NEN活用スタートセミナー')
+    await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(host.textContent).toContain('オンデマンド・いつでも視聴・公開中（版 3）')
     const tabs = host.querySelector('[data-wc-tabs="true"]')
     expect(tabs?.textContent).toContain('参加者 124')

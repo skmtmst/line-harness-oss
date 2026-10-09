@@ -331,8 +331,8 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
         <div className={styles.toolbar}>
           <div className={styles.searchWrap}>
             <SearchField
-              aria-label="マーク名で検索"
-              placeholder="マーク名で検索"
+              aria-label="マーク名で探す"
+              placeholder="マーク名で探す"
               value={query}
               onChange={setQuery}
               onClear={() => setQuery('')}

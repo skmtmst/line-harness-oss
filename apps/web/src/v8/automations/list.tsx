@@ -588,7 +588,7 @@ export default function AutomationListV8() {
           allCount={ready ? items.length : null}
           unfiledCount={ready ? items.length : null}
           countOf={() => null}
-          placeholder="例: 予約・購入"
+          placeholder="例：予約・購入"
         />
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}

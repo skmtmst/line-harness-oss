@@ -1829,7 +1829,7 @@ function CommonVarsListV8Inner() {
           folder={editingFolder}
           accountId={selectedAccountId}
           note="共通情報を分けてしまう箱です。削除しても、入っていた共通情報は未分類として残ります。"
-          placeholder="例: 01_店舗案内"
+          placeholder="例：01_店舗案内"
           onClose={() => setEditingFolder(null)}
           onAdded={() => { setEditingFolder(null); void load() }}
         />

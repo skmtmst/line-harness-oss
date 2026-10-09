@@ -117,7 +117,7 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
       <KpiCard metricSize="small" title="支払いを確認" icon={<CreditCard size={13} />} value={summary?.atRisk} unit="件" detail="ECから届いた決済状態" />
     </KpiBand>
     <div className={styles.toolbar}>
-      <SearchField className={styles.search} value={search} onChange={setSearch} placeholder="お客様の名前・ペット名・契約番号・中身で検索" aria-label="定期便を検索" />
+      <SearchField className={styles.search} value={search} onChange={setSearch} placeholder="お客様の名前・ペット名・契約番号・中身で探す" aria-label="定期便を検索" />
       {FILTERS.map((item) => <FilterChip key={item.key} selected={filter === item.key} icon={item.key === 'all' ? <CircleDot size={13} /> : <Star size={13} />} onChange={() => setFilter(item.key)}>{item.label}</FilterChip>)}
     </div>
     {shown.length === 0 ? <ListState kind="empty" title="条件に合う定期便はありません" description="検索する言葉か表示条件を変えてください。" action={filter !== 'all' || search ? <Button onClick={() => { setFilter('all'); setSearch('') }}>条件を外す</Button> : undefined} /> : <DataTable label="定期便" density="compact" columns="var(--tpl-ecc-sub-columns)">

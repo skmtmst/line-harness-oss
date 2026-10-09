@@ -22,6 +22,7 @@ import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenants.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /**
  * 運営の契約先アカウント V8（絵 `XWtYC`・作る窓 `i0FTN`）。
@@ -236,10 +237,7 @@ export default function OpsTenantsV8() {
         onCancel={closeCreate}
       >
         <div className={parts.dialogBody}>
-          <label className={styles.field}>
-            <span className={styles.label}>統括名（会社名）</span>
-            <TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" />
-          </label>
+          <Field label="統括名（会社名）"><TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" /></Field>
           <div className={styles.field}>
             <span className={styles.smallLabel}>飲食店機能</span>
             <div className={styles.fullSelect}>

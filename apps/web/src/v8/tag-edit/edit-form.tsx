@@ -237,16 +237,10 @@ export function TagEditForm({
       <CreatePage
         boardId={host ? 'MFgPZ' : 'Qat9s'}
         footerOutlined={Boolean(host)}
-        notice={host?.notice}
+        notice={<>{host?.notice}{readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}{conflictBand}</>}
         title={host?.title ?? (tag.name || 'タグを編集')}
         identity={host ? undefined : <Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />タグへ</Link>}
-        help={host ? <>{host.description}{readOnly ? <p className={styles.roBand} role="note">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}</> : (
-          <>
-            {`${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
-            {readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}
-            {conflictBand}
-          </>
-        )}
+        help={host?.description ?? `${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
         preview={host ? host.preview(values) : side}
         destructive={host || readOnly ? undefined : <Button variant="danger" type="button" onClick={onDelete}>タグを削除する</Button>}
         footerActions={(
@@ -268,11 +262,8 @@ export function TagEditForm({
         <fieldset disabled={saving || readOnly} className={styles.fieldset}>
           <section className={styles.card} aria-label="基本">
             <h2 className={styles.cardTitle}>基本</h2>
-            <div className={styles.field}>
-              <label htmlFor="tag-edit-name" className={styles.labelStrong}>タグ名</label>
-              {readOnly ? <span className={styles.roValue}>{name}</span> : <Field error={nameError}><TextField id="tag-edit-name" ref={nameRef} value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例: 定期購入者" aria-required="true" /></Field>}
-              <DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" />
-            </div>
+            <div className={styles.field}><Field label="タグ名" htmlFor="tag-edit-name">{readOnly ? <span className={styles.roValue}>{name}</span> : <Field error={nameError}><TextField id="tag-edit-name" ref={nameRef} value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例：定期購入者" aria-required="true" /></Field>}
+<DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></Field></div>
             <div className={styles.field}>
               <span className={styles.label}>所属フォルダ</span>
               <div className={styles.folderBox}>
@@ -393,16 +384,10 @@ export function TagEditForm({
                     <h3 className={styles.subTitle}>タグが付いたときに積むマイル</h3>
                   </div>
                   <div className={styles.pair}>
-                    <label className={styles.field}>
-                      <span className={styles.label}>本人へのマイル付与</span>
-                      <span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
-                      <span className={styles.hint}>このタグが付いた本人へ、一度だけ積みます。</span>
-                    </label>
-                    <label className={styles.field}>
-                      <span className={styles.label}>紹介者へのマイル付与</span>
-                      <span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
-                      <span className={styles.hint}>紹介経由の友だちなら、その紹介者にも積みます。</span>
-                    </label>
+                    <Field label="本人へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
+<span className={styles.hint}>このタグが付いた本人へ、一度だけ積みます。</span></Field>
+                    <Field label="紹介者へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
+<span className={styles.hint}>紹介経由の友だちなら、その紹介者にも積みます。</span></Field>
                   </div>
                   {readOnly ? (
                     <div className={styles.field}>

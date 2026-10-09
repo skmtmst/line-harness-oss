@@ -787,8 +787,8 @@ function HistoryV8(props: NenOverviewProps) {
           onSubmit={(event) => { event.preventDefault(); const q = draft.trim(); setAppliedQuery(q); props.onChangeDeliveryView(historyViewStatus(filter), undefined, q) }}
         >
           <TextField
-            aria-label="友だちの名前・配信の名前で検索"
-            placeholder="友だちの名前・配信の名前で検索"
+            aria-label="友だちの名前・配信の名前で探す"
+            placeholder="友だちの名前・配信の名前で探す"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
           />

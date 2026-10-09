@@ -155,14 +155,14 @@ describe('V8 コンバージョンの一覧', () => {
     expect(scroll).toHaveBeenCalledWith({ block: 'center' })
     const error = screen.getByRole('alert')
     expect(error.textContent).toBe('名前を入れてください')
-    expect(input.getAttribute('aria-describedby')).toBe(error.id)
+    expect(input.getAttribute('aria-describedby')?.split(/\s+/)).toContain(error.id)
     expect(screen.getAllByText('名前を入れてください')).toHaveLength(1)
     expect(calls.some((call) => call.startsWith('POST '))).toBe(false)
   })
 
   it('状態の札に口の件数を出し、行に数え方と使われている場所を出す', async () => {
     await mount()
-    expect(screen.getByRole('button', { name: /動いている 1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /有効 1/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /どこからも使われていない 1/ })).toBeTruthy()
     expect(screen.getByText('注文が確定したとき')).toBeTruthy()
     expect(screen.getByText('1回ごと・取り消しは引く')).toBeTruthy()
@@ -209,8 +209,8 @@ describe('V8 コンバージョンの一覧', () => {
   it('1152 の板：札は「動いている」「止めている」の2つだけ（ほかはよく使う絞り込みから）', async () => {
     narrow.value = true
     await mount()
-    expect(screen.getByRole('button', { name: /動いている 1/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /止めている 1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /有効 1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /停止中 1/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /下書き 0/ })).toBeNull()
     expect(screen.getByText('使われていない')).toBeTruthy()
   })
@@ -245,7 +245,7 @@ describe('V8 コンバージョンの一覧', () => {
 
   it('札で絞ると、その状態の行だけになる', async () => {
     await mount()
-    fireEvent.click(screen.getByRole('button', { name: /止めている 1/ }))
+    fireEvent.click(screen.getByRole('button', { name: /停止中 1/ }))
     await flush()
     expect(screen.queryByText('商品を買った')).toBeNull()
     expect(screen.getByText('資料をダウンロードした')).toBeTruthy()

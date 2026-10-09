@@ -337,7 +337,7 @@ export default function StaffNewV8() {
                     setFieldErrors({ name: nameFieldError(name) ?? undefined })
                   }}
                   maxLength={BOOKING_STAFF_LIMITS.name}
-                  placeholder="例: 田中 美咲"
+                  placeholder="例：田中 美咲"
                   className={styles.input}
                   aria-invalid={fieldErrors.name !== undefined}
                 />
@@ -353,7 +353,7 @@ export default function StaffNewV8() {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   maxLength={BOOKING_STAFF_LIMITS.displayName}
-                  placeholder="例: みさき"
+                  placeholder="例：みさき"
                   className={styles.input}
                 />
               </label>
@@ -365,7 +365,7 @@ export default function StaffNewV8() {
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   maxLength={BOOKING_STAFF_LIMITS.role}
-                  placeholder="例: トリミング担当"
+                  placeholder="例：トリミング担当"
                   className={styles.input}
                 />
               </label>
@@ -389,7 +389,7 @@ export default function StaffNewV8() {
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   maxLength={BOOKING_STAFF_LIMITS.bio}
-                  placeholder="例: トリミング歴10年。小型犬が得意です。"
+                  placeholder="例：トリミング歴10年。小型犬が得意です。"
                   className={styles.input}
                 />
               </label>

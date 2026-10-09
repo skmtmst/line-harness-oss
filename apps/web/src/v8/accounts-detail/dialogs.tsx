@@ -163,7 +163,7 @@ export function StopDialog({ account, onClose, onDone }: {
           <TextField
             id={inputId}
             maxLength={500}
-            placeholder={stopping ? '例: 乗り換えの準備のため' : '例: 接続を直したので再開する'}
+            placeholder={stopping ? '例：乗り換えの準備のため' : '例：接続を直したので再開する'}
             value={reason}
             onChange={(event) => { setReason(event.target.value); setFieldErrors({}) }}
             disabled={busy}
@@ -269,7 +269,7 @@ export function ArchiveDialog({ account, onClose, onDone }: {
         <TextField
           id={reasonId}
           maxLength={500}
-          placeholder="例: 使わなくなったため"
+          placeholder="例：使わなくなったため"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           disabled={busy}
@@ -608,12 +608,12 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         </div>
         <div className={styles.field}>
           <div className={styles.labelRow}>
-            <label className={styles.label} htmlFor={ids.og}>ブランド設定（OGP）</label>
+
             <Button type="button" variant="text" presentation="account-inline" aria-expanded={showOgMore} onClick={() => setShowOgMore((value) => !value)}>
               {showOgMore ? '説明と画像を閉じる' : '説明と画像も変える'}
             </Button>
           </div>
-          <TextField id={ids.og} placeholder="共有したときに出る名前" value={ogSiteName} onChange={(event) => setOgSiteName(event.target.value)} disabled={busy} />
+          <Field label="ブランド設定（OGP）" htmlFor={ids.og}><TextField id={ids.og} placeholder="共有したときに出る名前" value={ogSiteName} onChange={(event) => setOgSiteName(event.target.value)} disabled={busy} /></Field>
         </div>
         {showOgMore ? (
           <>

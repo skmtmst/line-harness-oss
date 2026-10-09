@@ -29,6 +29,7 @@ function useControlA11y(props: {
   const invalid = Boolean(props.invalid) || Boolean(field?.invalid)
   return {
     id: props.id ?? field?.controlId,
+    'aria-label': field?.label,
     'aria-describedby': joinDescribedBy(props['aria-describedby'], field?.describedBy),
     'aria-invalid': props['aria-invalid'] ?? (invalid || undefined),
     'aria-required': props['aria-required'] ?? (field?.required && !props.required ? true : undefined),
@@ -53,6 +54,7 @@ export const TextField = forwardRef<
       {...rest}
       id={a11y.id}
       required={required}
+      aria-label={rest['aria-label'] ?? a11y['aria-label']}
       aria-describedby={a11y['aria-describedby']}
       aria-invalid={a11y['aria-invalid']}
       aria-required={a11y['aria-required']}
@@ -81,6 +83,7 @@ export const TextArea = forwardRef<
       {...rest}
       id={a11y.id}
       required={required}
+      aria-label={rest['aria-label'] ?? a11y['aria-label']}
       aria-describedby={a11y['aria-describedby']}
       aria-invalid={a11y['aria-invalid']}
       aria-required={a11y['aria-required']}

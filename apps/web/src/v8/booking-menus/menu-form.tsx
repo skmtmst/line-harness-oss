@@ -50,6 +50,7 @@ import { LiffPhoneMenuStep } from './liff-phone'
 import shell from './settings.module.css'
 import styles from './menu-form.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -810,9 +811,7 @@ export default function MenuFormV8() {
               <h2 className={shell.sectionTitle}>メニューの中身</h2>
             </div>
             <div className={styles.nameRow}>
-              <label className={styles.field}>
-                <span className={styles.label}>メニュー名</span>
-                <input
+              <Field label="メニュー名"><input
                   className={styles.input}
                   type="text"
                   value={name}
@@ -825,13 +824,12 @@ export default function MenuFormV8() {
                   onBlur={() => {
                     setFieldErrors((previous) => ({ ...previous, name: bookingMenuNameError(name) ?? undefined }))
                   }}
-                  placeholder="例: トリミング（小型犬）"
+                  placeholder="例：トリミング（小型犬）"
                   aria-invalid={fieldErrors.name !== undefined}
                 />
-                {fieldErrors.name !== undefined ? (
+{fieldErrors.name !== undefined ? (
                   <span className={styles.fieldError} role="alert">{fieldErrors.name}</span>
-                ) : null}
-              </label>
+                ) : null}</Field>
               <span className={`${styles.field} ${styles.categoryField}`}>
                 <span className={styles.labelSmall}>分類</span>
                 <Select
@@ -855,22 +853,19 @@ export default function MenuFormV8() {
                     type="text"
                     value={categoryNew}
                     onChange={(e) => setCategoryNew(e.target.value)}
-                    placeholder="新しい分類の名前（例: トリミング）"
+                    placeholder="新しい分類の名前（例：トリミング）"
                     aria-label="新しい分類の名前"
                   />
                 )}
               </span>
             </div>
-            <label className={styles.field}>
-              <span className={styles.label}>説明（お客さまに見えます）<span className={styles.optional}>任意</span></span>
-              <input
+            <Field label="説明（お客さまに見えます）"><input
                 className={styles.input}
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="例: シャンプー・カット・爪切り"
-              />
-            </label>
+                placeholder="例：シャンプー・カット・爪切り"
+              /></Field>
             {/* 絵 QqER7：見出しの段と欄の段を分けて3列に並べる。 */}
             <div className={styles.grid3}>
               <span className={styles.labelSmall}>かかる時間</span>
@@ -1049,9 +1044,7 @@ export default function MenuFormV8() {
             <div className={styles.subSection}>
               <h2 className={styles.subTitle}>受け方</h2>
               <div className={styles.fieldStack}>
-                <label className={styles.field}>
-                  <span className={styles.label}>同時に受けられる件数</span>
-                  <span className={styles.unitField}>
+                <Field label="同時に受けられる件数"><span className={styles.unitField}>
                     <input
                       type="number"
                       min={1}
@@ -1060,11 +1053,8 @@ export default function MenuFormV8() {
                       aria-label="同時に受けられる件数"
                     />
                     <span className={styles.unitSuffix}>件</span>
-                  </span>
-                </label>
-                <label className={styles.field}>
-                  <span className={styles.label}>後の空き時間（片付け・移動）</span>
-                  <span className={styles.unitField}>
+                  </span></Field>
+                <Field label="後の空き時間（片付け・移動）"><span className={styles.unitField}>
                     <input
                       type="number"
                       min={0}
@@ -1083,10 +1073,9 @@ export default function MenuFormV8() {
                     />
                     <span className={styles.unitSuffix}>分</span>
                   </span>
-                  {fieldErrors.buffer !== undefined ? (
+{fieldErrors.buffer !== undefined ? (
                     <span className={styles.fieldError} role="alert">{fieldErrors.buffer}</span>
-                  ) : null}
-                </label>
+                  ) : null}</Field>
               </div>
             </div>
 
@@ -1121,17 +1110,14 @@ export default function MenuFormV8() {
                 <span className={styles.toggleLineLabel}>予約するときに質問を出す</span>
               </div>
               {askQuestion && (
-                <label className={styles.field}>
-                  <span className={styles.label}>質問文</span>
-                  <input
+                <Field label="質問文"><input
                     className={styles.input}
                     type="text"
                     value={intakeQuestion}
                     onChange={(e) => setIntakeQuestion(e.target.value)}
-                    placeholder="例: 気になるところ・アレルギーがあれば教えてください"
+                    placeholder="例：気になるところ・アレルギーがあれば教えてください"
                     maxLength={200}
-                  />
-                </label>
+                  /></Field>
               )}
             </div>
 

@@ -19,6 +19,7 @@ import { ApiError, api } from '@/lib/api'
 import type { NenPetRow } from '@/lib/nen-pets-api'
 import { normalizeBirthdayInput } from './parts'
 import styles from './pets.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const ANIMALS = [
   { value: 'dog', label: '犬' },
@@ -125,15 +126,9 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           </span>
         </div>
         <div className={styles.editorPair}>
-          <label className={styles.editorField}>
-            <span className={styles.fieldLabel}>ペットの名前</span>
-            <TextField {...fields.bind('pet-edit-name')} aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
-            <FieldError id="pet-edit-name-error">{fields.error('pet-edit-name')}</FieldError>
-          </label>
-          <label className={styles.editorField}>
-            <span className={styles.fieldLabel}>品種</span>
-            <TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} />
-          </label>
+          <Field label="ペットの名前"><TextField {...fields.bind('pet-edit-name')} aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
+<FieldError id="pet-edit-name-error">{fields.error('pet-edit-name')}</FieldError></Field>
+          <Field label="品種"><TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} /></Field>
         </div>
         <div className={styles.editorGroup}>
           <span id="pet-gender-label" className={styles.groupLabel}>性別</span>
@@ -144,16 +139,10 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           </span>
         </div>
         <div className={styles.editorPair}>
-          <label className={styles.editorField}>
-            <span className={styles.fieldLabel}>誕生日</span>
-            <TextField {...fields.bind('pet-edit-birthday')} aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} />
-            <FieldError id="pet-edit-birthday-error">{fields.error('pet-edit-birthday')}</FieldError>
-          </label>
-          <label className={styles.editorField}>
-            <span className={styles.fieldLabel}>体重</span>
-            <TextField {...fields.bind('pet-edit-weight')} aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} />
-            <FieldError id="pet-edit-weight-error">{fields.error('pet-edit-weight')}</FieldError>
-          </label>
+          <Field label="誕生日"><TextField {...fields.bind('pet-edit-birthday')} aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} />
+<FieldError id="pet-edit-birthday-error">{fields.error('pet-edit-birthday')}</FieldError></Field>
+          <Field label="体重"><TextField {...fields.bind('pet-edit-weight')} aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} />
+<FieldError id="pet-edit-weight-error">{fields.error('pet-edit-weight')}</FieldError></Field>
         </div>
         <p className={styles.editorHint}>生まれた年が分からないときは「03-15」のように月日だけを入れます。空欄は未登録です。</p>
       </div>

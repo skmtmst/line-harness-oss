@@ -129,7 +129,7 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     const submit = buttonNamed('作って開く') as HTMLButtonElement
     expect(submit, '作って開くがありません').toBeTruthy()
     expect(submit.disabled).toBe(true)
-    const name = document.querySelector('input[placeholder="例: 春の感謝祭 2周年"]') as HTMLInputElement
+    const name = document.querySelector('input[placeholder="例：春の感謝祭 2周年"]') as HTMLInputElement
     fireEvent.change(name, { target: { value: '新しい案件' } })
     await flush()
     expect(submit.disabled).toBe(false)

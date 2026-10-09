@@ -5,6 +5,7 @@
  * 担当スタッフタブ（menus/settings-v8.tsx）の両方から使う。
  * 見た目・入力検査（parseBookingStaffInput）・紐づけ候補の取り方は変えない。
  */
+import { Field } from '@/components/shared/form-controls'
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
@@ -14,18 +15,6 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { api, type BookingStaff } from '@/lib/api'
-
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="block text-xs font-medium text-ink-secondary mb-1">
-        {label}
-        {required && <span className="text-status-danger ml-0.5">*</span>}
-      </span>
-      {children}
-    </label>
-  )
-}
 
 export function StaffEditModal({
   staff,
@@ -94,7 +83,7 @@ export function StaffEditModal({
               onChange={(e) => set('name', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.name}
               className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="例: yamada-taro"
+              placeholder="例：yamada-taro"
             />
           </Field>
           <Field label="表示名" required>
@@ -114,7 +103,7 @@ export function StaffEditModal({
               onChange={(e) => set('role', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.role}
               className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="例: トップスタイリスト"
+              placeholder="例：トップスタイリスト"
             />
           </Field>
           <ImageUploader

@@ -46,6 +46,7 @@ import {
   webhookLabel,
 } from './view'
 import styles from './accounts.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const TITLE = 'LINEアカウント'
 const DESCRIPTION = 'musubo でつないでいる LINE 公式アカウントです。既定のアカウントと、親子（本店と支店など）を決めます。'
@@ -292,17 +293,14 @@ export default function AccountsV8() {
         onCancel={() => { if (!busy) { setArchiveTarget(null); setArchiveReason(''); setDialogError('') } }}
         onConfirm={() => void runArchive()}
       >
-        <label className={styles.reason}>
-          <span className={styles.reasonLabel}>アーカイブの理由（任意）</span>
-          <TextArea
+        <Field label="アーカイブの理由"><TextArea
             rows={2}
             maxLength={500}
-            placeholder="例: 使わなくなった旧店舗のアカウント"
+            placeholder="例：使わなくなった旧店舗のアカウント"
             value={archiveReason}
             onChange={(e) => setArchiveReason(e.target.value)}
             disabled={busy}
-          />
-        </label>
+          /></Field>
       </ConfirmDialog>
 
       <ConfirmDialog

@@ -24,6 +24,7 @@ import { formatNumber, formatTime } from '@/lib/format'
 import { KpiMenu } from './common'
 import { downloadCsv, periodCaption, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type CrossQueueStatus = { state: 'pending' | 'running' | 'available' | 'partial' | 'unavailable' | 'failed'; queuePosition: number | null; pendingAhead: number; estimatedWaitMs: number | null; nextTickAt: string | null }
 export type CrossSaveSlot = (props: { sourceResultId: string; defaultName: string }) => ReactNode
@@ -339,21 +340,11 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
     {kpis}
     <div className={styles.body} data-gap="tab">
       <div className={styles.controls}>
-        <label className={styles.field} data-w="measure"><span className={styles.fieldLabel}>数えるもの</span>
-          <Select id="cross-measure" value={measureKind} onChange={(value) => setMeasureKind(value as 'unique_friends' | 'events')} aria-label="数えるもの" size="full" options={[{ value: 'unique_friends', label: '友だちの人数（重複なし）' }, { value: 'events', label: 'イベントの回数' }]} />
-        </label>
-        {measureKind === 'events' ? <label className={styles.field} data-w="axis"><span className={styles.fieldLabel}>数えるイベント</span>
-          <Select id="cross-measure-event" value={measureEventType} onChange={setMeasureEventType} aria-label="数えるイベント" size="full" options={MEASURE_EVENTS} />
-        </label> : null}
-        <label className={styles.field} data-w="axis"><span className={styles.fieldLabel}>たての軸</span>
-          <Select aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} />
-        </label>
-        <label className={styles.field} data-w="axis"><span className={styles.fieldLabel}>よこの軸</span>
-          <Select id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} />
-        </label>
-        <label className={styles.field} data-w="period"><span className={styles.fieldLabel}>期間</span>
-          <Select aria-label="期間" value={String(crossDays)} onChange={(value) => setCrossDays(Number(value))} size="full" options={PERIODS.map((days) => ({ value: String(days), label: `この${days}日` }))} />
-        </label>
+        <Field label="数えるもの"><Select id="cross-measure" value={measureKind} onChange={(value) => setMeasureKind(value as 'unique_friends' | 'events')} aria-label="数えるもの" size="full" options={[{ value: 'unique_friends', label: '友だちの人数（重複なし）' }, { value: 'events', label: 'イベントの回数' }]} /></Field>
+        {measureKind === 'events' ? <Field label="数えるイベント"><Select id="cross-measure-event" value={measureEventType} onChange={setMeasureEventType} aria-label="数えるイベント" size="full" options={MEASURE_EVENTS} /></Field> : null}
+        <Field label="たての軸"><Select aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} /></Field>
+        <Field label="よこの軸"><Select id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} /></Field>
+        <Field label="期間"><Select aria-label="期間" value={String(crossDays)} onChange={(value) => setCrossDays(Number(value))} size="full" options={PERIODS.map((days) => ({ value: String(days), label: `この${days}日` }))} /></Field>
         <Button variant="primary" onClick={() => void runCross()} disabled={loading || !crossStorageRestored || sameAxis || Boolean(crossRunId)} busy={loading} busyLabel="集計中" title={sameAxis ? 'たてとよこに同じ軸は選べません' : '期間や軸を変えた場合は、新しい結果として集計します'}>集計する</Button>
         <span className={styles.spacer} />
         {crossResult && crossResultId && canManage && renderSave ? <span title="条件の定義と、いま表示している結果を別々に固定して残します">{renderSave({ sourceResultId: crossResultId, defaultName: `クロス分析 ${resultAxes?.row ?? ''} × ${resultAxes?.column ?? ''}` })}</span> : null}

@@ -20,6 +20,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isImeComposing } from '@/components/shared/ime'
 import styles from './quick-create.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /* 1欄ぶんの確かめ。文は「何をすれば直るか」を1文で書く。 */
 function validateKeywords(keywords: string[]): string | null {
@@ -277,9 +278,7 @@ export default function QuickCreateV8({
           </div>
           {keywordError ? <p className={styles.fieldError} role="alert">{keywordError}</p> : null}
         </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="quick-create-reply">返す文</label>
-          <textarea
+        <div className={styles.field}><Field label="返す文" htmlFor="quick-create-reply"><textarea
             id="quick-create-reply"
             value={reply}
             onChange={(event) => {
@@ -292,8 +291,7 @@ export default function QuickCreateV8({
             className={styles.textarea}
             aria-invalid={replyError ? true : undefined}
           />
-          {replyError ? <p className={styles.fieldError} role="alert">{replyError}</p> : null}
-        </div>
+{replyError ? <p className={styles.fieldError} role="alert">{replyError}</p> : null}</Field></div>
         {overlaps.length > 0 ? (
           <p className={styles.overlapBand} role="status">
             <HelpCircle size={16} aria-hidden="true" className={styles.overlapIcon} />

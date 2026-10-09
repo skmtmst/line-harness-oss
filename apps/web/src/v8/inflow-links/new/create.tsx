@@ -37,6 +37,7 @@ import { TextField } from '@/components/shared/text-field'
 import { focusField } from '../focus-field'
 import { groupTagsByFolder } from './tag-options'
 import styles from './create.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /* ref は口（entry-routes.ts）と同じ `[A-Za-z0-9_-]{1,64}`。 */
 const REF_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
@@ -399,9 +400,7 @@ function InflowCreate() {
           <p className={styles.cardNote}>名前は一覧で見分けるため。お客さまには見えません</p>
         </div>
         <div className={styles.fieldRow}>
-          <label className={styles.field}>
-            <span className={styles.label}>名前</span>
-            <TextField
+          <Field label="名前"><TextField
               id="ir-name"
               type="text"
               value={name}
@@ -415,8 +414,7 @@ function InflowCreate() {
               aria-invalid={Boolean(fieldErrors['ir-name'])}
               aria-describedby={fieldErrors['ir-name'] ? 'ir-name-error' : undefined}
             />
-            {fieldErrors['ir-name'] ? <span id="ir-name-error" className={styles.fieldError} role="alert">{fieldErrors['ir-name']}</span> : null}
-          </label>
+{fieldErrors['ir-name'] ? <span id="ir-name-error" className={styles.fieldError} role="alert">{fieldErrors['ir-name']}</span> : null}</Field>
           <div className={styles.field}>
             <span className={styles.pickLabel}>フォルダ</span>
             <Select
@@ -442,12 +440,10 @@ function InflowCreate() {
             aria-label="新しいフォルダの名前"
           />
         ) : null}
-        <label className={styles.field}>
-          <span className={styles.labelRow}>
+        <Field label={<><span className={styles.labelRow}>
             <span className={styles.label}>転送先（入れると友だち追加へ進みません）</span>
             <span className={styles.optional}>任意</span>
-          </span>
-          <TextField
+          </span></>}><TextField
             id="ir-redirect"
             type="url"
             value={redirectUrl}
@@ -456,11 +452,8 @@ function InflowCreate() {
             aria-invalid={Boolean(fieldErrors['ir-redirect'])}
             aria-describedby={fieldErrors['ir-redirect'] ? 'ir-redirect-error' : undefined}
           />
-          {fieldErrors['ir-redirect'] ? <span id="ir-redirect-error" className={styles.fieldError} role="alert">{fieldErrors['ir-redirect']}</span> : null}
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>見分けるための文字（URL の最後に付く）</span>
-          <TextField
+{fieldErrors['ir-redirect'] ? <span id="ir-redirect-error" className={styles.fieldError} role="alert">{fieldErrors['ir-redirect']}</span> : null}</Field>
+        <Field label="見分けるための文字（URL の最後に付く）"><TextField
             id="ir-ref"
             type="text"
             value={refCode}
@@ -469,8 +462,7 @@ function InflowCreate() {
             aria-invalid={Boolean(fieldErrors['ir-ref']) || (refCode !== '' && !validRef)}
             aria-describedby={fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? 'ir-ref-error' : undefined}
           />
-          {fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? <span id="ir-ref-error" className={styles.fieldError} role="alert">半角英数字・_・ハイフンで1〜64文字にしてください</span> : null}
-        </label>
+{fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? <span id="ir-ref-error" className={styles.fieldError} role="alert">半角英数字・_・ハイフンで1〜64文字にしてください</span> : null}</Field>
       </section>
 
       <section className={styles.card} aria-labelledby="ir-new-account">
@@ -577,7 +569,7 @@ function InflowCreate() {
         </div>
         <div className={styles.urlBox}>
           <Link2 size={14} aria-hidden="true" className={styles.urlIcon} />
-          <span className={styles.urlText} title={previewUrl || undefined}>{previewUrl || `例: ${workerBase}/r/summer-ig`}</span>
+          <span className={styles.urlText} title={previewUrl || undefined}>{previewUrl || `例：${workerBase}/r/summer-ig`}</span>
           <span className={styles.urlNote}>{previewUrl ? '発行するとできます' : 'まだ発行されていません'}</span>
         </div>
         {!previewUrl ? (

@@ -195,7 +195,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
 
     <div className={styles.toolbar}>
       <div className={styles.runSearch}>
-        <SearchField aria-label="お客様の名前・注文番号で検索" placeholder="お客様の名前・注文番号で検索" value={query} onChange={setQuery} onClear={() => setQuery('')} />
+        <SearchField aria-label="お客様の名前・注文番号で探す" placeholder="お客様の名前・注文番号で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
       </div>
       <div className={styles.runRecipient}>
         <Select aria-label="対象を絞り込み" label="対象" value={recipientFilter} onChange={(value) => setRecipientFilter(value as RecipientFilter)} options={[

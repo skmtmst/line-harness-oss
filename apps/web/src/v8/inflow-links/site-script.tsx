@@ -33,6 +33,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { DetailPage } from '@/components/templates'
 import { focusField } from './focus-field'
 import styles from './site-script.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -518,7 +519,7 @@ export default function SiteScriptV8() {
         open={siteDialog !== null}
         initialFocusId={Object.entries(siteFieldErrors).find(([, error]) => Boolean(error))?.[0]}
         title={siteDialog?.mode === 'edit' ? '計測サイトを直す' : '計測サイトを追加'}
-        description="このサイトから届いた成果だけを数えます。ドメインは1行に1つずつ書きます（例: shop.example.com）。www の有無は同じサイトとして扱います。"
+        description="このサイトから届いた成果だけを数えます。ドメインは1行に1つずつ書きます（例：shop.example.com）。www の有無は同じサイトとして扱います。"
         busy={siteBusy}
         error={siteDialog?.error ?? undefined}
         confirmLabel={siteDialog?.mode === 'edit' ? '保存する' : '追加する'}
@@ -527,16 +528,10 @@ export default function SiteScriptV8() {
       >
         {siteDialog ? (
           <div className={styles.dialogFields}>
-            <label className={styles.dialogField}>
-              <span className={styles.dialogLabel}>サイトの名前</span>
-              <TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例: 公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} />
-              {siteFieldErrors['site-name'] ? <span id="site-name-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-name']}</span> : null}
-            </label>
-            <label className={styles.dialogField}>
-              <span className={styles.dialogLabel}>計測を許可するドメイン</span>
-              <TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} />
-              {siteFieldErrors['site-domains'] ? <span id="site-domains-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-domains']}</span> : null}
-            </label>
+            <Field label="サイトの名前"><TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例：公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} />
+{siteFieldErrors['site-name'] ? <span id="site-name-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-name']}</span> : null}</Field>
+            <Field label="計測を許可するドメイン"><TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} />
+{siteFieldErrors['site-domains'] ? <span id="site-domains-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-domains']}</span> : null}</Field>
           </div>
         ) : null}
       </Dialog>
@@ -554,11 +549,8 @@ export default function SiteScriptV8() {
         {stopDialog ? (
           <div className={styles.dialogFields}>
             <p className={styles.small}>{`対象: ${stopDialog.site.label}`}</p>
-            <label className={styles.dialogField}>
-              <span className={styles.dialogLabel}>止める理由（必須）</span>
-              <TextField id="site-stop-reason" aria-invalid={Boolean(stopReasonError)} aria-describedby={stopReasonError ? 'site-stop-reason-error' : undefined} value={stopDialog.reason} maxLength={200} placeholder="例: サイトを閉じたため" onChange={(e) => { setStopDialog({ ...stopDialog, reason: e.target.value }); setStopReasonError('') }} />
-              {stopReasonError ? <span id="site-stop-reason-error" className={styles.fieldError} role="alert">{stopReasonError}</span> : null}
-            </label>
+            <Field label="止める理由" required><TextField id="site-stop-reason" aria-invalid={Boolean(stopReasonError)} aria-describedby={stopReasonError ? 'site-stop-reason-error' : undefined} value={stopDialog.reason} maxLength={200} placeholder="例：サイトを閉じたため" onChange={(e) => { setStopDialog({ ...stopDialog, reason: e.target.value }); setStopReasonError('') }} />
+{stopReasonError ? <span id="site-stop-reason-error" className={styles.fieldError} role="alert">{stopReasonError}</span> : null}</Field>
           </div>
         ) : null}
       </Dialog>

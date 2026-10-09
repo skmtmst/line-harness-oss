@@ -583,7 +583,7 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
               id="ad-cost-label-v8"
               value={model.manualLabel}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setManualLabel(event.target.value)}
-              placeholder="例: チラシ"
+              placeholder="例：チラシ"
               maxLength={100}
             />
           </div>
@@ -612,7 +612,7 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
               inputMode="numeric"
               value={model.manualAmount}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setManualAmount(event.target.value)}
-              placeholder="例: 20000"
+              placeholder="例：20000"
             />
           </div>
         </div>
@@ -645,7 +645,7 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
                 id="ad-cost-cancel-reason-v8"
                 value={model.cancelReason}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setCancelReason(event.target.value)}
-                placeholder="例: 金額を間違えた"
+                placeholder="例：金額を間違えた"
                 maxLength={200}
               />
             </div>

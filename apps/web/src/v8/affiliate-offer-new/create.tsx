@@ -31,6 +31,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import styles from './create.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -279,15 +280,9 @@ export default function AffiliateOfferCreateV8() {
           <h2 className={styles.cardTitle} id="af-new-what">どんな案件か</h2>
           <p className={styles.cardNote}>アフィリエイターの画面に出ます</p>
         </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="of-name">案件名</label>
-          <TextField {...fields.bind('name')} invalid={fields.invalid('name')} aria-describedby={describedBy('name')} id="of-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期便の初回" maxLength={120} readOnly={!canEdit} />
-          <FieldError id="of-name-error">{fields.error('name')}</FieldError>
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="of-description">説明<span className={styles.optional}>任意</span></label>
-          <TextField id="of-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：初回の定期便をお申し込みいただいた方が対象です。" maxLength={500} readOnly={!canEdit} />
-        </div>
+        <div className={styles.field}><Field label="案件名" htmlFor="of-name"><TextField {...fields.bind('name')} invalid={fields.invalid('name')} aria-describedby={describedBy('name')} id="of-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期便の初回" maxLength={120} readOnly={!canEdit} />
+<FieldError id="of-name-error">{fields.error('name')}</FieldError></Field></div>
+        <div className={styles.field}><Field label="説明" htmlFor="of-description"><TextField id="of-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：初回の定期便をお申し込みいただいた方が対象です。" maxLength={500} readOnly={!canEdit} /></Field></div>
       </section>
 
       <section className={styles.card} aria-labelledby="af-new-point">
@@ -320,19 +315,10 @@ export default function AffiliateOfferCreateV8() {
           <p className={styles.cardNote}>アフィリエイター側の決まりが「定額」のときにこの額を使います</p>
         </div>
         <div className={styles.pair}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="of-amount">報酬額（円）</label>
-            <TextField {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} />
-            <FieldError id="of-amount-error">{fields.error('amount')}</FieldError>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="of-miles">
-              マイル（任意）<span className={styles.optional}>任意</span>
-              <HelpTip label="マイルの説明">現金とマイルは併用できます。マイルは標準プログラムで付けます。</HelpTip>
-            </label>
-            <TextField {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} />
-            <FieldError id="of-miles-error">{fields.error('miles')}</FieldError>
-          </div>
+          <div className={styles.field}><Field label="報酬額（円）" htmlFor="of-amount"><TextField {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} />
+<FieldError id="of-amount-error">{fields.error('amount')}</FieldError></Field></div>
+          <div className={styles.field}><Field label="マイル" htmlFor="of-miles" help={<>現金とマイルは併用できます。マイルは標準プログラムで付けます。</>}><TextField {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} />
+<FieldError id="of-miles-error">{fields.error('miles')}</FieldError></Field></div>
         </div>
       </section>
 

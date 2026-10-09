@@ -259,10 +259,7 @@ export default function ClosureDialog({
           </div>
         </Field>
 
-        <label className={styles.field}>
-          <span className={styles.label}>メモ<OptionalBadge /></span>
-          <TextField value={input.memo ?? ''} maxLength={200} placeholder="例：設備点検のため" onChange={(event) => set({ memo: event.target.value })} />
-        </label>
+        <Field label="メモ"><TextField value={input.memo ?? ''} maxLength={200} placeholder="例：設備点検のため" onChange={(event) => set({ memo: event.target.value })} /></Field>
 
         {problem ? null : preview === null ? (
           <p className={styles.hint} aria-live="polite">{`${days}の予約を調べています。`}</p>

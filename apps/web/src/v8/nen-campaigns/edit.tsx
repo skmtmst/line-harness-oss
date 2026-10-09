@@ -40,6 +40,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import { useFieldValidation } from '@/lib/use-field-validation'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import { tapActionLiffUrl } from '@/lib/tap-actions'
+import { Field } from '@/components/shared/form-controls'
 
 /** きっかけの短い言い方（配信フローの札・日数の選ぶ欄）。 */
 const TRIGGER_SHORT: Record<string, string> = {
@@ -488,11 +489,11 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         </div>
         <div className={styles.field}>
           <span className={styles.labelRow}>
-            <label className={styles.labelSmall} htmlFor="nen-edit-body">配信本文</label>
+
             <span className={styles.labelNote}>差し込み：友だち情報欄「ペットの名前」・注文の「商品名」</span>
             {canEdit ? <button type="button" className={styles.labelAside} aria-expanded={insertOpen} onClick={() => setInsertOpen((current) => !current)}>{insertOpen ? '差し込みを閉じる' : '差し込む'}</button> : null}
           </span>
-          <InsertTextField
+          <Field label="配信本文" htmlFor="nen-edit-body"><InsertTextField
             id="nen-edit-body"
             aria-invalid={Boolean((validationSubmitted || !bodyCheck.fits) && bodyError)}
             aria-describedby={(validationSubmitted || !bodyCheck.fits) && bodyError ? 'nen-edit-body-error' : undefined}
@@ -502,7 +503,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             onValueChange={(next) => setDraft((previous) => ({ ...previous, bodyText: next }))}
             aria-label="配信本文"
             compact
-          />
+          /></Field>
           {insertOpen && canEdit ? (
             <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
           ) : null}

@@ -284,8 +284,8 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
         <div className={styles.toolbar}>
           <div className={styles.searchWrap}>
             <SearchField
-              aria-label="条件名で検索"
-              placeholder="条件名で検索"
+              aria-label="条件名で探す"
+              placeholder="条件名で探す"
               value={query}
               onChange={setQuery}
               onClear={() => setQuery('')}

@@ -20,6 +20,7 @@ import { useStaffRole } from '@/lib/staff-role'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import CompanyContactCard from './company-contact'
 import styles from './settings.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const TITLE = '統括の情報'
 const DESCRIPTION = '統括の名前です。各アカウントの画面の上と、メンバーへの招待メールに出ます。'
@@ -114,9 +115,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
 
   return (
     <form onSubmit={save} className={styles.card}>
-      <div className={styles.field}>
-        <label htmlFor={`${uid}-name`} className={styles.label}>統括名</label>
-        <TextField
+      <div className={styles.field}><Field label="統括名" htmlFor={`${uid}-name`}><TextField
           id={`${uid}-name`}
           value={name}
           maxLength={100}
@@ -126,8 +125,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
           aria-describedby={nameError ? `${uid}-name-error` : undefined}
           className={styles.full}
         />
-        {nameError ? <p id={`${uid}-name-error`} className={styles.error} role="alert">{nameError}</p> : null}
-      </div>
+{nameError ? <p id={`${uid}-name-error`} className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
       <p className={styles.hint}>会社名やブランド名など、メンバーが見てわかる名前にします</p>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {saved ? <p className={styles.saved} role="status">保存しました。</p> : null}

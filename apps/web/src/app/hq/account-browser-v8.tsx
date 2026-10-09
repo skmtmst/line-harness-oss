@@ -420,7 +420,7 @@ export default function AccountBrowser({
             value={tagName}
             maxLength={100}
             disabled={tagSaving}
-            placeholder="例: 渋谷エリア"
+            placeholder="例：渋谷エリア"
             onChange={(event) => setTagName(event.target.value)}
             className="w-full"
           />

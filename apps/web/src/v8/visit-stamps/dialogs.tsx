@@ -5,6 +5,7 @@
  * 特典・倍率・初回ボーナス・ランク倍率は「下書き」を変えるだけ（保存は下の帯の［保存する］）。
  * 理由・暗証番号・写真は、その場で口を呼ぶ（呼び出しは画面側）。
  */
+import { Field as SharedField } from '@/components/shared/form-controls'
 import { useEffect, useState } from 'react'
 import type { VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
 import Checkbox from '@/components/shared/checkbox'
@@ -17,7 +18,7 @@ import { WEEKDAYS, minuteLabel } from './display'
 import styles from './visit-stamps.module.css'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className={styles.field}><span className={styles.label}>{label}</span>{children}</label>
+  return <SharedField label={label}>{children}</SharedField>
 }
 
 /*
@@ -25,13 +26,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  * 打っている途中には出さない（窓の下の帯にも出さない）。
  */
 function CheckedField({ id, label, fields, name, children }: { id: string; label: string; fields: FormErrors; name: string; children: React.ReactNode }) {
-  return (
-    <div className={styles.field}>
-      <label htmlFor={id} className={styles.label}>{label}</label>
-      {children}
-      <FieldError id={`${id}-error`}>{fields.error(name)}</FieldError>
-    </div>
-  )
+  return <SharedField label={label} htmlFor={id}>{children}<FieldError id={`${id}-error`}>{fields.error(name)}</FieldError></SharedField>
 }
 const checkedProps = (fields: FormErrors, name: string, id: string) => ({ ...fields.bind(name), id, invalid: fields.invalid(name), 'aria-describedby': fields.invalid(name) ? `${id}-error` : undefined })
 

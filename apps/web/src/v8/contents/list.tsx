@@ -59,6 +59,7 @@ import { ListPage } from '@/components/templates'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import styles from './list.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -1142,7 +1143,7 @@ export default function MediaLibraryListV8() {
             allCount={mediaFolderRows[0].count}
             unfiledCount={unfiledCount}
             onAdded={(created) => setFolderFilter(created.id)}
-            placeholder="例: 01_商品写真"
+            placeholder="例：01_商品写真"
           >
             {folderFailure ? (
               <div role="alert">
@@ -1489,17 +1490,14 @@ export default function MediaLibraryListV8() {
           </div>
         }
       >
-        <label>
-          <span>理由<RequiredBadge /><span>（あとから履歴で確認できます）</span></span>
-          <input
+        <Field label="理由（あとから履歴で確認できます）" required><input
             type="text"
             autoFocus
             value={archiveReason}
             onChange={(event) => setArchiveReason(event.target.value)}
             placeholder={archiveTarget?.mode === 'archive' ? '例：古いキャンペーンの素材のため' : '例：再び使うため'}
             aria-label="理由"
-          />
-        </label>
+          /></Field>
       </Dialog>
 
       {/*

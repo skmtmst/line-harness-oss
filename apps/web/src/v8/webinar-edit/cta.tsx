@@ -31,6 +31,7 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './cta.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidden'; items: Array<{ id: string; name: string; isActive: boolean }> }
 
@@ -51,7 +52,7 @@ function cardFieldProblems(card: WebinarCtaCard, time: string, durationSeconds: 
   const url = card.url?.trim() ?? ''
   return {
     time: at === null
-      ? '出す時刻は 分:秒 で入れてください（例: 45:00）'
+      ? '出す時刻は 分:秒 で入れてください（例：45:00）'
       : durationSeconds > 0 && at > durationSeconds ? `出す時刻が動画の長さ（${Math.floor(durationSeconds / 60)}分）を超えています。動画の中の時刻に直してください` : null,
     title: card.title?.trim() ? null : 'カードの見出しを入れてください',
     button: card.buttonLabel?.trim() ? null : 'ボタンに出す文字を入れてください',
@@ -329,10 +330,13 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
               {/* 閲覧のみ：文字の欄は読み取りだけ、選ぶ部品は選んでいる値を文字で見せる（2026-10-06 オーナー決定）。 */}
               <p className={styles.editorTitle}>{`選んでいるカード：${times[currentIndex] ?? fmtMinSec(current.atSeconds)}`}</p>
               <div className={form.pair}>
-                <div className={form.field}><label htmlFor="cta-title" className={form.label}>見出し</label><TextField {...fields.bind(`cta-${currentIndex}-title`)} id="cta-title" value={current.title} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-title`)} aria-describedby={errId('title')} onChange={(event) => update(currentIndex, { title: event.target.value })} /><FieldError id="cta-title-error">{fields.error(`cta-${currentIndex}-title`)}</FieldError></div>
-                <div className={form.field}><label htmlFor="cta-time" className={form.label}>出す時刻（分:秒）</label><TextField {...fields.bind(`cta-${currentIndex}-time`)} id="cta-time" value={times[currentIndex] ?? ''} readOnly={readOnly} inputMode="numeric" placeholder="12:00" invalid={fields.invalid(`cta-${currentIndex}-time`)} aria-describedby={errId('time')} onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} /><FieldError id="cta-time-error">{fields.error(`cta-${currentIndex}-time`)}</FieldError></div>
+                <div className={form.field}><Field label="見出し" htmlFor="cta-title"><TextField {...fields.bind(`cta-${currentIndex}-title`)} id="cta-title" value={current.title} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-title`)} aria-describedby={errId('title')} onChange={(event) => update(currentIndex, { title: event.target.value })} />
+<FieldError id="cta-title-error">{fields.error(`cta-${currentIndex}-title`)}</FieldError></Field></div>
+                <div className={form.field}><Field label="出す時刻（分:秒）" htmlFor="cta-time"><TextField {...fields.bind(`cta-${currentIndex}-time`)} id="cta-time" value={times[currentIndex] ?? ''} readOnly={readOnly} inputMode="numeric" placeholder="12:00" invalid={fields.invalid(`cta-${currentIndex}-time`)} aria-describedby={errId('time')} onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} />
+<FieldError id="cta-time-error">{fields.error(`cta-${currentIndex}-time`)}</FieldError></Field></div>
               </div>
-              <div className={form.field}><label htmlFor="cta-button" className={form.label}>ボタンの言葉</label><TextField {...fields.bind(`cta-${currentIndex}-button`)} id="cta-button" value={current.buttonLabel} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-button`)} aria-describedby={errId('button')} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} /><FieldError id="cta-button-error">{fields.error(`cta-${currentIndex}-button`)}</FieldError></div>
+              <div className={form.field}><Field label="ボタンの言葉" htmlFor="cta-button"><TextField {...fields.bind(`cta-${currentIndex}-button`)} id="cta-button" value={current.buttonLabel} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-button`)} aria-describedby={errId('button')} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} />
+<FieldError id="cta-button-error">{fields.error(`cta-${currentIndex}-button`)}</FieldError></Field></div>
               <div className={form.field}>
                 <span className={form.labelSmall}>押したら</span>
                 {/*

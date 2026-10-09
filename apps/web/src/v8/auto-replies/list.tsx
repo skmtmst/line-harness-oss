@@ -990,7 +990,7 @@ export default function AutoRepliesListV8() {
       unfiledId={UNFILED}
       allCount={rules.length}
       unfiledCount={unfiledCount}
-      placeholder="例: 01_営業時間外"
+      placeholder="例：01_営業時間外"
     />
   )
 

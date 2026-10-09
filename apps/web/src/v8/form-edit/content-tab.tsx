@@ -4,6 +4,7 @@
  * 「中身」のタブ（m1cWEy・ITBAB・ijxur・J1pdB・Z9wXm の左の列）。
  * ページの札、ページのブロック（畳んだ行と開いた設定）、ブロックを足す欄。
  */
+import { Field } from '@/components/shared/form-controls'
 import { useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
@@ -283,12 +284,7 @@ function blockTitleKind(block: FormBlock): string {
 }
 
 function Labeled({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
-  return (
-    <div className={styles.field}>
-      <label className={styles.fieldLabel} htmlFor={htmlFor}>{label}</label>
-      {children}
-    </div>
-  )
+  return <Field label={label} htmlFor={htmlFor}>{children}</Field>
 }
 
 function InputFields({ block, refs, patch }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void }) {

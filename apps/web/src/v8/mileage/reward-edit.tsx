@@ -9,6 +9,7 @@
  * 欄は1つも落とさない。絵に無い欄（説明・交換したときの案内・交換後に使える日数・種類ごとの説明）は
  * 最後の「そのほか（任意）」の段にまとめ、欄の説明は「？」へ入れる。
  */
+import { Field as SharedField } from '@/components/shared/form-controls'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check, FlaskConical, Plus } from 'lucide-react'
@@ -131,16 +132,7 @@ function draftOf(form: FormState): MileageRewardDraftInput {
 
 /** 選ぶ欄（絵：ラベルは 12px・入れ物との間 6）。説明は「？」へ。 */
 function SelectField({ label, htmlFor, help, error, children }: { label: string; htmlFor: string; help?: string; error?: string; children: ReactNode }) {
-  return (
-    <div className={styles.field}>
-      <span className={styles.selectLabelRow}>
-        <label htmlFor={htmlFor} className={styles.selectLabel}>{label}</label>
-        {help ? <HelpTip label={`${label}の説明`}>{help}</HelpTip> : null}
-      </span>
-      {children}
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
-    </div>
-  )
+  return <SharedField label={label} htmlFor={htmlFor} help={help} error={error}>{children}</SharedField>
 }
 
 function RewardEditorInner() {
@@ -490,27 +482,15 @@ function RewardEditorInner() {
       <section className={styles.card} aria-label="出す数と期間">
         <h2 className={styles.cardTitle}>出す数と期間</h2>
         <div className={styles.grid2}>
-          <div className={styles.field}>
-            <label htmlFor="reward-stock" className={styles.label}>出す数<OptionalBadge /></label>
-            <TextField id="reward-stock" invalid={Boolean(errorOf(LIMIT_FIELD_ERRORS.stockLimit))} aria-describedby={errorOf(LIMIT_FIELD_ERRORS.stockLimit) ? 'reward-stock-error' : undefined} inputMode="numeric" title="空欄なら限りなし。0 と書くと品切れ（交換できません）" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="制限なし" />
-            {errorOf(LIMIT_FIELD_ERRORS.stockLimit) ? <p id="reward-stock-error" className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.stockLimit}</p> : null}
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="reward-per-friend" className={styles.label}>1人あたり<OptionalBadge /></label>
-            <TextField id="reward-per-friend" invalid={Boolean(errorOf(LIMIT_FIELD_ERRORS.perFriendLimit))} aria-describedby={errorOf(LIMIT_FIELD_ERRORS.perFriendLimit) ? 'reward-per-friend-error' : undefined} inputMode="numeric" title="空欄なら何回でも" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="1回まで" />
-            {errorOf(LIMIT_FIELD_ERRORS.perFriendLimit) ? <p id="reward-per-friend-error" className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.perFriendLimit}</p> : null}
-          </div>
+          <div className={styles.field}><Field label="出す数" htmlFor="reward-stock"><TextField id="reward-stock" invalid={Boolean(errorOf(LIMIT_FIELD_ERRORS.stockLimit))} aria-describedby={errorOf(LIMIT_FIELD_ERRORS.stockLimit) ? 'reward-stock-error' : undefined} inputMode="numeric" title="空欄なら限りなし。0 と書くと品切れ（交換できません）" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="制限なし" />
+{errorOf(LIMIT_FIELD_ERRORS.stockLimit) ? <p id="reward-stock-error" className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.stockLimit}</p> : null}</Field></div>
+          <div className={styles.field}><Field label="1人あたり" htmlFor="reward-per-friend"><TextField id="reward-per-friend" invalid={Boolean(errorOf(LIMIT_FIELD_ERRORS.perFriendLimit))} aria-describedby={errorOf(LIMIT_FIELD_ERRORS.perFriendLimit) ? 'reward-per-friend-error' : undefined} inputMode="numeric" title="空欄なら何回でも" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="1回まで" />
+{errorOf(LIMIT_FIELD_ERRORS.perFriendLimit) ? <p id="reward-per-friend-error" className={styles.error} role="alert">{LIMIT_FIELD_ERRORS.perFriendLimit}</p> : null}</Field></div>
         </div>
         <div className={styles.grid2}>
-          <div className={styles.field}>
-            <label htmlFor="reward-starts" className={styles.label}>交換開始</label>
-            <DateTimeField id="reward-starts" aria-label="交換開始" value={form.startsAt} onChange={(v) => set('startsAt', v)} />
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="reward-ends" className={styles.label}>交換終了<OptionalBadge /></label>
-            <DateTimeField id="reward-ends" aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} invalid={Boolean(errorOf('交換終了は交換開始より後にしてください'))} aria-describedby={errorOf('交換終了は交換開始より後にしてください') ? 'reward-ends-error' : undefined} placeholder="期限なし" />
-            {errorOf('交換終了は交換開始より後にしてください') ? <p id="reward-ends-error" className={styles.error} role="alert">交換終了は交換開始より後にしてください</p> : null}
-          </div>
+          <div className={styles.field}><Field label="交換開始" htmlFor="reward-starts"><DateTimeField id="reward-starts" aria-label="交換開始" value={form.startsAt} onChange={(v) => set('startsAt', v)} /></Field></div>
+          <div className={styles.field}><Field label="交換終了" htmlFor="reward-ends"><DateTimeField id="reward-ends" aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} invalid={Boolean(errorOf('交換終了は交換開始より後にしてください'))} aria-describedby={errorOf('交換終了は交換開始より後にしてください') ? 'reward-ends-error' : undefined} placeholder="期限なし" />
+{errorOf('交換終了は交換開始より後にしてください') ? <p id="reward-ends-error" className={styles.error} role="alert">交換終了は交換開始より後にしてください</p> : null}</Field></div>
         </div>
       </section>
 

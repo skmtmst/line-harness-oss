@@ -22,6 +22,7 @@ import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenant-detail.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /**
  * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
@@ -366,15 +367,9 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
               : '再開すると、権限者がまたログインできるようになります。'}
         </p>
         {needsName ? (
-          <label className={styles.field}>
-            <span className={styles.label}>確認のため、契約先の名前をそのまま入力</span>
-            <TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} />
-          </label>
+          <Field label="確認のため、契約先の名前をそのまま入力"><TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} /></Field>
         ) : null}
-        <label className={styles.field}>
-          <span className={styles.label}>理由（4文字以上）</span>
-          <TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" required />
-        </label>
+        <Field label="理由（4文字以上）" required><TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" required /></Field>
       </div>
     </Dialog>
   )

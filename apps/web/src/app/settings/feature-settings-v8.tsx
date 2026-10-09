@@ -524,7 +524,7 @@ export function FeatureSettingsV8() {
               id="feature-settings-reason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="例: マイルを使わないのでオフにする"
+              placeholder="例：マイルを使わないのでオフにする"
               maxLength={300}
               disabled={saving}
             />

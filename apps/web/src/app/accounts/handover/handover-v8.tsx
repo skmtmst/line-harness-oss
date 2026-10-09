@@ -594,7 +594,7 @@ export default function HandoverV8() {
                   type="number"
                   min={0}
                   className="mt-1 w-40"
-                  placeholder="例: 231"
+                  placeholder="例：231"
                   value={declaredTotalInput}
                   onChange={(e) => setDeclaredTotalInput(e.target.value)}
                   disabled={refreshing || !handover.counts}

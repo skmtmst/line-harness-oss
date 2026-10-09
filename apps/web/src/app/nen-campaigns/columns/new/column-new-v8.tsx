@@ -152,7 +152,7 @@ export default function ColumnNewV8() {
             <div className={styles.row2}>
               <label className={styles.fieldLabel}>
                 分類
-                <TextField aria-label="分類" value={draft.category} maxLength={CATEGORY_MAX} placeholder="例: 季節のこと" onChange={(event) => set({ category: event.target.value })} />
+                <TextField aria-label="分類" value={draft.category} maxLength={CATEGORY_MAX} placeholder="例：季節のこと" onChange={(event) => set({ category: event.target.value })} />
               </label>
               <div className={styles.fieldLabel}>
                 前のコラムを下敷きにする
@@ -238,7 +238,7 @@ export default function ColumnNewV8() {
             <div className={styles.row2}>
               <label className={styles.fieldLabel}>
                 読了イベント名
-                <TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例: 秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} />
+                <TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例：秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} />
               </label>
               <label className={styles.fieldLabel}>
                 読了後に付けるタグ

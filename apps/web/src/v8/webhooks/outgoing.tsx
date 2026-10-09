@@ -735,7 +735,7 @@ export default function WebhooksOutgoingV8() {
           allCount={ready ? displayed.length : null}
           unfiledCount={ready ? displayed.filter((item) => !item.folderId).length : null}
           countOf={folderCountOf}
-          placeholder="例: 顧客・会員"
+          placeholder="例：顧客・会員"
         />
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}

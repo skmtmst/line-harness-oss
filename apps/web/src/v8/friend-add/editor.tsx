@@ -81,6 +81,7 @@ import { addTimeWindow, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow }
 import { resendSuppressionText } from './text'
 import styles from './editor.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { Field } from '@/components/shared/form-controls'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
 type EditorRule = {
@@ -859,9 +860,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
           <p className={styles.cardDesc}>一覧に出る名前です。友だちには見えません。</p>
         </div>
         <div className={styles.fieldPair}>
-          <div className={styles.field}>
-            <label htmlFor="fa-name" className={styles.label}>設定名（60文字まで）</label>
-            <TextField
+          <div className={styles.field}><Field label="設定名（60文字まで）" htmlFor="fa-name"><TextField
               id="fa-name"
               value={rule.name}
               maxLength={60}
@@ -871,11 +870,8 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
               placeholder="例：秋フェアの初回案内"
               onChange={(event) => setRule((current) => ({ ...current, name: event.target.value }))}
             />
-            {nameError ? <span id="fa-name-error" className={styles.fieldError} role="alert">{nameError}</span> : null}
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="fa-folder" className={styles.label}>フォルダ</label>
-            {canEdit ? (
+{nameError ? <span id="fa-name-error" className={styles.fieldError} role="alert">{nameError}</span> : null}</Field></div>
+          <div className={styles.field}><Field label="フォルダ" htmlFor="fa-folder">{canEdit ? (
               <FolderSelect
                 id="fa-folder"
                 aria-label="フォルダ"
@@ -888,8 +884,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
               />
             ) : (
               <ReadOnlyText id="fa-folder" label="フォルダ" value={rule.folderName || '未分類'} />
-            )}
-          </div>
+            )}</Field></div>
         </div>
       </Card>
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="だれに送るか">
@@ -965,24 +960,18 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
   const conditions = (<>
       <p className={styles.subDesc}>空のままなら、選んだリンクから来た全員に送ります。</p>
       <div className={styles.datePair}>
-        <div className={styles.field}>
-          <label htmlFor="fa-from" className={styles.label}>有効期間 はじめ</label>
-          <DateTimeField
+        <div className={styles.field}><Field label="有効期間 はじめ" htmlFor="fa-from"><DateTimeField
             id="fa-from"
             value={localInputValue(definition.activeFrom)}
             readOnly={!canEdit}
             onChange={(next) => setDefinition((current) => ({ ...current, activeFrom: next || null }))}
-          />
-        </div>
-        <div className={styles.field}>
-          <label htmlFor="fa-until" className={styles.label}>有効期間 おわり</label>
-          <DateTimeField
+          /></Field></div>
+        <div className={styles.field}><Field label="有効期間 おわり" htmlFor="fa-until"><DateTimeField
             id="fa-until"
             value={localInputValue(definition.activeUntil)}
             readOnly={!canEdit}
             onChange={(next) => setDefinition((current) => ({ ...current, activeUntil: next || null }))}
-          />
-        </div>
+          /></Field></div>
       </div>
       {legacy ? (
         <p className={styles.fieldError} role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</p>
@@ -1025,16 +1014,13 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
           <h2 className={styles.cardTitle}>どの流入リンクから来た人に送るか</h2>
           <p className={styles.cardDesc}>選んだリンクの URL・QR（どちらも同じ入口）から追加された人に動きます</p>
         </div>
-        <label className={styles.routeSearch}>
-          <Search size={14} aria-hidden="true" />
-          <input
+        <Field label={<><Search size={14} aria-hidden="true" /></>}><input
             className={styles.routeSearchInput}
             value={query}
             placeholder="流入リンクの名前で探す"
             aria-label="流入リンクの名前で探す"
             onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
+          /></Field>
         {/* 閲覧のみ：選ぶチェックは置かず、選んでいるリンクの名前だけを並べる。 */}
         {(canEdit ? visibleRoutes : visibleRoutes.filter((route) => definition.routeIds.includes(route.id))).map((route) => {
           const checked = definition.routeIds.includes(route.id)

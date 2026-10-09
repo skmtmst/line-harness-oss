@@ -559,7 +559,7 @@ export default function FeatureSettingsScreen() {
                 aria-required="true"
                 value={reason}
                 onChange={(event) => { setReason(event.target.value); if (reasonError) setError('') }}
-                placeholder="例: マイルを使わないのでオフにする"
+                placeholder="例：マイルを使わないのでオフにする"
                 maxLength={300}
                 disabled={saving}
               />

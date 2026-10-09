@@ -31,6 +31,7 @@ import { FIELD_TYPE_HINTS } from '@/components/friend-fields/field-list'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { FIELD_TYPE_WORDS } from './field-editor'
 import styles from './create.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const TYPES = Object.keys(FIELD_TYPE_WORDS) as FriendFieldType[]
 
@@ -551,14 +552,8 @@ function FieldMigrate() {
             />
             {targetMode === 'new' ? (
               <div className={styles.twoCols}>
-                <label className={styles.field}>
-                  <span className={styles.label}>新しい項目の名前</span>
-                  <input className={styles.input} value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} />
-                </label>
-                <label className={styles.field}>
-                  <span className={styles.label}>差し込みの名前</span>
-                  <input className={styles.input} value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} />
-                </label>
+                <Field label="新しい項目の名前"><input className={styles.input} value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} /></Field>
+                <Field label="差し込みの名前"><input className={styles.input} value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} /></Field>
               </div>
             ) : (
               <div className={styles.field}>

@@ -26,6 +26,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { nenRanksApi, type NenFeedingData, type NenFeedingKind } from '@/lib/nen-ranks-api'
 import { Pill } from './parts'
 import styles from './pets.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /** 係数の説明（Worker `services/nen-feeding.ts` の ENERGY_FACTORS と同じ値）。 */
 const FACTOR_ROWS: Array<{ label: string; dog: string; cat: string }> = [
@@ -187,9 +188,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
               <p className={styles.cardDesc}>然の商品名と 100g あたりのカロリーを登録すると、マイページに「然の鹿肉の目安」が出ます</p>
             </div>
             <ProductTable {...tableProps} kind="nen" defaultHead="目安に使う商品" defaultChip="目安に使う中" makeDefault="これを使う" addLabel="然の商品を追加する" onAdd={() => add('nen')} />
-            <div className={styles.treat}>
-              <label className={styles.treatLabel} htmlFor="nen-treat-limit">おやつの上限（%）</label>
-              <span className={styles.treatRow}>
+            <div className={styles.treat}><Field label="おやつの上限（%）" htmlFor="nen-treat-limit"><span className={styles.treatRow}>
                 <span className={styles.treatInput}>
                   {canEdit ? (
                     <TextField disabled={busy} id="nen-treat-limit" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); touch() }} />
@@ -198,8 +197,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
                   )}
                 </span>
                 <span className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</span>
-              </span>
-            </div>
+              </span></Field></div>
           </Card>
         </div>
 

@@ -91,6 +91,7 @@ import {
 } from './model'
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -963,7 +964,7 @@ function CommonVarsListInner() {
       unfiledId={UNGROUPED}
       allCount={listFailed ? null : items.length}
       unfiledCount={unfiledCount}
-      placeholder="例: 01_店舗案内"
+      placeholder="例：01_店舗案内"
       controlRef={folderControlRef}
     >
       {folderFailureNote}
@@ -1462,17 +1463,14 @@ function CommonVarsListInner() {
                 </span>
               </p>
             ) : null}
-            <label className={styles.dialogField}>
-              <span className={styles.dialogLabel}>
+            <Field label={<><span className={styles.dialogLabel}>
                 {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
-              </span>
-              <input
+              </span></>}><input
                 value={statusReason}
                 onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
                 placeholder={statusAction === 'stop' ? 'キャンペーンが終わったため' : '新しい期間の案内を始めるため'}
                 className={styles.dialogInput}
-              />
-            </label>
+              /></Field>
             {statusAction === 'stop' && statusScheduled.length > 0 ? (
               <p className={styles.dialogWarn} role="note">
                 <TriangleAlert size={14} aria-hidden="true" />
@@ -1702,29 +1700,21 @@ function CommonVarsListInner() {
                 ) : null}
 
                 {deleteImpact.canDelete ? (
-                <label className={styles.dialogField}>
-                  <span className={styles.dialogLabel}>消した理由（記録に残ります）</span>
-                  <input
+                <Field label="消した理由（記録に残ります）"><input
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
                     placeholder="店舗情報の変更のため"
                     className={styles.dialogInput}
-                  />
-                </label>
+                  /></Field>
                 ) : null}
 
                 {deleteImpact.canDelete ? (
-                  <label className={styles.dialogField}>
-                    <span className={styles.dialogLabel}>
-                      削除する場合は、差し込みキーを入力してください
-                    </span>
-                    <input
+                  <Field label="削除する場合は、差し込みキーを入力してください"><input
                       value={typedKey}
                       onChange={(e) => setTypedKey(e.target.value)}
                       placeholder={placeholderText(deleteImpact.variable.varKey)}
                       className={styles.dialogInput}
-                    />
-                  </label>
+                    /></Field>
                 ) : null}
 
                 {deleteImpact.canDelete && blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason }) ? (
@@ -1762,17 +1752,12 @@ function CommonVarsListInner() {
           setDeleteTargets([])
         }}
       >
-        <label className={styles.dialogField}>
-          <span className={styles.dialogLabel}>
-            消した理由 <span className={styles.required}>必須</span>
-          </span>
-          <input
+        <Field label="消した理由" required><input
             value={batchReason}
             onChange={(e) => setBatchReason(e.target.value)}
             placeholder="店舗情報の変更のため"
             className={styles.dialogInput}
-          />
-        </label>
+          /></Field>
       </ConfirmDialog>
 
       {activeItem ? (

@@ -63,6 +63,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
   it('作る画面から一覧へは、上の帯のパンくず「テンプレート」で戻る（同じ URL のまま段を替える）', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    fireEvent.click(await screen.findByRole('button', { name: "メッセージを作るの説明" }))
     expect(await screen.findByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeTruthy()
     const crumb = chrome.crumbs?.find((item) => item.label === 'テンプレート')
     expect(crumb?.href).toBe('/hq/templates')
@@ -76,6 +77,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
   it('作る画面から一覧へは、下の帯の［キャンセル］でも戻る', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    fireEvent.click(await screen.findByRole('button', { name: "メッセージを作るの説明" }))
     expect(await screen.findByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     await waitFor(() => expect(screen.queryByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeNull())
@@ -84,6 +86,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
   it('メッセージは店の作る画面で作り、［保存する］で統括のひな形を作ってアカウントへ配るへ進む', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    fireEvent.click(await screen.findByRole('button', { name: "メッセージを作るの説明" }))
     expect(await screen.findByText('保存後に、配るアカウントを選べます。一覧の「…」からも配れます。')).toBeTruthy()
     // 板の頭の「← テンプレートへ」は無くした（2026-10-08）。一覧へは上の帯のパンくずで戻る。
     expect(screen.queryByText('← テンプレートへ')).toBeNull()

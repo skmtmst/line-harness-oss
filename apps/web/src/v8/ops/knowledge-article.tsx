@@ -21,6 +21,7 @@ import styles from './ops-knowledge-v8.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
 import ValidationSummary from '@/components/shared/validation-summary'
+import { Field } from '@/components/shared/form-controls'
 
 /**
  * ナレッジの記事 V8（絵 `R5ckwJ`）。一覧の「開く」から出す。
@@ -116,32 +117,20 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
       <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
       <div className={styles.article}>
         <section className={styles.fields} aria-label="記事の中身">
-          <div className={styles.field}>
-            <label htmlFor="ka-title" className={styles.label}>題名</label>
-            <TextField {...fields.bind('title')} id="ka-title" invalid={fields.invalid('title')} aria-describedby={fields.invalid('title') ? 'ka-title-error' : undefined} value={form.title} maxLength={120} disabled={busy} onChange={(e) => change('title', e.target.value)} />
-            <FieldError id="ka-title-error">{fields.error('title')}</FieldError>
-          </div>
+          <div className={styles.field}><Field label="題名" htmlFor="ka-title"><TextField {...fields.bind('title')} id="ka-title" invalid={fields.invalid('title')} aria-describedby={fields.invalid('title') ? 'ka-title-error' : undefined} value={form.title} maxLength={120} disabled={busy} onChange={(e) => change('title', e.target.value)} />
+<FieldError id="ka-title-error">{fields.error('title')}</FieldError></Field></div>
           <div className={styles.field}>
             <span className={styles.smallLabel} id="ops-article-kind">種類</span>
             <div className={styles.wideSelect}>
               <Select aria-label="種類" options={KNOWLEDGE_KINDS} value={form.kind} disabled={busy} onChange={(value) => change('kind', value as OpsKnowledgeInput['kind'])} />
             </div>
           </div>
-          <div className={styles.field}>
-            <label htmlFor="ka-question" className={styles.smallLabel}>質問</label>
-            <TextArea {...fields.bind('question')} id="ka-question" invalid={fields.invalid('question')} aria-describedby={fields.invalid('question') ? 'ka-question-error' : undefined} className={styles.question} value={form.question} maxLength={1000} disabled={busy} onChange={(e) => change('question', e.target.value)} />
-            <FieldError id="ka-question-error">{fields.error('question')}</FieldError>
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="ka-answer" className={styles.smallLabel}>答え</label>
-            <TextArea {...fields.bind('answer')} id="ka-answer" invalid={fields.invalid('answer')} aria-describedby={fields.invalid('answer') ? 'ka-answer-error' : undefined} className={styles.answer} value={form.answer} maxLength={12000} disabled={busy} onChange={(e) => change('answer', e.target.value)} />
-            <FieldError id="ka-answer-error">{fields.error('answer')}</FieldError>
-          </div>
+          <div className={styles.field}><Field label="質問" htmlFor="ka-question"><TextArea {...fields.bind('question')} id="ka-question" invalid={fields.invalid('question')} aria-describedby={fields.invalid('question') ? 'ka-question-error' : undefined} className={styles.question} value={form.question} maxLength={1000} disabled={busy} onChange={(e) => change('question', e.target.value)} />
+<FieldError id="ka-question-error">{fields.error('question')}</FieldError></Field></div>
+          <div className={styles.field}><Field label="答え" htmlFor="ka-answer"><TextArea {...fields.bind('answer')} id="ka-answer" invalid={fields.invalid('answer')} aria-describedby={fields.invalid('answer') ? 'ka-answer-error' : undefined} className={styles.answer} value={form.answer} maxLength={12000} disabled={busy} onChange={(e) => change('answer', e.target.value)} />
+<FieldError id="ka-answer-error">{fields.error('answer')}</FieldError></Field></div>
           {!form.answer.trim() && article.articleKind === 'answer_example' ? <p className={parts.note}>運営の回答がありません。答えを書いて承認できます</p> : null}
-          <label className={styles.field}>
-            <span className={styles.label}>キーワード</span>
-            <TextField value={keywords} maxLength={480} disabled={busy} onChange={(e) => { setKeywords(e.target.value); setReadChecked(false) }} />
-          </label>
+          <Field label="キーワード"><TextField value={keywords} maxLength={480} disabled={busy} onChange={(e) => { setKeywords(e.target.value); setReadChecked(false) }} /></Field>
         </section>
         <aside className={styles.side}>
           {editing ? (

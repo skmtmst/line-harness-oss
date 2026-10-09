@@ -27,7 +27,7 @@ export const FUNNEL_STEP_KINDS = [
   { key: 'tag', label: 'タグが付いた', hint: 'タグのID' },
   { key: 'field', label: '情報欄に値が入った', hint: '項目のID（値は問いません）' },
   { key: 'form', label: 'フォームに答えた', hint: 'フォームのID' },
-  { key: 'site_event', label: 'サイトのページを見た', hint: 'パスのまとまり（例: thanks）' },
+  { key: 'site_event', label: 'サイトのページを見た', hint: 'パスのまとまり（例：thanks）' },
   { key: 'purchase', label: '購入が確定した', hint: '' },
   { key: 'link_click', label: 'リンクを踏んだ', hint: '計測リンクのID' },
   { key: 'conversion', label: '成果が記録された', hint: '成果地点のID' },

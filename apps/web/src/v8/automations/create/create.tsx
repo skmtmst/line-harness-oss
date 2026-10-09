@@ -2369,16 +2369,13 @@ export function NewAutomationV8({
           </div>
           <p className={styles.sideNote}>選んだ友だち1人だけに動かします</p>
         </div>
-        <label className={styles.field} htmlFor="v8-test-friend">
-          <span className={styles.label}>友だち</span>
-          <TextField
+        <Field label="友だち" htmlFor="v8-test-friend"><TextField
             id="v8-test-friend"
             aria-label="1人テストの友だちID"
             value={testFriendId}
             onChange={(event) => setTestFriendId(event.target.value)}
             placeholder="試す友だちのID"
-          />
-        </label>
+          /></Field>
         {canEdit ? (
           <div>
             <Button
@@ -2613,16 +2610,13 @@ export function NewAutomationV8({
           </button>
         ) : null}
         {usesKeyword ? (
-          <label className={styles.field} htmlFor="v8-rule-keyword">
-            <span className={styles.label}>含まれる言葉</span>
-            <TextField
+          <Field label="含まれる言葉" htmlFor="v8-rule-keyword"><TextField
               id="v8-rule-keyword"
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="例：予約（空欄なら、どんな内容でも動きます）"
               maxLength={100}
-            />
-          </label>
+            /></Field>
         ) : null}
         {['tag_change', 'form_submitted', 'link_clicked', 'calendar_booked', 'datetime', 'daily', 'weekly'].includes(eventType) ? (
           <div className={styles.subBox}>
@@ -2768,9 +2762,7 @@ export function NewAutomationV8({
       >
         {editingRow ? (
           <div className={styles.dialogBody}>
-            <label className={styles.field} htmlFor={`v8-action-${editingRow.key}`}>
-              <span className={styles.label}>すること</span>
-              <Select
+            <Field label="すること" htmlFor={`v8-action-${editingRow.key}`}><Select
                 id={`v8-action-${editingRow.key}`}
                 error={inputError?.target === `v8-action-${editingRow.key}` ? inputError.message : undefined}
                 aria-label="すること"
@@ -2779,8 +2771,7 @@ export function NewAutomationV8({
                 options={(editingRow.type === 'notify_staff' ? ACTIONS : EDITABLE_ACTIONS)
                   .map((action) => ({ value: action.value, label: action.label }))}
                 size="full"
-              />
-            </label>
+              /></Field>
             {editingRow.type === 'add_tag' ? (
               <ResourcePick
                 kind="tag"
@@ -2828,17 +2819,14 @@ export function NewAutomationV8({
                 知らせる相手と文面は、見本から作ったときのまま保ちます。変えるときは、することを選び直してください。
               </p>
             ) : (
-              <label className={styles.field} htmlFor={`v8-message-${editingRow.key}`}>
-                <span className={styles.label}>送る文面</span>
-                <TextArea
+              <Field label="送る文面" htmlFor={`v8-message-${editingRow.key}`}><TextArea
                   invalid={inputError?.target === `v8-message-${editingRow.key}`}
                   aria-describedby={inputError?.target === `v8-message-${editingRow.key}` ? 'v8-action-error' : undefined}
                   id={`v8-message-${editingRow.key}`}
                   value={editingRow.message}
                   onChange={(event) => updateAction(editingRow.key, { message: event.target.value })}
                 />
-                {inputError?.target === `v8-message-${editingRow.key}` ? <p id="v8-action-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
-              </label>
+{inputError?.target === `v8-message-${editingRow.key}` ? <p id="v8-action-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}</Field>
             )}
           </div>
         ) : null}

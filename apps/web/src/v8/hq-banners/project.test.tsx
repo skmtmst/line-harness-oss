@@ -125,6 +125,7 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     act(() => { root.render(<HqBannerProjectV8 />) })
     await flush()
     expect(host.textContent).toContain('秋のキャンペーン')
+    await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(host.textContent).toContain('一斉配信の上の写真・10月。右で用途とテキストを決めて生成し')
     expect(host.textContent).toContain('すべて 2')
     expect(host.textContent).toContain('お気に入り 1')

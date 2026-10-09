@@ -63,6 +63,7 @@ import {
 } from './display'
 import styles from './detail.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
@@ -833,16 +834,13 @@ function ApprovalBox({
       </dl>
       {mine ? (
         <>
-          <div className={styles.field}>
-            <label htmlFor="approval-reject-reason" className={styles.fieldLabel}>差し戻すときの理由</label>
-            <TextField
+          <div className={styles.field}><Field label="差し戻すときの理由" htmlFor="approval-reject-reason"><TextField
               id="approval-reject-reason"
               maxLength={1000}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：日時を 10 月にずらしてください"
-            />
-          </div>
+            /></Field></div>
           {approval.message ? <p className={styles.error}>{approval.message}</p> : null}
           <div className={styles.approvalButtons}>
             <Button

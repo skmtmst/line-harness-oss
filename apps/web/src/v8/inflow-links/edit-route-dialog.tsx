@@ -208,7 +208,7 @@ export default function EditRouteModal({
             // 口が400ではじくため、ここで null に寄せる。
             onChange={(e) => setForm({ ...form, genre: e.target.value.trim() ? e.target.value : null })}
             readOnly={genreLocked}
-            placeholder="例: SNS（空欄なら未分類）"
+            placeholder="例：SNS（空欄なら未分類）"
             maxLength={80}
           />
           <datalist id="referral-genre-options">
@@ -225,7 +225,7 @@ export default function EditRouteModal({
           <TextField
             value={form.name}
             onChange={(e) => { setForm({ ...form, name: e.target.value }); setFieldErrors((old) => ({ ...old, 'route-name': '' })) }}
-            placeholder="例: Instagram プロフィール"
+            placeholder="例：Instagram プロフィール"
             maxLength={120}
           />
         </Field>
@@ -237,7 +237,7 @@ export default function EditRouteModal({
             // R271: 作成済みの識別子は口も変更を拒否する。保存時にはじめて
             // 拒否せず、欄自体を読み取り専用にして理由を近くに出す。
             disabled={refCodeLocked || !isNew}
-            placeholder="例: youtube"
+            placeholder="例：youtube"
           />
           {refCodeLocked && (
             <p className="text-ink-faint mt-1 text-xs">

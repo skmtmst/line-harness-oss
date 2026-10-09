@@ -84,6 +84,7 @@ import ReorderHandle from '@/components/shared/reorder-handle'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
 import styles from './list.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -691,7 +692,7 @@ export default function ScenariosListV8() {
       unfiledId={UNFILED}
       allCount={overallTotal}
       unfiledCount={unfiledCount}
-      placeholder="例: 01_新規フォロー"
+      placeholder="例：01_新規フォロー"
     >
       {sharedScenarioCount > 0 ? (
         <p className={styles.folderNote}>
@@ -1157,7 +1158,7 @@ export default function ScenariosListV8() {
         <div className={styles.narrowSearch}>
           <SearchField
             placeholder="シナリオ名で探す"
-            aria-label="シナリオ名で検索"
+            aria-label="シナリオ名で探す"
             value={nameQuery}
             onChange={(value) => setNameQuery(clampSearchQuery(value))}
             onClear={() => setNameQuery('')}
@@ -1181,7 +1182,7 @@ export default function ScenariosListV8() {
       <ListToolbar
         search={{
           placeholder: 'シナリオ名で探す',
-          label: 'シナリオ名で検索',
+          label: 'シナリオ名で探す',
           width: 240,
           value: nameQuery,
           onChange: (value) => setNameQuery(clampSearchQuery(value)),
@@ -1383,16 +1384,13 @@ export default function ScenariosListV8() {
           }}
         >
           <div className={styles.dupBody}>
-            <label className={styles.dupField}>
-              <span className={styles.dupLabel}>新しい名前</span>
-              <TextField
+            <Field label="新しい名前"><TextField
                 value={duplicateName}
                 onChange={(event) => setDuplicateName(event.target.value)}
                 disabled={duplicating}
                 maxLength={80}
                 aria-label="新しい名前"
-              />
-            </label>
+              /></Field>
             <div className={styles.dupBox}>
               <p className={styles.dupBoxTitle}>引き継ぐもの</p>
               <p className={styles.dupBoxText}>{`・${duplicateCarries}`}</p>
