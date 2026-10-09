@@ -21,7 +21,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError, type SearchConsoleMetric, type SearchConsoleMetricRow, type SearchConsolePerformance, type SearchConsoleSetup } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatNumber } from '@/lib/format'
-import { KpiMenu, StatePill, shortDay } from './common'
+import { StatePill, shortDay } from './common'
 import styles from './analytics.module.css'
 
 const RANGES = [7, 28, 90] as const
@@ -140,7 +140,7 @@ export default function SearchConsoleV8() {
             const previous = data.previousSummary[item.key] * (item.key === 'ctr' ? 100 : 1)
             const difference = value - previous
             const detail = item.key === 'clicks' || item.key === 'impressions' ? `前の${data.rangeDays}日より ${difference >= 0 ? '+' : ''}${formatNumber(difference)}` : item.help
-            return <KpiCard key={item.key} presentation="band" title={item.label} icon={<item.icon size={13} aria-hidden="true" />} menu={<KpiMenu title={item.label} onExport={exportCsv} disabled={false} />} value={Math.round(value * 10) / 10} unit={item.unit} detail={detail} />
+            return <KpiCard key={item.key} presentation="band" title={item.label} icon={<item.icon size={13} aria-hidden="true" />} value={Math.round(value * 10) / 10} unit={item.unit} detail={detail} />
           })}
         </KpiBand>
         <div className={styles.body} data-gap="tab">

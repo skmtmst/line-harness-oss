@@ -15,7 +15,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { api, type AnalyticsMetric, type AnalyticsRoutesOverview } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
-import { KpiMenu, RangePickerV8, dataRangeCaption } from './common'
+import { RangePickerV8, dataRangeCaption } from './common'
 import { MetricText } from './reactions'
 import { downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
@@ -79,14 +79,13 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
   const adCost = metricSum(overview.routes.map((item) => item.adCost))
   const profit = metricSum(overview.routes.map((item) => item.profitAfterAdCost))
   const noCost = overview.routes.filter((item) => shownValue(item.adCost) === null).length
-  const menu = (title: string) => <KpiMenu title={title} onExport={onExport} disabled={disabled} />
 
   return <>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="友だちになった" icon={<UserPlus size={13} aria-hidden="true" />} menu={menu('友だちになった')} value={friends} unit="人" detail={clicks === null ? 'クリックは未取得です' : `リンクを押した ${formatNumber(clicks)} 回から`} />
-      <KpiCard presentation="band" title="成果" icon={<Target size={13} aria-hidden="true" />} menu={menu('成果')} value={conversions} unit="件" detail={pending === null || rejected === null ? '保留・却下は未取得です' : `保留 ${formatNumber(pending)}・却下 ${formatNumber(rejected)}`} />
-      <KpiCard presentation="band" title="かかった広告費" icon={<Wallet size={13} aria-hidden="true" />} menu={menu('かかった広告費')} value={adCost} valueText={yen(adCost)} unit="円" detail={`費用を取れない経路 ${noCost}`} />
-      <KpiCard presentation="band" title="差し引き" icon={<TrendingUp size={13} aria-hidden="true" />} menu={menu('差し引き')} value={profit} valueText={yen(profit, true)} unit="円" detail={revenue === null ? '売上は未取得です' : `売上 ${yen(revenue)} − 費用`} />
+      <KpiCard presentation="band" title="友だちになった" icon={<UserPlus size={13} aria-hidden="true" />} value={friends} unit="人" detail={clicks === null ? 'クリックは未取得です' : `リンクを押した ${formatNumber(clicks)} 回から`} />
+      <KpiCard presentation="band" title="成果" icon={<Target size={13} aria-hidden="true" />} value={conversions} unit="件" detail={pending === null || rejected === null ? '保留・却下は未取得です' : `保留 ${formatNumber(pending)}・却下 ${formatNumber(rejected)}`} />
+      <KpiCard presentation="band" title="かかった広告費" icon={<Wallet size={13} aria-hidden="true" />} value={adCost} valueText={yen(adCost)} unit="円" detail={`費用を取れない経路 ${noCost}`} />
+      <KpiCard presentation="band" title="差し引き" icon={<TrendingUp size={13} aria-hidden="true" />} value={profit} valueText={yen(profit, true)} unit="円" detail={revenue === null ? '売上は未取得です' : `売上 ${yen(revenue)} − 費用`} />
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>

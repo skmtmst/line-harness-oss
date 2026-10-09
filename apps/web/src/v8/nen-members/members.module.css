@@ -17,25 +17,8 @@
 .band [data-kpi-number] {
   font-variant-numeric: normal;
 }
-.kpiMenu {
-  display: inline-flex;
-  align-items: center;
-  height: var(--tpl-mb-kpi-menu);
-}
 /* 数の帯の「…」は枠なしの小さな印（絵の 16 の印）。共通の枠つき 36 を外す。 */
-:global([data-theme='v8']) .kpiMenu > .kpiMenuButton {
-  width: var(--tpl-mb-kpi-menu);
-  height: var(--tpl-mb-kpi-menu);
-  min-height: 0;
-  flex-basis: var(--tpl-mb-kpi-menu);
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
 /* 枠の線（outline）も外す。キーボードで選んだときの輪は残す。 */
-:global([data-theme='v8']) .kpiMenu > .kpiMenuButton:not(:focus-visible) {
-  outline-color: transparent;
-}
 .csvWrap {
   display: inline-flex;
   align-items: center;
