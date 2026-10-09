@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+
 import Link from 'next/link'
 import { Banknote, Hourglass, Sparkles, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -273,22 +275,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 
 /** 月ごとの売上の柱（千円）。いちばん高い月を柱の高さいっぱいにする。いまの月は濃い緑。 */
 function RevenueColumns({ rows }: { rows: Array<{ label: string; yen: number; current: boolean }> }) {
-  const max = Math.max(...rows.map((r) => r.yen), 0)
-  return (
-    <div className={styles.chart} role="img" aria-label={`月ごとの売上。${rows.map((r) => `${r.label} ${formatYen(r.yen)}`).join('、')}`}>
-      {rows.map((r) => (
-        <div key={r.label} className={styles.column}>
-          <span
-            className={`${styles.bar} ${r.current ? styles.barCurrent : ''}`}
-            // 柱の高さは売上の割合で決まる（データの値）。
-            style={{ blockSize: `${max > 0 ? Math.max((r.yen / max) * 100, 2) : 2}%` }}
-            title={`${r.label} ${formatYen(r.yen)}`}
-          />
-          <span className={styles.columnLabel}>{r.label}</span>
-        </div>
-      ))}
-    </div>
-  )
+  return <ValueBarChart label="月ごとの売上" unit="円" items={rows.map(r=>({key:r.label,label:r.label,value:r.yen,note:r.current?'今月':undefined}))} />
 }
 
 function revenueSourceLabel(pricing: 'stripe_actual' | 'list_price', lastSyncedAt: string | null): string {

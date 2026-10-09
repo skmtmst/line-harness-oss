@@ -1,5 +1,7 @@
 'use client'
 
+import { BarChart, toBarChartItems } from '@/components/shared/bar-chart'
+
 /*
  * ★V8 分析「友だちの増減」（Pencil `ws9wt`・1152 `eEhYU`・閲覧のみ `L4Uov`）。
  * 数の帯（4つ）→ 左に日ごとの増減の棒、右に「どこから増えたか」「減った友だち」。
@@ -38,25 +40,7 @@ type Day = AnalyticsFriendsOverview['data']['days'][number]
 type Campaign = AnalyticsFriendsOverview['data']['campaigns'][number]
 
 function DailyBars({ days, campaigns, selected, onSelect }: { days: Day[]; campaigns: Campaign[]; selected: string; onSelect: (date: string) => void }) {
-  const max = Math.max(1, ...days.map((day) => Math.max(day.added, day.removed)))
-  const ticks = days.length > 1 ? [0, 7, 14, 21].filter((index) => index < days.length - 1).map((index) => days[index].date).concat(days[days.length - 1].date) : days.map((day) => day.date)
-  return <>
-    <div className={styles.bars} role="list" aria-label="日ごとの増減">
-      {days.map((day) => {
-        const marks = campaigns.filter((item) => item.date === day.date)
-        const label = `${Number(day.date.slice(5, 7))}月${Number(day.date.slice(8, 10))}日（${analyticsWeekday(day.date)}） 増加 ${day.added}人・減少 ${day.removed}人・差し引き ${day.net}人${marks.length ? `　${marks.map((item) => item.name).join('、')}` : ''}`
-        return <button key={day.date} type="button" role="listitem" className={styles.day} data-selected={selected === day.date || undefined} aria-label={label} title={label} onClick={() => onSelect(selected === day.date ? '' : day.date)}>
-          <span className={styles.dayUp}>
-            {marks.map((item) => <i key={item.id} className={styles.dayMark} data-kind={item.kind} aria-hidden="true" />)}
-            {day.added > 0 ? <span className={styles.barUp} style={{ height: `${day.added / max * 100}%` }} /> : null}
-            <span className={styles.baseline} />
-          </span>
-          <span className={styles.dayDown}>{day.removed > 0 ? <span className={styles.barDown} style={{ height: `${day.removed / max * 100}%` }} /> : null}</span>
-        </button>
-      })}
-    </div>
-    <div className={styles.ticks} aria-hidden="true">{ticks.map((date) => <span key={date}>{shortDate(date)}</span>)}</div>
-  </>
+  return <BarChart items={toBarChartItems(days, {campaigns, formatTitle:(date)=>`${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日（${analyticsWeekday(date)}）`})} selectedKey={selected} onSelect={(date)=>onSelect(selected===date?'':date)} />
 }
 
 /** 経路の内訳は概要の後に読む（2つの重い集計を同時に走らせない）。 */

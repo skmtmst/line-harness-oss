@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+
 /*
  * ★V8-B 健康日記 30日のまとめ（BVuYh）。一覧の上に右から出る引き出し（幅 600）。
  * 注意書き → 数（記録・体重・呼吸数・心拍数）→ 体重の30日の棒 → 記録の表 → 印刷・PDF に保存する。
@@ -164,15 +166,7 @@ function WeightChart30d({ logs, generatedAt }: { logs: Logs; generatedAt: string
   const min = known.length ? Math.min(...known) : 0
   const max = known.length ? Math.max(...known) : 0
   const label = known.length >= 2 ? `${known[0]}kg → ${known[known.length - 1]}kg` : known.length === 1 ? `${known[0]}kg` : '記録なし'
-  return (
-    <div className={styles.chartBars} role="img" aria-label={`体重の推移（30日）：${label}`} title={label}>
-      {days.map((day) => day.value == null ? (
-        <span key={day.key} className={styles.chartBarEmpty} />
-      ) : (
-        <span key={day.key} className={styles.chartBar} data-level={max === min ? 3 : 1 + Math.round(((day.value - min) / (max - min)) * 3)} title={`${md(day.key)} ${day.value}kg`} />
-      ))}
-    </div>
-  )
+  return <ValueBarChart label={`体重の推移（30日）：${label}`} unit="kg" items={days.map(day=>({key:day.key,label:day.key,value:day.value}))} />
 }
 
 /**

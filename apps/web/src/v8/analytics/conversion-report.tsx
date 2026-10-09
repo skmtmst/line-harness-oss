@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart } from '@/components/shared/charts'
+
 /*
  * ★V8 分析「成果地点ごとのレポート」（Pencil `AzrZq`・`/analytics?view=conversion-report`）。
  * 経路と成果の数の帯・道具の段（RoutesFrame）の下に、日ごとの成果の棒と成果地点ごとの表。
@@ -88,11 +90,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
               {point ? <><span className={styles.spacer} /><Button variant="secondary" onClick={() => setPointId(null)}>すべてに戻す</Button></> : null}
             </div>
             {daily.length ? <>
-              <div className={styles.reportBars}>{daily.map((item) => {
-                const label = `${shortDay(item.date)}（${analyticsWeekday(item.date)}） ${formatNumber(item.count)}件`
-                return <span key={item.date} role="img" aria-label={label} title={label} className={styles.reportBar} style={{ height: `${Math.max(2, item.count / max * 100)}%` }} />
-              })}</div>
-              <div className={styles.ticks} aria-hidden="true"><span>{shortDay(daily[0].date)}</span><span>{shortDay(daily[daily.length - 1].date)}</span></div>
+              <ValueBarChart label="日ごとの成果" unit="件" items={daily.map(item=>({key:item.date,label:item.date,value:item.count}))} />
             </> : <ListState kind="empty" title="この期間の成果はありません" />}
           </section>
           <div className={styles.reportTable} role="table" aria-label="成果地点ごとの成果">

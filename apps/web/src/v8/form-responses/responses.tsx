@@ -1,5 +1,7 @@
 'use client'
 
+import { HorizontalBarChart } from '@/components/shared/charts'
+
 /*
  * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
  *
@@ -504,17 +506,7 @@ function Responses() {
                       <p className={styles.cardNote}>{sub}</p>
                     </div>
                     {answered > 0 ? (
-                      <dl className={styles.bars}>
-                        {top.map(([value, count]) => (
-                          <div key={value} className={styles.barRow}>
-                            <dt title={value}>{block?.type === 'rating' ? `★${value}` : value}</dt>
-                            <dd className={styles.barTrack} aria-hidden="true">
-                              <meter className={styles.meter} min={0} max={Math.max(1, max)} value={count} />
-                            </dd>
-                            <dd className={styles.barCount}>{`${formatNumber(count)}件（${formatNumber(Math.round((count / answered) * 100))}%）`}</dd>
-                          </div>
-                        ))}
-                      </dl>
+                      <HorizontalBarChart label={labels[fieldSummary.key] ?? fieldSummary.key} unit="件" items={top.map(([value,count])=>({key:value,label:block?.type==='rating'?`★${value}`:value,value:count,detail:<span>{`${formatNumber(Math.round(count/answered*100))}%`}</span>}))} />
                     ) : null}
                   </section>
                 )

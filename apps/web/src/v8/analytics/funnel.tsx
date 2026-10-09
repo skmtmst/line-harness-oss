@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+
 /*
  * ★V8 分析「ファネル」（Pencil `DkRDE`）。
  * 数の帯 → 選ぶ段（ファネル・何日以内・比較する条件・作る・読み直す）→ 左に全体の流れ、
@@ -327,19 +329,11 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
             <section className={styles.funnelFlow} aria-labelledby="funnel-flow-title">
               <h2 id="funnel-flow-title" className={styles.hoursTitle}>全体の流れ</h2>
               <p className={styles.caption}>順番どおりに通った人だけを数えます。飛ばした人は含みません。</p>
-              {result.map((step, i) => {
-                const previous = i > 0 ? result[i - 1] : null
-                const dropRate = previous && previous.reached > 0 ? previous.droppedAfter / previous.reached * 100 : null
-                return <button key={step.stepOrder} type="button" className={styles.funnelStep} data-selected={shownPick === i || undefined} disabled={!measurable} onClick={() => setPicked(i)} aria-pressed={shownPick === i} title={previous ? `止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人` : undefined}>
-                  <span className={styles.funnelNumber}>{i + 1}</span>
-                  <span className={styles.funnelLabel} title={step.label}>{step.label}</span>
-                  <span className={styles.funnelMeasure}>
-                    <span className={styles.funnelTrack} aria-hidden="true"><span style={{ width: top > 0 && measurable ? `${step.reached / top * 100}%` : '0%' }} /></span>
-                    <span className={styles.funnelValue}>{measurable ? `${formatNumber(step.reached)} 人` : '—'}</span>
-                  </span>
-                  <span className={styles.funnelDrop} data-tone={measurable && dropRate !== null ? 'warn' : undefined}>{measurable && dropRate !== null ? `−${dropRate.toFixed(0)}%` : '—'}</span>
-                </button>
-              })}
+              <FunnelChart label="全体の流れ" disabled={!measurable} selectedKey={String(shownPick)} onSelect={key=>setPicked(Number(key))} items={result.map((step,i)=>{
+                const previous=i>0?result[i-1]:null
+                const dropRate=previous && previous.reached>0?previous.droppedAfter/previous.reached*100:null
+                return {key:String(i),label:step.label,value:measurable?step.reached:null,note:previous?`止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人`:undefined,detail:<span>{measurable && dropRate!==null?`−${dropRate.toFixed(0)}%`:'—'}</span>}
+              })} />
             </section>
             <aside className={styles.funnelSide} aria-labelledby="funnel-picked-title">
               <h2 id="funnel-picked-title" className={styles.hoursTitle}>{pickedStep ? `${circled(shownPick! + 1)} ${pickedStep.label}（選んだ段）` : '段を選んで対象者を確認'}</h2>

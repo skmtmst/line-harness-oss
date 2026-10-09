@@ -165,8 +165,8 @@ describe('V8 ウェビナーの編集', () => {
     nav.search = 'id=webinar-1&pane=analytics'
     await render(<WebinarEditV8 />)
     const funnel = host.querySelector('#webinar-analytics-funnel')
-    const row = [...(funnel?.querySelectorAll('li') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
-    expect(row?.textContent).toContain('9 人')
+    const row = [...(funnel?.querySelectorAll('button') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
+    expect(row?.textContent).toContain('9人')
     const stats = host.querySelector('[data-template-region="stats"]')
     expect(stats?.textContent).toContain('フォーム送信?9人')
     expect(stats?.textContent).not.toContain('フォーム送信?9件')

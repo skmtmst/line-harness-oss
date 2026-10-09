@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart } from '@/components/shared/charts'
+
 /*
  * ★V8 分析「配信の反応」（Pencil `yvOtn`）。
  * 数の帯（配信・届いた人・押された割合・取得できない配信）→ 道具の段（期間・データの範囲・CSV）
@@ -112,13 +114,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
         {/* 集計はクリックされた時刻の時間帯。送った時刻ではない。 */}
         <h2 id="reactions-hours-title" className={styles.hoursTitle}>押された時間帯ごとの回数</h2>
         <p className={styles.caption}>こちらで作った中継URLを、相手が押した時刻で時間帯ごとに並べています。送った時刻ではありません。</p>
-        <div className={styles.hourBars}>
-          {Array.from({ length: 24 }, (_, hour) => {
-            const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
-            return <span key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} title={`${hour}時台 ${clicks}回`} className={styles.hourBar} data-top={topHours.includes(hour) || undefined} style={{ height: `${Math.max(2, clicks / maxHourly * 100)}%` }} />
-          })}
-        </div>
-        <div className={styles.hourTicks} aria-hidden="true">{Array.from({ length: 24 }, (_, hour) => <span key={hour}>{hour % 3 === 0 ? hour : ''}</span>)}</div>
+        <ValueBarChart label="押された時間帯ごとの回数" unit="回" items={Array.from({length:24},(_,hour)=>({key:String(hour),label:`${hour}時台`,value:overview.trackedClickHours.find(item=>item.hour===hour)?.clicks??0,note:topHours.includes(hour)?'よく押された時間帯':undefined}))} />
       </section>
     </div>
   </>

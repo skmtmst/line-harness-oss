@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+
 /*
  * ★V8 Search Console（Pencil `h1G4d`・`/search-console`）。
  * 板の頭（CSV）→ 数の帯（合計クリック数・合計表示回数・平均CTR・平均掲載順位）→ 道具の段
@@ -156,7 +158,7 @@ export default function SearchConsoleV8() {
           <section className={styles.flowCard} data-w="full" aria-labelledby="sc-trend-title">
             <h2 id="sc-trend-title" className={styles.hoursTitle}>検索クリックの推移（日別クリック数）</h2>
             {data.daily.length === 0 ? <ListState kind="empty" title="期間内のデータがありません" description="集計期間を変えると、ここに推移が出ます。" /> : <>
-              <div className={styles.hourBars} role="img" aria-label="日別クリック数の推移">{data.daily.map((row) => <span key={row.key} className={styles.hourBar} data-empty={row.clicks === 0 || undefined} title={`${row.key}：${formatNumber(row.clicks)}クリック`} style={{ height: `${Math.max(2, row.clicks / maxDaily * 100)}%` }} />)}</div>
+              <ValueBarChart label="日別クリック数の推移" unit="クリック" items={data.daily.map(row=>({key:row.key,label:row.key,value:row.clicks}))} />
               <div className={styles.scAxis}><span>{shortDay(data.daily[0].key)}</span><span>{middle ? shortDay(middle.key) : ''}</span><span>{`${shortDay(data.daily[data.daily.length - 1].key)}（反映待ち）`}</span></div>
             </>}
           </section>

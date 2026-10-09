@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+
 /*
  * ★V8 ウェビナーの分析（Pencil z2dgw）。
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 「どこで人数が減っているか」→「どこまで見られたか」。
@@ -130,23 +132,7 @@ function Funnel({ summary }: { summary: WebinarAnalytics['summary'] }) {
       <p className={styles.cardDesc}>
         {biggest.drop > 0 ? `申込から相談の申込まで。いちばん減っているのは「${biggest.from} → ${biggest.to}」です` : '申込から相談の申込まで。'}
       </p>
-      <ol className={styles.funnel}>
-        {stages.map((stage, index) => {
-          const drop = index === 0 ? null : stages[index - 1].value - stage.value
-          return (
-            <li key={stage.label} className={styles.funnelRow}>
-              <span className={styles.funnelLabel}>{stage.label}</span>
-              <svg className={styles.funnelTrack} aria-hidden="true">
-                <rect className={styles.funnelBar} width={`${(stage.value / top) * 100}%`} height="100%" rx="4" />
-              </svg>
-              <span className={styles.funnelValue}>{`${formatNumber(stage.value)} ${stage.unit}`}</span>
-              <span className={styles.funnelDrop} aria-label={drop === null ? undefined : `${formatNumber(Math.abs(drop))}${drop >= 0 ? '減' : '増'}`}>
-                {drop === null ? '' : `${drop >= 0 ? '−' : '+'}${formatNumber(Math.abs(drop))}`}
-              </span>
-            </li>
-          )
-        })}
-      </ol>
+      <FunnelChart label="どこで人数が減っているか" items={stages.map((stage,i)=>({key:stage.label,label:stage.label,value:stage.value,detail:i>0?<span>{`${stages[i-1].value>=stage.value?'−':'+'}${formatNumber(Math.abs(stages[i-1].value-stage.value))}`}</span>:undefined}))} />
     </section>
   )
 }
@@ -179,22 +165,7 @@ function Retention({ analytics, durationSeconds }: { analytics: WebinarAnalytics
       <h3 id="webinar-retention-title" className={styles.cardTitle}>どこまで見られたか</h3>
       <p className={styles.cardText}>見ていた人の割合の線です。縦線は申し込みボタンを出した時刻。一時停止や隠れている時間は数えていません。</p>
       {empty ? <p className={styles.cardText}>まだ視聴データがありません</p> : (
-        <div className={styles.chart}>
-          <div className={styles.plot}>
-            <svg className={styles.line} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={`見ていた人の割合の線。始まりに見ていた${started}人。`}>
-              <path d={path} fill="none" className={styles.linePath} vectorEffect="non-scaling-stroke" />
-            </svg>
-            <svg className={styles.marks} aria-hidden="true">
-              {ctaPct !== null ? <>
-                <line className={styles.ctaLine} x1={`${ctaPct}%`} x2={`${ctaPct}%`} y1="-8" y2="162" />
-                <text className={styles.ctaText} x={`${ctaPct}%`} dx="8" y="-6" dominantBaseline="hanging">{`${fmtClock(ctaAt ?? 0)} 申し込みボタンを出した`}</text>
-              </> : null}
-              <text className={styles.axisText} x="0" y="160" dominantBaseline="hanging">0:00</text>
-              <text className={styles.axisText} x="100%" y="160" textAnchor="end" dominantBaseline="hanging">{fmtClock(maxX)}</text>
-              <text className={styles.axisSmall} x="-16" y="0" dominantBaseline="hanging">100%</text>
-            </svg>
-          </div>
-        </div>
+        <LineChart label={`見ていた人の割合の線。始まりに見ていた${started}人。`} unit="%" maxX={maxX} maxY={100} points={points.map(p=>({x:p.atSeconds,label:fmtClock(p.atSeconds),value:Math.min(p.viewers,started)/started*100}))} marker={ctaAt!==null?{x:ctaAt,label:`${fmtClock(ctaAt)} 申し込みボタンを出した`}:undefined} />
       )}
       <p className={styles.cardText}>
         {`最後まで見た人 ${completedRate}（${formatNumber(completed)}人）・半分まで ${rateOf(half)}・申し込みボタンを出したとき ${rateOf(ctaViewers)}`}

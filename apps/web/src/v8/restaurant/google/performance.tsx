@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+
 /*
  * ★V8 Googleビジネス パフォーマンス（`SrmVs`）。
  * 数4（共通の KpiCard）→ 飲食店向け指標 → 注。期間は 7／28／90 日（今の画面と同じ口・既定28日）。
@@ -70,19 +72,7 @@ function ImpressionsChart({ data }: { data: GooglePerformanceData }) {
   if (!buckets.some((bucket) => bucket.total !== null)) {
     return <ListState kind="empty" title="表示数のデータがまだありません" description="夜間の自動取得のあとに表示されます。" />
   }
-  const summary = buckets.filter((b) => b.total !== null).map((b) => `${shortDate(b.startDate)}〜 ${b.total}回`).join('、')
-  return (
-    <svg className={styles.chart} viewBox={`0 0 ${buckets.length * 10} 100`} preserveAspectRatio="none" role="img" aria-label={`プロフィール表示の推移（${BUCKET_LABELS[data.days]}の合計）: ${summary}`}>
-      {buckets.map((bucket, index) => {
-        const height = ((bucket.total ?? 0) / max) * 100
-        return (
-          <rect key={bucket.startDate} className={styles.chartBar} x={index * 10 + 1.5} width={7} y={100 - height} height={height}>
-            <title>{`${shortDate(bucket.startDate)}〜: ${bucket.total ?? '—'}`}</title>
-          </rect>
-        )
-      })}
-    </svg>
-  )
+  return <ValueBarChart label={`プロフィール表示の推移（${BUCKET_LABELS[data.days]}の合計）`} unit="回" items={buckets.map(bucket=>({key:bucket.startDate,label:bucket.startDate,value:bucket.total}))} />
 }
 
 function MetricMenu({ title, onShowTrend }: { title: string; onShowTrend: () => void }) {
