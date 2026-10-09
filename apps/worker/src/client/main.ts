@@ -570,6 +570,20 @@ async function initWebinar(): Promise<void> {
   mountWebinar(container, { liffId: LIFF_ID, lineUserId: profile.userId, idToken }, slug);
 }
 
+async function initResearch(): Promise<void> {
+  const [profile, friendship] = await Promise.all([liff.getProfile(), liff.getFriendship()]);
+  const idToken = liff.getIDToken();
+  if (!idToken) throw new Error('LINE から、もう一度開いてください');
+  if (!friendship.friendFlag) { showFriendAdd(profile); return; }
+  const linked = await apiCall('/api/liff/link', { method: 'POST', body: JSON.stringify({ idToken, displayName: profile.displayName, existingUuid: getSavedUuid(), ref: getRef() || undefined }) });
+  if (!linked.ok) throw new Error('LINE から、もう一度開いてください');
+  const container = document.getElementById('app');
+  const researchId = new URLSearchParams(window.location.search).get('researchId');
+  if (!container || !researchId) throw new Error('回答画面が見つかりませんでした');
+  const { mountResearch } = await import('../../../liff/src/research-entry.js');
+  await mountResearch(container, { liffId: LIFF_ID, lineUserId: profile.userId, idToken }, researchId);
+}
+
 // ─── Affiliate self-serve (React, dynamic-imported) ──────
 
 async function initAffiliate(): Promise<void> {
@@ -735,6 +749,8 @@ async function main() {
       await initEventBooking('history');
     } else if (page === 'webinar') {
       await initWebinar();
+    } else if (page === 'research') {
+      await initResearch();
     } else if (page === 'affiliate') {
       await initAffiliate();
     } else if (page === 'nen-member') {

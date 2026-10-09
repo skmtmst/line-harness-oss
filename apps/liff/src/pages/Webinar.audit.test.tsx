@@ -12,6 +12,7 @@ import type { WebinarState } from '../lib/api.js';
  */
 
 vi.mock('@line/liff', () => ({ default: { isInClient: () => false, openWindow: vi.fn() } }));
+vi.mock('../lib/liff-auth.js', () => ({ getIdToken: () => 'token', getLineUserId: () => 'user', getLiffId: () => 'liff-1' }));
 vi.mock('../lib/api.js', () => ({
   api: {
     webinarState: vi.fn(),
@@ -39,7 +40,9 @@ const LIVE: WebinarState = {
   playlistUrl: 'https://example.invalid/a.m3u8',
   cta: null,
   comments: [],
-};
+  ctas: [],
+  registeredForThisSession: true,
+} as WebinarState;
 
 function open() {
   render(
@@ -53,6 +56,16 @@ function open() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    const path = new URL(url, window.location.origin).pathname;
+    if (path.endsWith('/comments')) {
+      const body = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify(await webinarComment('w1', body.sessionStartAt, body.atSeconds, body.body)));
+    }
+    if (path.endsWith('/register')) return new Response(JSON.stringify({ ok: true }));
+    try { return new Response(JSON.stringify(await webinarState('w1'))); }
+    catch (err) { return new Response('{}', { status: (err as { status?: number }).status ?? 500 }); }
+  }));
   vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('maybe');
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
@@ -61,6 +74,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('監査 L7：変換中の Enter では送らない', () => {
@@ -132,5 +146,20 @@ describe('監査 L8：開始時刻を過ぎた後の読み直し', () => {
     await advanceSeconds(10);
     expect(webinarState).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy();
+  });
+});
+
+
+describe('B-173 申込と視聴の画面を共用する', () => {
+  it('開催回を選んで認証付きで申し込み、一覧を読み直す', async () => {
+    const session = Math.floor(Date.now() / 1000) + 3600;
+    webinarState.mockResolvedValue({ live: false, title: '秋の説明会', nextSessionAt: session, upcoming: [session], registeredSessionAt: null } as WebinarState);
+    open();
+    fireEvent.click(await screen.findByRole('button', { name: /の回$/ }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url, init]) => String(url).includes('/register') && init?.method === 'POST')).toBe(true));
+    const [, init] = vi.mocked(fetch).mock.calls.find(([url]) => String(url).includes('/register'))!;
+    expect(JSON.parse(String(init?.body))).toEqual({ sessionStartAt: session });
+    expect(init?.headers).toMatchObject({ Authorization: 'Bearer token' });
+    await waitFor(() => expect(webinarState).toHaveBeenCalledTimes(2));
   });
 });

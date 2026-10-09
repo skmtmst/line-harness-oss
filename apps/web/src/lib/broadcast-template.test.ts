@@ -186,14 +186,14 @@ describe('素材の引用を LINE の種別に直す', () => {
     expect(out.messageContent).toContain('coupon_use:a')
   })
 
-  it('リサーチは読める文に直す', () => {
+  it('リサーチはLIFFで回答するボタンに直す', () => {
     const out = bubbleLegacyMessage({
       id: 'b', type: 'research',
-      content: { assetId: 'a', assetName: '調査', description: '答えてください', actionUrl: 'https://example.com/f' },
+      content: { assetId: 'a', assetName: '調査', description: '答えてください', questions: [{ text: '質問', format: 'free', required: true }] },
     })
-    expect(out.messageType).toBe('text')
+    expect(out.messageType).toBe('flex')
     expect(out.messageContent).toContain('答えてください')
-    expect(out.messageContent).not.toContain('assetId')
+    expect(out.messageContent).toContain('page=research&researchId=a')
   })
 
   it('選んでいない素材は選び直しを求める', () => {

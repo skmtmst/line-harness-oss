@@ -36,7 +36,7 @@ import { SettingCheckbox } from '@/components/shared/checkbox'
 import { notifyToast } from '@/components/shared/toast'
 import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
-import { toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
+import { readInlineActions, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
 import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
@@ -147,9 +147,9 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   // リサーチ
   const [researchStartsAt, setResearchStartsAt] = useState(init ? init.startsAt : visual ? '2026-10-01T10:00' : '')
   const [researchEndsAt, setResearchEndsAt] = useState(init ? init.endsAt : visual ? '2026-10-15T23:59' : '')
-  const [targetTagId, setTargetTagId] = useState('')
+  const [targetTagId, setTargetTagId] = useState(() => host?.initialContent && 'payload' in host.initialContent && typeof host.initialContent.payload.targetTagId === 'string' ? host.initialContent.payload.targetTagId : '')
   const [questions, setQuestions] = useState<ResearchQuestion[]>(() => (init?.questions.length ? init.questions : visual ? visualQuestions() : [newQuestion()]))
-  const [answerActions, setAnswerActions] = useState<InlineAction[]>([])
+  const [answerActions, setAnswerActions] = useState<InlineAction[]>(() => readInlineActions(host?.initialContent && 'payload' in host.initialContent ? host.initialContent.payload.answerActions as unknown[] | undefined : undefined))
   const [orderMenu, setOrderMenu] = useState<string | null>(null)
   const orderAnchor = useRef<HTMLButtonElement | null>(null)
 

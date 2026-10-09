@@ -122,7 +122,7 @@ export function contentTemplateToBubble(asset: BroadcastMessageAsset): Broadcast
   return {
     id: bubbleId(),
     type: asset.kind,
-    content: { assetId: asset.id, assetName: asset.name, ...asset.payload },
+    content: { ...(asset.kind === 'research' ? asset.publishedPayload ?? asset.payload : asset.payload), assetId: asset.id, assetName: asset.name, ...(asset.kind === 'research' && asset.publishedVersion === 0 ? { assetId: '' } : {}) },
   }
 }
 

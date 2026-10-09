@@ -312,7 +312,7 @@ describe('対応マーク', () => {
     expect(marks.getSupportMarksWithUsage).toHaveBeenCalledWith(env.DB, {
       tenantId: 'tenant-1',
       lineAccountId: 'account-1',
-    });
+    }, false);
   });
 
   it('一覧に自動変更・表示先・版を実データから返す', async () => {

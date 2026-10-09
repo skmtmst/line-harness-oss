@@ -1,6 +1,8 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
+  restoreTag,
+  ArchiveRestoreError,
   getTags,
   getTagsWithUsage,
   getTagDeleteImpact,
@@ -36,7 +38,7 @@ import type {
   TagCsvImportSummary,
 } from '@line-crm/shared';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { listResponse } from '../lib/list-etag.js';
 import {
@@ -1360,6 +1362,25 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), inputJsonBound
     }
     console.error('POST /api/tags/:id/archive error:', err);
     return c.json({ success: false, error: 'タグをアーカイブできませんでした' }, 500);
+  }
+});
+
+tags.post('/api/tags/:id/restore', requireRole('owner', 'admin'), denyReadOnly(), async (c) => {
+  try {
+    const accountId = requestedLineAccountId(c);
+    if (!accountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    const denied = await requireVisibleLineAccount(c, accountId);
+    if (denied) return denied;
+    const body = await c.req.json<Record<string, unknown>>().catch((): Record<string, unknown> => ({}));
+    const expectedVersion = body.expectedVersion;
+    if (typeof expectedVersion !== 'number' || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      return c.json({ success: false, error: 'expectedVersion is required', fields: { expectedVersion: '最新の版を読み込んでください' } }, 400);
+    }
+    return c.json({ success: true, data: await restoreTag(c.env.DB, { id: c.req.param('id'), lineAccountId: accountId, expectedVersion, actorId: c.get('staff').id }) });
+  } catch (error) {
+    if (error instanceof ArchiveRestoreError) return c.json({ success: false, code: error.code, error: error.code === 'not_found' ? '対象が見つかりません' : '状態が変わりました。もう一度読み込んでください' }, error.code === 'not_found' ? 404 : 409);
+    console.error('POST /api/tags/:id/restore error:', error);
+    return c.json({ success: false, error: '保管から戻せませんでした' }, 500);
   }
 });
 

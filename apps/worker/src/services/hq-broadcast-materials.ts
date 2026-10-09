@@ -73,7 +73,11 @@ export async function resolveHqBroadcastMaterials(
       return value;
     };
     bubble.content = walk(content);
-    if (definition.asset) bubble.content.assetId = localTemplateId;
+    if (definition.asset?.kind === 'research') {
+      const local = await db.prepare(`SELECT payload_json,published_version,name FROM broadcast_message_assets WHERE id=? AND line_account_id=? AND kind='research'`).bind(localTemplateId, accountId).first<{ payload_json: string; published_version: number; name: string }>();
+      if (!local || local.published_version < 1) throw new StampError('店舗の公開済みリサーチを確認してください', 409);
+      bubble.content = { ...JSON.parse(local.payload_json), assetId: localTemplateId, assetName: local.name, hqTemplateId: templateId, hqTemplateVersionId: versionId };
+    } else if (definition.asset) bubble.content.assetId = localTemplateId;
     else if (bubble.type === 'carousel') bubble.content.templateId = localTemplateId;
   }
   return { ...input, messageBubbles: bubbles, messageBubblesJson: undefined };

@@ -1966,6 +1966,8 @@ export type { BroadcastBubbleType, BroadcastBubble } from '@line-crm/shared';
 import type { BroadcastBubble } from '@line-crm/shared';
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
+  publishedPayload?: Record<string, unknown>;
+  publishedVersion?: number;
   id: string;
   lineAccountId: string | null;
   kind: BroadcastAssetKind;
@@ -2004,7 +2006,7 @@ export type CommonActionSummary = {
 export type AutomationListItem = Automation & {
   folderId?: string | null
   triggerConfig: Record<string, unknown>;
-  status: 'draft' | 'active' | 'stopped';
+  status: 'draft' | 'active' | 'stopped' | 'archived';
   versionId: string;
   version: number;
   executionCount30d: number;
@@ -6679,6 +6681,10 @@ export const api = {
       ),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/tags/${id}`, { method: 'DELETE' }),
+    restore: (id: string, accountId: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<{ restored: true; version: number }>>(`/api/tags/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'POST', body: JSON.stringify({ expectedVersion }),
+      }),
     archive: (id: string, accountId: string, data: {
       expectedVersion: number
       impactRevision: string
@@ -6837,11 +6843,15 @@ export const api = {
   },
   /** 対応マーク。友だちの対応状況を運用側の言葉で持つ。 */
   supportMarks: {
-    list: (accountId: string, options?: FetchApiOptions) =>
+    list: (accountId: string, options?: FetchApiOptions & { includeArchived?: boolean }) =>
       fetchApi<ApiResponse<SupportMarkListItem[]>>(
-        `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
+        `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}${options?.includeArchived ? '&includeArchived=1' : ''}`,
         options,
       ),
+    restore: (id: string, accountId: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<{ restored: true; version: number }>>(`/api/support-marks/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'POST', body: JSON.stringify({ expectedVersion }),
+      }),
     /**
      * R512: 応答だけ失った再試行で二重に作らないため、要求キーを付ける。
      * 同じ作成のやり直しは同じキーを送り、内容を変えたら新しいキーにする。
@@ -10713,13 +10723,14 @@ export const api = {
   automations: {
     counts: (accountId: string) => fetchApi<ApiResponse<AutomationTabCounts>>(
       `/api/automations/counts?account_id=${encodeURIComponent(accountId)}`),
-    list: (params?: { accountId?: string; limit?: number; offset?: number }) => {
+    list: <IncludeArchived extends boolean = false>(params?: { accountId?: string; limit?: number; offset?: number; includeArchived?: IncludeArchived }) => {
       const query = new URLSearchParams()
+      if (params?.includeArchived) query.set('includeArchived', '1')
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.offset !== undefined) query.set('offset', String(params.offset))
       const suffix = query.size ? `?${query}` : ''
-      return fetchApi<ApiResponse<AutomationListItem[]> & {
+      return fetchApi<ApiResponse<Array<IncludeArchived extends true ? AutomationListItem : AutomationListItem & { status: Exclude<AutomationListItem['status'], 'archived'> }>> & {
         summary?: { active: number; stopped: number; executionCount30d: number; failureCount30d: number }
         freshness?: 'available'
         pagination?: { total: number; limit: number | null; offset: number }
@@ -10823,7 +10834,9 @@ export const api = {
         `/api/automations/${encodeURIComponent(id)}/duplicate`,
         { method: 'POST', body: '{}' },
       ),
-    // #942 N-352: 稼働切替と「保管」。保管は一方通行。実行記録は残る。
+    restore: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ id: string; status: 'draft' | 'active' | 'stopped' }>>(`/api/automations/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: '{}' }),
+    // 稼働切替と「保管」。実行記録は残る。
     setStatus: (id: string, status: 'active' | 'stopped' | 'archived') =>
       fetchApi<ApiResponse<{ id: string; status: 'active' | 'stopped' | 'archived' }>>(
         `/api/automations/${encodeURIComponent(id)}/status`,
@@ -11758,7 +11771,6 @@ export const api = {
     }),
     friendOverview: (friendId: string) => fetchApi<ApiResponse<NenFriendOverview>>(`/api/nen-members/friends/${encodeURIComponent(friendId)}`),
     ranks: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/ranks'),
-    consultations: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/consultations'),
     installRichMenu: (accountId: string) => fetchApi<ApiResponse<{ richMenuId: string; liffId: string }>>('/api/nen-members/rich-menu/install', { method: 'POST', body: JSON.stringify({ accountId }) }),
   },
   instagram: {

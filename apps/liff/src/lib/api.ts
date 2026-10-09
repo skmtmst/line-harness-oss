@@ -376,6 +376,7 @@ export interface FormSubmitResponse {
 }
 
 export const api = {
+  researchForm: (id: string) => getData<{ formId: string }>(`/api/liff/research/${encodeURIComponent(id)}/form`),
   /** 上の帯に出す店名など。liffId から店を決める公開口 (Worker は {success,data} で返す)。 */
   liffConfig: () =>
     get<{ success: boolean; data: { botBasicId: string; accountName: string; accountId: string } }>(

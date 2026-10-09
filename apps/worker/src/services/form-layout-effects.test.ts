@@ -269,7 +269,7 @@ describe('回答を配る', () => {
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
   });
 
-  test('本名・システム表示名・個別メモは friends の列に書く', async () => {
+  test('本名・表示名は友だち、メモは受信箱へ書く', async () => {
     const layout = layoutWith([
       input({
         name: 'full_name',
@@ -286,11 +286,12 @@ describe('回答を配る', () => {
       answers: { full_name: '山田太郎' },
     });
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0].sql).toContain('real_name = ?');
-    expect(calls[0].sql).toContain('system_display_name = ?');
-    expect(calls[0].sql).toContain('private_memo = ?');
-    expect(calls[0].binds.slice(0, 3)).toEqual(['山田太郎', '山田太郎', '山田太郎']);
+    expect(calls).toHaveLength(2);
+    expect(calls[0].sql).toContain('INSERT INTO chats');
+    expect(calls[0].binds[2]).toBe('山田太郎');
+    expect(calls[1].sql).toContain('real_name = ?');
+    expect(calls[1].sql).toContain('system_display_name = ?');
+    expect(calls[1].binds.slice(0, 2)).toEqual(['山田太郎', '山田太郎']);
   });
 
   test('選んだ選択肢のタグだけを付ける', async () => {

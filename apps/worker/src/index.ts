@@ -147,6 +147,7 @@ import dedupPreview from './routes/dedup-preview.js';
 import { profileRefresh } from './routes/profile-refresh.js';
 import { richMenuGroups } from './routes/rich-menu-groups.js';
 import { lineProxy } from './routes/line-proxy.js';
+import { research } from './routes/research.js';
 import { webinarRoutes } from './routes/webinars.js';
 import { instagramEngagement } from './routes/instagram-engagement.js';
 import adminVersion from './routes/admin-version.js';
@@ -599,6 +600,7 @@ app.route('/', dedupPreview);
 app.route('/', profileRefresh);
 app.route('/', richMenuGroups);
 app.route('/', webinarRoutes);
+app.route('/', research);
 app.route('/', instagramEngagement);
 app.route('/', instagram);
 // LINE Messaging API 互換プロキシ — 外部エージェントの直接送信を messages_log に残す
@@ -823,9 +825,10 @@ app.get('/r/:ref', async (c) => {
   // friend-add gate (initSalonBooking, initEventBooking); page=book/form
   // would bypass that gate and bypass ref-based attribution, so they are
   // intentionally excluded until those initializers are unified.
-  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar', 'visit-stamps']);
+  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar', 'research', 'visit-stamps']);
   const page = c.req.query('page');
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
+  if (page === 'research' && c.req.query('researchId')) liffParams.set('researchId', c.req.query('researchId')!);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
   const slug = c.req.query('slug');
@@ -1140,9 +1143,10 @@ app.get('/o', async (c) => {
 
   const liffParams = new URLSearchParams();
   liffParams.set('liffId', liffId);
-  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar', 'visit-stamps']);
+  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar', 'research', 'visit-stamps']);
   const page = c.req.query('page');
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
+  if (page === 'research' && c.req.query('researchId')) liffParams.set('researchId', c.req.query('researchId')!);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
   const slug = c.req.query('slug');

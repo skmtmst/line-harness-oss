@@ -173,7 +173,7 @@ export default function OverviewTab({
         </section>
 
         <section className={styles.group} aria-label="メモ">
-          {/* 個別メモの書き換えは受信箱側が持っている。ここは読むだけ。 */}
+          {/* メモの書き換えは受信箱側が持っている。ここは読むだけ。 */}
           <GroupHead title="メモ" action={perms.editSupport ? <Link className={styles.groupLink} href={inbox}>編集</Link> : null} />
           <p className={`${styles.memo} ${support?.notes ? '' : styles.faint}`}>{support?.notes || 'メモはありません'}</p>
         </section>

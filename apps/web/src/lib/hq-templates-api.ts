@@ -6,6 +6,7 @@ export type TemplateType = typeof TEMPLATE_TYPES[number]
 export type DistributionMode = 'create' | 'overwrite' | 'alias'
 export interface HqTemplate extends Partial<HqTemplateListDisplay> {
   id: string; name: string; description: string | null; template_type: TemplateType
+  current_version_id?: string | null;
   folder_id?: string | null; revision: number; updated_at: string; reference_summary?: string; distributed_account_count?: number
 }
 export type HqTemplateListItem = HqTemplate & HqTemplateListDisplay

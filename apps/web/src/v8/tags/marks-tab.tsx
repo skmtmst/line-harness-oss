@@ -24,6 +24,11 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import InlineEdit from '@/components/shared/inline-edit'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
+import StatusBadge from '@/components/shared/status-badge'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { useListUrlState } from '@/components/shared/list-url-state'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -59,6 +64,11 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   const [retryOrder, setRetryOrder] = useState<MarkRow[] | null>(null)
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsStatus, setStatsStatus] = useState<LoadStatus>('loading')
+  const [view, setView] = useListUrlState({ archived: '' })
+  const onlyArchived = !host && view.archived === '1'
+  const [restoreTarget, setRestoreTarget] = useState<MarkRow | null>(null)
+  const [restoring, setRestoring] = useState(false)
+  const [restoreError, setRestoreError] = useState('')
   const [query, setQuery] = useListUrlValue('q', '')
   const [usage, setUsage] = useState<'all' | 'used' | 'unused'>('all')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
@@ -82,6 +92,8 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
 
   useEffect(() => {
     gateRef.current.invalidate()
+    setRestoreTarget(null)
+    setRestoreError('')
     setPendingDelete(null)
     setArchiveImpact(null)
     setDragId(null)
@@ -106,7 +118,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
     setStatus('loading')
     setError('')
     try {
-      const res = await api.supportMarks.list(account)
+      const res = await api.supportMarks.list(account, { includeArchived: true })
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       if (!res.success) throw new Error(res.error)
       setItems(res.data)
@@ -142,12 +154,13 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   }, [accountId, host])
 
   const visible = useMemo(() => items.filter((mark) => {
+    if (!host && Boolean(mark.archivedAt) !== onlyArchived) return false
     if (query && !mark.name.toLocaleLowerCase('ja').includes(query.toLocaleLowerCase('ja'))) return false
     if (host && usage !== 'all' && mark.friendCount == null) return false
     if (usage === 'used' && !(host ? mark.friendCount > 0 : isUsed(mark))) return false
     if (usage === 'unused' && (host ? mark.friendCount > 0 : isUsed(mark))) return false
     return true
-  }), [items, query, usage, host])
+  }), [items, query, usage, host, onlyArchived])
 
   const pages = Math.max(1, Math.ceil(visible.length / pageSize))
   const currentPage = Math.min(page, pages)
@@ -158,7 +171,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   useFlipRows(bodyRef, liveOrder.shown.map((mark) => mark.id).join(','))
   const activeMark = items.find((mark) => mark.id === activeMarkId) ?? null
   const activeMarkIndex = pageItems.findIndex((mark) => mark.id === activeMarkId)
-  useEffect(() => setPage(1), [query, usage, pageSize])
+  useEffect(() => setPage(1), [query, usage, pageSize, onlyArchived])
 
   /* 並び替え：/api/support-marks/reorder へ「動かせる行だけの新しい順」を1回で渡す。共有マークは位置を保つ。 */
   const applyOrder = async (next: MarkRow[]) => {
@@ -266,6 +279,24 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
     }
   }
 
+  const confirmRestore = async () => {
+    if (!restoreTarget || !accountId || restoring) return
+    const mark = restoreTarget
+    const account = accountId
+    setRestoring(true)
+    setRestoreError('')
+    try {
+      const res = await api.supportMarks.restore(mark.id, account, mark.version ?? 1)
+      if (accountRef.current !== account) return
+      if (!res.success) throw new Error(res.error)
+      setRestoreTarget(null)
+      notifyToast(`「${mark.name}」を保管から戻しました`)
+      await load()
+    } catch (error) {
+      if (accountRef.current === account) setRestoreError(describeApiFailure(error, '保管から戻す操作', { forbidden: 'この操作はオーナーか管理者に頼んでください。' }))
+    } finally { setRestoring(false) }
+  }
+
   /* 行の「…」と右クリックは同じ操作。押せない理由もそのまま渡す。閲覧のみは押せない項目を出さない。 */
   const rowMenuItems = (mark: MarkRow): ActionMenuItem[] => {
     if (host) return canEdit ? [
@@ -274,6 +305,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
       { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => host.onRemove(mark.id) },
     ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openMarkDetail(mark.id) }]
+    if (mark.archivedAt) return [{ id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(mark) } }]
     return [
       { id: 'edit', label: '編集', external: true, href: `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
       {
@@ -327,7 +359,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
     { title: '過去7日の変更', icon: History, value: stats?.marks.changedLast7 ?? null, unit: '回', detail: statsReason ?? '手動・自動' },
   ]
 
-  const filterActive = Boolean(query || usage !== 'all')
+  const filterActive = Boolean(query || usage !== 'all' || onlyArchived)
 
   const table = status === 'forbidden' ? (
     <div className={styles.stateCard}>
@@ -353,7 +385,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
     <div className={styles.stateCard}>
       <p className={styles.stateTitle}>条件に合うものはありません</p>
       <p className={styles.stateDesc}>検索や絞り込みを外すと、すべて出ます</p>
-      {filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsage('all') }}>条件を外す</Button> : null}
+      {filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsage('all'); setView({ archived: '' }) }}>条件を外す</Button> : null}
     </div>
   ) : (
     <DelayedSkeleton loading={!listReady} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
@@ -373,7 +405,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
         <tbody ref={bodyRef}>
           {liveOrder.shown.map((mark) => {
             const editHref = `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`
-            const fixed = mark.isInherited || !canEdit
+            const fixed = mark.isInherited || !canEdit || Boolean(mark.archivedAt)
             return (
               <Tr
                 interactive
@@ -397,14 +429,14 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                   {canEdit ? (
                     <span
                       className={styles.gripBox}
-                      draggable={!mark.isInherited}
+                      draggable={!fixed}
                       title={mark.isInherited ? '共有マークは編集後に並び替えできます' : undefined}
                       onDragStart={() => setDragId(mark.id)}
                       onDragEnd={() => setDragId(null)}
                     >
                       <ReorderHandle
                         label={mark.name}
-                        disabledReason={fixed ? '共有マークは編集後に並び替えできます' : null}
+                        disabledReason={mark.archivedAt ? '保管から戻すと並び替えできます' : fixed ? '共有マークは編集後に並び替えできます' : null}
                         onMove={(direction) => void keyboardMove(mark.id, direction)}
                       >
                         <GripVertical className={styles.gripIcon} aria-hidden="true" />
@@ -414,7 +446,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                 </Td>
                 <Td className={styles.markColName}>
                   <ContextMenu label={`対応マーク「${mark.name}」の操作`} items={markContextItems(mark)}>
-                    {!canEdit ? <span className={styles.markPill} style={{ '--mark-color': mark.color } as CSSProperties} title={mark.name}>
+                    {!canEdit || mark.archivedAt ? <span className={styles.markPill} style={{ '--mark-color': mark.color } as CSSProperties} title={mark.name}>
                       <span className={styles.markPillDot} aria-hidden="true" />
                       <span className={styles.truncate}>{mark.name}</span>
                     </span> : <Link
@@ -428,6 +460,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                       <span className={styles.truncate}>{mark.name}</span>
                     </Link>}
                   </ContextMenu>
+                  {mark.archivedAt ? <StatusBadge size="annotation" dot={false}>保管</StatusBadge> : null}
                 </Td>
                 <Td className={styles.markColCount}><span className={styles.cellText}>{mark.friendCount == null ? emptyValue('unknown') : `${mark.friendCount}人`}</span></Td>
                 <Td className={styles.markColDefault}><span className={styles.cellText}>{mark.isDefault ? '新規の初期値' : emptyValue('unknown')}</span></Td>
@@ -491,6 +524,10 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
         </p>
       </div>
 
+      <ConfirmDialog open={restoreTarget !== null} title={`「${restoreTarget?.name ?? ''}」を保管から戻しますか？`}
+        description="同じ対応マークを通常の一覧へ戻します。初期値や自動変更は再開せず、友だちの付け替えはそのまま残ります。"
+        confirmLabel="保管から戻す" busy={restoring} error={restoreError}
+        onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
       <ListPageBody
         toolbar={<>
           <span className={styles.search}>
@@ -513,6 +550,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
               { value: 'unused', label: '使っている：なし' },
             ]}
           />
+          {!host ? <FilterChip selected={onlyArchived} onChange={(next) => { setView({ archived: next ? '1' : '' }); setPage(1) }}>保管</FilterChip> : null}
           <span className={styles.toolbarSpacer} />
           <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
         </>}

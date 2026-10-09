@@ -88,7 +88,7 @@ const OR_AXES: Array<{
   { label: '回答フォーム', input: null, make: () => ({ kind: 'form', op: 'exists' }) },
   { label: '最終反応日', input: 'date', make: (value) => value ? { kind: 'last_activity', op: 'after', value } : null },
   { label: 'リマインダ', input: null, make: () => ({ kind: 'reminder', op: 'exists' }) },
-  { label: '個別メモ', input: null, make: () => ({ kind: 'memo', op: 'exists' }) },
+  { label: 'メモ', input: null, make: () => ({ kind: 'memo', op: 'exists' }) },
   { label: 'ステータスメッセージ', input: 'text', placeholder: '含む文字', make: (value) => value.trim() ? { kind: 'status_message', op: 'contains', value: value.trim() } : null },
   { label: '友だち登録日', input: 'date', make: (value) => value ? { kind: 'created_at', op: 'after', value } : null },
   { label: 'その他', input: 'text', placeholder: 'イベント種別（例：conversion）', make: (value) => value.trim() ? { kind: 'common_event', op: 'exists', value: value.trim() } : null },

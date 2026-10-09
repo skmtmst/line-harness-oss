@@ -24,6 +24,7 @@ import {
 } from '@line-crm/db'
 import { executeConfiguredAction } from './action-execution-context.js'
 import type { AutomationActionExecutorDependencies } from './automation-action-executors.js'
+import { runEventBookingAction, validEventBookingAction } from './event-booking-action.js'
 import { matchesCondition, parseCondition } from './segment-query.js'
 
 export type ScenarioActionHook = 'step_sent' | 'scenario_completed' | 'choice_selected'
@@ -66,12 +67,13 @@ export interface RunActionRowsOptions {
    * - `pinned` … scenario_pinned_action_fires（版固定の実行用。live 行が消えても書ける）
    */
   fires?: 'live' | 'pinned'
+  /** 呼び出し元の工程キー。同じイベントの再送では予約を増やさない。 */
+  sourceEventId?: string
   /**
    * シナリオの LINE 公式アカウント。タグ・テンプレート・遷移先が別の
    * アカウントのものなら実行しない。null は共通シナリオ（確かめない）。
    */
   accountId?: string | null
-  sourceEventId?: string
   executorDependencies?: AutomationActionExecutorDependencies
 }
 
@@ -153,7 +155,7 @@ export function isScenarioActionComplete(actionType: string, config: unknown): b
     case 'reminder':
       return typeof c.reminderId === 'string' && c.reminderId !== ''
     case 'event_booking':
-      return typeof c.eventId === 'string' && c.eventId !== ''
+      return validEventBookingAction(c)
     default:
       return false
   }

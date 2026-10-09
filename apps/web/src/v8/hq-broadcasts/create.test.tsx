@@ -421,11 +421,11 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(hq.create).not.toHaveBeenCalled()
   })
 
-  it('まだ送れない質問・紹介は理由を示し、書いた本文を残す', async () => {
+  it('まだ送れない紹介・リッチビデオは理由を示し、書いた本文を残す', async () => {
     render(<HqBroadcastCreate />)
     await toMessage()
     fireEvent.change(screen.getByLabelText('本文'), {target:{value:'残す本文'}})
-    for (const name of ['質問','紹介','リッチビデオ']) {
+    for (const name of ['紹介','リッチビデオ']) {
       const tab = screen.getByRole('tab', {name})
       expect(tab.getAttribute('aria-disabled')).toBe('true')
       expect(tab.getAttribute('title')).toBeTruthy()
@@ -622,3 +622,16 @@ describe('一括配信の詳細（xOXuY ⑤ 送った結果）', () => {
     expect((await screen.findByRole('link', { name: /下書きを直す/ })).getAttribute('href')).toBe('/hq/broadcasts/new?id=run-9')
   })
 })
+
+it('B-173: 統括でリサーチの質問と公開版を読み込み下書きへ保存する', async () => {
+ tpl.listByKind.mockResolvedValue([{id:'research1',name:'健康調査',kind:'research',content_summary:'リサーチ'}]);
+ tpl.get.mockResolvedValue({template:{id:'research1',name:'健康調査',template_type:'template',current_version_id:'v1'},definition:{schemaVersion:1,media:[],template:{id:'source1',name:'健康調査',messageType:'text',messageContent:''},asset:{kind:'research',payload:{questions:[{text:'体調',format:'free',required:true}],answerActions:[]}}}});
+ render(<HqBroadcastCreate />);fireEvent.change(screen.getByLabelText('配信名'),{target:{value:'健康調査'}});fireEvent.click(screen.getByRole('button',{name:'対象設定へ'}));await selectAccounts('銀座店');fireEvent.click(screen.getByRole('button',{name:'メッセージ設定へ'}));
+ expect(screen.getByRole('tab',{name:'質問'}).getAttribute('aria-disabled')).not.toBe('true');
+ fireEvent.click(screen.getByRole('button',{name:'テンプレートから選ぶ'}));
+ fireEvent.click(await screen.findByRole('radio',{name:'健康調査'}));fireEvent.click(screen.getByRole('button',{name:'このテンプレートを使う'}));
+ await waitFor(()=>expect(screen.queryByRole('radio',{name:'健康調査'})).toBeNull());
+ fireEvent.click(screen.getByRole('button',{name:'下書きを保存する'}));
+ await waitFor(()=>expect(hq.create).toHaveBeenCalled());
+ expect(JSON.parse(hq.create.mock.calls[0][0].messageBubblesJson)[0]).toMatchObject({type:'research',content:{hqTemplateId:'research1',hqTemplateVersionId:'v1'}});
+});

@@ -92,7 +92,7 @@ function parseArray(raw: string, label: string): unknown[] {
 export async function listAutomationDefinitions(
   db: D1Database,
   lineAccountIds: string[],
-  paging?: { limit?: number; offset?: number },
+  paging?: { limit?: number; offset?: number; includeArchived?: boolean },
 ): Promise<{
   items: AutomationDefinitionSummary[];
   total: number;
@@ -108,11 +108,11 @@ export async function listAutomationDefinitions(
   const [totalRow, statusRows, runTotals] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS count FROM automation_definitions d
-        WHERE d.line_account_id IN (${placeholders}) AND d.status <> 'archived'`,
+        WHERE d.line_account_id IN (${placeholders}) ${paging?.includeArchived ? '' : "AND d.status <> 'archived'"}`,
     ).bind(...lineAccountIds).first<{ count: number }>(),
     db.prepare(
       `SELECT d.status AS status, COUNT(*) AS count FROM automation_definitions d
-        WHERE d.line_account_id IN (${placeholders}) AND d.status <> 'archived'
+        WHERE d.line_account_id IN (${placeholders}) ${paging?.includeArchived ? '' : "AND d.status <> 'archived'"}
         GROUP BY d.status`,
     ).bind(...lineAccountIds).all<{ status: string; count: number }>(),
     db.prepare(
@@ -120,7 +120,7 @@ export async function listAutomationDefinitions(
               SUM(CASE WHEN r.status IN ('partial', 'failed') THEN 1 ELSE 0 END) AS failures
          FROM automation_runs r
          JOIN automation_definitions d ON d.id = r.automation_id
-        WHERE d.line_account_id IN (${placeholders}) AND d.status <> 'archived'
+        WHERE d.line_account_id IN (${placeholders}) ${paging?.includeArchived ? '' : "AND d.status <> 'archived'"}
           AND r.is_test = 0 AND r.status IN ('success', 'partial', 'failed')
           AND datetime(r.created_at) >= datetime('now', '-30 days')`,
     ).bind(...lineAccountIds).first<{ executions: number; failures: number | null }>(),
@@ -148,10 +148,11 @@ export async function listAutomationDefinitions(
        JOIN automation_versions v
          ON v.id = CASE
               WHEN d.status = 'draft' THEN d.current_draft_version_id
+              WHEN d.status = 'archived' THEN COALESCE(d.current_published_version_id, d.current_draft_version_id)
               ELSE d.current_published_version_id
             END
         AND v.automation_id = d.id
-      WHERE d.line_account_id IN (${placeholders}) AND d.status <> 'archived'
+      WHERE d.line_account_id IN (${placeholders}) ${paging?.includeArchived ? '' : "AND d.status <> 'archived'"}
       ORDER BY d.priority DESC, d.updated_at DESC, d.id DESC${limit === null ? '' : ' LIMIT ? OFFSET ?'}`,
   ).bind(...lineAccountIds, ...(limit === null ? [] : [limit, offset])).all<DefinitionListRow>();
   const items = (result.results ?? []).map((row): AutomationDefinitionSummary => ({
@@ -561,8 +562,7 @@ export async function runAutomationTest(
  * - `archived`：一覧から外す。**実行記録は消えない**
  *   （`automation_runs` は定義を参照して残る）。
  *
- * 保管済みは元に戻せない。誤って隠した定義を動かし直す穴を開けないための
- * 一方通行で、複製して作り直す形にする。
+ * 保管から戻すときは専用の restore を使い、稼働は再開しない。
  */
 export async function updateAutomationDefinitionStatus(
   db: D1Database,
@@ -590,7 +590,7 @@ export async function updateAutomationDefinitionStatus(
   }
   if (definition.status === 'archived') {
     throw new AutomationDefinitionError(
-      'status_invalid', '保管したオートメーションは戻せません。複製して作り直してください',
+      'status_invalid', '保管から戻してから、稼働を切り替えてください',
     );
   }
   if (input.status === 'active' && !definition.current_published_version_id) {
@@ -609,4 +609,20 @@ export async function updateAutomationDefinitionStatus(
     throw new AutomationDefinitionError('version_conflict', '状態が変わりました。再読み込みしてください');
   }
   return { id: definition.id, status: input.status };
+}
+
+/** 保管から戻すだけでは実行しない。公開版なしは下書きへ戻す。 */
+export async function restoreAutomationDefinition(db: D1Database, input: { id: string; lineAccountId: string }) {
+  const definition = await db.prepare(`SELECT status, current_published_version_id FROM automation_definitions
+    WHERE id = ? AND line_account_id = ?`).bind(input.id, input.lineAccountId)
+    .first<{ status: 'draft' | 'active' | 'stopped' | 'archived'; current_published_version_id: string | null }>();
+  if (!definition) throw new AutomationDefinitionError('not_found', 'ルールが見つかりません');
+  if (definition.status !== 'archived') return { id: input.id, status: definition.status };
+  const status = definition.current_published_version_id ? 'stopped' : 'draft';
+  const updated = await db.prepare(`UPDATE automation_definitions SET status = ?, archived_at = NULL, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND status = 'archived'
+      AND current_published_version_id IS ?`)
+    .bind(status, new Date().toISOString(), input.id, input.lineAccountId, definition.current_published_version_id).run();
+  if ((updated.meta?.changes ?? 0) !== 1) throw new AutomationDefinitionError('version_conflict', '状態が変わりました。再読み込みしてください');
+  return { id: input.id, status };
 }
