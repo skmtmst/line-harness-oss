@@ -7,6 +7,7 @@
  * ［閉じた］は媒体ごと（まだ閉じていない先頭の媒体。ほかの媒体は「…」から）。
  * 席が空いた枠は「もう開けてよい」。読む口・書く口は channel-close-tasks（今ある口）だけ。動きは BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
@@ -54,7 +55,7 @@ export default function CloseTasksPage() {
   const [media, setMedia] = useState<StoreMedium[]>([])
   const [error, setError] = useState<unknown>(null)
   const [tab, setTab] = useState<Tab>('open')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [medium, setMedium] = useState('all')
   const [busyId, setBusyId] = useState('')
 

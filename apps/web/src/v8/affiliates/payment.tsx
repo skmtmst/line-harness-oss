@@ -11,6 +11,7 @@
  * - 明細発行・銀行用CSVは合言葉（冪等キー）つき、CSV 書き出しは本人確認を通してから
  * - 0円で外れた成果・持ち越し・取消の差し引きは案内に出す
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarClock, CalendarDays, FileText, Landmark, Lock, ReceiptText, TriangleAlert, Users, Wallet } from 'lucide-react'
 import {
@@ -66,13 +67,13 @@ export default function PaymentTab() {
   const [items, setItems] = useState<AffiliatePaymentSummary[]>([])
   const [preview, setPreview] = useState<AffiliateAccountSettlementPreview | null>(null)
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<PaymentFilter>('all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<PaymentFilter>('filter', 'all')
   const [saved, setSaved] = useState('')
   /* 「今回払う人」の札を押したか（絞りは全員のまま。押した形だけ残す）。 */
   const [allPicked, setAllPicked] = useState(false)
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null)
   const [closeOpen, setCloseOpen] = useState(false)
   const [closed, setClosed] = useState<AffiliateAccountSettlementResult | null>(null)

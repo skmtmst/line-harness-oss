@@ -1,6 +1,7 @@
 'use client'
 
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
@@ -261,14 +262,14 @@ export default function AutoRepliesListV8() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
-  const [sortKey, setSortKey] = useState<SortKey>('priority')
+  const [sortKey, setSortKey] = useListUrlValue<SortKey>('sortKey', 'priority')
   const [savedFilter, setSavedFilter] = useListUrlParam('view')
   const [stoppedOnly, setStoppedOnly] = useListUrlFlag('stopped')
   const [timedOnly, setTimedOnly] = useListUrlFlag('timed')
   const [zeroThisMonthOnly, setZeroThisMonthOnly] = useListUrlFlag('zero')
   /** 「重なりあり」の絞り込み。要確認の帯・行の札から入る。 */
   const [conflictOnly, setConflictOnly] = useListUrlFlag('conflict')
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [pageParam, setPageParam] = useListUrlParam('page', '1')
   const page = Math.max(1, Number.parseInt(pageParam, 10) || 1)
   const setPage = useCallback((next: number) => setPageParam(String(next)), [setPageParam])

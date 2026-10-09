@@ -9,6 +9,7 @@
  * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { CircleDot, Plug, Star } from 'lucide-react'
@@ -166,10 +167,10 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
   const [overviewSlot, setOverviewSlot] = useState<AccountBound<OverviewWithLatency | null>>(() => pendingFor(accountId, null))
   const [recordsSlot, setRecordsSlot] = useState<AccountBound<ImportRecords>>(() => pendingFor(accountId, EMPTY_RECORDS))
   const [pageSlot, setPageSlot] = useState<{ accountId: string | null; page: number }>({ accountId, page: 1 })
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [searchQuery, setSearchQuery] = useState('')
   const [status, setStatus] = useState<ActionTab>('all')
-  const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
+  const [sort, setSort] = useListUrlValue<'newest' | 'oldest'>('sort', 'newest')
   const [retryingSlot, setRetryingSlot] = useState<{ accountId: string | null; id: string | null }>({ accountId, id: null })
   const [noticeSlot, setNoticeSlot] = useState<{ accountId: string | null; notice: { tone: 'success' | 'error'; text: string } | null }>({ accountId, notice: null })
   const [detailSlot, setDetailSlot] = useState<{ accountId: string | null; orderId: string | null }>({ accountId, orderId: null })
@@ -274,7 +275,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearchQuery(query.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [query, setPage])
 

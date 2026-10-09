@@ -1,5 +1,6 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import Notice from '@/components/shared/notice'
 
@@ -73,7 +74,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
   const [rules, setRules] = useState<OperatorNotificationRule[]>([])
   const [summary, setSummary] = useState<OperatorNotificationSummary | null>(null)
   const [state, setState] = useState<LoadState>('loading')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null)
   const [exportReason, setExportReason] = useState('')

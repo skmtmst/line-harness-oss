@@ -9,6 +9,7 @@
  * 右の上に案内の帯、表は名前の前にフォルダの色の丸（表にフォルダ列は置かない）、行の右端は必ず「…」、
  * 表の下に操作の説明。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -72,11 +73,11 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
   // 操作の失敗は読み込みの失敗とは別の状態にする（ATTR-02）。
   const [actionError, setActionError] = useState('')
   const [retryOrder, setRetryOrder] = useState<FriendField[] | null>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [type, setType] = useState<'all' | FriendFieldType>('all')
-  const [folderFilter, setFolderFilter] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<FriendField | null>(null)
   const { leavingId, leave } = useRowLeaving()

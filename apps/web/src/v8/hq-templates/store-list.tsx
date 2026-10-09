@@ -11,6 +11,7 @@
  *   - 数の帯は配ったアカウントの数
  * 読み書き（一覧・分類・複製・削除・配る）は呼ぶ側（console.tsx）が今までどおり持つ。ここは見せ方と押した知らせだけ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useMemo, useState, type ReactNode } from 'react'
 import {
   CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2,
@@ -145,14 +146,14 @@ export default function HqStoreList(props: HqStoreListProps) {
     onAddFolder, onRenameFolder, onDeleteFolder, onReloadFolders, onCreate, onEdit, onOpen, onDistribute, onDistributeFolder, folderContents, onDuplicate, onRemove, notices, overlays,
   } = props
   const words = WORDS[type]
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [undistributedOnly, setUndistributedOnly] = useState(false)
   /* タグ（DzdC3）だけ：上のタブ（タグ・友だち情報欄・対応マーク・保存した検索）と、使用状態・付け方の絞り込み。 */
   const attribute = useAttributeTab('/hq/friend-attributes')
   const [tagUsage, setTagUsage] = useState<TagUsageFilter>('all')
   const [tagMethod, setTagMethod] = useState('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 分類（フォルダ）の窓：足す・名前を変える（統括のひな形の分類は色を持たない）・消す。 */
   const [folderDialog, setFolderDialog] = useState<{ editing: HqTemplateFolder | null } | null>(null)

@@ -11,6 +11,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -270,12 +271,12 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const [summaryReport, setSummaryReport] = useState<ConversionDefinitionReport | null>(null)
   const [listTruncated, setListTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [sort, setSort] = useState<PointSort>('cv-desc')
+  const [sort, setSort] = useListUrlValue<PointSort>('sort', 'cv-desc')
   const [status, setStatus] = useState<StatusFilter>('all')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   /* 左のフォルダの列（共通の /api/folders・種類 conversion）。'' はすべて。`?folder=` で共有できる。 */
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const folderState = useManagedFolders('conversion', accountId)
@@ -330,8 +331,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const [actionNotice, setActionNotice] = useState('')
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
-    return () => window.clearTimeout(timer)
+    setDebouncedQuery(query.trim())
   }, [query])
 
   /* 一覧は検索・並びを口へ渡し、続く頁をすべて読む（50頁・5000件で止め、切れたら断る）。 */

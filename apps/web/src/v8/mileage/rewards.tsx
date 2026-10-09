@@ -11,6 +11,7 @@
  * フォルダの列に割り当てる API は無いので、渡すものの種類で分けた
  * 見え方の切り替えとして持つ（保存はしない）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -158,13 +159,13 @@ export default function RewardsTab() {
   const [duplicateId, setDuplicateId] = useState<string | null>(null)
   const [menuNotice, setMenuNotice] = useState('')
   const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [folder, setFolder] = useState<Folder>('すべて')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [folder, setFolder] = useListUrlValue<Folder>('folder', 'すべて')
   const [publishedOnly, setPublishedOnly] = useState(false)
   const [draftOnly, setDraftOnly] = useState(false)
   const [preset, setPreset] = useState('default')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const requestRef = useRef(0)
 
   const load = useCallback(async () => {

@@ -10,6 +10,7 @@
  * 「シナリオを作る」は左のフォルダの列の上、行の右端は「…」（複製・配信結果・削除）、
  * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
@@ -268,8 +269,7 @@ export default function ScenariosListV8() {
   }, [loadStats])
 
   useEffect(() => {
-    const timer = setTimeout(() => setServerQuery(clampSearchQuery(nameQuery.trim())), 300)
-    return () => clearTimeout(timer)
+    setServerQuery(clampSearchQuery(nameQuery.trim()))
   }, [nameQuery])
 
   /* 「停止中のみ」と「稼働中のみ」は同時に掛からない（札が勝つ）。 */
@@ -294,7 +294,7 @@ export default function ScenariosListV8() {
   }, [accountLoading, activeParam, createdThisMonthOnly, folderFilter, selectedAccountId, serverQuery])
 
   /* 板 `axFrW`：右端は「20件表示」。 */
-  const [perPage, setPerPage] = useState(20)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const scenarioList = useOffsetServerList<ScenarioRow>({
     requestKey: JSON.stringify({
       ready: !accountLoading,

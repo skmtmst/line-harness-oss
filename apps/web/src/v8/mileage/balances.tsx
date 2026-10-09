@@ -10,6 +10,7 @@
  * 口に残高あり・確定待ちの絞り込みは無い。札を押したときは全件を読み切ってから
  * 絞る（読んだ頁の中だけで絞ると 21 件目以降が検索に出ない）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -84,9 +85,9 @@ export default function BalancesTab() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [offset, setOffset] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [withBalanceOnly, setWithBalanceOnly] = useState(false)
   const [pendingOnly, setPendingOnly] = useState(false)
   const [approvalRequests, setApprovalRequests] = useState<MileageAdjustmentApprovalRequest[] | null>(null)

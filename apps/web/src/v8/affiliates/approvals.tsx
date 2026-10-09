@@ -9,6 +9,7 @@
  * 行の右端は「認める」と「…」（認める・認めない・付帯動作をやり直す・詳細を見る）。
  * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」（hadfk）→ 確かめる → 結果。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, Check, CircleCheck, CircleHelp, Download, Hourglass, ListChecks, ShieldAlert, X } from 'lucide-react'
@@ -89,11 +90,11 @@ export default function ApprovalsTab() {
   const [holdDays, setHoldDays] = useState<number | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actioning, setActioning] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [flaggedOnly, setFlaggedOnly] = useState(false)
   const [saved, setSaved] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [detailItem, setDetailItem] = useState<ConversionApprovalItem | null>(null)
   const [truncatedStatuses, setTruncatedStatuses] = useState<ApprovalStatus[]>([])

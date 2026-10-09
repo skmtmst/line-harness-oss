@@ -9,6 +9,7 @@
  * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
  * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -158,8 +159,8 @@ export default function FriendsListV8() {
   const [savedOpen, setSavedOpen] = useState(false)
   const [advanced, setAdvanced] = useState<AdvancedSearchResult | null>(null)
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState<PageSize>(20)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue<PageSize>('pageSize', 20)
   const [selectedTagId, setSelectedTagId] = useState(directTagId)
   const [searchInput, setSearchInput] = useState(directQuery)
   const [searchSubmitted, setSearchSubmitted] = useState(directQuery)
@@ -272,8 +273,7 @@ export default function FriendsListV8() {
     if (!restored) return
     const next = searchInput.trim()
     if (next === searchSubmitted) return
-    const timer = window.setTimeout(() => { setSearchSubmitted(next); setPage(1) }, 300)
-    return () => window.clearTimeout(timer)
+     setSearchSubmitted(next); setPage(1)
   }, [restored, searchInput, searchSubmitted])
 
   /* 絞り込みは上の控えが戻す。スクロール位置も、戻ったときだけ同じ所へ戻す（動きの点検 5 番）。 */

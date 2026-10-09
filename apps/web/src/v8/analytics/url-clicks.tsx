@@ -49,8 +49,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
   // 検索語は API へ渡し、200件を超えた URL にも届くようにする。
   const [debouncedQuery, setDebouncedQuery] = useState('')
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
-    return () => window.clearTimeout(timer)
+    setDebouncedQuery(query.trim())
   }, [query])
   const state = useOverview<AnalyticsUrlClicksOverview>(
     () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200, query: debouncedQuery || undefined }),

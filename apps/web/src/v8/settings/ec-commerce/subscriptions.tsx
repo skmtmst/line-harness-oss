@@ -1,5 +1,6 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CircleDot, Star, Repeat2, Play, Pause, CreditCard } from 'lucide-react'
 import Link from 'next/link'
@@ -45,11 +46,11 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
   const loadGeneration = useRef(0)
   const [data, setData] = useState<EcSubscriptionList | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useListUrlValue<Filter>('filter', 'all')
   // 行の「その他」メニューの開き先（#641）
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [page, setPage] = useListUrlValue('page', 1)
   /** 絞り込みに合う総数。サーバが数える(#731)。 */
   const [total, setTotal] = useState(0)
 

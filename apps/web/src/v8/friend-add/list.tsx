@@ -11,6 +11,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/friend-add-settings/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -198,11 +199,11 @@ function FriendAddList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<FriendAddRuleStatus | ''>('')
-  const [folder, setFolder] = useState<string | null>(null)
-  const [perPage, setPerPage] = useState(20)
+  const [statusFilter, setStatusFilter] = useListUrlValue<FriendAddRuleStatus | ''>('statusFilter', '')
+  const [folder, setFolder] = useListUrlValue<string | null>('folder', null)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const { cursor, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -274,7 +275,7 @@ function FriendAddList() {
     const timer = setTimeout(() => {
       setAppliedSearch(search)
       resetCursor()
-    }, 300)
+    }, 0)
     return () => clearTimeout(timer)
   }, [search, resetCursor])
 

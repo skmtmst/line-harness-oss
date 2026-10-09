@@ -9,6 +9,7 @@
  * データの口と判断は今の一覧（app/inflow-links/page.tsx の InflowLinksPageInner）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -139,16 +140,16 @@ export default function InflowListV8({
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [loadError, setLoadError] = useState<unknown>(null)
-  const [sort, setSort] = useState<RouteSort>('friends-desc')
-  const [filter, setFilter] = useState<RouteFilter>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [sort, setSort] = useListUrlValue<RouteSort>('sort', 'friends-desc')
+  const [filter, setFilter] = useListUrlValue<RouteFilter>('filter', 'all')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   // null＝閉じている／'new'＝作る／EntryRoute＝直す／{register}＝未登録 ref を登録する
   const [editing, setEditing] = useState<EntryRoute | 'new' | { register: string } | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [copyFailedId, setCopyFailedId] = useState<string | null>(null)
   const [selectedGenre, setSelectedGenre] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [editingGenre, setEditingGenre] = useState<EntryRouteGenre | 'new' | null>(null)
   const [qrRoute, setQrRoute] = useState<QrRoute | null>(null)
   const [openMenuRefCode, setOpenMenuRefCode] = useState<string | null>(null)

@@ -9,6 +9,7 @@
  * から写した（import はしない）。動きの一覧は BEHAVIOR.md の「実行結果」。
  */
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -151,16 +152,16 @@ export default function AutoReplyRunsV8() {
   const requestedRuleId = searchParams.get('id') ?? ''
   const staffRole = useStaffRole()
   const canManage = staffRole === null || canManageRole(staffRole)
-  const [period, setPeriod] = useState<PeriodKey>('month')
+  const [period, setPeriod] = useListUrlValue<PeriodKey>('period', 'month')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [data, setData] = useState<AutoReplyRunsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [page, setPage] = useState(1)
-  const [filter, setFilter] = useState<RunFilter>('all')
-  const [search, setSearch] = useState('')
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [filter, setFilter] = useListUrlValue<RunFilter>('filter', 'all')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [actionMessage, setActionMessage] = useState('')
   const [stopOpen, setStopOpen] = useState(false)
   const [stopReason, setStopReason] = useState('')

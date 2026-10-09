@@ -9,6 +9,7 @@
  *   - 結果の列はアカウントの合計（届いた人数・失敗したアカウント）
  * 1行＝1回の一括配信。行を押すと詳細（送った結果）へ。動きは BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -87,15 +88,15 @@ export default function HqBroadcastList() {
   const canManage = role === null || canManageRole(role)
   const [runs, setRuns] = useState<HqBroadcastRun[] | null>(null)
   const [error, setError] = useState<unknown>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [status, setStatus] = useState<StatusKey>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   /* 並び順（絵 U4Eep0 の「新しい順」）。口は作った順の新しい順で返すので、古い順は逆に並べる。 */
-  const [sortKey, setSortKey] = useState<'newest' | 'oldest'>('newest')
+  const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
   /* 左の列のフォルダ（店の一斉配信と同じ。API-18 の統括のフォルダ）。読めなくても一覧は出す。 */
   const [folders, setFolders] = useState<HqFolder[] | null>(null)
-  const [folderFilter, setFolderFilter] = useState('all')
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', 'all')
   const [folderDialog, setFolderDialog] = useState<{ editing: HqFolder | null } | null>(null)
   const [folderName, setFolderName] = useState('')
   const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)

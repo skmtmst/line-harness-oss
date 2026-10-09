@@ -1,5 +1,6 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import HelpTip from '@/components/shared/help-tip'
 
 /*
@@ -76,12 +77,12 @@ export function replyBadge(review: GoogleReview): { label: string; tone: StatusB
 }
 
 export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: string; data: GoogleConnectionData; go: GoogleNav; onSynced: () => void }) {
-  const [filter, setFilter] = useState<GoogleReviewFilter>('all')
+  const [filter, setFilter] = useListUrlValue<GoogleReviewFilter>('filter', 'all')
   const [rating, setRating] = useState('')
-  const [order, setOrder] = useState<GoogleReviewOrder>('newest')
-  const [search, setSearch] = useState('')
+  const [order, setOrder] = useListUrlValue<GoogleReviewOrder>('order', 'newest')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [list, setList] = useState<GoogleReviewListData | null>(null)
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState('')
@@ -106,8 +107,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
-    const timer = setTimeout(() => { setAppliedSearch(search); setPage(1) }, 300)
-    return () => clearTimeout(timer)
+     setAppliedSearch(search); setPage(1)
   }, [search])
 
   const sync = useCallback(async () => {

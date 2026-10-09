@@ -10,6 +10,7 @@
  * 並べ替えは行の「…」の「上へ動かす・下へ動かす」（つまみで ↑↓ と同じ口）。
  * 絵の下の段のとおり、行の「…」に「複製して保存」を足した（同じ条件で新しく保存する）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -94,11 +95,11 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
   const [tags, setTags] = useState<Tag[]>([])
   const [conditionLabels, setConditionLabels] = useState<SavedSearchConditionLabels>({})
   const [pendingDelete, setPendingDelete] = useState<SavedSearch | null>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [usageFilter, setUsageFilter] = useState<SavedSearchUsageFilter>('all')
   const [matchFilter, setMatchFilter] = useState<'all' | 'matched' | 'zero' | 'unknown'>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?search=<id> を残す。 */
   const [activeSearchId, setActiveSearchId] = useDetailPanelUrl('search')

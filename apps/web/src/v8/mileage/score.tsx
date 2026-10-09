@@ -11,6 +11,7 @@
  * 開け閉めの段で残す（絵の表の下の案内どおり、操作を落とさない）。
  * 決めごとの編集の器（試す・保存・公開の手順）は /mileage/score-rules の画面。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -143,12 +144,12 @@ export default function ScoreTab() {
     latestAccountRef.current = accountId
   }, [accountId])
   const [overview, setOverview] = useState<ActionScoreOverview | null>(null)
-  const [filter, setFilter] = useState<ActionScoreFilter>('all')
-  const [sort, setSort] = useState<ActionScoreSort>('score_desc')
+  const [filter, setFilter] = useListUrlValue<ActionScoreFilter>('filter', 'all')
+  const [sort, setSort] = useListUrlValue<ActionScoreSort>('sort', 'score_desc')
   const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -259,12 +260,12 @@ export default function ScoreTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setRuleSearch(ruleSearchInput.trim()), 300)
+    const timer = window.setTimeout(() => setRuleSearch(ruleSearchInput.trim()), 0)
     return () => window.clearTimeout(timer)
   }, [ruleSearchInput])
 

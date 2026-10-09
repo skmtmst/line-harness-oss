@@ -9,6 +9,7 @@
  * 数の帯は共通の帯（板の端から端）、案内は青い帯、道具の段の右端に表示件数、
  * 表は板の端から端（行の右端は必ず「…」）、表の下に安全確認の段。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -56,10 +57,10 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   const [retryOrder, setRetryOrder] = useState<MarkRow[] | null>(null)
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsStatus, setStatsStatus] = useState<LoadStatus>('loading')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [usage, setUsage] = useState<'all' | 'used' | 'unused'>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<MarkRow | null>(null)
   const [archiveImpact, setArchiveImpact] = useState<SupportMarkArchiveImpact | null>(null)

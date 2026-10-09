@@ -8,6 +8,7 @@
  * 試行の履歴・受信箱で連絡・再試行・対応済みは、お知らせの名前を押して開く「記録の詳細」に置く（行は1段のまま）。
  * 読み込み・再試行・対応済みの口と世代の守りは今の部品（components/line-notifications/notification-run-list）の関数を使う。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, CircleX, Mail, RotateCw } from 'lucide-react'
 import {
@@ -87,7 +88,7 @@ function reasonWords(item: RunItem): string {
 }
 
 export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string | null; mode: 'history' | 'failures' }) {
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const currentScopeKey = `${lineAccountId ?? 'none'}:${mode}`
   const [scope, setScope] = useState<NotificationRunScope>(() => ({ key: currentScopeKey, generation: 0 }))
   /* 世代はレンダー中に進める（今の部品と同じ。古い応答を新しい画面へ漏らさない）。 */
@@ -97,8 +98,8 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
   const generation = scope.generation
 
   const [loaded, setLoaded] = useState<ScopedLoadState>({ generation: -1, state: 'loading', result: null, total: 0 })
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<RunFilter>('all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<RunFilter>('filter', 'all')
   const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('all')
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all')
   const [retrying, setRetrying] = useState<ScopedRetrying>({ generation: -1, id: null })

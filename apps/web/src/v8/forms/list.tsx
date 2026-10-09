@@ -8,6 +8,7 @@
  * （app/form-submissions/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
@@ -141,7 +142,7 @@ export default function FormsListV8() {
   const [formTotal, setFormTotal] = useState(0)
   /** フォルダ欄の「すべて」件数。絞り込み前の件数（all_total）。 */
   const [folderTotal, setFolderTotal] = useState(0)
-  const [activeFolderId, setActiveFolderId] = useState('all')
+  const [activeFolderId, setActiveFolderId] = useListUrlValue('activeFolderId', 'all')
   const [loading, setLoading] = useState(true)
   /* 戻ってきたら前のスクロール位置へ（絞り込みは前から URL に置いている）。 */
   useListScrollMemory(!loading)
@@ -357,8 +358,7 @@ export default function FormsListV8() {
 
   // 検索語のサーバー取得は少し遅らせ、1打鍵ごとの往復を避ける。
   useEffect(() => {
-    const timer = window.setTimeout(() => setFetchQuery(query), 300)
-    return () => window.clearTimeout(timer)
+    setFetchQuery(query)
   }, [query])
 
   const listState = { query, filter: formFilter, sort: formSort, pageSize, page }

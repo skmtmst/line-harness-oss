@@ -8,6 +8,7 @@
  * アフィリエイターごと・案件ごとの2つの見方。行（名前）を押すとその人の詳細の引き出し（tnTn9）。
  * 取得の上限を超えたら、合計を出さずに知らせる（今と同じ）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -66,9 +67,9 @@ export default function ReportTab() {
   const [affiliates, setAffiliates] = useState<AffiliateItem[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadError, setLoadError] = useState('')
-  const [query, setQuery] = useState('')
-  const [view, setView] = useState<ViewKey>('affiliate')
-  const [period, setPeriod] = useState<ReportPeriod>('this_month')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [view, setView] = useListUrlValue<ViewKey>('view', 'affiliate')
+  const [period, setPeriod] = useListUrlValue<ReportPeriod>('period', 'this_month')
   const [saved, setSaved] = useState('')
   /* 見方の札を押したか（はじめはアフィリエイターごとで、どちらの札も押していない形）。 */
   const [viewPicked, setViewPicked] = useState(false)

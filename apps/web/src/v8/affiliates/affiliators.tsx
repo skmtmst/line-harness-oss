@@ -11,6 +11,7 @@
  * フォルダの列：アフィリエイターを分けて保存する口は無いので、報酬の決め方で
  * 分けた見え方の切り替えとして持つ（保存しない）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -113,13 +114,13 @@ export default function AffiliatorsTab() {
   const [monthlyState, setMonthlyState] = useState<LoadState>('loading')
 
   /* ===== 見せ方 ===== */
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [filters, setFilters] = useState<FilterKey[]>([])
   const [group, setGroup] = useState<GroupKey>('all')
-  const [sort, setSort] = useState<SortKey>('conversions')
+  const [sort, setSort] = useListUrlValue<SortKey>('sort', 'conversions')
   const [saved, setSaved] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   /* ===== 操作 ===== */
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null)

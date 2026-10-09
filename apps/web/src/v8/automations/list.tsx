@@ -8,6 +8,7 @@
  * 型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「ルールを作る」）・案内の帯・
  * 道具の段・表（絵の列の並び）を渡す。行の右端は「編集する」と「…」。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -162,15 +163,15 @@ export default function AutomationListV8() {
   const [summary, setSummary] = useState<{ executionCount30d: number; failureCount30d: number } | null>(null)
   const [skipped, setSkipped] = useState<number | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
-  const [folderFilter, setFolderFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   /* ?search= で開くと、その言葉で探した状態から始める（動いた記録の「ルールを開く」）。 */
   const [search, setSearch] = useState(() => searchParams.get('search') ?? '')
   const [onlyActive, setOnlyActive] = useState(false)
   const [onlyStopped, setOnlyStopped] = useState(false)
   const [saved, setSaved] = useState<SavedKey>('')
-  const [sort, setSort] = useState<'updated' | 'runs' | 'name'>('updated')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [sort, setSort] = useListUrlValue<'updated' | 'runs' | 'name'>('sort', 'updated')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [rowBusyId, setRowBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')

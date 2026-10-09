@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 
 /*
  * 一覧の絞り込み・検索語・並び順・ページを URL に置く口（動きの点検 5 番）。
@@ -102,6 +102,10 @@ export function nextListUrl<T extends Record<string, string>>(
     if (value === '' || value === defaults[key]) params.delete(key)
     else params.set(key, value)
   }
+  const changedFilter = Object.entries(patch).some(([key, value]) => !['page', 'cursor', 'offset', 'highlight', 'id'].includes(key) && value !== undefined && value !== (new URLSearchParams(location.search).get(key) ?? defaults[key] ?? ''))
+  if (changedFilter && patch.page === undefined) params.delete('page')
+  if (changedFilter && patch.cursor === undefined) params.delete('cursor')
+  if (changedFilter && patch.offset === undefined) params.delete('offset')
   const query = params.toString()
   return `${location.pathname}${query ? `?${query}` : ''}${location.hash}`
 }
@@ -300,4 +304,19 @@ export function useOnAccountSwitch(accountId: string | null | undefined, onSwitc
     previousRef.current = accountId
     if (previous && accountId && previous !== accountId) onSwitchRef.current()
   }, [accountId])
+}
+
+/** 一覧の文字・数・入切を URL に保存する。useState と同じ更新関数を受け取る。 */
+export function useListUrlValue<T>(key: string, initial: T | (() => T)): [T, (next: T | ((current: T) => T)) => void] {
+  const [fallback] = useState(initial)
+  const encode = (value: T) => value === null ? '' : String(value)
+  const decode = (raw: string): T => {
+    if (typeof fallback === 'number') return (Number.isFinite(Number(raw)) && raw !== '' ? Number(raw) : fallback) as T
+    if (typeof fallback === 'boolean') return (raw === 'true') as T
+    return (raw === '' && fallback === null ? null : raw) as T
+  }
+  const [raw, setRaw] = useListUrlParam(key, encode(fallback))
+  const value = decode(raw)
+  const setValue = useCallback((next: T | ((current: T) => T)) => setRaw(encode(typeof next === 'function' ? (next as (current: T) => T)(decode(readListUrlParam(key, encode(fallback)))) : next)), [key, fallback, setRaw])
+  return [value, setValue]
 }

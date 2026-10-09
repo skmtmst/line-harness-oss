@@ -1,5 +1,6 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useEffect, useRef, useState } from 'react'
 import type { HqFriendAttributeDetail, HqTemplateReceivedVersion } from '@line-crm/shared'
 import { hqFriendAttributesApi as api, type HqAttributePreflight, type HqAttributeDistributionResult, type HqAttributeResolution } from '@/lib/hq-friend-attributes-api'
@@ -25,8 +26,8 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
   const [stage, setStage] = useState<'saved' | 'accounts' | 'confirm' | 'result'>(saved ? 'saved' : 'accounts')
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }> | null>(null)
   const [selected, setSelected] = useState<string[]>([])
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue('filter', 'all')
   const folders = useDistributionFolders(true)
   const [received, setReceived] = useState<HqTemplateReceivedVersion[] | null>(null)
   const [receivedFailed, setReceivedFailed] = useState(false)

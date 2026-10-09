@@ -7,6 +7,7 @@
  * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
@@ -230,9 +231,9 @@ export default function BroadcastListV8() {
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
-  const [pageSize, setPageSize] = useState(20)
-  const [sortKey, setSortKey] = useState<'newest' | 'oldest'>('newest')
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
+  const [page, setPage] = useListUrlValue('page', 1)
   const [listTotal, setListTotal] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ApiBroadcast | null>(null)
   const [deleting, setDeleting] = useState(false)

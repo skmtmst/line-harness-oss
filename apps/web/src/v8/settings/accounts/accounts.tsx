@@ -9,6 +9,7 @@
  * 一覧（確かめ直しは live）・アーカイブ（理由・本人確認）・アーカイブから戻す。
  * 「並び順と親子を変える」は今ある並び替えの部品（components/accounts/account-ordering）を窓で開く。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowUpDown, CircleDot, Plus, Star } from 'lucide-react'
@@ -58,8 +59,8 @@ export default function AccountsV8() {
   const canManage = role === null || canManageRole(role)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<AccountFilter>('all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<AccountFilter>('filter', 'all')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<LineAccount | null>(null)
   const [archiveReason, setArchiveReason] = useState('')

@@ -8,6 +8,7 @@
  * 選んだときの一括バーをはめる。データの口・確かめの窓は今の V8（src/app/contents/list-v8.tsx）から写した。
  * 札の名前の前にフォルダの色の丸（2026-10-07 オーナー）。札の操作は「…」へ集める。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   Folder,
@@ -135,7 +136,7 @@ const EMPTY_KPIS: MediaKpis = {
 }
 
 export default function MediaLibraryListV8() {
-  const [view, setView] = useState<MediaView>('grid')
+  const [view, setView] = useListUrlValue<MediaView>('view', 'grid')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
@@ -175,7 +176,7 @@ export default function MediaLibraryListV8() {
   */
   const [folderFailure, setFolderFailure] = useState<unknown>(null)
   const [folderReloading, setFolderReloading] = useState(false)
-  const [folderFilter, setFolderFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   /*
     R37: フォルダの名前・色・並べ替え・削除は共通のフォルダの列（ManagedFolderPanel）の「…」から。
     追加だけあって直し・消しが無いと、整理し直す手段が無い。
@@ -187,7 +188,7 @@ export default function MediaLibraryListV8() {
   const [kinds, setKinds] = useState<Set<MediaItem['kind']>>(
     () => new Set(KINDS.map((k) => k.key)),
   )
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [showUnusedOnly, setShowUnusedOnly] = useState(false)
   const [showNearLimitOnly, setShowNearLimitOnly] = useState(false)
   /** 退避済みだけを見る棚。普段の一覧には出ない。 */
@@ -205,9 +206,9 @@ export default function MediaLibraryListV8() {
   const [moveFolderId, setMoveFolderId] = useState('')
   const [moveBusy, setMoveBusy] = useState(false)
   const [moveError, setMoveError] = useState('')
-  const [sort, setSort] = useState<MediaSort>('newest')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [sort, setSort] = useListUrlValue<MediaSort>('sort', 'newest')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   /** 名前を直している札。null なら誰も直していない。 */

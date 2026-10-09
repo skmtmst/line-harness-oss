@@ -8,6 +8,7 @@
  * アカウント切替の見張り）は同じ。運用者へのお知らせの一覧は今の部品を入口（page.tsx）から差し込む。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadImageFile } from '@/components/shared/media-library-upload'
 import Link from 'next/link'
@@ -714,7 +715,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   // send-countsだけ取れなかった・形が違ったときの印。一覧全体は表示を続ける。
   const [sendCountsFailed, setSendCountsFailed] = useState(false)
   const [quota, setQuota] = useState<LineNotificationQuota | null>(null)
-  const [filter, setFilter] = useState<CustomerFilter>('all')
+  const [filter, setFilter] = useListUrlValue<CustomerFilter>('filter', 'all')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loadState, setLoadState] = useState<CustomerLoadState>('loading')
   const [busy, setBusy] = useState<string | null>(null)

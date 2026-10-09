@@ -10,6 +10,7 @@
  * 件数と金額はEC運用の集計の口（アカウントの切り替えで古い応答を捨てる・集計だけの失敗は数の帯だけ）、
  * 「候補を見る」で表の下に根拠・影響・両方の中身・これまでの判断、「決める」で判定の窓。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ArrowUpRight, Link2, Plug, Search, Unlink, UserSearch } from 'lucide-react'
 import { ORDER_IMPACT_KEYS, REVENUE_IMPACT_KEYS, type IdentityCandidateImpactMetric } from '@line-crm/shared'
@@ -76,8 +77,8 @@ export default function EcIdentityCandidatesScreen() {
   const detail = review.detail
   const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)
   const [operationsState, setOperationsState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
-  const [view, setView] = useState<View>('all')
-  const [sort, setSort] = useState<Sort>('confidence')
+  const [view, setView] = useListUrlValue<View>('view', 'all')
+  const [sort, setSort] = useListUrlValue<Sort>('sort', 'confidence')
 
   /* アカウントを切り替えたら、前のアカウントの遅れた応答は採らない（R600）。 */
   const operationsReqRef = useRef(0)

@@ -8,6 +8,7 @@
  * （一覧・送り直し・まとめて送り直し）。URL・鍵・本文は一覧にも中身にも出さない。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（CSV の書き出し口が無い など）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDownLeft, ArrowUpRight, CircleAlert, FileCode, History, Inbox, LayoutList, RefreshCw, RotateCw, TriangleAlert } from 'lucide-react'
 import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/shared'
@@ -118,11 +119,11 @@ export default function WebhooksInteractionsV8() {
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [direction, setDirection] = useState<Direction>('all')
   const [status, setStatus] = useState<Status>('all')
   const [periodDays, setPeriodDays] = useState(30)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [limit, setLimit] = useState(20)
   const [selected, setSelected] = useState<WebhookInteraction | null>(null)
   const [techOpen, setTechOpen] = useState(false)

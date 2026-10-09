@@ -141,6 +141,7 @@ describe('V8 自動応答一覧（src/v8）の動き', () => {
     const search = host.querySelector('input[placeholder="ルール名・言葉で探す"]') as HTMLInputElement
     expect(search, '探す欄がありません').toBeTruthy()
     fireEvent.change(search, { target: { value: '営業時間' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     await flush()
     expect(host.textContent).toContain('営業時間外の自動返信')
     expect(host.textContent).not.toContain('予約変更のお問い合わせ')

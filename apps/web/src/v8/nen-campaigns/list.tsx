@@ -9,6 +9,7 @@
  * 表は「見出し 36・行 56」の同じ物差しで並べる（タブを替えても表の頭が動かない）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useRouter } from 'next/navigation'
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -305,11 +306,11 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
   const router = useRouter()
   const { autoSettings, sentByKey, pausedOnly, canEdit, kpis } = props
   const tabError = props.tabError ?? ''
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<AutoFilter>('')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<AutoFilter>('filter', '')
   const [saved, setSaved] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
 
@@ -621,11 +622,11 @@ function columnBadge(column: NenColumn, sent: number | null) {
 function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
   const { columns, columnMetrics, canEdit } = props
   const tabError = props.tabError ?? ''
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<ColumnFilter>('')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<ColumnFilter>('filter', '')
   const [category, setCategory] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
 
@@ -875,8 +876,8 @@ function historyStatus(filter: HistoryFilter): string | undefined {
 function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
   const { deliveryList, deliveryDetail, canEdit } = props
   const tabError = props.tabError ?? ''
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<HistoryFilter>('all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<HistoryFilter>('filter', 'all')
   const [reasons, setReasons] = useState<Record<string, string>>({})
   const [retryFocusId, setRetryFocusId] = useState<string | null>(null)
   const shown = deliveryList?.deliveries ?? []

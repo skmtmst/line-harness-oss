@@ -9,6 +9,7 @@
  * ほかは「友だちを見る」）＋「…」。行を押すとその友だちのマイルの詳細。
  * 種類・方法・期間の絞り込みは「よく使う絞り込み」の見方として残す。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -88,12 +89,12 @@ export default function HistoryTab() {
   const [pendingBusy, setPendingBusy] = useState(false)
   const [pendingError, setPendingError] = useState('')
   const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [grantedOnly, setGrantedOnly] = useState(false)
   const [spentOnly, setSpentOnly] = useState(false)
   const [preset, setPreset] = useState('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)

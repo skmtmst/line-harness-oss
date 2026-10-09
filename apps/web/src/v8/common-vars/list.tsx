@@ -12,6 +12,7 @@
  * 空のまま使われているときの黄色の帯は表の列の上、行の右端は「…」
  * （編集・止める／再開する・削除する）。右クリックでも同じものが出る。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -215,11 +216,11 @@ function CommonVarsListInner() {
   const [folderReloading, setFolderReloading] = useState(false)
   const [listLimited, setListLimited] = useState(false)
 
-  const [query, setQuery] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [chip, setChip] = useState<VarsChip>('all')
-  const [order, setOrder] = useState<CommonVarOrder>('usage_desc')
+  const [order, setOrder] = useListUrlValue<CommonVarOrder>('order', 'usage_desc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [orderMenuOpen, setOrderMenuOpen] = useState(false)

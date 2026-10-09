@@ -11,6 +11,7 @@
  * フォルダの列に割り当てる API は無いので、きっかけの種類で分けた
  * 見え方の切り替えとして持つ（保存はしない）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -177,14 +178,14 @@ export default function EarningRulesTab() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [folder, setFolder] = useState<FolderKey>('all')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [folder, setFolder] = useListUrlValue<FolderKey>('folder', 'all')
   const [activeOnly, setActiveOnly] = useState(false)
   const [pendingOnly, setPendingOnly] = useState(false)
   const [stoppedOnly, setStoppedOnly] = useState(false)
-  const [sort, setSort] = useState<SortKey>('order')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [sort, setSort] = useListUrlValue<SortKey>('sort', 'order')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
@@ -273,7 +274,7 @@ export default function EarningRulesTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
