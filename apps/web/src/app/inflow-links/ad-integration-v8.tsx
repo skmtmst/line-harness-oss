@@ -34,6 +34,8 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import styles from './ad-integration-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const LOG_PAGE_SIZE = 20
 
@@ -389,7 +391,7 @@ function useAdV8Model() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `広告への送信履歴_${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("広告への送信履歴")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [logs])

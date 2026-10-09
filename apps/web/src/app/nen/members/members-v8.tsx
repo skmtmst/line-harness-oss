@@ -57,6 +57,7 @@ import { RankChip, yen } from './rank-view'
 import styles from './members-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -248,7 +249,7 @@ function CsvExportButton({ accountId }: { accountId: string }) {
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `nen-members-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("NEN会員")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch (caught) {

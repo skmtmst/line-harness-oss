@@ -53,6 +53,8 @@ import type { PetTab } from './page'
 import styles from './pets-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -249,7 +251,7 @@ function PetsListV8({
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `nen-pets-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = csvFileName("ペット")
       a.click()
       URL.revokeObjectURL(url)
     } catch {

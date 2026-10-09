@@ -36,6 +36,7 @@ import { csvCell, pageCountOf, pageOf } from './offer-list-view'
 import { formatDateTime, formatYenNullable, listAllConversionApprovals } from './tabs'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
 import './list-v8.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
@@ -332,7 +333,7 @@ export default function ApprovalsTabV8({
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `conversion-approvals-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("成果の承認")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [shownItems])

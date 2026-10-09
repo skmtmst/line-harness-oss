@@ -60,6 +60,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { V8CreateButton } from './mileage-v8'
 import styles from './mileage-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const EVENT_LABELS: Record<string, string> = {
   friend_added: '友だち追加',
@@ -309,7 +310,7 @@ export default function V8EarningRulesTab({
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-earning-rules-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイルの獲得ルール")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {

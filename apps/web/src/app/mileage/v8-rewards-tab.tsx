@@ -43,6 +43,7 @@ import type { MileageV8TabKey } from './mileage-v8'
 import { formatNumber } from '@/lib/format'
 import { V8CreateButton } from './mileage-v8'
 import styles from './mileage-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
   coupon: 'クーポン',
@@ -459,7 +460,7 @@ export default function V8RewardsTab({
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-rewards-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイルの特典")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {

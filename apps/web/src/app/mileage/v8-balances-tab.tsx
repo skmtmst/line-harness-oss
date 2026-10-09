@@ -38,6 +38,8 @@ import type { MileageV8TabKey } from './mileage-v8'
 import { mileagePaginationTotal } from './mileage-response-state'
 import { csvCell } from '@/lib/presentation'
 import styles from './mileage-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { Field } from '@/components/shared/form-controls'
 
 function dateOnlyDaysAgo(days: number) {
   const date = new Date()
@@ -270,7 +272,7 @@ export default function V8BalancesTab({
       const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-balances-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイル残高")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {

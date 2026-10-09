@@ -46,6 +46,8 @@ import {
 import { mileagePaginationTotal } from './mileage-response-state'
 import { formatNumber } from '@/lib/format'
 import styles from './mileage-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { Field } from '@/components/shared/form-controls'
 
 function viewName(item: MileageAdminHistoryItem) {
   return item.displayName || '名前未取得'
@@ -198,7 +200,7 @@ export default function V8HistoryTab({
       const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-history-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイル履歴")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {

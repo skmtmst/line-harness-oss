@@ -54,6 +54,7 @@ import { actionScoreReasonLabel, formatMileageChange, formatMileageDate, formatM
 import { csvCell } from '@/lib/presentation'
 import { actionScoreAdjustmentErrorMessage } from './action-score-adjustment-dialog'
 import styles from './mileage-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -209,7 +210,7 @@ export default function V8ScoreTab({
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `action-scores-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("行動の点数")
     anchor.click()
     URL.revokeObjectURL(url)
   }

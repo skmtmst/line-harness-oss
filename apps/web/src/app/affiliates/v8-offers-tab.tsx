@@ -36,6 +36,7 @@ import OfferTermsDialog from './offer-terms'
 import { confirmedThisMonth, confirmedTotals, confirmedValue, confirmedUnit, confirmedDetail, type ConfirmedState } from './offer-kpi'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
 import './list-v8.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 function formatYen(n: number): string {
   return `¥${formatNumber(Math.round(n))}`
@@ -191,7 +192,7 @@ export default function OffersTabV8({
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `affiliate-offers-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = csvFileName("アフィリエイト案件")
     a.click()
     URL.revokeObjectURL(url)
   }, [shown, accountMap, tagMap, scenarioMap])

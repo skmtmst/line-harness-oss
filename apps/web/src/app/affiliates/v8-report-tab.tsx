@@ -27,6 +27,7 @@ import AffiliateDrawerV8 from './v8-drawer'
 import { reportMonthKey as monthKeyShifted, reportPeriodLabel as monthLabel, type ReportPeriod } from './report-period'
 import Notice from '@/components/shared/notice'
 import './list-v8.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 function formatYen(n: number): string {
   return `¥${formatNumber(Math.round(n))}`
@@ -223,7 +224,7 @@ export default function ReportTabV8({
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `affiliate-report-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("アフィリエイト成果レポート")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [view, shownAffiliates, shownOffers])

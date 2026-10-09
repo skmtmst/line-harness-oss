@@ -40,6 +40,7 @@ import { currentAffiliateSettlementPeriod } from './payment-tab'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError, BulkBar } from './v8-shared'
 import AffiliateDrawerV8 from './v8-drawer'
 import './list-v8.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const PAGE_SIZES = [20, 50, 100]
 
@@ -300,7 +301,7 @@ export default function AffiliatesTabV8({
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `affiliates-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("アフィリエイター")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [shownRows])
