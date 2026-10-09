@@ -12,9 +12,10 @@
  * ここは見た目だけを受け持つ。
  */
 import type { RefObject } from 'react'
-import { CornerDownLeft, Folder, FolderOpen, Inbox, Send } from 'lucide-react'
+import { CornerDownLeft, FolderOpen, Send } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
+import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
 import styles from './inbox-chat.module.css'
@@ -57,21 +58,14 @@ const PACK_MAX = 5
 
 export default function TemplatePickerView(props: TemplatePickerViewProps) {
   const { side, packMode, packItems } = props
-  const sideRow = (key: TemplatePickerSideKey, label: string, icon: React.ReactNode, count: number | null, depth = 0) => (
-    <button
-      key={key}
-      type="button"
-      className={styles.tpSideRow}
-      data-depth={depth || undefined}
-      aria-pressed={side.active === key}
-      onClick={() => props.onPickSide(key)}
-      title={label}
-    >
-      {icon}
-      <span className={styles.tpSideName}>{label}</span>
-      {count === null ? null : <span className={styles.tpSideCount}>{count}</span>}
-    </button>
-  )
+  const folderRows: FolderPanelRow[] = [
+    { id: 'frequent', kind: 'folder', label: 'よく使う', icon: <FolderOpen size={15} aria-hidden="true" />, count: null },
+    { id: 'all', kind: 'all', label: 'すべて', count: side.allCount },
+    ...(side.status === 'error' ? [] : side.folders.map((folder): FolderPanelRow => ({
+      id: `folder:${folder.id}`, kind: 'folder', label: folder.name, color: folder.color, count: folder.count,
+    }))),
+    { id: 'none', kind: 'unfiled', label: '未分類', count: side.noneCount },
+  ]
 
   return (
     <Dialog
@@ -83,21 +77,10 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
       footer={(
         <>
           <div className={styles.tpBody}>
-            <nav className={styles.tpSide} aria-label="フォルダ">
-              {sideRow('frequent', 'よく使う', <FolderOpen aria-hidden="true" className={styles.tpSideIcon} />, null)}
-              {sideRow('all', 'すべて', <Inbox aria-hidden="true" className={styles.tpSideIcon} />, side.allCount)}
-              <p className={styles.tpSideLabel}>フォルダ</p>
-              {side.status === 'error' ? (
-                <p className={styles.tpSideNote}>フォルダを読み込めませんでした</p>
-              ) : side.folders.map((folder) => sideRow(
-                `folder:${folder.id}`,
-                folder.name,
-                <Folder aria-hidden="true" className={styles.tpSideIcon} style={{ color: folder.color ?? undefined, fill: folder.color ?? 'none' }} />,
-                folder.count,
-                folder.depth,
-              ))}
-              {sideRow('none', '未分類', <Folder aria-hidden="true" className={styles.tpSideIcon} />, side.noneCount)}
-            </nav>
+            <div className={styles.tpSide}>
+              <FolderPanel readOnly rows={folderRows} activeId={side.active} onSelect={(key) => props.onPickSide(key as TemplatePickerSideKey)} />
+              {side.status === 'error' ? <p className={styles.tpSideNote}>フォルダを読み込めませんでした</p> : null}
+            </div>
             <div className={styles.tpList}>
               <SearchField
                 ref={props.searchInputRef}

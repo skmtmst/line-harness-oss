@@ -19,7 +19,7 @@ describe('候補を選ぶ共通の窓', () => {
     const onSelect = vi.fn(), onConfirm = vi.fn()
     render(<SourcePickerDialog {...props} onSelect={onSelect} onConfirm={onConfirm} onCancel={() => {}} />)
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(screen.getByRole('navigation', { name: '候補のフォルダ' })).getByRole('button', { name: /季節/ }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'フォルダ' })).getByRole('button', { name: /季節/ }))
     expect(within(dialog).queryByRole('radio', { name: '商品3種' })).toBeNull()
     fireEvent.click(within(screen.getByLabelText('候補の絞り込み')).getByRole('button', { name: /テキスト/ }))
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '春' } })
@@ -31,6 +31,18 @@ describe('候補を選ぶ共通の窓', () => {
     expect(onConfirm).toHaveBeenCalledWith('1')
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '存在しない名前' } })
     expect(screen.getByText('当てはまる候補がありません。')).toBeTruthy()
+  })
+
+  it('未分類で絞り、読み込み中と確定中はフォルダ選択を止める', async () => {
+    const unfiled = { ...items[0], id: '3', name: '分類なし', folderId: null }
+    const view = render(<SourcePickerDialog {...props} items={[...items.filter((item) => item.folderId), unfiled]} onSelect={() => {}} onConfirm={() => {}} onCancel={() => {}} />)
+    await screen.findByRole('dialog')
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'フォルダ' })).getByRole('button', { name: /未分類/ }))
+    expect(screen.getAllByRole('radio').map((row) => row.getAttribute('aria-label'))).toEqual(['分類なし'])
+    for (const extra of [{ busy: true }, { state: <p>読み込み中</p> }]) {
+      view.rerender(<SourcePickerDialog {...props} {...extra} onSelect={() => {}} onConfirm={() => {}} onCancel={() => {}} />)
+      expect(within(screen.getByRole('navigation', { name: 'フォルダ' })).getAllByRole('button').every((button) => (button as HTMLButtonElement).disabled)).toBe(true)
+    }
   })
 
   it('Esc・キャンセルは確定せず、閉じると元のボタンへ焦点を戻す', async () => {

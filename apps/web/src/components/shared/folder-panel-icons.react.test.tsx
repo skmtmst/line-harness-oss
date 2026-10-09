@@ -105,3 +105,37 @@ describe('フォルダの行ごとに追加する操作', () => {
   })
 
 })
+
+
+describe('選ぶだけのフォルダ列', () => {
+  it('操作を渡されても追加・編集・並べ替えを出さず、選択だけはできる', async () => {
+    const onSelect = vi.fn(), mutate = vi.fn()
+    await act(async () => root.render(<FolderPanel readOnly rows={[{
+      id: 'f1', kind: 'folder', label: '季節', count: 3, color: 'blue',
+      onEdit: mutate, onMoveUp: mutate, onMoveDown: mutate, onDelete: mutate,
+      leadingActions: [{ id: 'send', label: '配る', onSelect: mutate }],
+      trailing: <button onClick={mutate}>まとめて選ぶ</button>,
+    }]} activeId="f1" onSelect={onSelect} onAddFolder={mutate}
+      createAction={<button onClick={mutate}>作る</button>} reserveCreateSpace>
+      <button onClick={mutate}>追加操作</button>
+    </FolderPanel>))
+    const buttons = host.querySelectorAll('button')
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0].getAttribute('aria-pressed')).toBe('true')
+    await act(async () => buttons[0].click())
+    expect(onSelect).toHaveBeenCalledWith('f1')
+    expect(mutate).not.toHaveBeenCalled()
+  })
+
+  it('処理中は選択も止め、未取得件数を0にしない', async () => {
+    const onSelect = vi.fn()
+    await act(async () => root.render(<FolderPanel readOnly disabled rows={[
+      { id: 'all', kind: 'all', label: 'すべて', count: null },
+    ]} activeId="all" onSelect={onSelect} />))
+    const button = host.querySelector('nav button') as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    expect(button.textContent).toBe('すべて')
+    await act(async () => button.click())
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+})

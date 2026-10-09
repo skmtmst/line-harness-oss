@@ -128,6 +128,13 @@
   border-color: var(--color-control-border);
 }
 
+/* 複合欄の焦点は外枠へ。内側の入力の輪郭を重ねない。 */
+[data-theme='v8'] .search:has(:focus-visible) {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+[data-theme='v8'] .input:focus-visible { outline: none; }
+
 [data-theme='v8'] .input {
   font-size: var(--text-label);
 }
