@@ -1,3 +1,4 @@
+import type { EntryRouteCouponReceived } from '@line-crm/shared';
 import type { CustomerBookingWaitlist,CustomerSeatWaitlist,RegisterSeatWaitlistInput,AcceptBookingWaitlistInput } from '@line-crm/shared';
 import type { FormLayout } from '@line-crm/shared';
 import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
@@ -377,6 +378,10 @@ export interface FormSubmitResponse {
 
 export const api = {
   researchForm: (id: string) => getData<{ formId: string }>(`/api/liff/research/${encodeURIComponent(id)}/form`),
+  entryRouteCoupon: {
+    receive: async (ref: string) => unwrapSuccessData<EntryRouteCouponReceived>(await post<unknown>('/api/liff/entry-route-coupon', { ref }), '/api/liff/entry-route-coupon'),
+    use: async (receiptId: string, requestId: string) => unwrapSuccessData<{ message: string; replayed: boolean }>(await post<unknown>('/api/liff/entry-route-coupon/use', { receiptId, requestId }), '/api/liff/entry-route-coupon/use'),
+  },
   /** 上の帯に出す店名など。liffId から店を決める公開口 (Worker は {success,data} で返す)。 */
   liffConfig: () =>
     get<{ success: boolean; data: { botBasicId: string; accountName: string; accountId: string } }>(

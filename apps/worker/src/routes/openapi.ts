@@ -2385,7 +2385,41 @@ const spec = {
       post: {
         tags: ['Dashboard'], summary: '印刷用PDFをサーバーで作る（止めた経路は出さない）',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'A4 PDF' }, '404': { description: 'Not found' }, '409': { description: '経路は停止中' } },
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { paper: { type: 'string', enum: ['A4', 'A5'], default: 'A4' } } } } } },
+        responses: { '200': { description: 'A4 または A5 の店頭用PDF', content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } } }, '400': { description: '用紙の指定が正しくない' }, '404': { description: '経路が見つからない、または閲覧範囲外' }, '409': { description: '経路またはクーポンが利用できない' } },
+      },
+    },
+    '/api/entry-routes/{id}/qr-image': {
+      post: {
+        tags: ['Dashboard'], summary: '流入経路のQR画像を保存する',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: {
+          format: { type: 'string', enum: ['png', 'svg'], default: 'png' },
+          size: { type: 'string', enum: ['small', 'medium', 'large'], default: 'medium', description: '256・512・1024ピクセル' },
+        } } } } },
+        responses: { '200': { description: 'QR画像', content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/svg+xml': { schema: { type: 'string', format: 'binary' } } } }, '400': { description: '形式または大きさが正しくない' }, '404': { description: '経路が見つからない、または閲覧範囲外' }, '409': { description: '経路は停止中' } },
+      },
+    },
+    '/api/liff/entry-route-coupon': {
+      post: {
+        tags: ['LIFF'], summary: '流入経路のクーポンを本人として受け取る（同じ経路では1人1回）',
+        security: [],
+        description: '管理APIキーは使わず、店舗のLINE Login IDトークンで個別に本人確認する。',
+        parameters: [{ name: 'Authorization', in: 'header', required: true, schema: { type: 'string' }, description: 'Bearer <LINE Login IDトークン>' }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['ref'], properties: { ref: { type: 'string' } } } } } },
+        responses: { '200': { description: '受け取ったクーポンと使用回数（再読込では同じ受取記録）' }, '400': { description: '経路の指定が正しくない' }, '401': { description: 'LINEの本人確認が必要' }, '404': { description: '経路または友だちが見つからない' }, '409': { description: 'クーポンが利用できない、または対象外' } },
+      },
+    },
+    '/api/liff/entry-route-coupon/use': {
+      post: {
+        tags: ['LIFF'], summary: '本人が受け取ったクーポンの使用を記録する（再試行は同じ結果）',
+        security: [],
+        description: '管理APIキーは使わず、店舗のLINE Login IDトークンで個別に本人確認する。',
+        parameters: [{ name: 'Authorization', in: 'header', required: true, schema: { type: 'string' }, description: 'Bearer <LINE Login IDトークン>' }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['receiptId', 'requestId'], properties: {
+          receiptId: { type: 'string' }, requestId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,64}$' },
+        } } } } },
+        responses: { '200': { description: '使用を記録した結果（同じrequestIdは重複記録しない）' }, '400': { description: '受取記録または再試行の識別子が正しくない' }, '401': { description: 'LINEの本人確認が必要' }, '404': { description: '本人の受取記録が見つからない' }, '409': { description: '使用済み、期限切れ、またはクーポンが利用できない' } },
       },
     },
     // ── 広告費 (#818) ────────────────────────────────────────────────────

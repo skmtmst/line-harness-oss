@@ -16,6 +16,7 @@ import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
+import CouponSettings from './coupon-settings'
 import { focusField } from './focus-field'
 import type {
   EntryRoute,
@@ -114,6 +115,9 @@ export default function EditRouteModal({
     poolId: route?.poolId ?? mainPool?.id ?? null,
     scenarioId: route?.scenarioId ?? null,
     introTemplateId: route?.introTemplateId ?? null,
+    couponEnabled: route?.couponEnabled ?? false,
+    couponAssetId: route?.couponAssetId ?? null,
+    couponAudience: route?.couponAudience ?? 'new_friends',
     runAccountFriendAddScenarios: route?.runAccountFriendAddScenarios ?? true,
     redirectUrl: route?.redirectUrl ?? null,
     isActive: route?.isActive ?? true,
@@ -127,6 +131,7 @@ export default function EditRouteModal({
     const errors: Record<string, string> = {}
     if (!form.name.trim()) errors['route-name'] = '流入元の名前を入力してください'
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(form.refCode)) errors['route-ref'] = '半角英数字・_・ハイフンで1〜64文字にしてください'
+    if (form.couponEnabled && !form.couponAssetId) errors['route-coupon'] = '渡すクーポンを選んでください'
     setFieldErrors(errors)
     setError('')
     if (Object.keys(errors).length) { focusField(Object.keys(errors)[0]); return false }
@@ -136,7 +141,7 @@ export default function EditRouteModal({
   const validateBeforeSave = () => {
     const nothingDelivers =
       !form.runAccountFriendAddScenarios && !form.scenarioId && !form.introTemplateId
-    if (nothingDelivers) {
+    if (nothingDelivers && !form.couponEnabled) {
       setWarning(
         '上書きモードかつ起動シナリオも即時 push も未設定です。このリンクで友だち追加した人には何も届きません。続行しますか?',
       )
@@ -185,7 +190,7 @@ export default function EditRouteModal({
       open
       title={isNew ? '新規リファラルリンク' : 'リファラルリンク編集'}
       busy={submitting}
-      error={error || undefined}
+      error={error || fieldErrors['route-coupon'] || undefined}
       onCancel={onClose}
       footer={
         <div className="flex justify-end gap-2">
@@ -336,6 +341,9 @@ export default function EditRouteModal({
           />
         )}
       </div>
+      <CouponSettings accountId={route?.lineAccountId ?? accountId} disabled={submitting}
+        value={{ couponEnabled: form.couponEnabled ?? false, couponAssetId: form.couponAssetId ?? null, couponAudience: form.couponAudience ?? 'new_friends' }}
+        onChange={(next) => { setForm((current) => ({ ...current, ...next })); setFieldErrors((current) => ({ ...current, 'route-coupon': '' })) }} />
     </Dialog>
   )
 }

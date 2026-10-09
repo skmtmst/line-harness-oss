@@ -458,7 +458,12 @@ function InflowDetailContent() {
         <DetailLoading />
       ) : <>
         <div className={styles.kpis}>
-          <KpiBand aria-label={`${route.name}の概要`}>
+          {route.couponEnabled ? <KpiBand aria-label={`${route.name}のクーポン概要`}>
+            <KpiCard presentation="band" icon={null} title="読み取り" value={funnel?.click_count ?? null} unit="回" detail="累計" />
+            <KpiCard presentation="band" icon={null} title="友だち追加" value={funnel?.new_friend_add_count ?? null} unit="人" detail="新しく友だちになった人" />
+            <KpiCard presentation="band" icon={null} title="クーポンを受け取った" value={funnel?.coupon_received_count ?? null} unit="人" detail="既存の友だちを含む" />
+            <KpiCard presentation="band" icon={null} title="使った" value={funnel?.coupon_used_count ?? null} unit="人" detail="受け取り後に使った人" />
+          </KpiBand> : <KpiBand aria-label={`${route.name}の概要`}>
             <KpiCard presentation="band" icon={null} title="今月 友だちになった" value={monthTotal} unit="人"
               detail={`先月より ${monthDelta == null ? emptyValue('unknown') : `${monthDelta >= 0 ? '+' : ''}${formatNumber(monthDelta)}`}`} />
             <KpiCard presentation="band" icon={null} title="累計" value={funnel ? funnel.friend_add_count : null} unit="人"
@@ -467,7 +472,7 @@ function InflowDetailContent() {
               detail={blockRate == null ? '割合は集計できません' : `友だちになった人の ${blockRate}%`} />
             <KpiCard presentation="band" icon={null} title="成果（コンバージョン）" value={funnel ? funnel.cv_count : null} unit="件"
               detail={`累計・1人あたり ${funnel?.valuePerFriend == null ? emptyValue('unknown') : yen(Math.round(funnel.valuePerFriend))}`} />
-          </KpiBand>
+          </KpiBand>}
         </div>
 
         <div className={styles.afterWrap}>
@@ -734,7 +739,7 @@ function InflowDetailContent() {
 
       {qrOpen && route ? (
         <QrDialog
-          route={{ refCode: route.refCode, name: route.name, genre: route.genre, isActive: route.isActive, id: route.id }}
+          route={{ refCode: route.refCode, name: route.name, genre: route.genre, isActive: route.isActive, id: route.id, couponEnabled: route.couponEnabled }}
           onClose={() => setQrOpen(false)}
         />
       ) : null}

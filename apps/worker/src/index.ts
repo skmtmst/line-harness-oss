@@ -747,14 +747,21 @@ app.get('/r/:ref', async (c) => {
       return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
     }
   }
+  // クーポンの所属アカウントを固定する。main poolへ落とすと別の店へ着地する。
+  const couponRoute = route?.coupon_enabled === 1 && Boolean(route.coupon_asset_id);
+  if (couponRoute) {
+    const account = route?.line_account_id ? await getLineAccountById(c.env.DB, route.line_account_id) : null;
+    if (!account?.liff_id) return c.html('<!doctype html><html lang="ja"><meta charset="utf-8"><title>このリンクは現在利用できません</title><p>お店へお問い合わせください。</p></html>', 503);
+    liffUrl = `https://liff.line.me/${account.liff_id}`;
+  }
   // 転送先が設定された経路はそちらへ送る（#514 重大4）。保存はするのに
   // 読まないままだった。危険な形式は safe-redirect が弾き、そのときは
   // 従来どおり友だち追加の着地画面へ進む。
-  if (route?.redirect_url) {
+  if (!couponRoute && route?.redirect_url) {
     const target = safeRedirectTarget(route.redirect_url);
     if (target) return c.redirect(target, 302);
   }
-  if (route?.pool_id) {
+  if (!couponRoute && route?.pool_id) {
     const candidate = await getTrafficPoolById(c.env.DB, route.pool_id);
     if (candidate?.is_active) pool = candidate;
   }
@@ -792,7 +799,7 @@ app.get('/r/:ref', async (c) => {
   // 2 / 3. fallback to URL query or 'main'. Skipped for affiliate refs, whose
   // account is already resolved above; falling through to the 'main' pool would
   // override the affiliate's chosen account.
-  if (!pool && !affiliateResolved) {
+  if (!pool && !affiliateResolved && !couponRoute) {
     const poolSlug = c.req.query('pool') || 'main';
     pool = await getTrafficPoolBySlug(c.env.DB, poolSlug);
   }
@@ -814,6 +821,7 @@ app.get('/r/:ref', async (c) => {
   const liffParams = new URLSearchParams();
   if (liffIdMatch) liffParams.set('liffId', liffIdMatch[1]);
   if (ref) liffParams.set('ref', ref);
+  if (couponRoute) liffParams.set('couponRef', ref);
   if (formId) liffParams.set('form', formId);
   const gate = c.req.query('gate');
   if (gate) liffParams.set('gate', gate);

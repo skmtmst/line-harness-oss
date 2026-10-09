@@ -1,5 +1,6 @@
 import { handleResearchTap } from '../services/research-tap.js';
 import { handleExtraPostback } from '../services/tap-extras.js';
+import { sendEntryRouteCoupon } from '../services/entry-route-coupon.js';
 import {stableWebhookStepId} from '../services/incoming-webhook-receipts.js';
 import { workflowLineClient } from '../services/workflow-line-client.js';
 import type { WorkflowExecution } from '../services/workflow-execution.js';
@@ -1037,6 +1038,27 @@ async function handleEvent(
       }
     }
 
+    // QRのクーポン: 初めての追加だけ。既存友だちは本人確認済みLIFFで受け取る。
+    if (friendKind === 'first_time' && !stoppedRefDiscarded && referralRoute?.coupon_enabled === 1
+      && lineAccountId && await holdSendRight({ external: true })) {
+      try {
+        await sendEntryRouteCoupon(db, referralRoute, friend, async (message, retryKey) => {
+          if (!await holdSendRight({ external: true })) {
+            throw Object.assign(new Error('entry_coupon_fenced_out'), { friendAddSendAborted: true });
+          }
+          try {
+            await lineClient.pushMessage(userId, [message], retryKey);
+          } catch (error) {
+            noteSendOutcome(classifyFollowSendFailure(error));
+            throw error;
+          }
+          noteSendOutcome('delivered');
+        });
+      } catch (error) {
+        logWebhookStepFailure('entry_route_coupon', error, lineAccountId, event);
+      }
+    }
+
     // NENの友だち追加クーポンは、アカウント別設定が有効な場合だけ初回追加時に発行する。
     // 再フォローとWebhook再送は発行台帳の一意制約でも二重発行を防ぐ。
     if ('first_time' === friendKind && lineAccountId && ecommerce && await holdSendRight({ external: true })) {
@@ -1232,8 +1254,8 @@ async function handleEvent(
       return;
     }
     if (rawPostbackData.startsWith('coupon_use:')) {
-      const assetId = rawPostbackData.slice('coupon_use:'.length);
-      const result = await redeemCoupon(db, friend, lineAccountId ?? null, assetId, event.webhookEventId, new Date(), {executorDependencies:{resolveLineAccessToken:async()=> 'existing-client',createLineClient:()=>lineClient}});
+      const [assetId, receiptId] = rawPostbackData.slice('coupon_use:'.length).split(':');
+      const result = await redeemCoupon(db, friend, lineAccountId ?? null, assetId, event.webhookEventId, new Date(event.timestamp), receiptId, {executorDependencies:{resolveLineAccessToken:async()=> 'existing-client',createLineClient:()=>lineClient}});
       if (!result.replayed && event.replyToken) await lineClient.replyMessage(event.replyToken, [{ type: 'text', text: result.message }]);
       return;
     }
