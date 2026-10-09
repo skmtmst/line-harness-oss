@@ -1,6 +1,6 @@
 /** LIFF と管理画面の見本で共有する入力の形。通信・送信は呼ぶ側が持つ。 */
 import { useEffect, useState, useRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
-import { PREFECTURES, type FormInputBlock } from '@line-crm/shared'
+import { PREFECTURES, type FormInputBlock, type FormFileAnswer } from '@line-crm/shared'
 import styles from './controls.module.css'
 
 type Mark = 'calendar' | 'clock' | 'chevron' | 'clip'
@@ -55,16 +55,56 @@ export function RatingStars({ name, current, onChange }: { name: string; current
   </div>
 }
 
-// Worker の forms/upload が受け付ける画像形式。PDF は受け付けない。
+// 写真の許可形式。PDF は質問の設定に応じて加える。
 export const FORM_FILE_ACCEPT = 'image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif'
 export const FORM_FILE_NOTE = 'JPG・PNG・GIF・WebP・HEIC・HEIF、10MBまで（画像のみ）'
-export function FormFileControl({ label, uploading = false, onUpload }: { label: string; uploading?: boolean; onUpload?: (file: File) => void }) {
+export function FormFileControl({ label, uploading = false, onUpload, kind = 'image', kinds, bothSides = false, maxCount = 1, files = [], onRemove }: {
+  label: string; uploading?: boolean; onUpload?: (file: File, side: 'single' | 'front' | 'back') => void;
+  kind?: FormInputBlock['fileKind']; kinds?: FormInputBlock['fileKinds']; bothSides?: boolean; maxCount?: number;
+  files?: (FormFileAnswer & { previewUrl?: string })[]; onRemove?: (fileId: string) => void;
+}) {
+  const allowedKinds = kinds ?? [kind];
+  kind = allowedKinds.includes('identity') ? 'identity' : allowedKinds.includes('image') ? 'image' : 'pdf';
   const ref = useRef<HTMLInputElement>(null)
+  const camera = useRef<HTMLInputElement>(null)
+  const sideRef = useRef<'single' | 'front' | 'back'>('single')
+  const [error, setError] = useState('')
+  const [selectedSide, setSelectedSide] = useState<'front' | 'back'>('front')
+  const accept = [allowedKinds.some(k => k === 'image' || k === 'identity') ? FORM_FILE_ACCEPT : '', allowedKinds.includes('pdf') ? 'application/pdf' : ''].filter(Boolean).join(',')
+  const choose = (file?: File) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024 || !file.size) { setError('1ファイル10MBまでです'); return }
+    if (!accept.split(',').includes(file.type)) { setError('受け取れる形式のファイルを選んでください'); return }
+    setError(''); onUpload?.(file, sideRef.current)
+  }
+  const sides: ('single' | 'front' | 'back')[] = kind === 'identity' && bothSides ? ['front', 'back'] : ['single']
+  const pick = (take: boolean) => {
+    sideRef.current = sides.length === 2 ? files.some(f => f.side === selectedSide) ? (selectedSide === 'front' ? 'back' : 'front') : selectedSide : 'single';
+    (take ? camera : ref).current?.click();
+  }
   return <div className={styles.stack}>
-    <input ref={ref} type="file" aria-label={label} accept={FORM_FILE_ACCEPT} disabled={uploading} hidden onChange={(e) => { const file = e.target.files?.[0]; if (file) onUpload?.(file); e.target.value = '' }} />
-    <button type="button" className={styles.fileButton} disabled={uploading} onClick={() => ref.current?.click()}><FieldIcon mark="clip" />写真・書類を選ぶ</button>
-    <p className={styles.note}>{FORM_FILE_NOTE}</p>
+    <input ref={ref} type="file" aria-label={label} accept={accept} disabled={uploading} hidden onChange={e => { choose(e.target.files?.[0]); e.target.value = '' }} />
+    <input ref={camera} type="file" aria-label={`${label}を撮る`} accept={FORM_FILE_ACCEPT} capture="environment" disabled={uploading} hidden onChange={e => { choose(e.target.files?.[0]); e.target.value = '' }} />
+    <div className={styles.fileSlots} data-both-sides={sides.length === 2 || undefined}>
+      {sides.map(side => {
+        const entries = files.filter(file => (file.side ?? 'single') === side)
+        return <div key={side} className={styles.stack} role="group" aria-label={side === 'single' ? label : side === 'front' ? '表' : '裏'}>
+          {side !== 'single' ? <button type="button" className={styles.fileSlot} aria-pressed={selectedSide === side} disabled={uploading} onClick={() => setSelectedSide(side)}>{side === 'front' ? '表' : '裏'}{!entries.length ? '（写真を入れる）' : ''}</button> : null}
+          {entries.map(file => <div key={file.fileId} className={styles.fileItem}>
+            {file.previewUrl && file.mimeType?.startsWith('image/') ? <img className={styles.filePreview} src={file.previewUrl} alt="送った写真" /> : <span className={styles.fileName} title={file.filename}>{file.filename || '書類'}{file.state === 'pending' ? '（検査中）' : ''}</span>}
+            <button type="button" className={styles.fileRemove} disabled={uploading} aria-label={`${file.filename || '書類'}を外す`} onClick={() => onRemove?.(file.fileId)}>×</button>
+          </div>)}
+        </div>
+      })}
+    </div>
+    {files.length < (sides.length === 2 ? 2 : Math.min(10, Math.max(1, maxCount))) ? <div className={styles.stack}>
+      {kind !== 'pdf' ? <button type="button" className={styles.fileButton} disabled={uploading} onClick={() => pick(true)}>写真を撮る</button> : null}
+      {kind !== 'pdf' ? <button type="button" className={styles.fileButton} disabled={uploading} onClick={() => pick(false)}>写真を選ぶ</button> : null}
+      <button type="button" className={styles.fileButton} disabled={uploading} onClick={() => pick(false)}><FieldIcon mark="clip" />ファイルを選ぶ</button>
+    </div> : null}
+    <p className={styles.note}>{kind === 'pdf' ? 'PDF・1ファイル10MBまで' : `JPG・PNG・GIF・WebP・HEIC・HEIF${allowedKinds.includes('pdf') ? '・PDF' : ''}・1ファイル10MBまで`}{`・${sides.length === 2 ? 2 : Math.min(10, Math.max(1, maxCount))}枚まで`}</p>
     {uploading ? <p className={styles.note}>送っています...</p> : null}
+    {error ? <p role="alert" className={styles.note}>{error}</p> : null}
   </div>
 }
 

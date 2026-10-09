@@ -62,11 +62,11 @@ describe('編集した参考の文字と実際の入力', () => {
     const file = new File(['test-image'], 'photo.png', { type: 'image/png' })
     const input = screen.getByLabelText('添付画像', { selector: 'input' }) as HTMLInputElement
     const choose = vi.spyOn(input, 'click')
-    fireEvent.click(screen.getByRole('button', { name: '写真・書類を選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '写真を選ぶ' }))
     expect(choose).toHaveBeenCalled()
     expect(input.accept).not.toContain('application/pdf')
     fireEvent.change(input, { target: { files: [file] } })
-    await waitFor(() => expect(api.uploadFormFile).toHaveBeenCalledWith('f1', file, undefined))
+    await waitFor(() => expect(api.uploadFormFile).toHaveBeenCalledWith('f1', file, undefined, 'b7', 'single'))
     expect((await screen.findByAltText('送った画像') as HTMLImageElement).src).toBe('https://example.test/photo.png')
   })
 })
