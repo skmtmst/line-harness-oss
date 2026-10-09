@@ -14,6 +14,8 @@ import { CircleDot, Folder, Gauge, Inbox, Plus, Send, Sparkles, Star, Upload } f
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import { notifyToast } from '@/components/shared/toast'
 import FilterChip from '@/components/shared/filter-chip'
@@ -27,7 +29,6 @@ import { Tabs } from '@/components/shared/tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import {
   SHAPE_FILTERS,
@@ -113,12 +114,12 @@ function BannersInner() {
   const changeTab = (next: Tab) => samePageUrl.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')
 
   const kpis = (
-    <div className={styles.kpis} data-design="KPIs">
-      <StatCard title="プロジェクト" icon={<Folder aria-hidden="true" />} value={stats ? stats.projects.active : null} unit="件" detail={stats ? `アーカイブ ${stats.projects.archived}` : '—'} loading={summaryLoading} />
-      <StatCard title="今月の生成" icon={<Sparkles aria-hidden="true" />} value={usage ? usage.month.used : null} unit="枚" detail={usage ? `今日 ${usage.today.used}枚・1日の上限 ${usage.today.limit}枚` : '—'} loading={summaryLoading} />
-      <StatCard title="今月の残り" icon={<Gauge aria-hidden="true" />} value={usage ? usage.month.remaining : null} unit="枚" detail={usage ? `上限 ${usage.month.limit}枚・${nextMonthResetLabel()} に戻る` : '—'} loading={summaryLoading} />
-      <StatCard title="アカウントへ配った画像" icon={<Send aria-hidden="true" />} value={stats ? stats.deliveredImages : null} unit="枚" detail={stats ? `${stats.deliveredAccounts}アカウント` : '—'} loading={summaryLoading} />
-    </div>
+    <KpiBand data-design="KPIs">
+      <KpiCard presentation="band" title="プロジェクト" icon={<Folder aria-hidden="true" />} value={stats ? stats.projects.active : null} unit="件" detail={summaryLoading ? '読み込んでいます' : stats ? `アーカイブ ${stats.projects.archived}` : '—'} loading={summaryLoading} />
+      <KpiCard presentation="band" title="今月の生成" icon={<Sparkles aria-hidden="true" />} value={usage ? usage.month.used : null} unit="枚" detail={summaryLoading ? '読み込んでいます' : usage ? `今日 ${usage.today.used}枚・1日の上限 ${usage.today.limit}枚` : '—'} loading={summaryLoading} />
+      <KpiCard presentation="band" title="今月の残り" icon={<Gauge aria-hidden="true" />} value={usage ? usage.month.remaining : null} unit="枚" detail={summaryLoading ? '読み込んでいます' : usage ? `上限 ${usage.month.limit}枚・${nextMonthResetLabel()} に戻る` : '—'} loading={summaryLoading} />
+      <KpiCard presentation="band" title="アカウントへ配った画像" icon={<Send aria-hidden="true" />} value={stats ? stats.deliveredImages : null} unit="枚" detail={summaryLoading ? '読み込んでいます' : stats ? `${stats.deliveredAccounts}アカウント` : '—'} loading={summaryLoading} />
+    </KpiBand>
   )
 
   const head = (
@@ -142,30 +143,6 @@ function BannersInner() {
   return tab === 'projects'
     ? <ProjectsView head={head} canManage={canManage} usage={usage} archivedCount={stats?.projects.archived ?? null} onChanged={() => void loadSummary()} />
     : <LibraryView head={head} canManage={canManage} presets={presets} accounts={accounts} onChanged={() => void loadSummary()} />
-}
-
-/**
- * 数のカード（絵の「数 プロジェクト」など）。絵はつながった帯ではなく、間 12 の別々のカード。
- * 数が取れないときは「—」（推測で埋めない）。読み込み中は数の所を「…」にする。
- */
-function StatCard({ title, icon, value, unit, detail, loading }: {
-  title: string
-  icon: React.ReactNode
-  value: number | null
-  unit: string
-  detail: string
-  loading: boolean
-}) {
-  return (
-    <div className={styles.stat} aria-busy={loading || undefined}>
-      <p className={styles.statHead}><span className={styles.statIcon}>{icon}</span><span className={styles.statTitle} title={title}>{title}</span></p>
-      <p className={styles.statValue}>
-        <span className={styles.statNumber}>{loading ? '…' : value === null ? '—' : formatNumber(value)}</span>
-        {!loading && value !== null ? <span className={styles.statUnit}>{unit}</span> : null}
-      </p>
-      <p className={styles.statDetail}>{loading ? '読み込んでいます' : detail}</p>
-    </div>
-  )
 }
 
 /* ───────── プロジェクト一覧（B9ZAr） ───────── */

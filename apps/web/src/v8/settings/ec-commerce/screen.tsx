@@ -349,11 +349,11 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
 
   return (
     <>
-      <KpiBand data-kpi-presentation="cards" gridClassName={styles.kpis}>
-        <KpiCard presentation="card" density="record" icon={null} title="処理完了" value={listedSummary?.succeeded ?? null} unit="" detail="件" loading={listState === 'loading'} />
-        <KpiCard presentation="card" density="record" icon={null} title="処理中" value={processingCount ?? null} unit="" detail="件" loading={listState === 'loading'} />
-        <KpiCard presentation="card" density="record" icon={null} title="送信なし" value={listedSummary?.skipped ?? null} unit="" detail="件・送る設定がない" loading={listState === 'loading'} />
-        <KpiCard presentation="card" density="record" icon={null} title="失敗" value={failedCount ?? null} unit="" detail="件" valueTone={failedCount ? 'warning' : 'default'} loading={listState === 'loading'} />
+      <KpiBand presentation="band">
+        <KpiCard presentation="band" icon={null} title="処理完了" value={listedSummary?.succeeded ?? null} unit="" detail="件" loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={null} title="処理中" value={processingCount ?? null} unit="" detail="件" loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={null} title="送信なし" value={listedSummary?.skipped ?? null} unit="" detail="件・送る設定がない" loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={null} title="失敗" value={failedCount ?? null} unit="" detail="件" valueTone={failedCount ? 'warning' : 'default'} loading={listState === 'loading'} />
       </KpiBand>
       {kpiDetailMissing ? (
         <p className={styles.minor} role="status">

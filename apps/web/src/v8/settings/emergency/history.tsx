@@ -13,6 +13,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { ExternalLink, GitBranch, RefreshCw, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { MANUAL_UPDATE_GUIDE_URL } from '@/components/update/use-update-status'
@@ -126,23 +128,11 @@ export default function UpdateHistoryV8() {
 
   return (
     <div className={styles.board}>
-      <div className={styles.kpis} aria-label="更新の集計">
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}><span className={styles.kpiTile} aria-hidden="true"><GitBranch size={14} /></span><span className={styles.kpiLabel}>いまの版</span></div>
-          <p className={styles.kpiValue}>{current ? `v${current}` : '—'}</p>
-          <p className={styles.kpiDetail}>{currentAt ? `${shortWhen(currentAt)} に更新` : '更新の記録なし'}</p>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}><span className={styles.kpiTile} aria-hidden="true"><RefreshCw size={14} /></span><span className={styles.kpiLabel}>この30日の更新</span></div>
-          <p className={styles.kpiValue}>{ready ? Math.max(recent.length, recentReleases.length) : '—'}<span className={styles.kpiUnit}>回</span></p>
-          <p className={styles.kpiDetail}>{ready ? (recent.length > 0 ? `自動 ${auto}・手動 ${recent.length - auto}` : '配備の記録なし（版の記録から）') : '読み込み中'}</p>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}><span className={styles.kpiTile} aria-hidden="true"><TriangleAlert size={14} /></span><span className={styles.kpiLabel}>失敗した更新</span></div>
-          <p className={`${styles.kpiValue} ${failed > 0 ? styles.kpiValueDanger : ''}`}>{ready ? failed : '—'}<span className={styles.kpiUnit}>回</span></p>
-          <p className={styles.kpiDetail}>この30日</p>
-        </div>
-      </div>
+      <KpiBand aria-label="更新の集計">
+        <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} valueText={current ? `v${current}` : '—'} unit="" detail={currentAt ? `${shortWhen(currentAt)} に更新` : '更新の記録なし'} />
+        <KpiCard title="この30日の更新" icon={<RefreshCw size={14} />} value={ready ? Math.max(recent.length, recentReleases.length) : null} unit="回" detail={ready ? (recent.length > 0 ? `自動 ${auto}・手動 ${recent.length - auto}` : '配備の記録なし（版の記録から）') : '読み込み中'} />
+        <KpiCard title="失敗した更新" icon={<TriangleAlert size={14} />} value={ready ? failed : null} unit="回" valueTone={failed > 0 ? 'danger' : 'default'} detail="この30日" />
+      </KpiBand>
 
       {state === 'error' ? (
         <ListState kind="error" title="更新の記録を読み込めませんでした" description="版の一覧は出しています。どうやって・結果は読み直すと出ます。" />

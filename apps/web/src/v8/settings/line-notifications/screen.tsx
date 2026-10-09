@@ -29,7 +29,6 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { withViewTransition } from '@/components/shared/view-transition'
 import Notice from '@/components/shared/notice'
 import {
   ApiError,
@@ -980,8 +979,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   const renderKpiCard = (kpi: CustomerNotificationKpi) => (
     <KpiCard
       key={kpi.label}
-      presentation="card"
-      appearance="notification-customer"
+      presentation="band"
       icon={null}
       title={kpi.label}
       value={typeof kpi.value === 'number' || kpi.value === null ? kpi.value : null}
@@ -1284,7 +1282,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
     />
     {tab === 'customer' && !expandedSetting ? <>
     {/* 板 g3iDs：数のカード4枚（共通の KpiBand・KpiCard）。 */}
-    <KpiBand data-kpi-presentation="cards" gridClassName={styles.kpis} data-design="KPIs">
+    <KpiBand presentation="band" data-design="KPIs">
       {kpisWithSendCountsState.map(renderKpiCard)}
     </KpiBand>
     {/* R611: 一覧の取得に失敗したときは、上部の件数も取れていないことを添える（赤は使わない）。 */}

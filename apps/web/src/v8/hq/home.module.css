@@ -27,59 +27,6 @@
 
 .progress { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
 
-/* 数のカード4枚（余白14・間4・題と「数＋単位」の2段。B-33：単位は数の横に1行） */
-.cards {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--tpl-hq-cards-gap);
-}
-
-.stat4 {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hq-card-gap);
-  min-width: 0;
-  padding: var(--tpl-hq-home-card-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-
-.statLabel {
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  line-height: var(--tpl-hq-small-lh);
-}
-
-.statValue {
-  color: var(--color-ink);
-  font-family: var(--font-inter), Inter, system-ui, sans-serif;
-  font-size: var(--text-title);
-  font-weight: 700;
-  line-height: var(--tpl-hq-home-value-lh);
-  font-variant-numeric: tabular-nums;
-}
-
-.statWarn { color: var(--color-status-warn-deep); }
-
-.statLine {
-  display: flex;
-  align-items: baseline;
-  gap: var(--tpl-hq-card-gap);
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.statSub {
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-hq-small-lh);
-  white-space: nowrap;
-}
-
 /* 道具の段（1段目：探す欄 280、2段目：札・切り替え・並び・件数） */
 .tools {
   display: flex;
