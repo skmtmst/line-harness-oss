@@ -26,10 +26,9 @@ describe('テンプレートの詳細の計算', () => {
     expect(publishRowState(rows[1])).toBe('')
   })
 
-  it('変わるところ：消えた行は－、増えた行は＋。同じ行だけ省き、空の行も比べる', () => {
+  it('変わるところ：消えた行は－、増えた行は＋。同じ行と空の行は省く（WEB-099）', () => {
     expect(lineChanges('A\nB\n\nC', 'A\nB2\nC\nD')).toEqual([
       { kind: 'removed', text: 'B' },
-      { kind: 'removed', text: '' },
       { kind: 'added', text: 'B2' },
       { kind: 'added', text: 'D' },
     ])
@@ -44,8 +43,8 @@ describe('テンプレートの詳細の計算', () => {
   })
 })
 
-// WEB-099: 並び・重複・空行も公開する本文の差。
-it.each([['A\nB', 'B\nA'], ['A\nA', 'A'], ['A\n\nB', 'A\nB'], ['A ', 'A']])('本文の差を消さない: %s → %s', (before, after) => {
+// WEB-099（オーナー決定）：並びの違いは出す。重複・空行・行末の空白の違いは出さない（ordered-diff.test.ts）。
+it.each([['A\nB', 'B\nA']])('本文の差を消さない: %s → %s', (before, after) => {
   const changes = lineChanges(before, after)
   expect(changes.length).toBeGreaterThan(0)
 })

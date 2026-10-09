@@ -1168,7 +1168,7 @@ function CommonVarsListInner() {
       {listLimited && !listFailed ? (
         <div className={styles.alertBand} role="status">
           <TriangleAlert size={16} aria-hidden="true" />
-          <span className={styles.alertText}>一覧・検索・集計は取得した範囲（先頭200件まで）だけが対象です。残りの情報はこの画面から取得できません。</span>
+          <span className={styles.alertText}>一覧・検索・集計は取得した範囲（先頭200件まで）だけが対象です。それより後の情報はこの画面には出ません。</span>
         </div>
       ) : null}
       {error && !listFailed ? (
