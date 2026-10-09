@@ -114,14 +114,18 @@ describe('V8 流入と計測の一覧', () => {
     expect(dialog?.textContent).toContain('印刷用 PDF')
   })
 
-  it('停止中の行は URL をコピーさせず、「…」に QR を出さない（受付の再開は出す）', async () => {
+  it('WEB-037：停止中も札とURLコピー・QR保存を残す', async () => {
     await render()
     const row = rowOf('flyer-26s')
     expect(row?.textContent).toContain('停止中')
-    expect(buttonByLabel('チラシ計測リンクのURLをコピー')).toBeUndefined()
+    expect(buttonByLabel('チラシ計測リンクのURLをコピー')).toBeTruthy()
     await act(async () => { buttonByLabel('「チラシ計測リンク」の操作')!.click() })
     const labels = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent)
-    expect(labels.some((text) => text?.includes('QRコード'))).toBe(false)
+    expect(labels.some((text) => text?.includes('QRコード'))).toBe(true)
+    const qr = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('QRコード')) as HTMLElement
+    await act(async () => qr.click())
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('停止中')
+    expect([...document.querySelectorAll('a')].some(a => a.download.endsWith('.png'))).toBe(true)
     expect(labels.some((text) => text?.includes('受付を再開する'))).toBe(true)
   })
 
