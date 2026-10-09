@@ -464,6 +464,27 @@
 /* B-152・仕上げ1：余白の正本。数の帯（B-153）は別担当。 */
 /* B-152・仕上げ2：文字の段 */
 /* B-152・仕上げ3：表 */
+/* B-152・仕上げ4：状態の札（5色） */
+:root {
+  --polish-status-dot-size: 6px;
+  --polish-status-gap: 8px;
+  --polish-status-pad: 2px 8px;
+  --polish-status-success-dot: #16a34a;
+  --polish-status-success-bg: #16a34a1a;
+  --polish-status-success-ink: #087a3e;
+  --polish-status-warning-dot: #f97316;
+  --polish-status-warning-bg: #f973161a;
+  --polish-status-warning-ink: #c2410c;
+  --polish-status-danger-dot: #ef4444;
+  --polish-status-danger-bg: #ef44441a;
+  --polish-status-danger-ink: #b91c1c;
+  --polish-status-info-dot: #2563eb;
+  --polish-status-info-bg: #2563eb1a;
+  --polish-status-info-ink: #1d4ed8;
+  --polish-status-neutral-dot: #94a3b8;
+  --polish-status-neutral-bg: #94a3b81a;
+  --polish-status-neutral-ink: #475569;
+}
 :root {
   --polish-table-row: 56px;
   --polish-table-head: 40px;

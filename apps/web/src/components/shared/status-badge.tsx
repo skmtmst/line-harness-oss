@@ -43,7 +43,7 @@ export default function StatusBadge({
   const hasHelp = help !== undefined && help !== null
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この状態')
   return (
-    <span className={classes} data-design-node="xRvDB" data-surface={surface} {...props}>
+    <span className={classes} data-tone={tone} data-design-node="xRvDB" data-surface={surface} {...props}>
       {children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
