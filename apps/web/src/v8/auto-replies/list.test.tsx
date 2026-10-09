@@ -156,7 +156,7 @@ describe('V8 自動応答一覧（src/v8）の動き', () => {
       expect(checkbox, '行の選択肢がありません').toBeTruthy()
       act(() => { checkbox.click() })
       await flush()
-      expect(host.textContent).toContain('1 件を選択中')
+      expect(host.textContent).toContain('1件を選択中')
       expect(host.textContent).toContain('まとめて止める')
     } finally {
       restore()

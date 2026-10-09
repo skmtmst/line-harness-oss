@@ -123,7 +123,7 @@ describe('来店スタンプ（管理画面）', () => {
     ] }).mockResolvedValue({ success: true, data: [] })
     render(<VisitStampsV8 />)
     fireEvent.click(await screen.findByRole('tab', { name: /紙のカードの移行.*1/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7 個を承認' }))
+    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' }))
     expect(await screen.findByRole('tab', { name: /紙のカードの移行.*0/ })).toBeTruthy()
   })
 
@@ -136,9 +136,9 @@ describe('来店スタンプ（管理画面）', () => {
     await screen.findByRole('tab', { name: '紙のカードの移行' })
     fx.accountId = 'acc-2'
     rerender(<VisitStampsV8 />)
-    expect(await screen.findByRole('button', { name: '鈴木 美咲さんの 2 個を承認' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '鈴木 美咲さんの 2個を承認' })).toBeTruthy()
     await act(async () => { finishOld({ success: true, data: [{ id: 'old-paper', friend_id: 'f1', photo_url: '', stamps: 9, status: 'pending' }] }) })
-    expect(screen.queryByRole('button', { name: '鈴木 美咲さんの 9 個を承認' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '鈴木 美咲さんの 9個を承認' })).toBeNull()
     expect(screen.getByRole('tab', { name: /紙のカードの移行.*1/ })).toBeTruthy()
   })
 
@@ -196,7 +196,7 @@ describe('来店スタンプ（管理画面）', () => {
     expect(screen.queryByRole('button', { name: '記録の表示件数' })).toBeNull()
     // 承認後の再読込が古いリクエストを追い越す場面を再現する。
     fireEvent.click(screen.getByRole('tab', { name: /紙のカードの移行/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7 個を承認' }))
+    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' }))
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     await act(async () => { finishOld({ success: true, data: { items: [], total: 88, page: 2, pageSize: 20 } }) })
     fireEvent.click(screen.getByRole('tab', { name: '押した・使った記録' }))
@@ -281,7 +281,7 @@ describe('来店スタンプ（管理画面）', () => {
     render(<VisitStampsV8 />)
     await screen.findByRole('tab', { name: /紙のカードの移行/ })
     fireEvent.click(screen.getByRole('tab', { name: /紙のカードの移行/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7 個を承認' }))
+    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' }))
     await waitFor(() => expect(fx.reviewPaper).toHaveBeenCalledWith('p1', 'approve', expect.any(String)))
   })
 
@@ -300,7 +300,7 @@ describe('来店スタンプ（管理画面）', () => {
     render(<VisitStampsV8 />)
     await screen.findByRole('tab', { name: /紙のカードの移行/ })
     fireEvent.click(screen.getByRole('tab', { name: /紙のカードの移行/ }))
-    expect(await screen.findByRole('button', { name: '鈴木 美咲さんの 7 個を承認' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
     expect(screen.queryByRole('button', { name: /店員の暗証番号/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /特典を足す/ })).toBeNull()

@@ -78,7 +78,7 @@ export function PhotoReviewDetail({
   const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
   const downloadReady = stepUpMethod === 'password' ? downloadCode.length > 0 : /^\d{6}$/.test(downloadCode)
   if (loading) return <div><DetailLoading label="写真を読み込んでいます" /></div>
-  if (loadKind === 'forbidden') return <div><ListState kind="forbidden" /></div>
+  if (loadKind === 'forbidden') return <div><ListState kind="forbidden" onRetry={onReloadPhoto} /></div>
   if (loadKind === 'error') return <div><ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={onReloadPhoto} /></div>
   if (!photo || loadKind === 'empty') return <div><ListState kind="empty" title="確認する写真はありません" /></div>
 

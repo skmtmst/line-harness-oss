@@ -193,7 +193,7 @@ describe('V8 流入リンクを作る', () => {
     createStatus = 409
     fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
     await flush()
-    fireEvent.click(within(screen.getByRole('alert', { name: '文字が重複しています' })).getByRole('button', { name: /違いを比べる/ }))
+    fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: /違いを比べる/ }))
     await flush()
     const comparison = screen.getByRole('dialog', { name: '違いを比べる' })
     expect(comparison.textContent).toContain('店頭10%オフ / すでに友だちの人にも')

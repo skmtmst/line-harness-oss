@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { tapExtrasError, validateTapExtrasTree, collectTapExtraTagIds } from './tap-extras.js';
+import { researchFormLayout } from './research-form.js';
 import { convertBroadcastAsset } from './broadcast-asset-conversion.js';
 import { parseHqMessageCard, composeHqMessageCard } from './hq-message-card.js';
 
@@ -39,11 +40,15 @@ describe('押されたときの追加処理の契約', () => {
     expect(JSON.parse(composeHqMessageCard(card,'t').messageContent).footer.contents[0].action.tapExtras).toEqual(tapExtras);
     expect(()=>parseHqMessageCard({...card,buttons:[{...card.buttons[0],tapExtras:{scoreChange:1.5}}]})).toThrow();
   });
-  it('リサーチの押下には配信した公開版と選択肢の番号を固定する', () => {
+  it('リサーチは共通の回答画面へ進み、公開版の選択肢と追加処理を回答フォームに保つ', () => {
     const payload={assetId:'r',assetVersion:2,questions:[{text:'続けますか',format:'single',required:true,choices:['はい','いいえ'],choiceTapExtras:[{scoreChange:10},{scoreChange:100}]}]};
     const result=convertBroadcastAsset('research','調査',payload);
     expect(result.ok).toBe(true);
-    if(result.ok) expect(JSON.parse(result.message.messageContent).footer.contents.map((b:{action:{data:string}})=>b.action.data)).toEqual(['research:r:2:0:0','research:r:2:0:1']);
-    expect(convertBroadcastAsset('research','調査',{...payload,assetVersion:undefined}).ok).toBe(false);
+    if(result.ok) expect(JSON.parse(result.message.messageContent).footer.contents[0].action).toEqual({type:'uri',label:'回答する',uri:'https://liff.line.me/{{liff_id}}/?page=research&researchId=r'});
+    const layout=researchFormLayout('r',2,'調査',payload);
+    expect(layout.options.researchGate).toMatchObject({assetId:'r',version:2});
+    expect(layout.sections[0].blocks[0]).toMatchObject({kind:'input',type:'radio',choices:[{id:'choice-1',label:'はい',tapExtras:{scoreChange:10}},{id:'choice-2',label:'いいえ',tapExtras:{scoreChange:100}}]});
+    expect(convertBroadcastAsset('research','調査',{...payload,assetId:undefined}).ok).toBe(false);
+    expect(convertBroadcastAsset('research','調査',{...payload,questions:[{...payload.questions[0],choiceTapExtras:[{scoreChange:0.5},{}]}]}).ok).toBe(false);
   });
 });

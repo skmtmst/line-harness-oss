@@ -1068,8 +1068,8 @@ export default function BroadcastListV8() {
               <Td>
                 <span className={styles.cellMain}>
                   {broadcast.status === 'sent'
-                    ? (broadcast.sentAt ? polishFormatListDateTime(broadcast.sentAt) : '—')
-                    : (broadcast.scheduledAt ? polishFormatListDateTime(broadcast.scheduledAt) : '未設定')}
+                    ? (broadcast.sentAt ? polishFormatListDateTime(broadcast.sentAt) : emptyValue('unknown'))
+                    : (broadcast.scheduledAt ? polishFormatListDateTime(broadcast.scheduledAt) : emptyValue('unconfigured'))}
                 </span>
                 {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
               </Td>

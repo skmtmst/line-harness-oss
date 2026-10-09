@@ -166,7 +166,7 @@ describe('集計範囲と深掘り先の一致(#666)', () => {
     const card = photoCard()
     // 集計は選んだ勘定の審査待ちだけ。全社の枚数でも全状態の枚数でもない。
     expect(card.count).toBe(pendingOf('account-a').length)
-    expect(card.detail).toBe(`確認待ち ${pendingOf('account-a').length} 件`)
+    expect(card.detail).toBe(`確認待ち ${pendingOf('account-a').length}件`)
     expect(card.count).not.toBe(PHOTOS['account-a'].length)
 
     // ダッシュボードが描いたリンク先へ、そのまま移動する。

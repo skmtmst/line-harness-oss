@@ -71,6 +71,8 @@
 }
 
 .box {
+  /* 印は入力の上に描く。クリックは透明な本物の入力へ通す。 */
+  pointer-events: none;
   display: inline-flex;
   width: 100%;
   height: 100%;

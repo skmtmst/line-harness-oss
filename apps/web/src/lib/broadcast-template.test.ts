@@ -49,7 +49,9 @@ describe('broadcast template conversion', () => {
       createdAt: '', updatedAt: '',
     })
     expect(bubble.content).toMatchObject({ assetId: 'survey', assetVersion: 2, questions: published })
-    expect(bubbleLegacyMessage(bubble).messageContent).toContain('research:survey:2:0:0')
+    const card = JSON.parse(bubbleLegacyMessage(bubble).messageContent)
+    expect(card.footer.contents[0].action).toEqual({ type: 'uri', label: '回答する', uri: 'https://liff.line.me/{{liff_id}}/?page=research&researchId=survey' })
+    expect(JSON.stringify(card)).not.toContain('research:survey:2:0:0')
   })
 
   it('uses raw Flex JSON as the legacy message content', () => {

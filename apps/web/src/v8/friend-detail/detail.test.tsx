@@ -246,18 +246,23 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
   })
 })
 
-it('本名とシステム表示名は情報欄やLINE登録名と別のAPIの値を表示する', async () => {
-  getFriend.mockResolvedValue({ success: true, data: { ...friend, realName: '本名の値', systemDisplayName: '社内の呼び名' } })
+it('本名の固定欄とシステム表示名を、LINE登録名や通常の情報欄と分けて表示する', async () => {
+  getFriend.mockResolvedValue({ success: true, data: { ...friend, realName: '以前の本名', systemDisplayName: '社内の呼び名' } })
+  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '本名の値', true), fixedKey: 'name' }, field('other-name', '本名', '山田 花子')], hiddenPersonalCount: 0 } })
   await render()
-  const group = host.querySelector('[aria-label="顧客情報"]')!
-  expect(group.textContent).toContain('本名の値')
-  expect(group.textContent).toContain('社内の呼び名')
-  expect(group.textContent).not.toContain('山田 花子')
+  const basic = host.querySelector('[aria-label="基本"]')!
+  expect(basic.textContent).toContain('本名の値')
+  expect(basic.textContent).not.toContain('以前の本名')
+  expect(basic.textContent).not.toContain('山田 花子')
+  act(() => { (links('顧客情報をすべて表示')[0] as HTMLButtonElement).click() })
+  await flush()
+  expect(host.querySelector('[aria-label="友だち情報"]')!.textContent).toContain('社内の呼び名')
 })
-it('本名が未登録なら本名という情報欄を代わりに表示しない', async () => {
+it('本名の固定欄が未設定でも、同じ名前の通常情報欄を代わりに表示しない', async () => {
   getFriend.mockResolvedValue({ success: true, data: { ...friend, realName: null, systemDisplayName: null } })
+  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '', true), fixedKey: 'name', value: null }, field('other-name', '本名', '山田 花子')], hiddenPersonalCount: 0 } })
   await render()
-  const group = host.querySelector('[aria-label="顧客情報"]')!
-  expect(group.textContent).not.toContain('山田 花子')
-  expect(group.textContent).toContain('未登録')
+  const basic = host.querySelector('[aria-label="基本"]')!
+  expect(basic.textContent).not.toContain('山田 花子')
+  expect(basic.textContent).toContain('未設定')
 })

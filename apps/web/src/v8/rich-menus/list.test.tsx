@@ -114,7 +114,7 @@ describe('V8 リッチメニュー一覧', () => {
     const view = render(<RichMenusListV8 />)
     const first = (await view.findByText('通常メニュー')).closest('tr') as HTMLElement
     expect(first.textContent).toContain('公開中')
-    expect(first.textContent).toContain('12 回')
+    expect(first.textContent).toContain('12回')
     expect(first.textContent).toContain('（既定）')
     const second = view.getByText('秋のキャンペーン').closest('tr') as HTMLElement
     expect(second.textContent).toContain('10/05 公開')

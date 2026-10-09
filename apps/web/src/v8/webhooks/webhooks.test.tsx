@@ -224,7 +224,7 @@ describe('外部連携 V8', () => {
     expect(host.textContent).toContain('失敗 2')
     const row = host.querySelector('tr[data-row-id="wi-1"]')
     expect(row?.textContent).toContain('予約が入った')
-    expect(row?.textContent).toContain('Masato S.・3 回やり直して失敗')
+    expect(row?.textContent).toContain('Masato S.・3回やり直して失敗')
     expect(row?.textContent).toContain('30.0 秒')
   })
 

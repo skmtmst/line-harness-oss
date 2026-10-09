@@ -13,6 +13,10 @@ const key = ({ file, selector }: Candidate) => `${file} ${selector}`
 // B-168: ファイル全体・名前のパターンでは免除しない。該当する規則だけ。
 // 新しい箱はここを足さず、共通の Card / content-card の形を使う。
 const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
+  ["components/shared/combobox.module.css", ".popup", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
+  ["components/shared/date-field.module.css", ".popover", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
+  ["components/shared/date-time-field.module.css", ".popover", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
+  ["components/shared/multi-select.module.css", ".popup", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
   ["app/accounts/new/register-v8.module.css", ".checkList", "設定項目の一覧の外枠。行で区切り、影を重ねない。"],
   ["app/affiliates/create-v8.css", ".af-create-choiceCard", "申込方法の選択肢。内容をまとめるカードではない。"],
   ["app/affiliates/list-v8.css", ".af-list-tableWrap", "一覧表を切り取る枠。表の外側に影を重ねない。"],
@@ -32,14 +36,12 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/hq/account-menu.module.css", ".menu", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/account-switch-menu.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/action-menu.module.css", ".menu", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
-  ["components/shared/bell-popover.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/check-card.module.css", ".card", "複数選択の入力欄。枠は選択状態を示す。"],
   ["components/shared/check-card.module.css", "[data-theme='v8'] .card", "複数選択の入力欄。枠は選択状態を示す。"],
   ["components/shared/command-palette.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/data-table.module.css", "[data-theme='v8'] .frame[data-table-presentation='account-list'], [data-theme='v8'] .frame[data-table-presentation='account-handover']", "アカウント一覧と乗り換えの表の枠。影を重ねない。"],
   ["components/shared/file-drop.module.css", ".zone", "ファイルを落とす入力欄。内容のカードではない。"],
   ["components/shared/file-drop.module.css", ".row", "選んだファイルの入力行。外側の入力欄と影を重ねない。"],
-  ["components/shared/kpi-card.module.css", "[data-theme='v8'] .card[data-kpi-presentation='stacked']", "縦に並ぶ数の帯。内容のカードではない。"],
   ["components/shared/layout-picker.module.css", ".tile", "面の分け方の選択肢。選択枠で区別する。"],
   ["components/shared/line-preview.module.css", ".flat", "LINEに届く内容の見本。管理画面のカードの影は付けない。"],
   ["components/shared/media-slot.module.css", ".frame", "画像を入れる入力欄。内容のカードではない。"],
@@ -50,7 +52,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/radio-card.module.css", "[data-theme='v8'] .card", "一つを選ぶ入力欄。枠は選択状態を示す。"],
   ["components/shared/seat-tile.module.css", ".map", "席を選ぶ入力。枠は選択状態を示す。"],
   ["components/shared/select-menu.module.css", ".surface", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
-  ["components/shared/source-picker-dialog.module.css", ".panel", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/source-picker-dialog.module.css", ".selectedRow", "選ぶ窓の中の仮選択行。入れ子に影を重ねない。"],
   ["components/shared/sticky-bar.module.css", ".bar", "保存の追従帯。V8の帯は別の影を持つ。"],
   ["components/shared/tap-area-editor.module.css", ".frame", "押したら行うことの入れ子の編集欄。影を重ねない。"],
@@ -63,7 +64,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["v8/analytics/analytics.module.css", ".waitBox", "警告・閲覧のみ・状態・待機の帯。線で区別する。"],
   ["v8/friends/compare/compare.module.css", ".panel, .historyCard", "値を決めるカード内の判定欄と履歴の小箱。入れ子に影を重ねない。"],
   ["v8/booking-menus/menu-form.module.css", ".subSection", "カード内の小箱・入れ子・階層の行。影を重ねない。"],
-  ["v8/broadcast-detail/detail.module.css", ".stats", "数の帯。B-153に従い線で区切る。"],
   ["v8/broadcast-detail/detail.module.css", ".linkList", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/broadcast-detail/detail.module.css", ".approval", "警告・閲覧のみ・状態・待機の帯。線で区別する。"],
   ["v8/broadcasts/list.module.css", ".datePopover", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
@@ -163,13 +163,10 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/staff/login-audit.tsx", "className=\"overflow-hidden rounded-card border border-hairline bg-canvas\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
   ["components/staff/login-audit.tsx", "className=\"flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4\"", "数の帯のマス。B-153に従い線で区切る。"],
   ["components/templates/message-template-editor.tsx", "className=\"border-hairline rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
-  ["components/theme-preview-switch.tsx", "className=\"rounded-card border-hairline bg-canvas border p-4\"", "本番切り替え前の旧テーマ用分岐。V8固定環境では出ない。"],
   ["components/webinars/webinar-form.tsx", "className=\"group rounded-card border border-hairline bg-canvas-sunken/60\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["v8/affiliates/attribution-view.tsx", "className=\"bg-canvas border-hairline mt-2 overflow-x-auto rounded-card border\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
-  ["v8/affiliates/dialogs.tsx", "className=\"flex w-full flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay\"", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
   ["v8/automations/branch-editor.tsx", "className=\"border-hairline bg-canvas-sunken mt-3 rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["v8/contents/media-detail-dialog.tsx", "className=\"bg-canvas-sunken rounded-card flex min-h-96 items-center justify-center overflow-hidden border border-hairline\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
-  ["v8/contents/media-upload-dialog.tsx", "className=\"border-hairline max-h-screen w-full max-w-2xl overflow-y-auto rounded-card border bg-canvas shadow-float\"", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
   ["v8/nen-posts/detail.tsx", "className=\"mt-4 rounded-card border border-hairline bg-canvas p-4\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["v8/scenario-detail/detail.tsx", "className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["v8/scenario-detail/detail.tsx", "className=\"border-hairline rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
@@ -219,7 +216,7 @@ describe('B-168 カードの角丸・枠・影', () => {
   })
 
   it('ringのみ・none・別の薄い影・分割した影の取り消しも検出する', () => {
-    for (const shadow of ['var(--tpl-fe-ring)', 'none', 'var(--control-shadow)']) {
+    for (const shadow of ['var(--tpl-fe-ring)', 'none', 'var(--control-shadow)', 'var(--shadow-card)']) {
       expect(cssShapeCandidates(`@media (min-width: 1000px) { .newCard { border-radius: var(--radius-card); border: 1px solid var(--color-hairline); box-shadow: ${shadow}; } }`, tokens)).toEqual(['.newCard'])
     }
     expect(cssShapeCandidates(`.newCard { border-radius: 12px; border: 1px solid var(--color-hairline); box-shadow: var(--card-shadow); } .newCard { box-shadow: none; }`, tokens)).toEqual(['.newCard'])
@@ -227,7 +224,7 @@ describe('B-168 カードの角丸・枠・影', () => {
   })
 
   it('共通の影・その別名・カード以外の角丸・コメントは誤検知しない', () => {
-    for (const shadow of ['var(--card-shadow)', 'var(--shadow-card)', 'var(--tpl-fe-ring), var(--card-shadow)']) {
+    for (const shadow of ['var(--card-shadow)', 'var(--shadow-card-surface)', 'var(--tpl-fe-ring), var(--card-shadow)']) {
       expect(cssShapeCandidates(`.newCard { border-radius: 12px; border: 1px solid var(--card-edge); box-shadow: ${shadow}; }`, tokens)).toEqual([])
     }
     expect(cssShapeCandidates('/* .bad { border-radius:12px; border:1px solid var(--color-hairline); } */ .input { border-radius:8px; box-shadow:var(--tpl-fe-ring); }', tokens)).toEqual([])
@@ -239,13 +236,14 @@ describe('B-168 カードの角丸・枠・影', () => {
       '<section className="rounded-card border border-hairline" />',
       '<section className="rounded-card border-hairline shadow-none" />',
       '<section className="rounded-card border-hairline shadow-field" />',
+      '<section className="rounded-card border-hairline shadow-card" />',
       '<section className={cn("rounded-card", "border-hairline")} />',
       '<section className={`rounded-card border-hairline ${ok ? "shadow-card" : ""}`} />',
       'const shape = "rounded-card border-hairline"; const View = () => <section className={shape} />',
       '<section className="rounded-card border-hairline"><div className="shadow-card" /></section>',
     ]
     for (const source of bad) expect(classShapeCandidates(source, tokens), source).toHaveLength(1)
-    for (const shadow of ['shadow-card', 'content-card']) {
+    for (const shadow of ['shadow-card-surface', 'content-card']) {
       expect(classShapeCandidates(`<section className="rounded-card border-hairline ${shadow}" />`, tokens)).toEqual([])
     }
     expect(classShapeCandidates('<div className="rounded-card"><div className="border-hairline" /></div>', tokens)).toEqual([])

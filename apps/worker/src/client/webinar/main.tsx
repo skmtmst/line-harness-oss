@@ -750,7 +750,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
     const visibleUpcoming = upcoming.slice(0, visibleSessionCount);
     const registered = state.registeredSessionAt ?? null;
     return (
-      <div className="flex min-h-dvh flex-col items-center bg-canvas text-ink">
+      <div className="flex min-h-dvh flex-col bg-canvas text-ink">
         {header}
         <div className="flex w-full flex-col items-center p-6">
         <p className="mb-2 text-sm text-liff-sub">ライブ配信</p>
@@ -800,7 +800,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
   // ---- 待機画面 (スケジュール未設定・開催予定なし) ----
   if (!state.live) {
     return (
-      <div className="flex min-h-dvh flex-col items-center bg-canvas text-ink">
+      <div className="flex min-h-dvh flex-col bg-canvas text-ink">
         {header}
         <div className="flex w-full flex-col items-center p-6">
         <p className="mb-2 text-sm text-liff-sub">次回のライブ配信</p>
@@ -828,7 +828,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
     const visibleUpcoming = upcoming.slice(0, visibleSessionCount);
     const registered = state.registeredSessionAt ?? null;
     return (
-      <div className="flex min-h-dvh flex-col items-center bg-canvas text-ink">
+      <div className="flex min-h-dvh flex-col bg-canvas text-ink">
         {header}
         <div className="flex w-full flex-col items-center p-6">
         <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold">● LIVE</span>

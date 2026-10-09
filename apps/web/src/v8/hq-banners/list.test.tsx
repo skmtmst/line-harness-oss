@@ -117,7 +117,7 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     act(() => { root.render(<HqBannersListV8 />) })
     await flush()
     expect(host.textContent).toContain('今月の残り')
-    expect(host.textContent).toContain('上限 150 枚')
+    expect(host.textContent).toContain('上限 150枚')
     expect(host.textContent).toContain('秋のキャンペーン')
     expect(host.textContent).toContain('3 枚 ・ 09/30 更新')
     expect(host.textContent).toContain('— ・ いま作成中')

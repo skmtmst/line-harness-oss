@@ -185,7 +185,7 @@ describe('V8 シナリオ配信の編集', () => {
     expect(screen.getByText('購読開始から0日後 10:00')).toBeTruthy()
     expect(screen.getByText('1日後 20:00')).toBeTruthy()
     // 選んだ通（先頭）の中身が右のスマホに出る（「配る内容がまだありません」の空の箱にしない）。
-    expect(screen.getByText('選んだ通（1 通目）の見え方')).toBeTruthy()
+    expect(screen.getByText('選んだ通（1通目）の見え方')).toBeTruthy()
     expect(screen.queryByText('配る内容がまだありません')).toBeNull()
     expect(screen.getAllByText('ご登録ありがとうございます。').length).toBeGreaterThan(1)
   })

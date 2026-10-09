@@ -34,6 +34,8 @@ const ALLOWED_SAME_VALUE = [
   '--radius-icon / --radius-mini / --radius-tile-sm',
   // §6: 浮く面と最前面の面は現在同じ影。
   '--shadow-float / --shadow-overlay',
+  // B-148・B-151: カードと主操作は同じ案Aの影を使い、役割ごとの入口を残す。
+  '--shadow-card-surface / --shadow-primary-action',
   // §6: 補足とラベル12、大きな数28。
   '--text-caption / --text-label',
   '--text-hero / --text-metric',

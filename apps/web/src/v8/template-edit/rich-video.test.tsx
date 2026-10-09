@@ -32,7 +32,7 @@ describe('リッチビデオ編集',()=>{
   fireEvent.change(container.querySelector('input[type=file]')!,{target:{files:[new File(['mp4'],'video.mp4',{type:'video/mp4'})]}})
   await waitFor(()=>expect(uploadPreview).toHaveBeenCalledOnce())
   await screen.findByText('プレビュー画像も作りました')
-  fireEvent.click(screen.getByRole('switch',{name:'見終わったあとのボタンを出す'}))
+  fireEvent.click(screen.getByRole('checkbox',{name:'見終わったあとのボタンを出す'}))
   fireEvent.change(screen.getByLabelText('通知に出る文'),{target:{value:'動画のお知らせ'}})
   fireEvent.click(screen.getByRole('button',{name:'保存して配る'}))
   await waitFor(()=>expect(save).toHaveBeenCalledOnce())

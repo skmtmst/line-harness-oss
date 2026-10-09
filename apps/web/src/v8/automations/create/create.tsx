@@ -2747,6 +2747,8 @@ export function NewAutomationV8({
       {/* することの中身を直す窓。種類と「どれを」をここで選ぶ。失敗したら、いまはその場で止まる。 */}
       <Dialog
         open={editingRow !== null}
+        // 入力は親の下書きへ即時反映済み。窓を閉じても捨てない。
+        dirty={false}
         title={editingRow ? `${actions.findIndex((row) => row.key === editingRow.key) + 1}つめのすること` : 'すること'}
         description="上から順に動きます。失敗したときは、いまはここで止まります。"
         designWidth={560}
@@ -2830,6 +2832,8 @@ export function NewAutomationV8({
       {/* だれに：条件の窓。一斉配信・シナリオと同じ条件（標準互換・15軸）。 */}
       <Dialog
         open={conditionOpen}
+        // 条件は親の下書きで保つ。閉じても入力は消えない。
+        dirty={false}
         title="動かす相手"
         description="条件を付けないと、きっかけに当てはまった人全員に動きます。一斉配信やシナリオと同じ条件です。"
         designWidth={720}

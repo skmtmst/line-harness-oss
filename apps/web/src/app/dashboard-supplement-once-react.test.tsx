@@ -201,11 +201,11 @@ describe('補足データは、対応マークの判明で取り直さない（V
   it('アカウントを替えたら、前のアカウントの写真の件数を出さない（DASH-03）', async () => {
     await render()
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 80)) })
-    expect(host.textContent).toContain('確認待ち 3 件')
+    expect(host.textContent).toContain('確認待ち 3件')
 
     fixture.accountId = null
     await act(async () => { root.render(<DashboardPage />) })
     await act(async () => { await Promise.resolve() })
-    expect(host.textContent).not.toContain('確認待ち 3 件')
+    expect(host.textContent).not.toContain('確認待ち 3件')
   })
 })

@@ -834,7 +834,7 @@ export default function SavedSearchEditV8() {
     <div className={styles.side}>
       <div className={styles.sideHead}><h2 className={styles.sideTitle}>当てはまる人</h2></div>
       <p className={styles.count}>
-        {previewCount === null ? <span className={styles.countNum}>—</span> : <span className={styles.countNum}>{polishFormatNumber(previewCount)}</span>}
+        {previewCount === null ? <span className={styles.countNum}>{emptyValue('unknown')}</span> : <span className={styles.countNum}>{polishFormatNumber(previewCount)}</span>}
         <span className={styles.countUnit}>人</span>
       </p>
       {previewError ? <p role="alert" className={styles.errorText}>{previewError}</p> : null}

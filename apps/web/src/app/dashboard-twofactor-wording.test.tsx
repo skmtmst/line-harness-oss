@@ -86,7 +86,7 @@ describe('N-012 ダッシュボードの二段階認証表記', () => {
     await act(async () => { root.render(<DashboardPage />) })
     await act(async () => { await Promise.resolve() })
     // 選択中アカウントの話ではなく、組織全体の話だと行だけで分かる。
-    expect(host.textContent).toContain('組織全体の二段階認証：1 / 2 人')
+    expect(host.textContent).toContain('組織全体の二段階認証：1 / 2人')
     // 有効な利用者2人のうち1人が有効。無効な人は分母に入らない。
     expect(host.textContent).not.toContain('1 / 3人')
   })
