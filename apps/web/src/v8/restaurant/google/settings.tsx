@@ -7,6 +7,8 @@
  */
 import { useState } from 'react'
 import { Link2, RefreshCw } from 'lucide-react'
+import Card from '@/components/shared/card'
+import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
@@ -73,8 +75,8 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
 
   if (connection.status === 'disconnected') {
     return (
-      <section className={styles.card} aria-labelledby="google-connect-title">
-        <h2 id="google-connect-title" className={styles.cardTitle}>Googleアカウントを接続 <StatusBadge tone="neutral">未接続</StatusBadge></h2>
+      <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-connect-title">
+        <SectionHeader size="small" title={<span id="google-connect-title">Googleアカウントを接続 <StatusBadge tone="neutral">未接続</StatusBadge></span>} />
         <p className={styles.preText}>{'店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。'}</p>
         {!data.oauthConfigured ? <Notice tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</Notice> : null}
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
@@ -85,14 +87,14 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         ) : null}
         <p className={styles.grayNote}>初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。接続後は、このLINEアカウントの店舗だけを表示します。</p>
         {manageNote}
-      </section>
+      </Card>
     )
   }
 
   if (connection.status === 'pending_location') {
     return (
-      <section className={styles.card} aria-labelledby="google-location-title">
-        <h2 id="google-location-title" className={styles.cardTitle}>接続する店舗を選ぶ</h2>
+      <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-location-title">
+        <SectionHeader size="small" title={<span id="google-location-title">接続する店舗を選ぶ</span>} />
         <p className={styles.muted}>{`Googleアカウントの認証は完了しています${connection.googleAccountEmail ? `（${connection.googleAccountEmail}）` : ''}`}</p>
         <p className={styles.preText}>{`このLINEアカウント（${data.store.name}）に接続する店舗を1つ選んでください。接続後は、選んだ店舗だけを表示します。`}</p>
         {previousTitle ? (
@@ -132,7 +134,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
           onConfirm={() => void selectLocation(true)}
           onCancel={() => setConfirmSwitch(false)}
         />
-      </section>
+      </Card>
     )
   }
 
@@ -145,8 +147,8 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
       {connection.status === 'expired' ? <Notice tone="danger">Googleとの接続を確認してください。認可が切れています。店舗を管理するGoogleアカウントで再接続してください。保存中の返信の下書きはいま残っていますが、Googleから取得した口コミは最終更新から30日以内に削除するため、再接続しないままだと下書きも一緒に消えます。</Notice> : null}
       {connection.status === 'no_permission' ? <Notice tone="danger">この店舗を操作する権限がありません。接続済み店舗の管理権限をGoogle側で確認してください。</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
-      <section className={styles.card} aria-labelledby="google-account-title">
-        <h2 id="google-account-title" className={styles.cardTitle}>Googleアカウント</h2>
+      <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-account-title">
+        <SectionHeader size="small" title={<span id="google-account-title">Googleアカウント</span>} />
         <dl className={styles.facts}>
           <div className={styles.factRow}><dt className={styles.factKey}>つないでいるアカウント</dt><dd className={styles.factValue}>{connection.googleAccountEmail ?? '—'}</dd></div>
           <div className={styles.factRow}><dt className={styles.factKey}>つないだ日</dt><dd className={styles.factValue}>{formatYmd(connection.connectedAt)}</dd></div>
@@ -158,7 +160,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
             <Button onClick={() => void startConnect()} disabled={busy}><RefreshCw aria-hidden className={styles.icon15} />Googleアカウントを再接続</Button>
           </div>
         ) : manageNote}
-      </section>
+      </Card>
       <p className={styles.grayNote}>接続を解除すると、口コミ・投稿・パフォーマンスの取り込みが止まります。解除の前に確認の小窓が出ます。</p>
       <p className={styles.footCaption}>{`LINEアカウント：${data.store.name}・接続店舗：${connection.locationTitle ?? '—'}・最終同期：${formatStampFull(connection.lastSyncedAt)}`}</p>
       <ConfirmDialog

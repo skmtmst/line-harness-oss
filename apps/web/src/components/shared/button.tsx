@@ -21,7 +21,8 @@ type CommonProps = {
    * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
    * `standard` のままにする。
    */
-  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot'
+  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail'
+  align?: 'start'
   className?: string
   children: ReactNode
 }
@@ -76,9 +77,9 @@ export default function Button(props: ButtonProps) {
   const classes = [styles.button, styles[variant], styles[size], props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, size: _size, variant: _variant, ...linkProps } = props
+    const { children, className: _className, href, size: _size, variant: _variant, align, ...linkProps } = props
     return (
-      <Link href={href} className={classes} {...linkProps}>
+      <Link href={href} className={classes} data-align={align} {...linkProps}>
         {children}
       </Link>
     )
@@ -94,6 +95,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     className: _className,
     variant: _variant,
     size: _size,
+    align,
     href: _href,
     type = 'button',
     busy,
@@ -149,6 +151,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     <button
       type={type}
       className={classes}
+      data-align={align}
       ref={setRefs}
       disabled={disabled || busyNow}
       aria-busy={busyNow ? true : undefined}

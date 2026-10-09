@@ -123,7 +123,7 @@ export type RowMenuProps = {
    * 「…」の大きさ（'box' のときだけ）。'row' は 28角（★V8 i0Ao0R など、行の「その他の操作」が 28 の板）。
    * 省略時は KspUx の 36角（友だち一覧 AOWoJ など 36 の板）。板ごとに絵の大きさを選ぶ。
    */
-  size?: 'row'
+  size?: 'row' | 'small'
   /** 「…」ボタンの大きさなど、画面の絵に合わせる class。 */
   className?: string
   /** 「…」ボタンの title。省略時は label。 */
@@ -176,7 +176,7 @@ export function RowMenu({
   return (
     <>
       {appearance === 'plain' ? (
-        <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} />
+        <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} data-size={size} />
       ) : (
         <IconButton {...common} ref={triggerRef} aria-label={label} title={title ?? label} className={className} size={size} data-row-menu="">
           <MoreHorizontal size={size === 'row' ? 14 : 16} aria-hidden="true" />

@@ -99,15 +99,18 @@ export function DataTable({
   className,
   'data-design': dataDesign,
   presentation,
+  density,
 }: {
   children: ReactNode
   className?: string
   'data-design'?: string
   /** 時間×卓と予約一覧の寸法。指定した表だけに適用する。 */
   presentation?: 'ledger' | 'calendar'
+  /** 連携画面の3種類の行。指定のない表の見た目は変えない。 */
+  density?: 'reviews' | 'media' | 'sample'
 }) {
   return (
-    <div className={[shell.frame, presentation && presentationStyles[presentation], className].filter(Boolean).join(' ')}>
+    <div className={[shell.frame, presentation && presentationStyles[presentation], className].filter(Boolean).join(' ')} data-density={density}>
       <table className={shell.table} data-design={dataDesign}>{children}</table>
     </div>
   )

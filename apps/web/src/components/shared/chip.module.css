@@ -89,3 +89,21 @@
 }
 
 }
+[data-theme='v8'] .chip[data-kind='channel'] {
+  align-items: center;
+  gap: var(--tpl-e1-gap-s);
+  padding: var(--tpl-e1-gap-xxs) var(--tpl-e49-gap-s);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-e1-lh-20);
+}
+[data-theme='v8'] .chip[data-kind='channel']::before {
+  content: '';
+  flex-shrink: 0;
+  width: var(--tpl-e49-gap-s);
+  height: var(--tpl-e49-gap-s);
+  border-radius: var(--radius-pill);
+  background: var(--color-status-info);
+}

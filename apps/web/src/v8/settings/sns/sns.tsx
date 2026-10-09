@@ -12,6 +12,9 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Check, Link2 } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import Card from '@/components/shared/card'
+import Avatar from '@/components/shared/avatar'
+import Chip from '@/components/shared/chip'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -51,13 +54,13 @@ function stamp(iso: string | null | undefined): string {
 
 function GoogleCard({ data, error, canManage }: { data: GoogleConnectionData | null; error: unknown; canManage: boolean }) {
   const router = useRouter()
-  if (error && !data) return <section className={styles.card}><ListState kind="error" error={error} onRetry={() => window.location.reload()} /></section>
-  if (!data) return <section className={styles.card}><ListState kind="loading" /></section>
+  if (error && !data) return <Card appearance="outlined" layout="vertical" padding="spacious" gap="loose" className={styles.card}><ListState kind="error" error={error} onRetry={() => window.location.reload()} /></Card>
+  if (!data) return <Card appearance="outlined" layout="vertical" padding="spacious" gap="loose" className={styles.card}><ListState kind="loading" /></Card>
   const { connection, summary } = data
   const state = GOOGLE_STATE[connection.status] ?? GOOGLE_STATE.disconnected
   const connected = connection.status === 'connected'
   return (
-    <section className={styles.card} aria-labelledby="sns-google">
+    <Card appearance="outlined" layout="vertical" padding="spacious" gap="loose" className={styles.card} aria-labelledby="sns-google">
       <div className={styles.cardHead}>
         <span className={styles.mark} aria-hidden="true">G</span>
         <h2 id="sns-google" className={styles.cardTitle}>Google ビジネス</h2>
@@ -74,7 +77,7 @@ function GoogleCard({ data, error, canManage }: { data: GoogleConnectionData | n
         <dl className={styles.facts}>
           <div className={styles.fact}><dt>店舗</dt><dd>{connection.locationTitle ?? data.store.name}</dd></div>
           <div className={styles.fact}><dt>最終同期</dt><dd>{stamp(connection.lastSyncedAt)}</dd></div>
-          <div className={styles.fact}><dt>口コミ</dt><dd>{`★${connection.averageRating ?? '—'}（${connection.totalReviewCount ?? 0}件）・未返信 ${summary.unrepliedCount}件`}</dd></div>
+          <div className={styles.fact}><dt>口コミ</dt><dd>{`★${connection.averageRating ?? '—'}（${connection.totalReviewCount ?? '—'}件）・未返信 ${summary.unrepliedCount}件`}</dd></div>
           <div className={styles.fact}><dt>投稿</dt><dd>{summary.postsAttentionCount ? `確かめる投稿 ${summary.postsAttentionCount}件` : '確かめる投稿はありません'}</dd></div>
         </dl>
       ) : (
@@ -93,14 +96,14 @@ function GoogleCard({ data, error, canManage }: { data: GoogleConnectionData | n
           <TextLink href="/restaurant-test/google?tab=settings">Google ビジネスの設定を見る</TextLink>
         )}
       </div>
-    </section>
+    </Card>
   )
 }
 
 function InstagramCard({ canManage }: { canManage: boolean }) {
   const [asked, setAsked] = useState(false)
   return (
-    <section className={`${styles.card} ${styles.cardInstagram}`} aria-labelledby="sns-instagram">
+    <Card appearance="outlined" layout="vertical" padding="spacious" gap="normal" className={styles.card} aria-labelledby="sns-instagram">
       <div className={styles.cardHead}>
         <span className={styles.mark} aria-hidden="true">IG</span>
         <h2 id="sns-instagram" className={styles.cardTitle}>Instagram</h2>
@@ -122,7 +125,7 @@ function InstagramCard({ canManage }: { canManage: boolean }) {
       {canManage && asked ? (
         <Notice tone="info" role="status">Instagram とつなぐ機能は、まだ使えません。使えるようになったら、このボタンからつなげます。</Notice>
       ) : null}
-    </section>
+    </Card>
   )
 }
 
@@ -170,9 +173,9 @@ export default function SnsSettingsPage() {
             help="Instagram をつないだあとの受信箱の並び方の見本です。表の中身は例で、実際のメッセージではありません。"
             helpLabel="受信箱での見え方の説明"
           />
-          <DataTable className={styles.table} data-design="sns-inbox-sample">
+          <DataTable density="sample" data-design="sns-inbox-sample">
             <thead>
-              <TableHeadRow className={styles.headRow} data-table-layout="columns">
+              <TableHeadRow data-table-layout="columns">
                 <Th className={styles.colWho}>相手</Th>
                 <Th className={styles.colState}>対応・担当</Th>
                 <Th className={styles.colText}>最新のメッセージ</Th>
@@ -182,16 +185,16 @@ export default function SnsSettingsPage() {
             </thead>
             <tbody>
               {SAMPLE_ROWS.map((row) => (
-                <Tr key={row.who} className={styles.row} data-table-layout="columns">
+                <Tr key={row.who} data-table-layout="columns">
                   <Td className={styles.colWho}>
                     <span className={styles.whoCell}>
-                      <span className={styles.face} aria-hidden="true">{row.face}</span>
+                      <Avatar name={row.face} size={32} />
                       <span className={styles.whoText}><span className={styles.who}>{row.who}</span><span className={styles.whoSub}>{row.sub}</span></span>
                     </span>
                   </Td>
                   <Td className={styles.colState}><span className={styles.stateCell}><StatusBadge tone={row.tone}>{row.state}</StatusBadge><span className={styles.owner}>{row.owner}</span></span></Td>
                   <Td className={styles.colText}><span className={styles.message}>{row.text}</span><span className={styles.owner}>{`今日 ${row.at}`}</span></Td>
-                  <Td className={styles.colRoute}><span className={styles.route}>{row.route}</span></Td>
+                  <Td className={styles.colRoute}><Chip kind="channel">{row.route}</Chip></Td>
                   <Td className={styles.colLast}><span className={styles.last}>{row.last}</span></Td>
                 </Tr>
               ))}

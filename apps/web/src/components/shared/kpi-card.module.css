@@ -311,3 +311,10 @@
 [data-theme='v8'] .card[data-kpi-presentation='band'] .skeleton { height: var(--tpl-band-number-lh); }
 
 [data-theme='v8'] .valueRow[data-unit-spacing='tight'] .value { gap: var(--tpl-kpi-unit-gap-tight); }
+/* SrmVs は帯の各マスを離して並べる。帯の既定の線・隙間0は変えない。 */
+[data-theme='v8'] .strip[data-kpi-presentation='separated'] {
+  display: flex; align-items: stretch; gap: var(--tpl-rt-section-gap); min-width: 0;
+}
+[data-theme='v8'] .strip[data-kpi-presentation='separated'] > * { flex: 1 1 0; min-width: 0; }
+
+[data-theme='v8'] .strip[data-kpi-presentation='separated'] .number { font-size: 28px; line-height: 32px; }
