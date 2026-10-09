@@ -109,3 +109,5 @@
 
 .btnIcon { width: var(--tpl-bks-btn-icon); height: var(--tpl-bks-btn-icon); flex-shrink: 0; }
 .sideButton { width: 100%; }
+
+.checkRow[aria-invalid='true'] { outline: var(--tpl-bks-ring) solid var(--color-danger); }

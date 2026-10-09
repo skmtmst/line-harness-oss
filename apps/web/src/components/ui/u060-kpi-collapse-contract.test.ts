@@ -50,8 +50,9 @@ describe('V8の数の帯とメンバー一覧', () => {
   })
 
   it('メンバー管理は集計カードを重ねず一覧と設定の案内を出す', () => {
-    const page = read('app/hq/members/page.tsx')
-    expect(page).toContain('<HqSettingsNav active="members"')
+    // 入口（app/hq/members/page.tsx）は V8 の画面を出すだけになった（2026-10-09 V7 削除）。V8 の本体を見る。
+    const page = read('v8/hq/members.tsx')
+    expect(page).toContain('<HqSettingsNavV8 active="members"')
     expect(page).toContain('data-design="Table"')
     expect(page).not.toContain('<KpiCard')
   })
@@ -64,7 +65,7 @@ describe('KPI折りたたみの適用（#975 U060）', () => {
     ['app/conversions/page.tsx', 'KpiCollapse'],
     ['app/automations/page.tsx', 'KpiCollapse'],
     ['app/automations/runs/page.tsx', 'KpiCollapse'],
-    ['app/hq/page.tsx', 'KpiCollapse'],
+    // app/hq/page.tsx は V8 のホーム（v8/hq/home.tsx・絵どおりの数の帯）を出すだけになったので外した（2026-10-09 V7 削除）。
     ['app/nen-campaigns/nen-overview.tsx', 'KpiCollapse'],
     ['app/ec-commerce/page.tsx', 'KpiCollapse'],
     ['app/emergency/page.tsx', 'KpiCollapse'],

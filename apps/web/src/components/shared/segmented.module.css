@@ -107,6 +107,8 @@
  * 選択中 700 ink・未選択 500 ink-secondary／つまみ r6・上下 3。
  * 小型（d8X09）と箱型（dtJVi）の合格は変えない。v8 だけ。
  */
+[data-theme='v8'] .root[data-equal-width][data-size='panel'] .item { padding: 4px 12px; }
+.root[data-equal-width] .item { flex: 1; min-width: 0; min-height: 0; }
 [data-theme='v8'] .root[data-size='panel'] { display: flex; padding: 3px; border-radius: var(--radius-segment); }
 [data-theme='v8'] .root[data-size='panel'] .item { padding: 5px 12px; font-size: var(--text-caption); line-height: 17px; }
 [data-theme='v8'] .root[data-size='panel'] .selected { font-weight: 700; }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../v8/hq/home.tsx', import.meta.url), 'utf8')
 
 /**
  * M021：読み込み失敗の文言が一律で、権限不足と分からない。

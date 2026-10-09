@@ -9,7 +9,8 @@ const MERGED = readFileSync(join(HERE, 'merged-tabs.tsx'), 'utf8')
 const SRC = join(HERE, '..', '..')
 const NEN_MEMBERS = readFileSync(join(SRC, 'app', 'nen', 'members', 'page.tsx'), 'utf8')
 const NEN_HEALTH = readFileSync(join(SRC, 'app', 'nen', 'health', 'page.tsx'), 'utf8')
-const HQ_MEMBERS = readFileSync(join(SRC, 'app', 'hq', 'members', 'page.tsx'), 'utf8')
+// 入口は V8 の画面を出すだけになった（2026-10-09 V7 削除）。V8 の本体を見る。
+const HQ_MEMBERS = readFileSync(join(SRC, 'v8', 'hq', 'members.tsx'), 'utf8')
 const HQ_NAV = readFileSync(join(SRC, 'app', 'hq', 'hq-settings-nav-v8.tsx'), 'utf8')
 const HQ_NAV_CSS = readFileSync(join(SRC, 'app', 'hq', 'hq-settings-nav-v8.css'), 'utf8')
 
@@ -61,7 +62,7 @@ describe('右に隠れたタブへ届く（#975 U091）', () => {
   })
 
   it('V8のメンバー管理は縦の設定メニューから各画面へ進む', () => {
-    expect(HQ_MEMBERS).toContain('<HqSettingsNav active="members"')
+    expect(HQ_MEMBERS).toContain('<HqSettingsNavV8 active="members"')
     expect(HQ_NAV).toContain('aria-label="統括の設定"')
     expect(HQ_NAV).toContain("aria-current={key === active ? 'page' : undefined}")
     expect(HQ_NAV_CSS).toMatch(/\.hq-settings-nav__list\s*\{[^}]*flex-direction:\s*column/s)

@@ -51,13 +51,6 @@ test('failed reference lookup preserves typed title and body on retry', async ()
   await waitFor(()=>expect(screen.queryByRole('alert')).toBeNull())
   expect(captured.card!.body).toBe('入力を残す')
 })
-test('V7 keeps the existing editor and does not load new references', () => {
-  vi.mocked(hqTemplatesApi.messageReferences).mockResolvedValue([])
-  render(<Harness />)
-  expect(screen.getByText('LINEプレビュー')).toBeTruthy()
-  expect(screen.queryByLabelText('ひな形のタイトル')).toBeNull()
-  expect(hqTemplatesApi.messageReferences).not.toHaveBeenCalled()
-})
 test('V8 retains the existing image and carousel authoring entry', () => {
   document.documentElement.dataset.theme='v8'
   vi.mocked(hqTemplatesApi.messageReferences).mockResolvedValue([])

@@ -163,15 +163,7 @@ shared-button-importer app/getting-started/page.tsx
 shared-button-importer app/health/page.tsx
 shared-button-importer app/hq/account-browser-v8.tsx
 shared-button-importer app/hq/account-settings-dialogs.tsx
-shared-button-importer app/hq/banners/project/page.tsx
-shared-button-importer app/hq/billing/page.tsx
-shared-button-importer app/hq/members/page.tsx
 shared-button-importer app/hq/open/page.tsx
-shared-button-importer app/hq/page.tsx
-shared-button-importer app/hq/settings/page.tsx
-shared-button-importer app/hq/support/detail/page.tsx
-shared-button-importer app/hq/support/page.tsx
-shared-button-importer app/hq/templates/template-console.tsx
 shared-button-importer app/hq/templates/template-message-v8.tsx
 shared-button-importer app/inflow-links/_components/edit-route-modal.tsx
 shared-button-importer app/inflow-links/ad-integration-v8.tsx

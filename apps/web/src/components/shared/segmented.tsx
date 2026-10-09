@@ -20,6 +20,7 @@ export default function SegmentedControl<T extends string>({
   size = 'medium',
   disabled = false,
   appearance = 'track',
+  equalWidth = false,
 }: {
   options: { value: T; label: string }[]
   value: T
@@ -40,6 +41,8 @@ export default function SegmentedControl<T extends string>({
   disabled?: boolean
   /** 電話予約の探し方（rm92Y）：各項目が独立した丸い選択肢。 */
   appearance?: 'track' | 'choices'
+  /** 選択肢を器の幅へ均等に並べる（統括の生成枚数）。 */
+  equalWidth?: boolean
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -77,6 +80,7 @@ export default function SegmentedControl<T extends string>({
       className={[styles.root, className].filter(Boolean).join(' ')}
       data-size={size}
       data-appearance={appearance}
+      data-equal-width={equalWidth || undefined}
       onKeyDown={onKeyDown}
     >
       {appearance === 'track' ? <span

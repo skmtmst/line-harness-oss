@@ -7,7 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const SRC = join(HERE, '..', '..')
 const HQ_LIST = readFileSync(join(SRC, 'components', 'hq', 'account-list.tsx'), 'utf8')
 const ACCOUNTS = readFileSync(join(SRC, 'app', 'accounts', 'page.tsx'), 'utf8')
-const MEMBERS = readFileSync(join(HERE, 'members', 'page.tsx'), 'utf8')
+const MEMBERS = readFileSync(join(SRC, 'v8', 'hq', 'members.tsx'), 'utf8')
 
 /*
  * #975 U042: 統括（/hq）・アカウント一覧（/accounts）・権限者
@@ -35,12 +35,11 @@ describe('行操作を見える位置へ（#975 U042）', () => {
     expect(ACCOUNTS).toContain('/accounts/detail?id=')
   })
 
-  it('権限者一覧はスマホでカードになり、権限変更・再送が行内にある', () => {
-    // カードは「Table」の節の狭い画面向けの出し方。
-    expect(MEMBERS).toContain('data-design="Table"')
-    expect(MEMBERS).toContain('hidden md:block')
-    expect(MEMBERS).toContain('権限を変更')
-    expect(MEMBERS).toContain('招待メールを再送')
-    expect(MEMBERS).toContain('setDialog({ open: true, member })')
+  it('権限者の変更・再送は各行にあり、操作権限がある人だけに出す', () => {
+    expect(MEMBERS).toContain('role="table"')
+    expect(MEMBERS).toContain('onClick={() => openChange(member)}')
+    expect(MEMBERS).toContain('canManage && canResendInvite(member)')
+    expect(MEMBERS).toContain('onClick={() => void resend(member)}')
+    expect(MEMBERS).toContain('aria-label={`${member.name}さんの権限を変更`}')
   })
 })
