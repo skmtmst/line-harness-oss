@@ -116,6 +116,7 @@ export function DataTable({
   label,
   columnLayout,
   'aria-label': ariaLabel,
+  grid,
 }: {
   children: ReactNode
   className?: string
@@ -130,11 +131,13 @@ export function DataTable({
   'aria-label'?: string
   /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
   columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string }
+  /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
+  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string }
 }) {
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <div className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} style={columns || columnLayout ? ({
+    <div className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
       ...(columns ? { '--table-columns': columns } : {}),
       ...(columnLayout ? {
         '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
@@ -146,7 +149,12 @@ export function DataTable({
         '--table-body-text-size': columnLayout.bodyTextSize ?? 'var(--text-label)',
       } : {}),
     } as CSSProperties) : undefined}>
-      <table className={shell.table} data-design={dataDesign} aria-label={label ?? ariaLabel}>{children}</table>
+      <table className={shell.table} data-design={dataDesign} aria-label={label ?? ariaLabel} style={grid ? {
+        '--table-columns': grid.columns,
+        '--table-compact-columns': grid.compactColumns ?? grid.columns,
+        '--table-row-padding': grid.padding,
+        '--table-head-padding': grid.headPadding,
+      } as CSSProperties : undefined}>{children}</table>
     </div>
   )
 }

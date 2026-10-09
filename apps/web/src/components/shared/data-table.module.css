@@ -355,3 +355,56 @@
 [data-theme='v8'] .frame[data-column-layout] .table tr[data-table-layout='columns'] > [data-cell-align='right'] {
   padding-right: var(--table-number-inset); text-align: right;
 }
+
+/* 指定された列組みだけに適用。通常の一覧表の寸法は変えない。 */
+[data-theme='v8'] .frame[data-grid-table] {
+  container-type: inline-size;
+  container-name: shared-grid-table;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+[data-theme='v8'] .frame[data-grid-table] .table { display: block; }
+[data-theme='v8'] .frame[data-grid-table] .table :is(thead, tbody) { display: block; }
+[data-theme='v8'] .frame[data-grid-table] .table tr {
+  display: grid;
+  grid-template-columns: var(--table-columns);
+  align-items: center;
+  column-gap: var(--tpl-sb-ec-gap);
+  height: auto;
+  border: 0;
+  padding: var(--table-row-padding);
+  box-shadow: var(--tpl-sb-line-top);
+  font-size: var(--tpl-sb-tbl-head);
+  line-height: var(--tpl-sb-ec-lh);
+}
+[data-theme='v8'] .frame[data-grid-table] .table thead tr {
+  padding: var(--table-head-padding);
+  background: var(--color-surface-pearl);
+  box-shadow: none;
+}
+[data-theme='v8'] .frame[data-grid-table] .table :is(th, td) {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  color: var(--color-ink-secondary);
+  font-size: inherit;
+  line-height: inherit;
+}
+[data-theme='v8'] .frame[data-grid-table] .table th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/* 狭い板では同じ列を保ちながら、指定された比率で収める。 */
+@container shared-grid-table (max-width: 800px) {
+  [data-theme='v8'] .frame[data-grid-table] .table tr {
+    grid-template-columns: var(--table-compact-columns);
+  }
+}

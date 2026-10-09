@@ -21,6 +21,12 @@ import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
+import { DetailColumns } from '@/components/templates/detail-columns'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { Field as FormField } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import FormSection from '@/components/shared/form-section'
+import ListState from '@/components/shared/list-state'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
@@ -72,6 +78,9 @@ function OperatorEditInner() {
   const [eventType, setEventType] = useState(DEFAULT_EVENT_TYPE)
   const [threshold, setThreshold] = useState('one')
   const [importance, setImportance] = useState('normal')
+  const nameRef = useRef<HTMLInputElement>(null)
+  const [nameError, setNameError] = useState('')
+  const [recipientsFieldError, setRecipientsFieldError] = useState('')
   const [name, setName] = useState('新しい予約が入りました')
   const [loadedName, setLoadedName] = useState<string | null>(null)
   const [recipients, setRecipients] = useState<OperatorRecipientPreview | null>(null)
@@ -83,6 +92,7 @@ function OperatorEditInner() {
   const [teamBusy, setTeamBusy] = useState(false)
   /* 絵に無い「チームを作る」は、受け取るスタッフの箱の右上から開く（足りないときだけ出す）。 */
   const [teamFormOpen, setTeamFormOpen] = useState(false)
+  const [previewExpanded, setPreviewExpanded] = useState(false)
   const teamGeneration = useRef(0)
   /*
    * 作るときはチームがあれば最初のチームを選んでおく（絵 gjUz3：送り先「チーム」・チーム「〇〇（3人）」）。
@@ -288,19 +298,29 @@ function OperatorEditInner() {
       return null
     }
     if (!name.trim()) {
-      setError('お知らせの名前を入力してください。')
+      setError('')
+      setNameError('お知らせの名前を入力してください。')
+      nameRef.current?.focus()
+      nameRef.current?.scrollIntoView?.({ block: 'center' })
       return null
     }
     if (recipientIds.length === 0) {
       if (recipients !== null && recipients.items.length === 0) {
         setError('受け取る人がいません。先にログインユーザーでスタッフ登録とLINE連携を済ませてください。')
       } else {
-        setError(recipientsError !== null
-          ? RECIPIENTS_SAVE_GUARD_MESSAGE
-          : '受け取るスタッフを1人以上選んでください。')
+        if (recipientsError !== null) setError(RECIPIENTS_SAVE_GUARD_MESSAGE)
+        else {
+          setError('')
+          setRecipientsFieldError('受け取るスタッフを1人以上選んでください。')
+          const field = document.getElementById('operator-recipient-team')
+          field?.focus()
+          field?.scrollIntoView?.({ block: 'center' })
+        }
       }
       return null
     }
+    setNameError('')
+    setRecipientsFieldError('')
     setSaving(true)
     setError('')
     try {
@@ -418,11 +438,8 @@ function OperatorEditInner() {
   const teamOptions = [{ value: '', label: 'スタッフを選ぶ' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length}人）` }))]
 
   return (
-    <div data-design-node={editId ? 'hiBO8' : 'gjUz3'} className={styles.board}>
-      <div className={styles.head}>
-        <h1 className={styles.headTitle} title={title}>{title}</h1>
-        <p className={styles.headDescription}>{description}</p>
-      </div>
+    <PageFrame kind="settings" boardId={editId ? 'hiBO8' : 'gjUz3'}>
+      <PageHeading title={title} description={description} />
 
       <div className={styles.body}>
         <SettingsInnerNav inline />
@@ -433,24 +450,58 @@ function OperatorEditInner() {
               <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
             </div>
           )}
-          <div className={styles.split}>
-            <div className={styles.main}>
-              <section className={styles.card} aria-labelledby="operator-when-heading">
-                <div className={styles.cardHead}>
-                  <h2 id="operator-when-heading" className={styles.cardTitle}>どんなときに知らせるか</h2>
+          <DetailColumns
+            presentation="notification"
+            asideLabel="公開前の案内を開閉する"
+            expanded={previewExpanded}
+            onExpandedChange={setPreviewExpanded}
+            aside={<>
+              <FormSection id="operator-preview-heading" title="お店の人にはこう届きます" description="文面はここで確かめられます">
+                <div className={styles.previewBack}>
+                  <div className={styles.previewBubble}>
+                    <p className={styles.previewName}>【{importanceLabel(importance)}】{name.trim() || 'お知らせ名'}</p>
+                    <p className={styles.previewBody}>
+                      {eventLabel(eventType)}・{dedupeMinutes === '0' ? 'その都度知らせる' : `${dedupeMinutes}分のあいだは1回だけ`}
+                    </p>
+                    <p className={styles.previewBody}>{`${eventPlaceLabel(eventType)}で見る ›`}</p>
+                  </div>
                 </div>
-                <div className={styles.nameField}>
-                  <label htmlFor="operator-name" className={styles.nameLabel}>お知らせの名前</label>
-                  <input
+                {canWrite ? (
+                  <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => void testSend()} disabled={saveDisabled}>
+                    <Send size={15} aria-hidden="true" />自分にテストを送る
+                  </Button>
+                ) : null}
+              </FormSection>
+
+              <FormSection id="operator-care-heading" title="気をつけること">
+                <ul className={styles.careList}>
+                  <li>・受け取る人が0人だと公開できません</li>
+                  <li>・下書きを保存しても通知は始まりません</li>
+                  <li>・担当が決まっていないと届きません</li>
+                </ul>
+              </FormSection>
+
+              <FormSection id="operator-links-heading" title="つながる先">
+                <p className={styles.linkRow}>
+                  <Link href="/chats" className={styles.linkItem}>→ 受信箱</Link>
+                  <Link href="/staff" className={styles.linkItem}>→ ログインユーザー</Link>
+                  <Link href="/line-notifications" className={styles.linkItem}>→ 顧客へのお知らせ</Link>
+                </p>
+              </FormSection>
+            </>}
+          >
+              <FormSection id="operator-when-heading" title="どんなときに知らせるか">
+                <FormField htmlFor="operator-name" label="お知らせの名前" error={nameError}>
+                  <TextField
+                    ref={nameRef}
                     id="operator-name"
                     value={name}
-                    onChange={(event) => setName(event.target.value)}
+                    onChange={(event) => { setName(event.target.value); setNameError('') }}
                     placeholder="新しい予約が入りました"
                     maxLength={80}
                     readOnly={!canWrite}
-                    className={styles.input}
                   />
-                </div>
+                </FormField>
                 <div className={styles.pair}>
                   <Field id="operator-event" label="きっかけ" value={eventType} onChange={setEventType} options={[...EVENT_OPTIONS]} readOnly={!canWrite} />
                   <Field id="operator-importance" label="重要度" value={importance} onChange={setImportance} options={IMPORTANCE_OPTIONS} readOnly={!canWrite} />
@@ -459,24 +510,22 @@ function OperatorEditInner() {
                   <Field id="operator-threshold" label="どれくらいたまったら" value={threshold} onChange={setThreshold} options={THRESHOLD_OPTIONS} readOnly={!canWrite} />
                   <Field id="operator-dedupe" label="同じ知らせを重ねない" value={dedupeMinutes} onChange={setDedupeMinutes} options={DEDUPE_OPTIONS} readOnly={!canWrite} />
                 </div>
-              </section>
+              </FormSection>
 
-              <section className={styles.card} aria-labelledby="operator-who-heading">
-                <div className={styles.cardHead}>
-                  <h2 id="operator-who-heading" className={styles.cardTitle}>だれが受け取るか</h2>
-                  <p className={styles.cardNote}>LINEログイン済みの人にだけ届きます。お客様の連絡先は宛先に入りません。</p>
-                </div>
+              <FormSection id="operator-who-heading" title="だれが受け取るか" description="LINEログイン済みの人にだけ届きます。お客様の連絡先は宛先に入りません。">
                 <div className={styles.pair}>
                   <Field id="operator-recipient-kind" label="送り先" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'チーム' }]} readOnly={!canWrite} />
                   <Field
                     id="operator-recipient-team"
                     label="チーム"
+                    error={recipientsFieldError}
                     value={teamId}
                     readOnly={!canWrite}
                     onChange={(value) => {
                       teamTouchedRef.current = true
                       teamIdRef.current = value
                       setTeamId(value)
+                      setRecipientsFieldError('')
                       const team = teams.find(item => item.id === value)
                       if (team) { setRecipientIds(team.staffIds); setTeamName(team.name) }
                       else setTeamName('')
@@ -519,6 +568,7 @@ function OperatorEditInner() {
                                   teamTouchedRef.current = true
                                   teamIdRef.current = ''
                                   setTeamId('')
+                                  setRecipientsFieldError('')
                                   setRecipientIds((current) => checked
                                     ? [...current, recipient.id]
                                     : current.filter((id) => id !== recipient.id))
@@ -549,7 +599,7 @@ function OperatorEditInner() {
                           )}
                         </div>
                       )
-                      : <p className={styles.cardNote}>受け取る人を読み込んでいます…</p>}
+                      : <ListState kind="loading" title="受け取る人を読み込んでいます…" />}
                   {items.length > 0 ? (
                     <>
                       <p className={styles.staffSummary}>
@@ -560,7 +610,7 @@ function OperatorEditInner() {
                   ) : null}
                   {canWrite && teamFormOpen ? (
                     <div className={styles.teamForm}>
-                      <input aria-label="チーム名" placeholder="チーム名" value={teamName} maxLength={100} disabled={teamBusy} onChange={event => setTeamName(event.target.value)} className={styles.input} />
+                      <TextField aria-label="チーム名" placeholder="チーム名" value={teamName} maxLength={100} disabled={teamBusy} onChange={event => setTeamName(event.target.value)} />
                       <Button variant="secondary" disabled={teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
                     </div>
                   ) : null}
@@ -584,65 +634,16 @@ function OperatorEditInner() {
                   <p className={styles.cardNote}>{`手が空いている人だけに送る：${onlyAvailable ? 'する' : 'しない'}`}</p>
                   <p className={styles.cardNote}>{`だれも受け取れないときはメールでも送る：${emailFallback ? 'する' : 'しない'}`}</p>
                 </>}
-              </section>
+              </FormSection>
 
-              <section className={styles.card} aria-labelledby="operator-when-send-heading">
-                <div className={styles.cardHead}>
-                  <h2 id="operator-when-send-heading" className={styles.cardTitle}>いつ送るか・重ならないか</h2>
-                </div>
+              <FormSection id="operator-when-send-heading" title="いつ送るか・重ならないか">
                 <Field id="operator-schedule" label="送る時間" value={schedule} onChange={setSchedule} options={SCHEDULE_OPTIONS} readOnly={!canWrite} />
                 <p className={styles.cardNote}>営業時間外のものは翌朝 10:00 にまとめて送ります。</p>
-              </section>
+              </FormSection>
 
               {error ? <p className={styles.formError} role="alert">{error}</p> : null}
               {notice ? <p className={styles.formNotice} role="status">{notice}</p> : null}
-            </div>
-
-            <aside className={styles.side} aria-label="公開前の案内">
-              <section className={styles.card} aria-labelledby="operator-preview-heading">
-                <div className={styles.cardHead}>
-                  <h2 id="operator-preview-heading" className={styles.cardTitle}>お店の人にはこう届きます</h2>
-                  <p className={styles.cardNote}>文面はここで確かめられます</p>
-                </div>
-                <div className={styles.previewBack}>
-                  <div className={styles.previewBubble}>
-                    <p className={styles.previewName}>【{importanceLabel(importance)}】{name.trim() || 'お知らせ名'}</p>
-                    <p className={styles.previewBody}>
-                      {eventLabel(eventType)}・{dedupeMinutes === '0' ? 'その都度知らせる' : `${dedupeMinutes}分のあいだは1回だけ`}
-                    </p>
-                    <p className={styles.previewBody}>{`${eventPlaceLabel(eventType)}で見る ›`}</p>
-                  </div>
-                </div>
-                {canWrite ? (
-                  <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => void testSend()} disabled={saveDisabled}>
-                    <Send size={15} aria-hidden="true" />自分にテストを送る
-                  </Button>
-                ) : null}
-              </section>
-
-              <section className={styles.card} aria-labelledby="operator-care-heading">
-                <div className={styles.cardHead}>
-                  <h2 id="operator-care-heading" className={styles.cardTitle}>気をつけること</h2>
-                </div>
-                <ul className={styles.careList}>
-                  <li>・受け取る人が0人だと公開できません</li>
-                  <li>・下書きを保存しても通知は始まりません</li>
-                  <li>・担当が決まっていないと届きません</li>
-                </ul>
-              </section>
-
-              <section className={styles.card} aria-labelledby="operator-links-heading">
-                <div className={styles.cardHead}>
-                  <h2 id="operator-links-heading" className={styles.cardTitle}>つながる先</h2>
-                </div>
-                <p className={styles.linkRow}>
-                  <Link href="/chats" className={styles.linkItem}>→ 受信箱</Link>
-                  <Link href="/staff" className={styles.linkItem}>→ ログインユーザー</Link>
-                  <Link href="/line-notifications" className={styles.linkItem}>→ 顧客へのお知らせ</Link>
-                </p>
-              </section>
-            </aside>
-          </div>
+          </DetailColumns>
 
           <StickyBar
             actions={(
@@ -725,7 +726,7 @@ function OperatorEditInner() {
       </Dialog>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したお知らせ" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </PageFrame>
   )
 }
 
@@ -737,22 +738,22 @@ function recipientRole(recipient: OperatorRecipientPreview['items'][number], sta
 
 /** 題（12px・太字）＋選ぶ欄。2つ並べるときは .pair に入れる。 */
 /** 選ぶ欄。閲覧のみ（readOnly）は選ぶ部品を置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */
-function Field({ id, label, value, onChange, options, readOnly = false }: {
+function Field({ id, label, value, onChange, options, readOnly = false, error }: {
   id: string
   label: string
   value: string
   onChange: (value: string) => void
   options: { value: string; label: string }[]
   readOnly?: boolean
+  error?: string
 }) {
   const shown = options.find((option) => option.value === value)?.label ?? value
   return (
-    <div className={styles.field}>
-      <label htmlFor={id} className={styles.fieldLabel}>{label}</label>
+    <FormField htmlFor={id} label={label} size="compact" error={error} fill>
       {readOnly
-        ? <input id={id} aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} className={styles.input} />
-        : <Select aria-label={label} id={id} size="full" value={value} onChange={onChange} options={options} />}
-    </div>
+        ? <TextField id={id} aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} />
+        : <Select aria-label={label} id={id} size="full" invalid={!!error} value={value} onChange={onChange} options={options} />}
+    </FormField>
   )
 }
 

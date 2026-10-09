@@ -3,56 +3,8 @@
  * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-sb-*）。
  */
 
-.tabs {
-  display: flex;
-  gap: var(--tpl-sb-tab-gap);
-  box-shadow: var(--tpl-sb-line-bottom);
-}
-
-.tab {
-  padding-bottom: var(--tpl-sb-tab-pad-bottom);
-  border-bottom: var(--tpl-sb-tab-line) solid transparent;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-sb-band-text);
-  font-weight: 500;
-  line-height: var(--tpl-sb-row-name-lh);
-  white-space: nowrap;
-}
-
-.tab[aria-current='page'] {
-  border-bottom-color: var(--color-ink);
-  color: var(--color-ink);
-  font-weight: 600;
-}
-
-.tab:focus-visible {
-  outline: var(--tpl-sb-focus-ring);
-}
-
 .kpis {
   gap: var(--tpl-sb-group-gap);
-}
-
-:global([data-theme='v8']) .kpis > [data-design-version] {
-  gap: var(--tpl-sb-kpi-gap);
-  padding: var(--tpl-sb-kpi-pad);
-}
-
-:global([data-theme='v8']) .kpis > [data-design-version] > :first-child,
-:global([data-theme='v8']) .kpis > [data-design-version] > :first-child > p,
-:global([data-theme='v8']) .kpis > [data-design-version] > :last-child {
-  min-height: 0;
-  font-size: var(--tpl-sb-row-sub);
-  line-height: var(--tpl-sb-row-sub-lh);
-}
-
-:global([data-theme='v8']) .kpis > [data-design-version] > :first-child > p {
-  font-weight: 600;
-}
-
-:global([data-theme='v8']) .kpis [data-kpi-number] {
-  font-size: var(--tpl-sb-kpi-num);
-  line-height: var(--tpl-sb-kpi-num-lh);
 }
 
 .minor {
@@ -79,7 +31,6 @@
   gap: var(--tpl-sb-ctl-gap);
 }
 
-.infoBand,
 .viewerBand {
   display: flex;
   align-items: center;
@@ -92,8 +43,6 @@
   line-height: var(--tpl-sb-band-lh);
 }
 
-.infoBand { background: var(--color-status-info-soft); }
-.infoBand .bandIcon { color: var(--color-action); }
 .viewerBand { background: var(--color-shell); }
 
 .bandIcon {
@@ -116,29 +65,6 @@
   outline: 1px solid var(--color-hairline);
 }
 
-.row {
-  display: grid;
-  grid-template-columns:
-    minmax(0, 1fr) var(--tpl-sb-ln-col-when) var(--tpl-sb-ln-col-who) var(--tpl-sb-ln-col-count)
-    var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) var(--tpl-sb-ln-col-edit);
-  align-items: center;
-  column-gap: var(--tpl-sb-ec-gap);
-  padding: var(--tpl-sb-ec-row-pad);
-  box-shadow: var(--tpl-sb-line-top);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-sb-tbl-head);
-  line-height: var(--tpl-sb-ec-lh);
-}
-
-.headRow {
-  padding: var(--tpl-sb-ec-head-pad);
-  background: var(--color-surface-pearl);
-  box-shadow: none;
-  font-size: var(--tpl-sb-row-sub);
-  font-weight: 600;
-  line-height: var(--tpl-sb-row-sub-lh);
-}
-
 .cell {
   min-width: 0;
   overflow: hidden;
@@ -159,6 +85,7 @@
 }
 
 .num {
+  display: block;
   padding-right: var(--tpl-sb-tbl-gap);
   text-align: right;
   white-space: nowrap;
@@ -173,29 +100,6 @@
   color: var(--color-ink-faint);
   font-weight: 600;
 }
-
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-sb-chip-gap);
-  padding: var(--tpl-sb-pill-pad-sm);
-  border-radius: var(--radius-pill);
-  font-size: var(--tpl-sb-chip-text);
-  font-weight: 600;
-  line-height: var(--tpl-sb-chip-lh);
-  white-space: nowrap;
-}
-
-.dot {
-  width: var(--tpl-sb-dot);
-  height: var(--tpl-sb-dot);
-  border-radius: var(--tpl-sb-dot-radius);
-  background: currentColor;
-}
-
-.status[data-tone='good'] { background: var(--color-accent-soft); color: var(--color-success); }
-.status[data-tone='muted'] { background: var(--color-shell); color: var(--color-ink-secondary); }
-.status[data-tone='warn'] { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
 
 .actions {
   display: flex;
@@ -260,31 +164,6 @@
   gap: var(--tpl-sb-group-gap);
 }
 
-:global([data-theme='v8']) .opKpis > [data-design-version] {
-  gap: var(--tpl-rest3-op-kpi-gap);
-  padding: var(--tpl-rest3-op-kpi-pad);
-}
-
-:global([data-theme='v8']) .opKpis > [data-design-version] > :first-child,
-:global([data-theme='v8']) .opKpis > [data-design-version] > :first-child > p {
-  font-size: var(--tpl-rest3-op-kpi-title);
-  line-height: var(--tpl-rest3-op-kpi-title-lh);
-}
-
-:global([data-theme='v8']) .opKpis > [data-design-version] > :last-child {
-  font-size: var(--tpl-rest3-op-kpi-title);
-  line-height: var(--tpl-rest3-op-kpi-title-lh);
-}
-
-:global([data-theme='v8']) .opKpis [data-kpi-number] {
-  font-size: var(--tpl-rest3-op-kpi-num);
-  line-height: var(--tpl-rest3-op-kpi-num-lh);
-}
-
-.opBand {
-  padding: var(--tpl-rest3-op-band-pad);
-}
-
 .opSearch {
   width: var(--tpl-rest3-op-search-w);
   max-width: 100%;
@@ -299,25 +178,10 @@
   max-width: 100%;
 }
 
-.opRow {
-  display: grid;
-  grid-template-columns: var(--tpl-rest3-op-cols);
-  align-items: center;
-  column-gap: var(--tpl-sb-ec-gap);
-  padding: var(--tpl-rest3-op-row-pad);
-  box-shadow: var(--tpl-sb-line-top);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-sb-tbl-head);
-  line-height: var(--tpl-sb-ec-lh);
-}
-
-.opRow.headRow {
-  padding: var(--tpl-rest3-op-head-pad);
-}
-
 .opName {
   display: flex;
   flex-direction: column;
+  gap: var(--tpl-sb-row-sub-gap);
   min-width: 0;
 }
 
@@ -343,6 +207,7 @@
 }
 
 .opNum {
+  display: block;
   padding-right: var(--tpl-rest3-op-num-pad);
   text-align: right;
   white-space: nowrap;
@@ -353,8 +218,6 @@
   align-items: center;
   gap: var(--tpl-sb-ctl-gap);
 }
-
-.status[data-tone='danger'] { background: var(--color-status-danger-soft); color: var(--color-danger); }
 
 /*
  * 送れなかったもの（DrwMm）・記録（PZBVb）：探す 300・対象 150・期間 136。
@@ -383,24 +246,10 @@
   flex: 1;
 }
 
-.runRow {
-  display: grid;
-  grid-template-columns: var(--tpl-rest3-run-cols);
-  align-items: center;
-  column-gap: var(--tpl-sb-ec-gap);
-  padding: var(--tpl-rest3-run-row-pad);
-  box-shadow: var(--tpl-sb-line-top);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-sb-tbl-head);
-  line-height: var(--tpl-sb-ec-lh);
-}
-
-.runRow.headRow {
-  padding: var(--tpl-rest3-op-head-pad);
-}
-
 .runWhen {
   align-self: start;
+  color: var(--color-ink);
+  font-weight: 600;
 }
 
 .runWho {
@@ -416,7 +265,7 @@
   background: none;
   color: var(--color-ink);
   font: inherit;
-  font-weight: 600;
+  font-weight: 400;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -453,9 +302,7 @@
   min-width: 0;
 }
 
-.opRow.headRow > span,
-.runRow.headRow > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+@container shared-grid-table (max-width: 800px) {
+  .opSchedule { display: none; }
+  .name, .opNameLink { display: block; white-space: nowrap; text-overflow: ellipsis; }
 }

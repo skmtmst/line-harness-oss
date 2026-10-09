@@ -79,6 +79,8 @@ export type KpiCardProps = {
   density?: 'compact' | 'comfortable' | 'record' | 'mini'
   /** 小さい数値の設定カード（22/26）。 */
   metricSize?: 'small'
+  /** LINE通知の板の数カード。既定のカードの寸法は保つ。 */
+  appearance?: 'notification-customer' | 'notification-operator'
   className?: string
   hidden?: boolean
   id?: string
@@ -124,6 +126,7 @@ export default function KpiCard({
   variant = 'v6',
   presentation = 'card',
   density = 'comfortable',
+  appearance,
   className,
   metricSize,
   valueTone = 'default',
@@ -156,6 +159,7 @@ export default function KpiCard({
       data-kpi-presentation={presentation}
       data-kpi-density={density}
       data-kpi-metric-size={metricSize}
+      data-kpi-appearance={appearance}
       aria-busy={loading || undefined}
       data-design-version={variant}
       {...cardProps}

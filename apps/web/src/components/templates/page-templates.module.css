@@ -239,12 +239,16 @@
 .detailColumns[data-detail-columns='restaurant-tables'] { grid-template-columns: minmax(0, 1fr) var(--tpl-rs-table-detail-w); }
 .detailColumns[data-detail-columns^='restaurant-'] .detailColumnMain { gap: var(--tpl-rs-body-gap); }
 .detailColumns[data-detail-columns^='restaurant-'] .detailColumnAside { padding-left: 0; border-left: 0; }
+.detailColumns[data-presentation='notification'] { grid-template-columns: minmax(0, 1fr) var(--tpl-hb2-op-side-w); gap: var(--tpl-hb2-op-gap); margin-right: 0; }
+.detailColumns[data-presentation='notification'] .detailColumnMain { gap: var(--tpl-hb2-op-col-gap); }
+.detailColumns[data-presentation='notification'] .detailColumnAside { display: flex; flex-direction: column; gap: var(--tpl-hb2-op-col-gap); padding-left: 0; border-left: 0; }
 @container v8-page (max-width: 1099px) {
   .detailColumns, .detailColumns[data-detail-columns^='restaurant-'] { grid-template-columns: minmax(0, 1fr); margin-right: 0; gap: var(--tpl-body-pad); }
-  .detailColumns[data-presentation='card'] { grid-template-columns: minmax(0, 1fr); }
+  .detailColumns:is([data-presentation='card'], [data-presentation='notification']) { grid-template-columns: minmax(0, 1fr); }
   .detailColumnToggle { display: block; }
-  .detailColumnAside { display: none; min-height: 0; padding-left: 0; border-left: 0; }
+  .detailColumnAside, .detailColumns[data-presentation='notification'] .detailColumnAside { display: none; min-height: 0; padding-left: 0; border-left: 0; }
   .detailColumnAside[data-expanded] { display: block; }
+  .detailColumns[data-presentation='notification'] .detailColumnAside[data-expanded] { display: flex; }
 }
 
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-spacing='compact'] > .steps { margin-top: var(--tpl-steps-compact-top-gap); }

@@ -87,7 +87,7 @@ describe('運用者へのお知らせを なおす（hiBO8）', () => {
   test('保存ずみの名前で題を出し、選んでいない人も並べて数を数える', async () => {
     await render()
     expect(host?.querySelector('[data-design-node="hiBO8"]')).not.toBeNull()
-    expect(host?.querySelector('h1')?.textContent).toBe('「新しい予約が入りました」を編集する')
+    expect(host?.querySelector('[data-template-region="heading"] h2')?.textContent).toBe('「新しい予約が入りました」を編集する')
     const rows = Array.from(host?.querySelectorAll('ul[class*=staffList] > li') ?? []).map((li) => li.textContent ?? '')
     expect(rows.length).toBe(3)
     expect(rows[1]).toContain('LINE 未ログイン')
@@ -102,9 +102,23 @@ describe('運用者へのお知らせを なおす（hiBO8）', () => {
     search.value = ''
     await render()
     expect(host?.querySelector('[data-design-node="gjUz3"]')).not.toBeNull()
-    expect(host?.querySelector('h1')?.textContent).toBe('運用者へのお知らせを作る')
+    expect(host?.querySelector('[data-template-region="heading"] h2')?.textContent).toBe('運用者へのお知らせを作る')
     expect(host?.textContent).toContain('選択 3人／LINEで受け取れる 2人')
   })
+})
+
+test('狭い板の案内は開閉しても入力内容を保つ', async () => {
+  await render()
+  const toggle = host?.querySelector<HTMLButtonElement>('button[aria-controls][aria-expanded]')
+  expect(toggle?.getAttribute('aria-expanded')).toBe('false')
+  const aside = document.getElementById(toggle!.getAttribute('aria-controls')!)
+  await act(async () => { toggle?.click() })
+  expect(toggle?.getAttribute('aria-expanded')).toBe('true')
+  expect(aside?.hasAttribute('data-expanded')).toBe(true)
+  expect(aside?.textContent).toContain('自分にテストを送る')
+  await act(async () => { toggle?.click() })
+  expect(aside?.hasAttribute('data-expanded')).toBe(false)
+  expect(host?.querySelector<HTMLInputElement>('#operator-name')?.value).toBe(rule.name)
 })
 
 describe('公開前の確認の窓（sDXNy）', () => {
@@ -139,6 +153,39 @@ describe('公開前の確認の窓（sDXNy）', () => {
 test('きっかけの写しは正本と同じ（ずれると公開しても届かない）', () => {
   expect(EVENT_OPTIONS).toEqual(OPERATOR_EVENT_OPTIONS)
   for (const option of EVENT_OPTIONS) expect(eventPlaceLabel(option.value)).not.toBe('管理画面')
+})
+
+test('名前が空の保存は止め、理由を欄に一度だけ出して欄へ移る', async () => {
+  const previousFetch = globalThis.fetch
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+    String(input).includes('/operator-rules/rule-9') && (init?.method ?? 'GET') === 'GET'
+      ? Promise.resolve(json({ success: true, data: { ...rule, name: '' } }))
+      : previousFetch(input, init)))
+  await render()
+  await act(async () => {
+    const save = [...host!.querySelectorAll('button')].find(button => button.textContent === '下書きを保存する')!
+    save.click()
+  })
+  const input = host!.querySelector<HTMLInputElement>('#operator-name')!
+  expect(input.getAttribute('aria-invalid')).toBe('true')
+  expect(document.activeElement).toBe(input)
+  expect([...host!.querySelectorAll('[role="alert"]')].filter(node => node.textContent === 'お知らせの名前を入力してください。')).toHaveLength(1)
+  expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
+})
+
+test('宛先をすべて外した保存は止め、欄の理由と赤枠を出す', async () => {
+  await render()
+  await act(async () => {
+    for (const input of host!.querySelectorAll<HTMLInputElement>('ul[class*=staffList] input:checked')) input.click()
+  })
+  await act(async () => {
+    [...host!.querySelectorAll('button')].find(button => button.textContent === '下書きを保存する')!.click()
+  })
+  const field = host!.querySelector('#operator-recipient-team')!
+  expect(field.getAttribute('aria-invalid')).toBe('true')
+  expect(document.activeElement).toBe(field)
+  expect([...host!.querySelectorAll('[role="alert"]')].filter(node => node.textContent === '受け取るスタッフを1人以上選んでください。')).toHaveLength(1)
+  expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
 })
 
 test('お知らせの公開中は窓の×・Esc・戻って直すを止める', async () => {

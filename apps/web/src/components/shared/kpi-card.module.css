@@ -354,3 +354,29 @@
 [data-theme='v8'] .strip[data-kpi-presentation='band'][data-kpi-border='inset-top'] {
   border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
 }
+
+/* LINE通知の数カード。指定した利用先だけで寸法を切り替える。 */
+[data-theme='v8'] .card[data-kpi-appearance='notification-customer'] {
+  gap: var(--tpl-sb-kpi-gap); padding: var(--tpl-sb-kpi-pad);
+}
+[data-theme='v8'] .card[data-kpi-appearance='notification-operator'] {
+  gap: var(--tpl-rest3-op-kpi-gap); padding: var(--tpl-rest3-op-kpi-pad);
+}
+[data-theme='v8'] .card[data-kpi-appearance] .head,
+[data-theme='v8'] .card[data-kpi-appearance] .label,
+[data-theme='v8'] .card[data-kpi-appearance] .detail { min-height: 0; }
+[data-theme='v8'] .card[data-kpi-appearance='notification-customer'] .label,
+[data-theme='v8'] .card[data-kpi-appearance='notification-customer'] .detail {
+  font-size: var(--tpl-sb-row-sub); line-height: var(--tpl-sb-row-sub-lh);
+}
+[data-theme='v8'] .card[data-kpi-appearance='notification-operator'] .label,
+[data-theme='v8'] .card[data-kpi-appearance='notification-operator'] .detail {
+  font-size: var(--tpl-rest3-op-kpi-title); line-height: var(--tpl-rest3-op-kpi-title-lh);
+}
+[data-theme='v8'] .card[data-kpi-appearance] .label { font-weight: 600; }
+[data-theme='v8'] .card[data-kpi-appearance='notification-customer'] .number {
+  font-size: var(--tpl-sb-kpi-num); line-height: var(--tpl-sb-kpi-num-lh);
+}
+[data-theme='v8'] .card[data-kpi-appearance='notification-operator'] .number {
+  font-size: var(--tpl-rest3-op-kpi-num); line-height: var(--tpl-rest3-op-kpi-num-lh);
+}

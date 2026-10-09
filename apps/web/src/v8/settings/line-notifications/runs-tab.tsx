@@ -24,6 +24,8 @@ import {
   type ScopedNotice,
   type ScopedRetrying,
 } from '@/components/line-notifications/notification-run-list'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import StatusBadge from '@/components/shared/status-badge'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -56,8 +58,8 @@ type RunItem = EcNotificationRun & {
   attemptHistory?: DeliveryAttempt[]
 }
 
-const STATUS: Record<EcNotificationRun['status'], { label: string; tone: 'good' | 'warn' | 'muted' | 'danger' }> = {
-  pending: { label: '送信処理中', tone: 'warn' },
+const STATUS: Record<EcNotificationRun['status'], { label: string; tone: 'good' | 'info' | 'muted' | 'danger' }> = {
+  pending: { label: '送信処理中', tone: 'info' },
   accepted: { label: 'LINE API受付済み', tone: 'good' },
   excluded: { label: '送信対象外', tone: 'muted' },
   failed: { label: '送れなかった', tone: 'danger' },
@@ -182,10 +184,10 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
           * 数えているので、全件より少ないときは「このページの n件から」と書く。
           * WEB202：送れなかった一覧にはメールで届いたもの（受付済み）は出ないので、ここでは数えない。
           */}
-        <KpiCard presentation="card" icon={<CircleX size={14} aria-hidden="true" />} title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={kpiNote('記録の合計')} loading={visibleState === 'loading'} />
-        <KpiCard presentation="card" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={kpiValue(breakdown.blocked)} unit="件" detail={kpiNote(pageScoped ? `このページの${items.length}件から・対応不要` : '対応不要')} loading={visibleState === 'loading'} />
-        <KpiCard presentation="card" icon={<Mail size={14} aria-hidden="true" />} title="メールで送った" value={null} unit="件" detail={kpiNote('お知らせの記録で見られます')} loading={visibleState === 'loading'} />
-        <KpiCard presentation="card" icon={<RotateCw size={14} aria-hidden="true" />} title="再試行の予定" value={kpiValue(breakdown.retry)} unit="件" detail={kpiNote(`${pageScoped ? `このページの${items.length}件から・` : ''}${breakdown.nextRetryAt ? shortJst(breakdown.nextRetryAt) : '予定なし'}`)} loading={visibleState === 'loading'} />
+        <KpiCard appearance="notification-operator" presentation="card" icon={<CircleX size={14} aria-hidden="true" />} title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={kpiNote('記録の合計')} loading={visibleState === 'loading'} />
+        <KpiCard appearance="notification-operator" presentation="card" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={kpiValue(breakdown.blocked)} unit="件" detail={kpiNote(pageScoped ? `このページの${items.length}件から・対応不要` : '対応不要')} loading={visibleState === 'loading'} />
+        <KpiCard appearance="notification-operator" presentation="card" icon={<Mail size={14} aria-hidden="true" />} title="メールで送った" value={null} unit="件" detail={kpiNote('お知らせの記録で見られます')} loading={visibleState === 'loading'} />
+        <KpiCard appearance="notification-operator" presentation="card" icon={<RotateCw size={14} aria-hidden="true" />} title="再試行の予定" value={kpiValue(breakdown.retry)} unit="件" detail={kpiNote(`${pageScoped ? `このページの${items.length}件から・` : ''}${breakdown.nextRetryAt ? shortJst(breakdown.nextRetryAt) : '予定なし'}`)} loading={visibleState === 'loading'} />
       </KpiBand>
     ) : null}
 
@@ -207,54 +209,54 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
       </div>
       {mode === 'history' ? <FilterChip selected={filter === 'clicked'} onChange={() => setFilter(filter === 'clicked' ? 'all' : 'clicked')}>クリック記録あり</FilterChip> : null}
       <span className={styles.runSpacer} />
-      <Button onClick={() => void load()}>記録を再読み込み</Button>
+      <Button onClick={() => void load()}><RotateCw size={15} aria-hidden="true" />記録を再読み込み</Button>
     </div>
 
     <section className={styles.table} data-design-node={mode === 'failures' ? 'DrwMm-table' : 'PZBVb-table'} data-list-state={listState} aria-label={title}>
       {!lineAccountId ? <ListState kind="empty" title="LINEアカウントを選択してください" description="上のアカウント切り替えから、確認するLINEアカウントを選んでください。" />
         : visibleState === 'loading' ? <ListState kind="loading" title={`${title}を読み込んでいます`} />
-        : visibleState === 'error' ? <ListState kind="error" title={`${title}を表示できませんでした`} description="登録済みの記録は消えていません。時間をおいて読み直してください。" action={<Button onClick={() => void load()}>記録を再読み込み</Button>} />
+        : visibleState === 'error' ? <ListState kind="error" title={`${title}を表示できませんでした`} description="登録済みの記録は消えていません。時間をおいて読み直してください。" action={<Button onClick={() => void load()}><RotateCw size={15} aria-hidden="true" />記録を再読み込み</Button>} />
         : visibleState === 'forbidden' ? <ListState kind="forbidden" />
         : items.length === 0 ? <ListState kind="empty" title={mode === 'failures' ? '送れなかったお知らせはありません' : 'お知らせの記録はまだありません'} description={mode === 'failures' ? '現在の表示範囲には、確認が必要な失敗はありません。' : 'ECからのお知らせを処理すると、ここに記録が残ります。'} />
         : visibleItems.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合う記録はありません" description="検索語か絞り込みを変えてください。" />
-        : <div role="table" aria-label={title}>
-          <div role="rowgroup">
-            <div role="row" className={`${styles.runRow} ${styles.headRow}`}>
-              <span role="columnheader">日時</span>
-              <span role="columnheader">お知らせ</span>
-              <span role="columnheader">対象者</span>
-              <span role="columnheader">状態</span>
-              <span role="columnheader">理由・対応</span>
-              <span role="columnheader">試行・クリック</span>
-            </div>
-          </div>
-          <div role="rowgroup">
+        : <DataTable label="お知らせの記録" grid={{ columns: 'var(--tpl-rest3-run-cols)', compactColumns: 'minmax(0, .8fr) minmax(0, 1fr) minmax(0, .8fr) var(--tpl-an-col-130) minmax(0, 1.5fr) var(--tpl-an-col-88)', padding: 'var(--tpl-rest3-run-row-pad)', headPadding: 'var(--tpl-rest3-op-head-pad)' }}>
+          <thead>
+            <TableHeadRow>
+              <Th>日時</Th>
+              <Th>お知らせ</Th>
+              <Th>対象者</Th>
+              <Th>状態</Th>
+              <Th>理由・対応</Th>
+              <Th>試行・クリック</Th>
+            </TableHeadRow>
+          </thead>
+          <tbody>
             {visibleItems.map((item) => {
               const status = STATUS[item.status]
               const who = item.recipientType === 'customer' ? `顧客${item.orderNumber ? `・${item.orderNumber}` : ''}` : '運用者'
               const reason = reasonWords(item)
-              return <div role="row" key={item.id} className={styles.runRow}>
-                <span role="cell" className={`${styles.cell} ${styles.runWhen}`}>{shortJst(item.receivedAt)}</span>
-                <span role="cell" className={styles.cell}>
+              return <Tr key={item.id}>
+                <Td className={`${styles.cell} ${styles.runWhen}`}><span className={styles.runWhen}>{shortJst(item.receivedAt)}</span></Td>
+                <Td className={styles.cell}>
                   <button type="button" className={styles.runOpen} onClick={() => setDetailId(item.id)} title={`${item.notificationName}の記録の詳細を開く`}>{item.notificationName}</button>
-                </span>
-                <span role="cell" className={styles.runWhoCell}>
+                </Td>
+                <Td className={styles.runWhoCell}>
                   <span className={`${styles.cell} ${styles.runWho}`}>{item.friendName || '名前は未取得'}</span>
                   <span className={`${styles.cell} ${styles.opSub}`}>{who}</span>
-                </span>
-                <span role="cell"><span className={styles.status} data-tone={status.tone}><span className={styles.dot} aria-hidden="true" />{status.label}</span></span>
-                <span role="cell" className={styles.cell} title={reason}>{item.resolved ? `対応済み・${reason}` : reason}</span>
-                <span role="cell" className={styles.cell}>{`${item.attemptCount == null ? '—' : `${item.attemptCount}回`}・${item.clickedAt ? 'クリックあり' : '—'}`}</span>
-              </div>
+                </Td>
+                <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'muted' ? 'neutral' : status.tone}>{status.label}</StatusBadge></Td>
+                <Td className={styles.cell} title={reason}>{item.resolved ? `対応済み・${reason}` : reason}</Td>
+                <Td className={styles.cell}>{`${item.attemptCount == null ? '—' : `${item.attemptCount}回`}・${item.clickedAt ? 'クリックあり' : '—'}`}</Td>
+              </Tr>
             })}
-          </div>
-        </div>}
+          </tbody>
+        </DataTable>}
     </section>
 
     {visibleState === 'ready' && items.length > 0 ? (
       <div className={styles.runFoot}>
         {mode === 'failures'
-          ? <p className={`${styles.infoBand} ${styles.opBand}`}>個人の既読は見られません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。</p>
+          ? <Notice tone="info" icon={null}>個人の既読は見られません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。</Notice>
           : <p className={styles.minor}>{`表示中の20件を絞り込み・${formatNumber(total)}件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, total)}件`}</p>}
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
       </div>
