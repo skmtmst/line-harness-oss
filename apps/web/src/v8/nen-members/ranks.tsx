@@ -25,6 +25,8 @@ import { formatNumber } from '@/lib/format'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { RULE_LABELS, parsePercent, parseYen, shortDateTime, shortTime, yen, type LoadStatus, type SavedHandler } from './parts'
 import styles from './members.module.css'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError } from '@/components/shared/form-controls'
 
 type RankDraft = { id: string | null; name: string; threshold: string; rate: string; tagId: string | null; tagName: string | null; memberCount: number }
 
@@ -122,7 +124,25 @@ export default function RankSettingsV8({
     return false
   }
 
+  /* 保存で落ちた欄は、その行のその欄の真下に理由を出して移る（B-139）。 */
+  const fields = useFormErrors()
+  drafts.forEach((row, index) => {
+    const isBase = index === drafts.length - 1 && parseYen(row.threshold) === 0
+    fields.define(`rank-${index}-name`, `ランク名 ${index + 1}`, () => (row.name.trim() ? null : 'ランク名を入れるか、行を消してください。'))
+    fields.define(`rank-${index}-threshold`, `しきい値 ${index + 1}`, () => {
+      if (isBase) return null
+      const value = parseYen(row.threshold)
+      return Number.isFinite(value) && value >= 0 ? null : '0 以上の金額で入れてください。'
+    })
+    fields.define(`rank-${index}-rate`, `マイル還元 ${index + 1}`, () => {
+      const value = parsePercent(row.rate)
+      return Number.isFinite(value) && value >= 0 ? null : '0 以上の数（%）で入れてください。'
+    })
+  })
+  const cellProps = (key: string) => ({ ...fields.bind(key), invalid: fields.invalid(key), 'aria-describedby': fields.invalid(key) ? `${key}-error` : undefined })
+
   const save = async (force = false) => {
+    if (fields.submit().length > 0) { setError(''); return }
     const rows = drafts.map((row) => ({
       id: row.id,
       name: row.name.trim(),
@@ -310,17 +330,20 @@ export default function RankSettingsV8({
               return (
                 <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={row.tagName ? `タグ：${row.tagName}・会員 ${formatNumber(row.memberCount)} 人` : undefined}>
                   <div className={styles.rankColName}>
-                    <TextField aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} />
+                    <TextField {...cellProps(`rank-${index}-name`)} aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} />
+                    <FieldError id={`rank-${index}-name-error`}>{fields.error(`rank-${index}-name`)}</FieldError>
                   </div>
                   <div className={styles.rankColThreshold}>
                     {isBase ? (
                       <span className={styles.fixedBox} title="いちばん下のランクは ¥0 から（変えられません）">¥0〜（固定）</span>
                     ) : (
-                      <TextField aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
+                      <TextField {...cellProps(`rank-${index}-threshold`)} aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
                     )}
+                    <FieldError id={`rank-${index}-threshold-error`}>{fields.error(`rank-${index}-threshold`)}</FieldError>
                   </div>
                   <div className={styles.rankColRate}>
-                    <TextField aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} readOnly={readonly} onChange={(event) => update(index, { rate: event.target.value })} />
+                    <TextField {...cellProps(`rank-${index}-rate`)} aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} readOnly={readonly} onChange={(event) => update(index, { rate: event.target.value })} />
+                    <FieldError id={`rank-${index}-rate-error`}>{fields.error(`rank-${index}-rate`)}</FieldError>
                   </div>
                   <div className={styles.rankColAction}>
                     {/* 行の右端は「…」（タグを開く・ランクを削除する）。1つの機能の印にしない。 */}

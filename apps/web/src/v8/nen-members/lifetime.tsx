@@ -22,6 +22,8 @@ import { formatNumber } from '@/lib/format'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { parseYen, yen, type LoadStatus, type SavedHandler } from './parts'
 import styles from './members.module.css'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError } from '@/components/shared/form-controls'
 
 type MilestoneDraft = { id: string | null; threshold: number; title: string; benefit: string | null; notify: boolean; reachedCount: number }
 
@@ -61,9 +63,19 @@ export default function LifetimeV8({
     setDrafts(fromSettings(settings))
   }, [settings, dirty])
 
+  /* 窓で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  const editFields = useFormErrors()
+  editFields.define('threshold', '節目の金額', () => {
+    if (!editing) return null
+    const value = parseYen(editing.threshold)
+    return Number.isFinite(value) && value > 0 ? null : '節目の金額は 1 円以上で入れてください。'
+  })
+  editFields.define('title', '称号', () => (editing && !editing.title.trim() ? '称号を入れてください。' : null))
+
   const openEdit = (index: number) => {
     const row = drafts[index]
     setEditError('')
+    editFields.reset()
     setEditing(row
       ? { index, threshold: String(row.threshold), title: row.title, notify: row.notify }
       : { index, threshold: '', title: '', notify: true })
@@ -71,9 +83,8 @@ export default function LifetimeV8({
 
   const applyEdit = () => {
     if (!editing) return
+    if (editFields.submit().length > 0) { setEditError(''); return }
     const threshold = parseYen(editing.threshold)
-    if (!Number.isFinite(threshold) || threshold <= 0) { setEditError('節目の金額は 1 円以上で入れてください。'); return }
-    if (!editing.title.trim()) { setEditError('称号を入れてください。'); return }
     setDrafts((current) => {
       const next = [...current]
       const before = next[editing.index]
@@ -210,14 +221,16 @@ export default function LifetimeV8({
       >
         {editing ? (
           <div className={styles.editBody}>
-            <label className={styles.removeField}>
-              <span className={styles.removeLabel}>節目（累計の金額）</span>
-              <TextField inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} />
-            </label>
-            <label className={styles.removeField}>
-              <span className={styles.removeLabel}>称号</span>
-              <TextField maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} />
-            </label>
+            <div className={styles.removeField}>
+              <label htmlFor="life-threshold" className={styles.removeLabel}>節目（累計の金額）</label>
+              <TextField {...editFields.bind('threshold')} id="life-threshold" invalid={editFields.invalid('threshold')} aria-describedby={editFields.invalid('threshold') ? 'life-threshold-error' : undefined} inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} />
+              <FieldError id="life-threshold-error">{editFields.error('threshold')}</FieldError>
+            </div>
+            <div className={styles.removeField}>
+              <label htmlFor="life-title" className={styles.removeLabel}>称号</label>
+              <TextField {...editFields.bind('title')} id="life-title" invalid={editFields.invalid('title')} aria-describedby={editFields.invalid('title') ? 'life-title-error' : undefined} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} />
+              <FieldError id="life-title-error">{editFields.error('title')}</FieldError>
+            </div>
             <div className={styles.editToggle}>
               <Toggle checked={editing.notify} onChange={(checked) => setEditing({ ...editing, notify: checked })} label={editing.notify ? '到達したら LINE で通知する' : '到達しても通知しない'} />
             </div>
