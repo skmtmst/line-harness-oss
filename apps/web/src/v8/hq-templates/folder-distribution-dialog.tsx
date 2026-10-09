@@ -14,7 +14,7 @@ import styles from './folder-distribution-dialog.module.css'
 
 export function distributionKind(row: HqTemplate) {
   if (row.template_type === 'template' && (row.kind ?? 'message') === 'message' && row.content_summary) return row.content_summary.replace(/\s+\d+$/u, '')
-  return row.template_type === 'template' ? ({ message: 'メッセージ', carousel: 'カルーセル', rich_message: 'リッチメッセージ', question: '質問', coupon: 'クーポン', research: 'リサーチ' }[row.kind ?? 'message'])
+  return row.template_type === 'template' ? ({ message: 'メッセージ', carousel: 'カルーセル', rich_message: 'リッチメッセージ', rich_video: 'リッチビデオ', question: '質問', coupon: 'クーポン', research: 'リサーチ' }[row.kind ?? 'message'])
     : ({ tag: 'タグ', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }[row.template_type])
 }
 export default function FolderDistributionDialog({ name, templates, templateFolders = [], accounts, busy, error, onCancel, onConfirm }: {
