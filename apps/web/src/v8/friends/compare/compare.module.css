@@ -39,6 +39,18 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+/* B-168: 中身のカードと、その中の判定・履歴の小箱を分ける。 */
+.subject,
+.card {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+}
+
+.panel,
+.historyCard {
   border-radius: var(--radius-card);
   box-shadow: var(--tpl-fr-shadow-outline);
 }
