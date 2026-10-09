@@ -53,6 +53,7 @@ export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof Messag
   { kind: 'message', label: 'メッセージ', icon: MessageSquare },
   { kind: 'carousel', label: 'カルーセル', icon: GalleryHorizontalEnd },
   { kind: 'rich_message', label: 'リッチメッセージ', icon: ImageIcon },
+  { kind: 'rich_video', label: 'リッチビデオ', icon: ImageIcon },
   { kind: 'question', label: '質問', icon: HelpCircle },
   { kind: 'coupon', label: 'クーポン', icon: Ticket },
   { kind: 'research', label: 'リサーチ', icon: ClipboardList },
