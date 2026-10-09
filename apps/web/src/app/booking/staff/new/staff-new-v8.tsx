@@ -23,7 +23,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
@@ -460,7 +460,7 @@ export default function StaffNewV8() {
             </div>
             <div className={styles.toggleList}>
               <div className={styles.switchRow}>
-                <Toggle
+                <SettingCheckbox
                   label="店舗の営業時間に合わせる"
                   checked
                   locked
@@ -471,7 +471,7 @@ export default function StaffNewV8() {
                 </span>
               </div>
               <div className={styles.switchRow}>
-                <Toggle
+                <SettingCheckbox
                   label="「指名なし」の枠にも含める"
                   checked={isDesignationOptional}
                   onChange={setIsDesignationOptional}
@@ -482,7 +482,7 @@ export default function StaffNewV8() {
                 </span>
               </div>
               <div className={styles.switchRow}>
-                <Toggle
+                <SettingCheckbox
                   label="登録したらすぐ予約を受ける"
                   checked={isActive}
                   onChange={setIsActive}

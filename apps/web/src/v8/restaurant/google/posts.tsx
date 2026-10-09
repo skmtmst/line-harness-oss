@@ -27,7 +27,7 @@ import { Field } from '@/components/shared/form-controls'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
@@ -602,7 +602,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             <div className={styles.igToggleRow}>
               {editable ? (
                 <>
-                  <Toggle checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} />
+                  <SettingCheckbox checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} />
                   <span className={styles.igToggleLabel}>Instagram にも投稿する</span>
                 </>
               ) : (

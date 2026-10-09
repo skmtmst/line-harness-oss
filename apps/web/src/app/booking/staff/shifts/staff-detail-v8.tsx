@@ -39,7 +39,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import { formatDay } from '@/lib/format'
@@ -992,7 +992,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                   return (
                     <div className={styles.dayRow} key={day.weekday}>
                       <strong className={styles.dayName}>{day.label.slice(0, 1)}</strong>
-                      <Toggle
+                      <SettingCheckbox
                         label={`${day.label}は出勤する`}
                         checked={row.active}
                         onChange={(checked) => updateDraft(day.weekday, { active: checked })}

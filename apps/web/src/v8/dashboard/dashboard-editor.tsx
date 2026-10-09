@@ -55,7 +55,7 @@ import {
 import Drawer from '@/components/shared/drawer'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -115,7 +115,7 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, disabled, onMove, o
           <ChevronDown aria-hidden="true" />
         </IconButton>
       </div>
-      <Toggle disabled={disabled} checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} />
+      <SettingCheckbox disabled={disabled} checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} />
     </div>
   )
 }

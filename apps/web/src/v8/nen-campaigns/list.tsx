@@ -49,7 +49,7 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -561,7 +561,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
     >
       <div className={styles.couponForm}>
         <div className={styles.couponSwitch}>
-          <Toggle checked={coupon.isEnabled} label="クーポンを付ける" onChange={(next) => onChange({ ...coupon, isEnabled: next })} />
+          <SettingCheckbox checked={coupon.isEnabled} label="クーポンを付ける" onChange={(next) => onChange({ ...coupon, isEnabled: next })} />
           <div className={styles.couponSwitchText}>
             <strong>クーポンを付ける</strong>
             <span>切ると、誕生日のメッセージだけが届きます</span>

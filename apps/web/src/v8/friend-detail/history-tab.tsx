@@ -1,5 +1,7 @@
 'use client'
 
+import SegmentedControl from '@/components/shared/segmented'
+
 /*
  * 履歴タブ（Q5F2QE の 3.）。全部の出来事を時系列で、日ごとに区切って並べる。
  * 受信・送信・システム通知の切り替えは、読んだ行の中で絞る（口は今と同じ1本）。
@@ -53,11 +55,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
   return (
     <div className={styles.pane}>
       <div className={styles.tools}>
-        <div className={styles.seg} role="group" aria-label="履歴の種類">
-          {FILTERS.map((f) => (
-            <button key={f.value} type="button" className={styles.segBtn} aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}>{f.label}</button>
-          ))}
-        </div>
+        <SegmentedControl aria-label="履歴の種類" value={filter} onChange={setFilter} options={FILTERS} />
         {historyStatus === 'ready' ? (
           <span className={styles.count}>{complete ? `${rows.length}件` : `${rows.length}件を表示中`}</span>
         ) : null}

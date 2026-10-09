@@ -16,7 +16,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import TapActionField from '@/components/shared/tap-action-field'
@@ -366,7 +366,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
                 <FieldError id="cta-link-error">{fields.error(`cta-${currentIndex}-link`)}</FieldError>
               </div>
               <div className={styles.toggleRow}>
-                {readOnly ? null : <Toggle checked={current.autoOpen} label="ボタンを押したら、フォームを自動で開く" onChange={(next) => update(currentIndex, { autoOpen: next })} />}
+                {readOnly ? null : <SettingCheckbox checked={current.autoOpen} label="ボタンを押したら、フォームを自動で開く" onChange={(next) => update(currentIndex, { autoOpen: next })} />}
                 <span className={styles.toggleText}>{readOnly ? `ボタンを押したら、フォームを自動で${current.autoOpen ? '開く' : '開かない'}` : 'ボタンを押したら、フォームを自動で開く'}</span>
               </div>
             </fieldset>

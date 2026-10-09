@@ -37,7 +37,7 @@ import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import { PhoneDatetimeStep } from './phone'
@@ -1061,7 +1061,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                 return (
                   <div className={styles.dayRow} key={day.weekday} data-on={row.active || undefined}>
                     <span className={styles.dayName}>{day.short}</span>
-                    {canEdit ? <Toggle label={`${day.label}は出勤する`} checked={row.active} onChange={(checked) => updateDraft(day.weekday, { active: checked })} /> : null}
+                    {canEdit ? <SettingCheckbox label={`${day.label}は出勤する`} checked={row.active} onChange={(checked) => updateDraft(day.weekday, { active: checked })} /> : null}
                     {row.active ? (
                       <>
                         <span className={styles.dayState}>出る</span>

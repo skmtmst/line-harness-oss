@@ -32,7 +32,7 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 import { EntityKindDialog } from '@/components/shared/entity-picker-sources'
 import { Th } from '@/components/shared/table'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { TextField } from '@/components/shared/text-field'
 import { focusField } from '../focus-field'
 import { groupTagsByFolder } from './tag-options'
@@ -357,7 +357,7 @@ function InflowCreate() {
   }) => (
     <div className={styles.actionItem}>
       <div className={styles.actionRow}>
-        <Toggle checked={opts.on} label={opts.title} onChange={(next) => { if (!next) opts.onOff(); else if (!opts.on) opts.onToggleOpen() }} />
+        <SettingCheckbox checked={opts.on} label={opts.title} onChange={(next) => { if (!next) opts.onOff(); else if (!opts.on) opts.onToggleOpen() }} />
         <div className={styles.actionText}>
           <span className={styles.actionTitle}>{opts.title}</span>
           <span className={styles.actionValue}>{opts.value ?? 'まだ決めていません'}</span>
@@ -577,7 +577,7 @@ function InflowCreate() {
         ) : null}
         {/* 絵には無いが、公開オフで仕込む口は残す（URL の発行の話なのでこの段の最後に置く）。 */}
         <div className={styles.actionRow}>
-          <Toggle checked={isActive} label="発行したらすぐ使えるようにする" onChange={(next) => setIsActive(next)} />
+          <SettingCheckbox checked={isActive} label="発行したらすぐ使えるようにする" onChange={(next) => setIsActive(next)} />
           <div className={styles.actionText}>
             <span className={styles.actionTitle}>発行したらすぐ使えるようにする</span>
             <span className={styles.actionValue}>

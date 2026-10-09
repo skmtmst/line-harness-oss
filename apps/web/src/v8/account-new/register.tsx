@@ -32,7 +32,7 @@ import Notice from '@/components/shared/notice'
 import Radio from '@/components/shared/radio'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import StatusBadge from '@/components/shared/status-badge'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
@@ -584,7 +584,7 @@ export default function AccountRegisterV8() {
                   {checkRows.map((row) => <CheckRow key={row.key} row={row} />)}
                 </ol>
                 <Card className={styles.importBox} surface="inset" contentPadding="var(--tpl-htn-import-pad)" gap="var(--tpl-htn-panel-gap)">
-                  <Toggle checked={form.importFriends} label="既存の友だちの取り込み" onChange={(next) => update('importFriends', next)} />
+                  <SettingCheckbox checked={form.importFriends} label="既存の友だちの取り込み" onChange={(next) => update('importFriends', next)} />
                   <span className={styles.importText}>
                     <strong>既存の友だちの取り込み</strong>
                     <span>登録のあと、いまの友だちを musubo に取り込みます（数分かかります）</span>

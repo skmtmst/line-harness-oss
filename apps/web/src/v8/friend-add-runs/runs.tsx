@@ -1,5 +1,7 @@
 'use client'
 
+import SegmentedControl from '@/components/shared/segmented'
+
 /*
  * ★V8 友だち追加時の配信の実行結果（Pencil `REIxB`）。
  *
@@ -500,13 +502,7 @@ function FriendAddRunsInner() {
               onClear={() => setSearch('')}
             />
           </div>
-          <div className={styles.chips} role="group" aria-label="結果で絞り込む">
-            {chips.map((chip) => (
-              <button key={chip.key} type="button" className={styles.chip} aria-pressed={activeChip === chip.key} onClick={() => pickChip(chip.key)}>
-                {chip.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl aria-label="結果で絞り込む" value={activeChip} onChange={pickChip} options={chips.map(chip=>({value:chip.key,label:chip.label}))} />
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <div className={styles.sizeBox}>
             <Select

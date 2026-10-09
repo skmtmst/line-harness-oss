@@ -334,7 +334,7 @@ describe('来店スタンプ（管理画面）', () => {
     fx.cards.mockResolvedValue({ success: true, data: [{ ...card, settings: { ...card.settings, multipliers: [{ name: '火曜の2倍デー', multiplier: 2, weekdays: [2] }] } }] })
     render(<VisitStampsV8 />)
     expect(await screen.findByText('火曜の2倍デー')).toBeTruthy()
-    fireEvent.click(screen.getByRole('switch', { name: '火曜の2倍デーを使う' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '火曜の2倍デーを使う' }))
     expect(screen.getByText(/止めています/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '重ねたときの順番' }))
     fireEvent.click(await screen.findByRole('button', { name: '倍率のあとで初回ボーナス' }))

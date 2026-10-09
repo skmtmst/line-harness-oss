@@ -23,7 +23,7 @@ import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
@@ -95,11 +95,11 @@ export function AppearanceTab(props: Props) {
         </div>
         <div className={styles.toggleRow}>
           <span>1人1回だけ答えられる</span>
-          <Toggle checked={options.oncePerFriend?.enabled ?? false} onChange={(enabled) => onChangeOptions({ oncePerFriend: { ...options.oncePerFriend, enabled } })} label="1人1回だけ答えられる" />
+          <SettingCheckbox checked={options.oncePerFriend?.enabled ?? false} onChange={(enabled) => onChangeOptions({ oncePerFriend: { ...options.oncePerFriend, enabled } })} label="1人1回だけ答えられる" />
         </div>
         <div className={styles.toggleRow}>
           <span>{`答えの数が ${(options.totalLimit?.max ?? 300).toLocaleString('ja-JP')}件 になったら締め切る`}</span>
-          <Toggle
+          <SettingCheckbox
             checked={options.totalLimit?.enabled ?? false}
             onChange={(enabled) => onChangeOptions({ totalLimit: { ...options.totalLimit, enabled, max: options.totalLimit?.max ?? 300 } })}
             label="答えの数が上限になったら締め切る"

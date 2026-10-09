@@ -31,7 +31,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
 
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 
 import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 
@@ -279,7 +279,7 @@ export function TagEditForm({
                 <span className={styles.label}>友だち一覧に出す</span>
                 <span className={styles.hint}>オンにすると、友だち一覧の名前の下にこのタグが出ます</span>
               </div>
-              {readOnly ? <span className={styles.linkedState}>{isStarred ? 'オン' : 'オフ'}</span> : <Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" />}
+              {readOnly ? <span className={styles.linkedState}>{isStarred ? 'オン' : 'オフ'}</span> : <SettingCheckbox checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" />}
             </div>
           </section>
 
@@ -291,7 +291,7 @@ export function TagEditForm({
                   <HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。</HelpTip>
                   <span className={styles.titleSpacer} />
                   <span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>
-                  {readOnly ? null : <Toggle checked={linked} onChange={setLinked} label="タグ連動" />}
+                  {readOnly ? null : <SettingCheckbox checked={linked} onChange={setLinked} label="タグ連動" />}
                 </div>
                 <div className={styles.noteRow}>
                   <p className={styles.cardNote}>上から順に動きます。並べ替えは上下の印で</p>
@@ -369,7 +369,7 @@ export function TagEditForm({
                       <span className={styles.label}>今付いている人にもさかのぼって積む（倍率は次の付与から）</span>
                       <span className={styles.hint}>{`オンにすると、すでに付いている ${tag.friendCount ?? 0} 人にも本人・紹介者のマイルをさかのぼって積みます（倍率は次の付与から）。積む前に人数の確認が開きます`}</span>
                     </div>
-                    {readOnly ? <span className={styles.linkedState}>{applyToExisting ? 'オン' : 'オフ'}</span> : <Toggle checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" />}
+                    {readOnly ? <span className={styles.linkedState}>{applyToExisting ? 'オン' : 'オフ'}</span> : <SettingCheckbox checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" />}
                   </div>
                   }
                   {applyToExisting ? (

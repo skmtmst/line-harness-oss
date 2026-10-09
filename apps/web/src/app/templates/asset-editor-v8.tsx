@@ -18,7 +18,7 @@ import type { Folder, MediaItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import LinePreview from '@/components/shared/line-preview'
 import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -589,7 +589,7 @@ export default function TemplateAssetEditorV8({ kind, visual = false }: { kind: 
               <div className={styles.subCard}>
                 <div className={styles.subCardHead}>
                   <p className={styles.subCardTitle}>抽選</p>
-                  <Toggle
+                  <SettingCheckbox
                     checked={lottery}
                     label="抽選する"
                     onChange={setLottery}

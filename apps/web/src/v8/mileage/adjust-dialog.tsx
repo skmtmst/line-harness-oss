@@ -20,7 +20,7 @@ import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { ApiError, api, type MileageAdjustmentPolicy } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { FieldError } from '@/components/shared/form-controls'
@@ -455,7 +455,7 @@ export default function MileageAdjustDialog({
 
           {/* 絵 M8zhjL：スイッチ＋題と説明の2行。 */}
           <div className={styles.notifyRow}>
-            <Toggle checked={notifyFriend} onChange={setNotifyFriend} label="友だちに知らせる（LINE通知）" />
+            <SettingCheckbox checked={notifyFriend} onChange={setNotifyFriend} label="友だちに知らせる（LINE通知）" />
             <div className={styles.dlgPersonText}>
               <span className={styles.dlgPersonName}>友だちに知らせる（LINE通知）</span>
               <span className={styles.dlgPersonSub}>増減したマイルと変更後の残高をLINEで知らせます。</span>

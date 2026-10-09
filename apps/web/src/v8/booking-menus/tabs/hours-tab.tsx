@@ -12,7 +12,7 @@ import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
 import { TimeField } from '@/components/shared/date-time-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { RowMenu } from '@/components/shared/row-actions'
 import { notifyToast } from '@/components/shared/toast'
 import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from '@/lib/api'
@@ -189,7 +189,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             return (
               <div key={weekday} className={styles.dayRow}>
                 <div className={styles.dayName}>
-                  <Toggle
+                  <SettingCheckbox
                     label={`${label}を${isOpen ? '休みにする' : '開ける'}`}
                     checked={isOpen}
                     onChange={(next) => updateDay(weekday, () => next ? [{ start: '09:00', end: '18:00', capacity: 1 }] : [])}

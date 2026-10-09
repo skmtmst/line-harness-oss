@@ -1,5 +1,7 @@
 'use client'
 
+import SegmentedControl from '@/components/shared/segmented'
+
 /*
  * ★V8 自動応答の実行結果（Pencil `nWmLg`）。
  *
@@ -475,22 +477,7 @@ export default function AutoReplyRunsV8() {
               onClear={() => setSearch('')}
             />
           </div>
-          <div className={styles.chips} role="group" aria-label="結果で絞り込む">
-            {chips.map((chip) => {
-              const count = chipCounts[chip.key]
-              return (
-                <button
-                  key={chip.key}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={filter === chip.key}
-                  onClick={() => setFilter(chip.key)}
-                >
-                  {count == null ? chip.label : `${chip.label} ${formatNumber(count)}`}
-                </button>
-              )
-            })}
-          </div>
+          <SegmentedControl aria-label="結果で絞り込む" value={filter} onChange={setFilter} options={chips.map(chip=>({value:chip.key,label:chipCounts[chip.key]==null?chip.label:`${chip.label} ${formatNumber(chipCounts[chip.key]!)}`}))} />
           <span className={styles.toolsSpacer} aria-hidden="true" />
           {period === 'custom' ? (
             <>

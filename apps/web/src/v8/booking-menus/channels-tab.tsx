@@ -9,6 +9,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -236,7 +237,7 @@ export function ConflictDialog({
           ]}
         />
         <div className={ch.detailRow}>
-          <Toggle label="移したことを、お客さまに知らせる" checked={notify} disabled={busy} onChange={setNotify} />
+          <SettingCheckbox label="移したことを、お客さまに知らせる" checked={notify} disabled={busy} onChange={setNotify} />
           <span className={ch.conflictReason}>移したことを、お客さまに知らせる（LINE の友だちなら LINE、そうでなければ電話の案内を出す）</span>
         </div>
         </> : null}

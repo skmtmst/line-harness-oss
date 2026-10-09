@@ -29,7 +29,7 @@ import { RowActions, DeleteAction } from '@/components/shared/row-actions'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -1086,7 +1086,7 @@ function LifetimeTabV8({
                       /* 閲覧のみ：押せない文字で出す。locked は「オン固定」なので実際の値を見せられない */
                       <span className="text-label text-ink-secondary">{row.notify ? '通知する' : '通知しない'}</span>
                     ) : (
-                      <Toggle checked={row.notify} onChange={(checked) => update(index, { notify: checked })} label={row.notify ? '通知する' : '通知しない'} />
+                      <SettingCheckbox checked={row.notify} onChange={(checked) => update(index, { notify: checked })} label={row.notify ? '通知する' : '通知しない'} />
                     )}
                   </Td>
                   <Td align="right" className="w-14">

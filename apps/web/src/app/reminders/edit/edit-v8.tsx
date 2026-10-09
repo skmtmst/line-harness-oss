@@ -42,7 +42,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
@@ -861,7 +861,7 @@ function TargetStageV8({
                   <span className={styles.stopTitle}>予約がキャンセルされた</span>
                   <span className={styles.stopNote}>すぐ止める</span>
                 </span>
-                <Toggle
+                <SettingCheckbox
                   label="予約がキャンセルされたら止める"
                   checked={stop.bookingCancelled}
                   onChange={(next) => onChange({ ...settings, stopConditions: { ...stop, bookingCancelled: next } })}
@@ -872,7 +872,7 @@ function TargetStageV8({
                   <span className={styles.stopTitle}>対応マークが「完了」になった</span>
                   <span className={styles.stopNote}>残りを止める</span>
                 </span>
-                <Toggle
+                <SettingCheckbox
                   label="対応マークが完了になったら止める"
                   checked={stop.supportMarkCompleted}
                   onChange={(next) => onChange({ ...settings, stopConditions: { ...stop, supportMarkCompleted: next } })}
@@ -883,7 +883,7 @@ function TargetStageV8({
                   <span className={styles.stopTitle}>基準日を7日過ぎた</span>
                   <span className={styles.stopNote}>自動で終わる</span>
                 </span>
-                <Toggle
+                <SettingCheckbox
                   label="基準日を7日過ぎたら自動で終わる"
                   checked={stop.daysAfterTarget != null}
                   onChange={(next) => onChange({ ...settings, stopConditions: { ...stop, daysAfterTarget: next ? 7 : null } })}
@@ -895,7 +895,7 @@ function TargetStageV8({
                   <span className={styles.stopNote}>すぐ止める（変えられません）</span>
                 </span>
                 {/* ブロックはLINE側で止まる。切っても届かないので、変えられない入口として出す。 */}
-                <Toggle label="友だちがブロックしたら止める" checked locked />
+                <SettingCheckbox label="友だちがブロックしたら止める" checked locked />
               </div>
             </div>
           </section>

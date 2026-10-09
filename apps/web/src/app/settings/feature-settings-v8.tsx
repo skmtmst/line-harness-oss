@@ -7,7 +7,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   groupEnabledCount,
@@ -164,7 +164,7 @@ function FeatureRowV8({ item, features, usage, featureUsage, usageRetry, sharedS
             必須
           </span>
         ) : (
-          <Toggle
+          <SettingCheckbox
             checked={enabled}
             label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
             onChange={(next) => onToggle(item, next)}

@@ -18,7 +18,7 @@ import IconButton from '@/components/shared/icon-button'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
 import { STAY_MINUTES, freeTables, openTimes, startOf, tableNote, toYmd } from './slots'
 import { useFormErrors } from '@/lib/use-form-errors'
@@ -270,7 +270,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
         <Field label="メモ"><TextField value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="アレルギー・記念日など" /></Field>
         {friend ? (
           <div className={styles.notifyRow}>
-            <Toggle checked={notify} onChange={setNotify} label="LINE で確認を送る" />
+            <SettingCheckbox checked={notify} onChange={setNotify} label="LINE で確認を送る" />
             <span className={styles.notifyText}>
               <span className={styles.notifyTitle}>LINE で確認を送る</span>
               <span className={styles.notifySub}>友だちのときだけ出ます</span>

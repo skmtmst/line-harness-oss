@@ -22,7 +22,7 @@ import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { GitCompare, Pencil, RefreshCw, Smartphone, TriangleAlert, Upload } from 'lucide-react'
 import StatusBadge from '@/components/shared/status-badge'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -977,7 +977,7 @@ export default function MenuFormV8() {
                 {fieldErrors.staff && assigned.size === 0 ? <p className={styles.fieldError} role="alert">{fieldErrors.staff}</p> : null}
                 <div className={styles.toggleLine}>
                   <span className={styles.toggleLineLabel}>「指名なし」でも受ける</span>
-                  <Toggle
+                  <SettingCheckbox
                     label="「指名なし」でも受ける"
                     checked={noAssign}
                     onChange={toggleNoAssign}
@@ -1105,7 +1105,7 @@ export default function MenuFormV8() {
                 />
               )}
               <div className={styles.toggleLineLead}>
-                <Toggle
+                <SettingCheckbox
                   label="予約するときに質問を出す"
                   checked={askQuestion}
                   onChange={setAskQuestion}

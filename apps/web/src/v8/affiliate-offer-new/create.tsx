@@ -26,7 +26,7 @@ import HelpTip from '@/components/shared/help-tip'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
@@ -329,7 +329,7 @@ export default function AffiliateOfferCreateV8() {
           <p className={styles.cardNote}>任意</p>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={tagEnabled} label="タグを付ける" onChange={canEdit ? (next) => { setTagEnabled(next); if (!next) setTagId('') } : undefined} />
+          <SettingCheckbox checked={tagEnabled} label="タグを付ける" onChange={canEdit ? (next) => { setTagEnabled(next); if (!next) setTagId('') } : undefined} />
           <div className={styles.switchBody}>
             <p className={styles.switchName}>タグを付ける</p>
             <p className={styles.switchNote}>{tagName ?? 'まだ決めていません'}</p>
@@ -356,7 +356,7 @@ export default function AffiliateOfferCreateV8() {
           </div>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={scenarioEnabled} label="シナリオ配信を始める" onChange={canEdit ? (next) => { setScenarioEnabled(next); if (!next) setScenarioId('') } : undefined} />
+          <SettingCheckbox checked={scenarioEnabled} label="シナリオ配信を始める" onChange={canEdit ? (next) => { setScenarioEnabled(next); if (!next) setScenarioId('') } : undefined} />
           <div className={styles.switchBody}>
             <p className={styles.switchName}>シナリオ配信を始める</p>
             <p className={styles.switchNote}>{scenarioName ?? 'まだ決めていません'}</p>

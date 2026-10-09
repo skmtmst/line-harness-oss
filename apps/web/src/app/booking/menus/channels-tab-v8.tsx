@@ -10,6 +10,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -169,7 +170,7 @@ export function ConflictDialog({
             ...targets.map((t) => ({ value: t.staffId, label: `${t.displayName}へ移す` })),
           ]}
         />
-        <Toggle label="移したことを、お客さまに知らせる" checked={notify} onChange={setNotify} />
+        <SettingCheckbox label="移したことを、お客さまに知らせる" checked={notify} onChange={setNotify} />
       </Dialog>
     </div>
   )

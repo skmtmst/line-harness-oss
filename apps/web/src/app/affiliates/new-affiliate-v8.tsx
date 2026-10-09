@@ -24,7 +24,7 @@ import Button from '@/components/shared/button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import HelpTip from '@/components/shared/help-tip'
 import Disclosure from '@/components/shared/disclosure'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import Notice from '@/components/shared/notice'
@@ -522,7 +522,7 @@ export function NewAffiliateV8() {
             <h2 className="af-create-cardTitle">成果が出たときにすること</h2>
             <p className="af-create-cardNote">任意</p>
             <div className="af-create-switchRow">
-              <Toggle checked={notifyOnConversion} label="本人にLINEで知らせる" onChange={setNotifyOnConversion} />
+              <SettingCheckbox checked={notifyOnConversion} label="本人にLINEで知らせる" onChange={setNotifyOnConversion} />
               <div className="af-create-switchBody">
                 <p className="af-create-switchName">本人にLINEで知らせる</p>
                 <p className="af-create-switchNote">成果1件ごとに</p>
@@ -530,7 +530,7 @@ export function NewAffiliateV8() {
             </div>
             <Disclosure title="計測の開始" hint={startTracking ? "登録後すぐに開始" : "開始しない"} size="compact">
             <div className="af-create-switchRow">
-              <Toggle checked={startTracking} label="すぐに計測を始める" onChange={setStartTracking} />
+              <SettingCheckbox checked={startTracking} label="すぐに計測を始める" onChange={setStartTracking} />
               <div className="af-create-switchBody">
                 <p className="af-create-switchName">すぐに計測を始める</p>
                 <p className="af-create-switchNote">オフでもリンクは発行されます</p>

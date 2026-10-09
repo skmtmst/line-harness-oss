@@ -23,7 +23,7 @@ import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
@@ -404,15 +404,15 @@ export default function StaffNewV8() {
           <section className={layout.card} aria-labelledby="bs-card-accept">
             <div className={layout.cardHead}><h2 id="bs-card-accept" className={layout.cardTitle}>受付と表示</h2></div>
             <div className={styles.switchRow} title="個別に変えるときは、登録後に「勤務とシフト」で調整できます。">
-              <Toggle label="店舗の営業時間に合わせる" checked locked />
+              <SettingCheckbox label="店舗の営業時間に合わせる" checked locked />
               <span className={styles.switchLabel}>店舗の営業時間に合わせる</span>
             </div>
             <div className={styles.switchRow}>
-              <Toggle label="「指名なし」の枠にも含める" checked={isDesignationOptional} onChange={setIsDesignationOptional} />
+              <SettingCheckbox label="「指名なし」の枠にも含める" checked={isDesignationOptional} onChange={setIsDesignationOptional} />
               <span className={styles.switchLabel}>「指名なし」の枠にも含める（お客さまが担当者を選ばなかったときの割り当て先になる）</span>
             </div>
             <div className={styles.switchRow}>
-              <Toggle label="登録したらすぐ予約を受ける" checked={isActive} onChange={setIsActive} />
+              <SettingCheckbox label="登録したらすぐ予約を受ける" checked={isActive} onChange={setIsActive} />
               <span className={styles.switchLabel}>登録したらすぐ予約を受ける（オフにすると予約画面に出ません）</span>
             </div>
             <div className={styles.colorRow}>

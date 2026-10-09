@@ -34,7 +34,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { Tabs } from '@/components/shared/tabs'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextArea, TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -547,7 +547,7 @@ function VisitStampsScreen() {
                 {settings.multipliers.map((m, i) => (
                   <div key={i} className={styles.switchRow}>
                     {/* 切る＝止める（消さない）。消すのは「…」から。 */}
-                    <Toggle checked={m.active !== false} label={`${multiplierName(m)}を使う`} locked={ro} onChange={ro ? undefined : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} />
+                    <SettingCheckbox checked={m.active !== false} label={`${multiplierName(m)}を使う`} locked={ro} onChange={ro ? undefined : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} />
                     <span className={styles.texts}>
                       <span className={styles.name}>{multiplierName(m)}</span>
                       <span className={styles.sub} title={multiplierDetail(m)}>{m.active === false ? `止めています ・ ${multiplierDetail(m)}` : multiplierDetail(m)}</span>
@@ -557,7 +557,7 @@ function VisitStampsScreen() {
                   </div>
                 ))}
                 <div className={styles.switchRow}>
-                  <Toggle checked={settings.firstVisitBonus > 0} label="初回来店ボーナスを使う" locked={ro && settings.firstVisitBonus > 0} onChange={ro ? undefined : (on) => set({ firstVisitBonus: on ? 1 : 0 })} />
+                  <SettingCheckbox checked={settings.firstVisitBonus > 0} label="初回来店ボーナスを使う" locked={ro && settings.firstVisitBonus > 0} onChange={ro ? undefined : (on) => set({ firstVisitBonus: on ? 1 : 0 })} />
                   <span className={styles.texts}>
                     <span className={styles.name}>初回来店ボーナス</span>
                     <span className={styles.sub}>{settings.firstVisitBonus > 0 ? `はじめての来店で +${settings.firstVisitBonus}個` : 'はじめての来店で多めに押します'}</span>
@@ -565,7 +565,7 @@ function VisitStampsScreen() {
                   {ro ? null : <RowActions subjectName="初回来店ボーナス" menuItems={[{ id: 'edit', label: '個数を変える', onSelect: () => setBonusOpen(true) }]} />}
                 </div>
                 <div className={styles.switchRow}>
-                  <Toggle checked={settings.rankMultipliers.length > 0} label="会員ランクの倍率を使う" locked={ro && settings.rankMultipliers.length > 0} onChange={ro ? undefined : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} />
+                  <SettingCheckbox checked={settings.rankMultipliers.length > 0} label="会員ランクの倍率を使う" locked={ro && settings.rankMultipliers.length > 0} onChange={ro ? undefined : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} />
                   <span className={styles.texts}>
                     <span className={styles.name}>会員ランクの倍率</span>
                     <span className={styles.sub} title={rankDetail(settings)}>{rankDetail(settings)}</span>

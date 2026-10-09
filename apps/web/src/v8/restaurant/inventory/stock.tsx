@@ -25,7 +25,7 @@ import { TextField } from '@/components/shared/text-field'
 import DateField from '@/components/shared/date-field'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import TimeField from '@/components/shared/time-field-v8'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -500,7 +500,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                   <div className={styles.dayHead}>
                     {/* 閲覧のみ：つまみ・時刻を選ぶ部品は置かず、いまの時間を文字で見せる（2026-10-06 オーナー決定）。 */}
                     {canEdit ? (
-                      <Toggle
+                      <SettingCheckbox
                         checked={open}
                         label={`${name}曜日に予約を受ける`}
                         onChange={(next) => setDay(weekday, next ? [{ opensAt: '17:00', closesAt: '22:00' }] : [])}

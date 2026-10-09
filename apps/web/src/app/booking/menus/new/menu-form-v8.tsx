@@ -22,7 +22,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge from '@/components/shared/status-badge'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -962,7 +962,7 @@ export default function MenuFormV8() {
                 </div>
                 <div className={`${shell.toggleRow} mt-3`}>
                   <span className={shell.toggleRowLabel}>「指名なし」でも受ける</span>
-                  <Toggle
+                  <SettingCheckbox
                     label="「指名なし」でも受ける"
                     checked={noAssign}
                     onChange={toggleNoAssign}
@@ -1123,7 +1123,7 @@ export default function MenuFormV8() {
               </span>
               <div className={shell.toggleRow}>
                 <span className={shell.toggleRowLabel}>予約するときに質問を出す</span>
-                <Toggle
+                <SettingCheckbox
                   label="予約するときに質問を出す"
                   checked={askQuestion}
                   onChange={setAskQuestion}

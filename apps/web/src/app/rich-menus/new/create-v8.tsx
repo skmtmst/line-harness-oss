@@ -54,7 +54,7 @@ import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import SegmentedControl from '@/components/shared/segmented'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import DateTimeField from '@/components/shared/date-time-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConditionBuilder from '@/components/shared/condition-builder'
@@ -2475,7 +2475,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           <div className={styles.endBox}>
             <div className={styles.endHead}>
               <span className={styles.endTitle}>終わりを決める（任意）</span>
-              <Toggle
+              <SettingCheckbox
                 label="終わりを決める"
                 checked={endEnabled}
                 onChange={(on) => {

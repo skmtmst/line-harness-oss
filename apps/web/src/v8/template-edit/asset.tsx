@@ -29,7 +29,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { notifyToast } from '@/components/shared/toast'
 import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
@@ -530,7 +530,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <div className={styles.toggleRow}>
                 <span className={styles.toggleLabel}>抽選する</span>
                 <span className={styles.spacer} />
-                <Toggle checked={lottery} label="抽選する" onChange={setLottery} />
+                <SettingCheckbox checked={lottery} label="抽選する" onChange={setLottery} />
               </div>
               {lottery ? (
                 <div className={styles.pair}>
@@ -590,7 +590,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     <span className={styles.questionNo}>問 {index + 1}</span>
                     <span className={styles.spacer} />
                     <span className={styles.toggleLabelSmall}>必ず答えてもらう</span>
-                    <Toggle checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} />
+                    <SettingCheckbox checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} />
                     <button
                       type="button"
                       className={`${styles.insertChip} ${styles.questionRemove}`}

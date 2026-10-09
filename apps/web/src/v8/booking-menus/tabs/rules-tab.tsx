@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Disclosure from '@/components/shared/disclosure'
 import HelpTip from '@/components/shared/help-tip'
 import { notifyToast } from '@/components/shared/toast'
@@ -302,7 +302,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
           <div className={styles.ruleLine}>
             <span className={styles.ruleLineLabel}>お店が承認してから確定する</span>
             {canEdit ? (
-              <Toggle
+              <SettingCheckbox
                 label="お店が承認してから確定する"
                 checked={draft.approvalMode === 'manual'}
                 onChange={(next) => set('approvalMode', next ? 'manual' : 'automatic')}
@@ -328,7 +328,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
               <HelpTip label="「指名なし」の説明">オンにすると、受付中のスタッフ全員が「指名なし」での予約の対象になります。</HelpTip>
             </span>
             {canEdit ? (
-              <Toggle
+              <SettingCheckbox
                 label="「指名なし」を出す"
                 checked={noAssign ?? initialNoAssign}
                 onChange={(next) => setNoAssign(next)}

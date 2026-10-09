@@ -59,7 +59,7 @@ import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } fr
 import SegmentedControl from '@/components/shared/segmented'
 import { TextField } from '@/components/shared/text-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
@@ -1282,7 +1282,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
           <span className={styles.spacer} aria-hidden="true" />
           {/* 閲覧のみ：つまみは置かない（左の文で今の設定が読める）。 */}
           {canEdit ? (
-            <Toggle
+            <SettingCheckbox
               checked={suppressOn}
               label="同じ人に何度も送らない"
               onChange={(next) => setDefinition((current) => ({ ...current, resendSuppressionHours: next ? 24 : 0 }))}

@@ -67,7 +67,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import TargetMissing from '@/components/shared/target-missing'
@@ -2187,7 +2187,7 @@ function AutoReplyWizardV8Inner() {
                     ) : (
                       <span className={styles.toggleNote}>何度でも返す</span>
                     )}
-                    <Toggle
+                    <SettingCheckbox
                       label="同じ人へ続けて返さない"
                       checked={form.cooldownOn}
                       onChange={(on) => patch({ cooldownOn: on })}
@@ -2199,7 +2199,7 @@ function AutoReplyWizardV8Inner() {
                   <div className={styles.toggleText}>
                     <p className={styles.toggleTitle}>担当者が対応中のトークには返さない</p>
                   </div>
-                  <Toggle
+                  <SettingCheckbox
                     label="担当者が対応中のトークには返さない"
                     checked={form.skipWhenOperatorActive}
                     onChange={(on) => patch({ skipWhenOperatorActive: on })}
@@ -2212,7 +2212,7 @@ function AutoReplyWizardV8Inner() {
                       オフのときは、同じ人が何度送っても返します（上の「続けて返さない」の時間は守ります）
                     </p>
                   </div>
-                  <Toggle
+                  <SettingCheckbox
                     label="1人につき1回だけ返す"
                     checked={form.oncePerFriend}
                     onChange={(on) => patch({ oncePerFriend: on })}

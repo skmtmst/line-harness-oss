@@ -30,7 +30,7 @@ import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { distributionUrl } from './display'
 import styles from './create.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -480,14 +480,14 @@ export default function CreateAffiliateV8() {
           <p className={styles.cardNote}>任意</p>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={notifyOnConversion} label="本人に LINE で知らせる" onChange={setNotifyOnConversion} />
+          <SettingCheckbox checked={notifyOnConversion} label="本人に LINE で知らせる" onChange={setNotifyOnConversion} />
           <div className={styles.switchBody}>
             <p className={styles.switchName}>本人に LINE で知らせる</p>
             <p className={styles.switchNote}>成果 1 件ごとに</p>
           </div>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={startTracking} label="すぐに計測を始める" onChange={setStartTracking} />
+          <SettingCheckbox checked={startTracking} label="すぐに計測を始める" onChange={setStartTracking} />
           <div className={styles.switchBody}>
             <p className={styles.switchName}>すぐに計測を始める</p>
             <p className={styles.switchNoteFaint}>{startTracking ? '登録したらすぐに数え始めます' : 'オフでもリンクは発行されます'}</p>

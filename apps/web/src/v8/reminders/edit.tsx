@@ -59,7 +59,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import ConditionBuilder, { findConditionDraftIssue, pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
@@ -1040,8 +1040,8 @@ function TargetStageV8({
                 <span className={styles.stopNote}>{row.note}</span>
               </span>
               {row.locked
-                ? <Toggle label={row.label} checked locked />
-                : <Toggle label={row.label} checked={row.checked} onChange={(next) => row.onChange?.(next)} />}
+                ? <SettingCheckbox label={row.label} checked locked />
+                : <SettingCheckbox label={row.label} checked={row.checked} onChange={(next) => row.onChange?.(next)} />}
             </div>
           ))}
         </div>

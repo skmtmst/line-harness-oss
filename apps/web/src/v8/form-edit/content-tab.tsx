@@ -27,7 +27,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
@@ -265,7 +265,7 @@ function OpenBlock(props: RowProps) {
         {input ? (
           <label className={styles.required}>
             <span className={styles.requiredLabel}>必須</span>
-            <Toggle checked={input.required ?? false} onChange={(required) => patch({ required } as Partial<FormBlock>)} label="必須" />
+            <SettingCheckbox checked={input.required ?? false} onChange={(required) => patch({ required } as Partial<FormBlock>)} label="必須" />
           </label>
         ) : null}
         <RowActions className={styles.more} subjectName={`「${blockTitleLine(block)}」`} menuItems={menuItems} destructiveItem={menu.destructiveItem} />

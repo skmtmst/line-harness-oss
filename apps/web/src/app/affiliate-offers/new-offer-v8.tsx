@@ -13,7 +13,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { formatNumber } from '@/lib/format'
@@ -308,7 +308,7 @@ export function NewOfferV8() {
             <h2 className="af-create-cardTitle">成果を認めたときにすること</h2>
             <p className="af-create-cardNote">任意</p>
             <div className="af-create-switchRow">
-              <Toggle checked={tagEnabled} label="タグを付ける" onChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} />
+              <SettingCheckbox checked={tagEnabled} label="タグを付ける" onChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} />
               <div className="af-create-switchBody">
                 <p className="af-create-switchName">タグを付ける</p>
                 <p className="af-create-switchNote">{tagName ?? 'まだ決めていません'}</p>
@@ -337,7 +337,7 @@ export function NewOfferV8() {
               </div>
             </div>
             <div className="af-create-switchRow">
-              <Toggle checked={scenarioEnabled} label="シナリオ配信を始める" onChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} />
+              <SettingCheckbox checked={scenarioEnabled} label="シナリオ配信を始める" onChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} />
               <div className="af-create-switchBody">
                 <p className="af-create-switchName">シナリオ配信を始める</p>
                 <p className="af-create-switchNote">{scenarioName ?? 'まだ決めていません'}</p>

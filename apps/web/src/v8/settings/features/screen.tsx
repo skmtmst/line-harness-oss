@@ -17,7 +17,7 @@ import Dialog from '@/components/shared/dialog'
 import ReorderList from '@/components/shared/reorder-list'
 import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
@@ -129,7 +129,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
           必須
         </span>
       ) : canManage ? (
-        <Toggle
+        <SettingCheckbox
           checked={enabled}
           label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
           disabled={busy}
