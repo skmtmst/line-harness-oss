@@ -128,8 +128,8 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
     const note = notes[notes.length - 1]
     expect(note).toMatch(/font-size:\s*var\(--polish-text-support\)/)
     expect(note).toMatch(/line-height:\s*var\(--text-lh\)/)
-    // 選んだ印タグは濃い緑（#087a3e）。
-    expect(c).toMatch(/\[data-theme='v8'\]\s*\.checked \.topIcon\s*\{[^}]*color:\s*var\(--color-accent-deep\)/s)
+    // 印は選択中も文字の色を継ぐ（B-152⑤）。
+    expect(c).toMatch(/\[data-theme='v8'\]\s*\.checked \.topIcon\s*\{[^}]*color:\s*inherit/s)
   })
 
   it('オフは白地＋1px の hairline 枠・丸の輪郭 control-border（r3xz1W）', () => {

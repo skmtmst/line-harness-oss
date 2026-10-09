@@ -209,9 +209,9 @@
   background: var(--color-canvas);
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }
-[data-theme='v8'] .topIcon { display: flex; height: 16px; width: 100%; color: var(--color-ink-secondary); }
-[data-theme='v8'] .topIcon svg { width: 16px; height: 16px; flex-shrink: 0; }
-[data-theme='v8'] .checked .topIcon { color: var(--color-accent-deep); }
+[data-theme='v8'] .topIcon { display: flex; height: var(--polish-icon-control); width: 100%; color: inherit; }
+[data-theme='v8'] .topIcon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex-shrink: 0; }
+[data-theme='v8'] .checked .topIcon { color: inherit; }
 [data-theme='v8'] .body { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 [data-theme='v8'] .title { font-size: 13px; line-height: 20px; font-weight: 600; }
 [data-theme='v8'] .note { font-size: 12px; line-height: 18px; color: var(--color-ink-secondary); }
